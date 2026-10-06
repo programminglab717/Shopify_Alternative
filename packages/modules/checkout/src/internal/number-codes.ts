@@ -151,7 +151,7 @@ export async function sendCodeIn(
 /**
  * Remembers that the browser placing an order proved `phone` with a code at `provedAt` (ADR-199):
  * the token its cookie keeps, of which the shop keeps only a digest, for {@link NUMBER_PROOF}'s
- * days from then. Lapsed proofs are cleared as it goes.
+ * days from then. Lapsed proofs are the worker's to delete (ADR-230).
  */
 export async function proveBrowserIn(
   tx: Tx,
@@ -159,12 +159,6 @@ export async function proveBrowserIn(
   phone: string,
   provedAt: Date,
 ): Promise<string> {
-  await tx.execute(sql`
-    DELETE FROM checkout.number_proofs
-     WHERE shop_id = ${shopId}
-       AND id IN (SELECT id FROM checkout.number_proofs
-                   WHERE shop_id = ${shopId} AND expires_at < now()
-                   LIMIT 100)`);
   const token = secretToken('', NUMBER_PROOF.tokenBytes);
   const at = provedAt.toISOString();
   await tx.execute(sql`

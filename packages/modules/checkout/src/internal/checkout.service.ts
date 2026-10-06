@@ -97,9 +97,6 @@ export const CHECKOUT_HOURS = 24;
 const TOKEN_BYTES = 16;
 const TOKEN = /^[A-Za-z0-9_-]{22}$/;
 
-/** Expired checkouts deleted each time a shop gets a new one. */
-const SWEEP = 100;
-
 /**
  * Codes a checkout's page takes that take nothing off before it takes no more, so that codes
  * cannot be guessed.
@@ -389,12 +386,6 @@ export class CheckoutService {
     return this.db.tenant(shopId, async (tx) => {
       const cart = await this.carts.findIn(tx, shopId, cartToken);
       if (!cart || (await this.carts.priceIn(tx, shopId, cart)).items.length === 0) return null;
-      await tx.execute(sql`
-        DELETE FROM checkout.checkouts
-         WHERE shop_id = ${shopId}
-           AND id IN (SELECT id FROM checkout.checkouts
-                       WHERE shop_id = ${shopId} AND expires_at < now()
-                       LIMIT ${SWEEP})`);
       const secret = secretToken('', TOKEN_BYTES);
       await tx.insert(checkouts).values({
         shopId,

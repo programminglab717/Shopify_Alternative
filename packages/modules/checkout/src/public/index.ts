@@ -32,6 +32,7 @@ export {
   type DeliveryZoneRecord,
 } from '../internal/delivery.js';
 export { DeliveryService } from '../internal/delivery.service.js';
+export { CheckoutExpiry, EXPIRY_BATCH, type ExpiredCounts } from '../internal/expiry.service.js';
 export {
   CheckoutEvents,
   type CodSettingsUpdatedPayload,

@@ -30,6 +30,7 @@ import { CodRulesService } from './cod-rules.service.js';
 import { CheckoutMarketingService } from './marketing.service.js';
 import { TrustBadgeService } from './trust-badge.service.js';
 import { DeliveryService } from './delivery.service.js';
+import { CheckoutExpiry } from './expiry.service.js';
 
 /**
  * The payments module as checkout sees it (ADR-152), standing in: the gateways a test sets, none
@@ -121,6 +122,8 @@ export interface CheckoutFixture {
   /** The channels the checkout's page offers boxes for the shop's news and offers on. */
   marketing: CheckoutMarketingService;
   checkouts: CheckoutService;
+  /** What the worker's sweep deletes once past its time (ADR-230). */
+  expiry: CheckoutExpiry;
   orders: OrderService;
   /** The shop's gateway, as the payments module would give it: none unless a test sets one. */
   payments: StubPayments;
@@ -168,7 +171,11 @@ function tenant(shopId: string): TenantContext {
 
 export async function checkoutFixture(server: string): Promise<CheckoutFixture> {
   const testDb = await createTestDatabase(server);
-  const db = new Database({ appUrl: testDb.appUrl, applicationName: 'checkout-test' });
+  const db = new Database({
+    appUrl: testDb.appUrl,
+    systemUrl: testDb.systemUrl,
+    applicationName: 'checkout-test',
+  });
   const admin = new pg.Client({ connectionString: testDb.adminUrl });
   await admin.connect();
   const a = tenant(newId());
@@ -224,6 +231,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
       payments,
       new PublicSite('https://hatti.test'),
     ),
+    expiry: new CheckoutExpiry(db),
     orders,
     payments,
     fulfillments: new FulfillmentService(db, stock),

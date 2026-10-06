@@ -512,7 +512,7 @@ The `events` table above replaces them with V1.
 |---|---|---|
 | Active shop commerce data | Life of the shop | Shop closure + 90 days (export offered), except records legally required to be kept |
 | Tax and accounting records (orders, invoices, refunds) | ≥ 6 years (confirm with counsel) | Automatic purge job after the legal period |
-| Abandoned carts/checkouts | 90 days | TTL job |
+| Abandoned carts/checkouts | 90 days. Built: a cart 14 days after its last change, a checkout a day after it starts and a browser's proof of a number 30 days after it was proved, deleted by the worker's sweep across shops (ADR-042, ADR-230); abandoned checkouts kept for recovery come with CHK-12 | TTL job |
 | Message content | 12 months | Partition drop |
 | Storefront analytics raw events | 13 months | TTL |
 | Backups | 35-day PITR + monthly snapshots for 12 months | Rolling |

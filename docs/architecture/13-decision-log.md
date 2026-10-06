@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-229 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-230 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -237,6 +237,7 @@
 | 227 | PayFast is a gateway shops take payments through: an access token asked for the basket and its amount with the secured key, then a form with the token posted to its page; its return, and its word at the webhook, which may come in the address, believed by their validation hash | Accepted |
 | 228 | Bank Alfalah's payment gateway is one shops take payments through: a handshake whose request is hashed with the account's two keys, then a form with its token, hashed the same way, posted to its page; its return, which it does not sign, believed only once its order status, asked at once, says the payment is made | Accepted |
 | 229 | HBL's payment gateway is one shops take payments through: a session asked for with the order encrypted under a key of the request's own, which HBL's public key wraps with the password; its return, encrypted to the shop's own public key, believed once the shop's private key opens it to a reference of Hatti's | Accepted |
+| 230 | Carts, checkouts and browsers' proofs of a number are deleted once past their time by a sweep in the worker, across shops and the longest expired first, each shop's in its own transaction, rather than by shoppers' requests as their shop gets new ones | Accepted |
 
 ---
 
@@ -9591,3 +9592,39 @@
     can be added if HBL gives a shop that version.
   * **Hatti making the shop's key pair:** the private key would never leave Hatti, but HBL takes
     the public key through its own onboarding. This can come with the merchant app.
+
+## ADR-230 · Carts, checkouts and browsers' proofs of a number are deleted once past their time by a sweep in the worker, across shops and the longest expired first, each shop's in its own transaction, rather than by shoppers' requests as their shop gets new ones
+
+* **Context:** A cart lasts 14 days after its last change ([ADR-042](#adr-042--carts-are-kept-by-the-core-and-priced-whenever-they-are-read-storefronts-change-them-with-a-key-of-their-own)), a checkout a day
+  ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)) and a browser's proof of a number 30 days ([ADR-199](#adr-199--a-browser-that-proved-a-number-with-a-code-at-a-shops-checkout-is-not-asked-for-another-for-it-there-for-30-days-where-the-shops-risk-rules-would-ask-it-keeps-a-random-token-in-a-cookie-for-checkouts-the-shop-a-digest-of-it-with-the-number-and-when-it-was-proved-spending-store-credit-still-asks-each-time)). Nothing
+  reads one past its time. Each was deleted only as its shop got a new one, a hundred at a time,
+  in the shopper's own transaction: a statement more for every new cart, checkout and proof. A
+  shop that got no more kept its expired rows, and the proofs among them kept customers' numbers
+  past the days they serve.
+* **Decision:**
+  * **The worker's sweep deletes them**, every `SWEEP_INTERVAL_MS`. It finds up to a thousand of
+    each kind with the system role, the longest expired first whichever shop's they are, by an
+    index on when they expire. Each shop's are deleted in its own transaction, and only if still
+    past their time, so a cart its shopper changed since is kept. Checkouts go first, then
+    carts, then proofs, a batch at a time until one comes back short.
+  * **What went with them still does.** A checkout's codes go with it. A checkout that outlasts
+    its cart goes on without it, as when a shop's new cart swept the cart.
+  * **Shoppers' requests delete nothing.** Making a cart, starting a checkout and proving a
+    number no longer sweep, and the indexes by shop and expiry give way to indexes by expiry
+    alone.
+  * **One shop's failure is logged** and left for the next sweep; the others go on, as in the
+    worker's other sweeps ([ADR-092](#adr-092--an-order-whose-customer-could-not-be-reached-is-cancelled-as-many-days-after-it-was-placed-as-the-shop-says-by-a-sweep-in-the-worker-shop-by-shop-and-order-by-order)).
+* **Consequences:**
+  * A shop's expired carts, checkouts and proofs are gone within the sweep's interval of
+    expiring, whether or not it gets new ones. A customer's number is kept no longer than it
+    spares them a code.
+  * Making a cart, a checkout or a proof is a statement shorter.
+  * Rows that expired before the sweep came are deleted by its first sweeps, a batch at a time.
+  * Where no worker runs the `sweeps` role, nothing deletes them; nothing reads them either.
+* **Alternatives:**
+  * **Sweeping in shoppers' requests as well:** a statement more for every new cart, for what
+    the worker does anyway.
+  * **Deleting with the system role in one statement:** fewer transactions, but writes as the
+    role that sees every shop, where the worker's sweeps use it only to find.
+  * **Partitions by when carts expire, dropped whole:** cheaper with many millions of carts,
+    but the table's keys are by shop. It can come with scale.

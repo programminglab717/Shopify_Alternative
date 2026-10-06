@@ -6,6 +6,7 @@ import {
   ProductService,
   VariantService,
 } from '@hatti/catalog/public';
+import { CheckoutExpiry } from '@hatti/checkout/public';
 import { StoreCreditService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import {
@@ -58,6 +59,7 @@ import { ConfirmationReminders } from './confirmation-reminders.js';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
 import { CourierBookings } from './courier-bookings.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
+import { ExpiredCheckouts } from './expired-checkouts.js';
 import { StoreCreditExpiry } from './store-credit-expiry.js';
 import { StoreCreditNotices } from './store-credit-notices.js';
 import { ErasedReceipts } from './erased-receipts.js';
@@ -268,6 +270,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => credit.stop());
+    // Carts, checkouts and browsers' proofs of a number past their time deleted (ADR-230).
+    const expired = new ExpiredCheckouts(new CheckoutExpiry(database), logger).start(
+      config.SWEEP_INTERVAL_MS,
+    );
+    closers.push(() => expired.stop());
     // Articles and pages published at a time ahead shown once it comes (ADR-215, ADR-217).
     const scheduledContent = new ScheduledContent(
       scheduledKinds(new ArticleService(database), new PageService(database)),

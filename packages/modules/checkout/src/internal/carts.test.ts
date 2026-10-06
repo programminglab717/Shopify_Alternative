@@ -1,7 +1,9 @@
 import 'reflect-metadata';
+import { randomBytes } from 'node:crypto';
 import type { TenantContext } from '@hatti/api';
 import { sha256 } from '@hatti/crypto';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { newId } from '@hatti/ids';
 import type { CartActionName } from '@hatti/storefront-api';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseAction } from './cart-lines.js';
@@ -171,9 +173,112 @@ describe.skipIf(!server)('CartService', () => {
     const fresh = done(await act(f.a, noted.token, 'add', { items: [{ variantId: lawn }] }));
     expect(fresh.token).not.toBe(noted.token);
     expect(fresh.cart.note).toBe('');
-    // Making it swept the expired one.
+    // The expired one is left to the worker's sweep (ADR-230).
+    expect(await f.expiry.deleteExpired()).toEqual({ checkouts: 0, carts: 1, proofs: 0 });
     const { rows } = await f.admin.query<{ count: string }>(`SELECT count(*) FROM checkout.carts`);
     expect(rows[0]!.count).toBe('1');
+  });
+
+  it('leaves what expired to the sweep, which deletes it across shops, the longest expired first', async () => {
+    const at = Date.now();
+    const hours = (n: number) => new Date(at + n * 3_600_000).toISOString();
+    const ids = {
+      oldA: newId(),
+      staleA: newId(),
+      liveA: newId(),
+      oldB: newId(),
+      oldCheckout: newId(),
+      liveCheckout: newId(),
+      ongoing: newId(),
+    };
+    const cart = (shopId: string, id: string, expires: number) =>
+      f.admin.query(
+        `INSERT INTO checkout.carts (shop_id, id, token_hash, expires_at) VALUES ($1, $2, $3, $4)`,
+        [shopId, id, randomBytes(32), hours(expires)],
+      );
+    const checkout = (id: string, cartId: string, expires: number) =>
+      f.admin.query(
+        `INSERT INTO checkout.checkouts (shop_id, id, token_hash, cart_id, expires_at)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [f.a.shopId, id, randomBytes(32), cartId, hours(expires)],
+      );
+    const proof = async (shopId: string, expires: number) => {
+      const { rows } = await f.admin.query<{ id: string }>(
+        `INSERT INTO checkout.number_proofs (shop_id, token_hash, phone, proved_at, expires_at)
+         VALUES ($1, $2, '+923001234567', $3::timestamptz - interval '30 days', $3)
+         RETURNING id`,
+        [shopId, randomBytes(32), hours(expires)],
+      );
+      return rows[0]!.id;
+    };
+    await cart(f.a.shopId, ids.oldA, -3);
+    await cart(f.a.shopId, ids.staleA, -1);
+    await cart(f.a.shopId, ids.liveA, 5);
+    await cart(f.b.shopId, ids.oldB, -4);
+    await checkout(ids.oldCheckout, ids.oldA, -2);
+    await checkout(ids.liveCheckout, ids.liveA, 1);
+    // A checkout outlasting its cart.
+    await checkout(ids.ongoing, ids.staleA, 20);
+    await f.admin.query(
+      `INSERT INTO checkout.number_codes (shop_id, checkout_id, phone, channel, code_hash, expires_at)
+       VALUES ($1, $2, '+923001234567', 'whatsapp', $3, $4)`,
+      [f.a.shopId, ids.oldCheckout, randomBytes(32), hours(-2)],
+    );
+    const oldProofA = await proof(f.a.shopId, -1);
+    const liveProof = await proof(f.a.shopId, 240);
+    await proof(f.b.shopId, -2);
+    const left = async () => {
+      const idsOf = async (table: string) =>
+        (
+          await f.admin.query<{ id: string }>(
+            `SELECT id FROM checkout.${table} ORDER BY expires_at`,
+          )
+        ).rows.map((row) => row.id);
+      return {
+        carts: await idsOf('carts'),
+        checkouts: await idsOf('checkouts'),
+        codes: await idsOf('number_codes'),
+        proofs: await idsOf('number_proofs'),
+      };
+    };
+
+    // The longest expired of each kind first, whichever shop's; a checkout's codes go with it.
+    expect(await f.expiry.deleteExpired(new Date(at), 1)).toEqual({
+      checkouts: 1,
+      carts: 1,
+      proofs: 1,
+    });
+    expect(await left()).toEqual({
+      carts: [ids.oldA, ids.staleA, ids.liveA],
+      checkouts: [ids.liveCheckout, ids.ongoing],
+      codes: [],
+      proofs: [oldProofA, liveProof],
+    });
+    // Then the rest; what has time left stays, and a checkout outlasting its cart goes on without
+    // it.
+    expect(await f.expiry.deleteExpired(new Date(at))).toEqual({
+      checkouts: 0,
+      carts: 2,
+      proofs: 1,
+    });
+    expect(await left()).toEqual({
+      carts: [ids.liveA],
+      checkouts: [ids.liveCheckout, ids.ongoing],
+      codes: [],
+      proofs: [liveProof],
+    });
+    const { rows } = await f.admin.query<{ id: string; cart_id: string | null }>(
+      'SELECT id, cart_id FROM checkout.checkouts ORDER BY expires_at',
+    );
+    expect(rows).toEqual([
+      { id: ids.liveCheckout, cart_id: ids.liveA },
+      { id: ids.ongoing, cart_id: null },
+    ]);
+    expect(await f.expiry.deleteExpired(new Date(at))).toEqual({
+      checkouts: 0,
+      carts: 0,
+      proofs: 0,
+    });
   });
 
   it('lets actions on one cart take turns', async () => {

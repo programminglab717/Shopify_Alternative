@@ -936,7 +936,7 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect(await f.checkouts.place(secret, 'x', FORM)).toEqual({ kind: 'empty', shop });
   });
 
-  it('lasts a day, its thank-you page with it; later checkouts sweep it away', async () => {
+  it("lasts a day, its thank-you page with it; then it is the worker's sweep's", async () => {
     const { token } = await lawnCart();
     const { secret, view } = await started(token);
     placedOrder(await f.checkouts.place(secret, view.shown, FORM));
@@ -944,8 +944,10 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect((await f.checkouts.view(secret)).kind).toBe('expired');
     expect((await f.checkouts.place(secret, view.shown, FORM)).kind).toBe('expired');
 
+    // Later checkouts leave it; the worker's sweep deletes it (ADR-230).
     const next = await lawnCart();
     await started(next.token);
+    expect(await f.expiry.deleteExpired()).toEqual({ checkouts: 1, carts: 0, proofs: 0 });
     const { rows } = await f.admin.query<{ count: string }>(
       'SELECT count(*) FROM checkout.checkouts',
     );

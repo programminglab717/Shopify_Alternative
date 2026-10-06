@@ -24,9 +24,6 @@ import { carts } from './schema.js';
 const TOKEN_BYTES = 16;
 const TOKEN = /^[A-Za-z0-9_-]{22}$/;
 
-/** Expired carts deleted each time a shop gets a new one. */
-const SWEEP = 100;
-
 export type CartResult =
   | { ok: true; cart: CartJson; token: string | null; added: string[] }
   | { ok: false; error: CartError };
@@ -98,7 +95,6 @@ export class CartService {
       if (isEmpty(content) && discountCodes.length === 0) {
         return { ok: true, cart, token: null, added };
       }
-      await this.#sweep(tx, shopId);
       const secret = secretToken('', TOKEN_BYTES);
       await tx.insert(carts).values({
         shopId,
@@ -216,16 +212,6 @@ export class CartService {
         },
       ]),
     );
-  }
-
-  /** Deletes some of the shop's expired carts, as it gets a new one. */
-  async #sweep(tx: Tx, shopId: string): Promise<void> {
-    await tx.execute(sql`
-      DELETE FROM checkout.carts
-       WHERE shop_id = ${shopId}
-         AND id IN (SELECT id FROM checkout.carts
-                     WHERE shop_id = ${shopId} AND expires_at < now()
-                     LIMIT ${SWEEP})`);
   }
 }
 

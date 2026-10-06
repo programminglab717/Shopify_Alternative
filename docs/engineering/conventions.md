@@ -88,7 +88,10 @@ and calls `remindToConfirm`, which asks only in the shop's calling hours
 ([ADR-175](../architecture/13-decision-log.md#adr-175--a-cash-on-delivery-order-whose-customer-has-not-answered-three-hours-after-it-was-placed-asks-them-once-more-with-the-same-buttons-and-link-in-the-shops-calling-hours-a-sweep-in-the-worker-finds-them-and-an-order-placed-more-than-three-days-before-is-left-to-the-desk));
 `CustomerErasures` lists those with customers' erasures
 due and calls the customers module's `eraseDue`
-([ADR-110](../architecture/13-decision-log.md#adr-110--a-customers-erasure-can-be-asked-for-ten-days-ahead-and-cancelled-until-then-the-workers-sweep-carries-it-out-as-the-system-naming-who-asked)). Sweeps run under the
+([ADR-110](../architecture/13-decision-log.md#adr-110--a-customers-erasure-can-be-asked-for-ten-days-ahead-and-cancelled-until-then-the-workers-sweep-carries-it-out-as-the-system-naming-who-asked)). `ExpiredCheckouts` has the checkout module's `CheckoutExpiry` delete
+carts, checkouts and browsers' proofs of a number past their time, which it finds the longest
+expired first and deletes each shop's in its own transaction, if still expired
+([ADR-230](../architecture/13-decision-log.md#adr-230--carts-checkouts-and-browsers-proofs-of-a-number-are-deleted-once-past-their-time-by-a-sweep-in-the-worker-across-shops-and-the-longest-expired-first-each-shops-in-its-own-transaction-rather-than-by-shoppers-requests-as-their-shop-gets-new-ones)). Sweeps run under the
 worker's `sweeps` role, at once and then every `SWEEP_INTERVAL_MS` after the last ends
 (`repeat`), and must be safe to run twice at once: re-check under the row's lock what the sweep
 found. One shop's failure is logged, and the sweep goes on to the next.

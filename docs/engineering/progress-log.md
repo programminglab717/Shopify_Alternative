@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Expired carts swept** (ADR-042): the worker deleting carts past their time on a schedule,
-rather than as a shop gets new ones.
+**Titles and descriptions for search engines** (OS-09): products, collections, pages and articles
+with an SEO title and description of their own, as Shopify's `seo` has them, read from and written
+to Shopify's product CSV, and given to the storefront's `page_title` and `page_description`.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +17,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Expired carts and checkouts swept
+
+* **The worker deletes carts, checkouts and browsers' proofs of a number past their time**
+  ([ADR-230](../architecture/13-decision-log.md#adr-230--carts-checkouts-and-browsers-proofs-of-a-number-are-deleted-once-past-their-time-by-a-sweep-in-the-worker-across-shops-and-the-longest-expired-first-each-shops-in-its-own-transaction-rather-than-by-shoppers-requests-as-their-shop-gets-new-ones)), across shops, every sweep: found with the system role, the longest
+  expired first, a thousand of each kind at a time; each shop's deleted in its own transaction
+  if still expired, so a cart changed since is kept; one shop's failure logged while the others
+  go on.
+* **Shoppers' requests no longer sweep.** Making a cart, starting a checkout and proving a
+  number each lose a statement, and a shop that gets no new carts keeps no old ones, nor its
+  customers' numbers in lapsed proofs. Migration 0142 indexes the three tables by expiry alone,
+  in place of by shop and expiry (simplification 37).
+* 1703 tests (2 new): the sweep across two shops, the longest expired first, a checkout's codes
+  with it and one outlasting its cart going on without it; and the worker's batches, its count
+  and a shop's failure logged.
 
 ### 2003922 · HBL
 
