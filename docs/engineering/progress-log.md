@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Search that forgives a typo
+### 0275a9d · Search that forgives a typo
 
 * **A search that finds nothing as typed is read again** ([ADR-234](../architecture/13-decision-log.md#adr-234--a-storefront-search-that-finds-no-product-with-every-word-as-typed-reads-each-word-none-of-the-shops-products-holds-as-the-shops-own-words-a-typo-or-two-from-it-a-typo-being-a-letter-added-taken-away-or-changed-or-two-swapped-and-shows-those-with-the-fewest-typos-first)): each word
   none of the shop's products holds is corrected to the shop's own words a typo or two from it.
