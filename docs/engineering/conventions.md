@@ -1344,6 +1344,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   the worker's `HandleRedirects` for the catalog. A handler like it reads where the resource is
   now rather than trusting the event, since events can be handled late and out of order, as
   `RiskRescoring` reads the customer's history.
+* **Many pages moving at once take `redirectsMoved(tx, …)`**
+  ([ADR-218](../architecture/13-decision-log.md#adr-218--a-blog-whose-handle-changes-sends-its-articles-old-addresses-to-their-new-ones-when-asked-as-shopifys-redirectarticles-does-a-redirect-for-each-made-all-at-once-with-one-event-the-storefront-follows)), `redirectMoved`'s rules in five
+  statements however many pages there are, with one `url_redirects.moved` event: never
+  `redirectMoved` in a loop. Its moves name each page once, none moving to where another was,
+  and those the shop most needs kept come first, as only those fit when it is nearly full.
 
 * **A shop's theme is a platform theme with the shop's own JSON files over it**
   ([ADR-039](../architecture/13-decision-log.md#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)):

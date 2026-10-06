@@ -9,6 +9,7 @@ import {
   OnlineStoreEvents,
   type UrlRedirectChangedPayload,
   type UrlRedirectsImportedPayload,
+  type UrlRedirectsMovedPayload,
 } from './events.js';
 import { REDIRECT_LIMIT, redirectPath, redirectTarget } from './redirect-paths.js';
 import type { Page, UrlRedirectRecord } from './records.js';
@@ -417,6 +418,106 @@ export async function redirectMoved(
     .returning();
   await recordEvent(tx, OnlineStoreEvents.UrlRedirectCreated, row!);
   return true;
+}
+
+/** What {@link redirectsMoved} did. */
+export interface RedirectsMoved {
+  /** Redirects made from old addresses. */
+  created: number;
+  /** Redirects sent on to new addresses: from an old one, or that sent shoppers to one. */
+  updated: number;
+  /** Redirects from where the pages are now, gone. */
+  deleted: number;
+  /** Old addresses left without a redirect: the shop keeps as many as it may. */
+  skipped: number;
+}
+
+/**
+ * {@link redirectMoved} for many pages moved at once, as a blog's articles move with it
+ * (ADR-218), in a few statements however many there are: each old address sends shoppers to its
+ * new one, in place of a redirect it had, those first in `moves` while the shop has room for
+ * more; redirects that sent shoppers to an old address send them to its new one; and those from
+ * a new address go. One `url_redirects.moved` event says so, for the storefront. Each page moves
+ * once, and none to where another was.
+ */
+export async function redirectsMoved(
+  tx: Tx,
+  shopId: string,
+  moves: readonly { from: string; to: string }[],
+): Promise<RedirectsMoved> {
+  const done: RedirectsMoved = { created: 0, updated: 0, deleted: 0, skipped: 0 };
+  if (moves.length === 0) return done;
+  const froms = moves.map((move) => move.from);
+  const tos = moves.map((move) => move.to);
+  const arrived = new Set(tos);
+  if (new Set(froms).size < froms.length || froms.some((from) => arrived.has(from))) {
+    throw new Error('Each page moves once, and none to where another was');
+  }
+  const pairs = sql`unnest(${sql.param(froms)}::text[], ${sql.param(tos)}::text[])
+                    AS m(from_path, to_path)`;
+
+  done.deleted = (
+    await tx
+      .delete(urlRedirects)
+      .where(
+        and(
+          eq(urlRedirects.shopId, shopId),
+          sql`${urlRedirects.path} = ANY(${sql.param(tos)}::text[])`,
+        ),
+      )
+      .returning({ id: urlRedirects.id })
+  ).length;
+  // Those sending shoppers to an old address, with a query or a fragment or without: by what
+  // comes before either, as no path has them.
+  const { rows: pointing } = await tx.execute<{ id: string }>(sql`
+    UPDATE online_store.url_redirects r
+       SET target = m.to_path || substr(r.target, length(m.from_path) + 1), updated_at = now()
+      FROM ${pairs}
+     WHERE r.shop_id = ${shopId}
+       AND split_part(split_part(r.target, '?', 1), '#', 1) = m.from_path
+    RETURNING r.id`);
+  const { rows: replaced } = await tx.execute<{ id: string }>(sql`
+    UPDATE online_store.url_redirects r
+       SET target = m.to_path, updated_at = now()
+      FROM ${pairs}
+     WHERE r.shop_id = ${shopId} AND r.path = m.from_path AND r.target <> m.to_path
+    RETURNING r.id`);
+  done.updated = new Set([...pointing, ...replaced].map((row) => row.id)).size;
+
+  const [counts] = await tx
+    .select({ total: count() })
+    .from(urlRedirects)
+    .where(eq(urlRedirects.shopId, shopId));
+  const room = Math.max(0, REDIRECT_LIMIT - (counts?.total ?? 0));
+  const ids = moves.map(() => newId());
+  const {
+    rows: [made],
+  } = await tx.execute<{ wanted: number; created: number }>(sql`
+    WITH wanted AS (
+      SELECT m.id, m.from_path, m.to_path, m.n
+        FROM unnest(${sql.param(ids)}::uuid[], ${sql.param(froms)}::text[],
+                    ${sql.param(tos)}::text[]) WITH ORDINALITY AS m(id, from_path, to_path, n)
+       WHERE NOT EXISTS (SELECT 1 FROM online_store.url_redirects r
+                          WHERE r.shop_id = ${shopId} AND r.path = m.from_path)
+    ), made AS (
+      INSERT INTO online_store.url_redirects (shop_id, id, path, target)
+      SELECT ${shopId}, id, from_path, to_path FROM wanted ORDER BY n LIMIT ${room}
+      ON CONFLICT DO NOTHING
+      RETURNING id
+    )
+    SELECT (SELECT count(*) FROM wanted)::int AS wanted, (SELECT count(*) FROM made)::int AS created`);
+  done.created = made!.created;
+  done.skipped = made!.wanted - made!.created;
+
+  if (done.created + done.updated + done.deleted > 0) {
+    await appendEvent<UrlRedirectsMovedPayload>(tx, shopId, {
+      type: OnlineStoreEvents.UrlRedirectsMoved,
+      aggregateType: 'url_redirect',
+      aggregateId: shopId,
+      payload: { created: done.created, updated: done.updated, deleted: done.deleted },
+    });
+  }
+  return done;
 }
 
 /**

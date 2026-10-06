@@ -4,6 +4,7 @@ import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { publishedArticleImageOf } from './article.service.js';
 import { searchContentIn } from './content-search.js';
+import { REDIRECT_LIMIT } from './redirect-paths.js';
 import { articles, blogs } from './schema.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
 import { shopRedirectsOf } from './url-redirect.service.js';
@@ -232,6 +233,67 @@ describe.skipIf(!server)('Blogs and their articles (ADR-176)', () => {
     ]);
     expect(errorsOf(await f.articles.update(f.a, newId(), { title: 'Gone' }))).toEqual([
       ['id', 'NOT_FOUND', 'Article not found'],
+    ]);
+  });
+
+  it("sends a blog's articles' old addresses to their new ones when asked, as Shopify's redirectArticles (ADR-218)", async () => {
+    const news = unwrap(await f.blogs.create(f.a, { title: 'News' }));
+    const at = (day: string) => new Date(`2026-${day}T09:00:00Z`);
+    unwrap(
+      await f.articles.create(f.a, { blogId: news.id, title: 'Eid', publishDate: at('03-01') }),
+    );
+    unwrap(
+      await f.articles.create(f.a, { blogId: news.id, title: 'Lawn', publishDate: at('04-01') }),
+    );
+    unwrap(await f.articles.create(f.a, { blogId: news.id, title: 'Draft', isPublished: false }));
+    // Another blog's articles stay where they are.
+    const guides = unwrap(await f.blogs.create(f.a, { title: 'Guides' }));
+    unwrap(await f.articles.create(f.a, { blogId: guides.id, title: 'Sizes' }));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+
+    // Not asked: nothing sends shoppers on.
+    unwrap(await f.blogs.update(f.a, news.id, { handle: 'updates' }));
+    expect(await redirects()).toEqual([]);
+    unwrap(await f.blogs.update(f.a, news.id, { handle: 'journal', redirectArticles: true }));
+    expect(await redirects()).toEqual([
+      { path: '/blogs/updates/draft', target: '/blogs/journal/draft' },
+      { path: '/blogs/updates/eid', target: '/blogs/journal/eid' },
+      { path: '/blogs/updates/lawn', target: '/blogs/journal/lawn' },
+    ]);
+    // With its own address too; the older addresses go straight to the newest.
+    unwrap(
+      await f.blogs.update(f.a, news.id, {
+        handle: 'stories',
+        redirectNewHandle: true,
+        redirectArticles: true,
+      }),
+    );
+    expect(await redirects()).toEqual([
+      { path: '/blogs/journal', target: '/blogs/stories' },
+      { path: '/blogs/journal/draft', target: '/blogs/stories/draft' },
+      { path: '/blogs/journal/eid', target: '/blogs/stories/eid' },
+      { path: '/blogs/journal/lawn', target: '/blogs/stories/lawn' },
+      { path: '/blogs/updates/draft', target: '/blogs/stories/draft' },
+      { path: '/blogs/updates/eid', target: '/blogs/stories/eid' },
+      { path: '/blogs/updates/lawn', target: '/blogs/stories/lawn' },
+    ]);
+    // The storefront told once for the articles each time.
+    expect((await events()).filter(([type]) => type.startsWith('url_redirect'))).toEqual([
+      ['url_redirects.moved', { created: 3, updated: 0, deleted: 0 }],
+      ['url_redirect.created', { path: '/blogs/journal', target: '/blogs/stories' }],
+      ['url_redirects.moved', { created: 3, updated: 3, deleted: 0 }],
+    ]);
+
+    // A shop with room for one more redirect gets its latest published article's.
+    await f.admin.query('DELETE FROM online_store.url_redirects WHERE shop_id = $1', [f.a.shopId]);
+    await f.admin.query(
+      `INSERT INTO online_store.url_redirects (shop_id, path, target)
+       SELECT $1, '/old-' || n, '/' FROM generate_series(1, $2) AS n`,
+      [f.a.shopId, REDIRECT_LIMIT - 1],
+    );
+    unwrap(await f.blogs.update(f.a, news.id, { handle: 'posts', redirectArticles: true }));
+    expect((await redirects()).filter((r) => r.path.startsWith('/blogs/'))).toEqual([
+      { path: '/blogs/stories/lawn', target: '/blogs/posts/lawn' },
     ]);
   });
 

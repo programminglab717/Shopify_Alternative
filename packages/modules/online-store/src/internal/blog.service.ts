@@ -3,12 +3,12 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
-import { and, asc, count, eq, gt, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import { checkHandle, checkSuffix, insertWithHandle } from './content-input.js';
 import { OnlineStoreEvents, type BlogChangedPayload, type BlogUpdatedPayload } from './events.js';
 import type { BlogRecord, Page } from './records.js';
 import { articles, blogs, type BlogRow } from './schema.js';
-import { redirectMoved } from './url-redirect.service.js';
+import { redirectMoved, redirectsMoved } from './url-redirect.service.js';
 
 /** What a shop's blogs and articles may hold (ADR-176). */
 export const BLOG_LIMITS = {
@@ -40,6 +40,11 @@ export interface BlogInput {
    * `redirectNewHandle` does (ADR-053).
    */
   redirectNewHandle?: boolean | null;
+  /**
+   * With a new handle: each of its articles' old addresses sends shoppers to its new one, as
+   * Shopify's `redirectArticles` does (ADR-218).
+   */
+  redirectArticles?: boolean | null;
 }
 
 /**
@@ -199,8 +204,25 @@ export class BlogService {
         changed,
       });
       if (input.redirectNewHandle && row!.handle !== blog.handle) {
-        // The blog's own address; its articles' are their own redirects to make.
+        // The blog's own address; its articles' with redirectArticles.
         await redirectMoved(tx, tenant.shopId, `/blogs/${blog.handle}`, `/blogs/${row!.handle}`);
+      }
+      if (input.redirectArticles && row!.handle !== blog.handle) {
+        // Its articles', published or not as an article's own are, all at once: the latest
+        // published first, where the shop has no room for them all (ADR-218).
+        const moved = await tx
+          .select({ handle: articles.handle })
+          .from(articles)
+          .where(and(eq(articles.shopId, tenant.shopId), eq(articles.blogId, id)))
+          .orderBy(sql`${articles.publishedAt} DESC NULLS LAST`, desc(articles.id));
+        await redirectsMoved(
+          tx,
+          tenant.shopId,
+          moved.map(({ handle }) => ({
+            from: `/blogs/${blog.handle}/${handle}`,
+            to: `/blogs/${row!.handle}/${handle}`,
+          })),
+        );
       }
       return { ok: true, value: toRecord(row!) };
     });

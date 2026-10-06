@@ -225,9 +225,19 @@ export class BlogUpdateInput {
     nullable: true,
     description:
       "With a new handle, whether the blog's old address sends shoppers to its new one: a URL " +
-      "redirect is made, as on Shopify, for the blog's own page. False unless given.",
+      "redirect is made, as on Shopify, for the blog's own page; its articles' with " +
+      'redirectArticles. False unless given.',
   })
   redirectNewHandle?: boolean | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      "With a new handle, whether each of the blog's articles' old addresses sends shoppers to " +
+      'its new one: a URL redirect is made for each, as on Shopify, the latest published first ' +
+      'where the shop has no room for them all (ADR-218). False unless given.',
+  })
+  redirectArticles?: boolean | null;
 }
 
 @InputType({ description: 'Who an article is by.' })

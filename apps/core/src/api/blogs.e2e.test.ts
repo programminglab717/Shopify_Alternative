@@ -169,14 +169,33 @@ describe.skipIf(!server)('Admin GraphQL API: blogs and their articles (ADR-176)'
     });
     const renamed = await call(
       tokens.a,
-      `mutation ($id: ID!) {
-        blogUpdate(id: $id, blog: { title: "Journal", handle: "journal", redirectNewHandle: true }) {
-          blog { title handle } userErrors { field code }
-        }
+      `mutation ($id: ID!, $blog: BlogUpdateInput!) {
+        blogUpdate(id: $id, blog: $blog) { blog { title handle } userErrors { field code } }
       }`,
-      { id: news.blog.id },
+      {
+        id: news.blog.id,
+        blog: {
+          title: 'Journal',
+          handle: 'journal',
+          redirectNewHandle: true,
+          redirectArticles: true,
+        },
+      },
     );
     expect(renamed).toEqual({ blog: { title: 'Journal', handle: 'journal' }, userErrors: [] });
+    // Its address and its articles' send shoppers on (ADR-218).
+    const redirects = await call(
+      tokens.menus,
+      '{ urlRedirects(first: 5) { nodes { path target } } }',
+    );
+    expect([...redirects.nodes].sort((a: Json, b: Json) => a.path.localeCompare(b.path))).toEqual([
+      { path: '/blogs/news', target: '/blogs/journal' },
+      { path: '/blogs/news/coming-soon', target: '/blogs/journal/coming-soon' },
+      {
+        path: '/blogs/news/eid-collection-is-here',
+        target: '/blogs/journal/eid-collection-is-here',
+      },
+    ]);
 
     const blogs = await call(
       tokens.reader,

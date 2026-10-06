@@ -6,8 +6,9 @@
 
 ## In progress
 
-**A blog's articles redirected with it** (OS-07, ADR-176): Shopify's `redirectArticles`, each
-article's old address sending shoppers to its new one when its blog's handle changes.
+**The customer choosing among the shop's gateways** (PAY-01, ADR-151): each of the shop's live
+accounts offered on an order's page and at checkout, as Shopify lists a shop's payment methods,
+in place of its oldest alone.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +17,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### A blog's articles redirected with it
+
+* **`redirectArticles` on `blogUpdate`**, as Shopify's
+  ([ADR-218](../architecture/13-decision-log.md#adr-218--a-blog-whose-handle-changes-sends-its-articles-old-addresses-to-their-new-ones-when-asked-as-shopifys-redirectarticles-does-a-redirect-for-each-made-all-at-once-with-one-event-the-storefront-follows)):
+  with a new handle, each of the blog's articles' old addresses sends shoppers to its new one,
+  beside `redirectNewHandle`'s redirect of the blog's own.
+* **Made all at once:** `redirectsMoved` keeps `redirectMoved`'s rules for many pages in five
+  statements, redirects that sent shoppers to an old address following it, the latest published
+  articles first where the shop has room for only some, and one `url_redirects.moved` event has
+  the publisher write the shop's redirects again.
+* 1656 tests (2 new): many moved at once, chains followed, room for only some, and nothing to do
+  saying nothing; a blog's articles redirected with it, again and with its own; and through the
+  API.
 
 ### d6f0eb5 · Pages published at a time ahead
 

@@ -4,7 +4,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { REDIRECT_LIMIT, redirectPath, redirectTarget } from './redirect-paths.js';
 import { urlRedirects } from './schema.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
-import { UrlRedirectService, redirectMoved, shopRedirectsOf } from './url-redirect.service.js';
+import {
+  UrlRedirectService,
+  redirectMoved,
+  redirectsMoved,
+  shopRedirectsOf,
+} from './url-redirect.service.js';
 
 const server = testDatabaseServer();
 
@@ -188,6 +193,78 @@ describe.skipIf(!server)('UrlRedirectService', () => {
     expect((await redirects())[0]).toEqual({ path: '/eid', target: '/products/lawn?variant=2' });
   });
 
+  it('moves many pages at once as each would move, saying so once (ADR-218)', async () => {
+    const moved = (moves: { from: string; to: string }[], shop = f.a) =>
+      f.db.tenant(shop.shopId, (tx) => redirectsMoved(tx, shop.shopId, moves));
+    const redirects = () => f.db.tenant(f.a.shopId, (tx) => shopRedirectsOf(tx, f.a.shopId));
+    const blog = (from: string, to: string) =>
+      ['eid', 'lawn', 'sale'].map((handle) => ({
+        from: `/blogs/${from}/${handle}`,
+        to: `/blogs/${to}/${handle}`,
+      }));
+    unwrap(await service.create(f.a, { path: '/eid', target: '/blogs/news/eid?ref=ig#top' }));
+    unwrap(await service.create(f.a, { path: '/blogs/news/old-lawn', target: '/blogs/news/lawn' }));
+    unwrap(await service.create(f.a, { path: '/blogs/news/sale', target: '/pages/sale' }));
+    unwrap(await service.create(f.a, { path: '/blogs/journal/eid', target: '/' }));
+    unwrap(
+      await service.create(f.a, {
+        path: '/blogs/news/eid-2',
+        target: 'https://zari.pk/blogs/news/eid',
+      }),
+    );
+    await f.admin.query('DELETE FROM platform.outbox_events');
+
+    expect(await moved(blog('news', 'journal'))).toEqual({
+      created: 2,
+      updated: 3,
+      deleted: 1,
+      skipped: 0,
+    });
+    expect(await redirects()).toEqual([
+      { path: '/blogs/news/eid', target: '/blogs/journal/eid' },
+      // Elsewhere: not the shop's address.
+      { path: '/blogs/news/eid-2', target: 'https://zari.pk/blogs/news/eid' },
+      { path: '/blogs/news/lawn', target: '/blogs/journal/lawn' },
+      // Those that sent shoppers to an old address go straight to its new one.
+      { path: '/blogs/news/old-lawn', target: '/blogs/journal/lawn' },
+      // An old address's own redirect sends shoppers on to its new one.
+      { path: '/blogs/news/sale', target: '/blogs/journal/sale' },
+      { path: '/eid', target: '/blogs/journal/eid?ref=ig#top' },
+      // The one from a new address went: the page is there.
+    ]);
+    expect((await f.outbox()).map((row) => [row.event_type, row.payload])).toEqual([
+      ['url_redirects.moved', { created: 2, updated: 3, deleted: 1 }],
+    ]);
+    // Moved again: every old address goes to the newest.
+    expect(await moved(blog('journal', 'stories'))).toEqual({
+      created: 3,
+      updated: 5,
+      deleted: 0,
+      skipped: 0,
+    });
+    expect((await redirects()).filter((r) => r.target.startsWith('/blogs/journal'))).toEqual([]);
+    // Nothing to do, nothing said.
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    expect(await moved(blog('journal', 'stories'))).toEqual({
+      created: 0,
+      updated: 0,
+      deleted: 0,
+      skipped: 0,
+    });
+    expect(await f.outbox()).toEqual([]);
+    // A page moves once, and none to where another was.
+    await expect(
+      moved([
+        { from: '/pages/a', to: '/pages/b' },
+        { from: '/pages/b', to: '/pages/c' },
+      ]),
+    ).rejects.toThrow('Each page moves once');
+    // Another shop's redirects stay as they were.
+    const before = await redirects();
+    await moved(blog('stories', 'news'), f.b);
+    expect(await redirects()).toEqual(before);
+  });
+
   it(`keeps ${REDIRECT_LIMIT} redirects a shop at most`, async () => {
     await f.admin.query(
       `INSERT INTO online_store.url_redirects (shop_id, path, target)
@@ -203,6 +280,24 @@ describe.skipIf(!server)('UrlRedirectService', () => {
       f.db.tenant(f.a.shopId, (tx) => redirectMoved(tx, f.a.shopId, from, to));
     expect(await moved('/pages/a', '/pages/b')).toBe(false);
     expect(await moved('/old-1', '/products/newer')).toBe(true);
+    // Many at once: those first while there is room, the rest left without.
+    await f.admin.query(
+      `DELETE FROM online_store.url_redirects WHERE shop_id = $1 AND path = '/old-2'`,
+      [f.a.shopId],
+    );
+    expect(
+      await f.db.tenant(f.a.shopId, (tx) =>
+        redirectsMoved(tx, f.a.shopId, [
+          { from: '/pages/x', to: '/pages/y' },
+          { from: '/pages/z', to: '/pages/w' },
+          { from: '/old-3', to: '/pages/v' },
+        ]),
+      ),
+    ).toEqual({ created: 1, updated: 1, deleted: 0, skipped: 1 });
+    const redirects = await f.db.tenant(f.a.shopId, (tx) => shopRedirectsOf(tx, f.a.shopId));
+    expect(redirects.filter((r) => r.path.startsWith('/pages/'))).toEqual([
+      { path: '/pages/x', target: '/pages/y' },
+    ]);
   });
 
   it("takes redirects from a file as Shopify's export has them, and gives them back the same way", async () => {

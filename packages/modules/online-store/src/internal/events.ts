@@ -31,6 +31,7 @@ export const OnlineStoreEvents = {
   UrlRedirectUpdated: 'url_redirect.updated',
   UrlRedirectDeleted: 'url_redirect.deleted',
   UrlRedirectsImported: 'url_redirects.imported',
+  UrlRedirectsMoved: 'url_redirects.moved',
   PolicyUpdated: 'shop_policy.updated',
 } as const;
 
@@ -134,6 +135,16 @@ export interface UrlRedirectChangedPayload {
 /** Redirects made from a file, all at once: the storefront's are written again. */
 export interface UrlRedirectsImportedPayload {
   created: number;
+}
+
+/**
+ * Redirects made, changed and deleted all at once as many pages moved, such as a blog's articles
+ * with it (ADR-218): the storefront's are written again.
+ */
+export interface UrlRedirectsMovedPayload {
+  created: number;
+  updated: number;
+  deleted: number;
 }
 
 /** The shop changed what it sets for its storefront as a whole. */

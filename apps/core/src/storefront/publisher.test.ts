@@ -213,6 +213,7 @@ describe('What storefront documents an event makes stale', () => {
       'url_redirect.updated',
       'url_redirect.deleted',
       'url_redirects.imported',
+      'url_redirects.moved',
     ]) {
       const payload = { path: '/products/old-lawn', target: '/products/lawn' };
       expect(itemsFor(event(type, payload)), type).toEqual(['redirects']);

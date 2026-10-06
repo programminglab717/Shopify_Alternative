@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-217 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-218 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -225,6 +225,7 @@
 | 215 | An article is published at a time ahead as Shopify's publishDate schedules one: hidden until then wherever it would show, and the worker shows it once its time comes, with the article.updated the storefront follows | Accepted |
 | 216 | A collection has Shopify's Atom feed at its address with .atom: its first 50 products in its order, each with its type, vendor and variants in Shopify's own namespace, under IDs of their own, and products' documents say when each was made and last changed | Accepted |
 | 217 | A page is published at a time ahead as an article is, through Shopify's publishDate: hidden until then wherever it would show, and shown by the worker's same sweep, with the page.updated the storefront follows | Accepted |
+| 218 | A blog whose handle changes sends its articles' old addresses to their new ones when asked, as Shopify's redirectArticles does: a redirect for each, made all at once, with one event the storefront follows | Accepted |
 
 ---
 
@@ -9098,3 +9099,38 @@
   * **One table of everything scheduled, articles and pages:** it has to follow deletes, moves
     and dates changed; the mark on each row is read with the row, and its index holds only the
     rows marked.
+
+## ADR-218 · A blog whose handle changes sends its articles' old addresses to their new ones when asked, as Shopify's redirectArticles does: a redirect for each, made all at once, with one event the storefront follows
+
+* **Context:** Shopify's `BlogUpdateInput` takes `redirectArticles` beside `redirectNewHandle`:
+  a blog's new handle moves each of its articles, at `/blogs/{blog}/{article}`, and with it
+  every old address sends shoppers to the new one. Hatti redirected the blog's own address alone
+  ([ADR-176](#adr-176--a-shops-blogs-and-their-articles-are-the-online-stores-through-the-admin-api-as-shopifys-and-under-its-content-scopes-an-article-has-html-cleaned-as-a-pages-its-authors-name-tags-a-handle-unique-in-its-blog-and-when-it-was-published-never-in-the-future-and-goes-when-its-blog-is-deleted)), its articles' old addresses answering 404, so links to them in shares
+  and search results broke. A blog may have thousands of articles, and `redirectMoved`
+  ([ADR-053](#adr-053--a-handle-change-asks-for-its-redirect-as-shopifys-redirectnewhandle-does-and-the-redirect-leads-to-where-the-page-is-now)) makes one redirect in four or five round trips, with an event each.
+* **Decision:**
+  * **`redirectArticles` on `blogUpdate`**, false unless given: with a new handle, a redirect
+    from each of the blog's articles' old addresses to its new one, published or not, as an
+    article's own `redirectNewHandle` makes one. It is apart from `redirectNewHandle`, which
+    redirects the blog's own address.
+  * **Made all at once by `redirectsMoved`**, `redirectMoved`'s rules for many pages in five
+    statements however many there are: the redirects from where the pages are now go; those
+    that sent shoppers to an old address, with a query or a fragment, send them to its new one;
+    an old address's own redirect is sent on; and the rest are made while the shop has room
+    under its 20,000, the blog's latest published articles first.
+  * **One event, `url_redirects.moved`**, saying how many were made, changed and deleted, on
+    which the publisher writes the shop's redirects again, as for an import
+    ([ADR-052](#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)), and purges the paths that changed, or the shop's pages past 25.
+* **Consequences:**
+  * A shop renaming its blog keeps every link to its articles working, in the rename's own
+    transaction.
+  * Where the shop has no room for them all, the older articles' addresses are left without a
+    redirect, and nothing says so, as for a handle change's own redirect.
+  * A blog's tag pages and its Atom feed keep no redirect: a feed reader holding the old address
+    loses the feed until it is added again.
+* **Alternatives:**
+  * **A redirect of a path's beginning, `/blogs/old/` to `/blogs/new/`:** one row however many
+    articles, but Shopify's redirects and the storefront's are of whole paths, and a beginning
+    would be a new kind for the export, the import and the admin to show.
+  * **`redirectMoved` for each article:** the same rules, but thousands of round trips and
+    events in one request.

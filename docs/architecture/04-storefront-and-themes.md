@@ -416,7 +416,9 @@ imported at once and exported again as CSV, and the storefront follows one where
 ([ADR-052](./13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)); a product, collection or page whose handle changes
 sends shoppers from its old address to its new one when the change asks, as Shopify's
 `redirectNewHandle` does
-([ADR-053](./13-decision-log.md#adr-053--a-handle-change-asks-for-its-redirect-as-shopifys-redirectnewhandle-does-and-the-redirect-leads-to-where-the-page-is-now)). Shops add rules
+([ADR-053](./13-decision-log.md#adr-053--a-handle-change-asks-for-its-redirect-as-shopifys-redirectnewhandle-does-and-the-redirect-leads-to-where-the-page-is-now)),
+and a blog's articles with it when the blog's change asks, as `redirectArticles` does
+([ADR-218](./13-decision-log.md#adr-218--a-blog-whose-handle-changes-sends-its-articles-old-addresses-to-their-new-ones-when-asked-as-shopifys-redirectarticles-does-a-redirect-for-each-made-all-at-once-with-one-event-the-storefront-follows)). Shops add rules
 of their own to robots.txt, lines crawlers read, checked when saved
 ([ADR-055](./13-decision-log.md#adr-055--a-shop-adds-rules-to-its-robotstxt-as-lines-crawlers-read-checked-when-saved-never-liquid)).
 Images by URL, as a Shopify export brings, keep their own address in link previews and
