@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### The home page for search engines
+### b1683ae · The home page for search engines
 
 * **The shop's own words for its home page** ([ADR-243](../architecture/13-decision-log.md#adr-243--a-shops-home-page-has-a-title-and-description-of-its-own-for-search-engines-as-shopifys-preferences-keep-them-and-a-social-sharing-image-one-of-its-files-which-link-previews-show-of-pages-without-an-image-of-their-own-through-shopifys-page_image)): a title and description
   for search engines, as Shopify's preferences keep them, and a social sharing image, one of its
