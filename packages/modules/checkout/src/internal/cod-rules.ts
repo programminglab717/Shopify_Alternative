@@ -58,7 +58,7 @@ export const NO_COD_RULES: CodRulesRecord = {
  * order's delivery charge; on every order, or only on those that meet each of its conditions:
  * items that come to more than `above`, a city of its `cities`, a customer who refused
  * `refusedDeliveries` parcels before (ADR-089), a customer new to the shop, a risk score of
- * `riskScore` or more (ADR-094).
+ * `riskScore` or more (ADR-094), a product tagged with one of its `productTags` (ADR-224).
  */
 export type CodAdvanceValue = (
   | { kind: 'fixed_amount'; amount: bigint }
@@ -80,6 +80,11 @@ export type CodAdvanceValue = (
    * for review.
    */
   riskScore: number | null;
+  /**
+   * Only on orders holding a product tagged with any of these, in any letter case: "pre-order";
+   * empty for every order.
+   */
+  productTags: string[];
 };
 
 /** An amount, a percentage or the delivery charge: one of the three. */
@@ -100,6 +105,8 @@ export interface CodAdvanceInput {
   newCustomers?: boolean | null;
   /** 0.01 to 1, in hundredths, as risk scores are said; null for every order. */
   riskScore?: number | null;
+  /** Products' tags, as the shop writes them on its products: "pre-order"; empty for all. */
+  productTags?: string[] | null;
 }
 
 export const COD_RULE_LIMITS = {
@@ -172,13 +179,7 @@ export function codRefusalOf(
   if (rules.maxOrderTotal !== null && order.total > rules.maxOrderTotal) {
     return { reason: 'total', max: rules.maxOrderTotal };
   }
-  const tags = new Set(rules.unavailableProductTags.map((tag) => tag.toLowerCase()));
-  const product =
-    tags.size === 0
-      ? undefined
-      : order.products?.find((candidate) =>
-          candidate.tags.some((tag) => tags.has(tag.toLowerCase())),
-        );
+  const product = taggedProductOf(order.products ?? [], rules.unavailableProductTags);
   if (product) return { reason: 'product', title: product.title };
   const city = order.city ? (findCity(order.city)?.name ?? null) : null;
   if (city !== null && rules.unavailableCities.includes(city)) return { reason: 'city', city };
@@ -187,6 +188,33 @@ export function codRefusalOf(
     return { reason: 'customer' };
   }
   return null;
+}
+
+/** The first of `products` tagged with any of `tags`, in any letter case; null for none. */
+function taggedProductOf(
+  products: readonly CodProduct[],
+  tags: readonly string[],
+): CodProduct | null {
+  if (tags.length === 0) return null;
+  const lower = new Set(tags.map((tag) => tag.toLowerCase()));
+  return (
+    products.find((product) => product.tags.some((tag) => lower.has(tag.toLowerCase()))) ?? null
+  );
+}
+
+/**
+ * `advance` as a cart holding `products` is asked it, its products known before the shopper types
+ * anything (ADR-224): with the first tagged with one of its tags, which the page names; with none,
+ * where it names no tags; null where the cart holds none of them, as it isn't asked of the cart.
+ */
+export function advanceForCart(
+  advance: CodAdvanceValue | null,
+  products: readonly CodProduct[],
+): { advance: CodAdvanceValue; product: string | null } | null {
+  if (!advance) return null;
+  if (advance.productTags.length === 0) return { advance, product: null };
+  const product = taggedProductOf(products, advance.productTags);
+  return product && { advance, product: product.title };
 }
 
 /**
@@ -222,7 +250,8 @@ export function advanceOf(
  * a customer who refused as many parcels as it says, or more, if it says; by a customer the shop
  * delivered nothing to before, if it asks new customers alone. Null while one it asks about isn't
  * known. Its risk score is another matter: the order is scored as it is placed
- * ({@link placedAdvanceOf}).
+ * ({@link placedAdvanceOf}); and its products another, known before anything is typed
+ * ({@link advanceForCart}).
  */
 export function advanceTakes(
   advance: CodAdvanceValue,
@@ -308,7 +337,9 @@ export function advanceKeyOf(advance: CodAdvanceValue | null): string {
         : '';
   const cities = advance.cities.join('|');
   const whom = `${advance.refusedDeliveries ?? ''}:${advance.newCustomers}:${advance.riskScore ?? ''}`;
-  return `${advance.kind}:${what}:${advance.above ?? ''}:${cities}:${whom}`;
+  // Its products' tags, where it names any: without, the key is what it was before them.
+  const tags = advance.productTags.length > 0 ? `:${advance.productTags.join('|')}` : '';
+  return `${advance.kind}:${what}:${advance.above ?? ''}:${cities}:${whom}${tags}`;
 }
 
 /**
@@ -347,11 +378,11 @@ export function checkCodRules(
     );
   }
   if (input.unavailableProductTags !== undefined && input.unavailableProductTags !== null) {
-    const field = ['input', 'unavailableProductTags'];
-    unavailableProductTags = check.tags(field, input.unavailableProductTags);
-    if (unavailableProductTags.length > COD_RULE_LIMITS.productTags) {
-      check.addMessage(field, 'TOO_MANY', `At most ${COD_RULE_LIMITS.productTags} tags`);
-    }
+    unavailableProductTags = checkProductTags(
+      check,
+      ['input', 'unavailableProductTags'],
+      input.unavailableProductTags,
+    );
   }
   if (input.refusedDeliveriesLimit !== undefined) {
     refusedDeliveriesLimit =
@@ -453,6 +484,7 @@ function checkAdvance(
           }),
     newCustomers: input.newCustomers ?? false,
     riskScore: checkRiskScore(check, [...field, 'riskScore'], input.riskScore),
+    productTags: checkProductTags(check, [...field, 'productTags'], input.productTags),
   };
   if (amountGiven) {
     const amount = check.price([...field, 'amount'], input.amount, currency);
@@ -498,6 +530,22 @@ function checkRiskScore(
     return null;
   }
   return points;
+}
+
+/**
+ * Products' tags as staff typed them at `field`, each once whatever its letter case, as many as
+ * {@link COD_RULE_LIMITS} allows at most.
+ */
+function checkProductTags(
+  check: InputChecker,
+  field: string[],
+  inputs: string[] | null | undefined,
+): string[] {
+  const tags = check.tags(field, inputs);
+  if (tags.length > COD_RULE_LIMITS.productTags) {
+    check.addMessage(field, 'TOO_MANY', `At most ${COD_RULE_LIMITS.productTags} tags`);
+  }
+  return tags;
 }
 
 /** Cities as addresses name them, each once, `max` at most, from what staff typed at `field`. */

@@ -125,6 +125,8 @@ export const codSettings = checkoutSchema.table('cod_settings', {
   advanceNewCustomers: boolean('advance_new_customers').notNull().default(false),
   /** Only of orders whose risk score, 1 to 100, is this or more; null for every order. */
   advanceRisk: smallint('advance_risk'),
+  /** Only on orders holding a product tagged with any of these, in any letter case (ADR-224). */
+  advanceProductTags: text('advance_product_tags').array().notNull().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

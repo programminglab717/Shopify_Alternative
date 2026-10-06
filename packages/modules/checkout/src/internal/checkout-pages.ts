@@ -369,7 +369,8 @@ function paymentSection(
   // Beside another way to pay, the fee is said with the option; alone, the summary adds it.
   const withFee = fee !== null && (bankTransfer !== null || online !== null);
   const ahead = advanceWords(payments.advance, asked);
-  const askedOf = ahead && payments.advance && advanceTermsWords(payments.advance);
+  const askedOf =
+    ahead && payments.advance && advanceTermsWords(payments.advance, payments.advanceProduct);
   const onDelivery: Sentence = askedOf
     ? {
         en:
@@ -524,14 +525,24 @@ function advanceWords(
 }
 
 /**
- * Where, and of whom, the shop asks its advance (ADR-089, ADR-094), as the page says it before
- * anything is typed: "On orders to Quetta or Gilgit, if you refused a delivery from this shop
- * before". Every city it names, so that a shopper knows whether it asks them; of customers and
- * by risk, its rule alone, the page looking nobody up. Null when it asks every order.
+ * For what, where, and of whom, the shop asks its advance (ADR-089, ADR-094, ADR-224), as the page
+ * says it before anything is typed: "With Bridal lehenga in your cart, on orders to Quetta or
+ * Gilgit, if you refused a delivery from this shop before". The cart's `product` it is asked for,
+ * where it asks it for products it tags; every city it names, so that a shopper knows whether it
+ * asks them; of customers and by risk, its rule alone, the page looking nobody up. Null when it
+ * asks every order.
  */
-function advanceTermsWords(advance: CodAdvanceValue): { en: string; ur: HtmlValue } | null {
+function advanceTermsWords(
+  advance: CodAdvanceValue,
+  product: string | null,
+): { en: string; ur: HtmlValue } | null {
   const { cities, refusedDeliveries: refused, newCustomers, riskScore } = advance;
-  if (cities.length === 0 && refused === null && !newCustomers && riskScore === null) return null;
+  const every = cities.length === 0 && refused === null && !newCustomers && riskScore === null;
+  if (product === null && every) return null;
+  const what =
+    product === null
+      ? null
+      : { en: `with ${product} in your cart`, ur: html`آپ کے کارٹ میں ${text(product)} ہونے پر` };
   const urNames = cities.map((name) => findCity(name)?.nameUr ?? name);
   const where =
     cities.length === 0
@@ -566,7 +577,7 @@ function advanceTermsWords(advance: CodAdvanceValue): { en: string; ur: HtmlValu
           en: "if the shop's checks on your order call for it",
           ur: html`اگر دکان کی جانچ کے مطابق آپ کے آرڈر پر یہ ضروری ہو`,
         };
-  const parts = [where, who, fresh, risky].filter((part) => part !== null);
+  const parts = [what, where, who, fresh, risky].filter((part) => part !== null);
   const en = parts.map((part) => part.en).join(', ');
   return {
     en: `${en.charAt(0).toUpperCase()}${en.slice(1)}`,

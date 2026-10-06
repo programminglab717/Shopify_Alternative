@@ -15,6 +15,7 @@ const EVERY_ORDER = {
   refusedDeliveries: null,
   newCustomers: false,
   riskScore: null,
+  productTags: [],
 };
 
 const SHOP: CheckoutShop = {
@@ -141,6 +142,7 @@ function openView(
       bankTransfer: null,
       transferDiscount: null,
       advance: null,
+      advanceProduct: null,
       online: null,
       onlineDiscount: null,
     },
@@ -312,6 +314,7 @@ describe('checkoutPage', () => {
       bankTransfer: ACCOUNT,
       transferDiscount: null,
       advance: null,
+      advanceProduct: null,
       online: null,
       onlineDiscount: null,
     };
@@ -343,6 +346,7 @@ describe('checkoutPage', () => {
           bankTransfer: ACCOUNT,
           transferDiscount: null,
           advance: null,
+          advanceProduct: null,
           online: null,
           onlineDiscount: null,
         },
@@ -379,6 +383,7 @@ describe('checkoutPage', () => {
           bankTransfer: ACCOUNT,
           transferDiscount: null,
           advance: null,
+          advanceProduct: null,
           online: null,
           onlineDiscount: null,
         },
@@ -399,6 +404,7 @@ describe('checkoutPage', () => {
           bankTransfer: null,
           transferDiscount: null,
           advance: null,
+          advanceProduct: null,
           online: null,
           onlineDiscount: null,
         },
@@ -418,6 +424,7 @@ describe('checkoutPage', () => {
           bankTransfer: ACCOUNT,
           transferDiscount: null,
           advance: null,
+          advanceProduct: null,
           online: null,
           onlineDiscount: null,
         },
@@ -441,6 +448,7 @@ describe('checkoutPage', () => {
           bankTransfer: null,
           transferDiscount: null,
           advance: null,
+          advanceProduct: null,
           online: null,
           onlineDiscount: null,
         },
@@ -462,6 +470,7 @@ describe('checkoutPage', () => {
             bankTransfer,
             transferDiscount: null,
             advance: null,
+            advanceProduct: null,
             online: null,
             onlineDiscount: null,
           },
@@ -490,6 +499,7 @@ describe('checkoutPage', () => {
             bankTransfer: ACCOUNT,
             transferDiscount: null,
             advance: null,
+            advanceProduct: null,
             online: null,
             onlineDiscount: null,
           },
@@ -508,6 +518,7 @@ describe('checkoutPage', () => {
           bankTransfer: ACCOUNT,
           transferDiscount: null,
           advance: null,
+          advanceProduct: null,
           online: null,
           onlineDiscount: null,
         },
@@ -524,6 +535,7 @@ describe('checkoutPage', () => {
           bankTransfer: null,
           transferDiscount: null,
           advance: null,
+          advanceProduct: null,
           online: null,
           onlineDiscount: null,
         },
@@ -546,6 +558,7 @@ describe('checkoutPage', () => {
       bankTransfer: ACCOUNT,
       transferDiscount: null,
       advance: null,
+      advanceProduct: null,
       online: null,
       onlineDiscount: null,
     };
@@ -582,6 +595,7 @@ describe('checkoutPage', () => {
           bankTransfer: null,
           transferDiscount: null,
           advance: null,
+          advanceProduct: null,
           online: null,
           onlineDiscount: null,
         },
@@ -599,6 +613,7 @@ describe('checkoutPage', () => {
           bankTransfer: ACCOUNT,
           transferDiscount: null,
           advance: null,
+          advanceProduct: null,
           online: null,
           onlineDiscount: null,
         },
@@ -632,6 +647,7 @@ describe('checkoutPage', () => {
       bankTransfer: ACCOUNT,
       transferDiscount: fivePercent,
       advance: null,
+      advanceProduct: null,
       online: null,
       onlineDiscount: null,
     };
@@ -707,6 +723,7 @@ describe('checkoutPage', () => {
       bankTransfer: null,
       transferDiscount: null,
       advance,
+      advanceProduct: null,
       online: null,
       onlineDiscount: null,
     });
@@ -819,6 +836,7 @@ describe('checkoutPage', () => {
       bankTransfer: null,
       transferDiscount: null,
       advance,
+      advanceProduct: null,
       online: null,
       onlineDiscount: null,
     });
@@ -904,6 +922,56 @@ describe('checkoutPage', () => {
       'Cash on delivery: you pay when your order arrives.',
     );
     expect(page({ ...cities, above: 4_000_00n })).not.toContain('in advance');
+  });
+
+  it('names the product in the cart it asks the advance for, and takes it off at once', () => {
+    const flat = { ...DELIVERY, zones: [] };
+    const preOrders: CodAdvanceValue = {
+      kind: 'fixed_amount',
+      amount: 500_00n,
+      ...EVERY_ORDER,
+      productTags: ['pre-order'],
+    };
+    const payments = (advance: CodAdvanceValue, product: string) => ({
+      codRefusal: null,
+      capAdvance: false,
+      codRules: { ...NO_COD_RULES, advance },
+      bankTransfer: null,
+      transferDiscount: null,
+      advance,
+      advanceProduct: product,
+      online: null,
+      onlineDiscount: null,
+    });
+    const page = checkoutPage(
+      openView({ delivery: flat, payments: payments(preOrders, 'Bridal lehnga') }),
+    ).html;
+    expect(page).toContain(
+      'Cash on delivery: you pay when your order arrives. With Bridal lehnga in your cart, you ' +
+        'pay Rs 500 in advance by bank transfer.',
+    );
+    expect(page.replace(/\s+/g, ' ')).toContain(
+      'آپ کے کارٹ میں <bdi>Bridal lehnga</bdi> ہونے پر، <bdi dir="ltr">Rs 500</bdi> ایڈوانس ' +
+        'بینک ٹرانسفر سے ادا کریں۔',
+    );
+    // Known from the cart, it is taken off what the door collects before anything is typed.
+    expect(page).toMatch(/Advance by bank transfer<\/span>[\s\S]*?−Rs 500/);
+    // With its cities, the product first, as the shop titled it; taken off once the city is one.
+    const quetta = { ...preOrders, cities: ['Quetta'] };
+    const both = (city: string) =>
+      checkoutPage(
+        openView({
+          delivery: flat,
+          payments: payments(quetta, 'Kurta <b>'),
+          form: { ...EMPTY_FORM, city },
+        }),
+      ).html;
+    expect(both('')).toContain(
+      'With Kurta &lt;b&gt; in your cart, on orders to Quetta, you pay Rs 500 in advance by ' +
+        'bank transfer.',
+    );
+    expect(both('')).not.toContain('Advance by bank transfer');
+    expect(both('Quetta')).toMatch(/Advance by bank transfer<\/span>[\s\S]*?−Rs 500/);
   });
 
   it('tells the shopper where to pay a transfer, with the order as its reference', () => {
@@ -1002,6 +1070,7 @@ describe('checkoutPage', () => {
           bankTransfer: ACCOUNT,
           transferDiscount: null,
           advance: null,
+          advanceProduct: null,
           online: null,
           onlineDiscount: null,
         },

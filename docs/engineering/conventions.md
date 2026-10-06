@@ -705,6 +705,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   `CheckoutPayments.advance` is the rule where the shop has a bank account, offering transfers or
   not, and null otherwise. `advanceKeyOf` puts it in the page's digest and tells the service
   whether it changed; setting one checks the account, and nothing else does.
+* **An advance's products are settled when the page is built** ([ADR-224](../architecture/13-decision-log.md#adr-224--a-shops-advance-may-be-asked-only-of-orders-holding-a-product-it-tags-checkout-knows-the-carts-products-before-anything-is-typed-names-the-product-beside-cash-on-delivery-and-asks-a-cart-holding-none-for-nothing)):
+  `advanceForCart` gives the advance with the first of the cart's products it names, or null
+  for a cart holding none, so `CheckoutPayments.advance` is null then and `advanceProduct` is
+  the title the page names. `advanceTakes` and placing never look at products. `advanceKeyOf`
+  adds the tags only where there are some: keep an advance without them keyed as it was, as
+  pages' digests hold it.
 * **An order its customer placed keeps what they agreed to**
   ([ADR-057](../architecture/13-decision-log.md#adr-057--what-a-shopper-agrees-to-in-placing-an-order-is-kept-with-it-the-versions-of-the-shops-policies-its-checkout-linked-and-where-it-was-placed-from),
   [ADR-114](../architecture/13-decision-log.md#adr-114--a-draft-its-customer-confirms-through-its-link-keeps-what-they-agreed-to-as-checkouts-orders-do-the-page-names-the-shops-policies-above-its-button-and-the-order-keeps-their-versions-and-where-it-was-confirmed-from),

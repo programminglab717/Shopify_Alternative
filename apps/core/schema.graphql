@@ -703,7 +703,7 @@ input CallingHoursInput {
 }
 
 """
-What checkout asks for in advance on orders paid on delivery (CHK-10), saying it beside the option: the customer pays it by bank transfer into the shop's account, the order waits for it as an order paid by transfer waits for its money, and the courier collects the rest. On every order, or only on those that meet each of its conditions: above a total, to one of its cities, by a customer who refused parcels before or is new to the shop, scored at a risk or higher. Checkout asks for none while the shop gives no account.
+What checkout asks for in advance on orders paid on delivery (CHK-10), saying it beside the option: the customer pays it by bank transfer into the shop's account, the order waits for it as an order paid by transfer waits for its money, and the courier collects the rest. On every order, or only on those that meet each of its conditions: above a total, to one of its cities, by a customer who refused parcels before or is new to the shop, scored at a risk or higher, holding a product it tags. Checkout asks for none while the shop gives no account.
 """
 type CashOnDeliveryAdvance {
   """
@@ -727,6 +727,11 @@ type CashOnDeliveryAdvance {
 
   """Percent of the order's items, for PERCENTAGE: 20 is 20%."""
   percentage: Float
+
+  """
+  Only on orders holding a product tagged with any of these, in any letter case, such as pre-orders and custom stitching, paid in part ahead: "pre-order". Empty for every order. Checkout names the product beside the option.
+  """
+  productTags: [String!]!
 
   """
   Only of customers who refused this many parcels before, or more, as their delivery history counts them; null for every customer. Checkout says so, without looking anyone up, and placing the order counts the refusals of the number typed.
@@ -768,6 +773,11 @@ input CashOnDeliveryAdvanceInput {
   Percent of the order's items after any discount code, 0.01 to 100, with two decimals at most.
   """
   percentage: Float
+
+  """
+  Only on orders holding a product with one of these tags, as the shop writes them on its products, each once in any letter case. Empty or null for every order. Up to 50.
+  """
+  productTags: [String!]
 
   """
   Only of customers who refused this many parcels before, or more: 1 to 100; null for every customer.

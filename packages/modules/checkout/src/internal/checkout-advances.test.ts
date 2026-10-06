@@ -8,6 +8,7 @@ import { checkoutPage } from './checkout-pages.js';
 import type { CheckoutForm, CheckoutView } from './checkout.service.js';
 import {
   NO_COD_RULES,
+  advanceForCart,
   advanceOf,
   advanceTakes,
   checkCodRules,
@@ -26,6 +27,7 @@ const EVERY_ORDER = {
   refusedDeliveries: null,
   newCustomers: false,
   riskScore: null,
+  productTags: [],
 };
 
 describe('advanceOf', () => {
@@ -136,6 +138,23 @@ describe('advanceOf', () => {
     });
     expect(placedAdvanceOf(null, placing, 'PKR')).toEqual({ due: 0n, ifRisky: null });
   });
+
+  it('asks only of carts holding a product it tags, in any letter case, naming the first', () => {
+    const fiveHundred: CodAdvanceValue = { kind: 'fixed_amount', amount: 500_00n, ...EVERY_ORDER };
+    const kurta = { title: 'Kurta', tags: ['summer'] };
+    const lehnga = { title: 'Bridal lehnga', tags: ['bridal', 'Pre-Order'] };
+    const sherwani = { title: 'Sherwani', tags: ['stitching'] };
+    // Naming none, it asks every cart, naming no product.
+    expect(advanceForCart(fiveHundred, [kurta])).toEqual({ advance: fiveHundred, product: null });
+    expect(advanceForCart(null, [lehnga])).toBeNull();
+    const preOrders: CodAdvanceValue = { ...fiveHundred, productTags: ['pre-order', 'stitching'] };
+    expect(advanceForCart(preOrders, [kurta, lehnga, sherwani])).toEqual({
+      advance: preOrders,
+      product: 'Bridal lehnga',
+    });
+    expect(advanceForCart(preOrders, [kurta])).toBeNull();
+    expect(advanceForCart(preOrders, [])).toBeNull();
+  });
 });
 
 describe('checkCodRules', () => {
@@ -227,6 +246,23 @@ describe('checkCodRules', () => {
       ['input.advance.cities', 'TOO_MANY'],
     ]);
     expect(messages({ amount: '500', cities: many })).toEqual(['At most 50 cities']);
+  });
+
+  it("takes products' tags, each once in any letter case, 50 at most", () => {
+    expect(
+      advance({ amount: '500', productTags: [' Pre-order ', 'PRE-ORDER', 'stitching', ' '] }),
+    ).toEqual({
+      kind: 'fixed_amount',
+      amount: 500_00n,
+      ...EVERY_ORDER,
+      productTags: ['Pre-order', 'stitching'],
+    });
+    expect(advance({ amount: '500', productTags: null })).toMatchObject({ productTags: [] });
+    const many = Array.from({ length: 51 }, (_, index) => `tag-${index}`);
+    expect(advance({ amount: '500', productTags: many })).toEqual([
+      ['input.advance.productTags', 'TOO_MANY'],
+    ]);
+    expect(messages({ amount: '500', productTags: many })).toEqual(['At most 50 tags']);
   });
 
   it('takes new customers alone, and a risk score from 0.01 to 1, in hundredths', () => {
@@ -614,6 +650,74 @@ describe.skipIf(!server)('An advance at checkout', () => {
         }),
       ),
     ).toMatchObject({ advanceDue: 0n, stage: 'needs_review', risk: { score: 35 } });
+  });
+
+  it('asks it only of carts holding a product the shop tags, naming it, and places them so', async () => {
+    unwrap(await giveAccount());
+    unwrap(await f.delivery.update(f.a, { charge: '250' }));
+    unwrap(await f.codRules.update(f.a, { advance: { amount: '500' } }));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    // Its tags alone, each once in any letter case, are a change of the advance.
+    const saved = unwrap(
+      await f.codRules.update(f.a, {
+        advance: { amount: '500', productTags: ['Pre-order', 'pre-ORDER '] },
+      }),
+    );
+    expect(saved.advance).toEqual({
+      kind: 'fixed_amount',
+      amount: 500_00n,
+      ...EVERY_ORDER,
+      productTags: ['Pre-order'],
+    });
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'cod_settings.updated')
+        .map((event) => event.payload),
+    ).toEqual([{ changed: ['advance'] }]);
+
+    // A cart holding none: nothing asked, nor said.
+    const { secret, view } = await checkout();
+    expect(view.payments).toMatchObject({ advance: null, advanceProduct: null });
+    expect(checkoutPage(view).html).not.toContain('in advance');
+    expect(placed(await f.checkouts.place(secret, view.shown, FORM))).toMatchObject({
+      advanceDue: 0n,
+      stage: 'needs_confirmation',
+    });
+
+    // A pre-order in it, its tag in other letters: the page names it, and the order waits for it.
+    const [lehnga] = await f.variantsOf(f.a, 'Bridal lehnga', {
+      price: '4,000',
+      tags: ['bridal', 'PRE-ORDER'],
+    });
+    await f.stock(f.a, lehnga!, 5);
+    const [kurta] = await f.variantsOf(f.a, 'Kurta', { price: '1,000' });
+    await f.stock(f.a, kurta!, 5);
+    const token = await act(null, 'add', {
+      items: [
+        { variantId: kurta, quantity: 1 },
+        { variantId: lehnga, quantity: 1 },
+      ],
+    });
+    const preOrder = (await f.checkouts.start(f.a.shopId, token))!;
+    const asked = open(await f.checkouts.view(preOrder));
+    expect(asked.payments).toMatchObject({
+      advance: saved.advance,
+      advanceProduct: 'Bridal lehnga',
+    });
+    const page = checkoutPage(asked).html;
+    expect(page).toContain(
+      'Cash on delivery: you pay when your order arrives. With Bridal lehnga in your cart, you ' +
+        'pay Rs 500 in advance by bank transfer.',
+    );
+    expect(page).toMatch(/Advance by bank transfer<\/span>[\s\S]*?−Rs 500/);
+    expect(
+      placed(await f.checkouts.place(preOrder, asked.shown, { ...FORM, phone: '0300-1234599' })),
+    ).toMatchObject({
+      total: 5_250_00n,
+      advanceDue: 500_00n,
+      codAmount: 4_750_00n,
+      stage: 'awaiting_payment',
+    });
   });
 
   it('asks for none without the account, and shows a page again once its advance changed', async () => {

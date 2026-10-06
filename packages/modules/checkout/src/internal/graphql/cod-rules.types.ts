@@ -36,7 +36,8 @@ registerEnumType(CashOnDeliveryAdvanceKind, {
     'waits for it as an order paid by transfer waits for its money, and the courier collects ' +
     'the rest. On every order, or only on those that meet each of its conditions: above a ' +
     'total, to one of its cities, by a customer who refused parcels before or is new to the ' +
-    'shop, scored at a risk or higher. Checkout asks for none while the shop gives no account.',
+    'shop, scored at a risk or higher, holding a product it tags. Checkout asks for none while ' +
+    'the shop gives no account.',
 })
 export class CashOnDeliveryAdvance {
   @Field(() => CashOnDeliveryAdvanceKind)
@@ -90,6 +91,14 @@ export class CashOnDeliveryAdvance {
       'Null for every order.',
   })
   riskScore!: number | null;
+
+  @Field(() => [String], {
+    description:
+      'Only on orders holding a product tagged with any of these, in any letter case, such as ' +
+      'pre-orders and custom stitching, paid in part ahead: "pre-order". Empty for every order. ' +
+      'Checkout names the product beside the option.',
+  })
+  productTags!: string[];
 }
 
 @ObjectType({
@@ -224,6 +233,14 @@ export class CashOnDeliveryAdvanceInput {
       'every order.',
   })
   riskScore?: number | null;
+
+  @Field(() => [String], {
+    nullable: true,
+    description:
+      'Only on orders holding a product with one of these tags, as the shop writes them on its ' +
+      'products, each once in any letter case. Empty or null for every order. Up to 50.',
+  })
+  productTags?: string[] | null;
 }
 
 @InputType({ description: 'Those not given stay as they are.' })

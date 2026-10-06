@@ -6,9 +6,9 @@
 
 ## In progress
 
-**An advance for products the shop tags** (CHK-10): the shop's advance on cash on delivery
-asked only of orders holding a product with a tag it names, as pre-orders and custom stitching are
-paid in part ahead.
+**Storefronts left waiting swept** (ADR-036): the worker going back on a schedule to shops whose
+storefront items still wait after the publisher's retries ran out, rather than leaving them for
+the shop's next event.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### An advance for products the shop tags
+
+* **The shop's advance may name products' tags** ([ADR-224](../architecture/13-decision-log.md#adr-224--a-shops-advance-may-be-asked-only-of-orders-holding-a-product-it-tags-checkout-knows-the-carts-products-before-anything-is-typed-names-the-product-beside-cash-on-delivery-and-asks-a-cart-holding-none-for-nothing)) (migration 0141):
+  asked only of orders holding a product tagged with one of them, in any letter case, its other
+  conditions holding too; fifty at most, each once, through `cashOnDeliverySettingsUpdate`.
+* **Checkout knows the cart's products before anything is typed:** a cart holding none is asked
+  for no advance and told of none; one holding a tagged product names it beside the option, "With
+  Bridal lehnga in your cart, you pay Rs 500 in advance by bank transfer", and takes it off what
+  the door collects where nothing else waits on what is typed. Placing asks it as the page said.
+* 1678 tests (4 new): the tags checked and the product found, in any letter case; the page's
+  words in English and Urdu; carts with and without one, through checkout to their orders; and
+  through the Admin API.
 
 ### 52bd0b8 · Migration tests given the time their databases take
 

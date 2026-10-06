@@ -47,6 +47,7 @@ function advanceOfRow(row: typeof codSettings.$inferSelect): CodAdvanceValue | n
     refusedDeliveries: row.advanceRefused,
     newCustomers: row.advanceNewCustomers,
     riskScore: row.advanceRisk,
+    productTags: row.advanceProductTags,
   };
   switch (row.advanceKind) {
     case 'fixed_amount':
@@ -65,7 +66,8 @@ function advanceOfRow(row: typeof codSettings.$inferSelect): CodAdvanceValue | n
  * own, of none of the products it tags (ADR-078), outside cities it names, from customers who
  * refused fewer parcels than it allows, scored below its limit for risk (ADR-099); what it charges
  * for it (CHK-08, ADR-076); and what it asks for in advance, paid into its bank account (CHK-10,
- * ADR-084), where and of whom it asks it (ADR-089, ADR-094). A shop that set nothing takes cash on
+ * ADR-084), where, of whom and for what it asks it (ADR-089, ADR-094, ADR-224). A shop that set
+ * nothing takes cash on
  * delivery for every order the law allows, charging and asking nothing ahead for it.
  */
 @Injectable()
@@ -135,6 +137,7 @@ export class CodRulesService {
         advanceRefused: advance?.refusedDeliveries ?? null,
         advanceNewCustomers: advance?.newCustomers ?? false,
         advanceRisk: advance?.riskScore ?? null,
+        advanceProductTags: advance?.productTags ?? [],
       };
       await tx
         .insert(codSettings)

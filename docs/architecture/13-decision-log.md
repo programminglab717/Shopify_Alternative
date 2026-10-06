@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-223 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-224 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -231,6 +231,7 @@
 | 221 | A shop puts its gateways in the order its customers are offered them: the Admin API takes all its live accounts at once, those connected before keep the order they were connected in, and one connected later goes last | Accepted |
 | 222 | A shop may take something off orders paid online, as it may off those paid by transfer: a percentage up to a cap or an amount of its own, which checkout takes off the items after any code and the order keeps apart | Accepted |
 | 223 | A draft paid by transfer gets a link too: its customer confirms it as one paid on delivery, its order waits for the money, and the link becomes the order's, whose page shows where to pay and takes the payment online | Accepted |
+| 224 | A shop's advance may be asked only of orders holding a product it tags: checkout knows the cart's products before anything is typed, names the product beside cash on delivery, and asks a cart holding none for nothing | Accepted |
 
 ---
 
@@ -9346,3 +9347,43 @@
     page offers paying online whatever the draft said; drafts paid by transfer cover it.
   * **The draft's page taking the payment itself:** the order's page already does, and two pages
     doing it would drift apart.
+
+## ADR-224 · A shop's advance may be asked only of orders holding a product it tags: checkout knows the cart's products before anything is typed, names the product beside cash on delivery, and asks a cart holding none for nothing
+
+* **Context:** Pre-orders and custom stitching are paid in part ahead (CHK-10, 05 §4.4). A shop
+  could keep cash on delivery from products by their tags altogether ([ADR-078](#adr-078--a-shop-keeps-cash-on-delivery-from-products-by-their-tags-a-cart-holding-one-is-offered-bank-transfer-alone-the-page-naming-the-product)),
+  offering transfer alone, and ask its advance of every order, above a total, to cities, of
+  customers or by risk ([ADR-084](#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery), [ADR-089](#adr-089--a-shops-advance-may-be-asked-only-to-cities-it-names-and-of-customers-who-refused-parcels-before-checkout-names-every-city-and-says-of-whom-and-placing-applies-them-to-the-city-and-number-typed), [ADR-094](#adr-094--a-shops-advance-may-be-asked-only-of-customers-new-to-it-and-of-orders-its-risk-rules-score-high-such-an-order-is-asked-it-instead-of-waiting-for-review)), but not of
+  the orders holding what it makes to order alone. A shop selling ready-made kurtas and suits
+  stitched to measure wants the advance on the suits, and its kurtas paid at the door in full.
+* **Decision:**
+  * **The advance may name products' tags** (migration 0141): fifty at most, each once in any
+    letter case, as the tags that keep cash on delivery from products are. It is asked only of
+    orders holding a product tagged with one of them, its other conditions holding too.
+  * **Checkout settles it from the cart, before anything is typed.** It reads the cart's
+    products where the shop names tags for either rule, as it does for cash on delivery's. A cart
+    holding none is asked for no advance and told of none: the page's payments hold none, so its
+    digest changes, and the page is shown again, if the shop tags a product in the cart while it
+    is open. A cart holding one names the first such product beside the option, "With Bridal
+    lehnga in your cart, you pay Rs 500 in advance by bank transfer", and takes the advance off
+    what the door collects at once where nothing else waits on what is typed.
+  * **Placing asks it as the page said:** the view it builds again is the page's, which has no
+    advance for a cart holding none, so placing looks at no product.
+  * An advance naming no tags keeps the key it had in pages' digests, so pages open as this is
+    deployed don't change.
+* **Consequences:**
+  * A shop takes pre-orders and stitching on delivery with part paid ahead, and the rest of its
+    products at the door, through one checkout.
+  * The product is known on the page, unlike the customer's history or the order's risk, so the
+    shopper sees what they pay ahead before they type.
+  * The advance is counted on the whole order by its kind: a share is of all the items, not of
+    the tagged product's price.
+  * Drafts' advances stay staff's call ([ADR-085](#adr-085--a-draft-may-ask-for-an-advance-as-an-order-does-once-its-customer-confirms-it-the-drafts-link-shows-where-to-pay-and-takes-the-receipt)).
+* **Alternatives:**
+  * **A share of the tagged products alone:** a second way of counting the advance for one rule;
+    an amount the shop chooses fits what it makes to order, and a share of the items fits a cart
+    of one such product.
+  * **An advance set on each product:** the catalog has no field for it, and shops already mark
+    pre-orders with tags, as Shopify's pre-order apps do.
+  * **Keeping cash on delivery from them** ([ADR-078](#adr-078--a-shop-keeps-cash-on-delivery-from-products-by-their-tags-a-cart-holding-one-is-offered-bank-transfer-alone-the-page-naming-the-product)): already there, and prepays the
+    whole order, which shops asking an advance mean to avoid.

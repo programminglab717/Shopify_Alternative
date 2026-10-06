@@ -61,6 +61,7 @@ import { CartService } from './cart.service.js';
 import {
   NO_COD_RULES,
   advanceAsksOfCustomers,
+  advanceForCart,
   advanceKeyOf,
   codRefusalOf,
   placedAdvanceOf,
@@ -186,9 +187,15 @@ export interface CheckoutPayments {
   transferDiscount: PrepaidDiscountValue | null;
   /**
    * What cash on delivery asks for in advance by the shop's rules, paid by transfer into its
-   * account (ADR-084); null for nothing, as where it has no account.
+   * account (ADR-084); null for nothing, as where it has no account, or where it asks it only of
+   * orders holding products it tags and the cart holds none (ADR-224).
    */
   advance: CodAdvanceValue | null;
+  /**
+   * The cart's product the advance is asked for, where the shop asks it only of orders holding
+   * products it tags (ADR-224): its title, which the page names; null where it asks every order.
+   */
+  advanceProduct: string | null;
   /**
    * Whether cash on delivery asks in advance, by transfer into the shop's account, what an order
    * comes to past the law's cap (TAX-07, ADR-188): where the cart may come to more, wherever it
@@ -900,11 +907,15 @@ export class CheckoutService {
           (totals.freeDelivery ? 0n : highestDeliveryCharge(delivery, items)) +
           codRules.fee,
       }) > 0n;
-    // The cart's products, by their tags, where the shop keeps cash on delivery from some.
+    // The cart's products, by their tags, where the shop keeps cash on delivery from some, or asks
+    // its advance for some alone (ADR-224).
     const products =
-      codRules.unavailableProductTags.length === 0
+      codRules.unavailableProductTags.length === 0 &&
+      (codRules.advance?.productTags.length ?? 0) === 0
         ? []
         : await this.carts.productsIn(tx, shopId, priced);
+    // The shop's advance, where it asks it of this cart.
+    const ownAdvance = advanceForCart(codRules.advance, products);
     const transfer = await offeredBankTransferIn(tx, shopId);
     // The shop's gateways, where it takes the shop's currency online (ADR-152, ADR-219).
     const gateways = this.payments
@@ -917,7 +928,7 @@ export class CheckoutService {
     // An advance is paid into the shop's account, which it may give without offering transfers:
     // the shop's own, or what the order comes to past the law's cap (ADR-188).
     const account =
-      codRules.advance === null && !mayPassLimit
+      ownAdvance === null && !mayPassLimit
         ? null
         : (transfer?.account ?? (await bankTransferSettingsIn(tx, shopId)).account);
     const payments: CheckoutPayments = {
@@ -928,7 +939,8 @@ export class CheckoutService {
       codRules,
       bankTransfer: transfer?.account ?? null,
       transferDiscount: transfer?.discount ?? null,
-      advance: account ? codRules.advance : null,
+      advance: account ? (ownAdvance?.advance ?? null) : null,
+      advanceProduct: account ? (ownAdvance?.product ?? null) : null,
       capAdvance: mayPassLimit && account !== null,
       online,
       onlineDiscount,

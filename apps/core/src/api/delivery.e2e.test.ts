@@ -188,7 +188,7 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
         cashOnDeliverySettings {
           advance {
             kind amount { amount } percentage above { amount } cities refusedDeliveries
-            newCustomers riskScore
+            newCustomers riskScore productTags
           }
         }
         userErrors { field code message }
@@ -231,6 +231,7 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
           refusedDeliveries: null,
           newCustomers: false,
           riskScore: null,
+          productTags: [],
         },
       },
       userErrors: [],
@@ -295,6 +296,15 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
       (await gql(tokens.reader, '{ cashOnDeliverySettings { riskScoreLimit } }')).data
         ?.cashOnDeliverySettings,
     ).toEqual({ riskScoreLimit: 0.85 });
+    // Only on orders holding a product the shop tags, each tag once in any letter case.
+    expect(
+      await advance({ percentage: 30, productTags: [' Pre-order ', 'PRE-ORDER', 'stitching'] }),
+    ).toMatchObject({
+      cashOnDeliverySettings: {
+        advance: { kind: 'PERCENTAGE', percentage: 30, productTags: ['Pre-order', 'stitching'] },
+      },
+      userErrors: [],
+    });
     expect(await advance({ amount: '300', cities: ['Atlantis'], refusedDeliveries: 0 })).toEqual({
       cashOnDeliverySettings: null,
       userErrors: [
@@ -321,6 +331,7 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
           refusedDeliveries: null,
           newCustomers: false,
           riskScore: null,
+          productTags: [],
         },
       },
     });
