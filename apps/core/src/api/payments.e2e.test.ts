@@ -953,5 +953,40 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
     expect(refused.statusCode).toBe(503);
     const sessions = await data(tokens.reader, SESSIONS, { orderId: order.id });
     expect(sessions.map((each: Json) => each.gatewayName).sort()).toEqual(['JazzCash', 'Safepay']);
+
+    // The shop puts Safepay first (ADR-221): the page offers it first.
+    const REORDER = `mutation ($ids: [ID!]!) {
+      paymentGatewayAccountsReorder(ids: $ids) {
+        paymentGatewayAccounts { gateway }
+        userErrors { field code message }
+      }
+    }`;
+    const live = await data(tokens.owner, '{ paymentGatewayAccounts { id gateway } }');
+    expect(live.map((each: Json) => each.gateway)).toEqual(['jazzcash', 'safepay']);
+    const ids = live.map((each: Json) => each.id).reverse();
+    expect((await gql(tokens.clerk, REORDER, { ids })).errors?.[0].extensions.code).toBe(
+      'ACCESS_DENIED',
+    );
+    expect(await data(tokens.owner, REORDER, { ids: ids.slice(1) })).toEqual({
+      paymentGatewayAccounts: null,
+      userErrors: [
+        {
+          field: ['ids'],
+          code: 'INVALID',
+          message: "List each of the shop's live accounts: Safepay is missing",
+        },
+      ],
+    });
+    expect(await data(tokens.owner, REORDER, { ids })).toEqual({
+      paymentGatewayAccounts: [{ gateway: 'safepay' }, { gateway: 'jazzcash' }],
+      userErrors: [],
+    });
+    const reordered = await app.inject({ method: 'GET', url: order.path });
+    expect(reordered.body).toContain(
+      'Pay Rs 3,000 by card or wallet, through Safepay or JazzCash.',
+    );
+    expect(reordered.body.indexOf('value="safepay"')).toBeLessThan(
+      reordered.body.indexOf('value="jazzcash"'),
+    );
   });
 });

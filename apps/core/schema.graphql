@@ -5207,6 +5207,11 @@ type Mutation {
   paymentGatewayAccountUpdate(id: ID!, input: PaymentGatewayAccountInput!): PaymentGatewayAccountPayload!
 
   """
+  Puts the shop's live payment gateway accounts in the order its customers are offered them, on orders' pages and checkout's thank-you page (PAY-05, ADR-221): ids lists each of them once, the first offered first. An account connected later goes last.
+  """
+  paymentGatewayAccountsReorder(ids: [ID!]!): PaymentGatewayAccountsReorderPayload!
+
+  """
   Settles a refund through the gateway whose answer never came (UNKNOWN, or PENDING past a few minutes), as the gateway's dashboard shows it: given back, which records the order's refund, or not, which frees what it held. Staff need to be an owner or a manager.
   """
   paymentRefundSettle(id: ID!, input: PaymentRefundSettleInput!): PaymentRefundSettlePayload!
@@ -6868,6 +6873,14 @@ type PaymentGatewayAccountPayload {
   userErrors: [UserError!]!
 }
 
+type PaymentGatewayAccountsReorderPayload {
+  """
+  The shop's live accounts, in the order its customers are offered them now.
+  """
+  paymentGatewayAccounts: [PaymentGatewayAccount!]
+  userErrors: [UserError!]!
+}
+
 """A credential a payment gateway asks for, as its dashboard shows it."""
 type PaymentGatewayCredentialField {
   """What it goes by in PaymentGatewayCredentialInput, such as "apiKey"."""
@@ -7967,7 +7980,7 @@ type Query {
   ): ClaimedParcelConnection!
 
   """
-  The shop's payment gateway accounts, the oldest first; archived ones if asked. Orders' pages and checkout offer each live one, for customers to choose among (ADR-219).
+  The shop's payment gateway accounts, in the order its customers are offered them, as paymentGatewayAccountsReorder puts them; archived ones after them, if asked. Orders' pages and checkout offer each live one, for customers to choose among (ADR-219).
   """
   paymentGatewayAccounts(archived: Boolean): [PaymentGatewayAccount!]!
 

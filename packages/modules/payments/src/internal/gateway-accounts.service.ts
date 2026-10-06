@@ -12,7 +12,11 @@ import { appendEvent, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
-import { PaymentEvents, type GatewayAccountChangedPayload } from './events.js';
+import {
+  PaymentEvents,
+  type GatewayAccountChangedPayload,
+  type GatewayAccountsReorderedPayload,
+} from './events.js';
 import {
   GATEWAY_ENVIRONMENTS,
   PaymentGateways,
@@ -107,7 +111,10 @@ export class GatewayAccountService {
     @Inject(PAYMENT_GATEWAYS) private readonly gateways: PaymentGateways,
   ) {}
 
-  /** The shop's accounts, the oldest first; archived ones only if asked. */
+  /**
+   * The shop's accounts, in the order its customers are offered them (ADR-221); archived ones, after
+   * them, only if asked.
+   */
   async list(
     tenant: TenantContext,
     options: { archived?: boolean } = {},
@@ -118,7 +125,7 @@ export class GatewayAccountService {
           FROM payments.gateway_accounts
          WHERE shop_id = ${tenant.shopId}
            ${options.archived ? sql`` : sql`AND archived_at IS NULL`}
-         ORDER BY archived_at IS NOT NULL, created_at, id`);
+         ORDER BY archived_at IS NOT NULL, position, created_at, id`);
       return rows.map((row) => this.#toRecord(row));
     });
   }
@@ -130,7 +137,10 @@ export class GatewayAccountService {
     return row && this.#toRecord(row);
   }
 
-  /** Connects an account with a gateway: one live account a gateway. */
+  /**
+   * Connects an account with a gateway: one live account a gateway, offered after the shop's
+   * others.
+   */
   async connect(
     tenant: TenantContext,
     input: GatewayAccountInput,
@@ -168,9 +178,12 @@ export class GatewayAccountService {
       const id = newId();
       await tx.execute(sql`
         INSERT INTO payments.gateway_accounts (shop_id, id, gateway, environment, credentials,
-                                               credentials_hint)
-        VALUES (${tenant.shopId}, ${id}, ${gateway.info.gateway}, ${environment},
-                ${this.#seal(tenant.shopId, id, credentials)}, ${hintOf(credentials)})`);
+                                               credentials_hint, position)
+        SELECT ${tenant.shopId}, ${id}, ${gateway.info.gateway}, ${environment},
+               ${this.#seal(tenant.shopId, id, credentials)}, ${hintOf(credentials)},
+               coalesce(max(position), 0) + 1
+          FROM payments.gateway_accounts
+         WHERE shop_id = ${tenant.shopId}`);
       await this.#record(tx, tenant, id, PaymentEvents.GatewayAccountConnected, {
         gateway: gateway.info.gateway,
         environment,
@@ -273,6 +286,79 @@ export class GatewayAccountService {
         ok: true,
         value: this.#toRecord((await gatewayAccountIn(tx, tenant.shopId, id))!),
       };
+    });
+  }
+
+  /**
+   * Puts the shop's live accounts in the order its customers are offered them (PAY-05, ADR-221):
+   * `ids` names each of them once, the first offered first. An account connected later goes last.
+   */
+  async reorder(
+    tenant: TenantContext,
+    ids: readonly string[],
+  ): Promise<MutationResult<GatewayAccountRecord[]>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      await lockAccounts(tx, tenant.shopId);
+      const live = await liveGatewayAccountsIn(tx, tenant.shopId);
+      if (ids.length > live.length) {
+        return failOne(
+          ['ids'],
+          'TOO_MANY',
+          `List each of the shop's live accounts once: it has ${live.length}`,
+        );
+      }
+      const check = new InputChecker();
+      const given = new Set<string>();
+      for (const [index, id] of ids.entries()) {
+        if (given.has(id)) {
+          check.addMessage(['ids', String(index)], 'INVALID', 'The account is listed twice');
+        } else if (!live.some((row) => row.id === id)) {
+          check.addMessage(
+            ['ids', String(index)],
+            'NOT_FOUND',
+            'Payment gateway account not found among the live ones',
+          );
+        }
+        given.add(id);
+      }
+      const missing = live.filter((row) => !given.has(row.id));
+      if (check.ok && missing.length > 0) {
+        check.addMessage(
+          ['ids'],
+          'INVALID',
+          `List each of the shop's live accounts: ${missing
+            .map((row) => this.#nameOf(row.gateway))
+            .join(' and ')} ${missing.length === 1 ? 'is' : 'are'} missing`,
+        );
+      }
+      if (!check.ok) return { ok: false, errors: check.errors };
+      const order = live.map((row) => row.id);
+      if (ids.every((id, index) => order[index] === id)) {
+        return { ok: true, value: live.map((row) => this.#toRecord(row)) };
+      }
+      await tx.execute(sql`
+        UPDATE payments.gateway_accounts a
+           SET position = given.position, version = a.version + 1, updated_at = now()
+          FROM unnest(${sql.param(ids)}::uuid[]) WITH ORDINALITY AS given (id, position)
+         WHERE a.shop_id = ${tenant.shopId} AND a.id = given.id
+           AND a.position IS DISTINCT FROM given.position`);
+      const actor = actorColumnsOf(tenant.actor);
+      const gateways = ids.map((id) => live.find((row) => row.id === id)!.gateway);
+      await appendEvent<GatewayAccountsReorderedPayload>(tx, tenant.shopId, {
+        type: PaymentEvents.GatewayAccountsReordered,
+        aggregateType: 'shop',
+        aggregateId: tenant.shopId,
+        payload: { gateways, actorKind: actor.actorKind, actorId: actor.actorId },
+      });
+      await recordAudit(tx, tenant.shopId, {
+        action: PaymentEvents.GatewayAccountsReordered,
+        subjectType: 'shop',
+        subjectId: tenant.shopId,
+        ...actor,
+        details: { before: live.map((row) => row.gateway), after: gateways },
+      });
+      const reordered = await liveGatewayAccountsIn(tx, tenant.shopId);
+      return { ok: true, value: reordered.map((row) => this.#toRecord(row)) };
     });
   }
 
@@ -385,11 +471,15 @@ export class GatewayAccountService {
     });
   }
 
+  #nameOf(gateway: string): string {
+    return this.gateways.of(gateway)?.info.name ?? gateway;
+  }
+
   #toRecord(row: GatewayAccountRow): GatewayAccountRecord {
     return {
       id: row.id,
       gateway: row.gateway,
-      gatewayName: this.gateways.of(row.gateway)?.info.name ?? row.gateway,
+      gatewayName: this.#nameOf(row.gateway),
       environment: row.environment,
       credentialsHint: row.credentials_hint,
       webhookUrl: this.webhookUrl(row.id),
@@ -421,14 +511,14 @@ export async function gatewayAccountIn(
 
 /**
  * The accounts the shop takes payments through now, for customers to choose among (ADR-219): its
- * live ones, one a gateway, in the order it added them.
+ * live ones, one a gateway, in the order it puts them, else that it connected them in (ADR-221).
  */
 export async function liveGatewayAccountsIn(tx: Tx, shopId: string): Promise<GatewayAccountRow[]> {
   const { rows } = await tx.execute<GatewayAccountRow>(sql`
     SELECT ${ACCOUNT_COLUMNS}
       FROM payments.gateway_accounts
      WHERE shop_id = ${shopId} AND archived_at IS NULL
-     ORDER BY created_at, id`);
+     ORDER BY position, created_at, id`);
   return rows;
 }
 

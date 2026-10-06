@@ -5,6 +5,8 @@ export const PaymentEvents = {
   GatewayAccountUpdated: 'payment_gateway_account.updated',
   /** No new payments through the account; those made through it stay recorded. */
   GatewayAccountArchived: 'payment_gateway_account.archived',
+  /** The shop put its live accounts in a new order, the one its customers are offered them in. */
+  GatewayAccountsReordered: 'payment_gateway_accounts.reordered',
   /** A customer started paying an order online, on the gateway's page (PAY-04). */
   PaymentSessionStarted: 'payment_session.started',
   /** The gateway would not start a payment: see its error. */
@@ -22,6 +24,13 @@ export interface GatewayAccountChangedPayload {
   environment: string;
   /** For updates: what changed, such as ["credentials", "environment"]. */
   changed?: string[];
+  actorKind: 'staff' | 'app';
+  actorId: string;
+}
+
+export interface GatewayAccountsReorderedPayload {
+  /** The live accounts' gateways, in their new order: ["jazzcash", "safepay"]. */
+  gateways: string[];
   actorKind: 'staff' | 'app';
   actorId: string;
 }

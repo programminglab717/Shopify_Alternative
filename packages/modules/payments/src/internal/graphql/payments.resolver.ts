@@ -32,6 +32,7 @@ import {
   PaymentGatewayAccount,
   PaymentGatewayAccountInput,
   PaymentGatewayAccountPayload,
+  PaymentGatewayAccountsReorderPayload,
   PaymentGatewayEnvironment,
   PaymentGatewayRefunds,
   PaymentRefund,
@@ -77,7 +78,8 @@ export class PaymentsResolver {
 
   @Query(() => [PaymentGatewayAccount], {
     description:
-      "The shop's payment gateway accounts, the oldest first; archived ones if asked. Orders' " +
+      "The shop's payment gateway accounts, in the order its customers are offered them, as " +
+      "paymentGatewayAccountsReorder puts them; archived ones after them, if asked. Orders' " +
       'pages and checkout offer each live one, for customers to choose among (ADR-219).',
   })
   @RequireScopes('read_settings')
@@ -132,6 +134,27 @@ export class PaymentsResolver {
     @Args('id', { type: () => ID }) id: string,
   ): Promise<PaymentGatewayAccountPayload> {
     return accountPayload(await this.accounts.archive(tenant, uuidOf('paymentGatewayAccount', id)));
+  }
+
+  @Mutation(() => PaymentGatewayAccountsReorderPayload, {
+    description:
+      "Puts the shop's live payment gateway accounts in the order its customers are offered " +
+      "them, on orders' pages and checkout's thank-you page (PAY-05, ADR-221): ids lists each " +
+      'of them once, the first offered first. An account connected later goes last.',
+  })
+  @RequireScopes('write_settings')
+  async paymentGatewayAccountsReorder(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+  ): Promise<PaymentGatewayAccountsReorderPayload> {
+    const result = await this.accounts.reorder(
+      tenant,
+      ids.map((id) => uuidOf('paymentGatewayAccount', id)),
+    );
+    return Object.assign(new PaymentGatewayAccountsReorderPayload(), {
+      paymentGatewayAccounts: result.ok ? result.value.map(toAccount) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
   }
 
   @Query(() => [PaymentSession], {

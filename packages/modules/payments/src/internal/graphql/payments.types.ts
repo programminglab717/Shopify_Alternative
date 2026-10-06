@@ -223,6 +223,18 @@ export class PaymentGatewayAccountPayload {
   userErrors!: UserError[];
 }
 
+@ObjectType()
+export class PaymentGatewayAccountsReorderPayload {
+  @Field(() => [PaymentGatewayAccount], {
+    nullable: true,
+    description: "The shop's live accounts, in the order its customers are offered them now.",
+  })
+  paymentGatewayAccounts!: PaymentGatewayAccount[] | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
 @ObjectType({
   description:
     'Money asked back of a payment through its gateway (PAY-06, ADR-153), by orderRefund with ' +

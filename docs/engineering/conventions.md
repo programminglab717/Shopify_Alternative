@@ -1022,8 +1022,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   English and Urdu, and offer a transfer as the other way only where the order has an account.
 * **Offer every gateway, and start the one chosen**
   ([ADR-219](../architecture/13-decision-log.md#adr-219--customers-choose-among-the-shops-gateways-each-live-account-that-takes-the-orders-currency-is-offered-on-its-page-and-checkouts-thank-you-page-in-the-order-the-shop-added-them-and-the-payment-starts-through-the-one-chosen)): a page that takes money online
-  offers `gatewaysOf`'s list whole, a button each through `payOnlineForm`, lets its form go on
-  to each (`gatewayOrigins`), and starts the payment through the posted `gateway` found by
+  offers `gatewaysOf`'s list whole, in the shop's order
+  ([ADR-221](../architecture/13-decision-log.md#adr-221--a-shop-puts-its-gateways-in-the-order-its-customers-are-offered-them-the-admin-api-takes-all-its-live-accounts-at-once-those-connected-before-keep-the-order-they-were-connected-in-and-one-connected-later-goes-last)),
+  which `liveGatewayAccountsIn` alone keeps, a button each through `payOnlineForm`, lets its form go
+  on to each (`gatewayOrigins`), and starts the payment through the posted `gateway` found by
   `chosenGateway`, the first where none is posted and none where it names one not offered. Never
   choose for the customer where the shop has several.
 * **Give money back through the gateway as payments are taken** ([ADR-153](../architecture/13-decision-log.md#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)):

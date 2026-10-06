@@ -16,8 +16,8 @@ import type { OrderStatusValue } from './schema.js';
 export abstract class OnlinePayments {
   /**
    * The gateways the shop takes `currency` online through, for the customer to choose among
-   * (ADR-219): each of its live accounts that takes it, in the order the shop added them; none if
-   * it takes it online through none.
+   * (ADR-219): each of its live accounts that takes it, in the order the shop puts them
+   * (ADR-221); none if it takes it online through none.
    */
   abstract gatewaysOf(tx: Tx, shopId: string, currency: CurrencyCode): Promise<OnlineGateway[]>;
 

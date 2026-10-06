@@ -2,6 +2,7 @@
 export {
   PaymentEvents,
   type GatewayAccountChangedPayload,
+  type GatewayAccountsReorderedPayload,
   type PaymentRefundPayload,
   type PaymentSessionPayload,
 } from '../internal/events.js';

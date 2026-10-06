@@ -410,7 +410,7 @@ export class OnlinePaymentService extends OnlinePayments {
 
   /**
    * The shop's live accounts whose gateways take `currency`, with their gateways, in the order
-   * the shop added them (ADR-219): what customers choose among.
+   * the shop puts them (ADR-221): what customers choose among (ADR-219).
    */
   async #offeredIn(
     tx: Tx,

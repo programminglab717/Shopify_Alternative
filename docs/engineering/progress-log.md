@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Payment method rules for paying online** (PAY-05): the order the shop's gateways are offered
-in, set by the shop, and something off for paying online, as a transfer has.
+**Something off for paying online** (PAY-05, CHK-08): a percentage up to a cap, or an amount,
+taken off orders paid online at checkout, as the shop's discount for paying by transfer is.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### The order the shop's gateways are offered in
+
+* **The shop's own order** ([ADR-221](../architecture/13-decision-log.md#adr-221--a-shop-puts-its-gateways-in-the-order-its-customers-are-offered-them-the-admin-api-takes-all-its-live-accounts-at-once-those-connected-before-keep-the-order-they-were-connected-in-and-one-connected-later-goes-last)) for its live gateway accounts on an order's page and
+  checkout's thank-you page, in place of the order it connected them in, which those connected
+  before keep; one connected later goes last.
+* **`paymentGatewayAccountsReorder(ids)`** takes each live account once, the first offered first,
+  with `write_settings`: one listed twice, archived or another shop's refused, one left out
+  named; recorded as `payment_gateway_accounts.reordered` and audited before and after.
+* 1669 tests (1 new): the order kept, given and refused, and through HTTP, Safepay put first and
+  the order's page offering it first.
 
 ### 1c2cbe4 · Comments on articles
 

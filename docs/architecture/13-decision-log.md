@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-220 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-221 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -228,6 +228,7 @@
 | 218 | A blog whose handle changes sends its articles' old addresses to their new ones when asked, as Shopify's redirectArticles does: a redirect for each, made all at once, with one event the storefront follows | Accepted |
 | 219 | Customers choose among the shop's gateways: each live account that takes the order's currency is offered on its page and checkout's thank-you page, in the order the shop added them, and the payment starts through the one chosen | Accepted |
 | 220 | Articles take comments as their blog's Shopify comment policy says: posted from an article's page through the storefront, held for the shop's approval where the blog moderates them, shown escaped as text in the article's document, and approved, marked as spam or deleted through the Admin API | Accepted |
+| 221 | A shop puts its gateways in the order its customers are offered them: the Admin API takes all its live accounts at once, those connected before keep the order they were connected in, and one connected later goes last | Accepted |
 
 ---
 
@@ -9223,3 +9224,42 @@
     pages show.
   * **A spam filter, such as Akismet:** another processor of shoppers' words and addresses, for
     the volume a Pakistani shop's blog sees; moderation and the limit come first.
+
+## ADR-221 · A shop puts its gateways in the order its customers are offered them: the Admin API takes all its live accounts at once, those connected before keep the order they were connected in, and one connected later goes last
+
+* **Context:** An order's page and checkout's thank-you page offer each of the shop's live
+  gateway accounts, a button each, in the order the shop connected them, and nothing set it
+  otherwise ([ADR-219](#adr-219--customers-choose-among-the-shops-gateways-each-live-account-that-takes-the-orders-currency-is-offered-on-its-page-and-checkouts-thank-you-page-in-the-order-the-shop-added-them-and-the-payment-starts-through-the-one-chosen)). A shop knows which wallet its customers have: one selling to
+  JazzCash's users wants JazzCash first, though it connected Safepay first, and the first button
+  is the one most press. The method rules engine (05 §4.4) orders the ways to pay, as Shopify's
+  payment customizations reorder a checkout's payment methods.
+* **Decision:**
+  * **Each account keeps its place** (`position`, migration 0138): those connected before take
+    the order they were connected in, and one connected later goes after the shop's others.
+    `liveGatewayAccountsIn`, which every page offering them reads, and `paymentGatewayAccounts`
+    take them by it, then by when they were connected; an archived account keeps its place, after
+    the live ones in the list.
+  * **`paymentGatewayAccountsReorder(ids)` takes the whole order at once:** each of the shop's
+    live accounts once, the first offered first. One listed twice, not live or another shop's is
+    refused, one left out is named, and a list longer than the shop's is too many, so that no
+    order is ever half given. The same order again changes nothing; a new one is recorded as
+    `payment_gateway_accounts.reordered` and audited with the order before and after.
+  * **Settings' scope, without signing in again:** `write_settings`, as archiving an account
+    needs; the order sends no money anywhere new, unlike connecting an account or changing its
+    credentials ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)).
+* **Consequences:**
+  * The shop decides which gateway its customers see first, on every page that takes money
+    online; a post naming none, as a page from before could send, takes that first one.
+  * Checkout's digest keeps the gateways' names in their order, so a checkout open while the shop
+    reorders them shows itself again once, as when it connects one.
+  * The order is the shop's, the same for every customer: wallets first on phones and cards first
+    from abroad, as 05 §4.4 has it, would need the page to know the customer's device or
+    country, and wait.
+  * A client changing the order reads the shop's live accounts first, as it must name each.
+* **Alternatives:**
+  * **A position through `paymentGatewayAccountUpdate`, one account at a time:** each move would
+    shift others, and two calls racing could leave two accounts at one place; the whole list at
+    once states the order and nothing else.
+  * **Moves, as Shopify's `collectionReorderProducts` takes them:** made for a collection's
+    thousands of products; a shop has a few accounts, one a gateway.
+  * **A default gateway alone:** one choice, which putting it first already makes.

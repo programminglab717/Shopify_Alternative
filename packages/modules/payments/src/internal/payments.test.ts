@@ -351,6 +351,100 @@ describe.skipIf(!server)('Payments online', () => {
     );
   });
 
+  it("offers the shop's live accounts in the order it puts them, one connected later last (ADR-221)", async () => {
+    const testAccount = await f.connectTest(f.a);
+    const jazzcash = unwrap(
+      await f.accounts.connect(f.a, {
+        gateway: 'jazzcash',
+        credentials: [
+          { key: 'merchantId', value: 'MC12345' },
+          { key: 'password', value: 'x0y1z2w3' },
+          { key: 'integritySalt', value: 'salt-of-zari' },
+        ],
+      }),
+    );
+    const safepay = unwrap(
+      await f.accounts.connect(f.a, {
+        gateway: 'safepay',
+        credentials: [
+          { key: 'apiKey', value: 'sec_abc' },
+          { key: 'secretKey', value: 'secret-key' },
+          { key: 'webhookSecret', value: 'webhook-secret' },
+        ],
+      }),
+    );
+    const offered = async () =>
+      (await f.db.tenant(f.a.shopId, (tx) => f.payments.gatewaysOf(tx, f.a.shopId, 'PKR'))).map(
+        (each) => each.gateway,
+      );
+    // In the order the shop connected them, until it puts them in its own.
+    expect(await offered()).toEqual(['test', 'jazzcash', 'safepay']);
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    await f.admin.query('DELETE FROM platform.audit_log');
+
+    const order = [safepay.id, testAccount, jazzcash.id];
+    const reordered = unwrap(await f.accounts.reorder(f.a, order));
+    expect(reordered.map((each) => each.gateway)).toEqual(['safepay', 'test', 'jazzcash']);
+    expect(await offered()).toEqual(['safepay', 'test', 'jazzcash']);
+    expect((await f.accounts.list(f.a)).map((each) => each.id)).toEqual(order);
+    // The same order again changes nothing.
+    expect(unwrap(await f.accounts.reorder(f.a, order)).map((each) => each.id)).toEqual(order);
+    expect((await f.outbox()).map((event) => [event.event_type, event.payload])).toEqual([
+      [
+        'payment_gateway_accounts.reordered',
+        {
+          gateways: ['safepay', 'test', 'jazzcash'],
+          actorKind: 'app',
+          actorId: expect.any(String),
+        },
+      ],
+    ]);
+    const { rows: audit } = await f.admin.query<{ action: string; details: unknown }>(
+      'SELECT action, details FROM platform.audit_log ORDER BY occurred_at',
+    );
+    expect(audit).toEqual([
+      {
+        action: 'payment_gateway_accounts.reordered',
+        details: {
+          before: ['test', 'jazzcash', 'safepay'],
+          after: ['safepay', 'test', 'jazzcash'],
+        },
+      },
+    ]);
+
+    // Each live account once, and none else.
+    const missing = await f.accounts.reorder(f.a, [safepay.id, testAccount]);
+    expect(errorsOf(missing)).toEqual([['ids', 'INVALID']]);
+    expect(missing.ok ? null : missing.errors[0]!.message).toBe(
+      "List each of the shop's live accounts: JazzCash is missing",
+    );
+    expect(errorsOf(await f.accounts.reorder(f.a, [safepay.id, safepay.id, jazzcash.id]))).toEqual([
+      ['ids.1', 'INVALID'],
+    ]);
+    expect(errorsOf(await f.accounts.reorder(f.a, [...order, safepay.id]))).toEqual([
+      ['ids', 'TOO_MANY'],
+    ]);
+    // An archived account is offered to nobody; one connected after goes last.
+    unwrap(await f.accounts.archive(f.a, testAccount));
+    expect(errorsOf(await f.accounts.reorder(f.a, [testAccount, jazzcash.id]))).toEqual([
+      ['ids.0', 'NOT_FOUND'],
+    ]);
+    const again = await f.connectTest(f.a);
+    expect(await offered()).toEqual(['safepay', 'jazzcash', 'test']);
+    expect((await f.accounts.list(f.a, { archived: true })).map((each) => each.id)).toEqual([
+      safepay.id,
+      jazzcash.id,
+      again,
+      testAccount,
+    ]);
+    // Another shop's accounts are its own.
+    await f.connectTest(f.b);
+    expect(errorsOf(await f.accounts.reorder(f.b, [jazzcash.id]))).toEqual([
+      ['ids.0', 'NOT_FOUND'],
+    ]);
+    expect(await offered()).toEqual(['safepay', 'jazzcash', 'test']);
+  });
+
   it("takes what an order waits for through JazzCash's page, by a signed form (ADR-163)", async () => {
     const order = await f.awaiting(f.a, kurta);
     const token = await f.linkOf(f.a, order.id);
