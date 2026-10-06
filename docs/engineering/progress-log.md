@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Expired carts and checkouts swept
+### 14115ee · Expired carts and checkouts swept
 
 * **The worker deletes carts, checkouts and browsers' proofs of a number past their time**
   ([ADR-230](../architecture/13-decision-log.md#adr-230--carts-checkouts-and-browsers-proofs-of-a-number-are-deleted-once-past-their-time-by-a-sweep-in-the-worker-across-shops-and-the-longest-expired-first-each-shops-in-its-own-transaction-rather-than-by-shoppers-requests-as-their-shop-gets-new-ones)), across shops, every sweep: found with the system role, the longest
