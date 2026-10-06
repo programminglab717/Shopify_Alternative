@@ -29,6 +29,7 @@ import {
 } from './gateway-accounts.service.js';
 import type {
   GatewayEnvironmentValue,
+  GatewayForm,
   GatewayPayment,
   GatewayWebhook,
   PaymentGateway,
@@ -62,6 +63,12 @@ export const PAYMENT_INQUIRIES = {
   withinMs: 2 * 86_400_000,
   batch: 50,
 } as const;
+
+/**
+ * How often a customer's return may ask the gateway after a payment whose return is not signed
+ * (ADR-214): once a minute a session, however often the page is asked for.
+ */
+export const RETURN_INQUIRY_SECONDS = 60;
 
 export const SESSION_STATUSES = ['open', 'paid', 'failed'] as const;
 export type SessionStatusValue = (typeof SESSION_STATUSES)[number];
@@ -164,6 +171,16 @@ type Begun =
 
 /** What became of a webhook's request. */
 export type WebhookOutcome = 'not_found' | 'unsigned' | 'ignored' | 'paid';
+
+/**
+ * What a customer's return says: what to answer at once, or a session whose gateway is to be
+ * asked after it first, as its return is not signed (ADR-214).
+ */
+type Returned =
+  | { done: 'paid' | 'test' | GatewayForm | null }
+  | {
+      inquire: { session: SessionRow; gateway: PaymentGateway; account: OpenedGatewayAccount };
+    };
 
 type RefundRow = {
   id: string;
@@ -325,8 +342,9 @@ export class OnlinePaymentService extends OnlinePayments {
     shopId: string,
     orderId: string,
     form: Readonly<Record<string, string>>,
-  ): Promise<'paid' | 'test' | null> {
-    return this.db.tenant(shopId, async (tx) => {
+    returnUrl: string,
+  ): Promise<'paid' | 'test' | GatewayForm | null> {
+    const found = await this.db.tenant(shopId, async (tx): Promise<Returned> => {
       // The order's sessions with the gateway, each account asked whether the form is its own.
       const { rows: sessions } = await tx.execute<SessionRow>(sql`
         SELECT ${SESSION_COLUMNS}
@@ -339,17 +357,41 @@ export class OnlinePaymentService extends OnlinePayments {
         const row = await gatewayAccountIn(tx, shopId, accountId);
         const gateway = row && this.gateways.of(row.gateway);
         if (!row || !gateway) continue;
-        const payment = gateway.returned(this.accounts.openedIn(shopId, row), form);
-        const session =
-          payment &&
-          sessions.find(
-            (each) => each.account_id === accountId && each.gateway_ref === payment.ref,
-          );
-        if (!payment || !session) continue;
-        const paid = await this.#complete(tx, shopId, session, gateway, payment, 'return');
-        return paid.environment === 'sandbox' ? 'test' : 'paid';
+        const account = this.accounts.openedIn(shopId, row);
+        const ofAccount = (ref: string) =>
+          sessions.find((each) => each.account_id === accountId && each.gateway_ref === ref);
+        const payment = gateway.returned(account, form);
+        const session = payment && ofAccount(payment.ref);
+        if (payment && session) {
+          const paid = await this.#complete(tx, shopId, session, gateway, payment, 'return');
+          return { done: paid.environment === 'sandbox' ? 'test' : 'paid' };
+        }
+        // Partway, as Easypaisa's page sends the customer back with a token for its next one.
+        const next = gateway.continued?.(account, form, returnUrl);
+        if (next) return { done: next };
+        // A return not signed names the payment alone, which the gateway is asked after at once,
+        // at most once a minute, however often the page is asked for (ADR-214).
+        const ref = gateway.returnRef?.(form);
+        const asked = ref ? ofAccount(ref) : undefined;
+        if (!asked || asked.status !== 'open' || !gateway.inquire) continue;
+        const { rows: claimed } = await tx.execute<{ id: string }>(sql`
+          UPDATE payments.sessions SET inquired_at = now()
+           WHERE shop_id = ${shopId} AND id = ${asked.id} AND status = 'open'
+             AND (inquired_at IS NULL
+                  OR inquired_at <= now() - ${`${RETURN_INQUIRY_SECONDS} seconds`}::interval)
+          RETURNING id`);
+        return claimed[0] ? { inquire: { session: asked, gateway, account } } : { done: null };
       }
-      return null;
+      return { done: null };
+    });
+    if ('done' in found) return found.done;
+    const { session, gateway, account } = found.inquire;
+    // Asked outside any transaction, as the gateway may take its time.
+    const answer = await gateway.inquire!(account, session.gateway_ref!);
+    if (answer.status !== 'paid' || answer.payment.ref !== session.gateway_ref) return null;
+    return this.db.tenant(shopId, async (tx) => {
+      const paid = await this.#complete(tx, shopId, session, gateway, answer.payment, 'return');
+      return paid.environment === 'sandbox' ? 'test' : 'paid';
     });
   }
 

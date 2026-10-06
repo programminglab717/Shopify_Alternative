@@ -1034,9 +1034,19 @@ export class CheckoutService {
         .where(and(eq(checkouts.shopId, found.shopId), eq(checkouts.id, found.checkoutId)));
       return checkout?.orderId ?? null;
     });
+    const returnUrl = this.site?.url(`/${CHECKOUT_PATH}/${token}/paid`);
     const outcome =
-      orderId && this.payments ? await this.payments.returned(found.shopId, orderId, form) : null;
-    return paidNoticeOf(await this.view(token), outcome);
+      orderId && this.payments && returnUrl
+        ? await this.payments.returned(found.shopId, orderId, form, returnUrl)
+        : null;
+    const view = await this.view(token);
+    // Back partway: on to the gateway's next page, as Easypaisa's asks (ADR-214).
+    if (typeof outcome === 'object' && outcome !== null) {
+      return view.kind === 'placed' && view.online
+        ? { ...view, gatewayForm: outcome }
+        : paidNoticeOf(view, null);
+    }
+    return paidNoticeOf(view, outcome);
   }
 
   /**

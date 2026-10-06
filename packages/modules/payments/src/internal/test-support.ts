@@ -16,7 +16,13 @@ import {
 } from '@hatti/orders/public';
 import pg from 'pg';
 import { GatewayAccountService } from './gateway-accounts.service.js';
-import { JazzCashGateway, PaymentGateways, SafepayGateway, TestGateway } from './gateways.js';
+import {
+  EasypaisaGateway,
+  JazzCashGateway,
+  PaymentGateways,
+  SafepayGateway,
+  TestGateway,
+} from './gateways.js';
 import { OnlinePaymentService } from './online-payment.service.js';
 
 export interface OutboxRow {
@@ -82,7 +88,7 @@ function tenant(shopId: string): TenantContext {
 
 export async function paymentsFixture(
   server: string,
-  options: { safepayUrl?: string } = {},
+  options: { safepayUrl?: string; easypaisaUrl?: string } = {},
 ): Promise<PaymentsFixture> {
   const testDb = await createTestDatabase(server);
   const db = new Database({
@@ -107,6 +113,7 @@ export async function paymentsFixture(
   const box = new SecretBox([{ id: 'test', key: Buffer.alloc(32, 5) }]);
   const testGateway = new TestGateway();
   const safepay = options.safepayUrl ?? 'http://127.0.0.1:9/safepay';
+  const easypaisa = options.easypaisaUrl ?? 'http://127.0.0.1:9/easypaisa';
   const gateways = new PaymentGateways([
     new SafepayGateway({
       urls: {
@@ -116,6 +123,10 @@ export async function paymentsFixture(
       timeoutMs: 2_000,
     }),
     new JazzCashGateway(),
+    new EasypaisaGateway({
+      urls: { sandbox: easypaisa, production: easypaisa },
+      timeoutMs: 2_000,
+    }),
     testGateway,
   ]);
   const accounts = new GatewayAccountService(db, box, site, gateways);

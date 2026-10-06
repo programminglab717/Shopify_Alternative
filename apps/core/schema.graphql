@@ -6628,7 +6628,7 @@ enum PaperSize {
 }
 
 """
-How Hatti heard that a payment is made, signed by the gateway each way.
+How Hatti heard that a payment is made: signed by the gateway, or in its inquiry's answer.
 """
 enum PaymentConfirmation {
   """
@@ -6636,7 +6636,9 @@ enum PaymentConfirmation {
   """
   INQUIRY
 
-  """The customer came back from the gateway with it."""
+  """
+  The customer came back from the gateway with it, signed, or, as Easypaisa sends them back unsigned, the gateway asked at once said so (ADR-214).
+  """
   RETURN
 
   """The gateway's webhook said so."""

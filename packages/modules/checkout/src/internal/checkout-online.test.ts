@@ -182,7 +182,13 @@ describe.skipIf(!server)('Paying online at checkout', () => {
     expect(checkoutPage(paid).html).toContain(
       'Thank you: your payment is in, and A will send your order soon.',
     );
-    expect(f.payments.returns).toEqual([{ orderId: order.id, form: { tracker: 't', sig: 's' } }]);
+    expect(f.payments.returns).toEqual([
+      {
+        orderId: order.id,
+        form: { tracker: 't', sig: 's' },
+        returnUrl: `https://hatti.test/checkouts/${secret}/paid`,
+      },
+    ]);
     f.payments.outcome = 'test';
     expect(placed(await f.checkouts.paidOnline(secret, {})).payment).toBe('test');
     // Nothing said yet, and the order still waits: waiting to hear.
@@ -230,6 +236,31 @@ describe.skipIf(!server)('Paying online at checkout', () => {
     expect(page.html).toContain('Continue to JazzCash');
     expect(page.contentSecurityPolicy).toContain(
       "form-action 'self' https://payments.jazzcash.com.pk",
+    );
+  });
+
+  it("takes the shopper on to the gateway's next page when they come back partway, as Easypaisa's asks (ADR-214)", async () => {
+    f.payments.gateway = { name: 'Easypaisa', origin: 'https://easypay.easypaisa.com.pk' };
+    const { secret, view } = await started();
+    placed(await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'online' }));
+    const next = {
+      url: 'https://easypay.easypaisa.com.pk/easypay/Confirm.jsf',
+      form: { auth_token: 'tok-9cXq2', postBackURL: `https://hatti.test/checkouts/${secret}/paid` },
+    };
+    f.payments.outcome = next;
+    const partway = placed(await f.checkouts.paidOnline(secret, { auth_token: 'tok-9cXq2' }));
+    // The gateway is told where the shopper comes back to, as it was when they set out.
+    expect(f.payments.returns.at(-1)).toMatchObject({
+      form: { auth_token: 'tok-9cXq2' },
+      returnUrl: `https://hatti.test/checkouts/${secret}/paid`,
+    });
+    expect(partway.gatewayForm).toEqual(next);
+    const page = checkoutPage(partway);
+    expect(page.html).toContain(`<form method="post" action="${next.url}">`);
+    expect(page.html).toContain('<input type="hidden" name="auth_token" value="tok-9cXq2" />');
+    expect(page.html).toContain('Continue to Easypaisa');
+    expect(page.contentSecurityPolicy).toContain(
+      "form-action 'self' https://easypay.easypaisa.com.pk",
     );
   });
 

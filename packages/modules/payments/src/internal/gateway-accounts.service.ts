@@ -301,7 +301,8 @@ export class GatewayAccountService {
     const field = ['input', 'credentials'];
     const values = new Map<string, string>();
     for (const [index, credential] of (given ?? []).entries()) {
-      const known = gateway.credentials.some((each) => each.key === credential.key);
+      const spec = gateway.credentials.find((each) => each.key === credential.key);
+      const known = spec !== undefined;
       if (!known || values.has(credential.key)) {
         check.add(
           [...field, String(index), 'key'],
@@ -322,6 +323,15 @@ export class GatewayAccountService {
           [...field, String(index), 'value'],
           'INVALID',
           'must be as the gateway gave it: letters, digits and marks, without spaces',
+        );
+        continue;
+      }
+      // In the one shape the gateway gives it, where it has one, as Easypaisa's hash key.
+      if (spec.pattern && !spec.pattern.test(value)) {
+        check.add(
+          [...field, String(index), 'value'],
+          'INVALID',
+          spec.problem ?? 'must be as the gateway gave it',
         );
         continue;
       }

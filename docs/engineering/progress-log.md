@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Easypaisa** (PAY-01): the third gateway shops take payments through, by its hosted checkout,
-as JazzCash's is, and asked after when its customer never comes back.
+**A payment the gateway says failed** (PAY-01, ADR-208): its session marked failed when the
+gateway's inquiry says so, so that its order is no longer held from being cancelled unpaid.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,23 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Easypaisa
+
+* **Easypaisa is the third gateway shops take payments through**
+  ([ADR-214](../architecture/13-decision-log.md#adr-214--easypaisa-is-the-third-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-encrypted-with-the-stores-hash-key-to-its-page-and-the-token-it-comes-back-with-to-its-next-and-its-return-which-it-does-not-sign-is-believed-only-once-its-inquiry-asked-at-once-with-the-accounts-api-credentials-says-the-payment-is-made)):
+  by its hosted checkout, the customer's browser posting a form encrypted with the store's hash
+  key (AES in ECB mode, `easypaisaHash`) to its page, and the token it comes back with to its
+  next page, from a page of Hatti's with a button each time, on an order's page and checkout's.
+* **Its return is not signed, so it is believed only as its inquiry agrees:** a gateway may name
+  the payment a return says is made (`returnRef`), and the service asks its inquiry at once, at
+  most once a minute a session. Easypaisa's inquiry is asked with the API's username and
+  password, and believed as it comes from its own API, naming the account's store and the order.
+* **Credentials in one shape alone** are checked when an account is connected: Easypaisa's hash
+  key is 16, 24 or 32 characters.
+* 1644 tests (7 new): the form and its hash as OpenSSL makes it, the token's page, the return
+  asked after and its throttle, the inquiry's answers; and through HTTP, its two pages and its
+  return paying the order.
 
 ### 7071db6 · An article's image
 

@@ -1,24 +1,59 @@
 import 'reflect-metadata';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { toPublicId } from '@hatti/ids';
 import { orderLinkPage } from '@hatti/orders/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { jazzCashHash } from './gateways.js';
-import { PAYMENT_INQUIRIES, SESSION_LIMITS, paymentsUnderwayIn } from './online-payment.service.js';
+import {
+  PAYMENT_INQUIRIES,
+  RETURN_INQUIRY_SECONDS,
+  SESSION_LIMITS,
+  paymentsUnderwayIn,
+} from './online-payment.service.js';
 import { errorsOf, paymentsFixture, unwrap, type PaymentsFixture } from './test-support.js';
 
 const server = testDatabaseServer();
 
+/** A stand-in for Easypaisa's inquiry (ADR-214): what it was asked, and what it answers next. */
+class FakeEasypaisa {
+  readonly asked: unknown[] = [];
+  next: Record<string, unknown> = {};
+  url = '';
+  readonly server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on('data', (chunk: Buffer) => chunks.push(chunk));
+    request.on('end', () => {
+      this.asked.push(JSON.parse(Buffer.concat(chunks).toString('utf8') || 'null'));
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify(this.next));
+    });
+  });
+
+  async start(): Promise<void> {
+    await new Promise<void>((resolve) => this.server.listen(0, '127.0.0.1', resolve));
+    this.url = `http://127.0.0.1:${(this.server.address() as AddressInfo).port}`;
+  }
+
+  async stop(): Promise<void> {
+    await new Promise((resolve) => this.server.close(resolve));
+  }
+}
+
 describe.skipIf(!server)('Payments online', () => {
   let f: PaymentsFixture;
   let kurta: string;
+  const easypaisa = new FakeEasypaisa();
 
   beforeAll(async () => {
-    f = await paymentsFixture(server!);
+    await easypaisa.start();
+    f = await paymentsFixture(server!, { easypaisaUrl: easypaisa.url });
   });
 
   afterAll(async () => {
     await f?.close();
+    await easypaisa.stop();
   });
 
   beforeEach(async () => {
@@ -50,7 +85,7 @@ describe.skipIf(!server)('Payments online', () => {
     expect(
       errorsOf(
         await f.accounts.connect(f.a, {
-          gateway: 'easypaisa',
+          gateway: 'payfast',
           environment: 'staging' as 'sandbox',
           credentials: [],
         }),
@@ -346,6 +381,121 @@ describe.skipIf(!server)('Payments online', () => {
     expect((await f.timeline(f.a, order.id))[0]).toBe(
       'Rs 2,000 paid online through JazzCash, reference 261002143512, paying it in full',
     );
+  });
+
+  it("takes what an order waits for through Easypaisa's pages, believing its return once its inquiry agrees (ADR-214)", async () => {
+    const order = await f.awaiting(f.a, kurta);
+    const token = await f.linkOf(f.a, order.id);
+    const credentials = (hashKey: string) => [
+      { key: 'storeId', value: '43512' },
+      { key: 'hashKey', value: hashKey },
+      { key: 'accountNum', value: '03001234567' },
+      { key: 'username', value: 'zari' },
+      { key: 'password', value: 'pw-of-zari' },
+    ];
+    // Its hash key is a key for AES: 16, 24 or 32 characters.
+    const short = await f.accounts.connect(f.a, {
+      gateway: 'easypaisa',
+      environment: 'production',
+      credentials: credentials('short-key'),
+    });
+    if (short.ok) throw new Error('connected');
+    expect(short.errors.map((error) => [error.field.join('.'), error.message])).toEqual([
+      ['input.credentials.1.value', 'Value must be the 16, 24 or 32 characters Easypaisa gave'],
+      ['input.credentials', 'Easypaisa needs its Hash key'],
+    ]);
+    unwrap(
+      await f.accounts.connect(f.a, {
+        gateway: 'easypaisa',
+        environment: 'production',
+        credentials: credentials('ZARIHASHKEY12345'),
+      }),
+    );
+
+    // Its page takes a form, posted from the order's page.
+    const started = await f.links.payOnline(token);
+    if ('url' in started || started.kind !== 'order' || !started.gatewayForm) {
+      throw new Error(JSON.stringify(started));
+    }
+    const back = `https://hatti.test/o/${token}/paid`;
+    expect(started.gatewayForm.url).toBe(`${easypaisa.url}/easypay/Index.jsf`);
+    expect(started.gatewayForm.form).toMatchObject({
+      amount: '2000.0',
+      storeId: '43512',
+      postBackURL: back,
+    });
+    const ref = started.gatewayForm.form.orderRefNum!;
+
+    // Back with its token: on to its next page, posted there with the address to come back to.
+    const partway = await f.links.paidOnline(token, { auth_token: 'tok-9cXq2' });
+    if (partway.kind !== 'order') throw new Error(partway.kind);
+    expect(partway.gatewayForm).toEqual({
+      url: `${easypaisa.url}/easypay/Confirm.jsf`,
+      form: { auth_token: 'tok-9cXq2', postBackURL: back },
+    });
+    const page = orderLinkPage(partway);
+    expect(page.html).toContain(
+      `<form method="post" action="${easypaisa.url}/easypay/Confirm.jsf">`,
+    );
+    expect(page.html).toContain('Continue to Easypaisa');
+    expect(easypaisa.asked).toEqual([]);
+
+    // Back saying it is paid: Easypaisa's inquiry is asked at once, and believed alone.
+    const answer = {
+      orderId: ref,
+      storeId: '43512',
+      transactionStatus: 'PENDING',
+      transactionAmount: '2000.0',
+      transactionId: '24681357',
+      responseCode: '0000',
+      responseDesc: 'SUCCESS',
+    };
+    easypaisa.next = answer;
+    const returned = { status: '0000', desc: 'Success', orderRefNumber: ref };
+    expect(await f.links.paidOnline(token, returned)).toMatchObject({
+      problem: { kind: 'payment', reason: 'pending' },
+    });
+    expect(easypaisa.asked).toEqual([
+      { orderId: ref, storeId: '43512', accountNum: '03001234567' },
+    ]);
+    // Asked again within the minute, it waits; a return naming no session of the order asks none.
+    easypaisa.next = { ...answer, transactionStatus: 'PAID' };
+    expect(await f.links.paidOnline(token, returned)).toMatchObject({
+      problem: { kind: 'payment', reason: 'pending' },
+    });
+    expect(await f.links.paidOnline(token, { ...returned, orderRefNumber: 'E1' })).toMatchObject({
+      problem: { kind: 'payment', reason: 'pending' },
+    });
+    expect(easypaisa.asked).toHaveLength(1);
+    await f.admin.query(
+      `UPDATE payments.sessions
+          SET inquired_at = now() - make_interval(secs => $2)
+        WHERE order_id = $1`,
+      [order.id, RETURN_INQUIRY_SECONDS + 1],
+    );
+    const paid = await f.links.paidOnline(token, returned);
+    if (paid.kind !== 'order') throw new Error(paid.kind);
+    expect(paid.problem).toBeNull();
+    expect(easypaisa.asked).toHaveLength(2);
+    expect(await f.orders.get(f.a, order.id)).toMatchObject({
+      amountPaid: 2_000_00n,
+      financialStatus: 'paid',
+    });
+    const [session] = await f.payments.sessionsOf(f.a.shopId, order.id);
+    expect(session).toMatchObject({
+      gateway: 'easypaisa',
+      gatewayName: 'Easypaisa',
+      status: 'paid',
+      gatewayRef: ref,
+      paidThrough: 'return',
+      reference: '24681357',
+    });
+    expect((await f.timeline(f.a, order.id))[0]).toBe(
+      'Rs 2,000 paid online through Easypaisa, reference 24681357, paying it in full',
+    );
+    // Paid, its return asks nothing more.
+    expect(await f.links.paidOnline(token, returned)).toMatchObject({ problem: null });
+    expect(easypaisa.asked).toHaveLength(2);
   });
 
   it('records what its webhook says is paid, once, and what was paid beyond what was owed', async () => {

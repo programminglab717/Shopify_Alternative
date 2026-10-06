@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createDecipheriv, createHmac } from 'node:crypto';
 import {
   createServer,
   type IncomingHttpHeaders,
@@ -9,10 +9,12 @@ import {
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  EasypaisaGateway,
   JazzCashGateway,
   PaymentGateways,
   SafepayGateway,
   TestGateway,
+  easypaisaHash,
   jazzCashHash,
   type GatewayAccount,
 } from './gateways.js';
@@ -456,6 +458,9 @@ describe('The test gateway', () => {
     const jazzcash = new JazzCashGateway();
     expect(jazzcash.checkoutOrigin('production')).toBe('https://payments.jazzcash.com.pk');
     expect(jazzcash.checkoutOrigin('sandbox')).toBe('https://sandbox.jazzcash.com.pk');
+    const easypaisa = new EasypaisaGateway();
+    expect(easypaisa.checkoutOrigin('production')).toBe('https://easypay.easypaisa.com.pk');
+    expect(easypaisa.checkoutOrigin('sandbox')).toBe('https://easypaystg.easypaisa.com.pk');
   });
 
   it('lists the gateways by name', () => {
@@ -463,8 +468,14 @@ describe('The test gateway', () => {
       new TestGateway(),
       new SafepayGateway(),
       new JazzCashGateway(),
+      new EasypaisaGateway(),
     ]);
-    expect(gateways.list.map((info) => info.gateway)).toEqual(['jazzcash', 'safepay', 'test']);
+    expect(gateways.list.map((info) => info.gateway)).toEqual([
+      'easypaisa',
+      'jazzcash',
+      'safepay',
+      'test',
+    ]);
     expect(gateways.of('jazzcash')?.info).toMatchObject({
       credentials: [
         { key: 'merchantId', label: 'Merchant ID' },
@@ -479,7 +490,16 @@ describe('The test gateway', () => {
       'secretKey',
       'webhookSecret',
     ]);
-    expect(gateways.of('easypaisa')).toBeNull();
+    expect(gateways.of('easypaisa')?.info.credentials.map((field) => field.key)).toEqual([
+      'storeId',
+      'hashKey',
+      'accountNum',
+      'username',
+      'password',
+    ]);
+    expect(gateways.of('payfast')).toBeNull();
+    // Those that can be asked after a payment, Easypaisa's return needing it (ADR-214).
+    expect(gateways.inquirable.sort()).toEqual(['easypaisa', 'jazzcash', 'safepay', 'test']);
   });
 });
 
@@ -735,6 +755,212 @@ describe('JazzCash', () => {
       expect(await away.inquire(account, 'T1')).toMatchObject({
         status: 'unknown',
         message: expect.stringMatching(/^JazzCash could not be reached/),
+      });
+    });
+  });
+});
+
+describe('Easypaisa (ADR-214)', () => {
+  const account: GatewayAccount = {
+    environment: 'sandbox',
+    credentials: {
+      storeId: '43512',
+      hashKey: 'ZARIHASHKEY12345',
+      accountNum: '03001234567',
+      username: 'zari',
+      password: 'pw-of-zari',
+    },
+  };
+  const easypaisa = new EasypaisaGateway();
+  const request = {
+    amount: 250_050n,
+    currency: 'PKR' as const,
+    orderName: '#1043',
+    returnUrl: 'https://hatti.pk/o/Zx8kQ2mN/paid',
+    cancelUrl: 'https://hatti.pk/o/Zx8kQ2mN',
+  };
+
+  /** What `merchantHashedReq` says, opened with the account's hash key. */
+  const opened = (hash: string) => {
+    const decipher = createDecipheriv('aes-128-ecb', Buffer.from('ZARIHASHKEY12345'), null);
+    return Buffer.concat([decipher.update(hash, 'base64'), decipher.final()]).toString('utf8');
+  };
+
+  it("sends the customer's browser to its page with a form encrypted with the store's hash key", async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-02T09:30:00Z') });
+    try {
+      const started = await easypaisa.checkout(account, request);
+      if (!started.ok) throw new Error(started.message);
+      const { ref, url, form } = started.value;
+      expect(url).toBe('https://easypaystg.easypaisa.com.pk/easypay/Index.jsf');
+      // Unique to the store: when it began, in Pakistan, and five digits.
+      expect(ref).toMatch(/^E20261002143000\d{5}$/);
+      expect(form).toEqual({
+        amount: '2500.50',
+        autoRedirect: '1',
+        expiryDate: '20261003 143000',
+        orderRefNum: ref,
+        postBackURL: 'https://hatti.pk/o/Zx8kQ2mN/paid',
+        storeId: '43512',
+        merchantHashedReq: expect.any(String),
+      });
+      // Its fields by their names, each as name=value, encrypted with the key.
+      expect(opened(form!.merchantHashedReq!)).toBe(
+        `amount=2500.50&autoRedirect=1&expiryDate=20261003 143000&orderRefNum=${ref}` +
+          '&postBackURL=https://hatti.pk/o/Zx8kQ2mN/paid&storeId=43512',
+      );
+      // Rupees alone, a decimal place kept.
+      const whole = await easypaisa.checkout(account, { ...request, amount: 250_000n });
+      expect(whole.ok && whole.value.form?.amount).toBe('2500.0');
+    } finally {
+      vi.useRealTimers();
+    }
+    // As OpenSSL makes it: AES-128 in ECB mode, PKCS#5's padding, Base64.
+    expect(
+      easypaisaHash('ZARIHASHKEY12345', {
+        storeId: '43512',
+        amount: '2500.50',
+        postBackURL: 'https://hatti.pk/o/Zx8kQ2mN/paid',
+        orderRefNum: 'E2026100214300012345',
+        expiryDate: '20261003 143000',
+        autoRedirect: '1',
+        emailAddr: '',
+      }),
+    ).toBe(
+      'ZWkpXGjzPlV4pQ9MexeyArvYH5TAVCXK2cuf2jwRcRHjHXM8+XFjwnv2WFYQrXK0Zq0Ph7ENwq5ZqO/SLJCtJIBgi' +
+        'CJ4d3ur5hYO9acZXOirC24flg1Rpi4Fx4796V68mQnzQgdC5p+QaqFJoMR0LLxId+lIcGYP6en/GURdz3GYkv4ov' +
+        'hBHGP8OJTVCvo2/pNRGgpThUuUMFl/oQ3K+XA==',
+    );
+    expect(await easypaisa.checkout(account, { ...request, currency: 'USD' })).toEqual({
+      ok: false,
+      retry: false,
+      message: 'Easypaisa takes payments in rupees alone',
+    });
+    const short = { ...account, credentials: { ...account.credentials, hashKey: 'short' } };
+    expect(await easypaisa.checkout(short, request)).toEqual({
+      ok: false,
+      retry: false,
+      message: "Easypaisa's hash key is not 16, 24 or 32 characters long",
+    });
+  });
+
+  it('takes the browser on with its token, and believes nothing its return says alone', () => {
+    const back = 'https://hatti.pk/o/Zx8kQ2mN/paid';
+    expect(easypaisa.continued(account, { auth_token: ' 9cXq2-Lk ' }, back)).toEqual({
+      url: 'https://easypaystg.easypaisa.com.pk/easypay/Confirm.jsf',
+      form: { auth_token: '9cXq2-Lk', postBackURL: back },
+    });
+    for (const token of ['', 'with space', 'x'.repeat(513)]) {
+      expect(easypaisa.continued(account, { auth_token: token }, back), token).toBeNull();
+    }
+    expect(easypaisa.continued(account, { status: '0000' }, back)).toBeNull();
+    // What it says was paid is asked after: its return names the order, unsigned.
+    const paid = { status: '0000', desc: 'Success', orderRefNumber: 'E2026100214300012345' };
+    expect(easypaisa.returnRef(paid)).toBe('E2026100214300012345');
+    expect(easypaisa.returnRef({ status: '0000', orderRefNum: 'E1' })).toBe('E1');
+    expect(easypaisa.returnRef({ ...paid, status: '0001' })).toBeNull();
+    expect(easypaisa.returnRef({ status: '0000' })).toBeNull();
+    expect(easypaisa.returned()).toBeNull();
+    expect(easypaisa.webhook()).toBeNull();
+  });
+
+  describe('its inquiry, asked at once on its return and for a customer who never came back', () => {
+    const fake = new FakeSafepay();
+    let asking: EasypaisaGateway;
+    const PAID = {
+      orderId: 'E2026100214300012345',
+      accountNum: '03001234567',
+      storeId: 43512,
+      storeName: 'Zari',
+      paymentToken: null,
+      transactionStatus: 'PAID',
+      transactionAmount: 2500.5,
+      transactionDateTime: '02/10/2026 02:31 PM',
+      transactionId: '24681357',
+      msisdn: '03111234567',
+      paymentMode: 'MA',
+      responseCode: '0000',
+      responseDesc: 'SUCCESS',
+    };
+    const answer = (body: Record<string, unknown>) => {
+      fake.next = { status: 200, body };
+    };
+
+    beforeAll(async () => {
+      await fake.start();
+      asking = new EasypaisaGateway({ urls: { sandbox: fake.url }, timeoutMs: 2_000 });
+    });
+
+    afterAll(async () => {
+      await fake.stop();
+    });
+
+    it("asks with the account's API credentials, and believes it for its store and the order alone", async () => {
+      answer(PAID);
+      expect(await asking.inquire(account, 'E2026100214300012345')).toEqual({
+        status: 'paid',
+        payment: {
+          ref: 'E2026100214300012345',
+          amount: 250_050n,
+          currency: 'PKR',
+          reference: '24681357',
+        },
+      });
+      const request = fake.requests.at(-1)!;
+      expect([request.method, request.path]).toEqual([
+        'POST',
+        '/easypay-service/rest/v4/inquire-transaction',
+      ]);
+      expect(request.body).toEqual({
+        orderId: 'E2026100214300012345',
+        storeId: '43512',
+        accountNum: '03001234567',
+      });
+      expect(fake.headers.at(-1)!.credentials).toBe(
+        Buffer.from('zari:pw-of-zari').toString('base64'),
+      );
+      // Without an amount it can read, the session's own is taken.
+      answer({ ...PAID, transactionAmount: 'about 2500' });
+      expect(await asking.inquire(account, 'E2026100214300012345')).toMatchObject({
+        status: 'paid',
+        payment: { amount: null, currency: null },
+      });
+      // Not signed: believed only naming the account's store and the order asked after.
+      answer({ ...PAID, storeId: 99999 });
+      expect(await asking.inquire(account, 'E2026100214300012345')).toEqual({
+        status: 'unknown',
+        message: "Easypaisa's answer named another store or order",
+      });
+      answer(PAID);
+      expect((await asking.inquire(account, 'E1')).status).toBe('unknown');
+    });
+
+    it('says a payment not made, or not yet, is unpaid, and what it could not learn unknown', async () => {
+      answer({ ...PAID, transactionStatus: 'PENDING', transactionId: null });
+      expect(await asking.inquire(account, 'E2026100214300012345')).toEqual({
+        status: 'unpaid',
+        message: 'Easypaisa: the payment is PENDING',
+      });
+      answer({ ...PAID, transactionStatus: '' });
+      expect(await asking.inquire(account, 'E2026100214300012345')).toEqual({
+        status: 'unknown',
+        message: "Easypaisa's answer had no status",
+      });
+      answer({ responseCode: '0003', responseDesc: 'INVALID CREDENTIALS' });
+      expect(await asking.inquire(account, 'E1')).toEqual({
+        status: 'unknown',
+        message: 'Easypaisa: INVALID CREDENTIALS',
+      });
+      fake.next = { status: 502, body: { message: 'Bad gateway' } };
+      expect(await asking.inquire(account, 'E1')).toEqual({
+        status: 'unknown',
+        message: 'Easypaisa answered 502',
+      });
+      const closed = await closedPort();
+      const away = new EasypaisaGateway({ urls: { sandbox: `http://127.0.0.1:${closed}` } });
+      expect(await away.inquire(account, 'E1')).toMatchObject({
+        status: 'unknown',
+        message: expect.stringMatching(/^Easypaisa could not be reached/),
       });
     });
   });

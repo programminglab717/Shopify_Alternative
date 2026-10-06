@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { fromMajor, isCurrencyCode, money, toMajorString, type CurrencyCode } from '@hatti/money';
 
 // Payment gateways' APIs behind one interface (PAY-01, ADR-151): starting a checkout for an
@@ -15,6 +15,10 @@ export type GatewayEnvironmentValue = (typeof GATEWAY_ENVIRONMENTS)[number];
 export interface GatewayCredentialField {
   key: string;
   label: string;
+  /** What it must look like, where the gateway gives it in one shape alone. */
+  pattern?: RegExp;
+  /** What connecting says of one not so, as "must be …". */
+  problem?: string;
 }
 
 /**
@@ -113,6 +117,12 @@ export type GatewayRefundResult =
 export type GatewayInquiry =
   { status: 'paid'; payment: GatewayPayment } | { status: 'unpaid' | 'unknown'; message: string };
 
+/** A page of the gateway's that the customer's browser posts `form` to. */
+export interface GatewayForm {
+  url: string;
+  form: Readonly<Record<string, string>>;
+}
+
 /** A request to a gateway's webhook, as it came. */
 export interface GatewayWebhook {
   /** The body as sent, which signatures cover. */
@@ -139,6 +149,22 @@ export interface PaymentGateway {
    * payment it vouches for, if signed with the account's secret; null otherwise.
    */
   returned(account: GatewayAccount, form: Readonly<Record<string, string>>): GatewayPayment | null;
+  /**
+   * The customer came back partway, as Easypaisa's page sends them back with a token for its next
+   * one (ADR-214): that page, and what their browser posts there, with `returnUrl` to come back to
+   * once they paid; null when `form` is no such return. Absent when the gateway's pages need none.
+   */
+  continued?(
+    account: GatewayAccount,
+    form: Readonly<Record<string, string>>,
+    returnUrl: string,
+  ): GatewayForm | null;
+  /**
+   * For a gateway whose return is not signed, as Easypaisa's is not (ADR-214): its name for the
+   * payment `form` says is made, which the gateway is then asked after at once with
+   * {@link inquire}; null when it says none is.
+   */
+  returnRef?(form: Readonly<Record<string, string>>): string | null;
   /**
    * What a request to the webhook says: a payment made, if signed with the account's secret;
    * `unsigned` if the signature does not hold; null if it says nothing of a payment made.
@@ -726,6 +752,247 @@ export function jazzCashHash(
 /** When, in Pakistan's time, as JazzCash writes it: 20261002143000. */
 function pakistanTime(at: Date): string {
   return new Date(at.getTime() + 5 * 3_600_000).toISOString().replace(/\D/g, '').slice(0, 14);
+}
+
+/** Where Easypaisa's hosted checkout and its API answer, in each of its environments. */
+export const EASYPAISA_URLS: Readonly<Record<GatewayEnvironmentValue, string>> = {
+  sandbox: 'https://easypaystg.easypaisa.com.pk',
+  production: 'https://easypay.easypaisa.com.pk',
+};
+
+/** Its hosted checkout's page, which the customer's browser posts the order's form to. */
+const EASYPAISA_FORM_PATH = '/easypay/Index.jsf';
+
+/** Its next page, which the browser posts the token Easypaisa sent it back with to. */
+const EASYPAISA_CONFIRM_PATH = '/easypay/Confirm.jsf';
+
+/** Its inquiry, which asks after a payment by the order's reference (ADR-214). */
+const EASYPAISA_INQUIRY_PATH = '/easypay-service/rest/v4/inquire-transaction';
+
+/** The code its return and its API give what succeeded. */
+const EASYPAISA_SUCCESS = '0000';
+
+/** The cipher its hash takes for a key of each length: AES in ECB mode, as its guide has it. */
+const EASYPAISA_CIPHERS: Readonly<Record<number, string>> = {
+  16: 'aes-128-ecb',
+  24: 'aes-192-ecb',
+  32: 'aes-256-ecb',
+};
+
+export interface EasypaisaOptions {
+  /** {@link EASYPAISA_URLS}, unless a test says otherwise. */
+  urls?: Partial<Record<GatewayEnvironmentValue, string>>;
+  /** How long its page takes the payment for, as a token paid at a shop needs: a day. */
+  expiresInMs?: number;
+  /** How long its inquiry may take; fifteen seconds unless given. */
+  timeoutMs?: number;
+}
+
+/**
+ * Easypaisa (https://easypaisa.com.pk), its hosted checkout as its merchant integration guide has
+ * it: the customer's browser posts a form to Easypaisa's page for the amount and an order
+ * reference of Hatti's, with the store's ID and those fields encrypted with the store's hash key;
+ * Easypaisa's page takes a wallet, a card or a token paid at a shop, sends the browser back with a
+ * token that it posts to Easypaisa's next page, and then back again saying how the payment went.
+ * That return is not signed, so a payment it says is made is recorded only once Easypaisa's
+ * inquiry says so too, asked at once with the account's API credentials, as for a payment whose
+ * customer never came back (ADR-208, ADR-214). Its IPN is not followed, and nothing is given back
+ * through its API here.
+ */
+export class EasypaisaGateway implements PaymentGateway {
+  readonly info: PaymentGatewayInfo = {
+    gateway: 'easypaisa',
+    name: 'Easypaisa',
+    credentials: [
+      {
+        key: 'storeId',
+        label: 'Store ID',
+        pattern: /^\d{1,12}$/,
+        problem: "must be the store's ID, in digits, as Easypaisa gave it",
+      },
+      {
+        key: 'hashKey',
+        label: 'Hash key',
+        pattern: /^(?:.{16}|.{24}|.{32})$/,
+        problem: 'must be the 16, 24 or 32 characters Easypaisa gave',
+      },
+      {
+        key: 'accountNum',
+        label: 'Account number',
+        pattern: /^\d{1,24}$/,
+        problem: "must be the store's Easypaisa account number, in digits",
+      },
+      { key: 'username', label: 'API username' },
+      { key: 'password', label: 'API password' },
+    ],
+    currencies: ['PKR'],
+    test: false,
+    refunds: 'none',
+  };
+
+  constructor(private readonly options: EasypaisaOptions = {}) {}
+
+  checkoutOrigin(environment: GatewayEnvironmentValue): string {
+    return new URL(this.#url(environment)).origin;
+  }
+
+  /** The form for Easypaisa's page, its hash made with the store's key: nothing asked before. */
+  async checkout(
+    account: GatewayAccount,
+    request: GatewayCheckoutRequest,
+  ): Promise<GatewayResult<GatewayCheckout>> {
+    if (request.currency !== 'PKR') {
+      return { ok: false, retry: false, message: 'Easypaisa takes payments in rupees alone' };
+    }
+    const key = account.credentials.hashKey ?? '';
+    if (!EASYPAISA_CIPHERS[Buffer.byteLength(key, 'utf8')]) {
+      return {
+        ok: false,
+        retry: false,
+        message: "Easypaisa's hash key is not 16, 24 or 32 characters long",
+      };
+    }
+    const now = new Date();
+    const expires = new Date(now.getTime() + (this.options.expiresInMs ?? 24 * 3_600_000));
+    // Its reference for the order, unique to the store: when, in Pakistan, and five digits.
+    const ref = `E${pakistanTime(now)}${randomInt(100_000).toString().padStart(5, '0')}`;
+    const when = pakistanTime(expires);
+    const fields: Record<string, string> = {
+      amount: easypaisaAmount(request.amount),
+      // Back to the return address as soon as it is paid, rather than on a button of its page.
+      autoRedirect: '1',
+      expiryDate: `${when.slice(0, 8)} ${when.slice(8)}`,
+      orderRefNum: ref,
+      postBackURL: request.returnUrl,
+      storeId: account.credentials.storeId ?? '',
+    };
+    const form = { ...fields, merchantHashedReq: easypaisaHash(key, fields) };
+    return {
+      ok: true,
+      value: { ref, url: `${this.#url(account.environment)}${EASYPAISA_FORM_PATH}`, form },
+    };
+  }
+
+  /** Its return is not signed: nothing is believed of it alone ({@link returnRef}). */
+  returned(): GatewayPayment | null {
+    return null;
+  }
+
+  /**
+   * Easypaisa sends the browser back with `auth_token` once the customer chose how to pay: the
+   * browser posts it to its next page, with the address to come back to after.
+   */
+  continued(
+    account: GatewayAccount,
+    form: Readonly<Record<string, string>>,
+    returnUrl: string,
+  ): GatewayForm | null {
+    const token = form.auth_token?.trim() ?? '';
+    if (!/^[!-~]{1,512}$/.test(token)) return null;
+    return {
+      url: `${this.#url(account.environment)}${EASYPAISA_CONFIRM_PATH}`,
+      form: { auth_token: token, postBackURL: returnUrl },
+    };
+  }
+
+  /** The order it says is paid, by its `status` of 0000: asked after at once to be believed. */
+  returnRef(form: Readonly<Record<string, string>>): string | null {
+    const ref = (form.orderRefNumber ?? form.orderRefNum)?.trim() ?? '';
+    return form.status?.trim() === EASYPAISA_SUCCESS && /^[!-~]{1,64}$/.test(ref) ? ref : null;
+  }
+
+  /** Its IPN is not followed: its inquiry is asked instead. */
+  webhook(): GatewayPayment | 'unsigned' | null {
+    return null;
+  }
+
+  /**
+   * Asks its inquiry after the order `ref` (ADR-208), with the account's API username and
+   * password, for the store and its account number. Its answer is not signed, so it is believed as
+   * coming from Easypaisa's own API, and only naming the account's store and the order asked
+   * after (ADR-210): paid when it succeeded (0000) and says the payment is PAID; not paid for any
+   * other status, such as a token not paid yet; unknown when Easypaisa could not be asked, or
+   * answered anything else.
+   */
+  async inquire(account: GatewayAccount, ref: string): Promise<GatewayInquiry> {
+    const { storeId = '', accountNum = '', username = '', password = '' } = account.credentials;
+    let response: Response;
+    try {
+      response = await fetch(`${this.#url(account.environment)}${EASYPAISA_INQUIRY_PATH}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json',
+          credentials: Buffer.from(`${username}:${password}`, 'utf8').toString('base64'),
+        },
+        body: JSON.stringify({ orderId: ref, storeId, accountNum }),
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+      });
+    } catch (error) {
+      const message = `Easypaisa could not be reached: ${(error as Error).message}`;
+      return { status: 'unknown', message: message.slice(0, 1_000) };
+    }
+    const json: unknown = await response.json().catch(() => null);
+    if (!response.ok || !isObject(json)) {
+      return { status: 'unknown', message: `Easypaisa answered ${response.status}` };
+    }
+    const said = (value: unknown) =>
+      typeof value === 'string' || typeof value === 'number' ? String(value).trim() : '';
+    if (said(json.responseCode) !== EASYPAISA_SUCCESS) {
+      const desc = said(json.responseDesc) || `it answered ${said(json.responseCode) || 'nothing'}`;
+      return { status: 'unknown', message: `Easypaisa: ${desc}`.slice(0, 1_000) };
+    }
+    if (said(json.storeId) !== storeId || said(json.orderId) !== ref) {
+      return { status: 'unknown', message: "Easypaisa's answer named another store or order" };
+    }
+    const status = said(json.transactionStatus).toUpperCase();
+    if (status === '') return { status: 'unknown', message: "Easypaisa's answer had no status" };
+    if (status !== 'PAID') {
+      return { status: 'unpaid', message: `Easypaisa: the payment is ${status}`.slice(0, 1_000) };
+    }
+    let paid: bigint;
+    try {
+      paid = fromMajor(said(json.transactionAmount), 'PKR').amount;
+    } catch {
+      paid = 0n;
+    }
+    const reference = said(json.transactionId);
+    return {
+      status: 'paid',
+      payment: {
+        ref,
+        amount: paid > 0n ? paid : null,
+        currency: paid > 0n ? 'PKR' : null,
+        reference: reference.slice(0, 200) || null,
+      },
+    };
+  }
+
+  #url(environment: GatewayEnvironmentValue): string {
+    return (this.options.urls?.[environment] ?? EASYPAISA_URLS[environment]).replace(/\/+$/, '');
+  }
+}
+
+/**
+ * Easypaisa's hash of its form, `merchantHashedReq`: its fields that have a value, by their names,
+ * each as name=value, joined by "&", encrypted with AES in ECB mode with the store's hash key as
+ * it is (16, 24 or 32 characters), padded as PKCS#5 pads; in Base64.
+ */
+export function easypaisaHash(key: string, fields: Readonly<Record<string, string>>): string {
+  const text = Object.keys(fields)
+    .sort()
+    .filter((name) => fields[name] !== '')
+    .map((name) => `${name}=${fields[name]}`)
+    .join('&');
+  const secret = Buffer.from(key, 'utf8');
+  const cipher = createCipheriv(EASYPAISA_CIPHERS[secret.length] ?? 'aes-128-ecb', secret, null);
+  return Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]).toString('base64');
+}
+
+/** Rupees as Easypaisa's form writes them: 2500.0, or with paisa 2500.50. */
+function easypaisaAmount(paisa: bigint): string {
+  const rest = paisa % 100n;
+  return `${paisa / 100n}.${rest === 0n ? '0' : rest.toString().padStart(2, '0')}`;
 }
 
 /**

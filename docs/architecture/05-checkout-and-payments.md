@@ -348,7 +348,11 @@ scripts, and JazzCash posts the outcome back signed the same way
 is asked after through JazzCash's status inquiry or Safepay's reporter, from a quarter of an hour
 on, hourly, for two days ([ADR-208](./13-decision-log.md#adr-208--a-payment-started-online-whose-customer-never-came-back-is-asked-after-the-worker-asks-the-gateways-status-inquiry-jazzcashs-first-from-a-quarter-of-an-hour-after-it-began-at-most-once-an-hour-for-two-days-and-records-one-the-gateway-vouches-for-paid-through-the-inquiry)).
 Safepay's reporter, which signs nothing, is believed as it comes from Safepay's own API
-([ADR-210](./13-decision-log.md#adr-210--safepays-trackers-are-asked-after-as-jazzcashs-payments-are-through-its-reporter-with-the-accounts-secret-key-its-answer-which-safepay-does-not-sign-is-believed-as-it-comes-from-safepays-own-api-and-only-naming-the-accounts-api-key-and-the-tracker-asked-about)). Reconciliation of §4.2, and JazzCash's refunds, come next.
+([ADR-210](./13-decision-log.md#adr-210--safepays-trackers-are-asked-after-as-jazzcashs-payments-are-through-its-reporter-with-the-accounts-secret-key-its-answer-which-safepay-does-not-sign-is-believed-as-it-comes-from-safepays-own-api-and-only-naming-the-accounts-api-key-and-the-tracker-asked-about)). Shops take Easypaisa too, by its hosted checkout: a form
+encrypted with the store's hash key, then the token it sends the customer back with posted on to
+its next page, and its return, which it does not sign, believed only once its inquiry, asked at
+once, says the payment is made ([ADR-214](./13-decision-log.md#adr-214--easypaisa-is-the-third-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-encrypted-with-the-stores-hash-key-to-its-page-and-the-token-it-comes-back-with-to-its-next-and-its-return-which-it-does-not-sign-is-believed-only-once-its-inquiry-asked-at-once-with-the-accounts-api-credentials-says-the-payment-is-made)). Reconciliation of
+§4.2, and JazzCash's refunds, come next.
 
 **Platform billing (our own subscriptions)** uses the same stack: card subscriptions (Safepay),
 wallet token debits (JazzCash, Easypaisa), and Raast request-to-pay or bank transfer for renewals

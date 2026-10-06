@@ -13,6 +13,7 @@ import {
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { fromPublicId, newId } from '@hatti/ids';
 import {
+  EasypaisaGateway,
   JazzCashGateway,
   PaymentGateways,
   SafepayGateway,
@@ -67,6 +68,11 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
   const refunds: { path: string; body: Json; secret: unknown; token: string }[] = [];
   /** How Safepay answers refunds. */
   let refundStatus = 200;
+  /** A stand-in for Easypaisa's pages and inquiry (ADR-214): what it was asked, and its answer. */
+  let easypaisa: Server;
+  let easypaisaUrl = '';
+  const inquiries: Json[] = [];
+  let inquiryAnswer: Json = {};
   const shop = newId();
   const tokens = { owner: '', clerk: '', reader: '' };
 
@@ -166,6 +172,21 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
     await new Promise<void>((resolve) => safepay.listen(0, '127.0.0.1', resolve));
     safepayUrl = `http://127.0.0.1:${(safepay.address() as AddressInfo).port}`;
     const urls = { api: safepayUrl, checkout: `${safepayUrl}/checkout` };
+    easypaisa = createServer((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on('data', (chunk: Buffer) => chunks.push(chunk));
+      request.on('end', () => {
+        inquiries.push({
+          path: request.url,
+          credentials: request.headers.credentials,
+          body: JSON.parse(Buffer.concat(chunks).toString('utf8') || 'null'),
+        });
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(JSON.stringify(inquiryAnswer));
+      });
+    });
+    await new Promise<void>((resolve) => easypaisa.listen(0, '127.0.0.1', resolve));
+    easypaisaUrl = `http://127.0.0.1:${(easypaisa.address() as AddressInfo).port}`;
 
     testDb = await createTestDatabase(server);
     admin = new pg.Client({ connectionString: testDb.adminUrl });
@@ -178,6 +199,10 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
       paymentGateways: new PaymentGateways([
         new SafepayGateway({ urls: { sandbox: urls, production: urls }, timeoutMs: 2_000 }),
         new JazzCashGateway(),
+        new EasypaisaGateway({
+          urls: { sandbox: easypaisaUrl, production: easypaisaUrl },
+          timeoutMs: 2_000,
+        }),
         new TestGateway(),
       ]),
     });
@@ -189,6 +214,7 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
     await admin?.end();
     await testDb?.drop();
     await new Promise((resolve) => safepay?.close(resolve));
+    await new Promise((resolve) => easypaisa?.close(resolve));
   });
 
   it("lists gateways, and connects the shop's Safepay account without showing its credentials", async () => {
@@ -198,6 +224,19 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
         '{ paymentGateways { gateway name credentials { key label } currencies test } }',
       ),
     ).toEqual([
+      {
+        gateway: 'easypaisa',
+        name: 'Easypaisa',
+        credentials: [
+          { key: 'storeId', label: 'Store ID' },
+          { key: 'hashKey', label: 'Hash key' },
+          { key: 'accountNum', label: 'Account number' },
+          { key: 'username', label: 'API username' },
+          { key: 'password', label: 'API password' },
+        ],
+        currencies: ['PKR'],
+        test: false,
+      },
       {
         gateway: 'jazzcash',
         name: 'JazzCash',
@@ -441,6 +480,7 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
       }
     }`;
     expect(await data(tokens.owner, '{ paymentGateways { gateway refunds } }')).toEqual([
+      { gateway: 'easypaisa', refunds: 'NONE' },
       { gateway: 'jazzcash', refunds: 'NONE' },
       { gateway: 'safepay', refunds: 'WHOLE' },
       { gateway: 'test', refunds: 'PARTIAL' },
@@ -757,5 +797,104 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
     expect([relayed.placed, relayed.status]).toEqual([false, 200]);
     expect(relayed.html).toContain(`<form method="post" action="${jazzcashPage}">`);
     expect(field(relayed.html!, 'pp_ReturnURL')).toBe(`http://localhost:4000${path}/paid`);
+  });
+
+  it("takes the customer through Easypaisa's two pages, and believes its return once its inquiry agrees (ADR-214)", async () => {
+    for (const each of await data(tokens.owner, '{ paymentGatewayAccounts { id archivedAt } }')) {
+      if (each.archivedAt !== null) continue;
+      await data(
+        tokens.owner,
+        'mutation ($id: ID!) { paymentGatewayAccountArchive(id: $id) { userErrors { code } } }',
+        { id: each.id },
+      );
+    }
+    const connected = await data(tokens.owner, CONNECT, {
+      input: {
+        gateway: 'easypaisa',
+        credentials: [
+          { key: 'storeId', value: '43512' },
+          { key: 'hashKey', value: 'ZARIHASHKEY12345' },
+          { key: 'accountNum', value: '03001234567' },
+          { key: 'username', value: 'zari' },
+          { key: 'password', value: 'pw-of-zari' },
+        ],
+      },
+    });
+    expect(connected.userErrors).toEqual([]);
+    expect(connected.paymentGatewayAccount).toMatchObject({
+      gateway: 'easypaisa',
+      gatewayName: 'Easypaisa',
+      credentialsHint: '3512',
+    });
+    const field = (body: string, name: string) =>
+      new RegExp(`name="${name}" value="([^"]*)"`).exec(body)?.[1];
+    const created = await data(
+      tokens.owner,
+      `mutation {
+        productCreate(input: { title: "Shawl", status: ACTIVE, variants: [{ price: "3,000" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const order = await transferOrder(created.product.variants[0].id as string);
+
+    // From the order's page: a form posting to Easypaisa's first page.
+    const sent = await pay(order.path);
+    expect(sent.statusCode).toBe(200);
+    expect(sent.body).toContain(`<form method="post" action="${easypaisaUrl}/easypay/Index.jsf">`);
+    const back = `http://localhost:4000${order.path}/paid`;
+    expect([field(sent.body, 'amount'), field(sent.body, 'postBackURL')]).toEqual(['3000.0', back]);
+    const ref = field(sent.body, 'orderRefNum')!;
+
+    // Back with its token: the page posting it on to Easypaisa's next one, as no script may.
+    const partway = await app.inject({
+      method: 'GET',
+      url: `${order.path}/paid?auth_token=tok-9cXq2`,
+    });
+    expect(partway.statusCode).toBe(200);
+    expect(partway.body).toContain(
+      `<form method="post" action="${easypaisaUrl}/easypay/Confirm.jsf">`,
+    );
+    expect([field(partway.body, 'auth_token'), field(partway.body, 'postBackURL')]).toEqual([
+      'tok-9cXq2',
+      back,
+    ]);
+    expect(inquiries).toEqual([]);
+
+    // Back saying it is paid: asked of Easypaisa at once, with the account's API credentials.
+    inquiryAnswer = {
+      orderId: ref,
+      storeId: 43512,
+      transactionStatus: 'PAID',
+      transactionAmount: 3000,
+      transactionId: '24681357',
+      responseCode: '0000',
+      responseDesc: 'SUCCESS',
+    };
+    const returned = await app.inject({
+      method: 'GET',
+      url: `${order.path}/paid?status=0000&desc=Success&orderRefNumber=${ref}`,
+    });
+    expect([returned.statusCode, returned.headers.location]).toEqual([303, `${order.path}?paid`]);
+    expect(inquiries).toEqual([
+      {
+        path: '/easypay-service/rest/v4/inquire-transaction',
+        credentials: Buffer.from('zari:pw-of-zari').toString('base64'),
+        body: { orderId: ref, storeId: '43512', accountNum: '03001234567' },
+      },
+    ]);
+    const sessions = await data(tokens.reader, SESSIONS, { orderId: order.id });
+    expect(sessions[0]).toMatchObject({
+      gatewayName: 'Easypaisa',
+      status: 'PAID',
+      gatewayRef: ref,
+      reference: '24681357',
+      paidThrough: 'RETURN',
+    });
+    const { rows } = await admin.query<{ financial_status: string }>(
+      'SELECT financial_status FROM orders.orders WHERE id = $1',
+      [fromPublicId(order.id, 'order')],
+    );
+    expect(rows).toEqual([{ financial_status: 'paid' }]);
   });
 });

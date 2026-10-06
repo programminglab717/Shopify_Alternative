@@ -92,9 +92,14 @@ export enum PaymentConfirmation {
 
 registerEnumType(PaymentConfirmation, {
   name: 'PaymentConfirmation',
-  description: 'How Hatti heard that a payment is made, signed by the gateway each way.',
+  description:
+    "How Hatti heard that a payment is made: signed by the gateway, or in its inquiry's answer.",
   valuesMap: {
-    RETURN: { description: 'The customer came back from the gateway with it.' },
+    RETURN: {
+      description:
+        'The customer came back from the gateway with it, signed, or, as Easypaisa sends them ' +
+        'back unsigned, the gateway asked at once said so (ADR-214).',
+    },
     WEBHOOK: { description: "The gateway's webhook said so." },
     INQUIRY: {
       description:

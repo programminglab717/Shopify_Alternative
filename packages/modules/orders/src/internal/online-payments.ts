@@ -28,15 +28,19 @@ export abstract class OnlinePayments {
   ): Promise<{ url: string; form?: Readonly<Record<string, string>> } | { error: string }>;
 
   /**
-   * The customer came back from the gateway with `form`, as it sent them: `paid` once the
-   * gateway's signature says a payment of the order's is made, and it is recorded; `test` if that
-   * payment was a test in the gateway's sandbox, which pays nothing; null if nothing says so yet.
+   * The customer came back from the gateway with `form`, as it sent them, to `returnUrl`: `paid`
+   * once the gateway's signature, or its inquiry where its return is not signed, says a payment
+   * of the order's is made, and it is recorded; `test` if that payment was a test in the
+   * gateway's sandbox, which pays nothing; the gateway's next page, with the fields the
+   * customer's browser posts there, where they came back partway (ADR-214); null if nothing says
+   * so yet.
    */
   abstract returned(
     shopId: string,
     orderId: string,
     form: Readonly<Record<string, string>>,
-  ): Promise<'paid' | 'test' | null>;
+    returnUrl: string,
+  ): Promise<'paid' | 'test' | { url: string; form: Readonly<Record<string, string>> } | null>;
 
   /**
    * Gives back `amount`, in minor units, of what the order's customer paid online, through the

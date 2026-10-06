@@ -1050,6 +1050,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-210](../architecture/13-decision-log.md#adr-210--safepays-trackers-are-asked-after-as-jazzcashs-payments-are-through-its-reporter-with-the-accounts-secret-key-its-answer-which-safepay-does-not-sign-is-believed-as-it-comes-from-safepays-own-api-and-only-naming-the-accounts-api-key-and-the-tracker-asked-about)).
   `OnlinePaymentService.inquireDue` asks each due session outside any transaction and records
   one paid through `#complete`, as `inquiry`; `PAYMENT_INQUIRIES` says when.
+* **A gateway whose return is not signed names the payment in it** with `returnRef`, and the
+  service asks its `inquire` at once, outside any transaction and at most once a minute a session
+  (`RETURN_INQUIRY_SECONDS`), as Easypaisa's
+  ([ADR-214](../architecture/13-decision-log.md#adr-214--easypaisa-is-the-third-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-encrypted-with-the-stores-hash-key-to-its-page-and-the-token-it-comes-back-with-to-its-next-and-its-return-which-it-does-not-sign-is-believed-only-once-its-inquiry-asked-at-once-with-the-accounts-api-credentials-says-the-payment-is-made)); one whose pages need the customer's
+  browser twice gives the next with `continued`, for which `OnlinePayments.returned` takes the
+  return address. A credential the gateway gives in one shape alone has a `pattern`, checked when
+  the account is connected.
 
 ## Billing
 

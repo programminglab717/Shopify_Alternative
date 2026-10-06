@@ -38,11 +38,15 @@ export class StubPayments extends OnlinePayments {
   answer: { url: string; form?: Readonly<Record<string, string>> } | { error: string } = {
     url: 'https://pay.test/checkout?session=1',
   };
-  outcome: 'paid' | 'test' | null = null;
+  outcome: 'paid' | 'test' | { url: string; form: Readonly<Record<string, string>> } | null = null;
   /** The payments started, and the returns heard, the latest last. */
   readonly started: { shopId: string; orderId: string; returnUrl: string; cancelUrl: string }[] =
     [];
-  readonly returns: { orderId: string; form: Readonly<Record<string, string>> }[] = [];
+  readonly returns: {
+    orderId: string;
+    form: Readonly<Record<string, string>>;
+    returnUrl: string;
+  }[] = [];
 
   async gatewayOf(_tx: Tx, _shopId: string): Promise<OnlineGateway | null> {
     return this.gateway;
@@ -61,8 +65,9 @@ export class StubPayments extends OnlinePayments {
     _shopId: string,
     orderId: string,
     form: Readonly<Record<string, string>>,
-  ): Promise<'paid' | 'test' | null> {
-    this.returns.push({ orderId, form });
+    returnUrl: string,
+  ): Promise<'paid' | 'test' | { url: string; form: Readonly<Record<string, string>> } | null> {
+    this.returns.push({ orderId, form, returnUrl });
     return this.outcome;
   }
 

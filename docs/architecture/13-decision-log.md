@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-213 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-214 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -221,6 +221,7 @@
 | 211 | Storefront dates print in the shop's own time zone and the page's language, and themes get Shopify's time_tag and its date formats by name, a theme's own date_formats first | Accepted |
 | 212 | A storefront's search finds the shop's published pages and articles beside its products, as Shopify's does: by the words each keeps folded, through the online store's own search in the core; products, then pages, then articles, the kinds Shopify's type names, and suggested as a shopper types | Accepted |
 | 213 | An article has Shopify's image, one of the shop's files with its alt text: the API serves it at an address of its own while the article is published, the address naming its file, the article's document names that address, and Hatti Base shows it in its blog and on the article's page | Accepted |
+| 214 | Easypaisa is the third gateway shops take payments through, by its hosted checkout: the customer's browser posts a form encrypted with the store's hash key to its page and the token it comes back with to its next, and its return, which it does not sign, is believed only once its inquiry, asked at once with the account's API credentials, says the payment is made | Accepted |
 
 ---
 
@@ -8927,3 +8928,58 @@
   * **A signed URL in the document:** it would expire while pages are kept at the edge.
   * **The image's file as a key of the article's table:** the online store would depend on the
     files module's tables, which are its own; the file's event is followed instead.
+
+## ADR-214 · Easypaisa is the third gateway shops take payments through, by its hosted checkout: the customer's browser posts a form encrypted with the store's hash key to its page and the token it comes back with to its next, and its return, which it does not sign, is believed only once its inquiry, asked at once with the account's API credentials, says the payment is made
+
+* **Context:** PAY-01 names JazzCash and Easypaisa beside Safepay; shops take payments through
+  accounts of their own ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)), and JazzCash's hosted checkout is in
+  ([ADR-163](#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)). Easypaisa's, Easypay, works as its merchant integration
+  guide and the open-source plugins built on it have it: the merchant's page posts the store's
+  ID, the amount, an order reference, the address to come back to and when it expires to
+  Easypaisa's page, with `merchantHashedReq`, those fields encrypted with the store's hash key
+  (AES in ECB mode, in Base64). Easypaisa sends the browser back with `auth_token`, which the page
+  posts to its next page with the same address, then back again with `status`, 0000 when it
+  succeeded, and the order's reference. None of that is signed. Its REST API's inquiry
+  (`inquire-transaction`, v4) answers for an order, asked with the API's username and password,
+  unsigned; its v5 signs with RSA keys of each side. Its IPN calls the merchant's address with
+  another to fetch.
+* **Decision:**
+  * **Easypaisa's adapter** (`EasypaisaGateway`): an account gives its store ID, its hash key,
+    its account number, and its API's username and password. A credential the gateway gives in
+    one shape alone may say so, checked when the account is connected: the hash key is 16, 24 or
+    32 characters, as AES takes. Its form: the amount in rupees with a decimal place at least
+    (2000.0), straight back once paid (`autoRedirect`), a day to pay, as JazzCash's, an order
+    reference of Hatti's (E, the time in Pakistan and five digits), the return address, the store
+    ID, and its hash (`easypaisaHash`); no `paymentMethod`, so its page offers every way the store
+    takes.
+  * **Its token's page:** a gateway may give `continued`. A customer back partway is shown the
+    gateway's next page as a form with a button, the token and the return address hidden, as
+    JazzCash's first page is; `OnlinePayments.returned` takes the return address and may answer
+    that form, on an order's page and checkout's alike.
+  * **A return not signed is a prompt to ask:** a gateway may give `returnRef`, naming the
+    payment a return says is made; the payments service then asks its inquiry at once, outside
+    any transaction, at most once a minute a session (`RETURN_INQUIRY_SECONDS`, by
+    `inquired_at`), and records what the inquiry vouches for as paid through the return.
+  * **Its inquiry:** v4's `inquire-transaction`, the API's username and password in its
+    `Credentials` header, for the store and its account number; believed as Safepay's reporter is
+    ([ADR-210](#adr-210--safepays-trackers-are-asked-after-as-jazzcashs-payments-are-through-its-reporter-with-the-accounts-secret-key-its-answer-which-safepay-does-not-sign-is-believed-as-it-comes-from-safepays-own-api-and-only-naming-the-accounts-api-key-and-the-tracker-asked-about)), only as it comes from Easypaisa's own API and only naming the account's
+    store and the order asked after: paid for PAID, with the amount it gives and its transaction
+    ID as the reference; not paid for any other status; unknown otherwise. The hourly sweep asks
+    it too ([ADR-208](#adr-208--a-payment-started-online-whose-customer-never-came-back-is-asked-after-the-worker-asks-the-gateways-status-inquiry-jazzcashs-first-from-a-quarter-of-an-hour-after-it-began-at-most-once-an-hour-for-two-days-and-records-one-the-gateway-vouches-for-paid-through-the-inquiry)).
+  * Its IPN is not followed, and nothing is given back through its API.
+* **Consequences:**
+  * Shops take Easypaisa's wallets, cards and tokens paid at its shops, each payment recorded
+    once Easypaisa itself says it is made.
+  * A customer taps twice, once on each of Hatti's pages, since the pages run no scripts.
+  * Every return saying a payment is made costs a call to Easypaisa's API, at most once a minute
+    a payment; its default plan allows 100 an hour.
+  * Not yet: its pages and inquiry tried against its sandbox; its v5 API's signed answers; its
+    IPN; refunds through its API.
+* **Alternatives:**
+  * **Believing its return's status, as its plugins do:** anyone could send a browser back with
+    0000 and an order's reference.
+  * **Its IPN instead of the inquiry:** a URL to fetch, set in Easypaisa's portal rather than by
+    Hatti; the inquiry answers the same when Hatti asks.
+  * **Its v5 API, signed with RSA:** each shop would make a key pair and keep Easypaisa's public
+    key; v4's answers come from Easypaisa's own API, as Safepay's reporter's do.
+  * **A script posting the token on:** the pages run none; a button is one tap more.

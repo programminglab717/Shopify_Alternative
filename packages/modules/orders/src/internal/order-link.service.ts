@@ -357,13 +357,16 @@ export class OrderLinkService {
   async paidOnline(token: string, form: Readonly<Record<string, string>>): Promise<OrderLinkView> {
     const link = await this.#resolveLink(token);
     if (!link) return { kind: 'not_found' };
+    const returnUrl = this.site.url(`${ORDER_LINK_PATH}/${token}/paid`);
     const outcome = this.payments
-      ? await this.payments.returned(link.shopId, link.orderId, form)
+      ? await this.payments.returned(link.shopId, link.orderId, form, returnUrl)
       : null;
     const view = await this.viewLink(token);
     if (view.kind !== 'order') return view;
     if (outcome === 'test') return { ...view, problem: { kind: 'payment', reason: 'test' } };
     if (outcome === 'paid') return view;
+    // Back partway: on to the gateway's next page, as Easypaisa's asks (ADR-214).
+    if (outcome && view.onlinePayment) return { ...view, gatewayForm: outcome };
     // Its webhook may have said so already; or nothing has yet.
     const owed = view.order.status === 'open' ? transferOwed(view.order) : 0n;
     return owed > 0n ? { ...view, problem: { kind: 'payment', reason: 'pending' } } : view;

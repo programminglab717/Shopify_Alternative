@@ -142,7 +142,8 @@ export class OrderLinkController {
 
   async #paid(token: string, form: Record<string, string>, reply: FastifyReply): Promise<void> {
     const view = await this.links.paidOnline(token, form);
-    if (view.kind === 'order' && !view.problem) {
+    // Paid, or nothing to say: the page itself. Partway, the gateway's next page (ADR-214).
+    if (view.kind === 'order' && !view.problem && !view.gatewayForm) {
       return seeOther(reply, `/${ORDER_LINK_PATH}/${token}?paid`);
     }
     await send(reply, orderLinkPage(view));
