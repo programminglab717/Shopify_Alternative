@@ -1,11 +1,12 @@
 {%- comment -%}
-  The cart's subtotal; what its discount code takes off, and the total after it; and what
-  delivery will add: nothing with a free-delivery code, or above the shop's free delivery
-  subtotal, which the items must reach after their discount, as at checkout; else what is left to
-  reach it. A code that does not apply yet is named: checkout says why. Past the law's cap on
-  cash on delivery, Rs 200,000 an order in paisa as the orders module's COD_CASH_LIMIT, the cart
-  says checkout asks the rest in advance or another way to pay (TAX-07, ADR-188). On the cart
-  page and in the drawer.
+  The cart's subtotal; what its discount code takes off, and the total after it; and what delivery
+  will add: nothing with a free-delivery code, or above the shop's free delivery subtotal, which
+  the items must reach after their discount, as at checkout; else what is left to reach it. How
+  many working days delivery takes, wherever it goes, where the shop says (ADR-235): checkout says
+  it for the shopper's city. A code that does not apply yet is named: checkout says why. Past the
+  law's cap on cash on delivery, Rs 200,000 an order in paisa as the orders module's
+  COD_CASH_LIMIT, the cart says checkout asks the rest in advance or another way to pay (TAX-07,
+  ADR-188). On the cart page and in the drawer.
 {%- endcomment -%}
 {%- liquid
   assign free_delivery_code = cart.discount_applications | where: 'target_type', 'shipping_line' | first
@@ -46,6 +47,9 @@
     {%- assign more = delivery.free_above | minus: cart.total_price | money -%}
     <p class="cart__delivery">{{ 'sections.cart.free_delivery_more' | t: amount: more }}</p>
   {%- endif -%}
+{%- endif -%}
+{%- if delivery.max_days != nil -%}
+  <p class="cart__delivery">{% render 'delivery-days', min: delivery.min_days, max: delivery.max_days %}</p>
 {%- endif -%}
 {%- assign cash_limit = 20000000 -%}
 {%- if cart.total_price > cash_limit -%}

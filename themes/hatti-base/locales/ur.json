@@ -8,7 +8,19 @@
       "order": "واٹس ایپ پر آرڈر کریں",
       "order_message": "السلام علیکم! مجھے {{ product }} ({{ variant }}) آرڈر کرنا ہے۔"
     },
-    "search": "تلاش"
+    "search": "تلاش",
+    "delivery_days": {
+      "same_day": "اسی دن ڈیلیوری",
+      "days": {
+        "one": "{{ count }} کام کے دن میں ڈیلیوری",
+        "other": "{{ count }} کام کے دنوں میں ڈیلیوری"
+      },
+      "within": {
+        "one": "{{ count }} کام کے دن کے اندر ڈیلیوری",
+        "other": "{{ count }} کام کے دنوں کے اندر ڈیلیوری"
+      },
+      "range": "{{ min }} سے {{ max }} کام کے دنوں میں ڈیلیوری"
+    }
   },
   "accessibility": {
     "skip_to_content": "مواد پر جائیں"

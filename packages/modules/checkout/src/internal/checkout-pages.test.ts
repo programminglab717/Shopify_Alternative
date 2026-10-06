@@ -59,7 +59,8 @@ const CART: CartJson = {
 const DELIVERY: DeliverySettingsRecord = {
   charge: 250_00n,
   freeAbove: null,
-  zones: [{ name: 'Karachi', cities: ['Karachi'], charge: 150_00n }],
+  days: null,
+  zones: [{ name: 'Karachi', cities: ['Karachi'], charge: 150_00n, days: null }],
   updatedAt: null,
 };
 
@@ -205,6 +206,29 @@ describe('checkoutPage', () => {
     expect(everywhere.html).toMatch(/Pay on delivery.*Rs 4,250/s);
     const free = checkoutPage(openView({ delivery: { ...DELIVERY, freeAbove: 3_000_00n } }));
     expect(free.html).toMatch(/Delivery.*Free.*Pay on delivery.*Rs 4,000/s);
+    // A shop that said nothing of the days says nothing.
+    expect(typed.html).not.toContain('working day');
+  });
+
+  it('says how many working days delivery takes to the city, or wherever it goes (ADR-235)', () => {
+    const delivery: DeliverySettingsRecord = {
+      ...DELIVERY,
+      days: { min: 2, max: 4 },
+      zones: [{ ...DELIVERY.zones[0]!, days: { min: 1, max: 1 } }],
+    };
+    const days = (city: string, settings = delivery) =>
+      checkoutPage(openView({ delivery: settings, form: { ...EMPTY_FORM, city } })).html;
+    expect(days('khi')).toContain('Delivered in 1 working day.');
+    expect(days('khi')).toContain('1 کام کے دن میں ڈیلیوری۔');
+    expect(days('Multan')).toContain('Delivered in 2 to 4 working days.');
+    expect(days('Multan')).toContain('2 سے 4 کام کے دنوں میں ڈیلیوری۔');
+    // No city yet: from the fewest days anywhere to the most.
+    expect(days('')).toContain('Delivered in 1 to 4 working days.');
+    const sameDay = { ...delivery, days: { min: 0, max: 0 }, zones: [] };
+    expect(days('Lahore', sameDay)).toContain('Delivered the same day.');
+    const within = { ...delivery, days: { min: 0, max: 2 }, zones: [] };
+    expect(days('Lahore', within)).toContain('Delivered within 2 working days.');
+    expect(days('Lahore', within)).toContain('2 کام کے دنوں کے اندر ڈیلیوری۔');
   });
 
   it('says what is wrong, beside the boxes, keeping what was typed', () => {

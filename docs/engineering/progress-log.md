@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Delivery estimates** (CHK-22): how many days delivery takes, for everywhere and for each of the
-shop's delivery zones, shown in the cart and at checkout for the shopper's city.
+**Sitemaps that say when pages changed** (OS-09): each address's `lastmod`, and products' images,
+as Shopify's sitemaps list them.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Delivery estimates
+
+* **How many working days delivery takes** ([ADR-235](../architecture/13-decision-log.md#adr-235--a-shop-may-say-how-many-working-days-delivery-takes-everywhere-and-in-each-of-its-delivery-zones-the-cart-and-product-pages-say-it-wherever-delivery-goes-from-the-fewest-days-anywhere-to-the-most-and-checkout-says-it-for-the-shoppers-city)), everywhere and in each
+  delivery zone, through `deliverySettingsUpdate`'s `days`; a zone without its own takes
+  everywhere's. Migration 0145 adds everywhere's to `checkout.delivery_settings`, and a zone's sits
+  in its JSON.
+* **Checkout says it for the shopper's city**, under the delivery charge, in English and Urdu;
+  before a city is typed, the fewest days anywhere to the most.
+* **The cart and product pages say it too:** Hatti's `delivery` gains `min_days` and
+  `max_days`, and Hatti Base's cart, drawer and product page phrase them through a
+  `delivery-days` snippet, in place of its own "2 to 5 days" where the shop said. The documents'
+  shape goes to 14.
+* 1728 tests: the days kept, refused and read for a city or wherever delivery goes, said at
+  checkout and on the storefront, and published in the shop's document.
 
 ### 0275a9d · Search that forgives a typo
 

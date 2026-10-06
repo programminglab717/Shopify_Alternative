@@ -58,7 +58,7 @@ import {
   type CheckoutShop,
   type CheckoutView,
 } from './checkout.service.js';
-import type { DeliverySettingsRecord } from './delivery.js';
+import { deliveryDays, type DeliveryDays, type DeliverySettingsRecord } from './delivery.js';
 import { MARKETING_FIELDS, marketingTicked, marketingWords } from './marketing.js';
 import { checkoutTotals } from './totals.js';
 
@@ -798,6 +798,8 @@ function cartSummary(
 ): Html {
   const totals = checkoutTotals(BigInt(cart.subtotal), delivery, city, code);
   const charge = totals.delivery;
+  // How long delivery takes to the city typed, or wherever it goes until one is (ADR-235).
+  const days = deliveryDays(delivery, city.trim() === '' ? null : city);
   const { onDelivery, fee, off, advance } = pay;
   // As placing the order works it out: on the items after what is taken off them, and on
   // delivery and the fee where the shop's include it.
@@ -872,6 +874,7 @@ function cartSummary(
       }
     </table>
     ${totals.total === null && paragraphs(chargesWords(delivery), 'small muted')}
+    ${days && paragraphs(deliveryDaysWords(days), 'small muted')}
     ${
       cart.note !== '' &&
       html`<p class="small muted">
@@ -879,6 +882,20 @@ function cartSummary(
       </p>`
     }
   </section>`;
+}
+
+/** How many working days delivery takes, as the summary says it under the charge. */
+function deliveryDaysWords(days: DeliveryDays): Sentence {
+  const { min, max } = days;
+  const en = (n: number) => `${n} working day${n === 1 ? '' : 's'}`;
+  const ur = (n: number) => `${n} کام کے ${n === 1 ? 'دن' : 'دنوں'}`;
+  if (max === 0) return { en: 'Delivered the same day.', ur: 'اسی دن ڈیلیوری۔' };
+  if (min === max) return { en: `Delivered in ${en(max)}.`, ur: `${ur(max)} میں ڈیلیوری۔` };
+  if (min === 0) return { en: `Delivered within ${en(max)}.`, ur: `${ur(max)} کے اندر ڈیلیوری۔` };
+  return {
+    en: `Delivered in ${min} to ${en(max)}.`,
+    ur: `${min} سے ${ur(max)} میں ڈیلیوری۔`,
+  };
 }
 
 /** What delivery costs where, for a shopper who has not typed their city yet. */

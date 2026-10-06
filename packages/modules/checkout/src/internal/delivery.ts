@@ -8,6 +8,8 @@ export interface DeliverySettingsRecord {
   charge: bigint;
   /** A subtotal from which delivery is free; null for none. */
   freeAbove: bigint | null;
+  /** How many working days delivery takes everywhere (CHK-22, ADR-235); null for unsaid. */
+  days: DeliveryDays | null;
   zones: DeliveryZoneRecord[];
   /** Null while the shop has set none. */
   updatedAt: Date | null;
@@ -19,17 +21,26 @@ export interface DeliveryZoneRecord {
   /** As `@hatti/pk` spells them: "Karachi", "Rawalpindi". */
   cities: string[];
   charge: bigint;
+  /** Its own working days, as the shop's own city's may be fewer; null for everywhere's. */
+  days: DeliveryDays | null;
+}
+
+/** How many working days delivery takes: from `min` to `max`, 0 the same day. */
+export interface DeliveryDays {
+  min: number;
+  max: number;
 }
 
 /** What a shop that has set nothing charges: nothing. */
 export const NO_DELIVERY_SETTINGS: DeliverySettingsRecord = {
   charge: 0n,
   freeAbove: null,
+  days: null,
   zones: [],
   updatedAt: null,
 };
 
-export const DELIVERY_LIMITS = { zones: 20, cities: 200, name: 100 } as const;
+export const DELIVERY_LIMITS = { zones: 20, cities: 200, name: 100, days: 30 } as const;
 
 /** Those left out stay as they are; `zones`, when given, replaces them all. */
 export interface DeliverySettingsInput {
@@ -37,6 +48,8 @@ export interface DeliverySettingsInput {
   charge?: string | null;
   /** Decimal, in major units; null or blank for none. */
   freeAbove?: string | null;
+  /** Null for unsaid. */
+  days?: DeliveryDays | null;
   zones?: DeliveryZoneInput[] | null;
 }
 
@@ -46,6 +59,8 @@ export interface DeliveryZoneInput {
   cities: string[];
   /** Decimal, in major units. */
   charge: string;
+  /** Null or left out for everywhere's. */
+  days?: DeliveryDays | null;
 }
 
 /**
@@ -61,6 +76,37 @@ export function deliveryCharge(
   const name = city ? (findCity(city)?.name ?? null) : null;
   const zone = name ? settings.zones.find((each) => each.cities.includes(name)) : undefined;
   return zone ? zone.charge : settings.charge;
+}
+
+/**
+ * How many working days delivery to `city` takes (ADR-235): the days of the zone naming it, else
+ * everywhere's. Without a city, how long it takes wherever it goes ({@link deliveryDaysRange}).
+ * Null where the shop has not said.
+ */
+export function deliveryDays(
+  settings: DeliverySettingsRecord,
+  city: string | null,
+): DeliveryDays | null {
+  const name = city ? (findCity(city)?.name ?? null) : null;
+  if (!name) return city ? settings.days : deliveryDaysRange(settings);
+  const zone = settings.zones.find((each) => each.cities.includes(name));
+  return zone?.days ?? settings.days;
+}
+
+/**
+ * How many working days delivery takes wherever it goes: from the fewest to the most of
+ * everywhere's and the zones'. Null unless the shop said how long it takes everywhere, as a
+ * city no zone names would have no days.
+ */
+export function deliveryDaysRange(settings: DeliverySettingsRecord): DeliveryDays | null {
+  if (!settings.days) return null;
+  let { min, max } = settings.days;
+  for (const zone of settings.zones) {
+    if (!zone.days) continue;
+    min = Math.min(min, zone.days.min);
+    max = Math.max(max, zone.days.max);
+  }
+  return { min, max };
 }
 
 /**
@@ -95,11 +141,35 @@ export function checkDeliverySettings(
       check.addMessage(['freeAbove'], 'INVALID', 'Free delivery must start above Rs 0');
     }
   }
+  let days = current.days;
+  if (input.days !== undefined) days = input.days && checkDays(check, ['days'], input.days);
   let zones = current.zones;
   if (input.zones !== undefined && input.zones !== null) {
     zones = checkZones(check, input.zones, currency);
   }
-  return check.errors.length > before ? null : { charge, freeAbove, zones };
+  return check.errors.length > before ? null : { charge, freeAbove, days, zones };
+}
+
+/** Whole working days, 0 to {@link DELIVERY_LIMITS.days}, the fewest first. */
+function checkDays(check: InputChecker, at: string[], days: DeliveryDays): DeliveryDays {
+  for (const key of ['min', 'max'] as const) {
+    const value = days[key];
+    if (!Number.isInteger(value) || value < 0 || value > DELIVERY_LIMITS.days) {
+      check.addMessage(
+        [...at, key],
+        'INVALID',
+        `Delivery takes 0 to ${DELIVERY_LIMITS.days} working days`,
+      );
+    }
+  }
+  if (days.max < days.min) {
+    check.addMessage(
+      [...at, 'max'],
+      'INVALID',
+      'The most days delivery takes must be no fewer than the fewest',
+    );
+  }
+  return { min: days.min, max: days.max };
 }
 
 function checkZones(
@@ -137,6 +207,7 @@ function checkZones(
         cities.push(city.name);
       }
     });
-    return { name, cities, charge: charge ?? 0n };
+    const days = input.days ? checkDays(check, [...at, 'days'], input.days) : null;
+    return { name, cities, charge: charge ?? 0n, days };
   });
 }

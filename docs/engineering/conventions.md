@@ -1556,7 +1556,12 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **What delivery costs is `deliveryCharge(settings, city, subtotal)`** (`delivery.ts`,
   [ADR-043](../architecture/13-decision-log.md#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)): checkout adds it, and themes see the
   same settings as Hatti's `delivery` (`charge`, `free_above`, `zones`), so pages can say what an
-  order will cost. Zones name cities as `@hatti/pk` spells them, each in one zone.
+  order will cost. Zones name cities as `@hatti/pk` spells them, each in one zone. How long it
+  takes is `deliveryDays(settings, city)` ([ADR-235](../architecture/13-decision-log.md#adr-235--a-shop-may-say-how-many-working-days-delivery-takes-everywhere-and-in-each-of-its-delivery-zones-the-cart-and-product-pages-say-it-wherever-delivery-goes-from-the-fewest-days-anywhere-to-the-most-and-checkout-says-it-for-the-shoppers-city)): the
+  city's zone's working days, else everywhere's, and without a city `deliveryDaysRange`, the
+  fewest anywhere to the most. Themes see them as `delivery.min_days` and `max_days`, and each
+  zone's; Hatti Base phrases them with its `delivery-days` snippet. Say nothing where the shop
+  said nothing.
 * **The cart's secret is an `HttpOnly` cookie**; its count, which scripts may read, is another.
   Changes from other sites are refused (`Sec-Fetch-Site: cross-site`), save `/discount/` links,
   which shops share elsewhere and which change nothing but the code; an address may make 120

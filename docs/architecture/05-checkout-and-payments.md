@@ -180,7 +180,9 @@ Shopify's cart forms and Ajax cart do. Step 4 in part: each shop's delivery char
 everywhere, by zones of cities, and nothing from a subtotal
 ([ADR-043](./13-decision-log.md#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)), which the storefront shows on product and cart
 pages, and checkout adds to the order for the address's city
-([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)). Step 6 in part: the shop's fee for cash on delivery
+([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)), and how many working days delivery takes,
+everywhere and in each zone, which the cart and product pages say wherever it goes and checkout
+says for the city ([ADR-235](./13-decision-log.md#adr-235--a-shop-may-say-how-many-working-days-delivery-takes-everywhere-and-in-each-of-its-delivery-zones-the-cart-and-product-pages-say-it-wherever-delivery-goes-from-the-fewest-days-anywhere-to-the-most-and-checkout-says-it-for-the-shoppers-city)). Step 6 in part: the shop's fee for cash on delivery
 ([ADR-076](./13-decision-log.md#adr-076--a-shops-fee-for-cash-on-delivery-is-the-orders-own-amount-apart-from-delivery-in-its-total-and-the-cash-collected-said-beside-the-option-where-the-shopper-chooses)), and
 what it takes off for paying by transfer, after any code and to the rupee ([ADR-077](./13-decision-log.md#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)). Step 7: the
 sales tax its prices include, on each taxable line after its share of the discount at its tax

@@ -26,6 +26,9 @@ export {
 export {
   DELIVERY_LIMITS,
   deliveryCharge,
+  deliveryDays,
+  deliveryDaysRange,
+  type DeliveryDays,
   type DeliverySettingsInput,
   type DeliverySettingsRecord,
   type DeliveryZoneInput,

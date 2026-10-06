@@ -255,10 +255,12 @@ export function shopDoc(
     delivery: {
       charge: Number(delivery.charge),
       freeAbove: delivery.freeAbove === null ? null : Number(delivery.freeAbove),
+      days: delivery.days,
       zones: delivery.zones.map((zone) => ({
         name: zone.name,
         cities: zone.cities,
         charge: Number(zone.charge),
+        days: zone.days,
       })),
     },
     theme: theme ? { id: theme.id, version: theme.version } : null,

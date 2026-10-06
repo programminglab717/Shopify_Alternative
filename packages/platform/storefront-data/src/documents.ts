@@ -9,7 +9,7 @@ import type { HandledKind } from './keys.js';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 13;
+export const DOCUMENTS_VERSION = 14;
 
 /**
  * What search engines and link previews are told of a product, collection, page or article in
@@ -295,7 +295,24 @@ export interface LinkPageDoc {
 export interface DeliveryDoc {
   charge: number;
   freeAbove: number | null;
-  zones: { name: string; cities: string[]; charge: number }[];
+  /**
+   * How many working days delivery takes everywhere (ADR-235); null while the shop has not said,
+   * absent in documents written before shops could.
+   */
+  days?: DeliveryDaysDoc | null;
+  zones: {
+    name: string;
+    cities: string[];
+    charge: number;
+    /** Its own days; null or absent for everywhere's. */
+    days?: DeliveryDaysDoc | null;
+  }[];
+}
+
+/** From `min` to `max` working days, 0 the same day. */
+export interface DeliveryDaysDoc {
+  min: number;
+  max: number;
 }
 
 /**

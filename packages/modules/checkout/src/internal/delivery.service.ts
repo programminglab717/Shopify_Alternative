@@ -14,9 +14,10 @@ import { deliverySettings } from './schema.js';
 
 /**
  * What a shop charges to deliver an order (ADR-043): one charge for everywhere, zones of cities
- * with charges of their own, and a subtotal from which delivery is free. Checkout adds the charge
- * for the shopper's city; the storefront shows the charges. A shop that set nothing charges
- * nothing.
+ * with charges of their own, and a subtotal from which delivery is free; and how many working
+ * days delivery takes, everywhere and in each zone (ADR-235). Checkout adds the charge for the
+ * shopper's city, and says how long delivery takes there; the storefront shows the charges and
+ * the days. A shop that set nothing charges nothing, and says nothing of the days.
  */
 @Injectable()
 export class DeliveryService {
@@ -42,12 +43,19 @@ export class DeliveryService {
       const changed = [
         ...(next.charge !== before.charge ? ['charge'] : []),
         ...(next.freeAbove !== before.freeAbove ? ['freeAbove'] : []),
+        ...(JSON.stringify(next.days) !== JSON.stringify(before.days) ? ['days'] : []),
         ...(JSON.stringify(stored(next.zones)) !== JSON.stringify(stored(before.zones))
           ? ['zones']
           : []),
       ];
       if (changed.length === 0) return { ok: true, value: before };
-      const values = { charge: next.charge, freeAbove: next.freeAbove, zones: stored(next.zones) };
+      const values = {
+        charge: next.charge,
+        freeAbove: next.freeAbove,
+        minDays: next.days?.min ?? null,
+        maxDays: next.days?.max ?? null,
+        zones: stored(next.zones),
+      };
       await tx
         .insert(deliverySettings)
         .values({ shopId: tenant.shopId, ...values })
@@ -80,12 +88,26 @@ export class DeliveryService {
     return {
       charge: row.charge,
       freeAbove: row.freeAbove,
-      zones: row.zones.map((zone) => ({ ...zone, charge: BigInt(zone.charge) })),
+      days:
+        row.minDays === null || row.maxDays === null
+          ? null
+          : { min: row.minDays, max: row.maxDays },
+      zones: row.zones.map((zone) => ({
+        name: zone.name,
+        cities: zone.cities,
+        charge: BigInt(zone.charge),
+        days: zone.days ?? null,
+      })),
       updatedAt: row.updatedAt,
     };
   }
 }
 
 function stored(zones: DeliverySettingsRecord['zones']) {
-  return zones.map((zone) => ({ ...zone, charge: zone.charge.toString() }));
+  return zones.map((zone) => ({
+    name: zone.name,
+    cities: zone.cities,
+    charge: zone.charge.toString(),
+    days: zone.days,
+  }));
 }

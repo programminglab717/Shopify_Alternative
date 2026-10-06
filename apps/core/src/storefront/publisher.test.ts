@@ -467,7 +467,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       whatsapp: null,
       cod: { available: true, fee: 0, limit: null },
       // It set no charges: delivery is free.
-      delivery: { charge: 0, freeAbove: null, zones: [] },
+      delivery: { charge: 0, freeAbove: null, days: null, zones: [] },
       // It never touched its themes: the storefront shows the platform theme as it is.
       theme: null,
       // Open, as a shop is until it closes its storefront behind a password.
@@ -1240,23 +1240,30 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(Object.keys(await store().shop())).not.toContain('brand');
   });
 
-  it('publishes what the shop charges for delivery', async () => {
+  it('publishes what the shop charges for delivery, and how many working days it takes', async () => {
     unwrap(
       await delivery.update(tenant, {
         charge: '250',
         freeAbove: '5,000',
-        zones: [{ name: 'Karachi', cities: ['khi'], charge: '150' }],
+        days: { min: 2, max: 4 },
+        zones: [{ name: 'Karachi', cities: ['khi'], charge: '150', days: { min: 1, max: 1 } }],
       }),
     );
     expect(await deliver()).toEqual(['delivery_settings.updated']);
     expect((await store().shop()).delivery).toEqual({
       charge: 25_000,
       freeAbove: 500_000,
-      zones: [{ name: 'Karachi', cities: ['Karachi'], charge: 15_000 }],
+      days: { min: 2, max: 4 },
+      zones: [{ name: 'Karachi', cities: ['Karachi'], charge: 15_000, days: { min: 1, max: 1 } }],
     });
-    unwrap(await delivery.update(tenant, { freeAbove: null, zones: [] }));
+    unwrap(await delivery.update(tenant, { freeAbove: null, days: null, zones: [] }));
     await deliver();
-    expect((await store().shop()).delivery).toEqual({ charge: 25_000, freeAbove: null, zones: [] });
+    expect((await store().shop()).delivery).toEqual({
+      charge: 25_000,
+      freeAbove: null,
+      days: null,
+      zones: [],
+    });
   });
 
   it("points the directory at the shop's own domains once DNS does, and names its primary one", async () => {

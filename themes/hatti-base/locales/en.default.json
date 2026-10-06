@@ -8,7 +8,19 @@
       "order": "Order on WhatsApp",
       "order_message": "Hi! I'd like to order {{ product }} ({{ variant }})."
     },
-    "search": "Search"
+    "search": "Search",
+    "delivery_days": {
+      "same_day": "Delivered the same day",
+      "days": {
+        "one": "Delivered in {{ count }} working day",
+        "other": "Delivered in {{ count }} working days"
+      },
+      "within": {
+        "one": "Delivered within {{ count }} working day",
+        "other": "Delivered within {{ count }} working days"
+      },
+      "range": "Delivered in {{ min }} to {{ max }} working days"
+    }
   },
   "accessibility": {
     "skip_to_content": "Skip to content"

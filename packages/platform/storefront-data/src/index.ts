@@ -8,6 +8,7 @@ export {
   type CommentPolicyDoc,
   type BrandDoc,
   type CollectionDoc,
+  type DeliveryDaysDoc,
   type DeliveryDoc,
   type ImageDoc,
   type LinkPageDoc,

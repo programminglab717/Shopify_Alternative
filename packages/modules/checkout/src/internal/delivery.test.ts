@@ -6,6 +6,8 @@ import {
   NO_DELIVERY_SETTINGS,
   checkDeliverySettings,
   deliveryCharge,
+  deliveryDays,
+  deliveryDaysRange,
   type DeliverySettingsInput,
   type DeliverySettingsRecord,
 } from './delivery.js';
@@ -15,9 +17,10 @@ import { checkoutFixture, unwrap, type CheckoutFixture } from './test-support.js
 const SETTINGS: DeliverySettingsRecord = {
   charge: 250_00n,
   freeAbove: 5_000_00n,
+  days: { min: 2, max: 5 },
   zones: [
-    { name: 'Karachi', cities: ['Karachi'], charge: 150_00n },
-    { name: 'Twin cities', cities: ['Islamabad', 'Rawalpindi'], charge: 200_00n },
+    { name: 'Karachi', cities: ['Karachi'], charge: 150_00n, days: { min: 1, max: 2 } },
+    { name: 'Twin cities', cities: ['Islamabad', 'Rawalpindi'], charge: 200_00n, days: null },
   ],
   updatedAt: null,
 };
@@ -41,24 +44,69 @@ describe('Delivery charges', () => {
     expect(deliveryCharge(NO_DELIVERY_SETTINGS, 'Lahore', 1n)).toBe(0n);
   });
 
+  it("says how many working days delivery takes: the city's zone's, else everywhere's (ADR-235)", () => {
+    expect(deliveryDays(SETTINGS, 'Karachi')).toEqual({ min: 1, max: 2 });
+    // A zone of its own days takes everywhere's, as a city no zone names does.
+    expect(deliveryDays(SETTINGS, 'Pindi')).toEqual({ min: 2, max: 5 });
+    expect(deliveryDays(SETTINGS, 'Multan')).toEqual({ min: 2, max: 5 });
+    expect(deliveryDays(SETTINGS, 'Chak 45 SB')).toEqual({ min: 2, max: 5 });
+    // Without a city, wherever it goes: the fewest days to the most.
+    expect(deliveryDays(SETTINGS, null)).toEqual({ min: 1, max: 5 });
+    expect(deliveryDaysRange(SETTINGS)).toEqual({ min: 1, max: 5 });
+    expect(deliveryDays(NO_DELIVERY_SETTINGS, 'Lahore')).toBeNull();
+    // Days for a zone alone say nothing of the cities it doesn't name.
+    const zoneAlone = { ...SETTINGS, days: null };
+    expect(deliveryDays(zoneAlone, 'Karachi')).toEqual({ min: 1, max: 2 });
+    expect(deliveryDays(zoneAlone, 'Multan')).toBeNull();
+    expect(deliveryDays(zoneAlone, null)).toBeNull();
+  });
+
   it('takes charges in rupees and cities as addresses name them, each in one zone', () => {
     expect(
       checked({
         charge: '250',
         freeAbove: '5,000',
-        zones: [{ name: 'Twin cities', cities: ['isb', 'Pindi'], charge: '200' }],
+        days: { min: 2, max: 4 },
+        zones: [
+          {
+            name: 'Twin cities',
+            cities: ['isb', 'Pindi'],
+            charge: '200',
+            days: { min: 0, max: 1 },
+          },
+        ],
       }),
     ).toEqual({
       charge: 250_00n,
       freeAbove: 5_000_00n,
-      zones: [{ name: 'Twin cities', cities: ['Islamabad', 'Rawalpindi'], charge: 200_00n }],
+      days: { min: 2, max: 4 },
+      zones: [
+        {
+          name: 'Twin cities',
+          cities: ['Islamabad', 'Rawalpindi'],
+          charge: 200_00n,
+          days: { min: 0, max: 1 },
+        },
+      ],
     });
-    // What is left out stays; null for nothing, or no free delivery.
+    // What is left out stays; null for nothing, or no free delivery, or no days said.
     expect(checked({ freeAbove: null }, SETTINGS)).toEqual({
       charge: 250_00n,
       freeAbove: null,
+      days: { min: 2, max: 5 },
       zones: SETTINGS.zones,
     });
+    expect(checked({ days: null }, SETTINGS)).toMatchObject({ days: null, zones: SETTINGS.zones });
+    expect(
+      checked({
+        days: { min: 5, max: 2 },
+        zones: [{ name: 'Lahore', cities: ['lhr'], charge: '100', days: { min: -1, max: 31 } }],
+      }),
+    ).toEqual([
+      ['days.max', 'The most days delivery takes must be no fewer than the fewest'],
+      ['zones.0.days.min', 'Delivery takes 0 to 30 working days'],
+      ['zones.0.days.max', 'Delivery takes 0 to 30 working days'],
+    ]);
     expect(checked({ charge: null, zones: [] }, SETTINGS)).toMatchObject({ charge: 0n, zones: [] });
     expect(
       checked({
@@ -133,6 +181,44 @@ describe.skipIf(!server)('DeliveryService', () => {
     // Each shop's are its own.
     expect(await f.delivery.get(f.b)).toEqual(NO_DELIVERY_SETTINGS);
     const read = await f.db.tenant(f.a.shopId, (tx) => f.delivery.settingsOf(tx, f.a.shopId));
-    expect(read.zones).toEqual([{ name: 'Karachi', cities: ['Karachi'], charge: 150_00n }]);
+    expect(read.zones).toEqual([
+      { name: 'Karachi', cities: ['Karachi'], charge: 150_00n, days: null },
+    ]);
+  });
+
+  it('keeps how many working days delivery takes, everywhere and in a zone (ADR-235)', async () => {
+    unwrap(
+      await f.delivery.update(f.a, {
+        charge: '250',
+        zones: [{ name: 'Karachi', cities: ['khi'], charge: '150' }],
+      }),
+    );
+    expect(await f.delivery.get(f.a)).toMatchObject({ days: null });
+    const saved = unwrap(
+      await f.delivery.update(f.a, {
+        days: { min: 2, max: 4 },
+        zones: [{ name: 'Karachi', cities: ['khi'], charge: '150', days: { min: 1, max: 1 } }],
+      }),
+    );
+    expect(saved).toMatchObject({
+      days: { min: 2, max: 4 },
+      zones: [{ name: 'Karachi', days: { min: 1, max: 1 } }],
+    });
+    expect(await f.delivery.get(f.a)).toEqual(saved);
+    // Unsaid again; the same again changes nothing.
+    unwrap(await f.delivery.update(f.a, { days: null }));
+    unwrap(await f.delivery.update(f.a, { days: null }));
+    expect((await f.delivery.get(f.a)).days).toBeNull();
+    expect(
+      (await f.outbox()).map((event) => (event.payload as { changed: string[] }).changed),
+    ).toEqual([['charge', 'zones'], ['days', 'zones'], ['days']]);
+    const refused = await f.delivery.update(f.a, { days: { min: 3, max: 1 } });
+    expect(refused.ok).toBe(false);
+    await expect(
+      f.admin.query(
+        `UPDATE checkout.delivery_settings SET min_days = 4, max_days = 2 WHERE shop_id = $1`,
+        [f.a.shopId],
+      ),
+    ).rejects.toThrow(/delivery_settings_days_check/);
   });
 });

@@ -2585,11 +2585,32 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 scalar DateTime
 
 """
+How many working days delivery takes (CHK-22): from `min` to `max`, 0 the same day.
+"""
+type DeliveryDays {
+  max: Int!
+  min: Int!
+}
+
+input DeliveryDaysInput {
+  """The most, no fewer than `min`, up to 30."""
+  max: Int!
+
+  """The fewest working days, 0 to 30; 0 is the same day."""
+  min: Int!
+}
+
+"""
 What the shop charges to deliver an order, which checkout adds for its city.
 """
 type DeliverySettings {
   """For everywhere no zone names. Nothing unless set."""
   charge: Money!
+
+  """
+  How many working days delivery takes everywhere no zone says otherwise: the cart and product pages say how long delivery takes, and checkout says it for the city. Null while the shop has not said.
+  """
+  days: DeliveryDays
 
   """Delivery is free for a subtotal of this or more; null for never."""
   freeAbove: Money
@@ -2603,6 +2624,11 @@ type DeliverySettings {
 input DeliverySettingsUpdateInput {
   """Decimal, e.g. "250"; null for nothing."""
   charge: String
+
+  """
+  How many working days delivery takes everywhere; null to say nothing of it.
+  """
+  days: DeliveryDaysInput
 
   """Decimal, e.g. "5,000"; null or blank for no free delivery."""
   freeAbove: String
@@ -2622,6 +2648,11 @@ type DeliveryZone {
 
   """As addresses spell them, such as "Karachi"."""
   cities: [String!]!
+
+  """
+  How many working days delivery to its cities takes; null for everywhere's.
+  """
+  days: DeliveryDays
   name: String!
 }
 
@@ -2633,6 +2664,11 @@ input DeliveryZoneInput {
   Cities by name, alias or code, as addresses have them: "Karachi", "khi", "Pindi". A city is in one zone at most.
   """
   cities: [String!]!
+
+  """
+  Its own working days, as the shop's own city's may be fewer; null for everywhere's.
+  """
+  days: DeliveryDaysInput
   name: String!
 }
 

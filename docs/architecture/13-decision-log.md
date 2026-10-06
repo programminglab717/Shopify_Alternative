@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-234 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-235 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -242,6 +242,7 @@
 | 232 | The setup checklist asks for a courier account, the test courier's aside, and counts a payment gateway's account in its production as a way to be paid ahead, as it counts a bank account | Accepted |
 | 233 | A parcel's city is booked as its courier names it: the shop's own name for it, else Hatti's, else the courier's list's, matched through Pakistan's names for the city and their aliases; a city the list names none of fails its booking with the courier's nearest names, and the name staff give is kept for the shop's next parcel | Accepted |
 | 234 | A storefront search that finds no product with every word as typed reads each word none of the shop's products holds as the shop's own words a typo or two from it, a typo being a letter added, taken away or changed or two swapped, and shows those with the fewest typos first | Accepted |
+| 235 | A shop may say how many working days delivery takes, everywhere and in each of its delivery zones: the cart and product pages say it wherever delivery goes, from the fewest days anywhere to the most, and checkout says it for the shopper's city | Accepted |
 
 ---
 
@@ -9802,3 +9803,44 @@
   * **Correcting every word of every search:** a search that works would change, with products
     the shopper didn't ask for among them.
   * **Typesense now:** another service to run before V1 ([ADR-013](#adr-013--typesense-for-search-with-app-level-urduroman-urdu-normalisation)).
+
+## ADR-235 · A shop may say how many working days delivery takes, everywhere and in each of its delivery zones: the cart and product pages say it wherever delivery goes, from the fewest days anywhere to the most, and checkout says it for the shopper's city
+
+* **Context:** A shopper paying on delivery asks first when the parcel will come, and one who
+  doesn't know is likelier to refuse it at the door. The feature catalog's CHK-22 asks for a
+  delivery estimate in the cart. A shop's delivery settings had charges alone: one for
+  everywhere, zones of cities with their own, and free delivery from a subtotal
+  ([ADR-043](#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)). Hatti Base's product page said "Delivered in 2 to 5 days across
+  Pakistan" for every shop, whatever its couriers took.
+* **Decision:**
+  * **Working days, from the fewest to the most,** for everywhere (`days`) and for each zone
+    (`zones[].days`), as the shop says them through `deliverySettingsUpdate`. A zone without its
+    own takes everywhere's. 0 is the same day, and 30 the most. Everywhere's days are columns of
+    `checkout.delivery_settings` (migration 0145), and a zone's sit in its JSON beside its
+    charge.
+  * **Checkout says it for the shopper's city** ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)): the city's zone's days,
+    else everywhere's, under the delivery charge, in English and Urdu (`deliveryDays`). Until a
+    city is typed, it says how long delivery takes wherever it goes.
+  * **Wherever it goes is the fewest days anywhere to the most** (`deliveryDaysRange`), and
+    nothing unless the shop said how long it takes everywhere, as a city no zone names would
+    have no days.
+  * **Themes get the days in Hatti's `delivery`:** `min_days` and `max_days` wherever it goes,
+    and each zone's. The shop's document carries them ([ADR-036](#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)), whose shape goes to
+    14. Hatti Base says it in the cart, the page and the drawer, and on the product page in place
+    of its own "2 to 5 days", through a `delivery-days` snippet: the same day, a number of days,
+    within some, or from some to more.
+* **Consequences:**
+  * A shop that delivers in its own city the next day says so, and its shoppers see it before
+    they order.
+  * A shop that says nothing shows what it showed before: Hatti Base's own words on the product
+    page, and nothing in the cart or at checkout.
+  * Days are the shop's word. Couriers' lead times by city, Sundays and holidays, and a date to
+    expect the parcel by are still to come, and orders don't keep what was said (simplification
+    112).
+* **Alternatives:**
+  * **A date rather than days:** it needs the shop's cut-off time and Pakistan's holidays to be
+    right, and a wrong date is a broken promise.
+  * **Couriers' lead times from their APIs:** neither PostEx nor Leopards gives them per city
+    yet, and a shop delivering with its own riders has no courier to ask.
+  * **One estimate for everywhere alone:** the shop's own city is usually much faster, and
+    saying the slowest everywhere would understate it.

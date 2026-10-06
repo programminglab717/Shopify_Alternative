@@ -1,0 +1,15 @@
+{%- comment -%}
+  How long delivery takes (CHK-22, ADR-235), from `min` to `max` working days: the same day, a
+  number of days, within some, or from some to more. Nothing without `max`.
+{%- endcomment -%}
+{%- if max != nil -%}
+  {%- if max == 0 -%}
+    {{- 'general.delivery_days.same_day' | t -}}
+  {%- elsif min == max -%}
+    {{- 'general.delivery_days.days' | t: count: max -}}
+  {%- elsif min == 0 -%}
+    {{- 'general.delivery_days.within' | t: count: max -}}
+  {%- else -%}
+    {{- 'general.delivery_days.range' | t: min: min, max: max -}}
+  {%- endif -%}
+{%- endif -%}

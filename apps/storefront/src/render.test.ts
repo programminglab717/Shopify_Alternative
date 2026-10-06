@@ -1471,6 +1471,81 @@ describe('Storefront rendering', () => {
     );
   });
 
+  it('says how many working days delivery takes, where the shop says (ADR-235)', async () => {
+    const sample = sampleStore();
+    const lawn = sample.products[0]!;
+    const variant = lawn.variants[0]!;
+    const cart: CartJson = {
+      note: '',
+      attributes: {},
+      items: [
+        {
+          key: `${variant.id}:0123456789abcdef0123456789abcdef`,
+          variantId: variant.id,
+          productId: lawn.id,
+          quantity: 1,
+          properties: {},
+          price: variant.price,
+          linePrice: variant.price,
+          title: lawn.title,
+          variantTitle: variant.title,
+          sku: null,
+          grams: 0,
+          taxable: true,
+          taxCode: null,
+          maxQuantity: null,
+        },
+      ],
+      itemCount: 1,
+      subtotal: variant.price,
+      totalWeightGrams: 0,
+      discount: null,
+      totalDiscount: 0,
+    };
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const withDays = (delivery: Partial<NonNullable<typeof sample.shop.delivery>>) =>
+      new MemoryStore({
+        ...sample,
+        shop: { ...sample.shop, delivery: { ...sample.shop.delivery!, ...delivery } },
+      }).fresh();
+    // Wherever it goes: from the fewest days anywhere to the most.
+    const days = withDays({
+      days: { min: 2, max: 4 },
+      zones: [{ name: 'Lahore', cities: ['Lahore'], charge: 15_000, days: { min: 1, max: 1 } }],
+    });
+    const product = await renderer.render({ path: `/products/${lawn.handle}` }, days);
+    expect(product.html).toContain('<li>Delivered in 1 to 4 working days</li>');
+    expect(product.html).not.toContain('Delivered in 2 to 5 days across Pakistan');
+    const inCart = await renderer.render({ path: '/cart', cart }, days);
+    expect(inCart.html).toContain('<p class="cart__delivery">Delivered in 1 to 4 working days</p>');
+    const urdu = await renderer.render({ path: '/cart', cart, locale: 'ur' }, days);
+    expect(urdu.html).toContain('1 سے 4 کام کے دنوں میں ڈیلیوری');
+    const oneDay = await renderer.render(
+      { path: '/cart', cart },
+      withDays({ days: { min: 1, max: 1 }, zones: [] }),
+    );
+    expect(oneDay.html).toContain('Delivered in 1 working day<');
+    const within = await renderer.render(
+      { path: `/products/${lawn.handle}` },
+      withDays({ days: { min: 0, max: 3 }, zones: [] }),
+    );
+    expect(within.html).toContain('<li>Delivered within 3 working days</li>');
+    const sameDay = await renderer.render(
+      { path: `/products/${lawn.handle}` },
+      withDays({ days: { min: 0, max: 0 }, zones: [] }),
+    );
+    expect(sameDay.html).toContain('<li>Delivered the same day</li>');
+    // Days for a zone alone say nothing of everywhere else; nor does a shop that set none.
+    const zoneAlone = withDays({
+      zones: [{ name: 'Lahore', cities: ['Lahore'], charge: 15_000, days: { min: 1, max: 1 } }],
+    });
+    const none = await renderer.render({ path: `/products/${lawn.handle}` }, zoneAlone);
+    expect(none.html).toContain('<li>Delivered in 2 to 5 days across Pakistan</li>');
+    expect((await renderer.render({ path: '/cart', cart }, zoneAlone)).html).not.toContain(
+      'working day',
+    );
+  });
+
   it("offers sign-ups for the shop's news on WhatsApp, saying how one went", async () => {
     const home = (await render({ path: '/' })).html;
     expect(home).toContain(

@@ -1,9 +1,10 @@
 import { CurrentTenant, Money, RequireScopes, UserError, type TenantContext } from '@hatti/api';
 import { money, type CurrencyCode } from '@hatti/money';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import type { DeliverySettingsRecord } from '../delivery.js';
+import type { DeliveryDays as Days, DeliverySettingsRecord } from '../delivery.js';
 import { DeliveryService } from '../delivery.service.js';
 import {
+  DeliveryDays,
   DeliverySettings,
   DeliverySettingsUpdateInput,
   DeliverySettingsUpdatePayload,
@@ -48,13 +49,19 @@ function toDeliverySettings(
   return Object.assign(new DeliverySettings(), {
     charge: amount(record.charge),
     freeAbove: record.freeAbove === null ? null : amount(record.freeAbove),
+    days: toDays(record.days),
     zones: record.zones.map((zone) =>
       Object.assign(new DeliveryZone(), {
         name: zone.name,
         cities: zone.cities,
         charge: amount(zone.charge),
+        days: toDays(zone.days),
       }),
     ),
     updatedAt: record.updatedAt,
   });
+}
+
+function toDays(days: Days | null): DeliveryDays | null {
+  return days && Object.assign(new DeliveryDays(), { min: days.min, max: days.max });
 }

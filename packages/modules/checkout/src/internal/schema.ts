@@ -78,12 +78,16 @@ export interface StoredZone {
   name: string;
   cities: string[];
   charge: string;
+  /** Its own working days (ADR-235); absent in zones saved before, as null. */
+  days?: { min: number; max: number } | null;
 }
 
 export const deliverySettings = checkoutSchema.table('delivery_settings', {
   shopId: uuid('shop_id').primaryKey(),
   charge: bigint('charge', { mode: 'bigint' }).notNull().default(0n),
   freeAbove: bigint('free_above', { mode: 'bigint' }),
+  minDays: smallint('min_days'),
+  maxDays: smallint('max_days'),
   zones: jsonb('zones').$type<StoredZone[]>().notNull().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

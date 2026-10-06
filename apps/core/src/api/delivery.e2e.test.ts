@@ -14,7 +14,9 @@ const server = testDatabaseServer();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = any;
 
-const FIELDS = 'charge { amount } freeAbove { amount } zones { name cities charge { amount } }';
+const FIELDS =
+  'charge { amount } freeAbove { amount } days { min max } ' +
+  'zones { name cities charge { amount } days { min max } }';
 const READ = `{ deliverySettings { ${FIELDS} } }`;
 const UPDATE = `mutation ($input: DeliverySettingsUpdateInput!) {
   deliverySettingsUpdate(input: $input) {
@@ -81,6 +83,7 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
     expect(await read(tokens.reader)).toEqual({
       charge: { amount: '0.00' },
       freeAbove: null,
+      days: null,
       zones: [],
     });
 
@@ -88,14 +91,29 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
       input: {
         charge: '250',
         freeAbove: '5,000',
-        zones: [{ name: 'Twin cities', cities: ['isb', 'Pindi'], charge: '200' }],
+        days: { min: 2, max: 4 },
+        zones: [
+          {
+            name: 'Twin cities',
+            cities: ['isb', 'Pindi'],
+            charge: '200',
+            days: { min: 1, max: 2 },
+          },
+        ],
       },
     });
+    // How many working days delivery takes, everywhere and in the zone (ADR-235).
     const saved = {
       charge: { amount: '250.00' },
       freeAbove: { amount: '5000.00' },
+      days: { min: 2, max: 4 },
       zones: [
-        { name: 'Twin cities', cities: ['Islamabad', 'Rawalpindi'], charge: { amount: '200.00' } },
+        {
+          name: 'Twin cities',
+          cities: ['Islamabad', 'Rawalpindi'],
+          charge: { amount: '200.00' },
+          days: { min: 1, max: 2 },
+        },
       ],
     };
     expect(set.data?.deliverySettingsUpdate).toEqual({ deliverySettings: saved, userErrors: [] });
@@ -113,6 +131,14 @@ describe.skipIf(!server)('Admin GraphQL API: delivery charges', () => {
       ],
     });
     expect(await read(tokens.reader)).toEqual(saved);
+    const backwards = await gql(tokens.a, UPDATE, { input: { days: { min: 5, max: 3 } } });
+    expect(backwards.data?.deliverySettingsUpdate.userErrors).toEqual([
+      {
+        field: ['days', 'max'],
+        code: 'INVALID',
+        message: 'The most days delivery takes must be no fewer than the fewest',
+      },
+    ]);
     // Another shop's are its own.
     expect((await read(tokens.b)).zones).toEqual([]);
 

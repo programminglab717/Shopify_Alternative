@@ -108,7 +108,11 @@
                 {%- endif -%}
               </li>
             {%- endif -%}
-            <li>{{ 'products.product.delivery' | t }}</li>
+            {%- if delivery.max_days != nil -%}
+              <li>{% render 'delivery-days', min: delivery.min_days, max: delivery.max_days %}</li>
+            {%- else -%}
+              <li>{{ 'products.product.delivery' | t }}</li>
+            {%- endif -%}
             {%- liquid
               assign lowest = delivery.charge
               for zone in delivery.zones
