@@ -18,7 +18,7 @@ import {
   type OrderPaymentFacts,
 } from '@hatti/orders/public';
 import { Inject, Injectable } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import { PaymentEvents, type PaymentRefundPayload, type PaymentSessionPayload } from './events.js';
 import {
   GatewayAccountService,
@@ -51,11 +51,23 @@ export const SESSION_LIMITS = {
   reuseMinutes: 30,
 } as const;
 
+/**
+ * When a payment started online whose customer never came back is asked after (ADR-208): from a
+ * quarter of an hour after it began, at most once an hour, for two days, as a voucher paid at a
+ * shop may take a day; a shop's oldest first, so many a sweep.
+ */
+export const PAYMENT_INQUIRIES = {
+  afterMs: 15 * 60_000,
+  everyMs: 3_600_000,
+  withinMs: 2 * 86_400_000,
+  batch: 50,
+} as const;
+
 export const SESSION_STATUSES = ['open', 'paid', 'failed'] as const;
 export type SessionStatusValue = (typeof SESSION_STATUSES)[number];
 
 /** How Hatti heard that a session is paid: the customer coming back, or the gateway's webhook. */
-export type PaidThroughValue = 'return' | 'webhook';
+export type PaidThroughValue = 'return' | 'webhook' | 'inquiry';
 
 export const REFUND_STATUSES = ['pending', 'refunded', 'refused', 'unknown'] as const;
 export type RefundStatusValue = (typeof REFUND_STATUSES)[number];
@@ -369,6 +381,67 @@ export class OnlinePaymentService extends OnlinePayments {
       await this.#complete(tx, shopId, rows[0], gateway, said, 'webhook');
       return 'paid';
     });
+  }
+
+  /**
+   * The shops with payments started online to ask their gateways after (ADR-208), found with the
+   * system role, which sees every shop.
+   */
+  async shopsWithInquiriesDue(at: Date = new Date()): Promise<string[]> {
+    const gateways = this.gateways.inquirable;
+    if (gateways.length === 0) return [];
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string }>(sql`
+        SELECT DISTINCT s.shop_id FROM ${SESSION_FROM} WHERE ${inquiryDue(at, gateways)}`),
+    );
+    return rows.map((row) => row.shop_id);
+  }
+
+  /**
+   * Asks the gateways after the shop's payments started online whose customers never came back
+   * (ADR-208): sessions still open, from {@link PAYMENT_INQUIRIES}' quarter of an hour after they
+   * began to two days, each at most once an hour, through gateways that can be asked. Each is
+   * asked outside any transaction, as a gateway may take its time; one it says is paid is recorded
+   * paid through the inquiry, as its return would have been. How many it asked, and found paid.
+   */
+  async inquireDue(
+    shopId: string,
+    at: Date = new Date(),
+  ): Promise<{ asked: number; paid: number }> {
+    const gateways = this.gateways.inquirable;
+    if (gateways.length === 0) return { asked: 0, paid: 0 };
+    const { rows: due } = await this.db.tenant(shopId, (tx) =>
+      tx.execute<SessionRow>(sql`
+        SELECT ${SESSION_COLUMNS}
+          FROM ${SESSION_FROM}
+         WHERE s.shop_id = ${shopId} AND ${inquiryDue(at, gateways)}
+         ORDER BY s.created_at
+         LIMIT ${PAYMENT_INQUIRIES.batch}`),
+    );
+    let asked = 0;
+    let paid = 0;
+    for (const session of due) {
+      const row = await this.db.tenant(shopId, (tx) =>
+        gatewayAccountIn(tx, shopId, session.account_id),
+      );
+      const gateway = row && this.gateways.of(row.gateway);
+      if (!row || !gateway?.inquire || !session.gateway_ref) continue;
+      const answer = await gateway.inquire(
+        this.accounts.openedIn(shopId, row),
+        session.gateway_ref,
+      );
+      asked += 1;
+      const found = await this.db.tenant(shopId, async (tx) => {
+        await tx.execute(sql`
+          UPDATE payments.sessions SET inquired_at = ${at}
+           WHERE shop_id = ${shopId} AND id = ${session.id}`);
+        if (answer.status !== 'paid' || answer.payment.ref !== session.gateway_ref) return false;
+        await this.#complete(tx, shopId, session, gateway, answer.payment, 'inquiry');
+        return true;
+      });
+      if (found) paid += 1;
+    }
+    return { asked, paid };
   }
 
   /** An order's sessions, the latest first, each with its refunds. */
@@ -793,6 +866,20 @@ function toRefundRecord(row: RefundRow): PaymentRefundRecord {
     createdAt: toDate(row.created_at),
     updatedAt: toDate(row.updated_at),
   };
+}
+
+/**
+ * The sessions to ask their gateways after at `at` (ADR-208), of {@link SESSION_FROM}: open, with
+ * the gateway's name for them, through one of `gateways`, begun from a quarter of an hour to two
+ * days before, and not asked within the hour.
+ */
+function inquiryDue(at: Date, gateways: readonly string[]): SQL {
+  const before = (ms: number) => new Date(at.getTime() - ms);
+  return sql`s.status = 'open' AND s.gateway_ref IS NOT NULL
+    AND s.created_at <= ${before(PAYMENT_INQUIRIES.afterMs)}
+    AND s.created_at > ${before(PAYMENT_INQUIRIES.withinMs)}
+    AND (s.inquired_at IS NULL OR s.inquired_at <= ${before(PAYMENT_INQUIRIES.everyMs)})
+    AND a.gateway = ANY(${sql.param([...gateways])}::text[])`;
 }
 
 /**

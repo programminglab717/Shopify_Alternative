@@ -85,7 +85,11 @@ export async function paymentsFixture(
   options: { safepayUrl?: string } = {},
 ): Promise<PaymentsFixture> {
   const testDb = await createTestDatabase(server);
-  const db = new Database({ appUrl: testDb.appUrl, applicationName: 'payments-test' });
+  const db = new Database({
+    appUrl: testDb.appUrl,
+    systemUrl: testDb.systemUrl,
+    applicationName: 'payments-test',
+  });
   const admin = new pg.Client({ connectionString: testDb.adminUrl });
   await admin.connect();
   const a = tenant(newId());

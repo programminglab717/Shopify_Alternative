@@ -31,6 +31,7 @@ export {
   type GatewayCredentialField,
   type GatewayCredentials,
   type GatewayEnvironmentValue,
+  type GatewayInquiry,
   type GatewayPayment,
   type GatewayRefundRequest,
   type GatewayRefundResult,
@@ -45,6 +46,7 @@ export {
 } from '../internal/gateways.js';
 export {
   OnlinePaymentService,
+  PAYMENT_INQUIRIES,
   REFUND_LIMITS,
   REFUND_STATUSES,
   SESSION_LIMITS,

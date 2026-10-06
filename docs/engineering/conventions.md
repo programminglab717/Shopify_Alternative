@@ -1041,6 +1041,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   origin (`checkoutOrigin`). Its session keeps no `checkout_url`, so it is never offered again,
   and the form is never stored: it may carry credentials, as JazzCash's does. Check a signed
   outcome with the account's secret in constant time (`sameHex`) before reading anything of it.
+* **A payment whose customer never came back is asked after, not waited for**
+  ([ADR-208](../architecture/13-decision-log.md#adr-208--a-payment-started-online-whose-customer-never-came-back-is-asked-after-the-worker-asks-the-gateways-status-inquiry-jazzcashs-first-from-a-quarter-of-an-hour-after-it-began-at-most-once-an-hour-for-two-days-and-records-one-the-gateway-vouches-for-paid-through-the-inquiry)):
+  a gateway that can be asked implements `inquire`, answering `paid` with the payment it vouches
+  for, `unpaid` or `unknown`; believe an answer only signed with the account's secret, as a return
+  is. `OnlinePaymentService.inquireDue` asks each due session outside any transaction and records
+  one paid through `#complete`, as `inquiry`; `PAYMENT_INQUIRIES` says when.
 
 ## Billing
 

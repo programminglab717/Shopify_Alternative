@@ -33,11 +33,13 @@ import {
   FulfillmentService,
   OrderExportService,
 } from '@hatti/orders/public';
+import { GatewayAccountService, OnlinePaymentService } from '@hatti/payments/public';
 import { StorefrontActivity } from '@hatti/storefront-data';
 import type { WorkerConfig } from '../config.js';
 import { couriersOf } from '../couriers.js';
 import { exportEmailsOf } from '../emails.js';
 import { messageProvidersOf } from '../messaging.js';
+import { paymentGatewaysOf } from '../payments.js';
 import { CloudflareCache, NO_EDGE_CACHE, type EdgeCache } from '../storefront/edge-cache.js';
 import {
   PUBLISHED_EVENTS,
@@ -57,6 +59,7 @@ import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
 import { ParcelSteps } from './parcel-steps.js';
+import { PaymentInquiries } from './payment-inquiries.js';
 import { MessagesSender, OrderNotifications } from './notifications.js';
 import { ProductImages } from './product-images.js';
 import { RiskRescoring } from './risk-rescoring.js';
@@ -324,10 +327,26 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         logger,
       }).start(config.COURIER_BOOKINGS_INTERVAL_MS);
       closers.push(() => bookings.stop());
+      // Payments started online whose customers never came back, asked after (ADR-208).
+      const gateways = paymentGatewaysOf({ production: config.NODE_ENV === 'production' });
+      const inquiries = new PaymentInquiries(
+        new OnlinePaymentService(
+          database,
+          new GatewayAccountService(
+            database,
+            config.ENCRYPTION_KEYS,
+            new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
+            gateways,
+          ),
+          gateways,
+        ),
+        logger,
+      ).start(config.SWEEP_INTERVAL_MS);
+      closers.push(() => inquiries.stop());
     } else {
       logger.warn(
-        'ENCRYPTION_KEYS is not set: no conversions go to the ad platforms, and no orders are ' +
-          'booked with couriers',
+        'ENCRYPTION_KEYS is not set: no conversions go to the ad platforms, no orders are ' +
+          'booked with couriers, and no payments are asked after',
       );
     }
     // Each message is paid for from its shop's credit as it goes (ADR-155).

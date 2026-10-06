@@ -559,4 +559,103 @@ describe('JazzCash', () => {
     expect(jazzcash.webhook(account, json(['not', 'fields']))).toBe('unsigned');
     expect(jazzcash.webhook(account, json(signed({ ...PAID, pp_ResponseCode: '157' })))).toBeNull();
   });
+
+  describe('its status inquiry, for a payment whose customer never came back (ADR-208)', () => {
+    const fake = new FakeSafepay();
+    let asking: JazzCashGateway;
+    const COMPLETED = {
+      pp_ResponseCode: '000',
+      pp_ResponseMessage: 'Successful',
+      pp_Status: 'Completed',
+      pp_PaymentResponseCode: '121',
+      pp_PaymentResponseMessage: 'Transaction has been completed.',
+      pp_RetreivalReferenceNo: '261002143512',
+      pp_AuthCode: '',
+    };
+    const answer = (body: Record<string, unknown>) => {
+      fake.next = { status: 200, body };
+    };
+
+    beforeAll(async () => {
+      await fake.start();
+      asking = new JazzCashGateway({ urls: { sandbox: fake.url }, timeoutMs: 2_000 });
+    });
+
+    afterAll(async () => {
+      await fake.stop();
+    });
+
+    it('asks with the merchant ID and password, signed with the salt, and believes it signed alone', async () => {
+      answer(signed(COMPLETED));
+      expect(await asking.inquire(account, 'T2026100214300012345')).toEqual({
+        status: 'paid',
+        payment: {
+          ref: 'T2026100214300012345',
+          amount: null,
+          currency: null,
+          reference: '261002143512',
+        },
+      });
+      const request = fake.requests.at(-1)!;
+      expect([request.method, request.path]).toEqual([
+        'POST',
+        '/ApplicationAPI/API/PaymentInquiry/Inquire',
+      ]);
+      const sent = request.body as Record<string, string>;
+      expect(sent).toMatchObject({
+        pp_TxnRefNo: 'T2026100214300012345',
+        pp_MerchantID: 'MC12345',
+        pp_Password: 'x0y1z2w3',
+      });
+      expect(sent.pp_SecureHash).toBe(jazzCashHash('salt-of-zari', sent, false));
+      // Its amount, where it gives one; a 000 its payment's code may be too.
+      answer(signed({ ...COMPLETED, pp_PaymentResponseCode: '000', pp_Amount: '250050' }));
+      expect(await asking.inquire(account, 'T1')).toMatchObject({
+        status: 'paid',
+        payment: { amount: 250_050n, currency: 'PKR' },
+      });
+      // An answer not signed with the account's salt is not believed.
+      answer({ ...signed(COMPLETED), pp_Status: 'Completed ' });
+      expect(await asking.inquire(account, 'T1')).toEqual({
+        status: 'unknown',
+        message: "JazzCash's answer was not signed with the salt",
+      });
+      answer(COMPLETED);
+      expect((await asking.inquire(account, 'T1')).status).toBe('unknown');
+    });
+
+    it('says a payment not made, or not yet, is unpaid, and what it could not learn unknown', async () => {
+      answer(
+        signed({
+          ...COMPLETED,
+          pp_Status: 'Pending',
+          pp_PaymentResponseCode: '124',
+          pp_PaymentResponseMessage: 'Order is placed and waiting for financials to be received',
+        }),
+      );
+      expect(await asking.inquire(account, 'T1')).toEqual({
+        status: 'unpaid',
+        message: 'JazzCash: Order is placed and waiting for financials to be received',
+      });
+      // A completed code with another status is not believed paid.
+      answer(signed({ ...COMPLETED, pp_Status: 'Reversed' }));
+      expect((await asking.inquire(account, 'T1')).status).toBe('unpaid');
+      answer(signed({ pp_ResponseCode: '110', pp_ResponseMessage: 'Invalid merchant' }));
+      expect(await asking.inquire(account, 'T1')).toEqual({
+        status: 'unknown',
+        message: 'JazzCash: Invalid merchant',
+      });
+      fake.next = { status: 502, body: { message: 'Bad gateway' } };
+      expect(await asking.inquire(account, 'T1')).toEqual({
+        status: 'unknown',
+        message: 'JazzCash answered 502',
+      });
+      const closed = await closedPort();
+      const away = new JazzCashGateway({ urls: { sandbox: `http://127.0.0.1:${closed}` } });
+      expect(await away.inquire(account, 'T1')).toMatchObject({
+        status: 'unknown',
+        message: expect.stringMatching(/^JazzCash could not be reached/),
+      });
+    });
+  });
 });

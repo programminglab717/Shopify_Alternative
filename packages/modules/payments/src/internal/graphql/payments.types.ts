@@ -87,14 +87,20 @@ registerEnumType(PaymentRefundStatus, {
 export enum PaymentConfirmation {
   RETURN = 'RETURN',
   WEBHOOK = 'WEBHOOK',
+  INQUIRY = 'INQUIRY',
 }
 
 registerEnumType(PaymentConfirmation, {
   name: 'PaymentConfirmation',
-  description: 'How Hatti heard that a payment is made, signed by the gateway either way.',
+  description: 'How Hatti heard that a payment is made, signed by the gateway each way.',
   valuesMap: {
     RETURN: { description: 'The customer came back from the gateway with it.' },
     WEBHOOK: { description: "The gateway's webhook said so." },
+    INQUIRY: {
+      description:
+        'Asked after, as the customer never came back, the gateway said so (ADR-208), as ' +
+        "JazzCash's status inquiry does.",
+    },
   },
 });
 

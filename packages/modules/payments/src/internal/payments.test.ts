@@ -4,7 +4,7 @@ import { toPublicId } from '@hatti/ids';
 import { orderLinkPage } from '@hatti/orders/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { jazzCashHash } from './gateways.js';
-import { SESSION_LIMITS, paymentsUnderwayIn } from './online-payment.service.js';
+import { PAYMENT_INQUIRIES, SESSION_LIMITS, paymentsUnderwayIn } from './online-payment.service.js';
 import { errorsOf, paymentsFixture, unwrap, type PaymentsFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -591,6 +591,51 @@ describe.skipIf(!server)('Payments online', () => {
     // Paid, it is underway no more.
     expect(await f.links.paidOnline(token, formOf(started.url))).toMatchObject({ problem: null });
     expect(await underway(dayAgo)).toEqual(new Set());
+  });
+
+  it('asks the gateway after a payment whose customer never came back, and records it paid (ADR-208)', async () => {
+    const order = await f.awaiting(f.a, kurta);
+    const token = await f.linkOf(f.a, order.id);
+    await f.connectTest(f.a);
+    const started = await f.links.payOnline(token);
+    if (!('url' in started)) throw new Error(JSON.stringify(started));
+    const ref = new URL(started.url).searchParams.get('ref')!;
+    const now = Date.now();
+    const at = (minutes: number) => new Date(now + minutes * 60_000);
+    // Not asked after for its first quarter of an hour: the customer may still come back.
+    expect(await f.payments.shopsWithInquiriesDue(at(0))).toEqual([]);
+    expect(await f.payments.inquireDue(f.a.shopId, at(10))).toEqual({ asked: 0, paid: 0 });
+    expect(await f.payments.shopsWithInquiriesDue(at(20))).toEqual([f.a.shopId]);
+
+    // Not paid yet: asked, and asked again only an hour later.
+    f.testGateway.inquiries.set(ref, { status: 'unpaid', message: 'Voucher not paid yet' });
+    expect(await f.payments.inquireDue(f.a.shopId, at(20))).toEqual({ asked: 1, paid: 0 });
+    expect(await f.payments.inquireDue(f.a.shopId, at(50))).toEqual({ asked: 0, paid: 0 });
+    expect(await f.payments.shopsWithInquiriesDue(at(50))).toEqual([]);
+    expect(f.testGateway.asked.filter((each) => each === ref)).toHaveLength(1);
+    expect((await f.orders.get(f.a, order.id))!.amountPaid).toBe(0n);
+    // Another shop's sweep asks nothing of it.
+    expect(await f.payments.inquireDue(f.b.shopId, at(90))).toEqual({ asked: 0, paid: 0 });
+
+    // Paid at the gateway: recorded paid through the inquiry, as its return would have been.
+    f.testGateway.inquiries.set(ref, {
+      status: 'paid',
+      payment: { ref, amount: null, currency: null, reference: 'T-INQ01' },
+    });
+    expect(await f.payments.inquireDue(f.a.shopId, at(90))).toEqual({ asked: 1, paid: 1 });
+    expect(await f.orders.get(f.a, order.id)).toMatchObject({
+      amountPaid: 2_000_00n,
+      financialStatus: 'paid',
+    });
+    const [session] = await f.payments.sessionsOf(f.a.shopId, order.id);
+    expect(session).toMatchObject({ status: 'paid', paidThrough: 'inquiry', reference: 'T-INQ01' });
+    expect((await f.timeline(f.a, order.id))[0]).toBe(
+      'Rs 2,000 paid online through Test gateway, reference T-INQ01, paying it in full',
+    );
+    // Paid, it is asked after no more; nor one older than two days.
+    expect(await f.payments.shopsWithInquiriesDue(at(200))).toEqual([]);
+    const late = new Date(now + PAYMENT_INQUIRIES.withinMs + 60_000);
+    expect(await f.payments.inquireDue(f.a.shopId, late)).toEqual({ asked: 0, paid: 0 });
   });
 
   /** An order of a kurta, Rs 2,000, paid online through the test gateway: it, and the payment's. */

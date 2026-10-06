@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-207 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-208 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -215,6 +215,7 @@
 | 205 | A shop's brand has Shopify's square logo beside its logo, one of its files, served by the API at an address of its own; the shop's document names where each logo is served, each address naming its file, and the link page shows the square logo, else the logo, at its top | Accepted |
 | 206 | Each product a shop's link page shows may name one of its variants, kept beside it by its place: the page shows that variant's title, image and price, and Buy now goes straight to checkout with it; a variant deleted since is as none chosen | Accepted |
 | 207 | Themes get Shopify's shop.brand: its logo and square logo as images from where the API serves them, nil for what Hatti does not keep; and Hatti Base's header shows the logo in place of the shop's name | Accepted |
+| 208 | A payment started online whose customer never came back is asked after: the worker asks the gateway's status inquiry, JazzCash's first, from a quarter of an hour after it began, at most once an hour for two days, and records one the gateway vouches for paid through the inquiry | Accepted |
 
 ---
 
@@ -8681,3 +8682,42 @@
   * **A logo setting of the theme's own, as Dawn's `settings.logo`:** a second logo to set, again
     for each theme; `shop.brand` is the shop's in every theme.
   * **The square logo in the header:** headers show wordmarks; the square logo is for squares.
+
+## ADR-208 · A payment started online whose customer never came back is asked after: the worker asks the gateway's status inquiry, JazzCash's first, from a quarter of an hour after it began, at most once an hour for two days, and records one the gateway vouches for paid through the inquiry
+
+* **Context:** A payment started online is heard of from the customer's return or the gateway's
+  webhook ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing), [ADR-163](#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)).
+  A customer who closes the page after paying, a voucher paid later at a shop, and a JazzCash
+  account without its notification set up leave the session open: the order waits, and an order
+  never paid is cancelled once the shop's days pass ([ADR-168](#adr-168--an-order-still-waiting-for-its-payment-by-transfer-online-or-its-advance-as-many-days-after-it-was-placed-as-its-shop-says-is-cancelled-by-a-sweep-in-the-worker-its-stock-let-go-and-its-customer-told-one-with-a-receipt-waiting-to-be-checked-is-left-to-staff-and-one-with-a-payment-started-online-in-the-last-day-waits-for-it)),
+  though it may have been paid. 05 §4.2 drew an inquiry; ADR-163 left JazzCash's for later.
+* **Decision:**
+  * **`inquire` on a gateway's adapter**, where the gateway can be asked: `paid`, with the
+    payment it vouches for; `unpaid`, not made or not yet; or `unknown`, not asked or its answer
+    not believed.
+  * **JazzCash's status inquiry** (`/ApplicationAPI/API/PaymentInquiry/Inquire`): the
+    transaction's reference with the merchant ID and password, signed with the integrity salt as
+    its forms are; its answer believed only signed with the salt. Paid when the inquiry succeeded
+    (000) and the payment's code is 000 or 121, its status, where it gives one, completed; unpaid
+    for any other code; unknown for anything else. Not yet tried against its sandbox, as
+    Safepay's refund was not (spike 4).
+  * **A sweep of the worker's:** sessions still open with the gateway's name for them, through a
+    gateway that can be asked, from a quarter of an hour to two days after they began, each asked
+    at most once an hour (`inquired_at`, migration 0132), 50 a shop a sweep. The shops are found
+    with the system role and each is asked after in its own transactions, the gateway outside any
+    of them. A payment the gateway says is made is recorded as its return would have been, paid
+    through the inquiry (`INQUIRY`).
+* **Consequences:**
+  * An order paid but never heard of is recorded paid within the hour, its customer told, and it
+    is not cancelled as never paid; a voucher paid at a shop the next day is found too.
+  * A JazzCash account is asked up to 48 times about a session never paid.
+  * Not yet: Safepay's trackers asked after; a session marked failed when the gateway says so;
+    reconciliation against the gateways' settlements (05 §4.2).
+* **Alternatives:**
+  * **Asking at 1, 3, 10 and 30 minutes, as 05 §4.2 drew it:** most customers come back within
+    minutes; the inquiry is for those who never do, and asking hourly is lighter on the shop's
+    account.
+  * **Asking only before an order never paid is cancelled:** a paid order would wait days to be
+    known as paid, and its customer to hear of it.
+  * **Believing an unsigned answer, as it comes over TLS:** what marks an order paid is believed
+    signed alone, as returns and webhooks are.

@@ -6601,9 +6601,14 @@ enum PaperSize {
 }
 
 """
-How Hatti heard that a payment is made, signed by the gateway either way.
+How Hatti heard that a payment is made, signed by the gateway each way.
 """
 enum PaymentConfirmation {
+  """
+  Asked after, as the customer never came back, the gateway said so (ADR-208), as JazzCash's status inquiry does.
+  """
+  INQUIRY
+
   """The customer came back from the gateway with it."""
   RETURN
 

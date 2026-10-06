@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Asking JazzCash what became of a payment** (PAY-01, ADR-163): JazzCash's status inquiry, for a
-payment whose customer never came back from paying, so that an order paid is recorded as paid
-rather than cancelled as never paid.
+**A blog's Atom feed, and the articles before and after** (OS-07, ADR-177): `/blogs/{handle}.atom`
+as Shopify serves it, for readers and other sites to follow a shop's blog, and
+`blog.previous_article` and `blog.next_article` on an article's page.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Asking JazzCash what became of a payment
+
+* **A payment whose customer never came back is asked after**
+  ([ADR-208](../architecture/13-decision-log.md#adr-208--a-payment-started-online-whose-customer-never-came-back-is-asked-after-the-worker-asks-the-gateways-status-inquiry-jazzcashs-first-from-a-quarter-of-an-hour-after-it-began-at-most-once-an-hour-for-two-days-and-records-one-the-gateway-vouches-for-paid-through-the-inquiry)):
+  JazzCash's status inquiry, signed with the account's salt as its forms are, its answer believed
+  signed alone; paid at 000 or 121 completed, unpaid at another code, unknown otherwise. Not yet
+  tried against its sandbox.
+* **The worker asks** after sessions still open from a quarter of an hour after they began, once
+  an hour for two days (`inquired_at`, migration 0132), and records one found paid as its return
+  would have been, paid through the inquiry (`INQUIRY` in the Admin API).
+* 1621 tests (4 new): JazzCash's inquiry signed, believed, paid, unpaid and unknown; the sweep
+  asking when due and recording one paid; and the worker going on past a shop that fails.
 
 ### a28340f · The shop's brand in its themes
 

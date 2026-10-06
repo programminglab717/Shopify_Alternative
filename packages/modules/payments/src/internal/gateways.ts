@@ -106,6 +106,13 @@ export interface GatewayRefundRequest {
 export type GatewayRefundResult =
   { ok: true; reference: string | null } | { ok: false; unknown: boolean; message: string };
 
+/**
+ * What a gateway says of a payment it was asked after (ADR-208): made, as it vouches for it; not
+ * made, or not yet; or not known, as when it could not be asked or its answer not believed.
+ */
+export type GatewayInquiry =
+  { status: 'paid'; payment: GatewayPayment } | { status: 'unpaid' | 'unknown'; message: string };
+
 /** A request to a gateway's webhook, as it came. */
 export interface GatewayWebhook {
   /** The body as sent, which signatures cover. */
@@ -142,6 +149,11 @@ export interface PaymentGateway {
    * {@link PaymentGatewayInfo.refunds} says it can; absent when it can give nothing back.
    */
   refund?(account: GatewayAccount, request: GatewayRefundRequest): Promise<GatewayRefundResult>;
+  /**
+   * Asks the gateway what became of the payment `ref` names, as of one whose customer never came
+   * back from its page (ADR-208); absent when it cannot be asked.
+   */
+  inquire?(account: GatewayAccount, ref: string): Promise<GatewayInquiry>;
 }
 
 /** The gateways shops can take payments through, by key. */
@@ -155,6 +167,13 @@ export class PaymentGateways {
   /** The gateway `gateway`'s adapter; null if shops cannot take payments through it here. */
   of(gateway: string): PaymentGateway | null {
     return this.#gateways.get(gateway) ?? null;
+  }
+
+  /** The gateways that can be asked what became of a payment (ADR-208), by key. */
+  get inquirable(): string[] {
+    return [...this.#gateways.values()]
+      .filter((gateway) => gateway.inquire !== undefined)
+      .map((gateway) => gateway.info.gateway);
   }
 
   /** What each gateway is and asks for, by name. */
@@ -414,11 +433,19 @@ export const JAZZCASH_URLS: Readonly<Record<GatewayEnvironmentValue, string>> = 
 /** Its hosted checkout's page, which the customer's browser posts the signed form to. */
 const JAZZCASH_FORM_PATH = '/CustomerPortal/transactionmanagement/merchantform/';
 
+/** Its status inquiry, which asks after a transaction by its reference (ADR-208). */
+const JAZZCASH_INQUIRY_PATH = '/ApplicationAPI/API/PaymentInquiry/Inquire';
+
+/** The codes its inquiry gives a payment completed with. */
+const JAZZCASH_PAID = new Set(['000', '121']);
+
 export interface JazzCashOptions {
   /** {@link JAZZCASH_URLS}, unless a test says otherwise. */
   urls?: Partial<Record<GatewayEnvironmentValue, string>>;
   /** How long its page takes the payment for, as a voucher paid at a shop needs: a day. */
   expiresInMs?: number;
+  /** How long its inquiry may take; fifteen seconds unless given. */
+  timeoutMs?: number;
 }
 
 /**
@@ -428,7 +455,8 @@ export interface JazzCashOptions {
  * a JazzCash wallet or a voucher paid at a shop, and posts the outcome to the return address,
  * signed the same way, as its instant payment notification does. The form carries the account's
  * merchant ID and password, as JazzCash asks of it; the salt, which signs, never leaves Hatti.
- * Nothing is given back through its API here.
+ * Its status inquiry is asked after a payment whose customer never came back (ADR-208). Nothing
+ * is given back through its API here.
  */
 export class JazzCashGateway implements PaymentGateway {
   readonly info: PaymentGatewayInfo = {
@@ -521,6 +549,68 @@ export class JazzCashGateway implements PaymentGateway {
     return this.#signed(account, fields);
   }
 
+  /**
+   * Asks its status inquiry after the transaction `ref` (ADR-208), with the merchant ID and
+   * password, signed with the integrity salt as its forms are; its answer is believed only signed
+   * with the salt too. Paid when the inquiry succeeded (000) and the payment's code is one of a
+   * completed payment, 000 or 121, its status, where it gives one, completed; not paid for any
+   * other code, as a voucher not paid yet; unknown when JazzCash could not be asked, or answered
+   * anything else.
+   */
+  async inquire(account: GatewayAccount, ref: string): Promise<GatewayInquiry> {
+    const salt = account.credentials.integritySalt ?? '';
+    const fields: Record<string, string> = {
+      pp_TxnRefNo: ref,
+      pp_MerchantID: account.credentials.merchantId ?? '',
+      pp_Password: account.credentials.password ?? '',
+    };
+    let response: Response;
+    try {
+      response = await fetch(`${this.#url(account.environment)}${JAZZCASH_INQUIRY_PATH}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ ...fields, pp_SecureHash: jazzCashHash(salt, fields, false) }),
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+      });
+    } catch (error) {
+      const message = `JazzCash could not be reached: ${(error as Error).message}`;
+      return { status: 'unknown', message: message.slice(0, 1_000) };
+    }
+    const json: unknown = await response.json().catch(() => null);
+    if (!response.ok || !isObject(json)) {
+      return { status: 'unknown', message: `JazzCash answered ${response.status}` };
+    }
+    const answer: Record<string, string> = {};
+    for (const [key, value] of Object.entries(json)) {
+      if (typeof value === 'string' || typeof value === 'number') answer[key] = String(value);
+    }
+    const outcome = this.#signed(account, answer);
+    if (outcome === 'unsigned') {
+      return { status: 'unknown', message: "JazzCash's answer was not signed with the salt" };
+    }
+    if (answer.pp_ResponseCode !== '000') {
+      const said = answer.pp_ResponseMessage?.trim() || `it answered ${answer.pp_ResponseCode}`;
+      return { status: 'unknown', message: `JazzCash: ${said}`.slice(0, 1_000) };
+    }
+    const code = answer.pp_PaymentResponseCode?.trim() ?? '';
+    const status = answer.pp_Status?.trim();
+    if (!JAZZCASH_PAID.has(code) || (status && !/^completed$/i.test(status))) {
+      const said = answer.pp_PaymentResponseMessage?.trim() || status || `code ${code || 'none'}`;
+      return { status: 'unpaid', message: `JazzCash: ${said}`.slice(0, 1_000) };
+    }
+    const paid = /^\d{1,15}$/.test(answer.pp_Amount ?? '') ? BigInt(answer.pp_Amount!) : 0n;
+    const reference = (answer.pp_RetreivalReferenceNo || answer.pp_AuthCode || '').trim();
+    return {
+      status: 'paid',
+      payment: {
+        ref,
+        amount: paid > 0n ? paid : null,
+        currency: paid > 0n ? answer.pp_TxnCurrency?.trim() || 'PKR' : null,
+        reference: reference.slice(0, 200) || null,
+      },
+    };
+  }
+
   /** The payment `fields` say is made, if signed with the account's salt; or `unsigned`. */
   #signed(
     account: GatewayAccount,
@@ -605,6 +695,10 @@ export class TestGateway implements PaymentGateway {
   refundAnswer: { refuse: string } | 'silent' | null = null;
   /** Runs while a refund is being given, as when staff act meanwhile. */
   whileRefunding: (() => Promise<void>) | null = null;
+  /** What it says when asked after a payment (ADR-208), by its ref; not known unless set. */
+  readonly inquiries = new Map<string, GatewayInquiry>();
+  /** The payments it was asked after, the latest last. */
+  readonly asked: string[] = [];
 
   /** Its page is the return address, on the shop's own pages. */
   checkoutOrigin(): null {
@@ -688,6 +782,11 @@ export class TestGateway implements PaymentGateway {
     const reference = `TR-${randomBytes(3).toString('hex')}`;
     this.refunds.push({ ...request, reference });
     return { ok: true, reference };
+  }
+
+  async inquire(_account: GatewayAccount, ref: string): Promise<GatewayInquiry> {
+    this.asked.push(ref);
+    return this.inquiries.get(ref) ?? { status: 'unknown', message: 'Test gateway was not told' };
   }
 
   #sign(account: GatewayAccount, body: Buffer): string {
