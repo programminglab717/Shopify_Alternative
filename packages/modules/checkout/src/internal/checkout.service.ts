@@ -28,6 +28,7 @@ import {
   bankTransferSettingsIn,
   cashPastLimitOf,
   checkAddress,
+  chosenGateway,
   codLimitError,
   offeredBankTransferIn,
   transferDiscountOf,
@@ -195,10 +196,11 @@ export interface CheckoutPayments {
    */
   capAdvance: boolean;
   /**
-   * The shop's payment gateway, while it takes the cart's currency online (ADR-152): the order
-   * placed waits for its total, which its thank-you page takes through it. Null otherwise.
+   * The shop's payment gateways, while it takes the cart's currency online (ADR-152): the order
+   * placed waits for its total, which its thank-you page takes through the one the shopper
+   * chooses there (ADR-219). Null while it takes it through none.
    */
-  online: OnlineGateway | null;
+  online: OnlineGateway[] | null;
 }
 
 /** Why the order was not placed: the page shows the checkout again, with what the shopper typed. */
@@ -320,9 +322,9 @@ export type CheckoutView =
       order: OrderRecord;
       /**
        * While it waits for its money and the shop takes it online (ADR-151, ADR-152): through
-       * which gateway, and how much, in minor units.
+       * which gateways, for the shopper to choose among (ADR-219), and how much, in minor units.
        */
-      online: { gateway: OnlineGateway; amount: bigint } | null;
+      online: { gateways: OnlineGateway[]; amount: bigint } | null;
       /**
        * How paying online went, as the shopper came back from the gateway: `paid` once its
        * payment is in; or why not.
@@ -830,18 +832,18 @@ export class CheckoutService {
     if (checkout.orderId) {
       const order = await this.orders.orderOf(tx, shopId, checkout.orderId);
       if (!order) return { kind: 'not_found' };
-      // What it waits for before it ships, which the shop's gateway may take online (ADR-152).
+      // What it waits for before it ships, which the shop's gateways may take online (ADR-152).
       const owed =
         order.status === 'open' && order.stage === 'awaiting_payment' ? transferOwed(order) : 0n;
-      const gateway =
+      const gateways =
         owed > 0n && this.payments
-          ? await this.payments.gatewayOf(tx, shopId, order.currency)
-          : null;
+          ? await this.payments.gatewaysOf(tx, shopId, order.currency)
+          : [];
       return {
         kind: 'placed',
         shop,
         order,
-        online: gateway && { gateway, amount: owed },
+        online: gateways.length > 0 ? { gateways, amount: owed } : null,
         payment: null,
         storeCredit: await storeCreditPaidIn(tx, shopId, order.id),
       };
@@ -889,10 +891,11 @@ export class CheckoutService {
         ? []
         : await this.carts.productsIn(tx, shopId, priced);
     const transfer = await offeredBankTransferIn(tx, shopId);
-    // The shop's gateway, where it takes the shop's currency online (ADR-152).
-    const online = this.payments
-      ? await this.payments.gatewayOf(tx, shopId, profile.currency as CurrencyCode)
-      : null;
+    // The shop's gateways, where it takes the shop's currency online (ADR-152, ADR-219).
+    const gateways = this.payments
+      ? await this.payments.gatewaysOf(tx, shopId, profile.currency as CurrencyCode)
+      : [];
+    const online = gateways.length > 0 ? gateways : null;
     // An advance is paid into the shop's account, which it may give without offering transfers:
     // the shop's own, or what the order comes to past the law's cap (ADR-188).
     const account =
@@ -992,15 +995,16 @@ export class CheckoutService {
   }
 
   /**
-   * The shopper asked, on the thank-you page, to pay online what their order waits for (ADR-152):
-   * the shop's gateway's page to send them to, or the page again saying why not. They come back
-   * to the checkout's `paid` address on the core's own site, wherever the page was, since the
-   * gateway sends them back from another site; and to its page if they give up. With `shopId`,
-   * only for that shop's checkouts.
+   * The shopper asked, on the thank-you page, to pay online what their order waits for (ADR-152),
+   * through `gateway`, one of those the page offers, or the first of them when not given
+   * (ADR-219): that gateway's page to send them to, or the page again saying why not. They come
+   * back to the checkout's `paid` address on the core's own site, wherever the page was, since
+   * the gateway sends them back from another site; and to its page if they give up. With
+   * `shopId`, only for that shop's checkouts.
    */
   async payOnline(
     token: string,
-    options: { shopId?: string } = {},
+    options: { shopId?: string; gateway?: string | null } = {},
   ): Promise<{ url: string } | CheckoutView> {
     const found = await this.#resolve(token, options.shopId);
     if (!found) return { kind: 'not_found' };
@@ -1008,14 +1012,18 @@ export class CheckoutService {
       this.#view(tx, found, false, EMPTY_FORM),
     );
     if (view.kind !== 'placed' || !view.online || !this.payments || !this.site) return view;
+    const chosen = chosenGateway(view.online.gateways, options.gateway);
+    if (!chosen) return { ...view, payment: 'unavailable' };
     const page = this.site.url(`/${CHECKOUT_PATH}/${token}`);
-    const started = await this.payments.start(found.shopId, view.order.id, {
-      returnUrl: `${page}/paid`,
-      cancelUrl: page,
-    });
+    const started = await this.payments.start(
+      found.shopId,
+      view.order.id,
+      { returnUrl: `${page}/paid`, cancelUrl: page },
+      chosen.gateway,
+    );
     if (!('url' in started)) return { ...view, payment: 'unavailable' };
     return started.form
-      ? { ...view, gatewayForm: { url: started.url, form: started.form } }
+      ? { ...view, gatewayForm: { url: started.url, form: started.form, gateway: chosen.name } }
       : started;
   }
 
@@ -1116,8 +1124,9 @@ export function shownOf(
     ...(fee > 0n && { codFee: fee.toString() }),
     ...(payments.advance && { codAdvance: advanceKeyOf(payments.advance) }),
     ...(payments.capAdvance && { codCapAdvance: true }),
-    // Through which gateway the page offers to pay online (ADR-152).
-    ...(payments.online && { online: payments.online.name }),
+    // Through which gateways the page offers to pay online (ADR-152, ADR-219): one by its name
+    // alone, as pages offering one showed it.
+    ...(payments.online && { online: payments.online.map((gateway) => gateway.name).join(', ') }),
     // The tax the page says the total includes, at which rates, and which items it is in.
     ...(tax.rate !== null && {
       tax: [

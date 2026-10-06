@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-218 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-219 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -226,6 +226,7 @@
 | 216 | A collection has Shopify's Atom feed at its address with .atom: its first 50 products in its order, each with its type, vendor and variants in Shopify's own namespace, under IDs of their own, and products' documents say when each was made and last changed | Accepted |
 | 217 | A page is published at a time ahead as an article is, through Shopify's publishDate: hidden until then wherever it would show, and shown by the worker's same sweep, with the page.updated the storefront follows | Accepted |
 | 218 | A blog whose handle changes sends its articles' old addresses to their new ones when asked, as Shopify's redirectArticles does: a redirect for each, made all at once, with one event the storefront follows | Accepted |
+| 219 | Customers choose among the shop's gateways: each live account that takes the order's currency is offered on its page and checkout's thank-you page, in the order the shop added them, and the payment starts through the one chosen | Accepted |
 
 ---
 
@@ -9134,3 +9135,40 @@
     would be a new kind for the export, the import and the admin to show.
   * **`redirectMoved` for each article:** the same rules, but thousands of round trips and
     events in one request.
+
+## ADR-219 · Customers choose among the shop's gateways: each live account that takes the order's currency is offered on its page and checkout's thank-you page, in the order the shop added them, and the payment starts through the one chosen
+
+* **Context:** A shop keeps one live account a gateway ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)), and may keep
+  Safepay's, JazzCash's ([ADR-163](#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)) and Easypaisa's ([ADR-214](#adr-214--easypaisa-is-the-third-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-encrypted-with-the-stores-hash-key-to-its-page-and-the-token-it-comes-back-with-to-its-next-and-its-return-which-it-does-not-sign-is-believed-only-once-its-inquiry-asked-at-once-with-the-accounts-api-credentials-says-the-payment-is-made)) together:
+  customers in Pakistan pay from the wallet they have, JazzCash or Easypaisa, or by card. Yet an
+  order's page and checkout's thank-you page took payments through the shop's oldest live account
+  alone ([ADR-152](#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)), and one connected after it went unused. Shopify's checkout lists
+  every way the shop takes payments.
+* **Decision:**
+  * **Each live account taking the order's currency is offered**, in the order the shop added
+    them: `OnlinePayments.gatewaysOf` in place of `gatewayOf`, each `OnlineGateway` naming its
+    gateway, such as `jazzcash`, which names its account too, one being live a gateway.
+  * **The customer chooses on the page that takes the money.** An order's page and checkout's
+    thank-you page show a button for each, Pay with JazzCash, posting `action=pay` and its
+    `gateway`; a shop with one keeps its one Pay online button. Checkout's option says the
+    shopper pays through JazzCash or Easypaisa once the order is placed, and stays the one
+    `online` way to pay.
+  * **The payment starts through the one chosen.** `start` takes the gateway; one the shop does
+    not take payments through is refused as paying online not working, with a 503, and a post
+    naming none, as a page from before could send, takes the first. Returns, webhooks, inquiries
+    and refunds already went by each session's own account.
+  * **What a page showed keeps its digest:** checkout's `shownOf` holds the gateways' names, one
+    alone as it held before, so a page stays fresh while the shop's gateways are the same, and
+    each page's policy lets its form go on to every gateway it offers.
+* **Consequences:**
+  * A shop takes JazzCash's and Easypaisa's wallets, and cards through Safepay, at once, and its
+    customers pay through the one they have.
+  * Which comes first is the order the shop connected them in; nothing sets it otherwise yet.
+  * The order says it is paid `online`, and its sessions through which gateway, as a customer may
+    start with one and pay with another.
+* **Alternatives:**
+  * **The gateway chosen among checkout's ways to pay:** closer to Shopify's list, but the order
+    would keep a gateway it may not be paid through, and its own page, which takes payments long
+    after checkout, would need the choice again anyway.
+  * **One gateway the shop sets as its default:** one button still, but a customer without that
+    wallet would have nowhere to pay.

@@ -24,6 +24,7 @@ import type { DraftLinkView } from './draft-order.service.js';
 import type { AddressForm, LinkProblem, LinkShop } from './links.js';
 import {
   gatewayForm,
+  gatewayOrigins,
   onlinePaidNotice,
   onlinePaymentProblemWords,
   payOnlineForm,
@@ -688,8 +689,8 @@ function statusPage(
     receipts?: number;
     /** They came back from paying online, and it is in. */
     paid?: boolean;
-    /** What the shop's gateway takes online of what the order waits for (ADR-151). */
-    onlinePayment?: { gateway: OnlineGateway; amount: bigint } | null;
+    /** What the shop's gateways take online of what the order waits for (ADR-151, ADR-219). */
+    onlinePayment?: { gateways: OnlineGateway[]; amount: bigint } | null;
     /** Its parcels' steps on their way (ADR-160). */
     steps?: ParcelSteps;
   },
@@ -739,8 +740,8 @@ function statusPage(
         order.splitFrom && paragraphs(partWords(order.splitFrom), 'center small muted'),
         ...rest,
       ],
-      // Paying online answers with the gateway's page: the form goes on there.
-      onlinePayment?.gateway.origin ? [onlinePayment.gateway.origin] : [],
+      // Paying online answers with a gateway's page: the form goes on there.
+      gatewayOrigins(onlinePayment?.gateways ?? []),
     );
 
   switch (order.stage) {
@@ -900,7 +901,7 @@ function gatewayFormPage(view: Extract<OrderLinkView, { kind: 'order' }>): LinkP
     200,
     `${LABELS.payOnline.en} · ${shop.name}`,
     shop,
-    [shopName(shop), heading(LABELS.payOnline), gatewayForm(started, online.gateway.name, due)],
+    [shopName(shop), heading(LABELS.payOnline), gatewayForm(started, due)],
     [new URL(started.url).origin],
   );
 }

@@ -177,8 +177,9 @@ export class OrderLinkController {
         view = await this.links.sendReceipt(token, receiptOf(body));
         break;
       case 'pay': {
-        // To the shop's gateway, linked or by its form (ADR-163), or the page again with why not.
-        const started = await this.links.payOnline(token);
+        // To the gateway the customer chose (ADR-219), linked or by its form (ADR-163), or the
+        // page again with why not.
+        const started = await this.links.payOnline(token, field(body, 'gateway'));
         if ('url' in started) return seeOther(reply, started.url);
         if (started.kind === 'order' && started.gatewayForm) {
           return send(reply, orderLinkPage(started));

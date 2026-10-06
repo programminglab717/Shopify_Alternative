@@ -427,10 +427,10 @@ export class OrderService {
     if (askedAhead > 0n && riskAdvance) {
       throw new Error('An order asks for an advance whatever its risk, or by it: not both');
     }
-    // Paid online through the shop's gateway, which it must have (ADR-152).
+    // Paid online through one of the shop's gateways, which it must have (ADR-152).
     if (
       paymentMethod === 'online' &&
-      !(this.payments && (await this.payments.gatewayOf(tx, shopId, currency)))
+      !(this.payments && (await this.payments.gatewaysOf(tx, shopId, currency)).length > 0)
     ) {
       return failOne(
         [...order.field, 'paymentMethod'],

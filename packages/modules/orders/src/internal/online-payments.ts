@@ -3,6 +3,7 @@ import type { Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { OrderEvents, type OrderPaidPayload } from './events.js';
+import type { GatewayFormStart } from './online-payment-page.js';
 import { addTimelineEntry, lockOrder, updateOrder } from './order-store.js';
 import { orderName, transferOwed } from './rules.js';
 import type { OrderStatusValue } from './schema.js';
@@ -13,18 +14,25 @@ import type { OrderStatusValue } from './schema.js';
  * the page offers transfers alone.
  */
 export abstract class OnlinePayments {
-  /** The gateway the shop takes `currency` online through; null if none. */
-  abstract gatewayOf(tx: Tx, shopId: string, currency: CurrencyCode): Promise<OnlineGateway | null>;
+  /**
+   * The gateways the shop takes `currency` online through, for the customer to choose among
+   * (ADR-219): each of its live accounts that takes it, in the order the shop added them; none if
+   * it takes it online through none.
+   */
+  abstract gatewaysOf(tx: Tx, shopId: string, currency: CurrencyCode): Promise<OnlineGateway[]>;
 
   /**
-   * Starts paying online what the order waits for: the gateway's page to send the customer to,
-   * with the fields their browser posts there where its page takes a form (ADR-163); or why it
-   * cannot. `returnUrl` brings them back once they paid, `cancelUrl` if they did not.
+   * Starts paying online what the order waits for, through `gateway`, one of the shop's as
+   * {@link gatewaysOf} gives them, or the first of them when not given (ADR-219): the gateway's
+   * page to send the customer to, with the fields their browser posts there where its page takes
+   * a form (ADR-163); or why it cannot. `returnUrl` brings them back once they paid, `cancelUrl`
+   * if they did not.
    */
   abstract start(
     shopId: string,
     orderId: string,
     urls: { returnUrl: string; cancelUrl: string },
+    gateway?: string | null,
   ): Promise<{ url: string; form?: Readonly<Record<string, string>> } | { error: string }>;
 
   /**
@@ -32,15 +40,15 @@ export abstract class OnlinePayments {
    * once the gateway's signature, or its inquiry where its return is not signed, says a payment
    * of the order's is made, and it is recorded; `test` if that payment was a test in the
    * gateway's sandbox, which pays nothing; the gateway's next page, with the fields the
-   * customer's browser posts there, where they came back partway (ADR-214); null if nothing says
-   * so yet.
+   * customer's browser posts there and the gateway's name, where they came back partway
+   * (ADR-214); null if nothing says so yet.
    */
   abstract returned(
     shopId: string,
     orderId: string,
     form: Readonly<Record<string, string>>,
     returnUrl: string,
-  ): Promise<'paid' | 'test' | { url: string; form: Readonly<Record<string, string>> } | null>;
+  ): Promise<'paid' | 'test' | GatewayFormStart | null>;
 
   /**
    * Gives back `amount`, in minor units, of what the order's customer paid online, through the
@@ -56,6 +64,11 @@ export abstract class OnlinePayments {
 
 /** A gateway the shop takes money online through, as pages offering it show it. */
 export interface OnlineGateway {
+  /**
+   * Which it is, such as "jazzcash": what a page's form posts to pay through it (ADR-219). A shop
+   * has one live account a gateway, so it names the account too.
+   */
+  gateway: string;
   /** By name, such as "Safepay"; "Safepay (test)" in its sandbox. */
   name: string;
   /**

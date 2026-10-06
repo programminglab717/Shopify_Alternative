@@ -23,7 +23,17 @@ const FORM: CheckoutForm = {
   resend: '',
 };
 
-const SAFEPAY = { name: 'Safepay', origin: 'https://getsafepay.com' };
+const SAFEPAY = { gateway: 'safepay', name: 'Safepay', origin: 'https://getsafepay.com' };
+const JAZZCASH = {
+  gateway: 'jazzcash',
+  name: 'JazzCash',
+  origin: 'https://payments.jazzcash.com.pk',
+};
+const EASYPAISA = {
+  gateway: 'easypaisa',
+  name: 'Easypaisa',
+  origin: 'https://easypay.easypaisa.com.pk',
+};
 
 describe.skipIf(!server)('Paying online at checkout', () => {
   let f: CheckoutFixture;
@@ -87,11 +97,11 @@ describe.skipIf(!server)('Paying online at checkout', () => {
       payment: null,
     });
 
-    f.payments.gateway = SAFEPAY;
+    f.payments.gateways = [SAFEPAY];
     const { secret, view } = await started();
-    expect(view.payments.online).toEqual(SAFEPAY);
+    expect(view.payments.online).toEqual([SAFEPAY]);
     // What the page offers is in what it showed: a gateway since makes the page stale.
-    const digest = (online: typeof SAFEPAY | null) =>
+    const digest = (online: (typeof SAFEPAY)[] | null) =>
       shownOf(
         view.cart,
         view.delivery,
@@ -103,7 +113,7 @@ describe.skipIf(!server)('Paying online at checkout', () => {
         },
         view.tax,
       );
-    expect(digest(SAFEPAY)).toBe(view.shown);
+    expect(digest([SAFEPAY])).toBe(view.shown);
     expect(digest(null)).not.toBe(view.shown);
     const page = checkoutPage(view).html;
     expect(page).toContain('<input type="radio" name="payment" value="online"');
@@ -139,7 +149,7 @@ describe.skipIf(!server)('Paying online at checkout', () => {
     });
     // Its thank-you page sends the shopper to pay it, through the gateway.
     const thanks = placed(await f.checkouts.view(secret));
-    expect(thanks.online).toEqual({ gateway: SAFEPAY, amount: order.total });
+    expect(thanks.online).toEqual({ gateways: [SAFEPAY], amount: order.total });
     const shown = checkoutPage(thanks);
     expect(shown.html).toContain('<input type="hidden" name="action" value="pay" />');
     expect(shown.html).toContain(`Your order #${order.number} is placed. Pay Rs `);
@@ -149,7 +159,7 @@ describe.skipIf(!server)('Paying online at checkout', () => {
   });
 
   it('sends the shopper to the gateway from the thank-you page, and says how it went', async () => {
-    f.payments.gateway = SAFEPAY;
+    f.payments.gateways = [SAFEPAY];
     const { secret, view } = await started();
     const order = placed(
       await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'online' }),
@@ -163,6 +173,7 @@ describe.skipIf(!server)('Paying online at checkout', () => {
         orderId: order.id,
         returnUrl: `https://hatti.test/checkouts/${secret}/paid`,
         cancelUrl: `https://hatti.test/checkouts/${secret}`,
+        gateway: 'safepay',
       },
     ]);
     // Another shop's storefront can't send it.
@@ -215,7 +226,7 @@ describe.skipIf(!server)('Paying online at checkout', () => {
   });
 
   it("sends the shopper on to a gateway whose page takes a form, as JazzCash's does (ADR-163)", async () => {
-    f.payments.gateway = { name: 'JazzCash', origin: 'https://payments.jazzcash.com.pk' };
+    f.payments.gateways = [JAZZCASH];
     const { secret, view } = await started();
     placed(await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'online' }));
     const url =
@@ -225,6 +236,7 @@ describe.skipIf(!server)('Paying online at checkout', () => {
     expect(going.gatewayForm).toEqual({
       url,
       form: { pp_TxnRefNo: 'T2026100214300012345', pp_Amount: '1' },
+      gateway: 'JazzCash',
     });
     // The thank-you page becomes the way on: the fields hidden, a button, and the policy for it.
     const page = checkoutPage(going);
@@ -240,12 +252,13 @@ describe.skipIf(!server)('Paying online at checkout', () => {
   });
 
   it("takes the shopper on to the gateway's next page when they come back partway, as Easypaisa's asks (ADR-214)", async () => {
-    f.payments.gateway = { name: 'Easypaisa', origin: 'https://easypay.easypaisa.com.pk' };
+    f.payments.gateways = [EASYPAISA];
     const { secret, view } = await started();
     placed(await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'online' }));
     const next = {
       url: 'https://easypay.easypaisa.com.pk/easypay/Confirm.jsf',
       form: { auth_token: 'tok-9cXq2', postBackURL: `https://hatti.test/checkouts/${secret}/paid` },
+      gateway: 'Easypaisa',
     };
     f.payments.outcome = next;
     const partway = placed(await f.checkouts.paidOnline(secret, { auth_token: 'tok-9cXq2' }));
@@ -264,8 +277,39 @@ describe.skipIf(!server)('Paying online at checkout', () => {
     );
   });
 
+  it("offers each of the shop's gateways, the shopper choosing which to pay through (ADR-219)", async () => {
+    f.payments.gateways = [JAZZCASH, EASYPAISA];
+    const { secret, view } = await started();
+    expect(view.payments.online).toEqual([JAZZCASH, EASYPAISA]);
+    expect(checkoutPage(view).html).toContain(
+      'Pay online, by card or wallet: once your order is placed, you pay through JazzCash or ' +
+        'Easypaisa, and A sends your order when the payment is in.',
+    );
+    const order = placed(
+      await f.checkouts.place(secret, view.shown, { ...FORM, payment: 'online' }),
+    ).order;
+    // Its thank-you page offers each, and lets its form go on to either.
+    const thanks = placed(await f.checkouts.view(secret));
+    expect(thanks.online).toEqual({ gateways: [JAZZCASH, EASYPAISA], amount: order.total });
+    const page = checkoutPage(thanks);
+    expect(page.html).toContain('name="gateway" value="jazzcash"');
+    expect(page.html).toContain('name="gateway" value="easypaisa"');
+    expect(page.html).toContain('Pay with Easypaisa');
+    expect(page.html).toContain('by card or wallet, through JazzCash or Easypaisa.');
+    expect(page.contentSecurityPolicy).toContain(
+      "form-action 'self' https://payments.jazzcash.com.pk https://easypay.easypaisa.com.pk;",
+    );
+    // Through the one chosen; the first for a page that chose none; never one not offered.
+    await f.checkouts.payOnline(secret, { gateway: 'easypaisa' });
+    await f.checkouts.payOnline(secret);
+    expect(f.payments.started.map((each) => each.gateway)).toEqual(['easypaisa', 'jazzcash']);
+    const refused = placed(await f.checkouts.payOnline(secret, { gateway: 'safepay' }));
+    expect(refused.payment).toBe('unavailable');
+    expect(f.payments.started).toHaveLength(2);
+  });
+
   it("offers paying online when cash on delivery can't take the order", async () => {
-    f.payments.gateway = SAFEPAY;
+    f.payments.gateways = [SAFEPAY];
     // More than the law lets cash on delivery collect, and no transfers: online alone.
     const { secret, view } = await started('210,000');
     expect(view.problem).toBeNull();
@@ -321,7 +365,7 @@ describe.skipIf(!server)('Paying online at checkout', () => {
         message: 'The shop takes no payments online: connect a payment gateway account first',
       },
     ]);
-    f.payments.gateway = SAFEPAY;
+    f.payments.gateways = [SAFEPAY];
     expect(unwrap(await f.orders.create(f.a, input))).toMatchObject({
       paymentMethod: 'online',
       stage: 'awaiting_payment',

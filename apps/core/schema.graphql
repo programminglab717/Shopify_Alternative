@@ -7813,7 +7813,7 @@ type Query {
   ): ClaimedParcelConnection!
 
   """
-  The shop's payment gateway accounts, the oldest first; archived ones if asked. Orders' pages take payments through the oldest live one.
+  The shop's payment gateway accounts, the oldest first; archived ones if asked. Orders' pages and checkout offer each live one, for customers to choose among (ADR-219).
   """
   paymentGatewayAccounts(archived: Boolean): [PaymentGatewayAccount!]!
 

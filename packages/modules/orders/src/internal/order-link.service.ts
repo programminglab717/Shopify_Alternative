@@ -17,7 +17,7 @@ import { checkAddress } from './address.js';
 import { fulfillmentEventsIn } from './fulfillment-events.js';
 import type { ParcelSteps } from './link-pages.js';
 import { linkShopIn, linkTermsIn } from './link-shop.js';
-import type { GatewayFormStart } from './online-payment-page.js';
+import { chosenGateway, type GatewayFormStart } from './online-payment-page.js';
 import { OnlinePayments, type OnlineGateway } from './online-payments.js';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
 import {
@@ -105,10 +105,10 @@ export type OrderLinkView =
       /** How many receipts for its transfer the customer sent (ADR-080). */
       receipts: number;
       /**
-       * While it waits for money and the shop takes it online (ADR-151): through which gateway,
-       * and how much, in minor units.
+       * While it waits for money and the shop takes it online (ADR-151): through which gateways,
+       * for the customer to choose among (ADR-219), and how much, in minor units.
        */
-      onlinePayment: { gateway: OnlineGateway; amount: bigint } | null;
+      onlinePayment: { gateways: OnlineGateway[]; amount: bigint } | null;
       /** Its parcels' steps on their way (ADR-160), by parcel. */
       steps: ParcelSteps;
       problem: LinkProblem | null;
@@ -325,12 +325,16 @@ export class OrderLinkService {
   }
 
   /**
-   * The customer asked to pay online what the order waits for (ADR-151): the shop's gateway's
-   * page to send them to; the page with the form that takes them there, where the gateway's page
-   * takes one (ADR-163); or the page again with why not. They come back to the link's `paid`
-   * address, and to the link itself if they give up.
+   * The customer asked to pay online what the order waits for (ADR-151), through `gateway`, one
+   * of those its page offers, or the first of them when not given (ADR-219): that gateway's page
+   * to send them to; the page with the form that takes them there, where the gateway's page takes
+   * one (ADR-163); or the page again with why not. They come back to the link's `paid` address,
+   * and to the link itself if they give up.
    */
-  async payOnline(token: string): Promise<{ url: string } | OrderLinkView> {
+  async payOnline(
+    token: string,
+    gateway?: string | null,
+  ): Promise<{ url: string } | OrderLinkView> {
     const link = await this.#resolveLink(token);
     if (!link) return { kind: 'not_found' };
     const view = await this.viewLink(token);
@@ -338,15 +342,19 @@ export class OrderLinkService {
     if (!view.onlinePayment || !this.payments) {
       return { ...view, problem: { kind: 'too_late', action: 'pay' } };
     }
+    const chosen = chosenGateway(view.onlinePayment.gateways, gateway);
+    if (!chosen) return { ...view, problem: { kind: 'payment', reason: 'unavailable' } };
     const page = this.site.url(`${ORDER_LINK_PATH}/${token}`);
-    const started = await this.payments.start(link.shopId, link.orderId, {
-      returnUrl: `${page}/paid`,
-      cancelUrl: page,
-    });
+    const started = await this.payments.start(
+      link.shopId,
+      link.orderId,
+      { returnUrl: `${page}/paid`, cancelUrl: page },
+      chosen.gateway,
+    );
     if (!('url' in started))
       return { ...view, problem: { kind: 'payment', reason: 'unavailable' } };
     return started.form
-      ? { ...view, gatewayForm: { url: started.url, form: started.form } }
+      ? { ...view, gatewayForm: { url: started.url, form: started.form, gateway: chosen.name } }
       : started;
   }
 
@@ -431,13 +439,11 @@ export class OrderLinkService {
       awaitsCustomer(record) && !record.agreement
         ? await linkTermsIn(tx, shopId, this.storefronts)
         : [];
-    // What it waits for before it ships, which the shop's gateway may take online.
+    // What it waits for before it ships, which the shop's gateways may take online.
     const owed =
       record.status === 'open' && record.stage === 'awaiting_payment' ? transferOwed(record) : 0n;
-    const gateway =
-      owed > 0n && this.payments
-        ? await this.payments.gatewayOf(tx, shopId, record.currency)
-        : null;
+    const gateways =
+      owed > 0n && this.payments ? await this.payments.gatewaysOf(tx, shopId, record.currency) : [];
     return {
       kind: 'order',
       shop,
@@ -450,7 +456,7 @@ export class OrderLinkService {
         record.paymentMethod === 'bank_transfer' || record.advanceDue > 0n
           ? await receiptCountIn(tx, shopId, order.id)
           : 0,
-      onlinePayment: gateway ? { gateway, amount: owed } : null,
+      onlinePayment: gateways.length > 0 ? { gateways, amount: owed } : null,
       steps: await fulfillmentEventsIn(
         tx,
         shopId,

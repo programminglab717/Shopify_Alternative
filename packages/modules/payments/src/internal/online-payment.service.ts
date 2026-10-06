@@ -14,6 +14,7 @@ import {
   orderPaymentFactsIn,
   receiveOnlinePaymentIn,
   refundOnlinePaymentIn,
+  type GatewayFormStart,
   type OnlineGateway,
   type OrderPaymentFacts,
 } from '@hatti/orders/public';
@@ -24,17 +25,30 @@ import {
   GatewayAccountService,
   PAYMENT_GATEWAYS,
   gatewayAccountIn,
-  liveGatewayAccountIn,
+  liveGatewayAccountsIn,
+  type GatewayAccountRow,
   type OpenedGatewayAccount,
 } from './gateway-accounts.service.js';
 import type {
   GatewayEnvironmentValue,
-  GatewayForm,
   GatewayPayment,
   GatewayWebhook,
   PaymentGateway,
   PaymentGateways,
 } from './gateways.js';
+
+/** An account's gateway as pages offering it show it: "Safepay (test)" in its sandbox. */
+function onlineGatewayOf(
+  account: { environment: GatewayEnvironmentValue },
+  gateway: PaymentGateway,
+): OnlineGateway {
+  const { name } = gateway.info;
+  return {
+    gateway: gateway.info.gateway,
+    name: account.environment === 'sandbox' ? `${name} (test)` : name,
+    origin: gateway.checkoutOrigin(account.environment),
+  };
+}
 
 /** How many refunds a payment takes, and how long one waits for its answer. */
 export const REFUND_LIMITS = {
@@ -177,7 +191,7 @@ export type WebhookOutcome = 'not_found' | 'unsigned' | 'ignored' | 'paid';
  * asked after it first, as its return is not signed (ADR-214).
  */
 type Returned =
-  | { done: 'paid' | 'test' | GatewayForm | null }
+  | { done: 'paid' | 'test' | GatewayFormStart | null }
   | {
       inquire: { session: SessionRow; gateway: PaymentGateway; account: OpenedGatewayAccount };
     };
@@ -237,30 +251,29 @@ export class OnlinePaymentService extends OnlinePayments {
     super();
   }
 
-  async gatewayOf(tx: Tx, shopId: string, currency: CurrencyCode): Promise<OnlineGateway | null> {
-    const account = await liveGatewayAccountIn(tx, shopId);
-    const gateway = account && this.gateways.of(account.gateway);
-    if (!account || !gateway || !gateway.info.currencies.includes(currency)) return null;
-    const { name } = gateway.info;
-    return {
-      name: account.environment === 'sandbox' ? `${name} (test)` : name,
-      origin: gateway.checkoutOrigin(account.environment),
-    };
+  async gatewaysOf(tx: Tx, shopId: string, currency: CurrencyCode): Promise<OnlineGateway[]> {
+    return (await this.#offeredIn(tx, shopId, currency)).map(({ account, gateway }) =>
+      onlineGatewayOf(account, gateway),
+    );
   }
 
   async start(
     shopId: string,
     orderId: string,
     urls: { returnUrl: string; cancelUrl: string },
+    chosen?: string | null,
   ): Promise<{ url: string; form?: Readonly<Record<string, string>> } | { error: string }> {
     const begun = await this.db.tenant(shopId, async (tx): Promise<Begun> => {
       const order = await orderPaymentFactsIn(tx, shopId, orderId);
       if (!order || order.awaited <= 0n) return { error: 'The order waits for no payment' };
-      const account = await liveGatewayAccountIn(tx, shopId);
-      const gateway = account && this.gateways.of(account.gateway);
-      if (!account || !gateway || !gateway.info.currencies.includes(order.currency)) {
-        return { error: 'The shop takes no payments online' };
-      }
+      const offered = await this.#offeredIn(tx, shopId, order.currency);
+      if (offered.length === 0) return { error: 'The shop takes no payments online' };
+      // The customer's choice, or the first where a page from before they could choose asks.
+      const found = chosen
+        ? offered.find((each) => each.gateway.info.gateway === chosen)
+        : offered[0];
+      if (!found) return { error: 'The shop takes no payments online through it' };
+      const { account, gateway } = found;
       // The checkout started lately for the same amount, offered again.
       const { rows: recent } = await tx.execute<{ checkout_url: string }>(sql`
         SELECT checkout_url FROM payments.sessions
@@ -343,7 +356,7 @@ export class OnlinePaymentService extends OnlinePayments {
     orderId: string,
     form: Readonly<Record<string, string>>,
     returnUrl: string,
-  ): Promise<'paid' | 'test' | GatewayForm | null> {
+  ): Promise<'paid' | 'test' | GatewayFormStart | null> {
     const found = await this.db.tenant(shopId, async (tx): Promise<Returned> => {
       // The order's sessions with the gateway, each account asked whether the form is its own.
       const { rows: sessions } = await tx.execute<SessionRow>(sql`
@@ -368,7 +381,7 @@ export class OnlinePaymentService extends OnlinePayments {
         }
         // Partway, as Easypaisa's page sends the customer back with a token for its next one.
         const next = gateway.continued?.(account, form, returnUrl);
-        if (next) return { done: next };
+        if (next) return { done: { ...next, gateway: onlineGatewayOf(row, gateway).name } };
         // A return not signed names the payment alone, which the gateway is asked after at once,
         // at most once a minute, however often the page is asked for (ADR-214).
         const ref = gateway.returnRef?.(form);
@@ -392,6 +405,21 @@ export class OnlinePaymentService extends OnlinePayments {
     return this.db.tenant(shopId, async (tx) => {
       const paid = await this.#complete(tx, shopId, session, gateway, answer.payment, 'return');
       return paid.environment === 'sandbox' ? 'test' : 'paid';
+    });
+  }
+
+  /**
+   * The shop's live accounts whose gateways take `currency`, with their gateways, in the order
+   * the shop added them (ADR-219): what customers choose among.
+   */
+  async #offeredIn(
+    tx: Tx,
+    shopId: string,
+    currency: CurrencyCode,
+  ): Promise<{ account: GatewayAccountRow; gateway: PaymentGateway }[]> {
+    return (await liveGatewayAccountsIn(tx, shopId)).flatMap((account) => {
+      const gateway = this.gateways.of(account.gateway);
+      return gateway?.info.currencies.includes(currency) ? [{ account, gateway }] : [];
     });
   }
 

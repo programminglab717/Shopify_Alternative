@@ -234,7 +234,7 @@ async function posted(
     case 'remove_discount':
       return checkouts.removeDiscount(token, options);
     case 'pay':
-      return checkouts.payOnline(token, options);
+      return checkouts.payOnline(token, { ...options, gateway: field(body, 'gateway') });
     default:
       return checkouts.place(token, field(body, 'shown'), formOf(body), options);
   }

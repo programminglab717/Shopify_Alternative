@@ -104,6 +104,9 @@ export {
   type LinkShop,
 } from '../internal/links.js';
 export {
+  chosenGateway,
+  gatewayNames,
+  gatewayOrigins,
   onlinePaidNotice,
   onlinePaymentProblemWords,
   payOnlineForm,

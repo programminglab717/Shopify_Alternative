@@ -6,9 +6,9 @@
 
 ## In progress
 
-**The customer choosing among the shop's gateways** (PAY-01, ADR-151): each of the shop's live
-accounts offered on an order's page and at checkout, as Shopify lists a shop's payment methods,
-in place of its oldest alone.
+**Comments on articles** (OS-07, ADR-176): Shopify's comment policy for a blog, comments
+posted from an article's page and held for the shop's approval where it moderates them, and the
+Admin API's comments to approve, mark as spam or delete.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### The customer choosing among the shop's gateways
+
+* **Each of the shop's live accounts offered**
+  ([ADR-219](../architecture/13-decision-log.md#adr-219--customers-choose-among-the-shops-gateways-each-live-account-that-takes-the-orders-currency-is-offered-on-its-page-and-checkouts-thank-you-page-in-the-order-the-shop-added-them-and-the-payment-starts-through-the-one-chosen)), in the order it connected them, on
+  an order's page and checkout's thank-you page: a button each, Pay with JazzCash, in place of
+  the oldest account alone; one gateway keeps its one Pay online button.
+* **The payment starts through the one chosen:** `gatewaysOf` and `start`'s `gateway`, the first
+  where a page from before names none, and one the shop does not take refused with a 503.
+  Checkout's option names them all, and its digest keeps one gateway's as before.
+* 1659 tests (3 new): the order's page and checkout's offering each, the choice started, and
+  through HTTP, Safepay's page or JazzCash's form as the customer chose.
 
 ### 346fb25 · A blog's articles redirected with it
 

@@ -125,13 +125,13 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
     return { id, path: new URL(linked.url).pathname };
   }
 
-  /** Asks to pay online on the page: where it sends the customer. */
-  async function pay(path: string) {
+  /** Asks to pay online on the page, through `gateway` if given: where it sends the customer. */
+  async function pay(path: string, gateway?: string) {
     return app.inject({
       method: 'POST',
       url: path,
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      payload: 'action=pay',
+      payload: `action=pay${gateway ? `&gateway=${gateway}` : ''}`,
     });
   }
 
@@ -896,5 +896,62 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
       [fromPublicId(order.id, 'order')],
     );
     expect(rows).toEqual([{ financial_status: 'paid' }]);
+  });
+
+  it("offers each of the shop's live accounts on the order's page, the customer choosing which (ADR-219)", async () => {
+    for (const each of await data(tokens.owner, '{ paymentGatewayAccounts { id archivedAt } }')) {
+      if (each.archivedAt !== null) continue;
+      await data(
+        tokens.owner,
+        'mutation ($id: ID!) { paymentGatewayAccountArchive(id: $id) { userErrors { code } } }',
+        { id: each.id },
+      );
+    }
+    for (const input of [
+      {
+        gateway: 'jazzcash',
+        credentials: [
+          { key: 'merchantId', value: 'MC12345' },
+          { key: 'password', value: 'x0y1z2w3' },
+          { key: 'integritySalt', value: 'salt-of-zari' },
+        ],
+      },
+      {
+        gateway: 'safepay',
+        credentials: Object.entries(CREDENTIALS).map(([key, value]) => ({ key, value })),
+      },
+    ]) {
+      expect((await data(tokens.owner, CONNECT, { input })).userErrors).toEqual([]);
+    }
+    const created = await data(
+      tokens.owner,
+      `mutation {
+        productCreate(input: { title: "Chador", status: ACTIVE, variants: [{ price: "3,000" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const order = await transferOrder(created.product.variants[0].id as string);
+
+    // Both offered, in the order the shop connected them, and either's page let through.
+    const page = await app.inject({ method: 'GET', url: order.path });
+    expect(page.body).toContain('name="gateway" value="jazzcash"');
+    expect(page.body).toContain('name="gateway" value="safepay"');
+    expect(page.body).toContain('Pay Rs 3,000 by card or wallet, through JazzCash or Safepay.');
+    expect(page.headers['content-security-policy']).toContain(
+      `form-action 'self' https://payments.jazzcash.com.pk ${safepayUrl};`,
+    );
+    // Through the one chosen: Safepay's page, or JazzCash's form.
+    const viaSafepay = await pay(order.path, 'safepay');
+    expect(viaSafepay.statusCode).toBe(303);
+    expect(viaSafepay.headers.location).toMatch(new RegExp(`^${safepayUrl}/checkout`));
+    const viaJazzcash = await pay(order.path, 'jazzcash');
+    expect(viaJazzcash.statusCode).toBe(200);
+    expect(viaJazzcash.body).toContain('Continue to JazzCash');
+    // One the shop takes nothing through: the page again, saying paying online isn't working.
+    const refused = await pay(order.path, 'easypaisa');
+    expect(refused.statusCode).toBe(503);
+    const sessions = await data(tokens.reader, SESSIONS, { orderId: order.id });
+    expect(sessions.map((each: Json) => each.gatewayName).sort()).toEqual(['JazzCash', 'Safepay']);
   });
 });

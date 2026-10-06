@@ -17,6 +17,8 @@ import {
   COD_CASH_LIMIT,
   cashPastLimitOf,
   gatewayForm,
+  gatewayNames,
+  gatewayOrigins,
   onlinePaidNotice,
   onlinePaymentProblemWords,
   orderName,
@@ -403,13 +405,15 @@ function paymentSection(
     ${text(bankTransfer.bankName)} میں دکان کا اکاؤنٹ نظر آئے گا، اور رقم ملتے ہی آرڈر بھیج دیا جائے
     گا۔`,
   };
-  // Paying online (ADR-152): once the order is placed, through the shop's gateway.
-  const byGateway: Sentence | null = online && {
+  // Paying online (ADR-152): once the order is placed, through the shop's gateway the shopper
+  // chooses then (ADR-219).
+  const names = online && gatewayNames(online);
+  const byGateway: Sentence | null = names && {
     en:
-      `Pay online, by card or wallet: once your order is placed, you pay through ${online.name}, ` +
+      `Pay online, by card or wallet: once your order is placed, you pay through ${names.en}, ` +
       `and ${shop.name} sends your order when the payment is in.`,
-    ur: html`آن لائن ادائیگی، کارڈ یا والیٹ سے: آرڈر دینے کے بعد آپ ${text(online.name)} کے ذریعے
-    ادائیگی کریں گے، اور ادائیگی ملتے ہی آرڈر بھیج دیا جائے گا۔`,
+    ur: html`آن لائن ادائیگی، کارڈ یا والیٹ سے: آرڈر دینے کے بعد آپ ${names.ur} کے ذریعے ادائیگی
+    کریں گے، اور ادائیگی ملتے ہی آرڈر بھیج دیا جائے گا۔`,
   };
   const choice = (value: string, sentence: Sentence, checked: boolean) =>
     html`<label class="choice">
@@ -664,7 +668,7 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
       [
         shopName(shop),
         heading({ en: 'Pay online', ur: 'آن لائن ادائیگی کریں' }),
-        gatewayForm(view.gatewayForm, online.gateway.name, amount(online.amount)),
+        gatewayForm(view.gatewayForm, amount(online.amount)),
       ],
       [new URL(view.gatewayForm.url).origin],
     );
@@ -742,8 +746,8 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
       link(shop.storefront, LABELS.continueShopping),
       policyLinks(shop),
     ],
-    // Paying online answers with the gateway's page: the form goes on there.
-    online?.gateway.origin ? [online.gateway.origin] : [],
+    // Paying online answers with a gateway's page: the form goes on there.
+    gatewayOrigins(online?.gateways ?? []),
   );
 }
 

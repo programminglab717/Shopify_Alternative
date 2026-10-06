@@ -419,18 +419,17 @@ export async function gatewayAccountIn(
   return rows[0] ?? null;
 }
 
-/** The account the shop takes payments through now: its oldest live one; null without one. */
-export async function liveGatewayAccountIn(
-  tx: Tx,
-  shopId: string,
-): Promise<GatewayAccountRow | null> {
+/**
+ * The accounts the shop takes payments through now, for customers to choose among (ADR-219): its
+ * live ones, one a gateway, in the order it added them.
+ */
+export async function liveGatewayAccountsIn(tx: Tx, shopId: string): Promise<GatewayAccountRow[]> {
   const { rows } = await tx.execute<GatewayAccountRow>(sql`
     SELECT ${ACCOUNT_COLUMNS}
       FROM payments.gateway_accounts
      WHERE shop_id = ${shopId} AND archived_at IS NULL
-     ORDER BY created_at, id
-     LIMIT 1`);
-  return rows[0] ?? null;
+     ORDER BY created_at, id`);
+  return rows;
 }
 
 function checkEnvironment(

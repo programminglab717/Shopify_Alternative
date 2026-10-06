@@ -11,25 +11,33 @@ const PAY_ONLINE: Words = { en: 'Pay online', ur: 'آن لائن ادائیگی 
 export type OnlinePaymentProblem = 'unavailable' | 'pending' | 'test';
 
 /**
- * Pays what the order waits for online, through the shop's gateway: a button posting
- * `action=pay` to the page, which answers with the gateway's page; through which gateway, and,
- * where `transfer`, a transfer to the account below as the other way.
+ * Pays what the order waits for online, through the shop's gateways (ADR-219): a button for each,
+ * posting `action=pay` and the gateway it names to the page, which answers with that gateway's
+ * page; through which, and, where `transfer`, a transfer to the account below as the other way.
+ * A shop with one gateway shows one button, Pay online, naming its gateway below it.
  */
 export function payOnlineForm(
-  online: { gateway: OnlineGateway; amount: bigint },
+  online: { gateways: readonly OnlineGateway[]; amount: bigint },
   currency: CurrencyCode,
   transfer: boolean,
 ): Html {
   const due = formatMoney(money(online.amount, currency));
+  const names = gatewayNames(online.gateways);
+  const one = online.gateways.length === 1;
   return html`<form method="post">
     <input type="hidden" name="action" value="pay" />
-    <button class="button stack" type="submit">${say('bilingual', PAY_ONLINE)}</button>
+    ${online.gateways.map(
+      (gateway) =>
+        html`<button class="button stack" type="submit" name="gateway" value="${gateway.gateway}">
+          ${say('bilingual', one ? PAY_ONLINE : payWith(gateway.name))}
+        </button>`,
+    )}
     ${paragraphs(
       {
         en:
-          `Pay ${due} by card or wallet, through ${online.gateway.name}.` +
+          `Pay ${due} by card or wallet, through ${names.en}.` +
           (transfer ? ' Or transfer it to the account below.' : ''),
-        ur: html`${ltr(due)} کارڈ یا والیٹ سے ${text(online.gateway.name)} کے ذریعے ادا
+        ur: html`${ltr(due)} کارڈ یا والیٹ سے ${names.ur} کے ذریعے ادا
         کریں۔${transfer && ' یا نیچے دیے گئے اکاؤنٹ میں ٹرانسفر کریں۔'}`,
       },
       'center small muted',
@@ -37,10 +45,53 @@ export function payOnlineForm(
   </form>`;
 }
 
+/**
+ * The gateways' names as a sentence lists them, "JazzCash, Easypaisa or Safepay", in English and
+ * in Urdu, for pages offering them (ADR-219).
+ */
+export function gatewayNames(gateways: readonly { name: string }[]): { en: string; ur: Html } {
+  const names = gateways.map((gateway) => gateway.name);
+  const last = names.at(-1) ?? '';
+  const rest = names.slice(0, -1);
+  if (rest.length === 0) return { en: last, ur: text(last) };
+  return {
+    en: `${rest.join(', ')} or ${last}`,
+    ur: html`${rest.map((name, index) => html`${index > 0 && '، '}${text(name)}`)} یا ${text(last)}`,
+  };
+}
+
+/**
+ * Of the gateways a page offers, the one the customer chose by `gateway`, as its form posts it;
+ * the first when they chose none, as a page from before they could choose posts (ADR-219); null
+ * for one it does not offer.
+ */
+export function chosenGateway(
+  offered: readonly OnlineGateway[],
+  gateway: string | null | undefined,
+): OnlineGateway | null {
+  if (!gateway) return offered[0] ?? null;
+  return offered.find((each) => each.gateway === gateway) ?? null;
+}
+
+/**
+ * Where the gateways' pages are, by origin, which a page offering them lets its forms go on to,
+ * as browsers hold a form's redirect to the page's policy (ADR-151).
+ */
+export function gatewayOrigins(gateways: readonly OnlineGateway[]): string[] {
+  return [...new Set(gateways.flatMap((gateway) => (gateway.origin ? [gateway.origin] : [])))];
+}
+
+/** A button's words for paying through one of the shop's gateways. */
+function payWith(name: string): Words {
+  return { en: `Pay with ${name}`, ur: `${name} سے ادائیگی کریں` };
+}
+
 /** What the customer's browser posts to a gateway whose page takes a form, as JazzCash's does. */
 export interface GatewayFormStart {
   url: string;
   form: Readonly<Record<string, string>>;
+  /** The gateway's name, as pages say it, such as "JazzCash (test)". */
+  gateway: string;
 }
 
 /**
@@ -48,7 +99,8 @@ export interface GatewayFormStart {
  * hidden, and a button that posts them there, since these pages run no scripts; `due` is what the
  * customer pays, as the page says it.
  */
-export function gatewayForm(started: GatewayFormStart, gateway: string, due: string): Html {
+export function gatewayForm(started: GatewayFormStart, due: string): Html {
+  const { gateway } = started;
   return html`<form method="post" action="${started.url}">
     ${Object.entries(started.form).map(
       ([name, value]) => html`<input type="hidden" name="${name}" value="${value}" />`,

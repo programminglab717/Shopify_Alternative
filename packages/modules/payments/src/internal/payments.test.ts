@@ -225,7 +225,7 @@ describe.skipIf(!server)('Payments online', () => {
     const view = await f.links.viewLink(token);
     if (view.kind !== 'order') throw new Error(view.kind);
     expect(view.onlinePayment).toEqual({
-      gateway: { name: 'Test gateway', origin: null },
+      gateways: [{ gateway: 'test', name: 'Test gateway', origin: null }],
       amount: 2_000_00n,
     });
     const page = orderLinkPage(view).html;
@@ -302,6 +302,55 @@ describe.skipIf(!server)('Payments online', () => {
     expect(await f.payments.sessionsOf(f.b.shopId, order.id)).toEqual([]);
   });
 
+  it("offers each of the shop's live accounts on the order's page, the customer choosing which (ADR-219)", async () => {
+    const order = await f.awaiting(f.a, kurta);
+    const token = await f.linkOf(f.a, order.id);
+    const testAccount = await f.connectTest(f.a);
+    const jazzcash = unwrap(
+      await f.accounts.connect(f.a, {
+        gateway: 'jazzcash',
+        environment: 'production',
+        credentials: [
+          { key: 'merchantId', value: 'MC12345' },
+          { key: 'password', value: 'x0y1z2w3' },
+          { key: 'integritySalt', value: 'salt-of-zari' },
+        ],
+      }),
+    );
+    const view = await f.links.viewLink(token);
+    if (view.kind !== 'order') throw new Error(view.kind);
+    // In the order the shop added them, each a button of its own.
+    expect(view.onlinePayment?.gateways.map((each) => each.gateway)).toEqual(['test', 'jazzcash']);
+    const page = orderLinkPage(view);
+    expect(page.html).toContain(
+      '<button class="button stack" type="submit" name="gateway" value="jazzcash">',
+    );
+    expect(page.html).toContain('Pay with JazzCash');
+    expect(page.html).toContain(
+      'Pay Rs 2,000 by card or wallet, through Test gateway or JazzCash.',
+    );
+    expect(page.contentSecurityPolicy).toContain(
+      "form-action 'self' https://payments.jazzcash.com.pk",
+    );
+
+    // Through the one chosen: JazzCash's form, on its account.
+    const started = await f.links.payOnline(token, 'jazzcash');
+    if ('url' in started || started.kind !== 'order' || !started.gatewayForm) {
+      throw new Error(JSON.stringify(started));
+    }
+    expect(started.gatewayForm.gateway).toBe('JazzCash');
+    expect(orderLinkPage(started).html).toContain('Continue to JazzCash');
+    // None chosen, as a page from before: the first. One the shop has no live account with: not.
+    expect('url' in (await f.links.payOnline(token))).toBe(true);
+    expect(await f.links.payOnline(token, 'easypaisa')).toMatchObject({
+      problem: { kind: 'payment', reason: 'unavailable' },
+    });
+    const sessions = await f.payments.sessionsOf(f.a.shopId, order.id);
+    expect(sessions.map((each) => each.accountId).sort()).toEqual(
+      [testAccount, jazzcash.id].sort(),
+    );
+  });
+
   it("takes what an order waits for through JazzCash's page, by a signed form (ADR-163)", async () => {
     const order = await f.awaiting(f.a, kurta);
     const token = await f.linkOf(f.a, order.id);
@@ -319,7 +368,9 @@ describe.skipIf(!server)('Payments online', () => {
     const view = await f.links.viewLink(token);
     if (view.kind !== 'order') throw new Error(view.kind);
     expect(view.onlinePayment).toEqual({
-      gateway: { name: 'JazzCash', origin: 'https://payments.jazzcash.com.pk' },
+      gateways: [
+        { gateway: 'jazzcash', name: 'JazzCash', origin: 'https://payments.jazzcash.com.pk' },
+      ],
       amount: 2_000_00n,
     });
 
@@ -432,6 +483,7 @@ describe.skipIf(!server)('Payments online', () => {
     expect(partway.gatewayForm).toEqual({
       url: `${easypaisa.url}/easypay/Confirm.jsf`,
       form: { auth_token: 'tok-9cXq2', postBackURL: back },
+      gateway: 'Easypaisa',
     });
     const page = orderLinkPage(partway);
     expect(page.html).toContain(
@@ -633,7 +685,7 @@ describe.skipIf(!server)('Payments online', () => {
     const view = await f.links.viewLink(token);
     if (view.kind !== 'order') throw new Error(view.kind);
     expect(view.onlinePayment).toEqual({
-      gateway: { name: 'Test gateway', origin: null },
+      gateways: [{ gateway: 'test', name: 'Test gateway', origin: null }],
       amount: 500_00n,
     });
     const started = await f.links.payOnline(token);
@@ -656,7 +708,7 @@ describe.skipIf(!server)('Payments online', () => {
     const view = await f.links.viewLink(token);
     if (view.kind !== 'order') throw new Error(view.kind);
     expect(view.onlinePayment).toEqual({
-      gateway: { name: 'Test gateway (test)', origin: null },
+      gateways: [{ gateway: 'test', name: 'Test gateway (test)', origin: null }],
       amount: 2_000_00n,
     });
     const started = await f.links.payOnline(token);

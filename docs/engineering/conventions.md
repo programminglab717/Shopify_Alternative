@@ -990,8 +990,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   (`@RequireRecentAuthentication`) and need `write_settings`; reading accounts needs
   `read_settings`, and an order's sessions `read_orders`.
 * **The orders module owns the port, the payments module the gateways.** Orders' pages ask
-  `OnlinePayments` (from `@hatti/orders/public`, provided globally by `PaymentsModule`) what
-  gateway takes an order's currency, to start a payment and what a return says; the payments
+  `OnlinePayments` (from `@hatti/orders/public`, provided globally by `PaymentsModule`) which
+  gateways take an order's currency, to start a payment and what a return says; the payments
   module reads an order only through `orderPaymentFactsIn` and records money on it only through
   `receiveOnlinePaymentIn`, in its own transaction with the order locked. Never write to orders'
   tables from the payments module, nor call a gateway from the orders module.
@@ -1010,16 +1010,22 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-152](../architecture/13-decision-log.md#adr-152--checkout-offers-paying-online-where-the-shop-has-a-gateway-the-order-is-placed-to-wait-for-its-total-as-a-transfers-does-and-its-thank-you-page-sends-the-shopper-to-the-shops-gateway-which-sends-them-back-to-the-checkouts-address-on-the-core)). Paying online is the order's `online` payment method, waiting at
   `awaiting_payment` for its total (`transferOwed`) with no confirming, risk score, fee,
   transfer discount or advance; `OrderService.create` refuses it unless
-  `OnlinePayments.gatewayOf` finds the shop's gateway, and drafts refuse it. Checkout's page puts
-  the gateway's name in its digest (`shownOf`), so a gateway connected or archived since makes
-  the page stale. The thank-you page's `action=pay` starts the session and answers with the
-  gateway's address (`{ placed: false, redirect }` to storefronts, which send no referrer); the
+  `OnlinePayments.gatewaysOf` finds one of the shop's gateways, and drafts refuse it. Checkout's
+  page puts the gateways' names in its digest (`shownOf`), so a gateway connected or archived
+  since makes the page stale. The thank-you page's `action=pay` starts the session and answers with
+  the gateway's address (`{ placed: false, redirect }` to storefronts, which send no referrer); the
   gateway sends the shopper back to `/checkouts/{secret}/paid` on the core's own site
   (`PublicSite`), never a storefront, which refuses posts from other sites.
 * **Say paying online in the shared words**: the order's page and checkout's thank-you page take
   the button, the notice and the problems from `online-payment-page.ts` in the orders module
   (`payOnlineForm`, `onlinePaidNotice`, `onlinePaymentProblemWords`), so both say it alike in
   English and Urdu, and offer a transfer as the other way only where the order has an account.
+* **Offer every gateway, and start the one chosen**
+  ([ADR-219](../architecture/13-decision-log.md#adr-219--customers-choose-among-the-shops-gateways-each-live-account-that-takes-the-orders-currency-is-offered-on-its-page-and-checkouts-thank-you-page-in-the-order-the-shop-added-them-and-the-payment-starts-through-the-one-chosen)): a page that takes money online
+  offers `gatewaysOf`'s list whole, a button each through `payOnlineForm`, lets its form go on
+  to each (`gatewayOrigins`), and starts the payment through the posted `gateway` found by
+  `chosenGateway`, the first where none is posted and none where it names one not offered. Never
+  choose for the customer where the shop has several.
 * **Give money back through the gateway as payments are taken** ([ADR-153](../architecture/13-decision-log.md#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)):
   `orderRefund` by `ONLINE` goes through the `OnlinePayments` port's `refund`, which records a
   `payments.refunds` row, pending, with the order locked, calls the gateway's `refund` outside

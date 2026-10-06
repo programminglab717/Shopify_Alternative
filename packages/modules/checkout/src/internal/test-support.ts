@@ -16,6 +16,7 @@ import {
   FulfillmentService,
   OnlinePayments,
   OrderService,
+  type GatewayFormStart,
   type OnlineGateway,
 } from '@hatti/orders/public';
 import type { Tx } from '@hatti/db';
@@ -30,34 +31,40 @@ import { TrustBadgeService } from './trust-badge.service.js';
 import { DeliveryService } from './delivery.service.js';
 
 /**
- * The payments module as checkout sees it (ADR-152), standing in: the gateway a test sets, none
+ * The payments module as checkout sees it (ADR-152), standing in: the gateways a test sets, none
  * unless it does; what starting a payment answers; and what a return says.
  */
 export class StubPayments extends OnlinePayments {
-  gateway: OnlineGateway | null = null;
+  gateways: OnlineGateway[] = [];
   answer: { url: string; form?: Readonly<Record<string, string>> } | { error: string } = {
     url: 'https://pay.test/checkout?session=1',
   };
-  outcome: 'paid' | 'test' | { url: string; form: Readonly<Record<string, string>> } | null = null;
-  /** The payments started, and the returns heard, the latest last. */
-  readonly started: { shopId: string; orderId: string; returnUrl: string; cancelUrl: string }[] =
-    [];
+  outcome: 'paid' | 'test' | GatewayFormStart | null = null;
+  /** The payments started, through which gateway, and the returns heard, the latest last. */
+  readonly started: {
+    shopId: string;
+    orderId: string;
+    returnUrl: string;
+    cancelUrl: string;
+    gateway: string | null;
+  }[] = [];
   readonly returns: {
     orderId: string;
     form: Readonly<Record<string, string>>;
     returnUrl: string;
   }[] = [];
 
-  async gatewayOf(_tx: Tx, _shopId: string): Promise<OnlineGateway | null> {
-    return this.gateway;
+  async gatewaysOf(_tx: Tx, _shopId: string): Promise<OnlineGateway[]> {
+    return this.gateways;
   }
 
   async start(
     shopId: string,
     orderId: string,
     urls: { returnUrl: string; cancelUrl: string },
+    gateway?: string | null,
   ): Promise<{ url: string; form?: Readonly<Record<string, string>> } | { error: string }> {
-    this.started.push({ shopId, orderId, ...urls });
+    this.started.push({ shopId, orderId, ...urls, gateway: gateway ?? null });
     return this.answer;
   }
 
@@ -66,7 +73,7 @@ export class StubPayments extends OnlinePayments {
     orderId: string,
     form: Readonly<Record<string, string>>,
     returnUrl: string,
-  ): Promise<'paid' | 'test' | { url: string; form: Readonly<Record<string, string>> } | null> {
+  ): Promise<'paid' | 'test' | GatewayFormStart | null> {
     this.returns.push({ orderId, form, returnUrl });
     return this.outcome;
   }
@@ -77,7 +84,7 @@ export class StubPayments extends OnlinePayments {
   }
 
   reset(): void {
-    this.gateway = null;
+    this.gateways = [];
     this.answer = { url: 'https://pay.test/checkout?session=1' };
     this.outcome = null;
     this.started.length = 0;

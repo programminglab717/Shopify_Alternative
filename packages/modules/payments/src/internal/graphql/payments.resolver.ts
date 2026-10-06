@@ -78,7 +78,7 @@ export class PaymentsResolver {
   @Query(() => [PaymentGatewayAccount], {
     description:
       "The shop's payment gateway accounts, the oldest first; archived ones if asked. Orders' " +
-      'pages take payments through the oldest live one.',
+      'pages and checkout offer each live one, for customers to choose among (ADR-219).',
   })
   @RequireScopes('read_settings')
   async paymentGatewayAccounts(
