@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Telling staff a transfer receipt came
+### 53dba13 · Telling staff a transfer receipt came
 
 * **A receipt tells staff on WhatsApp** ([ADR-247](../architecture/13-decision-log.md#adr-247--staff-hear-on-whatsapp-the-moment-a-customer-sends-the-receipt-of-their-transfer-for-an-order-still-waiting-for-it-whoever-has-the-order-else-the-shops-owners-and-managers-once-a-receipt)): the moment a customer sends
   the receipt of their transfer through their link, whoever has the order is told, else the
