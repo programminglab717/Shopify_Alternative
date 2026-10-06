@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Comments on articles
+### 1c2cbe4 · Comments on articles
 
 * **A blog's comment policy**, as Shopify's: closed for a new blog, moderated, or published at
   once ([ADR-220](../architecture/13-decision-log.md#adr-220--articles-take-comments-as-their-blogs-shopify-comment-policy-says-posted-from-an-articles-page-through-the-storefront-held-for-the-shops-approval-where-the-blog-moderates-them-shown-escaped-as-text-in-the-articles-document-and-approved-marked-as-spam-or-deleted-through-the-admin-api)).
