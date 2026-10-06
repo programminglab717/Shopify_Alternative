@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### The link page's image of its own
+### 57cf640 · The link page's image of its own
 
 * **Shopify's square logo in the shop's brand, beside its logo**
   ([ADR-205](../architecture/13-decision-log.md#adr-205--a-shops-brand-has-shopifys-square-logo-beside-its-logo-one-of-its-files-served-by-the-api-at-an-address-of-its-own-the-shops-document-names-where-each-logo-is-served-each-address-naming-its-file-and-the-link-page-shows-the-square-logo-else-the-logo-at-its-top)):
