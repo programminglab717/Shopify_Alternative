@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### A refund's receipt
+### e247033 · A refund's receipt
 
 * **Money staff sent keeps its receipt** ([ADR-242](../architecture/13-decision-log.md#adr-242--a-refund-staff-sent-by-hand-may-keep-its-receipt-staged-as-any-upload-is-and-given-with-the-refund-its-order-keeps-it-among-its-receipts-never-as-one-of-the-shops-files-and-it-goes-with-the-customers-erasure-as-their-own-receipts-do)): a photo or a PDF of the
   transfer, staged as any upload is and given with the refund by its `resourceUrl`, for refunds
