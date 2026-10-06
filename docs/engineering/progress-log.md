@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### PayFast
+### 20aa5d7 · PayFast
 
 * **PayFast's hosted checkout** ([ADR-227](../architecture/13-decision-log.md#adr-227--payfast-is-a-gateway-shops-take-payments-through-an-access-token-asked-for-the-basket-and-its-amount-with-the-secured-key-then-a-form-with-the-token-posted-to-its-page-its-return-and-its-word-at-the-webhook-which-may-come-in-the-address-believed-by-their-validation-hash)): an access token asked for, server
   to server, for a basket of Hatti's and its amount in rupees with the secured key, then a form
