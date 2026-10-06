@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-236 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-237 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -244,6 +244,7 @@
 | 234 | A storefront search that finds no product with every word as typed reads each word none of the shop's products holds as the shop's own words a typo or two from it, a typo being a letter added, taken away or changed or two swapped, and shows those with the fewest typos first | Accepted |
 | 235 | A shop may say how many working days delivery takes, everywhere and in each of its delivery zones: the cart and product pages say it wherever delivery goes, from the fewest days anywhere to the most, and checkout says it for the shopper's city | Accepted |
 | 236 | A shop's sitemaps say when each page last changed and give its image, from an entry kept beside each document's handle as the document is written, so a sitemap reads no documents | Accepted |
+| 237 | Search engines are told an article's page is schema.org's BlogPosting, through Shopify's `structured_data`, and a shop's home page the shop's Organization and WebSite, through the same filter given the shop | Accepted |
 
 ---
 
@@ -9877,3 +9878,34 @@
     shop's products.
   * **A sorted set of handles by time:** it would date the files of the index too, but needs a
     second structure kept in step with the handles for every write and drop.
+
+## ADR-237 · Search engines are told an article's page is schema.org's BlogPosting, through Shopify's `structured_data`, and a shop's home page the shop's Organization and WebSite, through the same filter given the shop
+
+* **Context:** Product pages carried schema.org's `Product` through Shopify's `structured_data`
+  filter ([ADR-051](#adr-051--search-engines-and-link-previews-are-told-each-pages-address-at-the-shops-own-in-each-language-and-find-pages-through-sitemaps-of-the-storefronts-documents)), and no other page carried any. Shopify's filter gives an article
+  too, as a `BlogPosting`, which Dawn's article page prints. Google reads an article's headline,
+  dates, image and author for its results, a home page's `WebSite` for the site's name it shows
+  beside them, and its `Organization` for the name and logo of the business behind it.
+* **Decision:**
+  * **An article as a `BlogPosting`** (`{{ article | structured_data }}`): its headline, its
+    address at the shop's, when it was published and last changed, its image whole at the shop's
+    address as link previews give it ([ADR-213](#adr-213--an-article-has-shopifys-image-one-of-the-shops-files-with-its-alt-text-the-api-serves-it-at-an-address-of-its-own-while-the-article-is-published-the-address-naming-its-file-the-articles-document-names-that-address-and-hatti-base-shows-it-in-its-blog-and-on-the-articles-page)), and its author, else the shop, with
+    the shop as its publisher. Hatti Base's article page prints it, as Dawn's does.
+  * **The shop as its `Organization` and `WebSite`** (`{{ shop | structured_data }}`, Hatti's
+    own): its name, address and logo ([ADR-207](#adr-207--themes-get-shopifys-shopbrand-its-logo-and-square-logo-as-images-from-where-the-api-serves-them-nil-for-what-hatti-does-not-keep-and-hatti-bases-header-shows-the-logo-in-place-of-the-shops-name)), else its square logo, and the site's
+    name. Hatti Base prints it on the home page alone, in each language, where Google looks for
+    it.
+  * **What Google doesn't read is left out:** an article's description, which could say other
+    than what the shop wrote for search engines ([ADR-231](#adr-231--products-collections-pages-and-articles-may-be-given-a-title-and-description-of-their-own-for-search-engines-as-shopifys-seo-has-them-themes-are-given-them-as-page_title-and-page_description-the-description-made-from-the-pages-own-text-where-the-shop-wrote-none-and-shopifys-product-csv-carries-a-products)), and Dawn's `SearchAction`,
+    from which Google no longer shows a search box.
+* **Consequences:**
+  * Google may show an article with its image, date and author, and a shop's name and logo beside
+    its pages.
+  * `{{ shop | structured_data }}` is Hatti's alone: a theme taken to Shopify prints nothing
+    there.
+  * Breadcrumbs, and ratings with reviews, are still to come.
+* **Alternatives:**
+  * **The shop's data written out in the theme, as Dawn's header does:** each theme would repeat
+    it, with its addresses and logo for the theme to get right.
+  * **The `Organization` on every page, as Dawn gives it:** Google reads it from the home page
+    and needs it nowhere else.

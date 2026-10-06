@@ -266,12 +266,17 @@ function filters(theme: Theme): Record<string, FilterImplOptions> {
     /** JSON for a script element: what shops wrote cannot end the element (`</script>`). */
     json: (value: unknown, space?: unknown) => scriptJson(value, Number(space) || 0),
     /**
-     * Shopify's: a product as schema.org's JSON-LD, for search engines, its addresses absolute at
-     * the shop's; for a script element. Nothing for anything else.
+     * Shopify's: a product or an article as schema.org's JSON-LD, for search engines, its
+     * addresses absolute at the shop's; and Hatti's, the shop itself as its Organization and
+     * WebSite (ADR-237). For a script element; nothing for anything else.
      */
     structured_data: function (this: { context: Context }, value: unknown) {
-      const shop = (this.context.globals as { shop?: { url?: unknown } }).shop;
-      const data = productData(value, String(shop?.url ?? ''));
+      const shop = (this.context.globals as { shop?: Record<string, unknown> }).shop;
+      const origin = String(shop?.url ?? '');
+      const data =
+        productData(value, origin) ??
+        articleData(value, origin, shop) ??
+        (shop && value === shop ? shopData(shop, origin) : null);
       return data ? scriptJson(data) : '';
     },
   };
@@ -318,6 +323,61 @@ function productData(value: unknown, origin: string): Record<string, unknown> | 
         ? 'https://schema.org/InStock'
         : 'https://schema.org/OutOfStock',
     })),
+  };
+}
+
+/**
+ * An article object as schema.org's BlogPosting (ADR-237), with what Google reads of one: its
+ * headline, address, dates, image, and its author, else the shop, with the shop as its publisher;
+ * null for anything else.
+ */
+function articleData(
+  value: unknown,
+  origin: string,
+  shop: Record<string, unknown> | undefined,
+): Record<string, unknown> | null {
+  const article = value as Record<string, unknown> | null;
+  if (!article || article.object_type !== 'article') return null;
+  const image = article.image as ImageDrop | null | undefined;
+  const publisher = shop ? organizationData(shop, origin) : null;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: article.title,
+    url: `${origin}${String(article.url)}`,
+    datePublished: article.published_at,
+    dateModified: article.updated_at ?? article.published_at,
+    ...(image && { image: [imageAddress(image.src, origin, 1200)] }),
+    ...(article.author
+      ? { author: { '@type': 'Person', name: article.author } }
+      : publisher && { author: publisher }),
+    ...(publisher && { publisher }),
+  };
+}
+
+/**
+ * The shop as schema.org's Organization and WebSite (ADR-237), for its home page: its name,
+ * address and logo, and the site's name, which Google shows beside its results.
+ */
+function shopData(shop: Record<string, unknown>, origin: string): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      organizationData(shop, origin),
+      { '@type': 'WebSite', name: shop.name, ...(origin && { url: `${origin}/` }) },
+    ],
+  };
+}
+
+/** The shop as schema.org's Organization: its name, address, and logo, else its square logo. */
+function organizationData(shop: Record<string, unknown>, origin: string): Record<string, unknown> {
+  const brand = shop.brand as { logo?: ImageDrop | null; square_logo?: ImageDrop | null } | null;
+  const logo = brand?.logo ?? brand?.square_logo ?? null;
+  return {
+    '@type': 'Organization',
+    name: shop.name,
+    ...(origin && { url: `${origin}/` }),
+    ...(logo && { logo: imageAddress(logo.src, origin, 600) }),
   };
 }
 

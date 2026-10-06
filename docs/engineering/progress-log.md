@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Structured data beyond products** (OS-09): Shopify's `structured_data` for an article, as
-schema.org's BlogPosting, and the home page's Organization and WebSite, as Dawn gives them.
+**Content in Urdu** (OS-06): a shop's own Urdu for its products, collections, pages, articles and
+menus, kept as Shopify's `translationsRegister` keeps translations, and shown on its storefront's
+Urdu pages.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Structured data beyond products
+
+* **Articles as schema.org's `BlogPosting`** ([ADR-237](../architecture/13-decision-log.md#adr-237--search-engines-are-told-an-articles-page-is-schemaorgs-blogposting-through-shopifys-structured_data-and-a-shops-home-page-the-shops-organization-and-website-through-the-same-filter-given-the-shop)), through Shopify's
+  `structured_data`, as Dawn's article page prints it: the headline, the address, when it was
+  published and last changed, its image whole at the shop's address, and its author, else the
+  shop, with the shop as its publisher.
+* **The shop on its home page,** as its `Organization` and `WebSite`, through the same filter
+  given `shop`: its name, address and logo, else its square logo, and the site's name, which
+  Google shows beside its results. Hatti Base prints it on the home page alone, in both languages.
+* **Left out, as Google doesn't read them:** an article's description, and Dawn's `SearchAction`.
+* 1730 tests: an article's data with and without an author, an image and a change, and the
+  shop's on its home page alone, with its logo, its square logo or none.
 
 ### 0f42997 · Sitemaps that say when pages changed
 

@@ -211,6 +211,94 @@ describe('Storefront rendering', () => {
     );
   });
 
+  it("gives search engines an article as schema.org's BlogPosting, and the shop on its home page (ADR-237)", async () => {
+    const platformUrl = 'https://hatti.pk';
+    const logo = 'https://api.hatti.pk/logos/s1?v=0a1b2c3d';
+    const square = 'https://api.hatti.pk/logos/s1/square?v=4e5f6a7b';
+    const image = {
+      src: 'https://api.hatti.test/article-images/shop-1/art-eid?v=0a1b2c3d',
+      width: 0,
+      height: 0,
+      alt: 'Lawn, folded',
+    };
+    const sample = sampleStore();
+    const articles = sample.articles!.map((article) =>
+      article.id === 'art-eid'
+        ? { ...article, image, updatedAt: '2026-09-22T08:15:00.000Z' }
+        : article,
+    );
+    const renderer = new PageRenderer(loadTheme(files), {
+      platformUrl,
+      limits: { timeMs: 10_000 },
+    });
+    const branded: ShopDoc = { ...sample.shop, brand: { logo, squareLogo: null } };
+    const dataOf = async (request: PageRequest, shopDoc = branded) => {
+      const shop = new MemoryStore({ ...sample, shop: shopDoc, articles });
+      const { html } = await renderer.render(request, shop.fresh());
+      return [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(
+        ([, json]) => JSON.parse(json!) as unknown,
+      );
+    };
+    const organization = {
+      '@type': 'Organization',
+      name: 'Zari Fashions',
+      url: 'https://zari.hatti.pk/',
+      logo: `${logo}&width=600`,
+    };
+
+    // Its headline, address, dates and image at the shop's address, and who wrote it.
+    expect(await dataOf({ path: '/blogs/news/eid-lawn-is-here' })).toEqual([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BlogPosting',
+        headline: 'Eid lawn is here',
+        url: 'https://zari.hatti.pk/blogs/news/eid-lawn-is-here',
+        datePublished: '2026-09-20T21:30:00.000Z',
+        dateModified: '2026-09-22T08:15:00.000Z',
+        image: [`${image.src}&width=1200`],
+        author: { '@type': 'Person', name: 'Ayesha Khan' },
+        publisher: organization,
+      },
+    ]);
+    // One with no author is the shop's; one never changed, changed when it was published.
+    expect(await dataOf({ path: '/blogs/news/how-to-measure' })).toEqual([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BlogPosting',
+        headline: 'How to measure for a kurta',
+        url: 'https://zari.hatti.pk/blogs/news/how-to-measure',
+        datePublished: '2026-09-10T09:00:00.000Z',
+        dateModified: '2026-09-10T09:00:00.000Z',
+        author: organization,
+        publisher: organization,
+      },
+    ]);
+
+    // The home page has the shop and the site's name, in each language.
+    const home = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        organization,
+        { '@type': 'WebSite', name: 'Zari Fashions', url: 'https://zari.hatti.pk/' },
+      ],
+    };
+    expect(await dataOf({ path: '/' })).toEqual([home]);
+    expect(await dataOf({ path: '/', locale: 'ur' })).toEqual([home]);
+    // Its square logo when that is all it has, and none without.
+    const { logo: _, ...plain } = organization;
+    const squared = { ...sample.shop, brand: { logo: null, squareLogo: square } };
+    expect(await dataOf({ path: '/' }, squared)).toEqual([
+      { ...home, '@graph': [{ ...plain, logo: `${square}&width=600` }, home['@graph'][1]] },
+    ]);
+    expect(await dataOf({ path: '/' }, sample.shop)).toEqual([
+      { ...home, '@graph': [plain, home['@graph'][1]] },
+    ]);
+    // Other pages don't.
+    for (const path of ['/blogs/news', '/collections/eid-lawn', '/pages/returns', '/search']) {
+      expect(await dataOf({ path }), path).toEqual([]);
+    }
+  });
+
   it("keeps what shops write from ending a page's scripts", async () => {
     const sample = sampleStore();
     const lehenga = sample.products.find((p) => p.handle === 'bridal-lehenga-heavy')!;

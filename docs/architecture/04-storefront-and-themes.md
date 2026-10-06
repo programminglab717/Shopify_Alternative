@@ -401,7 +401,7 @@ the Growth phase.
 * Server-rendered HTML, clean URLs (`/products/{handle}`), canonical tags, automatic 301s on handle
   change, a redirect manager and bulk CSV import.
 * **Structured data (JSON-LD):** `Product`, `Offer` (availability, price, `priceCurrency: PKR`),
-  `AggregateRating`, `BreadcrumbList`, `Organization`, `WebSite` + `SearchAction`, `FAQPage`.
+  `AggregateRating`, `BreadcrumbList`, `Organization`, `WebSite`, `FAQPage`.
 * XML sitemaps (split, auto-updated), `robots.txt` editor, Open Graph and WhatsApp link-preview
   tags (WhatsApp previews drive a large share of traffic, so `og:image` is always set and
   compressed).
@@ -411,7 +411,9 @@ every page's canonical address is at the shop's primary domain, or its handle's 
 its language, and the storefront adds its address in the theme's other languages to the head.
 Hatti Base's link-preview tags give the page's address, type, description and image, absolute,
 and product pages carry schema.org's `Product` with an `Offer` for each variant, through
-Shopify's `structured_data` filter. `/sitemap.xml` indexes sitemaps of the shop's products,
+Shopify's `structured_data` filter, which gives article pages a `BlogPosting` too, and the home
+page the shop's `Organization` and `WebSite`
+([ADR-237](./13-decision-log.md#adr-237--search-engines-are-told-an-articles-page-is-schemaorgs-blogposting-through-shopifys-structured_data-and-a-shops-home-page-the-shops-organization-and-website-through-the-same-filter-given-the-shop)). `/sitemap.xml` indexes sitemaps of the shop's products,
 collections and pages, 5,000 to a file, each address with its Urdu one, when it last changed
 and its image ([ADR-236](./13-decision-log.md#adr-236--a-shops-sitemaps-say-when-each-page-last-changed-and-give-its-image-from-an-entry-kept-beside-each-documents-handle-as-the-document-is-written-so-a-sitemap-reads-no-documents)), from the documents the storefront shows;
 `robots.txt` keeps crawlers from carts, checkouts, searches, previews and the
@@ -439,7 +441,7 @@ Center and Meta's catalogs fetch, at `/feeds/products.xml`
 Each collection has Shopify's Atom feed too, at its address with .atom, its first 50 products
 with their variants in Shopify's own namespace, for feed readers and newsletters
 ([ADR-216](./13-decision-log.md#adr-216--a-collection-has-shopifys-atom-feed-at-its-address-with-atom-its-first-50-products-in-its-order-each-with-its-type-vendor-and-variants-in-shopifys-own-namespace-under-ids-of-their-own-and-products-documents-say-when-each-was-made-and-last-changed)).
-Breadcrumbs and the other structured data are to come.
+Breadcrumbs, ratings and FAQs in structured data are to come.
 * **Agent-ready storefront:** machine-readable product feeds, a public, rate-limited catalogue API
   per store, and a read-only store MCP endpoint, so AI shopping assistants can discover and
   recommend products; see [09](./09-ai-and-intelligence.md).

@@ -11,6 +11,9 @@
     <link rel="alternate" type="application/atom+xml" title="{{ shop.name | escape }} - {{ collection.title | escape }}" href="{{ collection.url }}.atom">
     {%- endif %}
     {%- render 'meta-tags' %}
+    {%- if request.page_type == 'index' %}
+    <script type="application/ld+json">{{ shop | structured_data }}</script>
+    {%- endif %}
     {{ 'base.css' | asset_url | stylesheet_tag }}
     {% style %}
       :root {

@@ -1284,7 +1284,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   port (`RendererOptions.platformUrl`), and `canonical_url` a page's path there in its language.
   A theme's link-preview tags and anything else read off the page use them, never the host asked
   for. `json` and `structured_data` output is safe inside `<script>`: use them, not `| escape`, for
-  JSON in a page (`scriptJson` in code).
+  JSON in a page (`scriptJson` in code). `structured_data` gives schema.org's data for a product, an
+  article and, Hatti's own, the shop
+  ([ADR-237](../architecture/13-decision-log.md#adr-237--search-engines-are-told-an-articles-page-is-schemaorgs-blogposting-through-shopifys-structured_data-and-a-shops-home-page-the-shops-organization-and-website-through-the-same-filter-given-the-shop)),
+  with what Google reads of each: data for anything else joins it there, made from the object a
+  theme passes, never written out in a theme.
 * **Sitemaps and robots.txt come from the documents** (`sitemap.ts`), through
   `StoreData.handles` and `StoreData.sitemap`: a new kind of document the storefront shows joins
   `SITEMAP_KINDS`, and a new route that crawlers should skip joins `robotsTxt`. What a sitemap says
