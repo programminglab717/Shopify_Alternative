@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### The home page's words in Urdu
+### 697e791 · The home page's words in Urdu
 
 * **The shop translated as Shopify's `SHOP`** ([ADR-245](../architecture/13-decision-log.md#adr-245--the-shops-own-words-for-its-home-page-may-be-translated-into-urdu-the-shop-a-translatable-resource-of-its-own-by-its-own-id-as-shopifys-shop-is-its-document-carries-them-beside-its-own-words-and-its-urdu-pages-show-them)): its home page's SEO title
   and description, by the shop's own ID, through the translations API; no migration, as
