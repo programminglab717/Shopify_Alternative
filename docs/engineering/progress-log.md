@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Sitemaps that say when pages changed
+### 0f42997 · Sitemaps that say when pages changed
 
 * **Each address's `lastmod` and image** ([ADR-236](../architecture/13-decision-log.md#adr-236--a-shops-sitemaps-say-when-each-page-last-changed-and-give-its-image-from-an-entry-kept-beside-each-documents-handle-as-the-document-is-written-so-a-sitemap-reads-no-documents)), as Shopify's sitemaps
   give them: when a product, collection, page, blog or article last changed, to the second, else
