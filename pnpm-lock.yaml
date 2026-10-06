@@ -1094,6 +1094,9 @@ importers:
       '@hatti/events':
         specifier: workspace:*
         version: link:../../platform/events
+      '@hatti/files':
+        specifier: workspace:*
+        version: link:../files
       '@hatti/ids':
         specifier: workspace:*
         version: link:../../platform/ids

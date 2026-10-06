@@ -1,7 +1,8 @@
 import { InputChecker, fail, failOne, type MutationResult, type TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
-import { newId } from '@hatti/ids';
+import { readyImagesIn } from '@hatti/files/public';
+import { isUuid, newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import { BLOG_LIMITS } from './blog.service.js';
@@ -12,7 +13,7 @@ import {
   type ArticleUpdatedPayload,
 } from './events.js';
 import { contentSearchText } from './content-search.js';
-import type { ArticleRecord, Page } from './records.js';
+import type { ArticleImageRecord, ArticleRecord, Page } from './records.js';
 import { articles, blogs, type ArticleRow } from './schema.js';
 import { redirectMoved } from './url-redirect.service.js';
 
@@ -45,6 +46,18 @@ export interface ArticleInput {
    * Shopify's `redirectNewHandle` does (ADR-053).
    */
   redirectNewHandle?: boolean | null;
+  /**
+   * One of the shop's files, an image, shown as the article's, as Shopify's `article.image`
+   * (ADR-213); null for none. Left as it is when not given.
+   */
+  image?: ArticleImageInput | null;
+}
+
+/** An article's image as given: one of the shop's files, by its ID, and what it shows. */
+export interface ArticleImageInput {
+  fileId: string;
+  /** For those who cannot see it; the file's own when blank. */
+  altText?: string | null;
 }
 
 /** How far ahead of the server's clock a publish date may be, for clients' clocks running fast. */
@@ -122,6 +135,8 @@ export class ArticleService {
       if ((counts?.total ?? 0) >= BLOG_LIMITS.articles) {
         return failOne([], 'TOO_MANY', `A shop can keep at most ${BLOG_LIMITS.articles} articles`);
       }
+      const image = await checkImage(tx, tenant.shopId, check, input.image);
+      if (!check.ok) return fail(check.errors);
       const values = {
         shopId: tenant.shopId,
         id: newId(),
@@ -133,6 +148,8 @@ export class ArticleService {
         tags,
         templateSuffix: templateSuffix ?? null,
         publishedAt: published ? (publishDate ?? sql`now()`) : null,
+        imageFileId: image?.fileId ?? null,
+        imageAlt: image?.altText ?? '',
         searchText: contentSearchText(title, [...tags, author], summary, body),
       };
       const row = await insertWithHandle(
@@ -209,6 +226,12 @@ export class ArticleService {
         if (!blog) return failOne(['blogId'], 'NOT_FOUND', 'Blog not found');
       }
       const published = input.isPublished ?? article.publishedAt !== null;
+      const image = await checkImage(tx, tenant.shopId, check, input.image);
+      if (!check.ok) return fail(check.errors);
+      const nextImage =
+        image === undefined
+          ? { imageFileId: article.imageFileId, imageAlt: article.imageAlt }
+          : { imageFileId: image?.fileId ?? null, imageAlt: image?.altText ?? '' };
       const next = {
         blogId,
         title: title ?? article.title,
@@ -234,6 +257,9 @@ export class ArticleService {
           ? ['publishedAt']
           : []),
         ...(blogId !== article.blogId ? ['blogId'] : []),
+        ...(nextImage.imageFileId !== article.imageFileId || nextImage.imageAlt !== article.imageAlt
+          ? ['image']
+          : []),
       ];
       if (changed.length === 0) return { ok: true, value: toRecord(article) };
       if (next.handle !== article.handle || blogId !== article.blogId) {
@@ -260,6 +286,7 @@ export class ArticleService {
         .update(articles)
         .set({
           ...next,
+          ...nextImage,
           tags: nextTags,
           searchText: contentSearchText(
             next.title,
@@ -414,9 +441,52 @@ function toRecord(row: ArticleRow): ArticleRecord {
     isPublished: row.publishedAt !== null,
     publishedAt: row.publishedAt,
     templateSuffix: row.templateSuffix,
+    image: row.imageFileId ? { fileId: row.imageFileId, altText: row.imageAlt } : null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+/**
+ * The image of the shop's article `id` while it is published, as the API serves it to pages
+ * (ADR-213), in the caller's transaction `tx`; null for an article without one, or not shown.
+ */
+export async function publishedArticleImageOf(
+  tx: Tx,
+  shopId: string,
+  id: string,
+): Promise<ArticleImageRecord | null> {
+  const [row] = await tx
+    .select({ fileId: articles.imageFileId, altText: articles.imageAlt })
+    .from(articles)
+    .where(and(eq(articles.shopId, shopId), eq(articles.id, id), isNotNull(articles.publishedAt)));
+  return row?.fileId ? { fileId: row.fileId, altText: row.altText } : null;
+}
+
+/**
+ * The image `input` names (ADR-213), checked to be one of the shop's files a page can show:
+ * undefined when not given, null for none.
+ */
+async function checkImage(
+  tx: Tx,
+  shopId: string,
+  check: InputChecker,
+  input: ArticleImageInput | null | undefined,
+): Promise<ArticleImageRecord | null | undefined> {
+  if (input === undefined) return undefined;
+  if (input === null) return null;
+  const altText =
+    check.text(['image', 'altText'], input.altText ?? '', { max: BLOG_LIMITS.imageAlt }) ?? '';
+  const found =
+    isUuid(input.fileId) && (await readyImagesIn(tx, shopId, [input.fileId])).has(input.fileId);
+  if (!found) {
+    check.addMessage(
+      ['image', 'fileId'],
+      'NOT_FOUND',
+      "No such image among the shop's files: a JPEG, PNG, WebP or GIF uploaded",
+    );
+  }
+  return { fileId: input.fileId, altText };
 }
 
 /** A publish date as given, never in the future; undefined when not given. */

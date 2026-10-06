@@ -20,6 +20,7 @@ import type {
 import {
   DOCUMENTS_VERSION,
   type ArticleDoc,
+  type ImageDoc,
   type BlogDoc,
   type BrandDoc,
   type CollectionDoc,
@@ -178,10 +179,14 @@ export function blogDoc(
   };
 }
 
-/** A published article (ADR-177): its body and summary were cleaned when it was saved. */
+/**
+ * A published article (ADR-177): its body and summary were cleaned when it was saved; with its
+ * image where the API serves it, while it has one (ADR-213).
+ */
 export function articleDoc(
   article: ArticleRecord & { publishedAt: Date },
   blogHandle: string,
+  image: ImageDoc | null = null,
 ): ArticleDoc {
   return {
     id: article.id,
@@ -195,6 +200,7 @@ export function articleDoc(
     publishedAt: article.publishedAt.toISOString(),
     templateSuffix: article.templateSuffix,
     updatedAt: article.updatedAt.toISOString(),
+    image,
   };
 }
 

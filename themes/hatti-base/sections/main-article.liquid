@@ -10,6 +10,11 @@
       {%- assign author = article.author | escape %} · {{ 'sections.article.by' | t: author: author }}
     {%- endif -%}
   </p>
+  {%- if article.image -%}
+    <figure class="article__image">
+      {{- article.image | image_url: width: 1200 | image_tag: widths: '1200', fetchpriority: 'high' -}}
+    </figure>
+  {%- endif -%}
   {%- comment -%} Cleaned when the shop saved it: text, links, images and tables, nothing that runs. {%- endcomment -%}
   <div class="rte" dir="auto">{{ article.content }}</div>
   {%- if article.tags.size > 0 -%}
@@ -43,6 +48,8 @@
   .article h1 { margin-block-end: 0.5rem; }
   .article__meta { margin-block: 0 1.5rem; opacity: 0.75; }
   .article .rte img { max-inline-size: 100%; block-size: auto; }
+  .article__image { margin: 0 0 1.5rem; }
+  .article__image img { inline-size: 100%; block-size: auto; border-radius: 0.5rem; }
   .article__tags { margin-block-start: 2rem; }
   .article__nav { display: flex; gap: 1rem; justify-content: space-between; margin-block-start: 2rem; }
   .article__nav a { display: flex; flex-direction: column; }

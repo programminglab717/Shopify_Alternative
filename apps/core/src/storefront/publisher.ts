@@ -11,7 +11,14 @@ import {
 import { CheckoutEvents, DeliveryService } from '@hatti/checkout/public';
 import type { Database, Tx } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
-import { FileEvents, shopLogoOf, type BrandImageValue, type ShopLogo } from '@hatti/files/public';
+import {
+  FileEvents,
+  readyImagesIn,
+  shopLogoOf,
+  type BrandImageValue,
+  type ShopImage,
+  type ShopLogo,
+} from '@hatti/files/public';
 import {
   InventoryEvents,
   InventoryService,
@@ -54,12 +61,14 @@ import {
   pathTag,
   shopTag,
   type ArticleDoc,
+  type ImageDoc,
   type Batch,
   type BlogDoc,
   type HandledKind,
   type ShopDoc,
 } from '@hatti/storefront-data';
 import type { Redis } from 'ioredis';
+import { articleImagePathOf } from '../api/article-images.js';
 import { logoPathOf } from '../api/logos.js';
 import {
   ALL_PRODUCTS,
@@ -256,10 +265,12 @@ export function itemsFor(event: DomainEvent): string[] {
         : [];
     case MarketingEvents.MetaConversionsDeleted:
       return [Items.shop];
-    // Its document names its logos (ADR-205), and a file deleted may have been one of them.
+    // Its document names its logos (ADR-205).
     case FileEvents.ShopBrandUpdated:
-    case FileEvents.FileDeleted:
       return [Items.shop];
+    // A file deleted may have been one of its logos, or an article's image (ADR-213).
+    case FileEvents.FileDeleted:
+      return [Items.shop, Items.everyArticle];
     case ShopEvents.ShopOpened:
       // Its storefront, at its handle's subdomain: a shop without documents gets all of them.
       return [Items.everything];
@@ -339,6 +350,10 @@ export interface PublisherServices {
   pixels: { metaPixelIdOf(tx: Tx, shopId: string): Promise<string | null> };
   /** The shop's logo and square logo, while it has them (ADR-205). */
   brand: { logoOf(tx: Tx, shopId: string, which: BrandImageValue): Promise<ShopLogo | null> };
+  /** Which of the shop's files are images a page can show, as articles' are (ADR-213). */
+  files: {
+    readyImagesIn(tx: Tx, shopId: string, ids: readonly string[]): Promise<Map<string, ShopImage>>;
+  };
 }
 
 export interface PublisherLogger {
@@ -786,9 +801,27 @@ export class StorefrontPublisher {
       ids: published.map((record) => record.blogId),
     });
     const handles = new Map(blogs.map((blog) => [blog.id, blog.handle]));
+    // Each image where the API serves it, its address naming its file, while it is one (ADR-213).
+    const ready = await this.services.files.readyImagesIn(
+      tx,
+      shopId,
+      published.flatMap((record) => (record.image ? [record.image.fileId] : [])),
+    );
+    const images = this.options.images ?? LOCAL_IMAGES;
+    const imageOf = (record: ArticleRecord): ImageDoc | null => {
+      const file = record.image && ready.get(record.image.fileId);
+      if (!record.image || !file) return null;
+      const path = articleImagePathOf(shopId, record.id, file.id);
+      return {
+        src: images.url(path),
+        width: 0,
+        height: 0,
+        alt: record.image.altText || file.alt || null,
+      };
+    };
     const docs = published.flatMap((record) => {
       const blogHandle = handles.get(record.blogId);
-      return blogHandle ? [articleDoc(record, blogHandle)] : [];
+      return blogHandle ? [articleDoc(record, blogHandle, imageOf(record))] : [];
     });
     const stored = await this.#stored(shopId, 'article', ids);
     await writer.putArticles(docs);
@@ -861,6 +894,7 @@ export function createStorefrontPublisher(
       policies: { policiesOf: shopPoliciesOf },
       pixels: { metaPixelIdOf: metaPixelIdIn },
       brand: { logoOf: shopLogoOf },
+      files: { readyImagesIn },
     },
     { logger, edge, images },
   );

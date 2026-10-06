@@ -38,6 +38,22 @@ export class OnlineStoreBlog {
   updatedAt!: Date;
 }
 
+@ObjectType({
+  description:
+    "An article's image (ADR-213): one of the shop's files, which the storefront serves while " +
+    'the article is published.',
+})
+export class ArticleImage {
+  @Field(() => ID, { description: 'The file, as `file` finds it.' })
+  fileId!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "What it shows, for those who cannot see it; null for its file's own.",
+  })
+  altText!: string | null;
+}
+
 @ObjectType({ description: 'Who an article is by.' })
 export class ArticleAuthor {
   @Field({ description: 'The name it is signed with.' })
@@ -94,6 +110,12 @@ export class OnlineStoreArticle {
       'article.json.',
   })
   templateSuffix!: string | null;
+
+  @Field(() => ArticleImage, {
+    nullable: true,
+    description: "One of the shop's files, shown as its image; null for none.",
+  })
+  image!: ArticleImage | null;
 
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
@@ -212,6 +234,18 @@ export class AuthorInput {
   name?: string | null;
 }
 
+@InputType({ description: "An article's image: one of the shop's files, an image." })
+export class ArticleImageInput {
+  @Field(() => ID, { description: 'A JPEG, PNG, WebP or GIF the shop uploaded.' })
+  fileId!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "What it shows, for those who cannot see it; the file's own when blank.",
+  })
+  altText?: string | null;
+}
+
 @InputType({ description: 'A new article.' })
 export class ArticleCreateInput {
   @Field(() => ID, { description: 'The blog it is in.' })
@@ -251,6 +285,9 @@ export class ArticleCreateInput {
 
   @Field(() => String, { nullable: true })
   templateSuffix?: string | null;
+
+  @Field(() => ArticleImageInput, { nullable: true })
+  image?: ArticleImageInput | null;
 }
 
 @InputType({ description: 'Changes to an article: fields left out stay as they are.' })
@@ -290,6 +327,9 @@ export class ArticleUpdateInput {
 
   @Field(() => String, { nullable: true, description: 'Blank for article.json.' })
   templateSuffix?: string | null;
+
+  @Field(() => ArticleImageInput, { nullable: true, description: 'Null for none.' })
+  image?: ArticleImageInput | null;
 
   @Field(() => Boolean, {
     nullable: true,

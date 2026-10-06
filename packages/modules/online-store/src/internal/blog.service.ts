@@ -21,6 +21,8 @@ export const BLOG_LIMITS = {
   /** An article's summary as HTML, cleaned, in bytes. */
   summary: 64 * 1024,
   author: 255,
+  /** What an article's image shows, as a file's alt text (ADR-213). */
+  imageAlt: 512,
 } as const;
 
 /** A blog's fields as given: those left out stay as they are on an update. */

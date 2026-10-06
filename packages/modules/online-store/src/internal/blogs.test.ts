@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { publishedArticleImageOf } from './article.service.js';
 import { articles, blogs } from './schema.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
 import { shopRedirectsOf } from './url-redirect.service.js';
@@ -231,6 +232,77 @@ describe.skipIf(!server)('Blogs and their articles (ADR-176)', () => {
     expect(errorsOf(await f.articles.update(f.a, newId(), { title: 'Gone' }))).toEqual([
       ['id', 'NOT_FOUND', 'Article not found'],
     ]);
+  });
+
+  it("keeps an article's image, one of the shop's images ready to show, and says it changed (ADR-213)", async () => {
+    const file = async (shopId: string, contentType: string, status = 'ready') => {
+      const id = newId();
+      await f.admin.query(
+        `INSERT INTO files.files (shop_id, id, key, filename, content_type, size, status)
+         VALUES ($1, $2, $3, 'file', $4, 64, $5)`,
+        [shopId, id, `shops/${shopId}/files/${id}/file`, contentType, status],
+      );
+      return id;
+    };
+    const photo = await file(f.a.shopId, 'image/webp');
+    const news = unwrap(await f.blogs.create(f.a, { title: 'News' }));
+    const article = unwrap(
+      await f.articles.create(f.a, {
+        blogId: news.id,
+        title: 'Eid lawn',
+        image: { fileId: photo, altText: ' Lawn, folded ' },
+      }),
+    );
+    expect(article.image).toEqual({ fileId: photo, altText: 'Lawn, folded' });
+    expect(await f.articles.get(f.a, article.id)).toEqual(article);
+    const shown = () =>
+      f.db.tenant(f.a.shopId, (tx) => publishedArticleImageOf(tx, f.a.shopId, article.id));
+    expect(await shown()).toEqual(article.image);
+
+    // Not a file a page can show: another kind, one not yet uploaded, another shop's, none.
+    const others = [
+      await file(f.a.shopId, 'application/pdf'),
+      await file(f.a.shopId, 'image/png', 'staged'),
+      await file(f.b.shopId, 'image/png'),
+      newId(),
+      'not-an-id',
+    ];
+    for (const fileId of others) {
+      expect(
+        errorsOf(
+          await f.articles.create(f.a, { blogId: news.id, title: 'Eid', image: { fileId } }),
+        ),
+        fileId,
+      ).toEqual([
+        [
+          'image.fileId',
+          'NOT_FOUND',
+          "No such image among the shop's files: a JPEG, PNG, WebP or GIF uploaded",
+        ],
+      ]);
+    }
+    expect(
+      errorsOf(
+        await f.articles.update(f.a, article.id, {
+          image: { fileId: photo, altText: 'x'.repeat(513) },
+        }),
+      ).map(([field, code]) => [field, code]),
+    ).toEqual([['image.altText', 'TOO_LONG']]);
+
+    // Its alt text changed, then the same again, which says nothing; then none.
+    const plain = unwrap(await f.articles.update(f.a, article.id, { image: { fileId: photo } }));
+    expect(plain.image).toEqual({ fileId: photo, altText: '' });
+    unwrap(await f.articles.update(f.a, article.id, { image: { fileId: photo, altText: '' } }));
+    unwrap(await f.articles.update(f.a, article.id, { isPublished: false }));
+    expect(await shown()).toBeNull();
+    unwrap(await f.articles.update(f.a, article.id, { isPublished: true }));
+    expect(await shown()).toEqual(plain.image);
+    expect(unwrap(await f.articles.update(f.a, article.id, { image: null })).image).toBeNull();
+    expect(await shown()).toBeNull();
+    const changed = (await events())
+      .filter(([type]) => type === 'article.updated')
+      .map(([, payload]) => (payload as { changed: string[] }).changed);
+    expect(changed).toEqual([['image'], ['isPublished'], ['isPublished'], ['image']]);
   });
 
   it('deletes an article, and a blog with its articles, saying so', async () => {

@@ -129,6 +129,10 @@ export const articles = onlineStoreSchema.table(
     tags: text('tags').array().notNull().default([]),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     templateSuffix: text('template_suffix'),
+    /** One of the shop's files, an image, shown as its image (ADR-213); null for none. */
+    imageFileId: uuid('image_file_id'),
+    /** What its image shows, for those who cannot see it; empty for its file's own. */
+    imageAlt: text('image_alt').notNull().default(''),
     /** The words a storefront's search finds it by, folded (ADR-212). */
     searchText: text('search_text').notNull().default(''),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

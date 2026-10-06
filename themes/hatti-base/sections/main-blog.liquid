@@ -18,6 +18,11 @@
     <ul class="blog__articles" role="list">
       {%- for article in blog.articles -%}
         <li class="blog__article">
+          {%- if article.image -%}
+            <a href="{{ article.url }}" class="blog__image" tabindex="-1" aria-hidden="true">
+              {{- article.image | image_url: width: 720 | image_tag: widths: '720', loading: 'lazy', alt: '' -}}
+            </a>
+          {%- endif -%}
           <h2 dir="auto"><a href="{{ article.url }}">{{ article.title | escape }}</a></h2>
           <p class="blog__meta">
             {{ article.published_at | time_tag: format: 'day_month_year' }}
@@ -51,6 +56,7 @@
   .blog__tags a[aria-current] { font-weight: 600; }
   .blog__articles { display: grid; gap: 2rem; padding: 0; list-style: none; }
   .blog__article h2 { margin-block: 0 0.25rem; }
+  .blog__image img { display: block; inline-size: 100%; block-size: auto; margin-block-end: 0.75rem; border-radius: 0.5rem; }
   .blog__meta { margin-block: 0 0.75rem; opacity: 0.75; }
 {% endstylesheet %}
 

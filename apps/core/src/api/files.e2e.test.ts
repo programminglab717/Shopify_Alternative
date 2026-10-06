@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import { newId } from '@hatti/ids';
+import { fromPublicId, newId } from '@hatti/ids';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -242,6 +242,92 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
       '/logos/zari',
     ]) {
       expect((await call('GET', path)).statusCode, path).toBe(404);
+    }
+  });
+
+  it("shows an article's image, one of the shop's files, at an address of its own while the article is published (ADR-213)", async () => {
+    const writer = await issueToken(['write_files', 'write_content']);
+    const upload = async (filename: string, mimeType: string, bytes: Buffer) => {
+      const staged = await gql(writer, STAGE, {
+        input: [{ filename, mimeType, fileSize: String(bytes.length) }],
+      });
+      const [target] = staged.data!.stagedUploadsCreate.stagedTargets;
+      expect((await call('PUT', target.url, bytes, mimeType)).statusCode).toBe(200);
+      const created = await gql(writer, CREATE, {
+        files: [{ originalSource: target.resourceUrl }],
+      });
+      return created.data!.fileCreate.files[0].id as string;
+    };
+    const photo = await upload('Eid lawn.png', 'image/png', png(96));
+    const catalogue = await upload('Lookbook.pdf', 'application/pdf', Buffer.from('%PDF-1.7\n'));
+    const blog = (
+      await gql(
+        writer,
+        `mutation { blogCreate(blog: { title: "News" }) { blog { id } userErrors { message } } }`,
+      )
+    ).data!.blogCreate.blog.id as string;
+    const CREATE_ARTICLE = `mutation ($article: ArticleCreateInput!) {
+      articleCreate(article: $article) {
+        article { id image { fileId altText } }
+        userErrors { field code message }
+      }
+    }`;
+    const refused = await gql(writer, CREATE_ARTICLE, {
+      article: { blogId: blog, title: 'Lookbook', image: { fileId: catalogue } },
+    });
+    expect(refused.data!.articleCreate).toEqual({
+      article: null,
+      userErrors: [
+        {
+          field: ['article', 'image', 'fileId'],
+          code: 'NOT_FOUND',
+          message: "No such image among the shop's files: a JPEG, PNG, WebP or GIF uploaded",
+        },
+      ],
+    });
+    const created = await gql(writer, CREATE_ARTICLE, {
+      article: {
+        blogId: blog,
+        title: 'Eid lawn',
+        image: { fileId: photo, altText: 'Lawn, folded' },
+      },
+    });
+    const article = created.data!.articleCreate.article;
+    expect(article.image).toEqual({ fileId: photo, altText: 'Lawn, folded' });
+    const articleId = fromPublicId(article.id as string, 'article');
+    // Served at the API's own address, read as the shop, while the article is published.
+    const served = await call('GET', `/article-images/${shop}/${articleId}`);
+    expect([
+      served.statusCode,
+      served.headers['content-type'],
+      served.headers['cache-control'],
+    ]).toEqual([200, 'image/png', 'public, max-age=3600']);
+    expect(served.rawPayload.equals(png(96))).toBe(true);
+    const UPDATE_ARTICLE = `mutation ($id: ID!, $article: ArticleUpdateInput!) {
+      articleUpdate(id: $id, article: $article) {
+        article { image { fileId altText } }
+        userErrors { field message }
+      }
+    }`;
+    await gql(writer, UPDATE_ARTICLE, { id: article.id, article: { isPublished: false } });
+    expect((await call('GET', `/article-images/${shop}/${articleId}`)).statusCode).toBe(404);
+    // Taken off, it is served no more, nor anything at an address naming nothing.
+    const removed = await gql(writer, UPDATE_ARTICLE, {
+      id: article.id,
+      article: { isPublished: true, image: null },
+    });
+    expect(removed.data!.articleUpdate).toEqual({ article: { image: null }, userErrors: [] });
+    for (const path of [
+      `/article-images/${shop}/${articleId}`,
+      `/article-images/${shop}/${newId()}`,
+      `/article-images/${newId()}/${articleId}`,
+      '/article-images/zari/eid',
+    ]) {
+      const answer = await call('GET', path);
+      expect([answer.statusCode, answer.headers['cache-control']], path).toEqual([
+        404,
+        'public, max-age=60',
+      ]);
     }
   });
 

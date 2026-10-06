@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-212 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-213 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -220,6 +220,7 @@
 | 210 | Safepay's trackers are asked after as JazzCash's payments are, through its reporter with the account's secret key; its answer, which Safepay does not sign, is believed as it comes from Safepay's own API, and only naming the account's API key and the tracker asked about | Accepted |
 | 211 | Storefront dates print in the shop's own time zone and the page's language, and themes get Shopify's time_tag and its date formats by name, a theme's own date_formats first | Accepted |
 | 212 | A storefront's search finds the shop's published pages and articles beside its products, as Shopify's does: by the words each keeps folded, through the online store's own search in the core; products, then pages, then articles, the kinds Shopify's type names, and suggested as a shopper types | Accepted |
+| 213 | An article has Shopify's image, one of the shop's files with its alt text: the API serves it at an address of its own while the article is published, the address naming its file, the article's document names that address, and Hatti Base shows it in its blog and on the article's page | Accepted |
 
 ---
 
@@ -8879,3 +8880,50 @@
     tables, which are its own.
   * **Matching pages' and articles' HTML as it is:** markup and entities would match words, and
     Roman Urdu and Urdu would not fold as products' do.
+
+## ADR-213 · An article has Shopify's image, one of the shop's files with its alt text: the API serves it at an address of its own while the article is published, the address naming its file, the article's document names that address, and Hatti Base shows it in its blog and on the article's page
+
+* **Context:** Shopify's articles each have an image, which its Admin API gives as `image` with
+  its alt text and themes as `article.image`; Dawn shows it beside each article in a blog and at
+  the top of the article. Hatti's articles had none
+  ([ADR-176](#adr-176--a-shops-blogs-and-their-articles-are-the-online-stores-through-the-admin-api-as-shopifys-and-under-its-content-scopes-an-article-has-html-cleaned-as-a-pages-its-authors-name-tags-a-handle-unique-in-its-blog-and-when-it-was-published-never-in-the-future-and-goes-when-its-blog-is-deleted), [ADR-177](#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)). A shop's files already hold the images it uploads
+  ([ADR-079](#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)), and its logos are served by the API at addresses of their own, never
+  signed, as pages kept at the edge outlive a signature ([ADR-205](#adr-205--a-shops-brand-has-shopifys-square-logo-beside-its-logo-one-of-its-files-served-by-the-api-at-an-address-of-its-own-the-shops-document-names-where-each-logo-is-served-each-address-naming-its-file-and-the-link-page-shows-the-square-logo-else-the-logo-at-its-top)).
+* **Decision:**
+  * **An article keeps its image's file and alt text** (migration 0134): `image_file_id` and
+    `image_alt`, 512 characters. `articleCreate` and `articleUpdate` take
+    `image: { fileId, altText }`, null for none, and `Article.image` gives them back. The file
+    must be one of the shop's images ready to show, a JPEG, PNG, WebP or GIF, as a logo must:
+    the online store asks the files module through `readyImagesIn`, in its own transaction, and
+    refuses any other under `image.fileId`. `article.updated` names `image` when either changes.
+  * **No key across the two modules' tables:** the files module keeps its tables to itself, and a
+    file deleted leaves the article without an image wherever it is shown, as the API and the
+    publisher look for the file each time.
+  * **Served by the API at `/article-images/{shop}/{article}`** while the article is published
+    and its file is one of those images: an hour in browsers, a minute when there is none, and
+    `?v=` with the start of the file's ID, so another image is another address.
+  * **The article's document names that address**, with the article's alt text, else its
+    file's; its width and height 0, as files keep no size. The publisher reads the images when
+    it builds articles, and `file.deleted` rebuilds the shop's articles as well as the shop.
+    `DOCUMENTS_VERSION` 10.
+  * **Themes get Shopify's `article.image`**, printed as its address, with `image_url` and
+    `image_tag` as a product's images have them. Hatti Base shows it above each article in its
+    blog, a link to the article that screen readers skip, as its title says the same, and at the
+    top of the article's page.
+* **Consequences:**
+  * A shop's blog looks as Dawn's does, each article with its picture.
+  * An image is served as it was uploaded: `image_url`'s width is ignored, phones fetch the whole
+    image, and `image_tag` gives no size, so the page may move as it loads; Hatti Base's styles
+    fit it to the column.
+  * A file deleted rebuilds every published article of the shop; files are deleted rarely enough
+    to bear it.
+  * Not yet: the image in the blog's feed ([ADR-209](#adr-209--a-blog-has-shopifys-atom-feed-at-its-address-with-atom-its-30-latest-articles-whole-under-ids-of-their-own-and-an-articles-page-gives-themes-the-newer-and-the-older-article-beside-it-fetched-together-when-a-theme-first-asks-for-either)), as how Shopify's feeds carry one
+    is not known; images at the sizes pages ask for; Shopify's `image { url }`, fetched from
+    where it is.
+* **Alternatives:**
+  * **Shopify's image by URL, fetched as products' images are:** the image service's sizes would
+    come with it, but it is a second way to the same picture, which the shop's files already keep;
+    it can come with blogs brought from Shopify.
+  * **A signed URL in the document:** it would expire while pages are kept at the edge.
+  * **The image's file as a key of the article's table:** the online store would depend on the
+    files module's tables, which are its own; the file's event is followed instead.

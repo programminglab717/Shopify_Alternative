@@ -157,8 +157,17 @@ export interface ArticleRecord {
   publishedAt: Date | null;
   /** Another of the theme's article templates, "recipe" for article.recipe.json; null for none. */
   templateSuffix: string | null;
+  /** One of the shop's files, shown as its image (ADR-213); null for none. */
+  image: ArticleImageRecord | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** An article's image: one of the shop's files, and what it shows (ADR-213). */
+export interface ArticleImageRecord {
+  fileId: string;
+  /** For those who cannot see it; empty for its file's own. */
+  altText: string;
 }
 
 /** What a shop sets for its storefront as a whole (ADR-041). */

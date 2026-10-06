@@ -4,10 +4,12 @@ export {
   BrandService,
   LOGO_TYPES,
   LOGO_URL_SECONDS,
+  readyImagesIn,
   shopLogoOf,
   type BrandImageValue,
   type BrandInput,
   type BrandRecord,
+  type ShopImage,
   type ShopLogo,
 } from '../internal/brand.service.js';
 export {

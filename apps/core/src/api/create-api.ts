@@ -15,6 +15,7 @@ import { keepRawBodies, readFileForms } from './forms.js';
 import { IdempotencyStore, idempotencyHooks } from './idempotency.js';
 import { serveImages } from './images.js';
 import { serveLocalStorage } from './local-storage.js';
+import { serveArticleImages } from './article-images.js';
 import { serveLogos } from './logos.js';
 import { recentAuthenticationHook } from './recent-authentication.js';
 import { supportAccessHook } from './support-access.js';
@@ -102,6 +103,8 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   serveImages(fastify, options.storage);
   // Shops' logos, for their orders' emails (ADR-198).
   serveLogos(fastify, options.database, options.storage);
+  // Published articles' images, for their storefronts' pages (ADR-213).
+  serveArticleImages(fastify, options.database, options.storage);
 
   const app = await NestFactory.create<NestFastifyApplication>(
     ApiModule.forRoot(hearingEmailEvents(options)),

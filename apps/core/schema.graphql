@@ -18,6 +18,9 @@ type Article {
   handle: String!
   id: ID!
 
+  """One of the shop's files, shown as its image; null for none."""
+  image: ArticleImage
+
   """Whether the storefront shows it."""
   isPublished: Boolean!
 
@@ -62,6 +65,7 @@ input ArticleCreateInput {
 
   """Made from the title when not given; unique in its blog."""
   handle: String
+  image: ArticleImageInput
 
   """Published unless false."""
   isPublished: Boolean
@@ -93,6 +97,26 @@ type ArticleEdge {
   node: Article!
 }
 
+"""
+An article's image (ADR-213): one of the shop's files, which the storefront serves while the article is published.
+"""
+type ArticleImage {
+  """What it shows, for those who cannot see it; null for its file's own."""
+  altText: String
+
+  """The file, as `file` finds it."""
+  fileId: ID!
+}
+
+"""An article's image: one of the shop's files, an image."""
+input ArticleImageInput {
+  """What it shows, for those who cannot see it; the file's own when blank."""
+  altText: String
+
+  """A JPEG, PNG, WebP or GIF the shop uploaded."""
+  fileId: ID!
+}
+
 """Changes to an article: fields left out stay as they are."""
 input ArticleUpdateInput {
   author: AuthorInput
@@ -103,6 +127,9 @@ input ArticleUpdateInput {
   """HTML, cleaned before it is kept."""
   body: String
   handle: String
+
+  """Null for none."""
+  image: ArticleImageInput
   isPublished: Boolean
 
   """When it was published, as its page says: never in the future."""

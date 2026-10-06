@@ -6,8 +6,8 @@
 
 ## In progress
 
-**An article's image** (OS-07, ADR-176): Shopify's `article.image`, one of the shop's files,
-through the Admin API and on the storefront, in Hatti Base's blog and the blog's feed.
+**Easypaisa** (PAY-01): the third gateway shops take payments through, by its hosted checkout,
+as JazzCash's is, and asked after when its customer never comes back.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,24 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### An article's image
+
+* **An article has Shopify's image**, one of the shop's images ready to show, with its alt text
+  ([ADR-213](../architecture/13-decision-log.md#adr-213--an-article-has-shopifys-image-one-of-the-shops-files-with-its-alt-text-the-api-serves-it-at-an-address-of-its-own-while-the-article-is-published-the-address-naming-its-file-the-articles-document-names-that-address-and-hatti-base-shows-it-in-its-blog-and-on-the-articles-page)):
+  `articleCreate` and `articleUpdate` take `image { fileId altText }`, null for none, checked
+  through the files module's `readyImagesIn` (migration 0134), and `article.updated` names
+  `image`.
+* **Served by the API** at `/article-images/{shop}/{article}` while the article is published,
+  its address naming its file (`?v=`); the article's document names that address, with the
+  file's alt text when the article gives none, and a file deleted rebuilds the shop's articles
+  (`DOCUMENTS_VERSION` 10).
+* **Themes get Shopify's `article.image`**; Hatti Base shows it above each article in its blog
+  and at the top of the article's page. The blog's feed leaves it out for now, as how Shopify's
+  feeds carry one is not known.
+* 1637 tests (4 new): the image checked, kept, changed and taken off, and served while its
+  article is published; its document's address, alt text and its file deleted; Hatti Base's blog
+  and article pages, and `article.image` in themes.
 
 ### 4e6a306 · Articles and pages in the storefront's search
 

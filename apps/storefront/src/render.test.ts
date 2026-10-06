@@ -509,6 +509,60 @@ describe('Storefront rendering', () => {
     expect(/<p class="dates">([^|]*)\|/.exec(urduDates.html)?.[1]).toBe('ستمبر 21, 2026');
   });
 
+  it("shows an article's image on its blog's page and its own, as Shopify's article.image (ADR-213)", async () => {
+    const sample = sampleStore();
+    // Where the API serves it, its size unknown, as the publisher names it.
+    const image = {
+      src: 'https://api.hatti.test/article-images/shop-1/art-eid?v=0a1b2c3d',
+      width: 0,
+      height: 0,
+      alt: 'Lawn, folded',
+    };
+    const shop = new MemoryStore({
+      ...sample,
+      articles: sample.articles!.map((article) =>
+        article.id === 'art-eid' ? { ...article, image } : article,
+      ),
+    });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const blog = await renderer.render({ path: '/blogs/news' }, shop.fresh());
+    // Beside the title it links to, hidden from screen readers, which the title tells already.
+    const listed = [
+      ...blog.html.matchAll(/<a href="([^"]+)" class="blog__image"[^>]*>\s*(<img [^>]*>)/g),
+    ];
+    expect(listed.map(([, url, img]) => [url, img])).toEqual([
+      [
+        '/blogs/news/eid-lawn-is-here',
+        '<img src="https://api.hatti.test/article-images/shop-1/art-eid?v=0a1b2c3d&amp;width=720" ' +
+          'srcset="https://api.hatti.test/article-images/shop-1/art-eid?v=0a1b2c3d&amp;width=720 720w" ' +
+          'alt="" loading="lazy">',
+      ],
+    ]);
+    const article = await renderer.render({ path: '/blogs/news/eid-lawn-is-here' }, shop.fresh());
+    expect(/<figure class="article__image">\s*(<img [^>]*>)/.exec(article.html)?.[1]).toBe(
+      '<img src="https://api.hatti.test/article-images/shop-1/art-eid?v=0a1b2c3d&amp;width=1200" ' +
+        'srcset="https://api.hatti.test/article-images/shop-1/art-eid?v=0a1b2c3d&amp;width=1200 1200w" ' +
+        'alt="Lawn, folded" fetchpriority="high">',
+    );
+    // None for an article without one, as for one in a document written before images.
+    const plain = await renderer.render({ path: '/blogs/news/winter-shawls' }, shop.fresh());
+    expect(plain.html).not.toContain('<figure class="article__image">');
+
+    // Themes get it as Shopify's: printed, its address; its alt; null when there is none.
+    const extra = {
+      'sections/main-article.liquid':
+        '<p class="image">{{ article.image }}|{{ article.image.alt }}|{{ article.image | image_url: width: 100 }}|[{{ articles[\'news/winter-shawls\'].image }}]</p>' +
+        '{% schema %}{ "name": "Article" }{% endschema %}',
+    };
+    const themed = await new PageRenderer(loadTheme({ ...files, ...extra }), {
+      limits: { timeMs: 10_000 },
+    }).render({ path: '/blogs/news/eid-lawn-is-here' }, shop.fresh());
+    expect(/<p class="image">([^]*?)<\/p>/.exec(themed.html)?.[1]).toBe(
+      'https://api.hatti.test/article-images/shop-1/art-eid?v=0a1b2c3d|Lawn, folded|' +
+        'https://api.hatti.test/article-images/shop-1/art-eid?v=0a1b2c3d&width=100|[]',
+    );
+  });
+
   it('renders what a search found, a page at a time, its links keeping the words', async () => {
     const ids = sampleStore().products.map((product) => product.id);
     const found = await render({

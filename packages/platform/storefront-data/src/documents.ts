@@ -9,7 +9,7 @@ import type { HandledKind } from './keys.js';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 9;
+export const DOCUMENTS_VERSION = 10;
 
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
@@ -127,6 +127,11 @@ export interface ArticleDoc {
    * written before blogs had feeds: when it was published.
    */
   updatedAt?: string;
+  /**
+   * Its image, where the API serves it (ADR-213); null for none. Absent in documents written
+   * before articles had images.
+   */
+  image?: ImageDoc | null;
 }
 
 /** What an article is found by, as in its address: its blog's handle and its own, news/eid-edit. */

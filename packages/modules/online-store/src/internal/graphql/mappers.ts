@@ -16,6 +16,7 @@ import { policyHandle } from '../policy-types.js';
 import type { ThemeRoleValue } from '../schema.js';
 import {
   ArticleAuthor,
+  ArticleImage,
   ArticleConnection,
   ArticleEdge,
   BlogConnection,
@@ -251,6 +252,12 @@ export function toArticle(record: ArticleRecord): OnlineStoreArticle {
     isPublished: record.isPublished,
     publishedAt: record.publishedAt,
     templateSuffix: record.templateSuffix,
+    image:
+      record.image &&
+      Object.assign(new ArticleImage(), {
+        fileId: toPublicId('file', record.image.fileId),
+        altText: record.image.altText === '' ? null : record.image.altText,
+      }),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     blogId: record.blogId,

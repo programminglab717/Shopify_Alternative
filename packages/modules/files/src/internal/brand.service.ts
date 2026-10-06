@@ -2,7 +2,7 @@ import { InputChecker, fail, type MutationResult, type TenantContext } from '@ha
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { Injectable } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { FileEvents, type ShopBrandUpdatePayload } from './events.js';
 import type { FileTypeValue } from './file-types.js';
@@ -139,6 +139,42 @@ export async function shopLogoOf(
     .innerJoin(files, and(eq(files.shopId, brands.shopId), eq(files.id, fileId)))
     .where(and(eq(brands.shopId, shopId), eq(files.status, 'ready')));
   return row ? { id: row.id, key: row.key, contentType: row.contentType as FileTypeValue } : null;
+}
+
+/** One of the shop's files that a page can show as an image, as a logo is. */
+export interface ShopImage {
+  id: string;
+  key: string;
+  contentType: FileTypeValue;
+  /** What the shop wrote of it; empty for nothing. */
+  alt: string;
+}
+
+/**
+ * Of the files `ids` names, those of the shop's that a page can show as images, uploaded and of
+ * a logo's types, by their IDs, in the caller's transaction `tx`: for another module's own image,
+ * as an article's is (ADR-213).
+ */
+export async function readyImagesIn(
+  tx: Tx,
+  shopId: string,
+  ids: readonly string[],
+): Promise<Map<string, ShopImage>> {
+  if (ids.length === 0) return new Map();
+  const rows = await tx
+    .select({ id: files.id, key: files.key, contentType: files.contentType, alt: files.alt })
+    .from(files)
+    .where(
+      and(
+        eq(files.shopId, shopId),
+        inArray(files.id, [...new Set(ids)]),
+        eq(files.status, 'ready'),
+        inArray(files.contentType, [...LOGO_TYPES]),
+      ),
+    );
+  return new Map(
+    rows.map((row) => [row.id, { ...row, contentType: row.contentType as FileTypeValue }]),
+  );
 }
 
 async function brandIn(tx: Tx, shopId: string): Promise<BrandRecord> {

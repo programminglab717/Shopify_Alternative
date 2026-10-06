@@ -1827,6 +1827,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   names (`?v=`), so another image is another address; the publisher rebuilds the document on
   `shop_brand.updated` and `file.deleted`. Another image of the brand goes in `BRAND_IMAGES`, the
   table, the route and the document together.
+* **An article's image is served the same way**, at `/article-images/{shop}/{article}` while the
+  article is published ([ADR-213](../architecture/13-decision-log.md#adr-213--an-article-has-shopifys-image-one-of-the-shops-files-with-its-alt-text-the-api-serves-it-at-an-address-of-its-own-while-the-article-is-published-the-address-naming-its-file-the-articles-document-names-that-address-and-hatti-base-shows-it-in-its-blog-and-on-the-articles-page)): a module keeping
+  one of the shop's files for a page checks it with `readyImagesIn` when it is chosen and again
+  when it is shown, keeps no key to the files module's tables, and has the publisher follow
+  `file.deleted`.
 * **Tests use `LocalStorage` in a temporary directory**: the API's test harness serves one at
   `http://localhost:4000/storage`, so a test uploads and reads through the URLs it was given.
 

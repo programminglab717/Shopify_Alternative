@@ -252,6 +252,10 @@ function articleInput(article: ArticleCreateInput | ArticleUpdateInput): Article
     isPublished: article.isPublished,
     publishDate: article.publishDate,
     templateSuffix: article.templateSuffix,
+    image: article.image && {
+      fileId: uuidOf('file', article.image.fileId),
+      altText: article.image.altText,
+    },
   };
 }
 

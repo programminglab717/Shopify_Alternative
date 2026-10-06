@@ -25,6 +25,7 @@
     "@hatti/csv": "workspace:*",
     "@hatti/db": "workspace:*",
     "@hatti/events": "workspace:*",
+    "@hatti/files": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@hatti/storefront-api": "workspace:*",

@@ -12,7 +12,7 @@ import { SecretBox, checkPassword } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import type { DomainEvent } from '@hatti/events';
-import { BrandService, shopLogoOf } from '@hatti/files/public';
+import { BrandService, FileService, readyImagesIn, shopLogoOf } from '@hatti/files/public';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
 import { MetaConversionsService, metaPixelIdIn } from '@hatti/marketing/public';
@@ -30,6 +30,7 @@ import {
   shopPoliciesOf,
   shopRedirectsOf,
 } from '@hatti/online-store/public';
+import type { ObjectStorage } from '@hatti/storage';
 import {
   DOCUMENTS_VERSION,
   RedisStore,
@@ -198,7 +199,8 @@ describe('What storefront documents an event makes stale', () => {
 
   it('rebuilds the shop when its brand changes, or a file goes that may have been a logo (ADR-205)', () => {
     expect(itemsFor(event('shop_brand.updated', { changed: ['squareLogo'] }))).toEqual(['shop']);
-    expect(itemsFor(event('file.deleted', {}))).toEqual(['shop']);
+    // A file deleted may have been an article's image too (ADR-213).
+    expect(itemsFor(event('file.deleted', {}))).toEqual(['shop', 'every-article']);
   });
 
   it('publishes a shop whole once it is opened (ADR-145)', () => {
@@ -344,6 +346,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         policies: { policiesOf: shopPoliciesOf },
         pixels: { metaPixelIdOf: metaPixelIdIn },
         brand: { logoOf: shopLogoOf },
+        files: { readyImagesIn },
       },
       {
         keys,
@@ -810,6 +813,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       templateSuffix: null,
       // When it last changed, as its blog's feed says (ADR-209).
       updatedAt: eid.updatedAt.toISOString(),
+      image: null,
     });
     expect(await store().articleByHandle('news/draft')).toBeNull();
 
@@ -847,6 +851,69 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await store().blogByHandle('guides')).toBeNull();
     expect(await store().articleByHandle('guides/sizes')).toBeNull();
     expect(await store().handles('article')).toEqual([]);
+  });
+
+  it("names an article's image where the API serves it, and drops it when its file goes (ADR-213)", async () => {
+    const [photo, plain] = [newId(), newId()];
+    await admin.query(
+      `INSERT INTO files.files (shop_id, id, key, filename, content_type, size, status, alt)
+       VALUES ($1, $2, $3, 'lawn.webp', 'image/webp', 100, 'ready', 'Lawn'),
+              ($1, $4, $5, 'plain.png', 'image/png', 100, 'ready', '')`,
+      [
+        shopId,
+        photo,
+        `shops/${shopId}/files/${photo}/lawn.webp`,
+        plain,
+        `shops/${shopId}/files/${plain}/plain.png`,
+      ],
+    );
+    const lookbook = unwrap(await blogs.create(tenant, { title: 'Lookbook' }));
+    const eid = unwrap(
+      await articles.create(tenant, {
+        blogId: lookbook.id,
+        title: 'Eid lawn',
+        image: { fileId: photo, altText: 'Lawn, folded' },
+      }),
+    );
+    const sizes = unwrap(
+      await articles.create(tenant, {
+        blogId: lookbook.id,
+        title: 'Sizes',
+        image: { fileId: photo },
+      }),
+    );
+    await deliver();
+    const imageOf = async (handle: string) => (await store().articleByHandle(handle))?.image;
+    expect(await imageOf('lookbook/eid-lawn')).toEqual({
+      src: `http://localhost:4000/article-images/${shopId}/${eid.id}?v=${photo.slice(0, 8)}`,
+      width: 0,
+      height: 0,
+      alt: 'Lawn, folded',
+    });
+    // Without alt text of its own, its file's.
+    expect((await imageOf('lookbook/sizes'))?.alt).toBe('Lawn');
+
+    // Another image is at another address, which pages and caches ask for anew.
+    unwrap(await articles.update(tenant, sizes.id, { image: { fileId: plain } }));
+    await deliver();
+    const plainImage = {
+      src: `http://localhost:4000/article-images/${shopId}/${sizes.id}?v=${plain.slice(0, 8)}`,
+      width: 0,
+      height: 0,
+      alt: null,
+    };
+    expect(await imageOf('lookbook/sizes')).toEqual(plainImage);
+
+    // Its file deleted, the article is shown without one.
+    const files = new FileService(database, {
+      delete: () => Promise.resolve(),
+    } as unknown as ObjectStorage);
+    unwrap(await files.delete(tenant, [photo]));
+    expect(await deliver()).toEqual(['file.deleted']);
+    expect(await imageOf('lookbook/eid-lawn')).toBeNull();
+    expect(await imageOf('lookbook/sizes')).toEqual(plainImage);
+    unwrap(await blogs.delete(tenant, lookbook.id));
+    await deliver();
   });
 
   it("publishes menus' links to blogs and articles, following their handles and showing (ADR-178)", async () => {

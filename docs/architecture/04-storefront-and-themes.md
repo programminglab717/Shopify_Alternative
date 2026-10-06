@@ -299,7 +299,9 @@ and its blogs, at `/blogs/{handle}` a page of articles at a time and those with 
 `/blogs/{handle}/tagged/{tag}`, with each article at `/blogs/{blog}/{article}`, in Hatti Base's
 `blog` and `article` templates ([ADR-177](./13-decision-log.md#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)),
 each blog's Atom feed at `/blogs/{handle}.atom` and an article's page linking those beside it
-([ADR-209](./13-decision-log.md#adr-209--a-blog-has-shopifys-atom-feed-at-its-address-with-atom-its-30-latest-articles-whole-under-ids-of-their-own-and-an-articles-page-gives-themes-the-newer-and-the-older-article-beside-it-fetched-together-when-a-theme-first-asks-for-either)).
+([ADR-209](./13-decision-log.md#adr-209--a-blog-has-shopifys-atom-feed-at-its-address-with-atom-its-30-latest-articles-whole-under-ids-of-their-own-and-an-articles-page-gives-themes-the-newer-and-the-older-article-beside-it-fetched-together-when-a-theme-first-asks-for-either)),
+and an article's image, one of the shop's files, which the API serves at an address of its own
+while the article is published ([ADR-213](./13-decision-log.md#adr-213--an-article-has-shopifys-image-one-of-the-shops-files-with-its-alt-text-the-api-serves-it-at-an-address-of-its-own-while-the-article-is-published-the-address-naming-its-file-the-articles-document-names-that-address-and-hatti-base-shows-it-in-its-blog-and-on-the-articles-page)).
 Its policies are kept as Shopify keeps them, its refund, privacy, shipping and terms policies
 and its contact information, cleaned as pages are, and shown at `/policies/refund-policy` and the
 rest in Shopify's markup inside the theme's layout, which needs no template for them; Liquid's

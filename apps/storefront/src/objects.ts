@@ -424,7 +424,8 @@ function tagsOf(articles: readonly { tags: readonly string[] }[]): string[] {
 
 /**
  * One of a blog's articles (ADR-177), as Shopify's `article`: its content and excerpt were
- * cleaned when they were saved, so themes print them as they are. No image or comments yet.
+ * cleaned when they were saved, so themes print them as they are; its image, if it has one
+ * (ADR-213). No comments yet.
  */
 export function articleObject(doc: ArticleDoc): Record<string, unknown> {
   return {
@@ -443,7 +444,8 @@ export function articleObject(doc: ArticleDoc): Record<string, unknown> {
     updated_at: doc.updatedAt ?? doc.publishedAt,
     tags: doc.tags,
     template_suffix: doc.templateSuffix,
-    image: null,
+    // One of the shop's files where the API serves it (ADR-213); null for none.
+    image: doc.image ? new ImageDrop(doc.image) : null,
     comments: [],
     comments_count: 0,
   };

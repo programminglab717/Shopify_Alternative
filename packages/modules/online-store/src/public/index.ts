@@ -19,6 +19,7 @@ export {
 } from '../internal/events.js';
 export { OnlineStoreModule } from '../internal/online-store.module.js';
 export type {
+  ArticleImageRecord,
   ArticleRecord,
   BlogRecord,
   DomainRecord,
@@ -33,7 +34,12 @@ export type {
   ThemeRecord,
   UrlRedirectRecord,
 } from '../internal/records.js';
-export { ArticleService, type ArticleInput } from '../internal/article.service.js';
+export {
+  ArticleService,
+  publishedArticleImageOf,
+  type ArticleImageInput,
+  type ArticleInput,
+} from '../internal/article.service.js';
 export { BLOG_LIMITS, BlogService, type BlogInput } from '../internal/blog.service.js';
 export { DOMAIN_LIMIT, hostOf } from '../internal/domain-name.js';
 export { DomainService, shopDomainsOf } from '../internal/domain.service.js';
