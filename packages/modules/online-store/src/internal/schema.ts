@@ -150,6 +150,8 @@ export const preferences = onlineStoreSchema.table('preferences', {
   linkBio: text('link_bio').notNull().default(''),
   linkLinks: jsonb('link_links').$type<LinkPageLinkValue[]>().notNull().default([]),
   linkProducts: uuid('link_products').array().notNull().default([]),
+  /** The variant chosen of each of `linkProducts`, by its place; null where none is (ADR-206). */
+  linkVariants: uuid('link_variants').array().$type<(string | null)[]>().notNull().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

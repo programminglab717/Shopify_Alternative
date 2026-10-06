@@ -970,7 +970,10 @@ async function resourceOf(
     const shown: LinkPageShown = {
       bio: page?.bio ?? '',
       links: page?.links ?? [],
-      products: docs.filter((doc) => doc !== null),
+      // Each with the variant chosen of it, if any (ADR-206), by its place.
+      products: docs.flatMap((doc, index) =>
+        doc ? [{ doc, variantId: page?.variantIds?.[index] ?? null }] : [],
+      ),
     };
     // Its markup is made once the page's language is known.
     return { link_page: shown };

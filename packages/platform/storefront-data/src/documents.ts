@@ -213,6 +213,11 @@ export interface LinkPageDoc {
   /** A path on the storefront, or an https address. */
   links: { title: string; url: string }[];
   productIds: string[];
+  /**
+   * The variant chosen of each of `productIds`, by its place (ADR-206); null for none. Absent
+   * while none is, as in documents written before variants could be.
+   */
+  variantIds?: (string | null)[];
 }
 
 export interface DeliveryDoc {

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-205 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-206 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -213,6 +213,7 @@
 | 203 | A shop's Confirmation Desk may wait for its customers to answer on WhatsApp: where the shop asks, an ordinary cash-on-delivery order is dealt for its first call an hour after its reminder to confirm, or three days after it was placed when none will go; one of high value is dealt at once, and an order is overdue counting from when it fell due | Accepted |
 | 204 | The link page's links go through the storefront, which counts each tap a day at a time by where the link goes, beside the sessions, and sends the shopper on; it follows only the page's own links, and the worker keeps each day's taps in Postgres for a report of a period's by link | Accepted |
 | 205 | A shop's brand has Shopify's square logo beside its logo, one of its files, served by the API at an address of its own; the shop's document names where each logo is served, each address naming its file, and the link page shows the square logo, else the logo, at its top | Accepted |
+| 206 | Each product a shop's link page shows may name one of its variants, kept beside it by its place: the page shows that variant's title, image and price, and Buy now goes straight to checkout with it; a variant deleted since is as none chosen | Accepted |
 
 ---
 
@@ -8618,3 +8619,36 @@
   * **The logos' addresses without their files' IDs:** browsers and the edge would show the old
     image for up to an hour after a change.
   * **The logo cropped square:** a wide wordmark in a circle loses its words.
+
+## ADR-206 · Each product a shop's link page shows may name one of its variants, kept beside it by its place: the page shows that variant's title, image and price, and Buy now goes straight to checkout with it; a variant deleted since is as none chosen
+
+* **Context:** A shop's link page ([ADR-161](#adr-161--a-shops-link-page-at-links-is-a-line-about-it-up-to-ten-links-and-up-to-24-of-its-products-kept-with-what-it-sets-for-its-storefront-the-storefront-shows-it-in-the-platforms-markup-inside-the-shops-theme-in-the-pages-language-a-product-with-nothing-to-choose-a-tap-from-checkout-and-the-edge-keeps-it-until-the-shop-or-any-of-its-products-changes)) shows up
+  to 24 of its products: one with a single variant a tap from checkout through its cart
+  permalink ([ADR-065](#adr-065--a-cart-permalink-begins-a-cart-of-its-own-and-goes-to-its-checkout-leaving-the-shoppers-cart-as-it-is)), one with more "Choose options" on its page. Shops post one
+  colour or size of a product in a story, and a shopper who tapped through to the page had to
+  find and choose it again. ADR-161 left a product's link with its variant chosen for later.
+* **Decision:**
+  * **`products` beside `productIds` in the link page**, given and read through the Admin API:
+    each a product and one of its variants, or none. It is given in place of `productIds`, not
+    with it; `productIds` alone chooses none. A product may be on the page twice with two of its
+    variants, and the same one twice is kept once.
+  * **Kept beside the products, by their place:** `link_variants` (migration 0131), null where
+    none is chosen, checked when saved to be the product's own. A variant deleted since is as
+    none chosen when read, and goes with the next change; its product stays where it was.
+  * **The shop's document** has `variantIds` beside `productIds` while any is chosen, and
+    nothing new otherwise.
+  * **The storefront shows the variant chosen:** its title under the product's where the product
+    has others, its image (else the product's first), its price and the price before a sale, and
+    "Buy now" to its cart permalink, or "Sold out"; the card opens the product's page with it
+    chosen (`?variant=`).
+* **Consequences:**
+  * A story about one colour leads to that colour, a tap from checkout.
+  * Those who give `productIds` alone see nothing change.
+  * Not yet: the admin's screens; a quantity other than one.
+* **Alternatives:**
+  * **Variants' IDs among `productIds`:** one list of two kinds of ID, which every reader would
+    have to tell apart.
+  * **The page's products as JSON pairs, in place of their column:** the products' checks and
+    reads would all change, for the same.
+  * **A table of the page's products:** 24 rows at most a shop, while the page is read with the
+    rest of its preferences in one row.

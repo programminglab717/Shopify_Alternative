@@ -1744,6 +1744,60 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it('shows a product of the link page with its variant chosen, a tap from checkout (ADR-206)', async () => {
+    const sample = sampleStore();
+    const several = sample.products.find((product) => product.variants.length > 1)!;
+    const [first, second, ...rest] = several.variants;
+    // Its own price, on sale, and its own image.
+    const chosen = { ...second!, price: 525_000, compareAtPrice: 600_000, image: 1 };
+    const image = { src: '/images/products/rose-suit.jpg', width: 0, height: 0, alt: 'Rose suit' };
+    const item = async (variantIds: (string | null)[], available = true) => {
+      const product: ProductDoc = {
+        ...several,
+        images: [several.images[0]!, image],
+        variants: [first!, { ...chosen, available }, ...rest],
+      };
+      const app = server({
+        sample: new MemoryStore({
+          ...sample,
+          products: sample.products.map((each) => (each.id === product.id ? product : each)),
+          shop: {
+            ...sample.shop,
+            linkPage: { bio: '', links: [], productIds: [product.id], variantIds },
+          },
+        }),
+      });
+      const page = await app.inject({
+        method: 'GET',
+        url: '/links',
+        headers: { host: 'localhost' },
+      });
+      await app.close();
+      return page.body.match(/<li class="hatti-links__product">(.*?)<\/li>/)![1]!;
+    };
+    const shown = await item([chosen.id]);
+    expect(shown).toContain(
+      `<a class="card__link" href="/products/${several.handle}?variant=${chosen.id}">`,
+    );
+    expect(shown).toContain('src="/images/products/rose-suit.jpg');
+    expect(shown).toContain(
+      `</h2><p class="hatti-links__variant" dir="auto">${chosen.title}</p></a>`,
+    );
+    expect(shown).toContain(
+      '<div class="price price--sale"><span class="visually-hidden">Sale price</span>' +
+        '<span class="price__amount">Rs 5,250</span>' +
+        '<span class="visually-hidden">Regular price</span>' +
+        '<s class="price__compare">Rs 6,000</s></div>' +
+        `<a class="button hatti-links__buy" href="/cart/${chosen.id}:1">Buy now</a>`,
+    );
+    // Sold out, it says so; a variant gone since is as none chosen.
+    expect(await item([chosen.id], false)).toContain('aria-disabled="true">Sold out</span>');
+    const gone = await item(['v-gone']);
+    expect(gone).toContain(`<a class="card__link" href="/products/${several.handle}">`);
+    expect(gone).toContain('Choose options</a>');
+    expect(gone).not.toContain('hatti-links__variant');
+  });
+
   it("shows the shop's square logo atop its link page, else its logo, else neither (ADR-205)", async () => {
     const sample = sampleStore();
     const logo = 'https://api.hatti.pk/logos/s1?v=0a1b2c3d';

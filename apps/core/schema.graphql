@@ -3470,6 +3470,11 @@ type LinkPage {
   The products it shows, in their order. Those deleted are gone from it; the page leaves off those not active while they are not. One with a single variant goes straight to checkout, the others to their page.
   """
   productIds: [ID!]!
+
+  """
+  Its products as productIds has them, each with the variant chosen of it, if any.
+  """
+  products: [LinkPageProduct!]!
 }
 
 """The link page's parts to change; those not given stay as they are."""
@@ -3484,6 +3489,11 @@ input LinkPageInput {
   Up to 24 of the shop's products, in their order, replacing those it had.
   """
   productIds: [ID!]
+
+  """
+  Up to 24 of the shop's products, in their order, each with one of its variants chosen or none, replacing those it had; in place of productIds, not with it. A product may be twice with two of its variants.
+  """
+  products: [LinkPageProductInput!]
 }
 
 """One of a link page's own links."""
@@ -3504,6 +3514,25 @@ input LinkPageLinkInput {
   A path on the storefront, such as /collections/sale, or an https address.
   """
   url: String!
+}
+
+"""One of the link page's products, and the variant chosen of it, if any."""
+type LinkPageProduct {
+  productId: ID!
+
+  """
+  One of its variants, chosen (ADR-206): the page shows its price and image, and "Buy now" goes straight to checkout with it. Null for the product as a whole.
+  """
+  variantId: ID
+}
+
+input LinkPageProductInput {
+  productId: ID!
+
+  """
+  One of its variants, to show chosen and buy straight; null or absent for none.
+  """
+  variantId: ID
 }
 
 """

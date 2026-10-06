@@ -1,4 +1,11 @@
-import { InputChecker, fail, failOne, type MutationResult, type TenantContext } from '@hatti/api';
+import {
+  InputChecker,
+  fail,
+  failOne,
+  type FieldError,
+  type MutationResult,
+  type TenantContext,
+} from '@hatti/api';
 import { ProductService } from '@hatti/catalog/public';
 import { SecretBox, passwordVerifier } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
@@ -33,6 +40,11 @@ export interface LinkPageInput {
   links?: readonly { title: string; url: string }[] | null;
   /** Up to 24 of the shop's products, in their order. */
   productIds?: readonly string[] | null;
+  /**
+   * As `productIds`, each with one of its variants chosen, or none (ADR-206); in place of
+   * `productIds`, not with it.
+   */
+  products?: readonly { productId: string; variantId?: string | null }[] | null;
 }
 
 export const LINK_PAGE_LIMITS = {
@@ -151,17 +163,8 @@ export class PreferencesService {
       const was = await this.#current(tx, tenant.shopId, this.#view(tenant.shopId, before));
       if (linkPage?.productIds && linkPage.productIds.length > 0) {
         const found = await this.#found(tx, tenant.shopId, linkPage.productIds);
-        const given = input.linkPage?.productIds ?? [];
-        const missing = linkPage.productIds.filter((id) => !found.has(id));
-        if (missing.length > 0) {
-          return fail(
-            missing.map((id) => ({
-              field: ['linkPage', 'productIds', String(given.indexOf(id))],
-              code: 'NOT_FOUND',
-              message: 'Product not found',
-            })),
-          );
-        }
+        const missing = missingOf(input.linkPage!, found);
+        if (missing.length > 0) return fail(missing);
       }
       const next = {
         whatsapp: whatsapp === undefined ? was.whatsappNumber : whatsapp,
@@ -174,6 +177,7 @@ export class PreferencesService {
           bio: linkPage?.bio ?? was.linkPage.bio,
           links: linkPage?.links ?? was.linkPage.links,
           productIds: linkPage?.productIds ?? was.linkPage.productIds,
+          variantIds: linkPage?.variantIds ?? was.linkPage.variantIds,
         },
       };
       if (next.passwordEnabled && next.password === null) {
@@ -205,6 +209,7 @@ export class PreferencesService {
         linkBio: next.linkPage.bio,
         linkLinks: next.linkPage.links,
         linkProducts: next.linkPage.productIds,
+        linkVariants: next.linkPage.variantIds,
       };
       const [row] = await tx
         .insert(preferences)
@@ -236,21 +241,50 @@ export class PreferencesService {
     return toRecord(await rowOf(tx, shopId, options));
   }
 
-  /** The view with the link page's products that are gone since left out (ADR-161). */
+  /**
+   * The view with the link page's products that are gone since left out (ADR-161), and the
+   * variants chosen that are gone since no longer chosen (ADR-206).
+   */
   async #current(tx: Tx, shopId: string, view: PreferencesView): Promise<PreferencesView> {
-    const ids = view.linkPage.productIds;
-    if (ids.length === 0) return view;
-    const found = await this.#found(tx, shopId, ids);
-    if (found.size === ids.length) return view;
+    const { productIds, variantIds } = view.linkPage;
+    if (productIds.length === 0) return view;
+    const found = await this.#found(tx, shopId, productIds);
+    const kept = shownOnce(
+      productIds.flatMap((productId, index) => {
+        const variants = found.get(productId);
+        if (!variants) return [];
+        const variantId = variantIds[index] ?? null;
+        return [
+          {
+            productId,
+            variantId: variantId !== null && variants.has(variantId) ? variantId : null,
+          },
+        ];
+      }),
+    );
+    const same =
+      kept.length === productIds.length &&
+      kept.every((each, index) => each.variantId === (variantIds[index] ?? null));
+    if (same) return view;
     return {
       ...view,
-      linkPage: { ...view.linkPage, productIds: ids.filter((id) => found.has(id)) },
+      linkPage: {
+        ...view.linkPage,
+        productIds: kept.map((each) => each.productId),
+        variantIds: kept.map((each) => each.variantId),
+      },
     };
   }
 
-  /** Those of `ids` the shop has products by, whatever their status. */
-  async #found(tx: Tx, shopId: string, ids: readonly string[]): Promise<Set<string>> {
-    return new Set((await this.products.recordsOf(tx, shopId, ids)).map((product) => product.id));
+  /** Those of `ids` the shop has products by, whatever their status, with their variants' IDs. */
+  async #found(tx: Tx, shopId: string, ids: readonly string[]): Promise<Map<string, Set<string>>> {
+    const records = await this.products.recordsOf(tx, shopId, ids);
+    return new Map(
+      records.map((product) => [
+        product.id,
+        new Set(product.variants.map((variant) => variant.id)),
+      ]),
+    );
   }
 
   #view(shopId: string, row: PreferencesRow | undefined): PreferencesView {
@@ -290,6 +324,8 @@ function toRecord(row: PreferencesRow | undefined): PreferencesRecord {
       bio: row?.linkBio ?? '',
       links: row?.linkLinks ?? [],
       productIds: row?.linkProducts ?? [],
+      // None chosen for the products of pages saved before variants could be.
+      variantIds: (row?.linkProducts ?? []).map((_, index) => row?.linkVariants[index] ?? null),
     },
   };
 }
@@ -331,13 +367,74 @@ function checkLinkPage(check: InputChecker, input: LinkPageInput): Partial<LinkP
       });
     }
   }
-  if (input.productIds !== undefined) {
-    const ids = [...new Set(input.productIds ?? [])];
-    if (ids.length > LINK_PAGE_LIMITS.products) {
-      check.addMessage(field('productIds'), 'TOO_LONG', 'A link page shows 24 products at most');
-    } else page.productIds = ids;
+  if (input.productIds !== undefined && input.products !== undefined) {
+    check.addMessage(field('products'), 'INVALID', 'Give products or productIds, not both');
+  } else if (input.productIds !== undefined || input.products !== undefined) {
+    const name = input.products !== undefined ? 'products' : 'productIds';
+    const shown = shownOnce(
+      input.products !== undefined
+        ? (input.products ?? []).map((each) => ({
+            productId: each.productId,
+            variantId: each.variantId ?? null,
+          }))
+        : (input.productIds ?? []).map((productId) => ({ productId, variantId: null })),
+    );
+    if (shown.length > LINK_PAGE_LIMITS.products) {
+      check.addMessage(field(name), 'TOO_LONG', 'A link page shows 24 products at most');
+    } else {
+      page.productIds = shown.map((each) => each.productId);
+      page.variantIds = shown.map((each) => each.variantId);
+    }
   }
   return page;
+}
+
+/** Each product once, as first given; one twice only with two of its variants (ADR-206). */
+function shownOnce<T extends { productId: string; variantId: string | null }>(given: T[]): T[] {
+  const seen = new Set<string>();
+  return given.filter(({ productId, variantId }) => {
+    const key = `${productId} ${variantId ?? ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * Where the products given are not the shop's, or a variant chosen is not of its product: by the
+ * place each was given at.
+ */
+function missingOf(input: LinkPageInput, found: Map<string, Set<string>>): FieldError[] {
+  const field = (...path: (string | number)[]) => ['linkPage', ...path.map(String)];
+  if (input.products) {
+    return input.products.flatMap((each, index): FieldError[] => {
+      const variants = found.get(each.productId);
+      if (!variants) {
+        return [
+          {
+            field: field('products', index, 'productId'),
+            code: 'NOT_FOUND',
+            message: 'Product not found',
+          },
+        ];
+      }
+      if (each.variantId && !variants.has(each.variantId)) {
+        return [
+          {
+            field: field('products', index, 'variantId'),
+            code: 'NOT_FOUND',
+            message: 'Variant not found on this product',
+          },
+        ];
+      }
+      return [];
+    });
+  }
+  return (input.productIds ?? []).flatMap((id, index): FieldError[] =>
+    found.has(id)
+      ? []
+      : [{ field: field('productIds', index), code: 'NOT_FOUND', message: 'Product not found' }],
+  );
 }
 
 /** Whether a link page may link `url`: a path on the storefront, or an https address. */

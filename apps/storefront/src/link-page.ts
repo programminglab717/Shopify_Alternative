@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { formatMoney, money } from '@hatti/money';
-import type { LinkPageDoc, ProductDoc, ShopDoc } from '@hatti/storefront-data';
+import type { ImageDoc, LinkPageDoc, ProductDoc, ShopDoc } from '@hatti/storefront-data';
 import { escapeHtml, sized } from './liquid.js';
 
 // A shop's link-in-bio page (CH-07, ADR-161), at /links: the one address for its Instagram and
@@ -77,8 +77,8 @@ const WORDS: Readonly<Record<string, LinkPageWords>> = {
 export interface LinkPageShown {
   bio: string;
   links: LinkPageDoc['links'];
-  /** In the shop's order. */
-  products: ProductDoc[];
+  /** In the shop's order, each with the variant chosen of it, if any (ADR-206). */
+  products: { doc: ProductDoc; variantId: string | null }[];
 }
 
 /**
@@ -104,7 +104,7 @@ export function linkPageMarkup(
       `<li><a class="button button--secondary hatti-links__link" href="${escapeHtml(link.url)}" ` +
       `dir="auto">${escapeHtml(link.title)}</a></li>`,
   );
-  const products = page.products.filter((product) => product.variants.length > 0);
+  const products = page.products.filter((product) => product.doc.variants.length > 0);
   // Its name follows, so the image says nothing more to those who hear the page.
   const square = shop.brand?.squareLogo ?? null;
   const image = square ?? shop.brand?.logo ?? null;
@@ -121,7 +121,9 @@ export function linkPageMarkup(
       : '') +
     (products.length > 0
       ? '<ul class="hatti-links__products" role="list">' +
-        products.map((product, index) => productItem(product, index, words, at)).join('') +
+        products
+          .map((product, index) => productItem(product.doc, product.variantId, index, words, at))
+          .join('') +
         '</ul>'
       : '') +
     `<p class="hatti-links__all"><a href="${escapeHtml(at('/collections/all'))}">` +
@@ -133,27 +135,37 @@ export function linkPageMarkup(
 /**
  * A product: its image and title, linking to its page; its price, the lowest when its variants'
  * differ, and the price before a sale; and "Buy now" when it has one variant, to buy, "Choose
- * options" on its page when it has more, or "Sold out".
+ * options" on its page when it has more, or "Sold out". With one of its variants chosen
+ * (ADR-206), that variant's: its title under the product's where it has others, its image, its
+ * price, and "Buy now" to buy it, or "Sold out"; its page opens with it chosen.
  */
 function productItem(
   doc: ProductDoc,
+  variantId: string | null,
   index: number,
   words: LinkPageWords,
   at: (url: string) => string,
 ): string {
-  const url = at(`/products/${doc.handle}`);
-  const prices = doc.variants.map((variant) => variant.price);
+  // A variant gone since is as none chosen.
+  const chosen = doc.variants.find((variant) => variant.id === variantId) ?? null;
+  const url = at(
+    `/products/${doc.handle}${chosen ? `?variant=${encodeURIComponent(chosen.id)}` : ''}`,
+  );
+  const shown = chosen ? [chosen] : doc.variants;
+  const prices = shown.map((variant) => variant.price);
   const price = Math.min(...prices);
-  const compared = doc.variants.flatMap((variant) =>
+  const compared = shown.flatMap((variant) =>
     variant.compareAtPrice === null ? [] : [variant.compareAtPrice],
   );
   const lowest = compared.length > 0 ? Math.min(...compared) : null;
   // The price before a sale, while there is one.
   const before = lowest !== null && lowest > price ? lowest : null;
   const amount = price === Math.max(...prices) ? rupees(price) : words.from(rupees(price));
-  const only = doc.variants.length === 1 ? doc.variants[0]! : null;
+  const only = shown.length === 1 ? shown[0]! : null;
+  const image =
+    chosen && chosen.image !== null ? (doc.images[chosen.image] ?? doc.images[0]) : doc.images[0];
   let action: string;
-  if (!doc.variants.some((variant) => variant.available)) {
+  if (!shown.some((variant) => variant.available)) {
     action =
       '<span class="button button--secondary hatti-links__buy" aria-disabled="true">' +
       `${escapeHtml(words.soldOut)}</span>`;
@@ -169,8 +181,11 @@ function productItem(
   return (
     '<li class="hatti-links__product">' +
     `<a class="card__link" href="${escapeHtml(url)}">` +
-    `<div class="card__media">${imageOf(doc, index)}</div>` +
+    `<div class="card__media">${imageOf(image, doc, index)}</div>` +
     `<h2 class="card__title" dir="auto">${escapeHtml(doc.title)}</h2>` +
+    (chosen && doc.variants.length > 1
+      ? `<p class="hatti-links__variant" dir="auto">${escapeHtml(chosen.title)}</p>`
+      : '') +
     '</a>' +
     `<div class="price${before === null ? '' : ' price--sale'}">` +
     (before === null ? '' : `<span class="visually-hidden">${escapeHtml(words.sale)}</span>`) +
@@ -185,9 +200,8 @@ function productItem(
   );
 }
 
-/** The product's first image, small enough for phones; the first two load at once. */
-function imageOf(doc: ProductDoc, index: number): string {
-  const image = doc.images[0];
+/** The product's image shown, small enough for phones; the first two load at once. */
+function imageOf(image: ImageDoc | undefined, doc: ProductDoc, index: number): string {
   if (!image) return '';
   const widths = [165, 360, 533].filter((width) => image.width === 0 || width <= image.width);
   const shown = image.width > 0 ? Math.min(360, image.width) : null;

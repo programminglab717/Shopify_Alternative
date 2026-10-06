@@ -1288,7 +1288,11 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **A link page links paths on the storefront or https addresses alone** (`linkAddress`), never
   `http:`, `javascript:` or `//` another host: the page shows them as they are. Its products are
   checked to be the shop's through the catalog's `recordsOf` when saved, of any status, and those
-  deleted since are left out when read (`#current`), so a list read and sent back saves.
+  deleted since are left out when read (`#current`), so a list read and sent back saves. A
+  variant chosen of one, in `variantIds` by its product's place
+  ([ADR-206](../architecture/13-decision-log.md#adr-206--each-product-a-shops-link-page-shows-may-name-one-of-its-variants-kept-beside-it-by-its-place-the-page-shows-that-variants-title-image-and-price-and-buy-now-goes-straight-to-checkout-with-it-a-variant-deleted-since-is-as-none-chosen)),
+  is checked to be the product's own, and read as none chosen once deleted. Products come as
+  `productIds` or as `products` with their variants, never both.
 
 * **A shop's domains are one shop's each across the platform** ([ADR-048](../architecture/13-decision-log.md#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)): the unique
   index on `online_store.domains (host)` sees every shop's rows, so `domainCreate` answers

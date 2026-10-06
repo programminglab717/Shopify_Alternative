@@ -224,4 +224,78 @@ describe.skipIf(!server)('Admin GraphQL API: online store preferences', () => {
     });
     expect(malformed.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
   });
+
+  it("sets the link page's products each with a variant chosen, or none (ADR-206)", async () => {
+    const PRODUCTS = `mutation ($input: OnlineStorePreferencesInput!) {
+      onlineStorePreferencesUpdate(input: $input) {
+        preferences { linkPage { productIds products { productId variantId } } }
+        userErrors { field code message }
+      }
+    }`;
+    const created = await gql(
+      tokens.products,
+      `mutation {
+        productCreate(input: {
+          title: "Lawn Suit", status: ACTIVE, options: [{ name: "Size", values: ["M", "L"] }],
+          variants: [{ optionValues: ["M"], price: "4,990" }, { optionValues: ["L"], price: "5,190" }]
+        }) { product { id variants { id } } }
+      }`,
+    );
+    const product = created.data?.productCreate.product as {
+      id: string;
+      variants: { id: string }[];
+    };
+    const [m, l] = product.variants.map((variant) => variant.id);
+    expect(m).toMatch(/^var_/);
+    const set = await gql(tokens.a, PRODUCTS, {
+      input: {
+        linkPage: {
+          products: [{ productId: product.id, variantId: l }, { productId: product.id }],
+        },
+      },
+    });
+    expect(set.data?.onlineStorePreferencesUpdate).toEqual({
+      preferences: {
+        linkPage: {
+          productIds: [product.id, product.id],
+          products: [
+            { productId: product.id, variantId: l },
+            { productId: product.id, variantId: null },
+          ],
+        },
+      },
+      userErrors: [],
+    });
+    // A variant of its own product alone, and one way of giving them.
+    const kurta = await gql(
+      tokens.products,
+      'mutation { productCreate(input: { title: "Kurta", variants: [{ price: "2,499" }] }) { product { id } } }',
+    );
+    const kurtaId = kurta.data?.productCreate.product.id as string;
+    const wrong = await gql(tokens.a, PRODUCTS, {
+      input: { linkPage: { products: [{ productId: kurtaId, variantId: m }] } },
+    });
+    expect(wrong.data?.onlineStorePreferencesUpdate.userErrors).toEqual([
+      {
+        field: ['linkPage', 'products', '0', 'variantId'],
+        code: 'NOT_FOUND',
+        message: 'Variant not found on this product',
+      },
+    ]);
+    const both = await gql(tokens.a, PRODUCTS, {
+      input: { linkPage: { productIds: [kurtaId], products: [{ productId: kurtaId }] } },
+    });
+    expect(both.data?.onlineStorePreferencesUpdate.userErrors).toEqual([
+      {
+        field: ['linkPage', 'products'],
+        code: 'INVALID',
+        message: 'Give products or productIds, not both',
+      },
+    ]);
+    // A variant's ID where a product's goes is no product's.
+    const swapped = await gql(tokens.a, PRODUCTS, {
+      input: { linkPage: { products: [{ productId: m }] } },
+    });
+    expect(swapped.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
+  });
 });

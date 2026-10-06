@@ -185,6 +185,11 @@ export interface LinkPageRecord {
   links: { title: string; url: string }[];
   /** The products it shows, in their order; those deleted or not on sale are left out. */
   productIds: string[];
+  /**
+   * The variant chosen of each of `productIds`, by its place (ADR-206): its price and image on
+   * the page, a tap from checkout; null where none is, as for a variant deleted since.
+   */
+  variantIds: (string | null)[];
 }
 
 export interface Page<T> {

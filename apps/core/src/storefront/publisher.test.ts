@@ -936,6 +936,33 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect((await store().shop()).linkPage).toEqual(page);
     // The shop's document changed, and the pages with it.
     expect(forgotten.flat()).toContain(shopTag(shopId));
+    // The variants chosen, by their products' places, while any is (ADR-206).
+    const suit = unwrap(
+      await products.create(tenant, {
+        title: 'Eid Suit',
+        status: 'active',
+        options: [{ name: 'Size', values: ['M', 'L'] }],
+        variants: [
+          { optionValues: ['M'], price: '6,500' },
+          { optionValues: ['L'], price: '6,900' },
+        ],
+      }),
+    );
+    unwrap(
+      await preferences.update(tenant, {
+        linkPage: {
+          products: [
+            { productId: suit.id, variantId: suit.variants[1]!.id },
+            { productId: khussa.id },
+          ],
+        },
+      }),
+    );
+    await deliver();
+    expect((await store().shop()).linkPage).toMatchObject({
+      productIds: [suit.id, khussa.id],
+      variantIds: [suit.variants[1]!.id, null],
+    });
     unwrap(await preferences.update(tenant, { linkPage: { bio: '', links: [], productIds: [] } }));
     await deliver();
     expect((await store().shop()).linkPage).toBeUndefined();

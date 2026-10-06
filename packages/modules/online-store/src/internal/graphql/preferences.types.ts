@@ -13,6 +13,22 @@ export class LinkPageLink {
 }
 
 @ObjectType({
+  description: "One of the link page's products, and the variant chosen of it, if any.",
+})
+export class LinkPageProduct {
+  @Field(() => ID)
+  productId!: string;
+
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      'One of its variants, chosen (ADR-206): the page shows its price and image, and "Buy now" ' +
+      'goes straight to checkout with it. Null for the product as a whole.',
+  })
+  variantId!: string | null;
+}
+
+@ObjectType({
   description:
     "The shop's link-in-bio page, at /links on its storefront, for its Instagram and TikTok bios " +
     'and its chats (ADR-161): what it says of itself, its own links, and products to buy at once.',
@@ -31,6 +47,11 @@ export class LinkPage {
       'checkout, the others to their page.',
   })
   productIds!: string[];
+
+  @Field(() => [LinkPageProduct], {
+    description: 'Its products as productIds has them, each with the variant chosen of it, if any.',
+  })
+  products!: LinkPageProduct[];
 }
 
 @ObjectType({ description: 'What the shop sets for its storefront as a whole.' })
@@ -81,6 +102,18 @@ export class LinkPageLinkInput {
   url!: string;
 }
 
+@InputType()
+export class LinkPageProductInput {
+  @Field(() => ID)
+  productId!: string;
+
+  @Field(() => ID, {
+    nullable: true,
+    description: 'One of its variants, to show chosen and buy straight; null or absent for none.',
+  })
+  variantId?: string | null;
+}
+
 @InputType({ description: "The link page's parts to change; those not given stay as they are." })
 export class LinkPageInput {
   @Field(() => String, { nullable: true, description: 'Up to 300 characters; blank for none.' })
@@ -97,6 +130,15 @@ export class LinkPageInput {
     description: "Up to 24 of the shop's products, in their order, replacing those it had.",
   })
   productIds?: string[] | null;
+
+  @Field(() => [LinkPageProductInput], {
+    nullable: true,
+    description:
+      "Up to 24 of the shop's products, in their order, each with one of its variants chosen or " +
+      'none, replacing those it had; in place of productIds, not with it. A product may be twice ' +
+      'with two of its variants.',
+  })
+  products?: LinkPageProductInput[] | null;
 }
 
 @InputType()

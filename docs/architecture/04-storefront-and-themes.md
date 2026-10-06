@@ -314,6 +314,8 @@ and sends the shopper on, following only the page's own links
 ([ADR-204](./13-decision-log.md#adr-204--the-link-pages-links-go-through-the-storefront-which-counts-each-tap-a-day-at-a-time-by-where-the-link-goes-beside-the-sessions-and-sends-the-shopper-on-it-follows-only-the-pages-own-links-and-the-worker-keeps-each-days-taps-in-postgres-for-a-report-of-a-periods-by-link)).
 At its top, the shop's square logo, else its logo, which the shop's document names where the
 API serves ([ADR-205](./13-decision-log.md#adr-205--a-shops-brand-has-shopifys-square-logo-beside-its-logo-one-of-its-files-served-by-the-api-at-an-address-of-its-own-the-shops-document-names-where-each-logo-is-served-each-address-naming-its-file-and-the-link-page-shows-the-square-logo-else-the-logo-at-its-top)).
+A product may show with one of its variants chosen: its title, image and price, and a tap
+from checkout ([ADR-206](./13-decision-log.md#adr-206--each-product-a-shops-link-page-shows-may-name-one-of-its-variants-kept-beside-it-by-its-place-the-page-shows-that-variants-title-image-and-price-and-buy-now-goes-straight-to-checkout-with-it-a-variant-deleted-since-is-as-none-chosen)).
 
 * **Draft vs published:** every save creates an immutable version. One-click rollback.
   **Scheduled publish** lets a merchant prepare an Eid or lawn-launch look and have it go live at

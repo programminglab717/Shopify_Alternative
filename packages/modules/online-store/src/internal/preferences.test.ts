@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { VariantService } from '@hatti/catalog/public';
 import { checkPassword } from '@hatti/crypto';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -32,7 +33,7 @@ describe.skipIf(!server)('PreferencesService', () => {
     passwordVerifier: null,
     passwordMessage: '',
     robotsTxtRules: '',
-    linkPage: { bio: '', links: [], productIds: [] },
+    linkPage: { bio: '', links: [], productIds: [], variantIds: [] },
   };
 
   it("keeps a shop's WhatsApp number in E.164, recording each change", async () => {
@@ -71,7 +72,7 @@ describe.skipIf(!server)('PreferencesService', () => {
       passwordVerifier: null,
       passwordMessage: '',
       robotsTxtRules: '',
-      linkPage: { bio: '', links: [], productIds: [] },
+      linkPage: { bio: '', links: [], productIds: [], variantIds: [] },
     });
   });
 
@@ -187,6 +188,7 @@ describe.skipIf(!server)('PreferencesService', () => {
         { title: 'Instagram', url: 'https://www.instagram.com/zari.pk' },
       ],
       productIds: [shawl.id, lawn.id],
+      variantIds: [null, null],
     });
     // A part given replaces what it had; those not given stay as they are.
     expect(unwrap(await f.preferences.update(f.a, { linkPage: { bio: '' } })).linkPage).toEqual({
@@ -252,5 +254,86 @@ describe.skipIf(!server)('PreferencesService', () => {
     ]);
     // Another shop's is its own.
     expect((await f.preferences.get(f.b)).linkPage).toEqual(OPEN.linkPage);
+  });
+
+  it("keeps a variant chosen of each of the link page's products, the product's own (ADR-206)", async () => {
+    const suit = unwrap(
+      await f.products.create(f.a, {
+        title: 'Lawn Suit',
+        status: 'active',
+        options: [{ name: 'Size', values: ['M', 'L', 'XL'] }],
+        variants: [
+          { optionValues: ['M'], price: '4,990' },
+          { optionValues: ['L'], price: '5,190' },
+          { optionValues: ['XL'], price: '5,390' },
+        ],
+      }),
+    );
+    const [m, l] = suit.variants.map((variant) => variant.id) as [string, string, string];
+    const shawl = unwrap(
+      await f.products.create(f.a, { title: 'Pashmina Shawl', variants: [{ price: '12,500' }] }),
+    );
+    const kept = unwrap(
+      await f.preferences.update(f.a, {
+        linkPage: {
+          // A product twice with two of its variants; the same one twice, once.
+          products: [
+            { productId: suit.id, variantId: m },
+            { productId: suit.id, variantId: l },
+            { productId: shawl.id },
+            { productId: suit.id, variantId: m },
+          ],
+        },
+      }),
+    );
+    expect(kept.linkPage).toMatchObject({
+      productIds: [suit.id, suit.id, shawl.id],
+      variantIds: [m, l, null],
+    });
+    expect((await f.preferences.get(f.a)).linkPage.variantIds).toEqual([m, l, null]);
+
+    // The product's own variants alone, products the shop's, and one way of giving them.
+    expect(
+      errorsOf(
+        await f.preferences.update(f.a, {
+          linkPage: {
+            products: [
+              { productId: shawl.id, variantId: m },
+              { productId: '00000000-0000-4000-8000-000000000000', variantId: m },
+            ],
+          },
+        }),
+      ),
+    ).toEqual([
+      ['linkPage.products.0.variantId', 'NOT_FOUND', 'Variant not found on this product'],
+      ['linkPage.products.1.productId', 'NOT_FOUND', 'Product not found'],
+    ]);
+    expect(
+      errorsOf(
+        await f.preferences.update(f.a, {
+          linkPage: { productIds: [shawl.id], products: [{ productId: shawl.id }] },
+        }),
+      ),
+    ).toEqual([['linkPage.products', 'INVALID', 'Give products or productIds, not both']]);
+
+    // A variant deleted since is no longer chosen: the product stays in its place, once.
+    unwrap(await new VariantService(f.db).bulkDelete(f.a, suit.id, [m]));
+    expect((await f.preferences.get(f.a)).linkPage).toMatchObject({
+      productIds: [suit.id, suit.id, shawl.id],
+      variantIds: [null, l, null],
+    });
+    unwrap(
+      await f.preferences.update(f.a, {
+        linkPage: { products: [{ productId: suit.id, variantId: l }, { productId: suit.id }] },
+      }),
+    );
+    unwrap(await new VariantService(f.db).bulkDelete(f.a, suit.id, [l]));
+    expect((await f.preferences.get(f.a)).linkPage).toMatchObject({
+      productIds: [suit.id],
+      variantIds: [null],
+    });
+    // Products given by their IDs alone have none chosen.
+    const plain = unwrap(await f.preferences.update(f.a, { linkPage: { productIds: [shawl.id] } }));
+    expect(plain.linkPage).toMatchObject({ productIds: [shawl.id], variantIds: [null] });
   });
 });

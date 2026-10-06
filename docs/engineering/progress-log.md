@@ -6,9 +6,9 @@
 
 ## In progress
 
-**A product on the link page with its variant chosen** (CH-07, ADR-161): a product the shop puts
-on its link page with one of its variants, as a suit in size M, bought with a tap through its
-cart permalink, as a product with nothing to choose is.
+**The shop's brand in its themes** (OS-02, ADR-205): Shopify's `shop.brand` in Liquid, its logo
+and square logo as images themes can show, and Hatti Base's header showing the logo in place of
+the shop's name where it has one.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### A product on the link page with its variant chosen
+
+* **Each product a link page shows may name one of its variants**
+  ([ADR-206](../architecture/13-decision-log.md#adr-206--each-product-a-shops-link-page-shows-may-name-one-of-its-variants-kept-beside-it-by-its-place-the-page-shows-that-variants-title-image-and-price-and-buy-now-goes-straight-to-checkout-with-it-a-variant-deleted-since-is-as-none-chosen)):
+  `products` beside `productIds` in the Admin API's link page, each a product and one of its
+  variants or none, kept by their place in `link_variants` (migration 0131) and checked to be the
+  product's own. A variant deleted since is as none chosen; a product may be there twice with two
+  of its variants.
+* **The storefront shows the variant chosen**: its title under the product's, its image, its price
+  and the price before a sale, and "Buy now" to its cart permalink, or "Sold out"; the card opens
+  the product's page with it chosen.
+* 1616 tests (3 new): variants kept, checked and dropped when deleted; the shop's document naming
+  them; the page showing one chosen, sold out and gone; and over GraphQL.
 
 ### 57cf640 · The link page's image of its own
 

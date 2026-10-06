@@ -346,6 +346,13 @@ input[type='number'] {
   gap: 0.25rem;
 }
 
+/* The variant chosen of a product (ADR-206), under its title. */
+.hatti-links__variant {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
 .hatti-links__buy {
   display: block;
   margin-block-start: auto;

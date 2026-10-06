@@ -255,6 +255,10 @@ export function shopDoc(
         bio: preferences.linkPage.bio,
         links: preferences.linkPage.links.map(({ title, url }) => ({ title, url })),
         productIds: [...preferences.linkPage.productIds],
+        // Left out while none is chosen, as in documents written before they could be.
+        ...(preferences.linkPage.variantIds.some((id) => id !== null) && {
+          variantIds: [...preferences.linkPage.variantIds],
+        }),
       },
     }),
     // Left out without either, for the same reason.

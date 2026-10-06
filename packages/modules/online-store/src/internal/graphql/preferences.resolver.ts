@@ -5,6 +5,7 @@ import { PreferencesService, type PreferencesView } from '../preferences.service
 import { uuidOf } from './mappers.js';
 import {
   LinkPage,
+  LinkPageProduct,
   OnlineStorePreferences,
   OnlineStorePreferencesInput,
   OnlineStorePreferencesUpdatePayload,
@@ -43,6 +44,10 @@ export class PreferencesResolver {
         linkPage: {
           ...linkPage,
           productIds: linkPage.productIds?.map((id) => uuidOf('product', id)),
+          products: linkPage.products?.map((each) => ({
+            productId: uuidOf('product', each.productId),
+            variantId: each.variantId ? uuidOf('variant', each.variantId) : null,
+          })),
         },
       }),
     });
@@ -64,6 +69,13 @@ function toPreferences(view: PreferencesView): OnlineStorePreferences {
       bio: view.linkPage.bio,
       links: view.linkPage.links,
       productIds: view.linkPage.productIds.map((id) => toPublicId('product', id)),
+      products: view.linkPage.productIds.map((id, index) => {
+        const variantId = view.linkPage.variantIds[index] ?? null;
+        return Object.assign(new LinkPageProduct(), {
+          productId: toPublicId('product', id),
+          variantId: variantId && toPublicId('variant', variantId),
+        });
+      }),
     }),
   });
 }
