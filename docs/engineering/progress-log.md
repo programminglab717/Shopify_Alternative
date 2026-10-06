@@ -6,9 +6,8 @@
 
 ## In progress
 
-**HBL's payment gateway** (PAY-01): HBLPay among the gateways shops take payments through, its
-session asked for with what HBL's public key encrypts, and its return opened with the shop's own
-private key.
+**Expired carts swept** (ADR-042): the worker deleting carts past their time on a schedule,
+rather than as a shop gets new ones.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +16,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### HBL
+
+* **HBL's payment gateway, HBLPay** ([ADR-229](../architecture/13-decision-log.md#adr-229--hbls-payment-gateway-is-one-shops-take-payments-through-a-session-asked-for-with-the-order-encrypted-under-a-key-of-the-requests-own-which-hbls-public-key-wraps-with-the-password-its-return-encrypted-to-the-shops-own-public-key-believed-once-the-shops-private-key-opens-it-to-a-reference-of-hattis)), by its session API's second
+  version: the order, its items where they add up and whom to bill, as JSON under AES-256-CBC
+  with a key made for the request, the password and the key under HBL's public key; the customer
+  sent to its page with the session.
+* **Its return, encrypted to the shop's own public key,** opened block by block with its private
+  key, and believed when it opens to a reference of Hatti's: 100, 0 or 00 a payment made, at the
+  session's own amount. Keys may be pasted as PEM or XML: a credential field may now normalize
+  what staff paste and allow a longer value. HBL publishes no status or refunds and sends no word
+  but the return (simplification 109).
+* 1701 tests (4 new): the session opened again by a stand-in with HBL's private key, refusals,
+  the return opened with the shop's key, and an order paid through it from its page, its keys
+  pasted as PEM.
+* With this, shops take Safepay, JazzCash, Easypaisa, PayFast, Bank Alfalah, HBL and Baadmay.
 
 ### c405cd0 · Bank Alfalah
 

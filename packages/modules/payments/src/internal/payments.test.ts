@@ -1,5 +1,12 @@
 import 'reflect-metadata';
-import { createHash } from 'node:crypto';
+import {
+  constants,
+  createDecipheriv,
+  createHash,
+  generateKeyPairSync,
+  privateDecrypt,
+  publicEncrypt,
+} from 'node:crypto';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { InputChecker } from '@hatti/api';
@@ -125,6 +132,48 @@ class FakeAlfalah {
   }
 }
 
+/**
+ * A stand-in for HBL's session API (ADR-229), its own keys made for the test: the orders it was
+ * asked for, opened with its private key.
+ */
+class FakeHbl {
+  readonly keys = generateKeyPairSync('rsa', { modulusLength: 2_048 });
+  readonly orders: ({ ADDITIONAL_DATA: Record<string, unknown> } & Record<string, unknown>)[] = [];
+  url = '';
+  readonly server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on('data', (chunk: Buffer) => chunks.push(chunk));
+    request.on('end', () => {
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, string>;
+      const [key, iv] = privateDecrypt(
+        { key: this.keys.privateKey, padding: constants.RSA_PKCS1_PADDING },
+        Buffer.from(body.Data3!, 'base64'),
+      )
+        .toString('utf8')
+        .split('||');
+      const decipher = createDecipheriv('aes-256-cbc', Buffer.from(key!), Buffer.from(iv!));
+      this.orders.push(
+        JSON.parse(
+          Buffer.concat([decipher.update(body.Data4!, 'base64'), decipher.final()]).toString(),
+        ),
+      );
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({ IsSuccess: true, ResponseCode: 0, Data: { SESSION_ID: 'sess-of-zari' } }),
+      );
+    });
+  });
+
+  async start(): Promise<void> {
+    await new Promise<void>((resolve) => this.server.listen(0, '127.0.0.1', resolve));
+    this.url = `http://127.0.0.1:${(this.server.address() as AddressInfo).port}`;
+  }
+
+  async stop(): Promise<void> {
+    await new Promise((resolve) => this.server.close(resolve));
+  }
+}
+
 describe.skipIf(!server)('Payments online', () => {
   let f: PaymentsFixture;
   let kurta: string;
@@ -132,17 +181,20 @@ describe.skipIf(!server)('Payments online', () => {
   const baadmay = new FakeBaadmay();
   const payfast = new FakePayFast();
   const alfalah = new FakeAlfalah();
+  const hbl = new FakeHbl();
 
   beforeAll(async () => {
     await easypaisa.start();
     await baadmay.start();
     await payfast.start();
     await alfalah.start();
+    await hbl.start();
     f = await paymentsFixture(server!, {
       easypaisaUrl: easypaisa.url,
       baadmayUrl: baadmay.url,
       payfastUrl: payfast.url,
       alfalahUrl: alfalah.url,
+      hblUrl: hbl.url,
     });
   });
 
@@ -152,6 +204,7 @@ describe.skipIf(!server)('Payments online', () => {
     await baadmay.stop();
     await payfast.stop();
     await alfalah.stop();
+    await hbl.stop();
   });
 
   beforeEach(async () => {
@@ -1071,6 +1124,83 @@ describe.skipIf(!server)('Payments online', () => {
       gatewayRef: ref,
       paidThrough: 'return',
       reference: 'T6612345',
+    });
+  });
+
+  it("takes what an order waits for through HBL's page, its return opened with the shop's private key (ADR-229)", async () => {
+    const order = await f.awaiting(f.a, kurta);
+    const token = await f.linkOf(f.a, order.id);
+    const shop = generateKeyPairSync('rsa', { modulusLength: 2_048 });
+    // The keys as staff paste them, PEM, armour and line breaks and all.
+    const pem = (key: string) => key.trim();
+    const credentials = (privateKey: string) => [
+      { key: 'userId', value: 'zari-mid' },
+      { key: 'password', value: 'pw-of-zari' },
+      { key: 'channel', value: 'HBLPay_Zari_Website' },
+      {
+        key: 'hblPublicKey',
+        value: pem(hbl.keys.publicKey.export({ type: 'spki', format: 'pem' }).toString()),
+      },
+      { key: 'privateKey', value: privateKey },
+    ];
+    const wrong = await f.accounts.connect(f.a, {
+      gateway: 'hbl',
+      environment: 'production',
+      credentials: credentials('my-private-key'),
+    });
+    if (wrong.ok) throw new Error('connected');
+    expect(wrong.errors.map((error) => [error.field.join('.'), error.message])).toEqual([
+      [
+        'input.credentials.4.value',
+        "Value must be the shop's own private key, whose public key HBL was given, as PEM or XML",
+      ],
+      ['input.credentials', 'HBL needs its Private key'],
+    ]);
+    unwrap(
+      await f.accounts.connect(f.a, {
+        gateway: 'hbl',
+        environment: 'production',
+        credentials: credentials(
+          pem(shop.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString()),
+        ),
+      }),
+    );
+
+    // A session asked for, and the customer sent to HBL's page with it.
+    const started = await f.links.payOnline(token);
+    if (!('url' in started)) throw new Error(JSON.stringify(started));
+    expect(started.url).toBe(
+      `${hbl.url}/page#/checkout?data=${Buffer.from('sess-of-zari').toString('base64')}`,
+    );
+    const asked = hbl.orders.at(-1)!;
+    const ref = asked.ADDITIONAL_DATA.REFERENCE_NUMBER as string;
+    expect(asked).toMatchObject({
+      RETURN_URL: `https://hatti.test/o/${token}/paid`,
+      ORDER: { SUBTOTAL: '2000.00' },
+      ADDITIONAL_DATA: { BILL_TO_FORENAME: 'Ayesha', BILL_TO_PHONE: '03001234567' },
+    });
+
+    // Back with the outcome encrypted to the shop's public key: paid.
+    const text = `RESPONSE_CODE=100&RESPONSE_MESSAGE=Success&ORDER_REF_NUMBER=${ref}&GUID=g-77`;
+    const data = publicEncrypt(
+      { key: shop.publicKey, padding: constants.RSA_PKCS1_PADDING },
+      Buffer.from(text),
+    ).toString('base64');
+    const paid = await f.links.paidOnline(token, { data: data.replace(/\+/g, ' ') });
+    if (paid.kind !== 'order') throw new Error(paid.kind);
+    expect(paid.problem).toBeNull();
+    expect(await f.orders.get(f.a, order.id)).toMatchObject({
+      amountPaid: 2_000_00n,
+      financialStatus: 'paid',
+    });
+    const [session] = await f.payments.sessionsOf(f.a.shopId, order.id);
+    expect(session).toMatchObject({
+      gateway: 'hbl',
+      gatewayName: 'HBL',
+      status: 'paid',
+      gatewayRef: ref,
+      paidThrough: 'return',
+      reference: 'g-77',
     });
   });
 

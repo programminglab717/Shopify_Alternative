@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-228 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-229 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -236,6 +236,7 @@
 | 226 | Baadmay's buy now, pay later is a gateway shops take payments through: the order, its items and its customer go to its page in the address, and its return, which it does not sign, is believed only once its order status, asked at once, names the order and the amount paid | Accepted |
 | 227 | PayFast is a gateway shops take payments through: an access token asked for the basket and its amount with the secured key, then a form with the token posted to its page; its return, and its word at the webhook, which may come in the address, believed by their validation hash | Accepted |
 | 228 | Bank Alfalah's payment gateway is one shops take payments through: a handshake whose request is hashed with the account's two keys, then a form with its token, hashed the same way, posted to its page; its return, which it does not sign, believed only once its order status, asked at once, says the payment is made | Accepted |
+| 229 | HBL's payment gateway is one shops take payments through: a session asked for with the order encrypted under a key of the request's own, which HBL's public key wraps with the password; its return, encrypted to the shop's own public key, believed once the shop's private key opens it to a reference of Hatti's | Accepted |
 
 ---
 
@@ -9547,3 +9548,46 @@
     Asking our own is the same answer.
   * **Its API channel (1002), card details through Hatti:** would bring cards onto Hatti's
     servers and into PCI DSS's scope.
+
+## ADR-229 · HBL's payment gateway is one shops take payments through: a session asked for with the order encrypted under a key of the request's own, which HBL's public key wraps with the password; its return, encrypted to the shop's own public key, believed once the shop's private key opens it to a reference of Hatti's
+
+* **Context:** HBL offers HBLPay, a hosted card checkout through Cybersource, to the shops that
+  bank with it. Shops connect their own accounts ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)). A merchant is given a
+  user ID, a password and a channel, and exchanges RSA public keys with HBL: HBL's encrypts
+  requests, and the merchant's lets HBL encrypt the return. Its integration guide and its own
+  plugin describe a second version of its session API. The order goes as JSON under AES-256-CBC
+  with a key made for the request, and the password and that key go under HBL's public key with
+  RSA PKCS#1 v1.5. The customer comes back with `data`, the outcome as `KEY=VALUE` pairs
+  encrypted to the merchant's public key a block at a time, in Base64 that is not escaped. HBL
+  publishes no status or refunds API and sends no word of a payment but the return.
+* **Decision:**
+  * **A session, server to server, then HBL's page.** The order is its items where they and
+    the delivery charge come to what is asked, else the order as one item. With it go Hatti's
+    reference, unique to the account, and whom to bill and ship to, from the order's customer.
+    Where the order has no email, Cybersource's own placeholder is used. The channel of
+    operation is sent as HBL's plugin sends it. The text is cut to what HBL takes. The AES key
+    and IV are hex digits, as its plugin makes them. The customer goes to its page with the
+    session in Base64.
+  * **Its return is opened, block by block, with the shop's private key.** It is believed when
+    it opens to pairs naming a reference of Hatti's. A code of 100, 0 or 00 is a payment made,
+    recorded at the session's own amount, which HBL took from the session. Only HBL holds the
+    shop's public key, so only HBL could have written what the private key opens; a wrong key
+    opens to noise, which names no reference. The return's "+" signs arrive as blanks and are
+    put back.
+  * **Keys as staff paste them.** A key may be PEM or .NET's XML. A credential field's own
+    `normalize` keeps it on one line, without its PEM armour or blanks, and its `maxLength`
+    allows the length a key needs.
+  * **No inquiry, no webhook, no refunds:** HBL publishes none.
+* **Consequences:**
+  * Shops banking with HBL take cards through its page, with their own account.
+  * A customer who pays and never comes back is not known until staff see the payment in HBL's
+    portal and record it. A payment under review (481) is left to staff too.
+  * The shop's public key must stay between the shop and HBL: whoever holds it could write a
+    return.
+  * Opening PKCS#1 v1.5 needs OpenSSL's implicit rejection, as Node 22 and 24 have it, so that
+    a wrong key gives noise rather than a clue.
+* **Alternatives:**
+  * **Its first version, each field under RSA:** older, and its plugin has moved on from it. It
+    can be added if HBL gives a shop that version.
+  * **Hatti making the shop's key pair:** the private key would never leave Hatti, but HBL takes
+    the public key through its own onboarding. This can come with the merchant app.

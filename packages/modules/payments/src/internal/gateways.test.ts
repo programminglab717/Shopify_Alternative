@@ -1,4 +1,13 @@
-import { createDecipheriv, createHash, createHmac } from 'node:crypto';
+import {
+  constants,
+  createDecipheriv,
+  createHash,
+  createHmac,
+  generateKeyPairSync,
+  privateDecrypt,
+  publicEncrypt,
+  type KeyObject,
+} from 'node:crypto';
 import {
   createServer,
   type IncomingHttpHeaders,
@@ -12,6 +21,7 @@ import {
   AlfalahGateway,
   BaadmayGateway,
   EasypaisaGateway,
+  HblGateway,
   JazzCashGateway,
   PayFastGateway,
   PaymentGateways,
@@ -1616,5 +1626,278 @@ describe('Bank Alfalah (ADR-228)', () => {
         message: expect.stringMatching(/^Bank Alfalah could not be reached/),
       });
     });
+  });
+});
+
+describe('HBL (ADR-229)', () => {
+  // HBL's keys and the shop's: smaller than HBL's 4,096 bits, for the tests' speed.
+  const hblKeys = generateKeyPairSync('rsa', { modulusLength: 2_048 });
+  const shopKeys = generateKeyPairSync('rsa', { modulusLength: 2_048 });
+  /** A key as an account keeps it: Base64 of its DER on one line. */
+  const kept = (key: KeyObject) =>
+    key.type === 'public'
+      ? key.export({ type: 'spki', format: 'der' }).toString('base64')
+      : key.export({ type: 'pkcs8', format: 'der' }).toString('base64');
+  const account: GatewayAccount = {
+    environment: 'sandbox',
+    credentials: {
+      userId: 'zari-mid',
+      password: 'pw-of-zari',
+      channel: 'HBLPay_Zari_Website',
+      hblPublicKey: kept(hblKeys.publicKey),
+      privateKey: kept(shopKeys.privateKey),
+    },
+  };
+  /** What HBL was asked, opened with its private key, and what it answers next. */
+  const asked: {
+    password: string;
+    order: { ORDER: unknown } & Record<string, unknown>;
+    userId: unknown;
+  }[] = [];
+  let next: { status: number; body: unknown } = { status: 200, body: {} };
+  let url = '';
+  const server = createServer(async (request, response) => {
+    const body = JSON.parse(await bodyOf(request)) as Record<string, string>;
+    const open = (data: string) =>
+      privateDecrypt(
+        { key: hblKeys.privateKey, padding: constants.RSA_PKCS1_PADDING },
+        Buffer.from(data, 'base64'),
+      ).toString('utf8');
+    const [key, iv] = open(body.Data3!).split('||');
+    const decipher = createDecipheriv(
+      'aes-256-cbc',
+      Buffer.from(key!, 'utf8'),
+      Buffer.from(iv!, 'utf8'),
+    );
+    const order = JSON.parse(
+      Buffer.concat([decipher.update(body.Data4!, 'base64'), decipher.final()]).toString('utf8'),
+    );
+    asked.push({ userId: body.Data1, password: open(body.Data2!), order });
+    response.writeHead(next.status, { 'content-type': 'application/json' });
+    response.end(JSON.stringify(next.body));
+  });
+  let hbl: HblGateway;
+  const SESSION = 'b9f0c2d4-7e1a-4c3b-9d8e-5f6a7b8c9d0e';
+  const buyer: GatewayBuyer = {
+    name: 'Ayesha Khan-Niazi',
+    phone: '+923001234567',
+    email: null,
+    address: {
+      address1: 'House 12, Street 4',
+      address2: 'Gulberg III',
+      city: 'Lahore',
+      province: 'Punjab',
+      zip: null,
+    },
+    lines: [{ name: 'Lawn Suit (Mint)', sku: 'LAWN-M', quantity: 2, unitPrice: 1_125_25n }],
+    shipping: 250_00n,
+  };
+  const request = {
+    amount: 2_500_50n,
+    currency: 'PKR' as const,
+    orderName: '#1043',
+    returnUrl: 'https://hatti.pk/o/Zx8kQ2mN/paid',
+    cancelUrl: 'https://hatti.pk/o/Zx8kQ2mN',
+    buyer,
+  };
+  /** HBL's return: `text` encrypted with `key` a block at a time, its "+" turned to blanks. */
+  const returnOf = (text: string, key: KeyObject = shopKeys.publicKey) => {
+    const bytes = Buffer.from(text, 'utf8');
+    const room = 2_048 / 8 - 11;
+    const blocks: Buffer[] = [];
+    for (let at = 0; at < bytes.length; at += room) {
+      blocks.push(
+        publicEncrypt({ key, padding: constants.RSA_PKCS1_PADDING }, bytes.subarray(at, at + room)),
+      );
+    }
+    return { data: Buffer.concat(blocks).toString('base64').replace(/\+/g, ' ') };
+  };
+
+  beforeAll(async () => {
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    hbl = new HblGateway({
+      urls: { sandbox: { api: `${url}/api`, page: `${url}/page#/checkout?data=` } },
+      timeoutMs: 2_000,
+    });
+  });
+
+  afterAll(async () => {
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  it('asks for a session with the order encrypted as its version 2 asks, then sends the customer to its page', async () => {
+    next = {
+      status: 200,
+      body: {
+        IsSuccess: true,
+        ResponseCode: 0,
+        ResponseMessage: 'Success',
+        Data: { SESSION_ID: SESSION },
+      },
+    };
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-02T09:30:00Z') });
+    let started;
+    try {
+      started = await hbl.checkout(account, request);
+    } finally {
+      vi.useRealTimers();
+    }
+    if (!started.ok) throw new Error(started.message);
+    const { ref, url: page, form } = started.value;
+    // Unique to the account: when it began, in Pakistan, and five digits.
+    expect(ref).toMatch(/^H20261002143000\d{5}$/);
+    expect(form).toBeUndefined();
+    expect(page).toBe(`${url}/page#/checkout?data=${Buffer.from(SESSION).toString('base64')}`);
+    // Its password and the AES key under HBL's public key; the order under the AES key.
+    const { userId, password, order } = asked.at(-1)!;
+    expect([userId, password]).toEqual(['zari-mid', 'pw-of-zari']);
+    const party = (prefix: string) => ({
+      [`${prefix}_FORENAME`]: 'Ayesha',
+      [`${prefix}_SURNAME`]: 'Khan Niazi',
+      [`${prefix}_EMAIL`]: 'null@cybersource.com',
+      [`${prefix}_PHONE`]: '03001234567',
+      [`${prefix}_ADDRESS_LINE`]: 'House 12, Street 4',
+      [`${prefix}_ADDRESS_CITY`]: 'Lahore',
+      [`${prefix}_ADDRESS_STATE`]: 'Punjab',
+      [`${prefix}_ADDRESS_COUNTRY`]: 'PK',
+      [`${prefix}_ADDRESS_POSTAL_CODE`]: '',
+    });
+    expect(order).toEqual({
+      RETURN_URL: request.returnUrl,
+      CANCEL_URL: request.cancelUrl,
+      CHANNEL: 'HBLPay_Zari_Website',
+      TYPE_ID: '0',
+      ORDER: {
+        DISCOUNT_ON_TOTAL: '0',
+        SUBTOTAL: '2500.50',
+        OrderSummaryDescription: [
+          {
+            ITEM_NAME: 'Lawn Suit Mint',
+            QUANTITY: '2',
+            UNIT_PRICE: '1125.25',
+            OLD_PRICE: null,
+            CATEGORY: '',
+            SUB_CATEGORY: '',
+          },
+        ],
+      },
+      SHIPPING_DETAIL: {
+        NAME: 'Delivery',
+        ICON_PATH: null,
+        DELIEVERY_DAYS: '0',
+        SHIPPING_COST: '250.00',
+      },
+      ADDITIONAL_DATA: {
+        REFERENCE_NUMBER: ref,
+        CUSTOMER_ID: '03001234567',
+        CURRENCY: 'PKR',
+        ...party('BILL_TO'),
+        ...party('SHIP_TO'),
+        MerchantFields: { MDD1: 'WC', MDD2: 'YES', MDD20: 'NO' },
+      },
+    });
+    // What isn't all of the order goes as the order alone, at what is asked.
+    await hbl.checkout(account, { ...request, amount: 1_000_00n });
+    expect(asked.at(-1)!.order.ORDER).toEqual({
+      DISCOUNT_ON_TOTAL: '0',
+      SUBTOTAL: '1000.00',
+      OrderSummaryDescription: [
+        {
+          ITEM_NAME: 'Order #1043',
+          QUANTITY: '1',
+          UNIT_PRICE: '1000.00',
+          OLD_PRICE: null,
+          CATEGORY: '',
+          SUB_CATEGORY: '',
+        },
+      ],
+    });
+    // HBL's key as .NET writes it, in XML, as HBL gives it.
+    const jwk = hblKeys.publicKey.export({ format: 'jwk' });
+    const b64 = (value: string | undefined) => Buffer.from(value!, 'base64url').toString('base64');
+    const xml = `<RSAKeyValue><Modulus>${b64(jwk.n)}</Modulus><Exponent>${b64(jwk.e)}</Exponent></RSAKeyValue>`;
+    const asXml = { ...account, credentials: { ...account.credentials, hblPublicKey: xml } };
+    expect((await hbl.checkout(asXml, request)).ok).toBe(true);
+    expect(asked.at(-1)!.password).toBe('pw-of-zari');
+    // Rupees alone, and a key it can read.
+    expect(await hbl.checkout(account, { ...request, currency: 'USD' })).toEqual({
+      ok: false,
+      retry: false,
+      message: 'HBL takes payments in rupees alone',
+    });
+    const unreadable = {
+      ...account,
+      credentials: { ...account.credentials, hblPublicKey: 'AAAA' },
+    };
+    expect(await hbl.checkout(unreadable, request)).toEqual({
+      ok: false,
+      retry: false,
+      message: "HBL's public key could not be read",
+    });
+    expect(new HblGateway().checkoutOrigin('production')).toBe(
+      'https://digitalbankingportal.hbl.com',
+    );
+  });
+
+  it('says why HBL gave no session, and whether trying again may help', async () => {
+    next = {
+      status: 200,
+      body: {
+        IsSuccess: false,
+        ResponseCode: 98,
+        ResponseMessage: 'DECRYPTION_FAILED',
+        Data: null,
+      },
+    };
+    expect(await hbl.checkout(account, request)).toEqual({
+      ok: false,
+      retry: false,
+      message: 'HBL: DECRYPTION_FAILED',
+    });
+    next = { status: 503, body: {} };
+    expect(await hbl.checkout(account, request)).toEqual({
+      ok: false,
+      retry: true,
+      message: 'HBL: it answered 503',
+    });
+    const closed = await closedPort();
+    const away = new HblGateway({
+      urls: {
+        sandbox: { api: `http://127.0.0.1:${closed}/api`, page: `${url}/page#/checkout?data=` },
+      },
+    });
+    expect(await away.checkout(account, request)).toMatchObject({
+      ok: false,
+      retry: true,
+      message: expect.stringMatching(/^HBL could not be reached/),
+    });
+  });
+
+  it("opens its return with the shop's private key: a payment when its code is 100, 0 or 00", () => {
+    const ref = 'H2026100214300012345';
+    const outcome = (code: string, order = ref) =>
+      `RESPONSE_CODE=${code}&RESPONSE_MESSAGE=Success&ORDER_REF_NUMBER=${order}` +
+      '&PAYMENT_TYPE=CARD&CARD_NUM_MASKED=4000XXXXXXXX0002&GUID=7c1f4e2a-90b3-4d5e-8f6a-1b2c3d4e5f60';
+    const payment = {
+      ref,
+      amount: null,
+      currency: null,
+      reference: '7c1f4e2a-90b3-4d5e-8f6a-1b2c3d4e5f60',
+    };
+    // Longer than one block, and its "+" come back as blanks.
+    expect(hbl.returned(account, returnOf(outcome('100')))).toEqual(payment);
+    expect(hbl.returned(account, returnOf(outcome('0')))).toEqual(payment);
+    expect(hbl.returned(account, returnOf(outcome('00')))).toEqual(payment);
+    // Cancelled, or under review: nothing paid.
+    expect(hbl.returned(account, returnOf(outcome('112')))).toBeNull();
+    expect(hbl.returned(account, returnOf(outcome('481')))).toBeNull();
+    // Encrypted to another key, or naming no reference of Hatti's: nothing believed.
+    const other = generateKeyPairSync('rsa', { modulusLength: 2_048 });
+    expect(hbl.returned(account, returnOf(outcome('100'), other.publicKey))).toBeNull();
+    expect(hbl.returned(account, returnOf(outcome('100', '1043')))).toBeNull();
+    expect(hbl.returned(account, { data: 'not-hbls' })).toBeNull();
+    expect(hbl.returned(account, {})).toBeNull();
+    expect(hbl.webhook()).toBeNull();
   });
 });

@@ -20,6 +20,7 @@ import {
   AlfalahGateway,
   BaadmayGateway,
   EasypaisaGateway,
+  HblGateway,
   PayFastGateway,
   JazzCashGateway,
   PaymentGateways,
@@ -100,6 +101,7 @@ export async function paymentsFixture(
     baadmayUrl?: string;
     payfastUrl?: string;
     alfalahUrl?: string;
+    hblUrl?: string;
   } = {},
 ): Promise<PaymentsFixture> {
   const testDb = await createTestDatabase(server);
@@ -129,7 +131,12 @@ export async function paymentsFixture(
   const baadmay = options.baadmayUrl ?? 'http://127.0.0.1:9/baadmay';
   const payfast = options.payfastUrl ?? 'http://127.0.0.1:9/payfast';
   const alfalah = options.alfalahUrl ?? 'http://127.0.0.1:9/alfalah';
+  const hbl = {
+    api: `${options.hblUrl ?? 'http://127.0.0.1:9'}/api`,
+    page: `${options.hblUrl ?? 'http://127.0.0.1:9'}/page#/checkout?data=`,
+  };
   const gateways = new PaymentGateways([
+    new HblGateway({ urls: { sandbox: hbl, production: hbl }, timeoutMs: 2_000 }),
     new AlfalahGateway({ urls: { sandbox: alfalah, production: alfalah }, timeoutMs: 2_000 }),
     new PayFastGateway({ urls: { sandbox: payfast, production: payfast }, timeoutMs: 2_000 }),
     new BaadmayGateway({

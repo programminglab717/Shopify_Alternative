@@ -399,10 +399,11 @@ export class GatewayAccountService {
         );
         continue;
       }
-      const value = credential.value.trim();
+      // As the gateway keeps it, as a key loses its PEM armour (ADR-229).
+      const value = (spec.normalize ?? ((text: string) => text))(credential.value.trim());
       if (
         value === '' ||
-        value.length > GATEWAY_ACCOUNT_LIMITS.credential ||
+        value.length > (spec.maxLength ?? GATEWAY_ACCOUNT_LIMITS.credential) ||
         !/^[!-~]+$/.test(value)
       ) {
         check.add(

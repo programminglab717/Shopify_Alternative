@@ -1,10 +1,16 @@
 import {
+  constants,
   createCipheriv,
   createHash,
   createHmac,
+  createPrivateKey,
+  createPublicKey,
+  privateDecrypt,
+  publicEncrypt,
   randomBytes,
   randomInt,
   timingSafeEqual,
+  type KeyObject,
 } from 'node:crypto';
 import { fromMajor, isCurrencyCode, money, toMajorString, type CurrencyCode } from '@hatti/money';
 
@@ -26,6 +32,13 @@ export interface GatewayCredentialField {
   pattern?: RegExp;
   /** What connecting says of one not so, as "must be …". */
   problem?: string;
+  /**
+   * What is kept of it, from what staff pasted, before it is checked: as a key HBL asks for
+   * loses its PEM armour and its line breaks (ADR-229).
+   */
+  normalize?: (value: string) => string;
+  /** How long it may be, where longer than {@link GATEWAY_ACCOUNT_LIMITS}' 1,000. */
+  maxLength?: number;
 }
 
 /**
@@ -1771,6 +1784,353 @@ function alfalahJson(text: string): Record<string, unknown> | null {
     }
   }
   return isObject(value) ? value : null;
+}
+
+/** Where HBL's session API and its checkout page answer, in one of its environments. */
+export interface HblUrls {
+  /** Its session API, version 2. */
+  api: string;
+  /** Its hosted page, which takes the session in Base64 after it. */
+  page: string;
+}
+
+/** Where HBL's payment gateway answers, in each of its environments. */
+export const HBL_URLS: Readonly<Record<GatewayEnvironmentValue, HblUrls>> = {
+  sandbox: {
+    api: 'https://testpaymentapi.hbl.com/HBLPay/api/Checkout/V2',
+    page: 'https://testpaymentapi.hbl.com/HBLPay/Site/index.html#/checkout?data=',
+  },
+  production: {
+    api: 'https://digitalbankingportal.hbl.com/HostedCheckout/api/checkout/V2',
+    page: 'https://digitalbankingportal.hbl.com/HostedCheckout/Site/index.html#/checkout?data=',
+  },
+};
+
+/** The codes its return gives a payment made. */
+const HBL_PAID = new Set(['100', '0', '00']);
+
+/**
+ * A key as staff paste it, PEM or .NET's XML, its armour and blanks taken off, so that it is
+ * kept as one line: what is left is Base64, or XML without spaces.
+ */
+function keyText(value: string): string {
+  return value.replace(/-----(BEGIN|END) [A-Z ]*-----/g, '').replace(/\s+/g, '');
+}
+
+/** What a key, as {@link keyText} keeps it, must look like: Base64 of DER, or .NET's XML. */
+const KEY_TEXT = /^(?:[A-Za-z0-9+/]{64,}={0,2}|<RSAKeyValue>.+<\/RSAKeyValue>)$/;
+
+export interface HblOptions {
+  /** {@link HBL_URLS}, unless a test says otherwise. */
+  urls?: Partial<Record<GatewayEnvironmentValue, HblUrls>>;
+  /** How long asking for a session may take; fifteen seconds unless given. */
+  timeoutMs?: number;
+}
+
+/** What HBL answers a session with. */
+interface HblSession {
+  IsSuccess?: unknown;
+  ResponseCode?: unknown;
+  ResponseMessage?: unknown;
+  Data?: { SESSION_ID?: unknown } | null;
+}
+
+/**
+ * HBL's payment gateway, HBLPay (https://www.hbl.com), as its integration guide and its own
+ * plugin have it, version 2: a session asked for, server to server, with the order and its
+ * customer encrypted with AES under a key of the request's own, and the account's password and
+ * that key encrypted with HBL's public key; the customer is sent to HBL's page with the session,
+ * which takes cards through Cybersource and sends them back with the outcome encrypted with the
+ * shop's own public key, which HBL alone was given, so that only the shop's private key opens it
+ * (ADR-229). HBL publishes no status or refunds API and sends no word but the return: a customer
+ * who never comes back is left to staff, and nothing is given back through its API here.
+ */
+export class HblGateway implements PaymentGateway {
+  readonly info: PaymentGatewayInfo = {
+    gateway: 'hbl',
+    name: 'HBL',
+    credentials: [
+      { key: 'userId', label: 'User ID' },
+      { key: 'password', label: 'Password' },
+      { key: 'channel', label: 'Channel' },
+      {
+        key: 'hblPublicKey',
+        label: "HBL's public key",
+        normalize: keyText,
+        maxLength: 2_000,
+        pattern: KEY_TEXT,
+        problem: "must be HBL's public key, as PEM or XML",
+      },
+      {
+        key: 'privateKey',
+        label: 'Private key',
+        normalize: keyText,
+        maxLength: 5_000,
+        pattern: KEY_TEXT,
+        problem:
+          "must be the shop's own private key, whose public key HBL was given, as PEM or XML",
+      },
+    ],
+    currencies: ['PKR'],
+    test: false,
+    refunds: 'none',
+  };
+
+  constructor(private readonly options: HblOptions = {}) {}
+
+  checkoutOrigin(environment: GatewayEnvironmentValue): string {
+    return new URL(this.#urls(environment).page).origin;
+  }
+
+  /** A session for the order, asked for encrypted as its version 2 asks, and its page. */
+  async checkout(
+    account: GatewayAccount,
+    request: GatewayCheckoutRequest,
+  ): Promise<GatewayResult<GatewayCheckout>> {
+    if (request.currency !== 'PKR') {
+      return { ok: false, retry: false, message: 'HBL takes payments in rupees alone' };
+    }
+    const c = account.credentials;
+    let hbl: KeyObject;
+    try {
+      hbl = rsaKeyOf(c.hblPublicKey ?? '', 'public');
+    } catch {
+      return { ok: false, retry: false, message: "HBL's public key could not be read" };
+    }
+    // Its reference for the order, unique to the account: when, in Pakistan, and five digits.
+    const ref = `H${pakistanTime(new Date())}${randomInt(100_000).toString().padStart(5, '0')}`;
+    const rupees = (paisa: bigint) => toMajorString(money(paisa, 'PKR'));
+    const amount = rupees(request.amount);
+    const buyer = request.buyer;
+    // Its items, where they and the delivery charge come to what is asked; else the order as one.
+    const itemized =
+      buyer !== undefined &&
+      buyer.lines.length > 0 &&
+      buyer.lines.reduce((sum, line) => sum + line.unitPrice * BigInt(line.quantity), 0n) +
+        buyer.shipping ===
+        request.amount;
+    const items = itemized
+      ? buyer.lines.map((line) => ({
+          ITEM_NAME: hblText(line.name) || 'Item',
+          QUANTITY: String(line.quantity),
+          UNIT_PRICE: rupees(line.unitPrice),
+          OLD_PRICE: null,
+          CATEGORY: '',
+          SUB_CATEGORY: '',
+        }))
+      : [
+          {
+            ITEM_NAME: hblText(`Order ${request.orderName}`),
+            QUANTITY: '1',
+            UNIT_PRICE: amount,
+            OLD_PRICE: null,
+            CATEGORY: '',
+            SUB_CATEGORY: '',
+          },
+        ];
+    // Cybersource asks whom to bill by name, email and address: what the order has.
+    const [forename = '', ...rest] = hblText(buyer?.name ?? '').split(' ');
+    const phone = buyer?.phone ? nationalNumber(buyer.phone) : '';
+    const address = buyer?.address ?? null;
+    const party = (prefix: 'BILL_TO' | 'SHIP_TO') => ({
+      [`${prefix}_FORENAME`]: forename || 'Customer',
+      [`${prefix}_SURNAME`]: rest.join(' ') || forename || 'Customer',
+      // Cybersource's own placeholder for a customer without an email.
+      [`${prefix}_EMAIL`]: buyer?.email ?? 'null@cybersource.com',
+      [`${prefix}_PHONE`]: phone,
+      [`${prefix}_ADDRESS_LINE`]: hblText(address?.address1 ?? ''),
+      [`${prefix}_ADDRESS_CITY`]: hblText(address?.city ?? ''),
+      [`${prefix}_ADDRESS_STATE`]: hblText(address?.province ?? address?.city ?? ''),
+      [`${prefix}_ADDRESS_COUNTRY`]: 'PK',
+      [`${prefix}_ADDRESS_POSTAL_CODE`]: address?.zip ?? '',
+    });
+    const order = {
+      RETURN_URL: request.returnUrl,
+      CANCEL_URL: request.cancelUrl,
+      CHANNEL: c.channel ?? '',
+      TYPE_ID: '0',
+      ORDER: { DISCOUNT_ON_TOTAL: '0', SUBTOTAL: amount, OrderSummaryDescription: items },
+      SHIPPING_DETAIL: {
+        NAME: 'Delivery',
+        ICON_PATH: null,
+        // Its own spelling.
+        DELIEVERY_DAYS: '0',
+        SHIPPING_COST: itemized ? rupees(buyer.shipping) : '0',
+      },
+      ADDITIONAL_DATA: {
+        REFERENCE_NUMBER: ref,
+        CUSTOMER_ID: phone || ref,
+        CURRENCY: 'PKR',
+        ...party('BILL_TO'),
+        ...party('SHIP_TO'),
+        // The channel of operation, which it asks for, as its own plugin sends it.
+        MerchantFields: { MDD1: 'WC', MDD2: 'YES', MDD20: 'NO' },
+      },
+    };
+    // The request's own AES key and IV, as its plugin makes them: hex digits, used as they are.
+    const key = randomBytes(16).toString('hex');
+    const iv = randomBytes(8).toString('hex');
+    const sealed = (text: string) =>
+      publicEncrypt(
+        { key: hbl, padding: constants.RSA_PKCS1_PADDING },
+        Buffer.from(text, 'utf8'),
+      ).toString('base64');
+    const cipher = createCipheriv('aes-256-cbc', Buffer.from(key, 'utf8'), Buffer.from(iv, 'utf8'));
+    const body = {
+      Data1: c.userId ?? '',
+      Data2: sealed(c.password ?? ''),
+      Data3: sealed(`${key}||${iv}`),
+      Data4: Buffer.concat([cipher.update(JSON.stringify(order), 'utf8'), cipher.final()]).toString(
+        'base64',
+      ),
+    };
+    const urls = this.#urls(account.environment);
+    let response: Response;
+    try {
+      response = await fetch(urls.api, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+      });
+    } catch (error) {
+      return {
+        ok: false,
+        retry: true,
+        message: `HBL could not be reached: ${(error as Error).message}`.slice(0, 1_000),
+      };
+    }
+    const json = (await response.json().catch(() => null)) as HblSession | null;
+    const session = isObject(json?.Data) ? json.Data.SESSION_ID : undefined;
+    if (
+      !response.ok ||
+      json?.IsSuccess === false ||
+      typeof session !== 'string' ||
+      !/^[!-~]{1,500}$/.test(session)
+    ) {
+      const said = typeof json?.ResponseMessage === 'string' ? json.ResponseMessage.trim() : '';
+      return {
+        ok: false,
+        retry: response.status >= 500 || response.status === 429,
+        message: `HBL: ${said || `it answered ${response.status}`}`.slice(0, 1_000),
+      };
+    }
+    const page = `${urls.page}${Buffer.from(session, 'utf8').toString('base64')}`;
+    return { ok: true, value: { ref, url: page } };
+  }
+
+  /**
+   * HBL sends the customer back with `data`: the outcome, `KEY=VALUE&…`, encrypted with the
+   * shop's public key a block at a time. Opened with its private key, a payment when its code is
+   * 100, 0 or 00, naming a reference of Hatti's. Its Base64 comes unescaped, its "+" read as
+   * blanks, which are put back.
+   */
+  returned(account: GatewayAccount, form: Readonly<Record<string, string>>): GatewayPayment | null {
+    if (!form.data) return null;
+    let key: KeyObject;
+    try {
+      key = rsaKeyOf(account.credentials.privateKey ?? '', 'private');
+    } catch {
+      return null;
+    }
+    const text = hblOpened(key, form.data.replace(/ /g, '+'));
+    if (text === null) return null;
+    const fields: Record<string, string> = {};
+    for (const pair of text.split('&')) {
+      const at = pair.indexOf('=');
+      if (at > 0) fields[pair.slice(0, at).trim()] = pair.slice(at + 1).trim();
+    }
+    // What a key not the shop's opens is noise, which names no reference of Hatti's.
+    const ref = fields.ORDER_REF_NUMBER ?? '';
+    if (!/^H\d{19}$/.test(ref) || !HBL_PAID.has(fields.RESPONSE_CODE ?? '')) return null;
+    const reference = (fields.GUID || fields.TXN_ID || '').slice(0, 200);
+    return { ref, amount: null, currency: null, reference: reference || null };
+  }
+
+  /** It sends no word but the return. */
+  webhook(): GatewayPayment | 'unsigned' | null {
+    return null;
+  }
+
+  #urls(environment: GatewayEnvironmentValue): HblUrls {
+    return this.options.urls?.[environment] ?? HBL_URLS[environment];
+  }
+}
+
+/**
+ * Text as HBL takes it: letters, digits and a few marks, a hyphen breaking it, at most fifty
+ * characters, as its own plugin trims it.
+ */
+function hblText(value: string): string {
+  return value
+    .replace(/[^\p{L}\p{N} .,#/]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 50)
+    .trim();
+}
+
+/** HBL's outcome opened with `key`, a block of the key's size at a time; null if it cannot be. */
+function hblOpened(key: KeyObject, data: string): string | null {
+  const bytes = Buffer.from(data, 'base64');
+  const size = (key.asymmetricKeyDetails?.modulusLength ?? 4_096) / 8;
+  if (bytes.length === 0 || bytes.length % size !== 0) return null;
+  const parts: Buffer[] = [];
+  for (let at = 0; at < bytes.length; at += size) {
+    try {
+      parts.push(
+        privateDecrypt(
+          { key, padding: constants.RSA_PKCS1_PADDING },
+          bytes.subarray(at, at + size),
+        ),
+      );
+    } catch {
+      return null;
+    }
+  }
+  return Buffer.concat(parts).toString('utf8');
+}
+
+/**
+ * An RSA key as {@link keyText} keeps it: Base64 of DER, PKCS#8 or SPKI or PKCS#1, or .NET's
+ * XML, as HBL gives its own.
+ */
+function rsaKeyOf(text: string, kind: 'public' | 'private'): KeyObject {
+  const xml = /^<RSAKeyValue>(.*)<\/RSAKeyValue>$/i.exec(text);
+  if (xml) {
+    const part = (name: string) => {
+      const found = new RegExp(`<${name}>([^<]*)</${name}>`, 'i').exec(xml[1]!)?.[1];
+      return found === undefined ? undefined : Buffer.from(found, 'base64').toString('base64url');
+    };
+    const jwk = {
+      kty: 'RSA',
+      n: part('Modulus'),
+      e: part('Exponent'),
+      ...(kind === 'private' && {
+        d: part('D'),
+        p: part('P'),
+        q: part('Q'),
+        dp: part('DP'),
+        dq: part('DQ'),
+        qi: part('InverseQ'),
+      }),
+    };
+    return kind === 'public'
+      ? createPublicKey({ key: jwk, format: 'jwk' })
+      : createPrivateKey({ key: jwk, format: 'jwk' });
+  }
+  const der = Buffer.from(text, 'base64');
+  const types = kind === 'public' ? (['spki', 'pkcs1'] as const) : (['pkcs8', 'pkcs1'] as const);
+  for (const type of types) {
+    try {
+      return kind === 'public'
+        ? createPublicKey({ key: der, format: 'der', type: type as 'spki' | 'pkcs1' })
+        : createPrivateKey({ key: der, format: 'der', type: type as 'pkcs8' | 'pkcs1' });
+    } catch {
+      // The other kind, next.
+    }
+  }
+  throw new Error('The key could not be read');
 }
 
 /**

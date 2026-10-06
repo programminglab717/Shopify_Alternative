@@ -1094,6 +1094,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   are `name=value` joined by `&` in a fixed order (`alfalahHash`), its hash's own field blank among
   them, and a value may hold neither `&` nor `=`, so return addresses carry no query. Read an
   answer that may be JSON written into a JSON string with `alfalahJson`'s two passes.
+* **A credential that is a key is kept on one line** ([ADR-229](../architecture/13-decision-log.md#adr-229--hbls-payment-gateway-is-one-shops-take-payments-through-a-session-asked-for-with-the-order-encrypted-under-a-key-of-the-requests-own-which-hbls-public-key-wraps-with-the-password-its-return-encrypted-to-the-shops-own-public-key-believed-once-the-shops-private-key-opens-it-to-a-reference-of-hattis)): its
+  field's `normalize` takes off PEM armour and blanks before it is checked, and its `maxLength`
+  allows the length a key needs. `rsaKeyOf` reads Base64 of DER (PKCS#8, SPKI or PKCS#1) or
+  .NET's XML. Check what a private key opens before believing it: PKCS#1 v1.5 with implicit
+  rejection gives noise, not an error.
 
 ## Billing
 
