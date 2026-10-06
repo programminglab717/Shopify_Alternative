@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### A collection's Atom feed
+### 611249a · A collection's Atom feed
 
 * **Each collection has Shopify's Atom feed** at its address with .atom
   ([ADR-216](../architecture/13-decision-log.md#adr-216--a-collection-has-shopifys-atom-feed-at-its-address-with-atom-its-first-50-products-in-its-order-each-with-its-type-vendor-and-variants-in-shopifys-own-namespace-under-ids-of-their-own-and-products-documents-say-when-each-was-made-and-last-changed)):
