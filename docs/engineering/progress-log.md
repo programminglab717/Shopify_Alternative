@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Search in Urdu** (OS-06, SRC-01): a shopper's search finding products, pages and articles by
-the shop's Urdu for them as by its own words, on the storefront's search page and in its
-suggestions.
+**Options in Urdu** (OS-06): a product's options and their values in Urdu, as Shopify translates
+them, shown on Urdu pages with each variant's title, the variant chosen the same in either
+language.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Search in Urdu
+
+* **Found by the shop's Urdu** ([ADR-240](../architecture/13-decision-log.md#adr-240--a-storefronts-search-finds-products-pages-and-articles-by-the-shops-urdu-for-them-as-by-its-own-words-from-words-of-each-translation-kept-folded-beside-its-own-as-its-translations-change-its-own-words-first)): products by their Urdu titles and
+  types, pages and articles by their Urdu titles and text, as by their own words, on the search
+  page and in its suggestions, a typo in Urdu forgiven as in English.
+* **Kept beside the own words:** migration 0148 gives products, pages and articles
+  `translated_text`, which the online store writes as their translations change, a product's
+  through the catalog; a search reads both, the own words first.
+* 1744 tests: found by Urdu titles, types and text, a typo forgiven, by the own words still, and
+  not once the Urdu is removed.
 
 ### ca2fcb6 · Policies in Urdu
 

@@ -12,7 +12,8 @@ import { sql, type SQL } from 'drizzle-orm';
 
 // A storefront's search of a shop's own content (ADR-212): its published articles and pages with
 // every word of what the shopper typed, found as its products are (ADR-046), by the words each
-// keeps folded, `search_text`, its title first.
+// keeps folded, `search_text`, its title first, and those of what the shop wrote in Urdu for it,
+// `translated_text` (ADR-240).
 
 /** The most of a page's or an article's text its words hold: its opening, where its subject is. */
 export const SEARCHED_TEXT = 10_000;
@@ -21,6 +22,9 @@ export const SEARCHED_TEXT = 10_000;
 const SEARCH_WORDS = 10;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** A page's or an article's words a search reads: its own first, then its Urdu's (ADR-240). */
+const SEARCHED = sql.raw(`(search_text || ' ' || translated_text)`);
 
 /**
  * The words a storefront's search finds a page or an article by, folded as products' are: its
@@ -56,14 +60,14 @@ export async function searchContentIn(
   const types = options.types ?? new Set(CONTENT_TYPES);
   // Tokens hold only letters and digits, so no LIKE escaping.
   const all = sql.join(
-    tokens.map((token) => sql`search_text LIKE ${`%${token}%`}`),
+    tokens.map((token) => sql`${SEARCHED} LIKE ${`%${token}%`}`),
     sql` AND `,
   );
   const find = async (table: SQL) => {
     const { rows } = await tx.execute<{ id: string }>(sql`
       SELECT id FROM ${table}
        WHERE shop_id = ${shopId} AND published_at <= now() AND ${all}
-       ORDER BY position(${tokens[0]!} IN search_text), published_at DESC, id DESC
+       ORDER BY position(${tokens[0]!} IN ${SEARCHED}), published_at DESC, id DESC
        LIMIT ${options.limit}`);
     return rows.map((row) => row.id);
   };

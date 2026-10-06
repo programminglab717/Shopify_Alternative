@@ -92,6 +92,8 @@ export const pages = onlineStoreSchema.table(
     seoDescription: text('seo_description'),
     /** The words a storefront's search finds it by, folded (ADR-212). */
     searchText: text('search_text').notNull().default(''),
+    /** The words of what the shop wrote in Urdu for it, folded as `searchText` (ADR-240). */
+    translatedText: text('translated_text').notNull().default(''),
     /** Published at a time ahead, until the worker shows it (ADR-217). */
     scheduled: boolean('scheduled').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -155,6 +157,8 @@ export const articles = onlineStoreSchema.table(
     seoDescription: text('seo_description'),
     /** The words a storefront's search finds it by, folded (ADR-212). */
     searchText: text('search_text').notNull().default(''),
+    /** The words of what the shop wrote in Urdu for it, folded as `searchText` (ADR-240). */
+    translatedText: text('translated_text').notNull().default(''),
     /** Published at a time ahead, until the worker shows it (ADR-215). */
     scheduled: boolean('scheduled').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

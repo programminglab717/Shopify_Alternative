@@ -58,6 +58,12 @@ const SEARCH_WORDS = 10;
 /** The most of a shop's words a search that found nothing as typed corrects its words to. */
 const SEARCH_VOCABULARY = 50_000;
 
+/**
+ * The words a storefront's search finds a product by: its own, then those of what the shop wrote
+ * in Urdu for it (ADR-240), so a word found among its own comes first.
+ */
+const SEARCHED = sql.raw(`(search_text || ' ' || translated_text)`);
+
 export interface CreateProductInput {
   title: string;
   handle?: string | null;
@@ -561,16 +567,28 @@ export class ProductService {
     if (tokens.length === 0) return [];
     if (options.prefix) tokens.push(prefixKey(tokens.pop()!));
     // Tokens hold only letters and digits, so no LIKE escaping.
-    const all = tokens.map((token) => sql`search_text LIKE ${`%${token}%`}`);
+    const all = tokens.map((token) => sql`${SEARCHED} LIKE ${`%${token}%`}`);
     const { rows } = await tx.execute<{ id: string }>(sql`
       SELECT id FROM catalog.products
        WHERE shop_id = ${shopId} AND status = 'active' AND ${sql.join(all, sql` AND `)}
-       ORDER BY position(${tokens[0]!} IN search_text), id DESC
+       ORDER BY position(${tokens[0]!} IN ${SEARCHED}), id DESC
        LIMIT ${limit}`);
     if (rows.length > 0 || !tokens.some((token) => typosAllowed(token) > 0)) {
       return rows.map((row) => row.id);
     }
     return searchCorrectedIn(tx, shopId, tokens, limit, options.prefix === true);
+  }
+
+  /**
+   * Keeps the words of what the shop wrote in Urdu for a product (ADR-240), folded as its own
+   * words are, for storefronts' search to find it by them too, in the caller's transaction `tx`:
+   * the online store keeps them as its translations change. Nothing else of the product changes.
+   */
+  async setTranslatedText(tx: Tx, shopId: string, id: string, text: string): Promise<void> {
+    await tx
+      .update(products)
+      .set({ translatedText: text })
+      .where(and(eq(products.shopId, shopId), eq(products.id, id)));
   }
 
   /** The handle a product has now, or null once it is gone, in the caller's transaction `tx`. */
@@ -625,7 +643,7 @@ async function searchCorrectedIn(
 ): Promise<string[]> {
   const { rows: words } = await tx.execute<{ word: string }>(sql`
     SELECT DISTINCT word
-      FROM catalog.products, unnest(string_to_array(search_text, ' ')) AS word
+      FROM catalog.products, unnest(string_to_array(${SEARCHED}, ' ')) AS word
      WHERE shop_id = ${shopId} AND status = 'active' AND word <> ''
      LIMIT ${SEARCH_VOCABULARY}`);
   const corrections = correctionsOf(
@@ -635,9 +653,9 @@ async function searchCorrectedIn(
   );
   if (corrections.some((each) => each.length === 0)) return [];
   if (corrections.every((each) => each[0]!.typos === 0)) return [];
-  const holds = (correction: Correction) => sql`search_text LIKE ${`%${correction.word}%`}`;
+  const holds = (correction: Correction) => sql`${SEARCHED} LIKE ${`%${correction.word}%`}`;
   const matched = corrections.map(
-    (each) => sql`search_text LIKE ANY(${sql.param(each.map((c) => `%${c.word}%`))}::text[])`,
+    (each) => sql`${SEARCHED} LIKE ANY(${sql.param(each.map((c) => `%${c.word}%`))}::text[])`,
   );
   // Corrections come the nearest first: the first a product holds is its fewest typos.
   const typos = sql.join(
@@ -651,7 +669,7 @@ async function searchCorrectedIn(
     sql` + `,
   );
   const first = sql`CASE ${sql.join(
-    corrections[0]!.map((c) => sql`WHEN ${holds(c)} THEN position(${c.word} IN search_text)`),
+    corrections[0]!.map((c) => sql`WHEN ${holds(c)} THEN position(${c.word} IN ${SEARCHED})`),
     sql` `,
   )} END`;
   const { rows } = await tx.execute<{ id: string }>(sql`

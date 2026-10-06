@@ -66,6 +66,8 @@ export const products = catalogSchema.table(
     seoTitle: text('seo_title'),
     seoDescription: text('seo_description'),
     searchText: text('search_text').notNull().default(''),
+    /** The words of what the shop wrote in Urdu for it, folded as `searchText` (ADR-240). */
+    translatedText: text('translated_text').notNull().default(''),
     version: integer('version').notNull().default(1),
     ...timestamps,
   },

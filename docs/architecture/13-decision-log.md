@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-239 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-240 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -247,6 +247,7 @@
 | 237 | Search engines are told an article's page is schema.org's BlogPosting, through Shopify's `structured_data`, and a shop's home page the shop's Organization and WebSite, through the same filter given the shop | Accepted |
 | 238 | A shop's products, collections, pages, blogs, articles and menus may have its own Urdu, as Shopify's translations keep a field each, written for the digest of the shop's own words; their documents carry it beside those words, and the storefront's Urdu pages show it in their place | Accepted |
 | 239 | A shop's policies may have its own Urdu, as its other content may, and the storefront shows a policy's Urdu only while it translates the policy as it is, its own words once they change; the checkout's Urdu links the Urdu pages | Accepted |
+| 240 | A storefront's search finds products, pages and articles by the shop's Urdu for them as by its own words, from words of each translation kept folded beside its own as its translations change, its own words first | Accepted |
 
 ---
 
@@ -9988,3 +9989,34 @@
     shop's.
   * **A policy for each language, each with its versions:** what was agreed could be kept in each
     language, but a shop would keep two policies of each kind, and Shopify's API has one.
+
+## ADR-240 · A storefront's search finds products, pages and articles by the shop's Urdu for them as by its own words, from words of each translation kept folded beside its own as its translations change, its own words first
+
+* **Context:** A storefront's search found products by the words the catalog keeps folded of
+  their titles, vendors, types and tags ([ADR-046](#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)), and pages and articles by their
+  titles and text ([ADR-212](#adr-212--a-storefronts-search-finds-the-shops-published-pages-and-articles-beside-its-products-as-shopifys-does-by-the-words-each-keeps-folded-through-the-online-stores-own-search-in-the-core-products-then-pages-then-articles-the-kinds-shopifys-type-names-and-suggested-as-a-shopper-types)), the shop's own words alone. A shop that writes its
+  content in Urdu too ([ADR-238](#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)) has shoppers who type Urdu, and found nothing.
+* **Decision:**
+  * **The Urdu's words kept beside the own:** a product's, page's and article's
+    `translated_text` (migration 0148) holds the words of its translations, folded as its own
+    are: a product's Urdu titles and types, a page's or an article's titles and text. The online
+    store keeps it as their translations change, in the same transaction, a product's through
+    the catalog's `setTranslatedText`.
+  * **Searched with the own:** a search matches each word typed in either, as one text, the own
+    words first, so a word found in a product's own title still ranks it first. A typo in an Urdu
+    word is corrected as in the shop's own ([ADR-234](#adr-234--a-storefront-search-that-finds-no-product-with-every-word-as-typed-reads-each-word-none-of-the-shops-products-holds-as-the-shops-own-words-a-typo-or-two-from-it-a-typo-being-a-letter-added-taken-away-or-changed-or-two-swapped-and-shows-those-with-the-fewest-typos-first)), as the Urdu's words are among the
+    shop's.
+  * **Whatever the page's language:** a shopper on an English page who types Urdu finds the same,
+    as one typing English on an Urdu page does.
+* **Consequences:**
+  * A shop that writes its titles in Urdu is found by shoppers who search in Urdu, on the search
+    page and in its suggestions.
+  * A product's own fields and its Urdu are kept apart, so an edit of either never loses the
+    other's words.
+  * Translations kept before this have no words until written again; none are yet on a live
+    shop.
+* **Alternatives:**
+  * **The Urdu's words in `search_text`:** every edit of the product would have to read its
+    translations again to keep them, across modules.
+  * **Searching the translations' table as well:** two searches to rank together, and the
+    catalog's corrections would not see the Urdu's words.

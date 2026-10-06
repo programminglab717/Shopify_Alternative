@@ -1855,6 +1855,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   `/storefront/shops/{shop}/search/content`, each keeping its words with `contentSearchText`
   whenever its title, names or text change
   ([ADR-212](../architecture/13-decision-log.md#adr-212--a-storefronts-search-finds-the-shops-published-pages-and-articles-beside-its-products-as-shopifys-does-by-the-words-each-keeps-folded-through-the-online-stores-own-search-in-the-core-products-then-pages-then-articles-the-kinds-shopifys-type-names-and-suggested-as-a-shopper-types)).
+* **A search reads the Urdu's words too**
+  ([ADR-240](../architecture/13-decision-log.md#adr-240--a-storefronts-search-finds-products-pages-and-articles-by-the-shops-urdu-for-them-as-by-its-own-words-from-words-of-each-translation-kept-folded-beside-its-own-as-its-translations-change-its-own-words-first)):
+  products, pages and articles keep the words of their translations in `translated_text`, folded as
+  their own are, which the online store writes as the translations change; a search matches
+  `search_text` and `translated_text` together, the own first. Never put a translation's words in
+  `search_text`, which the resource's own edits write.
 * **A search that finds nothing as typed is corrected** ([ADR-234](../architecture/13-decision-log.md#adr-234--a-storefront-search-that-finds-no-product-with-every-word-as-typed-reads-each-word-none-of-the-shops-products-holds-as-the-shops-own-words-a-typo-or-two-from-it-a-typo-being-a-letter-added-taken-away-or-changed-or-two-swapped-and-shows-those-with-the-fewest-typos-first)):
   `searchIdsOf` reads the shop's words and `correctionsOf` from `@hatti/pk` gives each word no
   product holds the words a typo or two from it (`typoDistance`, `typosAllowed`). Keep a search

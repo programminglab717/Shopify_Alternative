@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { DnsLookup, StorefrontSite } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { searchContentIn } from './content-search.js';
 import { DomainService } from './domain.service.js';
 import { PolicyService, shopPoliciesOf } from './policy.service.js';
 import { translations } from './schema.js';
@@ -464,5 +465,74 @@ describe.skipIf(!server)('TranslationService', () => {
     });
     expect(rest.items.map((each) => each.content[0]!.value)).toEqual(['Lawn']);
     expect(rest.hasNextPage).toBe(false);
+  });
+  it("finds products, pages and articles by the shop's Urdu for them, until it is removed (ADR-240)", async () => {
+    const kurta = unwrap(
+      await f.products.create(f.a, {
+        title: 'Cotton Kurta',
+        status: 'active',
+        productType: 'Kurta',
+        variants: [{ price: '2,500' }],
+      }),
+    );
+    const search = (terms: string) =>
+      f.db.tenant(f.a.shopId, (tx) => f.products.searchIdsOf(tx, f.a.shopId, terms, 10));
+    expect(await search('کرتا')).toEqual([]);
+    unwrap(
+      await f.translations.register(f.a, 'product', kurta.id, [
+        {
+          locale: 'ur',
+          key: 'title',
+          value: 'سوتی کرتا',
+          translatableContentDigest: digestOf('Cotton Kurta'),
+        },
+        {
+          locale: 'ur',
+          key: 'product_type',
+          value: 'کرتے',
+          translatableContentDigest: digestOf('Kurta'),
+        },
+      ]),
+    );
+    // By its Urdu, its type's too, a typo forgiven as in its own words; and by its own still.
+    expect(await search('سوتی کرتا')).toEqual([kurta.id]);
+    expect(await search('کرتے')).toEqual([kurta.id]);
+    expect(await search('سوطی')).toEqual([kurta.id]);
+    expect(await search('cotton kurta')).toEqual([kurta.id]);
+    unwrap(await f.translations.remove(f.a, 'product', kurta.id, ['title'], ['ur']));
+    expect(await search('سوتی')).toEqual([]);
+    expect(await search('کرتے')).toEqual([kurta.id]);
+
+    // A page by its Urdu text, and an article by its Urdu title.
+    const about = unwrap(
+      await f.pages.create(f.a, { title: 'About us', body: '<p>Since 1998.</p>' }),
+    );
+    const news = unwrap(await f.blogs.create(f.a, { title: 'News' }));
+    const eid = unwrap(await f.articles.create(f.a, { blogId: news.id, title: 'Eid is here' }));
+    unwrap(
+      await f.translations.register(f.a, 'page', about.id, [
+        {
+          locale: 'ur',
+          key: 'body_html',
+          value: '<p>ملتان میں ہاتھ سے بنا۔</p>',
+          translatableContentDigest: digestOf('<p>Since 1998.</p>'),
+        },
+      ]),
+    );
+    unwrap(
+      await f.translations.register(f.a, 'article', eid.id, [
+        {
+          locale: 'ur',
+          key: 'title',
+          value: 'عید آ گئی',
+          translatableContentDigest: digestOf('Eid is here'),
+        },
+      ]),
+    );
+    const content = (terms: string) =>
+      f.db.tenant(f.a.shopId, (tx) => searchContentIn(tx, f.a.shopId, terms, { limit: 10 }));
+    expect(await content('ملتان')).toEqual({ articleIds: [], pageIds: [about.id] });
+    expect(await content('عید')).toEqual({ articleIds: [eid.id], pageIds: [] });
+    expect(await content('since')).toEqual({ articleIds: [], pageIds: [about.id] });
   });
 });

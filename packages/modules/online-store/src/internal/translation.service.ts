@@ -2,15 +2,17 @@ import { InputChecker, fail, failOne, type MutationResult, type TenantContext } 
 import { CollectionService, ProductService } from '@hatti/catalog/public';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
+import { searchKey } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { ArticleService } from './article.service.js';
 import { BlogService } from './blog.service.js';
+import { contentSearchText } from './content-search.js';
 import { OnlineStoreEvents, type TranslationsUpdatedPayload } from './events.js';
 import { MenuService } from './menu.service.js';
 import { PageService } from './page.service.js';
 import type { MenuItemRecord, Page } from './records.js';
-import { policies, translations } from './schema.js';
+import { articles, pages, policies, translations } from './schema.js';
 import {
   TRANSLATABLE_FIELDS,
   TRANSLATION_LIMITS,
@@ -222,6 +224,7 @@ export class TranslationService {
           })
           .returning();
         await this.#changed(tx, tenant.shopId, kind, id, kept);
+        await this.#searchable(tx, tenant.shopId, kind, id);
         return {
           ok: true,
           value: kept.map((row) => ({
@@ -286,6 +289,7 @@ export class TranslationService {
           )
           .returning();
         await this.#changed(tx, tenant.shopId, kind, id, removed);
+        if (removed.length > 0) await this.#searchable(tx, tenant.shopId, kind, id);
         return {
           ok: true,
           value: removed.map((row) => ({
@@ -320,6 +324,41 @@ export class TranslationService {
         keys: [...new Set(rows.map((row) => row.key))].sort(),
       },
     });
+  }
+
+  /**
+   * Keeps the words of a product's, page's or article's translations for storefronts' search
+   * (ADR-240), folded as its own are: a product's titles and types, a page's or an article's
+   * titles and text.
+   */
+  async #searchable(tx: Tx, shopId: string, kind: TranslatableKind, id: string): Promise<void> {
+    if (kind !== 'product' && kind !== 'page' && kind !== 'article') return;
+    const fields = (await shopTranslationsOf(tx, shopId, [id])).get(id) ?? {};
+    const words = Object.values(fields)
+      .map((each) =>
+        kind === 'product'
+          ? searchKey(`${each?.title ?? ''} ${each?.product_type ?? ''}`)
+          : contentSearchText(
+              each?.title ?? '',
+              [],
+              each?.summary_html ?? '',
+              each?.body_html ?? '',
+            ),
+      )
+      .filter(Boolean)
+      .join(' ');
+    if (kind === 'product') await this.products.setTranslatedText(tx, shopId, id, words);
+    else if (kind === 'page') {
+      await tx
+        .update(pages)
+        .set({ translatedText: words })
+        .where(and(eq(pages.shopId, shopId), eq(pages.id, id)));
+    } else {
+      await tx
+        .update(articles)
+        .set({ translatedText: words })
+        .where(and(eq(articles.shopId, shopId), eq(articles.id, id)));
+    }
   }
 
   /** Resources of a kind by their IDs, in that order, with their fields and translations. */
