@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### The order the shop's gateways are offered in
+### f1e8298 · The order the shop's gateways are offered in
 
 * **The shop's own order** ([ADR-221](../architecture/13-decision-log.md#adr-221--a-shop-puts-its-gateways-in-the-order-its-customers-are-offered-them-the-admin-api-takes-all-its-live-accounts-at-once-those-connected-before-keep-the-order-they-were-connected-in-and-one-connected-later-goes-last)) for its live gateway accounts on an order's page and
   checkout's thank-you page, in place of the order it connected them in, which those connected
