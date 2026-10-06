@@ -79,8 +79,8 @@ export function shownOfDraft(
     taxes: [...tax.byRate].map(([rate, amount]) => ({ rate, tax: amount })),
     paid: draft.advancePaid,
     due: draft.codAmount,
-    // A draft's link is for cash on delivery alone, with the advance it asks for, if any.
-    transfer: draft.advanceDue,
+    // Paid on delivery, with the advance it asks for, if any; or by transfer, all of it (ADR-223).
+    transfer: draft.paymentMethod === 'bank_transfer' ? draft.total : draft.advanceDue,
     online: 0n,
     cashOnDelivery: draft.paymentMethod === 'cash_on_delivery',
     address: draft.shippingAddress,

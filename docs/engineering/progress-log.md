@@ -6,9 +6,9 @@
 
 ## In progress
 
-**A draft paid ahead through its link** (PAY-04): a draft to be paid by transfer or online,
-confirmed by its customer through its link and placed to wait for its money, which its order's
-page then takes, as Shopify's draft invoices are paid.
+**An advance for products the shop tags** (CHK-10): the shop's advance on cash on delivery
+asked only of orders holding a product with a tag it names, as pre-orders and custom stitching are
+paid in part ahead.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### A draft paid by transfer through its link
+
+* **A transfer's draft gets a link** ([ADR-223](../architecture/13-decision-log.md#adr-223--a-draft-paid-by-transfer-gets-a-link-too-its-customer-confirms-it-as-one-paid-on-delivery-its-order-waits-for-the-money-and-the-link-becomes-the-orders-whose-page-shows-where-to-pay-and-takes-the-payment-online)) while the shop gives its bank account
+  (migration 0140): its page asks for the address as a cash-on-delivery draft's does, and says
+  what to pay, by transfer or online once confirmed.
+* **Confirming places the order to wait for its money, and the link becomes the order's:** the
+  same secret, lasting as an order's link does, on its timeline; the draft's page, and its
+  confirming and address, go on to `/o/<secret>`, whose page shows the account, takes the
+  receipt and takes the payment online.
+* 1674 tests (1 new, 1 rewritten): the link refused without the account, confirmed and handed to
+  the order, past its own hours and taken back by a new one; and through HTTP, the address, the
+  confirmation and the order's page. The core's row on the status page counts the last entry's
+  HTTP test too, which it had missed.
 
 ### 9ff5600 · Something off for paying online
 

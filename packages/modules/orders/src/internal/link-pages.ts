@@ -312,8 +312,11 @@ function confirmPage(options: {
     options.saved && savedNotice(),
     summary(shown),
     addressed ? address(shown, { changeable: options.changeable }) : addressWanted(),
-    // A draft asking for an advance (ADR-085): the account comes with the order.
-    addressed && shown.transfer > 0n && paragraphs(advanceWords(shown), 'center'),
+    // A draft asking for an advance (ADR-085), or paid by transfer (ADR-223): the account comes
+    // with the order.
+    addressed &&
+      shown.transfer > 0n &&
+      paragraphs(shown.cashOnDelivery ? advanceWords(shown) : payAheadWords(shown), 'center'),
     addressed &&
       html`<form method="post">
         <input type="hidden" name="action" value="confirm" />
@@ -384,6 +387,22 @@ function advanceWords(shown: ShownOrder): Sentence {
       'page shows; the rest when your order arrives.',
     ur: html`کنفرم کرنے کے بعد ${ltr(advance)} ایڈوانس بینک ٹرانسفر سے ادا کریں، اگلے صفحے پر دیے
     گئے اکاؤنٹ میں؛ باقی رقم آرڈر ملنے پر۔`,
+  };
+}
+
+/**
+ * What a draft paid by transfer asks once confirmed (ADR-223): all of it, by transfer to the
+ * account its order's page shows, or online there where the shop takes payments online.
+ */
+function payAheadWords(shown: ShownOrder): Sentence {
+  const total = amount(shown.transfer, shown.currency);
+  return {
+    en:
+      `Once you confirm, pay ${total} by bank transfer, to the account the next page shows, or ` +
+      'online there where the shop takes it. The shop sends your order once it is paid.',
+    ur: html`کنفرم کرنے کے بعد ${ltr(total)} بینک ٹرانسفر سے اگلے صفحے پر دیے گئے اکاؤنٹ میں ادا
+    کریں، یا وہیں آن لائن اگر دکان آن لائن ادائیگی لیتی ہے۔ ادائیگی ملتے ہی دکان آپ کا آرڈر بھیج دے
+    گی۔`,
   };
 }
 

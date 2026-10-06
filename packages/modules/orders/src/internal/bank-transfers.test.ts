@@ -3,7 +3,7 @@ import type { MutationResult } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { orderLinkPage } from './link-pages.js';
+import { draftLinkPage, orderLinkPage } from './link-pages.js';
 import type { BankAccountValue } from './schema.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -323,22 +323,97 @@ describe.skipIf(!server)('Bank transfer', () => {
     expect(unwrap(await f.orders.confirm(f.a, order.id)).stage).toBe('awaiting_payment');
   });
 
-  it('places drafts paid by transfer, which no link confirms', async () => {
+  it("sends a draft paid by transfer a link, whose confirming places its order and makes it the order's (ADR-223)", async () => {
     const draft = unwrap(
       await f.drafts.create(f.a, {
         lineItems: [{ variantId: kurta, quantity: 1 }],
-        shippingAddress: ADDRESS,
         paymentMethod: 'bank_transfer',
       }),
     );
     expect(errorsOf(await f.drafts.update(f.a, draft.id, { advancePaid: '500' }))).toEqual([
       ['input.advancePaid', 'INVALID'],
     ]);
+    // Its order's page shows where to pay: the shop's account first.
     expect(refusalOf(await f.drafts.createLink(f.a, draft.id))).toBe(
-      'A link confirms a cash-on-delivery order. Complete a bank-transfer draft: its order ' +
-        "waits for the transfer, and the order's link shows where to pay",
+      "A link to pay by transfer needs the shop's bank account, which its page shows: add it first",
     );
-    const completed = unwrap(await f.drafts.complete(f.a, draft.id));
+    unwrap(await f.bankTransfer.update(f.a, { account: TYPED }));
+    const link = unwrap(await f.drafts.createLink(f.a, draft.id));
+    expect(decodeURIComponent(link.whatsappUrl.split('?text=')[1]!)).toBe(
+      `Please add your address, then confirm and pay for your order from A:\n${link.url}\n` +
+        'اپنا پتہ لکھ کر آرڈر کنفرم کرنے اور ادائیگی کے لیے یہ لنک کھولیں۔',
+    );
+    const token = link.url.split('/d/')[1]!;
+    const opened = await f.drafts.viewLink(token);
+    if (opened.kind !== 'open') throw new Error(opened.kind);
+    const addressed = await f.drafts.changeAddress(token, opened.shown, {
+      name: 'Ayesha Khan',
+      phone: '0300 1234567',
+      address1: 'House 12, Street 4',
+      address2: '',
+      landmark: '',
+      city: 'Lahore',
+      province: '',
+      zip: '',
+    });
+    if (addressed.kind !== 'open') throw new Error(addressed.kind);
+    const page = draftLinkPage(addressed).html;
+    expect(page).toMatch(/Pay by bank transfer<\/span>[\s\S]*Rs 2,000/);
+    expect(page).toContain(
+      'Once you confirm, pay Rs 2,000 by bank transfer, to the account the next page shows, or ' +
+        'online there where the shop takes it.',
+    );
+
+    // Confirming places the order to wait for the transfer, and the link is the order's now.
+    const confirmed = await f.drafts.confirmLink(token, addressed.shown);
+    if (confirmed.kind !== 'completed') throw new Error(confirmed.kind);
+    expect(confirmed.orderLinked).toBe(true);
+    expect(confirmed.order).toMatchObject({
+      paymentMethod: 'bank_transfer',
+      stage: 'awaiting_payment',
+      bankAccount: KEPT,
+    });
+    const number = confirmed.order.number;
+    expect(await latest(confirmed.order.id)).toEqual([
+      `The link of draft #D${draft.number} became the order's, working until 30 days after the ` +
+        'order ends',
+    ]);
+    const ordered = await f.links.viewLink(token);
+    if (ordered.kind !== 'order') throw new Error(`Expected an order, got ${ordered.kind}`);
+    expect(orderLinkPage(ordered).html).toContain(
+      `Your order #${number} is placed. Pay Rs 2,000 by bank transfer, with #${number} as the ` +
+        'reference: A sends your order once the money is in.',
+    );
+    // As long as the order's link works, past the draft's own hours.
+    await f.admin.query(
+      `UPDATE orders.draft_orders SET link_expires_at = now() - interval '1 hour' WHERE id = $1`,
+      [draft.id],
+    );
+    expect(await f.drafts.viewLink(token)).toMatchObject({ kind: 'completed', orderLinked: true });
+    // A new link for the order takes it back: the draft's is spent.
+    unwrap(await f.links.createLink(f.a, confirmed.order.id));
+    expect(await f.drafts.viewLink(token)).toMatchObject({ kind: 'expired' });
+
+    // A prepaid draft gets none, and staff complete a transfer's as before.
+    const prepaid = unwrap(
+      await f.drafts.create(f.a, {
+        lineItems: [{ variantId: kurta, quantity: 1 }],
+        shippingAddress: ADDRESS,
+        paymentMethod: 'prepaid',
+      }),
+    );
+    expect(refusalOf(await f.drafts.createLink(f.a, prepaid.id))).toBe(
+      'A link confirms an order paid on delivery or by transfer. Complete a prepaid draft once ' +
+        'the customer has paid',
+    );
+    const other = unwrap(
+      await f.drafts.create(f.a, {
+        lineItems: [{ variantId: kurta, quantity: 1 }],
+        shippingAddress: ADDRESS,
+        paymentMethod: 'bank_transfer',
+      }),
+    );
+    const completed = unwrap(await f.drafts.complete(f.a, other.id));
     expect(await f.orders.get(f.a, completed.orderId!)).toMatchObject({
       paymentMethod: 'bank_transfer',
       stage: 'awaiting_payment',

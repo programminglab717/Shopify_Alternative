@@ -31,6 +31,7 @@ import {
   type DraftOrderCreatedPayload,
   type DraftOrderDeletedPayload,
   type DraftOrderUpdatedPayload,
+  type OrderUpdatedPayload,
 } from './events.js';
 import {
   DRAFT_LINK_PATH,
@@ -44,7 +45,14 @@ import {
   type LinkShop,
 } from './links.js';
 import { changeAddressLocked } from './order-link.service.js';
-import { loadOrder, loadOrders, lockOrder, nextDraftNumber } from './order-store.js';
+import {
+  addTimelineEntry,
+  loadOrder,
+  loadOrders,
+  lockOrder,
+  nextDraftNumber,
+  updateOrder,
+} from './order-store.js';
 import { draftTaxOf, taxByRate, type DraftTax } from './order-tax.js';
 import {
   OrderService,
@@ -53,7 +61,7 @@ import {
   type Placement,
 } from './order.service.js';
 import type { DraftOrderRecord, OrderRecord, Page } from './records.js';
-import { LIMITS, advanceRefusal, codLimitError, draftName } from './rules.js';
+import { LIMITS, LINK_DAYS_AFTER_END, advanceRefusal, codLimitError, draftName } from './rules.js';
 import {
   DRAFT_ORDER_SOURCES,
   draftOrders,
@@ -151,6 +159,11 @@ export type DraftLinkView =
       /** How many receipts for its transfer the customer sent (ADR-080). */
       receipts: number;
       problem: LinkProblem | null;
+      /**
+       * Whether the link is its order's own now, as a draft paid by transfer's becomes once
+       * confirmed (ADR-223): the order's page shows it, at the same secret.
+       */
+      orderLinked: boolean;
     };
 
 /** Checked fields of a draft; those left out are undefined. */
@@ -319,10 +332,11 @@ export class DraftOrderService {
   }
 
   /**
-   * A new link where the customer sees a cash-on-delivery draft and confirms it, after filling in
-   * their address if it has none, working for `expiresInHours` (72 unless given, at most 720). It
-   * replaces the draft's previous link, which stops working. The link is returned once: only its
-   * digest is kept.
+   * A new link where the customer sees a draft paid on delivery or by transfer and confirms it,
+   * after filling in their address if it has none, working for `expiresInHours` (72 unless given,
+   * at most 720). A transfer's needs the shop's bank account, as its order's page shows it, and
+   * becomes the order's once confirmed (ADR-223). It replaces the draft's previous link, which
+   * stops working. The link is returned once: only its digest is kept.
    */
   async createLink(
     tenant: TenantContext,
@@ -336,7 +350,11 @@ export class DraftOrderService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const draft = await lockDraft(tx, tenant.shopId, id);
       if (!draft) return failOne(['id'], 'NOT_FOUND', 'Draft order not found');
-      const refusal = linkRefusal(draft);
+      const account =
+        draft.paymentMethod === 'bank_transfer'
+          ? (await bankTransferSettingsIn(tx, tenant.shopId)).account
+          : null;
+      const refusal = linkRefusal(draft, account !== null);
       if (refusal) return failOne(['id'], 'INVALID', refusal);
 
       const { token, hash } = newLinkToken();
@@ -358,11 +376,19 @@ export class DraftOrderService {
       });
       const shop = await shopProfile(tx, tenant.shopId);
       const url = this.site.url(`/${DRAFT_LINK_PATH}/${token}`);
-      const message = draft.shippingAddress
-        ? `Please confirm your order from ${shop.name}:\n${url}\n` +
-          'اپنا آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔'
-        : `Please add your address and confirm your order from ${shop.name}:\n${url}\n` +
-          'اپنا پتہ لکھ کر آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔';
+      const message =
+        draft.paymentMethod === 'bank_transfer'
+          ? draft.shippingAddress
+            ? `Please confirm and pay for your order from ${shop.name}:\n${url}\n` +
+              'اپنا آرڈر کنفرم کر کے ادائیگی کرنے کے لیے یہ لنک کھولیں۔'
+            : `Please add your address, then confirm and pay for your order from ${shop.name}:` +
+              `\n${url}\n` +
+              'اپنا پتہ لکھ کر آرڈر کنفرم کرنے اور ادائیگی کے لیے یہ لنک کھولیں۔'
+          : draft.shippingAddress
+            ? `Please confirm your order from ${shop.name}:\n${url}\n` +
+              'اپنا آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔'
+            : `Please add your address and confirm your order from ${shop.name}:\n${url}\n` +
+              'اپنا پتہ لکھ کر آرڈر کنفرم کرنے کے لیے یہ لنک کھولیں۔';
       return {
         ok: true,
         value: {
@@ -391,9 +417,11 @@ export class DraftOrderService {
   /**
    * The customer confirms the draft behind a link, as the page showed it (`shown`), from `client`:
    * it becomes an order, confirmed by them, which keeps what they agreed to (ADR-114): the
-   * versions of the policies the page linked, and where they confirmed it from. Returns what the
-   * page shows next: the order, or the draft again with why it did not go through, such as a
-   * change since they opened the page. Confirming twice places one order.
+   * versions of the policies the page linked, and where they confirmed it from. A draft paid by
+   * transfer's order waits for its money, and takes the link as its own (ADR-223), its page
+   * showing where to pay. Returns what the page shows next: the order, or the draft again with why
+   * it did not go through, such as a change since they opened the page. Confirming twice places
+   * one order.
    */
   async confirmLink(
     token: string,
@@ -424,6 +452,9 @@ export class DraftOrderService {
       );
       if (!placed.ok) return { ...view, problem: problemOf(placed.errors) };
       const completed = await this.#completed(tx, draft, placed.value, true);
+      if (draft.paymentMethod === 'bank_transfer') {
+        await linkOrderIn(tx, link.shopId, placed.value.id, link.hash, draft.number);
+      }
       return this.#view(tx, link.shopId, link.hash, completed, null);
     });
   }
@@ -544,8 +575,11 @@ export class DraftOrderService {
     // The link was replaced, or the draft deleted, since it was found.
     if (!draft?.linkTokenHash?.equals(hash) || !draft.linkExpiresAt) return { kind: 'not_found' };
     const shop = await linkShopIn(tx, shopId, this.storage);
+    // A link its order took (ADR-223) works as long as the order's does.
+    const orderLinked =
+      draft.status === 'completed' && (await orderHasLinkIn(tx, shopId, draft.orderId!, hash));
     // An expired link shows nothing of the order, which carries the customer's address.
-    if (draft.linkExpiresAt <= new Date()) return { kind: 'expired', shop };
+    if (draft.linkExpiresAt <= new Date() && !orderLinked) return { kind: 'expired', shop };
     if (draft.status === 'completed') {
       const order = (await loadOrder(tx, shopId, draft.orderId!))!;
       return {
@@ -554,8 +588,12 @@ export class DraftOrderService {
         draft: toDraftRecord(draft),
         order,
         shown: shownDigest(shownOfOrder(order)),
-        receipts: order.advanceDue > 0n ? await receiptCountIn(tx, shopId, order.id) : 0,
+        receipts:
+          order.advanceDue > 0n || order.paymentMethod === 'bank_transfer'
+            ? await receiptCountIn(tx, shopId, order.id)
+            : 0,
         problem,
+        orderLinked,
       };
     }
     const record = toDraftRecord(draft);
@@ -835,9 +873,9 @@ export class DraftOrderService {
       ([, column]) => canonicalJson(current[column]) !== canonicalJson(next[column]),
     ).map(([name]) => name);
     if (changed.length === 0) return { ok: true, value: toDraftRecord(current) };
-    // A link confirms a cash-on-delivery order, asking for the address if there is none; a draft
-    // that is no longer one loses its link.
-    const dropLink = current.linkTokenHash !== null && next.paymentMethod !== 'cash_on_delivery';
+    // A link confirms an order paid on delivery or by transfer, asking for the address if there is
+    // none; a draft that becomes prepaid loses its link.
+    const dropLink = current.linkTokenHash !== null && !LINKED_METHODS.has(next.paymentMethod);
     if (dropLink) changed.push('link');
     const [row] = await tx
       .update(draftOrders)
@@ -960,23 +998,77 @@ function defaultSource(actor: Actor): DraftOrderSourceValue {
 }
 
 /** Why the draft cannot get a link, or null if it can. */
-function linkRefusal(draft: DraftOrderRow): string | null {
+function linkRefusal(draft: DraftOrderRow, hasAccount: boolean): string | null {
   if (draft.status === 'completed') return 'This draft is an order already';
   switch (draft.paymentMethod) {
     case 'cash_on_delivery':
       return null;
-    case 'prepaid':
-      return (
-        'A link confirms a cash-on-delivery order. Complete a prepaid draft once the customer ' +
-        'has paid'
-      );
     case 'bank_transfer':
+      return hasAccount
+        ? null
+        : "A link to pay by transfer needs the shop's bank account, which its page shows: add " +
+            'it first';
+    case 'prepaid':
     case 'online':
       return (
-        'A link confirms a cash-on-delivery order. Complete a bank-transfer draft: its order ' +
-        "waits for the transfer, and the order's link shows where to pay"
+        'A link confirms an order paid on delivery or by transfer. Complete a prepaid draft ' +
+        'once the customer has paid'
       );
   }
+}
+
+/** The ways to pay a draft's link confirms (ADR-034, ADR-223). */
+const LINKED_METHODS: ReadonlySet<PaymentMethodValue> = new Set([
+  'cash_on_delivery',
+  'bank_transfer',
+]);
+
+/**
+ * Makes the link whose digest is `hash` the order's own (ADR-223), in the caller's transaction:
+ * its page is the order's from now on, working until the order has ended 30 days, as an order's
+ * link does.
+ */
+async function linkOrderIn(
+  tx: Tx,
+  shopId: string,
+  orderId: string,
+  hash: Buffer,
+  draftNumber: number,
+): Promise<void> {
+  const order = (await lockOrder(tx, shopId, orderId))!;
+  const updated = await updateOrder(tx, shopId, order, {
+    linkTokenHash: hash,
+    linkExpiresAt: null,
+  });
+  await addTimelineEntry(
+    tx,
+    shopId,
+    order.id,
+    'system',
+    'link',
+    `The link of draft ${draftName(draftNumber)} became the order's, working until ` +
+      `${LINK_DAYS_AFTER_END} days after the order ends`,
+  );
+  await appendEvent<OrderUpdatedPayload>(tx, shopId, {
+    type: OrderEvents.OrderUpdated,
+    aggregateType: 'order',
+    aggregateId: order.id,
+    payload: { changed: ['link'], stage: updated.stage, version: updated.version },
+  });
+}
+
+/** Whether the order's link is the one whose digest is `hash`. */
+async function orderHasLinkIn(
+  tx: Tx,
+  shopId: string,
+  orderId: string,
+  hash: Buffer,
+): Promise<boolean> {
+  const { rows } = await tx.execute<{ linked: boolean }>(sql`
+    SELECT link_token_hash = ${hash} AS linked
+      FROM orders.orders
+     WHERE shop_id = ${shopId} AND id = ${orderId}`);
+  return rows[0]?.linked === true;
 }
 
 /** Why placing the draft failed, for the customer: items no longer for sale, or the shop. */

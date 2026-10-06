@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-222 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-223 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -230,6 +230,7 @@
 | 220 | Articles take comments as their blog's Shopify comment policy says: posted from an article's page through the storefront, held for the shop's approval where the blog moderates them, shown escaped as text in the article's document, and approved, marked as spam or deleted through the Admin API | Accepted |
 | 221 | A shop puts its gateways in the order its customers are offered them: the Admin API takes all its live accounts at once, those connected before keep the order they were connected in, and one connected later goes last | Accepted |
 | 222 | A shop may take something off orders paid online, as it may off those paid by transfer: a percentage up to a cap or an amount of its own, which checkout takes off the items after any code and the order keeps apart | Accepted |
+| 223 | A draft paid by transfer gets a link too: its customer confirms it as one paid on delivery, its order waits for the money, and the link becomes the order's, whose page shows where to pay and takes the payment online | Accepted |
 
 ---
 
@@ -9307,3 +9308,41 @@
     `transferDiscount` would mean two things in the API and on every page that shows it.
   * **A discount for each gateway:** wallets run offers of their own; a shop's own for each can
     come once a shop asks for it.
+
+## ADR-223 · A draft paid by transfer gets a link too: its customer confirms it as one paid on delivery, its order waits for the money, and the link becomes the order's, whose page shows where to pay and takes the payment online
+
+* **Context:** A draft's link lets its customer add their address and confirm it
+  ([ADR-031](#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link), [ADR-034](#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link)), but only a draft paid on delivery got one. A draft to
+  be paid by transfer was completed by staff ([ADR-074](#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)), who needed its address first,
+  and then sent the order's own link to say where to pay. Selling in a chat, staff take the items
+  and send a link; the customer gives their address and pays, as Shopify's draft invoices are
+  paid: the payment link of PAY-04. An order's page already shows the shop's account, takes the
+  receipt ([ADR-080](#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)) and takes the payment online ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)).
+* **Decision:**
+  * **A draft paid by transfer gets a link** while the shop gives its bank account, which its
+    order's page shows (migration 0140 lets such a draft keep one). Its page says what to pay, all
+    of it, by transfer to the account the next page shows or online there, and asks for the
+    address as a cash-on-delivery draft's does. A prepaid draft still gets none, and one that
+    becomes prepaid loses its link.
+  * **Confirming places the order to wait for its money**, with what the customer agreed to
+    ([ADR-114](#adr-114--a-draft-its-customer-confirms-through-its-link-keeps-what-they-agreed-to-as-checkouts-orders-do-the-page-names-the-shops-policies-above-its-button-and-the-order-keeps-their-versions-and-where-it-was-confirmed-from)), and the link becomes the order's: its digest is the order's link too,
+    working until 30 days after the order ends, as an order's link does
+    ([ADR-038](#adr-038--an-orders-link-lasts-until-30-days-after-the-order-ends)), recorded on its timeline.
+  * **The draft's page goes on to the order's**, at the same secret: confirming, saving the
+    address and the draft's page itself answer with a redirect to `/o/<secret>`, as long as the
+    order's link is still it, past the draft link's own hours. A new link for the order takes it
+    back, and the draft's is spent.
+* **Consequences:**
+  * Staff selling in a chat send one link for a transfer order, before they have the address, and
+    the customer pays it by transfer or online from the page it becomes.
+  * One secret serves the draft and its order; a link forwarded before the order was placed works
+    for the order afterwards, as one sent for the order would.
+  * A draft paid on delivery keeps its own page once confirmed, which takes an advance's receipt
+    ([ADR-085](#adr-085--a-draft-may-ask-for-an-advance-as-an-order-does-once-its-customer-confirms-it-the-drafts-link-shows-where-to-pay-and-takes-the-receipt)).
+* **Alternatives:**
+  * **A new link for the order, sent when the draft is confirmed:** a second message, and a
+    customer reading the first would find a page saying only that it is placed.
+  * **Drafts paid online:** one more way to pay on drafts and their completing, while the order's
+    page offers paying online whatever the draft said; drafts paid by transfer cover it.
+  * **The draft's page taking the payment itself:** the order's page already does, and two pages
+    doing it would drift apart.

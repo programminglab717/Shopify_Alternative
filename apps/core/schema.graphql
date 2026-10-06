@@ -4806,7 +4806,7 @@ type Mutation {
   draftOrderDelete(id: ID!): DraftOrderDeletePayload!
 
   """
-  A link where the customer sees a cash-on-delivery draft, adds or corrects its address (with their number, while the draft has none), and confirms it: the draft then becomes an order the customer confirmed, unless the number is blocked or the order risky, which waits for review. A new link replaces the one before.
+  A link where the customer sees a draft paid on delivery or by bank transfer, adds or corrects its address (with their number, while the draft has none), and confirms it: the draft then becomes an order the customer confirmed, unless the number is blocked or the order risky, which waits for review. A transfer's order waits for its money, and the link becomes the order's own, whose page shows where to pay and takes the payment online (ADR-223); it needs the shop's bank account. A new link replaces the one before.
   """
   draftOrderLinkCreate(
     """How long it works: 1 to 720 hours; default 72."""

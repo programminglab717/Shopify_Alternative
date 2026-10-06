@@ -838,12 +838,16 @@ Stock follows Shopify's model too. How changes are written is decided in
   Stock is checked then. An order that cannot be placed leaves the draft open, with user errors
   pointing at the draft's own fields (`["lineItems", "0", "quantity"]`). Completing a completed
   draft changes nothing.
-* **A link lets the customer confirm a cash-on-delivery draft themselves.**
+* **A link lets the customer confirm a draft paid on delivery or by transfer themselves.**
   `draftOrderLinkCreate` returns the link's URL once, and a WhatsApp link carrying it: to the
   customer's number for callers who see numbers whole, and to a chat of the sender's choosing
   for the rest. A new link replaces the old one, and a draft that becomes prepaid loses its link.
   When the customer confirms, the system places the order, confirmed unless it is held for
   review.
+* **A transfer's draft link becomes its order's** ([ADR-223](../architecture/13-decision-log.md#adr-223--a-draft-paid-by-transfer-gets-a-link-too-its-customer-confirms-it-as-one-paid-on-delivery-its-order-waits-for-the-money-and-the-link-becomes-the-orders-whose-page-shows-where-to-pay-and-takes-the-payment-online)): confirming copies its digest to
+  the order (`linkOrderIn`), lasting as an order's link does, and the draft's view says so
+  (`orderLinked`), which the controller answers with a redirect to `../o/<secret>`. Never make
+  the order a new link in confirming: the customer has the one they were sent.
 * **On a draft's link, the customer adds or corrects the address**
   ([ADR-034](../architecture/13-decision-log.md#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link)),
   on the order links' form (`?address`), which also asks for their number while the draft has

@@ -24,9 +24,11 @@ const PRIVATE_PAGE_HEADERS = {
  * `?address` its address to fill in or correct; POST confirms it (`action=confirm`), from the
  * address and browser the request comes from (ADR-114), saves the address (`action=address`) or,
  * once its order waits for the advance it asked for, takes the receipt of the transfer
- * (`action=receipt`, a form with the file, ADR-085). The secret is the only credential; it is 128
- * random bits, and unknown ones cost one indexed lookup. Only a POST changes anything, so link
- * previews and scanners that fetch the page never place an order.
+ * (`action=receipt`, a form with the file, ADR-085). Once a draft paid by transfer is confirmed,
+ * the link is its order's (ADR-223), and every request goes on to the order's page at the same
+ * secret, /o/<secret>. The secret is the only credential; it is 128 random bits, and unknown ones
+ * cost one indexed lookup. Only a POST changes anything, so link previews and scanners that fetch
+ * the page never place an order.
  */
 @Controller(DRAFT_LINK_PATH)
 export class DraftLinkController {
@@ -42,6 +44,11 @@ export class DraftLinkController {
   ): Promise<void> {
     const view = await this.drafts.viewLink(token);
     const form = address !== undefined ? 'address' : undefined;
+    if (view.kind === 'completed' && view.orderLinked) {
+      const asked = [address !== undefined && 'address', saved !== undefined && 'saved'];
+      const query = asked.filter(Boolean).join('&');
+      return seeOther(reply, `${orderPageOf(token)}${query ? `?${query}` : ''}`);
+    }
     await send(
       reply,
       draftLinkPage(view, { form, saved: saved !== undefined, sent: sent !== undefined }),
@@ -61,19 +68,24 @@ export class DraftLinkController {
   ): Promise<void> {
     const action = field(body, 'action');
     const shown = field(body, 'shown');
+    // The page to go on to: the order's, once the link is its own.
+    const pageOf = (view: { kind: string; orderLinked?: boolean }) =>
+      view.kind === 'completed' && view.orderLinked ? orderPageOf(token) : token;
     if (action === 'confirm') {
       const view = await this.drafts.confirmLink(token, shown, clientOf(request));
-      if (view.kind === 'completed' && !view.problem) return seeOther(reply, token);
+      if (view.kind === 'completed' && !view.problem) return seeOther(reply, pageOf(view));
       await send(reply, draftLinkPage(view));
     } else if (action === 'address') {
       const view = await this.drafts.changeAddress(token, shown, addressForm(body));
       if ((view.kind === 'open' || view.kind === 'completed') && !view.problem) {
-        return seeOther(reply, `${token}?saved`);
+        return seeOther(reply, `${pageOf(view)}?saved`);
       }
       await send(reply, draftLinkPage(view, { form: 'address' }));
     } else if (action === 'receipt') {
       const view = await this.drafts.sendReceipt(token, receiptOf(body));
-      if (view.kind === 'completed' && !view.problem) return seeOther(reply, `${token}?sent`);
+      if (view.kind === 'completed' && !view.problem) {
+        return seeOther(reply, `${pageOf(view)}?sent`);
+      }
       // A draft not yet an order has no transfer to take a receipt for.
       await send(reply, { ...draftLinkPage(view), ...(view.kind === 'open' && { status: 400 }) });
     } else {
@@ -199,6 +211,11 @@ export class OrderLinkController {
     }
     await send(reply, orderLinkPage(view, { form: action === 'address' ? action : undefined }));
   }
+}
+
+/** The order's page at a draft's secret, relative to the draft's (ADR-223). */
+function orderPageOf(token: string): string {
+  return `../${ORDER_LINK_PATH}/${token}`;
 }
 
 /** Where the request came from, as the core sees it: behind a proxy, with `TRUST_PROXY`. */

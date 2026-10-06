@@ -438,8 +438,10 @@ draft orders keep their items at the prices agreed in the chat and the customer'
 they send it, and hold no stock. Staff place one with `draftOrderComplete`, or send a
 single-use **COD confirmation link**, with a ready WhatsApp message, that works for 72 hours by
 default. The customer sees the items, total and address on a bilingual page served by the core
-API, and confirming places the order, already confirmed. Payment links wait for the gateways
-(spike 4); a draft paid by bank transfer is completed by staff, and its order waits for the money
+API, and confirming places the order, already confirmed. A draft paid by bank transfer gets a
+link too, confirmed as one paid on delivery is: its order waits for the money, and the link
+becomes the order's, whose page shows where to pay and takes the payment online
+([ADR-223](./13-decision-log.md#adr-223--a-draft-paid-by-transfer-gets-a-link-too-its-customer-confirms-it-as-one-paid-on-delivery-its-order-waits-for-the-money-and-the-link-becomes-the-orders-whose-page-shows-where-to-pay-and-takes-the-payment-online)); staff may still complete it themselves
 ([ADR-074](./13-decision-log.md#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)).
 A cash-on-delivery draft may ask for an advance, which its page says before the customer
 confirms; its order waits for it, and the draft's link then shows where to pay and takes the

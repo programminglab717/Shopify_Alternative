@@ -458,4 +458,65 @@ describe.skipIf(!server)('Admin GraphQL API: bank transfer', () => {
       transferReceipts: [{ mimeType: 'image/png', fileSize: 64 }],
     });
   });
+
+  it("sends a draft paid by transfer a link, which goes on to its order's page once confirmed (ADR-223)", async () => {
+    const created = await gql(
+      tokens.owner,
+      `mutation {
+        productCreate(input: { title: "Chadar", status: ACTIVE, variants: [{ price: "2,500" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const drafted = await gql(
+      tokens.clerk,
+      `mutation ($variantId: ID!) {
+        draftOrderCreate(input: {
+          lineItems: [{ variantId: $variantId, quantity: 1 }], paymentMethod: BANK_TRANSFER
+        }) { draftOrder { id } userErrors { field message } }
+      }`,
+      { variantId: created.data?.productCreate.product.variants[0].id },
+    );
+    const linked = await gql(
+      tokens.clerk,
+      'mutation ($id: ID!) { draftOrderLinkCreate(id: $id) { url userErrors { message } } }',
+      { id: drafted.data?.draftOrderCreate.draftOrder.id },
+    );
+    expect(linked.data?.draftOrderLinkCreate.userErrors).toEqual([]);
+    const path = new URL(linked.data?.draftOrderLinkCreate.url).pathname;
+    const token = path.split('/').pop()!;
+    const shownOn = (body: string) => /name="shown" value="([\w-]{22})"/.exec(body)![1]!;
+    const post = (payload: Record<string, string>) =>
+      app.inject({
+        method: 'POST',
+        url: path,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: new URLSearchParams(payload).toString(),
+      });
+
+    // The customer adds their address, then sees what to pay, and confirms.
+    const form = (await app.inject({ method: 'GET', url: `${path}?address` })).body;
+    const addressed = await post({
+      action: 'address',
+      shown: shownOn(form),
+      name: 'Ayesha Khan',
+      phone: '0300 1234567',
+      address1: 'House 12, Street 4',
+      city: 'Lahore',
+    });
+    expect(addressed.statusCode).toBe(303);
+    const page = (await app.inject({ method: 'GET', url: path })).body;
+    expect(page).toContain('Once you confirm, pay Rs 2,500 by bank transfer');
+    const confirmed = await post({ action: 'confirm', shown: shownOn(page) });
+    expect([confirmed.statusCode, confirmed.headers.location]).toEqual([303, `../o/${token}`]);
+
+    // On to the order's page at the same secret: where to pay, and the receipt's form.
+    const order = await app.inject({ method: 'GET', url: `/o/${token}` });
+    expect(order.statusCode).toBe(200);
+    expect(order.body).toContain('Pay Rs 2,500 by bank transfer');
+    expect(order.body).toContain('<form method="post" enctype="multipart/form-data">');
+    // The draft's address goes there too.
+    const again = await app.inject({ method: 'GET', url: path });
+    expect([again.statusCode, again.headers.location]).toEqual([303, `../o/${token}`]);
+  });
 });
