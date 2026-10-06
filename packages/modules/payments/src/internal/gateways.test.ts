@@ -9,6 +9,7 @@ import {
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  AlfalahGateway,
   BaadmayGateway,
   EasypaisaGateway,
   JazzCashGateway,
@@ -1368,5 +1369,252 @@ describe('PayFast (ADR-227)', () => {
         headers: {},
       }),
     ).toBe('unsigned');
+  });
+});
+
+describe('Bank Alfalah (ADR-228)', () => {
+  const account: GatewayAccount = {
+    environment: 'sandbox',
+    credentials: {
+      merchantId: '12345',
+      storeId: '000456',
+      merchantHash: 'OUU362MB1upzA1ZUyK3oyD7NZ2ICm6qy',
+      merchantUsername: 'zari-apg',
+      merchantPassword: 'pw-of-zari',
+      key1: 'Kx9qT2mR7vB4nH1w',
+      key2: 'P3sL8dF6jZ0cY5gE',
+    },
+  };
+  /** What Alfalah was asked, and what it answers next to each. */
+  const asked: { method: string; path: string; form: URLSearchParams }[] = [];
+  let handshake: { status: number; body: string } = { status: 200, body: '' };
+  let status: { status: number; body: string } = { status: 200, body: '' };
+  let url = '';
+  const server = createServer(async (request, response) => {
+    const body = await bodyOf(request);
+    asked.push({
+      method: request.method ?? '',
+      path: request.url ?? '',
+      form: new URLSearchParams(body),
+    });
+    const answer = request.method === 'POST' ? handshake : status;
+    response.writeHead(answer.status, { 'content-type': 'application/json' });
+    response.end(answer.body);
+  });
+  let alfalah: AlfalahGateway;
+  const request = {
+    amount: 2_500_00n,
+    currency: 'PKR' as const,
+    orderName: '#1043',
+    returnUrl: 'https://hatti.pk/o/Zx8kQ2mN/paid',
+    cancelUrl: 'https://hatti.pk/o/Zx8kQ2mN',
+  };
+  /** What a hash of Alfalah's says, opened with the account's keys. */
+  const opened = (hash: string) => {
+    const decipher = createDecipheriv(
+      'aes-128-cbc',
+      Buffer.from('Kx9qT2mR7vB4nH1w'),
+      Buffer.from('P3sL8dF6jZ0cY5gE'),
+    );
+    return Buffer.concat([decipher.update(hash, 'base64'), decipher.final()]).toString('utf8');
+  };
+  const TOKEN = 'n1VZ8%2bzP4uL6qW0eR2tY%3d%3d';
+
+  beforeAll(async () => {
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    alfalah = new AlfalahGateway({ urls: { sandbox: url }, timeoutMs: 2_000 });
+  });
+
+  afterAll(async () => {
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  it('shakes hands with its request hashed with the keys, then sends the browser on with the token', async () => {
+    handshake = {
+      status: 200,
+      body: JSON.stringify({
+        success: 'true',
+        AuthToken: TOKEN,
+        ReturnURL: request.returnUrl,
+        ErrorMessage: null,
+      }),
+    };
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-02T09:30:00Z') });
+    let started;
+    try {
+      started = await alfalah.checkout(account, request);
+    } finally {
+      vi.useRealTimers();
+    }
+    if (!started.ok) throw new Error(started.message);
+    const { ref, url: page, form } = started.value;
+    // Unique to the account: when it began, in Pakistan, and five digits.
+    expect(ref).toMatch(/^A20261002143000\d{5}$/);
+    const shake = asked.at(-1)!;
+    expect([shake.method, shake.path]).toEqual(['POST', '/HS/HS/HS']);
+    const pairs =
+      'HS_ChannelId=1001&HS_IsRedirectionRequest=0&HS_MerchantId=12345&HS_StoreId=000456' +
+      `&HS_ReturnURL=${request.returnUrl}&HS_MerchantHash=OUU362MB1upzA1ZUyK3oyD7NZ2ICm6qy` +
+      `&HS_MerchantUsername=zari-apg&HS_MerchantPassword=pw-of-zari&HS_TransactionReferenceNumber=${ref}`;
+    expect(Object.fromEntries(shake.form)).toEqual({
+      ...Object.fromEntries(new URLSearchParams(pairs)),
+      HS_RequestHash: expect.any(String),
+    });
+    expect(opened(shake.form.get('HS_RequestHash')!)).toBe(pairs);
+    // The form for its page, hashed whole, the hash's own field blank; the keys never in it.
+    expect(page).toBe(`${url}/SSO/SSO/SSO`);
+    expect(form).toEqual({
+      AuthToken: TOKEN,
+      RequestHash: expect.any(String),
+      ChannelId: '1001',
+      Currency: 'PKR',
+      IsBIN: '0',
+      ReturnURL: request.returnUrl,
+      MerchantId: '12345',
+      StoreId: '000456',
+      MerchantHash: 'OUU362MB1upzA1ZUyK3oyD7NZ2ICm6qy',
+      MerchantUsername: 'zari-apg',
+      MerchantPassword: 'pw-of-zari',
+      TransactionTypeId: '',
+      TransactionReferenceNumber: ref,
+      TransactionAmount: '2500',
+    });
+    expect(opened(form!.RequestHash!)).toBe(
+      `AuthToken=${TOKEN}&RequestHash=&ChannelId=1001&Currency=PKR&IsBIN=0` +
+        `&ReturnURL=${request.returnUrl}&MerchantId=12345&StoreId=000456` +
+        '&MerchantHash=OUU362MB1upzA1ZUyK3oyD7NZ2ICm6qy&MerchantUsername=zari-apg' +
+        `&MerchantPassword=pw-of-zari&TransactionTypeId=&TransactionReferenceNumber=${ref}` +
+        '&TransactionAmount=2500',
+    );
+    expect(Object.values(form!)).not.toContain('Kx9qT2mR7vB4nH1w');
+    // Paisa, where there are some.
+    const exact = await alfalah.checkout(account, { ...request, amount: 2_500_50n });
+    if (!exact.ok) throw new Error(exact.message);
+    expect(exact.value.form!.TransactionAmount).toBe('2500.50');
+    expect(await alfalah.checkout(account, { ...request, currency: 'USD' })).toEqual({
+      ok: false,
+      retry: false,
+      message: 'Bank Alfalah takes payments in rupees alone',
+    });
+    const short = { ...account, credentials: { ...account.credentials, key2: 'short' } };
+    expect(await alfalah.checkout(short, request)).toEqual({
+      ok: false,
+      retry: false,
+      message: "Bank Alfalah's keys are not 16 characters each",
+    });
+  });
+
+  it('says why its handshake failed, and whether trying again may help', async () => {
+    // Its answer may be JSON written into a JSON string.
+    handshake = {
+      status: 200,
+      body: JSON.stringify(
+        JSON.stringify({ success: 'false', AuthToken: null, ErrorMessage: 'Invalid Request Hash' }),
+      ),
+    };
+    expect(await alfalah.checkout(account, request)).toEqual({
+      ok: false,
+      retry: false,
+      message: 'Bank Alfalah: Invalid Request Hash',
+    });
+    handshake = { status: 502, body: 'Bad gateway' };
+    expect(await alfalah.checkout(account, request)).toEqual({
+      ok: false,
+      retry: true,
+      message: 'Bank Alfalah: it answered 502',
+    });
+    const closed = await closedPort();
+    const away = new AlfalahGateway({ urls: { sandbox: `http://127.0.0.1:${closed}` } });
+    expect(await away.checkout(account, request)).toMatchObject({
+      ok: false,
+      retry: true,
+      message: expect.stringMatching(/^Bank Alfalah could not be reached/),
+    });
+  });
+
+  it('believes nothing its return says alone, naming the payment it says is made', () => {
+    const ref = 'A2026100214300012345';
+    expect(alfalah.returned()).toBeNull();
+    expect(alfalah.webhook()).toBeNull();
+    expect(alfalah.returnRef({ TS: 'P', RC: '00', RD: '', O: ref })).toBe(ref);
+    expect(alfalah.returnRef({ TS: 'F', RC: '01', RD: 'Declined', O: ref })).toBeNull();
+    expect(alfalah.returnRef({ RC: '00', O: 'E2026100214300012345' })).toBeNull();
+  });
+
+  describe('its order status, asked at once on its return and for a customer who never came back', () => {
+    const ref = 'A2026100214300012345';
+    const PAID = {
+      ResponseCode: '00',
+      Description: 'Success',
+      MerchantId: '12345',
+      MerchantName: 'Zari',
+      StoreId: '456',
+      StoreName: 'Zari Online',
+      TransactionTypeId: '3',
+      TransactionReferenceNumber: ref,
+      OrderDateTime: '02-10-2026 02:30:00 PM',
+      TransactionId: 'T6612345',
+      TransactionDateTime: '02-10-2026 02:31:12 PM',
+      AccountNumber: '',
+      TransactionAmount: '2500',
+      MobileNumber: '',
+      TransactionStatus: 'Paid',
+    };
+    const answer = (body: unknown, code = 200) => {
+      status = { status: code, body: JSON.stringify(JSON.stringify(body)) };
+    };
+
+    it('asks by the merchant, store and payment, and believes it naming them alone', async () => {
+      answer(PAID);
+      expect(await alfalah.inquire(account, ref)).toEqual({
+        status: 'paid',
+        payment: { ref, amount: 2_500_00n, currency: 'PKR', reference: 'T6612345' },
+      });
+      const request = asked.at(-1)!;
+      expect([request.method, request.path]).toEqual([
+        'GET',
+        `/HS/api/IPN/OrderStatus/12345/000456/${ref}`,
+      ]);
+      // Not signed: believed only naming the account's merchant and store, and the payment.
+      answer({ ...PAID, StoreId: '999' });
+      expect(await alfalah.inquire(account, ref)).toEqual({
+        status: 'unknown',
+        message: "Bank Alfalah's answer named another merchant, store or payment",
+      });
+      answer({ ...PAID, TransactionReferenceNumber: 'A2026100214300099999' });
+      expect((await alfalah.inquire(account, ref)).status).toBe('unknown');
+    });
+
+    it('says a payment that failed or ended is unpaid, and what it could not learn unknown', async () => {
+      answer({ ...PAID, TransactionStatus: 'SessionEnded' });
+      expect(await alfalah.inquire(account, ref)).toEqual({
+        status: 'unpaid',
+        message: 'Bank Alfalah: the payment is SessionEnded',
+      });
+      answer({ ...PAID, TransactionStatus: 'Failed' });
+      expect((await alfalah.inquire(account, ref)).status).toBe('unpaid');
+      answer({ ...PAID, TransactionStatus: '' });
+      expect(await alfalah.inquire(account, ref)).toEqual({
+        status: 'unknown',
+        message: "Bank Alfalah's answer had no status",
+      });
+      answer({ ResponseCode: '01', Description: 'Order not found' });
+      expect(await alfalah.inquire(account, ref)).toEqual({
+        status: 'unknown',
+        message: 'Bank Alfalah: Order not found',
+      });
+      status = { status: 500, body: 'error' };
+      expect(await alfalah.inquire(account, ref)).toEqual({
+        status: 'unknown',
+        message: 'Bank Alfalah answered 500',
+      });
+      const closed = await closedPort();
+      const away = new AlfalahGateway({ urls: { sandbox: `http://127.0.0.1:${closed}` } });
+      expect(await away.inquire(account, ref)).toMatchObject({
+        status: 'unknown',
+        message: expect.stringMatching(/^Bank Alfalah could not be reached/),
+      });
+    });
   });
 });

@@ -18,6 +18,8 @@ export {
   type OpenedGatewayAccount,
 } from '../internal/gateway-accounts.service.js';
 export {
+  ALFALAH_URLS,
+  AlfalahGateway,
   BAADMAY_URLS,
   BaadmayGateway,
   EASYPAISA_URLS,
@@ -32,8 +34,10 @@ export {
   SAFEPAY_URLS,
   SafepayGateway,
   TestGateway,
+  alfalahHash,
   easypaisaHash,
   jazzCashHash,
+  type AlfalahOptions,
   type BaadmayOptions,
   type BaadmayUrls,
   type EasypaisaOptions,

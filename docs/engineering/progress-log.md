@@ -6,9 +6,9 @@
 
 ## In progress
 
-**More of Pakistan's payment gateways** (PAY-01): Bank Alfalah's and HBL's, among the gateways
-shops take payments through, beside Safepay, JazzCash, Easypaisa, PayFast and Baadmay; Bank
-Alfalah's first.
+**HBL's payment gateway** (PAY-01): HBLPay among the gateways shops take payments through, its
+session asked for with what HBL's public key encrypts, and its return opened with the shop's own
+private key.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Bank Alfalah
+
+* **Bank Alfalah's page redirection** ([ADR-228](../architecture/13-decision-log.md#adr-228--bank-alfalahs-payment-gateway-is-one-shops-take-payments-through-a-handshake-whose-request-is-hashed-with-the-accounts-two-keys-then-a-form-with-its-token-hashed-the-same-way-posted-to-its-page-its-return-which-it-does-not-sign-believed-only-once-its-order-status-asked-at-once-says-the-payment-is-made)): a handshake, server to
+  server, for a reference of Hatti's, its request hashed with AES under the account's two keys
+  over its pairs in the bank's sample's order; then a form with its token, hashed the same way,
+  posted to its page, which offers every way the account takes. The keys never leave Hatti.
+* **Its return is not signed:** a return with a code of 00 names the payment, and its order
+  status is asked at once, as it is hourly for a customer who never came back. Its answer, JSON
+  perhaps written into a JSON string, is believed only naming the account's merchant, its store
+  and the payment, and saying Paid. Its listener is not followed, and nothing is given back
+  through its API (simplification 108).
+* 1697 tests (6 new): the handshake and form opened again to their pairs, refusals, the return,
+  the status against a stand-in, and an order paid through it from its page.
 
 ### 20aa5d7 · PayFast
 

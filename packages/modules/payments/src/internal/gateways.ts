@@ -1475,6 +1475,304 @@ export class PayFastGateway implements PaymentGateway {
   }
 }
 
+/** Where Bank Alfalah's payment gateway answers, in each of its environments. */
+export const ALFALAH_URLS: Readonly<Record<GatewayEnvironmentValue, string>> = {
+  sandbox: 'https://sandbox.bankalfalah.com',
+  production: 'https://payments.bankalfalah.com',
+};
+
+/** Its handshake, which gives the token its page takes. */
+const ALFALAH_HANDSHAKE_PATH = '/HS/HS/HS';
+
+/** Its page, which the customer's browser posts the form to. */
+const ALFALAH_FORM_PATH = '/SSO/SSO/SSO';
+
+/** Its order status, by the merchant, the store and the transaction's reference. */
+const ALFALAH_STATUS_PATH = '/HS/api/IPN/OrderStatus';
+
+/** Its channel for a page the customer's browser is sent to. */
+const ALFALAH_CHANNEL = '1001';
+
+export interface AlfalahOptions {
+  /** {@link ALFALAH_URLS}, unless a test says otherwise. */
+  urls?: Partial<Record<GatewayEnvironmentValue, string>>;
+  /** How long its handshake or status may take; fifteen seconds unless given. */
+  timeoutMs?: number;
+}
+
+/**
+ * Bank Alfalah's payment gateway (APG), its page redirection as its merchant integration guide
+ * has it: a handshake, server to server, for a transaction reference of Hatti's, its request
+ * hashed with the account's two keys; then the customer's browser posts a form with the token it
+ * gave, hashed the same way, to Alfalah's page, which takes Alfa wallets, Alfalah accounts and
+ * cards. The form carries the merchant's username, password and hash, as Alfalah asks of it; the
+ * keys, which make the hashes, never leave Hatti. Its return is not signed, so a payment it says
+ * is made is recorded only once its order status, asked at once, says so (ADR-228). Its listener
+ * is not followed, and nothing is given back through its API here.
+ */
+export class AlfalahGateway implements PaymentGateway {
+  readonly info: PaymentGatewayInfo = {
+    gateway: 'alfalah',
+    name: 'Bank Alfalah',
+    credentials: [
+      { key: 'merchantId', label: 'Merchant ID' },
+      { key: 'storeId', label: 'Store ID' },
+      { key: 'merchantHash', label: 'Merchant hash' },
+      { key: 'merchantUsername', label: 'Merchant username' },
+      { key: 'merchantPassword', label: 'Merchant password' },
+      {
+        key: 'key1',
+        label: 'Key 1',
+        pattern: /^[!-~]{16}$/,
+        problem: 'must be the 16 characters Bank Alfalah gave',
+      },
+      {
+        key: 'key2',
+        label: 'Key 2',
+        pattern: /^[!-~]{16}$/,
+        problem: 'must be the 16 characters Bank Alfalah gave',
+      },
+    ],
+    currencies: ['PKR'],
+    test: false,
+    refunds: 'none',
+  };
+
+  constructor(private readonly options: AlfalahOptions = {}) {}
+
+  checkoutOrigin(environment: GatewayEnvironmentValue): string {
+    return new URL(this.#url(environment)).origin;
+  }
+
+  /** The handshake's token, asked for with the request hashed, and the form for Alfalah's page. */
+  async checkout(
+    account: GatewayAccount,
+    request: GatewayCheckoutRequest,
+  ): Promise<GatewayResult<GatewayCheckout>> {
+    if (request.currency !== 'PKR') {
+      return { ok: false, retry: false, message: 'Bank Alfalah takes payments in rupees alone' };
+    }
+    const c = account.credentials;
+    const keys = { key: c.key1 ?? '', iv: c.key2 ?? '' };
+    if (Buffer.byteLength(keys.key) !== 16 || Buffer.byteLength(keys.iv) !== 16) {
+      return { ok: false, retry: false, message: "Bank Alfalah's keys are not 16 characters each" };
+    }
+    // Its reference for the payment, unique to the account: when, in Pakistan, and five digits.
+    const ref = `A${pakistanTime(new Date())}${randomInt(100_000).toString().padStart(5, '0')}`;
+    const merchant = [
+      c.merchantId ?? '',
+      c.storeId ?? '',
+      c.merchantHash ?? '',
+      c.merchantUsername ?? '',
+      c.merchantPassword ?? '',
+    ] as const;
+    // Its pairs, in its sample's order; no value may hold "&" or "=", which the return
+    // address, without a query, does not.
+    const handshake: [string, string][] = [
+      ['HS_ChannelId', ALFALAH_CHANNEL],
+      ['HS_IsRedirectionRequest', '0'],
+      ['HS_MerchantId', merchant[0]],
+      ['HS_StoreId', merchant[1]],
+      ['HS_ReturnURL', request.returnUrl],
+      ['HS_MerchantHash', merchant[2]],
+      ['HS_MerchantUsername', merchant[3]],
+      ['HS_MerchantPassword', merchant[4]],
+      ['HS_TransactionReferenceNumber', ref],
+    ];
+    const base = this.#url(account.environment);
+    let response: Response;
+    try {
+      response = await fetch(`${base}${ALFALAH_HANDSHAKE_PATH}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          accept: 'application/json',
+        },
+        body: new URLSearchParams([
+          ...handshake,
+          ['HS_RequestHash', alfalahHash(keys, handshake)],
+        ]).toString(),
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+      });
+    } catch (error) {
+      return {
+        ok: false,
+        retry: true,
+        message: `Bank Alfalah could not be reached: ${(error as Error).message}`.slice(0, 1_000),
+      };
+    }
+    const answer = alfalahJson(await response.text().catch(() => ''));
+    const token = answer?.AuthToken;
+    const succeeded = answer?.success === true || answer?.success === 'true';
+    if (!response.ok || !succeeded || typeof token !== 'string' || !/^[!-~]{1,2000}$/.test(token)) {
+      const said = typeof answer?.ErrorMessage === 'string' ? answer.ErrorMessage.trim() : '';
+      return {
+        ok: false,
+        retry: response.status >= 500 || response.status === 429,
+        message: `Bank Alfalah: ${said || `it answered ${response.status}`}`.slice(0, 1_000),
+      };
+    }
+    // The return address as its handshake gave it back, as its own sample posts it.
+    const back = answer?.ReturnURL;
+    const form: [string, string][] = [
+      // As its handshake gave it, already encoded.
+      ['AuthToken', token],
+      ['RequestHash', ''],
+      ['ChannelId', ALFALAH_CHANNEL],
+      ['Currency', 'PKR'],
+      ['IsBIN', '0'],
+      [
+        'ReturnURL',
+        typeof back === 'string' && back.trim() !== '' ? back.trim() : request.returnUrl,
+      ],
+      ['MerchantId', merchant[0]],
+      ['StoreId', merchant[1]],
+      ['MerchantHash', merchant[2]],
+      ['MerchantUsername', merchant[3]],
+      ['MerchantPassword', merchant[4]],
+      // Blank, so that its page offers every way the account takes.
+      ['TransactionTypeId', ''],
+      ['TransactionReferenceNumber', ref],
+      ['TransactionAmount', alfalahAmount(request.amount)],
+    ];
+    // Its hash covers every field, the hash's own left blank.
+    const hash = alfalahHash(keys, form);
+    const fields = Object.fromEntries(
+      form.map(([name, value]) => [name, name === 'RequestHash' ? hash : value]),
+    );
+    return { ok: true, value: { ref, url: `${base}${ALFALAH_FORM_PATH}`, form: fields } };
+  }
+
+  /** Its return is not signed: nothing is believed of it alone ({@link returnRef}). */
+  returned(): GatewayPayment | null {
+    return null;
+  }
+
+  /** The payment it says is made, by its code of 00: asked after at once to be believed. */
+  returnRef(form: Readonly<Record<string, string>>): string | null {
+    const ref = form.O?.trim() ?? '';
+    return form.RC?.trim() === '00' && /^A\d{19}$/.test(ref) ? ref : null;
+  }
+
+  /** Its listener is not followed: its order status is asked instead. */
+  webhook(): GatewayPayment | 'unsigned' | null {
+    return null;
+  }
+
+  /**
+   * Asks its order status after the payment `ref` (ADR-208, ADR-228), by the account's merchant
+   * and store, which it asks no secret for. Its answer is not signed, so it is believed as coming
+   * from Alfalah's own API, and only naming the account's merchant and store and the payment asked
+   * after: paid when it answered 00 and the payment is Paid; not paid for any other status, as
+   * one failed or whose session ended; unknown when Alfalah could not be asked, or answered
+   * anything else.
+   */
+  async inquire(account: GatewayAccount, ref: string): Promise<GatewayInquiry> {
+    const { merchantId = '', storeId = '' } = account.credentials;
+    const path = [merchantId, storeId, ref].map((part) => encodeURIComponent(part)).join('/');
+    let response: Response;
+    try {
+      response = await fetch(`${this.#url(account.environment)}${ALFALAH_STATUS_PATH}/${path}`, {
+        headers: { accept: 'application/json' },
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+      });
+    } catch (error) {
+      const message = `Bank Alfalah could not be reached: ${(error as Error).message}`;
+      return { status: 'unknown', message: message.slice(0, 1_000) };
+    }
+    const answer = alfalahJson(await response.text().catch(() => ''));
+    if (!response.ok || !answer) {
+      return { status: 'unknown', message: `Bank Alfalah answered ${response.status}` };
+    }
+    const said = (value: unknown) =>
+      typeof value === 'string' || typeof value === 'number' ? String(value).trim() : '';
+    if (said(answer.ResponseCode) !== '00') {
+      const description =
+        said(answer.Description) || `it answered ${said(answer.ResponseCode) || 'nothing'}`;
+      return { status: 'unknown', message: `Bank Alfalah: ${description}`.slice(0, 1_000) };
+    }
+    // Its store's ID may come without the zeros it was given with: "000456" or "456".
+    const store = (value: string) => value.replace(/^0+(?=.)/, '');
+    if (
+      said(answer.MerchantId) !== merchantId ||
+      store(said(answer.StoreId)) !== store(storeId) ||
+      said(answer.TransactionReferenceNumber) !== ref
+    ) {
+      return {
+        status: 'unknown',
+        message: "Bank Alfalah's answer named another merchant, store or payment",
+      };
+    }
+    const status = said(answer.TransactionStatus);
+    if (status === '') return { status: 'unknown', message: "Bank Alfalah's answer had no status" };
+    if (!/^paid$/i.test(status)) {
+      return {
+        status: 'unpaid',
+        message: `Bank Alfalah: the payment is ${status}`.slice(0, 1_000),
+      };
+    }
+    let paid: bigint;
+    try {
+      paid = fromMajor(said(answer.TransactionAmount), 'PKR').amount;
+    } catch {
+      paid = 0n;
+    }
+    const reference = said(answer.TransactionId);
+    return {
+      status: 'paid',
+      payment: {
+        ref,
+        amount: paid > 0n ? paid : null,
+        currency: paid > 0n ? 'PKR' : null,
+        reference: reference.slice(0, 200) || null,
+      },
+    };
+  }
+
+  #url(environment: GatewayEnvironmentValue): string {
+    return (this.options.urls?.[environment] ?? ALFALAH_URLS[environment]).replace(/\/+$/, '');
+  }
+}
+
+/**
+ * Bank Alfalah's hash of a request: its pairs as name=value, joined by "&", encrypted with
+ * AES-128 in CBC mode, Key 1 the key and Key 2 the IV, as they are, padded as PKCS#7 pads; in
+ * Base64.
+ */
+export function alfalahHash(
+  keys: { key: string; iv: string },
+  pairs: readonly (readonly [string, string])[],
+): string {
+  const text = pairs.map(([name, value]) => `${name}=${value}`).join('&');
+  const cipher = createCipheriv(
+    'aes-128-cbc',
+    Buffer.from(keys.key, 'utf8'),
+    Buffer.from(keys.iv, 'utf8'),
+  );
+  return Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]).toString('base64');
+}
+
+/** Rupees as Alfalah's form takes them: 2500, or with paisa 2500.50. */
+function alfalahAmount(paisa: bigint): string {
+  const rest = paisa % 100n;
+  return rest === 0n
+    ? (paisa / 100n).toString()
+    : `${paisa / 100n}.${rest.toString().padStart(2, '0')}`;
+}
+
+/** An answer of Alfalah's, which may be JSON written into a JSON string. */
+function alfalahJson(text: string): Record<string, unknown> | null {
+  let value: unknown = text;
+  for (let depth = 0; depth < 2 && typeof value === 'string'; depth++) {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  return isObject(value) ? value : null;
+}
+
 /**
  * A gateway that takes nothing (ADR-151): for trying payments out in development and tests. Its
  * checkout page is the return address itself, signed as {@link TestGateway.returnForm} signs it,

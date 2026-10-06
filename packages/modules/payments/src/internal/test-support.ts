@@ -17,6 +17,7 @@ import {
 import pg from 'pg';
 import { GatewayAccountService } from './gateway-accounts.service.js';
 import {
+  AlfalahGateway,
   BaadmayGateway,
   EasypaisaGateway,
   PayFastGateway,
@@ -98,6 +99,7 @@ export async function paymentsFixture(
     easypaisaUrl?: string;
     baadmayUrl?: string;
     payfastUrl?: string;
+    alfalahUrl?: string;
   } = {},
 ): Promise<PaymentsFixture> {
   const testDb = await createTestDatabase(server);
@@ -126,7 +128,9 @@ export async function paymentsFixture(
   const easypaisa = options.easypaisaUrl ?? 'http://127.0.0.1:9/easypaisa';
   const baadmay = options.baadmayUrl ?? 'http://127.0.0.1:9/baadmay';
   const payfast = options.payfastUrl ?? 'http://127.0.0.1:9/payfast';
+  const alfalah = options.alfalahUrl ?? 'http://127.0.0.1:9/alfalah';
   const gateways = new PaymentGateways([
+    new AlfalahGateway({ urls: { sandbox: alfalah, production: alfalah }, timeoutMs: 2_000 }),
     new PayFastGateway({ urls: { sandbox: payfast, production: payfast }, timeoutMs: 2_000 }),
     new BaadmayGateway({
       urls: {

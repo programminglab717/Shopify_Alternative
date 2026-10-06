@@ -1090,6 +1090,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   `PaymentWebhookController` answers a GET as well, handing `webhook` the query as it came, as a
   form's body. Read a body as JSON first and as a form otherwise, as PayFast's and JazzCash's
   adapters do.
+* **Hash a gateway's pairs in the order its own sample writes them** ([ADR-228](../architecture/13-decision-log.md#adr-228--bank-alfalahs-payment-gateway-is-one-shops-take-payments-through-a-handshake-whose-request-is-hashed-with-the-accounts-two-keys-then-a-form-with-its-token-hashed-the-same-way-posted-to-its-page-its-return-which-it-does-not-sign-believed-only-once-its-order-status-asked-at-once-says-the-payment-is-made)): Alfalah's
+  are `name=value` joined by `&` in a fixed order (`alfalahHash`), its hash's own field blank among
+  them, and a value may hold neither `&` nor `=`, so return addresses carry no query. Read an
+  answer that may be JSON written into a JSON string with `alfalahJson`'s two passes.
 
 ## Billing
 

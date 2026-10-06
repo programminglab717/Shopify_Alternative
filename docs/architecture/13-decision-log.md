@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-227 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-228 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -235,6 +235,7 @@
 | 225 | A shop with storefront items waiting is listed in Valkey until a drain finds none left, and the worker builds the shops quiet ten minutes, what their events' tries gave up on | Accepted |
 | 226 | Baadmay's buy now, pay later is a gateway shops take payments through: the order, its items and its customer go to its page in the address, and its return, which it does not sign, is believed only once its order status, asked at once, names the order and the amount paid | Accepted |
 | 227 | PayFast is a gateway shops take payments through: an access token asked for the basket and its amount with the secured key, then a form with the token posted to its page; its return, and its word at the webhook, which may come in the address, believed by their validation hash | Accepted |
+| 228 | Bank Alfalah's payment gateway is one shops take payments through: a handshake whose request is hashed with the account's two keys, then a form with its token, hashed the same way, posted to its page; its return, which it does not sign, believed only once its order status, asked at once, says the payment is made | Accepted |
 
 ---
 
@@ -9505,3 +9506,44 @@
   * **Its direct API, card details sent through Hatti:** would bring cards onto Hatti's servers
     and into PCI DSS's scope. The hosted page keeps them on PayFast's, as JazzCash's does
     ([ADR-163](#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)).
+
+## ADR-228 · Bank Alfalah's payment gateway is one shops take payments through: a handshake whose request is hashed with the account's two keys, then a form with its token, hashed the same way, posted to its page; its return, which it does not sign, believed only once its order status, asked at once, says the payment is made
+
+* **Context:** Bank Alfalah's payment gateway (APG) takes Alfa wallets, Alfalah accounts and
+  cards through one page, and shops that bank with Alfalah are given it with their accounts.
+  Shops connect their own ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)). Its merchant integration guide and the bank's
+  own samples describe page redirection. A handshake, server to server, gives a token for a
+  transaction reference, its request hashed with AES under two keys Alfalah gives. Then the
+  customer's browser posts a form with the token, hashed the same way, to Alfalah's page. The
+  customer comes back unsigned, and an order status takes the merchant, the store and the
+  reference with no secret at all.
+* **Decision:**
+  * **A handshake, then a form.** The handshake's pairs, in the bank's sample's order, are
+    joined as `name=value` with `&` and encrypted with AES-128 in CBC mode, Key 1 the key and
+    Key 2 the IV, in Base64. The form for its page holds every field, its own hash among them
+    left blank, hashed the same way. The reference is Hatti's, unique to the account. The
+    amount is in rupees, with paisa only where there are some. The transaction type is left
+    blank, so that its page offers every way the account takes.
+  * **The keys never leave Hatti.** The form carries the merchant's username, password and
+    hash, as Alfalah asks of it, as JazzCash's carries its password ([ADR-163](#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)). The
+    keys make the hashes, and only Hatti has them.
+  * **Nothing its return says is believed alone.** A return with a code of 00 names the payment
+    ([ADR-214](#adr-214--easypaisa-is-the-third-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-encrypted-with-the-stores-hash-key-to-its-page-and-the-token-it-comes-back-with-to-its-next-and-its-return-which-it-does-not-sign-is-believed-only-once-its-inquiry-asked-at-once-with-the-accounts-api-credentials-says-the-payment-is-made)), and its order status is asked at once. The answer may come as JSON
+    written into a JSON string. It is believed as coming from Alfalah's own API
+    ([ADR-210](#adr-210--safepays-trackers-are-asked-after-as-jazzcashs-payments-are-through-its-reporter-with-the-accounts-secret-key-its-answer-which-safepay-does-not-sign-is-believed-as-it-comes-from-safepays-own-api-and-only-naming-the-accounts-api-key-and-the-tracker-asked-about)), and only when it answered 00, names the account's merchant, its store,
+    with or without the store's zeros, and the payment asked after, and says Paid. Any other
+    status is unpaid. The status is also asked hourly for a customer who never came back
+    ([ADR-208](#adr-208--a-payment-started-online-whose-customer-never-came-back-is-asked-after-the-worker-asks-the-gateways-status-inquiry-jazzcashs-first-from-a-quarter-of-an-hour-after-it-began-at-most-once-an-hour-for-two-days-and-records-one-the-gateway-vouches-for-paid-through-the-inquiry)).
+  * **Its listener is not followed.** It sends the address of the status to ask, which anyone
+    could send, so the status is asked as above instead. Nothing is given back through its API.
+* **Consequences:**
+  * Shops banking with Alfalah take its wallets, accounts and cards through their own account.
+  * The form puts the merchant's password in the customer's browser, by Alfalah's design. The
+    keys stay with Hatti, so a changed form fails its hash.
+  * The return address must carry no query: a value with `&` or `=` would break the hash's
+    pairs. Hatti's addresses have none.
+* **Alternatives:**
+  * **Following its listener:** it names a status address to fetch, which could be forged.
+    Asking our own is the same answer.
+  * **Its API channel (1002), card details through Hatti:** would bring cards onto Hatti's
+    servers and into PCI DSS's scope.

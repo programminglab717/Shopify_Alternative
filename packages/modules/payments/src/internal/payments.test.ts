@@ -88,21 +88,61 @@ class FakePayFast {
   }
 }
 
+/**
+ * A stand-in for Bank Alfalah's handshake and order status (ADR-228): what it was asked, and what
+ * its status answers next.
+ */
+class FakeAlfalah {
+  readonly asked: { method: string; path: string; form: Record<string, string> }[] = [];
+  status: Record<string, unknown> = {};
+  url = '';
+  readonly server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on('data', (chunk: Buffer) => chunks.push(chunk));
+    request.on('end', () => {
+      const form = Object.fromEntries(new URLSearchParams(Buffer.concat(chunks).toString()));
+      this.asked.push({ method: request.method ?? '', path: request.url ?? '', form });
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        request.method === 'POST'
+          ? JSON.stringify({
+              success: 'true',
+              AuthToken: 'tok%2bof%3d%3d',
+              ReturnURL: form.HS_ReturnURL,
+            })
+          : JSON.stringify(JSON.stringify(this.status)),
+      );
+    });
+  });
+
+  async start(): Promise<void> {
+    await new Promise<void>((resolve) => this.server.listen(0, '127.0.0.1', resolve));
+    this.url = `http://127.0.0.1:${(this.server.address() as AddressInfo).port}`;
+  }
+
+  async stop(): Promise<void> {
+    await new Promise((resolve) => this.server.close(resolve));
+  }
+}
+
 describe.skipIf(!server)('Payments online', () => {
   let f: PaymentsFixture;
   let kurta: string;
   const easypaisa = new FakeEasypaisa();
   const baadmay = new FakeBaadmay();
   const payfast = new FakePayFast();
+  const alfalah = new FakeAlfalah();
 
   beforeAll(async () => {
     await easypaisa.start();
     await baadmay.start();
     await payfast.start();
+    await alfalah.start();
     f = await paymentsFixture(server!, {
       easypaisaUrl: easypaisa.url,
       baadmayUrl: baadmay.url,
       payfastUrl: payfast.url,
+      alfalahUrl: alfalah.url,
     });
   });
 
@@ -111,6 +151,7 @@ describe.skipIf(!server)('Payments online', () => {
     await easypaisa.stop();
     await baadmay.stop();
     await payfast.stop();
+    await alfalah.stop();
   });
 
   beforeEach(async () => {
@@ -953,6 +994,84 @@ describe.skipIf(!server)('Payments online', () => {
         headers: {},
       }),
     ).toBe('unsigned');
+  });
+
+  it("takes what an order waits for through Bank Alfalah's page, believing its return once its status agrees (ADR-228)", async () => {
+    const order = await f.awaiting(f.a, kurta);
+    const token = await f.linkOf(f.a, order.id);
+    const credentials = (key2: string) => [
+      { key: 'merchantId', value: '12345' },
+      { key: 'storeId', value: '000456' },
+      { key: 'merchantHash', value: 'OUU362MB1upzA1ZUyK3oyD7NZ2ICm6qy' },
+      { key: 'merchantUsername', value: 'zari-apg' },
+      { key: 'merchantPassword', value: 'pw-of-zari' },
+      { key: 'key1', value: 'Kx9qT2mR7vB4nH1w' },
+      { key: 'key2', value: key2 },
+    ];
+    // Its keys are AES's: 16 characters each.
+    const short = await f.accounts.connect(f.a, {
+      gateway: 'alfalah',
+      environment: 'production',
+      credentials: credentials('short'),
+    });
+    if (short.ok) throw new Error('connected');
+    expect(short.errors.map((error) => [error.field.join('.'), error.message])).toEqual([
+      ['input.credentials.6.value', 'Value must be the 16 characters Bank Alfalah gave'],
+      ['input.credentials', 'Bank Alfalah needs its Key 2'],
+    ]);
+    unwrap(
+      await f.accounts.connect(f.a, {
+        gateway: 'alfalah',
+        environment: 'production',
+        credentials: credentials('P3sL8dF6jZ0cY5gE'),
+      }),
+    );
+
+    // Its handshake first, then its page takes a form, posted from the order's page.
+    const started = await f.links.payOnline(token);
+    if ('url' in started || started.kind !== 'order' || !started.gatewayForm) {
+      throw new Error(JSON.stringify(started));
+    }
+    expect(alfalah.asked.map((each) => [each.method, each.path])).toEqual([['POST', '/HS/HS/HS']]);
+    expect(started.gatewayForm.url).toBe(`${alfalah.url}/SSO/SSO/SSO`);
+    const ref = started.gatewayForm.form.TransactionReferenceNumber!;
+    expect(started.gatewayForm.form).toMatchObject({
+      AuthToken: 'tok%2bof%3d%3d',
+      ReturnURL: `https://hatti.test/o/${token}/paid`,
+      TransactionAmount: '2000',
+      MerchantUsername: 'zari-apg',
+    });
+
+    // Back saying it is paid: its status is asked at once, and believed alone.
+    alfalah.status = {
+      ResponseCode: '00',
+      MerchantId: '12345',
+      StoreId: '000456',
+      TransactionReferenceNumber: ref,
+      TransactionId: 'T6612345',
+      TransactionAmount: '2000',
+      TransactionStatus: 'Paid',
+    };
+    const paid = await f.links.paidOnline(token, { TS: 'P', RC: '00', RD: '', O: ref });
+    if (paid.kind !== 'order') throw new Error(paid.kind);
+    expect(paid.problem).toBeNull();
+    expect(alfalah.asked.at(-1)).toMatchObject({
+      method: 'GET',
+      path: `/HS/api/IPN/OrderStatus/12345/000456/${ref}`,
+    });
+    expect(await f.orders.get(f.a, order.id)).toMatchObject({
+      amountPaid: 2_000_00n,
+      financialStatus: 'paid',
+    });
+    const [session] = await f.payments.sessionsOf(f.a.shopId, order.id);
+    expect(session).toMatchObject({
+      gateway: 'alfalah',
+      gatewayName: 'Bank Alfalah',
+      status: 'paid',
+      gatewayRef: ref,
+      paidThrough: 'return',
+      reference: 'T6612345',
+    });
   });
 
   it('records what its webhook says is paid, once, and what was paid beyond what was owed', async () => {
