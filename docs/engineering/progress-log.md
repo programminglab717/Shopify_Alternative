@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Content in Urdu
+### d51738e · Content in Urdu
 
 * **A shop's own Urdu for its content** ([ADR-238](../architecture/13-decision-log.md#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)), as Shopify's
   translations keep it: a product's title, description, type and SEO; a collection's, page's and
