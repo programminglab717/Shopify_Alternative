@@ -519,7 +519,7 @@ describe('Storefront rendering', () => {
     expect(found.status).toBe(200);
     expect(found.html).toContain('<title>Search · Zari Fashions</title>');
     expect(found.html).toContain('value="lawn"');
-    expect(found.html).toContain('30 products for “lawn”');
+    expect(found.html).toContain('30 results for “lawn”');
     // 24 a page: the second has the last 6, and links back keep the words.
     expect(count(found.html, 'class="grid__item"')).toBe(6);
     expect(found.html).toContain('<a href="?q=lawn&amp;page=1">');
@@ -528,7 +528,7 @@ describe('Storefront rendering', () => {
     // What the shopper typed is text on the page, however it is written.
     const typed = '<script>steal()</script>';
     const none = await render({ path: '/search', search: { terms: typed, productIds: [] } });
-    expect(none.html).toContain('No products match “&lt;script&gt;steal()&lt;/script&gt;”');
+    expect(none.html).toContain('Nothing matches “&lt;script&gt;steal()&lt;/script&gt;”');
     expect(none.html).toContain('value="&lt;script&gt;steal()&lt;/script&gt;"');
     expect(none.html).not.toContain('<script>steal()');
     expect(none.html).toContain('href="/collections/all"');
@@ -541,7 +541,7 @@ describe('Storefront rendering', () => {
       locale: 'ur',
       search: { terms: 'lawn', productIds: ids.slice(0, 1) },
     });
-    expect(urdu.html).toContain('“lawn” کے لیے 1 پروڈکٹ');
+    expect(urdu.html).toContain('“lawn” کے لیے 1 نتیجہ');
   });
 
   it("renders the predictive search section alone, as Shopify's section rendering API does", async () => {
@@ -607,7 +607,7 @@ describe('Storefront rendering', () => {
       'predictive-search',
     ]);
     expect(none.get('predictive-search')).toContain(
-      'No products match “&lt;b&gt;zz&lt;/b&gt;” yet. Search anyway',
+      'Nothing matches “&lt;b&gt;zz&lt;/b&gt;” yet. Search anyway',
     );
     const blank = await renderer.sections(suggest(''), shop.fresh(), ['predictive-search']);
     expect(blank.get('predictive-search')).not.toContain('<ul');
@@ -951,6 +951,7 @@ describe('Storefront rendering', () => {
       collectionByHandle: (handle) => held(() => memory.collectionByHandle(handle))(),
       menu: (handle) => held(() => memory.menu(handle))(),
       pageByHandle: (handle) => held(() => memory.pageByHandle(handle))(),
+      pages: (ids) => held(() => memory.pages(ids))(),
       blogByHandle: (handle) => held(() => memory.blogByHandle(handle))(),
       articleByHandle: (handle) => held(() => memory.articleByHandle(handle))(),
       articles: (ids) => held(() => memory.articles(ids))(),

@@ -81,6 +81,8 @@ export const pages = onlineStoreSchema.table(
     body: text('body').notNull().default(''),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     templateSuffix: text('template_suffix'),
+    /** The words a storefront's search finds it by, folded (ADR-212). */
+    searchText: text('search_text').notNull().default(''),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -127,6 +129,8 @@ export const articles = onlineStoreSchema.table(
     tags: text('tags').array().notNull().default([]),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     templateSuffix: text('template_suffix'),
+    /** The words a storefront's search finds it by, folded (ADR-212). */
+    searchText: text('search_text').notNull().default(''),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

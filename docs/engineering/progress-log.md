@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Articles and pages in the storefront's search** (SRC-01, ADR-177): Shopify's search finds a
-shop's articles and pages beside its products, at /search and in its suggestions.
+**An article's image** (OS-07, ADR-176): Shopify's `article.image`, one of the shop's files,
+through the Admin API and on the storefront, in Hatti Base's blog and the blog's feed.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Articles and pages in the storefront's search
+
+* **A storefront's search finds the shop's published pages and articles** beside its products
+  ([ADR-212](../architecture/13-decision-log.md#adr-212--a-storefronts-search-finds-the-shops-published-pages-and-articles-beside-its-products-as-shopifys-does-by-the-words-each-keeps-folded-through-the-online-stores-own-search-in-the-core-products-then-pages-then-articles-the-kinds-shopifys-type-names-and-suggested-as-a-shopper-types)):
+  each keeps the words it is found by, folded as products' are (`search_text`, migration 0133),
+  and the online store searches them at `/storefront/shops/{shop}/search/content`.
+* **On the storefront:** products, then pages, then articles, the kinds Shopify's `type` names,
+  pages fetched by ID; suggestions of pages and articles as JSON and in the theme's section.
+  Hatti Base shows them with their first words and speaks of results.
+* 1633 tests (4 new): the words kept and folded, found and kept as they change, hidden and other
+  shops' left out, the kinds and limits asked; the storefront's results in order, `type`, and
+  suggestions.
 
 ### 6fefbd8 · Dates in the shop's own time zone, and Shopify's `time_tag`
 

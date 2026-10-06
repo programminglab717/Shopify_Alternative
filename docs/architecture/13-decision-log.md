@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-211 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-212 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -219,6 +219,7 @@
 | 209 | A blog has Shopify's Atom feed at its address with .atom, its 30 latest articles whole under IDs of their own, and an article's page gives themes the newer and the older article beside it, fetched together when a theme first asks for either | Accepted |
 | 210 | Safepay's trackers are asked after as JazzCash's payments are, through its reporter with the account's secret key; its answer, which Safepay does not sign, is believed as it comes from Safepay's own API, and only naming the account's API key and the tracker asked about | Accepted |
 | 211 | Storefront dates print in the shop's own time zone and the page's language, and themes get Shopify's time_tag and its date formats by name, a theme's own date_formats first | Accepted |
+| 212 | A storefront's search finds the shop's published pages and articles beside its products, as Shopify's does: by the words each keeps folded, through the online store's own search in the core; products, then pages, then articles, the kinds Shopify's type names, and suggested as a shopper types | Accepted |
 
 ---
 
@@ -8840,3 +8841,41 @@
     engine parses its theme again.
   * **Dates formatted in the documents:** themes choose their own formats, which one document's
     could not serve.
+
+## ADR-212 · A storefront's search finds the shop's published pages and articles beside its products, as Shopify's does: by the words each keeps folded, through the online store's own search in the core; products, then pages, then articles, the kinds Shopify's type names, and suggested as a shopper types
+
+* **Context:** A storefront's search asks the core for the shop's products with every word typed
+  ([ADR-046](#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)), which left a shop's pages and articles out of it
+  ([ADR-045](#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is), [ADR-177](#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)). Shopify's search finds products, pages and articles
+  unless its `type` names fewer, gives each result its `object_type`, and its predictive search
+  suggests pages and articles when asked for them.
+* **Decision:**
+  * **Each page and article keeps the words a search finds it by**, `search_text`, folded by
+    `searchKey` as products' are: its title, an article's tags and author, then its text's
+    opening, 10,000 characters of it without its markup, kept whenever any of them changes
+    (migration 0133, which gives those kept before theirs unfolded).
+  * **The online store's own search** in the core, at
+    `/storefront/shops/{shop}/search/content`, beside the catalog's: published pages and
+    articles with every word typed, the last word cut short when asked, a title holding the
+    first word first, then the latest published, up to 250 of each kind. Storefronts ask it and
+    the catalog's at once.
+  * **The search page** finds products, pages and articles unless Shopify's `type` names fewer:
+    products, then pages, then articles, each kind best first, a page of them fetched a chunk at a
+    time, each kind's documents in one round trip; pages are fetched by ID, as a list's articles
+    are, and say what they are, `object_type: 'page'`.
+  * **Predictive search** gives pages and articles when asked for them, as JSON in Shopify's
+    shape and as `predictive_search.resources.pages` and `.articles` for a theme's section.
+  * **Hatti Base** shows pages and articles among its results with their first words, says each
+    kind, speaks of results rather than products, and its header asks for products, pages and
+    articles as a shopper types.
+* **Consequences:**
+  * A shopper looking for a shop's returns policy or a guide on its blog finds it from the search
+    box.
+  * Results are ordered by kind, not by relevance across kinds; Typesense, when it comes, can
+    rank them together.
+  * Every search with words asks the core twice, at once, unless `type` names products alone.
+* **Alternatives:**
+  * **One search in the catalog for every kind:** the catalog would read the online store's
+    tables, which are its own.
+  * **Matching pages' and articles' HTML as it is:** markup and entities would match words, and
+    Roman Urdu and Urdu would not fold as products' do.

@@ -1,10 +1,14 @@
 {%- comment -%}
-  Suggestions as a shopper types (ADR-046): the products that could be what they want, then a
-  search for all they typed. The header's search box asks for this section through
-  /search/suggest?section_id=predictive-search, and its styles are the header's.
+  Suggestions as a shopper types (ADR-046): the products that could be what they want, the shop's
+  pages and articles (ADR-212), then a search for all they typed. The header's search box asks
+  for this section through /search/suggest?section_id=predictive-search with the kinds it wants,
+  and its styles are the header's.
 {%- endcomment -%}
 {%- if predictive_search.performed -%}
   {%- assign products = predictive_search.resources.products -%}
+  {%- assign pages = predictive_search.resources.pages -%}
+  {%- assign articles = predictive_search.resources.articles -%}
+  {%- assign found = products.size | plus: pages.size | plus: articles.size -%}
   <ul
     id="predictive-search-results"
     class="predictive-search"
@@ -26,13 +30,29 @@
         </a>
       </li>
     {%- endfor -%}
+    {%- for page in pages -%}
+      <li id="predictive-search-option-page-{{ forloop.index }}" role="option" aria-selected="false">
+        <a href="{{ page.url }}" class="predictive-search__link" tabindex="-1">
+          <span class="predictive-search__title" dir="auto">{{ page.title | escape }}</span>
+          <span class="predictive-search__kind">{{ 'sections.search.kinds.page' | t }}</span>
+        </a>
+      </li>
+    {%- endfor -%}
+    {%- for article in articles -%}
+      <li id="predictive-search-option-article-{{ forloop.index }}" role="option" aria-selected="false">
+        <a href="{{ article.url }}" class="predictive-search__link" tabindex="-1">
+          <span class="predictive-search__title" dir="auto">{{ article.title | escape }}</span>
+          <span class="predictive-search__kind">{{ 'sections.search.kinds.article' | t }}</span>
+        </a>
+      </li>
+    {%- endfor -%}
     <li id="predictive-search-option-all" role="option" aria-selected="false">
       <a
         href="{{ routes.search_url }}?q={{ predictive_search.terms | url_encode }}&amp;options%5Bprefix%5D=last"
         class="predictive-search__link predictive-search__all"
         tabindex="-1"
       >
-        {%- if products.size == 0 -%}
+        {%- if found == 0 -%}
           {{ 'sections.predictive_search.none' | t: terms: predictive_search.terms }}
         {%- else -%}
           {{ 'sections.predictive_search.search_for' | t: terms: predictive_search.terms }}

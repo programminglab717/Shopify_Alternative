@@ -41,10 +41,16 @@ export {
   type StorefrontApiOptions,
 } from './client.js';
 export {
+  CONTENT_TYPES,
   SEARCH_RESULTS,
   SEARCH_TERMS_MAX,
+  contentSearchPath,
+  contentSearchQuery,
   searchPath,
   searchQuery,
+  type ContentSearchOptions,
+  type ContentSearchResponse,
+  type ContentType,
   type SearchOptions,
   type SearchResponse,
 } from './search.js';

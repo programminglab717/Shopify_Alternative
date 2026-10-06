@@ -19,7 +19,16 @@ import {
   type CheckoutStartResponse,
   type StorefrontVisit,
 } from './cart.js';
-import { searchPath, searchQuery, type SearchOptions, type SearchResponse } from './search.js';
+import {
+  contentSearchPath,
+  contentSearchQuery,
+  searchPath,
+  searchQuery,
+  type ContentSearchOptions,
+  type ContentSearchResponse,
+  type SearchOptions,
+  type SearchResponse,
+} from './search.js';
 import {
   signUpsPath,
   type SignUpErrorResponse,
@@ -143,6 +152,20 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return ((await response.json()) as SearchResponse).productIds;
+  }
+
+  /** The shop's published articles and pages with every word of `terms`, best first (ADR-212). */
+  async searchContent(
+    shopId: string,
+    terms: string,
+    options: ContentSearchOptions = {},
+  ): Promise<ContentSearchResponse> {
+    const query = contentSearchQuery(terms, options);
+    const response = await this.#request('GET', `${contentSearchPath(shopId)}?${query}`, null);
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return (await response.json()) as ContentSearchResponse;
   }
 
   /**

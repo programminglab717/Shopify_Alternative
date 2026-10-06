@@ -29,6 +29,17 @@
         {%- for item in search.results -%}
           {%- if item.object_type == 'product' -%}
             <li class="grid__item">{% render 'card-product', product: item, position: forloop.index %}</li>
+          {%- elsif item.object_type == 'article' or item.object_type == 'page' -%}
+            {%- comment -%} The shop's own pages and articles a search found (ADR-212). {%- endcomment -%}
+            <li class="grid__item search__text">
+              <p class="search__kind">{{ 'sections.search.kinds.' | append: item.object_type | t }}</p>
+              <h2 dir="auto"><a href="{{ item.url }}">{{ item.title | escape }}</a></h2>
+              {%- if item.object_type == 'article' -%}
+                <p dir="auto">{{ item.excerpt_or_content | strip_html | truncatewords: 30 }}</p>
+              {%- else -%}
+                <p dir="auto">{{ item.content | strip_html | truncatewords: 30 }}</p>
+              {%- endif -%}
+            </li>
           {%- endif -%}
         {%- endfor -%}
       </ul>
@@ -46,6 +57,9 @@
   .search__form { display: flex; gap: 0.5rem; margin-block-end: 1.5rem; }
   .search__form input { flex: 1; min-inline-size: 0; min-block-size: 2.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--color-muted); border-radius: 0.5rem; background: var(--color-background); color: inherit; font: inherit; }
   .search__count { margin-block-end: 1rem; color: var(--color-muted); }
+  .search__text { padding: 1rem; border: 1px solid var(--color-muted); border-radius: 0.5rem; }
+  .search__text h2 { margin-block: 0.25rem 0.5rem; font-size: 1.125rem; }
+  .search__kind { margin: 0; font-size: 0.875rem; color: var(--color-muted); }
 {% endstylesheet %}
 
 {% schema %}

@@ -243,10 +243,11 @@ It reads the documents the core publishes to Valkey
 [ADR-036](./13-decision-log.md#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)),
 each in one round trip: a product or collection by its handle through a script, a list's products
 with one `MGET`. The same pages render from Valkey as from memory, in as many round trips.
-A search page, `/search?q=`, asks the core which of the shop's products have the words typed,
-best first, and reads the page of them it shows from their documents in the same way
-([ADR-046](./13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)).
-Hatti Base's header suggests products as a shopper types, the last word taken as cut short: its
+A search page, `/search?q=`, asks the core which of the shop's products, pages and articles have
+the words typed, each kind best first, and reads the page of them it shows from their documents in
+the same way ([ADR-046](./13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense), [ADR-212](./13-decision-log.md#adr-212--a-storefronts-search-finds-the-shops-published-pages-and-articles-beside-its-products-as-shopifys-does-by-the-words-each-keeps-folded-through-the-online-stores-own-search-in-the-core-products-then-pages-then-articles-the-kinds-shopifys-type-names-and-suggested-as-a-shopper-types)).
+Hatti Base's header suggests products, pages and articles as a shopper types, the last word taken
+as cut short: its
 script asks for the theme's predictive-search section, which the storefront renders alone, as
 Shopify's section rendering API does, and `/search/suggest.json` gives the same as JSON.
 Each shop's pages are rendered in its main theme: its own templates, section groups and settings

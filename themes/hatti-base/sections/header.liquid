@@ -70,6 +70,7 @@
   .predictive-search__link { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem; border-radius: 0.5rem; color: inherit; text-decoration: none; }
   .predictive-search__link img { inline-size: 48px; border-radius: 0.25rem; }
   .predictive-search__title { flex: 1; }
+  .predictive-search__kind { font-size: 0.875rem; color: var(--color-muted); }
   .predictive-search__all { text-decoration: underline; }
   .predictive-search [aria-selected='true'] > .predictive-search__link, .predictive-search__link:hover { background: var(--color-muted-background); }
 {% endstylesheet %}
@@ -115,7 +116,7 @@
         const query = new URLSearchParams({
           q: terms,
           section_id: 'predictive-search',
-          'resources[type]': 'product',
+          'resources[type]': 'product,page,article',
           'resources[limit]': '4',
         });
         try {

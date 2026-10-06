@@ -19,6 +19,7 @@ import {
 } from '@hatti/storefront-data';
 import { RateLimiter } from '@hatti/ratelimit';
 import {
+  CONTENT_TYPES,
   NUMBER_PROOF_COOKIE,
   PRODUCT_FEED_PATH,
   SEARCH_TERMS_MAX,
@@ -27,6 +28,8 @@ import {
   numberProofCookie,
   type CartItemInput,
   type CartJson,
+  type ContentSearchResponse,
+  type ContentType,
   type ThemePreviewResponse,
 } from '@hatti/storefront-api';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
@@ -52,6 +55,7 @@ import { sampleStore } from './fixtures.js';
 import { PASSWORD_COOKIE, isPasswordPass, passwordCookie, passwordPass } from './password.js';
 import { browserIdsOf } from './pixels.js';
 import { translation } from './liquid.js';
+import type { SearchFound } from './objects.js';
 import type { NamedDocument, PageRenderer, PageRequest } from './render.js';
 import {
   SITEMAP_KINDS,
@@ -1306,9 +1310,10 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     limiter !== null && !(await limiter.hit(SEARCHES, request.ip)).allowed;
 
   /**
-   * Search (ADR-046): `/search?q=` finds the shop's products through the core, and the theme's
-   * search page shows them, a page at a time. Without words, the page asks for some. With
-   * Shopify's `options[prefix]=last`, the last word may be cut short.
+   * Search (ADR-046): `/search?q=` finds the shop's products through the core, and its pages and
+   * articles (ADR-212), or the kinds Shopify's `type` names, and the theme's search page shows
+   * them, a page at a time. Without words, the page asks for some. With Shopify's
+   * `options[prefix]=last`, the last word may be cut short.
    */
   const search = async (request: FastifyRequest, reply: FastifyReply) => {
     const found = await shopFor(request, reply);
@@ -1317,7 +1322,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const urdu = url.pathname.startsWith('/ur/');
     const query = Object.fromEntries(url.searchParams);
     const terms = (query.q ?? '').trim().slice(0, SEARCH_TERMS_MAX);
-    let productIds: string[] = [];
+    const types = searchTypes(query.type);
+    let results: Omit<SearchFound, 'terms' | 'types'> = { productIds: [] };
     try {
       if (terms !== '') {
         if (!core) throw new StorefrontApiError(503, 'This storefront has no search');
@@ -1329,13 +1335,20 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
             .send('Too many searches. Please wait a moment.\n');
         }
         const prefix = query['options[prefix]'] === 'last' ? 'last' : 'none';
-        productIds = await core.search(found.shopId, terms, { prefix });
+        const content = contentTypes(types);
+        const [productIds, more] = await Promise.all([
+          types.includes('product') ? core.search(found.shopId, terms, { prefix }) : [],
+          content.length > 0
+            ? core.searchContent(found.shopId, terms, { prefix, types: content })
+            : { pageIds: [], articleIds: [] },
+        ]);
+        results = { productIds, pageIds: more.pageIds, articleIds: more.articleIds };
       }
       const page = {
         path: '/search',
         query,
         locale: urdu ? 'ur' : 'en',
-        search: { terms, productIds },
+        search: { terms, types, ...results },
       };
       reply.header('cache-control', SEARCH_CACHE);
       return await sendPage(reply, page, found, undefined, request);
@@ -1376,27 +1389,47 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     };
     try {
       let productIds: string[] = [];
-      if (wanted > 0) {
+      let more: ContentSearchResponse = { pageIds: [], articleIds: [] };
+      // The shop's own pages and articles, when asked for (ADR-212).
+      const content = params.terms === '' ? [] : contentTypes(params.types);
+      if (wanted > 0 || content.length > 0) {
         if (!core) throw new StorefrontApiError(503, 'This storefront has no search');
         if (await searchedTooMuch(request)) {
           return await refuse(429, 'Too Many Requests', 'Too many searches. Please wait a moment.');
         }
-        productIds = await core.search(found.shopId, params.terms, {
-          prefix: 'last',
-          limit: wanted,
-        });
+        [productIds, more] = await Promise.all([
+          wanted > 0
+            ? core.search(found.shopId, params.terms, { prefix: 'last', limit: wanted })
+            : [],
+          content.length > 0
+            ? core.searchContent(found.shopId, params.terms, {
+                prefix: 'last',
+                limit: params.limit,
+                types: content,
+              })
+            : more,
+        ]);
       }
       if (found.preview) previewed(reply);
       else reply.header('cache-control', SEARCH_CACHE).header('cache-tag', shopTag(found.shopId));
       if (json) {
-        const docs = suggestedProducts(await found.store.products(productIds), params);
-        return await reply.send(suggestJson(params, docs));
+        const [docs, pages, articles] = await Promise.all([
+          found.store.products(productIds),
+          found.store.pages(more.pageIds),
+          found.store.articles(more.articleIds),
+        ]);
+        return await reply.send(
+          suggestJson(params, suggestedProducts(docs, params), {
+            pages: pages.filter((doc) => doc !== null),
+            articles: articles.filter((doc) => doc !== null),
+          }),
+        );
       }
       const page: PageRequest = {
         path: '/search',
         query: Object.fromEntries(url.searchParams),
         locale: url.pathname.startsWith('/ur/') ? 'ur' : 'en',
-        suggest: { params, productIds },
+        suggest: { params, productIds, pageIds: more.pageIds, articleIds: more.articleIds },
       };
       const rendered = await renderer.sections(page, found.store, [sectionId], themeFor(found));
       const html = rendered.get(sectionId);
@@ -1562,6 +1595,23 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   });
 
   return app;
+}
+
+/** What a search finds, as Shopify's search `type` names them, in the order it lists them. */
+const SEARCH_TYPES = ['product', 'page', 'article'] as const;
+
+/** The kinds a search finds: those Shopify's `type` names, else all of them (ADR-212). */
+function searchTypes(asked: string | undefined): string[] {
+  const named = (asked ?? '').split(',').map((each) => each.trim());
+  const types = SEARCH_TYPES.filter((type) => named.includes(type));
+  return types.length > 0 ? types : [...SEARCH_TYPES];
+}
+
+/** Of `types`, those the shop's own content holds, its pages and articles, in their order. */
+function contentTypes(types: readonly string[]): ContentType[] {
+  return types.filter((type): type is ContentType =>
+    (CONTENT_TYPES as readonly string[]).includes(type),
+  );
 }
 
 /** The cart as `/cart.js` gives it, with its lines' products. */

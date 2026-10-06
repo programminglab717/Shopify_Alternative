@@ -81,6 +81,13 @@ export class RedisStore implements StoreData {
     return this.#byHandle<ArticleDoc>('article', handle);
   }
 
+  async pages(ids: readonly string[]): Promise<(PageDoc | null)[]> {
+    if (ids.length === 0) return [];
+    this.roundTrips += 1;
+    const docs = await this.#redis.mget(ids.map((id) => this.keys.doc(this.shopId, 'page', id)));
+    return docs.map((doc) => parse<PageDoc>(doc));
+  }
+
   async articles(ids: readonly string[]): Promise<(ArticleDoc | null)[]> {
     if (ids.length === 0) return [];
     this.roundTrips += 1;

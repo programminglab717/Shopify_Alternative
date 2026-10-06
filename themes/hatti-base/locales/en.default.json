@@ -79,20 +79,24 @@
     },
     "search": {
       "title": "Search",
-      "label": "Search products",
-      "placeholder": "Search products",
+      "label": "Search the shop",
+      "placeholder": "Search",
       "submit": "Search",
       "results": {
-        "one": "{{ count }} product for “{{ terms }}”",
-        "other": "{{ count }} products for “{{ terms }}”"
+        "one": "{{ count }} result for “{{ terms }}”",
+        "other": "{{ count }} results for “{{ terms }}”"
       },
-      "no_results": "No products match “{{ terms }}”. Try other words, or browse everything.",
-      "browse": "Browse all products"
+      "no_results": "Nothing matches “{{ terms }}”. Try other words, or browse everything.",
+      "browse": "Browse all products",
+      "kinds": {
+        "article": "Article",
+        "page": "Page"
+      }
     },
     "predictive_search": {
       "label": "Suggestions",
       "search_for": "Search for “{{ terms }}”",
-      "none": "No products match “{{ terms }}” yet. Search anyway"
+      "none": "Nothing matches “{{ terms }}” yet. Search anyway"
     },
     "password": {
       "opening_soon": "Opening soon",

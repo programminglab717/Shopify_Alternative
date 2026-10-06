@@ -19,6 +19,7 @@ import { PolicyService } from './policy.service.js';
 import { PreferencesService } from './preferences.service.js';
 import { SessionDaysService } from './session-days.service.js';
 import { StorefrontThemePreviewController } from './theme-preview.controller.js';
+import { StorefrontContentSearchController } from './content-search.js';
 import { ThemePreviewService } from './theme-preview.js';
 import { ThemeService } from './theme.service.js';
 import { UrlRedirectService } from './url-redirect.service.js';
@@ -53,7 +54,7 @@ import { UrlRedirectService } from './url-redirect.service.js';
     LinkTapsService,
     LinkTapsResolver,
   ],
-  controllers: [StorefrontThemePreviewController],
+  controllers: [StorefrontThemePreviewController, StorefrontContentSearchController],
   exports: [
     ThemeService,
     MenuService,

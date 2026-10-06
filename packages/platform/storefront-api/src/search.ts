@@ -34,3 +34,34 @@ export function searchQuery(terms: string, options: SearchOptions = {}): URLSear
 export interface SearchResponse {
   productIds: string[];
 }
+
+/** GET `…/search/content?q=`: the shop's articles and pages a search finds (ADR-212). */
+export function contentSearchPath(shopId: string): string {
+  return `${STOREFRONT_API_PREFIX}shops/${shopId}/search/content`;
+}
+
+/** What a search may find beside products, as Shopify's search `type` names them. */
+export const CONTENT_TYPES = ['article', 'page'] as const;
+export type ContentType = (typeof CONTENT_TYPES)[number];
+
+/** How a search of the shop's articles and pages reads what was typed, and what it finds. */
+export interface ContentSearchOptions extends SearchOptions {
+  /** The kinds to find, each up to `limit`; both when not said. */
+  types?: readonly ContentType[];
+}
+
+/** The query of a content search's request: a search's, and `types` when they are asked for. */
+export function contentSearchQuery(
+  terms: string,
+  options: ContentSearchOptions = {},
+): URLSearchParams {
+  const query = searchQuery(terms, options);
+  if (options.types) query.set('types', options.types.join(','));
+  return query;
+}
+
+/** The published articles and pages found, best first, each kind by its documents' IDs. */
+export interface ContentSearchResponse {
+  articleIds: string[];
+  pageIds: string[];
+}

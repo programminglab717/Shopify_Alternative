@@ -34,6 +34,7 @@ export class RequestData {
   readonly #collections = new Map<string, Promise<CollectionDoc | null>>();
   readonly #menus = new Map<string, Promise<MenuDoc | null>>();
   readonly #pages = new Map<string, Promise<PageDoc | null>>();
+  readonly #pagesById = new Map<string, Promise<PageDoc | null>>();
   readonly #blogs = new Map<string, Promise<BlogDoc | null>>();
   readonly #articles = new Map<string, Promise<ArticleDoc | null>>();
   readonly #articleHandles = new Map<string, Promise<ArticleDoc | null>>();
@@ -73,6 +74,11 @@ export class RequestData {
 
   page(handle: string): Promise<PageDoc | null> {
     return remember(this.#pages, handle, () => this.store.pageByHandle(handle));
+  }
+
+  /** Pages by ID, as a search finds them (ADR-212), likewise. */
+  pages(ids: readonly string[]): Promise<(PageDoc | null)[]> {
+    return batched(this.#pagesById, ids, (missing) => this.store.pages(missing));
   }
 
   blog(handle: string): Promise<BlogDoc | null> {
@@ -246,20 +252,25 @@ export function collectionObject(
  * first, fetched a chunk at a time when a template first touches one. Not performed without words.
  */
 export function searchObject(
-  found: { terms: string; productIds: readonly string[] } | null,
+  found: SearchFound | null,
   ctx: ObjectContext,
 ): Record<string, unknown> & Paginable {
-  const ids = found?.productIds ?? [];
+  // Products, then pages, then articles, each kind best first (ADR-212).
+  const entries = [
+    ...(found?.productIds ?? []).map((id) => `product:${id}`),
+    ...(found?.pageIds ?? []).map((id) => `page:${id}`),
+    ...(found?.articleIds ?? []).map((id) => `article:${id}`),
+  ];
   let window = { offset: 0, limit: 50 };
   let results: ItemRef[] | null = null;
   return {
     performed: found !== null && found.terms.trim() !== '',
     terms: found?.terms ?? '',
-    results_count: ids.length,
-    types: ['product'],
+    results_count: entries.length,
+    types: found?.types ?? ['product'],
     get results(): ItemRef[] {
-      return (results ??= lazyProducts(
-        ids.slice(window.offset, window.offset + window.limit),
+      return (results ??= lazyResults(
+        entries.slice(window.offset, window.offset + window.limit),
         ctx,
       ));
     },
@@ -270,28 +281,44 @@ export function searchObject(
   };
 }
 
+/** What a search found, each kind by its documents' IDs, best first, and the kinds it looked for. */
+export interface SearchFound {
+  terms: string;
+  productIds: readonly string[];
+  pageIds?: readonly string[];
+  articleIds?: readonly string[];
+  /** As Shopify's `search.types`: product, page and article, those searched. */
+  types?: readonly string[];
+}
+
 /**
  * Shopify's `predictive_search`, for a predictive search's section (ADR-046): what the shopper
  * has typed so far, the kinds of result asked for, and the products that could be what they
  * want, best first. Hatti finds nothing of the other kinds yet.
  */
 export function predictiveSearchObject(
-  found: { terms: string; types: readonly string[]; productIds: readonly string[] } | null,
+  found: (SearchFound & { types: readonly string[] }) | null,
   ctx: ObjectContext,
 ): Record<string, unknown> {
-  const ids = found?.productIds ?? [];
   let products: ItemRef[] | null = null;
+  let pages: ItemRef[] | null = null;
+  let articles: ItemRef[] | null = null;
   return {
     performed: found !== null && found.terms !== '',
     terms: found?.terms ?? '',
     types: found?.types ?? [],
     resources: {
       get products(): ItemRef[] {
-        return (products ??= lazyProducts(ids, ctx));
+        return (products ??= lazyProducts(found?.productIds ?? [], ctx));
       },
       collections: [],
-      pages: [],
-      articles: [],
+      // The shop's own pages and articles too, as a search finds them (ADR-212).
+      get pages(): ItemRef[] {
+        return (pages ??= lazyPages(found?.pageIds ?? [], ctx));
+      },
+      get articles(): ItemRef[] {
+        return (articles ??= lazyArticles(found?.articleIds ?? [], ctx));
+      },
       queries: [],
     },
   };
@@ -304,6 +331,8 @@ export function predictiveSearchObject(
 export function pageObject(doc: PageDoc): Record<string, unknown> {
   return {
     id: doc.id,
+    // As search results say what each of them is.
+    object_type: 'page',
     handle: doc.handle,
     title: doc.title,
     url: `/pages/${doc.handle}`,
@@ -602,6 +631,46 @@ function lazyArticles(ids: readonly string[], ctx: ObjectContext): ItemRef[] {
   return new LazyList(ids, ctx.chunkSize, async (chunk) =>
     (await ctx.data.articles(chunk)).map((doc) => doc && articleObject(doc)),
   ).refs();
+}
+
+/** Pages in a list, likewise (ADR-212). */
+function lazyPages(ids: readonly string[], ctx: ObjectContext): ItemRef[] {
+  return new LazyList(ids, ctx.chunkSize, async (chunk) =>
+    (await ctx.data.pages(chunk)).map((doc) => doc && pageObject(doc)),
+  ).refs();
+}
+
+/**
+ * A search's results of every kind, each "kind:id", fetched a chunk at a time: a chunk's products,
+ * pages and articles each in one round trip, all at once (ADR-212).
+ */
+function lazyResults(entries: readonly string[], ctx: ObjectContext): ItemRef[] {
+  return new LazyList(entries, ctx.chunkSize, async (chunk) => {
+    const of = (kind: string) =>
+      chunk
+        .filter((entry) => entry.startsWith(`${kind}:`))
+        .map((entry) => entry.slice(kind.length + 1));
+    const [products, pages, articles] = await Promise.all([
+      ctx.data.products(of('product')),
+      ctx.data.pages(of('page')),
+      ctx.data.articles(of('article')),
+    ]);
+    const found = new Map<string, Record<string, unknown> | null>([
+      ...of('product').map((id, index) => {
+        const doc = products[index];
+        return [`product:${id}`, doc ? productObject(doc, ctx) : null] as const;
+      }),
+      ...of('page').map((id, index) => {
+        const doc = pages[index];
+        return [`page:${id}`, doc ? pageObject(doc) : null] as const;
+      }),
+      ...of('article').map((id, index) => {
+        const doc = articles[index];
+        return [`article:${id}`, doc ? articleObject(doc) : null] as const;
+      }),
+    ]);
+    return chunk.map((entry) => found.get(entry) ?? null);
+  }).refs();
 }
 
 /** An item in a list: its fields, once its chunk is in. */

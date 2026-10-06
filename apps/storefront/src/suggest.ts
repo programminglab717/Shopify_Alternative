@@ -1,12 +1,15 @@
 import { SEARCH_TERMS_MAX } from '@hatti/storefront-api';
-import type { ImageDoc, ProductDoc } from '@hatti/storefront-data';
+import type { ArticleDoc, ImageDoc, PageDoc, ProductDoc } from '@hatti/storefront-data';
 
 // Shopify's predictive search (ADR-046): the products that could be what a shopper is typing, a
 // few at a time, found by the core as the search page finds them, the last word taken as cut
 // short. /search/suggest.json gives them as JSON; /search/suggest?section_id= renders a section
 // of the theme's with them, as `predictive_search`.
 
-/** What Shopify's predictive search can be asked for. Hatti finds products alone, so far. */
+/**
+ * What Shopify's predictive search can be asked for. Hatti finds products, and the shop's pages
+ * and articles (ADR-212); not yet its collections, nor queries.
+ */
 const TYPES = ['query', 'product', 'collection', 'page', 'article'] as const;
 export type SuggestType = (typeof TYPES)[number];
 
@@ -72,16 +75,58 @@ export function suggestedProducts(
   return ordered.slice(0, params.limit);
 }
 
-/** /search/suggest.json's answer: the products found, and nothing yet of the other kinds asked. */
+/**
+ * /search/suggest.json's answer: the products, pages and articles found, as asked, and nothing
+ * yet of the other kinds asked.
+ */
 export function suggestJson(
   params: SuggestParams,
   products: readonly ProductDoc[],
+  content: { pages: readonly PageDoc[]; articles: readonly ArticleDoc[] } = {
+    pages: [],
+    articles: [],
+  },
 ): { resources: { results: Record<string, unknown[]> } } {
   const results: Record<string, unknown[]> = {};
   for (const type of params.types) {
-    results[RESULTS[type]] = type === 'product' ? products.map(productJson) : [];
+    results[RESULTS[type]] =
+      type === 'product'
+        ? products.map(productJson)
+        : type === 'page'
+          ? content.pages.slice(0, params.limit).map(pageJson)
+          : type === 'article'
+            ? content.articles.slice(0, params.limit).map(articleJson)
+            : [];
   }
   return { resources: { results } };
+}
+
+/** A page as Shopify's predictive search gives it (ADR-212). */
+function pageJson(doc: PageDoc): Record<string, unknown> {
+  return {
+    id: doc.id,
+    title: doc.title,
+    handle: doc.handle,
+    url: `/pages/${doc.handle}`,
+    body: doc.bodyHtml,
+    published_at: doc.publishedAt,
+  };
+}
+
+/** An article as Shopify's predictive search gives it (ADR-212). */
+function articleJson(doc: ArticleDoc): Record<string, unknown> {
+  return {
+    id: doc.id,
+    title: doc.title,
+    handle: doc.handle,
+    url: `/blogs/${doc.blogHandle}/${doc.handle}`,
+    body: doc.bodyHtml,
+    summary_html: doc.summaryHtml,
+    author: doc.author,
+    tags: doc.tags,
+    published_at: doc.publishedAt,
+    image: null,
+  };
 }
 
 function isAvailable(doc: ProductDoc): boolean {

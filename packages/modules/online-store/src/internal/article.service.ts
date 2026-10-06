@@ -11,6 +11,7 @@ import {
   type ArticleChangedPayload,
   type ArticleUpdatedPayload,
 } from './events.js';
+import { contentSearchText } from './content-search.js';
 import type { ArticleRecord, Page } from './records.js';
 import { articles, blogs, type ArticleRow } from './schema.js';
 import { redirectMoved } from './url-redirect.service.js';
@@ -132,6 +133,7 @@ export class ArticleService {
         tags,
         templateSuffix: templateSuffix ?? null,
         publishedAt: published ? (publishDate ?? sql`now()`) : null,
+        searchText: contentSearchText(title, [...tags, author], summary, body),
       };
       const row = await insertWithHandle(
         async (candidate) =>
@@ -259,6 +261,12 @@ export class ArticleService {
         .set({
           ...next,
           tags: nextTags,
+          searchText: contentSearchText(
+            next.title,
+            [...nextTags, next.author],
+            next.summary,
+            next.body,
+          ),
           publishedAt: published ? (publishedAt ?? sql`now()`) : null,
           updatedAt: sql`now()`,
         })

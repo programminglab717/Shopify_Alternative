@@ -7,6 +7,7 @@ import { and, asc, count, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import { checkHandle, checkHtml, checkSuffix, insertWithHandle } from './content-input.js';
 import { OnlineStoreEvents, type PageChangedPayload, type PageUpdatedPayload } from './events.js';
 import { PAGE_LIMITS } from './page-body.js';
+import { contentSearchText } from './content-search.js';
 import type { Page, PageRecord } from './records.js';
 import { pages, type PageRow } from './schema.js';
 import { redirectMoved } from './url-redirect.service.js';
@@ -95,6 +96,7 @@ export class PageService {
         body,
         templateSuffix: templateSuffix ?? null,
         publishedAt: published ? sql`now()` : null,
+        searchText: contentSearchText(title, [], body),
       };
       const row = await insertWithHandle(
         async (candidate) =>
@@ -170,6 +172,7 @@ export class PageService {
         .update(pages)
         .set({
           ...next,
+          searchText: contentSearchText(next.title, [], next.body),
           // Published again, it keeps the time it was first shown since it was last hidden.
           publishedAt: published ? (page.publishedAt ?? sql`now()`) : null,
           updatedAt: sql`now()`,

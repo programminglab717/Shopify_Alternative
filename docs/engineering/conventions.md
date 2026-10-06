@@ -1720,7 +1720,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-046](../architecture/13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)).
   A search matches `search_text`, folded by `searchKey` from `@hatti/pk`: fold what is typed the
   same way, and never match the fields as they were written. When Typesense comes, it answers the
-  same request.
+  same request. The shop's pages and articles are found by the online store at
+  `/storefront/shops/{shop}/search/content`, each keeping its words with `contentSearchText`
+  whenever its title, names or text change
+  ([ADR-212](../architecture/13-decision-log.md#adr-212--a-storefronts-search-finds-the-shops-published-pages-and-articles-beside-its-products-as-shopifys-does-by-the-words-each-keeps-folded-through-the-online-stores-own-search-in-the-core-products-then-pages-then-articles-the-kinds-shopifys-type-names-and-suggested-as-a-shopper-types)).
 * **The core gives IDs, best first; the storefront reads the products** from their documents,
   only the page it shows (`searchObject`), as it reads a collection's. The core's answer is
   `no-store`: what a search found is for the page that shows it, not to keep.

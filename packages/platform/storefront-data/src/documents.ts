@@ -257,6 +257,8 @@ export interface StoreData {
   collectionByHandle(handle: string): Promise<CollectionDoc | null>;
   menu(handle: string): Promise<MenuDoc | null>;
   pageByHandle(handle: string): Promise<PageDoc | null>;
+  /** Many pages in one round trip, in the order asked; null for those gone (ADR-212). */
+  pages(ids: readonly string[]): Promise<(PageDoc | null)[]>;
   blogByHandle(handle: string): Promise<BlogDoc | null>;
   /** An article by its blog's handle and its own, as {@link articleHandle} makes them. */
   articleByHandle(handle: string): Promise<ArticleDoc | null>;
@@ -307,6 +309,7 @@ export class MemoryStore implements StoreData {
   readonly #collections: Map<string, CollectionDoc>;
   readonly #menus: Map<string, MenuDoc>;
   readonly #pages: Map<string, PageDoc>;
+  readonly #pagesById: Map<string, PageDoc>;
   readonly #blogs: Map<string, BlogDoc>;
   readonly #articles: Map<string, ArticleDoc>;
   readonly #articlesByHandle: Map<string, ArticleDoc>;
@@ -325,6 +328,7 @@ export class MemoryStore implements StoreData {
     this.#collections = new Map(documents.collections.map((c) => [c.handle, c]));
     this.#menus = new Map(documents.menus.map((menu) => [menu.handle, menu]));
     this.#pages = new Map((documents.pages ?? []).map((page) => [page.handle, page]));
+    this.#pagesById = new Map((documents.pages ?? []).map((page) => [page.id, page]));
     this.#blogs = new Map((documents.blogs ?? []).map((blog) => [blog.handle, blog]));
     this.#articles = new Map((documents.articles ?? []).map((article) => [article.id, article]));
     this.#articlesByHandle = new Map(
@@ -363,6 +367,10 @@ export class MemoryStore implements StoreData {
 
   pageByHandle(handle: string): Promise<PageDoc | null> {
     return this.#answer(this.#pages.get(handle) ?? null);
+  }
+
+  pages(ids: readonly string[]): Promise<(PageDoc | null)[]> {
+    return this.#answer(ids.map((id) => this.#pagesById.get(id) ?? null));
   }
 
   blogByHandle(handle: string): Promise<BlogDoc | null> {

@@ -36,6 +36,7 @@ import {
   searchObject,
   shopObject,
   type ObjectContext,
+  type SearchFound,
 } from './objects.js';
 import { metaPixelScript, pixelProduct } from './pixels.js';
 import { suggestedProducts, type SuggestParams } from './suggest.js';
@@ -68,16 +69,23 @@ export interface PageRequest {
   /** Why a change to the cart was refused, in the page's language, for the cart page to say. */
   cartError?: string | null;
   /**
-   * What a search for the search page found (ADR-046): what the shopper typed, and the products
-   * found, best first. Absent for a search page asked for without words.
+   * What a search for the search page found (ADR-046): what the shopper typed, and the products,
+   * and the shop's pages and articles (ADR-212), found, best first. Absent for a search page
+   * asked for without words.
    */
-  search?: { terms: string; productIds: readonly string[] } | null;
+  search?: SearchFound | null;
   /**
    * What a predictive search found (ADR-046), for its section: what it was asked, and the
    * products the core found, best first, more than it shows when some may be left out or put
    * last.
    */
-  suggest?: { params: SuggestParams; productIds: readonly string[] } | null;
+  suggest?: {
+    params: SuggestParams;
+    productIds: readonly string[];
+    /** The shop's pages and articles found, when asked for (ADR-212). */
+    pageIds?: readonly string[];
+    articleIds?: readonly string[];
+  } | null;
   /**
    * A theme shown through a preview link (ADR-049) rather than the shop's main theme: a bar on
    * the page names it, and ends the preview.
@@ -575,6 +583,8 @@ export class PageRenderer {
           terms: suggest.params.terms,
           types: suggest.params.types,
           productIds: suggested.map((doc) => doc.id),
+          pageIds: suggest.pageIds ?? [],
+          articleIds: suggest.articleIds ?? [],
         },
         ctx,
       ),

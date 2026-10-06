@@ -24,6 +24,8 @@ import {
   type CartJson,
   type CheckoutClient,
   type CheckoutPageResponse,
+  type ContentSearchOptions,
+  type ContentSearchResponse,
   type SearchOptions,
   type SignUpRequest,
   type SignUpResult,
@@ -326,6 +328,25 @@ class FakeCore {
     this.searches.push({ shopId, terms, options });
     if (this.found instanceof Error) throw this.found;
     return this.found.slice(0, options.limit);
+  }
+
+  /** The searches of the shop's pages and articles asked for, and what they find (ADR-212). */
+  readonly contentSearches: { shopId: string; terms: string; options: ContentSearchOptions }[] = [];
+  foundContent: ContentSearchResponse = { pageIds: [], articleIds: [] };
+
+  async searchContent(
+    shopId: string,
+    terms: string,
+    options: ContentSearchOptions = {},
+  ): Promise<ContentSearchResponse> {
+    this.contentSearches.push({ shopId, terms, options });
+    const types = options.types ?? ['page', 'article'];
+    return {
+      pageIds: types.includes('page') ? this.foundContent.pageIds.slice(0, options.limit) : [],
+      articleIds: types.includes('article')
+        ? this.foundContent.articleIds.slice(0, options.limit)
+        : [],
+    };
   }
 
   /** Preview links' tokens, and the themes they show; the tokens asked about. */
@@ -1208,6 +1229,82 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it("finds the shop's pages and articles beside its products, as asked, and suggests them (ADR-212)", async () => {
+    const app = server();
+    const get = (url: string) => app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
+    const [product] = sampleStore().products;
+    core.found = [product!.id];
+    core.foundContent = { pageIds: ['pg-returns'], articleIds: ['art-eid'] };
+    const found = await get('/search?q=eid');
+    expect(found.statusCode).toBe(200);
+    expect(found.body).toContain('3 results for “eid”');
+    // Products, then pages, then articles, each said what it is.
+    const grid = found.body.slice(found.body.indexOf('<ul class="grid" role="list">'));
+    const order = [
+      `/products/${product!.handle}`,
+      '/pages/returns',
+      '/blogs/news/eid-lawn-is-here',
+    ].map((url) => grid.indexOf(`href="${url}`));
+    expect(order.every((at) => at >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(found.body).toMatch(
+      /<p class="search__kind">Page<\/p>\s*<h2 dir="auto"><a href="\/pages\/returns">Returns and exchanges<\/a><\/h2>\s*<p dir="auto">Changed your mind\?/,
+    );
+    expect(found.body).toContain('<p class="search__kind">Article</p>');
+    expect(core.contentSearches).toEqual([
+      { shopId: 'sample', terms: 'eid', options: { prefix: 'none', types: ['page', 'article'] } },
+    ]);
+    // Shopify's `type` says which kinds: products alone, or articles alone.
+    await get('/search?q=eid&type=product');
+    expect([core.searches.length, core.contentSearches.length]).toEqual([2, 1]);
+    const articles = await get('/search?q=eid&type=article');
+    expect([core.searches.length, core.contentSearches.at(-1)!.options.types]).toEqual([
+      2,
+      ['article'],
+    ]);
+    expect(articles.body).toContain('1 result for “eid”');
+
+    // Suggested as Shopify's predictive search gives them, when asked for.
+    const json = await get(
+      '/search/suggest.json?q=eid&resources%5Btype%5D=product,page,article&resources%5Blimit%5D=2',
+    );
+    const results = (json.json() as { resources: { results: Record<string, unknown[]> } }).resources
+      .results;
+    expect(Object.keys(results)).toEqual(['products', 'pages', 'articles']);
+    expect(results.pages).toEqual([
+      expect.objectContaining({
+        id: 'pg-returns',
+        title: 'Returns and exchanges',
+        url: '/pages/returns',
+      }),
+    ]);
+    expect(results.articles).toEqual([
+      expect.objectContaining({
+        id: 'art-eid',
+        url: '/blogs/news/eid-lawn-is-here',
+        author: 'Ayesha Khan',
+        tags: ['Eid', 'Lawn'],
+      }),
+    ]);
+    expect(core.contentSearches.at(-1)!.options).toEqual({
+      prefix: 'last',
+      limit: 2,
+      types: ['page', 'article'],
+    });
+    // Shopify's default kinds leave articles out; products alone ask nothing of the rest.
+    const asked = core.contentSearches.length;
+    await get('/search/suggest.json?q=eid&resources%5Btype%5D=product');
+    expect(core.contentSearches).toHaveLength(asked);
+    const section = await get(
+      '/search/suggest?q=eid&section_id=predictive-search&resources%5Btype%5D=product,page,article',
+    );
+    expect(section.body).toMatch(
+      /<a href="\/pages\/returns" class="predictive-search__link" tabindex="-1">\s*<span class="predictive-search__title" dir="auto">Returns and exchanges<\/span>\s*<span class="predictive-search__kind">Page<\/span>/,
+    );
+    expect(section.body).toContain('href="/blogs/news/eid-lawn-is-here"');
+    await app.close();
+  });
+
   it("searches the shop through the core, and shows what it found in the theme's search page", async () => {
     const app = server();
     core.found = sampleStore()
@@ -1219,7 +1316,7 @@ describe('Carts', () => {
       headers: { host: 'localhost' },
     });
     expect(found.statusCode).toBe(200);
-    expect(found.body).toContain('3 products for “Eid lawn”');
+    expect(found.body).toContain('3 results for “Eid lawn”');
     expect(core.searches).toEqual([
       { shopId: 'sample', terms: 'Eid lawn', options: { prefix: 'none' } },
     ]);
@@ -1229,7 +1326,7 @@ describe('Carts', () => {
       url: '/ur/search?q=lawn',
       headers: { host: 'localhost' },
     });
-    expect(urdu.body).toContain('کے لیے 3 پروڈکٹس');
+    expect(urdu.body).toContain('کے لیے 3 نتائج');
     const blank = await app.inject({
       method: 'GET',
       url: '/search?q=+',

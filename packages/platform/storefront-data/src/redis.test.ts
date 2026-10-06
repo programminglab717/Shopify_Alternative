@@ -161,6 +161,14 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     expect(await data.pageByHandle('about-us')).toBeNull();
     expect((await data.pageByHandle('contact'))?.bodyHtml).toBe('<p>Since 1998</p>');
     expect(data.roundTrips).toBe(3);
+    // Many by ID in one round trip, as a search finds them (ADR-212); none for none.
+    expect((await data.pages(['g2', 'gone', 'g1'])).map((doc) => doc?.handle ?? null)).toEqual([
+      'contact',
+      null,
+      'our-story',
+    ]);
+    expect(await data.pages([])).toEqual([]);
+    expect(data.roundTrips).toBe(4);
     await write(shopId, (writer) => writer.dropPages(['g2']));
     expect(await store(shopId).pageByHandle('contact')).toBeNull();
   });
