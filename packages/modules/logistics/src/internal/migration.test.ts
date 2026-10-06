@@ -1,4 +1,5 @@
 import {
+  MIGRATION_TEST_TIMEOUT,
   createTestDatabase,
   migrateThrough,
   testDatabaseServer,
@@ -10,7 +11,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 const server = testDatabaseServer();
 
-describe.skipIf(!server)('migration 0058', () => {
+describe.skipIf(!server)('migration 0058', { timeout: MIGRATION_TEST_TIMEOUT }, () => {
   let db: TestDatabase | undefined;
   let admin: pg.Client | undefined;
 
@@ -99,7 +100,7 @@ describe.skipIf(!server)('migration 0058', () => {
   });
 });
 
-describe.skipIf(!server)('migration 0063', () => {
+describe.skipIf(!server)('migration 0063', { timeout: MIGRATION_TEST_TIMEOUT }, () => {
   let db: TestDatabase | undefined;
   let admin: pg.Client | undefined;
 

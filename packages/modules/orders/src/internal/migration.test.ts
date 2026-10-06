@@ -1,4 +1,5 @@
 import {
+  MIGRATION_TEST_TIMEOUT,
   createTestDatabase,
   migrateThrough,
   testDatabaseServer,
@@ -10,7 +11,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 const server = testDatabaseServer();
 
-describe.skipIf(!server)('migration 0015', () => {
+describe.skipIf(!server)('migration 0015', { timeout: MIGRATION_TEST_TIMEOUT }, () => {
   let db: TestDatabase | undefined;
   let admin: pg.Client | undefined;
 
@@ -57,7 +58,7 @@ describe.skipIf(!server)('migration 0015', () => {
   });
 });
 
-describe.skipIf(!server)('migration 0040', () => {
+describe.skipIf(!server)('migration 0040', { timeout: MIGRATION_TEST_TIMEOUT }, () => {
   let db: TestDatabase | undefined;
   let admin: pg.Client | undefined;
 
@@ -119,7 +120,7 @@ describe.skipIf(!server)('migration 0040', () => {
   });
 });
 
-describe.skipIf(!server)('migration 0065', () => {
+describe.skipIf(!server)('migration 0065', { timeout: MIGRATION_TEST_TIMEOUT }, () => {
   let db: TestDatabase | undefined;
   let admin: pg.Client | undefined;
 
@@ -185,7 +186,7 @@ describe.skipIf(!server)('migration 0065', () => {
   });
 });
 
-describe.skipIf(!server)('migration 0072', () => {
+describe.skipIf(!server)('migration 0072', { timeout: MIGRATION_TEST_TIMEOUT }, () => {
   let db: TestDatabase | undefined;
   let admin: pg.Client | undefined;
 
@@ -249,7 +250,7 @@ describe.skipIf(!server)('migration 0072', () => {
   });
 });
 
-describe.skipIf(!server)('migration 0074', () => {
+describe.skipIf(!server)('migration 0074', { timeout: MIGRATION_TEST_TIMEOUT }, () => {
   let db: TestDatabase | undefined;
   let admin: pg.Client | undefined;
 

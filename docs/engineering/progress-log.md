@@ -18,6 +18,14 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
+### Migration tests given the time their databases take
+
+* CI timed out customers' test of migration 0013 (run 272): it makes its database before 0013 in
+  the test itself, every migration before it run from nothing, which took nine seconds here under
+  the whole suite and more than the test's 30 on CI's runner. The orders module's five such tests
+  took 82 seconds together here. Each `describe` that makes such a database now takes
+  `MIGRATION_TEST_TIMEOUT`, two minutes, from `@hatti/db/testing`; the rest keep 30 seconds.
+
 ### 9175b68 · A draft paid by transfer through its link
 
 * **A transfer's draft gets a link** ([ADR-223](../architecture/13-decision-log.md#adr-223--a-draft-paid-by-transfer-gets-a-link-too-its-customer-confirms-it-as-one-paid-on-delivery-its-order-waits-for-the-money-and-the-link-becomes-the-orders-whose-page-shows-where-to-pay-and-takes-the-payment-online)) while the shop gives its bank account

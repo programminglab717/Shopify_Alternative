@@ -2586,6 +2586,10 @@ Rules:
 
 * **Vitest**, with real Postgres and Redis. Each test file creates and drops its own database with
   `createTestDatabase()` from `@hatti/db/testing`.
+* **A test of how a migration treats old data** makes its database `before` it and applies it
+  alone with `migrateThrough`; its `describe` takes `{ timeout: MIGRATION_TEST_TIMEOUT }`, as
+  every migration before it runs from nothing, which a busy CI runner takes more than 30 seconds
+  over.
 * With `DATABASE_POOLER_URL` set, as in CI, the database's app, system and identity URLs go
   through PgBouncer in transaction mode. Fixtures (`adminUrl`) and `listenUrl` stay direct. Code
   that only works on a direct connection fails there.

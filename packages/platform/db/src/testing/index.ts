@@ -62,6 +62,13 @@ export interface TestDatabaseOptions {
   before?: string;
 }
 
+/**
+ * How long a test that makes its database `before` a migration may take (see
+ * {@link createTestDatabase}): every migration before it runs from nothing, which on a busy CI
+ * runner takes longer than a test's usual 30 seconds.
+ */
+export const MIGRATION_TEST_TIMEOUT = 120_000;
+
 /** Creates a fresh, fully migrated database with its own name. Call drop() when done. */
 export async function createTestDatabase(
   server = testDatabaseServer(),

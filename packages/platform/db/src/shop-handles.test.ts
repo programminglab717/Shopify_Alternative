@@ -4,6 +4,7 @@ import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
 import { Database, pgError } from './index.js';
 import {
+  MIGRATION_TEST_TIMEOUT,
   createTestDatabase,
   migrateThrough,
   testDatabaseServer,
@@ -22,7 +23,10 @@ async function errorCode(promise: Promise<unknown>): Promise<string | undefined>
   return undefined;
 }
 
-describe.skipIf(!server)('shop handles (migration 0021)', () => {
+/** Its database is made before migration 0021, every migration before that run from nothing. */
+const migrating = { timeout: MIGRATION_TEST_TIMEOUT };
+
+describe.skipIf(!server)('shop handles (migration 0021)', migrating, () => {
   let testDb: TestDatabase | undefined;
   let admin: pg.Client | undefined;
   let db: Database | undefined;
