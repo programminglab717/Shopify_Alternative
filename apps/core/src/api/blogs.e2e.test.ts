@@ -171,7 +171,10 @@ describe.skipIf(!server)('Admin GraphQL API: blogs and their articles (ADR-176)'
     const renamed = await call(
       tokens.a,
       `mutation ($id: ID!, $blog: BlogUpdateInput!) {
-        blogUpdate(id: $id, blog: $blog) { blog { title handle } userErrors { field code } }
+        blogUpdate(id: $id, blog: $blog) {
+          blog { title handle seo { title description } }
+          userErrors { field code }
+        }
       }`,
       {
         id: news.blog.id,
@@ -180,10 +183,19 @@ describe.skipIf(!server)('Admin GraphQL API: blogs and their articles (ADR-176)'
           handle: 'journal',
           redirectNewHandle: true,
           redirectArticles: true,
+          // Its own for search engines (ADR-244).
+          seo: { title: 'The Zari journal', description: 'Eid edits and lawn launches.' },
         },
       },
     );
-    expect(renamed).toEqual({ blog: { title: 'Journal', handle: 'journal' }, userErrors: [] });
+    expect(renamed).toEqual({
+      blog: {
+        title: 'Journal',
+        handle: 'journal',
+        seo: { title: 'The Zari journal', description: 'Eid edits and lawn launches.' },
+      },
+      userErrors: [],
+    });
     // Its address and its articles' send shoppers on (ADR-218).
     const redirects = await call(
       tokens.menus,
@@ -244,7 +256,11 @@ describe.skipIf(!server)('Admin GraphQL API: blogs and their articles (ADR-176)'
   });
 
   it("says what is wrong under the blog's and the article's fields", async () => {
-    const refused = await createBlog(tokens.a, { title: ' ', handle: '!!!' });
+    const refused = await createBlog(tokens.a, {
+      title: ' ',
+      handle: '!!!',
+      seo: { description: 'x'.repeat(1001) },
+    });
     expect(refused).toEqual({
       blog: null,
       userErrors: [
@@ -253,6 +269,11 @@ describe.skipIf(!server)('Admin GraphQL API: blogs and their articles (ADR-176)'
           field: ['blog', 'handle'],
           code: 'INVALID',
           message: 'Handle must contain letters or digits',
+        },
+        {
+          field: ['blog', 'seo', 'description'],
+          code: 'TOO_LONG',
+          message: 'SEO description is too long (maximum is 1000 characters)',
         },
       ],
     });

@@ -36,7 +36,7 @@ registerEnumType(TranslatableResourceType, {
       description: 'A collection: its title, description, and SEO title and description.',
     },
     ONLINE_STORE_PAGE: { description: 'A page: its title, body, and SEO title and description.' },
-    ONLINE_STORE_BLOG: { description: 'A blog: its title.' },
+    ONLINE_STORE_BLOG: { description: 'A blog: its title, and SEO title and description.' },
     ONLINE_STORE_ARTICLE: {
       description: 'An article: its title, body, summary, and SEO title and description.',
     },

@@ -447,6 +447,8 @@ made from the start of the page's own text where the shop wrote none ([ADR-231](
 The home page takes the shop's own, as Shopify's homepage title and meta description, and a page
 without an image of its own the shop's social sharing image, as `page_image` gives it
 ([ADR-243](./13-decision-log.md#adr-243--a-shops-home-page-has-a-title-and-description-of-its-own-for-search-engines-as-shopifys-preferences-keep-them-and-a-social-sharing-image-one-of-its-files-which-link-previews-show-of-pages-without-an-image-of-their-own-through-shopifys-page_image)).
+A blog takes its own too, in place of its title and of the shop's description, on its tags'
+pages as on its own ([ADR-244](./13-decision-log.md#adr-244--a-blog-may-be-given-a-title-and-description-of-its-own-for-search-engines-as-its-articles-may-its-pages-give-them-in-place-of-its-title-and-of-the-shops-description-its-articles-keep-their-own-and-the-shop-may-translate-them-into-urdu)).
 Images by URL, as a Shopify export brings, keep their own address in link previews and
 structured data until the worker has made them ready; then, as for an upload, Hatti's own, with
 their sizes ([ADR-158](./13-decision-log.md#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)). The storefront also gives each shop's catalog feed, which Google Merchant

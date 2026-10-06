@@ -232,6 +232,7 @@ export function toBlog(record: BlogRecord): OnlineStoreBlog {
     templateSuffix: record.templateSuffix,
     // The enum's values are the online store's own.
     commentPolicy: record.commentPolicy as CommentPolicy,
+    seo: Object.assign(new SEO(), record.seo),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   });

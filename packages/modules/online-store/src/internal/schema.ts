@@ -118,6 +118,9 @@ export const blogs = onlineStoreSchema.table(
     templateSuffix: text('template_suffix'),
     /** Whether its articles take comments, held for approval or shown at once (ADR-220). */
     commentPolicy: text('comment_policy').$type<CommentPolicyValue>().notNull().default('closed'),
+    /** For search engines and link previews, in place of its own (ADR-244); null for its own. */
+    seoTitle: text('seo_title'),
+    seoDescription: text('seo_description'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

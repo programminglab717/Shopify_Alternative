@@ -1040,10 +1040,13 @@ async function resourceOf(
   }
   if (found.name === 'blog' && found.handle) {
     const doc = await ctx.data.blog(found.handle);
+    // It has no text of its own to describe it: the shop's describes it, unless it has its own
+    // description for search engines (ADR-244).
     return doc
       ? {
           blog: blogObject(doc, ctx, found.tag ?? null),
           current_tags: found.tag ? [found.tag] : [],
+          [SEO]: seoOf(doc.seo, ''),
         }
       : null;
   }

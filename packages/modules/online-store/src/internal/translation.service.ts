@@ -441,7 +441,7 @@ export class TranslationService {
       }
     } else if (kind === 'blog') {
       for (const record of await this.blogService.blogsOf(tx, shopId, { ids })) {
-        sources.set(record.id, { title: record.title });
+        sources.set(record.id, record);
       }
     } else if (kind === 'article') {
       for (const record of await this.articleService.articlesOf(tx, shopId, { ids })) {

@@ -1730,7 +1730,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   `checkSeo(check, path, input)`, which keeps each on one line, treats a field left out as no
   change and null or blank as clearing, and names the field in its own words ("SEO title is too
   long"). Name the columns in the event's `changed` list as `seoTitle` and `seoDescription`; a
-  change to them alone is a page's own, which no listing reads.
+  change to them alone is a page's own, which no listing reads. A resource with no text of its own,
+  as a blog, gives `seoOf(doc.seo, '')`: the shop's description stands where it has none
+  ([ADR-244](../architecture/13-decision-log.md#adr-244--a-blog-may-be-given-a-title-and-description-of-its-own-for-search-engines-as-its-articles-may-its-pages-give-them-in-place-of-its-title-and-of-the-shops-description-its-articles-keep-their-own-and-the-shop-may-translate-them-into-urdu)).
 * **A page's image for link previews is `page_image`**
   ([ADR-243](../architecture/13-decision-log.md#adr-243--a-shops-home-page-has-a-title-and-description-of-its-own-for-search-engines-as-shopifys-preferences-keep-them-and-a-social-sharing-image-one-of-its-files-which-link-previews-show-of-pages-without-an-image-of-their-own-through-shopifys-page_image)):
   the storefront gives a product's featured image, an article's or a collection's image, else the

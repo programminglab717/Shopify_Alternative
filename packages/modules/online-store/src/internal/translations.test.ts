@@ -286,7 +286,13 @@ describe.skipIf(!server)('TranslationService', () => {
   });
 
   it("lists a kind's resources the newest first, a page at a time: articles, blogs, menus and their items", async () => {
-    const news = unwrap(await f.blogs.create(f.a, { title: 'News' }));
+    // A blog's description for search engines too (ADR-244).
+    const news = unwrap(
+      await f.blogs.create(f.a, {
+        title: 'News',
+        seo: { description: 'Eid edits, lawn launches.' },
+      }),
+    );
     const eid = unwrap(
       await f.articles.create(f.a, {
         blogId: news.id,
@@ -341,6 +347,12 @@ describe.skipIf(!server)('TranslationService', () => {
           value: 'News',
           digest: digestOf('News'),
           type: 'single_line_text_field',
+        },
+        {
+          key: 'meta_description',
+          value: 'Eid edits, lawn launches.',
+          digest: digestOf('Eid edits, lawn launches.'),
+          type: 'multi_line_text_field',
         },
       ],
     ]);

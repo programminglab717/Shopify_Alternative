@@ -55,7 +55,7 @@ export const TRANSLATABLE_FIELDS: Readonly<Record<TranslatableKind, readonly Tra
   product: ['title', 'body_html', 'product_type', 'meta_title', 'meta_description'],
   collection: ['title', 'body_html', 'meta_title', 'meta_description'],
   page: ['title', 'body_html', 'meta_title', 'meta_description'],
-  blog: ['title'],
+  blog: ['title', 'meta_title', 'meta_description'],
   article: ['title', 'body_html', 'summary_html', 'meta_title', 'meta_description'],
   menu: ['title'],
   menuItem: ['title'],

@@ -54,6 +54,13 @@ export class OnlineStoreBlog {
   })
   commentPolicy!: CommentPolicy;
 
+  @Field(() => SEO, {
+    description:
+      'What search engines and link previews are told of its page (ADR-244): a title in place ' +
+      "of its own, and a description in place of the shop's.",
+  })
+  seo!: SEO;
+
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
 
@@ -243,6 +250,12 @@ export class BlogCreateInput {
     description: 'Whether its articles take comments; closed when not given.',
   })
   commentPolicy?: CommentPolicy | null;
+
+  @Field(() => SEOInput, {
+    nullable: true,
+    description: 'A title and description for search engines in place of its own.',
+  })
+  seo?: SEOInput | null;
 }
 
 @InputType({ description: 'Changes to a blog: fields left out stay as they are.' })
@@ -263,6 +276,12 @@ export class BlogUpdateInput {
       'not, whatever it becomes.',
   })
   commentPolicy?: CommentPolicy | null;
+
+  @Field(() => SEOInput, {
+    nullable: true,
+    description: 'A field left out stays as it is; null or blank clears it.',
+  })
+  seo?: SEOInput | null;
 
   @Field(() => Boolean, {
     nullable: true,

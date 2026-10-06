@@ -139,6 +139,8 @@ export interface BlogRecord {
   templateSuffix: string | null;
   /** Whether its articles take comments, held for approval or shown at once (ADR-220). */
   commentPolicy: CommentPolicyValue;
+  /** What search engines are told in place of its title (ADR-244). */
+  seo: SeoValue;
   createdAt: Date;
   updatedAt: Date;
 }

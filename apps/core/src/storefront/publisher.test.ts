@@ -854,6 +854,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       ],
       commentPolicy: 'closed',
       updatedAt: news.updatedAt.toISOString(),
+      seo: { title: null, description: null },
     });
     expect(await store().articleByHandle('news/eid-collection')).toEqual({
       id: eid.id,
@@ -1503,6 +1504,50 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await preferences.update(tenant, { seo: null, sharingImage: null }));
     await deliver();
     expect(Object.keys(await store().shop())).not.toContain('seo');
+  });
+
+  it("publishes a blog's own title and description for search engines, and in Urdu (ADR-244)", async () => {
+    const translations = new TranslationService(
+      database,
+      products,
+      collections,
+      pages,
+      blogs,
+      articles,
+      menus,
+    );
+    const notes = unwrap(
+      await blogs.create(tenant, {
+        title: 'Style notes',
+        seo: { title: 'How to wear lawn', description: 'Notes on lawn, from Lahore.' },
+      }),
+    );
+    const { content } = (await translations.resource(tenant, 'blog', notes.id))!;
+    expect(content.map((field) => field.key)).toEqual(['title', 'meta_title', 'meta_description']);
+    unwrap(
+      await translations.register(tenant, 'blog', notes.id, [
+        {
+          locale: 'ur',
+          key: 'meta_title',
+          value: 'لان کیسے پہنیں',
+          translatableContentDigest: content.find((field) => field.key === 'meta_title')!.digest,
+        },
+      ]),
+    );
+    await deliver();
+    const doc = await store().blogByHandle('style-notes');
+    expect([doc!.seo, doc!.translations]).toEqual([
+      { title: 'How to wear lawn', description: 'Notes on lawn, from Lahore.' },
+      { ur: { seo: { title: 'لان کیسے پہنیں' } } },
+    ]);
+
+    // Changed, the storefront has it as it is now.
+    unwrap(await blogs.update(tenant, notes.id, { seo: { description: null } }));
+    await deliver();
+    expect((await store().blogByHandle('style-notes'))!.seo).toEqual({
+      title: 'How to wear lawn',
+      description: null,
+    });
   });
 
   it('publishes what the shop charges for delivery, and how many working days it takes', async () => {

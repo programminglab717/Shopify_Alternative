@@ -6,9 +6,9 @@
 
 ## In progress
 
-**A blog for search engines** (OS-09): a blog's own title and description for search engines,
-as Shopify's `seo` and as its articles' are (ADR-231), through the Admin API and in Urdu, on the
-blog's pages.
+**The home page's words in Urdu** (OS-06): the shop's own title and description for its home
+page (ADR-243) in Urdu, as Shopify's translations of a shop's `meta_title` and
+`meta_description`, through the Admin API, on its Urdu home page.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### A blog for search engines
+
+* **A blog's own words for search engines** ([ADR-244](../architecture/13-decision-log.md#adr-244--a-blog-may-be-given-a-title-and-description-of-its-own-for-search-engines-as-its-articles-may-its-pages-give-them-in-place-of-its-title-and-of-the-shops-description-its-articles-keep-their-own-and-the-shop-may-translate-them-into-urdu)): a title and description,
+  as its articles have ([ADR-231](../architecture/13-decision-log.md#adr-231--products-collections-pages-and-articles-may-be-given-a-title-and-description-of-their-own-for-search-engines-as-shopifys-seo-has-them-themes-are-given-them-as-page_title-and-page_description-the-description-made-from-the-pages-own-text-where-the-shop-wrote-none-and-shopifys-product-csv-carries-a-products)); migration 0152
+  keeps them, through `blogCreate` and `blogUpdate`, and the shop may translate them into Urdu.
+* **On the storefront:** a blog's page and its tags' pages give them as `page_title` and
+  `page_description`, the shop's description standing where it wrote none; its articles keep
+  their own.
+* 1756 tests: kept, cleared and refused, through the Admin API too; translatable and
+  published beside its own; shown in English and Urdu, and not on its articles.
 
 ### b1683ae · The home page for search engines
 

@@ -325,7 +325,7 @@ export function pageDoc(
 export function blogDoc(
   blog: BlogRecord,
   published: readonly { id: string; tags: string[] }[],
-  /** Its title as the shop translated it (ADR-238). */
+  /** Its title, and those for search engines, as the shop translated them (ADR-238, ADR-244). */
   translations?: TranslatedFields,
 ): BlogDoc {
   return {
@@ -336,7 +336,11 @@ export function blogDoc(
     articles: published.map((article) => ({ id: article.id, tags: article.tags })),
     commentPolicy: blog.commentPolicy,
     updatedAt: blog.updatedAt.toISOString(),
-    ...translationsDoc(translations, (fields) => ({ title: fields.title })),
+    seo: blog.seo,
+    ...translationsDoc(translations, (fields) => ({
+      title: fields.title,
+      seo: seoTranslation(fields),
+    })),
   };
 }
 

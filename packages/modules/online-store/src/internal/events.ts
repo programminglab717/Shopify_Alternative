@@ -87,7 +87,10 @@ export interface BlogChangedPayload {
 
 /** A blog changed: the storefront shows it again, and its articles under a new handle. */
 export interface BlogUpdatedPayload extends BlogChangedPayload {
-  /** The fields that changed: "title", "handle", "templateSuffix" or "commentPolicy". */
+  /**
+   * The fields that changed: "title", "handle", "templateSuffix", "commentPolicy", "seoTitle" or
+   * "seoDescription".
+   */
   changed: string[];
 }
 

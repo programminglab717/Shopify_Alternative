@@ -631,6 +631,11 @@ type Blog {
   id: ID!
 
   """
+  What search engines and link previews are told of its page (ADR-244): a title in place of its own, and a description in place of the shop's.
+  """
+  seo: SEO!
+
+  """
   Another of the theme's blog templates, `news` for blog.news.json; null for blog.json.
   """
   templateSuffix: String
@@ -651,6 +656,9 @@ input BlogCreateInput {
 
   """Made from the title when not given: "News" gives news."""
   handle: String
+
+  """A title and description for search engines in place of its own."""
+  seo: SEOInput
   templateSuffix: String
   title: String!
 }
@@ -687,6 +695,9 @@ input BlogUpdateInput {
   With a new handle, whether the blog's old address sends shoppers to its new one: a URL redirect is made, as on Shopify, for the blog's own page; its articles' with redirectArticles. False unless given.
   """
   redirectNewHandle: Boolean
+
+  """A field left out stays as it is; null or blank clears it."""
+  seo: SEOInput
 
   """Blank for blog.json."""
   templateSuffix: String
@@ -9989,7 +10000,7 @@ enum TranslatableResourceType {
   """An article: its title, body, summary, and SEO title and description."""
   ONLINE_STORE_ARTICLE
 
-  """A blog: its title."""
+  """A blog: its title, and SEO title and description."""
   ONLINE_STORE_BLOG
 
   """A page: its title, body, and SEO title and description."""

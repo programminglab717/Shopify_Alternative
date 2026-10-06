@@ -100,6 +100,31 @@ describe.skipIf(!server)('Blogs and their articles (ADR-176)', () => {
     expect((await f.outbox()).at(-1)?.payload).toMatchObject({ changed: ['seoTitle'] });
   });
 
+  it("keeps a blog's title and description for search engines (ADR-244)", async () => {
+    const news = unwrap(
+      await f.blogs.create(f.a, {
+        title: 'News',
+        seo: { title: 'The Zari journal', description: 'Eid edits\nand lawn launches.' },
+      }),
+    );
+    // Each on one line.
+    expect(news.seo).toEqual({
+      title: 'The Zari journal',
+      description: 'Eid edits and lawn launches.',
+    });
+    expect(await f.blogs.get(f.a, news.id)).toEqual(news);
+    // A blank title gives it its own again; the description stays.
+    const retitled = unwrap(await f.blogs.update(f.a, news.id, { seo: { title: ' ' } }));
+    expect(retitled.seo).toEqual({ title: null, description: 'Eid edits and lawn launches.' });
+    expect((await f.outbox()).at(-1)?.payload).toEqual({ handle: 'news', changed: ['seoTitle'] });
+    // Null clears both; too long is refused.
+    const cleared = unwrap(await f.blogs.update(f.a, news.id, { seo: null }));
+    expect(cleared.seo).toEqual({ title: null, description: null });
+    expect(
+      errorsOf(await f.blogs.update(f.a, news.id, { seo: { title: 'x'.repeat(256) } })),
+    ).toEqual([['seo.title', 'TOO_LONG', 'SEO title is too long (maximum is 255 characters)']]);
+  });
+
   it('keeps an article in its blog, its HTML cleaned, its handle its blog’s alone', async () => {
     const news = unwrap(await f.blogs.create(f.a, { title: 'News' }));
     const recipes = unwrap(await f.blogs.create(f.a, { title: 'Recipes' }));

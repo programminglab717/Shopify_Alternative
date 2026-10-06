@@ -1,4 +1,12 @@
-import { InputChecker, fail, failOne, type MutationResult, type TenantContext } from '@hatti/api';
+import {
+  InputChecker,
+  checkSeo,
+  fail,
+  failOne,
+  type MutationResult,
+  type SeoInputValue,
+  type TenantContext,
+} from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
@@ -43,6 +51,11 @@ export interface BlogInput {
   templateSuffix?: string | null;
   /** Whether its articles take comments (ADR-220); closed for a new blog when not given. */
   commentPolicy?: CommentPolicyValue | null;
+  /**
+   * What search engines are told in place of its title (ADR-244): a field left out stays as it
+   * is, and null or blank clears it.
+   */
+  seo?: SeoInputValue | null;
   /**
    * With a new handle: the blog's old address sends shoppers to its new one, as Shopify's
    * `redirectNewHandle` does (ADR-053).
@@ -123,6 +136,7 @@ export class BlogService {
       input.handle === undefined || input.handle === null ? null : checkHandle(check, input.handle);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
     const commentPolicy = checkCommentPolicy(check, input.commentPolicy);
+    const seo = checkSeo(check, ['seo'], input.seo);
     if (!check.ok || title === null) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -139,6 +153,8 @@ export class BlogService {
         title,
         templateSuffix: templateSuffix ?? null,
         commentPolicy: commentPolicy ?? 'closed',
+        seoTitle: seo.title ?? null,
+        seoDescription: seo.description ?? null,
       };
       const row = await insertWithHandle(
         async (candidate) =>
@@ -178,6 +194,7 @@ export class BlogService {
         : checkHandle(check, input.handle);
     const templateSuffix = checkSuffix(check, input.templateSuffix);
     const commentPolicy = checkCommentPolicy(check, input.commentPolicy);
+    const seo = checkSeo(check, ['seo'], input.seo);
     if (!check.ok) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -192,10 +209,19 @@ export class BlogService {
         handle: handle ?? blog.handle,
         templateSuffix: templateSuffix === undefined ? blog.templateSuffix : templateSuffix,
         commentPolicy: commentPolicy ?? blog.commentPolicy,
+        seoTitle: seo.title === undefined ? blog.seoTitle : seo.title,
+        seoDescription: seo.description === undefined ? blog.seoDescription : seo.description,
       };
-      const changed = (['title', 'handle', 'templateSuffix', 'commentPolicy'] as const).filter(
-        (field) => next[field] !== blog[field],
-      );
+      const changed = (
+        [
+          'title',
+          'handle',
+          'templateSuffix',
+          'commentPolicy',
+          'seoTitle',
+          'seoDescription',
+        ] as const
+      ).filter((field) => next[field] !== blog[field]);
       if (changed.length === 0) return { ok: true, value: toRecord(blog) };
       if (next.handle !== blog.handle) {
         const [taken] = await tx
@@ -300,6 +326,7 @@ function toRecord(row: BlogRow): BlogRecord {
     title: row.title,
     templateSuffix: row.templateSuffix,
     commentPolicy: row.commentPolicy,
+    seo: { title: row.seoTitle, description: row.seoDescription },
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

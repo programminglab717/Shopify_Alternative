@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-243 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-244 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -251,6 +251,7 @@
 | 241 | A product's options and their values may have the shop's Urdu, as Shopify's translations keep them, each by its own ID; the product's document carries its options in Urdu, and its Urdu pages show each variant's values and title in them, the variant chosen by its ID the same in either language | Accepted |
 | 242 | A refund staff sent by hand may keep its receipt, staged as any upload is and given with the refund; its order keeps it among its receipts, never as one of the shop's files, and it goes with the customer's erasure as their own receipts do | Accepted |
 | 243 | A shop's home page has a title and description of its own for search engines, as Shopify's preferences keep them, and a social sharing image, one of its files, which link previews show of pages without an image of their own, through Shopify's `page_image` | Accepted |
+| 244 | A blog may be given a title and description of its own for search engines, as its articles may; its pages give them in place of its title and of the shop's description, its articles keep their own, and the shop may translate them into Urdu | Accepted |
 
 ---
 
@@ -10128,3 +10129,33 @@
     sharing image is a preference of its own, chosen for previews' sizes.
   * **The theme's settings:** the image would change with each theme, and settings take no
     image a shop uploaded yet.
+
+## ADR-244 · A blog may be given a title and description of its own for search engines, as its articles may; its pages give them in place of its title and of the shop's description, its articles keep their own, and the shop may translate them into Urdu
+
+* **Context:** Products, collections, pages and articles took a title and description of their
+  own for search engines ([ADR-231](#adr-231--products-collections-pages-and-articles-may-be-given-a-title-and-description-of-their-own-for-search-engines-as-shopifys-seo-has-them-themes-are-given-them-as-page_title-and-page_description-the-description-made-from-the-pages-own-text-where-the-shop-wrote-none-and-shopifys-product-csv-carries-a-products)), and the home page the shop's
+  ([ADR-243](#adr-243--a-shops-home-page-has-a-title-and-description-of-its-own-for-search-engines-as-shopifys-preferences-keep-them-and-a-social-sharing-image-one-of-its-files-which-link-previews-show-of-pages-without-an-image-of-their-own-through-shopifys-page_image)), but a blog's pages gave search engines and link previews the blog's
+  title and the shop's description alone (simplification 110). Shopify's admin gives a blog a
+  search engine listing as it gives a page one, which Liquid gives as `page_title` and
+  `page_description`.
+* **Decision:**
+  * **Kept as other SEO is** ([ADR-231](#adr-231--products-collections-pages-and-articles-may-be-given-a-title-and-description-of-their-own-for-search-engines-as-shopifys-seo-has-them-themes-are-given-them-as-page_title-and-page_description-the-description-made-from-the-pages-own-text-where-the-shop-wrote-none-and-shopifys-product-csv-carries-a-products)): migration 0152 gives `online_store.blogs`
+    `seo_title` and `seo_description`; `blogCreate` and `blogUpdate` take `seo`, checked by
+    `checkSeo`, and `Blog.seo` gives it. A change names `seoTitle` and `seoDescription` among
+    `blog.updated`'s changed fields, which rebuilds the blog's own document alone.
+  * **In Urdu** ([ADR-238](#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)): a blog's `meta_title` and `meta_description` may be
+    translated, as a page's may, and its document carries them beside its own.
+  * **On the storefront:** a blog's page, and its tags' pages, give its SEO title as
+    `page_title` and its SEO description as `page_description`. A blog has no text of its own to
+    make a description from, so without one the shop's description stands, as before. Its
+    articles' pages keep their own.
+* **Consequences:**
+  * Every page a shop writes for its storefront takes words of its own for search engines, so
+    the SEO toolkit's screens can treat them alike.
+  * A blog's tags' pages share its title and description; search engines tell them apart by
+    their addresses, and a theme may add the tag to the title from `current_tags`, as Dawn does.
+* **Alternatives:**
+  * **A description made from its latest articles:** it would change with each article, and
+    say what the articles say rather than what the blog is.
+  * **A title of its own for each tag's page:** Shopify gives a tag's page its blog's, and
+    themes add the tag where they want it.

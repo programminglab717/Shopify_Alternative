@@ -265,6 +265,43 @@ describe('Storefront rendering', () => {
     expect(plain).not.toContain('og:image');
   });
 
+  it('gives search engines the title and description a shop wrote for a blog, and in Urdu (ADR-244)', async () => {
+    const sample = sampleStore();
+    const description = 'Eid edits, lawn launches and how to wear them.';
+    const store = new MemoryStore({
+      ...sample,
+      shop: { ...sample.shop, seo: { title: null, description: 'Lawn, bridal and khussas.' } },
+      blogs: sample.blogs!.map((blog) => ({
+        ...blog,
+        seo: { title: 'The Zari journal', description },
+        translations: { ur: { seo: { title: 'زری کا روزنامچہ' } } },
+      })),
+    });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = async (path: string, locale?: string) =>
+      (await renderer.render({ path, ...(locale && { locale }) }, store.fresh())).html;
+
+    // Its own, in place of its title and of the shop's description; on its tag's pages too.
+    for (const path of ['/blogs/news', '/blogs/news/tagged/eid']) {
+      const shown = await page(path);
+      expect(shown, path).toContain('<title>The Zari journal · Zari Fashions</title>');
+      expect(shown, path).toContain(`<meta name="description" content="${description}">`);
+    }
+    // In Urdu, the title it gave in Urdu; the description it gave none in Urdu, as it is.
+    const urdu = await page('/blogs/news', 'ur');
+    expect(urdu).toContain('<title>زری کا روزنامچہ · Zari Fashions</title>');
+    expect(urdu).toContain(`<meta name="description" content="${description}">`);
+    // Its articles are their own.
+    const article = await page('/blogs/news/eid-lawn-is-here');
+    expect(article).not.toContain('The Zari journal');
+    expect(article).not.toContain(description);
+
+    // A blog without: its own title, and the shop's description.
+    const plain = (await render({ path: '/blogs/news' })).html;
+    expect(plain).toContain('<title>News · Zari Fashions</title>');
+    expect(plain).toContain('<meta name="description" content="Zari Fashions">');
+  });
+
   it("gives search engines an article as schema.org's BlogPosting, and the shop on its home page (ADR-237)", async () => {
     const platformUrl = 'https://hatti.pk';
     const logo = 'https://api.hatti.pk/logos/s1?v=0a1b2c3d';

@@ -12,8 +12,8 @@ import type { HandledKind } from './keys.js';
 export const DOCUMENTS_VERSION = 15;
 
 /**
- * What search engines and link previews are told of a product, collection, page or article in
- * place of its own title and the start of its text (OS-09, ADR-231): null for its own.
+ * What search engines and link previews are told of a product, collection, page, blog or article
+ * in place of its own title and the start of its text (OS-09, ADR-231, ADR-244): null for its own.
  */
 export interface SeoDoc {
   title: string | null;
@@ -173,6 +173,11 @@ export interface BlogDoc {
   commentPolicy?: CommentPolicyDoc;
   /** When it last changed, as ISO 8601 (ADR-236). Absent in documents written before. */
   updatedAt?: string;
+  /**
+   * What search engines and link previews are told in place of its own title, and of the shop's
+   * description (ADR-244). Absent in documents written before: its own.
+   */
+  seo?: SeoDoc;
   /** Its fields in Urdu, those the shop translated (ADR-238); absent where it translated none. */
   translations?: TranslationsDoc<BlogDoc, 'title'>;
 }
