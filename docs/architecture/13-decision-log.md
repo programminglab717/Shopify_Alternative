@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-235 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-236 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -243,6 +243,7 @@
 | 233 | A parcel's city is booked as its courier names it: the shop's own name for it, else Hatti's, else the courier's list's, matched through Pakistan's names for the city and their aliases; a city the list names none of fails its booking with the courier's nearest names, and the name staff give is kept for the shop's next parcel | Accepted |
 | 234 | A storefront search that finds no product with every word as typed reads each word none of the shop's products holds as the shop's own words a typo or two from it, a typo being a letter added, taken away or changed or two swapped, and shows those with the fewest typos first | Accepted |
 | 235 | A shop may say how many working days delivery takes, everywhere and in each of its delivery zones: the cart and product pages say it wherever delivery goes, from the fewest days anywhere to the most, and checkout says it for the shopper's city | Accepted |
+| 236 | A shop's sitemaps say when each page last changed and give its image, from an entry kept beside each document's handle as the document is written, so a sitemap reads no documents | Accepted |
 
 ---
 
@@ -9844,3 +9845,35 @@
     yet, and a shop delivering with its own riders has no courier to ask.
   * **One estimate for everywhere alone:** the shop's own city is usually much faster, and
     saying the slowest everywhere would understate it.
+
+## ADR-236 · A shop's sitemaps say when each page last changed and give its image, from an entry kept beside each document's handle as the document is written, so a sitemap reads no documents
+
+* **Context:** A shop's sitemaps listed its addresses alone ([ADR-051](#adr-051--search-engines-and-link-previews-are-told-each-pages-address-at-the-shops-own-in-each-language-and-find-pages-through-sitemaps-of-the-storefronts-documents)). Search engines
+  crawl first what changed since they last came, by each address's `lastmod`, and find images
+  through sitemaps' `image:image`. Shopify's sitemaps give both. A sitemap file lists up to 5,000
+  addresses, and reading that many documents to date them would fetch megabytes from Valkey for
+  every crawl.
+* **Decision:**
+  * **An entry for each document, beside its handle.** As the publisher writes a product,
+    collection, page, blog or article ([ADR-036](#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)), the same script keeps its sitemap
+    entry in a hash of the kind's, by ID: when it last changed and its image
+    (`sitemapEntryOf`). Taking the document off takes the entry with it.
+  * **When it last changed:** a product's and an article's `updatedAt`
+    ([ADR-216](#adr-216--a-collection-has-shopifys-atom-feed-at-its-address-with-atom-its-first-50-products-in-its-order-each-with-its-type-vendor-and-variants-in-shopifys-own-namespace-under-ids-of-their-own-and-products-documents-say-when-each-was-made-and-last-changed)); a collection's, a page's and a blog's, which their documents now carry;
+    and a page or article from before, when it was published. The documents' shape goes to 15,
+    so every shop's are written again with their entries.
+  * **Its image:** a product's first, and an article's own, whole at the shop's address as link
+    previews give them. Collections have no images yet.
+  * **A sitemap page reads the entries** with the handles, both hashes in one round trip
+    (`StoreData.sitemap`). Each address gets its `lastmod`, to the second, and its
+    `image:image`, after its addresses in other languages. The home page has neither.
+* **Consequences:**
+  * Search engines come back for what changed, and find products' photos for image search.
+  * A crawl reads two hashes of a kind, not 5,000 documents.
+  * The index's entries say nothing of when their files changed, and images carry no titles,
+    which Google no longer reads.
+* **Alternatives:**
+  * **Reading the documents for each sitemap:** megabytes from Valkey for each crawl of a large
+    shop's products.
+  * **A sorted set of handles by time:** it would date the files of the index too, but needs a
+    second structure kept in step with the handles for every write and drop.

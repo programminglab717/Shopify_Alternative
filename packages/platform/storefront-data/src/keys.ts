@@ -31,6 +31,11 @@ export class StorefrontKeys {
     return `${this.#base(shopId)}:${kind}-handles`;
   }
 
+  /** A hash of what the sitemaps say of each document, by ID (ADR-236). */
+  sitemap(shopId: string, kind: HandledKind): string {
+    return `${this.#base(shopId)}:${kind}-sitemap`;
+  }
+
   /** The shop's theme files, over the platform theme's. */
   theme(shopId: string): string {
     return `${this.#base(shopId)}:theme`;

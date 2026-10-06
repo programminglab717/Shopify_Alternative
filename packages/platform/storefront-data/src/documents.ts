@@ -9,7 +9,7 @@ import type { HandledKind } from './keys.js';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 14;
+export const DOCUMENTS_VERSION = 15;
 
 /**
  * What search engines and link previews are told of a product, collection, page or article in
@@ -76,6 +76,11 @@ export interface CollectionDoc {
   /** Its products, in the collection's order; their documents are fetched a page at a time. */
   productIds: string[];
   /**
+   * When it last changed, as ISO 8601: its sitemap's `lastmod` (ADR-236). Absent in documents
+   * written before, and for all products.
+   */
+  updatedAt?: string;
+  /**
    * What search engines and link previews are told in place of its own title and text (ADR-231).
    * Absent in documents written before: its own.
    */
@@ -113,6 +118,8 @@ export interface PageDoc {
   templateSuffix: string | null;
   /** When it was published, in ISO 8601. */
   publishedAt: string;
+  /** When it last changed, as ISO 8601 (ADR-236). Absent in documents written before. */
+  updatedAt?: string;
   /**
    * What search engines and link previews are told in place of its own title and text (ADR-231).
    * Absent in documents written before: its own.
@@ -137,6 +144,8 @@ export interface BlogDoc {
    * Absent in documents written before blogs took comments: closed.
    */
   commentPolicy?: CommentPolicyDoc;
+  /** When it last changed, as ISO 8601 (ADR-236). Absent in documents written before. */
+  updatedAt?: string;
 }
 
 /** Shopify's comment policies: none, each approved by the shop first, or each shown at once. */
@@ -316,6 +325,36 @@ export interface DeliveryDaysDoc {
 }
 
 /**
+ * What a shop's sitemaps say of a document (ADR-236), kept beside its handle as it is written:
+ * when it last changed, as ISO 8601, and its image, where the image service serves it; null for
+ * what it has not.
+ */
+export interface SitemapEntryDoc {
+  at: string | null;
+  image: string | null;
+}
+
+/** A document's sitemap entry, with the handle the storefront finds it by. */
+export interface SitemapEntry extends SitemapEntryDoc {
+  handle: string;
+}
+
+/**
+ * What the sitemaps say of `doc`, a document of `kind`: when it last changed, else when it was
+ * published; and a product's first image, a collection's or an article's own.
+ */
+export function sitemapEntryOf(kind: HandledKind, doc: object): SitemapEntryDoc {
+  const fields = doc as {
+    updatedAt?: string;
+    publishedAt?: string;
+    images?: ImageDoc[];
+    image?: ImageDoc | null;
+  };
+  const image = kind === 'product' ? fields.images?.[0] : fields.image;
+  return { at: fields.updatedAt ?? fields.publishedAt ?? null, image: image?.src ?? null };
+}
+
+/**
  * A shop's main theme: the platform theme it is built on, and the shop's own JSON files over it,
  * templates, section groups and settings (ADR-039).
  */
@@ -362,6 +401,11 @@ export interface StoreData {
    * sitemaps, an article's with its blog's: in no order, in one round trip.
    */
   handles(kind: HandledKind): Promise<string[]>;
+  /**
+   * What the sitemaps say of each of a kind the storefront shows (ADR-236): its handle, when it
+   * last changed and its image, in no order, in one round trip.
+   */
+  sitemap(kind: HandledKind): Promise<SitemapEntry[]>;
   /** The ID of every product the storefront shows, for its catalog feed: in no order, likewise. */
   productIds(): Promise<string[]>;
 }
@@ -494,6 +538,19 @@ export class MemoryStore implements StoreData {
 
   productIds(): Promise<string[]> {
     return this.#answer([...this.#products.keys()]);
+  }
+
+  sitemap(kind: HandledKind): Promise<SitemapEntry[]> {
+    const docs: Map<string, object> = {
+      product: this.#productsByHandle,
+      collection: this.#collections,
+      page: this.#pages,
+      blog: this.#blogs,
+      article: this.#articlesByHandle,
+    }[kind];
+    return this.#answer(
+      [...docs].map(([handle, doc]) => ({ handle, ...sitemapEntryOf(kind, doc) })),
+    );
   }
 
   async #answer<T>(value: T): Promise<T> {

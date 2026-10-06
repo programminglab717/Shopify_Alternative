@@ -1621,20 +1621,31 @@ describe('Carts', () => {
     ]);
     const products = (await get('/sitemaps/products-1.xml')).body;
     expect(locs(products)).toHaveLength(sample.products.length);
-    const handle = sample.products[0]!.handle;
+    // Each with its image, whole (ADR-236).
+    const pictured = sample.products.find((product) => product.images.length > 0)!;
+    const handle = pictured.handle;
+    expect(products).toContain('xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"');
     expect(products).toContain(
       `<url><loc>http://localhost/products/${handle}</loc>` +
         `<xhtml:link rel="alternate" hreflang="en" href="http://localhost/products/${handle}"/>` +
-        `<xhtml:link rel="alternate" hreflang="ur" href="http://localhost/ur/products/${handle}"/></url>`,
+        `<xhtml:link rel="alternate" hreflang="ur" href="http://localhost/ur/products/${handle}"/>` +
+        `<image:image><image:loc>http://localhost${pictured.images[0]!.src}</image:loc>` +
+        '</image:image></url>',
     );
     expect(locs((await get('/sitemaps/collections-1.xml')).body)).toHaveLength(
       sample.collections.length,
     );
-    // The pages', with the home page first, in Urdu at /ur.
+    // The pages', with the home page first, in Urdu at /ur; each page with when it was
+    // published, as it has not changed since.
     const pages = (await get('/sitemaps/pages-1.xml')).body;
     expect(locs(pages)[0]).toBe('http://localhost/');
     expect(pages).toContain('hreflang="ur" href="http://localhost/ur"/>');
     expect(locs(pages)).toHaveLength(1 + sample.pages!.length);
+    const published = sample.pages![0]!;
+    expect(pages).toContain(
+      `<loc>http://localhost/pages/${published.handle}</loc>` +
+        `<lastmod>${published.publishedAt.replace(/\.\d+(?=Z$)/, '')}</lastmod>`,
+    );
     // Blogs, and articles at their blog's address and theirs (ADR-177).
     expect(locs((await get('/sitemaps/blogs-1.xml')).body)).toEqual([
       'http://localhost/blogs/news',
@@ -1648,6 +1659,28 @@ describe('Carts', () => {
       expect((await get(missing)).statusCode, missing).toBe(404);
     }
     await app.close();
+
+    // When a product last changed, to the second, after its address.
+    const changed = server({
+      sample: new MemoryStore({
+        ...sample,
+        products: sample.products.map((product, at) =>
+          at === 0 ? { ...product, updatedAt: '2026-10-06T09:41:12.345Z' } : product,
+        ),
+      }),
+    });
+    const dated = (
+      await changed.inject({
+        method: 'GET',
+        url: '/sitemaps/products-1.xml',
+        headers: { host: 'localhost' },
+      })
+    ).body;
+    expect(dated).toContain(
+      `<loc>http://localhost/products/${sample.products[0]!.handle}</loc>` +
+        '<lastmod>2026-10-06T09:41:12Z</lastmod>',
+    );
+    await changed.close();
 
     // The shop's own rules: those for every crawler join the platform's, its groups follow.
     const ruled = server({

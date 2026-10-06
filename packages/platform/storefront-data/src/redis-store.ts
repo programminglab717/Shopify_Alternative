@@ -7,6 +7,8 @@ import type {
   PageDoc,
   ProductDoc,
   ShopDoc,
+  SitemapEntry,
+  SitemapEntryDoc,
   StoreData,
   ThemeDoc,
 } from './documents.js';
@@ -118,6 +120,27 @@ export class RedisStore implements StoreData {
     this.roundTrips += 1;
     // The hash of handles by ID has each product once.
     return this.#redis.hkeys(this.keys.handles(this.shopId, 'product'));
+  }
+
+  async sitemap(kind: HandledKind): Promise<SitemapEntry[]> {
+    this.roundTrips += 1;
+    const answers = await this.#redis
+      .pipeline()
+      .hgetall(this.keys.ids(this.shopId, kind))
+      .hgetall(this.keys.sitemap(this.shopId, kind))
+      .exec();
+    const [ids, entries] = (answers ?? []).map(([error, value]) => {
+      if (error) throw error;
+      return value as Record<string, string>;
+    });
+    // A document written before sitemaps kept entries (ADR-236) has none until written again.
+    return Object.entries(ids ?? {}).map(([handle, id]) => {
+      const entry = entries?.[id];
+      const parsed: SitemapEntryDoc = entry
+        ? (JSON.parse(entry) as SitemapEntryDoc)
+        : { at: null, image: null };
+      return { handle, ...parsed };
+    });
   }
 
   async #byHandle<T>(kind: HandledKind, handle: string): Promise<T | null> {

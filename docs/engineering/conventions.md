@@ -1286,8 +1286,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   for. `json` and `structured_data` output is safe inside `<script>`: use them, not `| escape`, for
   JSON in a page (`scriptJson` in code).
 * **Sitemaps and robots.txt come from the documents** (`sitemap.ts`), through
-  `StoreData.handles`: a new kind of document the storefront shows joins `SITEMAP_KINDS`, and a new
-  route that crawlers should skip joins `robotsTxt`. A shop's own rules
+  `StoreData.handles` and `StoreData.sitemap`: a new kind of document the storefront shows joins
+  `SITEMAP_KINDS`, and a new route that crawlers should skip joins `robotsTxt`. What a sitemap says
+  of a document is `sitemapEntryOf`, which the writer keeps beside its handle ([ADR-236](../architecture/13-decision-log.md#adr-236--a-shops-sitemaps-say-when-each-page-last-changed-and-give-its-image-from-an-entry-kept-beside-each-documents-handle-as-the-document-is-written-so-a-sitemap-reads-no-documents)): a
+  document that gains a date or an image for search engines gives it there, never read from the
+  documents at crawl time. A shop's own rules
   ([ADR-055](../architecture/13-decision-log.md#adr-055--a-shop-adds-rules-to-its-robotstxt-as-lines-crawlers-read-checked-when-saved-never-liquid))
   are checked by `robotsRules` in the online store and served as they were kept: a directive the
   storefront should take from shops joins both.

@@ -142,6 +142,48 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     expect(await store(shopId).collectionByHandle('eid-2026')).toBeNull();
   });
 
+  it('keeps what the sitemaps say of each document beside its handle (ADR-236)', async () => {
+    const shopId = randomUUID();
+    const image = { src: '/images/s/p1/1.jpg', width: 800, height: 1000, alt: null };
+    const at = '2026-10-06T09:41:12.345Z';
+    await write(shopId, (writer) =>
+      writer.putProducts([
+        { ...product('p1', 'lawn-suit'), images: [image], updatedAt: at },
+        product('p2', 'khussa'),
+      ]),
+    );
+    const entries = async () =>
+      (await store(shopId).sitemap('product')).sort((a, b) => (a.handle < b.handle ? -1 : 1));
+    expect(await entries()).toEqual([
+      { handle: 'khussa', at: null, image: null },
+      { handle: 'lawn-suit', at, image: '/images/s/p1/1.jpg' },
+    ]);
+    // A handle changed takes its entry with it; one taken off takes its entry away.
+    await write(shopId, (writer) =>
+      writer.putProducts([{ ...product('p1', 'eid-lawn-suit'), updatedAt: at }]),
+    );
+    await write(shopId, (writer) => writer.dropProducts(['p2']));
+    expect(await entries()).toEqual([{ handle: 'eid-lawn-suit', at, image: null }]);
+    // Pages say when they last changed, else when they were published.
+    const page = (id: string, handle: string): PageDoc => ({
+      id,
+      handle,
+      title: handle,
+      bodyHtml: '',
+      templateSuffix: null,
+      publishedAt: '2026-09-01T00:00:00.000Z',
+    });
+    await write(shopId, (writer) =>
+      writer.putPages([page('g1', 'about'), { ...page('g2', 'faq'), updatedAt: at }]),
+    );
+    expect(
+      (await store(shopId).sitemap('page')).sort((a, b) => (a.handle < b.handle ? -1 : 1)),
+    ).toEqual([
+      { handle: 'about', at: '2026-09-01T00:00:00.000Z', image: null },
+      { handle: 'faq', at, image: null },
+    ]);
+  });
+
   it('keeps pages by handle as it keeps products, and takes them off', async () => {
     const shopId = randomUUID();
     const page = (id: string, handle: string): PageDoc => ({
@@ -465,7 +507,8 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
       await writer.putProducts([product('p1', 'lawn-suit')]);
     });
     await queue.add(shopId, ['product:p1']);
-    expect(await queue.clear(shopId)).toBe(5);
+    // The shop, the product, its handles both ways and its sitemap entry, and the queue.
+    expect(await queue.clear(shopId)).toBe(6);
     await expect(store(shopId).shop()).rejects.toThrow(StoreMissingError);
     expect(await store(shopId).productByHandle('lawn-suit')).toBeNull();
     expect(await queue.size(shopId)).toBe(0);

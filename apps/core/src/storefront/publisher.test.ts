@@ -774,6 +774,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       bodyHtml: '<h2>Since 1998</h2><p>Hand-made in Multan.</p>',
       templateSuffix: null,
       publishedAt: about.publishedAt!.toISOString(),
+      updatedAt: about.updatedAt.toISOString(),
       seo: { title: null, description: null },
     });
     expect(await store().pageByHandle('returns')).toBeNull();
@@ -824,6 +825,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         { id: eid.id, tags: ['Eid', 'lawn'] },
       ],
       commentPolicy: 'closed',
+      updatedAt: news.updatedAt.toISOString(),
     });
     expect(await store().articleByHandle('news/eid-collection')).toEqual({
       id: eid.id,

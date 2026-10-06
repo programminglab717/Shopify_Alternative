@@ -119,6 +119,7 @@ export function collectionDoc(record: CollectionRecord, productIds: string[]): C
     descriptionHtml: textToHtml(record.description),
     image: null,
     productIds,
+    updatedAt: record.updatedAt.toISOString(),
     seo: record.seo,
   };
 }
@@ -166,6 +167,7 @@ export function pageDoc(page: PageRecord & { publishedAt: Date }): PageDoc {
     bodyHtml: page.body,
     templateSuffix: page.templateSuffix,
     publishedAt: page.publishedAt.toISOString(),
+    updatedAt: page.updatedAt.toISOString(),
     seo: page.seo,
   };
 }
@@ -185,6 +187,7 @@ export function blogDoc(
     templateSuffix: blog.templateSuffix,
     articles: published.map((article) => ({ id: article.id, tags: article.tags })),
     commentPolicy: blog.commentPolicy,
+    updatedAt: blog.updatedAt.toISOString(),
   };
 }
 

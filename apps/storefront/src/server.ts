@@ -749,9 +749,11 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       const asked = sitemapOf((request.params as { name: string }).name);
       if (!asked) return null;
       // In the same order each time, so a handle stays in its file.
-      const handles = (await found.store.handles(asked.kind)).sort();
-      if (asked.page > Math.max(sitemapPages(handles.length), 1)) return null;
-      return sitemapPage(origin, asked.kind, handles, asked.page, languages);
+      const entries = (await found.store.sitemap(asked.kind)).sort((a, b) =>
+        a.handle < b.handle ? -1 : a.handle > b.handle ? 1 : 0,
+      );
+      if (asked.page > Math.max(sitemapPages(entries.length), 1)) return null;
+      return sitemapPage(origin, asked.kind, entries, asked.page, languages);
     }),
   );
 

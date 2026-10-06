@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Sitemaps that say when pages changed** (OS-09): each address's `lastmod`, and products' images,
-as Shopify's sitemaps list them.
+**Structured data beyond products** (OS-09): Shopify's `structured_data` for an article, as
+schema.org's BlogPosting, and the home page's Organization and WebSite, as Dawn gives them.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Sitemaps that say when pages changed
+
+* **Each address's `lastmod` and image** ([ADR-236](../architecture/13-decision-log.md#adr-236--a-shops-sitemaps-say-when-each-page-last-changed-and-give-its-image-from-an-entry-kept-beside-each-documents-handle-as-the-document-is-written-so-a-sitemap-reads-no-documents)), as Shopify's sitemaps
+  give them: when a product, collection, page, blog or article last changed, to the second, else
+  when it was published; a product's first image and an article's own, whole at the shop's address.
+* **Kept beside the handles:** as the publisher writes a document, the same script keeps its
+  sitemap entry in a hash by ID, so a sitemap page reads two hashes in one round trip rather than
+  5,000 documents. Collections, pages and blogs now carry `updatedAt`; the documents' shape goes
+  to 15.
+* 1729 tests: entries kept, moved with a handle and gone with their document in Valkey, and
+  the sitemaps' `lastmod` and images.
 
 ### 040dada · Delivery estimates
 

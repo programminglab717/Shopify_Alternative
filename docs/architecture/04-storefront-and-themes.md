@@ -412,8 +412,9 @@ its language, and the storefront adds its address in the theme's other languages
 Hatti Base's link-preview tags give the page's address, type, description and image, absolute,
 and product pages carry schema.org's `Product` with an `Offer` for each variant, through
 Shopify's `structured_data` filter. `/sitemap.xml` indexes sitemaps of the shop's products,
-collections and pages, 5,000 to a file, each address with its Urdu one, from the documents the
-storefront shows; `robots.txt` keeps crawlers from carts, checkouts, searches, previews and the
+collections and pages, 5,000 to a file, each address with its Urdu one, when it last changed
+and its image ([ADR-236](./13-decision-log.md#adr-236--a-shops-sitemaps-say-when-each-page-last-changed-and-give-its-image-from-an-entry-kept-beside-each-documents-handle-as-the-document-is-written-so-a-sitemap-reads-no-documents)), from the documents the storefront shows;
+`robots.txt` keeps crawlers from carts, checkouts, searches, previews and the
 editor's routes. Shops keep URL redirects from addresses they have no page at, such as their
 old store's, through the Admin API's `urlRedirect` mutations, or a Shopify redirects export
 imported at once and exported again as CSV, and the storefront follows one where it would answer

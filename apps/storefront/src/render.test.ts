@@ -1146,6 +1146,7 @@ describe('Storefront rendering', () => {
       redirect: (path) => memory.redirect(path),
       policy: (type) => memory.policy(type),
       handles: (kind) => memory.handles(kind),
+      sitemap: (kind) => memory.sitemap(kind),
       productIds: () => memory.productIds(),
     };
     const page = await renderer.stream({ path: '/' }, store);

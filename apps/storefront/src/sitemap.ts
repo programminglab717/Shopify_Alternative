@@ -1,9 +1,9 @@
-import type { HandledKind } from '@hatti/storefront-data';
-import { escapeHtml } from './liquid.js';
+import type { HandledKind, SitemapEntry } from '@hatti/storefront-data';
+import { escapeHtml, imageAddress } from './liquid.js';
 
 // What a shop tells search engines (OS-09), as Shopify's storefronts do: robots.txt, and
 // sitemaps of its products, collections, pages, blogs and articles at its own address, each in
-// every language.
+// every language, with when each last changed and its image (ADR-236).
 
 /** The most addresses in one sitemap file; the protocol allows 50,000. */
 export const SITEMAP_SIZE = 5_000;
@@ -67,27 +67,28 @@ export function sitemapIndex(
 }
 
 /**
- * A page of a sitemap: the addresses of `handles`, in their order, `page` from 1, each with its
- * address in every language of `locales`; the pages' first also has the home page. Null for a
- * page past the last.
+ * A page of a sitemap: the addresses of `entries`, in their order, `page` from 1, each with when
+ * it last changed, its address in every language of `locales` and its image, whole; the pages'
+ * first also has the home page. Null for a page past the last.
  */
 export function sitemapPage(
   origin: string,
   kind: HandledKind,
-  handles: readonly string[],
+  entries: readonly SitemapEntry[],
   page: number,
   languages: { locales: readonly string[]; defaultLocale: string },
 ): string | null {
-  const paths = handles
+  const listed = entries
     .slice((page - 1) * SITEMAP_SIZE, page * SITEMAP_SIZE)
-    .map((handle) => `${PATHS[kind].path}${handle}`);
-  if (kind === 'page' && page === 1) paths.unshift('/');
-  if (paths.length === 0) return null;
+    .map((entry) => ({ path: `${PATHS[kind].path}${entry.handle}`, ...entry }));
+  if (kind === 'page' && page === 1)
+    listed.unshift({ path: '/', handle: '', at: null, image: null });
+  if (listed.length === 0) return null;
   const addressIn = (code: string, path: string) => {
     if (code === languages.defaultLocale) return `${origin}${path}`;
     return `${origin}/${code}${path === '/' ? '' : path}`;
   };
-  const urls = paths.map((path) => {
+  const urls = listed.map(({ path, at, image }) => {
     const alternates =
       languages.locales.length > 1
         ? languages.locales.map(
@@ -96,15 +97,22 @@ export function sitemapPage(
               `href="${escapeHtml(addressIn(code, path))}"/>`,
           )
         : [];
+    // W3C's date and time, to the second.
+    const lastmod = at ? `<lastmod>${escapeHtml(at.replace(/\.\d+(?=Z$)/, ''))}</lastmod>` : '';
+    const picture = image
+      ? `<image:image><image:loc>${escapeHtml(imageAddress(image, origin, null))}</image:loc>` +
+        '</image:image>'
+      : '';
     return (
-      `<url><loc>${escapeHtml(addressIn(languages.defaultLocale, path))}</loc>` +
-      `${alternates.join('')}</url>`
+      `<url><loc>${escapeHtml(addressIn(languages.defaultLocale, path))}</loc>${lastmod}` +
+      `${alternates.join('')}${picture}</url>`
     );
   });
   return (
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" ' +
-    'xmlns:xhtml="http://www.w3.org/1999/xhtml">\n' +
+    'xmlns:xhtml="http://www.w3.org/1999/xhtml" ' +
+    'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n' +
     urls.join('\n') +
     '\n</urlset>\n'
   );

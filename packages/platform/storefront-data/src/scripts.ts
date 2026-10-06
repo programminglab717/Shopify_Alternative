@@ -60,12 +60,12 @@ return 0`,
   },
   // Documents with handles. A document's old handle is let go only if it still leads to the
   // document: another may have taken it since, as when two products swap handles.
-  // KEYS: lock, IDs by handle, handles by ID, then the documents' keys.
-  // ARGV: token, lock ms, then each document's ID, handle and JSON.
+  // KEYS: lock, IDs by handle, handles by ID, sitemap entries by ID, then the documents' keys.
+  // ARGV: token, lock ms, then each document's ID, handle, JSON and sitemap entry (ADR-236).
   sfPut: {
     lua: `${HOLDING}
-for i = 4, #KEYS do
-  local at = 3 + (i - 4) * 3
+for i = 5, #KEYS do
+  local at = 3 + (i - 5) * 4
   local id, handle = ARGV[at], ARGV[at + 1]
   local old = redis.call('HGET', KEYS[3], id)
   if old and old ~= handle and redis.call('HGET', KEYS[2], old) == id then
@@ -73,21 +73,23 @@ for i = 4, #KEYS do
   end
   redis.call('HSET', KEYS[2], handle, id)
   redis.call('HSET', KEYS[3], id, handle)
+  redis.call('HSET', KEYS[4], id, ARGV[at + 3])
   redis.call('SET', KEYS[i], ARGV[at + 2])
 end
 return 1`,
   },
-  // KEYS: lock, IDs by handle, handles by ID, then the documents' keys. ARGV: token, lock ms,
-  // then the documents' IDs.
+  // KEYS: lock, IDs by handle, handles by ID, sitemap entries by ID, then the documents' keys.
+  // ARGV: token, lock ms, then the documents' IDs.
   sfDrop: {
     lua: `${HOLDING}
-for i = 4, #KEYS do
-  local id = ARGV[i - 1]
+for i = 5, #KEYS do
+  local id = ARGV[i - 2]
   local handle = redis.call('HGET', KEYS[3], id)
   if handle then
     if redis.call('HGET', KEYS[2], handle) == id then redis.call('HDEL', KEYS[2], handle) end
     redis.call('HDEL', KEYS[3], id)
   end
+  redis.call('HDEL', KEYS[4], id)
   redis.call('DEL', KEYS[i])
 end
 return 1`,

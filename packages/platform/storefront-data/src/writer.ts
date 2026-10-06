@@ -1,5 +1,6 @@
 import {
   articleHandle,
+  sitemapEntryOf,
   type ArticleDoc,
   type BlogDoc,
   type CollectionDoc,
@@ -145,7 +146,12 @@ export class ShopWriter {
     for (let start = 0; start < docs.length; start += CHUNK) {
       const chunk = docs.slice(start, start + CHUNK);
       const keys = [...this.#handleKeys(kind), ...chunk.map((doc) => this.#doc(kind, doc.id))];
-      const args = chunk.flatMap((doc) => [doc.id, handleOf(doc), JSON.stringify(doc)]);
+      const args = chunk.flatMap((doc) => [
+        doc.id,
+        handleOf(doc),
+        JSON.stringify(doc),
+        JSON.stringify(sitemapEntryOf(kind, doc)),
+      ]);
       this.#check(await this.redis.sfPut(keys.length, ...keys, this.token, this.lockMs, ...args));
     }
   }
@@ -170,6 +176,7 @@ export class ShopWriter {
       this.keys.lock(this.shopId),
       this.keys.ids(this.shopId, kind),
       this.keys.handles(this.shopId, kind),
+      this.keys.sitemap(this.shopId, kind),
     ];
   }
 
