@@ -304,10 +304,10 @@ describe('Storefront rendering', () => {
     expect(blog.html).toContain('<p>Hand-block printed in Multan, out now.</p>');
     expect(blog.html).toContain('<p>Measure your chest under the arms');
     expect(blog.html).toContain(
-      '<time datetime="2026-09-20T21:30:00.000Z">21 September 2026</time> · By Ayesha Khan</p>',
+      '<time datetime="2026-09-20T21:30:00Z">21 September 2026</time> · By Ayesha Khan</p>',
     );
     expect(blog.html).toContain(
-      '<time datetime="2026-09-10T09:00:00.000Z">10 September 2026</time></p>',
+      '<time datetime="2026-09-10T09:00:00Z">10 September 2026</time></p>',
     );
     // Every tag of its articles once, whatever its case, each linking to the articles with it.
     const tags = [
@@ -454,6 +454,59 @@ describe('Storefront rendering', () => {
       },
     );
     expect(themed.roundTrips).toBe(plain.roundTrips + 1);
+  });
+
+  it("prints dates in the shop's time zone and the page's language, with Shopify's time_tag (ADR-211)", async () => {
+    // Published at 21:30 UTC on the 20th: the 21st in Pakistan, the 20th in New York.
+    const time = (html: string) =>
+      /<p class="article__meta">\s*(<time[^]*?<\/time>)/.exec(html)?.[1];
+    const article = await render({ path: '/blogs/news/eid-lawn-is-here' });
+    expect(time(article.html)).toBe(
+      '<time datetime="2026-09-20T21:30:00Z">21 September 2026</time>',
+    );
+    const urdu = await render({ path: '/blogs/news/eid-lawn-is-here', locale: 'ur' });
+    expect(time(urdu.html)).toBe('<time datetime="2026-09-20T21:30:00Z">21 ستمبر 2026</time>');
+    const sample = sampleStore();
+    const abroad = new MemoryStore({
+      ...sample,
+      shop: { ...sample.shop, timezone: 'America/New_York' },
+    });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const there = await renderer.render({ path: '/blogs/news/eid-lawn-is-here' }, abroad.fresh());
+    expect(time(there.html)).toBe('<time datetime="2026-09-20T21:30:00Z">20 September 2026</time>');
+    // A time zone Intl does not know, as no document should name: Pakistan's.
+    const unknown = new MemoryStore({
+      ...sample,
+      shop: { ...sample.shop, timezone: 'Mars/Olympus' },
+    });
+    const lost = await renderer.render({ path: '/blogs/news/eid-lawn-is-here' }, unknown.fresh());
+    expect(time(lost.html)).toBe('<time datetime="2026-09-20T21:30:00Z">21 September 2026</time>');
+
+    // Shopify's formats by name, the theme's own first; strftime's; and its datetime.
+    const extra = {
+      'sections/main-article.liquid':
+        '<p class="dates">' +
+        "{{ article.published_at | date: format: 'abbreviated_date' }}|" +
+        "{{ article.published_at | date: format: 'day_month_year' }}|" +
+        "{{ article.published_at | date: '%H:%M %z' }}|" +
+        '{{ article.published_at | date_to_long_string }}|' +
+        "{{ article.published_at | time_tag: '%Y', datetime: '%Y-%m-%d' }}|" +
+        "{{ article.published_at | time_tag: format: 'nothing' }}|" +
+        '[{{ article.missing | time_tag }}]</p>' +
+        '{% schema %}{ "name": "Article" }{% endschema %}',
+    };
+    const dated = await render({ path: '/blogs/news/eid-lawn-is-here' }, { extra });
+    expect(/<p class="dates">([^]*?)<\/p>/.exec(dated.html)?.[1]).toBe(
+      'Sep 21, 2026|21 September 2026|02:30 +0500|21 September 2026|' +
+        '<time datetime="2026-09-21">2026</time>|' +
+        '<time datetime="2026-09-20T21:30:00Z">Monday, September 21, 2026 at 2:30 am +0500</time>|' +
+        '[]',
+    );
+    const urduDates = await render(
+      { path: '/blogs/news/eid-lawn-is-here', locale: 'ur' },
+      { extra },
+    );
+    expect(/<p class="dates">([^|]*)\|/.exec(urduDates.html)?.[1]).toBe('ستمبر 21, 2026');
   });
 
   it('renders what a search found, a page at a time, its links keeping the words', async () => {

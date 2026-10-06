@@ -5,7 +5,7 @@
   {%- endif -%}
   <h1 dir="auto">{{ article.title | escape }}</h1>
   <p class="article__meta">
-    <time datetime="{{ article.published_at }}">{{ article.published_at | date: '%-d %B %Y' }}</time>
+    {{ article.published_at | time_tag: format: 'day_month_year' }}
     {%- if article.author != blank -%}
       {%- assign author = article.author | escape %} · {{ 'sections.article.by' | t: author: author }}
     {%- endif -%}

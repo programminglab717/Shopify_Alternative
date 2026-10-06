@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-210 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-211 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -218,6 +218,7 @@
 | 208 | A payment started online whose customer never came back is asked after: the worker asks the gateway's status inquiry, JazzCash's first, from a quarter of an hour after it began, at most once an hour for two days, and records one the gateway vouches for paid through the inquiry | Accepted |
 | 209 | A blog has Shopify's Atom feed at its address with .atom, its 30 latest articles whole under IDs of their own, and an article's page gives themes the newer and the older article beside it, fetched together when a theme first asks for either | Accepted |
 | 210 | Safepay's trackers are asked after as JazzCash's payments are, through its reporter with the account's secret key; its answer, which Safepay does not sign, is believed as it comes from Safepay's own API, and only naming the account's API key and the tracker asked about | Accepted |
+| 211 | Storefront dates print in the shop's own time zone and the page's language, and themes get Shopify's time_tag and its date formats by name, a theme's own date_formats first | Accepted |
 
 ---
 
@@ -8806,3 +8807,36 @@
     sandbox, and the tracker's amount is the session's, which Hatti set.
   * **Leaving Safepay out until it signs its answers:** its payments lost to a closed page would
     still wait for staff; its secret key and its own address already carry its refunds.
+
+## ADR-211 · Storefront dates print in the shop's own time zone and the page's language, and themes get Shopify's time_tag and its date formats by name, a theme's own date_formats first
+
+* **Context:** A blog's pages printed dates in Pakistan's time with English month names
+  ([ADR-177](#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)): the theme engine's options set one time zone and one language for every
+  render, and the shop's document did not carry its time zone. It does since sessions were
+  counted by the shop's day ([ADR-180](#adr-180--the-online-store-counts-its-sessions-as-shopify-does-a-browsers-pages-with-no-half-hour-between-them-a-script-in-each-page-keeps-a-sessions-id-in-a-cookie-of-the-shops-and-tells-the-storefront-of-each-page-which-counts-each-days-sessions-in-the-shops-time-zone-and-those-that-added-to-the-cart-reached-checkout-and-placed-an-order-as-hyperloglogs-in-valkey-with-who-saw-a-page-in-the-last-five-minutes-the-worker-keeps-each-days-counts-in-postgres-every-minute)). Shopify's `date` takes its formats by name
+  (`format: 'date'`), its `time_tag` prints a `<time>`, and themes keep formats of their own under
+  `date_formats` in their locales, as Dawn's do.
+* **Decision:**
+  * **LiquidJS's date filters**, `date`, `date_to_xmlschema`, `date_to_rfc822`, `date_to_string`
+    and `date_to_long_string`, are each given their page's options in place of the engine's: the
+    time zone the shop's document names, Pakistan's for a document written before or naming one
+    Intl does not know, and month and day names in the page's language through Intl, Urdu's on
+    Urdu pages. A page's render is one of many the engine runs at once, so the engine's own
+    options are shared and never changed.
+  * **Shopify's formats by name** for `date` and `time_tag`: `abbreviated_date`, `basic`, `date`,
+    `date_at_time`, `default` and `on_date`; a theme's own under `date_formats` in the page's
+    language, else its default language, first.
+  * **`time_tag`:** a `<time>` whose `datetime` is in UTC, or in the format `datetime:` gives,
+    printing the date in a format of strftime's, one by name, or Shopify's default; nothing for
+    no date.
+  * **Hatti Base** prints its blog's and articles' dates through `time_tag`, in a format of its
+    own, day first as Pakistan writes dates (`day_month_year`), in English and Urdu.
+* **Consequences:**
+  * A shop elsewhere dates its articles by its own day, and Urdu pages name months in Urdu; the
+    digits stay Western, as strftime writes them.
+  * Themes written for Shopify, which print dates through `time_tag: format: 'date'`, find it.
+* **Alternatives:**
+  * **An engine for each time zone and language:** the options are an engine's alone, and each
+    engine parses its theme again.
+  * **Dates formatted in the documents:** themes choose their own formats, which one document's
+    could not serve.

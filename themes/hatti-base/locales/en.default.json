@@ -137,5 +137,8 @@
       "invalid": "That did not work. Please try again.",
       "empty": "Your cart is empty."
     }
+  },
+  "date_formats": {
+    "day_month_year": "%-d %B %Y"
   }
 }

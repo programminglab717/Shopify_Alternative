@@ -3,7 +3,14 @@ import type { CartJson } from '@hatti/storefront-api';
 import type { HandledKind, ShopDoc, StoreData } from '@hatti/storefront-data';
 import { cartProducts } from './cart.js';
 import { editorAttribute, editorScript, type EditorPlace } from './editor.js';
-import { PAGE, createEngine, escapeHtml, translation, type PageState } from './liquid.js';
+import {
+  DEFAULT_TIMEZONE,
+  PAGE,
+  createEngine,
+  escapeHtml,
+  translation,
+  type PageState,
+} from './liquid.js';
 import {
   CappedEmitter,
   DEFAULT_LIMITS,
@@ -182,6 +189,8 @@ interface PreparedPage {
   named: NamedDocument[];
   /** The shop's primary domain of its own; empty when it has none. */
   domain: string;
+  /** The shop's time zone, which dates print in (ADR-211). */
+  timezone: string;
   preview: { name: string } | null;
   editor: { origins: readonly string[] } | null;
   /** The page's `<link rel="alternate" hreflang>`s, in its head. */
@@ -292,6 +301,7 @@ export class PageRenderer {
     const state: PageState = {
       theme,
       locale: page.locale,
+      timezone: page.timezone,
       page: Number(page.query.page) || 1,
       query: page.query,
       formErrors: page.formErrors,
@@ -383,6 +393,7 @@ export class PageRenderer {
     const state: PageState = {
       theme,
       locale,
+      timezone: prepared.timezone,
       page: Number(query.page) || 1,
       query,
       formErrors: prepared.formErrors,
@@ -620,6 +631,7 @@ export class PageRenderer {
       groups,
       named,
       domain: shopDoc.domain,
+      timezone: timeZoneOf(shopDoc),
       preview: request.preview ?? null,
       formErrors: request.formErrors ?? {},
       builtIn,
@@ -855,6 +867,21 @@ function previewBar(name: string, locale: string): string {
     'var bar=document.getElementById("hatti-preview-bar");if(bar)document.body.append(bar.content)' +
     '})</script>'
   );
+}
+
+/**
+ * The time zone the shop's document names, where Intl knows it; Pakistan's for one written before
+ * shops had one, or naming none Intl knows.
+ */
+function timeZoneOf(shop: ShopDoc): string {
+  const zone = shop.timezone;
+  if (!zone) return DEFAULT_TIMEZONE;
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: zone });
+    return zone;
+  } catch {
+    return DEFAULT_TIMEZONE;
+  }
 }
 
 /** Setting types, and templates, that name a document by its handle. */

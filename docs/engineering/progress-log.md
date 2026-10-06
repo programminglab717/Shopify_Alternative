@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Dates in the shop's own time zone, and Shopify's `time_tag`** (OS-07, ADR-177): Liquid's dates
-in the time zone the shop's document carries, and `time_tag` with the theme's date formats, in
-English and Urdu.
+**Articles and pages in the storefront's search** (SRC-01, ADR-177): Shopify's search finds a
+shop's articles and pages beside its products, at /search and in its suggestions.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +16,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Dates in the shop's own time zone, and Shopify's `time_tag`
+
+* **Storefront dates in the shop's time zone and the page's language**
+  ([ADR-211](../architecture/13-decision-log.md#adr-211--storefront-dates-print-in-the-shops-own-time-zone-and-the-pages-language-and-themes-get-shopifys-time_tag-and-its-date-formats-by-name-a-themes-own-date_formats-first)):
+  LiquidJS's date filters each given their page's options, the time zone the shop's document
+  names and month names in Urdu on Urdu pages; Pakistan's time for a zone Intl does not know.
+* **Shopify's `time_tag`**, and its date formats by name for `date` and `time_tag`, a theme's own
+  `date_formats` first. Hatti Base prints its blog's dates through it, day first.
+* 1629 tests (1 new): a shop abroad, an Urdu page and an unknown zone; formats by name, the
+  theme's, strftime's and `datetime:`; and no date.
 
 ### c1bc956 · Asking Safepay after its trackers
 

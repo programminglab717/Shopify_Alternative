@@ -31,6 +31,8 @@ import type { Theme, ThemeFiles } from '@hatti/themes';
 export interface PageState {
   theme: Theme;
   locale: string;
+  /** The shop's time zone, as its document says, which dates print in (ADR-211). */
+  timezone: string;
   renderSection(name: string): PromiseLike<string>;
   renderGroup(name: string): PromiseLike<string>;
   /** The page asked for, from 1, for `{% paginate %}`. */
@@ -56,10 +58,11 @@ export function createEngine(theme: Theme): Liquid {
     ownPropertyOnly: true,
     // A filter the theme misspells fails when it is published, not when a customer visits.
     strictFilters: true,
-    // Dates, as articles' (ADR-177), print in Pakistan's time, where Hatti's shops are.
-    timezoneOffset: 'Asia/Karachi',
+    // Dates print in the shop's time zone (ADR-211); outside a page's render, Pakistan's.
+    timezoneOffset: DEFAULT_TIMEZONE,
   });
   for (const [name, filter] of Object.entries(filters(theme))) liquid.registerFilter(name, filter);
+  registerDateFilters(liquid, theme);
   for (const name of ['schema', 'stylesheet', 'javascript']) {
     liquid.registerTag(name, skippedBlock(name));
   }
@@ -71,6 +74,119 @@ export function createEngine(theme: Theme): Liquid {
   liquid.registerTag('form', FormTag);
   liquid.registerTag('paginate', PaginateTag);
   return liquid;
+}
+
+/** Where Hatti's shops are, for a shop whose document names no time zone. */
+export const DEFAULT_TIMEZONE = 'Asia/Karachi';
+
+/**
+ * Shopify's own date formats, which `date` and `time_tag` take by name (`format: 'date'`) when
+ * the theme's locale has none of its own by that name under `date_formats`.
+ */
+export const DATE_FORMATS: Readonly<Record<string, string>> = {
+  abbreviated_date: '%b %-d, %Y',
+  basic: '%m/%d/%Y',
+  date: '%B %-d, %Y',
+  date_at_time: '%B %-d, %Y at %-l:%M %P',
+  default: '%A, %B %-d, %Y at %-l:%M %P %z',
+  on_date: 'on %B %-d, %Y',
+};
+
+/** LiquidJS's date filters, which read their time zone and language from the engine's options. */
+const DATE_FILTERS = [
+  'date',
+  'date_to_xmlschema',
+  'date_to_rfc822',
+  'date_to_string',
+  'date_to_long_string',
+] as const;
+
+type DateFilter = (this: { context: Context }, value: unknown, ...args: unknown[]) => unknown;
+
+/**
+ * Dates in the shop's time zone and the page's language (ADR-211): LiquidJS's date filters, each
+ * given its page's in place of the engine's; `date` taking Shopify's formats by name too; and
+ * Shopify's `time_tag`.
+ */
+function registerDateFilters(liquid: Liquid, theme: Theme): void {
+  const builtin = (name: string) => liquid.filters[name] as unknown as DateFilter;
+  const date = builtin('date');
+  for (const name of DATE_FILTERS) {
+    const filter = builtin(name);
+    liquid.registerFilter(name, function (this: { context: Context }, value, ...args) {
+      const format = name === 'date' ? named(args).format : undefined;
+      if (typeof format === 'string') {
+        return date.call(zoned(this), value, dateFormat(theme, this.context, format));
+      }
+      return filter.call(zoned(this), value, ...args);
+    });
+  }
+  /**
+   * Shopify's: a date as `<time>`: printed in a format of strftime's, or one of the theme's or
+   * Shopify's by name (`format: 'date'`), else Shopify's default; its `datetime` in UTC, or in the
+   * format `datetime:` gives. Nothing for no date.
+   */
+  liquid.registerFilter('time_tag', function (this: { context: Context }, value, ...args) {
+    if (!isDate(value)) return '';
+    const options = named(args);
+    const given = args.find((arg) => typeof arg === 'string');
+    const format =
+      typeof options.format === 'string'
+        ? dateFormat(theme, this.context, options.format)
+        : typeof given === 'string'
+          ? given
+          : dateFormat(theme, this.context, 'default');
+    const datetime =
+      typeof options.datetime === 'string'
+        ? date.call(zoned(this), value, options.datetime)
+        : date.call(zoned(this, 'UTC'), value, '%Y-%m-%dT%H:%M:%SZ');
+    const shown = date.call(zoned(this), value, format);
+    return `<time datetime="${attribute(datetime)}">${escapeHtml(String(shown))}</time>`;
+  });
+}
+
+/** A format by name: the theme's own in the page's language, else Shopify's, else its default. */
+function dateFormat(theme: Theme, context: Context, name: string): string {
+  const locale = (context.globals as { [PAGE]?: PageState })[PAGE]?.locale ?? theme.defaultLocale;
+  return (
+    translation(theme, locale, `date_formats.${name}`, {}) ??
+    DATE_FORMATS[name] ??
+    DATE_FORMATS.default!
+  );
+}
+
+/** Whether LiquidJS reads `value` as a date: a Date, seconds, "now", or a date as text. */
+function isDate(value: unknown): boolean {
+  if (value instanceof Date) return !Number.isNaN(value.getTime());
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value !== 'string' || value.trim() === '') return false;
+  return /^(now|today|\d+)$/.test(value) || !Number.isNaN(Date.parse(value));
+}
+
+/**
+ * A filter's `this` with its context's options in the page's time zone, or `timezone`, and its
+ * language: a page's render is one of many the engine runs at once, so its options stay shared.
+ */
+function zoned(filter: { context: Context }, timezone?: string): { context: Context } {
+  const state = (filter.context.globals as { [PAGE]?: PageState })[PAGE];
+  if (!state && !timezone) return filter;
+  const opts = {
+    ...filter.context.opts,
+    timezoneOffset: timezone ?? state!.timezone,
+    locale: dateLocale(state?.locale),
+  };
+  const context = Object.create(filter.context, { opts: { value: opts } }) as Context;
+  return Object.assign(Object.create(filter) as object, { context });
+}
+
+/** The language month and day names are in: the page's, where Intl knows it; else English. */
+function dateLocale(locale: string | undefined): string {
+  if (!locale) return 'en';
+  try {
+    return Intl.DateTimeFormat.supportedLocalesOf(locale).length > 0 ? locale : 'en';
+  } catch {
+    return 'en';
+  }
 }
 
 /** A tag's class, as LiquidJS registers it. */
