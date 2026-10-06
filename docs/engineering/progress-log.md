@@ -6,18 +6,32 @@
 
 ## In progress
 
-**The link page's image of its own** (CH-07, ADR-161): a picture or logo at the top of a shop's
-link page, so that the page its Instagram and TikTok bios send shoppers to looks like the shop.
-Its code is in: Shopify's square logo in the shop's brand (migration 0130), served at
-`/logos/{shop}/square` beside the logo, both named in the shop's document, and the square logo,
-else the logo, atop the link page. Its decision record (ADR-205), docs and a full run of the
-tests come next.
+**A product on the link page with its variant chosen** (CH-07, ADR-161): a product the shop puts
+on its link page with one of its variants, as a suit in size M, bought with a tap through its
+cart permalink, as a product with nothing to choose is.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
+
+## 2026-10-06
+
+### The link page's image of its own
+
+* **Shopify's square logo in the shop's brand, beside its logo**
+  ([ADR-205](../architecture/13-decision-log.md#adr-205--a-shops-brand-has-shopifys-square-logo-beside-its-logo-one-of-its-files-served-by-the-api-at-an-address-of-its-own-the-shops-document-names-where-each-logo-is-served-each-address-naming-its-file-and-the-link-page-shows-the-square-logo-else-the-logo-at-its-top)):
+  one of the shop's files, an image, checked as the logo is and gone with its file (migration
+  0130); `shopBrandUpdate` sets either or both. The API serves it at `/logos/{shop}/square`, as
+  the logo at `/logos/{shop}`.
+* **The shop's document names where both are served**, each address naming its file, so another
+  image is another address; the publisher rebuilds it when the brand changes or a file goes.
+* **The link page shows the square logo in a circle, else the logo whole**, at its top, styled by
+  Hatti Base. Its code came in 4bd1f7c, before the day's break.
+* 1613 tests (4 new): the square logo kept, checked and gone with its file; the shop's document
+  naming both logos, rebuilt as they change; the link page's image; and over HTTP, the square logo
+  set through GraphQL and served.
 
 ## 2026-10-05
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-05 (ADR-033 to ADR-204 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-205 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -212,6 +212,7 @@
 | 202 | An account's owner takes its number off it, from a session proved lately and past its second factor where it has one, while a password, a passkey or Google still signs it in: the number signs in to nothing from then on, may be proved for another account, and is told on WhatsApp, else by SMS | Accepted |
 | 203 | A shop's Confirmation Desk may wait for its customers to answer on WhatsApp: where the shop asks, an ordinary cash-on-delivery order is dealt for its first call an hour after its reminder to confirm, or three days after it was placed when none will go; one of high value is dealt at once, and an order is overdue counting from when it fell due | Accepted |
 | 204 | The link page's links go through the storefront, which counts each tap a day at a time by where the link goes, beside the sessions, and sends the shopper on; it follows only the page's own links, and the worker keeps each day's taps in Postgres for a report of a period's by link | Accepted |
+| 205 | A shop's brand has Shopify's square logo beside its logo, one of its files, served by the API at an address of its own; the shop's document names where each logo is served, each address naming its file, and the link page shows the square logo, else the logo, at its top | Accepted |
 
 ---
 
@@ -8572,3 +8573,48 @@
     links.
   * **The address itself as the table's key:** an entry longer than a B-tree's would fail the
     shop's whole day.
+
+## ADR-205 · A shop's brand has Shopify's square logo beside its logo, one of its files, served by the API at an address of its own; the shop's document names where each logo is served, each address naming its file, and the link page shows the square logo, else the logo, at its top
+
+* **Context:**
+  * A shop's link page ([ADR-161](#adr-161--a-shops-link-page-at-links-is-a-line-about-it-up-to-ten-links-and-up-to-24-of-its-products-kept-with-what-it-sets-for-its-storefront-the-storefront-shows-it-in-the-platforms-markup-inside-the-shops-theme-in-the-pages-language-a-product-with-nothing-to-choose-a-tap-from-checkout-and-the-edge-keeps-it-until-the-shop-or-any-of-its-products-changes)) showed its name and
+    no image; ADR-161 left an image or logo of its own for later.
+  * The shop's brand held its logo alone ([ADR-081](#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)):
+    one of its files, which the checkout's page shows through a URL signed for an hour, and its
+    orders' emails from the API's `/logos/{shop}`
+    ([ADR-198](#adr-198--an-email-of-an-orders-news-is-laid-out-as-its-shops-own-under-its-logo-served-at-an-address-of-the-apis-that-lasts-as-an-email-does-or-its-name-in-its-themes-accent-colour-with-the-orders-first-ten-lines-and-its-total)).
+    A logo is often a wordmark, wide, for a page's header; Shopify's brand has a square logo too,
+    for the places that show a square, as social profiles do.
+  * The storefront's documents named no logo, and the edge keeps the link page until the shop
+    changes, long after a signed URL lapses.
+* **Decision:**
+  * **`squareLogo` beside `logo` in the brand** (migration 0130): one of the shop's files, an
+    image, checked as the logo is and gone with its file. `shopBrandUpdate` sets either or both,
+    and `shop_brand.updated` says which changed.
+  * **Served at `/logos/{shop}/square`**, as the logo is at `/logos/{shop}`: the one the shop has
+    now, kept an hour by browsers and the edge, and nothing for a shop without one.
+  * **The shop's document names both:** `brand: { logo, squareLogo }`, each the API's address
+    with `?v=` and the first eight characters of its file's ID, so another image is another
+    address; left out while the shop has neither. The publisher rebuilds the shop's document when
+    its brand changes, and when one of its files is deleted, which may have been a logo; a
+    changed document purges the shop's pages.
+  * **The link page shows the square logo in a circle, else the logo whole,** 96 pixels at its
+    top, above the shop's name, with an empty `alt`: the name says it.
+* **Consequences:**
+  * A shop's link page looks like the shop from what it set once, and its square logo is where
+    Shopify's themes and apps look for one.
+  * A change of brand purges all the shop's pages, though only the link page shows a logo yet;
+    a file deleted rebuilds the shop's document, a few queries, which changes nothing unless the
+    file was a logo.
+  * The image is the shop's upload as it is, not made at the sizes pages ask for, as products'
+    images are ([ADR-158](#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)).
+  * Not yet: `shop.brand` in Liquid for themes; the logo on invoices and packing slips; and the
+    cover image, slogan and colours of Shopify's brand.
+* **Alternatives:**
+  * **An image of the link page's own, kept with it:** a second place for what the brand holds,
+    where Shopify's themes and apps do not look.
+  * **Signed URLs in the document, as the checkout's page has them:** they lapse in an hour, and
+    the edge keeps the page until the shop changes.
+  * **The logos' addresses without their files' IDs:** browsers and the edge would show the old
+    image for up to an hour after a change.
+  * **The logo cropped square:** a wide wordmark in a circle loses its words.

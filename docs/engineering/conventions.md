@@ -1280,7 +1280,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   `linkKey`, through the storefront, which counts the tap and sends the shopper on
   ([ADR-204](../architecture/13-decision-log.md#adr-204--the-link-pages-links-go-through-the-storefront-which-counts-each-tap-a-day-at-a-time-by-where-the-link-goes-beside-the-sessions-and-sends-the-shopper-on-it-follows-only-the-pages-own-links-and-the-worker-keeps-each-days-taps-in-postgres-for-a-report-of-a-periods-by-link)).
   The page and the route share `linkTargets`, so the route follows only what the page shows: a
-  link the page gains, as its chat on WhatsApp, goes there.
+  link the page gains, as its chat on WhatsApp, goes there. Its image is the shop's square logo,
+  else its logo, from the shop's document's `brand` (ADR-205).
 
 ## Online store themes, menus, pages, preferences, domains, redirects and policies
 
@@ -1798,6 +1799,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   other ([ADR-081](../architecture/13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)): its address without the signature, https, or http on localhost.
 * **A file another module needs is found through the files module's public functions**, in the
   caller's transaction, as `shopLogoOf` gives a page the logo's key; never by reading its tables.
+* **The shop's logos are served by the API, never signed, wherever a page is kept**
+  ([ADR-205](../architecture/13-decision-log.md#adr-205--a-shops-brand-has-shopifys-square-logo-beside-its-logo-one-of-its-files-served-by-the-api-at-an-address-of-its-own-the-shops-document-names-where-each-logo-is-served-each-address-naming-its-file-and-the-link-page-shows-the-square-logo-else-the-logo-at-its-top)):
+  `/logos/{shop}` and `/logos/{shop}/square`, an hour in browsers. `shopLogoOf(tx, shop, which)`
+  gives each with its file's `id`, which `logoPathOf` puts in the address the shop's document
+  names (`?v=`), so another image is another address; the publisher rebuilds the document on
+  `shop_brand.updated` and `file.deleted`. Another image of the brand goes in `BRAND_IMAGES`, the
+  table, the route and the document together.
 * **Tests use `LocalStorage` in a temporary directory**: the API's test harness serves one at
   `http://localhost:4000/storage`, so a test uploads and reads through the URLs it was given.
 
