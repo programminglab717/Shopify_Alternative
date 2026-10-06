@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Something off for paying online
+### 9ff5600 · Something off for paying online
 
 * **The shop's own discount for paying online** ([ADR-222](../architecture/13-decision-log.md#adr-222--a-shop-may-take-something-off-orders-paid-online-as-it-may-off-those-paid-by-transfer-a-percentage-up-to-a-cap-or-an-amount-of-its-own-which-checkout-takes-off-the-items-after-any-code-and-the-order-keeps-apart)), a percentage up to a cap or an
   amount, through `onlinePaymentSettings` and `onlinePaymentSettingsUpdate`, checked as a
