@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { InputChecker } from '@hatti/api';
@@ -63,22 +64,53 @@ class FakeBaadmay {
   }
 }
 
+/** A stand-in for PayFast's tokens (ADR-227): what it was asked, as forms. */
+class FakePayFast {
+  readonly asked: Record<string, string>[] = [];
+  url = '';
+  readonly server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on('data', (chunk: Buffer) => chunks.push(chunk));
+    request.on('end', () => {
+      this.asked.push(Object.fromEntries(new URLSearchParams(Buffer.concat(chunks).toString())));
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ MERCHANT_ID: '102', ACCESS_TOKEN: 'tok-of-the-basket' }));
+    });
+  });
+
+  async start(): Promise<void> {
+    await new Promise<void>((resolve) => this.server.listen(0, '127.0.0.1', resolve));
+    this.url = `http://127.0.0.1:${(this.server.address() as AddressInfo).port}`;
+  }
+
+  async stop(): Promise<void> {
+    await new Promise((resolve) => this.server.close(resolve));
+  }
+}
+
 describe.skipIf(!server)('Payments online', () => {
   let f: PaymentsFixture;
   let kurta: string;
   const easypaisa = new FakeEasypaisa();
   const baadmay = new FakeBaadmay();
+  const payfast = new FakePayFast();
 
   beforeAll(async () => {
     await easypaisa.start();
     await baadmay.start();
-    f = await paymentsFixture(server!, { easypaisaUrl: easypaisa.url, baadmayUrl: baadmay.url });
+    await payfast.start();
+    f = await paymentsFixture(server!, {
+      easypaisaUrl: easypaisa.url,
+      baadmayUrl: baadmay.url,
+      payfastUrl: payfast.url,
+    });
   });
 
   afterAll(async () => {
     await f?.close();
     await easypaisa.stop();
     await baadmay.stop();
+    await payfast.stop();
   });
 
   beforeEach(async () => {
@@ -110,7 +142,7 @@ describe.skipIf(!server)('Payments online', () => {
     expect(
       errorsOf(
         await f.accounts.connect(f.a, {
-          gateway: 'payfast',
+          gateway: 'paypal',
           environment: 'staging' as 'sandbox',
           credentials: [],
         }),
@@ -841,6 +873,86 @@ describe.skipIf(!server)('Payments online', () => {
       reference: '88123',
     });
     expect(baadmay.asked).toHaveLength(2);
+  });
+
+  it("takes what an order waits for through PayFast's page, its word signed with the secured key (ADR-227)", async () => {
+    const order = await f.awaiting(f.a, kurta);
+    const token = await f.linkOf(f.a, order.id);
+    const connected = unwrap(
+      await f.accounts.connect(f.a, {
+        gateway: 'payfast',
+        environment: 'production',
+        credentials: [
+          { key: 'merchantId', value: '102' },
+          { key: 'securedKey', value: 'zU3pQ8vX1kL9' },
+          { key: 'merchantName', value: 'Zari' },
+        ],
+      }),
+    );
+
+    // A token asked for the basket first, then a form posted to its page, from the order's page.
+    const started = await f.links.payOnline(token);
+    if ('url' in started || started.kind !== 'order' || !started.gatewayForm) {
+      throw new Error(JSON.stringify(started));
+    }
+    expect(started.gatewayForm.url).toBe(
+      `${payfast.url}/Ecommerce/api/Transaction/PostTransaction`,
+    );
+    const basket = started.gatewayForm.form.BASKET_ID!;
+    expect(payfast.asked).toEqual([
+      {
+        MERCHANT_ID: '102',
+        SECURED_KEY: 'zU3pQ8vX1kL9',
+        BASKET_ID: basket,
+        TXNAMT: '2000.00',
+        CURRENCY_CODE: 'PKR',
+      },
+    ]);
+    expect(started.gatewayForm.form).toMatchObject({
+      TOKEN: 'tok-of-the-basket',
+      TXNAMT: '2000.00',
+      SUCCESS_URL: `https://hatti.test/o/${token}/paid`,
+      FAILURE_URL: `https://hatti.test/o/${token}`,
+      CHECKOUT_URL: connected.webhookUrl,
+      CUSTOMER_MOBILE_NO: '03001234567',
+    });
+    expect(Object.values(started.gatewayForm.form)).not.toContain('zU3pQ8vX1kL9');
+
+    // Its word at the webhook, signed with the secured key: paid once, and again as paid.
+    const outcome = {
+      basket_id: basket,
+      err_code: '000',
+      err_msg: 'Success',
+      transaction_id: '8820261002143512',
+      validation_hash: createHash('sha256').update(`${basket}|zU3pQ8vX1kL9|102|000`).digest('hex'),
+    };
+    const publicId = connected.webhookUrl.split('/').at(-1)!;
+    const word = { body: Buffer.from(new URLSearchParams(outcome).toString()), headers: {} };
+    expect(await f.payments.webhook(publicId, word)).toBe('paid');
+    expect(await f.payments.webhook(publicId, word)).toBe('paid');
+    expect(await f.orders.get(f.a, order.id)).toMatchObject({
+      amountPaid: 2_000_00n,
+      financialStatus: 'paid',
+    });
+    const [session] = await f.payments.sessionsOf(f.a.shopId, order.id);
+    expect(session).toMatchObject({
+      gateway: 'payfast',
+      gatewayName: 'PayFast',
+      status: 'paid',
+      gatewayRef: basket,
+      paidThrough: 'webhook',
+      reference: '8820261002143512',
+    });
+    // The customer back with the same outcome: nothing more.
+    expect(await f.links.paidOnline(token, outcome)).toMatchObject({ problem: null });
+    // Made with another key: refused.
+    const forged = { ...outcome, validation_hash: createHash('sha256').update('x').digest('hex') };
+    expect(
+      await f.payments.webhook(publicId, {
+        body: Buffer.from(new URLSearchParams(forged).toString()),
+        headers: {},
+      }),
+    ).toBe('unsigned');
   });
 
   it('records what its webhook says is paid, once, and what was paid beyond what was owed', async () => {

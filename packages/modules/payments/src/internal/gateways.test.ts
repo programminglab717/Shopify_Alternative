@@ -1,4 +1,4 @@
-import { createDecipheriv, createHmac } from 'node:crypto';
+import { createDecipheriv, createHash, createHmac } from 'node:crypto';
 import {
   createServer,
   type IncomingHttpHeaders,
@@ -12,6 +12,7 @@ import {
   BaadmayGateway,
   EasypaisaGateway,
   JazzCashGateway,
+  PayFastGateway,
   PaymentGateways,
   SafepayGateway,
   TestGateway,
@@ -1173,5 +1174,199 @@ describe('Baadmay (ADR-226)', () => {
         message: expect.stringMatching(/^Baadmay could not be reached/),
       });
     });
+  });
+});
+
+describe('PayFast (ADR-227)', () => {
+  const account: GatewayAccount = {
+    environment: 'sandbox',
+    credentials: { merchantId: '102', securedKey: 'zU3pQ8vX1kL9', merchantName: 'Zari' },
+  };
+  /** What PayFast was asked for a token, and what it answers next. */
+  const asked: { method: string; path: string; form: URLSearchParams }[] = [];
+  let next: { status: number; body: unknown } = { status: 200, body: {} };
+  let url = '';
+  const server = createServer(async (request, response) => {
+    asked.push({
+      method: request.method ?? '',
+      path: request.url ?? '',
+      form: new URLSearchParams(await bodyOf(request)),
+    });
+    response.writeHead(next.status, { 'content-type': 'application/json' });
+    response.end(JSON.stringify(next.body));
+  });
+  let payfast: PayFastGateway;
+  const request = {
+    amount: 2_500_50n,
+    currency: 'PKR' as const,
+    orderName: '#1043',
+    returnUrl: 'https://hatti.pk/o/Zx8kQ2mN/paid',
+    cancelUrl: 'https://hatti.pk/o/Zx8kQ2mN',
+    notifyUrl: 'https://hatti.pk/webhooks/payments/pga_7Hq2',
+    buyer: {
+      name: 'Ayesha Khan',
+      phone: '+923001234567',
+      email: 'ayesha@example.pk',
+      address: null,
+      lines: [],
+      shipping: 0n,
+    },
+  };
+  const TOKEN = { MERCHANT_ID: '102', ACCESS_TOKEN: 'b3A4cXJzdHV2d3h5ejAxMjM0NTY3', NAME: 'Zari' };
+  /** The validation hash PayFast makes of an outcome. */
+  const hashOf = (basket: string, code: string, key = 'zU3pQ8vX1kL9') =>
+    createHash('sha256').update(`${basket}|${key}|102|${code}`).digest('hex');
+
+  beforeAll(async () => {
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    payfast = new PayFastGateway({ urls: { sandbox: url }, timeoutMs: 2_000 });
+  });
+
+  afterAll(async () => {
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  it('asks for a token with the secured key, then sends the browser to its page with it, never the key', async () => {
+    next = { status: 200, body: TOKEN };
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-02T09:30:00Z') });
+    let started;
+    try {
+      started = await payfast.checkout(account, request);
+    } finally {
+      vi.useRealTimers();
+    }
+    if (!started.ok) throw new Error(started.message);
+    const { ref, url: page, form } = started.value;
+    // Unique to the account: when it began, in Pakistan, and five digits.
+    expect(ref).toMatch(/^P20261002143000\d{5}$/);
+    const token = asked.at(-1)!;
+    expect([token.method, token.path]).toEqual([
+      'POST',
+      '/Ecommerce/api/Transaction/GetAccessToken',
+    ]);
+    expect(Object.fromEntries(token.form)).toEqual({
+      MERCHANT_ID: '102',
+      SECURED_KEY: 'zU3pQ8vX1kL9',
+      BASKET_ID: ref,
+      TXNAMT: '2500.50',
+      CURRENCY_CODE: 'PKR',
+    });
+    expect(page).toBe(`${url}/Ecommerce/api/Transaction/PostTransaction`);
+    expect(form).toEqual({
+      MERCHANT_ID: '102',
+      MERCHANT_NAME: 'Zari',
+      TOKEN: TOKEN.ACCESS_TOKEN,
+      PROCCODE: '00',
+      TXNAMT: '2500.50',
+      CURRENCY_CODE: 'PKR',
+      BASKET_ID: ref,
+      ORDER_DATE: '2026-10-02 14:30:00',
+      SUCCESS_URL: 'https://hatti.pk/o/Zx8kQ2mN/paid',
+      FAILURE_URL: 'https://hatti.pk/o/Zx8kQ2mN',
+      CHECKOUT_URL: 'https://hatti.pk/webhooks/payments/pga_7Hq2',
+      CUSTOMER_EMAIL_ADDRESS: 'ayesha@example.pk',
+      CUSTOMER_MOBILE_NO: '03001234567',
+      SIGNATURE: expect.stringMatching(/^[0-9a-f]{16}$/),
+      VERSION: 'MERCHANTCART-0.1',
+      TXNDESC: 'Order #1043',
+      TRAN_TYPE: 'ECOMM_PURCHASE',
+    });
+    expect(Object.values(form!)).not.toContain('zU3pQ8vX1kL9');
+    expect(await payfast.checkout(account, { ...request, currency: 'USD' })).toEqual({
+      ok: false,
+      retry: false,
+      message: 'PayFast takes payments in rupees alone',
+    });
+    expect(new PayFastGateway().checkoutOrigin('production')).toBe('https://ipg1.apps.net.pk');
+  });
+
+  it('says why PayFast gave no token, and whether trying again may help', async () => {
+    next = {
+      status: 200,
+      body: {
+        errorCode: '003',
+        errorDescription: 'Amount , Basket Id and Currency code must be required',
+      },
+    };
+    expect(await payfast.checkout(account, request)).toEqual({
+      ok: false,
+      retry: false,
+      message: 'PayFast: Amount , Basket Id and Currency code must be required',
+    });
+    next = { status: 503, body: { message: 'unavailable' } };
+    expect(await payfast.checkout(account, request)).toEqual({
+      ok: false,
+      retry: true,
+      message: 'PayFast: it answered 503',
+    });
+    const closed = await closedPort();
+    const away = new PayFastGateway({ urls: { sandbox: `http://127.0.0.1:${closed}` } });
+    expect(await away.checkout(account, request)).toMatchObject({
+      ok: false,
+      retry: true,
+      message: expect.stringMatching(/^PayFast could not be reached/),
+    });
+  });
+
+  it('reads its return and its word of the payment, their validation hash made with the secured key', () => {
+    const basket = 'P2026100214300012345';
+    const back = {
+      basket_id: basket,
+      err_code: '000',
+      err_msg: 'Success',
+      transaction_id: '8820261002143512',
+      order_date: '2026-10-02',
+      transaction_amount: '2500.50',
+      validation_hash: hashOf(basket, '000'),
+    };
+    const payment = { ref: basket, amount: null, currency: null, reference: '8820261002143512' };
+    expect(payfast.returned(account, back)).toEqual(payment);
+    // Its hash in any case, and 00 for a payment made too.
+    expect(
+      payfast.returned(account, { ...back, validation_hash: back.validation_hash.toUpperCase() }),
+    ).toEqual(payment);
+    expect(
+      payfast.returned(account, { ...back, err_code: '00', validation_hash: hashOf(basket, '00') }),
+    ).toEqual(payment);
+    // Made with another key, or for another basket or outcome: nothing believed.
+    expect(
+      payfast.returned(account, { ...back, validation_hash: hashOf(basket, '000', 'other') }),
+    ).toBeNull();
+    expect(payfast.returned(account, { ...back, basket_id: 'P2026100214300099999' })).toBeNull();
+    // Signed, but a payment that failed.
+    const failed = {
+      ...back,
+      err_code: '002',
+      err_msg: 'Time out',
+      validation_hash: hashOf(basket, '002'),
+    };
+    expect(payfast.returned(account, failed)).toBeNull();
+
+    // Its word at the webhook: a form, JSON, or the address read as a form.
+    const asForm = Buffer.from(new URLSearchParams(back).toString());
+    expect(payfast.webhook(account, { body: asForm, headers: {} })).toEqual(payment);
+    expect(
+      payfast.webhook(account, { body: Buffer.from(JSON.stringify(back)), headers: {} }),
+    ).toEqual(payment);
+    expect(
+      payfast.webhook(account, {
+        body: Buffer.from(new URLSearchParams(failed).toString()),
+        headers: {},
+      }),
+    ).toBeNull();
+    const { validation_hash: _, ...unsigned } = back;
+    expect(
+      payfast.webhook(account, {
+        body: Buffer.from(new URLSearchParams(unsigned).toString()),
+        headers: {},
+      }),
+    ).toBe('unsigned');
+    expect(
+      payfast.webhook(account, {
+        body: Buffer.from(new URLSearchParams({ ...back, err_code: '00' }).toString()),
+        headers: {},
+      }),
+    ).toBe('unsigned');
   });
 });

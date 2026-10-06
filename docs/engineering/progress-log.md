@@ -6,9 +6,9 @@
 
 ## In progress
 
-**More of Pakistan's payment gateways** (PAY-01): PayFast, HBL's and Bank Alfalah's, among the
-gateways shops take payments through, beside Safepay, JazzCash, Easypaisa and Baadmay; PayFast
-first.
+**More of Pakistan's payment gateways** (PAY-01): Bank Alfalah's and HBL's, among the gateways
+shops take payments through, beside Safepay, JazzCash, Easypaisa, PayFast and Baadmay; Bank
+Alfalah's first.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### PayFast
+
+* **PayFast's hosted checkout** ([ADR-227](../architecture/13-decision-log.md#adr-227--payfast-is-a-gateway-shops-take-payments-through-an-access-token-asked-for-the-basket-and-its-amount-with-the-secured-key-then-a-form-with-the-token-posted-to-its-page-its-return-and-its-word-at-the-webhook-which-may-come-in-the-address-believed-by-their-validation-hash)): an access token asked for, server
+  to server, for a basket of Hatti's and its amount in rupees with the secured key, then a form
+  with the token posted to its page; back to the return address on success and to the page it
+  came from on failure, and its word to the account's webhook address. The secured key never
+  leaves Hatti.
+* **Believed by its validation hash**, SHA-256 of the basket, the secured key, the merchant ID
+  and the code: 000 or 00 a payment made, at the session's own amount, which the token held
+  PayFast to. The webhook's address answers a GET too, its query read as a form, as PayFast may
+  send its word there. Its status API is not asked, and nothing is given back through its API
+  (simplification 107).
+* 1691 tests (5 new): the token and form against a stand-in, refusals, the return and its word
+  by their hash, an order paid by its word from its page, and through HTTP the word in the
+  webhook's address. A test that took `payfast` for a gateway nobody knows takes `paypal` now.
 
 ### 0915f6a · Baadmay's buy now, pay later
 

@@ -1,4 +1,11 @@
-import { createCipheriv, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import {
+  createCipheriv,
+  createHash,
+  createHmac,
+  randomBytes,
+  randomInt,
+  timingSafeEqual,
+} from 'node:crypto';
 import { fromMajor, isCurrencyCode, money, toMajorString, type CurrencyCode } from '@hatti/money';
 
 // Payment gateways' APIs behind one interface (PAY-01, ADR-151): starting a checkout for an
@@ -1274,6 +1281,198 @@ function baadmayReturn(form: Readonly<Record<string, string>>): { ref: string; b
 /** A number in E.164 as Pakistan writes it: +923001234567 is 03001234567. */
 function nationalNumber(e164: string): string {
   return /^\+92\d{10}$/.test(e164) ? `0${e164.slice(3)}` : e164;
+}
+
+/** Where PayFast's pages and API answer, in each of its environments. */
+export const PAYFAST_URLS: Readonly<Record<GatewayEnvironmentValue, string>> = {
+  sandbox: 'https://ipguat.apps.net.pk',
+  production: 'https://ipg1.apps.net.pk',
+};
+
+/** Where an access token is asked for, for a basket and its amount. */
+const PAYFAST_TOKEN_PATH = '/Ecommerce/api/Transaction/GetAccessToken';
+
+/** Its hosted checkout's page, which the customer's browser posts the form to. */
+const PAYFAST_FORM_PATH = '/Ecommerce/api/Transaction/PostTransaction';
+
+/** The codes its return and its notification give a payment made. */
+const PAYFAST_PAID = new Set(['000', '00']);
+
+export interface PayFastOptions {
+  /** {@link PAYFAST_URLS}, unless a test says otherwise. */
+  urls?: Partial<Record<GatewayEnvironmentValue, string>>;
+  /** How long asking for a token may take; fifteen seconds unless given. */
+  timeoutMs?: number;
+}
+
+/** What PayFast answers a token with. */
+interface PayFastToken {
+  ACCESS_TOKEN?: unknown;
+  errorDescription?: unknown;
+  errorCode?: unknown;
+}
+
+/**
+ * PayFast (https://gopayfast.com), APPS's hosted checkout, as its redirection sample has it: an
+ * access token asked for, server to server, for the basket and its amount with the account's
+ * secured key; then the customer's browser posts a form with the token to PayFast's page, which
+ * takes a card, a wallet or a bank account. PayFast sends the customer back, and word of the
+ * payment to the account's webhook address, each with a validation hash: SHA-256 of the basket,
+ * the secured key, the merchant ID and the outcome's code (ADR-227). The secured key never
+ * leaves Hatti, and the token is good for that basket and amount alone. Its status API, which
+ * PayFast turns on for a merchant, is not asked, and nothing is given back through its API here.
+ */
+export class PayFastGateway implements PaymentGateway {
+  readonly info: PaymentGatewayInfo = {
+    gateway: 'payfast',
+    name: 'PayFast',
+    credentials: [
+      { key: 'merchantId', label: 'Merchant ID' },
+      { key: 'securedKey', label: 'Secured key' },
+      { key: 'merchantName', label: 'Merchant name' },
+    ],
+    currencies: ['PKR'],
+    test: false,
+    refunds: 'none',
+  };
+
+  constructor(private readonly options: PayFastOptions = {}) {}
+
+  checkoutOrigin(environment: GatewayEnvironmentValue): string {
+    return new URL(this.#url(environment)).origin;
+  }
+
+  /** A token for the basket, asked for with the secured key, and the form for PayFast's page. */
+  async checkout(
+    account: GatewayAccount,
+    request: GatewayCheckoutRequest,
+  ): Promise<GatewayResult<GatewayCheckout>> {
+    if (request.currency !== 'PKR') {
+      return { ok: false, retry: false, message: 'PayFast takes payments in rupees alone' };
+    }
+    const now = new Date();
+    // Hatti's basket for the payment, unique to the account: when, in Pakistan, and five digits.
+    const ref = `P${pakistanTime(now)}${randomInt(100_000).toString().padStart(5, '0')}`;
+    const amount = toMajorString(money(request.amount, 'PKR'));
+    const { merchantId = '', securedKey = '', merchantName = '' } = account.credentials;
+    const base = this.#url(account.environment);
+    let response: Response;
+    try {
+      response = await fetch(`${base}${PAYFAST_TOKEN_PATH}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          accept: 'application/json',
+        },
+        body: new URLSearchParams({
+          MERCHANT_ID: merchantId,
+          SECURED_KEY: securedKey,
+          BASKET_ID: ref,
+          TXNAMT: amount,
+          CURRENCY_CODE: 'PKR',
+        }).toString(),
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+      });
+    } catch (error) {
+      return {
+        ok: false,
+        retry: true,
+        message: `PayFast could not be reached: ${(error as Error).message}`.slice(0, 1_000),
+      };
+    }
+    const json = (await response.json().catch(() => null)) as PayFastToken | null;
+    const token = json?.ACCESS_TOKEN;
+    if (!response.ok || typeof token !== 'string' || !/^[!-~]{1,2000}$/.test(token)) {
+      const said = typeof json?.errorDescription === 'string' ? json.errorDescription.trim() : '';
+      return {
+        ok: false,
+        retry: response.status >= 500 || response.status === 429,
+        message: `PayFast: ${said || `it answered ${response.status}`}`.slice(0, 1_000),
+      };
+    }
+    const when = pakistanTime(now);
+    const buyer = request.buyer;
+    const form: Record<string, string> = {
+      MERCHANT_ID: merchantId,
+      MERCHANT_NAME: merchantName,
+      TOKEN: token,
+      PROCCODE: '00',
+      TXNAMT: amount,
+      CURRENCY_CODE: 'PKR',
+      BASKET_ID: ref,
+      ORDER_DATE: `${when.slice(0, 4)}-${when.slice(4, 6)}-${when.slice(6, 8)} ${when.slice(8, 10)}:${when.slice(10, 12)}:${when.slice(12, 14)}`,
+      SUCCESS_URL: request.returnUrl,
+      // A payment that failed goes back to the page it came from, to try again.
+      FAILURE_URL: request.cancelUrl,
+      // Where PayFast sends word of the payment: the account's webhook address.
+      CHECKOUT_URL: request.notifyUrl ?? '',
+      CUSTOMER_EMAIL_ADDRESS: buyer?.email ?? '',
+      CUSTOMER_MOBILE_NO: buyer?.phone ? nationalNumber(buyer.phone) : '',
+      // Nothing checks it: PayFast's own sample sends any string.
+      SIGNATURE: randomBytes(8).toString('hex'),
+      VERSION: 'MERCHANTCART-0.1',
+      TXNDESC: `Order ${request.orderName}`,
+      TRAN_TYPE: 'ECOMM_PURCHASE',
+    };
+    return { ok: true, value: { ref, url: `${base}${PAYFAST_FORM_PATH}`, form } };
+  }
+
+  /** PayFast sends the customer back with the outcome, its validation hash made with the key. */
+  returned(account: GatewayAccount, form: Readonly<Record<string, string>>): GatewayPayment | null {
+    const outcome = this.#signed(account, form);
+    return outcome === 'unsigned' ? null : outcome;
+  }
+
+  /**
+   * Its word of the payment, at the account's webhook address: the same fields as its return,
+   * posted as a form or as JSON, or in the address, which the webhook reads as a form.
+   */
+  webhook(account: GatewayAccount, request: GatewayWebhook): GatewayPayment | 'unsigned' | null {
+    const text = request.body.toString('utf8');
+    let fields: Record<string, string> = {};
+    try {
+      const parsed: unknown = JSON.parse(text);
+      if (!isObject(parsed)) return 'unsigned';
+      for (const [key, value] of Object.entries(parsed)) {
+        if (typeof value === 'string' || typeof value === 'number') fields[key] = String(value);
+      }
+    } catch {
+      fields = Object.fromEntries(new URLSearchParams(text));
+    }
+    return this.#signed(account, fields);
+  }
+
+  /**
+   * The payment `fields` say is made, if their validation hash holds: SHA-256, in hex, of the
+   * basket, the secured key, the merchant ID and the code, each as PayFast sent it, joined by
+   * "|". Made when the code is 000, or 00. The hash covers no amount: the session's own is
+   * taken, which the token held PayFast to.
+   */
+  #signed(
+    account: GatewayAccount,
+    fields: Readonly<Record<string, string>>,
+  ): GatewayPayment | 'unsigned' | null {
+    const { merchantId, securedKey } = account.credentials;
+    const given = fields.validation_hash;
+    const basket = fields.basket_id ?? '';
+    const code = fields.err_code ?? '';
+    if (!merchantId || !securedKey || !given || basket.trim() === '') return 'unsigned';
+    const expected = createHash('sha256')
+      .update(`${basket}|${securedKey}|${merchantId}|${code}`, 'utf8')
+      .digest('hex');
+    if (!sameHex(given, expected)) return 'unsigned';
+    if (!PAYFAST_PAID.has(code.trim())) return null;
+    return {
+      ref: basket.trim(),
+      amount: null,
+      currency: null,
+      reference: fields.transaction_id?.trim().slice(0, 200) || null,
+    };
+  }
+
+  #url(environment: GatewayEnvironmentValue): string {
+    return (this.options.urls?.[environment] ?? PAYFAST_URLS[environment]).replace(/\/+$/, '');
+  }
 }
 
 /**

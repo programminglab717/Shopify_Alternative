@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Controller,
+  Get,
   HttpCode,
   NotFoundException,
   Param,
@@ -29,11 +30,37 @@ export class PaymentWebhookController {
     @Req() request: FastifyRequest & { rawBody?: Buffer },
   ): Promise<{ received: boolean }> {
     if (!request.rawBody) throw new BadRequestException('The request has no body');
+    return this.#receive(accountId, request.rawBody, request);
+  }
+
+  /**
+   * The same, for a gateway that sends its word in the address, as PayFast may (ADR-227): the
+   * query, as it came, is read as a form's body.
+   */
+  @Get(':accountId')
+  @HttpCode(200)
+  async receiveInAddress(
+    @Param('accountId') accountId: string,
+    @Req() request: FastifyRequest,
+  ): Promise<{ received: boolean }> {
+    const at = request.url.indexOf('?');
+    return this.#receive(
+      accountId,
+      Buffer.from(at === -1 ? '' : request.url.slice(at + 1), 'utf8'),
+      request,
+    );
+  }
+
+  async #receive(
+    accountId: string,
+    body: Buffer,
+    request: FastifyRequest,
+  ): Promise<{ received: boolean }> {
     const headers: Record<string, string | undefined> = {};
     for (const [name, value] of Object.entries(request.headers)) {
       headers[name.toLowerCase()] = Array.isArray(value) ? value[0] : value;
     }
-    const outcome = await this.payments.webhook(accountId, { body: request.rawBody, headers });
+    const outcome = await this.payments.webhook(accountId, { body, headers });
     if (outcome === 'not_found') throw new NotFoundException('No such payment gateway account');
     if (outcome === 'unsigned') {
       throw new UnauthorizedException("The request is not signed with the account's secret");

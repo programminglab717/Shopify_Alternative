@@ -1086,6 +1086,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   address. Where a gateway's return names the payment by an ID of its own, as Baadmay's does, its
   `inquire` takes what the customer came back with (`returned`); believe its unsigned answer
   only naming Hatti's reference, and record the amount it says was paid.
+* **A gateway's word may come in the webhook's address** ([ADR-227](../architecture/13-decision-log.md#adr-227--payfast-is-a-gateway-shops-take-payments-through-an-access-token-asked-for-the-basket-and-its-amount-with-the-secured-key-then-a-form-with-the-token-posted-to-its-page-its-return-and-its-word-at-the-webhook-which-may-come-in-the-address-believed-by-their-validation-hash)):
+  `PaymentWebhookController` answers a GET as well, handing `webhook` the query as it came, as a
+  form's body. Read a body as JSON first and as a form otherwise, as PayFast's and JazzCash's
+  adapters do.
 
 ## Billing
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-226 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-227 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -234,6 +234,7 @@
 | 224 | A shop's advance may be asked only of orders holding a product it tags: checkout knows the cart's products before anything is typed, names the product beside cash on delivery, and asks a cart holding none for nothing | Accepted |
 | 225 | A shop with storefront items waiting is listed in Valkey until a drain finds none left, and the worker builds the shops quiet ten minutes, what their events' tries gave up on | Accepted |
 | 226 | Baadmay's buy now, pay later is a gateway shops take payments through: the order, its items and its customer go to its page in the address, and its return, which it does not sign, is believed only once its order status, asked at once, names the order and the amount paid | Accepted |
+| 227 | PayFast is a gateway shops take payments through: an access token asked for the basket and its amount with the secured key, then a form with the token posted to its page; its return, and its word at the webhook, which may come in the address, believed by their validation hash | Accepted |
 
 ---
 
@@ -9465,3 +9466,42 @@
   * **Believing its return:** unsigned, it would let anyone mark an order paid.
   * **Its open PHP library:** a third party's, in PHP, and no surer of the answer's fields than
     the document.
+
+## ADR-227 · PayFast is a gateway shops take payments through: an access token asked for the basket and its amount with the secured key, then a form with the token posted to its page; its return, and its word at the webhook, which may come in the address, believed by their validation hash
+
+* **Context:** PayFast, from APPS, takes cards, wallets and bank accounts through one hosted
+  page, and many shops in Pakistan already have an account with it. Shops connect their own
+  ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)). Its documents and its redirection sample describe the flow. Server to
+  server, the merchant asks for an access token for a basket and its amount, with the secured
+  key. Then the customer's browser posts a form with the token to PayFast's page. PayFast sends
+  the customer back, and sends word to an address given with the form, each with a validation
+  hash. Its status API is turned on by PayFast for a merchant, and its documents give codes
+  that do not say plainly whether a payment was made.
+* **Decision:**
+  * **A token, then a form.** The token is asked for with the merchant ID, the secured key, a
+    basket of Hatti's unique to the account, and the amount in rupees. The browser posts the
+    token, the basket, the amount and the date to PayFast's page. It goes back to the return
+    address on success, to the page it came from on failure, and PayFast's word goes to the
+    account's webhook address. The form also carries the customer's number and email. The
+    secured key never leaves Hatti, and the token is good for that basket and amount alone.
+  * **Believed by its validation hash:** SHA-256 in hex of the basket, the secured key, the
+    merchant ID and the outcome's code, joined by `|` as PayFast sent them, compared in constant
+    time in any case. A code of 000 or 00 is a payment made. The hash covers no amount, so the
+    session's own amount is recorded, which the token held PayFast to.
+  * **Its word may come in the webhook's address.** The webhook's address answers a GET as well,
+    reading the query as a form's body, and a form or JSON when posted. As with every gateway, a
+    payment is recorded once, however often word of it comes.
+  * **Its status API is not asked** ([ADR-208](#adr-208--a-payment-started-online-whose-customer-never-came-back-is-asked-after-the-worker-asks-the-gateways-status-inquiry-jazzcashs-first-from-a-quarter-of-an-hour-after-it-began-at-most-once-an-hour-for-two-days-and-records-one-the-gateway-vouches-for-paid-through-the-inquiry)). It needs PayFast to turn it on, and its
+    codes as documented could record a payment not made. Nothing is given back through its API.
+* **Consequences:**
+  * Shops take cards, wallets and bank accounts through one more page that they may know
+    already.
+  * A customer who pays and never comes back is known by PayFast's word at the webhook alone.
+    Without that word, staff record the payment from PayFast's dashboard.
+  * The merchant name is a credential, as PayFast's page names the shop by it.
+* **Alternatives:**
+  * **Asking its status API, as the other gateways' are asked:** its codes, unconfirmed, could
+    record a payment not made.
+  * **Its direct API, card details sent through Hatti:** would bring cards onto Hatti's servers
+    and into PCI DSS's scope. The hosted page keeps them on PayFast's, as JazzCash's does
+    ([ADR-163](#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)).
