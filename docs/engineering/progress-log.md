@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Storefronts left waiting swept** (ADR-036): the worker going back on a schedule to shops whose
-storefront items still wait after the publisher's retries ran out, rather than leaving them for
-the shop's next event.
+**More of Pakistan's payment gateways** (PAY-01): PayFast, HBL's, Bank Alfalah's, and Baadmay's
+buy now, pay later, among the gateways shops take payments through, beside Safepay, JazzCash and
+Easypaisa.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Storefronts left waiting swept
+
+* **The build queue lists its shops** ([ADR-225](../architecture/13-decision-log.md#adr-225--a-shop-with-storefront-items-waiting-is-listed-in-valkey-until-a-drain-finds-none-left-and-the-worker-builds-the-shops-quiet-ten-minutes-what-their-events-tries-gave-up-on)) in `s:sf:waiting` while their items
+  wait: adding lists a shop after its items are in, a drain that finds nothing left takes it off
+  unless it was listed again since, and one that fails lists it again.
+* **The worker builds the shops quiet ten minutes**, every minute (`STOREFRONTS_INTERVAL_MS`), a
+  hundred at a time and the longest waiting first, each listed again from now so that one
+  failing again is tried ten minutes on. What an event's ten tries gave up on, as through an
+  outage of Postgres or Valkey, is built without waiting for the shop's next change.
+* 1681 tests (3 new): the list kept by adds and drains, built or failed, and taken in order once
+  quiet and not again at once; the sweep's batches and one shop's failure; and a product an
+  event's publisher gave up on built by the sweep.
 
 ### 7740474 · An advance for products the shop tags
 

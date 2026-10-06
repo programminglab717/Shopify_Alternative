@@ -30,6 +30,10 @@ export interface BuildQueueOptions {
  * One publisher at a time drains a shop, holding its lock, and builds what others add meanwhile.
  * Items it takes are kept aside until built, and put back if it fails or stops: nothing is lost,
  * and nothing is built from data older than the change that asked for it.
+ *
+ * A shop with items is listed as waiting until a drain finds none left, so that what its
+ * publishers gave up on is found by a sweep ({@link takeWaiting}) rather than waiting for the
+ * shop's next change (ADR-225).
  */
 export class BuildQueue {
   readonly #redis: ScriptedRedis;
@@ -50,6 +54,23 @@ export class BuildQueue {
     if (items.length === 0) return;
     const scored = items.flatMap((item) => [this.#priority(item), item]);
     await this.#redis.zadd(this.#keys.pending(shopId), 'NX', ...scored);
+    // Listed after its items are added: a drain that found none left still sees it listed again.
+    await this.#list(shopId);
+  }
+
+  /**
+   * Shops listed as waiting `idleMs` ago or more, none listed since, the longest waiting first,
+   * `limit` at most: those whose items their publishers gave up on, for a sweep to drain
+   * (ADR-225). Each is listed again from now, so it is taken once more only `idleMs` on, as when
+   * its build fails again; a drain that finds nothing left takes it off.
+   */
+  async takeWaiting(idleMs: number, limit = 100): Promise<string[]> {
+    const now = Date.now();
+    return this.#redis.sfTakeWaiting(this.#keys.waiting(), now - idleMs, now, limit);
+  }
+
+  #list(shopId: string): Promise<number> {
+    return this.#redis.sfList(this.#keys.waiting(), Date.now(), shopId);
   }
 
   /** How many items wait for the shop, taken ones included. */
@@ -98,12 +119,20 @@ export class BuildQueue {
         }
       } catch (error) {
         await this.#redis.sfGiveBack(lock, pending, taken, token);
+        // Listed again, for a sweep should nothing else build it.
+        await this.#list(shopId);
         throw error;
       } finally {
         await this.#redis.sfRelease(lock, token);
       }
       // Added after the last batch was taken, by one that found the lock held: build it now.
-      if ((await this.#redis.zcard(pending)) === 0) return built;
+      // With nothing left, the shop waits no more, unless it was listed again since its score was
+      // read, by items added since.
+      const listed = await this.#redis.zscore(this.#keys.waiting(), shopId);
+      if ((await this.size(shopId)) === 0) {
+        if (listed !== null) await this.#redis.sfUnlist(this.#keys.waiting(), shopId, listed);
+        return built;
+      }
     }
   }
 
@@ -122,6 +151,7 @@ export class BuildQueue {
       if (keys.length > 0) removed += await this.#redis.del(...keys);
       cursor = next;
     } while (cursor !== '0');
+    await this.#redis.zrem(this.#keys.waiting(), shopId);
     return removed;
   }
 }

@@ -72,6 +72,7 @@ import { ScheduledContent, scheduledKinds } from './scheduled-content.js';
 import { ScheduledExports } from './scheduled-exports.js';
 import { StaffAlerts } from './staff-alerts.js';
 import { StorefrontSessions } from './storefront-sessions.js';
+import { StorefrontSweep } from './storefront-sweep.js';
 import { UnpaidOrders } from './unpaid-orders.js';
 import { UnreachableOrders, workerOrders } from './unreachable-orders.js';
 
@@ -293,6 +294,22 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     closers.push(async () => {
       await sessions.stop();
       sessionsRedis.disconnect();
+    });
+    // Storefronts whose publisher gave up on them, built once their shops go quiet (ADR-225).
+    const sweepRedis = createRedis(config.REDIS_URL, 'worker');
+    const storefronts = new StorefrontSweep(
+      createStorefrontPublisher(
+        database,
+        sweepRedis,
+        logger,
+        edgeCacheOf(config),
+        new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
+      ),
+      logger,
+    ).start(config.STOREFRONTS_INTERVAL_MS);
+    closers.push(async () => {
+      await storefronts.stop();
+      sweepRedis.disconnect();
     });
     // Exports staff scheduled, emailed as each period ends (ADR-183).
     const exportEmails = exportEmailsOf(config, logger);

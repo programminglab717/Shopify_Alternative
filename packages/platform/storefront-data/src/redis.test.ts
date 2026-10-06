@@ -271,6 +271,8 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     expect(other).toBe(0);
     expect(first).toBe(2);
     expect(built).toEqual(['product:p1', 'product:p2']);
+    // The holder built what the other listed, and took the shop off the list.
+    expect(await redis.zscore(keys.waiting(), shopId)).toBeNull();
   });
 
   it('puts back a failed batch, and what a publisher that stopped had taken', async () => {
@@ -297,6 +299,41 @@ describe.skipIf(!redisUrl)('Storefront documents in Valkey', () => {
     resume();
     await expect(stalled).rejects.toThrow(LockLostError);
     expect(await queue.size(shopId)).toBe(0);
+  });
+
+  it('lists a shop while its items wait, for a sweep to take once it is quiet (ADR-225)', async () => {
+    // A list of its own, without the other tests' shops.
+    const own = new StorefrontKeys(`${prefix}:waiting`);
+    const listed = new BuildQueue(redis, { keys: own });
+    const listing = async () => (await redis.zrange(own.waiting(), '0', '-1')).sort();
+    const [built, failed, quiet] = [randomUUID(), randomUUID(), randomUUID()];
+    await listed.add(built, ['product:p1']);
+    await listed.add(failed, ['product:p1', 'product:p2']);
+    expect(await listing()).toEqual([built, failed].sort());
+    // Built, it waits no more; failed, it is listed again, its items put back.
+    expect(await listed.drain(built, async () => {})).toBe(1);
+    await expect(
+      listed.drain(failed, async () => {
+        throw new Error('database unavailable');
+      }),
+    ).rejects.toThrow('database unavailable');
+    expect(await listing()).toEqual([failed]);
+    expect(await listed.size(failed)).toBe(2);
+
+    // Taken once quiet as long as asked, the longest waiting first, as many as asked.
+    await sleep(30);
+    await listed.add(quiet, ['shop']);
+    await sleep(30);
+    expect(await listed.takeWaiting(60_000)).toEqual([]);
+    const before = Date.now();
+    expect(await listed.takeWaiting(20, 1)).toEqual([failed]);
+    // Listed from now: taken again only as long on, as when its build fails again.
+    expect(Number(await redis.zscore(own.waiting(), failed))).toBeGreaterThanOrEqual(before);
+    expect(await listed.takeWaiting(60_000)).toEqual([]);
+    // Drained with nothing left, a shop is taken off; cleared, too.
+    expect(await listed.drain(failed, async () => {})).toBe(2);
+    await listed.clear(quiet);
+    expect(await listing()).toEqual([]);
   });
 
   it('refuses the writes of a publisher that lost its lock', async () => {

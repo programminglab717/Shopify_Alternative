@@ -395,6 +395,8 @@ const workerSchema = z
     IMAGES_INTERVAL_MS: z.coerce.number().int().min(500).default(5_000),
     /** How often the storefronts' counts of each day's sessions are kept (ADR-180). */
     SESSIONS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(60_000),
+    /** How often storefronts whose publisher gave up are built, once they go quiet (ADR-225). */
+    STOREFRONTS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(60_000),
     ...messageSending,
     ...storage,
   })

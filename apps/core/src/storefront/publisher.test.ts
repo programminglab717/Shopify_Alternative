@@ -48,6 +48,7 @@ import { Redis } from 'ioredis';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TestDns } from '../testing/api.js';
+import { StorefrontSweep } from '../worker/storefront-sweep.js';
 import { itemsFor, StorefrontPublisher } from './publisher.js';
 
 const server = testDatabaseServer();
@@ -1395,6 +1396,26 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
     expect((await store().pageByHandle('our-story'))?.bodyHtml).toBe('<p>Since 1998.</p>');
     edgeDown = false;
+  });
+
+  it("builds what an event's publisher gave up on once the shop is quiet, as the worker sweeps (ADR-225)", async () => {
+    const ajrak = unwrap(
+      await products.create(tenant, {
+        title: 'Ajrak Shawl',
+        status: 'active',
+        variants: [{ price: '3,500' }],
+      }),
+    );
+    // Its event's tries ran out: its item waits, and the shop is listed.
+    await admin.query('UPDATE platform.outbox_events SET published_at = now()');
+    await publisher.queue.add(shopId, [`product:${ajrak.id}`]);
+    expect(await handles('ajrak-shawl')).toEqual([null]);
+    const sweep = new StorefrontSweep(publisher, undefined, 0);
+    expect(await sweep.sweep()).toBeGreaterThan(0);
+    expect(await handles('ajrak-shawl')).toEqual(['Ajrak Shawl']);
+    // Nothing left: off the list, and the next sweep builds nothing.
+    expect(await redis.zscore(keys.waiting(), shopId)).toBeNull();
+    expect(await sweep.sweep()).toBe(0);
   });
 });
 

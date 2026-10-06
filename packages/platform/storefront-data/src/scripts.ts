@@ -124,6 +124,41 @@ return 1`,
 for i = 2, #KEYS do redis.call('SET', KEYS[i], ARGV[i + 1]) end
 return 1`,
   },
+  // Lists a shop as waiting from now, or just after when it was listed last: each listing moves
+  // its score on, so a score read before one is never taken for it.
+  // KEYS: waiting. ARGV: now in milliseconds, the shop.
+  sfList: {
+    numberOfKeys: 1,
+    lua: `
+local score = tonumber(ARGV[1])
+local was = redis.call('ZSCORE', KEYS[1], ARGV[2])
+if was and tonumber(was) >= score then score = tonumber(was) + 1 end
+redis.call('ZADD', KEYS[1], score, ARGV[2])
+return 1`,
+  },
+  // The shops listed up to a time, the longest waiting first, each listed again from now, so a
+  // sweep running beside this one doesn't take them too.
+  // KEYS: waiting. ARGV: up to, now, in milliseconds, how many.
+  sfTakeWaiting: {
+    numberOfKeys: 1,
+    lua: `
+local shops = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1], 'LIMIT', 0, ARGV[3])
+for _, shop in ipairs(shops) do
+  local score = tonumber(ARGV[2])
+  local was = tonumber(redis.call('ZSCORE', KEYS[1], shop))
+  if was >= score then score = was + 1 end
+  redis.call('ZADD', KEYS[1], score, shop)
+end
+return shops`,
+  },
+  // Takes a shop off the list only if it is still listed as it was when its score was read.
+  // KEYS: waiting. ARGV: the shop, its score as read.
+  sfUnlist: {
+    numberOfKeys: 1,
+    lua: `
+if redis.call('ZSCORE', KEYS[1], ARGV[1]) == ARGV[2] then return redis.call('ZREM', KEYS[1], ARGV[1]) end
+return 0`,
+  },
   // Lets go of a field only if it still holds the value: a handle another shop has since taken
   // stays that shop's.
   // KEYS: the hash. ARGV: the field, the value.
@@ -181,6 +216,9 @@ export type ScriptedRedis = Redis & {
   ): Promise<number | null>;
   sfDel(keyCount: number, ...args: Arg[]): Promise<number | null>;
   sfUnmap(hash: string, field: string, value: string): Promise<number>;
+  sfList(waiting: string, now: number, shopId: string): Promise<number>;
+  sfTakeWaiting(waiting: string, upTo: number, now: number, count: number): Promise<string[]>;
+  sfUnlist(waiting: string, shopId: string, score: string): Promise<number>;
   sfByHandle(ids: string, handle: string, prefix: string): Promise<string | null>;
 };
 

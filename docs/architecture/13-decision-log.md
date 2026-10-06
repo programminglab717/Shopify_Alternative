@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-224 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-225 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -232,6 +232,7 @@
 | 222 | A shop may take something off orders paid online, as it may off those paid by transfer: a percentage up to a cap or an amount of its own, which checkout takes off the items after any code and the order keeps apart | Accepted |
 | 223 | A draft paid by transfer gets a link too: its customer confirms it as one paid on delivery, its order waits for the money, and the link becomes the order's, whose page shows where to pay and takes the payment online | Accepted |
 | 224 | A shop's advance may be asked only of orders holding a product it tags: checkout knows the cart's products before anything is typed, names the product beside cash on delivery, and asks a cart holding none for nothing | Accepted |
+| 225 | A shop with storefront items waiting is listed in Valkey until a drain finds none left, and the worker builds the shops quiet ten minutes, what their events' tries gave up on | Accepted |
 
 ---
 
@@ -9387,3 +9388,35 @@
     pre-orders with tags, as Shopify's pre-order apps do.
   * **Keeping cash on delivery from them** ([ADR-078](#adr-078--a-shop-keeps-cash-on-delivery-from-products-by-their-tags-a-cart-holding-one-is-offered-bank-transfer-alone-the-page-naming-the-product)): already there, and prepays the
     whole order, which shops asking an advance mean to avoid.
+
+## ADR-225 · A shop with storefront items waiting is listed in Valkey until a drain finds none left, and the worker builds the shops quiet ten minutes, what their events' tries gave up on
+
+* **Context:** Events mark a shop's storefront items stale and its publisher builds them
+  ([ADR-036](#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)). An event's job is tried ten times, a second apart and doubling, about
+  eight and a half minutes in all. A build failing for longer, as while Postgres or Valkey are
+  away, left its items in the shop's queue with nothing to build them until the shop's next
+  change: a shop that changed nothing for a week showed its old documents, or none, for a week.
+* **Decision:**
+  * **The queue lists its shops.** Adding items lists the shop in `s:sf:waiting`, a sorted set
+    by when it was last listed, after the items are in. A drain that finds nothing left, pending
+    or taken, takes the shop off, but only if it is still listed as when the drain read its
+    score: each listing moves the score on, never back to the same, so one listed again since is
+    kept. A drain whose build fails lists the shop again.
+  * **The worker's sweep builds the shops gone quiet.** Every minute (`STOREFRONTS_INTERVAL_MS`)
+    it takes the shops listed ten minutes ago or more, a hundred at a time and the longest
+    waiting first, lists each again from now, and publishes each as the events' publisher does,
+    the shop's lock keeping the two from building it at once. A shop that fails again is tried
+    ten minutes on, and one shop's failure isn't the others'.
+  * **The list is a key no shop owns**, as the directory is ([ADR-037](#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)), read and
+    written by scripts of that key alone, so a shop's own keys keep their slot.
+* **Consequences:**
+  * A storefront an outage left behind catches up about ten minutes after its shop's last change
+    once Postgres and Valkey are back, without the shop changing anything.
+  * Adding items costs a round trip more, and a drain three; the list holds only the shops being
+    built and those left waiting.
+  * Shops whose items waited before the list was kept are listed by their next change.
+* **Alternatives:**
+  * **Scanning Valkey for shops' pending items:** walks every key, documents included, at each
+    sweep.
+  * **Trying events for longer:** holds a job for each shop through an outage, and still ends.
+  * **Rebuilding every shop on a schedule:** work for every shop to catch the few left behind.

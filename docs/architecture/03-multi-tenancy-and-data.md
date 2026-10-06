@@ -436,7 +436,9 @@ and the shop's settings, with hashes finding products and collections by handle,
 which list every product for the shop's catalog feed ([ADR-142](./13-decision-log.md#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time)).
 Events mark what is stale, and
 one publisher per shop at a time rebuilds it from the database, a batch at a time, so a bulk edit
-is built about once. Keys carry no versions: each write is atomic, and versions come with the
+is built about once. A shop with items waiting is listed in `s:sf:waiting` until a drain finds
+none left, and the worker builds what its events gave up on ten minutes after its last change
+([ADR-225](./13-decision-log.md#adr-225--a-shop-with-storefront-items-waiting-is-listed-in-valkey-until-a-drain-finds-none-left-and-the-worker-builds-the-shops-quiet-ten-minutes-what-their-events-tries-gave-up-on)). Keys carry no versions: each write is atomic, and versions come with the
 edge cache. Storefronts find a shop by its handle in `s:sf:shops`, the origin's copy of the shop
 directory, written with the shop's settings ([ADR-037](./13-decision-log.md#adr-037--every-shop-has-a-handle-naming-its-storefront-on-the-platforms-domain-storefronts-find-shops-through-a-directory-in-valkey)),
 and by its verified domains in `s:sf:domains`, written with them ([ADR-048](./13-decision-log.md#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)).

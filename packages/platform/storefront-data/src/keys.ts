@@ -70,6 +70,15 @@ export class StorefrontKeys {
     return `${this.#base(shopId)}:*`;
   }
 
+  /**
+   * The shops with items waiting to be built: a sorted set, each scored by when it was last listed,
+   * in milliseconds, which the worker's sweep reads (ADR-225). Beside the shops' keys, as the
+   * directory is.
+   */
+  waiting(): string {
+    return `${this.prefix}:sf:waiting`;
+  }
+
   /** The cell's shops by handle: a hash, and the one key no shop owns. */
   directory(): string {
     return `${this.prefix}:sf:shops`;

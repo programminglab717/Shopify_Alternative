@@ -1216,6 +1216,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   needs an item, a step in the publisher's build, and a priority before whatever lists it.
 * **Write through the `ShopWriter` a drain hands you**, never with a plain `SET`: its scripts
   check the shop's lock, keep handles right, and write each call atomically.
+* **Add items through `BuildQueue.add`**, never to the pending set itself: it lists the shop as
+  waiting ([ADR-225](../architecture/13-decision-log.md#adr-225--a-shop-with-storefront-items-waiting-is-listed-in-valkey-until-a-drain-finds-none-left-and-the-worker-builds-the-shops-quiet-ten-minutes-what-their-events-tries-gave-up-on)), a drain that finds nothing left takes it off,
+  and the worker's `StorefrontSweep` builds it if nothing else does. A score on the list only
+  moves on (`sfList`), so a drain's `sfUnlist`, conditional on the score it read, never takes
+  off a shop listed again since.
 * **One round trip per document or list**, as `RedisStore` reads them; tests count round trips.
   Tests use a `StorefrontKeys` prefix of their own and clear it after.
 * **Raise `DOCUMENTS_VERSION` when documents gain or change a field.** The publisher publishes a
