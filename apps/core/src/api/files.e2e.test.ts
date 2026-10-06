@@ -331,6 +331,71 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
     }
   });
 
+  it("shows the shop's social sharing image, one of its files, at an address of its own (ADR-243)", async () => {
+    const writer = await issueToken(['write_files', 'write_settings']);
+    const upload = async (filename: string, mimeType: string, bytes: Buffer) => {
+      const staged = await gql(writer, STAGE, {
+        input: [{ filename, mimeType, fileSize: String(bytes.length) }],
+      });
+      const [target] = staged.data!.stagedUploadsCreate.stagedTargets;
+      expect((await call('PUT', target.url, bytes, mimeType)).statusCode).toBe(200);
+      const created = await gql(writer, CREATE, {
+        files: [{ originalSource: target.resourceUrl }],
+      });
+      return created.data!.fileCreate.files[0].id as string;
+    };
+    const photo = await upload('Share.png', 'image/png', png(80));
+    const UPDATE_PREFERENCES = `mutation ($input: OnlineStorePreferencesInput!) {
+      onlineStorePreferencesUpdate(input: $input) {
+        preferences { seo { title description } sharingImage { fileId altText } }
+        userErrors { field code message }
+      }
+    }`;
+    const set = await gql(writer, UPDATE_PREFERENCES, {
+      input: {
+        seo: { title: 'Zari | Lawn in Lahore', description: 'Lawn and bridal, delivered.' },
+        sharingImage: { fileId: photo, altText: 'Three lawn suits' },
+      },
+    });
+    expect(set.data!.onlineStorePreferencesUpdate).toEqual({
+      preferences: {
+        seo: { title: 'Zari | Lawn in Lahore', description: 'Lawn and bridal, delivered.' },
+        sharingImage: { fileId: photo, altText: 'Three lawn suits' },
+      },
+      userErrors: [],
+    });
+    // Served at the API's own address, read as the shop, for its pages' link previews.
+    const served = await call('GET', `/sharing-images/${shop}`);
+    expect([
+      served.statusCode,
+      served.headers['content-type'],
+      served.headers['cache-control'],
+    ]).toEqual([200, 'image/png', 'public, max-age=3600']);
+    expect(served.rawPayload.equals(png(80))).toBe(true);
+
+    // Not a file that is no image.
+    const catalogue = await upload('Lookbook.pdf', 'application/pdf', Buffer.from('%PDF-1.7\n'));
+    const refused = await gql(writer, UPDATE_PREFERENCES, {
+      input: { sharingImage: { fileId: catalogue } },
+    });
+    expect(refused.data!.onlineStorePreferencesUpdate.userErrors).toEqual([
+      {
+        field: ['sharingImage', 'fileId'],
+        code: 'NOT_FOUND',
+        message: "No such image among the shop's files: a JPEG, PNG, WebP or GIF uploaded",
+      },
+    ]);
+    // Taken away, it is served no more, nor anything at an address naming no shop's.
+    await gql(writer, UPDATE_PREFERENCES, { input: { sharingImage: null } });
+    for (const path of [
+      `/sharing-images/${shop}`,
+      `/sharing-images/${newId()}`,
+      '/sharing-images/zari',
+    ]) {
+      expect((await call('GET', path)).statusCode, path).toBe(404);
+    }
+  });
+
   it('says what is wrong with an upload', async () => {
     const refused = await gql(tokens.owner, STAGE, {
       input: [{ filename: 'page.html', mimeType: 'text/html', fileSize: '64' }],

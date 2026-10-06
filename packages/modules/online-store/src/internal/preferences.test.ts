@@ -2,7 +2,9 @@ import 'reflect-metadata';
 import { VariantService } from '@hatti/catalog/public';
 import { checkPassword } from '@hatti/crypto';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { shopPreferencesOf } from './preferences.service.js';
 import { preferences } from './schema.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
 
@@ -34,6 +36,8 @@ describe.skipIf(!server)('PreferencesService', () => {
     passwordMessage: '',
     robotsTxtRules: '',
     linkPage: { bio: '', links: [], productIds: [], variantIds: [] },
+    seo: { title: null, description: null },
+    sharingImage: null,
   };
 
   it("keeps a shop's WhatsApp number in E.164, recording each change", async () => {
@@ -73,6 +77,8 @@ describe.skipIf(!server)('PreferencesService', () => {
       passwordMessage: '',
       robotsTxtRules: '',
       linkPage: { bio: '', links: [], productIds: [], variantIds: [] },
+      seo: { title: null, description: null },
+      sharingImage: null,
     });
   });
 
@@ -335,5 +341,88 @@ describe.skipIf(!server)('PreferencesService', () => {
     // Products given by their IDs alone have none chosen.
     const plain = unwrap(await f.preferences.update(f.a, { linkPage: { productIds: [shawl.id] } }));
     expect(plain.linkPage).toMatchObject({ productIds: [shawl.id], variantIds: [null] });
+  });
+
+  it("keeps its home page's title and description for search engines, and its sharing image (ADR-243)", async () => {
+    const file = async (shopId: string, contentType: string) => {
+      const id = newId();
+      await f.admin.query(
+        `INSERT INTO files.files (shop_id, id, key, filename, content_type, size, status)
+         VALUES ($1, $2, $3, 'file', $4, 64, 'ready')`,
+        [shopId, id, `shops/${shopId}/files/${id}/file`, contentType],
+      );
+      return id;
+    };
+    const photo = await file(f.a.shopId, 'image/png');
+    const kept = unwrap(
+      await f.preferences.update(f.a, {
+        seo: {
+          title: '  Zari Fashions |  Lawn in Lahore ',
+          description: 'Lawn,\n bridal and khussas, delivered across Pakistan.',
+        },
+        sharingImage: { fileId: photo, altText: ' Three lawn suits ' },
+      }),
+    );
+    expect(kept).toMatchObject({
+      seo: {
+        title: 'Zari Fashions | Lawn in Lahore',
+        description: 'Lawn, bridal and khussas, delivered across Pakistan.',
+      },
+      sharingImage: { fileId: photo, altText: 'Three lawn suits' },
+    });
+    // Left out, each stays as it is; a blank description is cleared, its title kept.
+    unwrap(await f.preferences.update(f.a, { whatsappNumber: '0300 1234567' }));
+    expect(unwrap(await f.preferences.update(f.a, { seo: { description: ' ' } }))).toMatchObject({
+      seo: { title: 'Zari Fashions | Lawn in Lahore', description: null },
+      sharingImage: { fileId: photo },
+    });
+
+    // Not an image of the shop's that a page can show: another shop's, a PDF, nothing at all.
+    const theirs = await file(f.b.shopId, 'image/png');
+    const pdf = await file(f.a.shopId, 'application/pdf');
+    for (const fileId of [theirs, pdf, 'nonsense']) {
+      expect(errorsOf(await f.preferences.update(f.a, { sharingImage: { fileId } }))).toEqual([
+        [
+          'sharingImage.fileId',
+          'NOT_FOUND',
+          "No such image among the shop's files: a JPEG, PNG, WebP or GIF uploaded",
+        ],
+      ]);
+    }
+    expect(
+      errorsOf(
+        await f.preferences.update(f.a, {
+          seo: { title: 't'.repeat(256) },
+          sharingImage: { fileId: photo, altText: 'a'.repeat(513) },
+        }),
+      ),
+    ).toEqual([
+      ['seo.title', 'TOO_LONG', 'SEO title is too long (maximum is 255 characters)'],
+      ['sharingImage.altText', 'TOO_LONG', 'Alt text is too long (maximum is 512 characters)'],
+    ]);
+
+    // As read models are given them; null takes both away.
+    expect(await f.db.tenant(f.a.shopId, (tx) => shopPreferencesOf(tx, f.a.shopId))).toMatchObject({
+      seo: { title: 'Zari Fashions | Lawn in Lahore', description: null },
+      sharingImage: { fileId: photo, altText: 'Three lawn suits' },
+    });
+    expect(
+      unwrap(await f.preferences.update(f.a, { seo: null, sharingImage: null })),
+    ).toMatchObject({ seo: { title: null, description: null }, sharingImage: null });
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'online_store_preferences.updated')
+        .map((event) => event.payload),
+    ).toEqual([
+      { changed: ['seo', 'sharingImage'] },
+      { changed: ['whatsappNumber'] },
+      { changed: ['seo'] },
+      { changed: ['seo', 'sharingImage'] },
+    ]);
+    // Another shop's are its own.
+    expect(await f.preferences.get(f.b)).toMatchObject({
+      seo: { title: null, description: null },
+      sharingImage: null,
+    });
   });
 });

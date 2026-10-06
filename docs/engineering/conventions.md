@@ -1731,6 +1731,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   change and null or blank as clearing, and names the field in its own words ("SEO title is too
   long"). Name the columns in the event's `changed` list as `seoTitle` and `seoDescription`; a
   change to them alone is a page's own, which no listing reads.
+* **A page's image for link previews is `page_image`**
+  ([ADR-243](../architecture/13-decision-log.md#adr-243--a-shops-home-page-has-a-title-and-description-of-its-own-for-search-engines-as-shopifys-preferences-keep-them-and-a-social-sharing-image-one-of-its-files-which-link-previews-show-of-pages-without-an-image-of-their-own-through-shopifys-page_image)):
+  the storefront gives a product's featured image, an article's or a collection's image, else the
+  shop's social sharing image, as Shopify does, and a theme reads `page_image` rather than each
+  object's own; a kind of page that gains an image joins `pageImage`. The home page's title and
+  description are the shop's `seo`, kept with its preferences and given in its document.
 * **Documents carry `seo`** for the storefront, which sets `page_title` and `page_description`
   from them. Where a resource has no SEO description, `excerptOf` gives the start of its text,
   cut at a word. Themes read `page_description`; they don't make their own.

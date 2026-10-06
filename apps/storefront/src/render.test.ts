@@ -211,6 +211,60 @@ describe('Storefront rendering', () => {
     );
   });
 
+  it("gives search engines and link previews the home page's title and description the shop wrote, and its sharing image (ADR-243)", async () => {
+    const platformUrl = 'https://hatti.pk';
+    const sample = sampleStore();
+    const description = 'Lawn, bridal and khussas, delivered across Pakistan.';
+    const sharing = 'http://localhost:4000/sharing-images/s1?v=abc12345';
+    const store = new MemoryStore({
+      ...sample,
+      shop: {
+        ...sample.shop,
+        seo: { title: 'Zari Fashions: lawn and bridal in Lahore', description },
+        sharingImage: { src: sharing, width: 0, height: 0, alt: 'Three lawn suits' },
+      },
+    });
+    const renderer = new PageRenderer(loadTheme(files), {
+      platformUrl,
+      limits: { timeMs: 10_000 },
+    });
+    const page = async (path: string) => (await renderer.render({ path }, store.fresh())).html;
+
+    // Its own title, the shop's name already in it; its description; its sharing image.
+    const home = await page('/');
+    expect(home).toContain('<title>Zari Fashions: lawn and bridal in Lahore</title>');
+    expect(home).toContain(`<meta name="description" content="${description}">`);
+    expect(home).toContain(`<meta property="og:image" content="${sharing}&amp;width=1200">`);
+    expect(home).toContain('<meta property="og:image:alt" content="Three lawn suits">');
+    // The shop's website, as schema.org has it, with the description.
+    const graph = JSON.parse(
+      /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(home)![1]!,
+    ) as { '@graph': Record<string, unknown>[] };
+    expect(graph['@graph'][1]).toEqual({
+      '@type': 'WebSite',
+      name: 'Zari Fashions',
+      url: 'https://zari.hatti.pk/',
+      description,
+    });
+
+    // Elsewhere, a page's own title; the shop's description and image where it has none.
+    const cart = await page('/cart');
+    expect(cart).toContain(`<meta name="description" content="${description}">`);
+    expect(cart).toContain(`<meta property="og:image" content="${sharing}&amp;width=1200">`);
+    const returns = await page('/pages/returns');
+    expect(returns).toContain('<title>Returns and exchanges · Zari Fashions</title>');
+    expect(returns).not.toContain(`content="${description}"`);
+    expect(await page('/products/bridal-lehenga-heavy')).toMatch(
+      /<meta property="og:image" content="https:\/\/zari\.hatti\.pk\/images\/[^"]+\?width=1200">/,
+    );
+
+    // A shop that set none of it: its name, and no image.
+    const plain = (await render({ path: '/' }, { platformUrl })).html;
+    expect(plain).toContain('<title>Zari Fashions</title>');
+    expect(plain).toContain('<meta name="description" content="Zari Fashions">');
+    expect(plain).not.toContain('og:image');
+  });
+
   it("gives search engines an article as schema.org's BlogPosting, and the shop on its home page (ADR-237)", async () => {
     const platformUrl = 'https://hatti.pk';
     const logo = 'https://api.hatti.pk/logos/s1?v=0a1b2c3d';

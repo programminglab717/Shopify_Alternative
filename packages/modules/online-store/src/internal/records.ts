@@ -211,6 +211,23 @@ export interface PreferencesRecord {
   robotsTxtRules: string;
   /** Its link-in-bio page, at /links on its storefront (ADR-161). */
   linkPage: LinkPageRecord;
+  /**
+   * What search engines and link previews are told of its home page in place of its name
+   * (ADR-243), as Shopify's homepage title and meta description: null for its own.
+   */
+  seo: SeoValue;
+  /**
+   * The image link previews show of its pages without one of their own (ADR-243), as Shopify's
+   * social sharing image: one of its files; null for none.
+   */
+  sharingImage: SharingImageRecord | null;
+}
+
+/** A shop's social sharing image (ADR-243): one of its files, and what it shows. */
+export interface SharingImageRecord {
+  fileId: string;
+  /** For those who cannot see it; empty for the file's own. */
+  altText: string;
 }
 
 /** A shop's link-in-bio page (CH-07, ADR-161). */

@@ -1,15 +1,19 @@
 import {
   InputChecker,
+  checkSeo,
   fail,
   failOne,
   type FieldError,
   type MutationResult,
+  type SeoInputValue,
   type TenantContext,
 } from '@hatti/api';
 import { ProductService } from '@hatti/catalog/public';
 import { SecretBox, passwordVerifier } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
+import { readyImagesIn } from '@hatti/files/public';
+import { isUuid } from '@hatti/ids';
 import { parsePkMobile } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
@@ -31,7 +35,14 @@ export interface PreferencesInput {
   robotsTxtRules?: string | null;
   /** Its link-in-bio page (ADR-161): each part given replaces what it had. */
   linkPage?: LinkPageInput | null;
+  /** Its home page's title and description for search engines (ADR-243), as Shopify's SEO. */
+  seo?: SeoInputValue | null;
+  /** The image link previews show of its pages without their own (ADR-243); null for none. */
+  sharingImage?: { fileId: string; altText?: string | null } | null;
 }
+
+/** What a social sharing image's words for those who cannot see it may be, as a file's alt. */
+export const SHARING_IMAGE_ALT_MAX = 512;
 
 export interface LinkPageInput {
   /** Up to 300 characters; blank for none. */
@@ -69,8 +80,10 @@ type PreferencesRow = typeof preferences.$inferSelect;
 /**
  * What a shop sets for its storefront as a whole (ADR-041): the WhatsApp number its "Order on
  * WhatsApp" links and WhatsApp section go to, the password it is closed behind until it opens
- * (ADR-054), and rules it adds to its robots.txt (ADR-055). A shop that set nothing has no
- * number, an open storefront and the platform's robots.txt.
+ * (ADR-054), rules it adds to its robots.txt (ADR-055), and its home page's title, description
+ * and social sharing image for search engines and link previews (ADR-243). A shop that set
+ * nothing has no number, an open storefront, the platform's robots.txt, and its name for its home
+ * page.
  */
 @Injectable()
 export class PreferencesService {
@@ -154,6 +167,12 @@ export class PreferencesService {
       } else robots = rules;
     }
     const linkPage = input.linkPage ? checkLinkPage(check, input.linkPage) : undefined;
+    const seo = checkSeo(check, ['seo'], input.seo);
+    const sharingAlt = input.sharingImage
+      ? (check.text(['sharingImage', 'altText'], input.sharingImage.altText ?? '', {
+          max: SHARING_IMAGE_ALT_MAX,
+        }) ?? '')
+      : '';
     if (!check.ok) return fail(check.errors);
     // Some 50 ms of scrypt, before the transaction rather than inside it.
     const verifier = password === undefined ? undefined : await passwordVerifier(password);
@@ -165,6 +184,18 @@ export class PreferencesService {
         const found = await this.#found(tx, tenant.shopId, linkPage.productIds);
         const missing = missingOf(input.linkPage!, found);
         if (missing.length > 0) return fail(missing);
+      }
+      // An image among the shop's files a page can show, as an article's is (ADR-213).
+      const image = input.sharingImage;
+      if (
+        image &&
+        !(isUuid(image.fileId) && (await readyImagesIn(tx, tenant.shopId, [image.fileId])).size)
+      ) {
+        return failOne(
+          ['sharingImage', 'fileId'],
+          'NOT_FOUND',
+          "No such image among the shop's files: a JPEG, PNG, WebP or GIF uploaded",
+        );
       }
       const next = {
         whatsapp: whatsapp === undefined ? was.whatsappNumber : whatsapp,
@@ -179,6 +210,11 @@ export class PreferencesService {
           productIds: linkPage?.productIds ?? was.linkPage.productIds,
           variantIds: linkPage?.variantIds ?? was.linkPage.variantIds,
         },
+        seo: { ...was.seo, ...seo },
+        sharingImage:
+          image === undefined
+            ? was.sharingImage
+            : image && { fileId: image.fileId, altText: sharingAlt },
       };
       if (next.passwordEnabled && next.password === null) {
         return failOne(
@@ -194,6 +230,10 @@ export class PreferencesService {
         ...(next.passwordMessage !== was.passwordMessage ? ['passwordMessage'] : []),
         ...(next.robotsTxtRules !== was.robotsTxtRules ? ['robotsTxtRules'] : []),
         ...(JSON.stringify(next.linkPage) !== JSON.stringify(was.linkPage) ? ['linkPage'] : []),
+        ...(JSON.stringify(next.seo) !== JSON.stringify(was.seo) ? ['seo'] : []),
+        ...(JSON.stringify(next.sharingImage) !== JSON.stringify(was.sharingImage)
+          ? ['sharingImage']
+          : []),
       ];
       if (changed.length === 0) return { ok: true, value: was };
       const newPassword = changed.includes('password') && next.password !== null;
@@ -210,6 +250,10 @@ export class PreferencesService {
         linkLinks: next.linkPage.links,
         linkProducts: next.linkPage.productIds,
         linkVariants: next.linkPage.variantIds,
+        seoTitle: next.seo.title,
+        seoDescription: next.seo.description,
+        sharingImageId: next.sharingImage?.fileId ?? null,
+        sharingImageAlt: next.sharingImage?.altText ?? '',
       };
       const [row] = await tx
         .insert(preferences)
@@ -327,6 +371,10 @@ function toRecord(row: PreferencesRow | undefined): PreferencesRecord {
       // None chosen for the products of pages saved before variants could be.
       variantIds: (row?.linkProducts ?? []).map((_, index) => row?.linkVariants[index] ?? null),
     },
+    seo: { title: row?.seoTitle ?? null, description: row?.seoDescription ?? null },
+    sharingImage: row?.sharingImageId
+      ? { fileId: row.sharingImageId, altText: row.sharingImageAlt }
+      : null,
   };
 }
 

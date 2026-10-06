@@ -1466,6 +1466,45 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(Object.keys(await store().shop())).not.toContain('brand');
   });
 
+  it("publishes its home page's title and description, and where its sharing image is (ADR-243)", async () => {
+    // A shop that set neither keeps its document as it was.
+    expect(Object.keys(await store().shop())).not.toContain('seo');
+    const image = newId();
+    await admin.query(
+      `INSERT INTO files.files (shop_id, id, key, filename, content_type, size, status)
+       VALUES ($1, $2, $3, 'share.jpg', 'image/jpeg', 100, 'ready')`,
+      [shopId, image, `shops/${shopId}/files/${image}/share.jpg`],
+    );
+    unwrap(
+      await preferences.update(tenant, {
+        seo: { title: 'Zari | Lawn in Lahore', description: 'Lawn and bridal, delivered.' },
+        sharingImage: { fileId: image, altText: 'Three lawn suits' },
+      }),
+    );
+    expect(await deliver()).toEqual(['online_store_preferences.updated']);
+    const shop = await store().shop();
+    expect([shop.seo, shop.sharingImage]).toEqual([
+      { title: 'Zari | Lawn in Lahore', description: 'Lawn and bridal, delivered.' },
+      {
+        src: `http://localhost:4000/sharing-images/${shopId}?v=${image.slice(0, 8)}`,
+        width: 0,
+        height: 0,
+        alt: 'Three lawn suits',
+      },
+    ]);
+
+    // Its file deleted, it has none; taken away, nor the title and description.
+    const files = new FileService(database, {
+      delete: () => Promise.resolve(),
+    } as unknown as ObjectStorage);
+    unwrap(await files.delete(tenant, [image]));
+    expect(await deliver()).toEqual(['file.deleted']);
+    expect(Object.keys(await store().shop())).not.toContain('sharingImage');
+    unwrap(await preferences.update(tenant, { seo: null, sharingImage: null }));
+    await deliver();
+    expect(Object.keys(await store().shop())).not.toContain('seo');
+  });
+
   it('publishes what the shop charges for delivery, and how many working days it takes', async () => {
     unwrap(
       await delivery.update(tenant, {

@@ -1,4 +1,4 @@
-import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
+import { CurrentTenant, RequireScopes, SEO, UserError, type TenantContext } from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { PreferencesService, type PreferencesView } from '../preferences.service.js';
@@ -9,6 +9,7 @@ import {
   OnlineStorePreferences,
   OnlineStorePreferencesInput,
   OnlineStorePreferencesUpdatePayload,
+  SharingImage,
 } from './preferences.types.js';
 
 @Resolver(() => OnlineStorePreferences)
@@ -37,9 +38,15 @@ export class PreferencesResolver {
     @CurrentTenant() tenant: TenantContext,
     @Args('input') input: OnlineStorePreferencesInput,
   ): Promise<OnlineStorePreferencesUpdatePayload> {
-    const { linkPage, ...rest } = input;
+    const { linkPage, sharingImage, ...rest } = input;
     const result = await this.service.update(tenant, {
       ...rest,
+      ...(sharingImage !== undefined && {
+        sharingImage: sharingImage && {
+          fileId: uuidOf('file', sharingImage.fileId),
+          altText: sharingImage.altText,
+        },
+      }),
       ...(linkPage && {
         linkPage: {
           ...linkPage,
@@ -77,5 +84,12 @@ function toPreferences(view: PreferencesView): OnlineStorePreferences {
         });
       }),
     }),
+    seo: Object.assign(new SEO(), view.seo),
+    sharingImage:
+      view.sharingImage &&
+      Object.assign(new SharingImage(), {
+        fileId: toPublicId('file', view.sharingImage.fileId),
+        altText: view.sharingImage.altText || null,
+      }),
   });
 }

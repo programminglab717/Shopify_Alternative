@@ -401,6 +401,8 @@ export function shopDoc(
   metaPixelId: string | null = null,
   /** Where its logos are served (ADR-205). */
   brand: BrandDoc = { logo: null, squareLogo: null },
+  /** Its social sharing image, where it is served (ADR-243); null for none. */
+  sharingImage: ImageDoc | null = null,
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -454,6 +456,11 @@ export function shopDoc(
     ...((brand.logo !== null || brand.squareLogo !== null) && {
       brand: { logo: brand.logo, squareLogo: brand.squareLogo },
     }),
+    // Its home page's for search engines and link previews (ADR-243), left out likewise.
+    ...((preferences.seo.title !== null || preferences.seo.description !== null) && {
+      seo: { title: preferences.seo.title, description: preferences.seo.description },
+    }),
+    ...(sharingImage && { sharingImage }),
   };
 }
 

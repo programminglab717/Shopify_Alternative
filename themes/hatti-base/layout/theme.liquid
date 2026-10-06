@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ page_title | escape }}{% unless page_title == shop.name %} · {{ shop.name | escape }}{% endunless %}</title>
+    <title>{{ page_title | escape }}{% unless page_title contains shop.name %} · {{ shop.name | escape }}{% endunless %}</title>
     <link rel="canonical" href="{{ canonical_url }}">
     {%- if blog %}
     <link rel="alternate" type="application/atom+xml" title="{{ shop.name | escape }} - {{ blog.title | escape }}" href="{{ blog.url }}.atom">

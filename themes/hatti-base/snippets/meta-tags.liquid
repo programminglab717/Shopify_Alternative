@@ -1,16 +1,17 @@
 {%- comment -%}
   What search engines and link previews read, WhatsApp's above all: the page's title and
   description, and its image, at the shop's own address. page_description is the description the
-  shop gave it for search engines, else the start of its own text.
+  shop gave it for search engines, else the start of its own text; shop.description is its home
+  page's. page_image is its own image, else the shop's social sharing image.
 {%- endcomment -%}
 {%- liquid
-  assign description = page_description | default: shop.name
+  assign description = page_description | default: shop.description | default: shop.name
+  assign image = page_image
   assign type = 'website'
   if product
-    assign image = product.featured_image
     assign type = 'product'
-  elsif collection
-    assign image = collection.image
+  elsif article
+    assign type = 'article'
   endif
 -%}
 <meta name="description" content="{{ description | escape }}">

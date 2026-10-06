@@ -1,5 +1,33 @@
-import { UserError } from '@hatti/api';
+import { SEO, SEOInput, UserError } from '@hatti/api';
 import { Field, ID, InputType, ObjectType } from '@nestjs/graphql';
+
+@ObjectType({
+  description:
+    "The shop's social sharing image (ADR-243): one of its files, which link previews show of " +
+    'its pages without an image of their own.',
+})
+export class SharingImage {
+  @Field(() => ID, { description: 'The file, as `file` finds it.' })
+  fileId!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "What it shows, for those who cannot see it; null for its file's own.",
+  })
+  altText!: string | null;
+}
+
+@InputType({ description: "The shop's social sharing image: one of its files, an image." })
+export class SharingImageInput {
+  @Field(() => ID, { description: 'A JPEG, PNG, WebP or GIF the shop uploaded.' })
+  fileId!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "What it shows, for those who cannot see it; the file's own when blank.",
+  })
+  altText?: string | null;
+}
 
 @ObjectType({ description: "One of a link page's own links." })
 export class LinkPageLink {
@@ -89,6 +117,21 @@ export class OnlineStorePreferences {
 
   @Field(() => LinkPage, { description: 'Its link-in-bio page, at /links on its storefront.' })
   linkPage!: LinkPage;
+
+  @Field(() => SEO, {
+    description:
+      'What search engines and link previews are told of its home page in place of its name ' +
+      "(ADR-243), as Shopify's homepage title and meta description.",
+  })
+  seo!: SEO;
+
+  @Field(() => SharingImage, {
+    nullable: true,
+    description:
+      'The image link previews show of its pages without one of their own (ADR-243), as ' +
+      "Shopify's social sharing image; null for none.",
+  })
+  sharingImage!: SharingImage | null;
 }
 
 @InputType()
@@ -185,6 +228,22 @@ export class OnlineStorePreferencesInput {
 
   @Field(() => LinkPageInput, { nullable: true, description: 'Its link-in-bio page.' })
   linkPage?: LinkPageInput | null;
+
+  @Field(() => SEOInput, {
+    nullable: true,
+    description:
+      "Its home page's title and description for search engines and link previews; null " +
+      'clears both, for its name.',
+  })
+  seo?: SEOInput | null;
+
+  @Field(() => SharingImageInput, {
+    nullable: true,
+    description:
+      'The image link previews show of its pages without one of their own, 1200 by 628 pixels ' +
+      'at best; null for none. Left as it is if not given.',
+  })
+  sharingImage?: SharingImageInput | null;
 }
 
 @ObjectType()

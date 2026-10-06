@@ -78,6 +78,7 @@ import {
 import type { Redis } from 'ioredis';
 import { articleImagePathOf } from '../api/article-images.js';
 import { logoPathOf } from '../api/logos.js';
+import { sharingImagePathOf } from '../api/sharing-images.js';
 import {
   ALL_PRODUCTS,
   allProductsDoc,
@@ -653,6 +654,19 @@ export class StorefrontPublisher {
       return logo && images.url(logoPathOf(shopId, which, logo));
     };
     const brand = { logo: await logoUrl('logo'), squareLogo: await logoUrl('squareLogo') };
+    // Its social sharing image where the API serves it, while it is an image of its (ADR-243).
+    const sharing = preferences.sharingImage;
+    const sharingFile =
+      sharing &&
+      (await this.services.files.readyImagesIn(tx, shopId, [sharing.fileId])).get(sharing.fileId);
+    const sharingImage = sharingFile
+      ? {
+          src: images.url(sharingImagePathOf(shopId, sharingFile.id)),
+          width: 0,
+          height: 0,
+          alt: sharing!.altText || sharingFile.alt || null,
+        }
+      : null;
     const doc = shopDoc(
       profile,
       theme,
@@ -662,6 +676,7 @@ export class StorefrontPublisher {
       policies,
       metaPixelId,
       brand,
+      sharingImage,
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];

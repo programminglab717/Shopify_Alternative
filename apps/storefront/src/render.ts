@@ -37,6 +37,7 @@ import {
   articleObject,
   blogObject,
   handleize,
+  ImageDrop,
   predictiveSearchObject,
   productObject,
   resolveSettings,
@@ -620,10 +621,17 @@ export class PageRenderer {
         directory: null,
       },
       // What search engines and link previews are told of it (ADR-231): its SEO title and
-      // description, else its own title and the start of its own text.
+      // description, else its own title and the start of its own text; the home page's are the
+      // shop's own (ADR-243).
       page_title:
-        seo?.title ?? pageTitle(resource, shop, name, (key) => translation(theme, locale, key, {})),
-      page_description: seo?.description ?? null,
+        seo?.title ??
+        (name === 'index' ? shopDoc.seo?.title : null) ??
+        pageTitle(resource, shop, name, (key) => translation(theme, locale, key, {})),
+      page_description:
+        seo?.description ?? (name === 'index' ? shopDoc.seo?.description : null) ?? null,
+      // The image link previews show of it, as Shopify's page_image: its product's, article's or
+      // collection's, else the shop's social sharing image (ADR-243).
+      page_image: pageImage(resource, shopDoc),
       ...lookups(ctx),
       // The page's product, collection or page is global on its template, as on Shopify:
       // snippets see it too.
@@ -1074,6 +1082,16 @@ async function resourceOf(
     return { link_page: shown };
   }
   return {};
+}
+
+/** A page's own image, else the shop's social sharing image; nil for neither. */
+function pageImage(resource: Record<string, unknown>, shopDoc: ShopDoc): unknown {
+  const own =
+    (resource.product as { featured_image?: unknown } | undefined)?.featured_image ??
+    (resource.article as { image?: unknown } | undefined)?.image ??
+    (resource.collection as { image?: unknown } | undefined)?.image;
+  if (own) return own;
+  return shopDoc.sharingImage ? new ImageDrop(shopDoc.sharingImage) : null;
 }
 
 function pageTitle(

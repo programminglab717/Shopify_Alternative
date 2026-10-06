@@ -569,6 +569,8 @@ export function shopObject(
     // Prices include any sales tax, as Pakistan's consumer laws ask them to be shown (ADR-096).
     taxes_included: true,
     whatsapp: doc.whatsapp,
+    // Its home page's description for search engines (ADR-243), as Shopify's; nil without one.
+    description: doc.seo?.description ?? null,
     // What the password page tells shoppers while the shop is closed (ADR-054), as safe HTML.
     password_message: doc.password?.message ?? '',
     brand: brandObject(doc),

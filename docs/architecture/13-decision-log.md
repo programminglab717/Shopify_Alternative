@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-242 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-243 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -250,6 +250,7 @@
 | 240 | A storefront's search finds products, pages and articles by the shop's Urdu for them as by its own words, from words of each translation kept folded beside its own as its translations change, its own words first | Accepted |
 | 241 | A product's options and their values may have the shop's Urdu, as Shopify's translations keep them, each by its own ID; the product's document carries its options in Urdu, and its Urdu pages show each variant's values and title in them, the variant chosen by its ID the same in either language | Accepted |
 | 242 | A refund staff sent by hand may keep its receipt, staged as any upload is and given with the refund; its order keeps it among its receipts, never as one of the shop's files, and it goes with the customer's erasure as their own receipts do | Accepted |
+| 243 | A shop's home page has a title and description of its own for search engines, as Shopify's preferences keep them, and a social sharing image, one of its files, which link previews show of pages without an image of their own, through Shopify's `page_image` | Accepted |
 
 ---
 
@@ -10095,3 +10096,35 @@
   * **Its bytes through a form of the core's, as a transfer's:** the Admin API's clients upload
     as Shopify's do, straight to storage; forms are for pages without scripts.
   * **A table of refunds' receipts:** a refund keeps one at most, so its own columns do.
+
+## ADR-243 · A shop's home page has a title and description of its own for search engines, as Shopify's preferences keep them, and a social sharing image, one of its files, which link previews show of pages without an image of their own, through Shopify's `page_image`
+
+* **Context:** Products, collections, pages and articles took a title and description of their
+  own for search engines ([ADR-231](#adr-231--products-collections-pages-and-articles-may-be-given-a-title-and-description-of-their-own-for-search-engines-as-shopifys-seo-has-them-themes-are-given-them-as-page_title-and-page_description-the-description-made-from-the-pages-own-text-where-the-shop-wrote-none-and-shopifys-product-csv-carries-a-products)), but a shop's home page, the page most shared, gave
+  search engines its name alone, and link previews no image (simplifications 36 and 110).
+  Shopify keeps a homepage title and meta description in a store's preferences, which Liquid
+  gives as `page_title` and `shop.description`, and a social sharing image, which it gives as
+  `page_image` on pages without an image of their own.
+* **Decision:**
+  * **Kept with the shop's preferences** ([ADR-041](#adr-041--what-a-shop-sets-for-its-storefront-as-a-whole-is-the-online-stores-starting-with-its-whatsapp-number)): `seo`, a title and description
+    checked as other SEO is, and `sharingImage`, one of the shop's files a page can show with
+    words for those who cannot see it, as an article's image is ([ADR-213](#adr-213--an-article-has-shopifys-image-one-of-the-shops-files-with-its-alt-text-the-api-serves-it-at-an-address-of-its-own-while-the-article-is-published-the-address-naming-its-file-the-articles-document-names-that-address-and-hatti-base-shows-it-in-its-blog-and-on-the-articles-page)); migration
+    0151 keeps them, through `onlineStorePreferencesUpdate`.
+  * **In the shop's document:** its `seo`, and its sharing image where the API serves it, at
+    `/sharing-images/{shop}`, the address naming its file; a file deleted leaves none.
+  * **On the storefront:** the home page's `page_title` and `page_description` are the shop's
+    own, `shop.description` its description, and the shop's website in structured data
+    ([ADR-237](#adr-237--search-engines-are-told-an-articles-page-is-schemaorgs-blogposting-through-shopifys-structured_data-and-a-shops-home-page-the-shops-organization-and-website-through-the-same-filter-given-the-shop)) has it. `page_image` is a product's featured image, an article's or a
+    collection's image, else the sharing image, which Hatti Base's link-preview tags read as
+    Dawn's do; a title with the shop's name in it is not given the name again.
+* **Consequences:**
+  * A shop's home page, shared on WhatsApp or found on Google, says what the shop wrote of
+    itself, with its image; its other pages without an image share it too.
+  * Articles' pages now give link previews their image, which they had only in structured data.
+  * The home page's words are the shop's own on Urdu pages too, until shops translate them
+    (simplification 113).
+* **Alternatives:**
+  * **The brand's cover image:** Shopify keeps it for places such as its Shop app; its social
+    sharing image is a preference of its own, chosen for previews' sizes.
+  * **The theme's settings:** the image would change with each theme, and settings take no
+    image a shop uploaded yet.

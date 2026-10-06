@@ -364,7 +364,13 @@ function shopData(shop: Record<string, unknown>, origin: string): Record<string,
     '@context': 'https://schema.org',
     '@graph': [
       organizationData(shop, origin),
-      { '@type': 'WebSite', name: shop.name, ...(origin && { url: `${origin}/` }) },
+      {
+        '@type': 'WebSite',
+        name: shop.name,
+        ...(origin && { url: `${origin}/` }),
+        // Its home page's description for search engines, where it gave one (ADR-243).
+        ...(typeof shop.description === 'string' && { description: shop.description }),
+      },
     ],
   };
 }

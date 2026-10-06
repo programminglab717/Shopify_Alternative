@@ -319,6 +319,17 @@ export interface ShopDoc {
    * while it has neither, as in documents written before shops' documents had them.
    */
   brand?: BrandDoc;
+  /**
+   * What search engines and link previews are told of its home page in place of its name
+   * (ADR-243), as Shopify's homepage title and meta description. Absent while it set neither, as
+   * in documents written before shops could.
+   */
+  seo?: SeoDoc;
+  /**
+   * The image link previews show of its pages without one of their own (ADR-243), as Shopify's
+   * social sharing image, where the API serves it. Absent while it has none.
+   */
+  sharingImage?: ImageDoc;
 }
 
 export interface BrandDoc {

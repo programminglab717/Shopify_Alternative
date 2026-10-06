@@ -212,6 +212,12 @@ export const preferences = onlineStoreSchema.table('preferences', {
   linkProducts: uuid('link_products').array().notNull().default([]),
   /** The variant chosen of each of `linkProducts`, by its place; null where none is (ADR-206). */
   linkVariants: uuid('link_variants').array().$type<(string | null)[]>().notNull().default([]),
+  /** Its home page's title and description for search engines (ADR-243); null for its own. */
+  seoTitle: text('seo_title'),
+  seoDescription: text('seo_description'),
+  /** The image link previews show of pages without their own, one of its files (ADR-243). */
+  sharingImageId: uuid('sharing_image_id'),
+  sharingImageAlt: text('sharing_image_alt').notNull().default(''),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

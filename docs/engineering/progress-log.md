@@ -6,9 +6,9 @@
 
 ## In progress
 
-**The home page for search engines** (OS-09): the storefront's own title and description for
-search engines, and an image for link previews, as Shopify's preferences keep them, in the home
-page's head and the shop's structured data.
+**A blog for search engines** (OS-09): a blog's own title and description for search engines,
+as Shopify's `seo` and as its articles' are (ADR-231), through the Admin API and in Urdu, on the
+blog's pages.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### The home page for search engines
+
+* **The shop's own words for its home page** ([ADR-243](../architecture/13-decision-log.md#adr-243--a-shops-home-page-has-a-title-and-description-of-its-own-for-search-engines-as-shopifys-preferences-keep-them-and-a-social-sharing-image-one-of-its-files-which-link-previews-show-of-pages-without-an-image-of-their-own-through-shopifys-page_image)): a title and description
+  for search engines, as Shopify's preferences keep them, and a social sharing image, one of its
+  files; migration 0151 keeps them, through `onlineStorePreferencesUpdate`.
+* **On the storefront:** the home page's title and description, `shop.description`, the website's
+  structured data with it, and `page_image`, a page's own image else the sharing image, which
+  Hatti Base's link-preview tags read as Dawn's do; the API serves the image at
+  `/sharing-images/{shop}`.
+* 1753 tests: kept, cleared and refused; published in the shop's document and gone with the
+  file; shown on the home page and elsewhere; and served while the shop has it.
 
 ### e247033 · A refund's receipt
 
