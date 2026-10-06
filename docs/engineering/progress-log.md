@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Storefronts left waiting swept
+### 3952dee · Storefronts left waiting swept
 
 * **The build queue lists its shops** ([ADR-225](../architecture/13-decision-log.md#adr-225--a-shop-with-storefront-items-waiting-is-listed-in-valkey-until-a-drain-finds-none-left-and-the-worker-builds-the-shops-quiet-ten-minutes-what-their-events-tries-gave-up-on)) in `s:sf:waiting` while their items
   wait: adding lists a shop after its items are in, a drain that finds nothing left takes it off
