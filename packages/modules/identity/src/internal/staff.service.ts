@@ -85,6 +85,8 @@ export interface StaffPhoneRecord {
   phone: string | null;
   /** What Hatti's words to them are in (ADR-194). */
   language: 'en' | 'ur';
+  /** Their role in the shop, which says what of its work is theirs (ADR-247). */
+  role: StaffRole;
 }
 
 /**
@@ -103,7 +105,15 @@ export async function staffPhonesIn(tx: ShopTx, shopId: string): Promise<StaffPh
   }>(sql`SELECT user_id, name, role, phone, language FROM identity.staff_phones(${shopId})`);
   return rows.flatMap((row) =>
     isStaffRole(row.role)
-      ? [{ userId: row.user_id, name: row.name, phone: row.phone, language: row.language }]
+      ? [
+          {
+            userId: row.user_id,
+            name: row.name,
+            phone: row.phone,
+            language: row.language,
+            role: row.role,
+          },
+        ]
       : [],
   );
 }

@@ -197,6 +197,8 @@ describe.skipIf(!server)("Comments on an order's timeline", () => {
     expect(await factsOf(comment.id)).toEqual({
       number: order.number,
       assigneeId: null,
+      // Paid on delivery: no transfer to wait for (ADR-247).
+      awaitingTransfer: false,
       comment: { message: '@Ali call her', authorId: agentId },
     });
     unwrap(
@@ -214,6 +216,7 @@ describe.skipIf(!server)("Comments on an order's timeline", () => {
     expect(await factsOf(apps.id)).toEqual({
       number: order.number,
       assigneeId: agentId,
+      awaitingTransfer: false,
       comment: null,
     });
     expect((await factsOf(null))!.comment).toBeNull();

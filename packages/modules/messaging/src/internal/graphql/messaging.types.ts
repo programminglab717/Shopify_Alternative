@@ -30,6 +30,7 @@ export enum MessageKind {
   STOCK_OUT = 'STOCK_OUT',
   ORDER_ASSIGNED = 'ORDER_ASSIGNED',
   ORDER_MENTIONED = 'ORDER_MENTIONED',
+  ORDER_RECEIPT_SENT = 'ORDER_RECEIPT_SENT',
   INVOICE_DUE = 'INVOICE_DUE',
   PLAN_ENDED = 'PLAN_ENDED',
   CREDIT_LOW = 'CREDIT_LOW',
@@ -112,6 +113,12 @@ registerEnumType(MessageKind, {
       description:
         'For a member of staff, at their own number: a comment on an order names them, as @ and ' +
         'their name (ORD-02, ADR-191).',
+    },
+    ORDER_RECEIPT_SENT: {
+      description:
+        'For staff, at their own numbers: a customer sent the receipt of their transfer for an ' +
+        'order still waiting for it; told to whom the order is given, else to the owners and ' +
+        'managers (PAY-02, ADR-247).',
     },
     INVOICE_DUE: {
       description:

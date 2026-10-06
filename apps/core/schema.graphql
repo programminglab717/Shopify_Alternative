@@ -4535,6 +4535,11 @@ enum MessageKind {
   ORDER_PLACED
 
   """
+  For staff, at their own numbers: a customer sent the receipt of their transfer for an order still waiting for it; told to whom the order is given, else to the owners and managers (PAY-02, ADR-247).
+  """
+  ORDER_RECEIPT_SENT
+
+  """
   A parcel of theirs left with its courier: its tracking, and the order's page.
   """
   ORDER_SHIPPED

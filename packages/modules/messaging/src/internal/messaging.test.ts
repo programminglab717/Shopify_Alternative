@@ -190,7 +190,13 @@ describe("Messages' words", () => {
       'Zari Fashions: a comment on order #1043 names you. Read it in Hatti.',
     );
     expect(messageText('order_mentioned', 'ur', work)).toMatch(/^Zari Fashions: .*#1043/u);
-    for (const kind of ['order_assigned', 'order_mentioned'] as const) {
+    // A receipt a customer sent, for those who look for the money (ADR-247).
+    expect(messageText('order_receipt_sent', 'en', work)).toBe(
+      'Zari Fashions: the customer sent the receipt of their transfer for order #1043. See that ' +
+        'the money came, then mark it paid in Hatti.',
+    );
+    expect(messageText('order_receipt_sent', 'ur', work)).toMatch(/^Zari Fashions: .*#1043/u);
+    for (const kind of ['order_assigned', 'order_mentioned', 'order_receipt_sent'] as const) {
       expect(templateParameters(kind, work)).toEqual(['Zari Fashions', '#1043']);
       // Not the news of an order for its customer: no email carries it.
       expect(messageEmail(kind, 'en', work)).toBeNull();

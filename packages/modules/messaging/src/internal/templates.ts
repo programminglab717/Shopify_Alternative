@@ -30,6 +30,7 @@ export const MESSAGE_KINDS = [
   'stock_out',
   'order_assigned',
   'order_mentioned',
+  'order_receipt_sent',
   'invoice_due',
   'plan_ended',
   'credit_low',
@@ -446,6 +447,19 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: '{shop}: a comment on order {order} names you. Read it in Hatti.',
       ur: '{shop}: آرڈر {order} پر ایک تبصرے میں آپ کا نام ہے۔ اسے ہٹی میں پڑھیں۔',
+    },
+  },
+  order_receipt_sent: {
+    whatsapp: 'hatti_order_receipt_sent',
+    category: 'utility',
+    parameters: ['shop', 'order'],
+    text: {
+      en:
+        '{shop}: the customer sent the receipt of their transfer for order {order}. See that the ' +
+        'money came, then mark it paid in Hatti.',
+      ur:
+        '{shop}: گاہک نے آرڈر {order} کے لیے اپنی ٹرانسفر کی رسید بھیجی ہے۔ دیکھیں کہ رقم آ گئی ' +
+        'ہے، پھر ہٹی میں اسے ادا شدہ کریں۔',
     },
   },
   order_cancelled: {

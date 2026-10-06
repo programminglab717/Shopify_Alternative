@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-246 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-247 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -254,6 +254,7 @@
 | 244 | A blog may be given a title and description of its own for search engines, as its articles may; its pages give them in place of its title and of the shop's description, its articles keep their own, and the shop may translate them into Urdu | Accepted |
 | 245 | The shop's own words for its home page may be translated into Urdu, the shop a translatable resource of its own by its own ID as Shopify's `SHOP` is; its document carries them beside its own words, and its Urdu pages show them | Accepted |
 | 246 | A courier's statement may come as the Excel workbook it was sent as, read from its first sheet shown by a reader of Hatti's own, under a header found below the courier's title rows; and other cash on a parcel paid short before pays what its order still owes | Accepted |
+| 247 | Staff hear on WhatsApp the moment a customer sends the receipt of their transfer for an order still waiting for it: whoever has the order, else the shop's owners and managers, once a receipt | Accepted |
 
 ---
 
@@ -10234,3 +10235,34 @@
   * **A staged upload:** the shop's files are images and PDFs a page can show; a statement is
     read once.
   * **Shortfalls named in a column:** couriers' statements share no column for them.
+
+## ADR-247 · Staff hear on WhatsApp the moment a customer sends the receipt of their transfer for an order still waiting for it: whoever has the order, else the shop's owners and managers, once a receipt
+
+* **Context:** A customer paying by transfer sends its receipt through their order's link
+  ([ADR-080](#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)), and the home counts the orders with receipts to check, but nothing told
+  staff when one came (simplification 55): the customer waited for their order to move while no
+  one looked in the bank. Staff already hear of their own work on WhatsApp
+  ([ADR-191](#adr-191--a-member-of-staff-hears-on-whatsapp-at-the-number-their-account-signs-in-with-of-an-order-someone-else-gives-them-and-of-a-comment-that-names-them-as--and-their-name-the-orders-events-say-which-the-worker-finds-whom-through-the-identity-login-and-each-is-one-of-the-shops-alerts-paid-from-its-credit)).
+* **Decision:**
+  * **The event the receipt makes:** the link's `order.updated` naming `transferReceipt`, which
+    an order's and a draft's links both make; `StaffAlerts` hears it as it hears assignments and
+    comments.
+  * **Whom it tells:** whoever the order is given to, if they are still on the staff; else the
+    owners and managers, the roles that look for the shop's money and mark orders paid. Packers
+    and confirmation agents may mark them paid too, but are told only of orders given to them;
+    accountants, who read orders, are not told. `staffPhonesIn` now gives each member's role
+    beside their number ([ADR-193](#adr-193--the-worker-reads-staffs-numbers-as-it-reads-their-emails-through-a-function-of-identitys-that-answers-for-the-shop-of-its-transaction-alone-never-identitys-tables-staffs-alerts-need-no-identity-login)).
+  * **When:** while the order still waits for its transfer, as `staffAlertFactsIn` reads it
+    when the worker hears the event: one marked paid or cancelled meanwhile tells no one.
+  * **The message:** `order_receipt_sent`, the shop's name and the order's, nothing of the
+    customer; once a receipt for each member told, in their own language, paid from the shop's
+    credit; the shop may turn it off, as its other alerts.
+* **Consequences:**
+  * The money is looked for while the customer waits, and the order ships sooner.
+  * A customer who sends several receipts, five at most, tells staff of each.
+  * A shop with many owners and managers and no one given its orders tells them all; giving
+    orders to the member who checks payments narrows it to them.
+* **Alternatives:**
+  * **Telling everyone who may mark orders paid:** packers and agents would hear of money they
+    do not look for.
+  * **A digest of receipts every few hours:** the customer would wait for it.

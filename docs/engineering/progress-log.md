@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Telling staff a transfer receipt came** (PAY-02): the moment a customer sends the receipt of
-their transfer, the staff who check payments are told, as they are of an order given to them
-(ADR-191), so the money is looked for while the customer waits.
+**Payment links for many customers** (PAY-04): a link the shop shares once, on WhatsApp or
+Instagram, for a product or an amount, that many customers pay through, online or by transfer,
+each placing an order of their own, beside the links of single orders and drafts.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Telling staff a transfer receipt came
+
+* **A receipt tells staff on WhatsApp** ([ADR-247](../architecture/13-decision-log.md#adr-247--staff-hear-on-whatsapp-the-moment-a-customer-sends-the-receipt-of-their-transfer-for-an-order-still-waiting-for-it-whoever-has-the-order-else-the-shops-owners-and-managers-once-a-receipt)): the moment a customer sends
+  the receipt of their transfer through their link, whoever has the order is told, else the
+  shop's owners and managers, once a receipt each, in their own language; nothing once the
+  order is paid or cancelled.
+* **For it:** `staffPhonesIn` gives each member's role, `staffAlertFactsIn` whether the order
+  still waits for its transfer, and messaging the `order_receipt_sent` alert, which the shop may
+  turn off.
+* 1769 tests: told by role and by whom the order is given to, not when paid since, nor for
+  other changes; the alert's words in English and Urdu.
 
 ### a64747d · Couriers' statements from Excel files
 

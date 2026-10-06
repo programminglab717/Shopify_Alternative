@@ -8,7 +8,7 @@ import { ProductService, VariantService } from '@hatti/catalog/public';
 import { StoreCreditService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import type { DomainEvent } from '@hatti/events';
+import { appendEvent, type DomainEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import {
   InventoryService,
@@ -1528,6 +1528,96 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     unwrap(await comments.create(tenant, third.id, '@Bilal Ahmed, packed?'));
     await dispatch();
     expect(await alerts()).toHaveLength(4);
+  });
+
+  it("tells staff a customer sent the receipt of their transfer: its order's own member, else its owners and managers (ADR-247)", async () => {
+    // The shop's staff now: an owner and a manager with numbers, one without, a packer and an
+    // accountant.
+    const [hina, omar, faraz, danish, zara] = [newId(), newId(), newId(), newId(), newId()];
+    const [HINA, OMAR, DANISH, ZARA] = [
+      '+923451110001',
+      '+923451110002',
+      '+923451110003',
+      '+923451110004',
+    ];
+    await admin.query('DELETE FROM identity.memberships WHERE shop_id = $1', [shopId]);
+    await admin.query(
+      `INSERT INTO identity.users (id, name, email, phone_e164, phone_verified_at, language)
+       VALUES ($1, 'Hina Butt', NULL, $6, now(), 'ur'),
+              ($2, 'Omar Sheikh', NULL, $7, now(), 'en'),
+              ($3, 'Faraz', 'faraz@example.pk', '+923451110005', NULL, 'en'),
+              ($4, 'Danish', NULL, $8, now(), 'en'),
+              ($5, 'Zara', NULL, $9, now(), 'en')`,
+      [hina, omar, faraz, danish, zara, HINA, OMAR, DANISH, ZARA],
+    );
+    await admin.query(
+      `INSERT INTO identity.memberships (user_id, shop_id, role)
+       VALUES ($1, $6, 'owner'), ($2, $6, 'manager'), ($3, $6, 'manager'), ($4, $6, 'packer'),
+              ($5, $6, 'accountant')`,
+      [hina, omar, faraz, danish, zara, shopId],
+    );
+    const receipts = async () =>
+      (await queued())
+        .filter((message) => message.kind === 'order_receipt_sent')
+        .map((message) => [message.recipient, message.variables]);
+    // As the customer's link takes a receipt: the order says it changed so (ADR-080).
+    const receiptSent = (order: { id: string; version: number }) =>
+      database.tenant(shopId, (tx) =>
+        appendEvent(tx, shopId, {
+          type: 'order.updated',
+          aggregateType: 'order',
+          aggregateId: order.id,
+          payload: {
+            changed: ['transferReceipt'],
+            stage: 'awaiting_payment',
+            version: order.version,
+          },
+        }),
+      );
+    const waiting = await placeOnline({ paymentMethod: 'bank_transfer' });
+    const said = { shop: 'Zari Fashions', order: `#${waiting.number}` };
+
+    // No one has the order: its owners and managers with numbers are told.
+    await receiptSent(waiting);
+    await dispatch(2);
+    expect(await receipts()).toEqual([
+      [HINA, said],
+      [OMAR, said],
+    ]);
+    // Given to Danish: the next receipt is his alone.
+    unwrap(
+      await orders().assign(
+        tenant,
+        waiting.id,
+        { staffMemberId: danish, name: 'Danish' },
+        { fromOthers: true },
+      ),
+    );
+    await receiptSent(waiting);
+    await dispatch(2);
+    expect(await receipts()).toEqual([
+      [HINA, said],
+      [OMAR, said],
+      [DANISH, said],
+    ]);
+
+    // Marked paid before the worker heard of the receipt: nothing left to look for.
+    await receiptSent(waiting);
+    unwrap(await orders().markAsPaid(tenant, waiting.id));
+    await dispatch(2);
+    expect(await receipts()).toHaveLength(3);
+    // Other changes to an order tell no one.
+    const other = await placeOnline({ paymentMethod: 'bank_transfer' });
+    await database.tenant(shopId, (tx) =>
+      appendEvent(tx, shopId, {
+        type: 'order.updated',
+        aggregateType: 'order',
+        aggregateId: other.id,
+        payload: { changed: ['note'], stage: 'awaiting_payment', version: other.version },
+      }),
+    );
+    await dispatch(2);
+    expect(await receipts()).toHaveLength(3);
   });
 });
 

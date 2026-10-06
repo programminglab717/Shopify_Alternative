@@ -1058,9 +1058,16 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       // As the worker reads them: in a transaction of the shop's, through identity's function.
       const phonesFrom = (transactionShop: string) =>
         appDb.tenant(transactionShop, (tx) => staffPhonesIn(tx, shopId));
+      // Each with their role, which says what of the shop's work is theirs (ADR-247).
       expect(await phonesFrom(shopId)).toEqual([
-        { userId: owner.userId, name: 'Ayesha Khan', phone: null, language: 'ur' },
-        { userId: packer.userId, name: 'Ayesha Khan', phone: '+923001112223', language: 'en' },
+        { userId: owner.userId, name: 'Ayesha Khan', phone: null, language: 'ur', role: 'owner' },
+        {
+          userId: packer.userId,
+          name: 'Ayesha Khan',
+          phone: '+923001112223',
+          language: 'en',
+          role: 'packer',
+        },
       ]);
       // A disabled account is told nothing; another shop's transaction learns nothing of them.
       await admin.query("UPDATE identity.users SET status = 'disabled' WHERE id = $1", [

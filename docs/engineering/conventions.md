@@ -2325,7 +2325,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   and `StaffAlerts` finds whom to tell: `mentionsIn` finds the members a comment names as `@` and
   their name, and `staffAlertFactsIn` reads the order and the comment as they are now. A new
   alert for staff is a `MessageKind` queued the same way, once by a key naming what it tells of
-  and the member, and its words name the shop and the order but nothing of the customer.
+  and the member, and its words name the shop and the order but nothing of the customer. A
+  customer's receipt for a transfer is `order.updated` naming `transferReceipt`
+  ([ADR-247](../architecture/13-decision-log.md#adr-247--staff-hear-on-whatsapp-the-moment-a-customer-sends-the-receipt-of-their-transfer-for-an-order-still-waiting-for-it-whoever-has-the-order-else-the-shops-owners-and-managers-once-a-receipt)):
+  it tells whoever has the order, else the members whose role is in `PAYMENT_ROLES`, from the role
+  `staffPhonesIn` gives, and no one once `staffAlertFactsIn` says the order no longer waits for its
+  transfer.
 * **A provider's `send` says what to do with a refusal:** `retry` for what may pass (a 5xx, a 429,
   a provider not reached), `replace` for what WhatsApp will never deliver, which an SMS replaces
   once, and `fail` for the rest. A provider's answer of success is final: a message sent is never

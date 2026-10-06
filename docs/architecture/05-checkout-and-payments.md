@@ -496,6 +496,8 @@ its link is the payment link
   While a bank-transfer order waits for its money, the page shows where to pay, and takes the
   receipt: a photo, a screenshot or a PDF, up to five, which staff see with the order
   ([ADR-080](./13-decision-log.md#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)).
+  Staff hear of each receipt on WhatsApp as it comes: whoever has the order, else the shop's
+  owners and managers ([ADR-247](./13-decision-log.md#adr-247--staff-hear-on-whatsapp-the-moment-a-customer-sends-the-receipt-of-their-transfer-for-an-order-still-waiting-for-it-whoever-has-the-order-else-the-shops-owners-and-managers-once-a-receipt)).
 
 ---
 

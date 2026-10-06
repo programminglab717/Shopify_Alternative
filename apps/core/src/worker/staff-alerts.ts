@@ -3,6 +3,7 @@ import type { Database } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
 import { staffPhonesIn } from '@hatti/identity/public';
 import type { MessageKind, MessagesService } from '@hatti/messaging/public';
+import type { StaffRole } from '@hatti/api';
 import {
   OrderEvents,
   mentionsIn,
@@ -10,21 +11,31 @@ import {
   staffAlertFactsIn,
   type OrderAssignedPayload,
   type OrderCommentPayload,
+  type OrderUpdatedPayload,
 } from '@hatti/orders/public';
 
-/** What an event tells staff of: an order given to one of them, or a comment that may name some. */
+/**
+ * What an event tells staff of: an order given to one of them, a comment that may name some, or
+ * a receipt its customer sent for its transfer.
+ */
 type Alert =
   | { kind: 'order_assigned'; orderId: string; assigneeId: string }
-  | { kind: 'order_mentioned'; orderId: string; commentId: string };
+  | { kind: 'order_mentioned'; orderId: string; commentId: string }
+  | { kind: 'order_receipt_sent'; orderId: string };
+
+/** Who looks for a transfer's money in the shop's bank when no one has its order (ADR-247). */
+const PAYMENT_ROLES: readonly StaffRole[] = ['owner', 'manager'];
 
 /**
  * Tells members of staff on WhatsApp of their own work (ORD-10, ORD-02, ADR-191), at the number
  * their account signs in with, which identity gives for the shop alone (ADR-193), as the orders'
  * events are heard: an order someone else gave them,
  * unless it was given to another since; and a comment that names them as `@` and their name, but
- * not its author, once a comment however often it is changed. Nothing for those who left the shop
- * or proved no number, nor what the shop turned off; each is the shop's message, paid from its
- * credit as its other alerts are.
+ * not its author, once a comment however often it is changed. And a receipt a customer sent for
+ * an order that still waits for its transfer (ADR-247): told to whom the order is given, else to
+ * the owners and managers, once a receipt. Nothing for those who left the shop or proved no
+ * number, nor what the shop turned off; each is the shop's message, paid from its credit as its
+ * other alerts are.
  */
 export class StaffAlerts {
   /** The events {@link handle} reads. */
@@ -32,6 +43,7 @@ export class StaffAlerts {
     OrderEvents.OrderAssigned,
     OrderEvents.OrderCommentCreated,
     OrderEvents.OrderCommentUpdated,
+    OrderEvents.OrderUpdated,
   ];
 
   constructor(
@@ -58,6 +70,15 @@ export class StaffAlerts {
         // Given to another since, who is told instead.
         if (facts.assigneeId !== alert.assigneeId) return;
         told = [alert.assigneeId];
+      } else if (alert.kind === 'order_receipt_sent') {
+        // Marked paid, or cancelled, since: nothing left to look for.
+        if (!facts.awaitingTransfer) return;
+        const assignee = staff.find((member) => member.userId === facts.assigneeId);
+        told = assignee
+          ? [assignee.userId]
+          : staff
+              .filter((member) => PAYMENT_ROLES.includes(member.role))
+              .map((member) => member.userId);
       } else {
         const comment = facts.comment;
         if (!comment) return;
@@ -76,11 +97,14 @@ export class StaffAlerts {
           recipient: member.phone,
           // In their own language, which may not be the shop's (ADR-194).
           language: member.language,
-          // Each assignment once; each comment once for each member it names, edited or not.
+          // Each assignment once; each comment once for each member it names, edited or not; each
+          // receipt once for each member told.
           dedupeKey:
             alert.kind === 'order_assigned'
               ? `order_assigned:${event.id}`
-              : `order_mentioned:${alert.commentId}:${userId}`,
+              : alert.kind === 'order_receipt_sent'
+                ? `order_receipt_sent:${event.id}:${userId}`
+                : `order_mentioned:${alert.commentId}:${userId}`,
           variables,
           channel: 'whatsapp',
         });
@@ -102,6 +126,12 @@ function alertOf(event: DomainEvent): Alert | null {
       const { orderId } = event.payload as Partial<OrderCommentPayload>;
       if (!orderId) return null;
       return { kind: 'order_mentioned', orderId, commentId: event.aggregateId };
+    }
+    case OrderEvents.OrderUpdated: {
+      // A receipt its customer sent through their link (ADR-080), not any other change.
+      const { changed } = event.payload as Partial<OrderUpdatedPayload>;
+      if (!changed?.includes('transferReceipt')) return null;
+      return { kind: 'order_receipt_sent', orderId: event.aggregateId };
     }
     default:
       return null;

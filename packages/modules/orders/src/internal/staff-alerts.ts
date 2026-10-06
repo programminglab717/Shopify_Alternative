@@ -1,15 +1,19 @@
 import type { Tx } from '@hatti/db';
 import { sql } from 'drizzle-orm';
-import type { CommentAuthorKind } from './schema.js';
+import { awaitsTransfer } from './rules.js';
+import type { CommentAuthorKind, PaymentMethodValue } from './schema.js';
 
 /**
  * What a member of staff is told of an order (ORD-10, ORD-02, ADR-191): its number, whom it is
- * given to now and, where asked for, a comment on it.
+ * given to now, whether it still waits for its transfer (ADR-247) and, where asked for, a comment
+ * on it.
  */
 export interface StaffAlertFacts {
   number: number;
   /** The account it is given to now; null while no one has it. */
   assigneeId: string | null;
+  /** Open, and waiting for money by transfer, as its customer's receipt says they sent. */
+  awaitingTransfer: boolean;
   /** Null where none was asked for, or it was deleted since. */
   comment: {
     message: string;
@@ -28,11 +32,17 @@ export async function staffAlertFactsIn(
   const { rows } = await tx.execute<{
     number: number;
     assignee_id: string | null;
+    status: string;
+    payment_method: PaymentMethodValue;
+    amount_paid: string;
+    total: string;
+    advance_due: string;
     message: string | null;
     author_kind: CommentAuthorKind | null;
     author_id: string | null;
   }>(sql`
-    SELECT o.number, o.assignee_id, c.message, c.author_kind, c.author_id
+    SELECT o.number, o.assignee_id, o.status, o.payment_method, o.amount_paid::text,
+           o.total::text, o.advance_due::text, c.message, c.author_kind, c.author_id
       FROM orders.orders o
       LEFT JOIN orders.order_comments c
         ON c.shop_id = o.shop_id AND c.order_id = o.id AND c.id = ${commentId}::uuid
@@ -42,6 +52,14 @@ export async function staffAlertFactsIn(
   return {
     number: row.number,
     assigneeId: row.assignee_id,
+    awaitingTransfer:
+      row.status === 'open' &&
+      awaitsTransfer({
+        paymentMethod: row.payment_method,
+        amountPaid: BigInt(row.amount_paid),
+        total: BigInt(row.total),
+        advanceDue: BigInt(row.advance_due),
+      }),
     comment:
       row.message === null
         ? null
