@@ -3,6 +3,7 @@ import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { publishedArticleImageOf } from './article.service.js';
+import { searchContentIn } from './content-search.js';
 import { articles, blogs } from './schema.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
 import { shopRedirectsOf } from './url-redirect.service.js';
@@ -140,14 +141,14 @@ describe.skipIf(!server)('Blogs and their articles (ADR-176)', () => {
           title: '',
           summary: `<p>${'x'.repeat(70_000)}</p>`,
           author: 'x'.repeat(256),
-          publishDate: new Date(Date.now() + 86_400_000),
+          publishDate: new Date(Date.now() + 400 * 86_400_000),
         }),
       ),
     ).toEqual([
       ['title', 'BLANK', "Title can't be blank"],
       ['summary', 'TOO_LONG', 'Summary is too long (maximum is 64 KB)'],
       ['author', 'TOO_LONG', 'Author is too long (maximum is 255 characters)'],
-      ['publishDate', 'INVALID', "Publish date can't be in the future"],
+      ['publishDate', 'INVALID', "Publish date can't be more than a year ahead"],
     ]);
     // Another shop's blog is none to write in.
     expect(errorsOf(await f.articles.create(f.b, { blogId: news.id, title: 'Mine' }))).toEqual([
@@ -303,6 +304,92 @@ describe.skipIf(!server)('Blogs and their articles (ADR-176)', () => {
       .filter(([type]) => type === 'article.updated')
       .map(([, payload]) => (payload as { changed: string[] }).changed);
     expect(changed).toEqual([['image'], ['isPublished'], ['isPublished'], ['image']]);
+  });
+
+  it('publishes an article at a time ahead, hidden until then and shown once by the worker (ADR-215)', async () => {
+    const news = unwrap(await f.blogs.create(f.a, { title: 'News' }));
+    const tomorrow = new Date(Math.ceil(Date.now() / 1000) * 1000 + 86_400_000);
+    const eid = unwrap(
+      await f.articles.create(f.a, {
+        blogId: news.id,
+        title: 'Eid sale begins',
+        body: '<p>Lawn at half price.</p>',
+        publishDate: tomorrow,
+      }),
+    );
+    expect(eid).toMatchObject({ isPublished: false, publishedAt: tomorrow });
+    // Hidden until then: from its blog's page, the read models and the storefront's search.
+    const seen = () =>
+      f.db.tenant(f.a.shopId, async (tx) => ({
+        listed: (await f.articles.publishedIn(tx, f.a.shopId, [news.id])).map((each) => each.id),
+        read: (await f.articles.articlesOf(tx, f.a.shopId, { published: true })).map(
+          (each) => each.id,
+        ),
+        found: (await searchContentIn(tx, f.a.shopId, 'lawn', { limit: 10 })).articleIds,
+      }));
+    expect(await seen()).toEqual({ listed: [], read: [], found: [] });
+    expect(await f.articles.shopsWithArticlesDue()).not.toContain(f.a.shopId);
+    expect(await f.articles.showDue(f.a.shopId)).toBe(0);
+
+    // Its time come: shown, the worker saying so once.
+    await f.admin.query(
+      "UPDATE online_store.articles SET published_at = now() - interval '1 minute' WHERE id = $1",
+      [eid.id],
+    );
+    expect((await f.articles.get(f.a, eid.id))?.isPublished).toBe(true);
+    expect(await f.articles.shopsWithArticlesDue()).toContain(f.a.shopId);
+    expect(await f.articles.showDue(f.a.shopId)).toBe(1);
+    expect(await f.articles.showDue(f.a.shopId)).toBe(0);
+    expect(await seen()).toEqual({ listed: [eid.id], read: [eid.id], found: [eid.id] });
+
+    // Moved ahead, hidden, scheduled again, kept as it is, and shown now.
+    const updates = async (input: Parameters<typeof f.articles.update>[2]) => {
+      const before = (await events()).length;
+      const record = unwrap(await f.articles.update(f.a, eid.id, input));
+      const said = (await events())
+        .slice(before)
+        .map(([, payload]) => payload as { isPublished: boolean; changed: string[] });
+      return { isPublished: record.isPublished, said };
+    };
+    expect(await updates({ publishDate: tomorrow })).toEqual({
+      isPublished: false,
+      said: [
+        expect.objectContaining({ isPublished: false, changed: ['isPublished', 'publishedAt'] }),
+      ],
+    });
+    expect(await updates({ isPublished: false })).toEqual({
+      isPublished: false,
+      said: [expect.objectContaining({ isPublished: false, changed: ['publishedAt'] })],
+    });
+    expect(await updates({ isPublished: true, publishDate: tomorrow })).toEqual({
+      isPublished: false,
+      said: [expect.objectContaining({ isPublished: false, changed: ['publishedAt'] })],
+    });
+    expect(await updates({ isPublished: true })).toEqual({ isPublished: false, said: [] });
+    expect(await updates({ publishDate: new Date('2026-01-01T00:00:00Z') })).toEqual({
+      isPublished: true,
+      said: [
+        expect.objectContaining({ isPublished: true, changed: ['isPublished', 'publishedAt'] }),
+      ],
+    });
+    expect(await f.articles.showDue(f.a.shopId)).toBe(0);
+
+    // A client's clock a little fast publishes now; more than a year ahead is refused.
+    const soon = unwrap(
+      await f.articles.create(f.a, {
+        blogId: news.id,
+        title: 'Now',
+        publishDate: new Date(Date.now() + 30_000),
+      }),
+    );
+    expect(soon.isPublished).toBe(true);
+    expect(
+      errorsOf(
+        await f.articles.update(f.a, eid.id, {
+          publishDate: new Date(Date.now() + 367 * 86_400_000),
+        }),
+      ),
+    ).toEqual([['publishDate', 'INVALID', "Publish date can't be more than a year ahead"]]);
   });
 
   it('deletes an article, and a blog with its articles, saying so', async () => {

@@ -94,12 +94,14 @@ export class OnlineStoreArticle {
   @Field(() => [String])
   tags!: string[];
 
-  @Field({ description: 'Whether the storefront shows it.' })
+  @Field({ description: 'Whether the storefront shows it: published, and its time come.' })
   isPublished!: boolean;
 
   @Field(() => GraphQLISODateTime, {
     nullable: true,
-    description: 'When it was published, as its page says; null while it is not.',
+    description:
+      'When it was published, as its page says, or will be, for one published at a time ahead ' +
+      '(ADR-215); null while it is hidden.',
   })
   publishedAt!: Date | null;
 
@@ -272,14 +274,17 @@ export class ArticleCreateInput {
   @Field(() => [String], { nullable: true })
   tags?: string[] | null;
 
-  @Field(() => Boolean, { nullable: true, description: 'Published unless false.' })
+  @Field(() => Boolean, {
+    nullable: true,
+    description: 'Published unless false: now, or at its publish date.',
+  })
   isPublished?: boolean | null;
 
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description:
-      'When it was published, as its page says, for one written before: never in the future. ' +
-      'Now when not given.',
+      'When it is shown from, as its page says: for one written before, or a time ahead it ' +
+      'waits for, at most a year (ADR-215). Now when not given.',
   })
   publishDate?: Date | null;
 
@@ -321,7 +326,9 @@ export class ArticleUpdateInput {
 
   @Field(() => GraphQLISODateTime, {
     nullable: true,
-    description: 'When it was published, as its page says: never in the future.',
+    description:
+      'When it is shown from, as its page says: a time gone by, or one ahead it waits for, at ' +
+      'most a year (ADR-215).',
   })
   publishDate?: Date | null;
 

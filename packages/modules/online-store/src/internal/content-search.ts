@@ -62,7 +62,7 @@ export async function searchContentIn(
   const find = async (table: SQL) => {
     const { rows } = await tx.execute<{ id: string }>(sql`
       SELECT id FROM ${table}
-       WHERE shop_id = ${shopId} AND published_at IS NOT NULL AND ${all}
+       WHERE shop_id = ${shopId} AND published_at <= now() AND ${all}
        ORDER BY position(${tokens[0]!} IN search_text), published_at DESC, id DESC
        LIMIT ${options.limit}`);
     return rows.map((row) => row.id);

@@ -352,6 +352,8 @@ const workerSchema = z
     OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().min(50).default(1_000),
     /** How often the sweeps run. */
     SWEEP_INTERVAL_MS: z.coerce.number().int().min(1_000).default(600_000),
+    /** How often articles published at a time ahead are shown once it comes (ADR-215). */
+    ARTICLES_INTERVAL_MS: z.coerce.number().int().min(1_000).default(60_000),
     EVENT_CONCURRENCY: z.coerce.number().int().min(1).max(100).default(10),
     /**
      * Cloudflare, the edge in front of storefronts (ADR-007): the zone storefront pages are kept in,

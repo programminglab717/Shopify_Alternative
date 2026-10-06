@@ -6,8 +6,8 @@
 
 ## In progress
 
-**A payment the gateway says failed** (PAY-01, ADR-208): its session marked failed when the
-gateway's inquiry says so, so that its order is no longer held from being cancelled unpaid.
+**A collection's Atom feed** (OS-07, ADR-209): Shopify's /collections/{handle}.atom, the
+collection's products with their variants and images, as Shopify's feed has them.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Articles published at a time ahead
+
+* **An article's publish date may be ahead**, a year at most, as Shopify's `publishDate`
+  schedules one ([ADR-215](../architecture/13-decision-log.md#adr-215--an-article-is-published-at-a-time-ahead-as-shopifys-publishdate-schedules-one-hidden-until-then-wherever-it-would-show-and-the-worker-shows-it-once-its-time-comes-with-the-articleupdated-the-storefront-follows)):
+  hidden until then from the storefront, its blog's page, its search, its image's address and
+  menus' links, `isPublished` false and `publishedAt` the time ahead in the Admin API.
+* **The worker shows it when its time comes:** `scheduled` marks it (migration 0135), and a sweep
+  every minute (`ARTICLES_INTERVAL_MS`) clears the mark and records `article.updated`, which the
+  publisher follows.
+* Marking a payment failed when its gateway says so waits: which answers are final differs by
+  gateway, and JazzCash's and Safepay's are not known well enough to cancel an order on.
+* 1647 tests (3 new): scheduled, hidden, shown once, and what each change says; the worker's
+  sweep; and the storefront following.
 
 ### 26f59e7 · Easypaisa
 

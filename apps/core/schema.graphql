@@ -21,10 +21,12 @@ type Article {
   """One of the shop's files, shown as its image; null for none."""
   image: ArticleImage
 
-  """Whether the storefront shows it."""
+  """Whether the storefront shows it: published, and its time come."""
   isPublished: Boolean!
 
-  """When it was published, as its page says; null while it is not."""
+  """
+  When it was published, as its page says, or will be, for one published at a time ahead (ADR-215); null while it is hidden.
+  """
   publishedAt: DateTime
 
   """
@@ -67,11 +69,11 @@ input ArticleCreateInput {
   handle: String
   image: ArticleImageInput
 
-  """Published unless false."""
+  """Published unless false: now, or at its publish date."""
   isPublished: Boolean
 
   """
-  When it was published, as its page says, for one written before: never in the future. Now when not given.
+  When it is shown from, as its page says: for one written before, or a time ahead it waits for, at most a year (ADR-215). Now when not given.
   """
   publishDate: DateTime
 
@@ -132,7 +134,9 @@ input ArticleUpdateInput {
   image: ArticleImageInput
   isPublished: Boolean
 
-  """When it was published, as its page says: never in the future."""
+  """
+  When it is shown from, as its page says: a time gone by, or one ahead it waits for, at most a year (ADR-215).
+  """
   publishDate: DateTime
 
   """

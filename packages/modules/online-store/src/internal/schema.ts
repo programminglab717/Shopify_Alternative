@@ -135,6 +135,8 @@ export const articles = onlineStoreSchema.table(
     imageAlt: text('image_alt').notNull().default(''),
     /** The words a storefront's search finds it by, folded (ADR-212). */
     searchText: text('search_text').notNull().default(''),
+    /** Published at a time ahead, until the worker shows it (ADR-215). */
+    scheduled: boolean('scheduled').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

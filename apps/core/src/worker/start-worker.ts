@@ -26,7 +26,7 @@ import {
 } from '@hatti/marketing/public';
 import { MessagesService } from '@hatti/messaging/public';
 import { CourierAccountService, CourierBookingService } from '@hatti/logistics/public';
-import { LinkTapsService, SessionDaysService } from '@hatti/online-store/public';
+import { ArticleService, LinkTapsService, SessionDaysService } from '@hatti/online-store/public';
 import {
   CustomerAnswers,
   ExportScheduleService,
@@ -63,6 +63,7 @@ import { PaymentInquiries } from './payment-inquiries.js';
 import { MessagesSender, OrderNotifications } from './notifications.js';
 import { ProductImages } from './product-images.js';
 import { RiskRescoring } from './risk-rescoring.js';
+import { ScheduledArticles } from './scheduled-articles.js';
 import { ScheduledExports } from './scheduled-exports.js';
 import { StaffAlerts } from './staff-alerts.js';
 import { StorefrontSessions } from './storefront-sessions.js';
@@ -261,6 +262,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => credit.stop());
+    // Articles published at a time ahead shown once it comes (ADR-215).
+    const articles = new ScheduledArticles(new ArticleService(database), logger).start(
+      config.ARTICLES_INTERVAL_MS,
+    );
+    closers.push(() => articles.stop());
     // Products' images made ready, and those of media gone removed (ADR-158).
     const images = new ProductImages({
       processing: new MediaProcessing(database),

@@ -916,6 +916,32 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
   });
 
+  it('publishes an article published at a time ahead once the worker shows it (ADR-215)', async () => {
+    const diary = unwrap(await blogs.create(tenant, { title: 'Diary' }));
+    const sale = unwrap(
+      await articles.create(tenant, {
+        blogId: diary.id,
+        title: 'Sale',
+        publishDate: new Date(Date.now() + 86_400_000),
+      }),
+    );
+    await deliver();
+    expect(await store().articleByHandle('diary/sale')).toBeNull();
+    expect((await store().blogByHandle('diary'))?.articles).toEqual([]);
+
+    // Its time come, the worker shows it, and the storefront follows.
+    await admin.query(
+      "UPDATE online_store.articles SET published_at = now() - interval '1 minute' WHERE id = $1",
+      [sale.id],
+    );
+    expect(await articles.showDue(shopId)).toBe(1);
+    expect(await deliver()).toEqual(['article.updated']);
+    expect((await store().articleByHandle('diary/sale'))?.id).toBe(sale.id);
+    expect((await store().blogByHandle('diary'))?.articles).toEqual([{ id: sale.id, tags: [] }]);
+    unwrap(await blogs.delete(tenant, diary.id));
+    await deliver();
+  });
+
   it("publishes menus' links to blogs and articles, following their handles and showing (ADR-178)", async () => {
     const stories = unwrap(await blogs.create(tenant, { title: 'Stories' }));
     const lawn = unwrap(

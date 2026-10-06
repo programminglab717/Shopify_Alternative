@@ -240,7 +240,7 @@ describe.skipIf(!server)('Admin GraphQL API: blogs and their articles (ADR-176)'
     const article = await createArticle(tokens.a, {
       blogId: blog.id,
       title: 'Sizes',
-      publishDate: new Date(Date.now() + 86_400_000).toISOString(),
+      publishDate: new Date(Date.now() + 400 * 86_400_000).toISOString(),
     });
     expect(article).toEqual({
       article: null,
@@ -248,9 +248,17 @@ describe.skipIf(!server)('Admin GraphQL API: blogs and their articles (ADR-176)'
         {
           field: ['article', 'publishDate'],
           code: 'INVALID',
-          message: "Publish date can't be in the future",
+          message: "Publish date can't be more than a year ahead",
         },
       ],
+    });
+    // A time ahead within the year: published then, hidden until it comes (ADR-215).
+    const tomorrow = new Date(Math.ceil(Date.now() / 1000) * 1000 + 86_400_000).toISOString();
+    expect(
+      await createArticle(tokens.a, { blogId: blog.id, title: 'Sale', publishDate: tomorrow }),
+    ).toMatchObject({
+      article: { isPublished: false, publishedAt: tomorrow },
+      userErrors: [],
     });
   });
 

@@ -784,8 +784,9 @@ export class StorefrontPublisher {
   }
 
   /**
-   * Articles published go on the storefront, found by their blog's handle and theirs (ADR-177);
-   * others come off. Their blogs' pages list them, before and after: those are forgotten too.
+   * Articles published go on the storefront, once their time comes (ADR-215), found by their
+   * blog's handle and theirs (ADR-177); others come off. Their blogs' pages list them, before and
+   * after: those are forgotten too.
    */
   async #articles(
     tx: Tx,
@@ -795,7 +796,8 @@ export class StorefrontPublisher {
   ): Promise<void> {
     const records = await this.services.articles.articlesOf(tx, shopId, { ids });
     const published = records.filter(
-      (record): record is ArticleRecord & { publishedAt: Date } => record.publishedAt !== null,
+      (record): record is ArticleRecord & { publishedAt: Date } =>
+        record.isPublished && record.publishedAt !== null,
     );
     const blogs = await this.services.blogs.blogsOf(tx, shopId, {
       ids: published.map((record) => record.blogId),

@@ -4,7 +4,7 @@ import { appendEvent } from '@hatti/events';
 import { readyImagesIn } from '@hatti/files/public';
 import { isUuid, newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gt, inArray, isNotNull, ne, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, lte, ne, sql } from 'drizzle-orm';
 import { BLOG_LIMITS } from './blog.service.js';
 import { checkHandle, checkHtml, checkSuffix, insertWithHandle } from './content-input.js';
 import {
@@ -32,11 +32,11 @@ export interface ArticleInput {
   /** The name it is signed with; blank for none. */
   author?: string | null;
   tags?: string[] | null;
-  /** A new article is published unless this is false. */
+  /** A new article is published unless this is false: now, or at its publish date. */
   isPublished?: boolean | null;
   /**
-   * When it was published, as its page says, for one written before, such as one brought from
-   * another platform: never in the future. Now when not given.
+   * When it is shown from, as its page says: one written before, such as one brought from
+   * another platform, or a time ahead it waits for, at most a year (ADR-215). Now when not given.
    */
   publishDate?: Date | null;
   /** Another of the theme's article templates, "recipe" for article.recipe.json; blank for none. */
@@ -60,13 +60,14 @@ export interface ArticleImageInput {
   altText?: string | null;
 }
 
-/** How far ahead of the server's clock a publish date may be, for clients' clocks running fast. */
+/** How far ahead of the server's clock a publish date is still now, for clients' clocks running fast. */
 const CLOCK_SKEW_MS = 60_000;
 
 /**
  * The articles of a shop's blogs (OS-07, ADR-176): a title, a handle naming it at
  * /blogs/{blog}/{handle}, a body and a summary of HTML, cleaned when saved as pages' are, its
- * author's name, tags, and when it was published. The storefront shows those published.
+ * author's name, tags, and when it was published. The storefront shows those published, once
+ * their time comes (ADR-215).
  */
 @Injectable()
 export class ArticleService {
@@ -148,6 +149,8 @@ export class ArticleService {
         tags,
         templateSuffix: templateSuffix ?? null,
         publishedAt: published ? (publishDate ?? sql`now()`) : null,
+        // Hidden until its time comes, when the worker shows it (ADR-215).
+        scheduled: published && publishDate !== undefined && !shownBy(publishDate),
         imageFileId: image?.fileId ?? null,
         imageAlt: image?.altText ?? '',
         searchText: contentSearchText(title, [...tags, author], summary, body),
@@ -171,7 +174,7 @@ export class ArticleService {
       await this.#recordEvent<ArticleChangedPayload>(tx, OnlineStoreEvents.ArticleCreated, row, {
         blogId: row.blogId,
         handle: row.handle,
-        isPublished: row.publishedAt !== null,
+        isPublished: shownBy(row.publishedAt),
       });
       return { ok: true, value: toRecord(row) };
     });
@@ -225,6 +228,7 @@ export class ArticleService {
           .for('share');
         if (!blog) return failOne(['blogId'], 'NOT_FOUND', 'Blog not found');
       }
+      // Published, now or at a time ahead, unless hidden.
       const published = input.isPublished ?? article.publishedAt !== null;
       const image = await checkImage(tx, tenant.shopId, check, input.image);
       if (!check.ok) return fail(check.errors);
@@ -243,19 +247,23 @@ export class ArticleService {
       };
       const nextTags = tags ?? article.tags;
       // Published again, it keeps the time it was first shown since it was last hidden, unless
-      // another is given.
+      // another is given; one waiting for its time keeps it (ADR-215).
       const publishedAt = published ? (publishDate ?? article.publishedAt) : null;
+      // Shown before and after: one whose time came but which the worker has not shown yet was not.
+      const wasShown = shownBy(article.publishedAt) && !article.scheduled;
+      const willShow = published && (publishedAt === null || shownBy(publishedAt));
+      const moved = !published
+        ? article.publishedAt !== null
+        : publishedAt === null || publishedAt.getTime() !== article.publishedAt?.getTime();
+      // Shown or hidden alone says isPublished; a date that moved, or waits, says publishedAt.
+      const toggled = (article.publishedAt === null && willShow) || (!published && wasShown);
       const changed = [
         ...(['title', 'handle', 'body', 'summary', 'author', 'templateSuffix'] as const).filter(
           (field) => next[field] !== article[field],
         ),
         ...(nextTags.join('\n') !== article.tags.join('\n') ? ['tags'] : []),
-        ...(published !== (article.publishedAt !== null) ? ['isPublished'] : []),
-        ...(published &&
-        article.publishedAt !== null &&
-        publishedAt?.getTime() !== article.publishedAt.getTime()
-          ? ['publishedAt']
-          : []),
+        ...(wasShown !== willShow ? ['isPublished'] : []),
+        ...(moved && !toggled ? ['publishedAt'] : []),
         ...(blogId !== article.blogId ? ['blogId'] : []),
         ...(nextImage.imageFileId !== article.imageFileId || nextImage.imageAlt !== article.imageAlt
           ? ['image']
@@ -295,6 +303,7 @@ export class ArticleService {
             next.body,
           ),
           publishedAt: published ? (publishedAt ?? sql`now()`) : null,
+          scheduled: published && !willShow,
           updatedAt: sql`now()`,
         })
         .where(and(eq(articles.shopId, tenant.shopId), eq(articles.id, id)))
@@ -302,7 +311,7 @@ export class ArticleService {
       await this.#recordEvent<ArticleUpdatedPayload>(tx, OnlineStoreEvents.ArticleUpdated, row!, {
         blogId: row!.blogId,
         handle: row!.handle,
-        isPublished: row!.publishedAt !== null,
+        isPublished: willShow,
         changed,
         previousBlogId: blogId !== article.blogId ? article.blogId : null,
       });
@@ -339,7 +348,7 @@ export class ArticleService {
       await this.#recordEvent<ArticleChangedPayload>(tx, OnlineStoreEvents.ArticleDeleted, row, {
         blogId: row.blogId,
         handle: row.handle,
-        isPublished: row.publishedAt !== null,
+        isPublished: shownBy(row.publishedAt),
       });
       return { ok: true, value: { id } };
     });
@@ -364,7 +373,7 @@ export class ArticleService {
           eq(articles.shopId, shopId),
           options.ids ? inArray(articles.id, [...new Set(options.ids)]) : undefined,
           options.blogIds ? inArray(articles.blogId, [...new Set(options.blogIds)]) : undefined,
-          options.published ? isNotNull(articles.publishedAt) : undefined,
+          options.published ? lte(articles.publishedAt, sql`now()`) : undefined,
         ),
       )
       .orderBy(sql`${articles.publishedAt} DESC NULLS LAST`, desc(articles.id));
@@ -391,8 +400,8 @@ export class ArticleService {
   }
 
   /**
-   * The published articles of these blogs, the latest first, with their tags alone: what a blog's
-   * page lists, in the caller's transaction `tx`, without their bodies.
+   * The published articles of these blogs, their time come, the latest first, with their tags
+   * alone: what a blog's page lists, in the caller's transaction `tx`, without their bodies.
    */
   async publishedIn(
     tx: Tx,
@@ -407,10 +416,53 @@ export class ArticleService {
         and(
           eq(articles.shopId, shopId),
           inArray(articles.blogId, [...new Set(blogIds)]),
-          isNotNull(articles.publishedAt),
+          lte(articles.publishedAt, sql`now()`),
         ),
       )
       .orderBy(desc(articles.publishedAt), desc(articles.id));
+  }
+
+  /**
+   * The shops with articles whose time came (ADR-215), found with the system role, which sees
+   * every shop.
+   */
+  async shopsWithArticlesDue(): Promise<string[]> {
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string }>(sql`
+        SELECT DISTINCT shop_id FROM online_store.articles
+         WHERE scheduled AND published_at <= now()`),
+    );
+    return rows.map((row) => row.shop_id);
+  }
+
+  /**
+   * Shows the shop's articles whose time came (ADR-215): each recorded as shown with its
+   * `article.updated`, saying it is published now, once. How many.
+   */
+  async showDue(shopId: string): Promise<number> {
+    return this.db.tenant(shopId, async (tx) => {
+      const rows = await tx
+        .update(articles)
+        .set({ scheduled: false })
+        .where(
+          and(
+            eq(articles.shopId, shopId),
+            eq(articles.scheduled, true),
+            lte(articles.publishedAt, sql`now()`),
+          ),
+        )
+        .returning();
+      for (const row of rows) {
+        await this.#recordEvent<ArticleUpdatedPayload>(tx, OnlineStoreEvents.ArticleUpdated, row, {
+          blogId: row.blogId,
+          handle: row.handle,
+          isPublished: true,
+          changed: ['isPublished'],
+          previousBlogId: null,
+        });
+      }
+      return rows.length;
+    });
   }
 
   async #recordEvent<P extends ArticleChangedPayload>(
@@ -438,7 +490,7 @@ function toRecord(row: ArticleRow): ArticleRecord {
     summary: row.summary,
     author: row.author,
     tags: row.tags,
-    isPublished: row.publishedAt !== null,
+    isPublished: shownBy(row.publishedAt),
     publishedAt: row.publishedAt,
     templateSuffix: row.templateSuffix,
     image: row.imageFileId ? { fileId: row.imageFileId, altText: row.imageAlt } : null,
@@ -459,7 +511,9 @@ export async function publishedArticleImageOf(
   const [row] = await tx
     .select({ fileId: articles.imageFileId, altText: articles.imageAlt })
     .from(articles)
-    .where(and(eq(articles.shopId, shopId), eq(articles.id, id), isNotNull(articles.publishedAt)));
+    .where(
+      and(eq(articles.shopId, shopId), eq(articles.id, id), lte(articles.publishedAt, sql`now()`)),
+    );
   return row?.fileId ? { fileId: row.fileId, altText: row.altText } : null;
 }
 
@@ -492,8 +546,18 @@ async function checkImage(
 /** A publish date as given, never in the future; undefined when not given. */
 function checkPublishDate(check: InputChecker, value: Date | null | undefined): Date | undefined {
   if (value === undefined || value === null) return undefined;
-  if (Number.isNaN(value.getTime()) || value.getTime() > Date.now() + CLOCK_SKEW_MS) {
-    check.add(['publishDate'], 'INVALID', "can't be in the future");
+  if (Number.isNaN(value.getTime())) {
+    check.add(['publishDate'], 'INVALID', 'is not a date');
+  } else if (value.getTime() > Date.now() + BLOG_LIMITS.scheduleDays * 86_400_000) {
+    check.add(['publishDate'], 'INVALID', "can't be more than a year ahead");
   }
-  return value;
+  // A client's clock running a little fast publishes now, not a minute ahead.
+  return value.getTime() > Date.now() && value.getTime() <= Date.now() + CLOCK_SKEW_MS
+    ? new Date()
+    : value;
+}
+
+/** Whether an article published at `at` is shown now: published, and its time come (ADR-215). */
+function shownBy(at: Date | null): boolean {
+  return at !== null && at.getTime() <= Date.now();
 }

@@ -300,7 +300,8 @@ export class MenuService {
             if (!article) return GONE;
             return {
               url: `/blogs/${article.blogHandle}/${article.handle}`,
-              shown: article.publishedAt !== null,
+              // Published, and its time come (ADR-215).
+              shown: article.publishedAt !== null && article.publishedAt.getTime() <= Date.now(),
             };
           }
           case 'http':

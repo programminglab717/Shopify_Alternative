@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-214 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-215 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -222,6 +222,7 @@
 | 212 | A storefront's search finds the shop's published pages and articles beside its products, as Shopify's does: by the words each keeps folded, through the online store's own search in the core; products, then pages, then articles, the kinds Shopify's type names, and suggested as a shopper types | Accepted |
 | 213 | An article has Shopify's image, one of the shop's files with its alt text: the API serves it at an address of its own while the article is published, the address naming its file, the article's document names that address, and Hatti Base shows it in its blog and on the article's page | Accepted |
 | 214 | Easypaisa is the third gateway shops take payments through, by its hosted checkout: the customer's browser posts a form encrypted with the store's hash key to its page and the token it comes back with to its next, and its return, which it does not sign, is believed only once its inquiry, asked at once with the account's API credentials, says the payment is made | Accepted |
+| 215 | An article is published at a time ahead as Shopify's publishDate schedules one: hidden until then wherever it would show, and the worker shows it once its time comes, with the article.updated the storefront follows | Accepted |
 
 ---
 
@@ -8983,3 +8984,36 @@
   * **Its v5 API, signed with RSA:** each shop would make a key pair and keep Easypaisa's public
     key; v4's answers come from Easypaisa's own API, as Safepay's reporter's do.
   * **A script posting the token on:** the pages run none; a button is one tap more.
+
+## ADR-215 · An article is published at a time ahead as Shopify's publishDate schedules one: hidden until then wherever it would show, and the worker shows it once its time comes, with the article.updated the storefront follows
+
+* **Context:** Shopify's `publishDate` schedules an article: until its time it is not visible,
+  `isPublished` false and `publishedAt` the time ahead, then it shows by itself. Merchants write
+  their Eid and sale posts ahead that way. Hatti refused a date ahead, publishing at a time ahead
+  being not yet ([ADR-176](#adr-176--a-shops-blogs-and-their-articles-are-the-online-stores-through-the-admin-api-as-shopifys-and-under-its-content-scopes-an-article-has-html-cleaned-as-a-pages-its-authors-name-tags-a-handle-unique-in-its-blog-and-when-it-was-published-never-in-the-future-and-goes-when-its-blog-is-deleted)); an article showed from the moment its `published_at` was set.
+* **Decision:**
+  * **A publish date may be ahead**, a year at most (`BLOG_LIMITS.scheduleDays`); one less than
+    a minute ahead, as a client's clock running fast gives, is now.
+  * **An article shows once published and its time has come**, `published_at <= now()`, wherever
+    it would show: the storefront's documents and its blog's page ([ADR-177](#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)), its image
+    ([ADR-213](#adr-213--an-article-has-shopifys-image-one-of-the-shops-files-with-its-alt-text-the-api-serves-it-at-an-address-of-its-own-while-the-article-is-published-the-address-naming-its-file-the-articles-document-names-that-address-and-hatti-base-shows-it-in-its-blog-and-on-the-articles-page)), the storefront's search ([ADR-212](#adr-212--a-storefronts-search-finds-the-shops-published-pages-and-articles-beside-its-products-as-shopifys-does-by-the-words-each-keeps-folded-through-the-online-stores-own-search-in-the-core-products-then-pages-then-articles-the-kinds-shopifys-type-names-and-suggested-as-a-shopper-types)), and menus' links to it
+    ([ADR-178](#adr-178--menus-link-to-a-shops-blogs-and-articles-as-they-do-to-its-pages-by-id-a-blogs-link-leads-to-it-an-articles-to-its-blogs-address-and-its-own-and-an-article-not-published-is-left-out)). The Admin API's `isPublished` says so, and `publishedAt` gives the time
+    ahead.
+  * **The worker shows it when its time comes:** `scheduled` (migration 0135) marks an article
+    whose time is ahead until then. A sweep every minute (`ARTICLES_INTERVAL_MS`) finds the
+    shops with articles due with the system role and, in each shop's transaction, clears the mark
+    and records `article.updated` saying it is published, which the publisher follows as for any
+    article shown: the article, its blog's page and menus' links.
+  * **What changed is said as before:** shown or hidden alone, `isPublished`; a date moved, or
+    one ahead set or taken off, `publishedAt`. An article whose time came but which the worker
+    has not shown yet counts as not shown.
+* **Consequences:**
+  * A shop writes its posts ahead and they appear on time, within a minute.
+  * Until the worker shows an article whose time came, the Admin API says it is published while
+    the storefront does not show it yet: a minute at most.
+  * Pages are not scheduled yet, though Shopify's take a publish date too.
+* **Alternatives:**
+  * **The storefront comparing each article's time with its clock:** its documents are built
+    ahead and kept at the edge; the publisher has to hear when an article appears.
+  * **A delayed job for each article, queued for its time:** it outlives a date moved or an
+    article deleted; the sweep reads the table as it is when the time comes.

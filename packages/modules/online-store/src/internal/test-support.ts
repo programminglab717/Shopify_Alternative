@@ -59,7 +59,12 @@ function tenant(shopId: string): TenantContext {
 
 export async function onlineStoreFixture(server: string): Promise<OnlineStoreFixture> {
   const testDb = await createTestDatabase(server);
-  const db = new Database({ appUrl: testDb.appUrl, applicationName: 'online-store-test' });
+  const db = new Database({
+    appUrl: testDb.appUrl,
+    // The worker's sweeps find the shops with something due with the system role (ADR-215).
+    systemUrl: testDb.systemUrl,
+    applicationName: 'online-store-test',
+  });
   const admin = new pg.Client({ connectionString: testDb.adminUrl });
   await admin.connect();
   const a = tenant(newId());

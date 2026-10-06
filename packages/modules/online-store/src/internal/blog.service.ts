@@ -23,6 +23,8 @@ export const BLOG_LIMITS = {
   author: 255,
   /** What an article's image shows, as a file's alt text (ADR-213). */
   imageAlt: 512,
+  /** How far ahead an article may be published (ADR-215), in days. */
+  scheduleDays: 366,
 } as const;
 
 /** A blog's fields as given: those left out stay as they are on an update. */
