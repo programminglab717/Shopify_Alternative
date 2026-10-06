@@ -50,7 +50,7 @@ import {
   permalinkItems,
   type CoreBackend,
 } from './cart.js';
-import { blogFeed, productFeed } from './feeds.js';
+import { blogFeed, collectionFeed, productFeed } from './feeds.js';
 import { sampleStore } from './fixtures.js';
 import { PASSWORD_COOKIE, isPasswordPass, passwordCookie, passwordPass } from './password.js';
 import { browserIdsOf } from './pixels.js';
@@ -789,6 +789,37 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         .header('cache-tag', cacheTags(found.shopId, [{ kind: 'blog', handle }], null))
         .type('application/atom+xml; charset=utf-8')
         .send(Readable.from(blogFeed(found.store, shop, blog, origin)));
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      throw error;
+    }
+  });
+
+  /**
+   * A collection's Atom feed (ADR-216), at its page's address with .atom, as Shopify's: kept at the
+   * edge as its page is, and forgotten when the collection changes, or any product, whose change
+   * purges the listing of them all, as the link page's does.
+   */
+  app.get('/collections/:handle.atom', async (request, reply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const { handle } = request.params as { handle: string };
+    try {
+      const collection = /^[\w-]+$/.test(handle)
+        ? await found.store.collectionByHandle(handle)
+        : null;
+      if (!collection) return await notFound(reply, 'The shop has no such collection.');
+      const shop = await found.store.shop();
+      const origin = await originOf(request, found);
+      const named: NamedDocument[] = [
+        { kind: 'collection', handle },
+        { kind: 'collection', handle: 'all' },
+      ];
+      return await reply
+        .header('cache-control', PAGE_CACHE)
+        .header('cache-tag', cacheTags(found.shopId, handle === 'all' ? [named[0]!] : named, null))
+        .type('application/atom+xml; charset=utf-8')
+        .send(Readable.from(collectionFeed(found.store, shop, collection, origin)));
     } catch (error) {
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
       throw error;

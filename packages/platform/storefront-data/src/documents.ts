@@ -9,7 +9,7 @@ import type { HandledKind } from './keys.js';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 10;
+export const DOCUMENTS_VERSION = 11;
 
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
@@ -45,6 +45,12 @@ export interface ProductDoc {
   options: { name: string; values: string[] }[];
   variants: VariantDoc[];
   images: ImageDoc[];
+  /**
+   * When it was made and last changed, as ISO 8601 (ADR-216): its collection's feed dates its entry
+   * with them. Absent in documents written before.
+   */
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CollectionDoc {

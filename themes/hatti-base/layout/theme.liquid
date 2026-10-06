@@ -7,6 +7,8 @@
     <link rel="canonical" href="{{ canonical_url }}">
     {%- if blog %}
     <link rel="alternate" type="application/atom+xml" title="{{ shop.name | escape }} - {{ blog.title | escape }}" href="{{ blog.url }}.atom">
+    {%- elsif collection %}
+    <link rel="alternate" type="application/atom+xml" title="{{ shop.name | escape }} - {{ collection.title | escape }}" href="{{ collection.url }}.atom">
     {%- endif %}
     {%- render 'meta-tags' %}
     {{ 'base.css' | asset_url | stylesheet_tag }}

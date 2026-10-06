@@ -102,6 +102,9 @@ export function productDoc(
       height: media.height ?? 0,
       alt: media.alt || null,
     })),
+    // As its collection's feed dates it (ADR-216).
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
   };
 }
 

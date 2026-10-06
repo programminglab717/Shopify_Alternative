@@ -1746,6 +1746,52 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it("gives a collection's Atom feed at its address with .atom, forgotten with it or any product (ADR-216)", async () => {
+    const app = server();
+    const get = (url: string, host = 'localhost') =>
+      app.inject({ method: 'GET', url, headers: { host } });
+    const feed = await get('/collections/eid-lawn.atom');
+    // Forgotten with the collection's document, and with any product's, which purges all's.
+    expect([
+      feed.statusCode,
+      feed.headers['content-type'],
+      feed.headers['cache-control'],
+      feed.headers['cache-tag'],
+    ]).toEqual([
+      200,
+      'application/atom+xml; charset=utf-8',
+      'public, max-age=0, s-maxage=300, stale-while-revalidate=86400, stale-if-error=604800',
+      'hatti:sample,hatti:sample:collection:eid-lawn,hatti:sample:collection:all',
+    ]);
+    expect(feed.body).toContain(
+      '<link rel="self" type="application/atom+xml" href="http://localhost/collections/eid-lawn.atom"/>',
+    );
+    const entries = [...feed.body.matchAll(/<entry>/g)].length;
+    expect(entries).toBeGreaterThan(0);
+    expect(entries).toBeLessThanOrEqual(50);
+    expect(feed.body.endsWith('</entry>\n</feed>\n')).toBe(true);
+    const all = await get('/collections/all.atom');
+    expect([all.statusCode, all.headers['cache-tag']]).toEqual([
+      200,
+      'hatti:sample,hatti:sample:collection:all',
+    ]);
+    // No such collection, no such handle, and no such shop.
+    for (const [url, host] of [
+      ['/collections/silk.atom', 'localhost'],
+      ['/collections/eid-lawn.x.atom', 'localhost'],
+      ['/collections/eid-lawn.atom', 'nobody.localhost'],
+    ] as const) {
+      expect((await get(url, host)).statusCode, url).toBe(404);
+    }
+    // The collection's page is still its page, and links its feed.
+    const page = await get('/collections/eid-lawn');
+    expect(page.headers['content-type']).toBe('text/html; charset=utf-8');
+    expect(page.body).toMatch(
+      /<link rel="alternate" type="application\/atom\+xml" title="Zari Fashions - [^"]+" href="\/collections\/eid-lawn\.atom">/,
+    );
+    await app.close();
+  });
+
   it("shows the shop's policies at Shopify's addresses, in its theme, and links them from the footer", async () => {
     const sample = sampleStore();
     const app = server({

@@ -188,6 +188,11 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     featured_image: images[0] ?? null,
     media: images,
     featured_media: images[0] ?? null,
+    // When it was made and last changed (ADR-216): published when made, as Hatti keeps no time
+    // of a product's being made active. Null in documents written before.
+    created_at: doc.createdAt ?? null,
+    published_at: doc.createdAt ?? null,
+    updated_at: doc.updatedAt ?? doc.createdAt ?? null,
   };
 }
 

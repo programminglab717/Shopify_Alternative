@@ -1240,6 +1240,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   image's whole address with `imageAddress`: an image by URL keeps its own, and one the image
   service keeps is at a path on the shop's. A theme does the same with `image_url`, putting
   `shop.url` before it only when it has no scheme, as `meta-tags.liquid` does.
+* **Atom feeds are made as the blog's and the collection's are** (`blogFeed`, `collectionFeed`,
+  [ADR-216](../architecture/13-decision-log.md#adr-216--a-collection-has-shopifys-atom-feed-at-its-address-with-atom-its-first-50-products-in-its-order-each-with-its-type-vendor-and-variants-in-shopifys-own-namespace-under-ids-of-their-own-and-products-documents-say-when-each-was-made-and-last-changed)): the head, then an entry at a time
+  through `xml()`, IDs of Hatti's own as `urn:uuid:`, dates from the documents and the feed's
+  own where a document has none, and Shopify's details in its namespace, `s:`. A route serving
+  one is kept at the edge with the tags of the page it feeds.
 * **What a shopper's own browser should keep is kept by a script, not a cookie the answer
   sets**, so pages stay the same for everyone and kept at the edge, which serves them without
   asking the storefront. The visits that brought a shopper ([ADR-139](../architecture/13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)) are the case:

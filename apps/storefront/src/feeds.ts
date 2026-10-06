@@ -1,6 +1,8 @@
+import { formatMoney, money } from '@hatti/money';
 import type {
   ArticleDoc,
   BlogDoc,
+  CollectionDoc,
   ProductDoc,
   StoreData,
   VariantDoc,
@@ -10,8 +12,8 @@ import { escapeHtml, imageAddress, unescapeHtml } from './liquid.js';
 // Catalog feeds (MKT-11, ADR-142): a shop's products as Google Merchant Center fetches them, in
 // its RSS 2.0 format, which Meta's catalogs take too: an item for each variant, grouped by its
 // product, linking to it on the shop's own address. Ads and free listings are made from them, and
-// the pixels' and conversions' content IDs to come name the same variants. And a blog's Atom feed
-// (ADR-209), which feed readers and other sites follow.
+// the pixels' and conversions' content IDs to come name the same variants. And Atom feeds, which
+// feed readers and other sites follow: a blog's (ADR-209) and a collection's (ADR-216).
 
 /** Products fetched a round trip at a time. */
 export const FEED_CHUNK = 100;
@@ -185,6 +187,98 @@ export function feedEntry(article: ArticleDoc, origin: string): string {
       ? `<summary type="html" ${base}>${xml(article.summaryHtml)}</summary>\n`
       : '') +
     `<content type="html" ${base}>${xml(article.bodyHtml)}</content>\n` +
+    '</entry>\n'
+  );
+}
+
+/** The products a collection's feed holds: its first, in its order. */
+export const COLLECTION_FEED_PRODUCTS = 50;
+
+/** Shopify's own namespace, which its feeds' product details are in. */
+const SHOPIFY_NS = 'http://jadedpixel.com/-/spec/shopify';
+
+/**
+ * A collection's Atom feed (RFC 4287), as Shopify serves it at /collections/{handle}.atom
+ * (ADR-216): its first products, in its order, each with its type, vendor and variants in
+ * Shopify's own namespace, a summary of its picture, description and price, and a link to its
+ * page at the shop's own address. Its IDs are the collection's and the products' own, as a blog's
+ * feed's are (ADR-209).
+ */
+export async function* collectionFeed(
+  store: Pick<StoreData, 'products'>,
+  shop: FeedShop,
+  collection: CollectionDoc,
+  origin: string,
+  now: Date = new Date(),
+): AsyncGenerator<string> {
+  const ids = collection.productIds.slice(0, COLLECTION_FEED_PRODUCTS);
+  const products = (ids.length === 0 ? [] : await store.products(ids)).filter(
+    (doc): doc is ProductDoc => doc !== null,
+  );
+  const address = `${origin}/collections/${collection.handle}`;
+  // When it last changed: when its products did, or now for one without any, or without dates.
+  const updated =
+    products.map((product) => product.updatedAt ?? '').reduce((a, b) => (a > b ? a : b), '') ||
+    now.toISOString();
+  yield '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    `<feed xmlns="http://www.w3.org/2005/Atom" xmlns:s="${SHOPIFY_NS}">\n` +
+    `<id>urn:uuid:${xml(collection.id)}</id>\n` +
+    `<link rel="alternate" type="text/html" href="${xml(address)}"/>\n` +
+    `<link rel="self" type="application/atom+xml" href="${xml(`${address}.atom`)}"/>\n` +
+    `<title>${xml(`${shop.name} - ${collection.title}`)}</title>\n` +
+    `<updated>${updated}</updated>\n` +
+    `<author><name>${xml(shop.name)}</name></author>\n`;
+  for (const product of products) yield productEntry(product, origin, updated);
+  yield '</feed>\n';
+}
+
+/**
+ * A product as its collection's feed has it: dated when it was made and last changed, or as the
+ * feed is in documents without; its type and vendor, and each variant with its price in rupees,
+ * as Shopify's; and a summary of its first picture, its description and its price, as HTML,
+ * escaped.
+ */
+export function productEntry(product: ProductDoc, origin: string, fallback: string): string {
+  const address = `${origin}/products/${encodeURIComponent(product.handle)}`;
+  const [image] = product.images;
+  const prices = product.variants.map((variant) => variant.price);
+  const lowest = prices.length > 0 ? Math.min(...prices) : 0;
+  const rupees = (paisa: number) => formatMoney(money(BigInt(paisa), 'PKR'));
+  const summary =
+    (image
+      ? `<p><img src="${escapeHtml(imageAddress(image.src, origin, 600))}" alt="${escapeHtml(
+          image.alt ?? product.title,
+        )}"></p>`
+      : '') +
+    product.descriptionHtml +
+    `<p>${escapeHtml(`${Math.max(...prices) > lowest ? 'From ' : ''}${rupees(lowest)}`)}</p>`;
+  const updated = product.updatedAt ?? fallback;
+  return (
+    '<entry>\n' +
+    `<id>urn:uuid:${xml(product.id)}</id>\n` +
+    `<published>${product.createdAt ?? updated}</published>\n` +
+    `<updated>${updated}</updated>\n` +
+    `<link rel="alternate" type="text/html" href="${xml(address)}"/>\n` +
+    `<title>${xml(product.title)}</title>\n` +
+    (product.productType ? `<s:type>${xml(product.productType)}</s:type>\n` : '') +
+    (product.vendor ? `<s:vendor>${xml(product.vendor)}</s:vendor>\n` : '') +
+    product.tags.map((tag) => `<category term="${xml(tag)}"/>\n`).join('') +
+    `<summary type="html">${xml(summary)}</summary>\n` +
+    product.variants
+      .map(
+        (variant) =>
+          '<s:variant>' +
+          `<id>urn:uuid:${xml(variant.id)}</id>` +
+          `<title>${xml(variant.title)}</title>` +
+          `<s:price currency="PKR">${(variant.price / 100).toFixed(2)}</s:price>` +
+          (variant.compareAtPrice !== null
+            ? `<s:compare_at_price currency="PKR">${(variant.compareAtPrice / 100).toFixed(2)}</s:compare_at_price>`
+            : '') +
+          `<s:sku>${xml(variant.sku ?? '')}</s:sku>` +
+          `<s:available>${variant.available}</s:available>` +
+          '</s:variant>\n',
+      )
+      .join('') +
     '</entry>\n'
   );
 }

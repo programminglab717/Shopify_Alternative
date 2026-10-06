@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-215 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-216 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -223,6 +223,7 @@
 | 213 | An article has Shopify's image, one of the shop's files with its alt text: the API serves it at an address of its own while the article is published, the address naming its file, the article's document names that address, and Hatti Base shows it in its blog and on the article's page | Accepted |
 | 214 | Easypaisa is the third gateway shops take payments through, by its hosted checkout: the customer's browser posts a form encrypted with the store's hash key to its page and the token it comes back with to its next, and its return, which it does not sign, is believed only once its inquiry, asked at once with the account's API credentials, says the payment is made | Accepted |
 | 215 | An article is published at a time ahead as Shopify's publishDate schedules one: hidden until then wherever it would show, and the worker shows it once its time comes, with the article.updated the storefront follows | Accepted |
+| 216 | A collection has Shopify's Atom feed at its address with .atom: its first 50 products in its order, each with its type, vendor and variants in Shopify's own namespace, under IDs of their own, and products' documents say when each was made and last changed | Accepted |
 
 ---
 
@@ -9017,3 +9018,45 @@
     ahead and kept at the edge; the publisher has to hear when an article appears.
   * **A delayed job for each article, queued for its time:** it outlives a date moved or an
     article deleted; the sweep reads the table as it is when the time comes.
+
+## ADR-216 · A collection has Shopify's Atom feed at its address with .atom: its first 50 products in its order, each with its type, vendor and variants in Shopify's own namespace, under IDs of their own, and products' documents say when each was made and last changed
+
+* **Context:** Shopify serves a feed for each collection at /collections/{handle}.atom, its
+  products with their variants in its own namespace (`http://jadedpixel.com/-/spec/shopify`):
+  `s:type`, `s:vendor`, `s:variant` with its `s:price` and `s:sku`. Feed readers and newsletter
+  services follow it to show a shop's newest products. A blog's feed came first, collections'
+  left for later ([ADR-209](#adr-209--a-blog-has-shopifys-atom-feed-at-its-address-with-atom-its-30-latest-articles-whole-under-ids-of-their-own-and-an-articles-page-gives-themes-the-newer-and-the-older-article-beside-it-fetched-together-when-a-theme-first-asks-for-either)). Products' documents said nothing of when each was made or
+  changed, which Atom's entries need and Liquid's `product.created_at`, `published_at` and
+  `updated_at` give.
+* **Decision:**
+  * **The feed at `/collections/{handle}.atom`**, `/collections/all.atom` among them: the
+    collection's first 50 products in its order, fetched in one round trip, those gone left out;
+    the feed's ID the collection's and each entry's the product's (`urn:uuid:`), as a blog's are;
+    each dated when made and last changed, and the feed when its products last changed, or now
+    without any.
+  * **Each entry as Shopify's:** its title and a link to its page at the shop's own address,
+    `s:type` and `s:vendor` where it has them, its tags as categories, a summary of its first
+    picture, its description and its price, "From" where its variants' differ, as HTML,
+    escaped; and each variant as `s:variant`: its ID, title, price in rupees
+    (`s:price currency="PKR"`), the price it was, its SKU, and whether it can be bought
+    (`s:available`, Hatti's own).
+  * **Kept at the edge as the collection's page is**, tagged with the collection and with all
+    products' listing, whose tag any product's change purges, as the link page's is
+    ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)).
+  * **Products' documents say when each was made and last changed** (`createdAt`, `updatedAt`;
+    `DOCUMENTS_VERSION` 11), and themes get Shopify's `product.created_at`, `updated_at` and
+    `published_at`, when it was made, as Hatti keeps no time of a product's being made active.
+  * **Hatti Base's collection pages link their feed**, as its blog's pages link theirs.
+* **Consequences:**
+  * A shop's collections can feed a newsletter's product blocks or a reader's list.
+  * A product's change has the edge forget every feed of the shop's collections with the listing
+    of them all: a busy shop's feeds are made again more often.
+  * Not in it: Shopify's variant weights and inventory tracking, and a feed in each of the
+    theme's languages.
+* **Alternatives:**
+  * **Shopify's own entry IDs (`tag:…`):** they are its database's; IDs of Hatti's own keep a
+    product moved to another handle or domain from showing readers twice.
+  * **Tagging the feed with each of its products:** up to 50 tags a feed for what the listing's
+    tag already purges.
+  * **The catalog feed for this too** ([ADR-142](#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time)): RSS for Google and Meta, a variant an
+    item, every product; feed readers and newsletters take a collection's Atom feed.

@@ -563,6 +563,33 @@ describe('Storefront rendering', () => {
     );
   });
 
+  it("gives themes a product's dates, as Shopify's product.created_at and its kin (ADR-216)", async () => {
+    const sample = sampleStore();
+    const [first, second] = sample.products;
+    const dated = {
+      ...first!,
+      createdAt: '2026-09-01T09:00:00.000Z',
+      updatedAt: '2026-09-20T10:00:00.000Z',
+    };
+    const shop = new MemoryStore({ ...sample, products: [dated, second!] });
+    const theme = loadTheme({
+      ...files,
+      'sections/main-product.liquid':
+        '<p class="dates">{{ product.created_at }}|{{ product.published_at }}|' +
+        "{{ product.updated_at | date: '%Y-%m-%d' }}|[{{ all_products['" +
+        second!.handle +
+        "'].created_at }}]</p>" +
+        '{% schema %}{ "name": "Product" }{% endschema %}',
+    });
+    const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${dated.handle}` }, shop.fresh());
+    // Published when made, as Hatti keeps no time of a product's being made active; none in
+    // documents written before.
+    expect(/<p class="dates">([^]*?)<\/p>/.exec(page.html)?.[1]).toBe(
+      '2026-09-01T09:00:00.000Z|2026-09-01T09:00:00.000Z|2026-09-20|[]',
+    );
+  });
+
   it('renders what a search found, a page at a time, its links keeping the words', async () => {
     const ids = sampleStore().products.map((product) => product.id);
     const found = await render({

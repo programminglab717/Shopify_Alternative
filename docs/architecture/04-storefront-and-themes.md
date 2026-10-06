@@ -423,6 +423,9 @@ their sizes ([ADR-158](./13-decision-log.md#adr-158--hatti-keeps-products-images
 Center and Meta's catalogs fetch, at `/feeds/products.xml`
 ([ADR-142](./13-decision-log.md#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time); see
 [07 §7](./07-messaging-and-marketing.md#7-catalog-feeds--social-channels)).
+Each collection has Shopify's Atom feed too, at its address with .atom, its first 50 products
+with their variants in Shopify's own namespace, for feed readers and newsletters
+([ADR-216](./13-decision-log.md#adr-216--a-collection-has-shopifys-atom-feed-at-its-address-with-atom-its-first-50-products-in-its-order-each-with-its-type-vendor-and-variants-in-shopifys-own-namespace-under-ids-of-their-own-and-products-documents-say-when-each-was-made-and-last-changed)).
 Breadcrumbs and the other structured data are to come.
 * **Agent-ready storefront:** machine-readable product feeds, a public, rate-limited catalogue API
   per store, and a read-only store MCP endpoint, so AI shopping assistants can discover and

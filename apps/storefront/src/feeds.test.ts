@@ -2,10 +2,19 @@ import {
   MemoryStore,
   type ArticleDoc,
   type BlogDoc,
+  type CollectionDoc,
   type ProductDoc,
 } from '@hatti/storefront-data';
 import { describe, expect, it } from 'vitest';
-import { BLOG_FEED_ARTICLES, blogFeed, FEED_CHUNK, feedItems, productFeed } from './feeds.js';
+import {
+  BLOG_FEED_ARTICLES,
+  blogFeed,
+  COLLECTION_FEED_PRODUCTS,
+  collectionFeed,
+  FEED_CHUNK,
+  feedItems,
+  productFeed,
+} from './feeds.js';
 import { sampleStore } from './fixtures.js';
 
 const ORIGIN = 'https://www.zari.pk';
@@ -294,6 +303,133 @@ describe("A blog's Atom feed (ADR-209)", () => {
     const store = new MemoryStore({ ...sampleStore(), articles: [] });
     const now = new Date('2026-10-06T12:00:00.000Z');
     const feed = await blogFeedOf(store, blogOf([]), now);
+    expect(feed).toContain('<updated>2026-10-06T12:00:00.000Z</updated>');
+    expect(feed).not.toContain('<entry>');
+    expect(feed.endsWith('</name></author>\n</feed>\n')).toBe(true);
+    expect(store.roundTrips).toBe(0);
+  });
+});
+
+describe("A collection's Atom feed (ADR-216)", () => {
+  const LAWN = '0192d3a4-0000-7000-8000-000000000010';
+
+  async function collectionFeedOf(
+    store: MemoryStore,
+    collection: CollectionDoc,
+    now?: Date,
+  ): Promise<string> {
+    let feed = '';
+    for await (const part of collectionFeed(store, SHOP, collection, ORIGIN, now)) feed += part;
+    return feed;
+  }
+
+  function collectionOf(productIds: string[]): CollectionDoc {
+    return {
+      id: LAWN,
+      handle: 'lawn',
+      title: 'Lawn & silk',
+      descriptionHtml: '',
+      image: null,
+      productIds,
+    };
+  }
+
+  it("gives its products in its order, each with its variants in Shopify's namespace, linking to their pages", async () => {
+    const dated: ProductDoc = {
+      ...kurta,
+      vendor: 'Zari',
+      tags: ['Eid'],
+      createdAt: '2026-09-01T09:00:00.000Z',
+      updatedAt: '2026-09-20T10:00:00.000Z',
+    };
+    const store = new MemoryStore({ ...sampleStore(), products: [dated] });
+    const feed = await collectionFeedOf(store, collectionOf([dated.id]));
+    const summary =
+      '<p><img src="https://www.zari.pk/images/products/kurta-1.jpg?width=600" ' +
+      'alt="Chikankari Kurta"></p>' +
+      '<p>Embroidered in Lucknow &amp; Lahore.</p>\n<ul><li>Cotton</li></ul>' +
+      '<p>From Rs 3,499</p>';
+    const escaped = summary
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    expect(feed).toBe(
+      '<?xml version="1.0" encoding="UTF-8"?>\n' +
+        '<feed xmlns="http://www.w3.org/2005/Atom" xmlns:s="http://jadedpixel.com/-/spec/shopify">\n' +
+        `<id>urn:uuid:${LAWN}</id>\n` +
+        '<link rel="alternate" type="text/html" href="https://www.zari.pk/collections/lawn"/>\n' +
+        '<link rel="self" type="application/atom+xml" href="https://www.zari.pk/collections/lawn.atom"/>\n' +
+        '<title>Zari Fashions - Lawn &amp; silk</title>\n' +
+        '<updated>2026-09-20T10:00:00.000Z</updated>\n' +
+        '<author><name>Zari Fashions</name></author>\n' +
+        '<entry>\n' +
+        '<id>urn:uuid:p-kurta</id>\n' +
+        '<published>2026-09-01T09:00:00.000Z</published>\n' +
+        '<updated>2026-09-20T10:00:00.000Z</updated>\n' +
+        '<link rel="alternate" type="text/html" href="https://www.zari.pk/products/chikankari-kurta"/>\n' +
+        '<title>Chikankari Kurta</title>\n' +
+        '<s:type>Kurta</s:type>\n' +
+        '<s:vendor>Zari</s:vendor>\n' +
+        '<category term="Eid"/>\n' +
+        `<summary type="html">${escaped}</summary>\n` +
+        '<s:variant><id>urn:uuid:v-m</id><title>M / White</title>' +
+        '<s:price currency="PKR">3499.00</s:price>' +
+        '<s:compare_at_price currency="PKR">4499.00</s:compare_at_price>' +
+        '<s:sku></s:sku><s:available>true</s:available></s:variant>\n' +
+        '<s:variant><id>urn:uuid:v-l</id><title>L / White</title>' +
+        '<s:price currency="PKR">3699.00</s:price>' +
+        '<s:compare_at_price currency="PKR">3699.00</s:compare_at_price>' +
+        '<s:sku></s:sku><s:available>false</s:available></s:variant>\n' +
+        '</entry>\n' +
+        '</feed>\n',
+    );
+    // Its products in one round trip.
+    expect(store.roundTrips).toBe(1);
+  });
+
+  it(`holds its first ${COLLECTION_FEED_PRODUCTS} products, skips one gone, and dates one without dates as the feed`, async () => {
+    const products = Array.from({ length: 60 }, (_, index): ProductDoc => ({
+      ...kurta,
+      id: `p-${index + 1}`,
+      handle: `kurta-${index + 1}`,
+      variants: [kurta.variants[0]!],
+      images: [],
+      createdAt: '2026-09-01T09:00:00.000Z',
+      updatedAt: new Date(Date.UTC(2026, 8, 1 + (index % 20))).toISOString(),
+    }));
+    // One written before documents had dates, and one gone since.
+    const { createdAt: _made, updatedAt: _changed, ...undated } = products[3]!;
+    products[3] = undated;
+    const store = new MemoryStore({
+      ...sampleStore(),
+      products: products.filter((_, index) => index !== 5),
+    });
+    const feed = await collectionFeedOf(store, collectionOf(products.map((each) => each.id)));
+    const ids = [...feed.matchAll(/<entry>\n<id>urn:uuid:([^<]+)<\/id>/g)].map((match) => match[1]);
+    expect(ids).toEqual(
+      products
+        .slice(0, COLLECTION_FEED_PRODUCTS)
+        .filter((_, index) => index !== 5)
+        .map((each) => each.id),
+    );
+    const latest = '2026-09-20T00:00:00.000Z';
+    expect(/<updated>([^<]+)<\/updated>/.exec(feed)![1]).toBe(latest);
+    expect(feed).toContain(
+      '<id>urn:uuid:p-4</id>\n' + `<published>${latest}</published>\n<updated>${latest}</updated>`,
+    );
+    // Without a picture, its summary is its description and price; one price alone.
+    expect(feed).toContain(
+      '<summary type="html">&lt;p&gt;Embroidered in Lucknow &amp;amp; Lahore.&lt;/p&gt;\n' +
+        '&lt;ul&gt;&lt;li&gt;Cotton&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;Rs 3,499&lt;/p&gt;</summary>',
+    );
+    expect(store.roundTrips).toBe(1);
+  });
+
+  it('says a collection without products changed now, and asks for none', async () => {
+    const store = new MemoryStore({ ...sampleStore(), products: [] });
+    const now = new Date('2026-10-06T12:00:00.000Z');
+    const feed = await collectionFeedOf(store, collectionOf([]), now);
     expect(feed).toContain('<updated>2026-10-06T12:00:00.000Z</updated>');
     expect(feed).not.toContain('<entry>');
     expect(feed.endsWith('</name></author>\n</feed>\n')).toBe(true);

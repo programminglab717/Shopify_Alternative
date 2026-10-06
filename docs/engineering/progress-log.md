@@ -6,8 +6,8 @@
 
 ## In progress
 
-**A collection's Atom feed** (OS-07, ADR-209): Shopify's /collections/{handle}.atom, the
-collection's products with their variants and images, as Shopify's feed has them.
+**Pages published at a time ahead** (OS-07, ADR-215): Shopify's `publishDate` for pages too,
+hidden until it comes and shown by the worker, as articles are.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### A collection's Atom feed
+
+* **Each collection has Shopify's Atom feed** at its address with .atom
+  ([ADR-216](../architecture/13-decision-log.md#adr-216--a-collection-has-shopifys-atom-feed-at-its-address-with-atom-its-first-50-products-in-its-order-each-with-its-type-vendor-and-variants-in-shopifys-own-namespace-under-ids-of-their-own-and-products-documents-say-when-each-was-made-and-last-changed)):
+  its first 50 products in its order, each with its type, vendor, tags and variants in Shopify's
+  own namespace, and a summary of its picture, description and price; kept at the edge with the
+  collection and the listing of all products, and linked from Hatti Base's collection pages.
+* **Products' documents say when each was made and last changed** (`DOCUMENTS_VERSION` 11), and
+  themes get Shopify's `product.created_at`, `published_at` and `updated_at`.
+* 1652 tests (5 new): the feed whole, its 50 products and their dates, an empty collection, the
+  route and its tags, and the dates in Liquid.
 
 ### 73fd722 · Articles published at a time ahead
 
