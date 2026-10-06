@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### A blog for search engines
+### 27f1015 · A blog for search engines
 
 * **A blog's own words for search engines** ([ADR-244](../architecture/13-decision-log.md#adr-244--a-blog-may-be-given-a-title-and-description-of-its-own-for-search-engines-as-its-articles-may-its-pages-give-them-in-place-of-its-title-and-of-the-shops-description-its-articles-keep-their-own-and-the-shop-may-translate-them-into-urdu)): a title and description,
   as its articles have ([ADR-231](../architecture/13-decision-log.md#adr-231--products-collections-pages-and-articles-may-be-given-a-title-and-description-of-their-own-for-search-engines-as-shopifys-seo-has-them-themes-are-given-them-as-page_title-and-page_description-the-description-made-from-the-pages-own-text-where-the-shop-wrote-none-and-shopifys-product-csv-carries-a-products)); migration 0152
