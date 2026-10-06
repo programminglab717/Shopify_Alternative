@@ -2,7 +2,7 @@
   "name": "@hatti/xlsx",
   "version": "0.0.0",
   "private": true,
-  "description": "Excel workbooks of one sheet for exports: typed cells under a header that stays in view, with a filter, in a ZIP written with Node's own zlib.",
+  "description": "Excel workbooks of one sheet for exports: typed cells under a header that stays in view, with a filter, in a ZIP written with Node's own zlib; and the first sheet of workbooks people send, read within limits.",
   "type": "module",
   "exports": {
     ".": {

@@ -33,8 +33,9 @@ registerEnumType(CodRemittanceOutcome, {
     UNMATCHED: { description: 'No parcel of the shop has its tracking number.' },
     REPEATED: {
       description:
-        'The parcel came before, in this statement or with cash in an earlier one: nothing ' +
-        'was received, so that a statement imported twice is not received twice.',
+        'The parcel came before: in this statement, or in an earlier one with the same cash or ' +
+        'its order owing nothing since. Nothing was received, so that a statement imported ' +
+        'twice is not received twice.',
     },
     NOT_OWED: {
       description:

@@ -343,3 +343,12 @@ function zip(files: readonly { path: string; data: Buffer }[]): Buffer {
   end.writeUInt32LE(offset, 16);
   return Buffer.concat([...entries, ...directory, end]);
 }
+
+// Reading workbooks people send, such as couriers' statements.
+export {
+  XlsxError,
+  readXlsx,
+  type XlsxRead,
+  type XlsxReadOptions,
+  type XlsxValue,
+} from './read.js';

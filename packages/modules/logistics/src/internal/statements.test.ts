@@ -1,7 +1,15 @@
 import type { CourierParcel, OrderCod } from '@hatti/orders/public';
+import { toXlsx } from '@hatti/xlsx';
 import { describe, expect, it } from 'vitest';
 import { parcelFor, reconcile } from './reconcile.js';
-import { amountOf, digestOf, headingKey, readStatement, type StatementLine } from './statement.js';
+import {
+  amountOf,
+  digestOf,
+  headingKey,
+  readStatement,
+  readStatementWorkbook,
+  type StatementLine,
+} from './statement.js';
 
 function read(csv: string) {
   const result = readStatement(csv, 'PKR');
@@ -72,6 +80,92 @@ describe("Couriers' statements", () => {
     expect(codes('CN,Consignee\nLE1,Ayesha')).toEqual(['INVALID']);
     expect(codes('CN,COD Amount\n"LE1,100')).toEqual(['INVALID']);
     expect(codes(`CN,COD Amount\n${'LE1,100\n'.repeat(5_001)}`)).toEqual(['TOO_MANY']);
+  });
+
+  it("finds the header under a courier's title rows, passes over empty rows, and says when Excel shortened a number (ADR-246)", () => {
+    const statement = read(
+      [
+        'TCS Payment Statement',
+        'Account,ZARI-001',
+        ',,',
+        'CN,COD Amount',
+        '1.23457E+11,"2,000"',
+        ',,',
+        '779412345678,"1,500"',
+      ].join('\n'),
+    );
+    expect(statement.rows).toBe(2);
+    expect(statement.lines.map((line) => [line.row, line.trackingNumber, line.collected])).toEqual([
+      [7, '779412345678', 150_000n],
+    ]);
+    expect(statement.rowErrors).toEqual([
+      {
+        row: 5,
+        column: 'CN',
+        message:
+          '"1.23457E+11" is a tracking number Excel shortened: import the courier\'s Excel file ' +
+          'itself, not a CSV saved from it',
+      },
+    ]);
+  });
+
+  it('reads a statement from the Excel workbook a courier sends, its long numbers whole (ADR-246)', () => {
+    const workbook = toXlsx({
+      name: 'Statement',
+      columns: [
+        { header: 'CN', type: 'number' },
+        { header: 'COD Amount', type: 'amount' },
+        { header: 'Delivery Charges', type: 'amount' },
+      ],
+      rows: [
+        ['779412345678', '6650.50', '250'],
+        ['779412345679', '0', '180'],
+        ['', 'lots', null],
+      ],
+    });
+    const type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const result = readStatementWorkbook(
+      `data:${type};base64,${workbook.toString('base64')}`,
+      'PKR',
+    );
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    expect(
+      result.value.lines.map((line) => [
+        line.row,
+        line.trackingNumber,
+        line.collected,
+        line.charges,
+      ]),
+    ).toEqual([
+      [2, '779412345678', 665_050n, 25_000n],
+      [3, '779412345679', 0n, 18_000n],
+    ]);
+    expect(result.value.rowErrors).toEqual([
+      { row: 4, column: 'CN', message: 'The tracking number is missing' },
+    ]);
+    // The same lines as a CSV of them: the same statement.
+    expect(digestOf(result.value.lines)).toEqual(
+      digestOf(
+        read('CN,COD Amount,Delivery Charges\n779412345678,"6,650.50",250\n779412345679,0,180')
+          .lines,
+      ),
+    );
+
+    const refused = (base64: string) => {
+      const read = readStatementWorkbook(base64, 'PKR');
+      return read.ok ? null : read.errors.map((error) => [error.field.join('.'), error.code]);
+    };
+    expect(refused('')).toEqual([['xlsx', 'BLANK']]);
+    expect(refused('not base64!')).toEqual([['xlsx', 'INVALID']]);
+    expect(refused(Buffer.from('CN,COD Amount\nLE1,100').toString('base64'))).toEqual([
+      ['xlsx', 'INVALID'],
+    ]);
+    const old = Buffer.alloc(64);
+    Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]).copy(old);
+    const message = readStatementWorkbook(old.toString('base64'), 'PKR');
+    expect(message.ok ? null : message.errors[0]!.message).toMatch(
+      /^An Excel 97-2003 workbook \(\.xls\), or one with a password, cannot be read/,
+    );
   });
 
   it('knows a statement by its lines, however it was saved', () => {
@@ -151,7 +245,7 @@ describe("Couriers' statements", () => {
       ],
       parcels,
       orders,
-      new Set(['p8']),
+      new Map([['p8', [1_000n]]]),
     );
     expect(lines.map((each) => [each.row, each.outcome, each.owed, each.received])).toEqual([
       [2, 'received', 5_000n, 5_000n],
@@ -182,6 +276,54 @@ describe("Couriers' statements", () => {
     expect(parcelFor([leopards, tcs], 'tcs')).toBe(tcs);
     expect(parcelFor([leopards, tcs], 'M&P')).toBe(leopards);
     expect(parcelFor([], 'TCS')).toBeNull();
+  });
+
+  it('receives cash a courier paid short on an earlier statement, but not the same cash again (ADR-246)', () => {
+    const parcel = (id: string, orderId: string) =>
+      ({
+        id,
+        orderId,
+        trackingNumber: id,
+        trackingCompany: 'TCS',
+        status: 'delivered',
+      }) as CourierParcel;
+    const line = (row: number, collected: bigint): StatementLine => ({
+      row,
+      trackingNumber: `P${row}`,
+      key: `P${row}`,
+      collected,
+      charges: 0n,
+      tax: 0n,
+      net: null,
+    });
+    // Each was paid 2,000 of 2,500 before, but o3, paid in full.
+    const orders = new Map<string, OrderCod>([
+      ['o1', { id: 'o1', number: 1001, payable: true, owed: 500n }],
+      ['o2', { id: 'o2', number: 1002, payable: true, owed: 500n }],
+      ['o3', { id: 'o3', number: 1003, payable: true, owed: 0n }],
+      ['o4', { id: 'o4', number: 1004, payable: true, owed: 500n }],
+    ]);
+    const lines = reconcile(
+      [line(2, 500n), line(3, 2_000n), line(4, 500n), line(5, 300n)],
+      [parcel('p1', 'o1'), parcel('p2', 'o2'), parcel('p3', 'o3'), parcel('p4', 'o4')],
+      orders,
+      new Map([
+        ['p1', [2_000n]],
+        ['p2', [2_000n]],
+        ['p3', [2_500n]],
+        ['p4', [2_000n]],
+      ]),
+    );
+    expect(lines.map((each) => [each.row, each.outcome, each.owed, each.received])).toEqual([
+      // The shortfall, paid.
+      [2, 'received', 500n, 500n],
+      // The same cash again: the parcel listed again, not paid twice.
+      [3, 'repeated', 500n, 0n],
+      // Its order owing nothing since.
+      [4, 'repeated', 0n, 0n],
+      // Less than the shortfall: what came is received, and the rest is owed still.
+      [5, 'short', 500n, 300n],
+    ]);
   });
 
   it("pays a lost parcel's claim with its cash, unless the shop settled the claim otherwise", () => {
@@ -236,7 +378,7 @@ describe("Couriers' statements", () => {
         lost('p8', 'o2', null, 'delivered'),
       ],
       orders,
-      new Set(),
+      new Map(),
     );
     expect(lines.map((each) => [each.row, each.outcome, each.owed, each.received])).toEqual([
       // Not claimed yet, claimed, or refused: the claim is paid.

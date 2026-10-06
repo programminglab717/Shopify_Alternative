@@ -26,13 +26,22 @@ import {
   codRemittances,
   type RemittanceOutcomeValue,
 } from './schema.js';
-import { STATEMENT_LIMITS, digestOf, readStatement, type StatementRowError } from './statement.js';
+import {
+  STATEMENT_LIMITS,
+  digestOf,
+  readStatement,
+  readStatementWorkbook,
+  type StatementRowError,
+  type StatementSource,
+} from './statement.js';
 
 export interface RemittanceImportInput {
   /** The courier, as staff name it. */
   courier: string;
-  /** The statement, as the courier sent it, in CSV. */
-  csv: string;
+  /** The statement, as the courier sent it, in CSV; or `xlsx`. */
+  csv?: string | null;
+  /** The statement as the Excel workbook the courier sent, in base64 (ADR-246); or `csv`. */
+  xlsx?: string | null;
   /**
    * The statement's number or the payment's reference. One imported before is refused, as is one
    * with the same lines, unless both have references and they differ, for charges alone.
@@ -65,12 +74,14 @@ export interface RemittanceImport {
 }
 
 /**
- * Couriers' remittance statements (COD-10): a statement imported whole, in one transaction, each
- * line matched to a parcel by its tracking number and its cash received on the parcel's order
- * through the orders module, which says what the order still owes, and its charges kept on the
- * parcel (ADR-088); cash for a parcel the courier lost pays the parcel's claim (ADR-093). Lines
- * that match no parcel, or one whose cash was collected before, receive nothing and are kept to
- * look into. A shop's statements are imported one at a time, and each once.
+ * Couriers' remittance statements (COD-10), as CSV or as the Excel workbooks couriers send
+ * (ADR-246): a statement imported whole, in one transaction, each line matched to a parcel by
+ * its tracking number and its cash received on the parcel's order through the orders module,
+ * which says what the order still owes, and its charges kept on the parcel (ADR-088); cash for
+ * a parcel the courier lost pays the parcel's claim (ADR-093). Lines that match no parcel, or
+ * one whose cash came before, receive nothing and are kept to look into, but for other cash on a
+ * parcel whose order the courier paid short. A shop's statements are imported one at a time, and
+ * each once.
  */
 @Injectable()
 export class CodRemittanceService {
@@ -84,7 +95,15 @@ export class CodRemittanceService {
     const courier = check.text(['courier'], input.courier, { required: true, max: 100 });
     const reference = check.text(['reference'], input.reference, { max: 100 });
     if (!check.ok || courier === null) return fail(check.errors);
-    const read = readStatement(input.csv, tenant.currency);
+    const workbook = input.xlsx ?? null;
+    if (workbook !== null && (input.csv ?? null) !== null) {
+      return failOne(['xlsx'], 'INVALID', 'Give the statement as csv or as xlsx, not both');
+    }
+    const source: StatementSource = workbook === null ? 'csv' : 'xlsx';
+    const read =
+      workbook === null
+        ? readStatement(input.csv ?? '', tenant.currency)
+        : readStatementWorkbook(workbook, tenant.currency);
     if (!read.ok) return read;
     const statement = read.value;
     const dryRun = input.dryRun ?? false;
@@ -120,7 +139,7 @@ export class CodRemittanceService {
           : `one from ${taken.courier}`;
         const another = !cash && reference === null && same.every((each) => each.reference);
         return failOne(
-          ['csv'],
+          [source],
           'TAKEN',
           `This statement has the same lines as ${named}, imported already` +
             (another ? '; if it is another statement, give its reference' : ''),
@@ -367,15 +386,16 @@ export class CodRemittanceService {
       .orderBy(codRemittances.createdAt, codRemittances.id);
   }
 
-  /** The parcels of `fulfillmentIds` whose cash earlier statements collected. */
+  /** The cash earlier statements collected on each parcel of `fulfillmentIds` with any. */
   async #collectedBefore(
     tx: Tx,
     shopId: string,
     fulfillmentIds: readonly string[],
-  ): Promise<Set<string>> {
-    if (fulfillmentIds.length === 0) return new Set();
+  ): Promise<Map<string, bigint[]>> {
+    const before = new Map<string, bigint[]>();
+    if (fulfillmentIds.length === 0) return before;
     const rows = await tx
-      .selectDistinct({ id: codRemittanceLines.fulfillmentId })
+      .select({ id: codRemittanceLines.fulfillmentId, collected: codRemittanceLines.collected })
       .from(codRemittanceLines)
       .where(
         and(
@@ -384,7 +404,10 @@ export class CodRemittanceService {
           gt(codRemittanceLines.collected, 0n),
         ),
       );
-    return new Set(rows.flatMap((row) => (row.id ? [row.id] : [])));
+    for (const { id, collected } of rows) {
+      if (id) before.set(id, [...(before.get(id) ?? []), collected]);
+    }
+    return before;
   }
 }
 

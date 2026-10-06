@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { toXlsx } from '@hatti/xlsx';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { codRemittanceLines, codRemittances } from './schema.js';
 import { errorsOf, logisticsFixture, unwrap, type LogisticsFixture } from './test-support.js';
@@ -233,6 +234,63 @@ describe.skipIf(!server)('CodRemittanceService', () => {
     const order = (await f.orders.get(f.a, parcel.orderId))!;
     expect(order).toMatchObject({ amountPaid: 5_000_00n, financialStatus: 'paid' });
     expect(order.fulfillments[0]!.courierCharges).toBe(150_00n);
+  });
+
+  it('receives a shortfall the courier pays on a later statement, as CSV or Excel, but not the same cash again (ADR-246)', async () => {
+    const parcel = await f.delivered(f.a, shawl, { company: 'TCS', number: '779412345678' });
+    const workbook = (rows: string[][]) =>
+      toXlsx({
+        name: 'Statement',
+        columns: [
+          { header: 'CN', type: 'number' },
+          { header: 'COD Amount', type: 'amount' },
+        ],
+        rows,
+      }).toString('base64');
+    // Paid short: 4,500 of 5,000.
+    const short = unwrap(
+      await f.remittances.import(f.a, {
+        courier: 'TCS',
+        csv: 'CN,COD Amount\n779412345678,"4,500"',
+        reference: 'S-1',
+      }),
+    );
+    expect([short.outcomes.short, short.received]).toEqual([1, 4_500_00n]);
+    // Listed again with the same cash, beside another parcel: nothing received.
+    const again = unwrap(
+      await f.remittances.import(f.a, {
+        courier: 'TCS',
+        xlsx: workbook([
+          ['779412345678', '4500'],
+          ['779400000000', '100'],
+        ]),
+        reference: 'S-2',
+      }),
+    );
+    expect([again.outcomes.repeated, again.outcomes.unmatched, again.received]).toEqual([1, 1, 0n]);
+    // The shortfall, on the courier's next statement, its tracking number a number in Excel.
+    const paid = unwrap(
+      await f.remittances.import(f.a, {
+        courier: 'TCS',
+        xlsx: workbook([['779412345678', '500']]),
+        reference: 'S-3',
+      }),
+    );
+    expect([paid.outcomes.received, paid.received]).toEqual([1, 500_00n]);
+    expect(await f.orders.get(f.a, parcel.orderId)).toMatchObject({
+      amountPaid: 5_000_00n,
+      financialStatus: 'paid',
+    });
+
+    // Given both ways, or neither, it says so.
+    expect(
+      errorsOf(
+        await f.remittances.import(f.a, { courier: 'TCS', csv: 'CN,COD\nX,1', xlsx: workbook([]) }),
+      ),
+    ).toEqual([['xlsx', 'INVALID']]);
+    expect(errorsOf(await f.remittances.import(f.a, { courier: 'TCS' }))).toEqual([
+      ['csv', 'BLANK'],
+    ]);
   });
 
   it('keeps what couriers charged for each parcel, both ways, and once', async () => {

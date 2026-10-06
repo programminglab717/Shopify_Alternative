@@ -469,7 +469,9 @@ flowchart TB
   Each line's charges are kept on its parcel, and a statement is imported once: one with the
   same lines as one before, however it was saved, is refused (ADR-088, §6). Cash for a parcel the
   courier lost pays the parcel's claim, and the statement keeps what of its cash did so (ADR-093,
-  §6). Couriers' APIs, the
+  §6). Statements may come as the Excel workbooks couriers send, read from their first sheet
+  shown under the courier's title rows, and other cash on a parcel paid short before pays what
+  its order still owes ([ADR-246](./13-decision-log.md#adr-246--a-couriers-statement-may-come-as-the-excel-workbook-it-was-sent-as-read-from-its-first-sheet-shown-by-a-reader-of-hattis-own-under-a-header-found-below-the-couriers-title-rows-and-other-cash-on-a-parcel-paid-short-before-pays-what-its-order-still-owes)). Couriers' APIs, the
   ledger, tax credits and dispute sheets come later.
 * **Deductions** are itemised: shipping fees, fuel surcharges, COD handling fees, RTO charges and
   **tax withheld at source**. Since Finance Act 2025, couriers withhold income tax on COD

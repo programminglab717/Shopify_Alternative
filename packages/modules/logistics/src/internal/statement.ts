@@ -3,11 +3,16 @@ import { failOne, type MutationResult } from '@hatti/api';
 import { CsvError, parseCsv } from '@hatti/csv';
 import { fromMajor, MoneyError, type CurrencyCode } from '@hatti/money';
 import { trackingKey } from '@hatti/orders/public';
+import { XlsxError, readXlsx, type XlsxValue } from '@hatti/xlsx';
 
 export const STATEMENT_LIMITS = {
-  /** Characters in an imported file. */
+  /** Characters in an imported CSV file. */
   csv: 1_500_000,
+  /** Bytes in an imported Excel workbook, which comes in base64 in a request of at most 2 MiB. */
+  xlsx: 1_400_000,
   rows: 5_000,
+  /** Rows above its header a file may have: the courier's name, the account, the period. */
+  titleRows: 20,
   /** Rows an import reports it could not read; it counts them all. */
   rowErrors: 100,
   /** Lines to look into that an import gives back; a statement's lines are read in pages. */
@@ -113,12 +118,21 @@ export interface StatementRowError {
 }
 
 export interface Statement {
-  /** Rows after the header. */
+  /** Rows after the header with something in them. */
   rows: number;
   lines: StatementLine[];
   /** The first {@link STATEMENT_LIMITS.rowErrors} rows that could not be read. */
   rowErrors: StatementRowError[];
   rowErrorCount: number;
+}
+
+/** The field a statement came in, which its errors are under: CSV, or an Excel workbook. */
+export type StatementSource = 'csv' | 'xlsx';
+
+/** A file's row: its number in the file, and its cells' text. */
+interface StatementRow {
+  row: number;
+  cells: readonly string[];
 }
 
 /**
@@ -144,15 +158,71 @@ export function readStatement(csv: string, currency: CurrencyCode): MutationResu
     if (error instanceof CsvError) return failOne(['csv'], 'INVALID', error.message);
     throw error;
   }
-  const [header = [], ...body] = table;
-  if (body.length === 0) return failOne(['csv'], 'BLANK', 'The file has no rows after its header');
-  if (body.length > STATEMENT_LIMITS.rows) {
+  return readRows(
+    table.map((cells, index) => ({ row: index + 1, cells })),
+    currency,
+    'csv',
+  );
+}
+
+/**
+ * A courier's statement from the Excel workbook it came as (ADR-246), in base64 or as a data
+ * URL: its first sheet shown, read as a CSV is, its rows by their numbers in the sheet and its
+ * numbers as Excel keeps them, so long tracking numbers keep their digits.
+ */
+export function readStatementWorkbook(
+  base64: string,
+  currency: CurrencyCode,
+): MutationResult<Statement> {
+  const encoded = base64.replace(/^data:[^,]*;base64,/, '').replace(/\s+/g, '');
+  if (encoded === '') return failOne(['xlsx'], 'BLANK', 'The file is empty');
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || encoded.length % 4 !== 0) {
+    return failOne(['xlsx'], 'INVALID', 'Give the workbook in base64');
+  }
+  if ((encoded.length / 4) * 3 > STATEMENT_LIMITS.xlsx + 2) {
     return failOne(
-      ['csv'],
-      'TOO_MANY',
-      `The file can have at most ${STATEMENT_LIMITS.rows.toLocaleString('en')} parcels; split it`,
+      ['xlsx'],
+      'TOO_LONG',
+      `The workbook can be at most ${(STATEMENT_LIMITS.xlsx / 1_000_000).toLocaleString('en')} MB; ` +
+        'split it',
     );
   }
+  let sheet: { rows: XlsxValue[][]; more: boolean };
+  try {
+    sheet = readXlsx(Buffer.from(encoded, 'base64'), {
+      maxRows: STATEMENT_LIMITS.titleRows + STATEMENT_LIMITS.rows + 1,
+      maxColumns: 200,
+    });
+  } catch (error) {
+    if (error instanceof XlsxError) return failOne(['xlsx'], 'INVALID', error.message);
+    throw error;
+  }
+  if (sheet.more) return tooMany('xlsx');
+  return readRows(
+    sheet.rows.map((cells, index) => ({ row: index + 1, cells: cells.map(cellText) })),
+    currency,
+    'xlsx',
+  );
+}
+
+/** A workbook's cell as a CSV would have it, a number to the 15 digits Excel keeps. */
+function cellText(value: XlsxValue): string {
+  if (value === null) return '';
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+  if (typeof value === 'number') return String(Number(value.toPrecision(15)));
+  return value;
+}
+
+function tooMany(source: StatementSource): MutationResult<Statement> {
+  return failOne(
+    [source],
+    'TOO_MANY',
+    `The file can have at most ${STATEMENT_LIMITS.rows.toLocaleString('en')} parcels; split it`,
+  );
+}
+
+/** The columns a statement's header names, each by the first of its names the header has. */
+function columnsOf(header: readonly string[]): Map<ColumnKey, number> {
   const headings = header.map(headingKey);
   const columns = new Map<ColumnKey, number>();
   for (const [key, names] of Object.entries(COLUMNS) as [ColumnKey, readonly string[]][]) {
@@ -165,16 +235,41 @@ export function readStatement(csv: string, currency: CurrencyCode): MutationResu
       }
     }
   }
-  if (!columns.has('tracking')) {
+  return columns;
+}
+
+/**
+ * A statement's lines from its file's rows: under its header, the first row that names a column
+ * of tracking numbers, so that a courier's title rows above it are passed over; rows with
+ * nothing in them are passed over wherever they are.
+ */
+function readRows(
+  all: readonly StatementRow[],
+  currency: CurrencyCode,
+  source: StatementSource,
+): MutationResult<Statement> {
+  const rows = all.filter((each) => each.cells.some((cell) => cell.trim() !== ''));
+  if (rows.length === 0) return failOne([source], 'BLANK', 'The file is empty');
+  const at = rows
+    .slice(0, STATEMENT_LIMITS.titleRows + 1)
+    .findIndex((each) => columnsOf(each.cells).has('tracking'));
+  if (at < 0) {
     return failOne(
-      ['csv'],
+      [source],
       'INVALID',
       'The file needs a column of tracking numbers, such as "Tracking Number" or "CN"',
     );
   }
+  const header = rows[at]!.cells;
+  const body = rows.slice(at + 1);
+  if (body.length === 0) {
+    return failOne([source], 'BLANK', 'The file has no rows after its header');
+  }
+  if (body.length > STATEMENT_LIMITS.rows) return tooMany(source);
+  const columns = columnsOf(header);
   if (!columns.has('collected')) {
     return failOne(
-      ['csv'],
+      [source],
       'INVALID',
       'The file needs a column of the cash collected, such as "COD Amount"',
     );
@@ -194,37 +289,49 @@ export function readStatement(csv: string, currency: CurrencyCode): MutationResu
     }
   };
   const lines: StatementLine[] = [];
-  body.forEach((cells, index) => {
-    const row = index + 2;
+  for (const { row, cells } of body) {
     const cell = (key: ColumnKey) => {
-      const at = columns.get(key);
-      return at === undefined ? '' : (cells[at] ?? '').trim();
+      const index = columns.get(key);
+      return index === undefined ? '' : (cells[index] ?? '').trim();
     };
     const trackingNumber = cell('tracking');
     if (trackingNumber === '') {
       // The statement's totals, under its parcels.
-      if (cells.some((text) => /^\s*(grand\s+)?totals?\b/i.test(text))) return;
+      if (cells.some((text) => /^\s*(grand\s+)?totals?\b/i.test(text))) continue;
       reject(row, 'tracking', 'The tracking number is missing');
-      return;
+      continue;
     }
     if (trackingNumber.length > 100) {
       reject(row, 'tracking', 'The tracking number is longer than 100 characters');
-      return;
+      continue;
+    }
+    // Excel writes a long number it shows as 1.23457E+11 so in a CSV, its digits gone.
+    if (/^\d(\.\d+)?E\+\d+$/i.test(trackingNumber)) {
+      reject(
+        row,
+        'tracking',
+        `"${trackingNumber}" is a tracking number Excel shortened: import the courier's Excel ` +
+          'file itself, not a CSV saved from it',
+      );
+      continue;
     }
     const amounts: Partial<Record<'collected' | 'charges' | 'tax' | 'net', bigint | null>> = {};
+    let readable = true;
     for (const key of ['collected', 'charges', 'tax', 'net'] as const) {
       const text = cell(key);
       const amount = amountOf(text, currency);
       if (amount === undefined) {
         reject(row, key, `"${text}" is not an amount`);
-        return;
+        readable = false;
+        break;
       }
       amounts[key] = amount;
     }
+    if (!readable) continue;
     const collected = amounts.collected ?? 0n;
     if (collected < 0n) {
       reject(row, 'collected', 'The cash collected is less than 0');
-      return;
+      continue;
     }
     lines.push({
       row,
@@ -235,7 +342,7 @@ export function readStatement(csv: string, currency: CurrencyCode): MutationResu
       tax: absolute(amounts.tax ?? 0n),
       net: amounts.net ?? null,
     });
-  });
+  }
   return { ok: true, value: { rows: body.length, lines, rowErrors, rowErrorCount } };
 }
 

@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
+import { toXlsx } from '@hatti/xlsx';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -14,7 +15,7 @@ const server = testDatabaseServer();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = any;
 
-const IMPORT = `mutation ($csv: String!, $reference: String, $dryRun: Boolean) {
+const IMPORT = `mutation ($csv: String, $reference: String, $dryRun: Boolean) {
   codRemittanceImport(courier: "Leopards", csv: $csv, reference: $reference, dryRun: $dryRun) {
     remittance { id courier reference lineCount received { amount } issueCount }
     rows
@@ -252,6 +253,37 @@ describe.skipIf(!server)("Admin GraphQL API: couriers' remittances", () => {
             'This statement has the same lines as the statement LHR-7 from Leopards, imported already',
         },
       ],
+    });
+
+    // The second's shortfall, on the courier's next statement, as the Excel workbook it sent
+    // (ADR-246): received, the order paid in full.
+    const workbook = toXlsx({
+      name: 'Payments',
+      columns: [{ header: 'CN #' }, { header: 'COD Amount', type: 'amount' }],
+      rows: [['LE7002', '1000']],
+    }).toString('base64');
+    const shortfall = await gql(
+      tokens.owner,
+      `mutation ($xlsx: String!) {
+        codRemittanceImport(courier: "Leopards", xlsx: $xlsx, reference: "LHR-7B") {
+          outcomes { received repeated } received { amount } userErrors { field code message }
+        }
+        }`,
+      { xlsx: workbook },
+    );
+    expect(shortfall.data?.codRemittanceImport).toEqual({
+      outcomes: { received: 1, repeated: 0 },
+      received: { amount: '1000.00' },
+      userErrors: [],
+    });
+    const settled = await gql(
+      tokens.owner,
+      `query ($id: ID!) { order(id: $id) { financialStatus amountPaid { amount } } }`,
+      { id: ids[1] },
+    );
+    expect(settled.data?.order).toEqual({
+      financialStatus: 'PAID',
+      amountPaid: { amount: '5000.00' },
     });
 
     // A parcel sent back: the courier's charges, both ways, are what its return cost.

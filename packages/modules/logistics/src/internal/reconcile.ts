@@ -20,10 +20,12 @@ export function parcelFor(
 
 /**
  * What becomes of each line of a statement, in its order, given its parcel (null for none),
- * what the parcels' orders owe, and the parcels whose cash earlier statements collected:
+ * what the parcels' orders owe, and the cash earlier statements collected on each parcel:
  * * no parcel: `unmatched`;
- * * a parcel an earlier line or statement collected cash on: `repeated`, so that a statement
- *   imported twice is not received twice;
+ * * a parcel an earlier line of the statement came with, or one an earlier statement collected
+ *   cash on, the same cash again or its order owing nothing since: `repeated`, so that a
+ *   statement imported twice is not received twice. Other cash on a parcel whose order still
+ *   owes is what the courier paid short before, and is received as any is (ADR-246);
  * * cash on a parcel the courier lost: `compensated`, paying its claim, filed or not, unless the
  *   shop settled the claim otherwise, paid by hand or withdrawn: `not_owed` (ADR-093);
  * * no cash on a parcel coming or come back: `charged`, the courier's charges alone;
@@ -37,7 +39,8 @@ export function reconcile(
   lines: readonly StatementLine[],
   parcels: readonly (CourierParcel | null)[],
   orders: ReadonlyMap<string, OrderCod>,
-  collectedBefore: ReadonlySet<string>,
+  /** The cash on each parcel's earlier lines that had any, by parcel. */
+  collectedBefore: ReadonlyMap<string, readonly bigint[]>,
 ): CodRemittanceLineRecord[] {
   const remaining = new Map(
     [...orders.values()].map((order) => [order.id, order.payable ? order.owed : 0n]),
@@ -70,7 +73,12 @@ export function reconcile(
       orderNumber: orders.get(parcel.orderId)?.number ?? null,
     };
     const owed = remaining.get(parcel.orderId) ?? 0n;
-    const repeated = seen.has(parcel.id) || (line.collected > 0n && collectedBefore.has(parcel.id));
+    const before = collectedBefore.get(parcel.id);
+    const repeated =
+      seen.has(parcel.id) ||
+      (line.collected > 0n &&
+        before !== undefined &&
+        (owed <= 0n || before.includes(line.collected)));
     seen.add(parcel.id);
     if (repeated) return { ...matched, outcome: 'repeated', owed, received: 0n };
     if (line.collected > 0n && parcel.status === 'lost') {

@@ -641,6 +641,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   money in major units, `number` for counts, `time` for "2026-09-29 01:30" in the shop time zone,
   and text otherwise, which numbers, postcodes and SKUs stay, as they may begin with 0. A new
   column says its type; tests read a workbook back with `xlsxRows` from `@hatti/xlsx/testing`.
+* **A workbook people send is read by `readXlsx`**
+  ([ADR-246](../architecture/13-decision-log.md#adr-246--a-couriers-statement-may-come-as-the-excel-workbook-it-was-sent-as-read-from-its-first-sheet-shown-by-a-reader-of-hattis-own-under-a-header-found-below-the-couriers-title-rows-and-other-cash-on-a-parcel-paid-short-before-pays-what-its-order-still-owes)):
+  its first sheet shown, each cell text, a number or a boolean, within the rows, columns and
+  unpacked bytes the caller allows; .xls, locked, damaged and over-large files are refused as
+  `XlsxError`s, in words for whoever sent them. It comes through the API in base64, as an export's
+  `file` goes out. An import turns its cells into text as a CSV would have them, numbers to the 15
+  digits Excel keeps, so one reader of rows serves both, as `readStatementWorkbook` does.
 * **Scheduled exports** ([ADR-183](../architecture/13-decision-log.md#adr-183--staff-schedule-exports-of-the-shops-orders-every-day-week-or-month-the-worker-emails-each-the-orders-placed-in-the-period-that-ended-as-an-attachment-at-the-hour-they-chose-in-the-shops-time-zone-exported-as-them-asking-identity-as-it-sends-whether-they-still-export-the-shops-orders-and-at-which-proved-email)):
   `orderExportScheduleCreate` keeps a schedule in `orders.export_schedules` for the member of
   staff asking (`user_id`), never for an address: its `frequency` (a day, a week from Monday or a
@@ -906,7 +913,8 @@ Stock follows Shopify's model too. How changes are written is decided in
 
 * **Couriers' statements are the logistics module's** (`@hatti/logistics`,
   [ADR-067](../architecture/13-decision-log.md#adr-067--couriers-remittance-statements-are-imported-whole-into-a-logistics-module-each-lines-cash-received-on-its-parcels-order-at-most-what-the-order-owes-and-a-parcels-cash-once)):
-  `CodRemittanceService.import` reads the CSV (`readStatement`, columns by the names in
+  `CodRemittanceService.import` reads the CSV or the Excel workbook (`readStatement` or
+  `readStatementWorkbook`, one reader of rows under the header it finds, columns by the names in
   `COLUMNS`, matched with `headingKey`), matches lines to parcels and works out what becomes of
   each in `reconcile`, a pure function with its own tests, then writes the statement and its
   lines and receives the cash, all in one transaction. A new courier's column name joins
@@ -920,8 +928,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   orders are locked, so that `reconcile` sees what changed under those locks (a parcel lost, a
   claim settled), and `payClaimsIn` pays lost parcels' claims with their lines' cash
   (`compensated`). Nothing else in the logistics module reads the orders module's tables.
-* **A parcel's cash is collected once:** a line naming a parcel that an earlier line collected
-  cash on is `repeated`. Lines that receive nothing stay with the statement, for staff to look
+* **A parcel's cash is collected once:** a line naming a parcel an earlier line of its statement
+  named, or one an earlier statement collected the same cash on or whose order owes nothing since,
+  is `repeated`; other cash on a parcel whose order still owes is a shortfall paid later, received
+  as any is
+  ([ADR-246](../architecture/13-decision-log.md#adr-246--a-couriers-statement-may-come-as-the-excel-workbook-it-was-sent-as-read-from-its-first-sheet-shown-by-a-reader-of-hattis-own-under-a-header-found-below-the-couriers-title-rows-and-other-cash-on-a-parcel-paid-short-before-pays-what-its-order-still-owes)).
+  Lines that receive nothing stay with the statement, for staff to look
   into (`issuesOnly`); charges and tax are kept, not taken off what orders received.
 * **A parcel keeps what statements charged for it** ([ADR-088](../architecture/13-decision-log.md#adr-088--a-parcel-keeps-what-couriers-statements-charged-for-it-which-cod-health-adds-up-for-those-that-came-back-a-statement-with-the-lines-of-one-imported-before-is-refused)):
   every matched line's charges but a `repeated` line's with cash, whose charges came with the

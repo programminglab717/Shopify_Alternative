@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Couriers' statements from Excel files** (COD-10): remittance statements imported as Excel
-workbooks as well as CSV, their tracking numbers as Excel keeps them rather than as `1.23E+11`,
-and a shortfall a courier pays in a later statement received on its parcel.
+**Telling staff a transfer receipt came** (PAY-02): the moment a customer sends the receipt of
+their transfer, the staff who check payments are told, as they are of an order given to them
+(ADR-191), so the money is looked for while the customer waits.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Couriers' statements from Excel files
+
+* **The workbook a courier sends** ([ADR-246](../architecture/13-decision-log.md#adr-246--a-couriers-statement-may-come-as-the-excel-workbook-it-was-sent-as-read-from-its-first-sheet-shown-by-a-reader-of-hattis-own-under-a-header-found-below-the-couriers-title-rows-and-other-cash-on-a-parcel-paid-short-before-pays-what-its-order-still-owes)): `codRemittanceImport` takes `xlsx`,
+  the workbook in base64, read by a reader of Hatti's own in `@hatti/xlsx`: the first sheet
+  shown, its numbers whole, so long tracking numbers keep their digits; .xls and locked
+  workbooks are refused, saying how to save them.
+* **Read as a CSV is:** the header found under a courier's title rows, empty rows passed over,
+  the sheet's own row numbers; a CSV's tracking number Excel shortened is reported.
+* **A shortfall paid later:** other cash on a parcel whose order the courier paid short is
+  received; the same cash again, or an order owing nothing since, stays `repeated`.
+* 1768 tests: workbooks as Excel, Google Sheets and LibreOffice keep them, and those refused;
+  statements from them, the same as their CSV; shortfalls across statements, through the API too.
 
 ### 697e791 · The home page's words in Urdu
 

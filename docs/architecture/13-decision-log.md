@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-245 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-246 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -253,6 +253,7 @@
 | 243 | A shop's home page has a title and description of its own for search engines, as Shopify's preferences keep them, and a social sharing image, one of its files, which link previews show of pages without an image of their own, through Shopify's `page_image` | Accepted |
 | 244 | A blog may be given a title and description of its own for search engines, as its articles may; its pages give them in place of its title and of the shop's description, its articles keep their own, and the shop may translate them into Urdu | Accepted |
 | 245 | The shop's own words for its home page may be translated into Urdu, the shop a translatable resource of its own by its own ID as Shopify's `SHOP` is; its document carries them beside its own words, and its Urdu pages show them | Accepted |
+| 246 | A courier's statement may come as the Excel workbook it was sent as, read from its first sheet shown by a reader of Hatti's own, under a header found below the courier's title rows; and other cash on a parcel paid short before pays what its order still owes | Accepted |
 
 ---
 
@@ -10191,3 +10192,45 @@
     migration.
   * **The theme's locale files:** they hold the theme's words, the same for every shop that uses
     it, not the shop's own.
+
+## ADR-246 · A courier's statement may come as the Excel workbook it was sent as, read from its first sheet shown by a reader of Hatti's own, under a header found below the courier's title rows; and other cash on a parcel paid short before pays what its order still owes
+
+* **Context:** Couriers send their statements as Excel workbooks. Staff had to save them as CSV,
+  and Excel writes a long tracking number it shows as `1.23457E+11` so in the CSV, its digits
+  gone, so such lines matched no parcel (simplification 52). Statements often open with title
+  rows, the courier's name, the account and the period, above their header. And a parcel's cash
+  was taken once ([ADR-067](#adr-067--couriers-remittance-statements-are-imported-whole-into-a-logistics-module-each-lines-cash-received-on-its-parcels-order-at-most-what-the-order-owes-and-a-parcels-cash-once)): a shortfall a courier paid on a later statement was taken
+  for the parcel listed again, and not received, though a statement imported twice is refused
+  by its lines anyway ([ADR-088](#adr-088--a-parcel-keeps-what-couriers-statements-charged-for-it-which-cod-health-adds-up-for-those-that-came-back-a-statement-with-the-lines-of-one-imported-before-is-refused)).
+* **Decision:**
+  * **The workbook through the API:** `codRemittanceImport` takes `xlsx`, the workbook in base64
+    or as a data URL, as exports give theirs ([ADR-182](#adr-182--an-order-export-may-be-an-excel-workbook-as-well-as-csv-one-sheet-written-by-a-package-of-hattis-own-its-amounts-and-counts-numbers-and-its-times-dates-as-a-spreadsheet-keeps-them-and-numbers-that-begin-with-0-kept-as-text-given-in-base64-in-the-mutations-answer-as-the-csv-is-given-in-it)), of at most 1.4 MB, within the
+    API's requests of 2 MiB; `csv` becomes optional, and one of the two is given.
+  * **A reader of Hatti's own**, in `@hatti/xlsx` beside its writer: `readXlsx` reads the ZIP
+    from its central directory, each part inflated within a size the caller sets and checked
+    against its CRC, and the workbook's first sheet shown through its relationships, with
+    shared and inline strings, rich text, numbers, booleans, formulas' text and errors. Excel
+    97-2003 workbooks (.xls) and locked ones, which are not ZIPs, are refused in words that say
+    how to save them.
+  * **One reader of rows:** a workbook's cells become text as a CSV would have them, numbers to
+    the 15 digits Excel keeps, so tracking numbers come whole. The header is the first of the
+    first 21 rows with something in them that names a column of tracking numbers; rows with
+    nothing in them are passed over, and rows keep their numbers in the sheet. A CSV's tracking
+    number Excel shortened is reported for its row, saying to import the workbook itself.
+  * **A shortfall paid later:** a line with cash on a parcel an earlier statement collected cash
+    on is `repeated` when its cash is what the parcel had before, or its order owes nothing;
+    other cash on a parcel whose order still owes is received as any line's is, up to what it
+    owes.
+* **Consequences:**
+  * Staff import the file a courier sends as it came.
+  * A statement imported as CSV and again as its workbook has the same lines, and is refused.
+  * A shortfall paid in just the cash of the parcel's earlier line is taken for the parcel
+    listed again, and left for staff to mark paid by hand.
+  * A workbook is read within the request, as a CSV is, and kept as its lines, never as a file.
+* **Alternatives:**
+  * **A spreadsheet library, such as SheetJS or ExcelJS:** large, with a history of flaws in
+    reading untrusted files, for the small part of the format statements use, as the writer
+    found ([ADR-182](#adr-182--an-order-export-may-be-an-excel-workbook-as-well-as-csv-one-sheet-written-by-a-package-of-hattis-own-its-amounts-and-counts-numbers-and-its-times-dates-as-a-spreadsheet-keeps-them-and-numbers-that-begin-with-0-kept-as-text-given-in-base64-in-the-mutations-answer-as-the-csv-is-given-in-it)).
+  * **A staged upload:** the shop's files are images and PDFs a page can show; a statement is
+    read once.
+  * **Shortfalls named in a column:** couriers' statements share no column for them.
