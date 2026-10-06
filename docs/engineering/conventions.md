@@ -1310,6 +1310,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-239](../architecture/13-decision-log.md#adr-239--a-shops-policies-may-have-its-own-urdu-as-its-other-content-may-and-the-storefront-shows-a-policys-urdu-only-while-it-translates-the-policy-as-it-is-its-own-words-once-they-change-the-checkouts-urdu-links-the-urdu-pages)),
   its words being terms customers agree to: a field with the same weight checks its digest where it
   is published, as `shopPoliciesOf` does.
+* **A variant is chosen by its ID, never its words**
+  ([ADR-241](../architecture/13-decision-log.md#adr-241--a-products-options-and-their-values-may-have-the-shops-urdu-as-shopifys-translations-keep-them-each-by-its-own-id-the-products-document-carries-its-options-in-urdu-and-its-urdu-pages-show-each-variants-values-and-title-in-them-the-variant-chosen-by-its-id-the-same-in-either-language)):
+  a product's options in Urdu are its document's `options` in their own order, and
+  `translatedProduct` shows each variant's values by their places in their options, its title made
+  of them; a value whose Urdu another of its option's shares keeps its own words. Anything that
+  picks a variant takes its ID, as forms, links and carts do.
 * **Catalog feeds come from the documents too** (`feeds.ts`, [ADR-142](../architecture/13-decision-log.md#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time)):
   `productFeed` lists `StoreData.productIds` and fetches them `FEED_CHUNK` at a time, yielding
   each chunk's items as they are made, so the route streams the feed through `Readable.from`

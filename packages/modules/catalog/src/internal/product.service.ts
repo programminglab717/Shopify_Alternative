@@ -5,7 +5,7 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { correctionsOf, prefixKey, searchKey, typosAllowed, type Correction } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
-import { and, eq, ne, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { refreshMemberships } from './collection-store.js';
 import {
   CatalogEvents,
@@ -589,6 +589,46 @@ export class ProductService {
       .update(products)
       .set({ translatedText: text })
       .where(and(eq(products.shopId, shopId), eq(products.id, id)));
+  }
+
+  /**
+   * The names of the shop's product options, or of their values, by ID, with their products, in
+   * the caller's transaction `tx`: for the online store's translations of them (ADR-241).
+   */
+  async optionNamesOf(
+    tx: Tx,
+    shopId: string,
+    which: 'option' | 'value',
+    ids: readonly string[],
+  ): Promise<Map<string, { productId: string; name: string }>> {
+    if (ids.length === 0) return new Map();
+    const table = which === 'option' ? productOptions : productOptionValues;
+    const rows = await tx
+      .select({ id: table.id, productId: table.productId, name: table.name })
+      .from(table)
+      .where(and(eq(table.shopId, shopId), inArray(table.id, [...ids])));
+    return new Map(rows.map((row) => [row.id, { productId: row.productId, name: row.name }]));
+  }
+
+  /**
+   * Up to `limit` IDs of the shop's product options, or of their values, the newest first, those
+   * older than `after`, in the caller's transaction `tx` (ADR-241).
+   */
+  async optionIdsOf(
+    tx: Tx,
+    shopId: string,
+    which: 'option' | 'value',
+    options: { after?: string | null; limit: number },
+  ): Promise<string[]> {
+    const table = sql.raw(
+      which === 'option' ? 'catalog.product_options' : 'catalog.product_option_values',
+    );
+    const { rows } = await tx.execute<{ id: string }>(sql`
+      SELECT id FROM ${table}
+       WHERE shop_id = ${shopId} ${options.after ? sql`AND id < ${options.after}` : sql``}
+       ORDER BY id DESC
+       LIMIT ${options.limit}`);
+    return rows.map((row) => row.id);
   }
 
   /** The handle a product has now, or null once it is gone, in the caller's transaction `tx`. */

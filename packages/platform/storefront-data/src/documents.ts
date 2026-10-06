@@ -74,8 +74,15 @@ export interface ProductDoc {
    * Absent in documents written before: its own.
    */
   seo?: SeoDoc;
-  /** Its fields in Urdu, those the shop translated (ADR-238); absent where it translated none. */
-  translations?: TranslationsDoc<ProductDoc, 'title' | 'descriptionHtml' | 'productType'>;
+  /**
+   * Its fields in Urdu, those the shop translated (ADR-238); absent where it translated none. Its
+   * options there are its own, each name and value in Urdu where the shop translated it (ADR-241),
+   * in the same order: its variants' values and titles are shown in them (`translatedProduct`).
+   */
+  translations?: TranslationsDoc<
+    ProductDoc,
+    'title' | 'descriptionHtml' | 'productType' | 'options'
+  >;
 }
 
 export interface CollectionDoc {

@@ -67,6 +67,14 @@ const TABLES: Partial<Record<TranslatableKind, string>> = {
   article: 'online_store.articles',
 };
 
+/** The aggregate types of kinds whose names differ from them in events. */
+const AGGREGATE_TYPES: Partial<Record<TranslatableKind, string>> = {
+  menuItem: 'menu_item',
+  shopPolicy: 'shop_policy',
+  productOption: 'product_option',
+  productOptionValue: 'product_option_value',
+};
+
 /** What a kind is called in messages. */
 const NAMES: Readonly<Record<TranslatableKind, string>> = {
   product: 'product',
@@ -77,13 +85,28 @@ const NAMES: Readonly<Record<TranslatableKind, string>> = {
   menu: 'menu',
   menuItem: 'menu item',
   shopPolicy: 'policy',
+  productOption: 'product option',
+  productOptionValue: 'option value',
 };
+
+/** What a kind is called, with "a" or "an" before it. */
+function aName(kind: TranslatableKind): string {
+  return `${/^[aeiou]/.test(NAMES[kind]) ? 'an' : 'a'} ${NAMES[kind]}`;
+}
+
+/** The catalog's name for an option kind's rows. */
+const OPTION_ROWS = { productOption: 'option', productOptionValue: 'value' } as const;
+
+function isOptionKind(kind: TranslatableKind): kind is keyof typeof OPTION_ROWS {
+  return kind === 'productOption' || kind === 'productOptionValue';
+}
 
 /**
  * A shop's own words for its content in another of the storefront's languages (OS-06, ADR-238),
  * as Shopify's translations API keeps them: a product's, collection's, page's, blog's, article's,
- * menu's or menu item's fields, each in Urdu, written for the shop's own words as they were then.
- * The storefront shows each in its Urdu pages; where the shop gave none, its own.
+ * menu's or menu item's fields, a policy's, and a product option's or option value's name
+ * (ADR-241), each in Urdu, written for the shop's own words as they were then. The storefront
+ * shows each in its Urdu pages; where the shop gave none, its own.
  */
 @Injectable()
 export class TranslationService {
@@ -173,7 +196,7 @@ export class TranslationService {
             check.addMessage(
               [...at, 'key'],
               'INVALID',
-              `Key ${input.key.slice(0, 40)} is not a field of a ${NAMES[kind]} that can be ` +
+              `Key ${input.key.slice(0, 40)} is not a field of ${aName(kind)} that can be ` +
                 `translated: ${TRANSLATABLE_FIELDS[kind].join(', ')}`,
             );
           } else if (!own) {
@@ -256,7 +279,7 @@ export class TranslationService {
         check.addMessage(
           ['translationKeys', String(index)],
           'INVALID',
-          `Key ${key.slice(0, 40)} is not a field of a ${NAMES[kind]} that can be translated`,
+          `Key ${key.slice(0, 40)} is not a field of ${aName(kind)} that can be translated`,
         );
       }
     });
@@ -313,15 +336,19 @@ export class TranslationService {
     rows: readonly { key: string; locale: string }[],
   ): Promise<void> {
     if (rows.length === 0) return;
+    // An option's or value's product, whose document shows it (ADR-241).
+    const productId = isOptionKind(kind)
+      ? (await this.products.optionNamesOf(tx, shopId, OPTION_ROWS[kind], [id])).get(id)?.productId
+      : undefined;
     await appendEvent<TranslationsUpdatedPayload>(tx, shopId, {
       type: OnlineStoreEvents.TranslationsUpdated,
-      aggregateType:
-        kind === 'menuItem' ? 'menu_item' : kind === 'shopPolicy' ? 'shop_policy' : kind,
+      aggregateType: AGGREGATE_TYPES[kind] ?? kind,
       aggregateId: id,
       payload: {
         kind,
         locales: [...new Set(rows.map((row) => row.locale))].sort(),
         keys: [...new Set(rows.map((row) => row.key))].sort(),
+        ...(productId ? { productId } : {}),
       },
     });
   }
@@ -426,6 +453,9 @@ export class TranslationService {
         .from(policies)
         .where(and(eq(policies.shopId, shopId), inArray(policies.id, [...ids])));
       for (const row of rows) sources.set(row.id, { body: row.body });
+    } else if (isOptionKind(kind)) {
+      const names = await this.products.optionNamesOf(tx, shopId, OPTION_ROWS[kind], ids);
+      for (const [id, { name }] of names) sources.set(id, { name });
     } else {
       const wanted = new Set(ids);
       const menus = await this.menus.menusOf(tx, shopId);
@@ -446,6 +476,9 @@ export class TranslationService {
     limit: number,
   ): Promise<string[]> {
     if (kind === 'product') return this.products.idsOf(tx, shopId, { after, limit });
+    if (isOptionKind(kind)) {
+      return this.products.optionIdsOf(tx, shopId, OPTION_ROWS[kind], { after, limit });
+    }
     const table = TABLES[kind];
     if (table) {
       const { rows } = await tx.execute<{ id: string }>(sql`

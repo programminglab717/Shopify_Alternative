@@ -448,7 +448,9 @@ the platform theme ([ADR-039](./13-decision-log.md#adr-039--a-shops-theme-is-a-p
 Pages carry cache tags, their shop's and the handles they name, and the publisher purges those of
 the documents that change ([ADR-047](./13-decision-log.md#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)).
 Documents carry the shop's Urdu beside its own words
-([ADR-238](./13-decision-log.md#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place));
+([ADR-238](./13-decision-log.md#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)),
+a product's for its options too
+([ADR-241](./13-decision-log.md#adr-241--a-products-options-and-their-values-may-have-the-shops-urdu-as-shopifys-translations-keep-them-each-by-its-own-id-the-products-document-carries-its-options-in-urdu-and-its-urdu-pages-show-each-variants-values-and-title-in-them-the-variant-chosen-by-its-id-the-same-in-either-language));
 facets and a listing per sort order are to come.
 
 ---

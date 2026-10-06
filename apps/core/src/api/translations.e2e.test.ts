@@ -278,4 +278,51 @@ describe.skipIf(!server)('Admin GraphQL API: translations', () => {
       expect(body.errors?.[0]?.extensions?.code, query).toBe('ACCESS_DENIED');
     }
   });
+
+  it("translates a product's options and their values, by their own IDs (ADR-241)", async () => {
+    const { product } = await call(
+      tokens.a,
+      `mutation {
+        productCreate(input: {
+          title: "Khussa", options: [{ name: "Size", values: ["38", "39"] }],
+          variants: [{ optionValues: ["38"], price: "2,500" }, { optionValues: ["39"], price: "2,500" }]
+        }) { product { options { id optionValues { id name } } } userErrors { field } }
+      }`,
+    );
+    const [size] = product.options;
+    expect(
+      await register(tokens.a, size.id, [
+        { locale: 'ur', key: 'name', value: 'سائز', translatableContentDigest: digestOf('Size') },
+      ]),
+    ).toEqual({
+      translations: [{ key: 'name', value: 'سائز', locale: 'ur', outdated: false }],
+      userErrors: [],
+    });
+    const values = await call(
+      tokens.reader,
+      `{ translatableResources(resourceType: PRODUCT_OPTION_VALUE) {
+          nodes { resourceId translatableContent { key value type } }
+      } }`,
+    );
+    expect(
+      (values.nodes as Json[]).sort((a, b) =>
+        a.translatableContent[0].value.localeCompare(b.translatableContent[0].value),
+      ),
+    ).toEqual(
+      (size.optionValues as Json[]).map((value) => ({
+        resourceId: value.id,
+        translatableContent: [{ key: 'name', value: value.name, type: 'SINGLE_LINE_TEXT_FIELD' }],
+      })),
+    );
+    const option = await call(
+      tokens.reader,
+      `query ($id: ID!) { translatableResource(resourceId: $id) { ${RESOURCE} } }`,
+      { id: size.id },
+    );
+    expect(option).toMatchObject({
+      resourceId: size.id,
+      translatableContent: [{ key: 'name', value: 'Size', type: 'SINGLE_LINE_TEXT_FIELD' }],
+      translations: [{ key: 'name', value: 'سائز', locale: 'ur', outdated: false }],
+    });
+  });
 });

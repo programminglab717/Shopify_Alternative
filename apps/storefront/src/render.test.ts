@@ -357,6 +357,68 @@ describe('Storefront rendering', () => {
     }
   });
 
+  it("shows a product's options in the shop's Urdu, the variant chosen the same (ADR-241)", async () => {
+    const sample = sampleStore();
+    const lehenga = sample.products.find((product) => product.id === 'p-heavy')!;
+    // Its colours' name and two of them in Urdu; its other options as they are.
+    const options = lehenga.options.map((option) =>
+      option.name === 'Colour'
+        ? {
+            name: 'رنگ',
+            values: option.values.map((value) =>
+              value === 'Red' ? 'لال' : value === 'Maroon' ? 'میرون' : value,
+            ),
+          }
+        : option,
+    );
+    const store = new MemoryStore({
+      ...sample,
+      products: sample.products.map((product) =>
+        product === lehenga ? { ...product, translations: { ur: { options } } } : product,
+      ),
+    });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = async (locale?: string) =>
+      (
+        await renderer.render(
+          {
+            path: '/products/bridal-lehenga-heavy',
+            query: { variant: 'p-heavy-v7' },
+            ...(locale && { locale }),
+          },
+          store.fresh(),
+        )
+      ).html;
+    const variantsIn = (html: string) =>
+      JSON.parse(
+        /<script type="application\/json" data-variants>([\s\S]*?)<\/script>/.exec(html)![1]!,
+      ) as { id: string; title: string; options: string[] }[];
+
+    const urdu = await page('ur');
+    expect(urdu).toContain('<legend>رنگ</legend>');
+    expect(urdu).toContain('<legend>Size</legend>');
+    // The variant asked for, its value checked in Urdu, its title in Urdu, its ID its own.
+    expect(urdu).toMatch(/value="p-heavy-v7"\s+selected/);
+    expect(urdu).toMatch(/value="میرون"\s+checked/);
+    expect(urdu).toContain('XS / میرون / Velvet · ');
+    // The variants the picker finds by the values checked, in the same words.
+    expect(variantsIn(urdu)[6]).toMatchObject({
+      id: 'p-heavy-v7',
+      title: 'XS / میرون / Velvet',
+      options: ['XS', 'میرون', 'Velvet'],
+    });
+
+    // In English, its own words alone.
+    const english = await page();
+    expect(english).toContain('<legend>Colour</legend>');
+    expect(english).toMatch(/value="Maroon"\s+checked/);
+    expect(variantsIn(english)[6]).toMatchObject({
+      id: 'p-heavy-v7',
+      title: 'XS / Maroon / Velvet',
+    });
+    expect(english).not.toContain('میرون');
+  });
+
   it("keeps what shops write from ending a page's scripts", async () => {
     const sample = sampleStore();
     const lehenga = sample.products.find((p) => p.handle === 'bridal-lehenga-heavy')!;

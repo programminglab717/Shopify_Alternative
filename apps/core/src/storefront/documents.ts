@@ -4,6 +4,7 @@ import {
   DEFAULT_VARIANT_TITLE,
   type CollectionRecord,
   type MediaRecord,
+  type OptionRecord,
   type ProductRecord,
 } from '@hatti/catalog/public';
 import {
@@ -63,8 +64,11 @@ export function productDoc(
   record: ProductRecord,
   available: ReadonlyMap<string, boolean>,
   address: ImageAddress,
-  /** Its fields the shop translated (ADR-238), a description as text. */
-  translations?: TranslatedFields,
+  /**
+   * What the shop translated, by what it translates: the product's fields (ADR-238), a description
+   * as text, and its options' and their values' names (ADR-241).
+   */
+  translations: ReadonlyMap<string, TranslatedFields> = new Map(),
 ): ProductDoc {
   const images = record.media.flatMap((media) => {
     const src = imageSrc(media, record.handle, address);
@@ -72,6 +76,12 @@ export function productDoc(
   });
   const imageAt = new Map(images.map(({ media }, index) => [media.id, index]));
   const hasOptions = record.options.length > 0;
+  const own = translations.get(record.id) ?? {};
+  const locales = new Set(
+    [record.id, ...optionIds(record.options)].flatMap((id) =>
+      Object.keys(translations.get(id) ?? {}),
+    ),
+  );
   return {
     id: record.id,
     handle: record.handle,
@@ -82,9 +92,9 @@ export function productDoc(
     tags: record.tags,
     // Without options a product has one variant, shown as Shopify shows it.
     options: hasOptions
-      ? record.options.map((option) => ({
+      ? shownOptions(record.options).map((option) => ({
           name: option.name,
-          values: option.values.filter((value) => value.hasVariants).map((value) => value.name),
+          values: option.values.map((value) => value.name),
         }))
       : [{ name: 'Title', values: [DEFAULT_VARIANT_TITLE] }],
     variants: record.variants.map((variant) => ({
@@ -113,13 +123,56 @@ export function productDoc(
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
     seo: record.seo,
-    ...translationsDoc(translations, (fields) => ({
-      title: fields.title,
-      descriptionHtml: fields.body_html === undefined ? undefined : textToHtml(fields.body_html),
-      productType: fields.product_type,
-      seo: seoTranslation(fields),
-    })),
+    ...translationsDoc(
+      Object.fromEntries([...locales].map((locale) => [locale, own[locale] ?? {}])),
+      (fields, locale) => ({
+        title: fields.title,
+        descriptionHtml: fields.body_html === undefined ? undefined : textToHtml(fields.body_html),
+        productType: fields.product_type,
+        seo: seoTranslation(fields),
+        options: optionsIn(record.options, translations, locale),
+      }),
+    ),
   };
+}
+
+/** A product's options with the values its variants have, as its document shows them. */
+function shownOptions(options: readonly OptionRecord[]): OptionRecord[] {
+  return options.map((option) => ({
+    ...option,
+    values: option.values.filter((value) => value.hasVariants),
+  }));
+}
+
+/** The IDs of a product's options and their values. */
+function optionIds(options: readonly OptionRecord[]): string[] {
+  return options.flatMap((option) => [option.id, ...option.values.map((value) => value.id)]);
+}
+
+/**
+ * A product's options as its pages in `locale` show them (ADR-241): each name and value the shop
+ * translated in place of its own; none where that changes none of those shown. An option whose
+ * values would read the same in the language keeps its own words for them, as a shopper must
+ * tell its values apart.
+ */
+function optionsIn(
+  options: readonly OptionRecord[],
+  translations: ReadonlyMap<string, TranslatedFields>,
+  locale: string,
+): ProductDoc['options'] | undefined {
+  const nameIn = (id: string) => translations.get(id)?.[locale]?.name;
+  let changed = false;
+  const shown = shownOptions(options).map((option) => {
+    const own = option.values.map((value) => value.name);
+    const words = option.values.map((value) => nameIn(value.id) ?? value.name);
+    const distinct = new Set(words.map((word) => word.toLowerCase())).size === words.length;
+    const shownOption = { name: nameIn(option.id) ?? option.name, values: distinct ? words : own };
+    changed ||=
+      shownOption.name !== option.name ||
+      shownOption.values.some((value, index) => value !== own[index]);
+    return shownOption;
+  });
+  return changed ? shown : undefined;
 }
 
 export function collectionDoc(
@@ -148,11 +201,13 @@ export function collectionDoc(
 /** A document's fields in each language the shop translated some into (ADR-238); none without. */
 function translationsDoc<T extends object>(
   translations: TranslatedFields | undefined,
-  fieldsOf: (fields: Partial<Record<TranslationKey, string>>) => T,
+  fieldsOf: (fields: Partial<Record<TranslationKey, string>>, locale: string) => T,
 ): { translations?: Partial<Record<string, T>> } {
-  const entries = Object.entries(translations ?? {}).flatMap(([locale, fields]) =>
-    fields ? [[locale, defined(fieldsOf(fields))] as const] : [],
-  );
+  const entries = Object.entries(translations ?? {}).flatMap(([locale, fields]) => {
+    if (!fields) return [];
+    const shown = defined(fieldsOf(fields, locale));
+    return Object.keys(shown).length > 0 ? [[locale, shown] as const] : [];
+  });
   return entries.length > 0 ? { translations: Object.fromEntries(entries) } : {};
 }
 

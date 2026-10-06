@@ -21,6 +21,8 @@ export enum TranslatableResourceType {
   MENU = 'menu',
   LINK = 'menuItem',
   SHOP_POLICY = 'shopPolicy',
+  PRODUCT_OPTION = 'productOption',
+  PRODUCT_OPTION_VALUE = 'productOptionValue',
 }
 
 registerEnumType(TranslatableResourceType, {
@@ -44,6 +46,13 @@ registerEnumType(TranslatableResourceType, {
       description:
         "A policy: its body, shown on the storefront's Urdu pages while it translates the policy " +
         'as it is (ADR-239).',
+    },
+    PRODUCT_OPTION: {
+      description: "A product's option, such as Size: its name, shown with its values (ADR-241).",
+    },
+    PRODUCT_OPTION_VALUE: {
+      description:
+        "An option's value, such as Small: its name, in each variant's title too (ADR-241).",
     },
   },
 });

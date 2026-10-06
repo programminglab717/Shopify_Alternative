@@ -535,4 +535,108 @@ describe.skipIf(!server)('TranslationService', () => {
     expect(await content('عید')).toEqual({ articleIds: [eid.id], pageIds: [] });
     expect(await content('since')).toEqual({ articleIds: [], pageIds: [about.id] });
   });
+
+  it("keeps a product's options and their values in Urdu, naming the product (ADR-241)", async () => {
+    // The other shop's, after its products are paged through, as the catalog stays between tests.
+    const suit = unwrap(
+      await f.products.create(f.b, {
+        title: 'Lawn Suit',
+        options: [
+          { name: 'Size', values: ['Small', 'Large'] },
+          { name: 'Colour', values: ['Red'] },
+        ],
+        variants: [
+          { optionValues: ['Small', 'Red'], price: '4,990' },
+          { optionValues: ['Large', 'Red'], price: '5,190' },
+        ],
+      }),
+    );
+    const size = suit.options[0]!;
+    const [small, large] = [size.values[0]!, size.values[1]!];
+    expect(await f.translations.resource(f.b, 'productOption', size.id)).toEqual({
+      kind: 'productOption',
+      id: size.id,
+      content: [
+        { key: 'name', value: 'Size', digest: digestOf('Size'), type: 'single_line_text_field' },
+      ],
+      translations: [],
+    });
+    // A name on one line, as long as the catalog's may be.
+    const kept = unwrap(
+      await f.translations.register(f.b, 'productOption', size.id, [
+        {
+          locale: 'ur',
+          key: 'name',
+          value: ' سائز\n',
+          translatableContentDigest: digestOf('Size'),
+        },
+      ]),
+    );
+    expect(kept.map((each) => [each.key, each.value, each.outdated])).toEqual([
+      ['name', 'سائز', false],
+    ]);
+    unwrap(
+      await f.translations.register(f.b, 'productOptionValue', small.id, [
+        { locale: 'ur', key: 'name', value: 'چھوٹا', translatableContentDigest: digestOf('Small') },
+      ]),
+    );
+    const digest = digestOf('Large');
+    expect(
+      errorsOf(
+        await f.translations.register(f.b, 'productOptionValue', large.id, [
+          { locale: 'ur', key: 'title', value: 'بڑا', translatableContentDigest: digest },
+          { locale: 'ur', key: 'name', value: 'ب'.repeat(256), translatableContentDigest: digest },
+        ]),
+      ),
+    ).toEqual([
+      [
+        'translations.0.key',
+        'INVALID',
+        'Key title is not a field of an option value that can be translated: name',
+      ],
+      ['translations.1.value', 'TOO_LONG', 'Value is too long (maximum is 255 characters)'],
+    ]);
+    // Neither is anything else's: a product's ID names no option.
+    expect(
+      errorsOf(
+        await f.translations.register(f.b, 'productOption', suit.id, [
+          { locale: 'ur', key: 'name', value: 'سائز', translatableContentDigest: digestOf('Size') },
+        ]),
+      ),
+    ).toEqual([['resourceId', 'NOT_FOUND', 'No such product option']]);
+
+    // Each tells the storefront the product whose document shows it.
+    expect(await events()).toEqual([
+      [size.id, { kind: 'productOption', locales: ['ur'], keys: ['name'], productId: suit.id }],
+      [
+        small.id,
+        { kind: 'productOptionValue', locales: ['ur'], keys: ['name'], productId: suit.id },
+      ],
+    ]);
+    const given = await f.db.tenant(f.b.shopId, (tx) =>
+      shopTranslationsOf(tx, f.b.shopId, [size.id, small.id, large.id]),
+    );
+    expect(given).toEqual(
+      new Map([
+        [size.id, { ur: { name: 'سائز' } }],
+        [small.id, { ur: { name: 'چھوٹا' } }],
+      ]),
+    );
+
+    // The shop's values, a page at a time, each once; another shop's are not among them.
+    const first = await f.translations.resources(f.b, 'productOptionValue', { first: 2 });
+    const rest = await f.translations.resources(f.b, 'productOptionValue', {
+      first: 2,
+      after: first.items[1]!.id,
+    });
+    expect([first.hasNextPage, rest.hasNextPage]).toEqual([true, false]);
+    expect([...first.items, ...rest.items].map((each) => each.content[0]!.value).sort()).toEqual([
+      'Large',
+      'Red',
+      'Small',
+    ]);
+    const options = await f.translations.resources(f.b, 'productOption', { first: 5 });
+    expect(options.items.map((each) => each.content[0]!.value).sort()).toEqual(['Colour', 'Size']);
+    expect(await f.translations.resource(f.a, 'productOption', size.id)).toBeNull();
+  });
 });

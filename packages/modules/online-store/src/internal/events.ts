@@ -172,11 +172,14 @@ export interface PreferencesUpdatedPayload {
 
 /**
  * A resource's translations kept, replaced or forgotten (ADR-238): the storefront writes its
- * document again, or the menus for a menu's or menu item's.
+ * document again, or the menus for a menu's or menu item's, or the product of an option's or
+ * option value's (ADR-241).
  */
 export interface TranslationsUpdatedPayload {
   kind: TranslatableKind;
   /** The languages and fields whose translations changed. */
   locales: string[];
   keys: string[];
+  /** The product of an option or option value, whose document shows it. */
+  productId?: string;
 }

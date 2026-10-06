@@ -31,6 +31,7 @@ import {
   shopDomainsOf,
   shopPoliciesOf,
   shopRedirectsOf,
+  digestOf,
   shopTranslationsOf,
   type TranslatableKind,
 } from '@hatti/online-store/public';
@@ -40,6 +41,7 @@ import {
   RedisStore,
   StorefrontKeys,
   StoreMissingError,
+  TranslatedStore,
   handleTag,
   pathTag,
   shopTag,
@@ -258,6 +260,12 @@ describe('What storefront documents an event makes stale', () => {
       ['menus'],
       ['menus'],
     ]);
+    // An option's or value's, its product's (ADR-241); without one, nothing.
+    const option = (payload: Record<string, unknown>) =>
+      itemsFor(event('translations.updated', { locales: ['ur'], keys: ['name'], ...payload }));
+    expect(option({ kind: 'productOptionValue', productId: 'p1' })).toEqual(['product:p1']);
+    expect(option({ kind: 'productOption', productId: 'p1' })).toEqual(['product:p1']);
+    expect(option({ kind: 'productOption' })).toEqual([]);
   });
 });
 
@@ -1187,6 +1195,75 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect((await store().products([kurta.id]))[0]!.translations).toBeUndefined();
     expect((await store().menu('customer-care'))!.translations).toBeUndefined();
     expect((await store().pageByHandle('size-guide'))!.translations?.ur?.title).toBe('سائز گائیڈ');
+  });
+
+  it("publishes a product's options in Urdu beside its own, its variants shown in them (ADR-241)", async () => {
+    const translations = new TranslationService(
+      database,
+      products,
+      collections,
+      pages,
+      blogs,
+      articles,
+      menus,
+    );
+    const suit = unwrap(
+      await products.create(tenant, {
+        title: 'Lawn Suit',
+        status: 'active',
+        options: [
+          { name: 'Size', values: ['Small', 'Large', 'XL'] },
+          { name: 'Colour', values: ['Red', 'Blue'] },
+        ],
+        variants: [
+          { optionValues: ['Small', 'Red'], price: '4,990' },
+          { optionValues: ['Large', 'Red'], price: '5,190' },
+          { optionValues: ['Large', 'Blue'], price: '5,190' },
+        ],
+      }),
+    );
+    const [size, colour] = [suit.options[0]!, suit.options[1]!];
+    const name = (kind: TranslatableKind, id: string, own: string, value: string) =>
+      translations.register(tenant, kind, id, [
+        { locale: 'ur', key: 'name', value, translatableContentDigest: digestOf(own) },
+      ]);
+    unwrap(await name('productOption', size.id, 'Size', 'سائز'));
+    // XL, which no variant has; Red and Blue alike, which a shopper could not tell apart.
+    const words = ['چھوٹا', 'بڑا', 'بہت بڑا', 'لال', 'لال'];
+    for (const [index, value] of [...size.values, ...colour.values].entries()) {
+      unwrap(await name('productOptionValue', value.id, value.name, words[index]!));
+    }
+    await deliver();
+
+    const [doc] = await store().products([suit.id]);
+    expect(doc!.options).toEqual([
+      { name: 'Size', values: ['Small', 'Large'] },
+      { name: 'Colour', values: ['Red', 'Blue'] },
+    ]);
+    expect(doc!.translations).toEqual({
+      ur: {
+        options: [
+          { name: 'سائز', values: ['چھوٹا', 'بڑا'] },
+          { name: 'Colour', values: ['Red', 'Blue'] },
+        ],
+      },
+    });
+    // As an Urdu page shows it: each variant's values and title in them, its ID its own.
+    const shown = await new TranslatedStore(store(), 'ur').productByHandle(doc!.handle);
+    expect(shown!.options).toEqual(doc!.translations!.ur!.options);
+    expect(shown!.variants.map((variant) => [variant.id, variant.title, variant.options])).toEqual([
+      [doc!.variants[0]!.id, 'چھوٹا / Red', ['چھوٹا', 'Red']],
+      [doc!.variants[1]!.id, 'بڑا / Red', ['بڑا', 'Red']],
+      [doc!.variants[2]!.id, 'بڑا / Blue', ['بڑا', 'Blue']],
+    ]);
+
+    // Removed, but for words that change nothing shown, its own words alone.
+    unwrap(await translations.remove(tenant, 'productOption', size.id, ['name'], ['ur']));
+    for (const value of size.values) {
+      unwrap(await translations.remove(tenant, 'productOptionValue', value.id, ['name'], ['ur']));
+    }
+    await deliver();
+    expect((await store().products([suit.id]))[0]!.translations).toBeUndefined();
   });
 
   it("publishes the shop's WhatsApp number, and takes it off when the shop does", async () => {

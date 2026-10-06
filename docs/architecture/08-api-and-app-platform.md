@@ -44,7 +44,9 @@ Storefront API with public tokens comes with headless storefronts.
   header sets the default. *Built so far*
   ([ADR-238](./13-decision-log.md#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)):
   Shopify's `translatableResource`, `translatableResources`, `translationsRegister` and
-  `translationsRemove`, under `read_translations` and `write_translations`.
+  `translationsRemove`, under `read_translations` and `write_translations`; products' options and
+  their values as `PRODUCT_OPTION` and `PRODUCT_OPTION_VALUE`
+  ([ADR-241](./13-decision-log.md#adr-241--a-products-options-and-their-values-may-have-the-shops-urdu-as-shopifys-translations-keep-them-each-by-its-own-id-the-products-document-carries-its-options-in-urdu-and-its-urdu-pages-show-each-variants-values-and-title-in-them-the-variant-chosen-by-its-id-the-same-in-either-language)).
 
 ```graphql
 mutation BookShipments($input: ShipmentsBookInput!) {

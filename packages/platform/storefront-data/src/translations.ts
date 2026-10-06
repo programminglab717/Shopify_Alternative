@@ -42,9 +42,32 @@ export function translated<T extends Translatable>(doc: T, locale: string): T {
 }
 
 /**
- * A shop's documents as its pages in `locale` show them (ADR-238): products, collections, menus,
- * pages, blogs and articles as {@link translated} gives each, and policies in the language where
- * the shop gave it (ADR-239); the rest as they are.
+ * A product as a page in `locale` shows it (ADR-241): as {@link translated} gives it, and each of
+ * its variants' values in its options' words in the language, its title made of them as the
+ * catalog makes it. A variant keeps its ID, so the one a shopper chooses is the same in either
+ * language.
+ */
+export function translatedProduct(doc: ProductDoc, locale: string): ProductDoc {
+  const shown = translated(doc, locale);
+  const options = doc.translations?.[locale]?.options;
+  if (!options) return shown;
+  return {
+    ...shown,
+    variants: doc.variants.map((variant) => {
+      const values = variant.options.map((value, index) => {
+        const at = doc.options[index]?.values.indexOf(value) ?? -1;
+        return (at < 0 ? undefined : options[index]?.values[at]) ?? value;
+      });
+      return { ...variant, options: values, title: values.join(' / ') };
+    }),
+  };
+}
+
+/**
+ * A shop's documents as its pages in `locale` show them (ADR-238): products as
+ * {@link translatedProduct} gives each, collections, menus, pages, blogs and articles as
+ * {@link translated} does, and policies in the language where the shop gave it (ADR-239); the
+ * rest as they are.
  */
 export class TranslatedStore implements StoreData {
   constructor(
@@ -57,11 +80,11 @@ export class TranslatedStore implements StoreData {
   }
 
   async productByHandle(handle: string): Promise<ProductDoc | null> {
-    return this.#one(await this.store.productByHandle(handle));
+    return this.#product(await this.store.productByHandle(handle));
   }
 
   async products(ids: readonly string[]): Promise<(ProductDoc | null)[]> {
-    return (await this.store.products(ids)).map((doc) => this.#one(doc));
+    return (await this.store.products(ids)).map((doc) => this.#product(doc));
   }
 
   async collectionByHandle(handle: string): Promise<CollectionDoc | null> {
@@ -118,5 +141,9 @@ export class TranslatedStore implements StoreData {
 
   #one<T extends Translatable>(doc: T | null): T | null {
     return doc && translated(doc, this.locale);
+  }
+
+  #product(doc: ProductDoc | null): ProductDoc | null {
+    return doc && translatedProduct(doc, this.locale);
   }
 }

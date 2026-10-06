@@ -28,6 +28,8 @@ export const TRANSLATABLE_KINDS = [
   'menu',
   'menuItem',
   'shopPolicy',
+  'productOption',
+  'productOptionValue',
 ] as const;
 export type TranslatableKind = (typeof TRANSLATABLE_KINDS)[number];
 
@@ -44,6 +46,7 @@ export const TRANSLATION_KEYS = [
   'meta_title',
   'meta_description',
   'body',
+  'name',
 ] as const;
 export type TranslationKey = (typeof TRANSLATION_KEYS)[number];
 
@@ -58,6 +61,9 @@ export const TRANSLATABLE_FIELDS: Readonly<Record<TranslatableKind, readonly Tra
   menuItem: ['title'],
   // Shown only while it translates the policy as it is (ADR-239).
   shopPolicy: ['body'],
+  // A product's options and their values, shown with its variants (ADR-241).
+  productOption: ['name'],
+  productOptionValue: ['name'],
 };
 
 /** How a field's words are written, as Shopify's LocalizableContentType. */
@@ -71,6 +77,7 @@ const CONTENT_TYPES: Readonly<Record<TranslationKey, ContentTypeValue>> = {
   meta_title: 'single_line_text_field',
   meta_description: 'multi_line_text_field',
   body: 'html',
+  name: 'single_line_text_field',
 };
 
 /** The most translations one call registers. */
@@ -117,6 +124,8 @@ export interface TranslatableSource {
   summary?: string;
   productType?: string | null;
   seo?: SeoValue;
+  /** A product option's or option value's name. */
+  name?: string;
 }
 
 /**
@@ -136,6 +145,7 @@ export function translatableContent(
     meta_title: source.seo?.title,
     meta_description: source.seo?.description,
     body: source.body,
+    name: source.name,
   });
 }
 
@@ -176,8 +186,9 @@ export function checkTranslation(
     return text;
   };
   let words: string;
-  if (key === 'title' || key === 'product_type') words = line(TRANSLATION_LIMITS.title);
-  else if (key === 'meta_title') words = line(SEO_LIMITS.title);
+  if (key === 'title' || key === 'product_type' || key === 'name') {
+    words = line(TRANSLATION_LIMITS.title);
+  } else if (key === 'meta_title') words = line(SEO_LIMITS.title);
   else if (key === 'meta_description') words = line(SEO_LIMITS.description);
   else if (keptAsText(kind, key)) {
     words = htmlToText(value);

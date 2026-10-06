@@ -278,8 +278,12 @@ export function itemsFor(event: DomainEvent): string[] {
       return [Items.policies, Items.shop];
     case OnlineStoreEvents.TranslationsUpdated: {
       // Its document has its Urdu (ADR-238); a menu's and its items' are in the menus'.
-      const { kind } = event.payload as unknown as TranslationsUpdatedPayload;
+      const { kind, productId } = event.payload as unknown as TranslationsUpdatedPayload;
       if (kind === 'product') return [Items.product(id)];
+      // An option's or value's are in its product's (ADR-241).
+      if (kind === 'productOption' || kind === 'productOptionValue') {
+        return productId ? [Items.product(productId)] : [];
+      }
       if (kind === 'collection') return [Items.collection(id)];
       if (kind === 'page') return [Items.page(id)];
       if (kind === 'blog') return [Items.blog(id)];
@@ -763,10 +767,17 @@ export class StorefrontPublisher {
     );
     const stored = await this.#stored(shopId, 'product', ids);
     const images = this.options.images ?? LOCAL_IMAGES;
+    // Its own, and its options' and their values' (ADR-241).
     const translations = await this.services.translations.translationsOf(
       tx,
       shopId,
-      active.map((record) => record.id),
+      active.flatMap((record) => [
+        record.id,
+        ...record.options.flatMap((option) => [
+          option.id,
+          ...option.values.map((value) => value.id),
+        ]),
+      ]),
     );
     const docs = active.map((record) =>
       productDoc(
@@ -776,7 +787,7 @@ export class StorefrontPublisher {
           const path = imagePathOf(shopId, media, handle);
           return path && images.url(path);
         },
-        translations.get(record.id),
+        translations,
       ),
     );
     await writer.putProducts(docs);

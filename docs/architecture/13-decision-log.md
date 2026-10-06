@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-240 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-241 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -248,6 +248,7 @@
 | 238 | A shop's products, collections, pages, blogs, articles and menus may have its own Urdu, as Shopify's translations keep a field each, written for the digest of the shop's own words; their documents carry it beside those words, and the storefront's Urdu pages show it in their place | Accepted |
 | 239 | A shop's policies may have its own Urdu, as its other content may, and the storefront shows a policy's Urdu only while it translates the policy as it is, its own words once they change; the checkout's Urdu links the Urdu pages | Accepted |
 | 240 | A storefront's search finds products, pages and articles by the shop's Urdu for them as by its own words, from words of each translation kept folded beside its own as its translations change, its own words first | Accepted |
+| 241 | A product's options and their values may have the shop's Urdu, as Shopify's translations keep them, each by its own ID; the product's document carries its options in Urdu, and its Urdu pages show each variant's values and title in them, the variant chosen by its ID the same in either language | Accepted |
 
 ---
 
@@ -10020,3 +10021,39 @@
     translations again to keep them, across modules.
   * **Searching the translations' table as well:** two searches to rank together, and the
     catalog's corrections would not see the Urdu's words.
+
+## ADR-241 · A product's options and their values may have the shop's Urdu, as Shopify's translations keep them, each by its own ID; the product's document carries its options in Urdu, and its Urdu pages show each variant's values and title in them, the variant chosen by its ID the same in either language
+
+* **Context:** A shop's Urdu for its products ([ADR-238](#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)) left their options and values
+  in its own words: an Urdu product page asked for "Size" and "Small" among its Urdu, and named
+  each variant so in its list and the cart. Shopify translates them as resources of their own,
+  `PRODUCT_OPTION` and `PRODUCT_OPTION_VALUE`, each by its `name`. A variant is found by its
+  values, in the theme's picker as in Shopify's, so words that change must not change which
+  variant a shopper gets.
+* **Decision:**
+  * **As Shopify's:** an option and a value are translated by their own IDs (`opt_`, `optv_`),
+    their `name` on one line and as long as the catalog's; migration 0149 allows the key. The
+    catalog gives their names and IDs to the online store (`optionNamesOf`, `optionIdsOf`),
+    listed the newest first.
+  * **In the product's document:** a translation's event names the option's product, whose
+    document the publisher writes again. Its Urdu holds its options in their own order, each
+    name and value the shop translated in place of its own, of the values its variants have.
+  * **Values a shopper can tell apart:** an option whose values would read the same in Urdu
+    keeps its own words for them; Urdu that changes nothing shown is left out.
+  * **On an Urdu page:** `translatedProduct` shows each variant's values in its options' Urdu,
+    by their places in their options, and its title made of them as the catalog makes one ("XS /
+    میرون / Velvet"). A variant keeps its ID, which the form, `?variant=` and the cart choose it
+    by, so it is the same in either language; themes need nothing new.
+* **Consequences:**
+  * An Urdu product page is in Urdu through its picker and its variants' list, and an Urdu cart
+    page names each line's variant in it.
+  * The cart's JSON for scripts, the checkout, orders and messages name variants in the shop's
+    own words, as they do its products (simplification 113).
+  * The documents' version stays: no option had Urdu before.
+* **Alternatives:**
+  * **Translating each variant's title:** Shopify does not, its titles being made of the values,
+    and a shop would write the same words again for every combination.
+  * **Refusing a value's Urdu that another value of its option has:** the shop may be part way
+    through its translations; its own words until they differ ask nothing of it.
+  * **Variants found by both languages' words:** a picker would need both in the page; by their
+    IDs, the words are only what is shown.

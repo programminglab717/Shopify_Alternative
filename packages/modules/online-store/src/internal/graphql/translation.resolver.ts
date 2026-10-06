@@ -156,7 +156,8 @@ function resourceOf(resourceId: string): { kind: TranslatableKind; id: string } 
     throw badUserInput(`Invalid resource id: ${resourceId.slice(0, 64)}`);
   }
   throw badUserInput(
-    'Not a product, collection, page, blog, article, menu, menu item or policy: ' +
+    'Not a product, collection, page, blog, article, menu, menu item, policy, product option ' +
+      'or option value: ' +
       resourceId.slice(0, 64),
   );
 }

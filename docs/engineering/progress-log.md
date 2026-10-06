@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Options in Urdu** (OS-06): a product's options and their values in Urdu, as Shopify translates
-them, shown on Urdu pages with each variant's title, the variant chosen the same in either
-language.
+**A refund's receipt** (ORD-09): a picture or PDF of the receipt for money staff sent back by
+hand, one of the shop's files, kept with the refund and shown with it on the order, so the shop
+can show a customer the money went.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Options in Urdu
+
+* **A product's options and their values in Urdu** ([ADR-241](../architecture/13-decision-log.md#adr-241--a-products-options-and-their-values-may-have-the-shops-urdu-as-shopifys-translations-keep-them-each-by-its-own-id-the-products-document-carries-its-options-in-urdu-and-its-urdu-pages-show-each-variants-values-and-title-in-them-the-variant-chosen-by-its-id-the-same-in-either-language)), as Shopify's
+  translations keep them, `PRODUCT_OPTION` and `PRODUCT_OPTION_VALUE`, by their own IDs, their
+  `name` on one line; migration 0149 allows the key.
+* **In the product's document:** each translation names its product, whose document holds its
+  options in Urdu in their own order; values no variant has are left out, and an option whose
+  values would read the same keeps its own words for them.
+* **On Urdu pages:** each variant's values and title in its options' Urdu, its ID its own, so the
+  variant a shopper chooses is the same in either language; themes need nothing new.
+* 1748 tests: options and values kept, refused, listed and told to their product; published in
+  their product's document and removed; shown on an Urdu page with the variant chosen; and
+  through the Admin API.
 
 ### 8b463b0 · Search in Urdu
 
