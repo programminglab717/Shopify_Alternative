@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Structured data beyond products
+### 424177e · Structured data beyond products
 
 * **Articles as schema.org's `BlogPosting`** ([ADR-237](../architecture/13-decision-log.md#adr-237--search-engines-are-told-an-articles-page-is-schemaorgs-blogposting-through-shopifys-structured_data-and-a-shops-home-page-the-shops-organization-and-website-through-the-same-filter-given-the-shop)), through Shopify's
   `structured_data`, as Dawn's article page prints it: the headline, the address, when it was
