@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-233 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-234 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -241,6 +241,7 @@
 | 231 | Products, collections, pages and articles may be given a title and description of their own for search engines, as Shopify's seo has them; themes are given them as page_title and page_description, the description made from the page's own text where the shop wrote none, and Shopify's product CSV carries a product's | Accepted |
 | 232 | The setup checklist asks for a courier account, the test courier's aside, and counts a payment gateway's account in its production as a way to be paid ahead, as it counts a bank account | Accepted |
 | 233 | A parcel's city is booked as its courier names it: the shop's own name for it, else Hatti's, else the courier's list's, matched through Pakistan's names for the city and their aliases; a city the list names none of fails its booking with the courier's nearest names, and the name staff give is kept for the shop's next parcel | Accepted |
+| 234 | A storefront search that finds no product with every word as typed reads each word none of the shop's products holds as the shop's own words a typo or two from it, a typo being a letter added, taken away or changed or two swapped, and shows those with the fewest typos first | Accepted |
 
 ---
 
@@ -9757,3 +9758,47 @@
   * **Correcting the order's address instead:** the address is what the customer wrote, the
     courier's names are the shop's business, and the next order from the city would fail
     again.
+
+## ADR-234 · A storefront search that finds no product with every word as typed reads each word none of the shop's products holds as the shop's own words a typo or two from it, a typo being a letter added, taken away or changed or two swapped, and shows those with the fewest typos first
+
+* **Context:** Shoppers misspell what they search for: "kirta", "peshwari chapal". A storefront's
+  search finds the shop's products with every word typed, folded by `searchKey` so that Roman Urdu
+  spellings and Urdu script match ([ADR-046](#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense)), and nothing beyond that: a typo finds
+  nothing, and the shopper leaves. The feature catalog's SRC-01 asks for typo tolerance. Typesense,
+  which has it, comes with V1 ([ADR-013](#adr-013--typesense-for-search-with-app-level-urduroman-urdu-normalisation)).
+* **Decision:**
+  * **As typed first.** A search that finds products finds what it found before. Only one that
+    finds none is read again.
+  * **Each word no product holds is corrected to the shop's own words** a typo or two from it:
+    those of its active products' `search_text`, up to 50,000. A typo is a letter added, taken
+    away or changed, or two letters side by side swapped (`typoDistance` in `@hatti/pk`). A word
+    of four to seven letters may have one typo, and a longer one two. Shorter words, and those
+    with a digit such as sizes, have none (`typosAllowed`). Each word keeps its five nearest
+    corrections, the shortest first among equals (`correctionsOf`).
+  * **Words found as typed stay as typed, and every word must still be there.** A search whose
+    words are all the shop's, but never together, still finds nothing, and so does one with a
+    word no correction reaches.
+  * **The fewest typos first,** then as before: the first word earliest, then the newest.
+  * **Suggestions too.** With `prefix=last` the last word is still being typed, and is matched
+    against the starts of the shop's words.
+  * **In the core, with no extension.** The shop's words come from Postgres in one query, are
+    compared in the core, and the products are found with `LIKE` as before.
+* **Consequences:**
+  * "kirta" finds kurtas, and "peshwari chapal" Peshawari chappals. A search that worked is as it
+    was.
+  * A search that finds nothing reads the shop's words once more. Measured on a development
+    machine with a warm cache, a corrected search took about 35 ms for a shop of 10,000
+    products and 160 ms for 100,000.
+  * A correction may find what the shopper didn't mean: "kurtu" finds kurtis and kurtas. The
+    results don't say which word was corrected.
+  * Pages' and articles' search stays as typed ([ADR-212](#adr-212--a-storefronts-search-finds-the-shops-published-pages-and-articles-beside-its-products-as-shopifys-does-by-the-words-each-keeps-folded-through-the-online-stores-own-search-in-the-core-products-then-pages-then-articles-the-kinds-shopifys-type-names-and-suggested-as-a-shopper-types)): their words run to 10,000
+    characters of text each, and a typo in them waits for Typesense.
+* **Alternatives:**
+  * **`pg_trgm`'s similarity in Postgres:** an extension in every database, and it counts letters
+    in common rather than typos, judging short words unevenly. "krta" scored 0.4 against one
+    title with "kurta" in it and 0.6 against another.
+  * **`fuzzystrmatch`'s Levenshtein over each product's words:** an extension too, and it counts
+    two swapped letters, the commonest slip on a phone's keyboard, as two typos.
+  * **Correcting every word of every search:** a search that works would change, with products
+    the shopper didn't ask for among them.
+  * **Typesense now:** another service to run before V1 ([ADR-013](#adr-013--typesense-for-search-with-app-level-urduroman-urdu-normalisation)).

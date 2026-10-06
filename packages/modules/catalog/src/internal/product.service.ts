@@ -3,7 +3,7 @@ import { checkSeo, type SeoInputValue, type SeoValue, type TenantContext } from 
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { prefixKey, searchKey } from '@hatti/pk';
+import { correctionsOf, prefixKey, searchKey, typosAllowed, type Correction } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { and, eq, ne, sql } from 'drizzle-orm';
 import { refreshMemberships } from './collection-store.js';
@@ -54,6 +54,9 @@ import {
 
 /** Words of a storefront search that count: more make a query slower, not better. */
 const SEARCH_WORDS = 10;
+
+/** The most of a shop's words a search that found nothing as typed corrects its words to. */
+const SEARCH_VOCABULARY = 50_000;
 
 export interface CreateProductInput {
   title: string;
@@ -542,8 +545,10 @@ export class ProductService {
    * The IDs of the shop's active products with every word of `terms`, as the admin's search
    * matches them (Roman Urdu spellings folded), best first: those with the first word earliest,
    * which puts titles before vendors, types and tags, then the newest. At most `limit`. With
-   * `prefix`, the last word may be cut short, as it is while a shopper types. In the caller's
-   * transaction `tx`, for storefronts' search (ADR-046).
+   * `prefix`, the last word may be cut short, as it is while a shopper types. Where none has
+   * every word as typed, the words none of the shop's products holds are read as the shop's own
+   * words a typo or two from them, and those with the fewest typos come first (ADR-234). In the
+   * caller's transaction `tx`, for storefronts' search (ADR-046).
    */
   async searchIdsOf(
     tx: Tx,
@@ -562,7 +567,10 @@ export class ProductService {
        WHERE shop_id = ${shopId} AND status = 'active' AND ${sql.join(all, sql` AND `)}
        ORDER BY position(${tokens[0]!} IN search_text), id DESC
        LIMIT ${limit}`);
-    return rows.map((row) => row.id);
+    if (rows.length > 0 || !tokens.some((token) => typosAllowed(token) > 0)) {
+      return rows.map((row) => row.id);
+    }
+    return searchCorrectedIn(tx, shopId, tokens, limit, options.prefix === true);
   }
 
   /** The handle a product has now, or null once it is gone, in the caller's transaction `tx`. */
@@ -595,6 +603,58 @@ export class ProductService {
       .onConflictDoNothing({ target: [products.shopId, products.handle] })
       .returning();
   }
+}
+
+/**
+ * The shop's active products with every word of `tokens`, each word as typed or as the shop's
+ * own word it was corrected to (ADR-234): the fewest typos first, then as {@link
+ * ProductService.searchIdsOf} orders them. None where a word has no correction, or every word
+ * was there as typed, if never together.
+ */
+async function searchCorrectedIn(
+  tx: Tx,
+  shopId: string,
+  tokens: readonly string[],
+  limit: number,
+  prefix: boolean,
+): Promise<string[]> {
+  const { rows: words } = await tx.execute<{ word: string }>(sql`
+    SELECT DISTINCT word
+      FROM catalog.products, unnest(string_to_array(search_text, ' ')) AS word
+     WHERE shop_id = ${shopId} AND status = 'active' AND word <> ''
+     LIMIT ${SEARCH_VOCABULARY}`);
+  const corrections = correctionsOf(
+    tokens,
+    words.map((row) => row.word),
+    { prefix },
+  );
+  if (corrections.some((each) => each.length === 0)) return [];
+  if (corrections.every((each) => each[0]!.typos === 0)) return [];
+  const holds = (correction: Correction) => sql`search_text LIKE ${`%${correction.word}%`}`;
+  const matched = corrections.map(
+    (each) => sql`search_text LIKE ANY(${sql.param(each.map((c) => `%${c.word}%`))}::text[])`,
+  );
+  // Corrections come the nearest first: the first a product holds is its fewest typos.
+  const typos = sql.join(
+    corrections.map(
+      (each) =>
+        sql`CASE ${sql.join(
+          each.map((c) => sql`WHEN ${holds(c)} THEN ${sql.raw(String(c.typos))}`),
+          sql` `,
+        )} END`,
+    ),
+    sql` + `,
+  );
+  const first = sql`CASE ${sql.join(
+    corrections[0]!.map((c) => sql`WHEN ${holds(c)} THEN position(${c.word} IN search_text)`),
+    sql` `,
+  )} END`;
+  const { rows } = await tx.execute<{ id: string }>(sql`
+    SELECT id FROM catalog.products
+     WHERE shop_id = ${shopId} AND status = 'active' AND ${sql.join(matched, sql` AND `)}
+     ORDER BY ${typos}, ${first}, id DESC
+     LIMIT ${limit}`);
+  return rows.map((row) => row.id);
 }
 
 /**

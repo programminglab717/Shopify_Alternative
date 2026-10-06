@@ -95,6 +95,11 @@ describe.skipIf(!server)('Storefront API: search', () => {
     });
     expect((await search(shopA, '   ')).json()).toEqual({ productIds: [] });
     expect((await search(shopB, 'shalwar')).json()).toEqual({ productIds: [] });
+    // A typo, where nothing matches as typed, read as the shop's own word (ADR-234).
+    expect((await search(shopA, 'peshwari')).json()).toEqual({
+      productIds: [ids['Peshawari Chappal']],
+    });
+    expect((await search(shopB, 'peshwari')).json()).toEqual({ productIds: [] });
 
     // As a shopper types: the last word may be cut short, and fewer are wanted.
     expect((await search(shopA, 'kame')).json()).toEqual({ productIds: [] });

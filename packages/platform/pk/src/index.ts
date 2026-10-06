@@ -13,9 +13,14 @@ export { formatIban, isValidIban, normalizePkIban } from './iban.js';
 export { normalizeCnic, normalizeNtn } from './identity.js';
 export { isPkMobile, maskPkMobile, parsePkMobile, type PkMobileNumber } from './phone.js';
 export {
+  CORRECTIONS,
+  correctionsOf,
   normalizeDigits,
   normalizeUrduScript,
   prefixKey,
   searchKey,
+  typoDistance,
+  typosAllowed,
+  type Correction,
   type SearchKeyOptions,
 } from './text.js';

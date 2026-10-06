@@ -15,9 +15,13 @@ import {
   maskPkMobile,
   normalizeUrduScript,
   parsePkMobile,
+  CORRECTIONS,
+  correctionsOf,
   prefixKey,
   searchCities,
   searchKey,
+  typoDistance,
+  typosAllowed,
 } from './index.js';
 
 describe('parsePkMobile', () => {
@@ -155,6 +159,62 @@ describe('text normalisation', () => {
       'kamiz',
       'شلوار',
     ]);
+  });
+
+  it('counts typos: letters added, taken away, changed or swapped with the next', () => {
+    expect(typoDistance('kurta', 'kurta')).toBe(0);
+    expect(typoDistance('kurtta', 'kurta')).toBe(1);
+    expect(typoDistance('krta', 'kurta')).toBe(1);
+    expect(typoDistance('kurti', 'kurta')).toBe(1);
+    expect(typoDistance('kurat', 'kurta')).toBe(1);
+    expect(typoDistance('peshwari', 'peshawari')).toBe(1);
+    expect(typoDistance('shalwr', 'shalwar')).toBe(1);
+    expect(typoDistance('سوٹ', 'سوٹس')).toBe(1);
+    expect(typoDistance('lehnga', 'lawn')).toBe(4);
+    // Past what is asked, it stops counting.
+    expect(typoDistance('lehnga', 'lawn', { max: 1 })).toBe(2);
+    expect(typoDistance('a', 'abcdef', { max: 2 })).toBe(3);
+    // A word still being typed, against whichever start of the word is nearest.
+    expect(typoDistance('peshwa', 'peshawari', { prefix: true })).toBe(1);
+    expect(typoDistance('kurt', 'kurta', { prefix: true })).toBe(0);
+    expect(typoDistance('chapl', 'chapal', { prefix: true })).toBe(1);
+    expect(typoDistance('zari', 'kurta', { prefix: true, max: 1 })).toBe(2);
+  });
+
+  it("corrects words typed to a catalog's own, each a word as typed where one holds it", () => {
+    const words = ['peshawari', 'chapal', 'kurta', 'kurti', 'kamiz', 'shalwar', 'lawn', 'red'];
+    expect(correctionsOf(['kurtta', 'red', 'shalwr'], words)).toEqual([
+      [{ word: 'kurta', typos: 1 }],
+      [{ word: 'red', typos: 0 }],
+      [{ word: 'shalwar', typos: 1 }],
+    ]);
+    // A word holding it as typed is enough; one too short, or with a digit, is never corrected.
+    expect(correctionsOf(['kurt', 'rad', 'lawm38'], words)).toEqual([
+      [{ word: 'kurt', typos: 0 }],
+      [],
+      [],
+    ]);
+    // The nearest first, then the shortest.
+    expect(correctionsOf(['kurtu'], words)).toEqual([
+      [
+        { word: 'kurta', typos: 1 },
+        { word: 'kurti', typos: 1 },
+      ],
+    ]);
+    // A word still being typed, against the starts of words.
+    expect(correctionsOf(['red', 'peshwa'], words, { prefix: true })).toEqual([
+      [{ word: 'red', typos: 0 }],
+      [{ word: 'peshawari', typos: 1 }],
+    ]);
+    expect(correctionsOf(['peshwa'], words)).toEqual([[]]);
+    const many = Array.from({ length: 9 }, (_, at) => `law${String.fromCharCode(97 + at)}`);
+    expect(correctionsOf(['lawm'], many)[0]).toHaveLength(CORRECTIONS);
+  });
+
+  it('allows typos by how long a word is, and none in numbers', () => {
+    expect(
+      ['red', 'lawn', 'kurtta', 'embroidered', 'size38', '2024', 'سوٹس'].map(typosAllowed),
+    ).toEqual([0, 1, 1, 2, 0, 0, 1]);
   });
 });
 

@@ -491,6 +491,39 @@ describe.skipIf(!server)('ProductService', () => {
     expect(await typing('peshawa')).toEqual([shoes.id]);
   });
 
+  it('forgives a typo or two where nothing matches as typed, the fewest typos first (ADR-234)', async () => {
+    const shoes = await create('Peshawari Chappal', { status: 'active', tags: ['red'] });
+    const kurta = await create('Embroidered Kurta', { status: 'active', tags: ['red'] });
+    const kurti = await create('Lawn Kurti', { status: 'active' });
+    await create('Kirta draft');
+    await f.products.create(f.b, { title: 'Kurtas', status: 'active' });
+    const search = (terms: string) =>
+      f.db.tenant(f.a.shopId, (tx) => f.products.searchIdsOf(tx, f.a.shopId, terms, 10));
+    const typing = (terms: string) =>
+      f.db.tenant(f.a.shopId, (tx) =>
+        f.products.searchIdsOf(tx, f.a.shopId, terms, 10, { prefix: true }),
+      );
+
+    // A word as typed finds only what holds it.
+    expect(await search('kurta')).toEqual([kurta.id]);
+    // A letter added, taken away, changed or swapped: the fewest typos first.
+    expect(await search('kirta')).toEqual([kurta.id]);
+    expect(await search('kurat')).toEqual([kurta.id]);
+    expect(await search('kurtu')).toEqual([kurti.id, kurta.id]);
+    expect(await search('peshwari chapal')).toEqual([shoes.id]);
+    // Only the words no product holds are corrected, and every word must still be there.
+    expect(await search('red krta')).toEqual([kurta.id]);
+    expect(await search('lawn kirti')).toEqual([kurti.id]);
+    expect(await search('lawn chapal')).toEqual([]);
+    // Short words and numbers are as typed; words too far are no word of the shop's.
+    expect(await search('rad')).toEqual([]);
+    expect(await search('kurta 38')).toEqual([]);
+    expect(await search('lehnga')).toEqual([]);
+    // A word still being typed, against the starts of the shop's words.
+    expect(await typing('peshwa')).toEqual([shoes.id]);
+    expect(await typing('embroiderd kur')).toEqual([kurta.id]);
+  });
+
   it('pages newest first, with variants, options and media loaded in one go', async () => {
     const first = await create('One', { options: [{ name: 'Size', values: ['S', 'M'] }] });
     const second = await create('Two');

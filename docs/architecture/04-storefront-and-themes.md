@@ -246,6 +246,8 @@ with one `MGET`. The same pages render from Valkey as from memory, in as many ro
 A search page, `/search?q=`, asks the core which of the shop's products, pages and articles have
 the words typed, each kind best first, and reads the page of them it shows from their documents in
 the same way ([ADR-046](./13-decision-log.md#adr-046--storefront-search-asks-the-core-which-finds-products-in-postgres-as-the-admins-search-does-until-typesense), [ADR-212](./13-decision-log.md#adr-212--a-storefronts-search-finds-the-shops-published-pages-and-articles-beside-its-products-as-shopifys-does-by-the-words-each-keeps-folded-through-the-online-stores-own-search-in-the-core-products-then-pages-then-articles-the-kinds-shopifys-type-names-and-suggested-as-a-shopper-types)).
+Where no product has every word as typed, each word none holds is read as the shop's own words a
+typo or two from it, the fewest typos first ([ADR-234](./13-decision-log.md#adr-234--a-storefront-search-that-finds-no-product-with-every-word-as-typed-reads-each-word-none-of-the-shops-products-holds-as-the-shops-own-words-a-typo-or-two-from-it-a-typo-being-a-letter-added-taken-away-or-changed-or-two-swapped-and-shows-those-with-the-fewest-typos-first)).
 Hatti Base's header suggests products, pages and articles as a shopper types, the last word taken
 as cut short: its
 script asks for the theme's predictive-search section, which the storefront renders alone, as

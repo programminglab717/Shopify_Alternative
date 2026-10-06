@@ -1831,6 +1831,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   `/storefront/shops/{shop}/search/content`, each keeping its words with `contentSearchText`
   whenever its title, names or text change
   ([ADR-212](../architecture/13-decision-log.md#adr-212--a-storefronts-search-finds-the-shops-published-pages-and-articles-beside-its-products-as-shopifys-does-by-the-words-each-keeps-folded-through-the-online-stores-own-search-in-the-core-products-then-pages-then-articles-the-kinds-shopifys-type-names-and-suggested-as-a-shopper-types)).
+* **A search that finds nothing as typed is corrected** ([ADR-234](../architecture/13-decision-log.md#adr-234--a-storefront-search-that-finds-no-product-with-every-word-as-typed-reads-each-word-none-of-the-shops-products-holds-as-the-shops-own-words-a-typo-or-two-from-it-a-typo-being-a-letter-added-taken-away-or-changed-or-two-swapped-and-shows-those-with-the-fewest-typos-first)):
+  `searchIdsOf` reads the shop's words and `correctionsOf` from `@hatti/pk` gives each word no
+  product holds the words a typo or two from it (`typoDistance`, `typosAllowed`). Keep a search
+  that finds products as it is: correct only one that finds none, and only its words that match
+  nothing. Count typos with `typoDistance`, never with your own edit distance.
 * **The core gives IDs, best first; the storefront reads the products** from their documents,
   only the page it shows (`searchObject`), as it reads a collection's. The core's answer is
   `no-store`: what a search found is for the page that shows it, not to keep.

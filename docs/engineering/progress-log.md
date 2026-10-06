@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Search that forgives a typo** (SRC-01): the storefront's search and its suggestions finding
-products whose words are a letter or two from what a shopper typed, when nothing matches as
-typed, the nearest first.
+**Delivery estimates** (CHK-22): how many days delivery takes, for everywhere and for each of the
+shop's delivery zones, shown in the cart and at checkout for the shopper's city.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +16,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Search that forgives a typo
+
+* **A search that finds nothing as typed is read again** ([ADR-234](../architecture/13-decision-log.md#adr-234--a-storefront-search-that-finds-no-product-with-every-word-as-typed-reads-each-word-none-of-the-shops-products-holds-as-the-shops-own-words-a-typo-or-two-from-it-a-typo-being-a-letter-added-taken-away-or-changed-or-two-swapped-and-shows-those-with-the-fewest-typos-first)): each word
+  none of the shop's products holds is corrected to the shop's own words a typo or two from it.
+  A typo is a letter added, taken away or changed, or two swapped. "kirta" finds kurtas, and
+  "peshwari chapal" Peshawari chappals; a search that worked finds what it did.
+* **One typo for words of four to seven letters, two for longer ones,** and none in shorter
+  words or numbers. Every word must still be there, and those with the fewest typos come first.
+  Suggestions match the word still being typed against the starts of the shop's words.
+* **No extension:** `@hatti/pk`'s `typoDistance` and `correctionsOf` compare the shop's words in
+  the core, and the courier city names' nearest names now count typos the same way. A corrected
+  search took about 35 ms for a shop of 10,000 products.
+* 1724 tests: typos counted and words corrected, and the catalog's search forgiving them, the
+  storefront's API included.
 
 ### b4d7760 · Couriers' city names
 

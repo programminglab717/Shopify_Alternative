@@ -1,4 +1,4 @@
-import { findCity } from '@hatti/pk';
+import { findCity, typoDistance } from '@hatti/pk';
 
 // Couriers' names for cities (SHP-03, ADR-233). A courier delivers to the cities on its own list,
 // written its own way: "Rawalpindi" where a customer typed "Pindi", "D.G. Khan" for Dera Ghazi
@@ -56,7 +56,7 @@ export function nearestCityNames(
     let best: { rank: number; distance: number } | null = null;
     for (const each of typed) {
       const rank = key.startsWith(each) || each.startsWith(key) ? 0 : 1;
-      const distance = editDistance(each, key);
+      const distance = typoDistance(each, key);
       // A few letters off for a name of its length: a third of it, two at least.
       if (rank === 1 && distance > Math.max(2, Math.floor(each.length / 3))) continue;
       if (!best || rank < best.rank || (rank === best.rank && distance < best.distance)) {
@@ -69,23 +69,4 @@ export function nearestCityNames(
     .sort((a, b) => a.rank - b.rank || a.distance - b.distance || a.name.localeCompare(b.name))
     .slice(0, limit)
     .map((each) => each.name);
-}
-
-/** How many letters added, taken away or changed make `a` into `b`. */
-function editDistance(a: string, b: string): number {
-  const x = Array.from(a);
-  const y = Array.from(b);
-  let previous = Array.from({ length: y.length + 1 }, (_, at) => at);
-  for (let i = 1; i <= x.length; i++) {
-    const current = [i];
-    for (let j = 1; j <= y.length; j++) {
-      current[j] = Math.min(
-        previous[j]! + 1,
-        current[j - 1]! + 1,
-        previous[j - 1]! + (x[i - 1] === y[j - 1] ? 0 : 1),
-      );
-    }
-    previous = current;
-  }
-  return previous[y.length]!;
 }
