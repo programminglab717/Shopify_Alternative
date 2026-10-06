@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### The shop's brand in its themes
+### a28340f · The shop's brand in its themes
 
 * **Themes get Shopify's `shop.brand`**
   ([ADR-207](../architecture/13-decision-log.md#adr-207--themes-get-shopifys-shopbrand-its-logo-and-square-logo-as-images-from-where-the-api-serves-them-nil-for-what-hatti-does-not-keep-and-hatti-bases-header-shows-the-logo-in-place-of-the-shops-name)):
