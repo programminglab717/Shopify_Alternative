@@ -1,6 +1,11 @@
-import { MemoryStore, type ProductDoc } from '@hatti/storefront-data';
+import {
+  MemoryStore,
+  type ArticleDoc,
+  type BlogDoc,
+  type ProductDoc,
+} from '@hatti/storefront-data';
 import { describe, expect, it } from 'vitest';
-import { FEED_CHUNK, feedItems, productFeed } from './feeds.js';
+import { BLOG_FEED_ARTICLES, blogFeed, FEED_CHUNK, feedItems, productFeed } from './feeds.js';
 import { sampleStore } from './fixtures.js';
 
 const ORIGIN = 'https://www.zari.pk';
@@ -172,5 +177,126 @@ describe('Catalog feeds', () => {
     const empty = await feedOf(new MemoryStore({ ...sampleStore(), products: [] }));
     expect(empty).not.toContain('<item>');
     expect(empty.endsWith('</description>\n</channel>\n</rss>\n')).toBe(true);
+  });
+});
+
+describe("A blog's Atom feed (ADR-209)", () => {
+  const NEWS = '0192d3a4-0000-7000-8000-000000000001';
+
+  async function blogFeedOf(store: MemoryStore, blog: BlogDoc, now?: Date): Promise<string> {
+    let feed = '';
+    for await (const part of blogFeed(store, SHOP, blog, ORIGIN, now)) feed += part;
+    return feed;
+  }
+
+  /** An article of News published on `day` of September, changed `changed` if said. */
+  function article(n: number, day: number, changed?: string): ArticleDoc {
+    return {
+      id: `0192d3a4-0000-7000-8000-0000000001${String(n).padStart(2, '0')}`,
+      handle: `note-${n}`,
+      blogHandle: 'news',
+      title: `Note ${n}`,
+      bodyHtml: `<p>Note ${n}</p>`,
+      summaryHtml: '',
+      author: '',
+      tags: [],
+      publishedAt: new Date(Date.UTC(2026, 8, day, 9)).toISOString(),
+      templateSuffix: null,
+      ...(changed ? { updatedAt: changed } : {}),
+    };
+  }
+
+  function blogOf(articles: ArticleDoc[]): BlogDoc {
+    return {
+      id: NEWS,
+      handle: 'news',
+      title: 'News & notes',
+      templateSuffix: null,
+      articles: articles.map((each) => ({ id: each.id, tags: each.tags })),
+    };
+  }
+
+  it('gives its articles, the newest first, each whole, linking to their pages at the shop', async () => {
+    const eid: ArticleDoc = {
+      ...article(1, 20, '2026-09-22T10:00:00.000Z'),
+      handle: 'eid-lawn',
+      title: 'Eid lawn <is> here',
+      bodyHtml: '<p>Hand-block printed in Multan. <a href="sizes">Sizes</a></p>',
+      summaryHtml: '<p>Out now &amp; stitched.</p>',
+      author: 'Ayesha Khan',
+      tags: ['Eid', 'Lawn & silk'],
+    };
+    const shawls = article(2, 5);
+    const store = new MemoryStore({ ...sampleStore(), articles: [eid, shawls] });
+    const feed = await blogFeedOf(store, blogOf([eid, shawls]));
+    expect(feed).toBe(
+      '<?xml version="1.0" encoding="UTF-8"?>\n' +
+        '<feed xmlns="http://www.w3.org/2005/Atom">\n' +
+        `<id>urn:uuid:${NEWS}</id>\n` +
+        '<link rel="alternate" type="text/html" href="https://www.zari.pk/blogs/news"/>\n' +
+        '<link rel="self" type="application/atom+xml" href="https://www.zari.pk/blogs/news.atom"/>\n' +
+        '<title>Zari Fashions - News &amp; notes</title>\n' +
+        // When its articles last changed: the newest's edit, two days after it was published.
+        '<updated>2026-09-22T10:00:00.000Z</updated>\n' +
+        '<author><name>Zari Fashions</name></author>\n' +
+        '<entry>\n' +
+        `<id>urn:uuid:${eid.id}</id>\n` +
+        '<published>2026-09-20T09:00:00.000Z</published>\n' +
+        '<updated>2026-09-22T10:00:00.000Z</updated>\n' +
+        '<link rel="alternate" type="text/html" href="https://www.zari.pk/blogs/news/eid-lawn"/>\n' +
+        '<title>Eid lawn &lt;is&gt; here</title>\n' +
+        '<author><name>Ayesha Khan</name></author>\n' +
+        '<category term="Eid"/>\n<category term="Lawn &amp; silk"/>\n' +
+        '<summary type="html" xml:base="https://www.zari.pk/blogs/news/eid-lawn">' +
+        '&lt;p&gt;Out now &amp;amp; stitched.&lt;/p&gt;</summary>\n' +
+        '<content type="html" xml:base="https://www.zari.pk/blogs/news/eid-lawn">' +
+        '&lt;p&gt;Hand-block printed in Multan. &lt;a href=&quot;sizes&quot;&gt;Sizes&lt;/a&gt;' +
+        '&lt;/p&gt;</content>\n' +
+        '</entry>\n' +
+        // Without an author or a summary, and written before documents said when it changed.
+        '<entry>\n' +
+        `<id>urn:uuid:${shawls.id}</id>\n` +
+        '<published>2026-09-05T09:00:00.000Z</published>\n' +
+        '<updated>2026-09-05T09:00:00.000Z</updated>\n' +
+        '<link rel="alternate" type="text/html" href="https://www.zari.pk/blogs/news/note-2"/>\n' +
+        '<title>Note 2</title>\n' +
+        '<content type="html" xml:base="https://www.zari.pk/blogs/news/note-2">' +
+        '&lt;p&gt;Note 2&lt;/p&gt;</content>\n' +
+        '</entry>\n' +
+        '</feed>\n',
+    );
+    // Its articles in one round trip.
+    expect(store.roundTrips).toBe(1);
+  });
+
+  it(`holds the latest ${BLOG_FEED_ARTICLES} articles, says when an older one changed, and skips one gone`, async () => {
+    const articles = Array.from({ length: 35 }, (_, index) => article(index + 1, 30 - index / 2));
+    // An older article edited since is the last change; one gone since is left out.
+    articles[20] = { ...articles[20]!, updatedAt: '2026-10-01T08:00:00.000Z' };
+    const store = new MemoryStore({ ...sampleStore(), articles: articles.slice(1) });
+    const feed = await blogFeedOf(store, blogOf(articles));
+    const ids = [...feed.matchAll(/<entry>\n<id>urn:uuid:([^<]+)<\/id>/g)].map((match) => match[1]);
+    expect(ids).toEqual(articles.slice(1, BLOG_FEED_ARTICLES).map((each) => each.id));
+    expect(feed).toContain('<author><name>Zari Fashions</name></author>\n<entry>');
+    expect(/<updated>([^<]+)<\/updated>/.exec(feed)![1]).toBe('2026-10-01T08:00:00.000Z');
+    // An edit dated before its publication, as a publication date set later: then.
+    const back = { ...articles[0]!, updatedAt: '2026-01-01T00:00:00.000Z' };
+    const one = await blogFeedOf(
+      new MemoryStore({ ...sampleStore(), articles: [back] }),
+      blogOf([back]),
+    );
+    expect(one).toContain(
+      `<published>${back.publishedAt}</published>\n<updated>${back.publishedAt}</updated>`,
+    );
+  });
+
+  it('says a blog without articles changed now, and asks for none', async () => {
+    const store = new MemoryStore({ ...sampleStore(), articles: [] });
+    const now = new Date('2026-10-06T12:00:00.000Z');
+    const feed = await blogFeedOf(store, blogOf([]), now);
+    expect(feed).toContain('<updated>2026-10-06T12:00:00.000Z</updated>');
+    expect(feed).not.toContain('<entry>');
+    expect(feed.endsWith('</name></author>\n</feed>\n')).toBe(true);
+    expect(store.roundTrips).toBe(0);
   });
 });

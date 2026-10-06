@@ -47,7 +47,7 @@ import {
   permalinkItems,
   type CoreBackend,
 } from './cart.js';
-import { productFeed } from './feeds.js';
+import { blogFeed, productFeed } from './feeds.js';
 import { sampleStore } from './fixtures.js';
 import { PASSWORD_COOKIE, isPasswordPass, passwordCookie, passwordPass } from './password.js';
 import { browserIdsOf } from './pixels.js';
@@ -761,6 +761,30 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
         .header('cache-tag', shopTag(found.shopId))
         .type('application/xml; charset=utf-8')
         .send(Readable.from(productFeed(found.store, shop, origin)));
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      throw error;
+    }
+  });
+
+  /**
+   * A blog's Atom feed (ADR-209), at its page's address with .atom, as Shopify's: kept at the edge
+   * as its page is, and forgotten with it when an article changes.
+   */
+  app.get('/blogs/:handle.atom', async (request, reply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const { handle } = request.params as { handle: string };
+    try {
+      const blog = /^[\w-]+$/.test(handle) ? await found.store.blogByHandle(handle) : null;
+      if (!blog) return await notFound(reply, 'The shop has no such blog.');
+      const shop = await found.store.shop();
+      const origin = await originOf(request, found);
+      return await reply
+        .header('cache-control', PAGE_CACHE)
+        .header('cache-tag', cacheTags(found.shopId, [{ kind: 'blog', handle }], null))
+        .type('application/atom+xml; charset=utf-8')
+        .send(Readable.from(blogFeed(found.store, shop, blog, origin)));
     } catch (error) {
       if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
       throw error;

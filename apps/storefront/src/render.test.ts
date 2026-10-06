@@ -402,6 +402,60 @@ describe('Storefront rendering', () => {
     expect(plain.html).not.toContain('class="more"');
   });
 
+  it('links an article to the older and the newer beside it, and its blog to its feed (ADR-209)', async () => {
+    /** The links to the articles beside it: older, then newer. */
+    const beside = (html: string) =>
+      [...html.matchAll(/<a href="([^"]+)" class="article__(older|newer)">/g)].map(
+        ([, url, side]) => `${side} ${url}`,
+      );
+    const middle = await render({ path: '/blogs/news/how-to-measure' });
+    expect(middle.errors).toEqual([]);
+    expect(beside(middle.html)).toEqual([
+      'older /blogs/news/winter-shawls',
+      'newer /blogs/news/eid-lawn-is-here',
+    ]);
+    expect(middle.html).toContain('<nav class="article__nav" aria-label="More from News">');
+    expect(middle.html).toMatch(
+      /<span>Older article<\/span>\s*<span dir="auto">Winter shawls<\/span>/,
+    );
+    // The latest has none newer, the first none older.
+    expect(beside((await render({ path: '/blogs/news/eid-lawn-is-here' })).html)).toEqual([
+      'older /blogs/news/how-to-measure',
+    ]);
+    const first = await render({ path: '/blogs/news/winter-shawls', locale: 'ur' });
+    expect(beside(first.html)).toEqual(['newer /blogs/news/how-to-measure']);
+    expect(first.html).toContain('<span>نئی تحریر</span>');
+
+    // Its blog's feed, on its page and its articles', and nowhere else.
+    const feed =
+      '<link rel="alternate" type="application/atom+xml" title="Zari Fashions - News" ' +
+      'href="/blogs/news.atom">';
+    expect(middle.html).toContain(feed);
+    expect((await render({ path: '/blogs/news' })).html).toContain(feed);
+    expect((await render({ path: '/' })).html).not.toContain('application/atom+xml');
+
+    // Themes get them as Shopify's: printed, their address; nothing on a blog's own page.
+    const extra = {
+      'sections/main-article.liquid':
+        '<p class="beside">{{ blog.next_article }} {{ blog.previous_article.title }} {{ blog.previous_article.updated_at }} [{{ blogs[\'news\'].next_article }}]</p>' +
+        '{% schema %}{ "name": "Article" }{% endschema %}',
+    };
+    const themed = await render({ path: '/blogs/news/how-to-measure' }, { extra });
+    expect(themed.html).toContain(
+      '<p class="beside">/blogs/news/winter-shawls Eid lawn is here 2026-09-20T21:30:00.000Z []</p>',
+    );
+    // The two in one round trip, beside the shop, the article and its blog, and the menus.
+    const plain = await render(
+      { path: '/blogs/news/how-to-measure' },
+      {
+        extra: {
+          'sections/main-article.liquid': '{% schema %}{ "name": "Article" }{% endschema %}',
+        },
+      },
+    );
+    expect(themed.roundTrips).toBe(plain.roundTrips + 1);
+  });
+
   it('renders what a search found, a page at a time, its links keeping the words', async () => {
     const ids = sampleStore().products.map((product) => product.id);
     const found = await render({

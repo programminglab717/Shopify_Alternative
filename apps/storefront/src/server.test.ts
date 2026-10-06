@@ -1604,6 +1604,51 @@ describe('Carts', () => {
     await app.close();
   });
 
+  it("gives a blog's Atom feed at its address with .atom, kept at the edge as its page is (ADR-209)", async () => {
+    const app = server();
+    const get = (url: string, host = 'localhost') =>
+      app.inject({ method: 'GET', url, headers: { host } });
+    const feed = await get('/blogs/news.atom');
+    // Forgotten with the shop's document and the blog's, which an article's change purges.
+    expect([
+      feed.statusCode,
+      feed.headers['content-type'],
+      feed.headers['cache-control'],
+      feed.headers['cache-tag'],
+    ]).toEqual([
+      200,
+      'application/atom+xml; charset=utf-8',
+      'public, max-age=0, s-maxage=300, stale-while-revalidate=86400, stale-if-error=604800',
+      'hatti:sample,hatti:sample:blog:news',
+    ]);
+    expect(feed.body).toContain('<title>Zari Fashions - News</title>');
+    expect(feed.body).toContain(
+      '<link rel="self" type="application/atom+xml" href="http://localhost/blogs/news.atom"/>',
+    );
+    expect(
+      [...feed.body.matchAll(/<link rel="alternate" type="text\/html" href="([^"]+)"/g)].map(
+        (m) => m[1],
+      ),
+    ).toEqual([
+      'http://localhost/blogs/news',
+      'http://localhost/blogs/news/eid-lawn-is-here',
+      'http://localhost/blogs/news/how-to-measure',
+      'http://localhost/blogs/news/winter-shawls',
+    ]);
+    expect(feed.body.endsWith('</entry>\n</feed>\n')).toBe(true);
+    // No such blog, no such handle, and no such shop.
+    for (const [url, host] of [
+      ['/blogs/journal.atom', 'localhost'],
+      ['/blogs/news.notes.atom', 'localhost'],
+      ['/blogs/news.atom', 'nobody.localhost'],
+    ] as const) {
+      expect((await get(url, host)).statusCode, url).toBe(404);
+    }
+    // The blog's page is still its page.
+    expect((await get('/blogs/news')).headers['content-type']).toBe('text/html; charset=utf-8');
+    await app.close();
+  });
+
   it("shows the shop's policies at Shopify's addresses, in its theme, and links them from the footer", async () => {
     const sample = sampleStore();
     const app = server({

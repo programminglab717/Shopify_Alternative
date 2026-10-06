@@ -808,6 +808,8 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       tags: ['Eid', 'lawn'],
       publishedAt: '2026-09-01T09:00:00.000Z',
       templateSuffix: null,
+      // When it last changed, as its blog's feed says (ADR-209).
+      updatedAt: eid.updatedAt.toISOString(),
     });
     expect(await store().articleByHandle('news/draft')).toBeNull();
 

@@ -316,12 +316,14 @@ export function pageObject(doc: PageDoc): Record<string, unknown> {
 /**
  * A shop's blog (ADR-177), as Shopify's `blog`: its published articles, the latest first, fetched
  * a chunk at a time as a page of them is shown; with `tag`, as at /blogs/{handle}/tagged/{tag},
- * those tagged with it alone, a tag matching as its handle does.
+ * those tagged with it alone, a tag matching as its handle does. On the page of its article
+ * `shown`, the articles either side of it too (ADR-209).
  */
 export function blogObject(
   doc: BlogDoc,
   ctx: ObjectContext,
   tag: string | null = null,
+  shown: string | null = null,
 ): Record<string, unknown> & Paginable {
   const listed =
     tag === null
@@ -329,6 +331,19 @@ export function blogObject(
       : doc.articles.filter((article) => article.tags.some((each) => handleize(each) === tag));
   let window = { offset: 0, limit: 50 };
   let articles: ItemRef[] | null = null;
+  // Shopify's `previous_article` is the newer, `next_article` the older; both are fetched in one
+  // round trip when a template first asks for either, and neither elsewhere than on the page.
+  const at = shown === null ? -1 : doc.articles.findIndex((article) => article.id === shown);
+  const newer = at > 0 ? doc.articles[at - 1]!.id : null;
+  const older = at >= 0 ? (doc.articles[at + 1]?.id ?? null) : null;
+  const beside = [newer, older].filter((id): id is string => id !== null);
+  const besideOf = (id: string | null) =>
+    id === null
+      ? null
+      : ctx.data.articles(beside).then((docs) => {
+          const found = docs[beside.indexOf(id)];
+          return found ? besideObject(found) : null;
+        });
   return {
     id: doc.id,
     handle: doc.handle,
@@ -346,11 +361,26 @@ export function blogObject(
         ctx,
       ));
     },
+    get previous_article() {
+      return besideOf(newer);
+    },
+    get next_article() {
+      return besideOf(older);
+    },
     [PAGINATE](offset: number, limit: number) {
       window = { offset, limit };
       articles = null;
     },
   };
+}
+
+/**
+ * An article beside the one shown, as Shopify's `article`. Printed, it is its address: Shopify
+ * gave the address alone before it gave the article, and themes written then print it.
+ */
+function besideObject(doc: ArticleDoc): Record<string, unknown> {
+  const article = articleObject(doc);
+  return { ...article, toString: () => String(article.url) };
 }
 
 /** The tags of these articles, each once whatever its case, in alphabetical order. */
@@ -381,6 +411,7 @@ export function articleObject(doc: ArticleDoc): Record<string, unknown> {
     author: doc.author,
     published_at: doc.publishedAt,
     created_at: doc.publishedAt,
+    updated_at: doc.updatedAt ?? doc.publishedAt,
     tags: doc.tags,
     template_suffix: doc.templateSuffix,
     image: null,

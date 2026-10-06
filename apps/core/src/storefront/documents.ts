@@ -194,6 +194,7 @@ export function articleDoc(
     tags: article.tags,
     publishedAt: article.publishedAt.toISOString(),
     templateSuffix: article.templateSuffix,
+    updatedAt: article.updatedAt.toISOString(),
   };
 }
 

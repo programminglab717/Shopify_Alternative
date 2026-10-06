@@ -6,9 +6,8 @@
 
 ## In progress
 
-**A blog's Atom feed, and the articles before and after** (OS-07, ADR-177): `/blogs/{handle}.atom`
-as Shopify serves it, for readers and other sites to follow a shop's blog, and
-`blog.previous_article` and `blog.next_article` on an article's page.
+**Paused** after the blog's feed, at a stop asked for. Next: Safepay's trackers asked after as
+JazzCash's payments are (PAY-01, ADR-208).
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +16,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### A blog's Atom feed, and the articles before and after
+
+* **Each blog's Atom feed** at `/blogs/{handle}.atom`, as Shopify serves it
+  ([ADR-209](../architecture/13-decision-log.md#adr-209--a-blog-has-shopifys-atom-feed-at-its-address-with-atom-its-30-latest-articles-whole-under-ids-of-their-own-and-an-articles-page-gives-themes-the-newer-and-the-older-article-beside-it-fetched-together-when-a-theme-first-asks-for-either)):
+  its 30 latest articles whole, with their summaries, authors and tags, under IDs of their own
+  (`urn:uuid:`), linking to their pages at the shop's address; kept at the edge with the blog's
+  page. Hatti Base's layout names it on the blog's pages and its articles'.
+* **Articles' documents say when each last changed** (`updatedAt`, documents' version 9), for the
+  feed and Liquid's `article.updated_at`.
+* **`blog.previous_article` and `blog.next_article`** on an article's page, the newer and the
+  older, fetched in one round trip when a theme first asks; printed, their addresses. Hatti Base
+  links both, in English and Urdu.
+* 1626 tests (5 new): the feed's markup, escaping, its 30 and when it changed, one gone and a blog
+  without articles; the route, its caching and its 404s; and an article's page linking those
+  beside it, in one round trip.
 
 ### 87132d9 · Asking JazzCash what became of a payment
 

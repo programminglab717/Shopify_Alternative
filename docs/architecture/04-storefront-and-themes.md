@@ -296,7 +296,9 @@ and its pages, at `/pages/{handle}` in Hatti Base's `page` template, their HTML 
 anything that runs when saved, which menus link to ([ADR-045](./13-decision-log.md#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)),
 and its blogs, at `/blogs/{handle}` a page of articles at a time and those with a tag at
 `/blogs/{handle}/tagged/{tag}`, with each article at `/blogs/{blog}/{article}`, in Hatti Base's
-`blog` and `article` templates ([ADR-177](./13-decision-log.md#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)).
+`blog` and `article` templates ([ADR-177](./13-decision-log.md#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)),
+each blog's Atom feed at `/blogs/{handle}.atom` and an article's page linking those beside it
+([ADR-209](./13-decision-log.md#adr-209--a-blog-has-shopifys-atom-feed-at-its-address-with-atom-its-30-latest-articles-whole-under-ids-of-their-own-and-an-articles-page-gives-themes-the-newer-and-the-older-article-beside-it-fetched-together-when-a-theme-first-asks-for-either)).
 Its policies are kept as Shopify keeps them, its refund, privacy, shipping and terms policies
 and its contact information, cleaned as pages are, and shown at `/policies/refund-policy` and the
 rest in Shopify's markup inside the theme's layout, which needs no template for them; Liquid's

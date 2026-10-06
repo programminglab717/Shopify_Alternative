@@ -1,10 +1,17 @@
-import type { ProductDoc, StoreData, VariantDoc } from '@hatti/storefront-data';
+import type {
+  ArticleDoc,
+  BlogDoc,
+  ProductDoc,
+  StoreData,
+  VariantDoc,
+} from '@hatti/storefront-data';
 import { escapeHtml, imageAddress, unescapeHtml } from './liquid.js';
 
 // Catalog feeds (MKT-11, ADR-142): a shop's products as Google Merchant Center fetches them, in
 // its RSS 2.0 format, which Meta's catalogs take too: an item for each variant, grouped by its
 // product, linking to it on the shop's own address. Ads and free listings are made from them, and
-// the pixels' and conversions' content IDs to come name the same variants.
+// the pixels' and conversions' content IDs to come name the same variants. And a blog's Atom feed
+// (ADR-209), which feed readers and other sites follow.
 
 /** Products fetched a round trip at a time. */
 export const FEED_CHUNK = 100;
@@ -122,6 +129,71 @@ function textOf(html: string): string {
 
 function clip(text: string, max: number): string {
   return text.length > max ? text.slice(0, max) : text;
+}
+
+/** The articles a blog's feed holds, its latest, as Shopify's does (ADR-209). */
+export const BLOG_FEED_ARTICLES = 30;
+
+/**
+ * A blog's Atom feed (RFC 4287), as Shopify serves it at /blogs/{handle}.atom (ADR-209): its
+ * latest articles, the newest first, each whole, linking to its page at the shop's own address.
+ * Its IDs are the blog's and the articles' own, so a new handle or domain shows readers nothing
+ * twice. The head, then an article at a time: an article's body may be half a megabyte.
+ */
+export async function* blogFeed(
+  store: Pick<StoreData, 'articles'>,
+  shop: FeedShop,
+  blog: BlogDoc,
+  origin: string,
+  now: Date = new Date(),
+): AsyncGenerator<string> {
+  const ids = blog.articles.slice(0, BLOG_FEED_ARTICLES).map((article) => article.id);
+  const articles = ids.length === 0 ? [] : await store.articles(ids);
+  const shown = articles.filter((doc): doc is ArticleDoc => doc !== null);
+  const address = `${origin}/blogs/${blog.handle}`;
+  // When it last changed: when its articles did, or now for a blog without any yet.
+  const updated = shown.map(updatedOf).reduce((a, b) => (a > b ? a : b), '') || now.toISOString();
+  yield '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<feed xmlns="http://www.w3.org/2005/Atom">\n' +
+    `<id>urn:uuid:${xml(blog.id)}</id>\n` +
+    `<link rel="alternate" type="text/html" href="${xml(address)}"/>\n` +
+    `<link rel="self" type="application/atom+xml" href="${xml(`${address}.atom`)}"/>\n` +
+    `<title>${xml(`${shop.name} - ${blog.title}`)}</title>\n` +
+    `<updated>${updated}</updated>\n` +
+    `<author><name>${xml(shop.name)}</name></author>\n`;
+  for (const article of shown) yield feedEntry(article, origin);
+  yield '</feed>\n';
+}
+
+/**
+ * An article as its blog's feed has it: its content and summary as HTML, escaped, their relative
+ * addresses taken from its page's; signed by its author, else by the shop, as the feed is.
+ */
+export function feedEntry(article: ArticleDoc, origin: string): string {
+  const address = `${origin}/blogs/${article.blogHandle}/${article.handle}`;
+  const base = `xml:base="${xml(address)}"`;
+  return (
+    '<entry>\n' +
+    `<id>urn:uuid:${xml(article.id)}</id>\n` +
+    `<published>${new Date(article.publishedAt).toISOString()}</published>\n` +
+    `<updated>${updatedOf(article)}</updated>\n` +
+    `<link rel="alternate" type="text/html" href="${xml(address)}"/>\n` +
+    `<title>${xml(article.title)}</title>\n` +
+    (article.author ? `<author><name>${xml(article.author)}</name></author>\n` : '') +
+    article.tags.map((tag) => `<category term="${xml(tag)}"/>\n`).join('') +
+    (article.summaryHtml
+      ? `<summary type="html" ${base}>${xml(article.summaryHtml)}</summary>\n`
+      : '') +
+    `<content type="html" ${base}>${xml(article.bodyHtml)}</content>\n` +
+    '</entry>\n'
+  );
+}
+
+/** When an article last changed, never before it was published: in documents without, then. */
+function updatedOf(article: ArticleDoc): string {
+  const published = new Date(article.publishedAt);
+  const updated = new Date(article.updatedAt ?? article.publishedAt);
+  return (updated > published ? updated : published).toISOString();
 }
 
 /** Text as XML holds it: escaped, without the control characters XML 1.0 has no place for. */

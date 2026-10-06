@@ -956,7 +956,9 @@ async function resourceOf(
       ctx.data.article(found.handle),
       ctx.data.blog(found.handle.split('/')[0]!),
     ]);
-    return doc ? { article: articleObject(doc), blog: blog && blogObject(blog, ctx) } : null;
+    return doc
+      ? { article: articleObject(doc), blog: blog && blogObject(blog, ctx, null, doc.id) }
+      : null;
   }
   if (found.name === 'policy') {
     const kind = found.handle ? policyByHandle(found.handle) : null;

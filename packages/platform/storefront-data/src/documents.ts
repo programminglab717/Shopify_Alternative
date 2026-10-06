@@ -9,7 +9,7 @@ import type { HandledKind } from './keys.js';
  * The documents' shape. Raise it when documents gain or change a field: a publisher that finds a
  * shop's written in an older shape publishes all of them again.
  */
-export const DOCUMENTS_VERSION = 8;
+export const DOCUMENTS_VERSION = 9;
 
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
@@ -122,6 +122,11 @@ export interface ArticleDoc {
   publishedAt: string;
   /** Another of the theme's article templates, "recipe" for article.recipe.json; null for none. */
   templateSuffix: string | null;
+  /**
+   * When it last changed, in ISO 8601, as its blog's feed says (ADR-209). Absent in documents
+   * written before blogs had feeds: when it was published.
+   */
+  updatedAt?: string;
 }
 
 /** What an article is found by, as in its address: its blog's handle and its own, news/eid-edit. */

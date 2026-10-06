@@ -110,7 +110,10 @@
     "article": {
       "by": "By {{ author }}",
       "back": "Back to {{ blog }}",
-      "tags": "Tagged:"
+      "tags": "Tagged:",
+      "older": "Older article",
+      "newer": "Newer article",
+      "more": "More from {{ blog }}"
     },
     "newsletter": {
       "consent": "Send me news and offers from {{ shop }} on WhatsApp",

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-208 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-209 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -216,6 +216,7 @@
 | 206 | Each product a shop's link page shows may name one of its variants, kept beside it by its place: the page shows that variant's title, image and price, and Buy now goes straight to checkout with it; a variant deleted since is as none chosen | Accepted |
 | 207 | Themes get Shopify's shop.brand: its logo and square logo as images from where the API serves them, nil for what Hatti does not keep; and Hatti Base's header shows the logo in place of the shop's name | Accepted |
 | 208 | A payment started online whose customer never came back is asked after: the worker asks the gateway's status inquiry, JazzCash's first, from a quarter of an hour after it began, at most once an hour for two days, and records one the gateway vouches for paid through the inquiry | Accepted |
+| 209 | A blog has Shopify's Atom feed at its address with .atom, its 30 latest articles whole under IDs of their own, and an article's page gives themes the newer and the older article beside it, fetched together when a theme first asks for either | Accepted |
 
 ---
 
@@ -8721,3 +8722,50 @@
     known as paid, and its customer to hear of it.
   * **Believing an unsigned answer, as it comes over TLS:** what marks an order paid is believed
     signed alone, as returns and webhooks are.
+
+## ADR-209 · A blog has Shopify's Atom feed at its address with .atom, its 30 latest articles whole under IDs of their own, and an article's page gives themes the newer and the older article beside it, fetched together when a theme first asks for either
+
+* **Context:** A shop's blogs show on its storefront as Shopify's do
+  ([ADR-177](#adr-177--a-shops-blogs-show-on-its-storefront-as-shopifys-do-a-blogs-document-lists-its-published-articles-the-latest-first-with-their-tags-and-each-articles-is-found-by-its-blogs-handle-and-its-own-a-blogs-page-lists-a-page-of-them-at-a-time-those-with-a-tag-apart-and-the-sitemaps-list-both)), which left their Atom feed and the next and previous articles for later.
+  Shopify serves each blog's feed at /blogs/{handle}.atom, its 30 latest articles with their
+  content, authors, tags and dates, which feed readers, other sites and newsletters follow. Its
+  themes link an article to those beside it through `blog.previous_article`, the newer, and
+  `blog.next_article`, the older, which Shopify once gave as addresses and gives now as articles.
+  Articles' documents said when each was published, not when it last changed.
+* **Decision:**
+  * **The feed** at /blogs/{handle}.atom, in Atom 1.0 (RFC 4287): the blog's 30 latest articles,
+    the newest first, each whole as HTML, with its summary where it has one, its author, else the
+    shop's, and its tags as categories, linking to its page at the shop's own address; relative
+    addresses in it are taken from its page's (`xml:base`). The feed's ID and its articles' are
+    their own UUIDs (`urn:uuid:`), so a new handle or domain shows readers nothing twice; its
+    title is the shop's name and the blog's, as Shopify's is.
+  * **When they changed:** articles' documents say when each last changed (`updatedAt`, documents'
+    version 9), never before it was published; the feed, when its articles last did, or when it
+    is asked for while the blog has none. Documents written before say when it was published,
+    until the shop's next publish writes them all again.
+  * **Kept at the edge as the blog's page is**, by the shop's and the blog's tags
+    ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)): an article's change purges its blog's. Each article is fetched in one
+    round trip, and the feed sent an article at a time, as one may be half a megabyte.
+  * **The articles beside one:** on an article's page, `blog.previous_article` and
+    `blog.next_article` are those either side of it in its blog, fetched in one round trip when a
+    theme first asks for either, and nothing elsewhere; printed, each is its address, as
+    Shopify's once was. Liquid's `article.updated_at` too.
+  * **Hatti Base** links an article to the older and the newer, and its layout names the blog's
+    feed on the blog's pages and its articles', in English and Urdu.
+* **Consequences:**
+  * A shop moving from Shopify keeps its feed's address; its readers see its articles once more,
+    under their new IDs.
+  * An article's page showing those beside it costs a round trip more; any article's change in
+    its blog forgets it at the edge already, so its links stay right.
+  * Every shop's documents are published again on its next event, for `updatedAt`.
+  * Not yet: feeds of collections' products, as Shopify's /collections/{handle}.atom; articles'
+    images in the feed, as articles have none yet; the feed in each of the theme's languages, as
+    articles are not translated.
+* **Alternatives:**
+  * **Articles' addresses as their IDs, as Shopify's are:** a new handle or domain would show
+    readers each article again.
+  * **The handles and titles of articles in their blog's document:** no round trip, but the
+    document grows with every article for links few themes show, and a theme asking more of
+    them would still fetch them.
+  * **The feed as a template of the theme's:** Shopify serves it without one, and themes written
+    for Shopify have none; sitemaps are served the same way ([ADR-051](#adr-051--search-engines-and-link-previews-are-told-each-pages-address-at-the-shops-own-in-each-language-and-find-pages-through-sitemaps-of-the-storefronts-documents)).
