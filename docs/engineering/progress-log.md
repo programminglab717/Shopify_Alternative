@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### A blog's Atom feed, and the articles before and after
+### 16e8ae5 · A blog's Atom feed, and the articles before and after
 
 * **Each blog's Atom feed** at `/blogs/{handle}.atom`, as Shopify serves it
   ([ADR-209](../architecture/13-decision-log.md#adr-209--a-blog-has-shopifys-atom-feed-at-its-address-with-atom-its-30-latest-articles-whole-under-ids-of-their-own-and-an-articles-page-gives-themes-the-newer-and-the-older-article-beside-it-fetched-together-when-a-theme-first-asks-for-either)):
