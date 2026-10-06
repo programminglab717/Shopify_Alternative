@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### An advance for products the shop tags
+### 7740474 · An advance for products the shop tags
 
 * **The shop's advance may name products' tags** ([ADR-224](../architecture/13-decision-log.md#adr-224--a-shops-advance-may-be-asked-only-of-orders-holding-a-product-it-tags-checkout-knows-the-carts-products-before-anything-is-typed-names-the-product-beside-cash-on-delivery-and-asks-a-cart-holding-none-for-nothing)) (migration 0141):
   asked only of orders holding a product tagged with one of them, in any letter case, its other
