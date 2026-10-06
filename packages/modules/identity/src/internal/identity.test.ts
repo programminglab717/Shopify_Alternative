@@ -1743,6 +1743,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'write_content',
         'write_domains',
         'write_legal_policies',
+        'write_translations',
         'write_discounts',
         'write_files',
         'write_pixels',

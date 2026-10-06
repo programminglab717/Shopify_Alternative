@@ -26,10 +26,13 @@ import {
   PolicyService,
   PreferencesService,
   ThemeService,
+  TranslationService,
   UrlRedirectService,
   shopDomainsOf,
   shopPoliciesOf,
   shopRedirectsOf,
+  shopTranslationsOf,
+  type TranslatableKind,
 } from '@hatti/online-store/public';
 import type { ObjectStorage } from '@hatti/storage';
 import {
@@ -240,6 +243,22 @@ describe('What storefront documents an event makes stale', () => {
       expect(itemsFor(event(type, payload)), type).toEqual(['redirects']);
     }
   });
+
+  it("rebuilds what a translation is of, and the menus for a menu's or its item's (ADR-238)", () => {
+    const translated = (kind: string) =>
+      itemsFor(event('translations.updated', { kind, locales: ['ur'], keys: ['title'] }));
+    expect(
+      ['product', 'collection', 'page', 'blog', 'article', 'menu', 'menuItem'].map(translated),
+    ).toEqual([
+      ['product:a1'],
+      ['collection:a1'],
+      ['page:a1'],
+      ['blog:a1'],
+      ['article:a1'],
+      ['menus'],
+      ['menus'],
+    ]);
+  });
 });
 
 describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
@@ -370,6 +389,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         pixels: { metaPixelIdOf: metaPixelIdIn },
         brand: { logoOf: shopLogoOf },
         files: { readyImagesIn },
+        translations: { translationsOf: shopTranslationsOf },
       },
       {
         keys,
@@ -1079,6 +1099,94 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await articles.update(tenant, lawn.id, { isPublished: false }));
     await deliver();
     expect(await links()).toEqual(['Stories /blogs/making blog_link']);
+  });
+
+  it('publishes what the shop wrote in Urdu beside its own words, and follows it (ADR-238)', async () => {
+    const translations = new TranslationService(
+      database,
+      products,
+      collections,
+      pages,
+      blogs,
+      articles,
+      menus,
+    );
+    const kurta = unwrap(
+      await products.create(tenant, {
+        title: 'Cotton Kurta',
+        status: 'active',
+        description: 'Soft cotton.\nHand wash.',
+        variants: [{ price: '2,500' }],
+      }),
+    );
+    const guide = unwrap(
+      await pages.create(tenant, {
+        title: 'Size guide',
+        body: '<p>Measure twice.</p>',
+        seo: { title: 'Sizes', description: null },
+      }),
+    );
+    const care = unwrap(
+      await menus.create(tenant, {
+        title: 'Customer care',
+        handle: 'customer-care',
+        items: [
+          { title: 'Track your order', type: 'http', url: '/pages/track' },
+          { title: 'Home', type: 'frontpage' },
+        ],
+      }),
+    );
+    const translate = async (kind: TranslatableKind, id: string, words: Record<string, string>) => {
+      const { content } = (await translations.resource(tenant, kind, id))!;
+      unwrap(
+        await translations.register(
+          tenant,
+          kind,
+          id,
+          Object.entries(words).map(([key, value]) => ({
+            locale: 'ur',
+            key,
+            value,
+            translatableContentDigest: content.find((field) => field.key === key)!.digest,
+          })),
+        ),
+      );
+    };
+    await translate('product', kurta.id, {
+      title: 'سوتی کرتا',
+      body_html: '<p>نرم سوتی۔<br>ہاتھ سے دھوئیں۔</p>',
+    });
+    await translate('page', guide.id, { title: 'سائز گائیڈ', meta_title: 'سائز' });
+    await translate('menuItem', care.items[0]!.id, { title: 'آرڈر ٹریک کریں' });
+    await deliver();
+
+    // Each document has the shop's own words, and its Urdu beside them, a description shown as
+    // the product's own is.
+    const [kurtaDoc] = await store().products([kurta.id]);
+    expect([kurtaDoc!.title, kurtaDoc!.translations]).toEqual([
+      'Cotton Kurta',
+      { ur: { title: 'سوتی کرتا', descriptionHtml: '<p>نرم سوتی۔<br>ہاتھ سے دھوئیں۔</p>' } },
+    ]);
+    expect((await store().pageByHandle('size-guide'))!.translations).toEqual({
+      ur: { title: 'سائز گائیڈ', seo: { title: 'سائز' } },
+    });
+    // A menu's links in Urdu, those not translated in the shop's own words.
+    expect((await store().menu('customer-care'))!.translations).toEqual({
+      ur: {
+        links: [
+          { title: 'آرڈر ٹریک کریں', url: '/pages/track', type: 'http_link', links: [] },
+          { title: 'Home', url: '/', type: 'frontpage_link', links: [] },
+        ],
+      },
+    });
+
+    // Removed, the shop's own words are all there is again.
+    unwrap(await translations.remove(tenant, 'product', kurta.id, ['title', 'body_html'], ['ur']));
+    unwrap(await translations.remove(tenant, 'menuItem', care.items[0]!.id, ['title'], ['ur']));
+    await deliver();
+    expect((await store().products([kurta.id]))[0]!.translations).toBeUndefined();
+    expect((await store().menu('customer-care'))!.translations).toBeUndefined();
+    expect((await store().pageByHandle('size-guide'))!.translations?.ur?.title).toBe('سائز گائیڈ');
   });
 
   it("publishes the shop's WhatsApp number, and takes it off when the shop does", async () => {

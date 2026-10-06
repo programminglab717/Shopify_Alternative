@@ -20,6 +20,15 @@ export interface SeoDoc {
   description: string | null;
 }
 
+/**
+ * A document's fields in other languages of the storefront, as the shop translated them (OS-06,
+ * ADR-238), by language: each field it translated, and its SEO title or description, shown in
+ * place of the document's own on that language's pages (`translated`).
+ */
+export type TranslationsDoc<T, K extends keyof T> = Partial<
+  Record<string, Partial<Pick<T, K>> & { seo?: Partial<SeoDoc> }>
+>;
+
 export interface ImageDoc {
   /** Where the image service serves it, without size parameters. */
   src: string;
@@ -65,6 +74,8 @@ export interface ProductDoc {
    * Absent in documents written before: its own.
    */
   seo?: SeoDoc;
+  /** Its fields in Urdu, those the shop translated (ADR-238); absent where it translated none. */
+  translations?: TranslationsDoc<ProductDoc, 'title' | 'descriptionHtml' | 'productType'>;
 }
 
 export interface CollectionDoc {
@@ -85,12 +96,19 @@ export interface CollectionDoc {
    * Absent in documents written before: its own.
    */
   seo?: SeoDoc;
+  /** Its fields in Urdu, those the shop translated (ADR-238); absent where it translated none. */
+  translations?: TranslationsDoc<CollectionDoc, 'title' | 'descriptionHtml'>;
 }
 
 export interface MenuDoc {
   handle: string;
   title: string;
   links: MenuLinkDoc[];
+  /**
+   * Its title and links in Urdu (ADR-238), each link's title the shop's translation where it gave
+   * one; absent where it translated none.
+   */
+  translations?: TranslationsDoc<MenuDoc, 'title' | 'links'>;
 }
 
 /** A menu's link, as Liquid's `link` has it, with the links under it. */
@@ -125,6 +143,8 @@ export interface PageDoc {
    * Absent in documents written before: its own.
    */
   seo?: SeoDoc;
+  /** Its fields in Urdu, those the shop translated (ADR-238); absent where it translated none. */
+  translations?: TranslationsDoc<PageDoc, 'title' | 'bodyHtml'>;
 }
 
 /** A shop's blog, such as News (ADR-177). */
@@ -146,6 +166,8 @@ export interface BlogDoc {
   commentPolicy?: CommentPolicyDoc;
   /** When it last changed, as ISO 8601 (ADR-236). Absent in documents written before. */
   updatedAt?: string;
+  /** Its fields in Urdu, those the shop translated (ADR-238); absent where it translated none. */
+  translations?: TranslationsDoc<BlogDoc, 'title'>;
 }
 
 /** Shopify's comment policies: none, each approved by the shop first, or each shown at once. */
@@ -203,6 +225,8 @@ export interface ArticleDoc {
    * Absent in documents written before: its own.
    */
   seo?: SeoDoc;
+  /** Its fields in Urdu, those the shop translated (ADR-238); absent where it translated none. */
+  translations?: TranslationsDoc<ArticleDoc, 'title' | 'bodyHtml' | 'summaryHtml'>;
 }
 
 /** What an article is found by, as in its address: its blog's handle and its own, news/eid-edit. */

@@ -16,6 +16,7 @@ export {
   type ThemeDeletedPayload,
   type ThemePublishedPayload,
   type ThemeUpdatedPayload,
+  type TranslationsUpdatedPayload,
   type UrlRedirectChangedPayload,
 } from '../internal/events.js';
 export { OnlineStoreModule } from '../internal/online-store.module.js';
@@ -64,6 +65,23 @@ export { MENU_LIMITS, type MenuItemInput } from '../internal/menu-items.js';
 export { MenuService, type MenuInput } from '../internal/menu.service.js';
 export { PAGE_LIMITS, cleanPageBody } from '../internal/page-body.js';
 export { PageService, type PageInput } from '../internal/page.service.js';
+export {
+  PRIMARY_LOCALE,
+  TRANSLATABLE_FIELDS,
+  TRANSLATION_LIMITS,
+  TRANSLATION_LOCALES,
+  digestOf,
+  type TranslatableKind,
+  type TranslationKey,
+} from '../internal/translation-content.js';
+export {
+  TranslationService,
+  shopTranslationsOf,
+  type TranslatableResourceRecord,
+  type TranslatedFields,
+  type TranslationInputValue,
+  type TranslationRecord,
+} from '../internal/translation.service.js';
 export {
   PASSWORD_LENGTH,
   PASSWORD_MESSAGE_MAX,

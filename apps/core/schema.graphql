@@ -3879,6 +3879,20 @@ type LinkTaps {
   url: String!
 }
 
+"""
+How a field's words are written, so an editor knows how to take its translation.
+"""
+enum LocalizableContentType {
+  """HTML, cleaned when kept of anything that could run."""
+  HTML
+
+  """Words that may run long, such as an SEO description."""
+  MULTI_LINE_TEXT_FIELD
+
+  """Words on one line, such as a title."""
+  SINGLE_LINE_TEXT_FIELD
+}
+
 """A place where stock is kept, such as a warehouse or a shop."""
 type Location {
   address: LocationAddress!
@@ -5577,6 +5591,16 @@ type Mutation {
   Makes the theme the main one, which the storefront shows a moment later; the main one before it is unpublished.
   """
   themePublish(id: ID!): ThemePublishPayload!
+
+  """
+  Keeps translations of a resource's fields, each naming the digest of the words it translates, as Shopify's translationsRegister: one kept already for a field in the language is replaced, and the storefront's Urdu pages show them a moment later.
+  """
+  translationsRegister(resourceId: ID!, translations: [TranslationInput!]!): TranslationsRegisterPayload!
+
+  """
+  Forgets a resource's translations of the fields named, in the languages named, as Shopify's translationsRemove: the storefront shows the shop's own words for them again.
+  """
+  translationsRemove(locales: [String!]!, resourceId: ID!, translationKeys: [String!]!): TranslationsRemovePayload!
 
   """
   A redirect from a path the shop has no page at to another address, followed by the storefront a moment later.
@@ -8441,6 +8465,22 @@ type Query {
     """Only themes with these roles."""
     roles: [ThemeRole!]
   ): OnlineStoreThemeConnection!
+
+  """
+  A product, collection, page, blog, article, menu or menu item of the shop, by its ID, with its fields that may be translated and their translations (ADR-238).
+  """
+  translatableResource(resourceId: ID!): TranslatableResource
+
+  """
+  The shop's resources of a kind that may be translated, the newest first.
+  """
+  translatableResources(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+    resourceType: TranslatableResourceType!
+  ): TranslatableResourceConnection!
   urlRedirect(id: ID!): UrlRedirect
 
   """The shop's URL redirects, oldest first."""
@@ -9824,6 +9864,121 @@ type TransferReceipt {
   Where it is shown, for an hour from when it was asked for, named for its order: "Receipt #1023-1.jpg".
   """
   url: String!
+}
+
+"""
+A field of the shop's own that may be translated, in its own language, as Shopify's TranslatableContent: a translation names its digest.
+"""
+type TranslatableContent {
+  """SHA-256 of `value`, in hex: give it with a translation of these words."""
+  digest: String
+
+  """The field, by Shopify's key: title, body_html, meta_title…"""
+  key: String!
+
+  """The language it is in: the storefront's own, en."""
+  locale: String!
+  type: LocalizableContentType!
+  value: String
+}
+
+"""
+Something of the shop's that may be translated, as Shopify's TranslatableResource: its fields with words, and their translations. The storefront's Urdu pages show each translation in place of its field (ADR-238).
+"""
+type TranslatableResource {
+  """The product, collection, page, blog, article, menu or item."""
+  resourceId: ID!
+  translatableContent: [TranslatableContent!]!
+
+  """
+  Its translations into `locale`; with `outdated`, only those whose words have, or have not, changed since.
+  """
+  translations(locale: String!, outdated: Boolean): [Translation!]!
+}
+
+type TranslatableResourceConnection {
+  edges: [TranslatableResourceEdge!]!
+  nodes: [TranslatableResource!]!
+  pageInfo: PageInfo!
+}
+
+type TranslatableResourceEdge {
+  cursor: String!
+  node: TranslatableResource!
+}
+
+"""What of a shop's may be translated, as Shopify names it."""
+enum TranslatableResourceType {
+  """A collection: its title, description, and SEO title and description."""
+  COLLECTION
+
+  """A menu's item, at any level: its title."""
+  LINK
+
+  """A menu: its title."""
+  MENU
+
+  """An article: its title, body, summary, and SEO title and description."""
+  ONLINE_STORE_ARTICLE
+
+  """A blog: its title."""
+  ONLINE_STORE_BLOG
+
+  """A page: its title, body, and SEO title and description."""
+  ONLINE_STORE_PAGE
+
+  """
+  A product: its title, description, type, and SEO title and description.
+  """
+  PRODUCT
+}
+
+"""
+A field in another of the storefront's languages, as Shopify's Translation.
+"""
+type Translation {
+  key: String!
+
+  """Its language: ur."""
+  locale: String!
+
+  """
+  Whether the shop's own words have changed since it was written for them: the storefront shows it until it is written again or removed.
+  """
+  outdated: Boolean!
+  updatedAt: DateTime
+  value: String
+}
+
+"""A field's translation, as Shopify's TranslationInput."""
+input TranslationInput {
+  """The field, by Shopify's key, as its TranslatableContent names it."""
+  key: String!
+
+  """Its language: ur."""
+  locale: String!
+
+  """
+  The digest of the shop's own words it translates, as their TranslatableContent gives it: refused with STALE if they have changed since.
+  """
+  translatableContentDigest: String!
+
+  """
+  Its words: a title on one line; a product's or collection's description as HTML, kept as its paragraphs and line breaks, as the description is; HTML of a page or article cleaned of anything that could run.
+  """
+  value: String!
+}
+
+type TranslationsRegisterPayload {
+  """Those kept; null on errors."""
+  translations: [Translation!]
+  userErrors: [UserError!]!
+}
+
+type TranslationsRemovePayload {
+  """Those removed; null on errors."""
+  translations: [Translation!]
+  userErrors: [UserError!]!
 }
 
 """

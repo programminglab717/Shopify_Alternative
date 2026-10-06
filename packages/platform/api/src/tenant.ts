@@ -32,6 +32,8 @@ export const ACCESS_SCOPES = [
   'write_domains',
   'read_legal_policies',
   'write_legal_policies',
+  'read_translations',
+  'write_translations',
   'read_discounts',
   'write_discounts',
   'read_files',
@@ -77,8 +79,9 @@ const VIEW_CATALOG: readonly AccessScope[] = ['read_products', 'read_inventory',
  * and marketers view, packers and accountants see none. Segments: owner, manager and marketer
  * build them. Shop settings and policies, such as when risky orders wait for review, the online
  * store's themes, menus and domains, and its legal policies: owner and manager only. Its pages
- * and blogs, which are content (ADR-176), discount codes, which are marketing, the files they
- * upload, and the ad platforms its orders go to (ADR-143): marketers too. Store credit (ADR-184):
+ * and blogs, which are content (ADR-176), and its content's Urdu (ADR-238), discount codes, which
+ * are marketing, the files they upload, and the ad platforms its orders go to (ADR-143):
+ * marketers too. Store credit (ADR-184):
  * owners and managers credit and debit it; accountants see it all, and confirmation agents what
  * a customer has.
  */
@@ -95,6 +98,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_content',
     'write_domains',
     'write_legal_policies',
+    'write_translations',
     'write_discounts',
     'write_files',
     'write_pixels',
@@ -113,6 +117,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_content',
     'write_domains',
     'write_legal_policies',
+    'write_translations',
     'write_discounts',
     'write_files',
     'write_pixels',
@@ -133,6 +138,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_segments',
     'write_online_store_pages',
     'write_content',
+    'write_translations',
     'write_discounts',
     'write_files',
     'write_pixels',

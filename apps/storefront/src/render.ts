@@ -1,6 +1,12 @@
 import { Context, toPromise, type Liquid, type Template } from 'liquidjs';
 import type { CartJson } from '@hatti/storefront-api';
-import type { HandledKind, SeoDoc, ShopDoc, StoreData } from '@hatti/storefront-data';
+import {
+  TranslatedStore,
+  type HandledKind,
+  type SeoDoc,
+  type ShopDoc,
+  type StoreData,
+} from '@hatti/storefront-data';
 import { cartProducts } from './cart.js';
 import { editorAttribute, editorScript, type EditorPlace } from './editor.js';
 import {
@@ -496,7 +502,10 @@ export class PageRenderer {
     themeFor?: ThemeFor,
   ): Promise<PreparedPage> {
     const started = performance.now();
-    const data = new RequestData(store);
+    // Shown in the page's language: the shop's own words where it translated none (ADR-238).
+    const data = new RequestData(
+      request.locale ? new TranslatedStore(store, request.locale) : store,
+    );
     const query = request.query ?? {};
     const ctx: ObjectContext = { data, query, chunkSize: this.options.chunkSize ?? 12 };
 

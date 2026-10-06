@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Content in Urdu** (OS-06): a shop's own Urdu for its products, collections, pages, articles and
-menus, kept as Shopify's `translationsRegister` keeps translations, and shown on its storefront's
-Urdu pages.
+**Policies in Urdu** (OS-06, ONB-09): a shop's policies translated as its other content is,
+through Shopify's SHOP_POLICY translations, shown on the Urdu policy pages and linked from checkout
+in the shopper's language.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,24 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Content in Urdu
+
+* **A shop's own Urdu for its content** ([ADR-238](../architecture/13-decision-log.md#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)), as Shopify's
+  translations keep it: a product's title, description, type and SEO; a collection's, page's and
+  article's title, body and SEO, and an article's summary; a blog's, menu's and menu item's
+  title. Migration 0146 keeps a field each, with the digest of the shop's words it was written
+  for.
+* **Shopify's API:** `translatableResource(s)` gives each field with words and its digest;
+  `translationsRegister` refuses a translation written for words since changed (STALE), and
+  `translationsRemove` forgets one. A translation whose words changed is `outdated`, and still
+  shown. New scopes, `read_translations` and `write_translations`, for owners, managers and
+  marketers.
+* **On the storefront:** documents carry their Urdu beside the shop's own words, and Urdu pages
+  show it in their place, a menu's links and an SEO description among them; themes need nothing
+  new.
+* 1741 tests: translations kept, refused, replaced, outdated and removed; listed a page at a
+  time; written into documents and shown on Urdu pages; and the API's scopes.
 
 ### 424177e · Structured data beyond products
 

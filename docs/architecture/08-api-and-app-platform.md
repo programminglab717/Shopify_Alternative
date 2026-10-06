@@ -41,7 +41,10 @@ Storefront API with public tokens comes with headless storefronts.
   `inventoryAdjustQuantities` require it. A retry with the same key gets the first answer back
   for 24 hours.
 * **Localisation:** translatable fields expose `translations(locale: UR)`. The `Accept-Language`
-  header sets the default.
+  header sets the default. *Built so far*
+  ([ADR-238](./13-decision-log.md#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)):
+  Shopify's `translatableResource`, `translatableResources`, `translationsRegister` and
+  `translationsRemove`, under `read_translations` and `write_translations`.
 
 ```graphql
 mutation BookShipments($input: ShipmentsBookInput!) {

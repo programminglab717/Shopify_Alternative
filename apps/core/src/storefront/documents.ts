@@ -18,6 +18,8 @@ import {
   type ShownComments,
   type ThemeFileRecord,
   type ThemeRecord,
+  type TranslatedFields,
+  type TranslationKey,
 } from '@hatti/online-store/public';
 import {
   DOCUMENTS_VERSION,
@@ -30,6 +32,7 @@ import {
   type MenuLinkDoc,
   type PageDoc,
   type ProductDoc,
+  type SeoDoc,
   type ShopDoc,
   type ThemeDoc,
 } from '@hatti/storefront-data';
@@ -60,6 +63,8 @@ export function productDoc(
   record: ProductRecord,
   available: ReadonlyMap<string, boolean>,
   address: ImageAddress,
+  /** Its fields the shop translated (ADR-238), a description as text. */
+  translations?: TranslatedFields,
 ): ProductDoc {
   const images = record.media.flatMap((media) => {
     const src = imageSrc(media, record.handle, address);
@@ -108,10 +113,21 @@ export function productDoc(
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
     seo: record.seo,
+    ...translationsDoc(translations, (fields) => ({
+      title: fields.title,
+      descriptionHtml: fields.body_html === undefined ? undefined : textToHtml(fields.body_html),
+      productType: fields.product_type,
+      seo: seoTranslation(fields),
+    })),
   };
 }
 
-export function collectionDoc(record: CollectionRecord, productIds: string[]): CollectionDoc {
+export function collectionDoc(
+  record: CollectionRecord,
+  productIds: string[],
+  /** Its fields the shop translated (ADR-238), a description as text. */
+  translations?: TranslatedFields,
+): CollectionDoc {
   return {
     id: record.id,
     handle: record.handle,
@@ -121,7 +137,36 @@ export function collectionDoc(record: CollectionRecord, productIds: string[]): C
     productIds,
     updatedAt: record.updatedAt.toISOString(),
     seo: record.seo,
+    ...translationsDoc(translations, (fields) => ({
+      title: fields.title,
+      descriptionHtml: fields.body_html === undefined ? undefined : textToHtml(fields.body_html),
+      seo: seoTranslation(fields),
+    })),
   };
+}
+
+/** A document's fields in each language the shop translated some into (ADR-238); none without. */
+function translationsDoc<T extends object>(
+  translations: TranslatedFields | undefined,
+  fieldsOf: (fields: Partial<Record<TranslationKey, string>>) => T,
+): { translations?: Partial<Record<string, T>> } {
+  const entries = Object.entries(translations ?? {}).flatMap(([locale, fields]) =>
+    fields ? [[locale, defined(fieldsOf(fields))] as const] : [],
+  );
+  return entries.length > 0 ? { translations: Object.fromEntries(entries) } : {};
+}
+
+/** An SEO title and description the shop translated; none where it translated neither. */
+function seoTranslation(
+  fields: Partial<Record<TranslationKey, string>>,
+): Partial<SeoDoc> | undefined {
+  const seo = defined({ title: fields.meta_title, description: fields.meta_description });
+  return Object.keys(seo).length > 0 ? seo : undefined;
+}
+
+/** `value` without its fields that are undefined. */
+function defined<T extends object>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, field]) => field !== undefined)) as T;
 }
 
 export function allProductsDoc(productIds: string[]): CollectionDoc {
@@ -139,27 +184,68 @@ export function allProductsDoc(productIds: string[]): CollectionDoc {
  * A menu as the storefront shows it (ADR-040): a link to a collection, product or page it cannot
  * show, gone, not active or not published, is left out with the links under it.
  */
-export function menuDoc(menu: MenuRecord): MenuDoc {
-  return { handle: menu.handle, title: menu.title, links: linkDocs(menu.items) };
+export function menuDoc(
+  menu: MenuRecord,
+  /** What the shop translated of the menu's title and its items' (ADR-238), by their IDs. */
+  translations: ReadonlyMap<string, TranslatedFields> = new Map(),
+): MenuDoc {
+  const doc: MenuDoc = {
+    handle: menu.handle,
+    title: menu.title,
+    links: linkDocs(menu.items, (item) => item.title),
+  };
+  const items = itemIds(menu.items);
+  const locales = new Set(
+    [menu.id, ...items].flatMap((id) => Object.keys(translations.get(id) ?? {})),
+  );
+  if (locales.size === 0) return doc;
+  const titleIn = (locale: string, id: string) => translations.get(id)?.[locale]?.title;
+  return {
+    ...doc,
+    translations: Object.fromEntries(
+      [...locales].map((locale) => [
+        locale,
+        defined({
+          title: titleIn(locale, menu.id),
+          // Its links as they are in the language, where it translated any.
+          links: items.some((id) => titleIn(locale, id) !== undefined)
+            ? linkDocs(menu.items, (item) => titleIn(locale, item.id) ?? item.title)
+            : undefined,
+        }),
+      ]),
+    ),
+  };
 }
 
-function linkDocs(items: readonly MenuItemRecord[]): MenuLinkDoc[] {
+function linkDocs(
+  items: readonly MenuItemRecord[],
+  titleOf: (item: MenuItemRecord) => string,
+): MenuLinkDoc[] {
   return items.flatMap((item) =>
     item.shown && item.url !== null
       ? [
           {
-            title: item.title,
+            title: titleOf(item),
             url: item.url,
             type: `${item.type}_link`,
-            links: linkDocs(item.items),
+            links: linkDocs(item.items, titleOf),
           },
         ]
       : [],
   );
 }
 
+/** The IDs of a menu's items at every level. */
+function itemIds(items: readonly MenuItemRecord[]): string[] {
+  return items.flatMap((item) => [item.id, ...itemIds(item.items)]);
+}
+
 /** A published page (ADR-045): its body was cleaned when it was saved. */
-export function pageDoc(page: PageRecord & { publishedAt: Date }): PageDoc {
+export function pageDoc(
+  page: PageRecord & { publishedAt: Date },
+  /** Its fields the shop translated (ADR-238), its body cleaned as its own was. */
+  translations?: TranslatedFields,
+): PageDoc {
   return {
     id: page.id,
     handle: page.handle,
@@ -169,6 +255,11 @@ export function pageDoc(page: PageRecord & { publishedAt: Date }): PageDoc {
     publishedAt: page.publishedAt.toISOString(),
     updatedAt: page.updatedAt.toISOString(),
     seo: page.seo,
+    ...translationsDoc(translations, (fields) => ({
+      title: fields.title,
+      bodyHtml: fields.body_html,
+      seo: seoTranslation(fields),
+    })),
   };
 }
 
@@ -179,6 +270,8 @@ export function pageDoc(page: PageRecord & { publishedAt: Date }): PageDoc {
 export function blogDoc(
   blog: BlogRecord,
   published: readonly { id: string; tags: string[] }[],
+  /** Its title as the shop translated it (ADR-238). */
+  translations?: TranslatedFields,
 ): BlogDoc {
   return {
     id: blog.id,
@@ -188,6 +281,7 @@ export function blogDoc(
     articles: published.map((article) => ({ id: article.id, tags: article.tags })),
     commentPolicy: blog.commentPolicy,
     updatedAt: blog.updatedAt.toISOString(),
+    ...translationsDoc(translations, (fields) => ({ title: fields.title })),
   };
 }
 
@@ -201,6 +295,8 @@ export function articleDoc(
   blog: Pick<BlogRecord, 'handle' | 'commentPolicy'>,
   image: ImageDoc | null = null,
   shown: ShownComments | undefined = undefined,
+  /** Its fields the shop translated (ADR-238), its body and summary cleaned as its own were. */
+  translations?: TranslatedFields,
 ): ArticleDoc {
   return {
     id: article.id,
@@ -224,6 +320,12 @@ export function articleDoc(
     })),
     commentsCount: shown?.count ?? 0,
     seo: article.seo,
+    ...translationsDoc(translations, (fields) => ({
+      title: fields.title,
+      bodyHtml: fields.body_html,
+      summaryHtml: fields.summary_html,
+      seo: seoTranslation(fields),
+    })),
   };
 }
 

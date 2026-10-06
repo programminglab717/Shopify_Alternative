@@ -299,6 +299,64 @@ describe('Storefront rendering', () => {
     }
   });
 
+  it("shows the shop's own Urdu on its Urdu pages, and its own words where it gave none (ADR-238)", async () => {
+    const sample = sampleStore();
+    const urdu = <T extends { id: string }>(docs: T[], id: string, translations: unknown) =>
+      docs.map((doc) => (doc.id === id ? { ...doc, translations } : doc));
+    const store = new MemoryStore({
+      ...sample,
+      products: urdu(
+        urdu(sample.products, 'p-heavy', {
+          ur: {
+            title: 'دلہن کا لہنگا',
+            descriptionHtml: '<p>ہاتھ سے کڑھائی۔</p>',
+            seo: { description: 'لاہور میں سلا ہوا' },
+          },
+        }),
+        'p-eid-lawn-1',
+        { ur: { title: 'لان کا سوٹ' } },
+      ),
+      collections: urdu(sample.collections, 'c-eid-lawn', { ur: { title: 'عید کی لان' } }),
+      menus: sample.menus.map((menu) =>
+        menu.handle === 'main-menu'
+          ? {
+              ...menu,
+              translations: {
+                ur: {
+                  links: menu.links.map((link, index) =>
+                    index === 0 ? { ...link, title: 'عید کی لان' } : link,
+                  ),
+                },
+              },
+            }
+          : menu,
+      ),
+    });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = async (path: string, locale?: string) =>
+      (await renderer.render({ path, ...(locale && { locale }) }, store.fresh())).html;
+
+    const lehenga = await page('/products/bridal-lehenga-heavy', 'ur');
+    expect(lehenga).toContain('<title>دلہن کا لہنگا · Zari Fashions</title>');
+    expect(lehenga).toContain('<p>ہاتھ سے کڑھائی۔</p>');
+    // What it gave search engines in Urdu; its menu's link too, those it did not translate as
+    // they are.
+    expect(lehenga).toContain('<meta name="description" content="لاہور میں سلا ہوا">');
+    expect(lehenga).toContain('عید کی لان</a>');
+    expect(lehenga).toContain('Khussas</a>');
+    // A listing's cards, and its own title.
+    const listing = await page('/collections/eid-lawn', 'ur');
+    expect(listing).toContain('عید کی لان');
+    expect(listing).toContain('لان کا سوٹ');
+
+    // In English, the shop's own words alone.
+    const english = await page('/products/bridal-lehenga-heavy');
+    expect(english).toContain('<title>Bridal Lehenga, Hand-embellished · Zari Fashions</title>');
+    for (const words of ['دلہن کا لہنگا', 'ہاتھ سے کڑھائی', 'عید کی لان']) {
+      expect(english).not.toContain(words);
+    }
+  });
+
   it("keeps what shops write from ending a page's scripts", async () => {
     const sample = sampleStore();
     const lehenga = sample.products.find((p) => p.handle === 'bridal-lehenga-heavy')!;

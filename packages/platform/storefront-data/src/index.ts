@@ -24,8 +24,10 @@ export {
   type StoreData,
   type StoreDocuments,
   type ThemeDoc,
+  type TranslationsDoc,
   type VariantDoc,
 } from './documents.js';
+export { TranslatedStore, translated } from './translations.js';
 export { ACTIVITY, StorefrontActivity, localDay, type ActivityCounts } from './activity.js';
 export { handleTag, imageTag, pathTag, shopTag } from './cache-tags.js';
 export { ShopDirectory } from './directory.js';

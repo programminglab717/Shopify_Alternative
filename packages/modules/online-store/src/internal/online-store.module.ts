@@ -14,6 +14,7 @@ import { PageResolver } from './graphql/page.resolver.js';
 import { PolicyResolver } from './graphql/policy.resolver.js';
 import { PreferencesResolver } from './graphql/preferences.resolver.js';
 import { ThemeResolver } from './graphql/theme.resolver.js';
+import { TranslationResolver } from './graphql/translation.resolver.js';
 import { UrlRedirectResolver } from './graphql/url-redirect.resolver.js';
 import { LinkTapsService } from './link-taps.service.js';
 import { MenuService } from './menu.service.js';
@@ -25,6 +26,7 @@ import { StorefrontThemePreviewController } from './theme-preview.controller.js'
 import { StorefrontContentSearchController } from './content-search.js';
 import { ThemePreviewService } from './theme-preview.js';
 import { ThemeService } from './theme.service.js';
+import { TranslationService } from './translation.service.js';
 import { UrlRedirectService } from './url-redirect.service.js';
 
 /**
@@ -56,6 +58,8 @@ import { UrlRedirectService } from './url-redirect.service.js';
     UrlRedirectResolver,
     PolicyService,
     PolicyResolver,
+    TranslationService,
+    TranslationResolver,
     SessionDaysService,
     LinkTapsService,
     LinkTapsResolver,
@@ -78,6 +82,7 @@ import { UrlRedirectService } from './url-redirect.service.js';
     PolicyService,
     SessionDaysService,
     LinkTapsService,
+    TranslationService,
   ],
 })
 export class OnlineStoreModule {}

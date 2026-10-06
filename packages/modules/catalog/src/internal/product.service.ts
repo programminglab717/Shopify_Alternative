@@ -582,16 +582,21 @@ export class ProductService {
     return row?.handle ?? null;
   }
 
-  /** The IDs of the shop's products, newest first, in the caller's transaction `tx`. */
+  /**
+   * The IDs of the shop's products, newest first, in the caller's transaction `tx`: those older
+   * than `after`, at most `limit`, when given.
+   */
   async idsOf(
     tx: Tx,
     shopId: string,
-    options: { status?: ProductStatusValue } = {},
+    options: { status?: ProductStatusValue; after?: string | null; limit?: number } = {},
   ): Promise<string[]> {
     const { rows } = await tx.execute<{ id: string }>(sql`
       SELECT id FROM catalog.products
        WHERE shop_id = ${shopId} ${options.status ? sql`AND status = ${options.status}` : sql``}
-       ORDER BY id DESC`);
+             ${options.after ? sql`AND id < ${options.after}` : sql``}
+       ORDER BY id DESC
+       ${options.limit === undefined ? sql`` : sql`LIMIT ${options.limit}`}`);
     return rows.map((row) => row.id);
   }
 

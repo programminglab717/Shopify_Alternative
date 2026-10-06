@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-237 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-238 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -245,6 +245,7 @@
 | 235 | A shop may say how many working days delivery takes, everywhere and in each of its delivery zones: the cart and product pages say it wherever delivery goes, from the fewest days anywhere to the most, and checkout says it for the shopper's city | Accepted |
 | 236 | A shop's sitemaps say when each page last changed and give its image, from an entry kept beside each document's handle as the document is written, so a sitemap reads no documents | Accepted |
 | 237 | Search engines are told an article's page is schema.org's BlogPosting, through Shopify's `structured_data`, and a shop's home page the shop's Organization and WebSite, through the same filter given the shop | Accepted |
+| 238 | A shop's products, collections, pages, blogs, articles and menus may have its own Urdu, as Shopify's translations keep a field each, written for the digest of the shop's own words; their documents carry it beside those words, and the storefront's Urdu pages show it in their place | Accepted |
 
 ---
 
@@ -9909,3 +9910,50 @@
     it, with its addresses and logo for the theme to get right.
   * **The `Organization` on every page, as Dawn gives it:** Google reads it from the home page
     and needs it nowhere else.
+
+## ADR-238 · A shop's products, collections, pages, blogs, articles and menus may have its own Urdu, as Shopify's translations keep a field each, written for the digest of the shop's own words; their documents carry it beside those words, and the storefront's Urdu pages show it in their place
+
+* **Context:** Storefronts are in English and Urdu, each page at its address in both
+  ([ADR-051](#adr-051--search-engines-and-link-previews-are-told-each-pages-address-at-the-shops-own-in-each-language-and-find-pages-through-sitemaps-of-the-storefronts-documents)), and Hatti Base's own words are in both, but a shop's content was in one
+  language, whichever it wrote: an Urdu page showed English titles under Urdu headings. The
+  feature catalog's OS-06 asks for bilingual content. Shopify keeps a translation a field,
+  through its translations API (`translatableResources`, `translationsRegister` and
+  `translationsRemove`), which apps such as Translate & Adapt write.
+* **Decision:**
+  * **A translation a field, as Shopify's:** a product's title, description, type, and SEO title
+    and description ([ADR-231](#adr-231--products-collections-pages-and-articles-may-be-given-a-title-and-description-of-their-own-for-search-engines-as-shopifys-seo-has-them-themes-are-given-them-as-page_title-and-page_description-the-description-made-from-the-pages-own-text-where-the-shop-wrote-none-and-shopifys-product-csv-carries-a-products)); a collection's and a page's title, body and SEO; a
+    blog's title; an article's title, body, summary and SEO; a menu's title, and each of its
+    items'. Each is kept in `online_store.translations` (migration 0146) by what it translates,
+    its language and Shopify's key for the field.
+  * **Written for the words as they are:** the API gives each field with words and the SHA-256
+    digest of them, and a translation names the digest of what it translates: one naming another
+    is refused (STALE), as Shopify's is, as is one for a field without words. When the shop's
+    words change, its translation is still shown, and the API says it is `outdated` until it is
+    written again or removed.
+  * **Checked as the shop's own:** a title on one line and as long; a product's or collection's
+    description kept as text, its paragraphs and line breaks, as the catalog keeps the
+    description; a page's or article's HTML cleaned of anything that could run
+    ([ADR-045](#adr-045--a-shops-pages-keep-html-cleaned-of-anything-that-runs-when-saved-the-storefront-shows-it-as-it-is)).
+  * **Urdu alone,** the storefront's other language; the shop's own words are in its default,
+    English.
+  * **In the documents:** the publisher writes each document's translations beside its own
+    fields ([ADR-036](#adr-036--one-publisher-per-shop-rebuilds-storefront-documents-from-the-database-its-writes-fenced-by-its-lock)), and a menu's links whole in Urdu, writing a document again when
+    its translations change. The storefront reads an Urdu page's documents in Urdu
+    (`TranslatedStore`), each field the shop translated in place of its own, so themes need
+    nothing new: `product.title` is the Urdu on an Urdu page.
+  * **Scopes:** `read_translations` and `write_translations`, as Shopify's; owners, managers
+    and marketers write them.
+* **Consequences:**
+  * A shop can show its storefront in Urdu, its own words as well as the theme's, and a shopper
+    switching languages finds the same products and pages in either.
+  * A field not translated shows the shop's own words, so a shop translates what matters most
+    first, and its documents grow by what it translated alone.
+  * Not in Urdu yet: options and their values, handles, the shop's name and policies, checkout,
+    messages and emails; and search matches the shop's own words alone (simplification 113).
+* **Alternatives:**
+  * **A document for each language:** twice the documents and writes for every change, for the
+    few fields a shop translates.
+  * **Translations in each module's tables:** every module would need the storefront's languages
+    and an API of its own, where Shopify's is one API across resources.
+  * **Machine translation by default:** the shop's words in Urdu are its own to give; drafts by AI
+    may come with AI's features (09).

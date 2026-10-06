@@ -1,5 +1,6 @@
 import type { PolicyType } from './policy-types.js';
 import type { ThemeRoleValue } from './schema.js';
+import type { TranslatableKind } from './translation-content.js';
 
 /**
  * Events the online store publishes. Payloads are thin: fetch current state through the API. The
@@ -36,6 +37,7 @@ export const OnlineStoreEvents = {
   UrlRedirectsImported: 'url_redirects.imported',
   UrlRedirectsMoved: 'url_redirects.moved',
   PolicyUpdated: 'shop_policy.updated',
+  TranslationsUpdated: 'translations.updated',
 } as const;
 
 export interface ThemeCreatedPayload {
@@ -166,4 +168,15 @@ export interface UrlRedirectsMovedPayload {
 export interface PreferencesUpdatedPayload {
   /** The preferences that changed, such as "whatsappNumber". */
   changed: string[];
+}
+
+/**
+ * A resource's translations kept, replaced or forgotten (ADR-238): the storefront writes its
+ * document again, or the menus for a menu's or menu item's.
+ */
+export interface TranslationsUpdatedPayload {
+  kind: TranslatableKind;
+  /** The languages and fields whose translations changed. */
+  locales: string[];
+  keys: string[];
 }

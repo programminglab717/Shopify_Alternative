@@ -1298,6 +1298,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-055](../architecture/13-decision-log.md#adr-055--a-shop-adds-rules-to-its-robotstxt-as-lines-crawlers-read-checked-when-saved-never-liquid))
   are checked by `robotsRules` in the online store and served as they were kept: a directive the
   storefront should take from shops joins both.
+* **A shop's Urdu is in its documents**
+  ([ADR-238](../architecture/13-decision-log.md#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)):
+  a field that may be translated is Shopify's key for it in `TRANSLATABLE_FIELDS`, kept with the
+  digest of the words it was written for. The publisher puts a document's translations in its
+  `translations`, named as the document's own fields are, and an Urdu page reads its documents
+  through `TranslatedStore`, so objects and themes see one language. A field that becomes
+  translatable joins `TRANSLATABLE_FIELDS`, `translatableContent` and its document's `translations`;
+  a kind of document the storefront shows joins `TranslatedStore`.
 * **Catalog feeds come from the documents too** (`feeds.ts`, [ADR-142](../architecture/13-decision-log.md#adr-142--a-shops-catalog-feed-is-its-storefronts-at-its-own-address-an-item-for-each-variant-of-its-products-with-an-image-in-googles-rss-which-metas-catalogs-read-too-made-from-its-documents-a-chunk-at-a-time)):
   `productFeed` lists `StoreData.productIds` and fetches them `FEED_CHUNK` at a time, yielding
   each chunk's items as they are made, so the route streams the feed through `Readable.from`

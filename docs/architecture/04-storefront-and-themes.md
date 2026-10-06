@@ -389,7 +389,11 @@ the Growth phase.
   scrambling.
 * **Content translation:** products, collections, pages, menus and theme strings all have
   translation fields (`translations` JSONB keyed by locale). AI draft translations are marked
-  "machine translated" until a human approves them.
+  "machine translated" until a human approves them. *Built so far*
+  ([ADR-238](./13-decision-log.md#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)):
+  a shop's Urdu for its products, collections, pages, blogs, articles and menus, a field at a time
+  through Shopify's translations API, each written for the digest of its own words; their
+  documents carry it beside those words, and the Urdu pages show it in their place.
 * **URLs:** `/ur/products/…` prefix for Urdu. `hreflang` alternates and localised sitemaps.
 * **Numbers and currency:** default "Rs 12,500". Optional lakh/crore grouping. Diaspora
   multi-currency display (AED, SAR, GBP, USD, CAD) in the Scale phase.

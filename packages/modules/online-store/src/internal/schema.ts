@@ -311,3 +311,27 @@ export const linkTaps = onlineStoreSchema.table(
   },
   (table) => [primaryKey({ columns: [table.shopId, table.day, table.link] })],
 );
+
+/**
+ * A shop's own words for a field of its content in another of the storefront's languages
+ * (ADR-238), as Shopify's translations: with the digest of the words they were written for.
+ */
+export const translations = onlineStoreSchema.table(
+  'translations',
+  {
+    shopId: uuid('shop_id').notNull(),
+    /** A product, collection, page, blog, article, menu or menu item. */
+    resourceId: uuid('resource_id').notNull(),
+    locale: text('locale').notNull(),
+    /** The field, by Shopify's name for it: "title", "body_html"… */
+    key: text('key').notNull(),
+    value: text('value').notNull(),
+    /** SHA-256 of the shop's own words it was written for, in hex. */
+    digest: text('digest').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.resourceId, table.locale, table.key] })],
+);
+
+export type TranslationRow = typeof translations.$inferSelect;

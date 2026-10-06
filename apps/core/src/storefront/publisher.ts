@@ -42,17 +42,21 @@ import {
   shopPoliciesOf,
   shopPreferencesOf,
   shopRedirectsOf,
+  shopTranslationsOf,
   type ArticleChangedPayload,
   type ArticleRecord,
   type ArticleUpdatedPayload,
   type BlogUpdatedPayload,
   type CommentChangedPayload,
   type DomainRecord,
+  type MenuItemRecord,
   type PageRecord,
   type PageUpdatedPayload,
   type PreferencesRecord,
   type ShownComments,
   type ThemeUpdatedPayload,
+  type TranslatedFields,
+  type TranslationsUpdatedPayload,
 } from '@hatti/online-store/public';
 import {
   BuildQueue,
@@ -271,6 +275,16 @@ export function itemsFor(event: DomainEvent): string[] {
     case OnlineStoreEvents.PolicyUpdated:
       // Its page, and the footers that list the shop's policies.
       return [Items.policies, Items.shop];
+    case OnlineStoreEvents.TranslationsUpdated: {
+      // Its document has its Urdu (ADR-238); a menu's and its items' are in the menus'.
+      const { kind } = event.payload as unknown as TranslationsUpdatedPayload;
+      if (kind === 'product') return [Items.product(id)];
+      if (kind === 'collection') return [Items.collection(id)];
+      if (kind === 'page') return [Items.page(id)];
+      if (kind === 'blog') return [Items.blog(id)];
+      if (kind === 'article') return [Items.article(id)];
+      return [Items.menus];
+    }
     case MarketingEvents.MetaConversionsUpdated:
       // Its pages load the pixel the shop's document names (ADR-144).
       return (event.payload as unknown as MetaConversionsUpdatedPayload).changed.includes('pixelId')
@@ -325,6 +339,7 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.UrlRedirectsImported,
   OnlineStoreEvents.UrlRedirectsMoved,
   OnlineStoreEvents.PolicyUpdated,
+  OnlineStoreEvents.TranslationsUpdated,
   CheckoutEvents.DeliverySettingsUpdated,
   MarketingEvents.MetaConversionsUpdated,
   MarketingEvents.MetaConversionsDeleted,
@@ -378,6 +393,14 @@ export interface PublisherServices {
   /** Which of the shop's files are images a page can show, as articles' are (ADR-213). */
   files: {
     readyImagesIn(tx: Tx, shopId: string, ids: readonly string[]): Promise<Map<string, ShopImage>>;
+  };
+  /** What the shop translated of its content into Urdu (ADR-238), by what it translates. */
+  translations: {
+    translationsOf(
+      tx: Tx,
+      shopId: string,
+      ids: readonly string[],
+    ): Promise<Map<string, TranslatedFields>>;
   };
 }
 
@@ -480,7 +503,13 @@ export class StorefrontPublisher {
         await this.#allProducts(tx, batch, all, changed);
       }
       if (wanted.has(Items.menus)) {
-        const docs = (await this.services.menus.menusOf(tx, shopId)).map(menuDoc);
+        const menus = await this.services.menus.menusOf(tx, shopId);
+        const translations = await this.services.translations.translationsOf(
+          tx,
+          shopId,
+          menus.flatMap((menu) => [menu.id, ...itemIdsOf(menu.items)]),
+        );
+        const docs = menus.map((menu) => menuDoc(menu, translations));
         const stored = await this.redis.hgetall(this.#keys.menus(shopId));
         await writer.putMenus(docs);
         // Menus are on every page.
@@ -717,11 +746,21 @@ export class StorefrontPublisher {
     );
     const stored = await this.#stored(shopId, 'product', ids);
     const images = this.options.images ?? LOCAL_IMAGES;
+    const translations = await this.services.translations.translationsOf(
+      tx,
+      shopId,
+      active.map((record) => record.id),
+    );
     const docs = active.map((record) =>
-      productDoc(record, available, (media, handle) => {
-        const path = imagePathOf(shopId, media, handle);
-        return path && images.url(path);
-      }),
+      productDoc(
+        record,
+        available,
+        (media, handle) => {
+          const path = imagePathOf(shopId, media, handle);
+          return path && images.url(path);
+        },
+        translations.get(record.id),
+      ),
     );
     await writer.putProducts(docs);
     const shown = new Set(active.map((record) => record.id));
@@ -744,10 +783,15 @@ export class StorefrontPublisher {
     changed: Set<string>,
   ): Promise<void> {
     const records = await this.services.collections.recordsOf(tx, shopId, { ids });
+    const translations = await this.services.translations.translationsOf(
+      tx,
+      shopId,
+      records.map((record) => record.id),
+    );
     const docs = [];
     for (const record of records) {
       const productIds = await this.services.collections.activeProductIdsOf(tx, shopId, record);
-      docs.push(collectionDoc(record, productIds));
+      docs.push(collectionDoc(record, productIds, translations.get(record.id)));
     }
     const stored = await this.#stored(shopId, 'collection', ids);
     await writer.putCollections(docs);
@@ -770,7 +814,12 @@ export class StorefrontPublisher {
         record.isPublished && record.publishedAt !== null,
     );
     const stored = await this.#stored(shopId, 'page', ids);
-    const docs = published.map(pageDoc);
+    const translations = await this.services.translations.translationsOf(
+      tx,
+      shopId,
+      published.map((record) => record.id),
+    );
+    const docs = published.map((record) => pageDoc(record, translations.get(record.id)));
     await writer.putPages(docs);
     const shown = new Set(published.map((record) => record.id));
     const dropped = ids.filter((id) => !shown.has(id));
@@ -790,10 +839,16 @@ export class StorefrontPublisher {
       shopId,
       records.map((record) => record.id),
     );
+    const translations = await this.services.translations.translationsOf(
+      tx,
+      shopId,
+      records.map((record) => record.id),
+    );
     const docs = records.map((record) =>
       blogDoc(
         record,
         listed.filter((article) => article.blogId === record.id),
+        translations.get(record.id),
       ),
     );
     const stored = await this.#stored(shopId, 'blog', ids);
@@ -853,9 +908,24 @@ export class StorefrontPublisher {
         alt: record.image.altText || file.alt || null,
       };
     };
+    const translations = await this.services.translations.translationsOf(
+      tx,
+      shopId,
+      published.map((record) => record.id),
+    );
     const docs = published.flatMap((record) => {
       const blog = blogsById.get(record.blogId);
-      return blog ? [articleDoc(record, blog, imageOf(record), comments.get(record.id))] : [];
+      return blog
+        ? [
+            articleDoc(
+              record,
+              blog,
+              imageOf(record),
+              comments.get(record.id),
+              translations.get(record.id),
+            ),
+          ]
+        : [];
     });
     const stored = await this.#stored(shopId, 'article', ids);
     await writer.putArticles(docs);
@@ -930,9 +1000,15 @@ export function createStorefrontPublisher(
       pixels: { metaPixelIdOf: metaPixelIdIn },
       brand: { logoOf: shopLogoOf },
       files: { readyImagesIn },
+      translations: { translationsOf: shopTranslationsOf },
     },
     { logger, edge, images },
   );
+}
+
+/** The IDs of a menu's items at every level. */
+function itemIdsOf(items: readonly MenuItemRecord[]): string[] {
+  return items.flatMap((item) => [item.id, ...itemIdsOf(item.items)]);
 }
 
 function splitItem(item: string): [string, string?] {

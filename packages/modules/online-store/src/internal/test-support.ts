@@ -13,6 +13,7 @@ import { MenuService } from './menu.service.js';
 import { PageService } from './page.service.js';
 import { PreferencesService } from './preferences.service.js';
 import { ThemeService } from './theme.service.js';
+import { TranslationService } from './translation.service.js';
 
 export interface OutboxRow {
   event_type: string;
@@ -34,6 +35,7 @@ export interface OnlineStoreFixture {
   articles: ArticleService;
   comments: CommentService;
   preferences: PreferencesService;
+  translations: TranslationService;
   /** The catalog, for the collections and products menus link to. */
   products: ProductService;
   collections: CollectionService;
@@ -55,6 +57,7 @@ function tenant(shopId: string): TenantContext {
       'write_online_store_pages',
       'write_content',
       'write_products',
+      'write_translations',
     ]),
   };
 }
@@ -72,6 +75,12 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
   const a = tenant(newId());
   const b = tenant(newId());
   const [products, collections] = [new ProductService(db), new CollectionService(db)];
+  const [menus, pages, blogs, articles] = [
+    new MenuService(db, collections, products),
+    new PageService(db),
+    new BlogService(db),
+    new ArticleService(db),
+  ];
   await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'A'), ($2, 'B')`, [
     a.shopId,
     b.shopId,
@@ -83,16 +92,17 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
     a,
     b,
     themes: new ThemeService(db),
-    menus: new MenuService(db, collections, products),
-    pages: new PageService(db),
-    blogs: new BlogService(db),
-    articles: new ArticleService(db),
+    menus,
+    pages,
+    blogs,
+    articles,
     comments: new CommentService(db),
     preferences: new PreferencesService(
       db,
       new SecretBox([{ id: 'test', key: Buffer.alloc(32, 5) }]),
       products,
     ),
+    translations: new TranslationService(db, products, collections, pages, blogs, articles, menus),
     products,
     collections,
     async outbox() {
@@ -113,6 +123,7 @@ export async function onlineStoreFixture(server: string): Promise<OnlineStoreFix
         DELETE FROM online_store.policy_versions;
         DELETE FROM online_store.domains;
         DELETE FROM online_store.url_redirects;
+        DELETE FROM online_store.translations;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {
