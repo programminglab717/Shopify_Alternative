@@ -31,7 +31,10 @@ import { RefundResolver } from './graphql/refund.resolver.js';
 import { RiskResolver } from './graphql/risk.resolver.js';
 import { SalesReportResolver } from './graphql/sales-report.resolver.js';
 import { SavedSearchResolver } from './graphql/saved-search.resolver.js';
-import { TransferReceiptResolver } from './graphql/transfer-receipt.resolver.js';
+import {
+  RefundReceiptResolver,
+  TransferReceiptResolver,
+} from './graphql/transfer-receipt.resolver.js';
 import { DraftLinkController, OrderLinkController } from './links.controller.js';
 import { ExportScheduleService } from './export-schedule.service.js';
 import { OrderExportService } from './order-export.service.js';
@@ -100,6 +103,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     BankTransferResolver,
     SalesReportResolver,
     TransferReceiptResolver,
+    RefundReceiptResolver,
     SavedSearchResolver,
     OrderCommentResolver,
     OrderEditResolver,

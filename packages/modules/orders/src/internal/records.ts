@@ -127,9 +127,21 @@ export interface RefundRecord {
   /** The transfer's reference, such as a wallet transaction ID; null once erased. */
   reference: string | null;
   note: string;
+  /** The receipt staff kept of the money they sent (ADR-242); null without one, or once erased. */
+  receipt: RefundReceiptRecord | null;
   actorKind: 'app' | 'staff';
   actorId: string;
   createdAt: Date;
+}
+
+/** A refund's receipt, among its order's receipts in storage (ADR-242). */
+export interface RefundReceiptRecord {
+  /** Where storage keeps it. */
+  key: string;
+  /** image/jpeg, image/png, image/webp or application/pdf. */
+  contentType: string;
+  /** Bytes. */
+  size: number;
 }
 
 /** A customer sending back items of a delivered parcel (ORD-07, ADR-136). */

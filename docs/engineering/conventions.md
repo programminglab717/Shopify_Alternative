@@ -1946,6 +1946,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   worker removes it once that commits, as `ErasedReceipts` does for `order.receipts_erased`.
   The handler removes only keys under the record's own prefix. The worker reads the API's
   storage settings, so the two name the same place.
+* **A module that keeps an upload itself takes it from the files module**
+  ([ADR-242](../architecture/13-decision-log.md#adr-242--a-refund-staff-sent-by-hand-may-keep-its-receipt-staged-as-any-upload-is-and-given-with-the-refund-its-order-keeps-it-among-its-receipts-never-as-one-of-the-shops-files-and-it-goes-with-the-customers-erasure-as-their-own-receipts-do)):
+  it copies the staged upload's bytes under its own prefix before its transaction, as `storeUpload`
+  does a refund's receipt, and in it takes the upload with `takeStagedUploadIn`, so the shop never
+  makes a file of it; once that commits it removes the staged copy, and if it fails, its own. A
+  refused request leaves the upload for the next try.
 * **Checkout's limits count orders, not attempts** ([ADR-087](../architecture/13-decision-log.md#adr-087--checkout-takes-at-most-three-orders-a-day-from-one-mobile-number-and-twenty-an-hour-from-one-internet-address-counting-the-orders-it-placed-one-at-a-time)):
   `checkoutOrdersFrom` counts the shop's checkout orders by number in the last day and by
   internet address in the last hour, after taking the placement transaction's advisory locks on

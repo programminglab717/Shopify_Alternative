@@ -90,6 +90,7 @@ import {
   TrackingInfo,
   UTMParameters,
 } from './order.types.js';
+import { RefundReceipt } from './transfer-receipt.types.js';
 
 /** The UUID behind a public ID of the given kind, or a BAD_USER_INPUT error. */
 export function uuidOf(kind: IdKind, id: string): string {
@@ -229,7 +230,9 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     fulfillments: record.fulfillments.map((parcel) =>
       toFulfillment(parcel, lineItemsById, currency),
     ),
-    refunds: record.refunds.map((refund) => toRefund(refund, currency)),
+    refunds: record.refunds.map((refund, index) =>
+      toRefund(refund, currency, record.number, index + 1),
+    ),
     returns: record.returns.map((back) => toReturn(back, record.number, lineItemsById)),
     returnStatus: returnStatusOf(record.returns),
     subtotalPrice: amount(record.subtotal),
@@ -489,7 +492,13 @@ function returnStatusOf(records: readonly ReturnRecord[]): OrderReturnStatus {
   return OrderReturnStatus.NO_RETURN;
 }
 
-export function toRefund(record: RefundRecord, currency: CurrencyCode): Refund {
+/** A refund of the order numbered `orderNumber`, at `position` among its refunds from 1. */
+export function toRefund(
+  record: RefundRecord,
+  currency: CurrencyCode,
+  orderNumber: number,
+  position: number,
+): Refund {
   return Object.assign(new Refund(), {
     id: toPublicId('refund', record.id),
     amount: Money.from(money(record.amount, currency)),
@@ -497,6 +506,15 @@ export function toRefund(record: RefundRecord, currency: CurrencyCode): Refund {
     method: upper<RefundMethod>(record.method),
     reference: record.reference,
     note: record.note,
+    receipt:
+      record.receipt &&
+      Object.assign(new RefundReceipt(), {
+        mimeType: record.receipt.contentType,
+        fileSize: record.receipt.size,
+        record: record.receipt,
+        orderNumber,
+        position,
+      }),
     createdAt: record.createdAt,
   });
 }

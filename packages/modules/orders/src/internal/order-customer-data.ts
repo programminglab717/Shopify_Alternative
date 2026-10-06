@@ -27,15 +27,15 @@ const NAMED = 5;
  * An erased customer's orders keep what the shop's accounts need: the items, amounts, statuses and
  * dates, and the city and province they went to; the name, number, email, street and note go, as do
  * the address and browser they were placed from and the IDs the shop's Meta pixel gave that browser
- * (ADR-144), the notes and references of their refunds, the comments on their timelines and the
- * receipts they sent for transfers, whose files nothing signs a URL for after; and the timeline
- * says so. The policies they agreed to stay: those are the shop's words, not the customer's
- * (ADR-057). Of the visits that brought them to the shop (ADR-139), the pages they landed on and
- * came from go, which may carry an ad's click ID or a search; where each came from and its UTM
- * parameters stay, the shop's own words for its campaigns, for its sales by campaign. Timeline
- * messages never hold contact details, so they stay as they are. Their orders' links stop working,
- * since their pages show the address. Their draft orders go: those that became their orders, and
- * open ones with one of their numbers or their email.
+ * (ADR-144), the notes, references and receipts of their refunds (ADR-242), the comments on their
+ * timelines and the receipts they sent for transfers, whose files nothing signs a URL for after;
+ * and the timeline says so. The policies they agreed to stay: those are the shop's words, not the
+ * customer's (ADR-057). Of the visits that brought them to the shop (ADR-139), the pages they
+ * landed on and came from go, which may carry an ad's click ID or a search; where each came from
+ * and its UTM parameters stay, the shop's own words for its campaigns, for its sales by campaign.
+ * Timeline messages never hold contact details, so they stay as they are. Their orders' links stop
+ * working, since their pages show the address. Their draft orders go: those that became their
+ * orders, and open ones with one of their numbers or their email.
  *
  * A customer's own export (ADR-102) gives them the same orders and drafts whole, with their
  * parcels, refunds, calls to confirm them, the receipts they sent, the visits that brought them and
@@ -135,8 +135,18 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
        WHERE t.shop_id = ${shopId} AND o.shop_id = ${shopId} AND o.id = t.order_id
          AND o.customer_id = ${customerId}
       RETURNING t.order_id, t.key`);
+    // So do the receipts of refunds staff sent them (ADR-242), among the same orders' receipts; the
+    // refund stays. Its row as it was gives the key.
+    const { rows: refundReceipts } = await tx.execute<{ order_id: string; key: string }>(sql`
+      UPDATE orders.refunds r
+         SET receipt_key = NULL, receipt_content_type = NULL, receipt_size = NULL
+        FROM orders.refunds was, orders.orders o
+       WHERE r.shop_id = ${shopId} AND was.shop_id = ${shopId} AND was.id = r.id
+         AND o.shop_id = ${shopId} AND o.id = r.order_id AND o.customer_id = ${customerId}
+         AND r.receipt_key IS NOT NULL
+      RETURNING r.order_id, was.receipt_key AS key`);
     const keysByOrder = new Map<string, string[]>();
-    for (const { order_id: orderId, key } of receipts) {
+    for (const { order_id: orderId, key } of [...receipts, ...refundReceipts]) {
       keysByOrder.set(orderId, [...(keysByOrder.get(orderId) ?? []), key]);
     }
     for (const [orderId, keys] of keysByOrder) {
@@ -338,6 +348,11 @@ function exportedOrder(
       method: refund.method,
       reference: refund.reference,
       note: refund.note,
+      // What its receipt is (ADR-242); the shop keeps the file.
+      receipt: refund.receipt && {
+        contentType: refund.receipt.contentType,
+        bytes: refund.receipt.size,
+      },
       refundedAt: refund.createdAt,
     })),
     calls: calls.map((call) => ({

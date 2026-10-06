@@ -630,6 +630,10 @@ export const refunds = ordersSchema.table(
     method: text('method', { enum: REFUND_METHODS }).notNull(),
     reference: text('reference'),
     note: text('note').notNull().default(''),
+    /** Its receipt, kept among its order's receipts (ADR-242); null without one, or once erased. */
+    receiptKey: text('receipt_key'),
+    receiptContentType: text('receipt_content_type'),
+    receiptSize: integer('receipt_size'),
     actorKind: text('actor_kind', { enum: ['app', 'staff'] }).notNull(),
     actorId: uuid('actor_id').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

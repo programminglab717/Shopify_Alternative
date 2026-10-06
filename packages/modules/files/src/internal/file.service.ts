@@ -278,6 +278,32 @@ export class FileService {
 
 const NOT_UPLOADED = 'Nothing has been uploaded to its URL yet';
 
+/**
+ * Hands a staged upload of the shop's, never made a file, to another module that keeps its bytes
+ * itself, as the orders module keeps a refund's receipt (ADR-242): its row goes in the caller's
+ * transaction `tx`, and the caller removes what storage keeps under `key` once that commits.
+ * Whether one of `size` bytes was staged there.
+ */
+export async function takeStagedUploadIn(
+  tx: Tx,
+  shopId: string,
+  key: string,
+  size: number,
+): Promise<boolean> {
+  const taken = await tx
+    .delete(files)
+    .where(
+      and(
+        eq(files.shopId, shopId),
+        eq(files.key, key),
+        eq(files.status, 'staged'),
+        eq(files.size, size),
+      ),
+    )
+    .returning({ id: files.id });
+  return taken.length > 0;
+}
+
 function countOf(check: InputChecker, field: string[], count: number): void {
   if (count === 0) check.addMessage(field, 'BLANK', 'Give at least one');
   if (count > FILE_LIMITS.perRequest) {

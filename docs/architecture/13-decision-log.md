@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-241 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-242 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -249,6 +249,7 @@
 | 239 | A shop's policies may have its own Urdu, as its other content may, and the storefront shows a policy's Urdu only while it translates the policy as it is, its own words once they change; the checkout's Urdu links the Urdu pages | Accepted |
 | 240 | A storefront's search finds products, pages and articles by the shop's Urdu for them as by its own words, from words of each translation kept folded beside its own as its translations change, its own words first | Accepted |
 | 241 | A product's options and their values may have the shop's Urdu, as Shopify's translations keep them, each by its own ID; the product's document carries its options in Urdu, and its Urdu pages show each variant's values and title in them, the variant chosen by its ID the same in either language | Accepted |
+| 242 | A refund staff sent by hand may keep its receipt, staged as any upload is and given with the refund; its order keeps it among its receipts, never as one of the shop's files, and it goes with the customer's erasure as their own receipts do | Accepted |
 
 ---
 
@@ -10057,3 +10058,40 @@
     through its translations; its own words until they differ ask nothing of it.
   * **Variants found by both languages' words:** a picker would need both in the page; by their
     IDs, the words are only what is shown.
+
+## ADR-242 · A refund staff sent by hand may keep its receipt, staged as any upload is and given with the refund; its order keeps it among its receipts, never as one of the shop's files, and it goes with the customer's erasure as their own receipts do
+
+* **Context:** A refund staff sent by hand ([ADR-029](#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)) was proved by its reference and
+  note alone (simplification 28). Staff send it by IBFT, Raast or a wallet, and the app's
+  screenshot is what a customer who says nothing came is shown. A shop's uploads are staged, then
+  made files of the shop's ([ADR-079](#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)); a customer's receipts for transfers are their
+  order's, and go with their erasure ([ADR-080](#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order), [ADR-113](#adr-113--an-erased-customers-receipts-leave-storage-too-the-erasure-records-each-orders-receipt-files-in-an-event-and-the-worker-removes-them-once-it-commits)).
+* **Decision:**
+  * **Staged as any upload:** staff stage the receipt with `stagedUploadsCreate` and give its
+    `resourceUrl` as `orderRefund`'s `receipt`, for money sent by bank transfer, mobile wallet,
+    cash or another way: a photo or a PDF of at most 10 MiB, as a transfer's receipt is.
+  * **The order's, never the shop's files:** the orders module copies it among the order's
+    receipts before its transaction and, in it, takes the staged upload from the files module
+    (`takeStagedUploadIn`), so it is never made one of the shop's files; its staged copy goes
+    once the refund commits. A refund refused leaves the upload for the next try, and its copy
+    goes. Migration 0150 keeps its key, type and size on the refund.
+  * **Shown with the refund:** `Refund.receipt` gives its type, its size and a URL signed for an
+    hour, named for its order and the refund's place among its refunds ("Refund receipt
+    #1023-2.png"); the timeline says the refund came with its receipt.
+  * **Erased with the customer:** it shows their name and account, so their erasure clears it,
+    and the worker removes its file as it removes their own receipts'; the refund stays. Their
+    own export says what it is.
+* **Consequences:**
+  * A shop shows a customer the money went from the order itself, as long as it keeps the order.
+  * Staging takes `write_files`, which owners and managers, who refund, have; an app that refunds
+    with receipts asks for both scopes.
+  * A receipt comes with its refund, never added to one after; refunds online
+    ([ADR-153](#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)) and as store credit ([ADR-184](#adr-184--a-shop-owes-its-customers-store-credit-as-shopify-keeps-it-an-account-for-each-customer-and-currency-credited-by-refunds-given-as-store-credit-or-by-hand-and-debited-by-hand-the-credits-that-expire-soonest-spent-first-its-balance-is-what-its-credits-have-left-unexpired-worked-out-when-asked-from-a-ledger-written-holding-the-accounts-lock-and-never-rewritten)) have the gateway's or the
+    credit's reference instead.
+* **Alternatives:**
+  * **One of the shop's files, by its ID:** the shop's files are its storefront's, for whoever
+    manages them, and a receipt naming a customer's account would stay there after their
+    erasure.
+  * **Its bytes through a form of the core's, as a transfer's:** the Admin API's clients upload
+    as Shopify's do, straight to storage; forms are for pages without scripts.
+  * **A table of refunds' receipts:** a refund keeps one at most, so its own columns do.

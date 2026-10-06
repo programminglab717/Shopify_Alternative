@@ -32,8 +32,8 @@ export class RefundResolver {
       'paid through to send it, and records it once the gateway says it is sent (ADR-153). The ' +
       'financial status becomes REFUNDED or PARTIALLY_REFUNDED; a completed order stays ' +
       'completed. By STORE_CREDIT, no money moves: the customer is credited it to spend on ' +
-      'later orders (ADR-184). Staff need to be an owner or a manager. Needs an ' +
-      'Idempotency-Key header.',
+      'later orders (ADR-184). Money staff sent may keep its receipt (ADR-242). Staff need to ' +
+      'be an owner or a manager. Needs an Idempotency-Key header.',
   })
   @RequireScopes('write_orders')
   @RequireIdempotencyKey()
@@ -56,12 +56,23 @@ export class RefundResolver {
       ...input,
       method: toRefundMethodValue(input.method),
     });
+    if (!result.ok) {
+      return Object.assign(new OrderRefundPayload(), {
+        order: null,
+        refund: null,
+        userErrors: UserError.list(result.errors),
+      });
+    }
+    const { order, refund } = result.value;
     return Object.assign(new OrderRefundPayload(), {
-      order: result.ok ? toOrder(result.value.order, tenant) : null,
-      refund: result.ok
-        ? toRefund(result.value.refund, result.value.order.currency as CurrencyCode)
-        : null,
-      userErrors: result.ok ? [] : UserError.list(result.errors),
+      order: toOrder(order, tenant),
+      refund: toRefund(
+        refund,
+        order.currency as CurrencyCode,
+        order.number,
+        order.refunds.findIndex((each) => each.id === refund.id) + 1,
+      ),
+      userErrors: [],
     });
   }
 }

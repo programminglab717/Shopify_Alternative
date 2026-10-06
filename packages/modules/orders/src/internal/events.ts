@@ -125,8 +125,9 @@ export interface OrderPaidPayload extends OrderState {
 }
 
 /**
- * The receipts the customer sent for the order's transfer went with their erasure (ADR-113):
- * where storage keeps their files, for the worker to remove them.
+ * The receipts the customer sent for the order's transfer, and those of its refunds (ADR-242),
+ * went with their erasure (ADR-113): where storage keeps their files, for the worker to remove
+ * them.
  */
 export interface OrderReceiptsErasedPayload {
   keys: string[];

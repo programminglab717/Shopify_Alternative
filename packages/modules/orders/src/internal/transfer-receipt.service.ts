@@ -8,6 +8,7 @@ import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
 import type { LinkProblem } from './links.js';
 import { addTimelineEntry } from './order-store.js';
+import type { RefundReceiptRecord } from './records.js';
 import { awaitsTransfer, orderName } from './rules.js';
 import { transferReceipts, type OrderRow } from './schema.js';
 
@@ -43,6 +44,17 @@ export interface StoredReceipt {
   contentType: ReceiptTypeValue;
   size: number;
 }
+
+/** Why a staged upload was not kept as a refund's receipt (ADR-242). */
+export interface UploadProblem {
+  code: 'NOT_FOUND' | 'INVALID';
+  message: string;
+}
+
+const NOT_STAGED = 'Give the resourceUrl of an upload stagedUploadsCreate staged';
+const NOT_UPLOADED = 'Nothing has been uploaded to its URL yet';
+const TOO_LARGE = `A receipt is at most ${RECEIPT_LIMITS.bytes / 1024 / 1024} MiB`;
+const NOT_A_RECEIPT = 'A receipt is a photo (JPEG, PNG or WebP) or a PDF';
 
 const isReceiptType = (type: string | null): type is ReceiptTypeValue =>
   (RECEIPT_TYPES as readonly (string | null)[]).includes(type);
@@ -109,6 +121,48 @@ export class TransferReceiptService {
     });
   }
 
+  /** A URL that shows a refund's receipt for an hour, named for its order and its place there. */
+  refundReceiptUrlOf(receipt: RefundReceiptRecord, orderNumber: number, position: number): string {
+    const extension = extensionOf(receipt.contentType as ReceiptTypeValue);
+    return this.storage.signDownload(receipt.key, RECEIPT_URL_SECONDS, {
+      filename: `Refund receipt ${orderName(orderNumber)}-${position}.${extension}`,
+    });
+  }
+
+  /**
+   * Keeps for `orderId`, outside any transaction, the receipt staff staged as an upload for a
+   * refund, by its resource URL `location` (ADR-242): its bytes copied among the order's receipts,
+   * if it is a photo or a PDF of at most 10 MiB. The caller takes the upload from the files module
+   * in its transaction (`takeStagedUploadIn`), by the key and size given, or {@link discard}s the
+   * copy.
+   */
+  async storeUpload(
+    shopId: string,
+    orderId: string,
+    location: string,
+  ): Promise<{ stored: StoredReceipt; upload: { key: string; size: number } } | UploadProblem> {
+    const key = this.storage.keyOf(location.trim());
+    if (!key?.startsWith(`shops/${shopId}/files/`)) {
+      return { code: 'NOT_FOUND', message: NOT_STAGED };
+    }
+    const head = await this.storage.head(key);
+    if (!head) return { code: 'NOT_FOUND', message: NOT_UPLOADED };
+    if (head.size > RECEIPT_LIMITS.bytes) return { code: 'INVALID', message: TOO_LARGE };
+    const upload = await this.storage.read(key);
+    if (!upload) return { code: 'NOT_FOUND', message: NOT_UPLOADED };
+    const stored = await this.store(shopId, orderId, { data: upload.body });
+    if ('kind' in stored) {
+      if (stored.kind === 'receipt' && stored.reason === 'missing') {
+        return { code: 'NOT_FOUND', message: NOT_UPLOADED };
+      }
+      return {
+        code: 'INVALID',
+        message: stored.kind === 'receipt' && stored.reason === 'size' ? TOO_LARGE : NOT_A_RECEIPT,
+      };
+    }
+    return { stored, upload: { key, size: upload.body.length } };
+  }
+
   /**
    * Keeps what the customer sent for `orderId` in storage, outside any transaction, if it is a
    * receipt at all: a photo or a PDF of at most 10 MiB. Returns why it is not, if not.
@@ -173,6 +227,11 @@ export class TransferReceiptService {
       payload: { changed: ['transferReceipt'], stage: order.stage, version: order.version },
     });
     return null;
+  }
+
+  /** Removes the upload {@link storeUpload} copied, once it is the order's; a failure leaves it. */
+  async removeUpload(key: string): Promise<void> {
+    await this.storage.delete(key).catch(() => undefined);
   }
 
   /** Removes a receipt {@link store} kept that its order did not take; a failure leaves it. */

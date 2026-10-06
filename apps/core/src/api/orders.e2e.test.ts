@@ -1694,6 +1694,58 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
         },
       ],
     });
+    // Money sent by hand keeps its receipt, an upload staged for it, shown for an hour (ADR-242).
+    const staged = await mutate(
+      await issueToken(shopA, ['write_files']),
+      `mutation ($input: [StagedUploadInput!]!) {
+        stagedUploadsCreate(input: $input) { stagedTargets { url resourceUrl } }
+      }`,
+      { input: [{ filename: 'JazzCash.png', mimeType: 'image/png', fileSize: '64' }] },
+    );
+    const [target] = staged.stagedTargets;
+    const local = (url: string) => url.replace('http://localhost:4000', '');
+    const receiptPng = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(56, 3),
+    ]);
+    const uploaded = await app.inject({
+      method: 'PUT',
+      url: local(target.url),
+      payload: receiptPng,
+      headers: { 'content-type': 'image/png' },
+    });
+    expect(uploaded.statusCode).toBe(200);
+    const withReceipt = await mutate(
+      tokens.a,
+      `mutation ($id: ID!, $input: OrderRefundInput!) {
+        orderRefund(id: $id, input: $input) {
+          refund { method receipt { mimeType fileSize url } }
+          order { name refunds { receipt { fileSize } } }
+          userErrors { field code message }
+        }
+      }`,
+      {
+        id,
+        input: {
+          amount: '500',
+          method: 'MOBILE_WALLET',
+          reference: 'JC-2',
+          receipt: target.resourceUrl,
+        },
+      },
+    );
+    expect(withReceipt).toMatchObject({
+      refund: { method: 'MOBILE_WALLET', receipt: { mimeType: 'image/png', fileSize: 64 } },
+      order: { refunds: [{ receipt: null }, { receipt: { fileSize: 64 } }] },
+      userErrors: [],
+    });
+    const shown = await app.inject({ method: 'GET', url: local(withReceipt.refund.receipt.url) });
+    expect(shown.statusCode).toBe(200);
+    expect(shown.headers['content-disposition']).toContain(
+      `filename="Refund receipt ${withReceipt.order.name}-2.png"`,
+    );
+    expect(shown.rawPayload.equals(receiptPng)).toBe(true);
+
     const elsewhere = await mutate(tokens.b, REFUND, {
       id,
       input: { amount: '1', method: 'CASH' },

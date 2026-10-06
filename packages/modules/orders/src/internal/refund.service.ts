@@ -10,6 +10,7 @@ import {
 import { StoreCreditService } from '@hatti/customers/public';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
+import { takeStagedUploadIn } from '@hatti/files/public';
 import { newId, toPublicId } from '@hatti/ids';
 import { formatMoney, money, toMajorString, type CurrencyCode } from '@hatti/money';
 import { Injectable, Optional } from '@nestjs/common';
@@ -21,6 +22,7 @@ import { refundTaxOf } from './order-tax.js';
 import type { OrderRecord, RefundRecord } from './records.js';
 import { LIMITS } from './rules.js';
 import { refunds, type OrderRow, type RefundMethodValue } from './schema.js';
+import { TransferReceiptService, type StoredReceipt } from './transfer-receipt.service.js';
 
 export interface RefundInput {
   /** In major units, like "2,000" or "499.50". */
@@ -32,6 +34,11 @@ export interface RefundInput {
   note?: string | null;
   /** A refund as store credit's: when the credit expires; never, unless given (ADR-184). */
   storeCreditExpiresAt?: Date | null;
+  /**
+   * A refund staff sent by hand's receipt, a photo or a PDF, by the resource URL of the upload
+   * `stagedUploadsCreate` staged for it (ADR-242).
+   */
+  receipt?: string | null;
 }
 
 export interface RefundResult {
@@ -49,6 +56,9 @@ const METHOD_TEXT: Readonly<Record<RefundMethodValue, string>> = {
   store_credit: ' as store credit',
 };
 
+/** Money staff send themselves, whose refunds may keep a receipt (ADR-242). */
+const BY_HAND: readonly RefundMethodValue[] = ['bank_transfer', 'mobile_wallet', 'cash', 'other'];
+
 @Injectable()
 export class RefundService {
   constructor(
@@ -57,6 +67,8 @@ export class RefundService {
     @Optional() private readonly payments?: OnlinePayments,
     /** Gives refunds as store credit (ADR-184); without it, none is. */
     @Optional() private readonly storeCredit?: StoreCreditService,
+    /** Keeps refunds' receipts among their orders' (ADR-242); without it, none are kept. */
+    @Optional() private readonly receipts?: TransferReceiptService,
   ) {}
 
   /**
@@ -64,7 +76,8 @@ export class RefundService {
    * send the money, then record it here; but `online`, which Hatti asks the payment gateway the
    * customer paid through to send, and records once the gateway says it is sent (ADR-153), and
    * `store_credit`, which credits the customer's store credit account with it instead, in the
-   * same transaction, the credit's ID its reference (ADR-184). The
+   * same transaction, the credit's ID its reference (ADR-184). A refund staff sent may keep its
+   * receipt, a staged upload copied among the order's receipts (ADR-242). The
    * order's financial status becomes refunded, or partially refunded, and its stage stays as it
    * is: a completed order stays completed. The timeline, the outbox and the audit log each get an
    * entry.
@@ -121,13 +134,61 @@ export class RefundService {
         'It must expire in the future',
       );
     }
+    const receipt = input.receipt?.trim() || null;
+    if (receipt !== null && !BY_HAND.includes(input.method)) {
+      check.addMessage(
+        ['input', 'receipt'],
+        'INVALID',
+        'A receipt is kept of money staff sent: not online, as store credit or by exchange',
+      );
+    } else if (receipt !== null && !this.receipts) {
+      check.addMessage(['input', 'receipt'], 'INVALID', "Refunds' receipts are not kept here");
+    }
     if (!check.ok || amount === null) return { ok: false, errors: check.errors };
     if (input.method === 'online') return this.#refundOnline(tenant, orderId, amount, note);
     const storeCredit = this.storeCredit;
     if (asCredit && !storeCredit) {
       return failOne(['input', 'method'], 'INVALID', 'Refunds as store credit are not given here');
     }
+    // Storage is written outside the transaction, which holds nothing while it answers.
+    const kept = receipt && (await this.receipts!.storeUpload(tenant.shopId, orderId, receipt));
+    if (kept && 'code' in kept) return failOne(['input', 'receipt'], kept.code, kept.message);
+    let result: MutationResult<RefundResult>;
+    try {
+      result = await this.#refundByHand(tenant, orderId, input, {
+        amount,
+        reference,
+        note,
+        expiresAt,
+        at,
+        receipt: kept || null,
+      });
+    } catch (error) {
+      if (kept) await this.receipts!.discard(kept.stored);
+      throw error;
+    }
+    if (kept && result.ok) await this.receipts!.removeUpload(kept.upload.key);
+    else if (kept) await this.receipts!.discard(kept.stored);
+    return result;
+  }
 
+  /** Records a refund staff gave, as {@link refund} says, its receipt kept if it has one. */
+  async #refundByHand(
+    tenant: TenantContext,
+    orderId: string,
+    input: RefundInput,
+    checked: {
+      amount: bigint;
+      reference: string | null;
+      note: string;
+      expiresAt: Date | null;
+      at: Date;
+      receipt: { stored: StoredReceipt; upload: { key: string; size: number } } | null;
+    },
+  ): Promise<MutationResult<RefundResult>> {
+    const { amount, reference, note, expiresAt, at, receipt } = checked;
+    const asCredit = input.method === 'store_credit';
+    const storeCredit = this.storeCredit;
     return rollbackResult(() =>
       this.db.tenant(tenant.shopId, async (tx): Promise<MutationResult<RefundResult>> => {
         const order = await lockOrder(tx, tenant.shopId, orderId);
@@ -152,6 +213,17 @@ export class RefundService {
           );
         }
 
+        // Its receipt's upload is the order's now, no longer one the shop may make a file of.
+        if (
+          receipt &&
+          !(await takeStagedUploadIn(tx, tenant.shopId, receipt.upload.key, receipt.upload.size))
+        ) {
+          return failOne(
+            ['input', 'receipt'],
+            'NOT_FOUND',
+            'Give the resourceUrl of an upload stagedUploadsCreate staged',
+          );
+        }
         // Store credit's transaction is named first, for the refund's reference.
         const creditId = asCredit ? newId() : null;
         const { refundId } = await writeRefund(tx, tenant, order, {
@@ -159,7 +231,10 @@ export class RefundService {
           method: input.method,
           reference: creditId ? toPublicId('storeCreditTransaction', creditId) : reference,
           note,
-          message: `Refunded ${format(amount)}${METHOD_TEXT[input.method]}`,
+          receipt: receipt?.stored ?? null,
+          message:
+            `Refunded ${format(amount)}${METHOD_TEXT[input.method]}` +
+            (receipt ? ', with its receipt' : ''),
         });
         if (creditId) {
           const credited = await storeCredit!.creditIn(
@@ -281,6 +356,8 @@ export async function writeRefund(
     method: RefundMethodValue;
     reference: string | null;
     note: string;
+    /** Its receipt, kept among the order's (ADR-242). */
+    receipt?: StoredReceipt | null;
     message: string;
   },
 ): Promise<{ refundId: string; order: OrderRow }> {
@@ -307,6 +384,9 @@ export async function writeRefund(
     method: refund.method,
     reference: refund.reference,
     note: refund.note,
+    receiptKey: refund.receipt?.key ?? null,
+    receiptContentType: refund.receipt?.contentType ?? null,
+    receiptSize: refund.receipt?.size ?? null,
     actorKind: actor.actorKind,
     actorId: actor.actorId,
   });

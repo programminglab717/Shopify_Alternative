@@ -306,6 +306,7 @@ export {
   type OrderRiskRecord,
   type OrderTally,
   type ParcelClaimRecord,
+  type RefundReceiptRecord,
   type RefundRecord,
   type ReturnRecord,
 } from '../internal/records.js';

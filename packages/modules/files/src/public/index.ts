@@ -23,6 +23,7 @@ export {
   FILE_URL_SECONDS,
   FileService,
   UPLOAD_SECONDS,
+  takeStagedUploadIn,
   type FileCreateInput,
   type StagedUploadInput,
 } from '../internal/file.service.js';

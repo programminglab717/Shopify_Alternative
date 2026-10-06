@@ -221,7 +221,7 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
     bankTransfer: new BankTransferService(db),
     documents: new OrderDocumentService(db, locations),
     exports: new OrderExportService(db),
-    refunds: new RefundService(db, undefined, new StoreCreditService(db)),
+    refunds: new RefundService(db, undefined, new StoreCreditService(db), receipts),
     storeCredit: new StoreCreditService(db),
     savedSearches: new SavedSearchService(db),
     comments: new OrderCommentService(db),

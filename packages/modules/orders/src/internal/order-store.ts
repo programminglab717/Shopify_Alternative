@@ -140,6 +140,9 @@ interface OrderJsonRow extends Record<string, unknown> {
     method: RefundRecord['method'];
     reference: string | null;
     note: string;
+    receipt_key: string | null;
+    receipt_content_type: string | null;
+    receipt_size: number | null;
     actor_kind: RefundRecord['actorKind'];
     actor_id: string;
     created_at: string;
@@ -305,6 +308,14 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       method: refund.method,
       reference: refund.reference,
       note: refund.note,
+      receipt:
+        refund.receipt_key === null
+          ? null
+          : {
+              key: refund.receipt_key,
+              contentType: refund.receipt_content_type!,
+              size: refund.receipt_size!,
+            },
       actorKind: refund.actor_kind,
       actorId: refund.actor_id,
       createdAt: toDate(refund.created_at),
@@ -408,6 +419,8 @@ export async function loadOrders(
                       'id', r.id, 'amount', r.amount::text, 'tax', r.tax::text,
                       'method', r.method,
                       'reference', r.reference, 'note', r.note, 'actor_kind', r.actor_kind,
+                      'receipt_key', r.receipt_key, 'receipt_content_type', r.receipt_content_type,
+                      'receipt_size', r.receipt_size,
                       'actor_id', r.actor_id, 'created_at', r.created_at) ORDER BY r.id)
                FROM orders.refunds r
               WHERE r.shop_id = o.shop_id AND r.order_id = o.id), '[]') AS refunds,

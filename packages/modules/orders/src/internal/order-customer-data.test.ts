@@ -408,6 +408,7 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
             method: 'bank_transfer',
             reference: 'IBFT-778812',
             note: 'Stitching came apart',
+            receipt: null,
             refundedAt: at,
           },
         ],

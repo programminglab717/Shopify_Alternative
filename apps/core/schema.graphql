@@ -5295,7 +5295,7 @@ type Mutation {
   orderPhoneReveal(id: ID!): OrderPhoneRevealPayload!
 
   """
-  Records money given back on an order, up to what was paid on it and not refunded yet. Send it, then record it here; or, by ONLINE, Hatti asks the payment gateway the customer paid through to send it, and records it once the gateway says it is sent (ADR-153). The financial status becomes REFUNDED or PARTIALLY_REFUNDED; a completed order stays completed. By STORE_CREDIT, no money moves: the customer is credited it to spend on later orders (ADR-184). Staff need to be an owner or a manager. Needs an Idempotency-Key header.
+  Records money given back on an order, up to what was paid on it and not refunded yet. Send it, then record it here; or, by ONLINE, Hatti asks the payment gateway the customer paid through to send it, and records it once the gateway says it is sent (ADR-153). The financial status becomes REFUNDED or PARTIALLY_REFUNDED; a completed order stays completed. By STORE_CREDIT, no money moves: the customer is credited it to spend on later orders (ADR-184). Money staff sent may keep its receipt (ADR-242). Staff need to be an owner or a manager. Needs an Idempotency-Key header.
   """
   orderRefund(id: ID!, input: OrderRefundInput!): OrderRefundPayload!
 
@@ -6618,6 +6618,11 @@ input OrderRefundInput {
 
   """Why, for the shop's records."""
   note: String
+
+  """
+  For money staff sent, by BANK_TRANSFER, MOBILE_WALLET, CASH or OTHER: its receipt, a photo, a screenshot or a PDF of at most 10 MiB, by the resourceUrl of the upload stagedUploadsCreate staged for it. The refund keeps it with its order (ADR-242); it is not made one of the shop's files.
+  """
+  receipt: String
 
   """
   The transfer's reference, such as a wallet transaction ID. Not for ONLINE or STORE_CREDIT: the gateway's, or the credit's, is recorded.
@@ -8511,6 +8516,11 @@ type Refund {
   note: String!
 
   """
+  The receipt staff kept of the money they sent (ADR-242); null without one, and once the customer's data is erased.
+  """
+  receipt: RefundReceipt
+
+  """
   The transfer's reference, such as a wallet transaction ID. Cleared, with the note, when the customer's data is erased.
   """
   reference: String
@@ -8551,6 +8561,22 @@ enum RefundMethod {
   No money moved: the customer's store credit account was credited with it, to spend on later orders (ADR-184), the credit's transaction ID its reference. Needs the write_store_credit_account_transactions scope too.
   """
   STORE_CREDIT
+}
+
+"""
+A refund's receipt, which staff kept of the money they sent back by hand: a photo, a screenshot or a PDF (ADR-242).
+"""
+type RefundReceipt {
+  """Bytes."""
+  fileSize: Int!
+
+  """image/jpeg, image/png, image/webp or application/pdf."""
+  mimeType: String!
+
+  """
+  Where it is shown, for an hour from when it was asked for, named for its order and the refund's place among its refunds: "Refund receipt #1023-1.jpg".
+  """
+  url: String!
 }
 
 """

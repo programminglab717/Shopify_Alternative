@@ -1,11 +1,24 @@
 import 'reflect-metadata';
+import type { MutationResult } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { listAudit } from '@hatti/events';
+import { FileService } from '@hatti/files/public';
 import { toPublicId } from '@hatti/ids';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
+
+/** A result's errors with their messages. */
+const problems = (result: MutationResult<unknown>) =>
+  result.ok ? [] : result.errors.map((error) => [error.field.join('.'), error.code, error.message]);
+
+/** A PNG's signature, then `size` bytes in all. */
+const png = (size: number) =>
+  Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.alloc(size - 8, 1),
+  ]);
 
 describe.skipIf(!server)('Refunds', () => {
   let f: OrdersFixture;
@@ -307,5 +320,99 @@ describe.skipIf(!server)('Refunds', () => {
       { amount: 200_000n, method: 'mobile_wallet', reference: null, note: '' },
     ]);
     expect(erased).toMatchObject({ financialStatus: 'refunded', amountRefunded: 200_000n });
+  });
+
+  it('keeps the receipt of money staff sent, taken from the upload staged for it (ADR-242)', async () => {
+    const files = new FileService(f.db, f.storage);
+    /** An upload staged for the shop, and in storage: its resource URL. */
+    const staged = async (owner: typeof f.a, data: Buffer, put = true) => {
+      const [upload] = unwrap(
+        await files.stage(owner, [
+          { filename: 'Receipt.png', mimeType: 'image/png', fileSize: String(data.length) },
+        ]),
+      );
+      if (put) await f.storage.put(f.storage.keyOf(upload!.resourceUrl)!, data, 'image/png');
+      return upload!.resourceUrl;
+    };
+    const order = await f.order(f.a, [kurta], { paymentMethod: 'prepaid' });
+    const receipt = await staged(f.a, png(64));
+    const refund = (amount: string, method: 'mobile_wallet' | 'store_credit', given: string) =>
+      f.refunds.refund(f.a, order.id, { amount, method, receipt: given });
+
+    // Refused for more than was paid, its copy goes, and its upload stays for the next try.
+    const put = vi.spyOn(f.storage, 'put');
+    expect(problems(await refund('5,000', 'mobile_wallet', receipt))).toEqual([
+      [
+        'input.amount',
+        'INVALID',
+        'A refund can be at most Rs 2,000: what was paid and not refunded yet',
+      ],
+    ]);
+    const copied = put.mock.calls.map(([key]) => key);
+    put.mockRestore();
+    expect(copied).toHaveLength(1);
+    expect(await f.storage.head(copied[0]!)).toBeNull();
+
+    const kept = unwrap(await refund('500', 'mobile_wallet', receipt)).refund;
+    expect(kept.receipt).toEqual({
+      key: expect.stringMatching(
+        new RegExp(`^shops/${f.a.shopId}/receipts/${order.id}/[0-9a-f-]{36}\\.png$`),
+      ),
+      contentType: 'image/png',
+      size: 64,
+    });
+    expect((await f.storage.read(kept.receipt!.key))?.body).toEqual(png(64));
+    expect(await timeline(order.id)).toEqual([
+      ['refunded', 'Refunded Rs 500 to a mobile wallet, with its receipt'],
+    ]);
+    // The upload is the order's now: gone from where it was staged, and no file of the shop's.
+    expect(await f.storage.head(f.storage.keyOf(receipt)!)).toBeNull();
+    expect(errorsOf(await files.create(f.a, [{ originalSource: receipt }]))[0]?.[1]).toBe(
+      'NOT_FOUND',
+    );
+
+    // Not of money given otherwise; nor anything but a photo or a PDF the shop staged and sent.
+    const at = 'input.receipt';
+    for (const [given, error] of [
+      [
+        await refund('100', 'store_credit', await staged(f.a, png(32))),
+        [
+          at,
+          'INVALID',
+          'A receipt is kept of money staff sent: not online, as store credit or by exchange',
+        ],
+      ],
+      [
+        await refund('100', 'mobile_wallet', 'https://elsewhere.pk/receipt.png'),
+        [at, 'NOT_FOUND', 'Give the resourceUrl of an upload stagedUploadsCreate staged'],
+      ],
+      [
+        await refund('100', 'mobile_wallet', await staged(f.b, png(32))),
+        [at, 'NOT_FOUND', 'Give the resourceUrl of an upload stagedUploadsCreate staged'],
+      ],
+      [
+        await refund('100', 'mobile_wallet', await staged(f.a, png(32), false)),
+        [at, 'NOT_FOUND', 'Nothing has been uploaded to its URL yet'],
+      ],
+      [
+        await refund('100', 'mobile_wallet', await staged(f.a, Buffer.from('not a receipt'))),
+        [at, 'INVALID', 'A receipt is a photo (JPEG, PNG or WebP) or a PDF'],
+      ],
+    ] as const) {
+      expect(problems(given)).toEqual([error]);
+    }
+
+    // The customer's data erased, the receipt goes with it, for the worker to remove its file.
+    unwrap(await f.orders.cancel(f.a, order.id, { reason: 'customer' }));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+    unwrap(await f.customerData.erase(f.a, order.customerId));
+    expect((await f.orders.get(f.a, order.id))!.refunds.map((each) => each.receipt)).toEqual([
+      null,
+    ]);
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type === 'order.receipts_erased')
+        .map((event) => [event.aggregate_id, event.payload]),
+    ).toEqual([[order.id, { keys: [kept.receipt!.key] }]]);
   });
 });

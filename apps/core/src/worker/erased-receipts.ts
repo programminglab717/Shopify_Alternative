@@ -5,9 +5,9 @@ import type { ObjectStorage } from '@hatti/storage';
 
 /**
  * Removes from storage the files of the receipts that went with their customer's erasure
- * (ADR-113), once the erasure has committed: the keys its order's event names, each under that
- * order's receipts. Removing a file already gone changes nothing, so an event handled twice, or
- * late, does no harm.
+ * (ADR-113), its refunds' too (ADR-242), once the erasure has committed: the keys its order's
+ * event names, each under that order's receipts. Removing a file already gone changes nothing, so
+ * an event handled twice, or late, does no harm.
  */
 export class ErasedReceipts {
   /** The events {@link handle} reads. */

@@ -1,6 +1,7 @@
 import { Money, PageInfo, UserError } from '@hatti/api';
 import { TaxLine } from '@hatti/tax/public';
 import { BankAccount } from './bank-transfer.types.js';
+import { RefundReceipt } from './transfer-receipt.types.js';
 import {
   ArgsType,
   Field,
@@ -169,6 +170,14 @@ export class Refund {
 
   @Field({ description: "Why, for the shop's records." })
   note!: string;
+
+  @Field(() => RefundReceipt, {
+    nullable: true,
+    description:
+      'The receipt staff kept of the money they sent (ADR-242); null without one, and once the ' +
+      "customer's data is erased.",
+  })
+  receipt!: RefundReceipt | null;
 
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
@@ -1691,6 +1700,16 @@ export class OrderRefundInput {
     description: 'For STORE_CREDIT: when the credit expires; never, unless given.',
   })
   storeCreditExpiresAt?: Date | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'For money staff sent, by BANK_TRANSFER, MOBILE_WALLET, CASH or OTHER: its receipt, a ' +
+      'photo, a screenshot or a PDF of at most 10 MiB, by the resourceUrl of the upload ' +
+      'stagedUploadsCreate staged for it. The refund keeps it with its order (ADR-242); it is ' +
+      "not made one of the shop's files.",
+  })
+  receipt?: string | null;
 }
 
 @InputType()

@@ -6,9 +6,9 @@
 
 ## In progress
 
-**A refund's receipt** (ORD-09): a picture or PDF of the receipt for money staff sent back by
-hand, one of the shop's files, kept with the refund and shown with it on the order, so the shop
-can show a customer the money went.
+**The home page for search engines** (OS-09): the storefront's own title and description for
+search engines, and an image for link previews, as Shopify's preferences keep them, in the home
+page's head and the shop's structured data.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### A refund's receipt
+
+* **Money staff sent keeps its receipt** ([ADR-242](../architecture/13-decision-log.md#adr-242--a-refund-staff-sent-by-hand-may-keep-its-receipt-staged-as-any-upload-is-and-given-with-the-refund-its-order-keeps-it-among-its-receipts-never-as-one-of-the-shops-files-and-it-goes-with-the-customers-erasure-as-their-own-receipts-do)): a photo or a PDF of the
+  transfer, staged as any upload is and given with the refund by its `resourceUrl`, for refunds
+  by bank transfer, mobile wallet, cash or another way.
+* **The order's, never the shop's files:** copied among the order's receipts, the staged upload
+  taken from the files module in the refund's transaction; a refund refused leaves the upload
+  for the next try. Migration 0150 keeps it on the refund.
+* **Shown and erased with its order:** `Refund.receipt` gives a URL signed for an hour; the
+  customer's erasure clears it and the worker removes its file, as their own receipts'.
+* 1749 tests: a receipt kept, its upload taken, refused for what is no receipt or no money sent
+  by hand, kept for the next try, shown through the Admin API, and gone with the customer's data.
 
 ### 06ad1c4 · Options in Urdu
 
