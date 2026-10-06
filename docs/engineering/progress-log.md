@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Articles published at a time ahead
+### 73fd722 · Articles published at a time ahead
 
 * **An article's publish date may be ahead**, a year at most, as Shopify's `publishDate`
   schedules one ([ADR-215](../architecture/13-decision-log.md#adr-215--an-article-is-published-at-a-time-ahead-as-shopifys-publishdate-schedules-one-hidden-until-then-wherever-it-would-show-and-the-worker-shows-it-once-its-time-comes-with-the-articleupdated-the-storefront-follows)):
