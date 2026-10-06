@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Baadmay's buy now, pay later
+### 0915f6a · Baadmay's buy now, pay later
 
 * **Gateways that ask are given the buyer** ([ADR-226](../architecture/13-decision-log.md#adr-226--baadmays-buy-now-pay-later-is-a-gateway-shops-take-payments-through-the-order-its-items-and-its-customer-go-to-its-page-in-the-address-and-its-return-which-it-does-not-sign-is-believed-only-once-its-order-status-asked-at-once-names-the-order-and-the-amount-paid)): the order's
   customer, number, email, address, items and delivery charge (`orderBuyerIn`), and the account's
