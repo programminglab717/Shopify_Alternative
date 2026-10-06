@@ -407,6 +407,8 @@ export function shopDoc(
   brand: BrandDoc = { logo: null, squareLogo: null },
   /** Its social sharing image, where it is served (ADR-243); null for none. */
   sharingImage: ImageDoc | null = null,
+  /** Its home page's words for search engines as it translated them (ADR-245). */
+  translations?: TranslatedFields,
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -465,6 +467,8 @@ export function shopDoc(
       seo: { title: preferences.seo.title, description: preferences.seo.description },
     }),
     ...(sharingImage && { sharingImage }),
+    // Left out while it translated none of them, likewise (ADR-245).
+    ...translationsDoc(translations, (fields) => ({ seo: seoTranslation(fields) })),
   };
 }
 

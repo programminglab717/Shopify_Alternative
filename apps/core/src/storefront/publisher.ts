@@ -291,6 +291,8 @@ export function itemsFor(event: DomainEvent): string[] {
       if (kind === 'article') return [Items.article(id)];
       // A policy's are written with the shop's policies' bodies (ADR-239).
       if (kind === 'shopPolicy') return [Items.policies];
+      // The shop's home page's are in its own document (ADR-245).
+      if (kind === 'shop') return [Items.shop];
       return [Items.menus];
     }
     case MarketingEvents.MetaConversionsUpdated:
@@ -667,6 +669,8 @@ export class StorefrontPublisher {
           alt: sharing!.altText || sharingFile.alt || null,
         }
       : null;
+    // Its home page's words as it translated them (ADR-245), kept under its own ID.
+    const translations = await this.services.translations.translationsOf(tx, shopId, [shopId]);
     const doc = shopDoc(
       profile,
       theme,
@@ -677,6 +681,7 @@ export class StorefrontPublisher {
       metaPixelId,
       brand,
       sharingImage,
+      translations.get(shopId),
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];

@@ -42,8 +42,9 @@ export class TranslationResolver {
   @Query(() => TranslatableResource, {
     nullable: true,
     description:
-      'A product, collection, page, blog, article, menu, menu item or policy of the shop, by its ' +
-      'ID, with its fields that may be translated and their translations (ADR-238).',
+      'A product, collection, page, blog, article, menu, menu item, policy, product option or ' +
+      'option value of the shop, or the shop itself, by its ID, with its fields that may be ' +
+      'translated and their translations (ADR-238).',
   })
   @RequireScopes('read_translations')
   async translatableResource(
@@ -156,8 +157,8 @@ function resourceOf(resourceId: string): { kind: TranslatableKind; id: string } 
     throw badUserInput(`Invalid resource id: ${resourceId.slice(0, 64)}`);
   }
   throw badUserInput(
-    'Not a product, collection, page, blog, article, menu, menu item, policy, product option ' +
-      'or option value: ' +
+    'Not a product, collection, page, blog, article, menu, menu item, policy, product option, ' +
+      'option value or shop: ' +
       resourceId.slice(0, 64),
   );
 }

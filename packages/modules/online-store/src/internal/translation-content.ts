@@ -30,6 +30,7 @@ export const TRANSLATABLE_KINDS = [
   'shopPolicy',
   'productOption',
   'productOptionValue',
+  'shop',
 ] as const;
 export type TranslatableKind = (typeof TRANSLATABLE_KINDS)[number];
 
@@ -64,6 +65,8 @@ export const TRANSLATABLE_FIELDS: Readonly<Record<TranslatableKind, readonly Tra
   // A product's options and their values, shown with its variants (ADR-241).
   productOption: ['name'],
   productOptionValue: ['name'],
+  // The shop itself: its home page's words for search engines (ADR-245).
+  shop: ['meta_title', 'meta_description'],
 };
 
 /** How a field's words are written, as Shopify's LocalizableContentType. */

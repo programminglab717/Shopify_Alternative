@@ -463,6 +463,73 @@ describe.skipIf(!server)('TranslationService', () => {
     });
   });
 
+  it("keeps the shop's own words for its home page in Urdu, by the shop's own ID (ADR-245)", async () => {
+    // Before it wrote any: the shop is there, with nothing to translate.
+    expect(await f.translations.resources(f.a, 'shop', { first: 10 })).toEqual({
+      items: [{ kind: 'shop', id: f.a.shopId, content: [], translations: [] }],
+      hasNextPage: false,
+    });
+    unwrap(
+      await f.preferences.update(f.a, {
+        seo: { title: 'Zari Fashions: lawn in Lahore', description: 'Lawn and bridal, delivered.' },
+      }),
+    );
+    const shop = await f.translations.resource(f.a, 'shop', f.a.shopId);
+    expect(shop!.content.map((field) => [field.key, field.value, field.type])).toEqual([
+      ['meta_title', 'Zari Fashions: lawn in Lahore', 'single_line_text_field'],
+      ['meta_description', 'Lawn and bridal, delivered.', 'multi_line_text_field'],
+    ]);
+    unwrap(
+      await f.translations.register(f.a, 'shop', f.a.shopId, [
+        {
+          locale: 'ur',
+          key: 'meta_title',
+          value: 'زری فیشنز: لاہور کی لان',
+          translatableContentDigest: digestOf('Zari Fashions: lawn in Lahore'),
+        },
+      ]),
+    );
+    expect(await events()).toEqual([
+      [f.a.shopId, { kind: 'shop', locales: ['ur'], keys: ['meta_title'] }],
+    ]);
+    const kept = await f.db.tenant(f.a.shopId, (tx) =>
+      shopTranslationsOf(tx, f.a.shopId, [f.a.shopId]),
+    );
+    expect(kept.get(f.a.shopId)).toEqual({ ur: { meta_title: 'زری فیشنز: لاہور کی لان' } });
+
+    // Its home page's fields alone; another shop is not it; nothing after it.
+    expect(
+      errorsOf(
+        await f.translations.register(f.a, 'shop', f.a.shopId, [
+          { locale: 'ur', key: 'title', value: 'زری', translatableContentDigest: digestOf('x') },
+        ]),
+      ),
+    ).toEqual([
+      [
+        'translations.0.key',
+        'INVALID',
+        'Key title is not a field of a shop that can be translated: meta_title, meta_description',
+      ],
+    ]);
+    expect(await f.translations.resource(f.a, 'shop', f.b.shopId)).toBeNull();
+    expect(
+      errorsOf(
+        await f.translations.register(f.a, 'shop', f.b.shopId, [
+          {
+            locale: 'ur',
+            key: 'meta_title',
+            value: 'زری',
+            translatableContentDigest: digestOf('Zari Fashions: lawn in Lahore'),
+          },
+        ]),
+      ),
+    ).toEqual([['resourceId', 'NOT_FOUND', 'No such shop']]);
+    expect(await f.translations.resources(f.a, 'shop', { first: 10, after: f.a.shopId })).toEqual({
+      items: [],
+      hasNextPage: false,
+    });
+  });
+
   it('pages through products by the catalog, the newest first', async () => {
     // The other shop's, as the catalog stays between tests.
     for (const title of ['Lawn', 'Shawl', 'Kurta']) {

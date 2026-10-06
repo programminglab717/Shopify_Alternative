@@ -265,6 +265,46 @@ describe('Storefront rendering', () => {
     expect(plain).not.toContain('og:image');
   });
 
+  it("gives the Urdu pages the shop's home page words in Urdu, its own where it gave none (ADR-245)", async () => {
+    const sample = sampleStore();
+    const description = 'Lawn, bridal and khussas, delivered across Pakistan.';
+    const urduDescription = 'لان، عروسی جوڑے اور کھسے، پورے پاکستان میں۔';
+    const store = new MemoryStore({
+      ...sample,
+      shop: {
+        ...sample.shop,
+        seo: { title: 'Zari Fashions: lawn and bridal in Lahore', description },
+        translations: {
+          ur: { seo: { title: 'زری فیشنز: لاہور کی لان', description: urduDescription } },
+        },
+      },
+    });
+    const renderer = new PageRenderer(loadTheme(files), {
+      platformUrl: 'https://hatti.pk',
+      limits: { timeMs: 10_000 },
+    });
+    const page = async (path: string, locale?: string) =>
+      (await renderer.render({ path, ...(locale && { locale }) }, store.fresh())).html;
+
+    // Its Urdu home page's title and description, and its website's in structured data.
+    const home = await page('/', 'ur');
+    expect(home).toContain('<title>زری فیشنز: لاہور کی لان · Zari Fashions</title>');
+    expect(home).toContain(`<meta name="description" content="${urduDescription}">`);
+    const graph = JSON.parse(
+      /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(home)![1]!,
+    ) as { '@graph': Record<string, unknown>[] };
+    expect(graph['@graph'][1]!.description).toBe(urduDescription);
+    // Its other Urdu pages describe it so too.
+    expect(await page('/cart', 'ur')).toContain(
+      `<meta name="description" content="${urduDescription}">`,
+    );
+    // Its English pages, its own words alone.
+    const english = await page('/');
+    expect(english).toContain('<title>Zari Fashions: lawn and bridal in Lahore</title>');
+    expect(english).toContain(`<meta name="description" content="${description}">`);
+    expect(english).not.toContain('زری فیشنز');
+  });
+
   it('gives search engines the title and description a shop wrote for a blog, and in Urdu (ADR-244)', async () => {
     const sample = sampleStore();
     const description = 'Eid edits, lawn launches and how to wear them.';

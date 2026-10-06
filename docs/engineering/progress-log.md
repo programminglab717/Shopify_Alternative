@@ -6,9 +6,9 @@
 
 ## In progress
 
-**The home page's words in Urdu** (OS-06): the shop's own title and description for its home
-page (ADR-243) in Urdu, as Shopify's translations of a shop's `meta_title` and
-`meta_description`, through the Admin API, on its Urdu home page.
+**Couriers' statements from Excel files** (COD-10): remittance statements imported as Excel
+workbooks as well as CSV, their tracking numbers as Excel keeps them rather than as `1.23E+11`,
+and a shortfall a courier pays in a later statement received on its parcel.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### The home page's words in Urdu
+
+* **The shop translated as Shopify's `SHOP`** ([ADR-245](../architecture/13-decision-log.md#adr-245--the-shops-own-words-for-its-home-page-may-be-translated-into-urdu-the-shop-a-translatable-resource-of-its-own-by-its-own-id-as-shopifys-shop-is-its-document-carries-them-beside-its-own-words-and-its-urdu-pages-show-them)): its home page's SEO title
+  and description, by the shop's own ID, through the translations API; no migration, as
+  translations are kept by what they translate's ID.
+* **On the storefront:** the shop's document carries them beside its own words; its Urdu pages
+  show them as the home page's title and description, `shop.description` and the website's
+  structured data, and the edge forgets all the shop's pages when they change.
+* 1760 tests: listed, kept and refused, another shop's not found, through the Admin API too;
+  published and removed; shown on Urdu pages and not on English ones.
 
 ### 27f1015 · A blog for search engines
 

@@ -23,6 +23,7 @@ export enum TranslatableResourceType {
   SHOP_POLICY = 'shopPolicy',
   PRODUCT_OPTION = 'productOption',
   PRODUCT_OPTION_VALUE = 'productOptionValue',
+  SHOP = 'shop',
 }
 
 registerEnumType(TranslatableResourceType, {
@@ -53,6 +54,10 @@ registerEnumType(TranslatableResourceType, {
     PRODUCT_OPTION_VALUE: {
       description:
         "An option's value, such as Small: its name, in each variant's title too (ADR-241).",
+    },
+    SHOP: {
+      description:
+        "The shop itself: its home page's SEO title and description (ADR-245), by the shop's ID.",
     },
   },
 });
@@ -131,7 +136,9 @@ export class Translation {
 })
 export class TranslatableResource {
   @Field(() => ID, {
-    description: 'The product, collection, page, blog, article, menu, menu item or policy.',
+    description:
+      'The product, collection, page, blog, article, menu, menu item, policy, product option, ' +
+      'option value or the shop itself.',
   })
   resourceId!: string;
 

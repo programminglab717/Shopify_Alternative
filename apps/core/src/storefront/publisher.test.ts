@@ -1550,6 +1550,51 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     });
   });
 
+  it("publishes its home page's words in Urdu beside its own, and forgets all its pages (ADR-245)", async () => {
+    const translations = new TranslationService(
+      database,
+      products,
+      collections,
+      pages,
+      blogs,
+      articles,
+      menus,
+    );
+    unwrap(
+      await preferences.update(tenant, {
+        seo: { title: 'Zari | Lawn in Lahore', description: 'Lawn and bridal, delivered.' },
+      }),
+    );
+    await deliver();
+    const { content } = (await translations.resource(tenant, 'shop', shopId))!;
+    unwrap(
+      await translations.register(tenant, 'shop', shopId, [
+        {
+          locale: 'ur',
+          key: 'meta_description',
+          value: 'لان اور عروسی جوڑے، گھر تک۔',
+          translatableContentDigest: content.find((field) => field.key === 'meta_description')!
+            .digest,
+        },
+      ]),
+    );
+    forgotten.length = 0;
+    expect(await deliver()).toEqual(['translations.updated']);
+    const shop = await store().shop();
+    expect([shop.seo, shop.translations]).toEqual([
+      { title: 'Zari | Lawn in Lahore', description: 'Lawn and bridal, delivered.' },
+      { ur: { seo: { description: 'لان اور عروسی جوڑے، گھر تک۔' } } },
+    ]);
+    // Its description is on every page of its: they are all forgotten at the edge.
+    expect(forgotten.flat()).toEqual([shopTag(shopId)]);
+
+    // Removed, its own words alone again.
+    unwrap(await translations.remove(tenant, 'shop', shopId, ['meta_description'], ['ur']));
+    unwrap(await preferences.update(tenant, { seo: null }));
+    await deliver();
+    expect(Object.keys(await store().shop())).not.toContain('translations');
+  });
+
   it('publishes what the shop charges for delivery, and how many working days it takes', async () => {
     unwrap(
       await delivery.update(tenant, {

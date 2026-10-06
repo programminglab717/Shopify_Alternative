@@ -335,6 +335,11 @@ export interface ShopDoc {
    * social sharing image, where the API serves it. Absent while it has none.
    */
   sharingImage?: ImageDoc;
+  /**
+   * Its home page's title and description in Urdu (ADR-245), those the shop translated; absent
+   * where it translated neither.
+   */
+  translations?: TranslationsDoc<ShopDoc, never>;
 }
 
 export interface BrandDoc {

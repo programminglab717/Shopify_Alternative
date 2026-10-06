@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import { newId } from '@hatti/ids';
+import { newId, toPublicId } from '@hatti/ids';
 import { digestOf } from '@hatti/online-store/public';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
@@ -323,6 +323,55 @@ describe.skipIf(!server)('Admin GraphQL API: translations', () => {
       resourceId: size.id,
       translatableContent: [{ key: 'name', value: 'Size', type: 'SINGLE_LINE_TEXT_FIELD' }],
       translations: [{ key: 'name', value: 'سائز', locale: 'ur', outdated: false }],
+    });
+  });
+
+  it("translates the shop's own words for its home page, by the shop's ID (ADR-245)", async () => {
+    await admin.query(
+      `INSERT INTO online_store.preferences (shop_id, seo_title, seo_description)
+       VALUES ($1, 'Zari Fashions: lawn in Lahore', 'Lawn and bridal, delivered.')`,
+      [shopA],
+    );
+    const id = toPublicId('shop', shopA);
+    const shops = await call(
+      tokens.reader,
+      `{ translatableResources(resourceType: SHOP) {
+          nodes { resourceId translatableContent { key value type } }
+      } }`,
+    );
+    expect(shops.nodes).toEqual([
+      {
+        resourceId: id,
+        translatableContent: [
+          {
+            key: 'meta_title',
+            value: 'Zari Fashions: lawn in Lahore',
+            type: 'SINGLE_LINE_TEXT_FIELD',
+          },
+          {
+            key: 'meta_description',
+            value: 'Lawn and bridal, delivered.',
+            type: 'MULTI_LINE_TEXT_FIELD',
+          },
+        ],
+      },
+    ]);
+    const title = {
+      locale: 'ur',
+      key: 'meta_title',
+      value: 'زری فیشنز: لاہور کی لان',
+      translatableContentDigest: digestOf('Zari Fashions: lawn in Lahore'),
+    };
+    expect(await register(tokens.a, id, [title])).toEqual({
+      translations: [
+        { key: 'meta_title', value: 'زری فیشنز: لاہور کی لان', locale: 'ur', outdated: false },
+      ],
+      userErrors: [],
+    });
+    // Another shop is not its own to translate.
+    expect(await register(tokens.b, id, [title])).toEqual({
+      translations: null,
+      userErrors: [{ field: ['resourceId'], code: 'NOT_FOUND', message: 'No such shop' }],
     });
   });
 });

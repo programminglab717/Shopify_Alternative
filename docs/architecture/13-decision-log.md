@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-244 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-245 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -252,6 +252,7 @@
 | 242 | A refund staff sent by hand may keep its receipt, staged as any upload is and given with the refund; its order keeps it among its receipts, never as one of the shop's files, and it goes with the customer's erasure as their own receipts do | Accepted |
 | 243 | A shop's home page has a title and description of its own for search engines, as Shopify's preferences keep them, and a social sharing image, one of its files, which link previews show of pages without an image of their own, through Shopify's `page_image` | Accepted |
 | 244 | A blog may be given a title and description of its own for search engines, as its articles may; its pages give them in place of its title and of the shop's description, its articles keep their own, and the shop may translate them into Urdu | Accepted |
+| 245 | The shop's own words for its home page may be translated into Urdu, the shop a translatable resource of its own by its own ID as Shopify's `SHOP` is; its document carries them beside its own words, and its Urdu pages show them | Accepted |
 
 ---
 
@@ -10159,3 +10160,34 @@
     say what the articles say rather than what the blog is.
   * **A title of its own for each tag's page:** Shopify gives a tag's page its blog's, and
     themes add the tag where they want it.
+
+## ADR-245 · The shop's own words for its home page may be translated into Urdu, the shop a translatable resource of its own by its own ID as Shopify's `SHOP` is; its document carries them beside its own words, and its Urdu pages show them
+
+* **Context:** A shop's home page took a title and description of its own for search engines
+  ([ADR-243](#adr-243--a-shops-home-page-has-a-title-and-description-of-its-own-for-search-engines-as-shopifys-preferences-keep-them-and-a-social-sharing-image-one-of-its-files-which-link-previews-show-of-pages-without-an-image-of-their-own-through-shopifys-page_image)), but its Urdu pages gave them in the shop's own words, as they did its
+  name (simplification 113). Shopify's translations take the shop itself as a resource, `SHOP`,
+  whose fields are its home page's `meta_title` and `meta_description`.
+* **Decision:**
+  * **The shop is a resource of its own** ([ADR-238](#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)): kind `shop`, listed as
+    `SHOP`, by the shop's own ID, its fields its home page's SEO title and description where it
+    wrote them. It is there before it wrote any, with nothing to translate, and another shop's
+    ID finds nothing. No migration: translations are kept by what they translate's ID, and the
+    keys are other SEO's.
+  * **In the shop's document:** its translations ride beside its own words, as other
+    documents' do; `translations.updated` for the shop rebuilds its document, and since every
+    page shows something of it, the edge forgets all its pages ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)).
+  * **On the storefront:** `TranslatedStore` gives an Urdu page the shop's document
+    translated, so the Urdu home page's `page_title` and `page_description`, `shop.description`
+    on every Urdu page and the website in structured data ([ADR-237](#adr-237--search-engines-are-told-an-articles-page-is-schemaorgs-blogposting-through-shopifys-structured_data-and-a-shops-home-page-the-shops-organization-and-website-through-the-same-filter-given-the-shop)) are in Urdu,
+    each field the shop did not translate in its own words.
+* **Consequences:**
+  * A shop's home page is described in Urdu to search engines as its other pages are.
+  * The shop's name and its sharing image stay the same in both languages.
+  * Translating the shop's words purges the shop's whole storefront at the edge, as any change to
+    its document does; they change seldom.
+* **Alternatives:**
+  * **A column for each language with the shop's preferences:** the translations API, its
+    digests and its outdated translations would not cover them, and each language would need a
+    migration.
+  * **The theme's locale files:** they hold the theme's words, the same for every shop that uses
+    it, not the shop's own.

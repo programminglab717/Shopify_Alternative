@@ -1309,7 +1309,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   storefront only while it translates the policy as it is
   ([ADR-239](../architecture/13-decision-log.md#adr-239--a-shops-policies-may-have-its-own-urdu-as-its-other-content-may-and-the-storefront-shows-a-policys-urdu-only-while-it-translates-the-policy-as-it-is-its-own-words-once-they-change-the-checkouts-urdu-links-the-urdu-pages)),
   its words being terms customers agree to: a field with the same weight checks its digest where it
-  is published, as `shopPoliciesOf` does.
+  is published, as `shopPoliciesOf` does. Words of the shop's own that belong to no resource, as its
+  home page's, are translated as kind `shop` under the shop's own ID, and its own document carries
+  them
+  ([ADR-245](../architecture/13-decision-log.md#adr-245--the-shops-own-words-for-its-home-page-may-be-translated-into-urdu-the-shop-a-translatable-resource-of-its-own-by-its-own-id-as-shopifys-shop-is-its-document-carries-them-beside-its-own-words-and-its-urdu-pages-show-them)).
 * **A variant is chosen by its ID, never its words**
   ([ADR-241](../architecture/13-decision-log.md#adr-241--a-products-options-and-their-values-may-have-the-shops-urdu-as-shopifys-translations-keep-them-each-by-its-own-id-the-products-document-carries-its-options-in-urdu-and-its-urdu-pages-show-each-variants-values-and-title-in-them-the-variant-chosen-by-its-id-the-same-in-either-language)):
   a product's options in Urdu are its document's `options` in their own order, and

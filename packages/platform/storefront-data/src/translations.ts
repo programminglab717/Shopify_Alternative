@@ -66,8 +66,8 @@ export function translatedProduct(doc: ProductDoc, locale: string): ProductDoc {
 /**
  * A shop's documents as its pages in `locale` show them (ADR-238): products as
  * {@link translatedProduct} gives each, collections, menus, pages, blogs and articles as
- * {@link translated} does, and policies in the language where the shop gave it (ADR-239); the
- * rest as they are.
+ * {@link translated} does, the shop's own with its home page's words likewise (ADR-245), and
+ * policies in the language where the shop gave it (ADR-239); the rest as they are.
  */
 export class TranslatedStore implements StoreData {
   constructor(
@@ -75,8 +75,8 @@ export class TranslatedStore implements StoreData {
     private readonly locale: string,
   ) {}
 
-  shop(): Promise<ShopDoc> {
-    return this.store.shop();
+  async shop(): Promise<ShopDoc> {
+    return translated(await this.store.shop(), this.locale);
   }
 
   async productByHandle(handle: string): Promise<ProductDoc | null> {

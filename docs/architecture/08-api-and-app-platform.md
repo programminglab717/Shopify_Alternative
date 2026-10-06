@@ -46,7 +46,7 @@ Storefront API with public tokens comes with headless storefronts.
   Shopify's `translatableResource`, `translatableResources`, `translationsRegister` and
   `translationsRemove`, under `read_translations` and `write_translations`; products' options and
   their values as `PRODUCT_OPTION` and `PRODUCT_OPTION_VALUE`
-  ([ADR-241](./13-decision-log.md#adr-241--a-products-options-and-their-values-may-have-the-shops-urdu-as-shopifys-translations-keep-them-each-by-its-own-id-the-products-document-carries-its-options-in-urdu-and-its-urdu-pages-show-each-variants-values-and-title-in-them-the-variant-chosen-by-its-id-the-same-in-either-language)).
+  ([ADR-241](./13-decision-log.md#adr-241--a-products-options-and-their-values-may-have-the-shops-urdu-as-shopifys-translations-keep-them-each-by-its-own-id-the-products-document-carries-its-options-in-urdu-and-its-urdu-pages-show-each-variants-values-and-title-in-them-the-variant-chosen-by-its-id-the-same-in-either-language)); the shop's own words for its home page as `SHOP`, by the shop's own ID ([ADR-245](./13-decision-log.md#adr-245--the-shops-own-words-for-its-home-page-may-be-translated-into-urdu-the-shop-a-translatable-resource-of-its-own-by-its-own-id-as-shopifys-shop-is-its-document-carries-them-beside-its-own-words-and-its-urdu-pages-show-them)).
 
 ```graphql
 mutation BookShipments($input: ShipmentsBookInput!) {

@@ -12,7 +12,7 @@ import { OnlineStoreEvents, type TranslationsUpdatedPayload } from './events.js'
 import { MenuService } from './menu.service.js';
 import { PageService } from './page.service.js';
 import type { MenuItemRecord, Page } from './records.js';
-import { articles, pages, policies, translations } from './schema.js';
+import { articles, pages, policies, preferences, translations } from './schema.js';
 import {
   TRANSLATABLE_FIELDS,
   TRANSLATION_LIMITS,
@@ -87,6 +87,7 @@ const NAMES: Readonly<Record<TranslatableKind, string>> = {
   shopPolicy: 'policy',
   productOption: 'product option',
   productOptionValue: 'option value',
+  shop: 'shop',
 };
 
 /** What a kind is called, with "a" or "an" before it. */
@@ -104,9 +105,10 @@ function isOptionKind(kind: TranslatableKind): kind is keyof typeof OPTION_ROWS 
 /**
  * A shop's own words for its content in another of the storefront's languages (OS-06, ADR-238),
  * as Shopify's translations API keeps them: a product's, collection's, page's, blog's, article's,
- * menu's or menu item's fields, a policy's, and a product option's or option value's name
- * (ADR-241), each in Urdu, written for the shop's own words as they were then. The storefront
- * shows each in its Urdu pages; where the shop gave none, its own.
+ * menu's or menu item's fields, a policy's, a product option's or option value's name (ADR-241),
+ * and the shop's own words for its home page (ADR-245), each in Urdu, written for the shop's own
+ * words as they were then. The storefront shows each in its Urdu pages; where the shop gave none,
+ * its own.
  */
 @Injectable()
 export class TranslationService {
@@ -456,6 +458,16 @@ export class TranslationService {
     } else if (isOptionKind(kind)) {
       const names = await this.products.optionNamesOf(tx, shopId, OPTION_ROWS[kind], ids);
       for (const [id, { name }] of names) sources.set(id, { name });
+    } else if (kind === 'shop') {
+      // The shop itself, by its own ID alone: its home page's words (ADR-245), which it may
+      // not have written yet.
+      if (ids.includes(shopId)) {
+        const [row] = await tx
+          .select({ title: preferences.seoTitle, description: preferences.seoDescription })
+          .from(preferences)
+          .where(eq(preferences.shopId, shopId));
+        sources.set(shopId, { seo: row ?? { title: null, description: null } });
+      }
     } else {
       const wanted = new Set(ids);
       const menus = await this.menus.menusOf(tx, shopId);
@@ -476,6 +488,8 @@ export class TranslationService {
     limit: number,
   ): Promise<string[]> {
     if (kind === 'product') return this.products.idsOf(tx, shopId, { after, limit });
+    // One shop, itself.
+    if (kind === 'shop') return after === null && limit > 0 ? [shopId] : [];
     if (isOptionKind(kind)) {
       return this.products.optionIdsOf(tx, shopId, OPTION_ROWS[kind], { after, limit });
     }
