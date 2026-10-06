@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Migration tests given the time their databases take
+### 52bd0b8 · Migration tests given the time their databases take
 
 * CI timed out customers' test of migration 0013 (run 272): it makes its database before 0013 in
   the test itself, every migration before it run from nothing, which took nine seconds here under
