@@ -89,6 +89,7 @@ describe.skipIf(!server)('Admin GraphQL API: the setup checklist', () => {
       steps: [
         { key: 'PRODUCTS', done: false, count: 0 },
         { key: 'DELIVERY', done: false, count: null },
+        { key: 'COURIERS', done: false, count: null },
         { key: 'PAYMENTS', done: false, count: null },
         { key: 'POLICIES', done: false, count: 0 },
         { key: 'BRAND', done: false, count: null },
@@ -96,7 +97,7 @@ describe.skipIf(!server)('Admin GraphQL API: the setup checklist', () => {
         { key: 'OPEN', done: true, count: null },
       ],
       done: 1,
-      total: 7,
+      total: 8,
     };
     expect(await checklist()).toEqual(fresh);
 
@@ -112,6 +113,42 @@ describe.skipIf(!server)('Admin GraphQL API: the setup checklist', () => {
     await mutate(
       `mutation { deliverySettingsUpdate(input: { charge: "250" }) { userErrors { code } } }`,
     );
+    // A courier to book parcels with (ADR-232): the test courier's books none.
+    const courier = (name: string) =>
+      admin.query(
+        `INSERT INTO logistics.courier_accounts (shop_id, courier, name, credentials, credentials_hint)
+         VALUES ($1, $2, $2, 'sealed', '1234')`,
+        [shop, name],
+      );
+    await courier('test');
+    expect(await step('COURIERS')).toEqual({ key: 'COURIERS', done: false, count: null });
+    await courier('postex');
+    expect(await step('COURIERS')).toEqual({ key: 'COURIERS', done: true, count: null });
+    // Paid ahead online: a gateway's account taking real money, not its sandbox's nor the test
+    // gateway's.
+    const gateway = async (name: string, environment: string) =>
+      (
+        await admin.query<{ id: string }>(
+          `INSERT INTO payments.gateway_accounts
+             (shop_id, gateway, environment, credentials, credentials_hint)
+           VALUES ($1, $2, $3, 'sealed', '1234') RETURNING id`,
+          [shop, name, environment],
+        )
+      ).rows[0]!.id;
+    const sandbox = await gateway('safepay', 'sandbox');
+    const tried = await gateway('test', 'production');
+    expect(await step('PAYMENTS')).toEqual({ key: 'PAYMENTS', done: false, count: null });
+    await admin.query(
+      `UPDATE payments.gateway_accounts SET archived_at = now() WHERE id = ANY($1::uuid[])`,
+      [[sandbox, tried]],
+    );
+    const real = await gateway('safepay', 'production');
+    expect(await step('PAYMENTS')).toEqual({ key: 'PAYMENTS', done: true, count: null });
+    // Or by transfer, with the account archived.
+    await admin.query(`UPDATE payments.gateway_accounts SET archived_at = now() WHERE id = $1`, [
+      real,
+    ]);
+    expect(await step('PAYMENTS')).toEqual({ key: 'PAYMENTS', done: false, count: null });
     await mutate(
       `mutation ($input: BankTransferSettingsInput!) {
         bankTransferSettingsUpdate(input: $input) { userErrors { code } }
@@ -154,8 +191,8 @@ describe.skipIf(!server)('Admin GraphQL API: the setup checklist', () => {
         done: true,
         count: each.key === 'PRODUCTS' ? 1 : each.key === 'POLICIES' ? 4 : null,
       })),
-      done: 7,
-      total: 7,
+      done: 8,
+      total: 8,
     });
 
     // Undone when it no longer holds: the store closed, its one product drafted again.
@@ -171,7 +208,7 @@ describe.skipIf(!server)('Admin GraphQL API: the setup checklist', () => {
         { key: 'PRODUCTS', done: false, count: 0 },
         { key: 'OPEN', done: false, count: null },
       ]),
-      done: 5,
+      done: 6,
     });
 
     // The shop's settings' readers see it; each shop its own.

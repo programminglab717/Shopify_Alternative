@@ -6,9 +6,9 @@
 
 ## In progress
 
-**The setup checklist's couriers and online payments** (ONB-02): a step for connecting a courier
-account, and the payments step done by a gateway connected online as well as by a bank account
-for transfers.
+**Couriers' city names** (SHP-03): a parcel's city matched to the courier's own list through
+Pakistan's city names and their aliases, the courier's nearest names suggested when none matches,
+and the corrections staff make remembered for the next parcel.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,15 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### The setup checklist's couriers and online payments
+
+* **A step for couriers** ([ADR-232](../architecture/13-decision-log.md#adr-232--the-setup-checklist-asks-for-a-courier-account-the-test-couriers-aside-and-counts-a-payment-gateways-account-in-its-production-as-a-way-to-be-paid-ahead-as-it-counts-a-bank-account)), after delivery: done while the shop has a
+  courier account not archived, the test courier's aside.
+* **Payments done by a gateway too:** a gateway's account in its production takes real money,
+  so a shop paid online alone is ready to be paid ahead, as one with a bank account for
+  transfers is. Sandboxes and the test gateway count for nothing.
+* 1709 tests: the checklist's test takes eight steps, couriers and gateways among them.
 
 ### f189127 · Titles and descriptions for search engines
 

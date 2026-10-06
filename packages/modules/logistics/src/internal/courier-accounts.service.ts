@@ -429,6 +429,17 @@ export class CourierAccountService {
   }
 }
 
+/**
+ * How many accounts the shop books parcels through (ADR-232), in the caller's transaction `tx`:
+ * those not archived, the test courier's aside, which books none.
+ */
+export async function liveCourierAccountsIn(tx: Tx, shopId: string): Promise<number> {
+  const { rows } = await tx.execute<{ count: number }>(sql`
+    SELECT count(*)::int AS count FROM logistics.courier_accounts
+     WHERE shop_id = ${shopId} AND archived_at IS NULL AND courier <> 'test'`);
+  return rows[0]?.count ?? 0;
+}
+
 /** One change to the shop's accounts at a time: its default stays one. */
 async function lockAccounts(tx: Tx, shopId: string): Promise<void> {
   await tx.execute(

@@ -16,6 +16,7 @@ export {
   COURIERS,
   COURIER_ACCOUNT_LIMITS,
   CourierAccountService,
+  liveCourierAccountsIn,
   type CourierAccountInput,
   type CourierAccountRecord,
   type OpenedCourierAccount,

@@ -757,9 +757,10 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **The setup checklist is the core's too** (`setupChecklist`, ONB-02,
   [ADR-095](../architecture/13-decision-log.md#adr-095--the-setup-checklist-is-worked-out-when-asked-from-what-each-module-keeps-in-one-transaction-a-step-is-done-while-what-it-asks-for-holds)):
   `SetupChecklistService` reads each step's state in one tenant transaction through the modules'
-  reads that take it (`activeProductsIn`, `DeliveryService.settingsOf`, `bankTransferSettingsIn`,
-  `shopPoliciesOf`, `shopLogoOf`, `shopPreferencesOf`), and stores nothing: a step is done while
-  what it asks for holds. A new step joins `SETUP_STEPS` in the order shops are asked it, and the
+  reads that take it (`activeProductsIn`, `DeliveryService.settingsOf`, `liveCourierAccountsIn`,
+  `bankTransferSettingsIn`, `realGatewayAccountsIn`, `shopPoliciesOf`, `shopLogoOf`,
+  `shopPreferencesOf`), and stores nothing: a step is done while what it asks for holds. Test
+  couriers and gateways, and gateways' sandboxes, count for nothing ([ADR-232](../architecture/13-decision-log.md#adr-232--the-setup-checklist-asks-for-a-courier-account-the-test-couriers-aside-and-counts-a-payment-gateways-account-in-its-production-as-a-way-to-be-paid-ahead-as-it-counts-a-bank-account)). A new step joins `SETUP_STEPS` in the order shops are asked it, and the
   API's `SetupStepKey`, with a read of its module's; the words are the admin app's.
 * **What couriers owe** (`codReceivables`, COD-10,
   [ADR-066](../architecture/13-decision-log.md#adr-066--what-couriers-owe-is-worked-out-from-the-orders-when-asked-delivered-cash-on-delivery-orders-not-yet-paid-by-courier-and-by-days-since-delivery)):

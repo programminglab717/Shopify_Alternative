@@ -12,6 +12,7 @@ export {
   GatewayAccountService,
   PAYMENT_GATEWAYS,
   PAYMENT_WEBHOOK_PATH,
+  realGatewayAccountsIn,
   type GatewayAccountInput,
   type GatewayAccountRecord,
   type GatewayCredentialInput,

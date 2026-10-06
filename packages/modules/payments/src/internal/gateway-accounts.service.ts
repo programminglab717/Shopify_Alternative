@@ -523,6 +523,18 @@ export async function liveGatewayAccountsIn(tx: Tx, shopId: string): Promise<Gat
   return rows;
 }
 
+/**
+ * How many of the shop's live accounts take real money (ADR-232), in the caller's transaction
+ * `tx`: those in their gateway's production, the test gateway's aside, which takes none.
+ */
+export async function realGatewayAccountsIn(tx: Tx, shopId: string): Promise<number> {
+  const { rows } = await tx.execute<{ count: number }>(sql`
+    SELECT count(*)::int AS count FROM payments.gateway_accounts
+     WHERE shop_id = ${shopId} AND archived_at IS NULL
+       AND environment = 'production' AND gateway <> 'test'`);
+  return rows[0]?.count ?? 0;
+}
+
 function checkEnvironment(
   check: InputChecker,
   given: string | null | undefined,

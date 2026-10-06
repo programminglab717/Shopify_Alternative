@@ -5,6 +5,7 @@ import { SetupChecklistService } from './setup-checklist.js';
 export enum SetupStepKey {
   PRODUCTS = 'PRODUCTS',
   DELIVERY = 'DELIVERY',
+  COURIERS = 'COURIERS',
   PAYMENTS = 'PAYMENTS',
   POLICIES = 'POLICIES',
   BRAND = 'BRAND',
@@ -18,10 +19,16 @@ registerEnumType(SetupStepKey, {
   valuesMap: {
     PRODUCTS: { description: 'Products on sale (ACTIVE): done with one; its count says how many.' },
     DELIVERY: { description: 'Delivery charges set: done once deliverySettingsUpdate saved them.' },
+    COURIERS: {
+      description:
+        "A courier account connected, which books the shop's parcels and follows them; the test " +
+        "courier's doesn't count.",
+    },
     PAYMENTS: {
       description:
-        'A way to be paid ahead of delivery: the bank account transfers, Raast and advances go ' +
-        'to. Cash on delivery needs nothing.',
+        "A way to be paid ahead of delivery: a payment gateway's account in its production, " +
+        'which takes real money, or the bank account transfers, Raast and advances go to. Cash ' +
+        'on delivery needs nothing.',
     },
     POLICIES: {
       description:

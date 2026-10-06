@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-231 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-232 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -239,6 +239,7 @@
 | 229 | HBL's payment gateway is one shops take payments through: a session asked for with the order encrypted under a key of the request's own, which HBL's public key wraps with the password; its return, encrypted to the shop's own public key, believed once the shop's private key opens it to a reference of Hatti's | Accepted |
 | 230 | Carts, checkouts and browsers' proofs of a number are deleted once past their time by a sweep in the worker, across shops and the longest expired first, each shop's in its own transaction, rather than by shoppers' requests as their shop gets new ones | Accepted |
 | 231 | Products, collections, pages and articles may be given a title and description of their own for search engines, as Shopify's seo has them; themes are given them as page_title and page_description, the description made from the page's own text where the shop wrote none, and Shopify's product CSV carries a product's | Accepted |
+| 232 | The setup checklist asks for a courier account, the test courier's aside, and counts a payment gateway's account in its production as a way to be paid ahead, as it counts a bank account | Accepted |
 
 ---
 
@@ -9673,3 +9674,30 @@
     a Shopify export that apps wrote longer. The admin can count as Shopify's does.
   * **A description made in each theme, as Hatti Base did:** every theme would repeat it, and
     would have to look for a written one itself.
+
+## ADR-232 · The setup checklist asks for a courier account, the test courier's aside, and counts a payment gateway's account in its production as a way to be paid ahead, as it counts a bank account
+
+* **Context:** The setup checklist ([ADR-095](#adr-095--the-setup-checklist-is-worked-out-when-asked-from-what-each-module-keeps-in-one-transaction-a-step-is-done-while-what-it-asks-for-holds)) left connecting a courier until shops
+  could connect one. They now can, with PostEx and Leopards ([ADR-149](#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data),
+  [ADR-162](#adr-162--leopards-is-the-second-courier-shops-book-with-through-the-same-adapter-the-accounts-key-and-password-in-each-requests-body-a-parcels-city-by-leopards-own-id-from-its-list-of-cities-kept-a-day-the-accounts-own-shipper-unless-a-shipper-id-is-given-its-parcels-asked-about-fifty-at-a-time-and-its-words-read-through-rows-of-data)). Its payments step asked only for the bank account that transfers, Raast
+  and advances go to. Shops can now also take payments through their own gateways' accounts
+  ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)), so a shop paid online alone was told it had no way to be paid ahead.
+* **Decision:**
+  * **A step for couriers, after delivery**, done while the shop has a courier account that is
+    not archived. The test courier's doesn't count, since it books nothing. Logistics' new
+    `liveCourierAccountsIn` gives the count.
+  * **Payments are done by a gateway's account in its production too**, or by the bank account
+    as before. The test gateway's doesn't count, and neither does a sandbox's, whose payments
+    move no money. Payments' new `realGatewayAccountsIn` gives the count.
+  * **Both are read in the checklist's one transaction**, through the modules' public surfaces,
+    as the other steps are. Nothing is stored, and a step is undone when its account is
+    archived.
+* **Consequences:**
+  * The checklist has eight steps. A shop delivering with its own riders sees the courier step
+    undone: like the others, it is a suggestion, and the shop can sell without it.
+  * A shop paid online alone is ready to be paid ahead.
+  * Sharing the store is still to come, with the admin app.
+* **Alternatives:**
+  * **Counting sandbox accounts:** a shop trying a gateway out would be told it can be paid.
+  * **A step of its own for paying online:** two steps for the one thing the shop needs, a way
+    to be paid ahead.

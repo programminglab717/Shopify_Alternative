@@ -3,18 +3,22 @@ import { activeProductsIn } from '@hatti/catalog/public';
 import { DeliveryService } from '@hatti/checkout/public';
 import { Database } from '@hatti/db';
 import { shopLogoOf } from '@hatti/files/public';
+import { liveCourierAccountsIn } from '@hatti/logistics/public';
 import { shopPoliciesOf, shopPreferencesOf } from '@hatti/online-store/public';
 import { bankTransferSettingsIn } from '@hatti/orders/public';
+import { realGatewayAccountsIn } from '@hatti/payments/public';
 import { Injectable } from '@nestjs/common';
 
 /**
  * What a new shop sets up before it sells (ONB-02, ADR-095), in the order it is asked to: its
- * products on sale, its delivery charges, a way to be paid ahead of delivery, its policies, its
- * logo, its WhatsApp number, and its store open to shoppers.
+ * products on sale, its delivery charges, a courier to book its parcels with (ADR-232), a way to
+ * be paid ahead of delivery, its policies, its logo, its WhatsApp number, and its store open to
+ * shoppers.
  */
 export const SETUP_STEPS = [
   'products',
   'delivery',
+  'couriers',
   'payments',
   'policies',
   'brand',
@@ -56,7 +60,9 @@ export class SetupChecklistService {
     return this.db.tenant(shopId, async (tx) => {
       const products = await activeProductsIn(tx, shopId);
       const delivery = await this.delivery.settingsOf(tx, shopId);
+      const couriers = await liveCourierAccountsIn(tx, shopId);
       const bankTransfer = await bankTransferSettingsIn(tx, shopId);
+      const gateways = await realGatewayAccountsIn(tx, shopId);
       const policies = new Set((await shopPoliciesOf(tx, shopId)).map((policy) => policy.type));
       const logo = await shopLogoOf(tx, shopId);
       const preferences = await shopPreferencesOf(tx, shopId);
@@ -64,8 +70,10 @@ export class SetupChecklistService {
       const steps: Record<SetupStepValue, Omit<SetupStepRecord, 'step'>> = {
         products: { done: products > 0, count: products },
         delivery: { done: delivery.updatedAt !== null, count: null },
-        // Cash on delivery needs nothing; transfers, Raast and advances need the shop's account.
-        payments: { done: bankTransfer.account !== null, count: null },
+        couriers: { done: couriers > 0, count: null },
+        // Cash on delivery needs nothing. Paying online needs a gateway's account that takes real
+        // money (ADR-232); transfers, Raast and advances, the shop's bank account.
+        payments: { done: gateways > 0 || bankTransfer.account !== null, count: null },
         policies: { done: written === SETUP_POLICIES.length, count: written },
         brand: { done: logo !== null, count: null },
         whatsapp: { done: preferences.whatsappNumber !== null, count: null },
