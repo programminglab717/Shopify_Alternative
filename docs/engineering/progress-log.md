@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### A draft paid by transfer through its link
+### 9175b68 · A draft paid by transfer through its link
 
 * **A transfer's draft gets a link** ([ADR-223](../architecture/13-decision-log.md#adr-223--a-draft-paid-by-transfer-gets-a-link-too-its-customer-confirms-it-as-one-paid-on-delivery-its-order-waits-for-the-money-and-the-link-becomes-the-orders-whose-page-shows-where-to-pay-and-takes-the-payment-online)) while the shop gives its bank account
   (migration 0140): its page asks for the address as a cash-on-delivery draft's does, and says
