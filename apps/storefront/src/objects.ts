@@ -461,7 +461,26 @@ export function shopObject(
     whatsapp: doc.whatsapp,
     // What the password page tells shoppers while the shop is closed (ADR-054), as safe HTML.
     password_message: doc.password?.message ?? '',
+    brand: brandObject(doc),
     ...policiesObject(doc, language),
+  };
+}
+
+/**
+ * The shop's brand as Liquid gives it, Shopify's `shop.brand` (ADR-207): its logo and square
+ * logo as images, from where the API serves them (ADR-205), nil for those it has none of; the
+ * brand's colours, cover image and words Hatti does not keep yet, nil.
+ */
+function brandObject(doc: ShopDoc): Record<string, unknown> {
+  const image = (src: string | null | undefined) =>
+    src ? new ImageDrop({ src, width: 0, height: 0, alt: null }) : null;
+  return {
+    logo: image(doc.brand?.logo),
+    square_logo: image(doc.brand?.squareLogo),
+    cover_image: null,
+    colors: null,
+    slogan: null,
+    short_description: null,
   };
 }
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-206 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-207 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -214,6 +214,7 @@
 | 204 | The link page's links go through the storefront, which counts each tap a day at a time by where the link goes, beside the sessions, and sends the shopper on; it follows only the page's own links, and the worker keeps each day's taps in Postgres for a report of a period's by link | Accepted |
 | 205 | A shop's brand has Shopify's square logo beside its logo, one of its files, served by the API at an address of its own; the shop's document names where each logo is served, each address naming its file, and the link page shows the square logo, else the logo, at its top | Accepted |
 | 206 | Each product a shop's link page shows may name one of its variants, kept beside it by its place: the page shows that variant's title, image and price, and Buy now goes straight to checkout with it; a variant deleted since is as none chosen | Accepted |
+| 207 | Themes get Shopify's shop.brand: its logo and square logo as images from where the API serves them, nil for what Hatti does not keep; and Hatti Base's header shows the logo in place of the shop's name | Accepted |
 
 ---
 
@@ -8652,3 +8653,31 @@
     reads would all change, for the same.
   * **A table of the page's products:** 24 rows at most a shop, while the page is read with the
     rest of its preferences in one row.
+
+## ADR-207 · Themes get Shopify's shop.brand: its logo and square logo as images from where the API serves them, nil for what Hatti does not keep; and Hatti Base's header shows the logo in place of the shop's name
+
+* **Context:** The shop's document names where its logo and square logo are served
+  ([ADR-205](#adr-205--a-shops-brand-has-shopifys-square-logo-beside-its-logo-one-of-its-files-served-by-the-api-at-an-address-of-its-own-the-shops-document-names-where-each-logo-is-served-each-address-naming-its-file-and-the-link-page-shows-the-square-logo-else-the-logo-at-its-top)), for its link page. Shopify's themes read the
+  logo from Liquid's `shop.brand`, and Hatti Base's header showed the shop's name alone; ADR-205
+  left `shop.brand` for later.
+* **Decision:**
+  * **`shop.brand` in Liquid:** `logo` and `square_logo`, each an image at the address the shop's
+    document names, nil for none; `cover_image`, `colors`, `slogan` and `short_description` nil,
+    since Hatti keeps none of them yet, so themes' checks of them pass over.
+  * **Their sizes are not known** (width and height 0): `image_url` adds the width asked for to
+    the address, which the API serves whole for now, and `image_tag` gives no size.
+  * **Hatti Base's header shows the logo** in place of the shop's name, at most 2.5rem high and
+    12rem wide, its `alt` the name; without one, the name as before.
+  * A change of brand already purges the shop's pages (ADR-205), so every header follows.
+* **Consequences:**
+  * A shop's storefront shows its logo on every page from what it set once for its checkout, and
+    themes written for Shopify that read `shop.brand.logo` show it too.
+  * The logo is fetched whole, not sized for the header: a large upload weighs on every page until
+    logos are made at the sizes pages ask for, as products' images are
+    ([ADR-158](#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)).
+  * Not yet: logos at the sizes pages ask for; the brand's colours, cover image, slogan and short
+    description.
+* **Alternatives:**
+  * **A logo setting of the theme's own, as Dawn's `settings.logo`:** a second logo to set, again
+    for each theme; `shop.brand` is the shop's in every theme.
+  * **The square logo in the header:** headers show wordmarks; the square logo is for squares.

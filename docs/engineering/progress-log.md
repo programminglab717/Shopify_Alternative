@@ -6,9 +6,9 @@
 
 ## In progress
 
-**The shop's brand in its themes** (OS-02, ADR-205): Shopify's `shop.brand` in Liquid, its logo
-and square logo as images themes can show, and Hatti Base's header showing the logo in place of
-the shop's name where it has one.
+**Asking JazzCash what became of a payment** (PAY-01, ADR-163): JazzCash's status inquiry, for a
+payment whose customer never came back from paying, so that an order paid is recorded as paid
+rather than cancelled as never paid.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### The shop's brand in its themes
+
+* **Themes get Shopify's `shop.brand`**
+  ([ADR-207](../architecture/13-decision-log.md#adr-207--themes-get-shopifys-shopbrand-its-logo-and-square-logo-as-images-from-where-the-api-serves-them-nil-for-what-hatti-does-not-keep-and-hatti-bases-header-shows-the-logo-in-place-of-the-shops-name)):
+  its `logo` and `square_logo` as images, at the addresses the shop's document names, nil for
+  none; the brand's colours, cover image, slogan and short description nil, as Hatti keeps none.
+* **Hatti Base's header shows the shop's logo** in place of its name, the name as before for a
+  shop without one.
+* 1617 tests (1 new): `shop.brand`'s logos, sized and not, and nil without; and the header with
+  the logo, else the name.
 
 ### 7124b35 · A product on the link page with its variant chosen
 

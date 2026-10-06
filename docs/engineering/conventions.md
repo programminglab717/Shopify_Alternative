@@ -1271,6 +1271,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   a template's sections would be, and `shop.policies` lists those the shop's document names. Their
   bodies are kept apart (`StoreData.policy`) and fetched for their own pages alone; the publisher
   writes them whole and purges the shop's pages when one differs.
+* **`shop.brand` is the shop's document's `brand`**
+  ([ADR-207](../architecture/13-decision-log.md#adr-207--themes-get-shopifys-shopbrand-its-logo-and-square-logo-as-images-from-where-the-api-serves-them-nil-for-what-hatti-does-not-keep-and-hatti-bases-header-shows-the-logo-in-place-of-the-shops-name)):
+  `brandObject` gives its logos as `ImageDrop`s of unknown size, nil without; the parts of
+  Shopify's brand Hatti does not keep are nil, so themes' checks of them pass over. Another part
+  comes into the shop's document first, then here.
 * **So does the link page** ([ADR-161](../architecture/13-decision-log.md#adr-161--a-shops-link-page-at-links-is-a-line-about-it-up-to-ten-links-and-up-to-24-of-its-products-kept-with-what-it-sets-for-its-storefront-the-storefront-shows-it-in-the-platforms-markup-inside-the-shops-theme-in-the-pages-language-a-product-with-nothing-to-choose-a-tap-from-checkout-and-the-edge-keeps-it-until-the-shop-or-any-of-its-products-changes)): `/links` gives the
   layout `linkPageMarkup`, `.hatti-links` classes Hatti Base styles, from the shop's document's
   `linkPage` and its products' documents, fetched in one round trip. Its words are its own, in each

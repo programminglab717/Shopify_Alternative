@@ -5,6 +5,7 @@ import {
   MemoryStore,
   type MenuLinkDoc,
   type ProductDoc,
+  type ShopDoc,
   type StoreData,
 } from '@hatti/storefront-data';
 import { sampleStore } from './fixtures.js';
@@ -666,6 +667,46 @@ describe('Storefront rendering', () => {
     expect(page.html).toContain(
       encodeURIComponent("Hi! I'd like to order Lawn & Silk </title><script>steal()</script>"),
     );
+  });
+
+  it("gives themes the shop's brand, its logos as images, and Hatti Base's header its logo (ADR-207)", async () => {
+    const logo = 'https://api.hatti.pk/logos/s1?v=0a1b2c3d';
+    const square = 'https://api.hatti.pk/logos/s1/square?v=4e5f6a7b';
+    const sample = sampleStore();
+    const home = async (brand: ShopDoc['brand'], extra: ThemeFiles = {}) => {
+      const renderer = new PageRenderer(loadTheme({ ...files, ...extra }), {
+        limits: { timeMs: 10_000 },
+      });
+      const shop = { ...sample.shop, ...(brand && { brand }) };
+      const page = await renderer.render(
+        { path: '/' },
+        new MemoryStore({ ...sample, shop }).fresh(0),
+      );
+      return page.html;
+    };
+    const probe = {
+      'sections/probe.liquid':
+        '[{{ shop.brand.logo }}|{{ shop.brand.logo | image_url: width: 200 }}|' +
+        '{{ shop.brand.square_logo }}|{{ shop.brand.slogan }}]',
+      'templates/index.json': JSON.stringify({
+        sections: { probe: { type: 'probe' } },
+        order: ['probe'],
+        layout: false,
+      }),
+    };
+    expect(await home({ logo, squareLogo: square }, probe)).toContain(
+      `[${logo}|${logo}&width=200|${square}|]`,
+    );
+    expect(await home({ logo, squareLogo: null }, probe)).toContain(
+      `[${logo}|${logo}&width=200||]`,
+    );
+    expect(await home(undefined, probe)).toContain('[|||]');
+    // Hatti Base's header shows the logo, else the shop's name.
+    expect(await home({ logo, squareLogo: null })).toContain(
+      `<a href="/" class="header__logo"><img src="${logo}&width=400" alt="Zari Fashions" ` +
+        'class="header__logo-image"></a>',
+    );
+    expect(await home(undefined)).toContain('<a href="/" class="header__logo">Zari Fashions</a>');
   });
 
   it('lets templates reach only what they are given', async () => {

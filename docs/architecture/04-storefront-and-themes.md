@@ -176,6 +176,8 @@ Shopify objects (`shop`, `product`, `variant`, `collection`, `cart`, `customer`,
 `image_tag`, `t`, `asset_url`, `handleize`, …) and tags (`section`, `sections`, `render`, `form`,
 `paginate`, `schema`, `style`, `javascript`). A custom theme a merchant owns can be ported with
 modest effort, and Liquid developers are productive on day one.
+`shop.brand` gives the shop's logo and square logo as images, which Hatti Base's header shows
+([ADR-207](./13-decision-log.md#adr-207--themes-get-shopifys-shopbrand-its-logo-and-square-logo-as-images-from-where-the-api-serves-them-nil-for-what-hatti-does-not-keep-and-hatti-bases-header-shows-the-logo-in-place-of-the-shops-name)).
 
 > **Licensing note:** themes bought from the Shopify Theme Store are licensed for use on Shopify.
 > We do not provide tooling to import licensed third-party themes. We provide a porting guide for
