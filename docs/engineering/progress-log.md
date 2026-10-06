@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Delivery estimates
+### 040dada · Delivery estimates
 
 * **How many working days delivery takes** ([ADR-235](../architecture/13-decision-log.md#adr-235--a-shop-may-say-how-many-working-days-delivery-takes-everywhere-and-in-each-of-its-delivery-zones-the-cart-and-product-pages-say-it-wherever-delivery-goes-from-the-fewest-days-anywhere-to-the-most-and-checkout-says-it-for-the-shoppers-city)), everywhere and in each
   delivery zone, through `deliverySettingsUpdate`'s `days`; a zone without its own takes
