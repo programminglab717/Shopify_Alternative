@@ -1044,8 +1044,11 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **A payment whose customer never came back is asked after, not waited for**
   ([ADR-208](../architecture/13-decision-log.md#adr-208--a-payment-started-online-whose-customer-never-came-back-is-asked-after-the-worker-asks-the-gateways-status-inquiry-jazzcashs-first-from-a-quarter-of-an-hour-after-it-began-at-most-once-an-hour-for-two-days-and-records-one-the-gateway-vouches-for-paid-through-the-inquiry)):
   a gateway that can be asked implements `inquire`, answering `paid` with the payment it vouches
-  for, `unpaid` or `unknown`; believe an answer only signed with the account's secret, as a return
-  is. `OnlinePaymentService.inquireDue` asks each due session outside any transaction and records
+  for, `unpaid` or `unknown`; believe an answer signed with the account's secret where the gateway
+  signs it, as JazzCash does, and otherwise only as it comes from the gateway's own API, asked
+  with the account's secret, naming the account and the payment asked about, as Safepay's
+  ([ADR-210](../architecture/13-decision-log.md#adr-210--safepays-trackers-are-asked-after-as-jazzcashs-payments-are-through-its-reporter-with-the-accounts-secret-key-its-answer-which-safepay-does-not-sign-is-believed-as-it-comes-from-safepays-own-api-and-only-naming-the-accounts-api-key-and-the-tracker-asked-about)).
+  `OnlinePaymentService.inquireDue` asks each due session outside any transaction and records
   one paid through `#complete`, as `inquiry`; `PAYMENT_INQUIRIES` says when.
 
 ## Billing

@@ -345,9 +345,10 @@ one without an answer holding its amount until staff settle it from the gateway'
 signed with the account's integrity salt, from a page with a button since customers' pages run no
 scripts, and JazzCash posts the outcome back signed the same way
 ([ADR-163](./13-decision-log.md#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)). A payment whose customer never came back
-is asked after through JazzCash's status inquiry, from a quarter of an hour on, hourly, for two
-days ([ADR-208](./13-decision-log.md#adr-208--a-payment-started-online-whose-customer-never-came-back-is-asked-after-the-worker-asks-the-gateways-status-inquiry-jazzcashs-first-from-a-quarter-of-an-hour-after-it-began-at-most-once-an-hour-for-two-days-and-records-one-the-gateway-vouches-for-paid-through-the-inquiry)).
-Reconciliation of §4.2, and JazzCash's refunds, come next.
+is asked after through JazzCash's status inquiry or Safepay's reporter, from a quarter of an hour
+on, hourly, for two days ([ADR-208](./13-decision-log.md#adr-208--a-payment-started-online-whose-customer-never-came-back-is-asked-after-the-worker-asks-the-gateways-status-inquiry-jazzcashs-first-from-a-quarter-of-an-hour-after-it-began-at-most-once-an-hour-for-two-days-and-records-one-the-gateway-vouches-for-paid-through-the-inquiry)).
+Safepay's reporter, which signs nothing, is believed as it comes from Safepay's own API
+([ADR-210](./13-decision-log.md#adr-210--safepays-trackers-are-asked-after-as-jazzcashs-payments-are-through-its-reporter-with-the-accounts-secret-key-its-answer-which-safepay-does-not-sign-is-believed-as-it-comes-from-safepays-own-api-and-only-naming-the-accounts-api-key-and-the-tracker-asked-about)). Reconciliation of §4.2, and JazzCash's refunds, come next.
 
 **Platform billing (our own subscriptions)** uses the same stack: card subscriptions (Safepay),
 wallet token debits (JazzCash, Easypaisa), and Raast request-to-pay or bank transfer for renewals

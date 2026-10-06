@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Paused** after the blog's feed, at a stop asked for. Next: Safepay's trackers asked after as
-JazzCash's payments are (PAY-01, ADR-208).
+**Dates in the shop's own time zone, and Shopify's `time_tag`** (OS-07, ADR-177): Liquid's dates
+in the time zone the shop's document carries, and `time_tag` with the theme's date formats, in
+English and Urdu.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +17,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
+
+### Asking Safepay after its trackers
+
+* **Safepay's trackers are asked after** as JazzCash's payments are
+  ([ADR-210](../architecture/13-decision-log.md#adr-210--safepays-trackers-are-asked-after-as-jazzcashs-payments-are-through-its-reporter-with-the-accounts-secret-key-its-answer-which-safepay-does-not-sign-is-believed-as-it-comes-from-safepays-own-api-and-only-naming-the-accounts-api-key-and-the-tracker-asked-about)):
+  its reporter, with the account's secret key; its answer, which Safepay does not sign, believed
+  as it comes from Safepay's own API, and only naming the account's API key and the tracker asked
+  about. Paid once the tracker ended, at the amount it was started for. Not yet tried against its
+  sandbox.
+* 1628 tests (2 new): the reporter asked with the secret key, believed for this account and
+  tracker alone, a tracker not ended unpaid, and what it could not learn unknown.
 
 ### 16e8ae5 · A blog's Atom feed, and the articles before and after
 

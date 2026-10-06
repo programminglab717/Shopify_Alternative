@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-209 added)
+> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-210 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -217,6 +217,7 @@
 | 207 | Themes get Shopify's shop.brand: its logo and square logo as images from where the API serves them, nil for what Hatti does not keep; and Hatti Base's header shows the logo in place of the shop's name | Accepted |
 | 208 | A payment started online whose customer never came back is asked after: the worker asks the gateway's status inquiry, JazzCash's first, from a quarter of an hour after it began, at most once an hour for two days, and records one the gateway vouches for paid through the inquiry | Accepted |
 | 209 | A blog has Shopify's Atom feed at its address with .atom, its 30 latest articles whole under IDs of their own, and an article's page gives themes the newer and the older article beside it, fetched together when a theme first asks for either | Accepted |
+| 210 | Safepay's trackers are asked after as JazzCash's payments are, through its reporter with the account's secret key; its answer, which Safepay does not sign, is believed as it comes from Safepay's own API, and only naming the account's API key and the tracker asked about | Accepted |
 
 ---
 
@@ -8769,3 +8770,39 @@
     them would still fetch them.
   * **The feed as a template of the theme's:** Shopify serves it without one, and themes written
     for Shopify have none; sitemaps are served the same way ([ADR-051](#adr-051--search-engines-and-link-previews-are-told-each-pages-address-at-the-shops-own-in-each-language-and-find-pages-through-sitemaps-of-the-storefronts-documents)).
+
+## ADR-210 · Safepay's trackers are asked after as JazzCash's payments are, through its reporter with the account's secret key; its answer, which Safepay does not sign, is believed as it comes from Safepay's own API, and only naming the account's API key and the tracker asked about
+
+* **Context:** The worker asks after payments whose customers never came back, through the
+  gateways that can be asked ([ADR-208](#adr-208--a-payment-started-online-whose-customer-never-came-back-is-asked-after-the-worker-asks-the-gateways-status-inquiry-jazzcashs-first-from-a-quarter-of-an-hour-after-it-began-at-most-once-an-hour-for-two-days-and-records-one-the-gateway-vouches-for-paid-through-the-inquiry)), which left Safepay's trackers for later and
+  believed an answer only signed with the account's secret, as JazzCash signs its inquiry's.
+  Safepay's trackers are heard of from the customer's return or its webhook
+  ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)); its documents fetch a tracker from its reporter
+  (`GET /reporter/api/v1/payments/{tracker}`) with the merchant's secret key, its answer saying
+  the tracker's state, `TRACKER_ENDED` once it is paid, and the account it is the merchant's of,
+  unsigned.
+* **Decision:**
+  * **Safepay's adapter implements `inquire`:** its reporter asked after the tracker with the
+    account's secret key (`x-sfpy-merchant-secret`), at the address its adapter keeps for the
+    environment, as its refunds are ([ADR-153](#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)).
+  * **Believed as it comes from Safepay's own API**, over TLS, as a refund's answer is, where
+    Safepay signs none; this supersedes ADR-208's answer signed alone for a gateway that signs
+    none. Only an answer naming the account's API key, alone or as its `api_key`, and no other
+    tracker, is believed at all.
+  * **Paid once the tracker ended** (`TRACKER_ENDED`), at the amount it was started for, which
+    Hatti set, as a return is; its reference where it gives one. Unpaid in any other state; unknown
+    when Safepay could not be asked, answered with an error, or named no state.
+  * Not yet tried against its sandbox, as its refund call is not (spike 4); the reporter's path
+    is a constant of the adapter's, `SAFEPAY_TRACKER_PATH`, as its SDKs ask the same reporter's
+    v2.
+* **Consequences:**
+  * A Safepay payment whose return and webhook both went astray is recorded paid within the
+    hour, its customer told, rather than waiting for staff or cancelled as never paid.
+  * The sweep asks Safepay up to 48 times about a tracker never paid, as it does JazzCash.
+  * A tracker refunded from Safepay's dashboard before Hatti heard it was paid reads as unpaid,
+    and its order goes on waiting.
+* **Alternatives:**
+  * **Taking the amount from the reporter's totals:** its units are not yet tried against the
+    sandbox, and the tracker's amount is the session's, which Hatti set.
+  * **Leaving Safepay out until it signs its answers:** its payments lost to a closed page would
+    still wait for staff; its secret key and its own address already carry its refunds.

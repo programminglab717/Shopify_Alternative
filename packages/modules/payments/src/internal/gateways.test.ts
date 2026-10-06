@@ -245,6 +245,86 @@ describe('Safepay', () => {
     expect(safepay.info.refunds).toBe('whole');
   });
 
+  describe('its tracker asked after, for a payment whose customer never came back (ADR-210)', () => {
+    const tracker = 'track_6a1f0e8e-0000-4000-8000-000000000001';
+    /** How Safepay's reporter says the tracker stands, as its documents fetch one. */
+    const ended = {
+      token: tracker,
+      client: { api_key: ACCOUNT.credentials.apiKey },
+      state: 'TRACKER_ENDED',
+      purchase_totals: { quote_amount: { amount: 250050, currency: 'PKR' } },
+      reference: '584112',
+    };
+    const answer = (data: Record<string, unknown>) => {
+      fake.next = { status: 200, body: { data, status: { errors: [], message: 'success' } } };
+    };
+
+    it('asks its reporter with the secret key, and believes it only for this account and tracker', async () => {
+      answer(ended);
+      // At the amount it was started for, which Hatti set, as a return is.
+      expect(await safepay.inquire(ACCOUNT, tracker)).toEqual({
+        status: 'paid',
+        payment: { ref: tracker, amount: null, currency: null, reference: '584112' },
+      });
+      expect(fake.requests).toEqual([
+        { method: 'GET', path: `/reporter/api/v1/payments/${tracker}`, body: null },
+      ]);
+      expect(fake.headers[0]!['x-sfpy-merchant-secret']).toBe(ACCOUNT.credentials.secretKey);
+      // Its API key alone, and no reference: believed all the same.
+      answer({ ...ended, client: ACCOUNT.credentials.apiKey, reference: undefined });
+      expect(await safepay.inquire(ACCOUNT, tracker)).toEqual({
+        status: 'paid',
+        payment: { ref: tracker, amount: null, currency: null, reference: null },
+      });
+      // Another account's tracker, an answer naming no account, or another tracker: not believed.
+      for (const client of [{ api_key: 'sec_other' }, 'sec_other', undefined]) {
+        answer({ ...ended, client });
+        expect(await safepay.inquire(ACCOUNT, tracker)).toEqual({
+          status: 'unknown',
+          message: "Safepay's answer named another account",
+        });
+      }
+      answer({ ...ended, token: 'track_other' });
+      expect(await safepay.inquire(ACCOUNT, tracker)).toEqual({
+        status: 'unknown',
+        message: "Safepay's answer named another tracker",
+      });
+    });
+
+    it('says a tracker not ended is unpaid, and what it could not learn unknown', async () => {
+      answer({ ...ended, state: 'TRACKER_STARTED' });
+      expect(await safepay.inquire(ACCOUNT, tracker)).toEqual({
+        status: 'unpaid',
+        message: 'Safepay: the tracker is TRACKER_STARTED',
+      });
+      answer({ ...ended, state: undefined });
+      expect(await safepay.inquire(ACCOUNT, tracker)).toEqual({
+        status: 'unknown',
+        message: "Safepay's answer had no state",
+      });
+      fake.next = { status: 404, body: { data: null, status: { errors: ['tracker not found'] } } };
+      expect(await safepay.inquire(ACCOUNT, tracker)).toEqual({
+        status: 'unknown',
+        message: 'Safepay answered 404',
+      });
+      fake.next = { status: 200, body: { data: null, status: { errors: [] } } };
+      expect(await safepay.inquire(ACCOUNT, tracker)).toEqual({
+        status: 'unknown',
+        message: 'Safepay answered 200',
+      });
+      const closed = await closedPort();
+      const nowhere = new SafepayGateway({
+        urls: { sandbox: { api: `http://127.0.0.1:${closed}`, checkout: 'http://127.0.0.1:9' } },
+        timeoutMs: 1_000,
+      });
+      const unreachable = await nowhere.inquire(ACCOUNT, tracker);
+      expect(unreachable.status).toBe('unknown');
+      if (unreachable.status !== 'paid') {
+        expect(unreachable.message).toMatch(/^Safepay could not be reached/);
+      }
+    });
+  });
+
   it('takes the customer back only with the tracker signed with the secret key', () => {
     const tracker = 'track_6a1f0e8e-0000-4000-8000-000000000001';
     const sig = createHmac('sha256', ACCOUNT.credentials.secretKey!).update(tracker).digest('hex');

@@ -201,6 +201,12 @@ export const SAFEPAY_URLS: Readonly<Record<GatewayEnvironmentValue, SafepayUrls>
   },
 };
 
+/** Where Safepay's reporter gives a tracker as it stands, by its token (ADR-210). */
+export const SAFEPAY_TRACKER_PATH = '/reporter/api/v1/payments/';
+
+/** The state of a tracker whose payment is made. */
+const SAFEPAY_PAID = 'TRACKER_ENDED';
+
 export interface SafepayOptions {
   /** {@link SAFEPAY_URLS}, unless a test says otherwise. */
   urls?: Partial<Record<GatewayEnvironmentValue, SafepayUrls>>;
@@ -350,6 +356,62 @@ export class SafepayGateway implements PaymentGateway {
     return {
       ok: true,
       reference: typeof token === 'string' && /^[\w-]{1,200}$/.test(token) ? token : null,
+    };
+  }
+
+  /**
+   * Asks Safepay's reporter how the tracker `ref` stands (ADR-210), with the account's secret
+   * key, as its documents fetch a tracker. Its answer is not signed: it is believed as it comes
+   * from Safepay's own API, as a refund's answer is, and only when it names the account's API key
+   * and no other tracker. Paid once the tracker ended, at the amount it was started for, which
+   * Hatti set; not yet while it has not; unknown when Safepay could not be asked, or answered
+   * anything else.
+   */
+  async inquire(account: GatewayAccount, ref: string): Promise<GatewayInquiry> {
+    const urls = this.#urls(account.environment);
+    let response: Response;
+    try {
+      response = await fetch(`${urls.api}${SAFEPAY_TRACKER_PATH}${encodeURIComponent(ref)}`, {
+        headers: {
+          accept: 'application/json',
+          'x-sfpy-merchant-secret': account.credentials.secretKey ?? '',
+        },
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+      });
+    } catch (error) {
+      const message = `Safepay could not be reached: ${(error as Error).message}`;
+      return { status: 'unknown', message: message.slice(0, 1_000) };
+    }
+    const json: unknown = await response.json().catch(() => null);
+    const tracker = isObject(json) && isObject(json.data) ? json.data : null;
+    if (!response.ok || !tracker) {
+      return { status: 'unknown', message: `Safepay answered ${response.status}` };
+    }
+    // The account it names, as its API key, whether alone or with the rest of the account's.
+    const client = isObject(tracker.client) ? tracker.client.api_key : tracker.client;
+    if (!account.credentials.apiKey || client !== account.credentials.apiKey) {
+      return { status: 'unknown', message: "Safepay's answer named another account" };
+    }
+    if (typeof tracker.token === 'string' && tracker.token !== ref) {
+      return { status: 'unknown', message: "Safepay's answer named another tracker" };
+    }
+    const state = typeof tracker.state === 'string' ? tracker.state.trim() : '';
+    if (state === '') return { status: 'unknown', message: "Safepay's answer had no state" };
+    if (state !== SAFEPAY_PAID) {
+      return { status: 'unpaid', message: `Safepay: the tracker is ${state}`.slice(0, 1_000) };
+    }
+    const reference = tracker.reference;
+    return {
+      status: 'paid',
+      payment: {
+        ref,
+        amount: null,
+        currency: null,
+        reference:
+          typeof reference === 'string' || typeof reference === 'number'
+            ? String(reference).trim().slice(0, 200) || null
+            : null,
+      },
     };
   }
 
