@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### A blog's articles redirected with it
+### 346fb25 · A blog's articles redirected with it
 
 * **`redirectArticles` on `blogUpdate`**, as Shopify's
   ([ADR-218](../architecture/13-decision-log.md#adr-218--a-blog-whose-handle-changes-sends-its-articles-old-addresses-to-their-new-ones-when-asked-as-shopifys-redirectarticles-does-a-redirect-for-each-made-all-at-once-with-one-event-the-storefront-follows)):
