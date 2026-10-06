@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Options in Urdu
+### 06ad1c4 · Options in Urdu
 
 * **A product's options and their values in Urdu** ([ADR-241](../architecture/13-decision-log.md#adr-241--a-products-options-and-their-values-may-have-the-shops-urdu-as-shopifys-translations-keep-them-each-by-its-own-id-the-products-document-carries-its-options-in-urdu-and-its-urdu-pages-show-each-variants-values-and-title-in-them-the-variant-chosen-by-its-id-the-same-in-either-language)), as Shopify's
   translations keep them, `PRODUCT_OPTION` and `PRODUCT_OPTION_VALUE`, by their own IDs, their
