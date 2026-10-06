@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-06
 
-### Search in Urdu
+### 8b463b0 · Search in Urdu
 
 * **Found by the shop's Urdu** ([ADR-240](../architecture/13-decision-log.md#adr-240--a-storefronts-search-finds-products-pages-and-articles-by-the-shops-urdu-for-them-as-by-its-own-words-from-words-of-each-translation-kept-folded-beside-its-own-as-its-translations-change-its-own-words-first)): products by their Urdu titles and
   types, pages and articles by their Urdu titles and text, as by their own words, on the search
