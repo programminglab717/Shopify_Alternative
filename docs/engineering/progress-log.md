@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### JazzCash's refunds
+### da3dc64 · JazzCash's refunds
 
 * **What a card or a JazzCash wallet paid goes back from the order** ([ADR-255](../architecture/13-decision-log.md#adr-255--what-a-card-or-a-jazzcash-wallet-paid-goes-back-through-jazzcashs-refunds-a-wallets-with-the-mpin-the-shop-gives-a-payment-keeps-how-its-customer-paid-as-its-gateway-said-and-a-voucher-paid-at-a-shop-goes-back-another-way-claimed-whole-until-tried-against-its-sandbox)):
   `orderRefund` by `ONLINE` asks JazzCash's card refund, or its wallet refund with the MPIN the
