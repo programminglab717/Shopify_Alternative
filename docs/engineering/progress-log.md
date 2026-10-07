@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### Hatti's invoices paid by transfer or Raast
+### a724913 · Hatti's invoices paid by transfer or Raast
 
 * **Paid into Hatti's own account** ([ADR-254](../architecture/13-decision-log.md#adr-254--a-shop-pays-hattis-invoice-by-transfer-or-raast-into-hattis-own-bank-account-its-owner-giving-the-transfers-reference-hattis-people-confirm-it-once-they-find-it-which-pays-the-invoice-as-a-gateways-payment-does-with-what-its-other-payments-brought-or-refuse-it-saying-why-and-the-owner-hears-either-way)): an open
   invoice's page and `billingBankAccount` show Hatti's account and Raast ID; the owner says they
