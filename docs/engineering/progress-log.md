@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### A tracking page found by tracking number
+### 7a2d2e3 · A tracking page found by tracking number
 
 * **`/track` on the shop's storefront** ([ADR-251](../architecture/13-decision-log.md#adr-251--the-shops-storefront-has-a-tracking-page-where-a-customer-finds-their-order-by-its-number-or-a-tracking-number-with-the-mobile-number-they-ordered-with-and-sees-its-parcels-steps-but-nothing-of-its-address-or-items)): a customer finds their order by its number or a
   parcel's tracking number with the mobile number they ordered with, and sees how it is doing
