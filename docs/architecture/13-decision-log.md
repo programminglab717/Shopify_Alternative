@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-254 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-255 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -262,6 +262,7 @@
 | 252 | An open shop can pause its storefront for a while: every page answers 503 with a page saying when it is back, and checkout takes no orders, until its staff open it again or the time they set comes | Accepted |
 | 253 | A courier account's parcels waiting to be picked up are handed to its courier through its API, PostEx's load sheet for its pickup address and Leopards' naming the rider who takes them; each pickup keeps its parcels and the courier's sheet, and a parcel its rider missed goes in the next a day later | Accepted |
 | 254 | A shop pays Hatti's invoice by transfer or Raast into Hatti's own bank account, its owner giving the transfer's reference; Hatti's people confirm it once they find it, which pays the invoice as a gateway's payment does, with what its other payments brought, or refuse it, saying why, and the owner hears either way | Accepted |
+| 255 | What a card or a JazzCash wallet paid goes back through JazzCash's refunds, a wallet's with the MPIN the shop gives; a payment keeps how its customer paid, as its gateway said, and a voucher paid at a shop goes back another way; claimed whole until tried against its sandbox | Accepted |
 
 ---
 
@@ -10527,3 +10528,45 @@
     whoever runs Hatti adds no surface anyone else can reach.
   * **Each payment held to its invoice's amount:** a transfer short of it would leave the
     invoice unpaid for good, or its rest unrecorded.
+
+## ADR-255 · What a card or a JazzCash wallet paid goes back through JazzCash's refunds, a wallet's with the MPIN the shop gives; a payment keeps how its customer paid, as its gateway said, and a voucher paid at a shop goes back another way; claimed whole until tried against its sandbox
+
+* **Context:** Money paid online goes back through the gateway that took it, as far as its
+  adapter can ([ADR-153](#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)); Safepay's alone did. JazzCash ([ADR-163](#adr-163--jazzcash-is-the-second-gateway-shops-take-payments-through-by-its-hosted-checkout-the-customers-browser-posts-a-form-signed-with-the-accounts-integrity-salt-to-jazzcashs-page-from-a-page-of-hattis-with-a-button-as-these-pages-run-no-scripts-and-jazzcash-posts-the-outcome-back-signed-the-same-way-the-form-is-never-kept-and-nothing-is-given-back-through-its-api)) has two
+  refunds: one of a card's payment, and one of a JazzCash wallet's, which asks for the merchant
+  wallet's MPIN. A voucher paid in cash at a shop has nowhere to go back to. Its page, its
+  notifications and its inquiry ([ADR-208](#adr-208--a-payment-started-online-whose-customer-never-came-back-is-asked-after-the-worker-asks-the-gateways-status-inquiry-jazzcashs-first-from-a-quarter-of-an-hour-after-it-began-at-most-once-an-hour-for-two-days-and-records-one-the-gateway-vouches-for-paid-through-the-inquiry)) say how the customer paid (`pp_TxnType`):
+  MPAY for a card, MWALLET for its wallet, OTC for a voucher.
+* **Decision:**
+  * **A payment keeps how its customer paid** (migration 0158, `payments.sessions.method`), as its
+    gateway named it where it said, in a shape kept; `PaymentSession.method` shows it. A refund
+    passes it on to the gateway's adapter (`GatewayRefundRequest.method`).
+  * **JazzCash's `refund`:** a card's payment through its card refund (`authorize/Refund`); a
+    wallet's through its wallet refund (`Purchase/domwalletrefundtransaction`), with the MPIN;
+    each with the merchant ID and password and the amount in paisa, signed with the integrity
+    salt. 000 is given back, with JazzCash's reference where it gives one; another code is a
+    refusal, said as JazzCash said it; no answer, a 5xx, or an answer whose hash does not hold may
+    have given it back, and waits for staff to settle it, as ADR-153 has it. A voucher's payment,
+    a wallet's where the account has no MPIN, and anything but rupees are refused before JazzCash
+    is asked, saying how to give it back instead. A payment whose method was never said goes back
+    as a card's.
+  * **The MPIN is a credential the account may go without** (`GatewayCredentialField.optional`,
+    `PaymentGatewayCredentialField.optional`): JazzCash's accounts take payments without it,
+    sealed with the rest when given, 4 to 6 digits.
+  * **Claimed whole** (`refunds: 'whole'`) until its refunds are tried against its sandbox, as
+    Safepay's were: part of a payment goes back in JazzCash's portal, recorded by hand.
+* **Consequences:**
+  * JazzCash's payments by card and from its wallet go back from the order, as Safepay's do.
+  * Payments recorded before keep no method: they go back as cards', and a wallet's is refused
+    and given back in the portal.
+  * Easypaisa, PayFast, Bank Alfalah and Baadmay give nothing back through Hatti yet: their
+    refunds are not in the documents Hatti has; HBL publishes none.
+  * JazzCash's refunds follow its integration guide as its open-source clients call it, untried
+    against its sandbox, as its inquiry was when it came.
+* **Alternatives:**
+  * **The card refund tried first, then the wallet's:** two calls for one refund, and a wallet's
+    payment refused by the card refund in words that say nothing of why.
+  * **Its inquiry asked how the payment was made, at each refund:** one more call each time, for
+    what its return said already.
+  * **Parts at once:** an amount misread would give back the wrong sum; Safepay's waited for its
+    sandbox too.

@@ -376,7 +376,7 @@ offered together, in the order the shop puts them
 ([ADR-221](./13-decision-log.md#adr-221--a-shop-puts-its-gateways-in-the-order-its-customers-are-offered-them-the-admin-api-takes-all-its-live-accounts-at-once-those-connected-before-keep-the-order-they-were-connected-in-and-one-connected-later-goes-last)), and the customer pays through the one
 they choose ([ADR-219](./13-decision-log.md#adr-219--customers-choose-among-the-shops-gateways-each-live-account-that-takes-the-orders-currency-is-offered-on-its-page-and-checkouts-thank-you-page-in-the-order-the-shop-added-them-and-the-payment-starts-through-the-one-chosen)). Checkout takes the shop's own discount off orders paid online,
 as it takes its discount off those paid by transfer ([ADR-222](./13-decision-log.md#adr-222--a-shop-may-take-something-off-orders-paid-online-as-it-may-off-those-paid-by-transfer-a-percentage-up-to-a-cap-or-an-amount-of-its-own-which-checkout-takes-off-the-items-after-any-code-and-the-order-keeps-apart)). Reconciliation of
-§4.2, and JazzCash's refunds, come next.
+§4.2 comes next. JazzCash gives back what a card or its wallet paid, by how the payment says it was made ([ADR-255](./13-decision-log.md#adr-255--what-a-card-or-a-jazzcash-wallet-paid-goes-back-through-jazzcashs-refunds-a-wallets-with-the-mpin-the-shop-gives-a-payment-keeps-how-its-customer-paid-as-its-gateway-said-and-a-voucher-paid-at-a-shop-goes-back-another-way-claimed-whole-until-tried-against-its-sandbox)).
 
 **Platform billing (our own subscriptions)** uses the same stack: card subscriptions (Safepay),
 wallet token debits (JazzCash, Easypaisa), and Raast request-to-pay or bank transfer for renewals

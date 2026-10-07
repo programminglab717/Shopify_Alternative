@@ -39,6 +39,11 @@ export interface GatewayCredentialField {
   normalize?: (value: string) => string;
   /** How long it may be, where longer than {@link GATEWAY_ACCOUNT_LIMITS}' 1,000. */
   maxLength?: number;
+  /**
+   * Not every account gives it, as a JazzCash wallet's MPIN, which its wallet refunds alone ask
+   * for (ADR-255): without it, the account takes payments but not what it is for.
+   */
+  optional?: boolean;
 }
 
 /**
@@ -139,6 +144,11 @@ export interface GatewayPayment {
   currency: string | null;
   /** The gateway's reference for the payment, to find it by in its dashboard. */
   reference: string | null;
+  /**
+   * How the customer paid, as the gateway names it where it says (ADR-255): JazzCash's MPAY for a
+   * card, MWALLET for its wallet, OTC for a voucher paid at a shop.
+   */
+  method?: string | null;
 }
 
 /** What a gateway answered: what was asked, or why not, and whether trying again may help. */
@@ -152,6 +162,8 @@ export interface GatewayRefundRequest {
   /** Minor units: what to give back. */
   amount: bigint;
   currency: CurrencyCode;
+  /** How the payment was made, as {@link GatewayPayment.method} said; null where it said none. */
+  method?: string | null;
 }
 
 /**
@@ -581,6 +593,10 @@ const JAZZCASH_FORM_PATH = '/CustomerPortal/transactionmanagement/merchantform/'
 /** Its status inquiry, which asks after a transaction by its reference (ADR-208). */
 const JAZZCASH_INQUIRY_PATH = '/ApplicationAPI/API/PaymentInquiry/Inquire';
 
+/** Its refunds (ADR-255): of a card's payment, and of a JazzCash wallet's, which asks its MPIN. */
+const JAZZCASH_CARD_REFUND_PATH = '/ApplicationAPI/API/authorize/Refund';
+const JAZZCASH_WALLET_REFUND_PATH = '/ApplicationAPI/API/Purchase/domwalletrefundtransaction';
+
 /** The codes its inquiry gives a payment completed with. */
 const JAZZCASH_PAID = new Set(['000', '121']);
 
@@ -600,8 +616,8 @@ export interface JazzCashOptions {
  * a JazzCash wallet or a voucher paid at a shop, and posts the outcome to the return address,
  * signed the same way, as its instant payment notification does. The form carries the account's
  * merchant ID and password, as JazzCash asks of it; the salt, which signs, never leaves Hatti.
- * Its status inquiry is asked after a payment whose customer never came back (ADR-208). Nothing
- * is given back through its API here.
+ * Its status inquiry is asked after a payment whose customer never came back (ADR-208). What a
+ * card or a JazzCash wallet paid is given back through its refunds, whole for now (ADR-255).
  */
 export class JazzCashGateway implements PaymentGateway {
   readonly info: PaymentGatewayInfo = {
@@ -611,10 +627,19 @@ export class JazzCashGateway implements PaymentGateway {
       { key: 'merchantId', label: 'Merchant ID' },
       { key: 'password', label: 'Password' },
       { key: 'integritySalt', label: 'Integrity salt' },
+      {
+        key: 'walletPin',
+        label: 'Wallet MPIN',
+        optional: true,
+        pattern: /^\d{4,6}$/,
+        problem: "must be the merchant wallet's MPIN: 4 to 6 digits",
+      },
     ],
     currencies: ['PKR'],
     test: false,
-    refunds: 'none',
+    // Its refunds take any part of a payment, in paisa as its checkout does; claimed whole alone
+    // until they are tried against its sandbox, as Safepay's were (ADR-153, ADR-255).
+    refunds: 'whole',
   };
 
   constructor(private readonly options: JazzCashOptions = {}) {}
@@ -725,10 +750,7 @@ export class JazzCashGateway implements PaymentGateway {
     if (!response.ok || !isObject(json)) {
       return { status: 'unknown', message: `JazzCash answered ${response.status}` };
     }
-    const answer: Record<string, string> = {};
-    for (const [key, value] of Object.entries(json)) {
-      if (typeof value === 'string' || typeof value === 'number') answer[key] = String(value);
-    }
+    const answer = jazzCashFields(json);
     const outcome = this.#signed(account, answer);
     if (outcome === 'unsigned') {
       return { status: 'unknown', message: "JazzCash's answer was not signed with the salt" };
@@ -752,8 +774,108 @@ export class JazzCashGateway implements PaymentGateway {
         amount: paid > 0n ? paid : null,
         currency: paid > 0n ? answer.pp_TxnCurrency?.trim() || 'PKR' : null,
         reference: reference.slice(0, 200) || null,
+        ...(methodOf(answer.pp_TxnType) && { method: methodOf(answer.pp_TxnType) }),
       },
     };
+  }
+
+  /**
+   * Gives back what `request` names of a payment (ADR-255), as JazzCash's refunds take it: what a
+   * card paid through its card refund; what a JazzCash wallet paid through its wallet refund,
+   * which asks for the wallet's MPIN, so only where the account was given it; a voucher paid at a
+   * shop not at all, as there is nothing to send it back to. A payment whose method was never said
+   * goes back as a card's. Each is asked with the merchant ID and password, the amount in paisa,
+   * signed with the integrity salt. 000 is given back, and another code a refusal; no answer, a
+   * 5xx, or an answer whose hash does not hold may have given it back all the same.
+   */
+  async refund(
+    account: GatewayAccount,
+    request: GatewayRefundRequest,
+  ): Promise<GatewayRefundResult> {
+    if (request.currency !== 'PKR') {
+      return { ok: false, unknown: false, message: 'JazzCash gives back rupees alone' };
+    }
+    const method = request.method?.toUpperCase() ?? null;
+    if (method === 'OTC') {
+      return {
+        ok: false,
+        unknown: false,
+        message:
+          'JazzCash gives nothing back through its API of a voucher paid at a shop: give it ' +
+          'back another way, then record it',
+      };
+    }
+    const wallet = method === 'MWALLET';
+    const pin = account.credentials.walletPin;
+    if (wallet && !pin) {
+      return {
+        ok: false,
+        unknown: false,
+        message:
+          "JazzCash asks for the wallet's MPIN to give back what a JazzCash wallet paid: add it " +
+          "to the account's credentials, or give it back in JazzCash's portal and record it",
+      };
+    }
+    const fields: Record<string, string> = {
+      pp_TxnRefNo: request.ref,
+      // In paisa, as its checkout took it.
+      pp_Amount: request.amount.toString(),
+      pp_TxnCurrency: 'PKR',
+      pp_MerchantID: account.credentials.merchantId ?? '',
+      pp_Password: account.credentials.password ?? '',
+      ...(wallet && { pp_MerchantMPIN: pin! }),
+    };
+    const salt = account.credentials.integritySalt ?? '';
+    const path = wallet ? JAZZCASH_WALLET_REFUND_PATH : JAZZCASH_CARD_REFUND_PATH;
+    let response: Response;
+    try {
+      response = await fetch(`${this.#url(account.environment)}${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ ...fields, pp_SecureHash: jazzCashHash(salt, fields, false) }),
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+      });
+    } catch (error) {
+      // Not reached at all: it gave nothing back. Anything else, such as no answer in time, may
+      // have reached it all the same.
+      const reached = !notConnected(error);
+      return {
+        ok: false,
+        unknown: reached,
+        message: (reached
+          ? `JazzCash did not answer: ${(error as Error).message}`
+          : `JazzCash could not be reached: ${(error as Error).message}`
+        ).slice(0, 1_000),
+      };
+    }
+    const json: unknown = await response.json().catch(() => null);
+    const answer = isObject(json) ? jazzCashFields(json) : {};
+    if (!response.ok) {
+      const said = answer.pp_ResponseMessage?.trim() || `it answered ${response.status}`;
+      return {
+        ok: false,
+        unknown: response.status >= 500,
+        message: `JazzCash: ${said}`.slice(0, 1_000),
+      };
+    }
+    if (!isObject(json)) {
+      return { ok: false, unknown: true, message: 'JazzCash answered with nothing it could read' };
+    }
+    // Its own answer, over its own TLS: where it signs it, the hash must hold.
+    if (answer.pp_SecureHash && this.#signed(account, answer) === 'unsigned') {
+      return {
+        ok: false,
+        unknown: true,
+        message: "JazzCash's answer was not signed with the salt",
+      };
+    }
+    if (answer.pp_ResponseCode !== '000') {
+      const said =
+        answer.pp_ResponseMessage?.trim() || `it answered ${answer.pp_ResponseCode || 'no code'}`;
+      return { ok: false, unknown: false, message: `JazzCash: ${said}`.slice(0, 1_000) };
+    }
+    const reference = (answer.pp_RetreivalReferenceNo || answer.pp_AuthCode || '').trim();
+    return { ok: true, reference: reference.slice(0, 200) || null };
   }
 
   /** The payment `fields` say is made, if signed with the account's salt; or `unsigned`. */
@@ -778,6 +900,7 @@ export class JazzCashGateway implements PaymentGateway {
       amount: paid > 0n ? paid : null,
       currency: paid > 0n ? fields.pp_TxnCurrency?.trim() || 'PKR' : null,
       reference: reference.slice(0, 200) || null,
+      ...(methodOf(fields.pp_TxnType) && { method: methodOf(fields.pp_TxnType) }),
     };
   }
 
@@ -804,6 +927,21 @@ export function jazzCashHash(
   return createHmac('sha256', salt)
     .update([salt, ...values].join('&'), 'utf8')
     .digest('hex');
+}
+
+/** An answer of JazzCash's API, its fields as text. */
+function jazzCashFields(json: Readonly<Record<string, unknown>>): Record<string, string> {
+  const fields: Record<string, string> = {};
+  for (const [key, value] of Object.entries(json)) {
+    if (typeof value === 'string' || typeof value === 'number') fields[key] = String(value);
+  }
+  return fields;
+}
+
+/** How JazzCash says its customer paid, "MWALLET", where it says so in a shape kept; or null. */
+function methodOf(type: string | undefined): string | null {
+  const method = type?.trim().toUpperCase() ?? '';
+  return /^[A-Z0-9_]{1,30}$/.test(method) ? method : null;
 }
 
 /** When, in Pakistan's time, as JazzCash writes it: 20261002143000. */
@@ -2196,10 +2334,17 @@ export class TestGateway implements PaymentGateway {
     };
   }
 
+  /** The payment `form` names, signed; with how the customer paid, where a test says (ADR-255). */
   returned(account: GatewayAccount, form: Readonly<Record<string, string>>): GatewayPayment | null {
-    const { ref, sig, reference } = form;
+    const { ref, sig, reference, method } = form;
     if (!ref || !sig || !sameHex(sig, this.returnForm(account, ref).sig!)) return null;
-    return { ref, amount: null, currency: null, reference: reference || null };
+    return {
+      ref,
+      amount: null,
+      currency: null,
+      reference: reference || null,
+      ...(method && { method }),
+    };
   }
 
   /** A webhook saying `ref` is paid: `amount` in minor units. */

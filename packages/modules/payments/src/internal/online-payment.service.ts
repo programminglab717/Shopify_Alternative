@@ -135,6 +135,11 @@ export interface PaymentSessionRecord {
   applied: bigint | null;
   /** The gateway's reference for the payment. */
   reference: string | null;
+  /**
+   * How the customer paid, as the gateway names it where it said (ADR-255): JazzCash's MPAY,
+   * MWALLET or OTC.
+   */
+  method: string | null;
   paidThrough: PaidThroughValue | null;
   paidAt: Date | null;
   /** Why the gateway would not start it. */
@@ -158,6 +163,7 @@ type SessionRow = {
   paid_amount: string | null;
   applied: string | null;
   reference: string | null;
+  method: string | null;
   paid_through: PaidThroughValue | null;
   paid_at: string | Date | null;
   error: string | null;
@@ -168,7 +174,7 @@ type SessionRow = {
 
 const SESSION_COLUMNS = sql.raw(
   `s.id, s.account_id, s.order_id, s.environment, s.amount::text, s.currency, s.status,
-   s.gateway_ref, s.checkout_url, s.paid_amount::text, s.applied::text, s.reference,
+   s.gateway_ref, s.checkout_url, s.paid_amount::text, s.applied::text, s.reference, s.method,
    s.paid_through, s.paid_at, s.error, s.created_at, s.updated_at, a.gateway`,
 );
 const SESSION_FROM = sql.raw(
@@ -674,6 +680,7 @@ export class OnlinePaymentService extends OnlinePayments {
       ref: session.gateway_ref!,
       amount: request.amount,
       currency: order.currency,
+      method: session.method,
     });
     const { name } = gateway.info;
     return this.db.tenant(shopId, async (tx) => {
@@ -877,10 +884,14 @@ export class OnlinePaymentService extends OnlinePayments {
       payment.amount !== null && (payment.currency ?? session.currency) === session.currency
         ? payment.amount
         : BigInt(session.amount);
+    // As the gateway named it, where it did in a shape kept (ADR-255).
+    const method =
+      payment.method && /^[A-Za-z0-9_]{1,30}$/.test(payment.method) ? payment.method : null;
     const { rows } = await tx.execute<{ id: string }>(sql`
       UPDATE payments.sessions
          SET status = 'paid', paid_amount = ${amount}, reference = ${payment.reference},
-             paid_through = ${through}, paid_at = now(), error = NULL, updated_at = now()
+             method = ${method}, paid_through = ${through}, paid_at = now(), error = NULL,
+             updated_at = now()
        WHERE shop_id = ${shopId} AND id = ${session.id} AND status = 'open'
       RETURNING id`);
     if (rows.length > 0) {
@@ -929,6 +940,7 @@ export class OnlinePaymentService extends OnlinePayments {
       paidAmount: row.paid_amount === null ? null : BigInt(row.paid_amount),
       applied: row.applied === null ? null : BigInt(row.applied),
       reference: row.reference,
+      method: row.method,
       paidThrough: row.paid_through,
       paidAt: row.paid_at === null ? null : toDate(row.paid_at),
       error: row.error,

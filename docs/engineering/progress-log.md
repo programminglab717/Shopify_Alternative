@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, the rest of what is left to build** (asked for on 2026-10-07): refunds through more
-gateways, the activity log of staff's changes, product videos and crops, a map pin at checkout,
-and couriers' city names shared across shops; then translations removed with what is deleted,
-and domains checked again. How the Free plan holds to its 50 orders a month waits on a decision.
+**Next, the rest of what is left to build** (asked for on 2026-10-07): the activity log of
+staff's changes, product videos and crops, a map pin at checkout, and couriers' city names
+shared across shops; then translations removed with what is deleted, and domains checked
+again. How the Free plan holds to its 50 orders a month waits on a decision.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### JazzCash's refunds
+
+* **What a card or a JazzCash wallet paid goes back from the order** ([ADR-255](../architecture/13-decision-log.md#adr-255--what-a-card-or-a-jazzcash-wallet-paid-goes-back-through-jazzcashs-refunds-a-wallets-with-the-mpin-the-shop-gives-a-payment-keeps-how-its-customer-paid-as-its-gateway-said-and-a-voucher-paid-at-a-shop-goes-back-another-way-claimed-whole-until-tried-against-its-sandbox)):
+  `orderRefund` by `ONLINE` asks JazzCash's card refund, or its wallet refund with the MPIN the
+  shop gave, by how the payment says its customer paid; a voucher paid at a shop, or a wallet's
+  payment without the MPIN, is refused before JazzCash is asked, saying how to give it back.
+  Claimed whole until tried against its sandbox.
+* **For it:** migration 0158, how each payment was made, as its gateway said; `PaymentSession.method`;
+  credentials an account may go without, `PaymentGatewayCredentialField.optional`, as JazzCash's
+  wallet MPIN.
+* 1810 tests: each refund asked as JazzCash takes it, its refusals and what may have gone
+  through; the method kept and passed on; the MPIN checked; through the API.
 
 ### a724913 · Hatti's invoices paid by transfer or Raast
 

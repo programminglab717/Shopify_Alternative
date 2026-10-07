@@ -116,6 +116,13 @@ export class PaymentGatewayCredentialField {
 
   @Field({ description: 'As staff know it, such as "API key".' })
   label!: string;
+
+  @Field({
+    description:
+      "Connecting takes the account without it, as JazzCash's wallet MPIN, which its wallet " +
+      'refunds alone ask for (ADR-255).',
+  })
+  optional!: boolean;
 }
 
 @ObjectType({ description: 'A payment gateway shops take payments online through (PAY-01).' })
@@ -323,6 +330,14 @@ export class PaymentSession {
 
   @Field(() => String, { nullable: true, description: "The gateway's reference for the payment." })
   reference!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "How the customer paid, as the gateway names it where it says (ADR-255): JazzCash's MPAY " +
+      'for a card, MWALLET for its wallet, OTC for a voucher paid at a shop.',
+  })
+  method!: string | null;
 
   @Field(() => PaymentConfirmation, { nullable: true })
   paidThrough!: PaymentConfirmation | null;

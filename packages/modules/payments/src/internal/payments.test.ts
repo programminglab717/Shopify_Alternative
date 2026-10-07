@@ -702,6 +702,22 @@ describe.skipIf(!server)('Payments online', () => {
   it("takes what an order waits for through JazzCash's page, by a signed form (ADR-163)", async () => {
     const order = await f.awaiting(f.a, kurta);
     const token = await f.linkOf(f.a, order.id);
+    // Its wallet's MPIN, which its wallet refunds alone ask for, is checked when given (ADR-255).
+    const pin = await f.accounts.connect(f.a, {
+      gateway: 'jazzcash',
+      environment: 'production',
+      credentials: [
+        { key: 'merchantId', value: 'MC12345' },
+        { key: 'password', value: 'x0y1z2w3' },
+        { key: 'integritySalt', value: 'salt-of-zari' },
+        { key: 'walletPin', value: '12ab' },
+      ],
+    });
+    expect(
+      pin.ok ? null : pin.errors.map((error) => [error.field.join('.'), error.message]),
+    ).toEqual([
+      ['input.credentials.3.value', "Value must be the merchant wallet's MPIN: 4 to 6 digits"],
+    ]);
     unwrap(
       await f.accounts.connect(f.a, {
         gateway: 'jazzcash',
@@ -1572,6 +1588,29 @@ describe.skipIf(!server)('Payments online', () => {
     expect(
       errorsOf(await f.refunds.refund(f.b, order.id, { amount: '1', method: 'online' })),
     ).toEqual([['id', 'NOT_FOUND']]);
+  });
+
+  it('keeps how the customer paid, as the gateway said, and gives it back by it (ADR-255)', async () => {
+    await f.connectTest(f.a);
+    const paidBy = async (method: string) => {
+      const order = await f.awaiting(f.a, kurta);
+      const token = await f.linkOf(f.a, order.id);
+      const started = await f.links.payOnline(token);
+      if (!('url' in started)) throw new Error(JSON.stringify(started));
+      await f.links.paidOnline(token, { ...formOf(started.url), method });
+      return order;
+    };
+    const wallet = await paidBy('MWALLET');
+    expect(await f.payments.sessionsOf(f.a.shopId, wallet.id)).toMatchObject([
+      { status: 'paid', method: 'MWALLET' },
+    ]);
+    unwrap(await f.refunds.refund(f.a, wallet.id, { amount: '500', method: 'online' }));
+    expect(f.testGateway.refunds.at(-1)).toMatchObject({ amount: 500_00n, method: 'MWALLET' });
+    // Said in no shape kept, it is not kept.
+    const odd = await paidBy('M WALLET!');
+    expect((await f.payments.sessionsOf(f.a.shopId, odd.id))[0]!.method).toBeNull();
+    unwrap(await f.refunds.refund(f.a, odd.id, { amount: '500', method: 'online' }));
+    expect(f.testGateway.refunds.at(-1)!.method).toBeNull();
   });
 
   it("gives back only what the gateway can: nothing, a whole payment, or one payment's part", async () => {

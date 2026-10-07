@@ -262,6 +262,7 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
           { key: 'merchantId', label: 'Merchant ID' },
           { key: 'password', label: 'Password' },
           { key: 'integritySalt', label: 'Integrity salt' },
+          { key: 'walletPin', label: 'Wallet MPIN' },
         ],
         currencies: ['PKR'],
         test: false,
@@ -508,9 +509,21 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
         refunds { id amount { amount } status reference refundId error }
       }
     }`;
+    // JazzCash's wallet MPIN is asked for, for its wallet refunds, but not needed (ADR-255).
+    const listed = await data(
+      tokens.owner,
+      '{ paymentGateways { gateway credentials { key optional } } }',
+    );
+    expect(
+      listed.flatMap((each: Json) =>
+        each.credentials
+          .filter((credential: Json) => credential.optional)
+          .map((credential: Json) => `${each.gateway}.${credential.key}`),
+      ),
+    ).toEqual(['jazzcash.walletPin']);
     expect(await data(tokens.owner, '{ paymentGateways { gateway refunds } }')).toEqual([
       { gateway: 'easypaisa', refunds: 'NONE' },
-      { gateway: 'jazzcash', refunds: 'NONE' },
+      { gateway: 'jazzcash', refunds: 'WHOLE' },
       { gateway: 'payfast', refunds: 'NONE' },
       { gateway: 'safepay', refunds: 'WHOLE' },
       { gateway: 'test', refunds: 'PARTIAL' },

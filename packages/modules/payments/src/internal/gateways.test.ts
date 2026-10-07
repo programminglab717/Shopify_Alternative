@@ -495,9 +495,10 @@ describe('The test gateway', () => {
         { key: 'merchantId', label: 'Merchant ID' },
         { key: 'password', label: 'Password' },
         { key: 'integritySalt', label: 'Integrity salt' },
+        { key: 'walletPin', label: 'Wallet MPIN', optional: true },
       ],
       currencies: ['PKR'],
-      refunds: 'none',
+      refunds: 'whole',
     });
     expect(gateways.of('safepay')?.info.credentials.map((field) => field.key)).toEqual([
       'apiKey',
@@ -621,11 +622,13 @@ describe('JazzCash', () => {
   });
 
   it('reads what it posts back, signed with the salt: a payment when its code is 000', () => {
+    // With how the customer paid: from a JazzCash wallet (ADR-255).
     const payment = {
       ref: 'T2026100214300012345',
       amount: 250_050n,
       currency: 'PKR',
       reference: '261002143512',
+      method: 'MWALLET',
     };
     expect(jazzcash.returned(account, signed(PAID))).toEqual(payment);
     // In capitals, as some of its integrations write it; or signed without its zeros.
@@ -768,6 +771,141 @@ describe('JazzCash', () => {
       const away = new JazzCashGateway({ urls: { sandbox: `http://127.0.0.1:${closed}` } });
       expect(await away.inquire(account, 'T1')).toMatchObject({
         status: 'unknown',
+        message: expect.stringMatching(/^JazzCash could not be reached/),
+      });
+    });
+  });
+
+  describe('its refunds, of a card and of a JazzCash wallet (ADR-255)', () => {
+    const fake = new FakeSafepay();
+    let refunding: JazzCashGateway;
+    const refund = { ref: 'T2026100214300012345', amount: 500_00n, currency: 'PKR' as const };
+    const withPin: GatewayAccount = {
+      ...account,
+      credentials: { ...account.credentials, walletPin: '4321' },
+    };
+    const answer = (body: Record<string, unknown>, status = 200) => {
+      fake.next = { status, body };
+    };
+    const GIVEN = {
+      pp_ResponseCode: '000',
+      pp_ResponseMessage: 'Thank you for Using JazzCash, your transaction was successful.',
+      pp_RetreivalReferenceNo: '261007111111',
+    };
+
+    beforeAll(async () => {
+      await fake.start();
+      refunding = new JazzCashGateway({ urls: { sandbox: fake.url }, timeoutMs: 2_000 });
+    });
+
+    afterAll(async () => {
+      await fake.stop();
+    });
+
+    it("gives back a card's payment through its card refund, and a wallet's with its MPIN", async () => {
+      answer(signed(GIVEN));
+      expect(await refunding.refund(account, { ...refund, method: 'MPAY' })).toEqual({
+        ok: true,
+        reference: '261007111111',
+      });
+      const card = fake.requests.at(-1)!;
+      expect([card.method, card.path]).toEqual(['POST', '/ApplicationAPI/API/authorize/Refund']);
+      // In paisa, with the merchant ID and password, signed with the salt.
+      const sent = card.body as Record<string, string>;
+      expect(sent).toEqual({
+        pp_TxnRefNo: 'T2026100214300012345',
+        pp_Amount: '50000',
+        pp_TxnCurrency: 'PKR',
+        pp_MerchantID: 'MC12345',
+        pp_Password: 'x0y1z2w3',
+        pp_SecureHash: jazzCashHash('salt-of-zari', sent, false),
+      });
+      // How it was paid never said: as a card's.
+      await refunding.refund(account, refund);
+      expect(fake.requests.at(-1)!.path).toBe('/ApplicationAPI/API/authorize/Refund');
+
+      // A wallet's, with the wallet's MPIN; an answer JazzCash did not sign is its own all the
+      // same, over its own connection.
+      answer({ ...GIVEN, pp_RetreivalReferenceNo: '' });
+      expect(await refunding.refund(withPin, { ...refund, method: 'MWALLET' })).toEqual({
+        ok: true,
+        reference: null,
+      });
+      const wallet = fake.requests.at(-1)!;
+      expect(wallet.path).toBe('/ApplicationAPI/API/Purchase/domwalletrefundtransaction');
+      const fromWallet = wallet.body as Record<string, string>;
+      expect(fromWallet).toMatchObject({ pp_MerchantMPIN: '4321', pp_Amount: '50000' });
+      expect(fromWallet.pp_SecureHash).toBe(jazzCashHash('salt-of-zari', fromWallet, false));
+      expect(
+        fake.requests.filter((each) => 'pp_MerchantMPIN' in (each.body as object)),
+      ).toHaveLength(1);
+
+      // Without its MPIN, a voucher paid at a shop, or in dollars: JazzCash is not asked at all.
+      const asked = fake.requests.length;
+      expect(await refunding.refund(account, { ...refund, method: 'MWALLET' })).toMatchObject({
+        ok: false,
+        unknown: false,
+        message: expect.stringMatching(/^JazzCash asks for the wallet's MPIN/),
+      });
+      expect(await refunding.refund(withPin, { ...refund, method: 'otc' })).toMatchObject({
+        ok: false,
+        unknown: false,
+        message: expect.stringMatching(/of a voucher paid at a shop/),
+      });
+      expect(await refunding.refund(account, { ...refund, currency: 'USD' })).toEqual({
+        ok: false,
+        unknown: false,
+        message: 'JazzCash gives back rupees alone',
+      });
+      expect(fake.requests).toHaveLength(asked);
+      // Claimed whole until its refunds are tried against its sandbox.
+      expect(refunding.info.refunds).toBe('whole');
+    });
+
+    it('says what it refused, and what may have been given back all the same', async () => {
+      answer(
+        signed({ pp_ResponseCode: '199', pp_ResponseMessage: 'Transaction already refunded' }),
+      );
+      expect(await refunding.refund(account, refund)).toEqual({
+        ok: false,
+        unknown: false,
+        message: 'JazzCash: Transaction already refunded',
+      });
+      // Signed, but not as the salt signs it: it may have been given back.
+      answer({ ...signed(GIVEN), pp_ResponseMessage: 'Changed after it was signed' });
+      expect(await refunding.refund(account, refund)).toEqual({
+        ok: false,
+        unknown: true,
+        message: "JazzCash's answer was not signed with the salt",
+      });
+      answer({ pp_ResponseMessage: 'Invalid request' }, 400);
+      expect(await refunding.refund(account, refund)).toEqual({
+        ok: false,
+        unknown: false,
+        message: 'JazzCash: Invalid request',
+      });
+      answer({ message: 'Bad gateway' }, 502);
+      expect(await refunding.refund(account, refund)).toEqual({
+        ok: false,
+        unknown: true,
+        message: 'JazzCash: it answered 502',
+      });
+      fake.hang = true;
+      try {
+        const slow = new JazzCashGateway({ urls: { sandbox: fake.url }, timeoutMs: 300 });
+        const late = await slow.refund(account, refund);
+        expect(late).toMatchObject({ ok: false, unknown: true });
+        if (!late.ok) expect(late.message).toMatch(/^JazzCash did not answer/);
+      } finally {
+        fake.hang = false;
+        fake.release();
+      }
+      // Never reached: nothing given back.
+      const closed = await closedPort();
+      const nowhere = new JazzCashGateway({ urls: { sandbox: `http://127.0.0.1:${closed}` } });
+      expect(await nowhere.refund(account, refund)).toMatchObject({
+        ok: false,
+        unknown: false,
         message: expect.stringMatching(/^JazzCash could not be reached/),
       });
     });

@@ -378,7 +378,10 @@ export class GatewayAccountService {
     return this.site.url(`${PAYMENT_WEBHOOK_PATH}/${toPublicId('paymentGatewayAccount', id)}`);
   }
 
-  /** What the gateway asks for, all of it, each once, as it was typed but trimmed. */
+  /**
+   * What the gateway asks for, each once, as it was typed but trimmed: all of it but what it
+   * takes without (ADR-255).
+   */
   #checkCredentials(
     check: InputChecker,
     gateway: PaymentGatewayInfo,
@@ -424,7 +427,7 @@ export class GatewayAccountService {
       }
       values.set(credential.key, value);
     }
-    const missing = gateway.credentials.filter((each) => !values.has(each.key));
+    const missing = gateway.credentials.filter((each) => !each.optional && !values.has(each.key));
     if (missing.length > 0) {
       check.addMessage(
         field,
@@ -434,7 +437,11 @@ export class GatewayAccountService {
     }
     // In the order the gateway asks for them: the first gives the hint.
     return check.ok
-      ? Object.fromEntries(gateway.credentials.map((each) => [each.key, values.get(each.key)!]))
+      ? Object.fromEntries(
+          gateway.credentials
+            .filter((each) => values.has(each.key))
+            .map((each) => [each.key, values.get(each.key)!]),
+        )
       : null;
   }
 

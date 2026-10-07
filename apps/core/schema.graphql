@@ -7425,6 +7425,11 @@ type PaymentGatewayCredentialField {
 
   """As staff know it, such as "API key"."""
   label: String!
+
+  """
+  Connecting takes the account without it, as JazzCash's wallet MPIN, which its wallet refunds alone ask for (ADR-255).
+  """
+  optional: Boolean!
 }
 
 input PaymentGatewayCredentialInput {
@@ -7638,6 +7643,11 @@ type PaymentSession {
   """The gateway's name for the payment, such as Safepay's tracker."""
   gatewayRef: String
   id: ID!
+
+  """
+  How the customer paid, as the gateway names it where it says (ADR-255): JazzCash's MPAY for a card, MWALLET for its wallet, OTC for a voucher paid at a shop.
+  """
+  method: String
   orderId: ID!
 
   """What was paid, as the gateway said."""

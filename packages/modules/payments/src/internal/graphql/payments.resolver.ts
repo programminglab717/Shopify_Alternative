@@ -68,7 +68,11 @@ export class PaymentsResolver {
       Object.assign(new PaymentGateway(), {
         gateway: info.gateway,
         name: info.name,
-        credentials: info.credentials.map((field) => ({ key: field.key, label: field.label })),
+        credentials: info.credentials.map((field) => ({
+          key: field.key,
+          label: field.label,
+          optional: field.optional ?? false,
+        })),
         currencies: [...info.currencies],
         test: info.test,
         refunds: info.refunds.toUpperCase() as PaymentGatewayRefunds,
@@ -242,6 +246,7 @@ function toSession(record: PaymentSessionRecord): PaymentSession {
     paidAmount: amount(record.paidAmount),
     applied: amount(record.applied),
     reference: record.reference,
+    method: record.method,
     paidThrough: record.paidThrough && (record.paidThrough.toUpperCase() as PaymentConfirmation),
     paidAt: record.paidAt,
     error: record.error,

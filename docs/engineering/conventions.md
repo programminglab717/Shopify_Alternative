@@ -1085,6 +1085,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   amount; only `paymentRefundSettle` moves an unknown one on. A gateway answers `unknown: true`
   whenever it may have acted (a timeout, a 5xx, a connection lost after sending), never for a
   refusal it plainly made or a request that never left.
+* **Keep how a payment was made where its gateway says**
+  ([ADR-255](../architecture/13-decision-log.md#adr-255--what-a-card-or-a-jazzcash-wallet-paid-goes-back-through-jazzcashs-refunds-a-wallets-with-the-mpin-the-shop-gives-a-payment-keeps-how-its-customer-paid-as-its-gateway-said-and-a-voucher-paid-at-a-shop-goes-back-another-way-claimed-whole-until-tried-against-its-sandbox)): `GatewayPayment.method`, as
+  the gateway names it, which `payments.sessions.method` keeps and a refund passes back in
+  `GatewayRefundRequest.method`, so that an adapter with a refund for each way, as JazzCash's,
+  picks its own. A credential only some accounts give, as JazzCash's wallet MPIN, is
+  `optional`: connecting takes the account without it, and the adapter refuses, before asking
+  the gateway, what needs it.
 * **A new gateway** is a `PaymentGateway` (`checkout`, `returned`, `webhook`, and
   `checkoutOrigin` for the pages' policies; `refund` if it gives money back) with its
   `PaymentGatewayInfo`: its key, its name, the credentials it asks for, the currencies it takes
