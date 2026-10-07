@@ -77,6 +77,7 @@ export const ID_PREFIXES = {
   paymentLink: 'plnk',
   billingInvoice: 'binv',
   billingWalletEntry: 'bwe',
+  billingTransfer: 'btr',
   return: 'ret',
   conversionEvent: 'cnv',
   message: 'msg',

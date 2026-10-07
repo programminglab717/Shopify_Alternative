@@ -11,7 +11,26 @@ export const BillingEvents = {
   InvoicePaid: 'billing_invoice.paid',
   /** The shop's message credit fell below what a few days of messages cost (ADR-169). */
   CreditLow: 'billing_credit.low',
+  /** The shop's owner said they paid an invoice by transfer into Hatti's account (ADR-254). */
+  InvoiceTransferReported: 'billing_invoice.transfer_reported',
+  /** Hatti's people found it in Hatti's account: it paid the invoice, or went towards it. */
+  InvoiceTransferConfirmed: 'billing_invoice.transfer_confirmed',
+  /** Hatti's people found no such transfer, or not as the shop said it: see the reason. */
+  InvoiceTransferRefused: 'billing_invoice.transfer_refused',
 } as const;
+
+export interface InvoiceTransferPayload {
+  number: string;
+  /** Paisa, as a string: what the invoice asked for when the transfer was said. */
+  amount: string;
+  /** As the shop's owner gave it. */
+  reference: string;
+  /** Confirmed: paisa, as a string, what Hatti's people found; and whether it paid the invoice. */
+  received?: string;
+  paid?: boolean;
+  /** Refused: why. */
+  reason?: string;
+}
 
 export interface SubscriptionChangedPayload {
   plan: string;

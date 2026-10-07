@@ -305,13 +305,57 @@ describe("Messages' words", () => {
         "once it runs out: buy more from Hatti's admin.",
     );
     expect(templateParameters('credit_low', low)).toEqual(['Zari Fashions', 'Rs 95.76']);
+    // What Hatti found of a transfer the shop said it made into Hatti's account (ADR-254).
+    const found = {
+      shop: 'Zari Fashions',
+      invoice: 'HB-000123',
+      amount: 'Rs 6,999',
+      reference: 'FT 2410 0012',
+    };
+    expect(messageText('transfer_confirmed', 'en', found)).toBe(
+      "Hatti: we found Zari Fashions's transfer of Rs 6,999, reference FT 2410 0012, in our " +
+        'account. Thank you: invoice HB-000123 is paid.',
+    );
+    expect(templateParameters('transfer_confirmed', found)).toEqual([
+      'Zari Fashions',
+      'Rs 6,999',
+      'FT 2410 0012',
+      'HB-000123',
+    ]);
+    const refused = {
+      shop: 'Zari Fashions',
+      invoice: 'HB-000123',
+      reference: 'FT 2410 0012',
+      reason: 'No such transfer reached us.',
+    };
+    expect(messageText('transfer_refused', 'en', refused)).toBe(
+      "Hatti: we couldn't find Zari Fashions's transfer for invoice HB-000123, reference " +
+        "FT 2410 0012, in our account. Give its reference again, or pay another way, from Hatti's " +
+        'admin. Why: No such transfer reached us.',
+    );
+    expect(templateParameters('transfer_refused', refused)).toEqual([
+      'Zari Fashions',
+      'HB-000123',
+      'FT 2410 0012',
+      'No such transfer reached us.',
+    ]);
+    expect(messageText('transfer_refused', 'ur', refused)).toContain('وجہ: No such transfer');
     // Never from the shop's credit, which may be what the notice is about; always sent.
     expect(MESSAGE_KINDS.filter((kind) => !paidByShop(kind))).toEqual([
       'invoice_due',
       'plan_ended',
       'credit_low',
+      'transfer_confirmed',
+      'transfer_refused',
     ]);
-    expect(ALWAYS_SENT).toEqual(['one_time_code', 'invoice_due', 'plan_ended', 'credit_low']);
+    expect(ALWAYS_SENT).toEqual([
+      'one_time_code',
+      'invoice_due',
+      'plan_ended',
+      'credit_low',
+      'transfer_confirmed',
+      'transfer_refused',
+    ]);
   });
 
   it('tells a number another took the place of which number signs in now (ADR-173)', () => {
@@ -398,6 +442,8 @@ describe("Messages' words", () => {
       'invoice_due',
       'plan_ended',
       'credit_low',
+      'transfer_confirmed',
+      'transfer_refused',
     ]);
     const shipped = messageEmail('order_shipped', 'en', SHIPPED.variables)!;
     expect(shipped.from).toBe('shop');

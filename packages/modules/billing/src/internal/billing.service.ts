@@ -3,6 +3,7 @@ import {
   PlanAllowance,
   PublicSite,
   actorColumnsOf,
+  fail,
   failOne,
   shopProfile,
   type MutationResult,
@@ -12,7 +13,7 @@ import {
 } from '@hatti/api';
 import { Database, toDate, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
-import { toPublicId, tryFromPublicId } from '@hatti/ids';
+import { isUuid, toPublicId, tryFromPublicId } from '@hatti/ids';
 import { formatMoney, money } from '@hatti/money';
 import type {
   GatewayAccount,
@@ -32,7 +33,12 @@ import {
   walletEntryIn,
   type WalletEntryRecord,
 } from './credits.js';
-import { BillingEvents, type InvoicePayload, type SubscriptionChangedPayload } from './events.js';
+import {
+  BillingEvents,
+  type InvoicePayload,
+  type InvoiceTransferPayload,
+  type SubscriptionChangedPayload,
+} from './events.js';
 import {
   BILLING_CURRENCY,
   BILLING_INTERVALS,
@@ -55,6 +61,70 @@ export interface HattiGateway {
 
 /** The host's {@link HattiGateway}, or null where none is set up. */
 export const BILLING_GATEWAY = Symbol('BILLING_GATEWAY');
+
+/** Hatti's own bank account, which shops pay invoices into by transfer or Raast (ADR-254). */
+export interface HattiBankAccount {
+  /** The account's title, as its bank shows it. */
+  title: string;
+  bankName: string;
+  /** Unspaced: "PK36SCBL0000001123456702". */
+  iban: string;
+  /** The mobile number its bank registered for Raast, in E.164; null for none. */
+  raastId: string | null;
+}
+
+/** The host's {@link HattiBankAccount}, or null where none is set up. */
+export const BILLING_BANK_ACCOUNT = Symbol('BILLING_BANK_ACCOUNT');
+
+/** How an invoice's payments name a transfer into Hatti's account, beside gateways' names. */
+export const TRANSFER_GATEWAY = 'bank_transfer';
+
+/** A transfer's reference, as banks and Raast print them: 4 to 64 characters. */
+export const TRANSFER_REFERENCE = { min: 4, max: 64 } as const;
+
+export type TransferStatusValue = 'waiting' | 'confirmed' | 'refused';
+
+/** A transfer the shop said it made for an invoice, into Hatti's account (ADR-254). */
+export interface InvoiceTransferRecord {
+  id: string;
+  invoiceId: string;
+  /** As the shop's owner gave it. */
+  reference: string;
+  /** Paisa: what the invoice asked for when the transfer was said. */
+  amount: bigint;
+  status: TransferStatusValue;
+  /** Paisa: what Hatti's people found in its account, once confirmed. */
+  received: bigint | null;
+  /** Why Hatti's people refused it. */
+  refusal: string | null;
+  reportedAt: Date;
+  /** When Hatti's people confirmed or refused it. */
+  checkedAt: Date | null;
+}
+
+/** What became of a transfer Hatti's people checked (ADR-254), and of its invoice. */
+export interface TransferChecked {
+  /**
+   * `paid`: it paid its invoice. `short`: it was kept, and the invoice waits for the rest.
+   * `already_paid`: it came for an invoice paid otherwise, and is Hatti's to give back. `refused`.
+   */
+  outcome: 'paid' | 'short' | 'already_paid' | 'refused';
+  /** "HB-000123". */
+  invoiceName: string;
+  /** Paisa: what the invoice still waits for; nothing once paid. */
+  left: bigint;
+}
+
+/** Why Hatti's people refused a transfer, as the shop is told: one line. */
+export const TRANSFER_REFUSAL_LENGTH = 500;
+
+/** A transfer waiting for Hatti's people, as they list them (ADR-254). */
+export interface WaitingTransferRecord extends InvoiceTransferRecord {
+  shopId: string;
+  shopName: string;
+  /** "HB-000123". */
+  invoiceName: string;
+}
 
 /** Where invoices' pages are, on the API's own address, and where Hatti's gateway's webhook is. */
 export const BILLING_PATH = 'billing/invoices';
@@ -130,6 +200,8 @@ export interface InvoicePageView {
   invoice: InvoiceRecord;
   /** When the plan it paid for runs until, once paid. */
   periodEnd: Date | null;
+  /** Hatti's account to pay it into by transfer or Raast, while it is open; null for none. */
+  bank: HattiBankAccount | null;
 }
 
 type SubscriptionRow = {
@@ -158,6 +230,24 @@ type InvoiceRow = {
 
 type PaymentRow = { id: string; invoice_id: string; amount: string };
 
+type TransferRow = {
+  id: string;
+  invoice_id: string;
+  transfer_reference: string;
+  amount: string;
+  status: 'open' | 'paid' | 'failed';
+  paid_amount: string | null;
+  error: string | null;
+  paid_at: string | Date | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+};
+
+const TRANSFER_COLUMNS = sql.raw(
+  `p.id, p.invoice_id, p.transfer_reference, p.amount::text, p.status, p.paid_amount::text,
+   p.error, p.paid_at, p.created_at, p.updated_at`,
+);
+
 const INVOICE_COLUMNS = sql.raw(
   `id, number::text, reason, plan, billing_interval, price::text, credit::text, amount::text,
    status, reference, paid_at, created_at`,
@@ -173,7 +263,9 @@ type Begun =
  * paid, less what was left of the period it cuts short; a smaller one, or Free, when the period
  * ends. Each period's renewal is invoiced a week ahead; unpaid a week past its end, the shop is on
  * Free. It keeps the limits each plan sets, which other modules ask through {@link PlanAllowance}.
- * Credit for the shop's messages is bought the same way, with an invoice of its own (ADR-155).
+ * Credit for the shop's messages is bought the same way, with an invoice of its own (ADR-155). An
+ * invoice is paid by transfer or Raast into Hatti's own bank account too, once Hatti's people find
+ * the transfer the shop's owner said they made (ADR-254).
  */
 @Injectable()
 export class BillingService extends PlanAllowance {
@@ -181,8 +273,255 @@ export class BillingService extends PlanAllowance {
     private readonly db: Database,
     private readonly site: PublicSite,
     @Optional() @Inject(BILLING_GATEWAY) private readonly hatti?: HattiGateway | null,
+    @Optional() @Inject(BILLING_BANK_ACCOUNT) private readonly bank?: HattiBankAccount | null,
   ) {
     super();
+  }
+
+  /** Hatti's account shops pay invoices into by transfer or Raast; null where none is set up. */
+  bankAccount(): HattiBankAccount | null {
+    return this.bank ?? null;
+  }
+
+  /**
+   * The shop's owner says it paid an open invoice by transfer or Raast into Hatti's account
+   * (ADR-254), with the reference its bank or Raast gave the transfer: Hatti's people find it
+   * there and confirm it, which pays the invoice, or refuse it, saying why. An invoice waits on
+   * one transfer at a time, and a reference is given once.
+   */
+  async reportTransfer(
+    tenant: TenantContext,
+    invoiceId: string,
+    input: { reference: string },
+  ): Promise<MutationResult<InvoiceTransferRecord>> {
+    if (!this.bank) {
+      return failOne(['id'], 'INVALID', "Paying Hatti by transfer isn't set up here");
+    }
+    const check = new InputChecker();
+    const reference = check.text(['reference'], input.reference, {
+      required: true,
+      max: TRANSFER_REFERENCE.max,
+    });
+    if (reference !== null && check.ok) {
+      if (reference.length < TRANSFER_REFERENCE.min) {
+        check.addMessage(
+          ['reference'],
+          'INVALID',
+          'Give the reference your bank or Raast gave the transfer: 4 characters at least',
+        );
+      } else if (!/^[\p{L}\p{N}][\p{L}\p{N} ./#-]*$/u.test(reference)) {
+        check.addMessage(
+          ['reference'],
+          'INVALID',
+          'Give the reference as your bank or Raast wrote it: letters, numbers, spaces, ' +
+            'dots, slashes and dashes',
+        );
+      }
+    }
+    if (!check.ok || reference === null) return fail(check.errors);
+    const { shopId } = tenant;
+    return this.db.tenant(shopId, async (tx): Promise<MutationResult<InvoiceTransferRecord>> => {
+      const { rows } = await tx.execute<InvoiceRow>(sql`
+        SELECT ${INVOICE_COLUMNS} FROM billing.invoices
+         WHERE shop_id = ${shopId} AND id = ${invoiceId}
+           FOR UPDATE`);
+      if (!rows[0]) return failOne(['id'], 'NOT_FOUND', 'Invoice not found');
+      const invoice = toInvoiceRecord(rows[0]);
+      if (invoice.status !== 'open') {
+        return failOne(['id'], 'INVALID', `Invoice ${invoice.name} is ${invoice.status}`);
+      }
+      const { rows: counts } = await tx.execute<{
+        payments: number;
+        waiting: number;
+        given: number;
+      }>(sql`
+        SELECT count(*) FILTER (WHERE invoice_id = ${invoiceId})::int AS payments,
+               count(*) FILTER (WHERE invoice_id = ${invoiceId} AND gateway = ${TRANSFER_GATEWAY}
+                                  AND status = 'open')::int AS waiting,
+               count(*) FILTER (WHERE lower(transfer_reference) = lower(${reference})
+                                  AND status <> 'failed')::int AS given
+          FROM billing.payments
+         WHERE shop_id = ${shopId}`);
+      const { payments, waiting, given } = counts[0]!;
+      if (payments >= BILLING_LIMITS.paymentsPerInvoice) {
+        return failOne(
+          ['id'],
+          'INVALID',
+          "The invoice started as many payments as it may: ask Hatti's support",
+        );
+      }
+      if (waiting > 0) {
+        return failOne(
+          ['id'],
+          'INVALID',
+          `A transfer for invoice ${invoice.name} waits for Hatti to find it`,
+        );
+      }
+      if (given > 0) {
+        return failOne(['reference'], 'TAKEN', 'This reference was given for a transfer before');
+      }
+      const { rows: inserted } = await tx.execute<{ id: string }>(sql`
+        INSERT INTO billing.payments (shop_id, invoice_id, gateway, environment, amount,
+                                      transfer_reference)
+        VALUES (${shopId}, ${invoiceId}, ${TRANSFER_GATEWAY}, 'production', ${invoice.amount},
+                ${reference})
+        RETURNING id`);
+      const id = inserted[0]!.id;
+      await appendEvent<InvoiceTransferPayload>(tx, shopId, {
+        type: BillingEvents.InvoiceTransferReported,
+        aggregateType: 'billing_invoice',
+        aggregateId: invoice.id,
+        payload: { number: invoice.name, amount: invoice.amount.toString(), reference },
+      });
+      await recordAudit(tx, shopId, {
+        action: 'billing.transfer_reported',
+        subjectType: 'shop',
+        subjectId: shopId,
+        ...actorColumnsOf(tenant.actor),
+        details: { invoice: invoice.name, reference, amount: invoice.amount.toString() },
+      });
+      return { ok: true, value: (await transfersIn(tx, shopId, { id }))[0]! };
+    });
+  }
+
+  /** The transfers the shop said it made for the invoices `invoiceIds`, the latest first. */
+  async transfersOf(
+    shopId: string,
+    invoiceIds: readonly string[],
+  ): Promise<Map<string, InvoiceTransferRecord[]>> {
+    const byInvoice = new Map<string, InvoiceTransferRecord[]>(invoiceIds.map((id) => [id, []]));
+    if (invoiceIds.length === 0) return byInvoice;
+    const transfers = await this.db.tenant(shopId, (tx) => transfersIn(tx, shopId, { invoiceIds }));
+    for (const transfer of transfers) byInvoice.get(transfer.invoiceId)?.push(transfer);
+    return byInvoice;
+  }
+
+  /**
+   * The transfers waiting for Hatti's people (ADR-254), the oldest first, across shops: found
+   * with the system role, for Hatti's own people alone, never through the Admin API.
+   */
+  async waitingTransfers(limit = 100): Promise<WaitingTransferRecord[]> {
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<TransferRow & { shop_id: string; shop_name: string; invoice_number: string }>(sql`
+        SELECT ${TRANSFER_COLUMNS}, p.shop_id, s.name AS shop_name,
+               i.number::text AS invoice_number
+          FROM billing.payments p
+          JOIN billing.invoices i ON i.shop_id = p.shop_id AND i.id = p.invoice_id
+          JOIN control.shops s ON s.id = p.shop_id
+         WHERE p.gateway = ${TRANSFER_GATEWAY} AND p.status = 'open'
+         ORDER BY p.created_at, p.id
+         LIMIT ${Math.max(1, Math.min(limit, 500))}`),
+    );
+    return rows.map((row) => ({
+      ...toTransferRecord(row),
+      shopId: row.shop_id,
+      shopName: row.shop_name,
+      invoiceName: invoiceName(Number(row.invoice_number)),
+    }));
+  }
+
+  /**
+   * Hatti's people found the transfer in Hatti's account (ADR-254): what they found, the amount
+   * it was said for unless given, pays its invoice as a gateway's payment does, once, together
+   * with what the invoice's other payments brought; short of it, the transfer is kept and the
+   * invoice waits for the rest. Who confirmed it is kept with it.
+   */
+  async confirmTransfer(
+    paymentId: string,
+    input: { by: string; received?: bigint | null },
+  ): Promise<TransferChecked | 'checked' | 'not_found'> {
+    if (input.received !== undefined && input.received !== null && input.received <= 0n) {
+      throw new RangeError('A transfer confirmed brought something');
+    }
+    const shopId = await this.#transferShop(paymentId);
+    if (!shopId) return 'not_found';
+    return this.db.tenant(shopId, async (tx) => {
+      const transfer = await lockedTransferIn(tx, shopId, paymentId);
+      if (!transfer) return 'not_found';
+      if (transfer.status !== 'open') return 'checked';
+      const received = input.received ?? BigInt(transfer.amount);
+      const before = await standingIn(tx, shopId, transfer.invoice_id);
+      await tx.execute(sql`
+        UPDATE billing.payments SET checked_by = ${checkerOf(input.by)}
+         WHERE shop_id = ${shopId} AND id = ${paymentId}`);
+      await this.#complete(
+        tx,
+        shopId,
+        { id: transfer.id, invoice_id: transfer.invoice_id, amount: transfer.amount },
+        {
+          ref: transfer.id,
+          amount: received,
+          currency: BILLING_CURRENCY,
+          reference: transfer.transfer_reference,
+        },
+      );
+      const after = await standingIn(tx, shopId, transfer.invoice_id);
+      const outcome =
+        before.status === 'paid' ? 'already_paid' : after.status === 'paid' ? 'paid' : 'short';
+      await appendEvent<InvoiceTransferPayload>(tx, shopId, {
+        type: BillingEvents.InvoiceTransferConfirmed,
+        aggregateType: 'billing_invoice',
+        aggregateId: transfer.invoice_id,
+        payload: {
+          number: after.name,
+          amount: transfer.amount,
+          reference: transfer.transfer_reference,
+          received: received.toString(),
+          paid: outcome === 'paid',
+        },
+      });
+      return { outcome, invoiceName: after.name, left: after.left };
+    });
+  }
+
+  /**
+   * Hatti's people found no such transfer, or not as the shop said it (ADR-254): it is refused,
+   * saying why, and the shop may say another. Who refused it is kept with it.
+   */
+  async refuseTransfer(
+    paymentId: string,
+    input: { by: string; reason: string },
+  ): Promise<TransferChecked | 'checked' | 'not_found'> {
+    const shopId = await this.#transferShop(paymentId);
+    if (!shopId) return 'not_found';
+    return this.db.tenant(shopId, async (tx) => {
+      const transfer = await lockedTransferIn(tx, shopId, paymentId);
+      if (!transfer) return 'not_found';
+      if (transfer.status !== 'open') return 'checked';
+      // One line, as WhatsApp's templates carry their variables.
+      const reason =
+        input.reason.replace(/\s+/g, ' ').trim().slice(0, TRANSFER_REFUSAL_LENGTH) ||
+        'Hatti found no such transfer';
+      await tx.execute(sql`
+        UPDATE billing.payments
+           SET status = 'failed', error = ${reason}, checked_by = ${checkerOf(input.by)},
+               updated_at = now()
+         WHERE shop_id = ${shopId} AND id = ${paymentId}`);
+      const standing = await standingIn(tx, shopId, transfer.invoice_id);
+      await appendEvent<InvoiceTransferPayload>(tx, shopId, {
+        type: BillingEvents.InvoiceTransferRefused,
+        aggregateType: 'billing_invoice',
+        aggregateId: transfer.invoice_id,
+        payload: {
+          number: standing.name,
+          amount: transfer.amount,
+          reference: transfer.transfer_reference,
+          reason,
+        },
+      });
+      return { outcome: 'refused', invoiceName: standing.name, left: standing.left };
+    });
+  }
+
+  /** The shop of a transfer, found with the system role; null for none. */
+  async #transferShop(paymentId: string): Promise<string | null> {
+    if (!isUuid(paymentId)) return null;
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string }>(sql`
+        SELECT shop_id FROM billing.payments
+         WHERE id = ${paymentId} AND gateway = ${TRANSFER_GATEWAY}`),
+    );
+    return rows[0]?.shop_id ?? null;
   }
 
   /** The plans shops choose from, the smallest first. */
@@ -647,8 +986,11 @@ export class BillingService extends PlanAllowance {
        WHERE shop_id = ${shopId} AND id = ${payment.invoice_id}
          FOR UPDATE`);
     const invoice = toInvoiceRecord(rows[0]!);
-    // Paid by another payment already, or short of it: the payment stays recorded, for Hatti.
-    if (invoice.status === 'paid' || amount < invoice.amount) return;
+    // Paid by another payment already, or short of it with what the invoice's other payments
+    // brought, as a transfer short of it and then its rest (ADR-254): the payment stays recorded.
+    if (invoice.status === 'paid' || (await paidOn(tx, shopId, invoice.id)) < invoice.amount) {
+      return;
+    }
     // A payment that comes for an invoice set aside meanwhile still pays it: the shop paid.
     await tx.execute(sql`
       UPDATE billing.invoices
@@ -782,8 +1124,105 @@ export class BillingService extends PlanAllowance {
         invoice.status === 'paid' && row?.period_end && row.plan === invoice.plan?.code
           ? toDate(row.period_end)
           : null,
+      bank: invoice.status === 'open' ? (this.bank ?? null) : null,
     };
   }
+}
+
+/** The shop's transfers into Hatti's account: one, or those of some invoices; the latest first. */
+async function transfersIn(
+  tx: Tx,
+  shopId: string,
+  which: { id: string } | { invoiceIds: readonly string[] },
+): Promise<InvoiceTransferRecord[]> {
+  const { rows } = await tx.execute<TransferRow>(sql`
+    SELECT ${TRANSFER_COLUMNS} FROM billing.payments p
+     WHERE p.shop_id = ${shopId} AND p.gateway = ${TRANSFER_GATEWAY}
+       AND ${
+         'id' in which
+           ? sql`p.id = ${which.id}`
+           : sql`p.invoice_id = ANY(${sql.param([...which.invoiceIds])}::uuid[])`
+       }
+     ORDER BY p.created_at DESC, p.id DESC`);
+  return rows.map(toTransferRecord);
+}
+
+/** Paisa: what the invoice's payments brought in all. */
+async function paidOn(tx: Tx, shopId: string, invoiceId: string): Promise<bigint> {
+  const { rows } = await tx.execute<{ paid: string }>(sql`
+    SELECT coalesce(sum(paid_amount), 0)::text AS paid FROM billing.payments
+     WHERE shop_id = ${shopId} AND invoice_id = ${invoiceId} AND status = 'paid'`);
+  return BigInt(rows[0]!.paid);
+}
+
+/** How the invoice stands: its name, its status, and what it still waits for. */
+async function standingIn(
+  tx: Tx,
+  shopId: string,
+  invoiceId: string,
+): Promise<{ name: string; status: InvoiceStatusValue; left: bigint }> {
+  const { rows } = await tx.execute<InvoiceRow>(sql`
+    SELECT ${INVOICE_COLUMNS} FROM billing.invoices
+     WHERE shop_id = ${shopId} AND id = ${invoiceId}`);
+  const invoice = toInvoiceRecord(rows[0]!);
+  const paid = await paidOn(tx, shopId, invoiceId);
+  const left = invoice.amount - paid;
+  return {
+    name: invoice.name,
+    status: invoice.status,
+    left: invoice.status !== 'paid' && left > 0n ? left : 0n,
+  };
+}
+
+/** Who among Hatti's people checked a transfer, as kept with it. */
+function checkerOf(by: string): string {
+  const checker = by.replace(/\s+/g, ' ').trim().slice(0, 200);
+  if (!checker) throw new RangeError("Say who among Hatti's people checked the transfer");
+  return checker;
+}
+
+/** A transfer of the shop's, locked for Hatti's people to check; null for none. */
+async function lockedTransferIn(
+  tx: Tx,
+  shopId: string,
+  paymentId: string,
+): Promise<{
+  id: string;
+  invoice_id: string;
+  amount: string;
+  status: string;
+  transfer_reference: string;
+} | null> {
+  const { rows } = await tx.execute<{
+    id: string;
+    invoice_id: string;
+    amount: string;
+    status: string;
+    transfer_reference: string;
+  }>(sql`
+    SELECT id, invoice_id, amount::text, status, transfer_reference FROM billing.payments
+     WHERE shop_id = ${shopId} AND id = ${paymentId} AND gateway = ${TRANSFER_GATEWAY}
+       FOR UPDATE`);
+  return rows[0] ?? null;
+}
+
+function toTransferRecord(row: TransferRow): InvoiceTransferRecord {
+  return {
+    id: row.id,
+    invoiceId: row.invoice_id,
+    reference: row.transfer_reference,
+    amount: BigInt(row.amount),
+    status: row.status === 'open' ? 'waiting' : row.status === 'paid' ? 'confirmed' : 'refused',
+    received: row.paid_amount === null ? null : BigInt(row.paid_amount),
+    refusal: row.status === 'failed' ? row.error : null,
+    reportedAt: toDate(row.created_at),
+    checkedAt:
+      row.status === 'paid' && row.paid_at !== null
+        ? toDate(row.paid_at)
+        : row.status === 'failed'
+          ? toDate(row.updated_at)
+          : null,
+  };
 }
 
 async function subscriptionIn(

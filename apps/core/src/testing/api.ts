@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DnsLookup } from '@hatti/api';
-import type { HattiGateway } from '@hatti/billing/public';
+import type { HattiBankAccount, HattiGateway } from '@hatti/billing/public';
 import type { AccountEmails, GoogleSignInSettings, PhoneCodeSender } from '@hatti/identity/public';
 import { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
@@ -29,6 +29,14 @@ export interface TestApi {
 /** What storefronts present to the /storefront/ routes in tests. */
 export const TEST_STOREFRONT_KEY = 'test-storefront-key-with-32-characters';
 
+/** Hatti's own bank account in tests (ADR-254), which shops pay invoices into by transfer. */
+export const TEST_HATTI_BANK_ACCOUNT: HattiBankAccount = {
+  title: 'Hatti Technologies (Private) Limited',
+  bankName: 'Standard Chartered',
+  iban: 'PK36SCBL0000001123456702',
+  raastId: '+923001234567',
+};
+
 /** Where tests' staff sign in with passkeys: the admin at http://localhost:4000. */
 export const TEST_PASSKEYS = {
   rpId: 'localhost',
@@ -49,6 +57,11 @@ export async function startTestApi(
     paymentGateways?: PaymentGateways;
     /** Hatti's own gateway account (ADR-154); the test gateway unless given, or null for none. */
     billingGateway?: HattiGateway | null;
+    /**
+     * Hatti's own bank account (ADR-254); {@link TEST_HATTI_BANK_ACCOUNT} unless given, or null
+     * for none.
+     */
+    billingBankAccount?: HattiBankAccount | null;
     /** Where merchants' sign-in codes go (ADR-159); without it, no one signs in by phone. */
     phoneCodes?: PhoneCodeSender;
     /** Hatti's client IDs and Google's keys (ADR-164); without them, no one signs in with Google. */
@@ -93,6 +106,10 @@ export async function startTestApi(
       options.billingGateway === undefined
         ? hattiGatewayOf({ NODE_ENV: 'test', BILLING_SAFEPAY_ENVIRONMENT: 'production' })
         : options.billingGateway,
+    billingBankAccount:
+      options.billingBankAccount === undefined
+        ? TEST_HATTI_BANK_ACCOUNT
+        : options.billingBankAccount,
   });
   await app.getHttpAdapter().getInstance().ready();
   return {

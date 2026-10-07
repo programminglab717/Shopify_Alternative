@@ -1,4 +1,4 @@
-import type { HattiGateway } from '@hatti/billing/public';
+import type { HattiBankAccount, HattiGateway } from '@hatti/billing/public';
 import { SafepayGateway, TestGateway } from '@hatti/payments/public';
 import type { ApiConfig } from './config.js';
 
@@ -39,5 +39,26 @@ export function hattiGatewayOf(
   return {
     gateway: new TestGateway(),
     account: { environment: 'production', credentials: { secret: 'hatti-billing-local' } },
+  };
+}
+
+/**
+ * Hatti's own bank account, which shops pay invoices into by transfer or Raast (ADR-254), where
+ * it is set; none otherwise, so that invoices are not paid by transfer.
+ */
+export function hattiBankAccountOf(
+  config: Pick<
+    ApiConfig,
+    'BILLING_BANK_TITLE' | 'BILLING_BANK_NAME' | 'BILLING_BANK_IBAN' | 'BILLING_RAAST_ID'
+  >,
+): HattiBankAccount | null {
+  if (!config.BILLING_BANK_TITLE || !config.BILLING_BANK_NAME || !config.BILLING_BANK_IBAN) {
+    return null;
+  }
+  return {
+    title: config.BILLING_BANK_TITLE,
+    bankName: config.BILLING_BANK_NAME,
+    iban: config.BILLING_BANK_IBAN,
+    raastId: config.BILLING_RAAST_ID ?? null,
   };
 }

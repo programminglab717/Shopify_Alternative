@@ -41,8 +41,15 @@ export enum BillingInvoiceStatus {
 registerEnumType(BillingInvoiceStatus, {
   name: 'BillingInvoiceStatus',
   valuesMap: {
-    OPEN: { description: 'Waiting to be paid, with billingInvoicePay.' },
-    PAID: { description: "Paid through Hatti's gateway: its plan runs for the period paid for." },
+    OPEN: {
+      description:
+        "Waiting to be paid, with billingInvoicePay, or by transfer into Hatti's account, said " +
+        'with billingInvoiceTransferReport.',
+    },
+    PAID: {
+      description:
+        "Paid, through Hatti's gateway or by transfer: its plan runs for the period paid for.",
+    },
     VOID: { description: 'No longer due: another choice took its place, or its plan ended.' },
   },
 });
@@ -95,6 +102,23 @@ registerEnumType(BillingWalletEntryKind, {
     MESSAGE: { description: 'A message sent, at its price.' },
     MESSAGE_REFUND: {
       description: 'What a WhatsApp message was charged, given back: it could not be delivered.',
+    },
+  },
+});
+
+export enum BillingTransferStatus {
+  WAITING = 'WAITING',
+  CONFIRMED = 'CONFIRMED',
+  REFUSED = 'REFUSED',
+}
+
+registerEnumType(BillingTransferStatus, {
+  name: 'BillingTransferStatus',
+  valuesMap: {
+    WAITING: { description: "Waiting for Hatti's people to find it in Hatti's account." },
+    CONFIRMED: { description: 'Found: it paid its invoice, or went towards it.' },
+    REFUSED: {
+      description: 'Not found as the shop said it, for the reason given: another may be said.',
     },
   },
 });
@@ -162,7 +186,12 @@ export class BillingInvoice {
   @Field(() => BillingInvoiceStatus)
   status!: BillingInvoiceStatus;
 
-  @Field(() => String, { nullable: true, description: "The gateway's reference for its payment." })
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The reference of the payment that paid it: the gateway's, or the transfer's as the owner " +
+      'gave it.',
+  })
   reference!: string | null;
 
   @Field(() => GraphQLISODateTime, { nullable: true })
@@ -170,6 +199,74 @@ export class BillingInvoice {
 
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
+
+  /** Its UUID, for the transfers said for it; not in the schema. */
+  uuid!: string;
+}
+
+@ObjectType({
+  description:
+    "Hatti's own bank account, which invoices are paid into by transfer or Raast (ADR-254).",
+})
+export class BillingBankAccount {
+  @Field({ description: "The account's title, as its bank shows it." })
+  title!: string;
+
+  @Field()
+  bankName!: string;
+
+  @Field({ description: 'Unspaced: "PK36SCBL0000001123456702".' })
+  iban!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'The mobile number its bank registered for Raast, E.164; null for none.',
+  })
+  raastId!: string | null;
+}
+
+@ObjectType({
+  description: "A transfer the shop said it made for an invoice, into Hatti's account (ADR-254).",
+})
+export class BillingInvoiceTransfer {
+  @Field(() => ID)
+  id!: string;
+
+  @Field({ description: "The bank's or Raast's reference for it, as the owner gave it." })
+  reference!: string;
+
+  @Field(() => Money, { description: 'What the invoice asked for when it was said.' })
+  amount!: Money;
+
+  @Field(() => BillingTransferStatus)
+  status!: BillingTransferStatus;
+
+  @Field(() => Money, {
+    nullable: true,
+    description: "What Hatti's people found in its account, once confirmed.",
+  })
+  received!: Money | null;
+
+  @Field(() => String, { nullable: true, description: "Why Hatti's people refused it." })
+  refusal!: string | null;
+
+  @Field(() => GraphQLISODateTime)
+  reportedAt!: Date;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: "When Hatti's people confirmed or refused it.",
+  })
+  checkedAt!: Date | null;
+}
+
+@ObjectType()
+export class BillingInvoiceTransferReportPayload {
+  @Field(() => BillingInvoiceTransfer, { nullable: true })
+  transfer!: BillingInvoiceTransfer | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
 }
 
 @ObjectType({ description: 'The plan the shop pays Hatti for; Free until it chooses another.' })

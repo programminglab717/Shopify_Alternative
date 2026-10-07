@@ -9,7 +9,7 @@ import { loadApiConfig, passkeysOf } from './config.js';
 import { couriersOf } from './couriers.js';
 import { accountEmailsOf } from './emails.js';
 import { ProviderPhoneCodes, messageProvidersOf } from './messaging.js';
-import { hattiGatewayOf } from './billing.js';
+import { hattiBankAccountOf, hattiGatewayOf } from './billing.js';
 import { paymentGatewaysOf } from './payments.js';
 import { onShutdown } from './shutdown.js';
 import { LOCAL_STORAGE_PATH, createStorage } from './storage.js';
@@ -72,6 +72,7 @@ const app = await createApi({
   couriers: couriersOf({ production: config.NODE_ENV === 'production' }),
   paymentGateways: paymentGatewaysOf({ production: config.NODE_ENV === 'production' }),
   billingGateway: hattiGatewayOf(config),
+  billingBankAccount: hattiBankAccountOf(config),
 });
 await app.listen({ host: config.HOST, port: config.PORT });
 

@@ -1152,6 +1152,16 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **The owner alone spends the shop's money on Hatti** (`billingPlanChange`, `billingCreditsBuy`,
   `billingInvoicePay`): staff owners only, recently authenticated; owners and managers, and apps
   with `read_settings`, only see it.
+* **A transfer to Hatti is one of its invoice's payments**
+  ([ADR-254](../architecture/13-decision-log.md#adr-254--a-shop-pays-hattis-invoice-by-transfer-or-raast-into-hattis-own-bank-account-its-owner-giving-the-transfers-reference-hattis-people-confirm-it-once-they-find-it-which-pays-the-invoice-as-a-gateways-payment-does-with-what-its-other-payments-brought-or-refuse-it-saying-why-and-the-owner-hears-either-way)): `gateway = 'bank_transfer'`
+  with its `transfer_reference`, which the table holds together. It waits `open` until Hatti's
+  people confirm it with `confirmTransfer`, which pays it through the same `#complete` as a
+  gateway's payment, or refuse it with `refuseTransfer` (`failed`, `error` the reason). The owner
+  alone says one was made (`billingInvoiceTransferReport`), without signing in again, as it
+  moves no money. Find transfers across shops only with the system login, as
+  `waitingTransfers` does, for Hatti's own tools, never through the Admin API. An invoice is
+  paid once what its paid payments brought together covers it, never by one payment's amount
+  alone.
 * **Message credit is a balance kept beside its ledger** ([ADR-155](../architecture/13-decision-log.md#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)): add to it or take from it
   only with `walletEntryIn`, which locks the balance, writes the entry with what the wallet holds
   after and then the balance, once for its message or invoice (`ON CONFLICT DO NOTHING`); entries

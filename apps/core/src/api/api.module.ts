@@ -7,7 +7,7 @@ import {
   SystemDnsLookup,
   type ApiContext,
 } from '@hatti/api';
-import { BillingModule, type HattiGateway } from '@hatti/billing/public';
+import { BillingModule, type HattiBankAccount, type HattiGateway } from '@hatti/billing/public';
 import { CatalogModule } from '@hatti/catalog/public';
 import { CheckoutModule } from '@hatti/checkout/public';
 import { SecretBox } from '@hatti/crypto';
@@ -91,6 +91,11 @@ export interface ApiModuleOptions {
    * invoices are not paid online.
    */
   billingGateway?: HattiGateway | null;
+  /**
+   * Hatti's own bank account, which shops pay invoices into by transfer or Raast (ADR-254);
+   * without it, invoices are not paid by transfer.
+   */
+  billingBankAccount?: HattiBankAccount | null;
 }
 
 /** Resources owned by the process entry point, shared with every module. */
@@ -203,7 +208,10 @@ export class ApiModule {
         MarketingModule,
         MessagingModule.forRoot({ whatsapp: options.whatsapp ?? null }),
         PaymentsModule.forRoot({ gateways: options.paymentGateways }),
-        BillingModule.forRoot({ gateway: options.billingGateway ?? null }),
+        BillingModule.forRoot({
+          gateway: options.billingGateway ?? null,
+          bankAccount: options.billingBankAccount ?? null,
+        }),
       ],
       controllers: [HealthController],
       providers: [

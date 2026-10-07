@@ -5,7 +5,7 @@ import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { TestGateway, type GatewayAccount } from '@hatti/payments/public';
 import pg from 'pg';
-import { BillingService, type HattiGateway } from './billing.service.js';
+import { BillingService, type HattiBankAccount, type HattiGateway } from './billing.service.js';
 import { MessageWallet } from './credits.js';
 import type { BillingIntervalValue, PlanCode } from './plans.js';
 
@@ -26,7 +26,9 @@ export interface BillingFixture {
   /** Hatti's own account with the test gateway. */
   gateway: TestGateway;
   hatti: HattiGateway;
-  /** The billing service of a host that set up no gateway for Hatti. */
+  /** Hatti's own bank account, which invoices are paid into by transfer (ADR-254). */
+  bank: HattiBankAccount;
+  /** The billing service of a host that set up no gateway for Hatti, nor any bank account. */
   unpaid: BillingService;
   /** The credit shops' messages are paid from. */
   wallet: MessageWallet;
@@ -84,16 +86,23 @@ export async function billingFixture(server: string): Promise<BillingFixture> {
   const gateway = new TestGateway();
   const account: GatewayAccount = { environment: 'production', credentials: { secret: 'hatti' } };
   const hatti: HattiGateway = { gateway, account };
+  const bank: HattiBankAccount = {
+    title: 'Hatti Technologies (Private) Limited',
+    bankName: 'Standard Chartered',
+    iban: 'PK36SCBL0000001123456702',
+    raastId: '+923001234567',
+  };
   return {
     testDb,
     db,
     admin,
     a,
     b,
-    billing: new BillingService(db, site, hatti),
+    billing: new BillingService(db, site, hatti, bank),
     gateway,
     hatti,
-    unpaid: new BillingService(db, site, null),
+    bank,
+    unpaid: new BillingService(db, site, null, null),
     wallet: new MessageWallet(db),
     async subscribe(tenant, plan, interval, period, next) {
       await admin.query(

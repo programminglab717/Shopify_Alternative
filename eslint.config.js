@@ -44,6 +44,7 @@ export default defineConfig(
       '**/src/seed.ts',
       '**/src/support-agent.ts',
       '**/src/email-suppression.ts',
+      '**/src/billing-transfers.ts',
       'scripts/**',
     ],
     rules: { 'no-console': 'off' },

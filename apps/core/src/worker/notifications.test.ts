@@ -1369,6 +1369,66 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     }
   });
 
+  it("tells the shop what Hatti found of a transfer it said it made into Hatti's account (ADR-254)", async () => {
+    const billing = new BillingService(database, new PublicSite('https://hatti.pk'), null, {
+      title: 'Hatti Technologies (Private) Limited',
+      bankName: 'Standard Chartered',
+      iban: 'PK36SCBL0000001123456702',
+      raastId: null,
+    });
+    const OWNER = '+923335550009';
+    unwrap(await new MessagingSettingsService(database).update(tenant, { alertsPhone: OWNER }));
+    const notices = async () =>
+      (await queued())
+        .filter((message) => message.kind.startsWith('transfer_'))
+        .map((message) => [message.kind, message.channel, message.recipient, message.variables]);
+    const { invoice } = unwrap(await billing.buyCredits(tenant, { amount: '1000' }));
+    const report = async (reference: string) =>
+      unwrap(await billing.reportTransfer(tenant, invoice.id, { reference })).id;
+
+    const refused = await report('FT 2410 0012');
+    expect(
+      await billing.refuseTransfer(refused, {
+        by: 'Ayesha',
+        reason: 'No such transfer reached us.',
+      }),
+    ).toMatchObject({ outcome: 'refused' });
+    // Short of the invoice: Hatti's people take it up with the shop themselves.
+    const short = await report('RAAST-77001');
+    expect(await billing.confirmTransfer(short, { by: 'Ayesha', received: 400_00n })).toMatchObject(
+      { outcome: 'short' },
+    );
+    const rest = await report('RAAST-77002');
+    expect(await billing.confirmTransfer(rest, { by: 'Ayesha', received: 600_00n })).toMatchObject({
+      outcome: 'paid',
+    });
+    await dispatch(2);
+    expect(await notices()).toEqual([
+      [
+        'transfer_refused',
+        'whatsapp',
+        OWNER,
+        {
+          shop: 'Zari Fashions',
+          invoice: invoice.name,
+          reference: 'FT 2410 0012',
+          reason: 'No such transfer reached us.',
+        },
+      ],
+      [
+        'transfer_confirmed',
+        'whatsapp',
+        OWNER,
+        {
+          shop: 'Zari Fashions',
+          invoice: invoice.name,
+          amount: 'Rs 600',
+          reference: 'RAAST-77002',
+        },
+      ],
+    ]);
+  });
+
   it('tells customers of store credit given them, and a week before a credit of theirs expires (ADR-192)', async () => {
     const { customerId } = await placeOnline();
     const storeCredit = new StoreCreditService(database);

@@ -34,6 +34,8 @@ export const MESSAGE_KINDS = [
   'invoice_due',
   'plan_ended',
   'credit_low',
+  'transfer_confirmed',
+  'transfer_refused',
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
@@ -57,13 +59,16 @@ export type AnyMessageKind = MessageKind | PlatformMessageKind;
 
 /**
  * Messages a shop cannot turn off: what a shopper asked for, as a code to prove their number, and
- * Hatti's notices of the shop's bills (ADR-169).
+ * Hatti's notices of the shop's bills (ADR-169), among them what Hatti found of a transfer the
+ * shop said it made (ADR-254).
  */
 export const ALWAYS_SENT: readonly MessageKind[] = [
   'one_time_code',
   'invoice_due',
   'plan_ended',
   'credit_low',
+  'transfer_confirmed',
+  'transfer_refused',
 ];
 
 /** What the buttons of a message asking a customer to confirm their order answer (COD-01). */
@@ -107,6 +112,12 @@ export interface MessageVariables {
   invoice?: string;
   amount?: string;
   plan?: string;
+  /**
+   * For a transfer the shop said it made into Hatti's account (ADR-254): the reference it gave
+   * the transfer, and why Hatti refused it.
+   */
+  reference?: string;
+  reason?: string;
   /**
    * The shop's message credit left: "Rs 85.50". For a customer's store credit (ADR-192): what
    * they have in all.
@@ -515,6 +526,34 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: "{shop}'s message credit is down to {balance}",
       ur: '{shop} کا میسج کریڈٹ {balance} رہ گیا ہے',
+    },
+  },
+  transfer_confirmed: {
+    whatsapp: 'hatti_transfer_confirmed',
+    category: 'utility',
+    parameters: ['shop', 'amount', 'reference', 'invoice'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: we found {shop}'s transfer of {amount}, reference {reference}, in our account. Thank you: invoice {invoice} is paid.",
+      ur: 'ہٹی: ہمیں اپنے اکاؤنٹ میں {shop} کی {amount} کی ٹرانسفر، ریفرنس {reference}، مل گئی ہے۔ شکریہ! انوائس {invoice} ادا ہو گئی ہے۔',
+    },
+    subject: {
+      en: 'Invoice {invoice} for {shop} is paid',
+      ur: '{shop} کی انوائس {invoice} ادا ہو گئی ہے',
+    },
+  },
+  transfer_refused: {
+    whatsapp: 'hatti_transfer_refused',
+    category: 'utility',
+    parameters: ['shop', 'invoice', 'reference', 'reason'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: we couldn't find {shop}'s transfer for invoice {invoice}, reference {reference}, in our account. Give its reference again, or pay another way, from Hatti's admin. Why: {reason}",
+      ur: 'ہٹی: انوائس {invoice} کے لیے {shop} کی ٹرانسفر، ریفرنس {reference}، ہمارے اکاؤنٹ میں نہیں ملی۔ ہٹی کے ایڈمن سے اس کا ریفرنس دوبارہ دیں، یا کسی اور طریقے سے ادا کریں۔ وجہ: {reason}',
+    },
+    subject: {
+      en: "Hatti couldn't find {shop}'s transfer for invoice {invoice}",
+      ur: 'ہٹی کو انوائس {invoice} کے لیے {shop} کی ٹرانسفر نہیں ملی',
     },
   },
 };

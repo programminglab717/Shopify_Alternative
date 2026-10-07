@@ -1,6 +1,8 @@
 import {
   CurrentTenant,
+  Loaders,
   Money,
+  RequestLoaders,
   RequireRecentAuthentication,
   RequireScopes,
   UserError,
@@ -11,10 +13,12 @@ import {
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import type { MessageChannelEnum } from '@hatti/messaging/public';
 import { money } from '@hatti/money';
-import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import {
   BillingService,
+  type HattiBankAccount,
   type InvoiceRecord,
+  type InvoiceTransferRecord,
   type MessagePriceRecord,
   type SubscriptionRecord,
   type WalletRecord,
@@ -22,6 +26,7 @@ import {
 import type { WalletEntryRecord } from '../credits.js';
 import { BILLING_CURRENCY, type Plan } from '../plans.js';
 import {
+  BillingBankAccount,
   BillingCreditsBuyInput,
   BillingCreditsBuyPayload,
   BillingInterval,
@@ -29,12 +34,15 @@ import {
   BillingInvoicePayPayload,
   BillingInvoiceReason,
   BillingInvoiceStatus,
+  BillingInvoiceTransfer,
+  BillingInvoiceTransferReportPayload,
   BillingMessagePrice,
   BillingPlan,
   BillingPlanChangeInput,
   BillingPlanChangePayload,
   BillingPlanCode,
   BillingSubscription,
+  BillingTransferStatus,
   BillingWallet,
   BillingWalletEntry,
   BillingWalletEntryKind,
@@ -45,9 +53,10 @@ import {
  * What the shop pays Hatti (BIL-01, BIL-03, ADR-154, ADR-155): the plans, its plan, its invoices
  * and the credit its messages are paid from, which owners and managers see and apps with
  * read_settings; the owner alone chooses a plan or credit and pays, having signed in lately, as
- * it spends the shop's money.
+ * it spends the shop's money. The owner says, too, what they paid by transfer into Hatti's account
+ * (ADR-254), which Hatti's people then find.
  */
-@Resolver()
+@Resolver(() => BillingInvoice)
 export class BillingResolver {
   constructor(private readonly billing: BillingService) {}
 
@@ -76,6 +85,20 @@ export class BillingResolver {
   ): Promise<BillingInvoice[]> {
     managing(tenant);
     return (await this.billing.invoicesOf(tenant.shopId, first)).map(toInvoice);
+  }
+
+  @Query(() => BillingBankAccount, {
+    nullable: true,
+    description:
+      "Hatti's own bank account, which invoices are paid into by transfer or Raast, writing the " +
+      "invoice's name as the transfer's purpose; null where none is set up. Staff need to be " +
+      'the owner or a manager.',
+  })
+  @RequireScopes('read_settings')
+  billingBankAccount(@CurrentTenant() tenant: TenantContext): BillingBankAccount | null {
+    managing(tenant);
+    const account = this.billing.bankAccount();
+    return account && toBankAccount(account);
   }
 
   @Query(() => BillingWallet, {
@@ -173,6 +196,49 @@ export class BillingResolver {
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }
+
+  @Mutation(() => BillingInvoiceTransferReportPayload, {
+    description:
+      "Says an open invoice was paid by transfer or Raast into Hatti's account (billingBankAccount), " +
+      "with the reference the bank or Raast gave the transfer: Hatti's people find it there, and " +
+      'confirm it, which pays the invoice, or refuse it, saying why. An invoice waits on one ' +
+      'transfer at a time, and a reference is given once. The owner alone.',
+  })
+  @RequireScopes('write_settings')
+  async billingInvoiceTransferReport(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('reference', {
+      description:
+        'As the bank or Raast wrote it: 4 to 64 letters, numbers, spaces, dots, ' +
+        'slashes and dashes.',
+    })
+    reference: string,
+  ): Promise<BillingInvoiceTransferReportPayload> {
+    owner(tenant);
+    const uuid = tryFromPublicId(id, 'billingInvoice');
+    if (!uuid) throw badUserInput(`Invalid billingInvoice id: ${id.slice(0, 64)}`);
+    const result = await this.billing.reportTransfer(tenant, uuid, { reference });
+    return Object.assign(new BillingInvoiceTransferReportPayload(), {
+      transfer: result.ok ? toTransfer(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @ResolveField(() => [BillingInvoiceTransfer], {
+    description:
+      "The transfers the owner said they made for it, into Hatti's account, the latest first.",
+  })
+  async transfers(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() invoice: BillingInvoice,
+  ): Promise<BillingInvoiceTransfer[]> {
+    const loader = loaders.get<string, InvoiceTransferRecord[]>('billing.transfers', (ids) =>
+      this.billing.transfersOf(tenant.shopId, ids),
+    );
+    return ((await loader.load(invoice.uuid)) ?? []).map(toTransfer);
+  }
 }
 
 /** Owners and managers see what the shop pays; apps with read_settings too. */
@@ -219,6 +285,29 @@ function toInvoice(record: InvoiceRecord): BillingInvoice {
     reference: record.reference,
     paidAt: record.paidAt,
     createdAt: record.createdAt,
+    uuid: record.id,
+  });
+}
+
+function toBankAccount(account: HattiBankAccount): BillingBankAccount {
+  return Object.assign(new BillingBankAccount(), {
+    title: account.title,
+    bankName: account.bankName,
+    iban: account.iban,
+    raastId: account.raastId,
+  });
+}
+
+function toTransfer(record: InvoiceTransferRecord): BillingInvoiceTransfer {
+  return Object.assign(new BillingInvoiceTransfer(), {
+    id: toPublicId('billingTransfer', record.id),
+    reference: record.reference,
+    amount: rupees(record.amount),
+    status: record.status.toUpperCase() as BillingTransferStatus,
+    received: record.received === null ? null : rupees(record.received),
+    refusal: record.refusal,
+    reportedAt: record.reportedAt,
+    checkedAt: record.checkedAt,
   });
 }
 

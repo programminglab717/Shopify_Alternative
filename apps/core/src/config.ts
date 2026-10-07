@@ -1,5 +1,6 @@
 import { env, parseEnv, z, type Env } from '@hatti/config';
 import { SecretBox } from '@hatti/crypto';
+import { normalizePkIban, parsePkMobile } from '@hatti/pk';
 
 /** "id:base64key,…", newest first. Parsed at startup so a bad key stops the process. */
 const encryptionKeys = () =>
@@ -10,6 +11,31 @@ const encryptionKeys = () =>
       context.addIssue({ code: 'custom', message: (error as Error).message });
       return z.NEVER;
     }
+  });
+
+/** A Pakistani IBAN, checked and unspaced: "PK36SCBL0000001123456702". */
+const pkIban = () =>
+  z.string().transform((value, context) => {
+    const iban = normalizePkIban(value);
+    if (!iban) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Expected a Pakistani IBAN: PK, 2 check digits, 4 letters and 16 digits',
+      });
+      return z.NEVER;
+    }
+    return iban;
+  });
+
+/** A Pakistani mobile number, in E.164: "+923001234567". */
+const pkMobile = () =>
+  z.string().transform((value, context) => {
+    const number = parsePkMobile(value);
+    if (!number) {
+      context.addIssue({ code: 'custom', message: 'Expected a Pakistani mobile number' });
+      return z.NEVER;
+    }
+    return number.e164;
   });
 
 const identity = {
@@ -253,6 +279,15 @@ const apiSchema = z
     BILLING_SAFEPAY_API_KEY: z.string().min(1).optional(),
     BILLING_SAFEPAY_SECRET_KEY: env.secret(16).optional(),
     BILLING_SAFEPAY_WEBHOOK_SECRET: env.secret(16).optional(),
+    /**
+     * Hatti's own bank account, which shops pay invoices into by transfer or Raast (ADR-254): its
+     * title and bank, as its bank shows them, and its IBAN, all three or none; and the number its
+     * bank registered for Raast, if any. Without them, invoices are not paid by transfer.
+     */
+    BILLING_BANK_TITLE: z.string().trim().min(1).max(100).optional(),
+    BILLING_BANK_NAME: z.string().trim().min(1).max(100).optional(),
+    BILLING_BANK_IBAN: pkIban().optional(),
+    BILLING_RAAST_ID: pkMobile().optional(),
     ...messageSending,
     ...storage,
   })
@@ -276,6 +311,25 @@ const apiSchema = z
       message:
         'Set BILLING_SAFEPAY_API_KEY, BILLING_SAFEPAY_SECRET_KEY and ' +
         'BILLING_SAFEPAY_WEBHOOK_SECRET together, or none of them',
+    },
+  )
+  .refine(
+    (config) =>
+      new Set([
+        config.BILLING_BANK_TITLE === undefined,
+        config.BILLING_BANK_NAME === undefined,
+        config.BILLING_BANK_IBAN === undefined,
+      ]).size === 1,
+    {
+      path: ['BILLING_BANK_IBAN'],
+      message: 'Set BILLING_BANK_TITLE, BILLING_BANK_NAME and BILLING_BANK_IBAN together, or none',
+    },
+  )
+  .refine(
+    (config) => config.BILLING_RAAST_ID === undefined || config.BILLING_BANK_IBAN !== undefined,
+    {
+      path: ['BILLING_RAAST_ID'],
+      message: "Set Hatti's account with BILLING_BANK_IBAN first: Raast pays into it",
     },
   )
   .refine(storageComplete, STORAGE_COMPLETE)
@@ -439,6 +493,17 @@ const seedSchema = z.object({
 const supportAgentSchema = z.object({ DATABASE_IDENTITY_URL: env.postgresUrl() });
 
 /**
+ * Hatti's people list the transfers shops said they made into Hatti's account, and confirm or
+ * refuse each (ADR-254), with the app login and the system login, which finds them across shops.
+ */
+const billingTransfersSchema = z.object({
+  DATABASE_URL: env.postgresUrl(),
+  DATABASE_SYSTEM_URL: env.postgresUrl(),
+  /** Where the API answers; invoices' pages are there. */
+  PUBLIC_URL: env.httpUrl().optional(),
+});
+
+/**
  * Hatti's operators see and lift suppressed addresses with the identity login, and SES's keys
  * where SES is set up, to keep its own list in step (ADR-200).
  */
@@ -458,6 +523,7 @@ export type WorkerConfig = z.output<typeof workerSchema>;
 export type SeedConfig = z.output<typeof seedSchema>;
 export type SupportAgentConfig = z.output<typeof supportAgentSchema>;
 export type EmailSuppressionConfig = z.output<typeof emailSuppressionSchema>;
+export type BillingTransfersConfig = z.output<typeof billingTransfersSchema>;
 
 export const loadApiConfig = (source?: Env): ApiConfig => parseEnv(apiSchema, source);
 export const loadWorkerConfig = (source?: Env): WorkerConfig => parseEnv(workerSchema, source);
@@ -466,3 +532,5 @@ export const loadSupportAgentConfig = (source?: Env): SupportAgentConfig =>
   parseEnv(supportAgentSchema, source);
 export const loadEmailSuppressionConfig = (source?: Env): EmailSuppressionConfig =>
   parseEnv(emailSuppressionSchema, source);
+export const loadBillingTransfersConfig = (source?: Env): BillingTransfersConfig =>
+  parseEnv(billingTransfersSchema, source);

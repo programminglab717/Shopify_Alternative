@@ -412,6 +412,9 @@ importers:
       '@hatti/payments':
         specifier: workspace:*
         version: link:../payments
+      '@hatti/pk':
+        specifier: workspace:*
+        version: link:../../platform/pk
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)

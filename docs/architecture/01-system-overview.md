@@ -197,7 +197,8 @@ flowchart LR
 
 *Built so far* ([ADR-154](./13-decision-log.md#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port)): Platform Billing's plans and invoices, in a `billing` schema
 of the one database, each shop's subscription under RLS as cells' data is: Free, Starter, Growth
-and Pro in rupees, paid through Hatti's own Safepay account, the plans' limits on staff and
+and Pro in rupees, paid through Hatti's own Safepay account or by transfer into its bank account
+([ADR-254](./13-decision-log.md#adr-254--a-shop-pays-hattis-invoice-by-transfer-or-raast-into-hattis-own-bank-account-its-owner-giving-the-transfers-reference-hattis-people-confirm-it-once-they-find-it-which-pays-the-invoice-as-a-gateways-payment-does-with-what-its-other-payments-brought-or-refuse-it-saying-why-and-the-owner-hears-either-way)), the plans' limits on staff and
 locations asked through a port; and the credit each shop's messages are paid from, bought the
 same way, which the messaging module charges through a port of its own ([ADR-155](./13-decision-log.md#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)).
 

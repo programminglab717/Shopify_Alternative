@@ -325,6 +325,22 @@ type BankTransferSettingsUpdatePayload {
   userErrors: [UserError!]!
 }
 
+"""
+Hatti's own bank account, which invoices are paid into by transfer or Raast (ADR-254).
+"""
+type BillingBankAccount {
+  bankName: String!
+
+  """Unspaced: "PK36SCBL0000001123456702"."""
+  iban: String!
+
+  """The mobile number its bank registered for Raast, E.164; null for none."""
+  raastId: String
+
+  """The account's title, as its bank shows it."""
+  title: String!
+}
+
 input BillingCreditsBuyInput {
   """How much, in whole rupees, like "1000": Rs 500 to Rs 100,000."""
   amount: String!
@@ -368,9 +384,16 @@ type BillingInvoice {
   price: Money!
   reason: BillingInvoiceReason!
 
-  """The gateway's reference for its payment."""
+  """
+  The reference of the payment that paid it: the gateway's, or the transfer's as the owner gave it.
+  """
   reference: String
   status: BillingInvoiceStatus!
+
+  """
+  The transfers the owner said they made for it, into Hatti's account, the latest first.
+  """
+  transfers: [BillingInvoiceTransfer!]!
 }
 
 type BillingInvoicePayPayload {
@@ -393,14 +416,46 @@ enum BillingInvoiceReason {
 }
 
 enum BillingInvoiceStatus {
-  """Waiting to be paid, with billingInvoicePay."""
+  """
+  Waiting to be paid, with billingInvoicePay, or by transfer into Hatti's account, said with billingInvoiceTransferReport.
+  """
   OPEN
 
-  """Paid through Hatti's gateway: its plan runs for the period paid for."""
+  """
+  Paid, through Hatti's gateway or by transfer: its plan runs for the period paid for.
+  """
   PAID
 
   """No longer due: another choice took its place, or its plan ended."""
   VOID
+}
+
+"""
+A transfer the shop said it made for an invoice, into Hatti's account (ADR-254).
+"""
+type BillingInvoiceTransfer {
+  """What the invoice asked for when it was said."""
+  amount: Money!
+
+  """When Hatti's people confirmed or refused it."""
+  checkedAt: DateTime
+  id: ID!
+
+  """What Hatti's people found in its account, once confirmed."""
+  received: Money
+
+  """The bank's or Raast's reference for it, as the owner gave it."""
+  reference: String!
+
+  """Why Hatti's people refused it."""
+  refusal: String
+  reportedAt: DateTime!
+  status: BillingTransferStatus!
+}
+
+type BillingInvoiceTransferReportPayload {
+  transfer: BillingInvoiceTransfer
+  userErrors: [UserError!]!
 }
 
 """
@@ -481,6 +536,19 @@ type BillingSubscription {
   """The period paid for."""
   periodStart: DateTime
   plan: BillingPlan!
+}
+
+enum BillingTransferStatus {
+  """Found: it paid its invoice, or went towards it."""
+  CONFIRMED
+
+  """
+  Not found as the shop said it, for the reason given: another may be said.
+  """
+  REFUSED
+
+  """Waiting for Hatti's people to find it in Hatti's account."""
+  WAITING
 }
 
 """The credit the shop's messages are paid from (ADR-155)."""
@@ -4661,6 +4729,16 @@ enum MessageKind {
   The shop gave them store credit, by hand or as a refund: how much, and what they have in all (ADR-192).
   """
   STORE_CREDIT_GIVEN
+
+  """
+  For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: Hatti found the transfer it said it made into Hatti's account, which paid its invoice (ADR-254).
+  """
+  TRANSFER_CONFIRMED
+
+  """
+  For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: Hatti did not find the transfer it said it made into Hatti's account, and why (ADR-254).
+  """
+  TRANSFER_REFUSED
 }
 
 enum MessageLanguage {
@@ -4835,6 +4913,18 @@ type Mutation {
   Pays an open invoice through Hatti's own payment gateway: its page to send the owner to. The owner alone, having signed in lately.
   """
   billingInvoicePay(id: ID!): BillingInvoicePayPayload!
+
+  """
+  Says an open invoice was paid by transfer or Raast into Hatti's account (billingBankAccount), with the reference the bank or Raast gave the transfer: Hatti's people find it there, and confirm it, which pays the invoice, or refuse it, saying why. An invoice waits on one transfer at a time, and a reference is given once. The owner alone.
+  """
+  billingInvoiceTransferReport(
+    id: ID!
+
+    """
+    As the bank or Raast wrote it: 4 to 64 letters, numbers, spaces, dots, slashes and dashes.
+    """
+    reference: String!
+  ): BillingInvoiceTransferReportPayload!
 
   """
   Chooses the shop's plan. A bigger one, or any from Free, is invoiced now, less what is left of the current period, and begins once paid with billingInvoicePay; a smaller one, or Free, begins when the period ends. The current plan again drops a change chosen for later. The owner alone, having signed in lately.
@@ -8046,6 +8136,11 @@ type Query {
   The shop's bank account for transfers, whether checkout offers them, and what paying so takes off.
   """
   bankTransferSettings: BankTransferSettings!
+
+  """
+  Hatti's own bank account, which invoices are paid into by transfer or Raast, writing the invoice's name as the transfer's purpose; null where none is set up. Staff need to be the owner or a manager.
+  """
+  billingBankAccount: BillingBankAccount
 
   """The shop's invoices from Hatti, the newest first, 50 at most."""
   billingInvoices(first: Int! = 20): [BillingInvoice!]!

@@ -1,7 +1,9 @@
 import 'reflect-metadata';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { generateAccessToken, type StaffRole } from '@hatti/api';
+import { PublicSite, generateAccessToken, type StaffRole } from '@hatti/api';
+import { BillingService } from '@hatti/billing/public';
 import { base32Decode, totp } from '@hatti/crypto';
+import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import pg from 'pg';
@@ -378,5 +380,102 @@ describe.skipIf(!server)('Admin GraphQL API: what shops pay Hatti', () => {
       [shop, hash, hint],
     );
     expect((await data(app, WALLET)).balance).toEqual({ amount: '1000.00' });
+  });
+
+  it("takes an invoice paid by transfer into Hatti's account, as its owner says, once Hatti finds it (ADR-254)", async () => {
+    const manager = await member('manager');
+    // Owners and managers see Hatti's account, to pay into; its invoices' pages show it too.
+    expect(await data(manager, '{ billingBankAccount { title bankName iban raastId } }')).toEqual({
+      title: 'Hatti Technologies (Private) Limited',
+      bankName: 'Standard Chartered',
+      iban: 'PK36SCBL0000001123456702',
+      raastId: '+923001234567',
+    });
+    const { openInvoice } = await data(owner, SUBSCRIPTION);
+    expect(Number(openInvoice.amount.amount)).toBeLessThan(17_999);
+    expect(
+      (await api.app.inject({ method: 'GET', url: `/billing/invoices/${openInvoice.id}` })).body,
+    ).toContain('PK36 SCBL 0000 0011 2345 6702');
+
+    const REPORT = `mutation ($id: ID!, $reference: String!) {
+      billingInvoiceTransferReport(id: $id, reference: $reference) {
+        transfer { id reference status amount { amount } received { amount } refusal reportedAt
+                   checkedAt }
+        userErrors { field code message } } }`;
+    // The owner alone says it was paid: not a manager.
+    expect(
+      (await gql(manager, REPORT, { id: openInvoice.id, reference: 'FT24100012' })).errors?.[0]
+        .extensions.code,
+    ).toBe('ACCESS_DENIED');
+    expect((await data(owner, REPORT, { id: openInvoice.id, reference: 'FT' })).userErrors).toEqual(
+      [
+        {
+          field: ['reference'],
+          code: 'INVALID',
+          message: 'Give the reference your bank or Raast gave the transfer: 4 characters at least',
+        },
+      ],
+    );
+    const said = await data(owner, REPORT, { id: openInvoice.id, reference: 'FT24100012' });
+    expect(said).toEqual({
+      transfer: {
+        id: expect.stringMatching(/^btr_/),
+        reference: 'FT24100012',
+        status: 'WAITING',
+        // Pro's price, less what was left of the Growth period paid for.
+        amount: openInvoice.amount,
+        received: null,
+        refusal: null,
+        reportedAt: expect.any(String),
+        checkedAt: null,
+      },
+      userErrors: [],
+    });
+
+    // Hatti's people find it, with the system login, and confirm it: the invoice is paid, and
+    // its plan begins.
+    const database = new Database({
+      appUrl: testDb.appUrl,
+      systemUrl: testDb.systemUrl,
+      applicationName: 'billing-transfers-test',
+    });
+    try {
+      const billing = new BillingService(database, new PublicSite('http://localhost:4000'));
+      expect((await billing.waitingTransfers()).map((transfer) => transfer.reference)).toEqual([
+        'FT24100012',
+      ]);
+      expect(
+        await billing.confirmTransfer(fromPublicId(said.transfer.id, 'billingTransfer'), {
+          by: 'Ayesha',
+        }),
+      ).toMatchObject({ outcome: 'paid' });
+    } finally {
+      await database.close();
+    }
+    expect((await data(manager, SUBSCRIPTION)).plan.code).toBe('PRO');
+    const invoices = await data(
+      manager,
+      `{ billingInvoices { id status reference
+           transfers { id status received { amount } checkedAt } } }`,
+    );
+    expect(invoices.find((invoice: Json) => invoice.id === openInvoice.id)).toEqual({
+      id: openInvoice.id,
+      status: 'PAID',
+      reference: 'FT24100012',
+      transfers: [
+        {
+          id: said.transfer.id,
+          status: 'CONFIRMED',
+          received: openInvoice.amount,
+          checkedAt: expect.any(String),
+        },
+      ],
+    });
+    // Each of the others had none said for it.
+    expect(
+      invoices
+        .filter((invoice: Json) => invoice.id !== openInvoice.id)
+        .map((invoice: Json) => invoice.transfers),
+    ).toEqual(invoices.slice(1).map(() => []));
   });
 });

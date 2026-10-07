@@ -369,6 +369,208 @@ describe.skipIf(!server)('Billing', () => {
     expect(PLANS.pro.prices.yearly).toBe(third.price);
   });
 
+  it("pays an invoice by transfer into Hatti's account, once Hatti's people find it (ADR-254)", async () => {
+    const invoice = unwrap(
+      await f.billing.changePlan(f.a, { plan: 'growth', interval: 'monthly' }),
+    ).invoice!;
+    // Its page shows Hatti's account, the IBAN in fours, and its name for the transfer's remarks.
+    const page = invoicePage(await f.billing.pageOf(publicId(invoice.id))).html;
+    expect(page).toContain('PK36 SCBL 0000 0011 2345 6702');
+    expect(page).toContain('0300 1234567');
+    expect(page).toContain(`Write ${invoice.name} in the transfer&#39;s remarks.`);
+    expect(f.billing.bankAccount()).toEqual(f.bank);
+    // A host with no account of Hatti's takes no transfers, and shows none.
+    const unset = await f.unpaid.reportTransfer(f.a, invoice.id, { reference: 'FT24100012' });
+    expect(unset.ok ? null : unset.errors[0]!.message).toBe(
+      "Paying Hatti by transfer isn't set up here",
+    );
+    expect(invoicePage(await f.unpaid.pageOf(publicId(invoice.id))).html).not.toContain('IBAN');
+    expect(f.unpaid.bankAccount()).toBeNull();
+
+    const report = (tenant = f.a, reference = 'FT 2410 0012', id = invoice.id) =>
+      f.billing.reportTransfer(tenant, id, { reference });
+    expect(errorsOf(await report(f.a, ' '))).toEqual([['reference', 'BLANK']]);
+    expect(errorsOf(await report(f.a, 'FT1'))).toEqual([['reference', 'INVALID']]);
+    expect(errorsOf(await report(f.a, 'FT<2410>'))).toEqual([['reference', 'INVALID']]);
+    expect(errorsOf(await report(f.a, 'F'.repeat(65)))).toEqual([['reference', 'TOO_LONG']]);
+    // Another shop's invoice is not found.
+    expect(errorsOf(await report(f.b))).toEqual([['id', 'NOT_FOUND']]);
+
+    const said = unwrap(await report());
+    expect(said).toEqual({
+      id: expect.any(String),
+      invoiceId: invoice.id,
+      reference: 'FT 2410 0012',
+      amount: 6_999_00n,
+      status: 'waiting',
+      received: null,
+      refusal: null,
+      reportedAt: expect.any(Date),
+      checkedAt: null,
+    });
+    // An invoice waits on one transfer at a time.
+    const twice = await report(f.a, 'FT 2410 0013');
+    expect(twice.ok ? null : twice.errors[0]!.message).toBe(
+      `A transfer for invoice ${invoice.name} waits for Hatti to find it`,
+    );
+    // Hatti's people see it waiting, whichever shop said it.
+    expect(await f.billing.waitingTransfers()).toEqual([
+      { ...said, shopId: f.a.shopId, shopName: 'Zari', invoiceName: invoice.name },
+    ]);
+    // A reference is given once, for whichever of the shop's invoices.
+    const credit = unwrap(await f.billing.buyCredits(f.a, { amount: '1000' })).invoice;
+    expect(errorsOf(await report(f.a, 'ft 2410 0012', credit.id))).toEqual([
+      ['reference', 'TAKEN'],
+    ]);
+
+    // Not found as said: refused, saying why, on one line; then checked, it stays so.
+    expect(
+      await f.billing.refuseTransfer(said.id, {
+        by: ' Ayesha ',
+        reason: '  No such transfer\n  reached us.  ',
+      }),
+    ).toEqual({ outcome: 'refused', invoiceName: invoice.name, left: 6_999_00n });
+    expect(await f.billing.refuseTransfer(said.id, { by: 'Ayesha', reason: 'Again' })).toBe(
+      'checked',
+    );
+    expect(await f.billing.confirmTransfer(said.id, { by: 'Ayesha' })).toBe('checked');
+    expect(await f.billing.waitingTransfers()).toEqual([]);
+    // Refused, its reference may be given again: the money may come late.
+    const again = unwrap(await report(f.a, 'ft 2410 0012'));
+    // Found short of the invoice: kept, and the invoice waits for the rest.
+    expect(await f.billing.confirmTransfer(again.id, { by: 'Bilal', received: 6_000_00n })).toEqual(
+      { outcome: 'short', invoiceName: invoice.name, left: 999_00n },
+    );
+    expect((await f.billing.subscriptionOf(f.a.shopId)).plan.code).toBe('free');
+    // The rest, said and found as said: with the first, it pays the invoice, and its plan begins.
+    const rest = unwrap(await report(f.a, 'RAAST-77001'));
+    expect(await f.billing.confirmTransfer(rest.id, { by: 'Bilal', received: 999_00n })).toEqual({
+      outcome: 'paid',
+      invoiceName: invoice.name,
+      left: 0n,
+    });
+    expect(await f.billing.subscriptionOf(f.a.shopId)).toMatchObject({
+      plan: { code: 'growth' },
+      interval: 'monthly',
+      openInvoice: null,
+    });
+    const paid = (await f.billing.invoicesOf(f.a.shopId)).find((each) => each.id === invoice.id);
+    expect(paid).toMatchObject({ status: 'paid', reference: 'RAAST-77001' });
+    expect(
+      (await f.billing.transfersOf(f.a.shopId, [invoice.id]))
+        .get(invoice.id)!
+        .map((each) => [
+          each.reference,
+          each.status,
+          each.received,
+          each.refusal,
+          each.checkedAt instanceof Date,
+        ]),
+    ).toEqual([
+      ['RAAST-77001', 'confirmed', 999_00n, null, true],
+      ['ft 2410 0012', 'confirmed', 6_000_00n, null, true],
+      ['FT 2410 0012', 'refused', null, 'No such transfer reached us.', true],
+    ]);
+    // A paid invoice takes no transfer; the other shop sees none of them.
+    expect(errorsOf(await report(f.a, 'FT 9999 0001'))).toEqual([['id', 'INVALID']]);
+    expect((await f.billing.transfersOf(f.b.shopId, [invoice.id])).get(invoice.id)).toEqual([]);
+    const { rows: checkers } = await f.admin.query<{ checked_by: string }>(
+      `SELECT checked_by FROM billing.payments WHERE gateway = 'bank_transfer'
+        ORDER BY created_at`,
+    );
+    expect(checkers.map((row) => row.checked_by)).toEqual(['Ayesha', 'Bilal', 'Bilal']);
+
+    // Said for credit that was then paid online: found all the same, it is Hatti's to give back.
+    const forCredit = unwrap(await report(f.a, 'IBFT-555', credit.id));
+    unwrap(await f.billing.pay(f.a, credit.id));
+    const { ref } = f.gateway.checkouts.at(-1)!;
+    expect(
+      await f.billing.webhook(f.gateway.webhookFor(f.hatti.account, { ref, amount: 1_000_00n })),
+    ).toBe('paid');
+    expect(await f.billing.confirmTransfer(forCredit.id, { by: 'Bilal' })).toEqual({
+      outcome: 'already_paid',
+      invoiceName: credit.name,
+      left: 0n,
+    });
+    expect(await f.wallet.balanceOf(f.a.shopId)).toBe(1_000_00n);
+    expect(await f.billing.confirmTransfer(newId(), { by: 'Bilal' })).toBe('not_found');
+    expect(await f.billing.refuseTransfer('btr_nothing', { by: 'Bilal', reason: 'x' })).toBe(
+      'not_found',
+    );
+
+    expect(
+      (await f.outbox())
+        .filter((event) => event.event_type.startsWith('billing_invoice.transfer'))
+        .map((event) => [event.event_type, event.payload]),
+    ).toEqual([
+      [
+        'billing_invoice.transfer_reported',
+        { number: invoice.name, amount: '699900', reference: 'FT 2410 0012' },
+      ],
+      [
+        'billing_invoice.transfer_refused',
+        {
+          number: invoice.name,
+          amount: '699900',
+          reference: 'FT 2410 0012',
+          reason: 'No such transfer reached us.',
+        },
+      ],
+      [
+        'billing_invoice.transfer_reported',
+        { number: invoice.name, amount: '699900', reference: 'ft 2410 0012' },
+      ],
+      [
+        'billing_invoice.transfer_confirmed',
+        {
+          number: invoice.name,
+          amount: '699900',
+          reference: 'ft 2410 0012',
+          received: '600000',
+          paid: false,
+        },
+      ],
+      [
+        'billing_invoice.transfer_reported',
+        { number: invoice.name, amount: '699900', reference: 'RAAST-77001' },
+      ],
+      [
+        'billing_invoice.transfer_confirmed',
+        {
+          number: invoice.name,
+          amount: '699900',
+          reference: 'RAAST-77001',
+          received: '99900',
+          paid: true,
+        },
+      ],
+      [
+        'billing_invoice.transfer_reported',
+        { number: credit.name, amount: '100000', reference: 'IBFT-555' },
+      ],
+      [
+        'billing_invoice.transfer_confirmed',
+        {
+          number: credit.name,
+          amount: '100000',
+          reference: 'IBFT-555',
+          received: '100000',
+          paid: false,
+        },
+      ],
+    ]);
+    const { rows: audit } = await f.admin.query<{ action: string; details: unknown }>(
+      `SELECT action, details FROM platform.audit_log WHERE action = 'billing.transfer_reported'
+        ORDER BY occurred_at, id`,
+    );
+    expect(audit.map((row) => row.details)).toEqual([
+      { invoice: invoice.name, reference: 'FT 2410 0012', amount: '699900' },
+      { invoice: invoice.name, reference: 'ft 2410 0012', amount: '699900' },
+      { invoice: invoice.name, reference: 'RAAST-77001', amount: '699900' },
+      { invoice: credit.name, reference: 'IBFT-555', amount: '100000' },
+    ]);
+  });
+
   it("buys message credit with an invoice of its own, the shop's once paid", async () => {
     for (const [amount, code] of [
       ['', 'BLANK'],

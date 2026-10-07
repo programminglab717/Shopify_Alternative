@@ -6,11 +6,10 @@
 
 ## In progress
 
-**Next, the rest of what is left to build** (asked for on 2026-10-07): Hatti's invoices paid by
-bank transfer or Raast, refunds through more gateways, the activity log of staff's changes,
-product videos and crops, a map pin at checkout, and couriers' city names shared across shops;
-then translations removed with what is deleted, and domains checked again. How the Free plan
-holds to its 50 orders a month waits on a decision.
+**Next, the rest of what is left to build** (asked for on 2026-10-07): refunds through more
+gateways, the activity log of staff's changes, product videos and crops, a map pin at checkout,
+and couriers' city names shared across shops; then translations removed with what is deleted,
+and domains checked again. How the Free plan holds to its 50 orders a month waits on a decision.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -19,6 +18,26 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### Hatti's invoices paid by transfer or Raast
+
+* **Paid into Hatti's own account** ([ADR-254](../architecture/13-decision-log.md#adr-254--a-shop-pays-hattis-invoice-by-transfer-or-raast-into-hattis-own-bank-account-its-owner-giving-the-transfers-reference-hattis-people-confirm-it-once-they-find-it-which-pays-the-invoice-as-a-gateways-payment-does-with-what-its-other-payments-brought-or-refuse-it-saying-why-and-the-owner-hears-either-way)): an open
+  invoice's page and `billingBankAccount` show Hatti's account and Raast ID; the owner says they
+  paid with `billingInvoiceTransferReport` and the transfer's reference; Hatti's people list the
+  transfers waiting and confirm or refuse each with `pnpm --filter @hatti/core
+  billing-transfers`, which pays the invoice as a gateway's payment does. The owner hears either
+  way, on WhatsApp and by email.
+* **An invoice is paid by its payments together:** one short of it waits for the rest, which a
+  second transfer brings.
+* **For it:** migration 0157, a transfer's reference and who checked it on `billing.payments`;
+  `BILLING_BANK_TITLE`, `BILLING_BANK_NAME`, `BILLING_BANK_IBAN` and `BILLING_RAAST_ID`;
+  `BillingInvoice.transfers`; the `transfer_confirmed` and `transfer_refused` notices; public
+  IDs `btr_…`.
+* 1807 tests: said, refused, confirmed short and then in full, and confirmed for an invoice
+  paid online; the notices; the settings; through the API end to end.
+* **Before it, b0a6cbe:** the test of staff's alerts of a transfer's receipt sorts them by
+  number: queued in one transaction, they came out in no order of their own, which failed the
+  full suite once.
 
 ### b4aa0ea · Courier pickups through couriers' APIs
 

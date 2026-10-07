@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-253 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-254 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -261,6 +261,7 @@
 | 251 | The shop's storefront has a tracking page where a customer finds their order by its number or a tracking number with the mobile number they ordered with, and sees its parcels' steps but nothing of its address or items | Accepted |
 | 252 | An open shop can pause its storefront for a while: every page answers 503 with a page saying when it is back, and checkout takes no orders, until its staff open it again or the time they set comes | Accepted |
 | 253 | A courier account's parcels waiting to be picked up are handed to its courier through its API, PostEx's load sheet for its pickup address and Leopards' naming the rider who takes them; each pickup keeps its parcels and the courier's sheet, and a parcel its rider missed goes in the next a day later | Accepted |
+| 254 | A shop pays Hatti's invoice by transfer or Raast into Hatti's own bank account, its owner giving the transfer's reference; Hatti's people confirm it once they find it, which pays the invoice as a gateway's payment does, with what its other payments brought, or refuse it, saying why, and the owner hears either way | Accepted |
 
 ---
 
@@ -10475,3 +10476,54 @@
     at the door; its answer and its sheet are wanted at once.
   * **The latest pickup kept on each booking:** a pickup would lose the parcels its rider missed
     once they go in the next.
+
+## ADR-254 · A shop pays Hatti's invoice by transfer or Raast into Hatti's own bank account, its owner giving the transfer's reference; Hatti's people confirm it once they find it, which pays the invoice as a gateway's payment does, with what its other payments brought, or refuse it, saying why, and the owner hears either way
+
+* **Context:** Shops pay Hatti's invoices through Hatti's own gateway account
+  ([ADR-154](#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port)). Many merchants pay their suppliers by IBFT or Raast from their bank's app
+  instead, and BIL-01 asks for bank transfer and Raast beside cards and wallets. Raast's
+  request-to-pay and banks' statement APIs come with partners; until then, Hatti's people read
+  Hatti's own account.
+* **Decision:**
+  * **Hatti's account, set by the host:** `BILLING_BANK_TITLE`, `BILLING_BANK_NAME` and
+    `BILLING_BANK_IBAN`, all three or none, the IBAN checked; and `BILLING_RAAST_ID`, the number
+    its bank registered for Raast, if any. An open invoice's page shows it, the IBAN in fours and
+    the invoice's name for the transfer's remarks, and `billingBankAccount` gives it to the admin.
+    Without it, invoices are not paid by transfer.
+  * **The owner says it was paid:** `billingInvoiceTransferReport` takes the reference the bank or
+    Raast gave the transfer, 4 to 64 letters, numbers, spaces, dots, slashes and dashes, and
+    records it as one of the invoice's payments (`gateway = 'bank_transfer'`, with its
+    `transfer_reference`), for what the invoice asks. The owner alone, as they pay; without
+    signing in again, as it moves no money. An invoice waits on one transfer at a time, a
+    reference is given once in a shop unless it was refused, and an invoice's payments stay 20
+    at most.
+  * **Hatti's people find it:** `pnpm --filter @hatti/core billing-transfers list` shows the
+    transfers waiting, the oldest first, across shops, through the system login; `confirm
+    <transfer> --by <who> [--received <rupees>]` pays its invoice as a gateway's payment does,
+    once, with what came, beginning its plan or adding its credit; `refuse <transfer> --by <who>
+    --reason <why>`. Who checked each is kept with it. For Hatti's own people, by whoever runs
+    Hatti, never through the Admin API, as support agents are made ([ADR-156](#adr-156--hattis-support-looks-at-a-shop-only-while-its-owner-allows-it-15-minutes-to-a-day-its-agents-hattis-own-people-signed-in-with-a-second-factor-come-as-a-caller-of-their-own-with-every-read-scope-numbers-masked-change-nothing-and-each-of-their-requests-goes-on-the-shops-audit-log-before-it-runs)).
+  * **An invoice is paid by what its payments brought together:** one short of it is kept, and
+    the invoice waits for the rest, which a second transfer brings. Gateways' payments are counted
+    so too.
+  * **The owner hears** at Hatti's cost, at the shop's alerts number and their proved email
+    ([ADR-169](#adr-169--hatti-tells-a-shop-on-whatsapp-at-the-number-it-gives-for-hattis-alerts-when-its-plans-next-period-is-invoiced-when-its-plan-ends-unpaid-and-when-its-message-credit-falls-below-rs-100-each-once-queued-with-its-messages-from-billings-events-at-hattis-cost-whatever-its-credit-and-never-turned-off), [ADR-195](#adr-195--a-shops-owner-hears-of-its-bills-with-hatti-by-email-too-at-the-address-their-account-proved-and-in-their-own-language-from-hattis-own-address-the-worker-finds-them-through-identitys-functions-for-the-shop-alone-and-queues-each-email-with-the-shops-messages-at-hattis-cost-with-an-alerts-number-or-without)), when a transfer paid its invoice
+    (`transfer_confirmed`) and when one was refused, with why (`transfer_refused`), from
+    `billing_invoice.transfer_confirmed` and `billing_invoice.transfer_refused`. One short, or
+    for an invoice paid otherwise, Hatti's people take up with the shop themselves.
+    `BillingInvoice.transfers` lists each with its status, what came and why it was refused.
+* **Consequences:**
+  * Shops without a card or wallet pay Hatti from any bank's app; Hatti's people check each by
+    hand until a bank's statement API or Raast's request-to-pay matches them.
+  * A transfer for an invoice paid otherwise is recorded, and is Hatti's to give back by hand.
+  * A transfer waiting does not hold off Free once a plan's week unpaid ends: paying the invoice
+    later begins the plan again, as ADR-154 has it.
+  * The two notices' WhatsApp templates are Meta's to approve before they go, as every one is.
+* **Alternatives:**
+  * **A receipt uploaded, as customers send theirs for orders ([ADR-080](#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)):** the
+    reference finds a transfer in Hatti's statement and asks nothing of storage; receipts can
+    come with a console for Hatti's people.
+  * **An API for Hatti's people:** Hatti has no console of its own yet; a command run by
+    whoever runs Hatti adds no surface anyone else can reach.
+  * **Each payment held to its invoice's amount:** a transfer short of it would leave the
+    invoice unpaid for good, or its rest unrecorded.

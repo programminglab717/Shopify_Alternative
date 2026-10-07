@@ -34,6 +34,8 @@ export enum MessageKind {
   INVOICE_DUE = 'INVOICE_DUE',
   PLAN_ENDED = 'PLAN_ENDED',
   CREDIT_LOW = 'CREDIT_LOW',
+  TRANSFER_CONFIRMED = 'TRANSFER_CONFIRMED',
+  TRANSFER_REFUSED = 'TRANSFER_REFUSED',
 }
 
 registerEnumType(MessageKind, {
@@ -134,6 +136,17 @@ registerEnumType(MessageKind, {
       description:
         "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
         'its message credit fell below Rs 100 (ADR-169, ADR-195).',
+    },
+    TRANSFER_CONFIRMED: {
+      description:
+        "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
+        "Hatti found the transfer it said it made into Hatti's account, which paid its invoice " +
+        '(ADR-254).',
+    },
+    TRANSFER_REFUSED: {
+      description:
+        "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
+        "Hatti did not find the transfer it said it made into Hatti's account, and why (ADR-254).",
     },
   },
 });

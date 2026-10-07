@@ -1,7 +1,12 @@
 import { SecretBox } from '@hatti/crypto';
 import { describe, expect, it } from 'vitest';
-import { hattiGatewayOf } from './billing.js';
-import { loadApiConfig, loadWorkerConfig, passkeysOf } from './config.js';
+import { hattiBankAccountOf, hattiGatewayOf } from './billing.js';
+import {
+  loadApiConfig,
+  loadBillingTransfersConfig,
+  loadWorkerConfig,
+  passkeysOf,
+} from './config.js';
 
 const KEY = 'k'.repeat(32);
 
@@ -201,6 +206,55 @@ describe('API configuration', () => {
     });
     // In production without it: invoices are not paid online.
     expect(hattiGatewayOf({ ...local, NODE_ENV: 'production' })).toBeNull();
+  });
+
+  it("takes Hatti's own bank account whole or not at all, its IBAN and Raast ID checked (ADR-254)", () => {
+    // Without it, invoices are not paid by transfer.
+    expect(hattiBankAccountOf(loadApiConfig(env))).toBeNull();
+    const bank = {
+      BILLING_BANK_TITLE: ' Hatti Technologies (Private) Limited ',
+      BILLING_BANK_NAME: 'Standard Chartered',
+      BILLING_BANK_IBAN: 'pk36 scbl 0000 0011 2345 6702',
+    };
+    expect(
+      hattiBankAccountOf(loadApiConfig({ ...env, ...bank, BILLING_RAAST_ID: '0300-1234567' })),
+    ).toEqual({
+      title: 'Hatti Technologies (Private) Limited',
+      bankName: 'Standard Chartered',
+      iban: 'PK36SCBL0000001123456702',
+      raastId: '+923001234567',
+    });
+    expect(hattiBankAccountOf(loadApiConfig({ ...env, ...bank }))?.raastId).toBeNull();
+    expect(() => loadApiConfig({ ...env, BILLING_BANK_IBAN: bank.BILLING_BANK_IBAN })).toThrow(
+      'BILLING_BANK_IBAN: Set BILLING_BANK_TITLE, BILLING_BANK_NAME and BILLING_BANK_IBAN ' +
+        'together, or none',
+    );
+    expect(() =>
+      loadApiConfig({ ...env, ...bank, BILLING_BANK_IBAN: 'PK36SCBL0000001123456703' }),
+    ).toThrow('BILLING_BANK_IBAN: Expected a Pakistani IBAN');
+    expect(() => loadApiConfig({ ...env, ...bank, BILLING_RAAST_ID: '042-111-222-333' })).toThrow(
+      'BILLING_RAAST_ID: Expected a Pakistani mobile number',
+    );
+    expect(() => loadApiConfig({ ...env, BILLING_RAAST_ID: '03001234567' })).toThrow(
+      "BILLING_RAAST_ID: Set Hatti's account with BILLING_BANK_IBAN first",
+    );
+  });
+});
+
+describe("Hatti's people's transfers tool (ADR-254)", () => {
+  it('reads the app and system logins, and where the API answers', () => {
+    expect(
+      loadBillingTransfersConfig({
+        DATABASE_URL: env.DATABASE_URL,
+        DATABASE_SYSTEM_URL: 'postgres://hatti_system:secret@localhost:5432/hatti',
+      }),
+    ).toEqual({
+      DATABASE_URL: env.DATABASE_URL,
+      DATABASE_SYSTEM_URL: 'postgres://hatti_system:secret@localhost:5432/hatti',
+    });
+    expect(() => loadBillingTransfersConfig({ DATABASE_URL: env.DATABASE_URL })).toThrow(
+      'DATABASE_SYSTEM_URL',
+    );
   });
 });
 
