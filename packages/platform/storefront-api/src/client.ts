@@ -6,6 +6,7 @@ import {
   CLIENT_USER_AGENT_HEADER,
   cartPath,
   checkoutsPath,
+  paymentLinkPath,
   type CartActionName,
   type CartBodies,
   type CartChangeResponse,
@@ -17,6 +18,7 @@ import {
   type CheckoutPageResponse,
   type CheckoutStartRequest,
   type CheckoutStartResponse,
+  type PaymentLinkOpenResponse,
   type StorefrontVisit,
 } from './cart.js';
 import {
@@ -126,6 +128,24 @@ export class StorefrontApiClient {
       return { ok: false, error: ((await response.json()) as CartErrorResponse).error };
     }
     throw new StorefrontApiError(response.status, await response.text());
+  }
+
+  /**
+   * Opens the shop's payment link `token` (ADR-248) for a shopper whom `visits` brought: where to
+   * send them, a checkout of their own; or the page saying why not, to send as it is.
+   */
+  async openPaymentLink(
+    shopId: string,
+    token: string,
+    visits: StorefrontVisit[] = [],
+  ): Promise<PaymentLinkOpenResponse> {
+    const body: CheckoutStartRequest = visits.length > 0 ? { visits } : {};
+    const path = paymentLinkPath(shopId, encodeURIComponent(token));
+    const response = await this.#request('POST', path, null, body);
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return (await response.json()) as PaymentLinkOpenResponse;
   }
 
   /**

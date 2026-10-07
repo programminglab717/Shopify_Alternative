@@ -154,7 +154,9 @@ export type CodRefusal =
    * The shop's risk rules scored it at the shop's limit or above (ADR-099): known only once it is
    * placed.
    */
-  | { reason: 'risk' };
+  | { reason: 'risk' }
+  /** It was opened from a payment link the shop takes prepaid alone (ADR-248). */
+  | { reason: 'link' };
 
 /** A product in an order, as the shop's rules for cash on delivery see it. */
 export interface CodProduct {

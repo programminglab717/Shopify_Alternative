@@ -20,6 +20,7 @@ export type CoreBackend = Pick<
   | 'read'
   | 'act'
   | 'startCheckout'
+  | 'openPaymentLink'
   | 'checkoutPage'
   | 'search'
   | 'searchContent'

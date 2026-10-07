@@ -29,6 +29,14 @@ export function checkoutsPath(shopId: string, token?: string): string {
 }
 
 /**
+ * Where the storefront opens the shop's payment link `token` (ADR-248): a POST, with the visits
+ * that brought the shopper.
+ */
+export function paymentLinkPath(shopId: string, token: string): string {
+  return `${STOREFRONT_API_PREFIX}shops/${shopId}/payment-links/${token}`;
+}
+
+/**
  * Carry, with the POST that places an order, where the shopper placed it from: the address and
  * `User-Agent` their browser gave the storefront, which the order keeps as what it agreed from
  * (ADR-057).
@@ -124,6 +132,13 @@ export type CheckoutPageResponse =
   | { placed: true; proof?: string }
   | { placed: false; redirect: string }
   | { placed: false; status: number; headers: Record<string, string>; html: string };
+
+/**
+ * What opening a payment link (ADR-248) comes to: where to send the shopper, a checkout of their
+ * own with the link's items; or the page saying why there is none, with its status and headers.
+ */
+export type PaymentLinkOpenResponse =
+  CheckoutStartResponse | { status: number; headers: Record<string, string>; html: string };
 
 /** A line of the cart: by its key, by its variant (the first line with it), or by place, from 1. */
 export type LineRef = { key: string } | { variantId: string } | { index: number };

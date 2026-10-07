@@ -73,6 +73,7 @@ export const ID_PREFIXES = {
   paymentGatewayAccount: 'pga',
   paymentSession: 'psn',
   paymentRefund: 'prf',
+  paymentLink: 'plnk',
   billingInvoice: 'binv',
   billingWalletEntry: 'bwe',
   return: 'ret',

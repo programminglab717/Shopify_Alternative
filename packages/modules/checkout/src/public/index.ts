@@ -35,12 +35,20 @@ export {
   type DeliveryZoneRecord,
 } from '../internal/delivery.js';
 export { DeliveryService } from '../internal/delivery.service.js';
+export { PaymentLinkService, type PaymentLinkOpening } from '../internal/payment-link.service.js';
+export {
+  PAYMENT_LINK_LIMITS,
+  PAYMENT_LINK_PATH,
+  type PaymentLinkInput,
+  type PaymentLinkRecord,
+} from '../internal/payment-links.js';
 export { CheckoutExpiry, EXPIRY_BATCH, type ExpiredCounts } from '../internal/expiry.service.js';
 export {
   CheckoutEvents,
   type CodSettingsUpdatedPayload,
   type DeliverySettingsUpdatedPayload,
   type MarketingOptionsUpdatedPayload,
+  type PaymentLinkChangedPayload,
   type TrustBadgesUpdatedPayload,
 } from '../internal/events.js';
 export { DEFAULT_MARKETING_CHANNELS, MARKETING_FIELDS } from '../internal/marketing.js';

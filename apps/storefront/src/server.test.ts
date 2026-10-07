@@ -24,6 +24,7 @@ import {
   type CartJson,
   type CheckoutClient,
   type CheckoutPageResponse,
+  type PaymentLinkOpenResponse,
   type ContentSearchOptions,
   type ContentSearchResponse,
   type SearchOptions,
@@ -309,6 +310,23 @@ class FakeCore {
     return cart && cart.itemCount > 0
       ? { ok: true, path: '/checkouts/c-secret', url: 'http://core.test/checkouts/c-secret' }
       : { ok: false, error: { code: 'EMPTY' } };
+  }
+
+  /** The payment links opened, by token, with the visits; what opening one comes to. */
+  readonly links: { token: string; visits: StorefrontVisit[] }[] = [];
+  link: PaymentLinkOpenResponse | Error = {
+    path: '/checkouts/l-secret',
+    url: 'http://core.test/checkouts/l-secret',
+  };
+
+  async openPaymentLink(
+    _shopId: string,
+    token: string,
+    visits: StorefrontVisit[] = [],
+  ): Promise<PaymentLinkOpenResponse> {
+    this.links.push({ token, visits });
+    if (this.link instanceof Error) throw this.link;
+    return this.link;
   }
 
   async checkoutPage(
@@ -925,6 +943,64 @@ describe('Carts', () => {
       '/cart',
       undefined,
     ]);
+    await app.close();
+  });
+
+  it('opens a payment link to a checkout of its own, or sends the page saying why not', async () => {
+    const app = server();
+    const opened = await app.inject({
+      method: 'GET',
+      url: '/pay/AbCdEfGhIjKlMnOpQrStUv?utm_source=instagram',
+      headers: { host: 'localhost', cookie: 'cart=own-1', 'sec-fetch-site': 'cross-site' },
+    });
+    expect([opened.statusCode, opened.headers.location]).toEqual([303, '/checkouts/l-secret']);
+    expect(opened.headers['cache-control']).toBe('private, no-store');
+    // The link is where the shopper landed, which their checkout keeps (ADR-139).
+    expect(core.links).toEqual([
+      {
+        token: 'AbCdEfGhIjKlMnOpQrStUv',
+        visits: [
+          {
+            occurredAt: expect.any(String),
+            landingPage: 'http://localhost/pay/AbCdEfGhIjKlMnOpQrStUv?utm_source=instagram',
+            referrerUrl: null,
+          },
+        ],
+      },
+    ]);
+    // Their own cart is left as it is.
+    expect([core.actions, core.started]).toEqual([[], []]);
+
+    // Closed: the core's page, as it is.
+    core.link = {
+      status: 410,
+      headers: { 'content-type': 'text/html; charset=utf-8', 'x-robots-tag': 'noindex' },
+      html: '<p>This link no longer takes orders</p>',
+    };
+    const closed = await app.inject({
+      method: 'GET',
+      url: '/ur/pay/AbCdEfGhIjKlMnOpQrStUv',
+      headers: { host: 'localhost' },
+    });
+    expect([closed.statusCode, closed.headers['x-robots-tag'], closed.body]).toEqual([
+      410,
+      'noindex',
+      '<p>This link no longer takes orders</p>',
+    ]);
+    // A HEAD request opens nothing; with the core away, the shopper is told so.
+    const head = await app.inject({
+      method: 'HEAD',
+      url: '/pay/AbCdEfGhIjKlMnOpQrStUv',
+      headers: { host: 'localhost' },
+    });
+    expect([head.statusCode, head.headers.location, core.links.length]).toEqual([302, '/', 2]);
+    core.link = new StorefrontApiError(503, 'down');
+    const away = await app.inject({
+      method: 'GET',
+      url: '/pay/AbCdEfGhIjKlMnOpQrStUv',
+      headers: { host: 'localhost' },
+    });
+    expect(away.statusCode).toBe(503);
     await app.close();
   });
 

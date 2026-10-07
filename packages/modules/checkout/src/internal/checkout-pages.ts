@@ -57,6 +57,7 @@ import {
   type CheckoutProblem,
   type CheckoutShop,
   type CheckoutView,
+  type ClosedLinkReason,
 } from './checkout.service.js';
 import { deliveryDays, type DeliveryDays, type DeliverySettingsRecord } from './delivery.js';
 import { MARKETING_FIELDS, marketingTicked, marketingWords } from './marketing.js';
@@ -118,6 +119,34 @@ interface Sentence {
   ur: HtmlValue;
 }
 
+/** What the page says of a payment link that opens no checkout (ADR-248), and with what status. */
+const CLOSED_LINK_WORDS = {
+  not_found: {
+    status: 404,
+    title: { en: "This link doesn't exist", ur: 'یہ لنک موجود نہیں' },
+    next: {
+      en: 'Check the link you were sent, or order from the online store.',
+      ur: 'آپ کو بھیجا گیا لنک دیکھیں، یا آن لائن اسٹور سے آرڈر کریں۔',
+    },
+  },
+  closed: {
+    status: 410,
+    title: { en: 'This link no longer takes orders', ur: 'یہ لنک اب آرڈر نہیں لیتا' },
+    next: {
+      en: 'Ask the shop for a new link, or order from its online store.',
+      ur: 'دکان سے نیا لنک مانگیں، یا اس کے آن لائن اسٹور سے آرڈر کریں۔',
+    },
+  },
+  sold_out: {
+    status: 200,
+    title: { en: 'This is sold out for now', ur: 'یہ ابھی دستیاب نہیں' },
+    next: {
+      en: 'Ask the shop when it will be back, or see what else it has.',
+      ur: 'دکان سے پوچھیں کہ یہ دوبارہ کب آئے گا، یا اس کی دوسری چیزیں دیکھیں۔',
+    },
+  },
+} satisfies Record<ClosedLinkReason, { status: number; title: Words; next: Sentence }>;
+
 /**
  * The page a checkout shows (ADR-044): the cart to order, with the form for who receives it and
  * where; once placed, the order; or why there is nothing to show. In English and Urdu, as
@@ -149,6 +178,15 @@ export function checkoutPage(view: CheckoutView): CheckoutPage {
         ),
         link(`${view.shop.storefront}/cart`, LABELS.backToCart),
       ]);
+    case 'closed': {
+      const words = CLOSED_LINK_WORDS[view.reason];
+      return page(words.status, `${words.title.en} · ${view.shop.name}`, view.shop, [
+        shopName(view.shop),
+        heading(words.title),
+        paragraphs(words.next, 'center muted'),
+        link(view.shop.storefront, LABELS.continueShopping),
+      ]);
+    }
     case 'empty':
       return page(200, `${LABELS.emptyTitle.en} · ${view.shop.name}`, view.shop, [
         shopName(view.shop),
@@ -1045,6 +1083,16 @@ function codRefusalWords(refusal: CodRefusal, ways: PrepaidWays): Sentence {
         en: `Cash on delivery isn't available for this order.${instead.en}`,
         ur: `اس آرڈر کے لیے ڈیلیوری پر نقد ادائیگی دستیاب نہیں۔${instead.ur}`,
       };
+    case 'link':
+      return by
+        ? {
+            en: `This link is for paying in advance. Pay ${by.en} to place your order.`,
+            ur: `یہ لنک پیشگی ادائیگی کے لیے ہے۔ آرڈر دینے کے لیے ${by.ur} ادائیگی کریں۔`,
+          }
+        : {
+            en: `This link is for paying in advance.${instead.en}`,
+            ur: `یہ لنک پیشگی ادائیگی کے لیے ہے۔${instead.ur}`,
+          };
     // Softly: what the shop asks of the order, not what its checks found (ADR-099).
     case 'risk':
       return by

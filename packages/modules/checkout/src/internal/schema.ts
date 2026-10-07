@@ -18,6 +18,7 @@ import type { MarketingChannelValue } from '@hatti/customers/public';
 import type { AttributionValue } from '@hatti/orders/public';
 import type { StoredLine } from './cart-lines.js';
 import type { CodAdvanceValue } from './cod-rules.js';
+import type { PaymentLinkItemValue } from './payment-links.js';
 import type { TrustBadgeValue } from './trust-badges.js';
 
 export const checkoutSchema = pgSchema('checkout');
@@ -64,6 +65,8 @@ export const checkouts = checkoutSchema.table(
      * began (ADR-139), for the order placed; null when it knew no visit.
      */
     attribution: jsonb('attribution').$type<AttributionValue>(),
+    /** The payment link it was opened from (ADR-248), whose rules it keeps; null for a cart's. */
+    paymentLinkId: uuid('payment_link_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
@@ -72,6 +75,36 @@ export const checkouts = checkoutSchema.table(
 );
 
 export type CheckoutRow = typeof checkouts.$inferSelect;
+
+/**
+ * A link many customers open, each to a checkout of their own with its items (PAY-04, ADR-248).
+ */
+export const paymentLinks = checkoutSchema.table(
+  'payment_links',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    /** In its address, /pay/<token>; kept as it is, since the shop copies it again. */
+    token: text('token').notNull(),
+    title: text('title').notNull(),
+    items: jsonb('items').$type<PaymentLinkItemValue[]>().notNull(),
+    discountCode: text('discount_code'),
+    prepaidOnly: boolean('prepaid_only').notNull().default(false),
+    usageLimit: integer('usage_limit'),
+    ordersPlaced: integer('orders_placed').notNull().default(0),
+    lastOrderAt: timestamp('last_order_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.shopId, table.id] }),
+    unique().on(table.shopId, table.token),
+  ],
+);
+
+export type PaymentLinkRow = typeof paymentLinks.$inferSelect;
 
 /** A delivery zone as kept: its charge in minor units, as text, since JSON has no bigint. */
 export interface StoredZone {

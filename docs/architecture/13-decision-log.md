@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-06 (ADR-033 to ADR-247 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-248 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -255,6 +255,7 @@
 | 245 | The shop's own words for its home page may be translated into Urdu, the shop a translatable resource of its own by its own ID as Shopify's `SHOP` is; its document carries them beside its own words, and its Urdu pages show them | Accepted |
 | 246 | A courier's statement may come as the Excel workbook it was sent as, read from its first sheet shown by a reader of Hatti's own, under a header found below the courier's title rows; and other cash on a parcel paid short before pays what its order still owes | Accepted |
 | 247 | Staff hear on WhatsApp the moment a customer sends the receipt of their transfer for an order still waiting for it: whoever has the order, else the shop's owners and managers, once a receipt | Accepted |
+| 248 | A payment link the shop shares once opens a checkout of each customer's own, with its items and discount code, until staff close it, its time passes or its orders run out; one taken prepaid alone offers no cash on delivery | Accepted |
 
 ---
 
@@ -10266,3 +10267,43 @@
   * **Telling everyone who may mark orders paid:** packers and agents would hear of money they
     do not look for.
   * **A digest of receipts every few hours:** the customer would wait for it.
+
+## ADR-248 · A payment link the shop shares once opens a checkout of each customer's own, with its items and discount code, until staff close it, its time passes or its orders run out; one taken prepaid alone offers no cash on delivery
+
+* **Context:** Shops sell in Instagram comments and WhatsApp groups, where one post reaches many
+  buyers. A draft's or an order's link is one customer's ([ADR-031](#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)), and a cart
+  permalink ([ADR-065](#adr-065--a-cart-permalink-begins-a-cart-of-its-own-and-goes-to-its-checkout-leaving-the-shoppers-cart-as-it-is)) can't be closed, counted, kept to paying first, or changed
+  without a new address. PAY-04 asks for links that many customers pay through.
+* **Decision:**
+  * **A link of the shop's:** staff make one through the Admin API (`paymentLinkCreate`,
+    `paymentLinkUpdate`, `paymentLinks`) with up to 20 items of the shop's variants, a title for
+    themselves, and if they like a discount code, a limit of orders, a time it closes, and
+    prepaid alone. Its address is on the shop's storefront, `/pay/<token>`, 128 random bits;
+    the token is kept as it is, so staff can copy the link again, since it names a public offer
+    and opens nothing private. The checkout module keeps it, `checkout.payment_links`.
+  * **Opening it:** each GET of the address, as a permalink's, gives the shopper a cart of their
+    own with the items, sold-out ones left out, the code applied, and a checkout of it that
+    names the link, their own cart left as it is; the visits that brought them go with it
+    ([ADR-139](#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)). Nothing to order shows a page saying it is sold out; a closed link or
+    an address the shop lacks shows its own page, in the shop's colours and both languages.
+  * **Its rules held to the order:** the checkout keeps the link, and every view and placing
+    reads it again, placing with its row locked: once it closes, its open checkouts say so and
+    place nothing, and the last order a limit allows is the last placed. Placing counts the
+    order on the link and its timeline says it came through the link by name.
+  * **Prepaid alone:** its checkouts give cash on delivery a reason of its own, `link`, so the
+    page offers transfer and paying online ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)) and says why; without either,
+    it says to ask the shop.
+* **Consequences:**
+  * One post sells to many customers, each with an address, a number and an order of their own,
+    the shop's rules for checkout applied to each.
+  * Staff see how many orders a link took and when the last came, and close it at once.
+  * A link's items are products at their prices: an amount alone, of no product, waits for
+    orders to take items of no product.
+  * A link preview opens a cart and checkout that no one uses, which expire as any do.
+* **Alternatives:**
+  * **Links in the orders module, placing orders without checkout:** would repeat checkout's
+    rules for paying, delivery, codes, limits and agreement.
+  * **Counting a link's orders from its checkouts:** expired checkouts are swept, and their
+    count with them.
+  * **Keeping only a digest of the token, as for single customers' links:** staff could not copy
+    the link again, and there is nothing private behind it.

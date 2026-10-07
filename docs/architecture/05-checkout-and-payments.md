@@ -470,6 +470,9 @@ An order waiting for its money, from checkout, a draft or staff, can be paid onl
 through the shop's own gateway account, and one placed at checkout from its thank-you page too:
 its link is the payment link
 ([ADR-151](./13-decision-log.md#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)).
+A link many customers pay through is the shop's to share once, on Instagram or WhatsApp: each who
+opens it gets a checkout of their own with its items and discount code, paid before it ships if
+the shop asks, until staff close it, its time passes or its orders run out ([ADR-248](./13-decision-log.md#adr-248--a-payment-link-the-shop-shares-once-opens-a-checkout-of-each-customers-own-with-its-items-and-discount-code-until-staff-close-it-its-time-passes-or-its-orders-run-out-one-taken-prepaid-alone-offers-no-cash-on-delivery)).
 
 ---
 

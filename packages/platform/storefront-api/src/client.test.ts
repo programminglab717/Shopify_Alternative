@@ -98,6 +98,33 @@ describe('StorefrontApiClient', () => {
     expect(await requests[2]!.json()).toEqual({ visits: [visit] });
   });
 
+  it('opens a payment link, with the visits that brought the shopper', async () => {
+    const closed = { status: 410, headers: { 'x-a': '1' }, html: '<p>Closed</p>' };
+    const { client, requests } = clientAnswering((request) =>
+      request.url.endsWith('/open-link')
+        ? Response.json({ path: '/checkouts/c', url: 'http://core.test/checkouts/c' })
+        : request.url.endsWith('/closed-link')
+          ? Response.json(closed)
+          : new Response('down', { status: 503 }),
+    );
+    const visit = {
+      occurredAt: '2026-10-01T09:30:00.000Z',
+      landingPage: 'https://zari.pk/pay/open-link',
+      referrerUrl: 'https://l.instagram.com/',
+    };
+    expect(await client.openPaymentLink('shop-1', 'open-link', [visit])).toEqual({
+      path: '/checkouts/c',
+      url: 'http://core.test/checkouts/c',
+    });
+    expect([requests[0]!.method, requests[0]!.url]).toEqual([
+      'POST',
+      'http://core.test/storefront/shops/shop-1/payment-links/open-link',
+    ]);
+    expect(await requests[0]!.json()).toEqual({ visits: [visit] });
+    expect(await client.openPaymentLink('shop-1', 'closed-link')).toEqual(closed);
+    await expect(client.openPaymentLink('shop-1', 'down')).rejects.toThrow(StorefrontApiError);
+  });
+
   it("fetches a checkout's page, and posts its form as JSON with where it came from", async () => {
     const page = { placed: false, status: 200, headers: { 'x-a': '1' }, html: '<p>Hi</p>' };
     const { client, requests } = clientAnswering((request) =>

@@ -14,6 +14,7 @@ import {
   type CheckoutPageResponse,
   type CheckoutStartRequest,
   type CheckoutStartResponse,
+  type PaymentLinkOpenResponse,
 } from '@hatti/storefront-api';
 import {
   Body,
@@ -33,6 +34,7 @@ import {
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { checkoutPage } from './checkout-pages.js';
 import { MARKETING_FIELDS } from './marketing.js';
+import { PaymentLinkService } from './payment-link.service.js';
 import {
   CHECKOUT_PATH,
   CheckoutService,
@@ -214,6 +216,51 @@ export class StorefrontCheckoutController {
     };
     const view = await posted(this.checkouts, token, body, { shopId, client });
     return responseOf(view, true);
+  }
+}
+
+/**
+ * The shop's payment links as the storefront opens them (ADR-248): `POST
+ * …/payment-links/{token}`, with the visits that brought the shopper as a checkout's start has
+ * them, gives where to send the shopper, a checkout of their own with the link's items; or, when
+ * it opens none, the page saying why, to send as it is. The storefront opens it for each GET
+ * of its address, as it follows a cart permalink. The host application checks the storefront key
+ * before any of this runs.
+ */
+@Controller('storefront/shops/:shopId/payment-links')
+export class StorefrontPaymentLinkController {
+  constructor(
+    private readonly links: PaymentLinkService,
+    private readonly checkouts: CheckoutService,
+    private readonly site: PublicSite,
+  ) {}
+
+  @Post(':token')
+  @HttpCode(200)
+  @Header('cache-control', 'no-store')
+  async open(
+    @Param('shopId') shopId: string,
+    @Param('token') token: string,
+    @Body() body: unknown,
+  ): Promise<PaymentLinkOpenResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const visits = (body as CheckoutStartRequest | null)?.visits;
+    const opened = await this.links.open(shopId, token, visits);
+    if (opened.kind === 'checkout') {
+      const path = checkoutPagePath(opened.secret);
+      return { path, url: this.site.url(path) };
+    }
+    const reason = opened.kind === 'unavailable' ? 'sold_out' : opened.kind;
+    const page = checkoutPage(await this.checkouts.linkPageView(shopId, reason));
+    return {
+      status: page.status,
+      headers: {
+        ...PRIVATE_PAGE_HEADERS,
+        'content-security-policy': page.contentSecurityPolicy,
+        'content-type': 'text/html; charset=utf-8',
+      },
+      html: page.html,
+    };
   }
 }
 

@@ -154,6 +154,7 @@ function openView(
     attribution: null,
     storeCredit: false,
     marketing: [],
+    paymentLink: null,
     ...changes,
   };
 }

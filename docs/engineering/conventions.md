@@ -1612,6 +1612,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   `permalinkItems` reads the path, and the storefront adds the items to a new cart, applies the
   link's `discount`, `note` and `attributes`, and starts the checkout; it never touches the
   shopper's cart cookie. A placed order's count cookie is the shopper's own cart's.
+* **A payment link, `/pay/<token>`, opens a checkout of its own** for each shopper
+  ([ADR-248](../architecture/13-decision-log.md#adr-248--a-payment-link-the-shop-shares-once-opens-a-checkout-of-each-customers-own-with-its-items-and-discount-code-until-staff-close-it-its-time-passes-or-its-orders-run-out-one-taken-prepaid-alone-offers-no-cash-on-delivery)): the
+  storefront asks the core's `…/payment-links/{token}`, which builds the cart from the link and
+  starts a checkout naming it; a link's rules are read again by every view and placing of its
+  checkouts, placing with the link's row locked, so a closed link places nothing.
 * **A shopper is sent only along paths on the shop**: a `return_to`, a link's `redirect` or a
   `sections_url` goes through `localPath` (`apps/storefront/src/server.ts`), which reads it as a
   browser will. A pattern on the text is not enough: `/%09/elsewhere.example` passes

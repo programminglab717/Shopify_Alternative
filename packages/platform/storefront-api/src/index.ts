@@ -12,6 +12,7 @@ export {
   PRODUCT_FEED_PATH,
   checkoutPagePath,
   checkoutsPath,
+  paymentLinkPath,
   type CartActionName,
   type CartAddBody,
   type CartBodies,
@@ -30,6 +31,7 @@ export {
   type CheckoutPageResponse,
   type CheckoutStartRequest,
   type CheckoutStartResponse,
+  type PaymentLinkOpenResponse,
   type LineRef,
   type StorefrontVisit,
 } from './cart.js';

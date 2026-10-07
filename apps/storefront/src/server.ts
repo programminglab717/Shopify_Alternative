@@ -881,6 +881,15 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     landed = false,
   ) => {
     if (!core) throw new StorefrontApiError(503, 'This storefront keeps no carts');
+    const started = await core.startCheckout(shopId, token, checkoutVisits(request, reply, landed));
+    return reply.redirect(started.ok ? started.path : `${urdu ? '/ur' : ''}/cart`, 303);
+  };
+
+  /**
+   * The visits that brought the shopper to a checkout they begin (ADR-139), this request among
+   * them, which the visits cookie keeps; `landed` when it is where they came in.
+   */
+  const checkoutVisits = (request: FastifyRequest, reply: FastifyReply, landed: boolean) => {
     const now = Math.floor(Date.now() / 1000);
     const host = request.headers.host ?? '';
     const url = new URL(request.url, 'http://storefront');
@@ -888,13 +897,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const path = `${url.pathname}${url.search}`;
     const after = visitsAfter(kept, { path, host, referrer: request.headers.referer, landed }, now);
     if (after) reply.header('set-cookie', visitsCookie(after, { secure }));
-    const origin = `${secure ? 'https' : 'http'}://${host}`;
-    const started = await core.startCheckout(
-      shopId,
-      token,
-      storefrontVisits(after ?? kept, origin),
-    );
-    return reply.redirect(started.ok ? started.path : `${urdu ? '/ur' : ''}/cart`, 303);
+    return storefrontVisits(after ?? kept, `${secure ? 'https' : 'http'}://${host}`);
   };
 
   /** The core could not be reached, as when it restarts: said so, rather than failing. */
@@ -1343,6 +1346,37 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
   };
   app.route({ method: ['GET', 'POST'], url: '/checkouts/:token', handler: checkoutPage });
+
+  /**
+   * A payment link (ADR-248), `/pay/{token}`, which a shop shares once, on WhatsApp, Instagram or
+   * anywhere: each shopper who opens it gets a checkout of their own with the link's items, kept
+   * apart from their own cart, as a cart permalink's is; or the core's page saying why not, such
+   * as once the link closed. Links come from anywhere, so one followed from another site is
+   * taken, at most {@link CART_CHANGES} a minute from an address; a HEAD request changes nothing.
+   */
+  const paymentLink = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    reply.header('cache-control', 'private, no-store');
+    const urdu = request.url.startsWith('/ur/');
+    if (request.method !== 'GET') return reply.redirect(urdu ? '/ur' : '/', 302);
+    const { token } = request.params as { token: string };
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no carts');
+      if (await changedTooMuch(request)) return await tooMany(reply);
+      const opened = await core.openPaymentLink(
+        found.shopId,
+        token,
+        checkoutVisits(request, reply, true),
+      );
+      if ('path' in opened) return await reply.redirect(opened.path, 303);
+      return await reply.code(opened.status).headers(opened.headers).send(opened.html);
+    } catch (error) {
+      if (!unreachable(request, error)) throw error;
+      return unavailable(reply);
+    }
+  };
+  for (const path of ['/pay/:token', '/ur/pay/:token']) app.get(path, paymentLink);
 
   /** Whether the address has asked for more searches this minute than {@link SEARCHES} allows. */
   const searchedTooMuch = async (request: FastifyRequest): Promise<boolean> =>

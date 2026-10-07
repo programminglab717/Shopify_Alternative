@@ -6,15 +6,30 @@
 
 ## In progress
 
-**Payment links for many customers** (PAY-04): a link the shop shares once, on WhatsApp or
-Instagram, for a product or an amount, that many customers pay through, online or by transfer,
-each placing an order of their own, beside the links of single orders and drafts.
+**Checkout codes limited by internet address** (CHK-09, CHK-18): the one-time codes checkout
+sends, capped for each internet address as well as for each number, so that one address can't
+spend a shop's message credits on codes to many numbers.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
+
+## 2026-10-07
+
+### Payment links for many customers
+
+* **A link the shop shares once** ([ADR-248](../architecture/13-decision-log.md#adr-248--a-payment-link-the-shop-shares-once-opens-a-checkout-of-each-customers-own-with-its-items-and-discount-code-until-staff-close-it-its-time-passes-or-its-orders-run-out-one-taken-prepaid-alone-offers-no-cash-on-delivery)): staff make it through
+  the Admin API with items, a code, a limit of orders, a time it closes, and prepaid alone if
+  they like; each customer who opens `/pay/<token>` on the storefront gets a checkout of their
+  own and places an order of their own, until staff close it, its time passes or its orders run
+  out, its open checkouts then placing nothing.
+* **For it:** migration 0153, `checkout.payment_links` and the link a checkout names; the
+  checkout's page says why a link opens nothing, and why one prepaid alone takes no cash on
+  delivery; the storefront API opens links; public IDs `plnk_…`.
+* 1783 tests: links made, refused, changed and listed; checkouts of their own, counted,
+  closed and used up; prepaid alone; the storefront's route; through the API end to end.
 
 ## 2026-10-06
 

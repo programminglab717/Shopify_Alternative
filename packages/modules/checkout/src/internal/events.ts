@@ -7,6 +7,8 @@ export const CheckoutEvents = {
   CodSettingsUpdated: 'cod_settings.updated',
   TrustBadgesUpdated: 'trust_badges.updated',
   MarketingOptionsUpdated: 'marketing_options.updated',
+  PaymentLinkCreated: 'payment_link.created',
+  PaymentLinkUpdated: 'payment_link.updated',
 } as const;
 
 /** The shop changed what it charges for delivery. */
@@ -34,4 +36,13 @@ export interface TrustBadgesUpdatedPayload {
 export interface MarketingOptionsUpdatedPayload {
   /** The channels now, in the page's order: "whatsapp", "email". */
   channels: string[];
+}
+
+/** Staff made a payment link (ADR-248), or changed one. */
+export interface PaymentLinkChangedPayload {
+  /**
+   * What changed: "title", "items", "discountCode", "prepaidOnly", "usageLimit", "expiresAt" or
+   * "active"; none for a new link.
+   */
+  changed: string[];
 }

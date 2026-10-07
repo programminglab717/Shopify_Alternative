@@ -6,7 +6,11 @@ import { OrdersModule } from '@hatti/orders/public';
 import { Module } from '@nestjs/common';
 import { CartController } from './cart.controller.js';
 import { CartService } from './cart.service.js';
-import { CheckoutController, StorefrontCheckoutController } from './checkout.controller.js';
+import {
+  CheckoutController,
+  StorefrontCheckoutController,
+  StorefrontPaymentLinkController,
+} from './checkout.controller.js';
 import { CheckoutService } from './checkout.service.js';
 import { CodRulesService } from './cod-rules.service.js';
 import { CheckoutCustomerData } from './customer-data.js';
@@ -14,8 +18,10 @@ import { DeliveryService } from './delivery.service.js';
 import { CodRulesResolver } from './graphql/cod-rules.resolver.js';
 import { DeliveryResolver } from './graphql/delivery.resolver.js';
 import { CheckoutMarketingResolver } from './graphql/marketing.resolver.js';
+import { PaymentLinkResolver } from './graphql/payment-link.resolver.js';
 import { TrustBadgeResolver } from './graphql/trust-badge.resolver.js';
 import { CheckoutMarketingService } from './marketing.service.js';
+import { PaymentLinkService } from './payment-link.service.js';
 import { TrustBadgeService } from './trust-badge.service.js';
 
 /**
@@ -36,12 +42,20 @@ import { TrustBadgeService } from './trust-badge.service.js';
     CheckoutMarketingService,
     CheckoutMarketingResolver,
     CheckoutService,
+    // Links many customers open, each to a checkout of their own (ADR-248).
+    PaymentLinkService,
+    PaymentLinkResolver,
     // Sends the codes that prove shoppers' numbers (CHK-09).
     MessagesService,
     // Browsers' proofs of numbers in customers' erasure and exports (ADR-199).
     CheckoutCustomerData,
   ],
-  controllers: [CartController, StorefrontCheckoutController, CheckoutController],
+  controllers: [
+    CartController,
+    StorefrontCheckoutController,
+    StorefrontPaymentLinkController,
+    CheckoutController,
+  ],
   exports: [
     CartService,
     DeliveryService,
@@ -49,6 +63,7 @@ import { TrustBadgeService } from './trust-badge.service.js';
     TrustBadgeService,
     CheckoutMarketingService,
     CheckoutService,
+    PaymentLinkService,
   ],
 })
 export class CheckoutModule {}

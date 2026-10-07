@@ -82,6 +82,7 @@ import {
   sendCodeIn,
   type CodeCheck,
 } from './number-codes.js';
+import { countLinkOrderIn, linkIsOpen, paymentLinkIn } from './payment-links.js';
 import { checkouts } from './schema.js';
 import { checkoutTotals } from './totals.js';
 import { trustBadgesIn } from './trust-badge.service.js';
@@ -277,6 +278,12 @@ export interface CheckoutShop {
   whatsapp: string | null;
 }
 
+/**
+ * Why a payment link opens no checkout: no link of the shop's has its address, it closed, or
+ * nothing in it can be ordered now.
+ */
+export type ClosedLinkReason = 'not_found' | 'closed' | 'sold_out';
+
 /** The discount code the shopper applied: what it is now, or why it takes nothing off now. */
 export type CheckoutDiscount =
   | { code: string; record: DiscountCodeRecord; refusal: null }
@@ -298,6 +305,11 @@ export interface CheckoutClient {
 export type CheckoutView =
   | { kind: 'not_found' }
   | { kind: 'expired'; shop: CheckoutShop }
+  /**
+   * Opened from a payment link that has closed since: by staff, at its time, or used up; or a
+   * link that opens no checkout (ADR-248).
+   */
+  | { kind: 'closed'; shop: CheckoutShop; reason: ClosedLinkReason }
   /** Its cart is empty, or gone. */
   | { kind: 'empty'; shop: CheckoutShop }
   | {
@@ -324,6 +336,8 @@ export type CheckoutView =
       storeCredit: boolean;
       /** The channels the page offers a box for the shop's news and offers on (ADR-187). */
       marketing: readonly MarketingChannelValue[];
+      /** The payment link it was opened from (ADR-248), for the order placed; null for a cart's. */
+      paymentLink: { id: string; title: string } | null;
     }
   | {
       kind: 'placed';
@@ -379,9 +393,15 @@ export class CheckoutService {
   /**
    * Starts a checkout for the cart `cartToken` names: the secret its page's address carries; null
    * when the cart is gone, or holds nothing that can be bought. `visits` are those the storefront
-   * knew of that brought the shopper (ADR-139), kept, as checked, for the order placed.
+   * knew of that brought the shopper (ADR-139), kept, as checked, for the order placed. Opened
+   * from a payment link (ADR-248), `paymentLinkId` names it: the checkout keeps its rules.
    */
-  async start(shopId: string, cartToken: string, visits?: unknown): Promise<string | null> {
+  async start(
+    shopId: string,
+    cartToken: string,
+    visits?: unknown,
+    paymentLinkId?: string,
+  ): Promise<string | null> {
     const attribution = attributionOf(visits, new Date());
     return this.db.tenant(shopId, async (tx) => {
       const cart = await this.carts.findIn(tx, shopId, cartToken);
@@ -393,6 +413,7 @@ export class CheckoutService {
         tokenHash: sha256(secret),
         cartId: cart.id,
         attribution,
+        paymentLinkId: paymentLinkId ?? null,
         expiresAt: sql`now() + ${`${CHECKOUT_HOURS} hours`}::interval`,
       });
       return secret;
@@ -692,9 +713,11 @@ export class CheckoutService {
           currency: profile.currency as CurrencyCode,
           actor: 'system',
           source: 'online_store',
-          how: verifiedAt
-            ? 'from the online store, its number proved with a code'
-            : 'from the online store',
+          how:
+            (verifiedAt
+              ? 'from the online store, its number proved with a code'
+              : 'from the online store') +
+            (view.paymentLink ? ` through the payment link "${view.paymentLink.title}"` : ''),
         },
         {
           field: [],
@@ -788,6 +811,8 @@ export class CheckoutService {
           })),
         });
       }
+      // One more order through its link, which the page's lock on it kept from closing meanwhile.
+      if (view.paymentLink) await countLinkOrderIn(tx, found.shopId, view.paymentLink.id);
       await tx
         .update(checkouts)
         .set({ orderId: placed.value.id, completedAt: sql`now()` })
@@ -827,19 +852,7 @@ export class CheckoutService {
     const [checkout] = lock ? await query.for('update') : await query;
     if (!checkout) return { kind: 'not_found' };
     const profile = await shopProfile(tx, shopId);
-    const logo = await shopLogoOf(tx, shopId);
-    const badges = await trustBadgesIn(tx, shopId);
-    const shop = {
-      name: profile.name,
-      storefront: this.storefronts.url(profile.handle),
-      policies: await shopPolicyVersionsOf(tx, shopId),
-      accent: await shopAccentOf(tx, shopId),
-      logo: logo && this.storage.signDownload(logo.key, LOGO_URL_SECONDS),
-      badges,
-      whatsapp: badges.some((badge) => badge.kind === 'whatsapp')
-        ? (await shopPreferencesOf(tx, shopId)).whatsappNumber
-        : null,
-    };
+    const shop = await this.#shopOf(tx, shopId, profile);
     // An expired checkout shows nothing, its thank-you page's address included.
     if (checkout.expiresAt <= new Date()) return { kind: 'expired', shop };
     if (checkout.orderId) {
@@ -860,6 +873,13 @@ export class CheckoutService {
         payment: null,
         storeCredit: await storeCreditPaidIn(tx, shopId, order.id),
       };
+    }
+    // Opened from a payment link: only while it stays open, which placing the order waits on.
+    const link = checkout.paymentLinkId
+      ? await paymentLinkIn(tx, shopId, checkout.paymentLinkId, lock)
+      : null;
+    if (checkout.paymentLinkId && (!link || !linkIsOpen(link, new Date()))) {
+      return { kind: 'closed', shop, reason: 'closed' };
     }
     const cart = checkout.cartId
       ? await this.carts.cartIn(tx, shopId, checkout.cartId, lock)
@@ -923,8 +943,10 @@ export class CheckoutService {
         ? null
         : (transfer?.account ?? (await bankTransferSettingsIn(tx, shopId)).account);
     const payments: CheckoutPayments = {
-      codRefusal:
-        overLimit && !account
+      // A link the shop takes prepaid alone (ADR-248) offers no cash on delivery at all.
+      codRefusal: link?.prepaidOnly
+        ? { reason: 'link' }
+        : overLimit && !account
           ? { reason: 'law' }
           : codRefusalOf(codRules, { total: items, products }),
       codRules,
@@ -952,6 +974,7 @@ export class CheckoutService {
       attribution: checkout.attribution,
       storeCredit: await shopGivesStoreCreditIn(tx, shopId),
       marketing: await checkoutMarketingIn(tx, shopId),
+      paymentLink: link && { id: link.id, title: link.title },
       problem:
         !codRefusal || payments.bankTransfer || payments.online
           ? null
@@ -959,6 +982,42 @@ export class CheckoutService {
             ? { kind: 'cod_limit' }
             : { kind: 'cod_unavailable', refusal: codRefusal },
     };
+  }
+
+  /**
+   * The shop as the checkout's page shows it at its head: its name, colour and logo, with the
+   * badges and policies the page carries.
+   */
+  async #shopOf(
+    tx: Tx,
+    shopId: string,
+    profile: { name: string; handle: string },
+  ): Promise<CheckoutShop> {
+    const logo = await shopLogoOf(tx, shopId);
+    const badges = await trustBadgesIn(tx, shopId);
+    return {
+      name: profile.name,
+      storefront: this.storefronts.url(profile.handle),
+      policies: await shopPolicyVersionsOf(tx, shopId),
+      accent: await shopAccentOf(tx, shopId),
+      logo: logo && this.storage.signDownload(logo.key, LOGO_URL_SECONDS),
+      badges,
+      whatsapp: badges.some((badge) => badge.kind === 'whatsapp')
+        ? (await shopPreferencesOf(tx, shopId)).whatsappNumber
+        : null,
+    };
+  }
+
+  /**
+   * The page for a payment link of the shop's that opens no checkout (ADR-248): none has its
+   * address, it has closed, or nothing in it can be ordered now.
+   */
+  async linkPageView(shopId: string, reason: ClosedLinkReason): Promise<CheckoutView> {
+    return this.db.tenant(shopId, async (tx) => ({
+      kind: 'closed',
+      shop: await this.#shopOf(tx, shopId, await shopProfile(tx, shopId)),
+      reason,
+    }));
   }
 
   /**
