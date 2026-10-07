@@ -36,6 +36,7 @@ export enum MessageKind {
   CREDIT_LOW = 'CREDIT_LOW',
   TRANSFER_CONFIRMED = 'TRANSFER_CONFIRMED',
   TRANSFER_REFUSED = 'TRANSFER_REFUSED',
+  DOMAIN_UNPOINTED = 'DOMAIN_UNPOINTED',
 }
 
 registerEnumType(MessageKind, {
@@ -147,6 +148,12 @@ registerEnumType(MessageKind, {
       description:
         "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
         "Hatti did not find the transfer it said it made into Hatti's account, and why (ADR-254).",
+    },
+    DOMAIN_UNPOINTED: {
+      description:
+        "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
+        'DNS points a domain of its own elsewhere, which is disconnected three days on unless it ' +
+        'points back (ADR-262).',
     },
   },
 });

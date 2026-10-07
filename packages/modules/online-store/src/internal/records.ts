@@ -73,6 +73,11 @@ export interface DomainRecord {
   verifiedAt: Date | null;
   /** Where the storefront sends shoppers; one of the shop's verified domains at most. */
   isPrimary: boolean;
+  /**
+   * Since when DNS has pointed it elsewhere, as the worker found checking it again (ADR-262);
+   * null while it points at the platform.
+   */
+  unpointedSince: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

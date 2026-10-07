@@ -9,11 +9,12 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { DOMAIN_LIMIT, hostOf, sameHost } from './domain-name.js';
 import {
   OnlineStoreEvents,
   type DomainChangedPayload,
+  type DomainUnpointedPayload,
   type DomainUpdatedPayload,
 } from './events.js';
 import type { DomainRecord } from './records.js';
@@ -25,11 +26,28 @@ interface Pointing {
   found: string[];
 }
 
+/** How long a verified domain goes before the worker asks DNS about it again (ADR-262). */
+export const DOMAIN_CHECK_HOURS = 6;
+
+/**
+ * How long DNS may point a verified domain elsewhere before it is disconnected (ADR-262): longer
+ * than DNS takes to change, so a shop moving its DNS, or fixing a mistake, keeps its domain.
+ */
+export const DOMAIN_GRACE_HOURS = 72;
+
+/**
+ * What came of asking DNS about a domain again (ADR-262): still pointed at the platform; pointed
+ * elsewhere, for less than {@link DOMAIN_GRACE_HOURS} hours; disconnected; DNS not answering; or
+ * nothing asked, the domain let go or not verified.
+ */
+export type DomainCheck = 'pointed' | 'unpointed' | 'disconnected' | 'unanswered' | 'skipped';
+
 /**
  * A shop's own domains (ADR-048), such as www.zari.pk: each one shop's on the whole platform,
  * pointed at the platform with a CNAME record, checked when the shop asks, and then served by its
- * storefront. The primary one, which must have been checked, is where the storefront sends
- * shoppers; without one, the shop's address on the platform's domain is.
+ * storefront, checked again by the worker every few hours (ADR-262). The primary one, which must
+ * have been checked, is where the storefront sends shoppers; without one, the shop's address on
+ * the platform's domain is.
  */
 @Injectable()
 export class DomainService {
@@ -91,9 +109,9 @@ export class DomainService {
   }
 
   /**
-   * Asks DNS whether the domain points at the platform, and marks it verified when it does. One
-   * that stops pointing stays as it was, until it is checked again. Records `domain.updated` the
-   * first time.
+   * Asks DNS whether the domain points at the platform, and marks it verified when it does, as
+   * pointing from now on: one the worker found pointing elsewhere (ADR-262) too, or disconnected.
+   * Records `domain.updated` when it was not verified before.
    */
   async verify(tenant: TenantContext, id: string): Promise<MutationResult<DomainRecord>> {
     const row = await this.db.tenant(tenant.shopId, (tx) => this.#find(tx, tenant.shopId, id));
@@ -124,7 +142,12 @@ export class DomainService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const [updated] = await tx
         .update(domains)
-        .set({ verifiedAt: sql`now()`, updatedAt: sql`now()` })
+        .set({
+          verifiedAt: sql`now()`,
+          checkedAt: sql`now()`,
+          unpointedSince: null,
+          updatedAt: sql`now()`,
+        })
         .where(and(eq(domains.shopId, tenant.shopId), eq(domains.id, id)))
         .returning();
       if (!updated) return failOne(['id'], 'NOT_FOUND', 'Domain not found');
@@ -150,7 +173,8 @@ export class DomainService {
       if (!row) return failOne(['id'], 'NOT_FOUND', 'Domain not found');
       const primary = input.isPrimary ?? row.isPrimary;
       if (primary === row.isPrimary) return { ok: true, value: toRecord(row) };
-      if (primary && row.verifiedAt === null) {
+      // Nor one DNS points elsewhere (ADR-262): shoppers sent there would find another site.
+      if (primary && (row.verifiedAt === null || row.unpointedSince !== null)) {
         return failOne(
           ['isPrimary'],
           'NOT_POINTED',
@@ -175,6 +199,113 @@ export class DomainService {
         .returning();
       await this.#recordUpdate(tx, updated!, ['isPrimary']);
       return { ok: true, value: toRecord(updated!) };
+    });
+  }
+
+  /**
+   * The verified domains due to be asked about again (ADR-262), across shops, through the system
+   * login: those not asked for {@link DOMAIN_CHECK_HOURS} hours, the longest first, `limit` at
+   * most.
+   */
+  async domainsToCheck(limit: number): Promise<{ shopId: string; id: string }[]> {
+    return this.db.system((tx) =>
+      tx
+        .select({ shopId: domains.shopId, id: domains.id })
+        .from(domains)
+        .where(
+          and(
+            isNotNull(domains.verifiedAt),
+            or(
+              isNull(domains.checkedAt),
+              lt(domains.checkedAt, sql`now() - make_interval(hours => ${DOMAIN_CHECK_HOURS})`),
+            ),
+          ),
+        )
+        .orderBy(sql`${domains.checkedAt} NULLS FIRST`)
+        .limit(limit),
+    );
+  }
+
+  /**
+   * Asks DNS again about a verified domain (ADR-262). Still pointed at the platform, it is checked
+   * now. Pointed elsewhere, it is noted from when, with `domain.unpointed` the first time, which
+   * tells the shop; {@link DOMAIN_GRACE_HOURS} hours on, it is disconnected, verified no more and
+   * primary no more, with `domain.updated`, and the storefront sends shoppers to the shop's
+   * address on the platform's domain in its place. DNS that cannot be asked changes nothing but
+   * when it was asked.
+   */
+  async recheck(shopId: string, id: string): Promise<DomainCheck> {
+    const row = await this.db.tenant(shopId, (tx) => this.#find(tx, shopId, id));
+    if (!row || row.verifiedAt === null) return 'skipped';
+    // Outside the transaction: DNS may take seconds to answer.
+    let pointing: Pointing | null = null;
+    try {
+      pointing = await this.#pointing(row.host);
+    } catch {
+      // Asked again at the next check, as if it had answered.
+    }
+    return this.db.tenant(shopId, async (tx): Promise<DomainCheck> => {
+      const current = await this.#find(tx, shopId, id, { lock: true });
+      // Let go, or checked by the shop and refused, since.
+      if (!current || current.verifiedAt === null) return 'skipped';
+      const where = and(eq(domains.shopId, shopId), eq(domains.id, id));
+      if (!pointing) {
+        await tx
+          .update(domains)
+          .set({ checkedAt: sql`now()` })
+          .where(where);
+        return 'unanswered';
+      }
+      if (pointing.ok) {
+        await tx
+          .update(domains)
+          .set({
+            checkedAt: sql`now()`,
+            verifiedAt: sql`now()`,
+            unpointedSince: null,
+            ...(current.unpointedSince ? { updatedAt: sql`now()` } : {}),
+          })
+          .where(where);
+        return 'pointed';
+      }
+      if (current.unpointedSince === null) {
+        const [unpointed] = await tx
+          .update(domains)
+          .set({ checkedAt: sql`now()`, unpointedSince: sql`now()`, updatedAt: sql`now()` })
+          .where(where)
+          .returning();
+        const since = unpointed!.unpointedSince!.getTime();
+        await this.#recordEvent<DomainUnpointedPayload>(
+          tx,
+          OnlineStoreEvents.DomainUnpointed,
+          unpointed!,
+          { disconnectAt: new Date(since + DOMAIN_GRACE_HOURS * 3_600_000).toISOString() },
+        );
+        return 'unpointed';
+      }
+      const [disconnected] = await tx
+        .update(domains)
+        .set({ checkedAt: sql`now()`, verifiedAt: null, isPrimary: false, updatedAt: sql`now()` })
+        .where(
+          and(
+            where,
+            lte(domains.unpointedSince, sql`now() - make_interval(hours => ${DOMAIN_GRACE_HOURS})`),
+          ),
+        )
+        .returning();
+      if (!disconnected) {
+        await tx
+          .update(domains)
+          .set({ checkedAt: sql`now()` })
+          .where(where);
+        return 'unpointed';
+      }
+      await this.#recordUpdate(
+        tx,
+        disconnected,
+        current.isPrimary ? ['isVerified', 'isPrimary'] : ['isVerified'],
+      );
+      return 'disconnected';
     });
   }
 
@@ -285,6 +416,7 @@ function toRecord(row: DomainRow): DomainRecord {
     host: row.host,
     verifiedAt: row.verifiedAt,
     isPrimary: row.isPrimary,
+    unpointedSince: row.unpointedSince,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

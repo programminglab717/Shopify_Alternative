@@ -244,6 +244,8 @@ export const domains = onlineStoreSchema.table(
     isPrimary: boolean('is_primary').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    checkedAt: timestamp('checked_at', { withTimezone: true }),
+    unpointedSince: timestamp('unpointed_since', { withTimezone: true }),
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],
 );

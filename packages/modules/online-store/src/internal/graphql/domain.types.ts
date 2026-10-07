@@ -29,6 +29,15 @@ export class OnlineStoreDomain {
   })
   verifiedAt!: Date | null;
 
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      'Since when DNS has pointed it elsewhere, as Hatti found checking it again every few hours; ' +
+      'null while it points at the platform. The shop is told, and three days on a verified ' +
+      'domain is disconnected: verified no more, nor primary (ADR-262).',
+  })
+  unpointedSince!: Date | null;
+
   @Field({
     description:
       "Where the storefront sends shoppers: one of the shop's verified domains at most. Without " +
@@ -61,8 +70,8 @@ export class DomainUpdateInput {
   @Field(() => Boolean, {
     nullable: true,
     description:
-      'Makes it the primary domain, which it must be verified to be, or primary no more. The ' +
-      'domain primary until then stops being.',
+      'Makes it the primary domain, which it must be verified and still pointed at the platform ' +
+      'to be, or primary no more. The domain primary until then stops being.',
   })
   isPrimary?: boolean | null;
 }

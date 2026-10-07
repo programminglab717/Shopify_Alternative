@@ -104,6 +104,7 @@ export class DomainResolver {
       url: this.storefronts.urlAt(record.host),
       isVerified: record.verifiedAt !== null,
       verifiedAt: record.verifiedAt,
+      unpointedSince: record.unpointedSince,
       isPrimary: record.isPrimary,
       dnsTarget: this.service.dnsTarget,
       createdAt: record.createdAt,

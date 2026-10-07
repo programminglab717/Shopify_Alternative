@@ -31,6 +31,8 @@ export const OnlineStoreEvents = {
   DomainCreated: 'domain.created',
   DomainUpdated: 'domain.updated',
   DomainDeleted: 'domain.deleted',
+  /** DNS found pointing a verified domain elsewhere when it was checked again (ADR-262). */
+  DomainUnpointed: 'domain.unpointed',
   UrlRedirectCreated: 'url_redirect.created',
   UrlRedirectUpdated: 'url_redirect.updated',
   UrlRedirectDeleted: 'url_redirect.deleted',
@@ -138,6 +140,15 @@ export interface DomainChangedPayload {
 export interface DomainUpdatedPayload extends DomainChangedPayload {
   /** "isVerified" or "isPrimary". */
   changed: string[];
+}
+
+/**
+ * A verified domain DNS points elsewhere, found when it was checked again (ADR-262): the shop is
+ * told once, and it is disconnected at `disconnectAt` unless DNS points it back before.
+ */
+export interface DomainUnpointedPayload extends DomainChangedPayload {
+  /** ISO 8601. */
+  disconnectAt: string;
 }
 
 /** One of the shop's policies changed, or was taken away: the storefront shows them. */

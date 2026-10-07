@@ -7,6 +7,7 @@ export {
   type BlogUpdatedPayload,
   type CommentChangedPayload,
   type DomainChangedPayload,
+  type DomainUnpointedPayload,
   type DomainUpdatedPayload,
   type MenuChangedPayload,
   type PageChangedPayload,
@@ -53,7 +54,13 @@ export {
   type ShownComments,
 } from '../internal/comment.service.js';
 export { DOMAIN_LIMIT, hostOf } from '../internal/domain-name.js';
-export { DomainService, shopDomainsOf } from '../internal/domain.service.js';
+export {
+  DOMAIN_CHECK_HOURS,
+  DOMAIN_GRACE_HOURS,
+  DomainService,
+  shopDomainsOf,
+  type DomainCheck,
+} from '../internal/domain.service.js';
 export {
   LINK_TAP_SOURCES,
   LinkTapsService,

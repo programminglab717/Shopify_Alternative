@@ -3062,6 +3062,11 @@ type Domain {
   Whether DNS pointed it at the platform when it was checked: the storefront answers at it from then on.
   """
   isVerified: Boolean!
+
+  """
+  Since when DNS has pointed it elsewhere, as Hatti found checking it again every few hours; null while it points at the platform. The shop is told, and three days on a verified domain is disconnected: verified no more, nor primary (ADR-262).
+  """
+  unpointedSince: DateTime
   updatedAt: DateTime!
 
   """The storefront's address at the domain: https://www.zari.pk."""
@@ -3090,7 +3095,7 @@ type DomainPayload {
 """Changes to a domain: fields left out stay as they are."""
 input DomainUpdateInput {
   """
-  Makes it the primary domain, which it must be verified to be, or primary no more. The domain primary until then stops being.
+  Makes it the primary domain, which it must be verified and still pointed at the platform to be, or primary no more. The domain primary until then stops being.
   """
   isPrimary: Boolean
 }
@@ -4781,6 +4786,11 @@ enum MessageKind {
   For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: its message credit fell below Rs 100 (ADR-169, ADR-195).
   """
   CREDIT_LOW
+
+  """
+  For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: DNS points a domain of its own elsewhere, which is disconnected three days on unless it points back (ADR-262).
+  """
+  DOMAIN_UNPOINTED
 
   """
   For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: its plan's next period is invoiced and waits for payment (ADR-169, ADR-195).

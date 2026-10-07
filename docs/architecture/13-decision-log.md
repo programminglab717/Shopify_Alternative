@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-261 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-262 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -269,6 +269,7 @@
 | 259 | A delivery address may carry a pin, where the customer's phone is at the address: checkout's and customers' links' address forms add it by the pages' first script, allowed by its hash; it is kept in Pakistan and near the city typed, as Shopify's latitude and longitude | Accepted |
 | 260 | A name for a city with a courier that three shops gave alike, which no shop gave otherwise, is every shop's, after the shop's own and Hatti's; Hatti's people keep Hatti's names with a command, which settles a city shops named wrong | Accepted |
 | 261 | A translation is deleted with what it translates, whichever way that goes, by triggers on the tables of what may be translated, as a foreign key would if one column could name ten kinds; a menu's items' as the menu goes or an update drops them | Accepted |
+| 262 | Shops' verified domains are checked again every six hours by the worker: one DNS points elsewhere is noted and its shop told once, at its alerts number and its owner's email, and three days on it is disconnected, verified no more nor primary, the shop's address on the platform's domain primary in its place | Accepted |
 
 ---
 
@@ -10860,3 +10861,50 @@
   * **A sweep for translations of nothing:** each run would ask every kind about every ID
     translated, to find what is rarely there.
   * **A column of each kind, with foreign keys:** ten columns, nine of them empty, for one ID.
+
+## ADR-262 · Shops' verified domains are checked again every six hours by the worker: one DNS points elsewhere is noted and its shop told once, at its alerts number and its owner's email, and three days on it is disconnected, verified no more nor primary, the shop's address on the platform's domain primary in its place
+
+* **Context:** [ADR-048](#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers) checked a domain only when the shop asked, and kept one that
+  stopped pointing at the platform connected until it was let go. A domain the shop points
+  elsewhere, or lets lapse, stayed its primary one: the storefront sent shoppers, canonical
+  links and sitemaps to a site not the shop's, and a lapsed domain someone else bought would
+  have had them. Simplification 32 left checking again in the background for later. DNS takes
+  hours to change everywhere, and a shop moving its DNS, or fixing a mistake, points a domain
+  elsewhere for a while. Hatti tells shops of their bills at their alerts number and their
+  owners' email ([ADR-169](#adr-169--hatti-tells-a-shop-on-whatsapp-at-the-number-it-gives-for-hattis-alerts-when-its-plans-next-period-is-invoiced-when-its-plan-ends-unpaid-and-when-its-message-credit-falls-below-rs-100-each-once-queued-with-its-messages-from-billings-events-at-hattis-cost-whatever-its-credit-and-never-turned-off), [ADR-195](#adr-195--a-shops-owner-hears-of-its-bills-with-hatti-by-email-too-at-the-address-their-account-proved-and-in-their-own-language-from-hattis-own-address-the-worker-finds-them-through-identitys-functions-for-the-shop-alone-and-queues-each-email-with-the-shops-messages-at-hattis-cost-with-an-alerts-number-or-without)).
+* **Decision:**
+  * **The worker asks again:** a sweep finds the verified domains not asked about for six hours
+    (`DomainService.domainsToCheck`, through the system login across shops, by an index of
+    verified domains by when they were asked), a hundred at a time and ten batches a sweep at
+    most, and asks DNS about each as the shop's check does (`recheck`), outside the transaction.
+    A check the shop asks for counts as one.
+  * **Still pointed at the platform:** checked now, `verified_at` the last time it pointed.
+  * **Pointed elsewhere:** `unpointed_since` (migration 0165) notes since when, with
+    `domain.unpointed` the first time, saying when it will be disconnected. It is served
+    meanwhile, and not made primary while it points elsewhere; pointed back, it is as before.
+  * **Three days on** (`DOMAIN_GRACE_HOURS`): disconnected, verified no more and primary no
+    more, with `domain.updated`, which the storefront's publisher follows: the shop's address on
+    the platform's domain is primary in its place. The shop checks it again once DNS points it
+    back.
+  * **DNS that does not answer** changes nothing but when it was asked.
+  * **The shop is told** (`domain_unpointed`, one of Hatti's notices it cannot turn off): the
+    domain, and when it is disconnected in the shop's time zone, at its alerts number and its
+    owner's email, at Hatti's cost, once each time a domain points elsewhere. Hatti's notices to
+    shops share `tellShop`.
+  * **The Admin API says since when:** `Domain.unpointedSince`.
+* **Consequences:**
+  * A domain a shop points elsewhere stops being its storefront's address within three days and
+    six hours, and shoppers, links and sitemaps go to the shop's address on the platform's domain.
+  * A shop moving its DNS keeps its domain if it points it back within three days, told at once.
+  * The worker asks DNS about each verified domain four times a day: a thousand a sweep, every
+    ten minutes by default, keeps up with 36,000 domains.
+  * The worker reads `STOREFRONT_DNS_TARGET` as the API does.
+* **Alternatives:**
+  * **Disconnecting at the first check that fails:** a shop moving its DNS, or a resolver's
+    mistake, would cost it its domain for hours.
+  * **Checking pending domains too, verifying them once they point:** the shop checks a domain it
+    has just pointed; one never pointed would be asked about for nothing.
+  * **Cloudflare for SaaS's own checks:** they come with the edge and its custom hostnames; until
+    then the worker asks DNS itself.
+  * **Telling the shop again before it is disconnected:** one notice with the date, and the
+    admin saying since when, is enough until the admin's notifications.

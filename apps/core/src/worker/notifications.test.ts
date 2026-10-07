@@ -2,7 +2,14 @@ import 'reflect-metadata';
 import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { PublicSite, type MutationResult, type StaffRole, type TenantContext } from '@hatti/api';
+import {
+  DnsLookup,
+  PublicSite,
+  StorefrontSite,
+  type MutationResult,
+  type StaffRole,
+  type TenantContext,
+} from '@hatti/api';
 import { BillingService, MessageWallet } from '@hatti/billing/public';
 import { ProductService, VariantService } from '@hatti/catalog/public';
 import { StoreCreditService } from '@hatti/customers/public';
@@ -26,6 +33,7 @@ import {
   type MessageProvider,
   type OutgoingMessage,
 } from '@hatti/messaging/public';
+import { DomainService } from '@hatti/online-store/public';
 import {
   BankTransferService,
   CustomerAnswers,
@@ -37,6 +45,7 @@ import {
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { BillingNotices } from './billing-notices.js';
+import { DomainNotices } from './domain-notices.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
 import {
   MessagesSender,
@@ -139,6 +148,7 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       billing: new BillingNotices(database, messages()),
       staff: new StaffAlerts(database, messages()),
       storeCredit: new StoreCreditNotices(database, messages()),
+      domains: new DomainNotices(database, messages()),
     });
     // At least once: the same event twice is one message.
     for (let time = 0; time < times; time++) {
@@ -1425,6 +1435,51 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
           invoice: invoice.name,
           amount: 'Rs 600',
           reference: 'RAAST-77002',
+        },
+      ],
+    ]);
+  });
+
+  it('tells the shop when DNS points a domain of its own elsewhere, with when it is disconnected (ADR-262)', async () => {
+    const OWNER = '+923335550009';
+    unwrap(await new MessagingSettingsService(database).update(tenant, { alertsPhone: OWNER }));
+    /** DNS naming one host for every domain. */
+    const dns = new (class extends DnsLookup {
+      target = 'shops.hatti.pk';
+      async cnames(): Promise<string[]> {
+        return [this.target];
+      }
+      async addresses(): Promise<string[]> {
+        return [];
+      }
+    })();
+    const domains = new DomainService(database, new StorefrontSite('https://hatti.pk'), dns);
+    const www = unwrap(await domains.create(tenant, { host: 'www.zari.pk' }));
+    unwrap(await domains.verify(tenant, www.id));
+    dns.target = 'zari.myshopify.com';
+    expect(await domains.recheck(shopId, www.id)).toBe('unpointed');
+    const {
+      rows: [shop],
+    } = await admin.query<{ timezone: string; unpointed_since: Date }>(
+      `SELECT s.timezone, d.unpointed_since
+         FROM control.shops s JOIN online_store.domains d ON d.shop_id = s.id
+        WHERE d.id = $1`,
+      [www.id],
+    );
+    await dispatch(2);
+    const disconnectAt = new Date(shop!.unpointed_since.getTime() + 72 * 3_600_000);
+    expect(
+      (await queued())
+        .filter((message) => message.kind === 'domain_unpointed')
+        .map((message) => [message.channel, message.recipient, message.variables]),
+    ).toEqual([
+      [
+        'whatsapp',
+        OWNER,
+        {
+          shop: 'Zari Fashions',
+          domain: 'www.zari.pk',
+          date: shopTime(shop!.timezone, disconnectAt),
         },
       ],
     ]);

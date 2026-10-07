@@ -12,14 +12,9 @@ import {
 } from '@hatti/billing/public';
 import type { Database } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
-import { ownerEmailIn } from '@hatti/identity/public';
-import {
-  settingsIn,
-  type MessageKind,
-  type MessagesService,
-  type MessageVariables,
-} from '@hatti/messaging/public';
+import type { MessageKind, MessagesService, MessageVariables } from '@hatti/messaging/public';
 import { formatMoney, money } from '@hatti/money';
+import { tellShop } from './shop-notices.js';
 
 /**
  * Tells a shop of its bills with Hatti (BIL-01, BIL-03, ADR-169), as billing's events are heard:
@@ -50,28 +45,7 @@ export class BillingNotices {
     const { shopId } = event;
     await this.database.tenant(shopId, async (tx) => {
       const variables = { shop: (await shopProfile(tx, shopId)).name, ...notice.variables };
-      const { alertsPhone } = await settingsIn(tx, shopId);
-      if (alertsPhone) {
-        await this.messages.queueIn(tx, shopId, {
-          kind: notice.kind,
-          recipient: alertsPhone,
-          dedupeKey: notice.dedupeKey,
-          variables,
-          channel: 'whatsapp',
-        });
-      }
-      // Through identity's function for the shop of the transaction, never its tables (ADR-193).
-      const owner = await ownerEmailIn(tx, shopId);
-      if (owner) {
-        await this.messages.queueIn(tx, shopId, {
-          kind: notice.kind,
-          recipient: owner.email,
-          language: owner.language,
-          dedupeKey: `${notice.dedupeKey}:email`,
-          variables,
-          channel: 'email',
-        });
-      }
+      await tellShop(tx, this.messages, shopId, { ...notice, variables });
     });
   }
 }

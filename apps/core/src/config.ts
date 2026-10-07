@@ -173,6 +173,12 @@ const SES_COMPLETE = {
   message: 'Set SES_REGION, SES_ACCESS_KEY_ID and SES_SECRET_ACCESS_KEY together, or none',
 };
 
+/** A host name shops point their own domains at (ADR-048), as both the API and the worker read it. */
+const storefrontDnsTarget = z
+  .string()
+  .regex(/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, 'Expected a host name')
+  .optional();
+
 const common = {
   NODE_ENV: env.nodeEnv(),
   LOG_LEVEL: env.logLevel(),
@@ -254,10 +260,7 @@ const apiSchema = z
      * Where shops point domains of their own with a CNAME record (ADR-048): shops.{STOREFRONT_URL's
      * host} unless set, as Cloudflare for SaaS's target is named.
      */
-    STOREFRONT_DNS_TARGET: z
-      .string()
-      .regex(/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, 'Expected a host name')
-      .optional(),
+    STOREFRONT_DNS_TARGET: storefrontDnsTarget,
     /**
      * The key storefronts present to the /storefront/ routes, such as carts' (ADR-042): at least
      * 32 characters. Required in production; without it, those routes are not served.
@@ -430,6 +433,11 @@ const workerSchema = z
      * production; http://localhost:4100 otherwise.
      */
     STOREFRONT_URL: env.httpUrl().optional(),
+    /**
+     * Where shops point domains of their own, as the API's: the domain checks ask DNS whether they
+     * still do (ADR-262).
+     */
+    STOREFRONT_DNS_TARGET: storefrontDnsTarget,
     /**
      * The API's public address, as its PUBLIC_URL: messages link customers' order pages there
      * (ADR-147). Required in production; http://localhost:4000 otherwise.

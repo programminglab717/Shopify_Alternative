@@ -165,4 +165,98 @@ describe.skipIf(!server)('DomainService', () => {
     // Let go, it can be connected again, by any shop.
     unwrap(await service.create(f.b, { host: 'www.zari.pk' }));
   });
+
+  it('checks verified domains again, telling of one DNS points elsewhere and disconnecting it three days on (ADR-262)', async () => {
+    const www = unwrap(await service.create(f.a, { host: 'www.zari.pk' }));
+    const apex = unwrap(await service.create(f.a, { host: 'zari.pk' }));
+    unwrap(await service.create(f.a, { host: 'shop.zari.pk' }));
+    const theirs = unwrap(await service.create(f.b, { host: 'www.theirs.pk' }));
+    for (const host of ['www.zari.pk', 'zari.pk', 'www.theirs.pk']) {
+      dns.records.set(host, { cnames: ['shops.hatti.pk'] });
+    }
+    unwrap(await service.verify(f.a, www.id));
+    unwrap(await service.verify(f.a, apex.id));
+    unwrap(await service.verify(f.b, theirs.id));
+    unwrap(await service.update(f.a, www.id, { isPrimary: true }));
+    /** Moves a column of the shop's domains, or one of them, back by `hours`. */
+    const back = (column: 'checked_at' | 'unpointed_since', hours: number, id?: string) =>
+      f.admin.query(
+        `UPDATE online_store.domains SET ${column} = ${column} - make_interval(hours => $1)
+          WHERE $2::uuid IS NULL OR id = $2`,
+        [hours, id ?? null],
+      );
+    const due = async (limit = 10) =>
+      (await service.domainsToCheck(limit)).map((each) => each.id).sort();
+    const domainOf = async (id: string) => (await service.get(f.a, id))!;
+    const events = async (type: string) =>
+      (await f.outbox()).filter((row) => row.event_type === type).map((row) => row.payload);
+
+    // Each verified domain, every shop's, six hours after it was checked; none not verified.
+    expect(await due()).toEqual([]);
+    await back('checked_at', 7);
+    expect(await due()).toEqual([www.id, apex.id, theirs.id].sort());
+    expect(await due(2)).toHaveLength(2);
+
+    // Pointed elsewhere: noted, and the shop told once, still served meanwhile.
+    dns.records.set('www.zari.pk', { cnames: ['zari.myshopify.com'] });
+    expect(await service.recheck(f.a.shopId, www.id)).toBe('unpointed');
+    expect(await service.recheck(f.a.shopId, apex.id)).toBe('pointed');
+    expect(await service.recheck(f.b.shopId, theirs.id)).toBe('pointed');
+    // Another shop's is not this shop's to check.
+    expect(await service.recheck(f.a.shopId, theirs.id)).toBe('skipped');
+    expect(await due()).toEqual([]);
+    const unpointed = await domainOf(www.id);
+    expect(unpointed).toMatchObject({ isPrimary: true, unpointedSince: expect.any(Date) });
+    expect(unpointed.verifiedAt).not.toBeNull();
+    const [told] = await events('domain.unpointed');
+    expect(told).toEqual({
+      host: 'www.zari.pk',
+      isVerified: true,
+      isPrimary: true,
+      disconnectAt: new Date(unpointed.unpointedSince!.getTime() + 72 * 3_600_000).toISOString(),
+    });
+    await back('checked_at', 7, www.id);
+    expect(await service.recheck(f.a.shopId, www.id)).toBe('unpointed');
+    expect(await events('domain.unpointed')).toHaveLength(1);
+
+    // One pointed elsewhere is not made primary; pointed back, it is as before.
+    dns.records.set('zari.pk', { cnames: ['parked.example.com'] });
+    await back('checked_at', 7, apex.id);
+    expect(await service.recheck(f.a.shopId, apex.id)).toBe('unpointed');
+    expect(errorsOf(await service.update(f.a, apex.id, { isPrimary: true }))[0]?.[1]).toBe(
+      'NOT_POINTED',
+    );
+    dns.records.set('zari.pk', { cnames: ['shops.hatti.pk'] });
+    await back('checked_at', 7, apex.id);
+    expect(await service.recheck(f.a.shopId, apex.id)).toBe('pointed');
+    expect((await domainOf(apex.id)).unpointedSince).toBeNull();
+
+    // DNS that does not answer changes nothing.
+    dns.down = true;
+    await back('checked_at', 7, apex.id);
+    expect(await service.recheck(f.a.shopId, apex.id)).toBe('unanswered');
+    expect(await domainOf(apex.id)).toMatchObject({ unpointedSince: null, isPrimary: false });
+    dns.down = false;
+
+    // Three days pointed elsewhere: disconnected, the platform's address primary in its place.
+    await back('unpointed_since', 73, www.id);
+    await back('checked_at', 7, www.id);
+    expect(await service.recheck(f.a.shopId, www.id)).toBe('disconnected');
+    expect(await domainOf(www.id)).toMatchObject({ verifiedAt: null, isPrimary: false });
+    expect(await events('domain.updated')).toContainEqual({
+      host: 'www.zari.pk',
+      isVerified: false,
+      isPrimary: false,
+      changed: ['isVerified', 'isPrimary'],
+    });
+    expect(await due()).toEqual([]);
+    expect(await service.recheck(f.a.shopId, www.id)).toBe('skipped');
+
+    // Pointed back, the shop checks it again: verified, pointing from now on.
+    dns.records.set('www.zari.pk', { cnames: ['shops.hatti.pk'] });
+    expect(unwrap(await service.verify(f.a, www.id))).toMatchObject({
+      verifiedAt: expect.any(Date),
+      unpointedSince: null,
+    });
+  });
 });

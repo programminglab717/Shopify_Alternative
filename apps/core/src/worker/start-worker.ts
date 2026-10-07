@@ -1,4 +1,4 @@
-import { PublicSite, StorefrontSite } from '@hatti/api';
+import { PublicSite, StorefrontSite, SystemDnsLookup } from '@hatti/api';
 import { BillingService, MessageWallet } from '@hatti/billing/public';
 import {
   CollectionService,
@@ -33,6 +33,7 @@ import {
 } from '@hatti/logistics/public';
 import {
   ArticleService,
+  DomainService,
   LinkTapsService,
   PageService,
   SessionDaysService,
@@ -63,6 +64,8 @@ import { ConfirmationReminders } from './confirmation-reminders.js';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
 import { CourierBookings } from './courier-bookings.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
+import { DomainChecks } from './domain-checks.js';
+import { DomainNotices } from './domain-notices.js';
 import { ExpiredCheckouts } from './expired-checkouts.js';
 import { StoreCreditExpiry } from './store-credit-expiry.js';
 import { StoreCreditNotices } from './store-credit-notices.js';
@@ -99,6 +102,7 @@ export interface EventConsumers {
   billing?: BillingNotices;
   staff?: StaffAlerts;
   storeCredit?: StoreCreditNotices;
+  domains?: DomainNotices;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
@@ -116,6 +120,7 @@ export function eventHandlers(
     billing,
     staff,
     storeCredit,
+    domains,
   }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
@@ -168,6 +173,9 @@ export function eventHandlers(
     for (const type of StoreCreditNotices.EVENTS) {
       registry.on(type, (event) => storeCredit.handle(event));
     }
+  }
+  if (domains) {
+    for (const type of DomainNotices.EVENTS) registry.on(type, (event) => domains.handle(event));
   }
   return registry;
 }
@@ -238,6 +246,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         billing: new BillingNotices(database, new MessagesService(database)),
         staff: new StaffAlerts(database, new MessagesService(database)),
         storeCredit: new StoreCreditNotices(database, new MessagesService(database)),
+        domains: new DomainNotices(database, new MessagesService(database)),
       }),
       concurrency: config.EVENT_CONCURRENCY,
       logger,
@@ -279,6 +288,19 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => expired.stop());
+    // Shops' verified domains asked about again, and those DNS points elsewhere disconnected three
+    // days on (ADR-262).
+    const domainChecks = new DomainChecks(
+      new DomainService(
+        database,
+        new StorefrontSite(config.STOREFRONT_URL ?? 'http://localhost:4100', {
+          dnsTarget: config.STOREFRONT_DNS_TARGET,
+        }),
+        new SystemDnsLookup(),
+      ),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => domainChecks.stop());
     // Articles and pages published at a time ahead shown once it comes (ADR-215, ADR-217).
     const scheduledContent = new ScheduledContent(
       scheduledKinds(new ArticleService(database), new PageService(database)),

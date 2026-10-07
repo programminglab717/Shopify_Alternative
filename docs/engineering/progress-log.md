@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the rest of what is left to build** (asked for on 2026-10-07): domains checked again, and
-Urdu handles where shops want them. How the Free plan holds to its 50 orders a month waits on a
-decision.
+**Next, the Free plan's limits** (decided on 2026-10-07): orders past its 50 a month taken but
+locked until the shop upgrades, its owner warned at 40 and at 50, cancelled orders not counted;
+and no custom domain or online payment gateway on Free. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### Shops' domains checked again
+
+* **The worker checks verified domains every six hours** ([ADR-262](../architecture/13-decision-log.md#adr-262--shops-verified-domains-are-checked-again-every-six-hours-by-the-worker-one-dns-points-elsewhere-is-noted-and-its-shop-told-once-at-its-alerts-number-and-its-owners-email-and-three-days-on-it-is-disconnected-verified-no-more-nor-primary-the-shops-address-on-the-platforms-domain-primary-in-its-place)):
+  one DNS points elsewhere is noted, still served but never made primary, and its shop is told
+  once at its alerts number and its owner's email; three days on it is disconnected, and the
+  shop's address on the platform's domain is primary in its place.
+* **For it:** migration 0165; `DomainService.recheck` and `domainsToCheck`; `Domain.unpointedSince`;
+  the `domain_unpointed` notice; the worker's `DomainChecks` and `DomainNotices`, and `tellShop`,
+  which Hatti's notices of bills share.
+* 1841 tests: each way a check ends, the sweep's batches, and the notice.
 
 ### cd67743 · Translations deleted with what they translate
 

@@ -1489,6 +1489,11 @@ Stock follows Shopify's model too. How changes are written is decided in
 * **DNS is asked through `DnsLookup`**, outside the database transaction, which the host
   application provides and tests replace (`TestDns`). A domain is verified by a CNAME naming the
   DNS target, or by addresses all among the target's, and only a verified domain is primary.
+* **Verified domains are checked again by the worker**
+  ([ADR-262](../architecture/13-decision-log.md#adr-262--shops-verified-domains-are-checked-again-every-six-hours-by-the-worker-one-dns-points-elsewhere-is-noted-and-its-shop-told-once-at-its-alerts-number-and-its-owners-email-and-three-days-on-it-is-disconnected-verified-no-more-nor-primary-the-shops-address-on-the-platforms-domain-primary-in-its-place)):
+  `DomainService.recheck` asks DNS as `verify` does, outside the transaction, and
+  `DOMAIN_GRACE_HOURS` is how long one may point elsewhere before it is disconnected. A domain
+  pointed elsewhere is never made primary, and DNS that does not answer changes nothing.
 * **A redirect's path is kept as the storefront looks it up** ([ADR-052](../architecture/13-decision-log.md#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)):
   `redirectPath` in the online store and `redirectKey` in `@hatti/storefront-data` give the same
   form, decoded, lowercase, without repeated or trailing slashes; change them together, with
@@ -2380,7 +2385,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   (`settings.alertsPhone`), with no customer or order; none is queued while it gives none. Keep
   the number off the audit log and out of events, as any contact detail. Hatti's notices of the
   shop's bills go there too ([ADR-169](../architecture/13-decision-log.md#adr-169--hatti-tells-a-shop-on-whatsapp-at-the-number-it-gives-for-hattis-alerts-when-its-plans-next-period-is-invoiced-when-its-plan-ends-unpaid-and-when-its-message-credit-falls-below-rs-100-each-once-queued-with-its-messages-from-billings-events-at-hattis-cost-whatever-its-credit-and-never-turned-off)), queued by the worker's
-  `BillingNotices` from billing's events: their templates say `hattiPays`, so that `paidByShop`
+  `BillingNotices` from billing's events, and of a domain DNS points elsewhere by `DomainNotices`
+  (ADR-262), both through `tellShop`: their templates say `hattiPays`, so that `paidByShop`
   keeps both settling and the sender's credit check from charging the shop for them, and they
   are in `ALWAYS_SENT`. Each is queued as an email to the owner too
   ([ADR-195](../architecture/13-decision-log.md#adr-195--a-shops-owner-hears-of-its-bills-with-hatti-by-email-too-at-the-address-their-account-proved-and-in-their-own-language-from-hattis-own-address-the-worker-finds-them-through-identitys-functions-for-the-shop-alone-and-queues-each-email-with-the-shops-messages-at-hattis-cost-with-an-alerts-number-or-without)), whether or not the shop

@@ -340,6 +340,19 @@ describe("Messages' words", () => {
       'No such transfer reached us.',
     ]);
     expect(messageText('transfer_refused', 'ur', refused)).toContain('وجہ: No such transfer');
+    // A domain of the shop's own DNS points elsewhere (ADR-262).
+    const unpointed = { shop: 'Zari Fashions', domain: 'www.zari.pk', date: '10 Oct, 3:00 pm' };
+    expect(messageText('domain_unpointed', 'en', unpointed)).toBe(
+      "Hatti: Zari Fashions's domain www.zari.pk no longer points at Hatti, so shoppers there " +
+        "don't reach the store. Point its CNAME record back at Hatti by 10 Oct, 3:00 pm, or the " +
+        "domain is disconnected and the store's Hatti address takes its place.",
+    );
+    expect(templateParameters('domain_unpointed', unpointed)).toEqual([
+      'Zari Fashions',
+      'www.zari.pk',
+      '10 Oct, 3:00 pm',
+    ]);
+    expect(messageText('domain_unpointed', 'ur', unpointed)).toContain('www.zari.pk');
     // Never from the shop's credit, which may be what the notice is about; always sent.
     expect(MESSAGE_KINDS.filter((kind) => !paidByShop(kind))).toEqual([
       'invoice_due',
@@ -347,6 +360,7 @@ describe("Messages' words", () => {
       'credit_low',
       'transfer_confirmed',
       'transfer_refused',
+      'domain_unpointed',
     ]);
     expect(ALWAYS_SENT).toEqual([
       'one_time_code',
@@ -355,6 +369,7 @@ describe("Messages' words", () => {
       'credit_low',
       'transfer_confirmed',
       'transfer_refused',
+      'domain_unpointed',
     ]);
   });
 
@@ -444,6 +459,7 @@ describe("Messages' words", () => {
       'credit_low',
       'transfer_confirmed',
       'transfer_refused',
+      'domain_unpointed',
     ]);
     const shipped = messageEmail('order_shipped', 'en', SHIPPED.variables)!;
     expect(shipped.from).toBe('shop');

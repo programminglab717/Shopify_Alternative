@@ -58,9 +58,11 @@ every shop has a handle in `control.shops`, and the storefront serves each open 
 Admin API gives each shop its storefront's address. Shops connect domains of their own through
 the Admin API, pointed at the platform with a CNAME record and checked by asking DNS; the
 directory maps the verified ones to the shop, and a page asked for at another of its addresses
-is sent on to its primary domain with a 301 ([ADR-048](./13-decision-log.md#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)). Cloudflare for SaaS custom
-hostnames, with their certificates, and the edge's own copy of the directory come with the
-infrastructure.
+is sent on to its primary domain with a 301 ([ADR-048](./13-decision-log.md#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)). The worker
+checks verified domains again every six hours, and disconnects one DNS has pointed elsewhere
+for three days, its shop told ([ADR-262](./13-decision-log.md#adr-262--shops-verified-domains-are-checked-again-every-six-hours-by-the-worker-one-dns-points-elsewhere-is-noted-and-its-shop-told-once-at-its-alerts-number-and-its-owners-email-and-three-days-on-it-is-disconnected-verified-no-more-nor-primary-the-shops-address-on-the-platforms-domain-primary-in-its-place)).
+Cloudflare for SaaS custom hostnames, with their certificates, and the edge's own copy of the
+directory come with the infrastructure.
 
 ### 2.2 Cache key and cacheability
 

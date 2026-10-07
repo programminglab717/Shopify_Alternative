@@ -8,7 +8,8 @@
 /**
  * The notifications a shop's customers get, the alerts the shop gets itself (ADR-157), and those
  * its staff get of their own work, each at their own number (ADR-191), each of which the shop may
- * turn off; and Hatti's notices of the shop's bills, which it may not (ADR-169).
+ * turn off; and Hatti's notices of the shop's bills (ADR-169), and of a domain of its own DNS
+ * points elsewhere (ADR-262), which it may not.
  */
 export const MESSAGE_KINDS = [
   'order_placed',
@@ -36,6 +37,7 @@ export const MESSAGE_KINDS = [
   'credit_low',
   'transfer_confirmed',
   'transfer_refused',
+  'domain_unpointed',
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
@@ -60,7 +62,7 @@ export type AnyMessageKind = MessageKind | PlatformMessageKind;
 /**
  * Messages a shop cannot turn off: what a shopper asked for, as a code to prove their number, and
  * Hatti's notices of the shop's bills (ADR-169), among them what Hatti found of a transfer the
- * shop said it made (ADR-254).
+ * shop said it made (ADR-254), and of a domain of its own DNS points elsewhere (ADR-262).
  */
 export const ALWAYS_SENT: readonly MessageKind[] = [
   'one_time_code',
@@ -69,6 +71,7 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'credit_low',
   'transfer_confirmed',
   'transfer_refused',
+  'domain_unpointed',
 ];
 
 /** What the buttons of a message asking a customer to confirm their order answer (COD-01). */
@@ -132,6 +135,11 @@ export interface MessageVariables {
   date?: string;
   /** For a sign-in alert (ADR-179): what signed in, "Chrome on Android". */
   device?: string;
+  /**
+   * For a domain of the shop's own DNS points elsewhere (ADR-262): the domain, "www.zari.pk"; and,
+   * in `date`, when it is disconnected unless DNS points it back before.
+   */
+  domain?: string;
   /**
    * For an email of an order's news (ADR-198): the shop's accent colour, "#B45309", and the
    * address of its logo, where it set them; the order's first lines, one to a line, each its name
@@ -554,6 +562,20 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: "Hatti couldn't find {shop}'s transfer for invoice {invoice}",
       ur: 'ہٹی کو انوائس {invoice} کے لیے {shop} کی ٹرانسفر نہیں ملی',
+    },
+  },
+  domain_unpointed: {
+    whatsapp: 'hatti_domain_unpointed',
+    category: 'utility',
+    parameters: ['shop', 'domain', 'date'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: {shop}'s domain {domain} no longer points at Hatti, so shoppers there don't reach the store. Point its CNAME record back at Hatti by {date}, or the domain is disconnected and the store's Hatti address takes its place.",
+      ur: 'ہٹی: {shop} کا ڈومین {domain} اب ہٹی کی طرف نہیں جاتا، اس لیے وہاں آنے والے خریدار اسٹور تک نہیں پہنچ پاتے۔ {date} تک اس کا CNAME ریکارڈ دوبارہ ہٹی کی طرف کریں، ورنہ ڈومین منقطع ہو جائے گا اور اسٹور کا ہٹی والا پتہ اس کی جگہ لے لے گا۔',
+    },
+    subject: {
+      en: "{shop}'s domain {domain} no longer points at Hatti",
+      ur: '{shop} کا ڈومین {domain} اب ہٹی کی طرف نہیں جاتا',
     },
   },
 };
