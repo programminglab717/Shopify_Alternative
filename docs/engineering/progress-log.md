@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### Payment links for many customers
+### f0b4750 · Payment links for many customers
 
 * **A link the shop shares once** ([ADR-248](../architecture/13-decision-log.md#adr-248--a-payment-link-the-shop-shares-once-opens-a-checkout-of-each-customers-own-with-its-items-and-discount-code-until-staff-close-it-its-time-passes-or-its-orders-run-out-one-taken-prepaid-alone-offers-no-cash-on-delivery)): staff make it through
   the Admin API with items, a code, a limit of orders, a time it closes, and prepaid alone if
