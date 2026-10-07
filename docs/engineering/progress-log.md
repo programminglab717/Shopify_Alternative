@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### A map pin for the address
+### 68e83dd · A map pin for the address
 
 * **Where the customer's phone is, at the delivery address** ([ADR-259](../architecture/13-decision-log.md#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)):
   checkout's page and the address forms of orders' and drafts' links offer "Add my location",
