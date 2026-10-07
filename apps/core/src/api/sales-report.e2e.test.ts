@@ -51,9 +51,11 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
   let app: NestFastifyApplication;
   const shop = newId();
   const tokens = { owner: '', products: '' };
+  // From one reading of the clock, so the period is two hours to the millisecond.
+  const now = Date.now();
   const period = {
-    from: new Date(Date.now() - 3_600_000).toISOString(),
-    before: new Date(Date.now() + 3_600_000).toISOString(),
+    from: new Date(now - 3_600_000).toISOString(),
+    before: new Date(now + 3_600_000).toISOString(),
   };
 
   async function issueToken(scopes: string[]): Promise<string> {
