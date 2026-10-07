@@ -450,7 +450,7 @@ export class CheckoutService {
     if (!found) return { kind: 'not_found' };
     // A new code asked for: sent, and nothing placed.
     if (form.resend === 'whatsapp' || form.resend === 'sms') {
-      return this.#sendCode(found, form, form.resend);
+      return this.#sendCode(found, form, form.resend, client);
     }
     // A code typed: the order goes on only once it is the one sent.
     if (form.code.trim() !== '') {
@@ -462,7 +462,7 @@ export class CheckoutService {
     } catch (error) {
       // The shop asks for a code first, or the shopper's store credit does: the order is
       // undone, and one sent on WhatsApp.
-      if (error instanceof NeedsCode) return this.#sendCode(found, form, 'whatsapp');
+      if (error instanceof NeedsCode) return this.#sendCode(found, form, 'whatsapp', client);
       if (!(error instanceof DiscountRefused) && !(error instanceof RefusedForRisk)) throw error;
       // The order is undone; the page says why, with what the shopper typed.
       return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
@@ -487,12 +487,14 @@ export class CheckoutService {
 
   /**
    * Sends a code to the number typed, on `channel`, for the shopper to prove it (CHK-09): the page
-   * again, asking for it. Nothing is placed.
+   * again, asking for it. Nothing is placed. The code keeps the address `client` asked from, which
+   * checkout sends only so many an hour (ADR-249).
    */
   async #sendCode(
     found: { shopId: string; checkoutId: string },
     form: CheckoutForm,
     channel: PhoneChannel,
+    client: CheckoutClient | undefined,
   ): Promise<CheckoutView> {
     return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
       const typed = { ...form, code: '', resend: '' };
@@ -507,6 +509,7 @@ export class CheckoutService {
         phone: address.phone,
         channel,
         shop: view.shop.name,
+        ip: client?.ip ?? null,
       });
       return {
         ...view,

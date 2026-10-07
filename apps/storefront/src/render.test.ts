@@ -1512,7 +1512,8 @@ describe('Storefront rendering', () => {
   it('knows what a page will be before it renders, and renders nothing until it streams', async () => {
     const sample = sampleStore();
     const own = new MemoryStore({ ...sample, shop: { ...sample.shop, domain: 'www.zari.pk' } });
-    const renderer = new PageRenderer(loadTheme(files));
+    // As the other tests, a budget no machine's load runs out of: the page is cut short past it.
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
     const data = own.fresh();
     const ready = await renderer.prepare({ path: '/products/bridal-lehenga-heavy' }, data);
     expect(ready).toMatchObject({ status: 200, domain: 'www.zari.pk' });

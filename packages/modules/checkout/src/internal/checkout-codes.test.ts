@@ -228,6 +228,54 @@ describe.skipIf(!server)('Codes that prove the number at checkout', () => {
     expect(await sent()).toHaveLength(NUMBER_CODE.perCheckout);
   });
 
+  it('sends one internet address at most 20 codes an hour, across checkouts and numbers (ADR-249)', async () => {
+    unwrap(await f.codRules.update(f.a, { verifyFromScore: 0 }));
+    const client = { ip: '203.0.113.7', userAgent: 'Test' };
+    const first = await checkout();
+    await f.checkouts.place(first.secret, first.shown, FORM, { client });
+    const kept = async () =>
+      (
+        await f.admin.query<{ ip: string | null }>(
+          'SELECT host(ip) AS ip FROM checkout.number_codes ORDER BY created_at, id',
+        )
+      ).rows.map((row) => row.ip);
+    expect(await kept()).toEqual(['203.0.113.7']);
+    // Nineteen more lately from the address, to other numbers.
+    await f.admin.query(
+      `INSERT INTO checkout.number_codes (shop_id, checkout_id, phone, channel, code_hash,
+                                          expires_at, ip)
+       SELECT shop_id, checkout_id, '+92300765' || lpad(n::text, 4, '0'), 'whatsapp', code_hash,
+              expires_at, ip
+         FROM checkout.number_codes, generate_series(1, 19) AS n`,
+    );
+    const next = await checkout();
+    const other = { ...FORM, phone: '0321-7654321' };
+    const refused = await f.checkouts.place(next.secret, next.shown, other, { client });
+    expect(problemOf(refused)).toMatchObject({ kind: 'code', state: 'too_many' });
+    expect(checkoutPage(refused).status).toBe(429);
+    // Another address is sent one; so is this one, an hour on.
+    const elsewhere = await f.checkouts.place(next.secret, next.shown, other, {
+      client: { ...client, ip: '2001:db8::1' },
+    });
+    expect(problemOf(elsewhere)).toMatchObject({ kind: 'code', state: 'sent' });
+    await f.admin.query(
+      `UPDATE checkout.number_codes SET created_at = created_at - interval '61 minutes'
+        WHERE host(ip) = '203.0.113.7'`,
+    );
+    const later = await f.checkouts.place(next.secret, next.shown, other, { client });
+    expect(problemOf(later)).toMatchObject({ kind: 'code', state: 'sent' });
+    // What isn't an address is kept as none, and counts for nothing.
+    const unknown = await f.checkouts.place(
+      next.secret,
+      next.shown,
+      { ...other, resend: 'sms' },
+      { client: { ...client, ip: 'unknown' } },
+    );
+    expect(problemOf(unknown)).toMatchObject({ kind: 'code', state: 'sent' });
+    expect((await kept()).slice(-3)).toEqual(['2001:db8::1', '203.0.113.7', null]);
+    expect(await sent()).toHaveLength(4);
+  });
+
   it('asks only of orders paid on delivery scored at the shop’s mark, and only once proved', async () => {
     // No mark: no code.
     let { secret, shown } = await checkout();

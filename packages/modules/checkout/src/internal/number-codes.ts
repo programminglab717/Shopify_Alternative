@@ -1,4 +1,5 @@
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
+import { isIP } from 'node:net';
 import { secretToken, sha256 } from '@hatti/crypto';
 import type { Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
@@ -18,6 +19,12 @@ export const NUMBER_CODE = {
   perCheckout: 5,
   /** Codes one number is sent in a day, across the shop's checkouts. */
   perNumberDaily: 10,
+  /**
+   * Codes asked for from one internet address in an hour, across the shop's checkouts (ADR-249):
+   * an address is shared by many phones on a mobile network, so as many as checkout takes orders
+   * from one.
+   */
+  perAddressHourly: 20,
 } as const;
 
 /**
@@ -105,8 +112,9 @@ export async function checkCodeIn(
 
 /**
  * Sends a new code to `phone` on `channel`, for the checkout, through the shop's messages: the
- * last one sent stops working. None while the checkout sent as many as it may, or the number was
- * sent as many as it may be in a day.
+ * last one sent stops working. None while the checkout sent as many as it may, the number was
+ * sent as many as it may be in a day, or the address `ip` the shopper asked from asked for as many
+ * as it may in an hour (ADR-249); an address that isn't one counts for nothing.
  */
 export async function sendCodeIn(
   tx: Tx,
@@ -117,17 +125,26 @@ export async function sendCodeIn(
     phone: string;
     channel: PhoneChannel;
     shop: string;
+    ip?: string | null;
   },
 ): Promise<'sent' | 'too_many'> {
   const { shopId, checkoutId, phone, channel } = code;
-  const { rows } = await tx.execute<{ checkout: number; number: number }>(sql`
+  const ip = code.ip && isIP(code.ip) !== 0 ? code.ip : null;
+  const { rows } = await tx.execute<{ checkout: number; number: number; address: number }>(sql`
     SELECT count(*) FILTER (WHERE checkout_id = ${checkoutId})::int AS checkout,
            count(*) FILTER (WHERE phone = ${phone}
-                              AND created_at > now() - interval '1 day')::int AS number
+                              AND created_at > now() - interval '1 day')::int AS number,
+           count(*) FILTER (WHERE ip = ${ip}::inet
+                              AND created_at > now() - interval '1 hour')::int AS address
       FROM checkout.number_codes
-     WHERE shop_id = ${shopId} AND (checkout_id = ${checkoutId} OR phone = ${phone})`);
+     WHERE shop_id = ${shopId}
+       AND (checkout_id = ${checkoutId} OR phone = ${phone} OR ip = ${ip}::inet)`);
   const sent = rows[0]!;
-  if (sent.checkout >= NUMBER_CODE.perCheckout || sent.number >= NUMBER_CODE.perNumberDaily) {
+  if (
+    sent.checkout >= NUMBER_CODE.perCheckout ||
+    sent.number >= NUMBER_CODE.perNumberDaily ||
+    sent.address >= NUMBER_CODE.perAddressHourly
+  ) {
     return 'too_many';
   }
   const id = newId();
@@ -135,9 +152,9 @@ export async function sendCodeIn(
   // The last one sent stops working: only the newest is checked.
   await tx.execute(sql`
     INSERT INTO checkout.number_codes (shop_id, id, checkout_id, phone, channel, code_hash,
-                                       expires_at)
+                                       expires_at, ip)
     VALUES (${shopId}, ${id}, ${checkoutId}, ${phone}, ${channel}, ${digest(id, digits)},
-            now() + ${`${NUMBER_CODE.minutes} minutes`}::interval)`);
+            now() + ${`${NUMBER_CODE.minutes} minutes`}::interval, ${ip}::inet)`);
   await messages.queueIn(tx, shopId, {
     kind: 'one_time_code',
     recipient: phone,

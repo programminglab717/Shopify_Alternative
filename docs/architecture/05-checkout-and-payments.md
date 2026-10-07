@@ -428,7 +428,9 @@ flowchart TD
   Rate-limited per phone, IP and device, and skipped for recently verified devices (signed
   device cookie). *Built so far:* the template, and SMS when the WhatsApp message fails or the
   shopper asks for it; six digits, kept as a digest, for ten minutes and five tries; five codes a
-  checkout and ten a number a day. Not yet: the device cookie.
+  checkout, ten a number a day, and twenty an hour from one internet address at a shop
+  ([ADR-249](./13-decision-log.md#adr-249--checkout-sends-one-internet-address-at-most-20-codes-an-hour-across-a-shops-checkouts-each-code-keeping-the-address-it-was-asked-from-until-its-checkout-goes)).
+  Not yet: the device cookie.
 * **Duplicate detection:** same phone with an overlapping basket within 6 h shows a "You already
   placed this order" prompt and flags the order for merging.
 

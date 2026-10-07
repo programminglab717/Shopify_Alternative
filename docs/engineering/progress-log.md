@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Checkout codes limited by internet address** (CHK-09, CHK-18): the one-time codes checkout
-sends, capped for each internet address as well as for each number, so that one address can't
-spend a shop's message credits on codes to many numbers.
+**Sales against the period before, refunds taken off** (ANL-01, ANL-02): the sales report and
+the home's today saying how the period compares with the one before it, and sales net of what
+was refunded, as Shopify's reports show them.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### Checkout's codes limited by internet address
+
+* **20 codes an hour from one address** ([ADR-249](../architecture/13-decision-log.md#adr-249--checkout-sends-one-internet-address-at-most-20-codes-an-hour-across-a-shops-checkouts-each-code-keeping-the-address-it-was-asked-from-until-its-checkout-goes)): each code checkout sends keeps the internet
+  address it was asked from, and the shop's checkouts send one address at most 20 an hour,
+  whatever numbers it types; past it the page says so, as past the other limits.
+* **For it:** migration 0154, `checkout.number_codes.ip`, gone with its checkout a day on.
+* 1784 tests: the limit across checkouts and numbers, another address and an hour on, and
+  what isn't an address.
+* **The storefront's tests given 30 seconds each**, as the core's and the modules' are: two that
+  make a hundred requests, or check passwords with a slow hash, ran past the default five under
+  the whole suite's load, though under a second alone; and the one render test left on the
+  renderer's own budget of 150 ms, which the load ran past, cutting its page short, given the
+  10 seconds the others have.
 
 ### f0b4750 · Payment links for many customers
 

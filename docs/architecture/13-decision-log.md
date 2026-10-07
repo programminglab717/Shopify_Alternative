@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-248 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-249 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -256,6 +256,7 @@
 | 246 | A courier's statement may come as the Excel workbook it was sent as, read from its first sheet shown by a reader of Hatti's own, under a header found below the courier's title rows; and other cash on a parcel paid short before pays what its order still owes | Accepted |
 | 247 | Staff hear on WhatsApp the moment a customer sends the receipt of their transfer for an order still waiting for it: whoever has the order, else the shop's owners and managers, once a receipt | Accepted |
 | 248 | A payment link the shop shares once opens a checkout of each customer's own, with its items and discount code, until staff close it, its time passes or its orders run out; one taken prepaid alone offers no cash on delivery | Accepted |
+| 249 | Checkout sends one internet address at most 20 codes an hour across a shop's checkouts, each code keeping the address it was asked from until its checkout goes | Accepted |
 
 ---
 
@@ -10307,3 +10308,27 @@
     count with them.
   * **Keeping only a digest of the token, as for single customers' links:** staff could not copy
     the link again, and there is nothing private behind it.
+
+## ADR-249 · Checkout sends one internet address at most 20 codes an hour across a shop's checkouts, each code keeping the address it was asked from until its checkout goes
+
+* **Context:** Checkout's codes ([ADR-148](#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)) are capped at five a checkout and ten a
+  number a day, but one internet address could start checkouts for many numbers and have a code
+  sent to each, each costing the shop a message from its credit; CHK-18 asks that checkout be
+  hard to flood.
+* **Decision:**
+  * **The address kept:** each code keeps the address the shopper asked from, as the storefront
+    passes it with the form; one that isn't an address is kept as none.
+  * **The limit:** 20 codes an hour from one address across the shop's checkouts, as many as
+    checkout takes orders from one ([ADR-087](#adr-087--checkout-takes-at-most-three-orders-a-day-from-one-mobile-number-and-twenty-an-hour-from-one-internet-address-counting-the-orders-it-placed-one-at-a-time)), since a mobile network puts many
+    phones behind one address. Past it the page says no more codes are sent for now, as past the
+    other limits, with 429.
+  * **How long it is kept:** a code goes with its checkout, a day after it began, and its address
+    with it.
+* **Consequences:**
+  * One address costs a shop at most 20 messages an hour in codes, whatever numbers it types.
+  * Shoppers behind one busy address may wait an hour for a code; a browser that proved its
+    number lately is not asked ([ADR-199](#adr-199--a-browser-that-proved-a-number-with-a-code-at-a-shops-checkout-is-not-asked-for-another-for-it-there-for-30-days-where-the-shops-risk-rules-would-ask-it-keeps-a-random-token-in-a-cookie-for-checkouts-the-shop-a-digest-of-it-with-the-number-and-when-it-was-proved-spending-store-credit-still-asks-each-time)).
+* **Alternatives:**
+  * **A limit across all shops:** would need the codes of every shop in one count, outside any
+    one shop's rows; an address flooding many shops is the platform's rate limit's to stop.
+  * **Limiting by device:** a script has no device to count.
