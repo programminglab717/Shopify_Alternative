@@ -98,6 +98,21 @@ describe('StorefrontApiClient', () => {
     expect(await requests[2]!.json()).toEqual({ visits: [visit] });
   });
 
+  it("fetches the shop's tracking page, and posts what the shopper typed", async () => {
+    const page = { status: 200, headers: { 'x-a': '1' }, html: '<h1>Track</h1>' };
+    const { client, requests } = clientAnswering(() => Response.json(page));
+    expect(await client.trackingPage('shop-1', null)).toEqual(page);
+    const form = { reference: '#1001', phone: '0300 1234567' };
+    expect(await client.trackingPage('shop-1', form)).toEqual(page);
+    expect(requests.map((request) => [request.method, request.url])).toEqual([
+      ['GET', 'http://core.test/storefront/shops/shop-1/tracking'],
+      ['POST', 'http://core.test/storefront/shops/shop-1/tracking'],
+    ]);
+    expect(await requests[1]!.json()).toEqual(form);
+    const { client: down } = clientAnswering(() => new Response('down', { status: 503 }));
+    await expect(down.trackingPage('shop-1', null)).rejects.toThrow(StorefrontApiError);
+  });
+
   it('opens a payment link, with the visits that brought the shopper', async () => {
     const closed = { status: 410, headers: { 'x-a': '1' }, html: '<p>Closed</p>' };
     const { client, requests } = clientAnswering((request) =>

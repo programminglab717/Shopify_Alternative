@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-250 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-251 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -258,6 +258,7 @@
 | 248 | A payment link the shop shares once opens a checkout of each customer's own, with its items and discount code, until staff close it, its time passes or its orders run out; one taken prepaid alone offers no cash on delivery | Accepted |
 | 249 | Checkout sends one internet address at most 20 codes an hour across a shop's checkouts, each code keeping the address it was asked from until its checkout goes | Accepted |
 | 250 | The sales report says what the period as long just before came to, and the home what yesterday came to by this time of day; refunds are said beside sales, not taken off them | Accepted |
+| 251 | The shop's storefront has a tracking page where a customer finds their order by its number or a tracking number with the mobile number they ordered with, and sees its parcels' steps but nothing of its address or items | Accepted |
 
 ---
 
@@ -10357,3 +10358,29 @@
   * **The same period a year before:** most shops have no year behind them yet.
   * **Refunds taken off net sales, returns left:** a refused parcel of cash on delivery refunds
     nothing, and would then take nothing off.
+
+## ADR-251 · The shop's storefront has a tracking page where a customer finds their order by its number or a tracking number with the mobile number they ordered with, and sees its parcels' steps but nothing of its address or items
+
+* **Context:** A customer's order page is the branded tracking page ([ADR-160](#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)), but
+  only its link reaches it, and customers lose links, or have only the tracking number the
+  courier's message gave them (SHP-05). An order has one link, which a new one would replace.
+* **Decision:**
+  * **The page:** `/track` on the shop's storefront, in English and Urdu, in the shop's colours:
+    a form for the order's number or a parcel's tracking number, and the mobile number the order
+    was placed with. The core renders it, as it renders checkouts', for storefronts alone.
+  * **What finds an order:** its number, written `#1001` or `1001`, or a tracking number of one
+    of its parcels in any case, with its customer's number however it is written. A wrong
+    number, another shop's order and an order the shop lacks all show the same page, so the page
+    tells nothing of whether an order exists.
+  * **What it shows:** how the order is doing and each parcel's steps, as its link's page does;
+    nothing of its address, its items or its amounts, nor any of the link's forms.
+  * **How often:** a storefront takes ten lookups a minute from an internet address, and none
+    posted from another site.
+* **Consequences:**
+  * A customer finds their parcel with what they have, without staff sending the link again.
+  * Someone who knows a customer's number and an order's number sees how it is doing, as
+    couriers' own tracking pages show anyone with a tracking number.
+* **Alternatives:**
+  * **A new link for the order, sent to the customer's WhatsApp:** would replace the link they
+    have, and cost a message each time.
+  * **The tracking number alone:** couriers number parcels in series, so one could be guessed.

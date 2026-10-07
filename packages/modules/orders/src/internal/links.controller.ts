@@ -1,11 +1,26 @@
 import { isFormFile } from '@hatti/api';
-import { Body, Controller, Get, Param, Post, Query, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { DraftOrderService } from './draft-order.service.js';
-import { draftLinkPage, orderLinkPage, type LinkPage } from './link-pages.js';
+import { draftLinkPage, orderLinkPage, trackingPage, type LinkPage } from './link-pages.js';
 import { DRAFT_LINK_PATH, ORDER_LINK_PATH, type AddressForm, type LinkClient } from './links.js';
 import { OrderLinkService, type OrderLinkView } from './order-link.service.js';
+import { OrderTrackingService } from './tracking.service.js';
 import type { ReceiptUpload } from './transfer-receipt.service.js';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /**
  * Sent with every response: the address carries the link's secret, so the page is never cached,
@@ -211,6 +226,52 @@ export class OrderLinkController {
     }
     await send(reply, orderLinkPage(view, { form: action === 'address' ? action : undefined }));
   }
+}
+
+/**
+ * The shop's tracking page as storefronts ask for it (SHP-05, ADR-251): `GET
+ * …/tracking` gives its form and `POST` the order what the shopper typed finds, `reference` and
+ * `phone`, each as the page to send, with its status and headers, as JSON. Storefronts limit how
+ * often an address asks; the host application checks the storefront key before any of this runs.
+ */
+@Controller('storefront/shops/:shopId/tracking')
+export class StorefrontTrackingController {
+  constructor(private readonly tracking: OrderTrackingService) {}
+
+  @Get()
+  @Header('cache-control', 'no-store')
+  async form(@Param('shopId') shopId: string): Promise<TrackingPageJson> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    return pageJson(trackingPage(await this.tracking.page(shopId)));
+  }
+
+  @Post()
+  @HttpCode(200)
+  @Header('cache-control', 'no-store')
+  async find(@Param('shopId') shopId: string, @Body() body: unknown): Promise<TrackingPageJson> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const form = { reference: field(body, 'reference'), phone: field(body, 'phone') };
+    return pageJson(trackingPage(await this.tracking.find(shopId, form)));
+  }
+}
+
+/** A page as storefronts send it, as `@hatti/storefront-api`'s TrackingPageResponse. */
+interface TrackingPageJson {
+  status: number;
+  headers: Record<string, string>;
+  html: string;
+}
+
+function pageJson(page: LinkPage): TrackingPageJson {
+  return {
+    status: page.status,
+    headers: {
+      ...PRIVATE_PAGE_HEADERS,
+      'content-security-policy': page.contentSecurityPolicy,
+      'content-type': 'text/html; charset=utf-8',
+    },
+    html: page.html,
+  };
 }
 
 /** The order's page at a draft's secret, relative to the draft's (ADR-223). */

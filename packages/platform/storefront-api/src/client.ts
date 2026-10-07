@@ -7,6 +7,7 @@ import {
   cartPath,
   checkoutsPath,
   paymentLinkPath,
+  trackingPath,
   type CartActionName,
   type CartBodies,
   type CartChangeResponse,
@@ -19,6 +20,8 @@ import {
   type CheckoutStartRequest,
   type CheckoutStartResponse,
   type PaymentLinkOpenResponse,
+  type TrackingPageResponse,
+  type TrackingRequest,
   type StorefrontVisit,
 } from './cart.js';
 import {
@@ -146,6 +149,20 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return (await response.json()) as PaymentLinkOpenResponse;
+  }
+
+  /**
+   * The shop's tracking page (ADR-251): its form, or, with `form`, the order what the shopper
+   * typed finds.
+   */
+  async trackingPage(shopId: string, form: TrackingRequest | null): Promise<TrackingPageResponse> {
+    const response = form
+      ? await this.#request('POST', trackingPath(shopId), null, form)
+      : await this.#request('GET', trackingPath(shopId), null);
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return (await response.json()) as TrackingPageResponse;
   }
 
   /**

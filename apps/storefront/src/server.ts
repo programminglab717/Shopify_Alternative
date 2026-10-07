@@ -162,6 +162,12 @@ const SIGN_UPS = { name: 'sign-ups', limit: 10, windowMs: 60_000 };
  */
 const COMMENTS = { name: 'comments', limit: 5, windowMs: 60_000 };
 
+/**
+ * Orders an address may look up a minute on a shop's tracking page (ADR-251): a customer looks
+ * for one or two, and a script trying numbers many.
+ */
+const TRACKING_LOOKUPS = { name: 'tracking-lookups', limit: 10, windowMs: 60_000 };
+
 /** The longest password a shopper's try is checked for: shops' are at most 100 characters. */
 const PASSWORD_TYPED_MAX = 200;
 
@@ -1377,6 +1383,43 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
   };
   for (const path of ['/pay/:token', '/ur/pay/:token']) app.get(path, paymentLink);
+
+  /**
+   * The shop's tracking page (SHP-05, ADR-251), `/track`: its form, and a customer's order found
+   * by its number or a tracking number, with the mobile number they ordered with, as the core
+   * renders it. Lookups come from the shop's own pages, at most {@link TRACKING_LOOKUPS} a minute
+   * from an address.
+   */
+  const trackingPage = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const posted = request.method === 'POST';
+    reply.header('cache-control', 'no-store');
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no orders');
+      if (posted && request.headers['sec-fetch-site'] === 'cross-site') {
+        return await reply
+          .code(403)
+          .type('text/plain; charset=utf-8')
+          .send('Orders are looked up from the shop itself.\n');
+      }
+      if (posted && limiter && !(await limiter.hit(TRACKING_LOOKUPS, request.ip)).allowed) {
+        return await tooMany(reply);
+      }
+      const fields = posted ? textFields(paramsOf(request)) : null;
+      const page = await core.trackingPage(
+        found.shopId,
+        fields && { reference: fields.reference ?? '', phone: fields.phone ?? '' },
+      );
+      return await reply.code(page.status).headers(page.headers).send(page.html);
+    } catch (error) {
+      if (!unreachable(request, error)) throw error;
+      return unavailable(reply);
+    }
+  };
+  for (const path of ['/track', '/ur/track']) {
+    app.route({ method: ['GET', 'POST'], url: path, handler: trackingPage });
+  }
 
   /** Whether the address has asked for more searches this minute than {@link SEARCHES} allows. */
   const searchedTooMuch = async (request: FastifyRequest): Promise<boolean> =>

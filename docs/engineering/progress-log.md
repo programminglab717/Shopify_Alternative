@@ -6,9 +6,8 @@
 
 ## In progress
 
-**A tracking page found by tracking number** (SHP-05): the shop's branded tracking page, which
-a customer reaches with their order's link today, found as well by the tracking number the
-courier's message gave them, and the number they ordered with.
+**Next from the gaps found**: translations of what is deleted removed with it, the audit log
+of staff's changes, and domains checked again, each as its own change.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +16,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### A tracking page found by tracking number
+
+* **`/track` on the shop's storefront** ([ADR-251](../architecture/13-decision-log.md#adr-251--the-shops-storefront-has-a-tracking-page-where-a-customer-finds-their-order-by-its-number-or-a-tracking-number-with-the-mobile-number-they-ordered-with-and-sees-its-parcels-steps-but-nothing-of-its-address-or-items)): a customer finds their order by its number or a
+  parcel's tracking number with the mobile number they ordered with, and sees how it is doing
+  and each parcel's steps, but nothing of its address or items; a wrong number finds nothing,
+  as an order the shop lacks does.
+* **For it:** the orders module's `OrderTrackingService` and page, the core's route for
+  storefronts, the storefront API's `trackingPage`, and the storefront's `/track`, ten lookups a
+  minute from an address.
+* 1790 tests: found by number or tracking number, not by another number or shop, nothing of
+  the address shown; the storefront's route and limit; through the API end to end.
 
 ### 03c7f0d · Sales beside the period before, and refunds
 

@@ -37,6 +37,27 @@ export function paymentLinkPath(shopId: string, token: string): string {
 }
 
 /**
+ * The shop's tracking page (ADR-251): GET for its form, POST with what the shopper typed, a
+ * {@link TrackingRequest}.
+ */
+export function trackingPath(shopId: string): string {
+  return `${STOREFRONT_API_PREFIX}shops/${shopId}/tracking`;
+}
+
+/** What a shopper typed to find their order: its number or a tracking number, and their mobile. */
+export interface TrackingRequest {
+  reference: string;
+  phone: string;
+}
+
+/** The tracking page as the core renders it, with the status and headers to send it with. */
+export interface TrackingPageResponse {
+  status: number;
+  headers: Record<string, string>;
+  html: string;
+}
+
+/**
  * Carry, with the POST that places an order, where the shopper placed it from: the address and
  * `User-Agent` their browser gave the storefront, which the order keeps as what it agreed from
  * (ADR-057).

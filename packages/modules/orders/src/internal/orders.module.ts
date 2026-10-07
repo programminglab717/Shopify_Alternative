@@ -35,7 +35,11 @@ import {
   RefundReceiptResolver,
   TransferReceiptResolver,
 } from './graphql/transfer-receipt.resolver.js';
-import { DraftLinkController, OrderLinkController } from './links.controller.js';
+import {
+  DraftLinkController,
+  OrderLinkController,
+  StorefrontTrackingController,
+} from './links.controller.js';
 import { ExportScheduleService } from './export-schedule.service.js';
 import { OrderExportService } from './order-export.service.js';
 import { OrderLinkService } from './order-link.service.js';
@@ -51,6 +55,7 @@ import { RiskSettingsService } from './risk-settings.service.js';
 import { SalesReportService } from './sales-report.service.js';
 import { SavedSearchService } from './saved-search.service.js';
 import { TodayService } from './today.service.js';
+import { OrderTrackingService } from './tracking.service.js';
 import { TransferReceiptService } from './transfer-receipt.service.js';
 
 /**
@@ -61,7 +66,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
  */
 @Module({
   imports: [CatalogModule, InventoryModule, CustomersModule],
-  controllers: [DraftLinkController, OrderLinkController],
+  controllers: [DraftLinkController, OrderLinkController, StorefrontTrackingController],
   providers: [
     OrderService,
     DraftOrderService,
@@ -82,6 +87,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     TransferReceiptService,
     SavedSearchService,
     TodayService,
+    OrderTrackingService,
     OrderCommentService,
     OrderEditService,
     ReturnService,

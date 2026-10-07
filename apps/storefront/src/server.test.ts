@@ -25,6 +25,8 @@ import {
   type CheckoutClient,
   type CheckoutPageResponse,
   type PaymentLinkOpenResponse,
+  type TrackingPageResponse,
+  type TrackingRequest,
   type ContentSearchOptions,
   type ContentSearchResponse,
   type SearchOptions,
@@ -327,6 +329,19 @@ class FakeCore {
     this.links.push({ token, visits });
     if (this.link instanceof Error) throw this.link;
     return this.link;
+  }
+
+  /** The tracking lookups asked for, and the page the core answers with. */
+  readonly lookups: (TrackingRequest | null)[] = [];
+  tracking: TrackingPageResponse = {
+    status: 200,
+    headers: { 'content-type': 'text/html; charset=utf-8' },
+    html: '<h1>Track your order</h1>',
+  };
+
+  async trackingPage(_shopId: string, form: TrackingRequest | null): Promise<TrackingPageResponse> {
+    this.lookups.push(form);
+    return this.tracking;
   }
 
   async checkoutPage(
@@ -943,6 +958,34 @@ describe('Carts', () => {
       '/cart',
       undefined,
     ]);
+    await app.close();
+  });
+
+  it('shows the tracking page, and passes on what the shopper typed, so often an address (ADR-251)', async () => {
+    const app = server();
+    const page = await app.inject({ method: 'GET', url: '/track', headers: { host: 'localhost' } });
+    expect([page.statusCode, page.body, page.headers['cache-control']]).toEqual([
+      200,
+      '<h1>Track your order</h1>',
+      'no-store',
+    ]);
+    const typed = 'reference=%231001&phone=0300+1234567&extra=1';
+    const ask = (headers: Record<string, string> = {}) =>
+      app.inject({
+        method: 'POST',
+        url: '/ur/track',
+        headers: {
+          host: 'localhost',
+          'content-type': 'application/x-www-form-urlencoded',
+          ...headers,
+        },
+        payload: typed,
+      });
+    expect((await ask()).statusCode).toBe(200);
+    expect(core.lookups).toEqual([null, { reference: '#1001', phone: '0300 1234567' }]);
+    // Not from another site.
+    expect((await ask({ 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403);
+    expect(core.lookups).toHaveLength(2);
     await app.close();
   });
 
@@ -2880,6 +2923,24 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       'Too many searches. Please wait a moment.\n',
     ]);
     expect(core.searches).toHaveLength(240);
+    await app.close();
+  });
+
+  it('limits how often an address can look up orders (ADR-251)', async () => {
+    const core = new FakeCore();
+    const app = server(core);
+    const answers = [];
+    for (let lookup = 0; lookup < 11; lookup += 1) {
+      const answer = await app.inject({
+        method: 'POST',
+        url: '/track',
+        headers: { host: 'bazaar.localhost', 'content-type': 'application/x-www-form-urlencoded' },
+        payload: 'reference=PX1&phone=03001234567',
+      });
+      answers.push(answer.statusCode);
+    }
+    expect(answers).toEqual([...Array<number>(10).fill(200), 429]);
+    expect(core.lookups).toHaveLength(10);
     await app.close();
   });
 

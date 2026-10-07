@@ -31,6 +31,7 @@ import {
 } from './online-payment-page.js';
 import type { OnlineGateway } from './online-payments.js';
 import type { OrderLinkView } from './order-link.service.js';
+import type { TrackingView } from './tracking.service.js';
 import type { FulfillmentEventRecord, FulfillmentRecord, OrderRecord } from './records.js';
 import { addressChangeable, awaitsCustomer, itemName, orderName } from './rules.js';
 import type { FulfillmentEventStatusValue, StoredAddressValue } from './schema.js';
@@ -96,6 +97,10 @@ const LABELS = {
   saveAddress: { en: 'Save address', ur: 'پتہ محفوظ کریں' },
   payOnline: { en: 'Pay online', ur: 'آن لائن ادائیگی کریں' },
   backToOrder: { en: 'Back to my order', ur: 'واپس اپنے آرڈر پر' },
+  trackTitle: { en: 'Track your order', ur: 'اپنا آرڈر ٹریک کریں' },
+  trackAnother: { en: 'Track another order', ur: 'کوئی اور آرڈر ٹریک کریں' },
+  reference: { en: 'Order or tracking number', ur: 'آرڈر یا ٹریکنگ نمبر' },
+  findOrder: { en: 'Find my order', ur: 'میرا آرڈر تلاش کریں' },
 } satisfies Record<string, Words>;
 
 /** A parcel's steps, as its page names them (ADR-160): shipped, then each its courier told of. */
@@ -906,6 +911,102 @@ function statusPage(
         cancellable && cancelLink(),
       );
   }
+}
+
+/**
+ * The shop's tracking page (SHP-05, ADR-251): the form that finds an order by its number or a
+ * parcel's tracking number, with the mobile number it was placed with; once found, how it is
+ * doing and its parcels' steps, but nothing of its address or items, and the form again below.
+ */
+export function trackingPage(view: TrackingView): LinkPage {
+  const { shop, form } = view;
+  const formHtml = (open: boolean) =>
+    html`<form method="post" class="${open ? 'stack' : 'section'}">
+      ${!open && html`<h2 class="label">${say('bilingual', LABELS.trackAnother)}</h2>`}
+      <div class="field">
+        <label class="label" for="reference">${say('bilingual', LABELS.reference)}</label>
+        <input
+          id="reference"
+          name="reference"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          value="${open ? form.reference : ''}"
+          aria-required="true"
+        />
+      </div>
+      <div class="field">
+        <label class="label" for="phone">${say('bilingual', LABELS.mobile)}</label>
+        <input
+          id="phone"
+          name="phone"
+          type="tel"
+          dir="ltr"
+          autocomplete="tel"
+          value="${open ? form.phone : ''}"
+          aria-required="true"
+        />
+      </div>
+      <button class="button stack" type="submit">${say('bilingual', LABELS.findOrder)}</button>
+    </form>`;
+  if (view.kind === 'form') {
+    const problem =
+      view.problem === 'blank'
+        ? {
+            en: 'Enter your order or tracking number, and the mobile number you ordered with.',
+            ur: 'اپنا آرڈر یا ٹریکنگ نمبر، اور وہ موبائل نمبر لکھیں جس سے آپ نے آرڈر دیا تھا۔',
+          }
+        : view.problem === 'not_found'
+          ? {
+              en:
+                'We found no order with that number and mobile number. Check them both, or ask ' +
+                `${shop.name} in your chat.`,
+              ur: 'اس نمبر اور موبائل نمبر کا کوئی آرڈر نہیں ملا۔ دونوں دیکھ لیں، یا اپنی چیٹ میں دکان سے پوچھیں۔',
+            }
+          : null;
+    return page(problem ? 404 : 200, `${LABELS.trackTitle.en} · ${shop.name}`, shop, [
+      shopName(shop),
+      problem && banner(problem),
+      heading(LABELS.trackTitle),
+      paragraphs(
+        {
+          en: 'Enter the number of your order, or the tracking number the courier sent you.',
+          ur: 'اپنے آرڈر کا نمبر، یا کوریئر کا بھیجا ہوا ٹریکنگ نمبر لکھیں۔',
+        },
+        'center muted',
+      ),
+      formHtml(true),
+    ]);
+  }
+  const { order, steps } = view;
+  const name = orderName(order.number);
+  const title =
+    order.stage === 'cancelled'
+      ? LABELS.cancelledTitle
+      : order.stage === 'delivered' || order.stage === 'completed'
+        ? LABELS.deliveredTitle
+        : order.stage === 'returning' || order.stage === 'returned' || order.stage === 'lost'
+          ? LABELS.notDeliveredTitle
+          : order.stage === 'in_transit' || order.stage === 'partially_fulfilled'
+            ? order.fulfillments.some(
+                (parcel) =>
+                  parcel.status === 'in_transit' &&
+                  steps.get(parcel.id)?.at(-1)?.status === 'out_for_delivery',
+              )
+              ? LABELS.outForDeliveryTitle
+              : LABELS.onItsWayTitle
+            : order.stage === 'awaiting_payment'
+              ? LABELS.awaitingPaymentTitle
+              : order.stage === 'to_pack' || order.stage === 'to_book'
+                ? LABELS.confirmedTitle
+                : LABELS.placedTitle;
+  return page(200, `${title.en} · ${shop.name}`, shop, [
+    shopName(shop),
+    heading(title),
+    paragraphs({ en: `Your order ${name}`, ur: html`آپ کا آرڈر ${ltr(name)}` }, 'center'),
+    parcels(order, steps, shop.timezone),
+    formHtml(false),
+  ]);
 }
 
 /**

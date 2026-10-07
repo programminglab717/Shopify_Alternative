@@ -344,6 +344,9 @@ Hatti does not follow. The customer's order page is the branded tracking page (S
 parcel's way, the latest step first, in English and Urdu, in the shop's colours. The shipped
 message links it, and a parcel out for delivery with cash to collect tells its customer what to
 keep ready.
+A customer finds it without the link too, on the shop's storefront at `/track`, by the
+order's number or a tracking number with the mobile number they ordered with, which
+shows the parcels' steps but not the address or items ([ADR-251](./13-decision-log.md#adr-251--the-shops-storefront-has-a-tracking-page-where-a-customer-finds-their-order-by-its-number-or-a-tracking-number-with-the-mobile-number-they-ordered-with-and-sees-its-parcels-steps-but-nothing-of-its-address-or-items)).
 
 ### 5.4 Smart courier allocation
 

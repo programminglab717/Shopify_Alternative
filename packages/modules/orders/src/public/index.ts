@@ -93,6 +93,7 @@ export {
 export {
   draftLinkPage,
   orderLinkPage,
+  trackingPage,
   type LinkPage,
   type LinkPageOptions,
 } from '../internal/link-pages.js';
@@ -286,6 +287,11 @@ export {
   type SavedSearchUpdateInput,
 } from '../internal/saved-search.service.js';
 export { TodayService, type OrderToday } from '../internal/today.service.js';
+export {
+  OrderTrackingService,
+  type TrackingForm,
+  type TrackingView,
+} from '../internal/tracking.service.js';
 export { OrdersModule } from '../internal/orders.module.js';
 export { Order, OrderAgreement, OrderEvent } from '../internal/graphql/order.types.js';
 export { DocumentLanguage, PaperSize } from '../internal/graphql/document.types.js';
