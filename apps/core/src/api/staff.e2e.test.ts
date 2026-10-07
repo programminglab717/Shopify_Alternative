@@ -644,6 +644,74 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       ]);
     });
 
+    it("lists what the shop's staff and apps changed, by whom, on its activity log (ADR-256)", async () => {
+      const manager = await signUp();
+      await grant(manager.userId, shopA, 'manager');
+      await enableTwoStep(manager.accessToken);
+      const created = await graphql(
+        manager.accessToken,
+        shopA,
+        'mutation { productCreate(input: { title: "Rilli" }) { product { id } } }',
+      );
+      const productId = created.json().data.productCreate.product.id as string;
+      const app = await appOfShopA(['write_products', 'read_settings']);
+      await app(
+        `mutation { productUpdate(input: { id: "${productId}", title: "Rilli quilt" }) {
+           product { title } } }`,
+      );
+      const ACTIVITY = (args: string) =>
+        `{ activityLog(${args}) { nodes { id type subjectType subjectId actor { kind id role }
+             occurredAt } pageInfo { hasNextPage endCursor } } }`;
+      const { activityLog } = await app(ACTIVITY(`subjectId: "${productId}"`));
+      expect(activityLog.nodes).toEqual([
+        {
+          id: expect.stringMatching(/^evt_/),
+          type: 'product.updated',
+          subjectType: 'product',
+          subjectId: productId,
+          actor: { kind: 'APP', id: expect.stringMatching(/^tok_/), role: null },
+          occurredAt: expect.any(String),
+        },
+        {
+          id: expect.stringMatching(/^evt_/),
+          type: 'product.created',
+          subjectType: 'product',
+          subjectId: productId,
+          actor: { kind: 'STAFF', id: toPublicId('user', manager.userId), role: 'manager' },
+          occurredAt: expect.any(String),
+        },
+      ]);
+      // A page at a time, the latest first; and by type.
+      const first = (await app(ACTIVITY(`subjectId: "${productId}", first: 1`))).activityLog;
+      expect([first.nodes.map((node: Json) => node.type), first.pageInfo.hasNextPage]).toEqual([
+        ['product.updated'],
+        true,
+      ]);
+      const next = (
+        await app(ACTIVITY(`subjectId: "${productId}", after: "${first.pageInfo.endCursor}"`))
+      ).activityLog;
+      expect(next.nodes.map((node: Json) => node.type)).toEqual(['product.created']);
+      expect(
+        (await app(ACTIVITY('type: "product.created", first: 250'))).activityLog.nodes.some(
+          (node: Json) => node.subjectId === productId,
+        ),
+      ).toBe(true);
+      // Staff without read_settings see none of it; nor does another shop.
+      const packer = await signUp();
+      await grant(packer.userId, shopA, 'packer');
+      const denied = await graphql(packer.accessToken, shopA, ACTIVITY('first: 1'));
+      expect(denied.json().errors[0].extensions.code).toBe('ACCESS_DENIED');
+      const other = await signUp();
+      await grant(other.userId, shopB, 'manager');
+      await enableTwoStep(other.accessToken);
+      const elsewhere = await graphql(
+        other.accessToken,
+        shopB,
+        ACTIVITY(`subjectId: "${productId}"`),
+      );
+      expect(elsewhere.json().data.activityLog.nodes).toEqual([]);
+    });
+
     it('lets owners and managers refund, and no other staff', async () => {
       const app = await appOfShopA(['write_products', 'write_orders']);
       const orderId = await orderOfShopA(app, 'PREPAID');

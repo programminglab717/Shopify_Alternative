@@ -27,7 +27,7 @@ import { TaxModule } from '@hatti/tax/public';
 import type { Logger } from '@hatti/logger';
 import { ObjectStorage } from '@hatti/storage';
 import { Global, Module, type DynamicModule } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { GraphQLModule } from '@nestjs/graphql';
 import { MercuriusDriver, type MercuriusDriverConfig } from '@nestjs/mercurius';
 import type { FastifyRequest } from 'fastify';
@@ -36,6 +36,7 @@ import type { Redis } from 'ioredis';
 import mercurius from 'mercurius';
 import { ADMIN_GRAPHQL_PATH, LOGGER, REDIS } from './constants.js';
 import { HealthController } from './health.controller.js';
+import { ActivityResolver, EventActorInterceptor } from './activity.resolver.js';
 import { AuditResolver } from './audit.resolver.js';
 import { HomeResolver } from './home.resolver.js';
 import { StorefrontSessionsResolver } from './storefront-sessions.resolver.js';
@@ -217,6 +218,7 @@ export class ApiModule {
       providers: [
         ShopResolver,
         AuditResolver,
+        ActivityResolver,
         StaffResolver,
         SupportAccessResolver,
         OrderAgreementResolver,
@@ -230,6 +232,8 @@ export class ApiModule {
         SetupChecklistService,
         SetupResolver,
         { provide: APP_GUARD, useClass: ScopesGuard },
+        // What a request records carries its caller, for the shop's activity log (ADR-256).
+        { provide: APP_INTERCEPTOR, useClass: EventActorInterceptor },
       ],
     };
   }

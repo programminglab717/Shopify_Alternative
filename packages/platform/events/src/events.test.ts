@@ -21,8 +21,11 @@ import {
   BullMqEventPublisher,
   EventHandlerRegistry,
   OutboxRelay,
+  actingAs,
   appendEvent,
   appendEvents,
+  currentActor,
+  listActivity,
   createEventQueue,
   createEventWorker,
   createRedis,
@@ -91,7 +94,7 @@ describe.skipIf(!server)('outbox', () => {
   });
 
   beforeEach(async () => {
-    await admin.query('DELETE FROM platform.outbox_events');
+    await admin.query('DELETE FROM platform.outbox_events; DELETE FROM platform.activity_log');
   });
 
   it('records events only when the transaction commits', async () => {
@@ -114,6 +117,116 @@ describe.skipIf(!server)('outbox', () => {
     expect(rows).toEqual([
       { id: event.id, event_type: 'product.updated', payload: { title: 'Lawn suit' } },
     ]);
+  });
+
+  it("carries who made it where a request says, and lists the shop's activity by it (ADR-256)", async () => {
+    const ayesha = { kind: 'staff' as const, id: newId(), role: 'manager' };
+    const app = { kind: 'app' as const, id: newId(), role: null };
+    // The worker's own: no one.
+    const swept = await append('product.updated');
+    const created = await actingAs(ayesha, () => append('product.created'));
+    const [first, second] = await actingAs(app, async () => {
+      expect(currentActor()).toEqual(app);
+      // Through any number of awaits, and every event of one statement.
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      return db.tenant(shopId, (tx) =>
+        appendEvents(tx, shopId, [
+          {
+            type: 'collection.updated',
+            aggregateType: 'collection',
+            aggregateId: newId(),
+            payload: {},
+          },
+          {
+            type: 'tax_settings.updated',
+            aggregateType: 'tax_settings',
+            aggregateId: shopId,
+            payload: {},
+          },
+        ]),
+      );
+    });
+    expect(currentActor()).toBeNull();
+    // Only if what it describes commits.
+    await expect(
+      actingAs(ayesha, () =>
+        db.tenant(shopId, async (tx) => {
+          await appendEvent(tx, shopId, {
+            type: 'product.deleted',
+            aggregateType: 'product',
+            aggregateId: newId(),
+            payload: {},
+          });
+          throw new Error('rollback');
+        }),
+      ),
+    ).rejects.toThrow('rollback');
+    // Each is in the outbox all the same; the request's on the activity log too, by whom.
+    const outbox = await admin.query<{ id: string }>(
+      'SELECT id FROM platform.outbox_events ORDER BY id',
+    );
+    expect(outbox.rows.map((row) => row.id)).toEqual([swept.id, created.id, first!.id, second!.id]);
+    const { rows } = await admin.query(
+      `SELECT id, event_type, actor_kind, actor_id, actor_role
+         FROM platform.activity_log ORDER BY id`,
+    );
+    expect(rows).toEqual([
+      {
+        id: created.id,
+        event_type: 'product.created',
+        actor_kind: 'staff',
+        actor_id: ayesha.id,
+        actor_role: 'manager',
+      },
+      {
+        id: first!.id,
+        event_type: 'collection.updated',
+        actor_kind: 'app',
+        actor_id: app.id,
+        actor_role: null,
+      },
+      {
+        id: second!.id,
+        event_type: 'tax_settings.updated',
+        actor_kind: 'app',
+        actor_id: app.id,
+        actor_role: null,
+      },
+    ]);
+
+    // The shop's activity: what its staff and apps did, the latest first, never what it recorded.
+    const page = await db.tenant(shopId, (tx) => listActivity(tx, shopId, { first: 2 }));
+    expect(page.hasNextPage).toBe(true);
+    expect(page.items).toEqual([
+      {
+        id: second!.id,
+        type: 'tax_settings.updated',
+        aggregateType: 'tax_settings',
+        aggregateId: shopId,
+        actor: app,
+        occurredAt: expect.any(Date),
+      },
+      expect.objectContaining({ id: first!.id, type: 'collection.updated' }),
+    ]);
+    const rest = await db.tenant(shopId, (tx) =>
+      listActivity(tx, shopId, { first: 2, after: first!.id }),
+    );
+    expect(rest).toEqual({
+      items: [expect.objectContaining({ id: created.id, actor: ayesha })],
+      hasNextPage: false,
+    });
+    const ids = async (query: { aggregateId?: string; type?: string }) =>
+      (
+        await db.tenant(shopId, (tx) => listActivity(tx, shopId, { first: 10, ...query }))
+      ).items.map((item) => item.id);
+    expect(await ids({ aggregateId: created.aggregateId })).toEqual([created.id]);
+    expect(await ids({ type: 'collection.updated' })).toEqual([first!.id]);
+    // Another shop's transaction sees none of it, whichever shop it asks for.
+    const elsewhere = newId();
+    expect(await db.tenant(elsewhere, (tx) => listActivity(tx, shopId, { first: 10 }))).toEqual({
+      items: [],
+      hasNextPage: false,
+    });
   });
 
   it('records several events with one statement, in order', async () => {

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-255 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-256 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -263,6 +263,7 @@
 | 253 | A courier account's parcels waiting to be picked up are handed to its courier through its API, PostEx's load sheet for its pickup address and Leopards' naming the rider who takes them; each pickup keeps its parcels and the courier's sheet, and a parcel its rider missed goes in the next a day later | Accepted |
 | 254 | A shop pays Hatti's invoice by transfer or Raast into Hatti's own bank account, its owner giving the transfer's reference; Hatti's people confirm it once they find it, which pays the invoice as a gateway's payment does, with what its other payments brought, or refuse it, saying why, and the owner hears either way | Accepted |
 | 255 | What a card or a JazzCash wallet paid goes back through JazzCash's refunds, a wallet's with the MPIN the shop gives; a payment keeps how its customer paid, as its gateway said, and a voucher paid at a shop goes back another way; claimed whole until tried against its sandbox | Accepted |
+| 256 | What the shop's staff and apps change goes on its activity log: each event a request of the Admin API records, written in the same statement as the outbox's, by whom and to what, never what it recorded, in a table of its own kept as long as the audit log | Accepted |
 
 ---
 
@@ -10570,3 +10571,51 @@
     what its return said already.
   * **Parts at once:** an amount misread would give back the wrong sum; Safepay's waited for its
     sandbox too.
+
+## ADR-256 · What the shop's staff and apps change goes on its activity log: each event a request of the Admin API records, written in the same statement as the outbox's, by whom and to what, never what it recorded, in a table of its own kept as long as the audit log
+
+* **Context:** The shop's activity and audit log (ADM-04) is the MVP's. The audit log
+  ([ADR-027](#adr-027--customers-numbers-are-masked-by-role-and-reveals-go-to-an-append-only-audit-log)) keeps what a shop may need to account for, with its details: a number
+  revealed, an export, an erasure, a refund, support's looks ([ADR-156](#adr-156--hattis-support-looks-at-a-shop-only-while-its-owner-allows-it-15-minutes-to-a-day-its-agents-hattis-own-people-signed-in-with-a-second-factor-come-as-a-caller-of-their-own-with-every-read-scope-numbers-masked-change-nothing-and-each-of-their-requests-goes-on-the-shops-audit-log-before-it-runs)). The rest, a
+  product edited, an order confirmed, a setting changed, went on no log, so staff could not see
+  who changed what. Every change is recorded already, as an event in the transaction that makes
+  it ([ADR-005](#adr-005--transactional-outbox--bullmq-first-kafka-compatible-log-later)), named for what happened to what; but an event does not say who made
+  it, request code cannot read the outbox, and the outbox is to keep its events for days
+  ([03 §6.5](./03-multi-tenancy-and-data.md#65-partitioning-and-hot-tables)).
+* **Decision:**
+  * **A request runs as its caller** (`EventActorInterceptor`, `actingAs`): the Admin API runs
+    each request's resolver with who made it, a member of staff with their role then or an app
+    by its access token, which Node's `AsyncLocalStorage` carries through every await. Hatti's
+    support, which changes nothing, is no one; so are the worker, checkout, customers' links and
+    `/auth`.
+  * **`appendEvents` puts a request's events on the activity log** (migration 0159,
+    `platform.activity_log`): each event, by whom, in the same statement as the outbox's, so an
+    entry stands only if its change does, with no round trip more and no module changed.
+  * **An entry names the event, what it happened to and who; never what it recorded.** What a
+    thing is now is on the thing; what needs accounting for is on the audit log, with its
+    details.
+  * **A table of its own,** isolated by shop and append-only for request code, kept as long as
+    the audit log, apart from the outbox and its days.
+  * **`activityLog(first, after, subjectId, type)`,** the latest first, a page at a time, for
+    owners and managers and apps with `read_settings`: each `ActivityEntry` with its event's ID
+    (`evt_`), its type, what it happened to (`subjectType`, and `subjectId` as the API's ID
+    where it has one), its actor (`AuditActor`) and when.
+* **Consequences:**
+  * Whatever staff and apps change through the Admin API is on the log, by whom; a mutation added
+    later is on it with nothing more.
+  * What the worker does, its sweeps, bookings and couriers' news, and what customers do at
+    checkout and through their links, are on no one's name. A file imported through the API is,
+    an entry for each event: each product made.
+  * A row more for each event a request records, narrow and without its payload; requests record
+    few next to the worker.
+  * The events of one transaction share a moment; among themselves they are in their IDs' order.
+* **Alternatives:**
+  * **Read from the outbox,** its events carrying who made them, through a function of the
+    database's for the shop alone: built first, and left, as the log would be lost with the
+    outbox's days, and shops' reading would land on the relay's busiest table.
+  * **Each module's changes recorded with `recordAudit`:** hundreds of places, which the next
+    mutation could miss; and the audit log is for what needs accounting for.
+  * **What each change was, from the events' payloads:** payloads are written for the modules
+    that read them, not for people, and the log would grow with them.
+  * **The caller passed to `appendEvent` by every service:** every service changed for what the
+    request knows already.

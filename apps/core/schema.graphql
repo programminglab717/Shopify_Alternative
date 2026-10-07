@@ -1,4 +1,39 @@
 """
+A change the shop's staff or apps made (ADM-04, ADR-256): the event it recorded, by whom and to what; never what it recorded.
+"""
+type ActivityEntry {
+  actor: AuditActor!
+
+  """The event's ID (evt_…)."""
+  id: ID!
+  occurredAt: DateTime!
+
+  """
+  Its ID, where it has one in the API: prod_…, ord_…; null for settings and such.
+  """
+  subjectId: ID
+
+  """What it happened to: "product", "order", "tax_settings"."""
+  subjectType: String!
+
+  """
+  What happened, as the event names it: "product.updated", "order.confirmed".
+  """
+  type: String!
+}
+
+type ActivityEntryConnection {
+  edges: [ActivityEntryEdge!]!
+  nodes: [ActivityEntry!]!
+  pageInfo: PageInfo!
+}
+
+type ActivityEntryEdge {
+  cursor: String!
+  node: ActivityEntry!
+}
+
+"""
 An article of one of the shop's blogs, which its storefront shows at /blogs/{blog}/{handle} once published.
 """
 type Article {
@@ -8116,6 +8151,21 @@ type ProductsImportPayload {
 }
 
 type Query {
+  """
+  What the shop's staff and apps changed, the latest first: each change as the event it recorded, by whom and to what. What needs accounting for, with more about it, is on auditLog. Owners and managers, and apps with read_settings.
+  """
+  activityLog(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """Only what happened to this, as prod_…."""
+    subjectId: ID
+
+    """Only this type, as "product.updated"."""
+    type: String
+  ): ActivityEntryConnection!
   article(id: ID!): Article
 
   """The articles of the shop's blogs, or of one, oldest first."""

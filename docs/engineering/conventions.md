@@ -222,6 +222,11 @@ In services, check input with `InputChecker` from `@hatti/api`: `mobile()` for m
 * Record events with `appendEvent(tx, shopId, …)` **inside the transaction that makes the
   change**. They are published only if it commits (transactional outbox). `appendEvents` records
   many in one statement, e.g. one per stock level a count changed.
+* **A request's events go on the shop's activity log**
+  ([ADR-256](../architecture/13-decision-log.md#adr-256--what-the-shops-staff-and-apps-change-goes-on-its-activity-log-each-event-a-request-of-the-admin-api-records-written-in-the-same-statement-as-the-outboxs-by-whom-and-to-what-never-what-it-recorded-in-a-table-of-its-own-kept-as-long-as-the-audit-log)): the Admin API runs
+  each request as its caller (`actingAs`), and `appendEvents` writes each event to
+  `platform.activity_log` too, in the same statement, by whom; the worker's are on no one's
+  name. Staff read the events' types as they are, so name them for what happened.
 * Name them `<aggregate>.<past-tense verb>`, e.g. `product.created`. Keep payloads thin: IDs,
   changed field names and versions, not whole documents.
 * Delivery is **at least once and not strictly ordered**. Handlers must be idempotent: deduplicate
@@ -2166,6 +2171,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   an entry stands only if what it describes does. Request code cannot change or delete entries.
 * **`auditLog(first, after, subjectId, action)`** reads them, newest first, with
   `read_settings`: owners and managers.
+* **Routine changes are on the activity log, not here**
+  ([ADR-256](../architecture/13-decision-log.md#adr-256--what-the-shops-staff-and-apps-change-goes-on-its-activity-log-each-event-a-request-of-the-admin-api-records-written-in-the-same-statement-as-the-outboxs-by-whom-and-to-what-never-what-it-recorded-in-a-table-of-its-own-kept-as-long-as-the-audit-log)):
+  `activityLog(first, after, subjectId, type)` lists each change a request made, by its
+  event, with `read_settings`. Record here only what needs accounting for, with its details.
 
 ## COD risk
 

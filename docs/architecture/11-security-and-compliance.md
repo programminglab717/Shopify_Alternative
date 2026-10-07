@@ -95,6 +95,8 @@ an attacker, but it affects availability in the same way.
   its own and managers those below them, and the owner hands the shop to a manager with a second
   factor, staying on as one ([ADR-104](./13-decision-log.md#adr-104--the-owner-hands-the-shop-to-one-of-its-managers-who-has-a-second-factor-and-stays-on-as-a-manager-the-shop-has-one-owner-throughout)); each change on the audit log
   ([ADR-101](./13-decision-log.md#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)).
+  What staff and apps change through the Admin API goes on the shop's activity log, by whom
+  and to what ([ADR-256](./13-decision-log.md#adr-256--what-the-shops-staff-and-apps-change-goes-on-its-activity-log-each-event-a-request-of-the-admin-api-records-written-in-the-same-statement-as-the-outboxs-by-whom-and-to-what-never-what-it-recorded-in-a-table-of-its-own-kept-as-long-as-the-audit-log)).
 * **PII visibility** is a permission: phone numbers can be masked (`0300-***4567`) with
   click-to-reveal that is logged. *Built so far:* numbers are masked ("0300 ••••567") for every
   staff role but owners and managers; confirmation agents reveal one with `orderPhoneReveal` or

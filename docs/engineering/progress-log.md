@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, the rest of what is left to build** (asked for on 2026-10-07): the activity log of
-staff's changes, product videos and crops, a map pin at checkout, and couriers' city names
-shared across shops; then translations removed with what is deleted, and domains checked
-again. How the Free plan holds to its 50 orders a month waits on a decision.
+**Next, the rest of what is left to build** (asked for on 2026-10-07): product videos and crops,
+a map pin at checkout, and couriers' city names shared across shops; then translations removed
+with what is deleted, and domains checked again. How the Free plan holds to its 50 orders a
+month waits on a decision.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### The shop's activity log
+
+* **What staff and apps change, by whom** ([ADR-256](../architecture/13-decision-log.md#adr-256--what-the-shops-staff-and-apps-change-goes-on-its-activity-log-each-event-a-request-of-the-admin-api-records-written-in-the-same-statement-as-the-outboxs-by-whom-and-to-what-never-what-it-recorded-in-a-table-of-its-own-kept-as-long-as-the-audit-log)):
+  `activityLog(first, after, subjectId, type)` lists each change made through the Admin API, the
+  latest first: the event it recorded, what it happened to and who made it, a member of staff
+  with their role or an app; never what it recorded. Owners and managers, and apps with
+  `read_settings`.
+* **For it:** migration 0159, `platform.activity_log`, written in the same statement as the
+  outbox's events while a request runs as its caller (`actingAs`).
+* **Learned:** the log was read from the outbox first, through a function of the database's,
+  then given a table of its own: the outbox is to keep its events for days, and the log must
+  last as long as the audit log.
+* 1812 tests: a request's events on it by whom and the worker's not, none of a transaction
+  rolled back, a page at a time, by subject and by type, another shop seeing none; through the
+  API, a manager's and an app's changes, a packer refused.
 
 ### da3dc64 · JazzCash's refunds
 

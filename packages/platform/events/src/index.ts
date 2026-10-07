@@ -1,4 +1,12 @@
 export {
+  actingAs,
+  currentActor,
+  listActivity,
+  type ActivityEntry,
+  type ActivityQuery,
+  type EventActor,
+} from './activity.js';
+export {
   listAudit,
   recordAudit,
   type AuditEntry,

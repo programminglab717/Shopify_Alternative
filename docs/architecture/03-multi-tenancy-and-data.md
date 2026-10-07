@@ -383,7 +383,7 @@ published. Consumers deduplicate on `event_id`. A later phase may switch the rel
 | Marketing | `campaigns`, `automations`, `automation_runs`, `loyalty_accounts`, `loyalty_ledger`, `referrals`, `affiliates`, `affiliate_conversions`, `pixels` |
 | Apps | `app_installations`, `access_tokens` (hashed), `webhook_subscriptions`, `webhook_deliveries` |
 | Tax | `tax_profiles` (NTN, STRN, filer status, province, Tier-1 flag, turnover band), `tax_settings`, `fiscal_invoices` (FBR invoice number, QR payload, submission status, 72-hour edit window), `fiscal_counters`, `withholding_entries` (tax withheld by couriers/intermediaries per settlement) |
-| Platform | `outbox_events`, `idempotency_keys`, `audit_log`, `shop_counters`, `files`, `jobs_dead_letter` |
+| Platform | `outbox_events`, `idempotency_keys`, `audit_log`, `activity_log` (each event a request of the Admin API records, by whom, [ADR-256](./13-decision-log.md#adr-256--what-the-shops-staff-and-apps-change-goes-on-its-activity-log-each-event-a-request-of-the-admin-api-records-written-in-the-same-statement-as-the-outboxs-by-whom-and-to-what-never-what-it-recorded-in-a-table-of-its-own-kept-as-long-as-the-audit-log)), `shop_counters`, `files`, `jobs_dead_letter` |
 
 ### 6.5 Partitioning and hot tables
 
@@ -393,6 +393,7 @@ published. Consumers deduplicate on `event_id`. A later phase may switch the rel
 | `tracking_events` | Monthly range partitions | 18 months, then archived to R2 as Parquet |
 | `messages`, `conversation_messages` | Monthly range partitions | 12 months of content; metadata kept longer |
 | `audit_log` | Monthly range partitions | 24 months hot, then archive |
+| `activity_log` | Monthly range partitions, as `audit_log` | 24 months hot, then archive |
 | `webhook_deliveries` | Daily range partitions | 30 days |
 | `orders`, `order_lines` | Not partitioned early; indexed `(shop_id, created_at DESC)` | Indefinite (tax records ≥ 6 years; confirm with counsel) |
 
