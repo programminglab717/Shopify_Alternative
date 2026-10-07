@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### Shops' domains checked again
+### 3f3a65b · Shops' domains checked again
 
 * **The worker checks verified domains every six hours** ([ADR-262](../architecture/13-decision-log.md#adr-262--shops-verified-domains-are-checked-again-every-six-hours-by-the-worker-one-dns-points-elsewhere-is-noted-and-its-shop-told-once-at-its-alerts-number-and-its-owners-email-and-three-days-on-it-is-disconnected-verified-no-more-nor-primary-the-shops-address-on-the-platforms-domain-primary-in-its-place)):
   one DNS points elsewhere is noted, still served but never made primary, and its shop is told
