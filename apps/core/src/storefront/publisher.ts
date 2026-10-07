@@ -5,6 +5,7 @@ import {
   ProductService,
   VariantService,
   imagePathOf,
+  videoPathOf,
   type CollectionRecord,
   type ProductUpdatedPayload,
 } from '@hatti/catalog/public';
@@ -808,6 +809,11 @@ export class StorefrontPublisher {
           return path && images.url(path);
         },
         translations,
+        // Videos the shop uploaded, at the same site as its images (ADR-258).
+        (media, handle) => {
+          const path = videoPathOf(shopId, media, handle);
+          return path && images.url(path);
+        },
       ),
     );
     await writer.putProducts(docs);

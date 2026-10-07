@@ -1,8 +1,10 @@
 export {
   KNOWN_CONTENT_TYPES,
+  MAX_VIDEO_UPLOAD_BYTES,
   SNIFF_BYTES,
   extensionOf,
   isKnownContentType,
+  isVideoType,
   sniffContentType,
   type KnownContentType,
 } from './file-types.js';
@@ -14,6 +16,8 @@ export {
   assertObjectPrefix,
   isObjectKey,
   isObjectPrefix,
+  maxUploadBytesOf,
+  type ByteRange,
   type SignedRequest,
   type StoredObject,
 } from './object-storage.js';

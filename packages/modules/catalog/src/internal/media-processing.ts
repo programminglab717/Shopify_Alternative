@@ -2,15 +2,25 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { and, eq, sql } from 'drizzle-orm';
 import { CatalogEvents, type ProductUpdatedPayload } from './events.js';
-import { products, type ImageFormatValue } from './schema.js';
+import type { VideoRecord } from './records.js';
+import { products, type ImageFormatValue, type MediaTypeValue } from './schema.js';
+import type { VideoHostValue } from './videos.js';
 
-/** A media the worker took, to make its image ready. */
+/** A media the worker took, to make its image ready, and a video's file. */
 export interface ClaimedMedia {
   id: string;
   productId: string;
+  /** An image; a video the shop uploaded; a YouTube or Vimeo video (ADR-258). */
+  mediaType: MediaTypeValue;
+  /** An image's, or a video the shop uploaded, or a YouTube or Vimeo video's address. */
   sourceUrl: string;
   /** The file the shop uploaded, when it did: read from storage rather than fetched. */
   sourceKey: string | null;
+  /** A video's preview image, where it was given: as `sourceUrl` and `sourceKey` are. */
+  previewSourceUrl: string | null;
+  previewSourceKey: string | null;
+  /** A YouTube or Vimeo video's host and ID. */
+  externalVideo: { host: VideoHostValue; id: string } | null;
   /** Its tries, this one counted. */
   attempts: number;
 }
@@ -31,9 +41,9 @@ export type ReadyOutcome = 'ready' | 'settled' | 'gone';
 const MESSAGE_LENGTH = 500;
 
 /**
- * Products' images on their way to ready (ADR-158), for the worker: the shops with some due, a
- * batch of a shop's taken at a time, and what came of each. An image ready, or failed, changes
- * what the storefront shows: the product's `product.updated`, its media changed.
+ * Products' images and videos on their way to ready (ADR-158, ADR-258), for the worker: the shops
+ * with some due, a batch of a shop's taken at a time, and what came of each. A media ready, or
+ * failed, changes what the storefront shows: the product's `product.updated`, its media changed.
  */
 export class MediaProcessing {
   constructor(private readonly db: Database) {}
@@ -59,8 +69,13 @@ export class MediaProcessing {
       tx.execute<{
         id: string;
         product_id: string;
+        media_type: MediaTypeValue;
         source_url: string;
         source_key: string | null;
+        preview_source_url: string | null;
+        preview_source_key: string | null;
+        video_host: VideoHostValue | null;
+        video_external_id: string | null;
         attempts: number;
       }>(sql`
         -- Chosen once: a subquery in UPDATE's FROM may be run again, and take more.
@@ -77,15 +92,24 @@ export class MediaProcessing {
                updated_at = now()
           FROM due
          WHERE m.shop_id = ${shopId} AND m.id = due.id
-        RETURNING m.id, m.product_id, m.source_url, m.source_key, m.attempts`),
+        RETURNING m.id, m.product_id, m.media_type, m.source_url, m.source_key,
+                  m.preview_source_url, m.preview_source_key, m.video_host, m.video_external_id,
+                  m.attempts`),
     );
     return (
       rows
         .map((row) => ({
           id: row.id,
           productId: row.product_id,
+          mediaType: row.media_type,
           sourceUrl: row.source_url,
           sourceKey: row.source_key,
+          previewSourceUrl: row.preview_source_url,
+          previewSourceKey: row.preview_source_key,
+          externalVideo:
+            row.video_host && row.video_external_id
+              ? { host: row.video_host, id: row.video_external_id }
+              : null,
           attempts: row.attempts,
         }))
         // The first added first: their IDs follow the time they were made.
@@ -93,14 +117,24 @@ export class MediaProcessing {
     );
   }
 
-  /** Marks a taken image ready, its clean copy as given. */
-  async ready(shopId: string, mediaId: string, image: ProcessedImage): Promise<ReadyOutcome> {
+  /**
+   * Marks a taken media ready, its image's clean copy as given: an image's own, or a video's
+   * preview; and a video the shop uploaded, as kept (ADR-258).
+   */
+  async ready(
+    shopId: string,
+    mediaId: string,
+    image: ProcessedImage,
+    video: VideoRecord | null = null,
+  ): Promise<ReadyOutcome> {
     return this.db.tenant(shopId, async (tx) => {
       const { rows } = await tx.execute<{ product_id: string }>(sql`
         UPDATE catalog.product_media
            SET status = 'ready', image_format = ${image.format}, image_size = ${image.size},
                width = ${image.width}, height = ${image.height}, next_attempt_at = NULL,
-               updated_at = now()
+               video_size = ${video?.size ?? null}, video_width = ${video?.width ?? null},
+               video_height = ${video?.height ?? null},
+               video_duration_ms = ${video?.durationMs ?? null}, updated_at = now()
          WHERE shop_id = ${shopId} AND id = ${mediaId} AND status = 'processing'
         RETURNING product_id`);
       if (rows[0]) {

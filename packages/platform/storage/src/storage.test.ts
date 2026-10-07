@@ -1,11 +1,19 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { Readable } from 'node:stream';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { extensionOf, sniffContentType } from './file-types.js';
 import { LocalStorage } from './local-storage.js';
-import { isObjectKey } from './object-storage.js';
+import { isObjectKey, maxUploadBytesOf } from './object-storage.js';
 import { S3Storage } from './s3-storage.js';
+
+/** What a stream gives, whole. */
+async function text(stream: Readable | null): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk as Uint8Array));
+  return Buffer.concat(chunks);
+}
 
 const KEY = 'shops/0196/files/0197/receipt.jpg';
 const NOW = new Date('2026-10-01T09:00:00Z');
@@ -43,6 +51,22 @@ describe('file types', () => {
     }
     expect(extensionOf('image/jpeg')).toBe('jpg');
     expect(extensionOf('application/pdf')).toBe('pdf');
+  });
+
+  it("take phones' videos by their first box's brand, and a HEIC photo for none (ADR-258)", () => {
+    const box = (brand: string) =>
+      Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from(`ftyp${brand}`)]);
+    expect(sniffContentType(box('isom'))).toBe('video/mp4');
+    expect(sniffContentType(box('mp42'))).toBe('video/mp4');
+    expect(sniffContentType(box('qt  '))).toBe('video/quicktime');
+    for (const brand of ['heic', 'mif1', 'avif', 'abcd']) {
+      expect(sniffContentType(box(brand)), brand).toBeNull();
+    }
+    expect([extensionOf('video/mp4'), extensionOf('video/quicktime')]).toEqual(['mp4', 'mov']);
+    expect([maxUploadBytesOf('video/mp4'), maxUploadBytesOf('image/jpeg')]).toEqual([
+      100 * 1024 * 1024,
+      20 * 1024 * 1024,
+    ]);
   });
 });
 
@@ -106,6 +130,15 @@ describe('LocalStorage', () => {
     await storage.delete(KEY);
     expect(await storage.head(KEY)).toBeNull();
     await storage.delete(KEY);
+  });
+
+  it('reads a file as it streams, the range asked for alone', async () => {
+    const video = 'shops/0196/images/0199/video.mp4';
+    expect(await storage.stream(video)).toBeNull();
+    await storage.put(video, Buffer.from('0123456789'), 'video/mp4');
+    expect((await text(await storage.stream(video))).toString()).toBe('0123456789');
+    expect((await text(await storage.stream(video, { start: 2, end: 5 }))).toString()).toBe('2345');
+    expect((await text(await storage.stream(video, { start: 9, end: 9 }))).toString()).toBe('9');
   });
 
   it('removes everything under a prefix, and nothing beside it', async () => {
@@ -208,6 +241,21 @@ describe('S3Storage', () => {
     await expect(
       storageWith(() => new Response('denied', { status: 403 })).storage.head(KEY),
     ).rejects.toThrow(`Storage HEAD ${KEY} failed: 403`);
+  });
+
+  it('streams objects, a range asked for by its header', async () => {
+    const { storage, sent } = storageWith((request) =>
+      request.url.endsWith('missing.mp4')
+        ? new Response(null, { status: 404 })
+        : new Response(request.headers.range ? '2345' : '0123456789', {
+            status: request.headers.range ? 206 : 200,
+          }),
+    );
+    expect((await text(await storage.stream(KEY, { start: 2, end: 5 }))).toString()).toBe('2345');
+    expect(sent[0]!.headers.range).toBe('bytes=2-5');
+    expect((await text(await storage.stream(KEY))).toString()).toBe('0123456789');
+    expect(sent[1]!.headers.range).toBeUndefined();
+    expect(await storage.stream('shops/a/missing.mp4')).toBeNull();
   });
 
   it('reads whole objects, and removes a prefix a listing page at a time', async () => {

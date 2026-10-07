@@ -24,6 +24,10 @@ export type ProductStatusValue = (typeof PRODUCT_STATUSES)[number];
 export const MEDIA_STATUSES = ['uploaded', 'processing', 'ready', 'failed'] as const;
 export type MediaStatusValue = (typeof MEDIA_STATUSES)[number];
 
+/** An image; a video the shop uploaded; a YouTube or Vimeo video (ADR-258). */
+export const MEDIA_TYPES = ['image', 'video', 'external_video'] as const;
+export type MediaTypeValue = (typeof MEDIA_TYPES)[number];
+
 /** A ready image's clean copy (ADR-158): JPEG, or PNG for one some of which is see-through. */
 export const IMAGE_FORMATS = ['jpeg', 'png'] as const;
 export type ImageFormatValue = (typeof IMAGE_FORMATS)[number];
@@ -111,9 +115,7 @@ export const productMedia = catalogSchema.table(
     shopId: uuid('shop_id').notNull(),
     id: uuid('id').notNull(),
     productId: uuid('product_id').notNull(),
-    mediaType: text('media_type', { enum: ['image'] })
-      .notNull()
-      .default('image'),
+    mediaType: text('media_type', { enum: MEDIA_TYPES }).notNull().default('image'),
     sourceUrl: text('source_url').notNull(),
     alt: text('alt').notNull().default(''),
     position: integer('position').notNull(),
@@ -133,6 +135,14 @@ export const productMedia = catalogSchema.table(
     cropHeight: integer('crop_height'),
     focalX: numeric('focal_x', { precision: 5, scale: 2 }),
     focalY: numeric('focal_y', { precision: 5, scale: 2 }),
+    previewSourceUrl: text('preview_source_url'),
+    previewSourceKey: text('preview_source_key'),
+    videoHost: text('video_host', { enum: ['youtube', 'vimeo'] }),
+    videoExternalId: text('video_external_id'),
+    videoSize: integer('video_size'),
+    videoWidth: integer('video_width'),
+    videoHeight: integer('video_height'),
+    videoDurationMs: integer('video_duration_ms'),
     ...timestamps,
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],

@@ -30,6 +30,7 @@ import {
   type BlogDoc,
   type BrandDoc,
   type CollectionDoc,
+  type MediaDoc,
   type MenuDoc,
   type MenuLinkDoc,
   type PageDoc,
@@ -47,6 +48,9 @@ export const ALL_PRODUCTS = 'all';
 
 /** Where a ready image is served (ADR-158), by its media and its product's handle. */
 export type ImageAddress = (media: MediaRecord, handle: string) => string | null;
+
+/** Where a ready video the shop uploaded is served (ADR-258), by its media and product's handle. */
+export type VideoAddress = (media: MediaRecord, handle: string) => string | null;
 
 /**
  * Where the storefront shows an image from: Hatti's own copy once ready (ADR-158); meanwhile an
@@ -70,12 +74,15 @@ export function productDoc(
    * as text, and its options' and their values' names (ADR-241).
    */
   translations: ReadonlyMap<string, TranslatedFields> = new Map(),
+  videoAddress: VideoAddress = () => null,
 ): ProductDoc {
+  // Its images; its videos are its media beside them (ADR-258).
   const images = record.media.flatMap((media) => {
-    const src = imageSrc(media, record.handle, address);
+    const src = media.mediaType === 'image' ? imageSrc(media, record.handle, address) : null;
     return src === null ? [] : [{ media, src }];
   });
   const imageAt = new Map(images.map(({ media }, index) => [media.id, index]));
+  const media = mediaDocs(record, imageAt, address, videoAddress);
   const hasOptions = record.options.length > 0;
   const own = translations.get(record.id) ?? {};
   const locales = new Set(
@@ -125,6 +132,7 @@ export function productDoc(
         ...(media.focalPoint && { focalPoint: media.focalPoint }),
       };
     }),
+    ...(media && { media }),
     // As its collection's feed dates it (ADR-216).
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
@@ -140,6 +148,47 @@ export function productDoc(
       }),
     ),
   };
+}
+
+/**
+ * A product's media in order, as Shopify's `product.media` (ADR-258): its images by their places
+ * among those shown, and its videos ready to play, each with its preview image. None where it has
+ * no video to show: its images are its media.
+ */
+function mediaDocs(
+  record: ProductRecord,
+  imageAt: ReadonlyMap<string, number>,
+  address: ImageAddress,
+  videoAddress: VideoAddress,
+): MediaDoc[] | undefined {
+  const docs = record.media.flatMap((media): MediaDoc[] => {
+    if (media.mediaType === 'image') {
+      const image = imageAt.get(media.id);
+      return image === undefined ? [] : [{ type: 'image', image }];
+    }
+    const src = media.status === 'ready' ? address(media, record.handle) : null;
+    if (src === null || media.width === null || media.height === null) return [];
+    const alt = media.alt || null;
+    const preview = { src, width: media.width, height: media.height, alt };
+    if (media.externalVideo) {
+      const { host, id } = media.externalVideo;
+      return [{ type: 'external_video', id: media.id, alt, preview, host, externalId: id }];
+    }
+    const file = media.video && videoAddress(media, record.handle);
+    if (!media.video || !file) return [];
+    const { width, height, durationMs } = media.video;
+    return [
+      {
+        type: 'video',
+        id: media.id,
+        alt,
+        preview,
+        sources: [{ src: file, mimeType: 'video/mp4', format: 'mp4', width, height }],
+        durationMs,
+      },
+    ];
+  });
+  return docs.some((doc) => doc.type !== 'image') ? docs : undefined;
 }
 
 /** A product's options with the values its variants have, as its document shows them. */

@@ -4,6 +4,7 @@ import type {
   BlogDoc,
   CollectionDoc,
   ImageDoc,
+  MediaDoc,
   MenuDoc,
   MenuLinkDoc,
   PageDoc,
@@ -11,6 +12,7 @@ import type {
   ShopDoc,
   StoreData,
   VariantDoc,
+  VideoSourceDoc,
 } from '@hatti/storefront-data';
 import type { CartDiscountJson, CartJson, CartLineJson } from '@hatti/storefront-api';
 import { imageValue, isSafeLink, settingValue, type SettingSchema } from '@hatti/themes';
@@ -121,6 +123,8 @@ export interface ObjectContext {
 
 /** An image: prints as its address; `image_url` and `image_tag` size it. */
 export class ImageDrop extends Drop {
+  /** As Shopify's media object, among a product's media (ADR-258). */
+  readonly media_type = 'image';
   readonly src: string;
   readonly width: number;
   readonly height: number;
@@ -148,9 +152,109 @@ export class ImageDrop extends Drop {
     return image.#focalPoint && image.presentation.focal_point;
   }
 
+  /** As a media's: an image is its own preview. */
+  get preview_image(): ImageDrop {
+    return this;
+  }
+
   override valueOf(): string {
     return this.src;
   }
+}
+
+/** A video's file, as Shopify's video_source. */
+export class VideoSourceDrop extends Drop {
+  readonly url: string;
+  readonly mime_type: string;
+  readonly format: string;
+  readonly width: number;
+  readonly height: number;
+
+  constructor(doc: VideoSourceDoc) {
+    super();
+    this.url = doc.src;
+    this.mime_type = doc.mimeType;
+    this.format = doc.format;
+    this.width = doc.width;
+    this.height = doc.height;
+  }
+
+  override valueOf(): string {
+    return this.url;
+  }
+}
+
+/** A video the shop uploaded, as Shopify's video object (ADR-258). */
+export class VideoDrop extends Drop {
+  readonly media_type = 'video';
+  readonly id: string;
+  readonly alt: string | null;
+  readonly position: number;
+  readonly preview_image: ImageDrop;
+  readonly sources: VideoSourceDrop[];
+  /** In milliseconds. */
+  readonly duration: number;
+  readonly aspect_ratio: number;
+
+  constructor(doc: Extract<MediaDoc, { type: 'video' }>, position: number) {
+    super();
+    this.id = doc.id;
+    this.alt = doc.alt;
+    this.position = position;
+    this.preview_image = new ImageDrop(doc.preview);
+    this.sources = doc.sources.map((source) => new VideoSourceDrop(source));
+    this.duration = doc.durationMs;
+    const [first] = doc.sources;
+    this.aspect_ratio =
+      first && first.height > 0 ? Math.round((first.width / first.height) * 1000) / 1000 : 1;
+  }
+
+  override valueOf(): string {
+    return this.preview_image.src;
+  }
+}
+
+/** A YouTube or Vimeo video, as Shopify's external_video object (ADR-258). */
+export class ExternalVideoDrop extends Drop {
+  readonly media_type = 'external_video';
+  readonly id: string;
+  readonly alt: string | null;
+  readonly position: number;
+  readonly preview_image: ImageDrop;
+  readonly host: 'youtube' | 'vimeo';
+  readonly external_id: string;
+  readonly aspect_ratio: number;
+
+  constructor(doc: Extract<MediaDoc, { type: 'external_video' }>, position: number) {
+    super();
+    this.id = doc.id;
+    this.alt = doc.alt;
+    this.position = position;
+    this.preview_image = new ImageDrop(doc.preview);
+    this.host = doc.host;
+    this.external_id = doc.externalId;
+    this.aspect_ratio = this.preview_image.aspect_ratio;
+  }
+
+  override valueOf(): string {
+    return this.preview_image.src;
+  }
+}
+
+/**
+ * A product's media in its order, as Shopify's `product.media` (ADR-258): its images, and its
+ * videos; its images alone in documents with no video.
+ */
+function mediaOf(doc: ProductDoc, images: readonly ImageDrop[]): Drop[] {
+  if (!doc.media) return [...images];
+  return doc.media.flatMap((item, index): Drop[] => {
+    if (item.type === 'image') return images[item.image] ? [images[item.image]!] : [];
+    return [
+      item.type === 'video'
+        ? new VideoDrop(item, index + 1)
+        : new ExternalVideoDrop(item, index + 1),
+    ];
+  });
 }
 
 /**
@@ -172,6 +276,7 @@ export class FocalPointDrop extends Drop {
 
 export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<string, unknown> {
   const images = doc.images.map((image) => new ImageDrop(image));
+  const media = mediaOf(doc, images);
   const variants = doc.variants.map((variant) => variantObject(variant, doc, images));
   const available = variants.filter((variant) => variant.available);
   const selected = variants.find((variant) => variant.id === ctx.query.variant) ?? null;
@@ -215,8 +320,8 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     })),
     images,
     featured_image: images[0] ?? null,
-    media: images,
-    featured_media: images[0] ?? null,
+    media,
+    featured_media: media[0] ?? null,
     // When it was made and last changed (ADR-216): published when made, as Hatti keeps no time
     // of a product's being made active. Null in documents written before.
     created_at: doc.createdAt ?? null,

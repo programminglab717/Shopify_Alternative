@@ -94,8 +94,12 @@ describe.skipIf(!server)('product images (ADR-158)', () => {
       {
         id: front,
         productId: kurta.id,
+        mediaType: 'image',
         sourceUrl: 'https://cdn.example.pk/lawn-kurta-1.jpg',
         sourceKey: null,
+        previewSourceUrl: null,
+        previewSourceKey: null,
+        externalVideo: null,
         attempts: 1,
       },
       expect.objectContaining({ id: back, attempts: 1 }),
@@ -298,6 +302,127 @@ describe.skipIf(!server)('product images (ADR-158)', () => {
       expect(errorsOf(await media.update(f.b, kurta.id, [{ id: front!, crop: null }]))).toEqual([
         ['productId', 'NOT_FOUND'],
       ]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('adds YouTube and Vimeo videos by their addresses, and uploaded ones with a preview image (ADR-258)', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'hatti-videos-'));
+    try {
+      const storage = new LocalStorage({
+        directory,
+        baseUrl: 'http://localhost:4000/storage',
+        secret: 'a'.repeat(32),
+      });
+      const media = new MediaService(f.db, storage);
+      const { id } = unwrap(await f.products.create(f.a, { title: 'Lawn Kurta' }));
+      const upload = (name: string) =>
+        storage.locationOf(`shops/${f.a.shopId}/files/${newId()}/${name}`);
+      const video = upload('kurta.mov');
+      const created = unwrap(
+        await media.create(f.a, id, [
+          {
+            originalSource: 'https://youtu.be/dQw4w9WgXcQ?si=share',
+            mediaContentType: 'EXTERNAL_VIDEO',
+          },
+          {
+            originalSource: 'https://vimeo.com/channels/staffpicks/76979871',
+            mediaContentType: 'EXTERNAL_VIDEO',
+            previewImageSource: 'https://cdn.example.pk/cover.jpg',
+          },
+          {
+            originalSource: video,
+            mediaContentType: 'VIDEO',
+            previewImageSource: upload('frame.jpg'),
+            alt: 'Kurta, turning',
+          },
+        ]),
+      );
+      expect(created.product.media).toMatchObject([
+        {
+          mediaType: 'external_video',
+          sourceUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          externalVideo: { host: 'youtube', id: 'dQw4w9WgXcQ' },
+          previewSourceUrl: null,
+          status: 'uploaded',
+        },
+        {
+          mediaType: 'external_video',
+          sourceUrl: 'https://vimeo.com/76979871',
+          externalVideo: { host: 'vimeo', id: '76979871' },
+          previewSourceUrl: 'https://cdn.example.pk/cover.jpg',
+          previewSourceKey: null,
+        },
+        {
+          mediaType: 'video',
+          sourceUrl: video,
+          sourceKey: storage.keyOf(video),
+          previewSourceKey: expect.stringMatching(/\/frame\.jpg$/),
+          alt: 'Kurta, turning',
+          video: null,
+        },
+      ]);
+      // Refused: another site's video, a video by URL or an upload not a video, one without its
+      // preview, and an image with one.
+      expect(
+        errorsOf(
+          await media.create(f.a, id, [
+            { originalSource: 'https://example.com/watch?v=1', mediaContentType: 'EXTERNAL_VIDEO' },
+            {
+              originalSource: 'https://cdn.example.pk/kurta.mp4',
+              mediaContentType: 'VIDEO',
+              previewImageSource: 'https://cdn.example.pk/cover.jpg',
+            },
+            { originalSource: upload('kurta.mp4'), mediaContentType: 'VIDEO' },
+            {
+              originalSource: upload('photo.jpg'),
+              mediaContentType: 'VIDEO',
+              previewImageSource: 'https://cdn.example.pk/cover.jpg',
+            },
+            {
+              originalSource: 'https://cdn.example.pk/kurta.jpg',
+              previewImageSource: 'https://cdn.example.pk/cover.jpg',
+            },
+          ]),
+        ),
+      ).toEqual([
+        ['media.0.originalSource', 'INVALID'],
+        ['media.1.originalSource', 'INVALID'],
+        ['media.2.previewImageSource', 'BLANK'],
+        ['media.3.originalSource', 'INVALID'],
+        ['media.4.previewImageSource', 'INVALID'],
+      ]);
+
+      // The worker takes them with what it needs; an uploaded video ready with its own facts.
+      const [youtube, vimeo, uploaded] = created.mediaIds;
+      const claimed = await processing.claim(f.a.shopId, now, 10, LEASE);
+      expect(claimed).toMatchObject([
+        { id: youtube, mediaType: 'external_video', externalVideo: { host: 'youtube' } },
+        { id: vimeo, previewSourceUrl: 'https://cdn.example.pk/cover.jpg' },
+        { id: uploaded, mediaType: 'video', sourceKey: storage.keyOf(video) },
+      ]);
+      const preview = { format: 'jpeg' as const, width: 1080, height: 1920, size: 90_000 };
+      const facts = { size: 4_000_000, width: 1080, height: 1920, durationMs: 12_000 };
+      expect(await processing.ready(f.a.shopId, uploaded!, preview, facts)).toBe('ready');
+      const ready = (await mediaOf(id))[2]!;
+      expect([ready.status, ready.video, ready.width]).toEqual(['ready', facts, 1080]);
+
+      // A video is neither cropped, nor marked, nor a variant's image.
+      expect(
+        errorsOf(
+          await media.update(f.a, id, [
+            { id: uploaded!, crop: { left: 0, top: 0, width: 500, height: 500 } },
+          ]),
+        ),
+      ).toEqual([['media.0.crop', 'INVALID']]);
+      expect(
+        errorsOf(await media.update(f.a, id, [{ id: uploaded!, focalPoint: { x: 10, y: 10 } }])),
+      ).toEqual([['media.0.focalPoint', 'INVALID']]);
+      const [variant] = (await f.products.get(f.a, id))!.variants;
+      expect(
+        errorsOf(await f.variants.bulkUpdate(f.a, id, [{ id: variant!.id, mediaId: uploaded! }])),
+      ).toEqual([['variants.0.mediaId', 'INVALID']]);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

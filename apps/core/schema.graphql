@@ -2416,12 +2416,21 @@ type CourierReceivables {
 
 input CreateMediaInput {
   alt: String
+
+  """
+  IMAGE; VIDEO, its originalSource the resourceUrl of a video staged as video/mp4 or video/quicktime, H.264 and AAC, up to 100 MB and 10 minutes; EXTERNAL_VIDEO, a YouTube or Vimeo video's address (ADR-258).
+  """
   mediaContentType: MediaContentType = IMAGE
 
   """
   Where the image is: an https URL to fetch it from, or the `resourceUrl` of an upload `stagedUploadsCreate` staged, once the file is in. JPEG, PNG, WebP, GIF or AVIF, up to 20 MB and 50 megapixels; kept at most 4,096 pixels a side, without its metadata.
   """
   originalSource: String!
+
+  """
+  The image that shows before a video plays: an https URL, or the resourceUrl of an image staged. A VIDEO needs one, as a frame of it the admin takes; an EXTERNAL_VIDEO's own is taken where none is given.
+  """
+  previewImageSource: String
 }
 
 """ISO 4217 currency code."""
@@ -3285,6 +3294,19 @@ enum EmailLanguage {
   UR
 }
 
+"""A YouTube or Vimeo video (ADR-258)."""
+type ExternalVideo {
+  """Where pages embed it from."""
+  embedUrl: String!
+
+  """Its ID there."""
+  externalId: String!
+  host: MediaHost!
+
+  """Where it is watched."""
+  originUrl: String!
+}
+
 """
 A file the shop uploaded, such as an image for its pages or the logo on its checkout (ADR-079): kept in the platform's storage, and shown only through short-lived URLs.
 """
@@ -3300,7 +3322,9 @@ type File {
   filename: String!
   id: ID!
 
-  """image/jpeg, image/png, image/webp, image/gif or application/pdf."""
+  """
+  image/jpeg, image/png, image/webp, image/gif, application/pdf, video/mp4 or video/quicktime.
+  """
   mimeType: String!
   updatedAt: DateTime!
 
@@ -4433,7 +4457,14 @@ enum MarketingState {
 }
 
 enum MediaContentType {
+  """A YouTube or Vimeo video, by its address."""
+  EXTERNAL_VIDEO
+
+  """An image."""
   IMAGE
+
+  """A video the shop uploaded: MP4 or QuickTime, H.264 and AAC (ADR-258)."""
+  VIDEO
 }
 
 """Why a media failed (ADR-158)."""
@@ -4446,6 +4477,15 @@ type MediaError {
 
 """Why a media failed, in Shopify's codes (ADR-158)."""
 enum MediaErrorCode {
+  """YouTube or Vimeo gave no image for the video: private, or gone."""
+  EXTERNAL_VIDEO_NOT_FOUND
+
+  """A video's upload could not be read."""
+  GENERIC_FILE_DOWNLOAD_FAILURE
+
+  """A video over 100 MB."""
+  GENERIC_FILE_INVALID_SIZE
+
   """Its URL or upload could not be read."""
   IMAGE_DOWNLOAD_FAILURE
 
@@ -4466,11 +4506,29 @@ enum MediaErrorCode {
 
   """Not a JPEG, PNG, WebP, GIF or AVIF image; HEIC photos among them."""
   UNSUPPORTED_IMAGE_FILE_TYPE
+
+  """
+  Not an MP4 or QuickTime video of H.264 and AAC, which every browser plays: HEVC among them (ADR-258).
+  """
+  VIDEO_INVALID_FILETYPE_ERROR
+
+  """Over 10 minutes."""
+  VIDEO_MAX_DURATION_ERROR
+
+  """Its index, length or size could not be read."""
+  VIDEO_METADATA_READ_ERROR
+}
+
+enum MediaHost {
+  VIMEO
+  YOUTUBE
 }
 
 """Where a media file is in processing."""
 enum MediaStatus {
-  """Could not be read, or is not an image to show: `mediaErrors` says why."""
+  """
+  Could not be read, or is not an image or video to show: `mediaErrors` says why.
+  """
   FAILED
 
   """
@@ -7864,7 +7922,7 @@ type ProductImportRowError {
   row: Int!
 }
 
-"""An image of a product."""
+"""An image or a video of a product."""
 type ProductMedia {
   """Alternative text, for screen readers and search engines."""
   alt: String!
@@ -7872,13 +7930,16 @@ type ProductMedia {
   """The part of the image shown; null for all of it."""
   crop: ImageCrop
 
+  """A YouTube or Vimeo video; null for anything else."""
+  externalVideo: ExternalVideo
+
   """What matters in it; null for none."""
   focalPoint: FocalPoint
   height: Int
   id: ID!
 
   """
-  The image as Hatti serves it, cropped where it is (ADR-257), once ready; null until then.
+  The image as Hatti serves it, cropped where it is (ADR-257), once ready; null until then, and for a video, whose is its previewImage.
   """
   image: Image
   mediaContentType: MediaContentType!
@@ -7888,13 +7949,23 @@ type ProductMedia {
   position: Int!
 
   """
+  What shows of it before anything plays, as Shopify's preview image: an image itself, as shown, or a video's preview image (ADR-258); null until it is ready.
+  """
+  previewImage: Image
+
+  """
   Where it came from: the URL given, or the file the shop uploaded, by its location.
   """
   sourceUrl: String!
   status: MediaStatus!
 
   """
-  The whole image, before any crop, for cropping it again (ADR-257); null until it is ready.
+  A video the shop uploaded, as Hatti serves it once ready; null for anything else.
+  """
+  video: ProductVideo
+
+  """
+  The whole image, before any crop, for cropping it again (ADR-257); null until it is ready, and for a video.
   """
   wholeImage: Image
 
@@ -8148,6 +8219,13 @@ input ProductVariantsBulkUpdateInput {
   """Whether its price includes sales tax."""
   taxable: Boolean
   weightGrams: Int
+}
+
+"""A video the shop uploaded, as Hatti serves it once ready (ADR-258)."""
+type ProductVideo {
+  """How long it lasts, in milliseconds."""
+  duration: Int!
+  sources: [VideoSource!]!
 }
 
 """
@@ -9967,13 +10045,15 @@ type StagedMediaUploadTarget {
 
 """A file to upload, as Shopify's stagedUploadsCreate takes it."""
 input StagedUploadInput {
-  """Bytes, 1 to 20 MiB, as a string: "123456"."""
+  """Bytes, as a string: "123456". 1 to 20 MiB; a video, to 100 MiB."""
   fileSize: String!
 
   """Its name, up to 255 characters: "Lawn collection.jpg"."""
   filename: String!
 
-  """image/jpeg, image/png, image/webp, image/gif or application/pdf."""
+  """
+  image/jpeg, image/png, image/webp, image/gif, application/pdf, or a product's video: video/mp4 or video/quicktime (ADR-258).
+  """
   mimeType: String!
 }
 
@@ -10706,4 +10786,25 @@ type UserError {
   """Path to the input field at fault, e.g. ["input", "title"]."""
   field: [String!]
   message: String!
+}
+
+"""A video's file as Hatti serves it (ADR-258), as Shopify's VideoSource."""
+type VideoSource {
+  """Bytes."""
+  fileSize: Int!
+
+  """mp4."""
+  format: String!
+  height: Int!
+
+  """video/mp4."""
+  mimeType: String!
+
+  """
+  Where it is served, whole or a range at a time, as browsers ask; the address never changes what it shows.
+  """
+  url: String!
+
+  """In pixels, as shown."""
+  width: Int!
 }

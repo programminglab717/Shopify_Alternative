@@ -21,7 +21,11 @@ export class File {
   @Field({ description: 'As the shop named it: "Lawn collection.jpg".' })
   filename!: string;
 
-  @Field({ description: 'image/jpeg, image/png, image/webp, image/gif or application/pdf.' })
+  @Field({
+    description:
+      'image/jpeg, image/png, image/webp, image/gif, application/pdf, video/mp4 or ' +
+      'video/quicktime.',
+  })
   mimeType!: string;
 
   @Field(() => Int, { description: 'Bytes.' })
@@ -79,11 +83,13 @@ export class StagedUploadInput {
   filename!: string;
 
   @Field({
-    description: 'image/jpeg, image/png, image/webp, image/gif or application/pdf.',
+    description:
+      "image/jpeg, image/png, image/webp, image/gif, application/pdf, or a product's video: " +
+      'video/mp4 or video/quicktime (ADR-258).',
   })
   mimeType!: string;
 
-  @Field({ description: 'Bytes, 1 to 20 MiB, as a string: "123456".' })
+  @Field({ description: 'Bytes, as a string: "123456". 1 to 20 MiB; a video, to 100 MiB.' })
   fileSize!: string;
 }
 

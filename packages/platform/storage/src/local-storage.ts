@@ -1,11 +1,14 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { mkdir, open, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import type { Readable } from 'node:stream';
 import {
   ObjectStorage,
   assertObjectKey,
   assertObjectPrefix,
   isObjectKey,
+  type ByteRange,
   type SignedRequest,
   type StoredObject,
 } from './object-storage.js';
@@ -133,6 +136,12 @@ export class LocalStorage extends ObjectStorage {
     const path = this.#path(key);
     const body = await readFile(path).catch(() => null);
     return body && { body, contentType: await this.#typeOf(path) };
+  }
+
+  async stream(key: string, range?: ByteRange): Promise<Readable | null> {
+    const path = this.#path(key);
+    if (!(await stat(path).catch(() => null))?.isFile()) return null;
+    return createReadStream(path, range && { start: range.start, end: range.end });
   }
 
   async put(key: string, body: Buffer, contentType: string): Promise<void> {

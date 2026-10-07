@@ -5,6 +5,7 @@ import type { FieldError } from '../input-checker.js';
 import { parseProductSearch } from '../product-filter.js';
 import type { CollectionRecord, MediaRecord, ProductRecord, VariantRecord } from '../records.js';
 import type { CollectionSortOrderValue, ProductStatusValue } from '../schema.js';
+import { externalVideoUrls } from '../videos.js';
 import {
   Collection,
   CollectionConnection,
@@ -16,6 +17,8 @@ import {
   CollectionSortOrder,
 } from './collection.types.js';
 import {
+  ExternalVideo,
+  ExternalVideoHost,
   FocalPoint,
   ImageCrop,
   MediaContentType,
@@ -75,7 +78,7 @@ const MEDIA_ERROR_CODES = new Set<string>(Object.values(MediaErrorCode));
 export function toMedia(record: MediaRecord, handle: string): ProductMedia {
   return Object.assign(new ProductMedia(), {
     id: toPublicId('media', record.id),
-    mediaContentType: MediaContentType.IMAGE,
+    mediaContentType: record.mediaType.toUpperCase() as MediaContentType,
     alt: record.alt,
     position: record.position,
     status: record.status.toUpperCase() as MediaStatus,
@@ -93,6 +96,13 @@ export function toMedia(record: MediaRecord, handle: string): ProductMedia {
         ]
       : [],
     crop: record.crop && Object.assign(new ImageCrop(), record.crop),
+    externalVideo:
+      record.externalVideo &&
+      Object.assign(new ExternalVideo(), {
+        host: record.externalVideo.host.toUpperCase() as ExternalVideoHost,
+        externalId: record.externalVideo.id,
+        ...externalVideoUrls(record.externalVideo.host, record.externalVideo.id),
+      }),
     focalPoint: record.focalPoint && Object.assign(new FocalPoint(), record.focalPoint),
     record,
     handle,

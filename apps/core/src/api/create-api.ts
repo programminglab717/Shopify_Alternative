@@ -14,6 +14,7 @@ import { adminApiAuthentication, storefrontApiAuthentication } from './auth.js';
 import { keepRawBodies, readFileForms } from './forms.js';
 import { IdempotencyStore, idempotencyHooks } from './idempotency.js';
 import { serveImages } from './images.js';
+import { serveVideos } from './videos.js';
 import { serveLocalStorage } from './local-storage.js';
 import { serveArticleImages } from './article-images.js';
 import { serveLogos } from './logos.js';
@@ -102,6 +103,8 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   }
   // Products' images, at the sizes and in the formats browsers ask for (ADR-158).
   serveImages(fastify, options.storage);
+  // And their videos, a range at a time as browsers play them (ADR-258).
+  serveVideos(fastify, options.storage);
   // Shops' logos, for their orders' emails (ADR-198).
   serveLogos(fastify, options.database, options.storage);
   // Published articles' images, for their storefronts' pages (ADR-213).

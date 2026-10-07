@@ -372,6 +372,7 @@ export class ProductImportService {
   #imagesOf(tenant: TenantContext, record: ProductRecord): Map<string, string> {
     const images = new Map<string, string>();
     for (const media of record.media) {
+      if (media.mediaType !== 'image') continue;
       images.set(media.sourceUrl, media.id);
       images.set(imageAddressOf(this.site, tenant.shopId, media, record.handle), media.id);
     }

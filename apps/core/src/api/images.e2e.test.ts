@@ -9,6 +9,7 @@ import pg from 'pg';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startTestApi, type TestApi } from '../testing/api.js';
+import { phoneVideo } from '../testing/videos.js';
 import { ProductImages } from '../worker/product-images.js';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
 
@@ -340,5 +341,154 @@ describe.skipIf(!server)("Products' images: uploaded or fetched, checked, served
       await api.storage.head(`shops/${shop}/images/${uuid}/crop-400-300-400-300/clean.jpg`),
     ).toBeNull();
     expect((await get(image.url)).statusCode).toBe(404);
+  });
+
+  it("takes a product's videos, uploaded or YouTube's, and plays an uploaded one a range at a time (ADR-258)", async () => {
+    const product = (
+      await gql(
+        'mutation { productCreate(input: { title: "Chikankari Kurta" }) { product { id } } }',
+      )
+    ).product;
+    const video = phoneVideo('avc1');
+    const staged = await gql(
+      `mutation ($input: [StagedUploadInput!]!) {
+        stagedUploadsCreate(input: $input) { stagedTargets { url resourceUrl } userErrors { field } } }`,
+      {
+        input: [
+          { filename: 'Kurta.MOV', mimeType: 'video/quicktime', fileSize: String(video.length) },
+        ],
+      },
+    );
+    const [target] = staged.stagedTargets;
+    const put = await api.app.inject({
+      method: 'PUT',
+      url: target.url.replace('http://localhost:4000', ''),
+      payload: video,
+      headers: { 'content-type': 'video/quicktime' },
+    });
+    expect(put.statusCode).toBe(200);
+    const created = await gql(
+      `mutation ($id: ID!, $media: [CreateMediaInput!]!) {
+        productCreateMedia(productId: $id, media: $media) {
+          media { id mediaContentType status } userErrors { field code } } }`,
+      {
+        id: product.id,
+        media: [
+          {
+            originalSource: target.resourceUrl,
+            mediaContentType: 'VIDEO',
+            previewImageSource: 'https://cdn.example.pk/frame.jpg',
+            alt: 'Kurta, turning',
+          },
+          {
+            originalSource: 'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+            mediaContentType: 'EXTERNAL_VIDEO',
+          },
+        ],
+      },
+    );
+    expect(created.userErrors).toEqual([]);
+    expect(created.media.map((media: Json) => media.mediaContentType)).toEqual([
+      'VIDEO',
+      'EXTERNAL_VIDEO',
+    ]);
+    const frame = await sharp({
+      create: { width: 90, height: 160, channels: 3, background: '#7a1f3d' },
+    })
+      .jpeg()
+      .toBuffer();
+    await images({
+      'https://cdn.example.pk/frame.jpg': frame,
+      'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg': frame,
+    }).process(shop, new Date(Date.now() + 60_000));
+
+    const [uploaded, youtube] = (
+      await gql(
+        `query ($id: ID!) { product(id: $id) { media {
+          id mediaContentType status alt image { url } previewImage { url width height }
+          video { duration sources { url mimeType format width height fileSize } }
+          externalVideo { host externalId originUrl embedUrl } } } }`,
+        { id: product.id },
+      )
+    ).media;
+    const uuid = fromPublicId(uploaded.id, 'media');
+    expect(uploaded).toMatchObject({
+      mediaContentType: 'VIDEO',
+      status: 'READY',
+      alt: 'Kurta, turning',
+      image: null,
+      previewImage: {
+        url: `http://localhost:4000/images/${shop}/${uuid}/chikankari-kurta.jpg`,
+        width: 90,
+        height: 160,
+      },
+      video: {
+        duration: 12_000,
+        sources: [
+          {
+            url: `http://localhost:4000/videos/${shop}/${uuid}/chikankari-kurta.mp4`,
+            mimeType: 'video/mp4',
+            format: 'mp4',
+            width: 1080,
+            height: 1920,
+            fileSize: video.length,
+          },
+        ],
+      },
+      externalVideo: null,
+    });
+    expect(youtube).toMatchObject({
+      mediaContentType: 'EXTERNAL_VIDEO',
+      status: 'READY',
+      video: null,
+      externalVideo: {
+        host: 'YOUTUBE',
+        externalId: 'dQw4w9WgXcQ',
+        originUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        embedUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+      },
+    });
+
+    // Whole, then a range at a time as a browser's player asks, never past its end.
+    const { url } = uploaded.video.sources[0];
+    const whole = await get(url);
+    expect([
+      whole.statusCode,
+      whole.headers['content-type'],
+      whole.headers['accept-ranges'],
+    ]).toEqual([200, 'video/mp4', 'bytes']);
+    expect(whole.rawPayload.length).toBe(video.length);
+    expect(whole.headers).toMatchObject({
+      'cache-control': 'public, max-age=31536000, immutable',
+      'cache-tag': `hatti:${shop}:image:${uuid}`,
+    });
+    const ranged = (range: string) =>
+      api.app.inject({
+        method: 'GET',
+        url: url.replace('http://localhost:4000', ''),
+        headers: { range },
+      });
+    const first = await ranged('bytes=0-7');
+    expect([first.statusCode, first.headers['content-range'], first.rawPayload.length]).toEqual([
+      206,
+      `bytes 0-7/${video.length}`,
+      8,
+    ]);
+    expect(first.rawPayload.toString('latin1', 4, 8)).toBe('ftyp');
+    const rest = await ranged(`bytes=${video.length - 4}-`);
+    expect(rest.headers['content-range']).toBe(
+      `bytes ${video.length - 4}-${video.length - 1}/${video.length}`,
+    );
+    expect((await ranged(`bytes=${video.length}-`)).statusCode).toBe(416);
+    expect((await get(`/videos/${shop}/${newId()}/chikankari-kurta.mp4`)).statusCode).toBe(404);
+
+    // Gone with its media.
+    await gql(
+      `mutation ($id: ID!, $ids: [ID!]!) {
+        productDeleteMedia(productId: $id, mediaIds: $ids) { deletedMediaIds } }`,
+      { id: product.id, ids: [uploaded.id] },
+    );
+    await images({}).remove();
+    expect((await get(url)).statusCode).toBe(404);
   });
 });

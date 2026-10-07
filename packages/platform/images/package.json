@@ -2,7 +2,7 @@
   "name": "@hatti/images",
   "version": "0.0.0",
   "private": true,
-  "description": "Product images: told by their first bytes, checked, and kept as a clean copy without what cameras add, at most 4,096 pixels a side; made at the widths and in the formats browsers ask for, with sharp (libvips); and fetched from merchants' URLs without reaching private networks.",
+  "description": "Product images: told by their first bytes, checked, and kept as a clean copy without what cameras add, at most 4,096 pixels a side, or cropped; made at the widths and in the formats browsers ask for, with sharp (libvips); fetched from merchants' URLs without reaching private networks; and products' videos, checked box by box and kept without where they were taken.",
   "type": "module",
   "exports": {
     ".": {

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-257 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-258 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -265,6 +265,7 @@
 | 255 | What a card or a JazzCash wallet paid goes back through JazzCash's refunds, a wallet's with the MPIN the shop gives; a payment keeps how its customer paid, as its gateway said, and a voucher paid at a shop goes back another way; claimed whole until tried against its sandbox | Accepted |
 | 256 | What the shop's staff and apps change goes on its activity log: each event a request of the Admin API records, written in the same statement as the outbox's, by whom and to what, never what it recorded, in a table of its own kept as long as the audit log | Accepted |
 | 257 | The merchant crops a product's image and marks what matters in it: a crop's clean copy is made from the whole image's as it is set and kept beside it, each size and format made from it at an address naming the crop, the whole kept to crop again; the focal point, in percent of the image shown, is Shopify's for themes and image_tag | Accepted |
+| 258 | Products' videos: an MP4 or QuickTime file the shop uploads, H.264 and AAC as phones record them, read box by box and kept as it is but for where it was taken, served a range at a time with the preview image its uploader gives; or a YouTube or Vimeo video by its address, its host's image its preview; themes have them as Shopify's media | Accepted |
 
 ---
 
@@ -10666,3 +10667,61 @@
     theme's choice of a frame; a merchant's crop belongs to the image.
   * **Focal points in the whole image's pixels:** kept through a new crop, but the API would
     speak of points outside the image shown.
+
+## ADR-258 · Products' videos: an MP4 or QuickTime file the shop uploads, H.264 and AAC as phones record them, read box by box and kept as it is but for where it was taken, served a range at a time with the preview image its uploader gives; or a YouTube or Vimeo video by its address, its host's image its preview; themes have them as Shopify's media
+
+* **Context:** CAT-02 asks for video; Hatti kept products' images alone ([ADR-158](#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)).
+  Merchants in Pakistan film their products on their phones, for Instagram's and TikTok's reels,
+  and many keep them on YouTube. Phones record MP4 or, on iPhones, QuickTime: H.264, or HEVC by
+  an iPhone's default, which Firefox and many Android phones' browsers cannot play; and they write
+  where they were taken into the file. No video service runs: making smaller sizes needs ffmpeg or
+  a service priced by the minute, before the infrastructure is chosen. Shopify takes `VIDEO` by a
+  staged upload and `EXTERNAL_VIDEO` by a YouTube or Vimeo address, and its themes read
+  `product.media` with each item's `media_type`, `preview_image` and `sources`, through its
+  `video_tag`, `external_video_tag`, `external_video_url` and `media_tag`.
+* **Decision:**
+  * **A video the shop uploads is kept as it plays** (`VIDEO`): a staged upload of video/mp4 or
+    video/quicktime, up to 100 MB (migration 0161 lets files be videos), which the worker reads
+    box by box, never decoding it (`cleanVideo`, `@hatti/images`): its first box `ftyp`, whole
+    and not in fragments, its video H.264, its sound AAC or none, at most ten minutes. HEVC is
+    refused saying how an iPhone records H.264. Its size as shown, turned as the phone was held,
+    and its length are kept; what it says about itself, a phone's location among it, and tracks
+    of anything but its video and sound become `free` boxes of the same size, so nothing else
+    moves. It is kept in its media's folder, removed with it.
+  * **Each has a preview image** (`previewImageSource`), made ready as an image is: an uploaded
+    video needs one, an image's URL or upload, as the admin takes a frame of it in the browser.
+    A YouTube video's is its host's largest, else the next; a Vimeo one's the image Vimeo's oEmbed
+    names, from Vimeo's own CDN alone; either is replaced by one given.
+  * **YouTube and Vimeo by their addresses** (`EXTERNAL_VIDEO`): a watch page, short, share or
+    player address is read as the host and its ID (migration 0161), and is ready once its
+    preview is; any other site's is refused.
+  * **Served a range at a time** (`/videos/{shop}/{media}/{handle}.mp4`): the clean copy whole, or
+    the one range a player asks for, streamed from storage, never held whole
+    (`ObjectStorage.stream`); kept a year, tagged as the media's images, so its removal forgets
+    it.
+  * **The Admin API as Shopify's:** `MediaContentType`'s `VIDEO` and `EXTERNAL_VIDEO`,
+    `ProductMedia.previewImage`, `video { sources duration }`, `externalVideo { host externalId
+    originUrl embedUrl }` and Shopify's codes for what failed; `image` is an image's alone. A
+    video is neither cropped ([ADR-257](#adr-257--the-merchant-crops-a-products-image-and-marks-what-matters-in-it-a-crops-clean-copy-is-made-from-the-whole-images-as-it-is-set-and-kept-beside-it-each-size-and-format-made-from-it-at-an-address-naming-the-crop-the-whole-kept-to-crop-again-the-focal-point-in-percent-of-the-image-shown-is-shopifys-for-themes-and-image_tag)) nor a variant's image, and Shopify's product file
+    has images alone, so exports and imports leave videos out.
+  * **Storefronts:** a product's document lists its `media` where it has a video ready, its
+    images by their places; themes have Shopify's `video` and `external_video` objects in
+    `product.media`, and its four filters; Hatti Base's gallery plays them in their places.
+* **Consequences:**
+  * Merchants show their products moving, from their phone's gallery or their YouTube channel,
+    and shoppers' phones fetch an uploaded video only as they play it.
+  * A video plays as it was uploaded: a large one costs shoppers' data, and an HEVC one must be
+    recorded or exported again; until a video service makes smaller sizes, 100 MB and ten minutes
+    cap them.
+  * The worker reads an uploaded video whole to check and keep it: up to 100 MB at a time.
+  * YouTube's and Vimeo's players bring their own cookies.
+* **Alternatives:**
+  * **ffmpeg in the worker:** smaller sizes, HLS and frames for previews, at the cost of a native
+    dependency and minutes of a CPU for each video, before the infrastructure is chosen.
+  * **Cloudflare Stream or Mux:** priced by the minutes kept and watched, the videos kept outside
+    the platform's storage ([ADR-079](#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)); the next step once volume asks for it.
+  * **HEVC taken as it is:** many shoppers' phones would show nothing.
+  * **A frame taken by the server for the preview:** it needs a decoder; the admin's browser has
+    one.
+  * **Signed storage URLs to play from:** they expire, and pages the edge keeps a year would name
+    dead addresses.

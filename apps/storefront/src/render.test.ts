@@ -597,7 +597,7 @@ describe('Storefront rendering', () => {
     expect(count(page.html, 'name="option-')).toBe(5 + 5 + 4);
     expect(page.html).toContain('Cash on delivery available');
     expect(page.html).toMatch(/https:\/\/wa\.me\/923001234567\?text=Hi!%20I'd%20like%20to%20order/);
-    expect(count(page.html, '<li>\n        <img')).toBe(10);
+    expect(count(page.html, '<li><img')).toBe(10);
     expect(page.html).toContain('fetchpriority="high"');
     // The variant asked for is the one the form adds.
     const picked = await render({
@@ -1062,6 +1062,104 @@ describe('Storefront rendering', () => {
     // None set: the middle, and nothing added to the tag.
     expect(none).toMatch(/^50% 50%\|50\|<img /);
     expect(none).not.toContain('object-position');
+  });
+
+  it("gives themes a product's videos among its media, with Shopify's video filters, and Hatti Base plays them (ADR-258)", async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const [front, back] = first!.images;
+    const preview = (name: string, width: number, height: number) => ({
+      src: `https://api.hatti.test/images/s1/${name}/kurta.jpg`,
+      width,
+      height,
+      alt: null,
+    });
+    const filmed = {
+      ...first!,
+      images: [front!, back!],
+      media: [
+        { type: 'image' as const, image: 0 },
+        {
+          type: 'video' as const,
+          id: 'm-video',
+          alt: 'Kurta, turning',
+          preview: preview('m-video', 1080, 1920),
+          sources: [
+            {
+              src: 'https://api.hatti.test/videos/s1/m-video/kurta.mp4',
+              mimeType: 'video/mp4',
+              format: 'mp4',
+              width: 1080,
+              height: 1920,
+            },
+          ],
+          durationMs: 12_000,
+        },
+        {
+          type: 'external_video' as const,
+          id: 'm-youtube',
+          alt: null,
+          preview: preview('m-youtube', 1280, 720),
+          host: 'youtube' as const,
+          externalId: 'dQw4w9WgXcQ',
+        },
+        { type: 'image' as const, image: 1 },
+      ],
+    };
+    const shop = new MemoryStore({ ...sample, products: [filmed, ...rest] });
+    const theme = loadTheme({
+      ...files,
+      'sections/main-product.liquid':
+        '<p class="kinds">{{ product.media.size }}|{{ product.images.size }}|' +
+        "{{ product.media | map: 'media_type' | join: ',' }}|{{ product.featured_media.media_type }}</p>" +
+        '{% for media in product.media %}<p class="tag">{{ media | media_tag: image_size: \'540x\' }}</p>{% endfor %}' +
+        '<p class="video">{{ product.media[1].duration }}|{{ product.media[1].sources[0].url }}|' +
+        '{{ product.media[1].preview_image.width }}|{{ product.media[1].aspect_ratio }}</p>' +
+        '<p class="url">{{ product.media[2] | external_video_url: color: \'white\', autoplay: true }}|' +
+        '{{ product.media[2].host }}|{{ product.media[2].external_id }}</p>' +
+        '{% schema %}{ "name": "Product" }{% endschema %}',
+    });
+    const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${filmed.handle}` }, shop.fresh());
+    const text = (name: string) =>
+      [...page.html.matchAll(new RegExp(`<p class="${name}">([^]*?)</p>`, 'g'))].map(
+        (match) => match[1]!,
+      );
+    expect(text('kinds')).toEqual(['4|2|image,video,external_video,image|image']);
+    const [, video, youtube] = text('tag');
+    expect(video).toBe(
+      '<video playsinline="playsinline" controls="controls" preload="metadata" ' +
+        'poster="https://api.hatti.test/images/s1/m-video/kurta.jpg?width=540" ' +
+        'aria-label="Kurta, turning"><source src="https://api.hatti.test/videos/s1/m-video/kurta.mp4" ' +
+        'type="video/mp4"><img src="https://api.hatti.test/images/s1/m-video/kurta.jpg?width=540" ' +
+        'alt="Kurta, turning"></video>',
+    );
+    expect(youtube).toBe(
+      '<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ?enablejsapi=1&amp;playsinline=1&amp;rel=0" ' +
+        'title="" loading="lazy" frameborder="0" ' +
+        'allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" ' +
+        'allowfullscreen="allowfullscreen"></iframe>',
+    );
+    expect(text('video')).toEqual([
+      '12000|https://api.hatti.test/videos/s1/m-video/kurta.mp4|1080|0.563',
+    ]);
+    expect(text('url')).toEqual([
+      'https://www.youtube.com/embed/dQw4w9WgXcQ?enablejsapi=1&playsinline=1&rel=0&color=white&autoplay=1|youtube|dQw4w9WgXcQ',
+    ]);
+
+    // Hatti Base's gallery: the video in its place, YouTube's player, the images around them.
+    const based = await new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } }).render(
+      { path: `/products/${filmed.handle}` },
+      shop.fresh(),
+    );
+    expect(count(based.html, '<li><img')).toBe(2);
+    expect(based.html).toContain('<li><video playsinline="playsinline"');
+    expect(based.html).toContain(
+      'poster="https://api.hatti.test/images/s1/m-video/kurta.jpg?width=1100"',
+    );
+    expect(based.html).toMatch(
+      /<div class="product__embed" style="--ratio: 1\.778">\s*<iframe src="https:\/\/www\.youtube\.com\/embed\/dQw4w9WgXcQ\?/,
+    );
   });
 
   it('renders what a search found, a page at a time, its links keeping the words', async () => {

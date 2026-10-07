@@ -46,7 +46,8 @@ registerEnumType(MediaStatus, {
     },
     READY: { description: 'Ready to show, at the widths and in the formats browsers ask for.' },
     FAILED: {
-      description: 'Could not be read, or is not an image to show: `mediaErrors` says why.',
+      description:
+        'Could not be read, or is not an image or video to show: `mediaErrors` says why.',
     },
   },
 });
@@ -58,6 +59,12 @@ export enum MediaErrorCode {
   INVALID_IMAGE_RESOLUTION = 'INVALID_IMAGE_RESOLUTION',
   INVALID_IMAGE_ASPECT_RATIO = 'INVALID_IMAGE_ASPECT_RATIO',
   IMAGE_PROCESSING_FAILURE = 'IMAGE_PROCESSING_FAILURE',
+  VIDEO_INVALID_FILETYPE_ERROR = 'VIDEO_INVALID_FILETYPE_ERROR',
+  VIDEO_METADATA_READ_ERROR = 'VIDEO_METADATA_READ_ERROR',
+  VIDEO_MAX_DURATION_ERROR = 'VIDEO_MAX_DURATION_ERROR',
+  GENERIC_FILE_INVALID_SIZE = 'GENERIC_FILE_INVALID_SIZE',
+  GENERIC_FILE_DOWNLOAD_FAILURE = 'GENERIC_FILE_DOWNLOAD_FAILURE',
+  EXTERNAL_VIDEO_NOT_FOUND = 'EXTERNAL_VIDEO_NOT_FOUND',
   UNKNOWN = 'UNKNOWN',
 }
 
@@ -73,6 +80,18 @@ registerEnumType(MediaErrorCode, {
     INVALID_IMAGE_RESOLUTION: { description: 'Over 50 megapixels.' },
     INVALID_IMAGE_ASPECT_RATIO: { description: 'One side over 20 times the other.' },
     IMAGE_PROCESSING_FAILURE: { description: 'Damaged, or not what it says it is.' },
+    VIDEO_INVALID_FILETYPE_ERROR: {
+      description:
+        'Not an MP4 or QuickTime video of H.264 and AAC, which every browser plays: HEVC among ' +
+        'them (ADR-258).',
+    },
+    VIDEO_METADATA_READ_ERROR: { description: 'Its index, length or size could not be read.' },
+    VIDEO_MAX_DURATION_ERROR: { description: 'Over 10 minutes.' },
+    GENERIC_FILE_INVALID_SIZE: { description: 'A video over 100 MB.' },
+    GENERIC_FILE_DOWNLOAD_FAILURE: { description: "A video's upload could not be read." },
+    EXTERNAL_VIDEO_NOT_FOUND: {
+      description: 'YouTube or Vimeo gave no image for the video: private, or gone.',
+    },
     UNKNOWN: { description: 'Anything else.' },
   },
 });
@@ -140,9 +159,78 @@ export class FocalPoint {
 
 export enum MediaContentType {
   IMAGE = 'IMAGE',
+  VIDEO = 'VIDEO',
+  EXTERNAL_VIDEO = 'EXTERNAL_VIDEO',
 }
 
-registerEnumType(MediaContentType, { name: 'MediaContentType' });
+registerEnumType(MediaContentType, {
+  name: 'MediaContentType',
+  valuesMap: {
+    IMAGE: { description: 'An image.' },
+    VIDEO: {
+      description: 'A video the shop uploaded: MP4 or QuickTime, H.264 and AAC (ADR-258).',
+    },
+    EXTERNAL_VIDEO: { description: 'A YouTube or Vimeo video, by its address.' },
+  },
+});
+
+export enum ExternalVideoHost {
+  YOUTUBE = 'YOUTUBE',
+  VIMEO = 'VIMEO',
+}
+
+registerEnumType(ExternalVideoHost, { name: 'MediaHost' });
+
+@ObjectType({
+  description: "A video's file as Hatti serves it (ADR-258), as Shopify's VideoSource.",
+})
+export class VideoSource {
+  @Field({
+    description:
+      'Where it is served, whole or a range at a time, as browsers ask; the address never ' +
+      'changes what it shows.',
+  })
+  url!: string;
+
+  @Field({ description: 'video/mp4.' })
+  mimeType!: string;
+
+  @Field({ description: 'mp4.' })
+  format!: string;
+
+  @Field(() => Int, { description: 'In pixels, as shown.' })
+  width!: number;
+
+  @Field(() => Int)
+  height!: number;
+
+  @Field(() => Int, { description: 'Bytes.' })
+  fileSize!: number;
+}
+
+@ObjectType({ description: 'A video the shop uploaded, as Hatti serves it once ready (ADR-258).' })
+export class ProductVideo {
+  @Field(() => [VideoSource])
+  sources!: VideoSource[];
+
+  @Field(() => Int, { description: 'How long it lasts, in milliseconds.' })
+  duration!: number;
+}
+
+@ObjectType({ description: 'A YouTube or Vimeo video (ADR-258).' })
+export class ExternalVideo {
+  @Field(() => ExternalVideoHost)
+  host!: ExternalVideoHost;
+
+  @Field({ description: 'Its ID there.' })
+  externalId!: string;
+
+  @Field({ description: 'Where it is watched.' })
+  originUrl!: string;
+
+  @Field({ description: 'Where pages embed it from.' })
+  embedUrl!: string;
+}
 
 export enum ProductVariantsStrategy {
   LEAVE_AS_IS = 'LEAVE_AS_IS',
@@ -196,7 +284,7 @@ export class SelectedOption {
   value!: string;
 }
 
-@ObjectType({ description: 'An image of a product.' })
+@ObjectType({ description: 'An image or a video of a product.' })
 export class ProductMedia {
   @Field(() => ID)
   id!: string;
@@ -239,6 +327,12 @@ export class ProductMedia {
 
   @Field(() => FocalPoint, { nullable: true, description: 'What matters in it; null for none.' })
   focalPoint!: FocalPoint | null;
+
+  @Field(() => ExternalVideo, {
+    nullable: true,
+    description: 'A YouTube or Vimeo video; null for anything else.',
+  })
+  externalVideo!: ExternalVideo | null;
 
   /** The media as the catalog keeps it, and its product's handle: for its image's address. */
   record!: MediaRecord;
@@ -624,8 +718,23 @@ export class CreateMediaInput {
   @Field(() => String, { nullable: true })
   alt?: string | null;
 
-  @Field(() => MediaContentType, { nullable: true, defaultValue: MediaContentType.IMAGE })
+  @Field(() => MediaContentType, {
+    nullable: true,
+    defaultValue: MediaContentType.IMAGE,
+    description:
+      'IMAGE; VIDEO, its originalSource the resourceUrl of a video staged as video/mp4 or ' +
+      "video/quicktime, H.264 and AAC, up to 100 MB and 10 minutes; EXTERNAL_VIDEO, a YouTube or Vimeo video's address (ADR-258).",
+  })
   mediaContentType?: MediaContentType | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The image that shows before a video plays: an https URL, or the resourceUrl of an image ' +
+      "staged. A VIDEO needs one, as a frame of it the admin takes; an EXTERNAL_VIDEO's own is " +
+      'taken where none is given.',
+  })
+  previewImageSource?: string | null;
 }
 
 @InputType({

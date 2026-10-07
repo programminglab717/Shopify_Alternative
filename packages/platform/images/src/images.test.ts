@@ -7,6 +7,7 @@ import { MAX_IMAGE_SIDE, cleanImage, cropImage } from './clean.js';
 import { ImageFetcher, isPublicAddress } from './fetch.js';
 import { sniffImage } from './formats.js';
 import { IMAGE_WIDTHS, formatFor, imageVariant, widthFor } from './variants.js';
+import { MAX_VIDEO_BYTES, cleanVideo } from './videos.js';
 
 /** A photo-like image: `width` × `height`, red to blue, opaque unless `alpha` says. */
 async function photo(
@@ -187,6 +188,136 @@ describe('crops', () => {
       40,
       true,
     ]);
+  });
+});
+
+describe('videos', () => {
+  /** A box of `type` holding `parts`. */
+  const box = (type: string, ...parts: Buffer[]) => {
+    const body = Buffer.concat(parts);
+    const header = Buffer.alloc(8);
+    header.writeUInt32BE(8 + body.length);
+    header.write(type, 4, 'latin1');
+    return Buffer.concat([header, body]);
+  };
+  const u32 = (...values: number[]) =>
+    Buffer.concat(
+      values.map((value) => {
+        const bytes = Buffer.alloc(4);
+        bytes.writeInt32BE(value | 0);
+        return bytes;
+      }),
+    );
+  // QuickTime's own boxes of what a video says of itself start with the copyright sign.
+  const QUICKTIME = String.fromCharCode(0xa9);
+  const IDENTITY = [0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000];
+  // A phone held upright: the frame turned a quarter.
+  const UPRIGHT = [0, 0x10000, 0, -0x10000, 0, 0, 0, 0, 0x40000000];
+  const track = (handler: string, codec: string, width = 0, height = 0, matrix = IDENTITY) =>
+    box(
+      'trak',
+      box(
+        'tkhd',
+        u32(0, 0, 0, 1, 0, 0),
+        Buffer.alloc(16),
+        u32(...matrix),
+        u32(width << 16, height << 16),
+      ),
+      box(
+        'mdia',
+        box('mdhd', Buffer.alloc(24)),
+        box('hdlr', u32(0, 0), Buffer.from(handler, 'latin1'), Buffer.alloc(12)),
+        box('minf', box('stbl', box('stsd', u32(0, 1), box(codec, Buffer.alloc(78))))),
+      ),
+      box('udta', box(`${QUICKTIME}nam`, Buffer.from('Camera'))),
+    );
+  /** A phone's video: where it was taken in its movie's metadata, and a track of timed metadata. */
+  const phoneVideo = (
+    options: {
+      brand?: string;
+      video?: string;
+      sound?: string;
+      seconds?: number;
+      matrix?: number[];
+    } = {},
+  ) =>
+    Buffer.concat([
+      box(
+        'ftyp',
+        Buffer.from(options.brand ?? 'qt  ', 'latin1'),
+        u32(0),
+        Buffer.from('qt  ', 'latin1'),
+      ),
+      box('wide'),
+      box('mdat', Buffer.from('frames and sound')),
+      box(
+        'moov',
+        box('mvhd', u32(0, 0, 0, 600, 600 * (options.seconds ?? 12)), Buffer.alloc(80)),
+        track('vide', options.video ?? 'avc1', 1920, 1080, options.matrix ?? UPRIGHT),
+        track('soun', options.sound ?? 'mp4a'),
+        track('meta', 'mebx'),
+        box(
+          'meta',
+          box('keys', Buffer.from('com.apple.quicktime.location.ISO6709')),
+          box('ilst', Buffer.from('+24.8607+067.0011/')),
+        ),
+        box('udta', box(`${QUICKTIME}xyz`, Buffer.from('+24.8607+067.0011/'))),
+      ),
+    ]);
+
+  it("keeps phones' H.264 videos as they are but for where they were taken (ADR-258)", () => {
+    const uploaded = phoneVideo();
+    const length = uploaded.length;
+    const kept = cleanVideo(Buffer.from(uploaded));
+    if (!kept.ok) throw new Error(kept.problem.message);
+    // As held: tall. Twelve seconds.
+    expect([kept.video.width, kept.video.height, kept.video.durationMs]).toEqual([
+      1080, 1920, 12_000,
+    ]);
+    expect(kept.video.body.length).toBe(length);
+    const latin = kept.video.body.toString('latin1');
+    expect(latin).not.toContain('+24.8607');
+    expect(latin).not.toContain('com.apple.quicktime.location');
+    expect(latin).not.toContain('mebx');
+    // The frames, the video's and sound's own tracks, where they were.
+    expect(latin.indexOf('frames and sound')).toBe(
+      uploaded.toString('latin1').indexOf('frames and sound'),
+    );
+    expect(latin).toContain('avc1');
+    expect(latin).toContain('mp4a');
+    // Held level, as made: wide.
+    const level = cleanVideo(phoneVideo({ brand: 'isom', matrix: IDENTITY }));
+    expect(level.ok && [level.video.width, level.video.height]).toEqual([1920, 1080]);
+  });
+
+  it('refuses what browsers cannot play as it is, or what is not a whole video, saying why', () => {
+    const refused = (bytes: Buffer) => {
+      const result = cleanVideo(bytes);
+      return result.ok ? null : result.problem;
+    };
+    expect(refused(phoneVideo({ video: 'hvc1' }))).toEqual({
+      code: 'VIDEO_INVALID_FILETYPE_ERROR',
+      message:
+        'It is HEVC video, which many browsers cannot play: record or export it as H.264, ' +
+        '"Most Compatible" in an iPhone\'s camera formats, and add it again',
+    });
+    expect(refused(phoneVideo({ sound: 'ac-3' }))?.message).toBe(
+      'Its sound is ac-3, not AAC: export it again as MP4 with AAC sound',
+    );
+    expect(refused(phoneVideo({ seconds: 11 * 60 }))).toEqual({
+      code: 'VIDEO_MAX_DURATION_ERROR',
+      message: 'The video lasts 11 minutes; it may last 10 minutes at most',
+    });
+    // Cut short before its index; a photo; nothing like a video.
+    const whole = phoneVideo();
+    expect(refused(whole.subarray(0, whole.indexOf(Buffer.from('moov', 'latin1')) - 4))?.code).toBe(
+      'VIDEO_METADATA_READ_ERROR',
+    );
+    expect(refused(whole.subarray(0, whole.length - 10))?.code).toBe('VIDEO_METADATA_READ_ERROR');
+    expect(refused(Buffer.from('<html>not a video</html>'))?.code).toBe(
+      'VIDEO_INVALID_FILETYPE_ERROR',
+    );
+    expect(refused(Buffer.alloc(MAX_VIDEO_BYTES + 1))?.code).toBe('GENERIC_FILE_INVALID_SIZE');
   });
 });
 

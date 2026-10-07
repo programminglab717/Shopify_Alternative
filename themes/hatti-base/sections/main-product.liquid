@@ -1,7 +1,7 @@
 {%- assign current = product.selected_or_first_available_variant -%}
 <div class="page-width section-spacing product">
   <ul class="product__media" role="list">
-    {%- for image in product.images -%}
+    {%- for media in product.media -%}
       {%- liquid
         if forloop.first
           assign loading = 'eager'
@@ -10,19 +10,28 @@
           assign loading = 'lazy'
           assign priority = 'auto'
         endif
-        assign alt = image.alt | default: product.title
+        assign alt = media.alt | default: product.title
       -%}
       <li>
-        {{
-          image
-          | image_url: width: 1100
-          | image_tag:
-            widths: '375, 550, 750, 1100',
-            sizes: '(min-width: 990px) 55vw, 100vw',
-            loading: loading,
-            fetchpriority: priority,
-            alt: alt
-        }}
+        {%- case media.media_type -%}
+          {%- when 'video' -%}
+            {{ media | video_tag: image_size: '1100x', alt: alt }}
+          {%- when 'external_video' -%}
+            <div class="product__embed" style="--ratio: {{ media.aspect_ratio }}">
+              {{ media | external_video_url | external_video_tag: title: alt, loading: loading }}
+            </div>
+          {%- else -%}
+            {{
+              media
+              | image_url: width: 1100
+              | image_tag:
+                widths: '375, 550, 750, 1100',
+                sizes: '(min-width: 990px) 55vw, 100vw',
+                loading: loading,
+                fetchpriority: priority,
+                alt: alt
+            }}
+        {%- endcase -%}
       </li>
     {%- endfor -%}
   </ul>
@@ -144,7 +153,9 @@
   .product__buy > .button { display: block; inline-size: 100%; }
   .product__media { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; gap: 0.5rem; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0; padding: 0; list-style: none; }
   .product__media li { scroll-snap-align: start; }
-  .product__media img { inline-size: 100%; block-size: auto; }
+  .product__media img, .product__media video { inline-size: 100%; block-size: auto; }
+  .product__embed { aspect-ratio: var(--ratio, 16 / 9); }
+  .product__embed iframe { inline-size: 100%; block-size: 100%; border: 0; }
   .product__title { margin: 0; font-size: 1.75rem; }
   .product__vendor { color: var(--color-muted); }
   .product__form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-block: 1rem; }

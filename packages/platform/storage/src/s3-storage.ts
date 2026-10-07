@@ -1,8 +1,11 @@
+import { Readable } from 'node:stream';
+import type { ReadableStream } from 'node:stream/web';
 import {
   ObjectStorage,
   assertObjectKey,
   assertObjectPrefix,
   isObjectKey,
+  type ByteRange,
   type SignedRequest,
   type StoredObject,
 } from './object-storage.js';
@@ -106,6 +109,17 @@ export class S3Storage extends ObjectStorage {
       body: Buffer.from(await response.arrayBuffer()),
       contentType: response.headers.get('content-type'),
     };
+  }
+
+  async stream(key: string, range?: ByteRange): Promise<Readable | null> {
+    const response = await this.#request(
+      'GET',
+      key,
+      range ? { range: `bytes=${range.start}-${range.end}` } : {},
+    );
+    if (response.status === 404) return null;
+    if (!response.ok) throw await failure('GET', key, response);
+    return response.body ? Readable.fromWeb(response.body as ReadableStream) : Readable.from([]);
   }
 
   async put(key: string, body: Buffer, contentType: string): Promise<void> {

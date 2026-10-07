@@ -1,5 +1,19 @@
-/** The most a file uploaded in one request may weigh: 20 MiB. */
+import type { Readable } from 'node:stream';
+import { MAX_VIDEO_UPLOAD_BYTES, isVideoType, type KnownContentType } from './file-types.js';
+
+/** The most a file uploaded in one request may weigh, but a video: 20 MiB. */
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+
+/** The most a file of `type` may weigh: a video 100 MiB, anything else 20 MiB. */
+export function maxUploadBytesOf(type: KnownContentType): number {
+  return isVideoType(type) ? MAX_VIDEO_UPLOAD_BYTES : MAX_UPLOAD_BYTES;
+}
+
+/** The bytes from `start` to `end` of a file, both counted, as an HTTP range names them. */
+export interface ByteRange {
+  start: number;
+  end: number;
+}
 
 /** A file kept under a key: how much it weighs and what it is. */
 export interface StoredObject {
@@ -73,6 +87,12 @@ export abstract class ObjectStorage {
 
   /** The whole file kept under `key`, with its type; null when nothing is. */
   abstract read(key: string): Promise<{ body: Buffer; contentType: string | null } | null>;
+
+  /**
+   * The file kept under `key` as it is read, from `range` alone when given, which must lie within
+   * it: a video sent as browsers ask for it, never held whole. Null when nothing is kept there.
+   */
+  abstract stream(key: string, range?: ByteRange): Promise<Readable | null>;
 
   abstract put(key: string, body: Buffer, contentType: string): Promise<void>;
 

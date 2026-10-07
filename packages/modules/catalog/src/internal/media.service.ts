@@ -10,14 +10,27 @@ import { InputChecker, LIMITS, fail, failOne, type MutationResult } from './inpu
 import { loadForUpdate, loadProduct, productChanged } from './product-store.js';
 import type { FocalPointRecord, MediaCropRecord, MediaRecord, ProductRecord } from './records.js';
 import { productMedia } from './schema.js';
+import { externalVideoOf, externalVideoUrls } from './videos.js';
+
+/** What a media is, as Shopify's `MediaContentType` names it (ADR-258). */
+export type MediaContentTypeValue = 'IMAGE' | 'VIDEO' | 'EXTERNAL_VIDEO';
 
 export interface MediaCreateInput {
   /**
-   * Where the image is: an https URL to fetch it from, or the resource URL of a file the shop
-   * uploaded through a staged upload (ADR-079).
+   * Where it is: an image's https URL to fetch it from, or the resource URL of a file the shop
+   * uploaded through a staged upload (ADR-079); a video's upload (ADR-258); a YouTube or Vimeo
+   * video's address.
    */
   originalSource: string;
   alt?: string | null;
+  /** IMAGE where not said. */
+  mediaContentType?: MediaContentTypeValue | null;
+  /**
+   * A video's preview image, which shows before it plays: an image's https URL or an upload's
+   * resource URL. A video the shop uploaded needs one; a YouTube or Vimeo video's own is taken
+   * where none is given.
+   */
+  previewImageSource?: string | null;
 }
 
 export interface MediaUpdateInput {
@@ -55,9 +68,11 @@ async function writePositions(tx: Tx, shopId: string, mediaIds: readonly string[
 }
 
 /**
- * Product images. A new image is due to the worker, which reads it from the file the shop
- * uploaded, or fetches it from its URL, checks it and keeps a clean copy, and marks it ready, or
- * failed, saying why (ADR-158). Until then the storefront shows an image by URL from its source.
+ * Products' images and videos. A new image is due to the worker, which reads it from the file the
+ * shop uploaded, or fetches it from its URL, checks it and keeps a clean copy, and marks it ready,
+ * or failed, saying why (ADR-158). Until then the storefront shows an image by URL from its source.
+ * A video the shop uploaded is checked and kept by the worker too, with its preview image; a
+ * YouTube or Vimeo video is ready once its preview image is (ADR-258).
  */
 @Injectable()
 export class MediaService {
@@ -73,16 +88,9 @@ export class MediaService {
   ): Promise<MutationResult<{ product: ProductRecord; mediaIds: string[] }>> {
     const check = new InputChecker();
     if (inputs.length === 0) check.add(['media'], 'BLANK', 'must include at least one');
-    const values = inputs.map((input, index) => {
-      const upload = this.#uploadOf(tenant.shopId, input.originalSource);
-      return {
-        sourceUrl:
-          upload?.url ??
-          check.httpsUrl(['media', String(index), 'originalSource'], input.originalSource),
-        sourceKey: upload?.key ?? null,
-        alt: check.text(['media', String(index), 'alt'], input.alt, { max: LIMITS.alt }) ?? '',
-      };
-    });
+    const values = inputs.map((input, index) =>
+      this.#mediaOf(check, tenant.shopId, ['media', String(index)], input),
+    );
     if (!check.ok) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
@@ -96,9 +104,7 @@ export class MediaService {
         shopId: tenant.shopId,
         id: newId(),
         productId,
-        sourceUrl: value.sourceUrl!,
-        sourceKey: value.sourceKey,
-        alt: value.alt,
+        ...value!,
         position: ++position,
       }));
       await tx.insert(productMedia).values(rows);
@@ -151,6 +157,15 @@ export class MediaService {
         }
       });
       if (!check.ok) return fail(check.errors);
+      inputs.forEach((input, index) => {
+        if (input.focalPoint && known.get(input.id)!.mediaType !== 'image') {
+          check.addMessage(
+            ['media', String(index), 'focalPoint'],
+            'INVALID',
+            'An image alone has a focal point',
+          );
+        }
+      });
       // Every crop checked against its image before any is made.
       const crops = inputs.map((input, index) =>
         input.crop === undefined
@@ -280,6 +295,100 @@ export class MediaService {
     });
   }
 
+  /** The row a new media is, checked; null where `check` says why not. */
+  #mediaOf(check: InputChecker, shopId: string, field: string[], input: MediaCreateInput) {
+    const alt = check.text([...field, 'alt'], input.alt, { max: LIMITS.alt }) ?? '';
+    const given = input.previewImageSource?.trim()
+      ? this.#imageSource(check, [...field, 'previewImageSource'], shopId, input.previewImageSource)
+      : null;
+    const preview = { previewSourceUrl: given?.url ?? null, previewSourceKey: given?.key ?? null };
+    switch (input.mediaContentType ?? 'IMAGE') {
+      case 'IMAGE': {
+        if (given) {
+          check.addMessage(
+            [...field, 'previewImageSource'],
+            'INVALID',
+            'An image is its own preview: give a preview image with a video',
+          );
+        }
+        const source = this.#imageSource(
+          check,
+          [...field, 'originalSource'],
+          shopId,
+          input.originalSource,
+        );
+        return (
+          source && {
+            mediaType: 'image' as const,
+            sourceUrl: source.url,
+            sourceKey: source.key,
+            alt,
+          }
+        );
+      }
+      case 'EXTERNAL_VIDEO': {
+        const video = externalVideoOf(input.originalSource ?? '');
+        if (!video) {
+          check.addMessage(
+            [...field, 'originalSource'],
+            'INVALID',
+            "Give a YouTube or Vimeo video's address, as its share button copies it",
+          );
+          return null;
+        }
+        return {
+          mediaType: 'external_video' as const,
+          sourceUrl: externalVideoUrls(video.host, video.id).originUrl,
+          sourceKey: null,
+          videoHost: video.host,
+          videoExternalId: video.id,
+          ...preview,
+          alt,
+        };
+      }
+      case 'VIDEO': {
+        const upload = this.#uploadOf(shopId, input.originalSource);
+        if (!upload || !/\.(?:mp4|mov)$/.test(upload.key)) {
+          check.addMessage(
+            [...field, 'originalSource'],
+            'INVALID',
+            'Upload the video through stagedUploadsCreate, as video/mp4 or video/quicktime, and ' +
+              'give its resourceUrl',
+          );
+        }
+        if (!given && !input.previewImageSource?.trim()) {
+          check.addMessage(
+            [...field, 'previewImageSource'],
+            'BLANK',
+            'Give the image that shows before the video plays: a frame of it, or its cover',
+          );
+        }
+        return upload && given
+          ? {
+              mediaType: 'video' as const,
+              sourceUrl: upload.url,
+              sourceKey: upload.key,
+              ...preview,
+              alt,
+            }
+          : null;
+      }
+    }
+  }
+
+  /** Where an image is: the shop's own upload, by its resource URL, or an https URL. */
+  #imageSource(
+    check: InputChecker,
+    field: string[],
+    shopId: string,
+    source: string | null | undefined,
+  ): { url: string; key: string | null } | null {
+    const upload = this.#uploadOf(shopId, source ?? '');
+    if (upload) return upload;
+    const url = check.httpsUrl(field, source);
+    return url === null ? null : { url, key: null };
+  }
+
   /**
    * Makes and keeps the clean copy of `crop` of a ready image, from its whole clean copy, unless
    * one was kept before. Whether it is kept.
@@ -318,6 +427,10 @@ function cropOf(
   crop: MediaCropRecord | null,
 ): MediaCropRecord | null {
   if (crop === null) return null;
+  if (media.mediaType !== 'image') {
+    check.addMessage(field, 'INVALID', 'An image alone is cropped');
+    return null;
+  }
   const { width, height } = media;
   if (media.status !== 'ready' || width === null || height === null) {
     check.addMessage(field, 'INVALID', 'An image is cropped once it is ready');

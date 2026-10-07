@@ -69,7 +69,8 @@ export class ProductExportService {
                  (SELECT count(*) FROM catalog.variants v
                    WHERE v.shop_id = p.shop_id AND v.product_id = p.id),
                  (SELECT count(*) FROM catalog.product_media m
-                   WHERE m.shop_id = p.shop_id AND m.product_id = p.id),
+                   WHERE m.shop_id = p.shop_id AND m.product_id = p.id
+                     AND m.media_type = 'image'),
                  1)), 0)::int AS rows
           FROM catalog.products p
          WHERE p.shop_id = ${tenant.shopId} AND ${where}`);

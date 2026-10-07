@@ -85,6 +85,9 @@ over ([ADR-158](./13-decision-log.md#adr-158--hatti-keeps-products-images-itself
 A crop the merchant sets is served at an address of its own,
 `/images/{shop}/{media}/crop-…/{handle}.jpg`, from a clean copy of its own, and its focal
 point is Shopify's `image.presentation` in themes ([ADR-257](./13-decision-log.md#adr-257--the-merchant-crops-a-products-image-and-marks-what-matters-in-it-a-crops-clean-copy-is-made-from-the-whole-images-as-it-is-set-and-kept-beside-it-each-size-and-format-made-from-it-at-an-address-naming-the-crop-the-whole-kept-to-crop-again-the-focal-point-in-percent-of-the-image-shown-is-shopifys-for-themes-and-image_tag)).
+Products' videos the shops upload are served at `/videos/{shop}/{media}/{handle}.mp4`, a range at a
+time as players ask, kept a year and tagged as their images; YouTube's and Vimeo's play in
+their hosts' players ([ADR-258](./13-decision-log.md#adr-258--products-videos-an-mp4-or-quicktime-file-the-shop-uploads-h264-and-aac-as-phones-record-them-read-box-by-box-and-kept-as-it-is-but-for-where-it-was-taken-served-a-range-at-a-time-with-the-preview-image-its-uploader-gives-or-a-youtube-or-vimeo-video-by-its-address-its-hosts-image-its-preview-themes-have-them-as-shopifys-media)).
 
 `stale-if-error` is deliberate. During origin incidents or international-link degradation (submarine
 cable faults have hit Pakistan before), shoppers still see the catalogue from PoPs inside the

@@ -336,6 +336,9 @@ The catalog follows Shopify's model, so merchants and importers find what they e
   A crop is made from the whole clean copy as it is set, and kept in a folder named after it
   ([ADR-257](../architecture/13-decision-log.md#adr-257--the-merchant-crops-a-products-image-and-marks-what-matters-in-it-a-crops-clean-copy-is-made-from-the-whole-images-as-it-is-set-and-kept-beside-it-each-size-and-format-made-from-it-at-an-address-naming-the-crop-the-whole-kept-to-crop-again-the-focal-point-in-percent-of-the-image-shown-is-shopifys-for-themes-and-image_tag)):
   the route serves only crops so made, never one an address asks for.
+  A video (ADR-258) is checked box by box, never decoded, by `cleanVideo`, and kept in its
+  media's folder; `/videos` streams it from storage a range at a time and never holds it whole
+  ([ADR-258](../architecture/13-decision-log.md#adr-258--products-videos-an-mp4-or-quicktime-file-the-shop-uploads-h264-and-aac-as-phones-record-them-read-box-by-box-and-kept-as-it-is-but-for-where-it-was-taken-served-a-range-at-a-time-with-the-preview-image-its-uploader-gives-or-a-youtube-or-vimeo-video-by-its-address-its-hosts-image-its-preview-themes-have-them-as-shopifys-media)).
 
 ## Inventory
 

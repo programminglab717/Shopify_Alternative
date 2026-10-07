@@ -211,7 +211,7 @@ export class VariantService {
           comboKey(variant.selectedOptions.map((selected) => selected.value)),
         ),
       );
-      const mediaIds = new Set(product.media.map((media) => media.id));
+      const mediaTypes = new Map(product.media.map((media) => [media.id, media.mediaType]));
       const combos = inputs.map((input, index) => {
         const field = ['variants', String(index)];
         const combo = resolveOptionValues(
@@ -231,9 +231,7 @@ export class VariantService {
           }
           taken.add(comboKey(combo));
         }
-        if (input.mediaId && !mediaIds.has(input.mediaId)) {
-          check.addMessage([...field, 'mediaId'], 'NOT_FOUND', 'The product has no such media');
-        }
+        checkVariantMedia(check, [...field, 'mediaId'], mediaTypes, input.mediaId);
         return combo ?? [];
       });
       if (!check.ok) return fail(check.errors);
@@ -298,7 +296,7 @@ export class VariantService {
       const product = await loadForUpdate(tx, tenant.shopId, productId);
       if (!product) return failOne(['productId'], 'NOT_FOUND', 'Product not found');
       const shapes = optionShapes(product);
-      const mediaIds = new Set(product.media.map((media) => media.id));
+      const mediaTypes = new Map(product.media.map((media) => [media.id, media.mediaType]));
       // Every variant's combination after the update, to check they stay unique.
       const finalCombos = new Map(
         product.variants.map((variant) => [
@@ -327,9 +325,7 @@ export class VariantService {
             changedCombos.set(input.id, combo);
           }
         }
-        if (input.mediaId && !mediaIds.has(input.mediaId)) {
-          check.addMessage([...field, 'mediaId'], 'NOT_FOUND', 'The product has no such media');
-        }
+        checkVariantMedia(check, [...field, 'mediaId'], mediaTypes, input.mediaId);
       });
       const owners = new Map<string, string>();
       for (const [variantId, combo] of finalCombos) {
@@ -470,4 +466,18 @@ function variantColumns(fields: VariantFields) {
     taxable: fields.taxable ?? true,
     taxCode: fields.taxCode ?? null,
   };
+}
+
+/** A variant's media: one of its product's, and an image, as Shopify's variants show (ADR-258). */
+function checkVariantMedia(
+  check: InputChecker,
+  field: string[],
+  mediaTypes: ReadonlyMap<string, string>,
+  mediaId: string | null | undefined,
+): void {
+  if (!mediaId) return;
+  const type = mediaTypes.get(mediaId);
+  if (type === undefined) check.addMessage(field, 'NOT_FOUND', 'The product has no such media');
+  else if (type !== 'image')
+    check.addMessage(field, 'INVALID', 'A variant shows an image, not a video');
 }

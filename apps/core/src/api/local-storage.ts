@@ -1,4 +1,4 @@
-import { LocalStorage, MAX_UPLOAD_BYTES, inlineDisposition } from '@hatti/storage';
+import { LocalStorage, MAX_VIDEO_UPLOAD_BYTES, inlineDisposition } from '@hatti/storage';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
 /**
@@ -12,14 +12,15 @@ export async function serveLocalStorage(
   prefix: string,
 ): Promise<void> {
   await fastify.register(async (scope) => {
-    // Uploads are the bytes themselves, of whatever type was signed for.
+    // Uploads are the bytes themselves, of whatever type and size were signed for: a video's the
+    // largest.
     scope.addContentTypeParser(
       '*',
-      { parseAs: 'buffer', bodyLimit: MAX_UPLOAD_BYTES },
+      { parseAs: 'buffer', bodyLimit: MAX_VIDEO_UPLOAD_BYTES },
       (_request, body, done) => done(null, body),
     );
 
-    scope.put(`${prefix}/*`, { bodyLimit: MAX_UPLOAD_BYTES }, async (request, reply) => {
+    scope.put(`${prefix}/*`, { bodyLimit: MAX_VIDEO_UPLOAD_BYTES }, async (request, reply) => {
       const target = targetOf(request.url, prefix);
       const grant = target && storage.verify('PUT', target.key, target.query);
       if (!target || grant?.method !== 'PUT') return denied(reply);

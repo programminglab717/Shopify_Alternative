@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, the rest of what is left to build** (asked for on 2026-10-07): product videos, a map pin
-at checkout, and couriers' city names shared across shops; then translations removed with what
-is deleted, and domains checked again. How the Free plan holds to its 50 orders a month waits on
-a decision.
+**Next, the rest of what is left to build** (asked for on 2026-10-07): a map pin at checkout, and
+couriers' city names shared across shops; then translations removed with what is deleted, and
+domains checked again. How the Free plan holds to its 50 orders a month waits on a decision.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### Products' videos
+
+* **Videos among a product's media** ([ADR-258](../architecture/13-decision-log.md#adr-258--products-videos-an-mp4-or-quicktime-file-the-shop-uploads-h264-and-aac-as-phones-record-them-read-box-by-box-and-kept-as-it-is-but-for-where-it-was-taken-served-a-range-at-a-time-with-the-preview-image-its-uploader-gives-or-a-youtube-or-vimeo-video-by-its-address-its-hosts-image-its-preview-themes-have-them-as-shopifys-media)):
+  `productCreateMedia` takes `VIDEO`, a staged upload of an MP4 or QuickTime file with its
+  `previewImageSource`, and `EXTERNAL_VIDEO`, a YouTube or Vimeo address. The worker checks an
+  uploaded one box by box, H.264 and AAC, and keeps it without where it was taken; the API serves
+  it at `/videos` a range at a time. Themes have them in `product.media`, with Shopify's video
+  filters, and Hatti Base plays them in its gallery.
+* **For it:** migration 0161; `cleanVideo` in `@hatti/images`; video uploads up to 100 MiB, and
+  `ObjectStorage.stream`, in `@hatti/storage`.
+* 1826 tests: videos read and refused as phones make them; previews from their hosts; served
+  whole and in ranges through the API; documents and themes showing them.
 
 ### 4f38c98 · Products' images cropped
 

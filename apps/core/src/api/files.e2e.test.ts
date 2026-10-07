@@ -407,8 +407,8 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
           field: ['input', '0', 'mimeType'],
           code: 'INVALID',
           message:
-            'Upload one of image/jpeg, image/png, image/webp, image/gif, application/pdf; not ' +
-            'text/html',
+            'Upload one of image/jpeg, image/png, image/webp, image/gif, application/pdf, ' +
+            'video/mp4, video/quicktime; not text/html',
         },
       ],
     });

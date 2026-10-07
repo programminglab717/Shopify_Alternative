@@ -20,7 +20,14 @@ import {
   type ValueToken,
 } from 'liquidjs';
 import type { WorkLimiter } from './limits.js';
-import { ImageDrop, PAGINATE, handleize, type Paginable } from './objects.js';
+import {
+  ExternalVideoDrop,
+  ImageDrop,
+  PAGINATE,
+  VideoDrop,
+  handleize,
+  type Paginable,
+} from './objects.js';
 import type { Theme, ThemeFiles } from '@hatti/themes';
 
 /**
@@ -240,6 +247,12 @@ function filters(theme: Theme): Record<string, FilterImplOptions> {
 
     image_url: (image: unknown, ...args: unknown[]) => imageUrl(image, named(args)),
     image_tag: (url: unknown, ...args: unknown[]) => imageTag(url, named(args)),
+    video_tag: (video: unknown, ...args: unknown[]) => videoTag(video, named(args)),
+    external_video_url: (video: unknown, ...args: unknown[]) =>
+      externalVideoUrl(video, named(args)),
+    external_video_tag: (video: unknown, ...args: unknown[]) =>
+      externalVideoTag(video, named(args)),
+    media_tag: (media: unknown, ...args: unknown[]) => mediaTag(media, named(args)),
 
     t: function (this: { context: Context }, key: unknown, ...args: unknown[]) {
       return translate(theme, pageState(this.context).locale, String(key), named(args));
@@ -464,6 +477,104 @@ function imageTag(url: unknown, options: Record<string, unknown>): string {
     .map(([name, value]) => `${name}="${attribute(value)}"`)
     .join(' ');
   return `<img ${markup}>`;
+}
+
+/**
+ * A `<video>` for a video the shop uploaded (ADR-258), as Shopify's video_tag: its preview image
+ * the poster, at `image_size`'s width; with controls, playing in its place on phones; loading no
+ * more than its length until played, as shoppers pay for their data.
+ */
+function videoTag(video: unknown, options: Record<string, unknown>): string {
+  if (!(video instanceof VideoDrop)) return '';
+  const poster = sized(video.preview_image.src, widthOf(options.image_size));
+  const attributes: Record<string, unknown> = {
+    playsinline: 'playsinline',
+    controls: options.controls === false ? null : 'controls',
+    autoplay: options.autoplay ? 'autoplay' : null,
+    loop: options.loop ? 'loop' : null,
+    // Phones play a video by itself only without its sound.
+    muted: options.muted || options.autoplay ? 'muted' : null,
+    preload: 'metadata',
+    poster,
+    'aria-label': options.alt ?? video.alt ?? null,
+    class: options.class ?? null,
+  };
+  const sources = video.sources
+    .map(
+      (source) => `<source src="${attribute(source.url)}" type="${attribute(source.mime_type)}">`,
+    )
+    .join('');
+  const fallback = `<img src="${attribute(poster)}" alt="${attribute(video.alt ?? '')}">`;
+  return `<video ${markupOf(attributes)}>${sources}${fallback}</video>`;
+}
+
+/**
+ * Where a YouTube or Vimeo video plays in a page (ADR-258), as Shopify's external_video_url: its
+ * host's player, YouTube's inline and without others' videos after it, and the parameters named.
+ */
+function externalVideoUrl(video: unknown, options: Record<string, unknown>): string {
+  if (!(video instanceof ExternalVideoDrop)) return '';
+  const id = encodeURIComponent(video.external_id);
+  const base =
+    video.host === 'youtube'
+      ? `https://www.youtube.com/embed/${id}`
+      : `https://player.vimeo.com/video/${id}`;
+  const params = new URLSearchParams(
+    video.host === 'youtube' ? { enablejsapi: '1', playsinline: '1', rel: '0' } : {},
+  );
+  for (const [name, value] of Object.entries(options)) {
+    params.set(name, value === true ? '1' : value === false ? '0' : String(value));
+  }
+  const query = params.toString();
+  return query ? `${base}?${query}` : base;
+}
+
+/**
+ * An `<iframe>` playing a YouTube or Vimeo video, from the video or the URL external_video_url
+ * gave, as Shopify's external_video_tag: loaded as the page scrolls to it.
+ */
+function externalVideoTag(video: unknown, options: Record<string, unknown>): string {
+  const src =
+    video instanceof ExternalVideoDrop
+      ? externalVideoUrl(video, {})
+      : typeof video === 'string' &&
+          /^https:\/\/(?:www\.youtube\.com\/embed|player\.vimeo\.com\/video)\//.test(video)
+        ? video
+        : null;
+  if (!src) return '';
+  const attributes: Record<string, unknown> = {
+    src,
+    title: options.title ?? (video instanceof ExternalVideoDrop ? video.alt : null) ?? '',
+    class: options.class ?? null,
+    loading: options.loading ?? 'lazy',
+    frameborder: '0',
+    allow: 'accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture',
+    allowfullscreen: 'allowfullscreen',
+  };
+  return `<iframe ${markupOf(attributes)}></iframe>`;
+}
+
+/** The tag a product's media shows as, by its kind, as Shopify's media_tag. */
+function mediaTag(media: unknown, options: Record<string, unknown>): string {
+  if (media instanceof VideoDrop) return videoTag(media, options);
+  if (media instanceof ExternalVideoDrop) return externalVideoTag(media, options);
+  if (media instanceof ImageDrop) {
+    return imageTag(new ImageUrl(media, widthOf(options.image_size ?? options.width)), options);
+  }
+  return '';
+}
+
+/** "1100x", "1100x1100" or 1100: 1100; null for none. */
+function widthOf(size: unknown): number | null {
+  return Number.parseInt(String(size ?? ''), 10) || null;
+}
+
+/** Attributes as markup, those with no value left out. */
+function markupOf(attributes: Record<string, unknown>): string {
+  return Object.entries(attributes)
+    .filter(([, value]) => value !== null && value !== undefined)
+    .map(([name, value]) => `${name}="${attribute(value)}"`)
+    .join(' ');
 }
 
 /**

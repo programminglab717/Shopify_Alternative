@@ -260,6 +260,26 @@ describe.skipIf(!server)('FileService', () => {
     });
     // Staged, not yet a file.
     expect((await service.list(a, { first: 10 })).items).toEqual([]);
+
+    // A product's video weighs up to 100 MiB, anything else 20 (ADR-258).
+    const MiB = 1024 * 1024;
+    const [video] = unwrap(
+      await stage([
+        { filename: 'Kurta.MOV', mimeType: 'video/quicktime', fileSize: String(60 * MiB) },
+      ]),
+    );
+    expect(keyOf(video!.resourceUrl)).toMatch(/\/Kurta\.mov$/);
+    expect(
+      errorsOf(
+        await stage([
+          { filename: 'big.jpg', mimeType: 'image/jpeg', fileSize: String(60 * MiB) },
+          { filename: 'long.mp4', mimeType: 'video/mp4', fileSize: String(100 * MiB + 1) },
+        ]),
+      ),
+    ).toEqual([
+      ['input.0.fileSize', 'INVALID'],
+      ['input.1.fileSize', 'INVALID'],
+    ]);
   });
 
   it('makes files of uploads that are in, of the size and type they were staged as', async () => {

@@ -56,6 +56,8 @@ within seconds, without the place they were taken; one that cannot be shown, suc
 HEIC photo, says so and what to do ([ADR-158](../architecture/13-decision-log.md#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)).
 A photo is cropped, and what matters in it marked, without taking it again
 ([ADR-257](../architecture/13-decision-log.md#adr-257--the-merchant-crops-a-products-image-and-marks-what-matters-in-it-a-crops-clean-copy-is-made-from-the-whole-images-as-it-is-set-and-kept-beside-it-each-size-and-format-made-from-it-at-an-address-naming-the-crop-the-whole-kept-to-crop-again-the-focal-point-in-percent-of-the-image-shown-is-shopifys-for-themes-and-image_tag)).
+A video from the phone's gallery plays as it was filmed, a frame of it its preview, and a
+YouTube or Vimeo video's address is enough for its own ([ADR-258](../architecture/13-decision-log.md#adr-258--products-videos-an-mp4-or-quicktime-file-the-shop-uploads-h264-and-aac-as-phones-record-them-read-box-by-box-and-kept-as-it-is-but-for-where-it-was-taken-served-a-range-at-a-time-with-the-preview-image-its-uploader-gives-or-a-youtube-or-vimeo-video-by-its-address-its-hosts-image-its-preview-themes-have-them-as-shopifys-media)).
 
 *Built so far:* the link for the share kit's Instagram bio, `/links` on the shop's storefront: its
 line about itself, its links and a chat on WhatsApp, and the products it chose, those with

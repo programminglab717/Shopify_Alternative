@@ -342,8 +342,11 @@ export function writeShopifyProducts(
   for (const product of products) {
     const options = [...product.options].sort((a, b) => a.position - b.position).slice(0, 3);
     const variants = [...product.variants].sort((a, b) => a.position - b.position);
-    const images = [...product.media].sort((a, b) => a.position - b.position);
-    const imageOf = new Map(product.media.map((media) => [media.id, imageSrc(media, product)]));
+    // Shopify's file has images alone, not videos (ADR-258).
+    const images = product.media
+      .filter((media) => media.mediaType === 'image')
+      .sort((a, b) => a.position - b.position);
+    const imageOf = new Map(images.map((media) => [media.id, imageSrc(media, product)]));
     const rows = Math.max(variants.length, images.length, 1);
     for (let at = 0; at < rows; at++) {
       const cells: Partial<Record<Heading, string | number>> = { Handle: product.handle };

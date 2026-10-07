@@ -205,6 +205,9 @@ again, 20 MB and 30 seconds at most. Images are decoded by libvips with their pi
 the header first; the copies kept lose their metadata, where a phone's photo was taken among it;
 and the API serves at `/images` only images' clean copies and what is made of them, never the
 rest of storage ([ADR-158](./13-decision-log.md#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)).
+A product's video is read box by box, never decoded, and kept as uploaded but for what the phone
+wrote of where and with what it was taken, which becomes empty space; a Vimeo video's image is
+fetched from Vimeo's own CDN alone ([ADR-258](./13-decision-log.md#adr-258--products-videos-an-mp4-or-quicktime-file-the-shop-uploads-h264-and-aac-as-phones-record-them-read-box-by-box-and-kept-as-it-is-but-for-where-it-was-taken-served-a-range-at-a-time-with-the-preview-image-its-uploader-gives-or-a-youtube-or-vimeo-video-by-its-address-its-hosts-image-its-preview-themes-have-them-as-shopifys-media)).
 
 **Web hardening:** strict CSP on checkout and admin; `frame-ancestors` limits; customers' pages'
 forms post to their own site alone, and go on only to the payment gateway's checkout where the

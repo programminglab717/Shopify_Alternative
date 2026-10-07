@@ -175,7 +175,17 @@ export async function queryProducts(
                                                          'height', m.crop_height) END,
                      'focalPoint', CASE WHEN m.focal_x IS NOT NULL
                                         THEN json_build_object('x', m.focal_x, 'y', m.focal_y)
-                                   END)
+                                   END,
+                     'previewSourceUrl', m.preview_source_url,
+                     'previewSourceKey', m.preview_source_key,
+                     'externalVideo', CASE WHEN m.video_host IS NOT NULL
+                                           THEN json_build_object('host', m.video_host,
+                                                                  'id', m.video_external_id) END,
+                     'video', CASE WHEN m.video_size IS NOT NULL
+                                   THEN json_build_object('size', m.video_size,
+                                                          'width', m.video_width,
+                                                          'height', m.video_height,
+                                                          'durationMs', m.video_duration_ms) END)
                      ORDER BY m.position), '[]'::json)
               FROM catalog.product_media m
              WHERE m.shop_id = p.shop_id AND m.product_id = p.id) AS media

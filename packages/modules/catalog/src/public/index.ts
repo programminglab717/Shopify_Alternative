@@ -45,9 +45,20 @@ export {
 export {
   CROP_MIN_SIDE,
   MediaService,
+  type MediaContentTypeValue,
   type MediaCreateInput,
   type MediaUpdateInput,
 } from '../internal/media.service.js';
+export {
+  VIDEOS_PATH,
+  externalVideoUrls,
+  hostPreviewsOf,
+  parseVideoPath,
+  videoKeyOf,
+  videoPathOf,
+  vimeoOembedUrl,
+  type VideoHostValue,
+} from '../internal/videos.js';
 export { OptionService, type OptionUpdateInput } from '../internal/option.service.js';
 export { DEFAULT_VARIANT_TITLE } from '../internal/product-store.js';
 export {
@@ -96,13 +107,14 @@ export {
   parseProductSearch,
   type ProductSearchKey,
 } from '../internal/product-filter.js';
-export type { ImageFormatValue, ProductStatusValue } from '../internal/schema.js';
+export type { ImageFormatValue, MediaTypeValue, ProductStatusValue } from '../internal/schema.js';
 export type {
   CollectionRecord,
   FocalPointRecord,
   MediaCropRecord,
   MediaErrorRecord,
   MediaRecord,
+  VideoRecord,
   OptionRecord,
   ProductRecord,
   VariantRecord,

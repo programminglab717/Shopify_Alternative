@@ -8,7 +8,7 @@ import {
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { MAX_UPLOAD_BYTES, ObjectStorage } from '@hatti/storage';
+import { ObjectStorage, maxUploadBytesOf } from '@hatti/storage';
 import { Injectable } from '@nestjs/common';
 import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { FileEvents, type FileCreatedPayload, type FileDeletedPayload } from './events.js';
@@ -330,11 +330,13 @@ function checkStaged(
     );
   }
   const size = /^\d{1,9}$/.test(input.fileSize.trim()) ? Number(input.fileSize) : NaN;
-  if (!(size >= 1 && size <= MAX_UPLOAD_BYTES)) {
+  // A video may weigh more than the rest (ADR-258).
+  const most = maxUploadBytesOf(isFileType(type) ? type : 'image/jpeg');
+  if (!(size >= 1 && size <= most)) {
     check.addMessage(
       [...field, 'fileSize'],
       'INVALID',
-      `A file is 1 byte to ${MAX_UPLOAD_BYTES / 1024 / 1024} MiB, given in bytes`,
+      `A file of its type is 1 byte to ${most / 1024 / 1024} MiB, given in bytes`,
     );
   }
   if (check.errors.length > before || !filename || !isFileType(type)) return null;

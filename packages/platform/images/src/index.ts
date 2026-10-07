@@ -35,3 +35,12 @@ export {
   widthFor,
   type VariantFormat,
 } from './variants.js';
+export {
+  MAX_VIDEO_BYTES,
+  MAX_VIDEO_DURATION_MS,
+  cleanVideo,
+  type CleanVideo,
+  type CleanVideoResult,
+  type VideoProblem,
+  type VideoProblemCode,
+} from './videos.js';

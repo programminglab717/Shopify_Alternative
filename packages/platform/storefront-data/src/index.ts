@@ -16,6 +16,7 @@ export {
   type ImageDoc,
   type LinkPageDoc,
   type MaintenanceDoc,
+  type MediaDoc,
   type MenuDoc,
   type MenuLinkDoc,
   type PageDoc,
@@ -29,6 +30,7 @@ export {
   type ThemeDoc,
   type TranslationsDoc,
   type VariantDoc,
+  type VideoSourceDoc,
 } from './documents.js';
 export { TranslatedStore, translated, translatedProduct } from './translations.js';
 export { ACTIVITY, StorefrontActivity, localDay, type ActivityCounts } from './activity.js';

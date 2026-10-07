@@ -43,6 +43,41 @@ export interface ImageDoc {
   focalPoint?: { x: number; y: number };
 }
 
+/** A video's file as the storefront plays it (ADR-258). */
+export interface VideoSourceDoc {
+  src: string;
+  /** "video/mp4". */
+  mimeType: string;
+  /** "mp4". */
+  format: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * A product's media in its order (ADR-258): an image, by its place in the product's images; a
+ * video the shop uploaded, with its file; a YouTube or Vimeo video, by its host and ID there. A
+ * video shows its preview image before it plays.
+ */
+export type MediaDoc =
+  | { type: 'image'; image: number }
+  | {
+      type: 'video';
+      id: string;
+      alt: string | null;
+      preview: ImageDoc;
+      sources: VideoSourceDoc[];
+      durationMs: number;
+    }
+  | {
+      type: 'external_video';
+      id: string;
+      alt: string | null;
+      preview: ImageDoc;
+      host: 'youtube' | 'vimeo';
+      externalId: string;
+    };
+
 export interface VariantDoc {
   id: string;
   title: string;
@@ -67,7 +102,13 @@ export interface ProductDoc {
   tags: string[];
   options: { name: string; values: string[] }[];
   variants: VariantDoc[];
+  /** Its images, in order: videos are not among them, as on Shopify. */
   images: ImageDoc[];
+  /**
+   * Its media in order, as Shopify's `product.media` (ADR-258): its images and its videos. Absent
+   * where it has no video to show, as in documents written before: its images are its media.
+   */
+  media?: MediaDoc[];
   /**
    * When it was made and last changed, as ISO 8601 (ADR-216): its collection's feed dates its entry
    * with them. Absent in documents written before.
