@@ -5,6 +5,7 @@ import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { draftLinkPage, orderLinkPage } from './link-pages.js';
 import type { AddressForm } from './links.js';
+import { LOCATION_SCRIPT } from './location.js';
 import type { OrderLinkView } from './order-link.service.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -86,6 +87,8 @@ describe.skipIf(!server)('Order links', () => {
     province: '',
     zip: '',
     phone: '',
+    latitude: '',
+    longitude: '',
   };
 
   it("keeps how long the shop's customers may cancel, and who changed it", async () => {
@@ -429,6 +432,85 @@ describe.skipIf(!server)('Order links', () => {
       kind: 'too_late',
       action: 'address',
     });
+  });
+
+  it('lets the customer pin the address where their phone is, near its city (ADR-259)', async () => {
+    const order = await f.order(f.a, [kurta]);
+    const token = await linkFor(order.id);
+    // Gulberg, in Lahore, as the page's script fills in the form.
+    const pinned = { ...FORM, latitude: '31.510000', longitude: '74.343500' };
+    const saved = await f.links.changeAddress(token, (await shownOn(token)).shown, pinned);
+    expect(saved).toMatchObject({
+      problem: null,
+      order: {
+        shippingAddress: { city: 'Lahore', location: { latitude: 31.51, longitude: 74.3435 } },
+      },
+    });
+    expect(await latest(order.id)).toEqual([
+      ['updated', 'system', 'The customer changed the shipping address through their link'],
+    ]);
+    // The order's page links it on the map; the address's page keeps it, its one script allowed by
+    // its hash, to add it again or take it off.
+    const view = await shownOn(token);
+    const map = 'https://www.google.com/maps/search/?api=1&amp;query=31.51,74.3435';
+    expect(orderLinkPage(view).html).toContain(`<a href="${map}" target="_blank" rel="noreferrer"`);
+    expect(orderLinkPage(view).html).not.toContain('<script');
+    const form = orderLinkPage(view, { form: 'address' });
+    expect(form.html).toContain('<input type="hidden" name="latitude" value="31.510000" />');
+    expect(form.html).toContain(`<script>${LOCATION_SCRIPT}</script>`);
+    expect(form.contentSecurityPolicy).toMatch(/; script-src 'sha256-[^']+'; style-src /);
+
+    // A pin is part of what the customer confirms: the page they saw before it changed is stale.
+    const before = view.shown;
+    const moved = { ...FORM, latitude: '31.520400', longitude: '74.358700' };
+    expect(await f.links.changeAddress(token, before, moved)).toMatchObject({ problem: null });
+    expect((await shownOn(token)).shown).not.toBe(before);
+
+    // A pin far from the city, as from the office in another, or abroad, or half of one, is not
+    // kept: the page shows the address again, saying why.
+    const now = (await shownOn(token)).shown;
+    const cases: [Partial<typeof FORM>, string, string, string][] = [
+      [
+        { latitude: '24.860700', longitude: '67.001100' },
+        'latitude',
+        'INVALID',
+        'The pin is 1033 km from Lahore: it was not added at the address',
+      ],
+      [
+        { latitude: '25.204800', longitude: '55.270800' },
+        'latitude',
+        'INVALID',
+        'The pin is not in Pakistan',
+      ],
+      [
+        { latitude: '31.51', longitude: '' },
+        'longitude',
+        'BLANK',
+        'Longitude must be given with the latitude',
+      ],
+      [
+        { latitude: 'north', longitude: '74.3435' },
+        'latitude',
+        'INVALID',
+        'Latitude must be a number of degrees, like 24.8607',
+      ],
+    ];
+    for (const [pin, field, code, message] of cases) {
+      const refused = await f.links.changeAddress(token, now, { ...FORM, ...pin });
+      const problem = problemOf(refused);
+      expect(problem, message).toMatchObject({
+        kind: 'address',
+        errors: [{ field: [field], code, message }],
+      });
+      expect(refused).toMatchObject({
+        order: { shippingAddress: { location: { latitude: 31.5204, longitude: 74.3587 } } },
+      });
+    }
+
+    // Taken off, the address has none.
+    const off = await f.links.changeAddress(token, now, FORM);
+    expect(off).toMatchObject({ problem: null });
+    expect((await f.orders.get(f.a, order.id))!.shippingAddress.location).toBeNull();
   });
 
   it('shows how the order is doing, and nothing once expired or erased', async () => {
@@ -796,6 +878,8 @@ describe.skipIf(!server)('Order links', () => {
       province: 'PB',
       zip: '54',
       phone: '',
+      latitude: '',
+      longitude: '',
     };
     const invalid = orderLinkPage(
       {

@@ -18,6 +18,7 @@ import { XLSX_CONTENT_TYPE, toXlsx, type XlsxColumn } from '@hatti/xlsx';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { OrderEvents, type OrderExportCreatedPayload } from './events.js';
+import { mapUrlOf } from './location.js';
 import { orderConditions, parseOrderSearch, type OrderFilter } from './order-filter.js';
 import { staffMemberOf } from './order.service.js';
 import { loadOrders } from './order-store.js';
@@ -213,6 +214,8 @@ const ORDER_COLUMNS: readonly XlsxColumn[] = [
   { header: 'Address' },
   { header: 'Area' },
   { header: 'Landmark' },
+  // The pin, as a link to it on the map (ADR-259).
+  { header: 'Location' },
   { header: 'City' },
   { header: 'Province' },
   { header: 'Postcode' },
@@ -308,6 +311,7 @@ class ExportCells {
       address.address1,
       address.address2,
       address.landmark,
+      address.location ? mapUrlOf(address.location) : null,
       address.city,
       address.provinceCode ? PK_PROVINCES[address.provinceCode as PkProvinceCode].name : null,
       address.zip,

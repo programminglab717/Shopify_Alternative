@@ -173,6 +173,7 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
               city: 'Rawalpindi',
               provinceCode: null,
               zip: null,
+              location: null,
             },
             email: 'Ayesha@Example.com',
             paymentMethod: 'cash_on_delivery',

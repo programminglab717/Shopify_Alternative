@@ -196,6 +196,7 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
               city: 'Rawalpindi',
               provinceCode: null,
               zip: null,
+              location: null,
             },
             email: null,
             paymentMethod: 'cash_on_delivery',
@@ -1693,5 +1694,6 @@ function addressOf(name: string): OrderToPlace['address'] {
     city: 'Lahore',
     provinceCode: null,
     zip: null,
+    location: null,
   };
 }

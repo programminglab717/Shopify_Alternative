@@ -56,7 +56,7 @@ flowchart TD
     O --> P["Thank-you page<br/>+ WhatsApp opt-in + post-purchase offer"]
 ```
 
-*Built so far* ([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)): the cash-on-delivery path, on one page without scripts. The
+*Built so far* ([ADR-044](./13-decision-log.md#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)): the cash-on-delivery path, on one page that works without scripts. The
 cart page's checkout button (or `/checkout`) starts a checkout with a secret of its own, whose
 page the core renders and the storefront serves on the shop's address: the cart at today's
 prices, what delivery costs, and the name, mobile number, city, address and landmark. Placing
@@ -76,7 +76,7 @@ which the storefront passes when it starts, and the order placed keeps them, for
 campaign ([ADR-139](./13-decision-log.md#adr-139--a-shoppers-browser-keeps-the-visits-that-brought-them-the-first-and-the-last-from-elsewhere-checkout-passes-them-on-and-the-order-keeps-them-as-shopifys-customer-journey)).
 Placing the order passes on, with the address and browser, the IDs the shop's Meta pixel gave the
 shopper's browser in its cookies on the shop's address, for the order's conversions; the page
-itself still runs no scripts, Meta's neither ([ADR-144](./13-decision-log.md#adr-144--a-shops-storefront-loads-its-meta-pixel-while-meta-is-connected-for-the-steps-shoppers-take-before-checkout-orders-go-from-the-server-alone-each-keeping-the-pixels-browser-and-click-ids-for-them)).
+itself runs none of Meta's scripts ([ADR-144](./13-decision-log.md#adr-144--a-shops-storefront-loads-its-meta-pixel-while-meta-is-connected-for-the-steps-shoppers-take-before-checkout-orders-go-from-the-server-alone-each-keeping-the-pixels-browser-and-click-ids-for-them)).
 The page is in the shop's colour: its published theme's accent on its buttons, and on its links
 where it reads on white ([ADR-069](./13-decision-log.md#adr-069--the-checkouts-page-takes-the-shops-accent-colour-from-its-published-theme-on-its-buttons-and-on-its-links-where-they-stay-readable)),
 and shows the shop's logo, one of the files it uploaded, in place of its name ([ADR-081](./13-decision-log.md#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)).
@@ -140,8 +140,10 @@ the city with its aliases, the house and street, then the area and the nearest l
 a box of its own. The area's box suggests well-known areas of the ten larger cities: the city's
 once one is typed, every listed city's, by its city, before. The order keeps the area as its
 address's second line, where apps built for Shopify read it, and the landmark in a field of its
-own, which `formatted`, slips and the customer's pages print. Not yet: the map pin and
-address-quality prompts, which need the page's scripts, and couriers' own area lists.
+own, which `formatted`, slips and the customer's pages print. The address's pin is where the
+customer's phone is, added by the page's one script when they say they are at the address, and
+kept in Pakistan and near the city typed ([ADR-259](./13-decision-log.md#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)). Not yet: a map to move
+the pin on, address-quality prompts, and couriers' own area lists.
 * **Address quality score:** heuristics and later ML flag vague addresses ("near market") and
   prompt the shopper to add detail. Poor address quality is a leading cause of failed delivery.
 * Phone validation: Pakistani mobile numbers normalised to E.164 (`+923XXXXXXXXX`) with the local

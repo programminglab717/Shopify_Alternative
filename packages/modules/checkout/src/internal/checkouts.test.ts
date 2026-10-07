@@ -353,6 +353,43 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect(await orderCount()).toBe(1);
   });
 
+  it("keeps the pin the shopper's phone added at the address, and refuses one far from it (ADR-259)", async () => {
+    const { token } = await lawnCart();
+    const { secret, view } = await started(token);
+    // Added at the office in Lahore, for a parcel to Karachi: the page says so, placing nothing.
+    const far = open(
+      await f.checkouts.place(secret, view.shown, {
+        ...FORM,
+        latitude: '31.520400',
+        longitude: '74.358700',
+      }),
+    );
+    expect(far.problem).toEqual({
+      kind: 'address',
+      errors: [
+        {
+          field: ['latitude'],
+          code: 'INVALID',
+          message: 'The pin is 1033 km from Karachi: it was not added at the address',
+        },
+      ],
+    });
+    expect(far.form).toMatchObject({ latitude: '31.520400', longitude: '74.358700' });
+    expect(await orderCount()).toBe(0);
+    // Added at the door in Gulshan-e-Iqbal, it goes with the order.
+    const order = placedOrder(
+      await f.checkouts.place(secret, far.shown, {
+        ...FORM,
+        latitude: '24.920400',
+        longitude: '67.093200',
+      }),
+    );
+    expect(order.shippingAddress).toMatchObject({
+      city: 'Karachi',
+      location: { latitude: 24.9204, longitude: 67.0932 },
+    });
+  });
+
   it('applies a discount code to the cart, takes it off the order and counts its use', async () => {
     unwrap(
       await f.delivery.update(f.a, {

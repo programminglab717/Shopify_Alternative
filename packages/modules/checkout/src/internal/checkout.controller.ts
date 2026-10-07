@@ -345,6 +345,9 @@ function formOf(body: unknown): CheckoutForm {
     marketing: MARKETING_CHANNELS.filter(
       (channel) => field(body, MARKETING_FIELDS[channel]) === '1',
     ).join(' '),
+    // The pin, where the shopper added their location (ADR-259).
+    latitude: field(body, 'latitude').slice(0, 20),
+    longitude: field(body, 'longitude').slice(0, 20),
   };
 }
 

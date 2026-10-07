@@ -1,4 +1,4 @@
-import type { OrderRecord } from '@hatti/orders/public';
+import { LOCATION_SCRIPT, type AddressValue, type OrderRecord } from '@hatti/orders/public';
 import type { DiscountCodeRecord } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
 import { NO_TAX } from '@hatti/tax/public';
@@ -104,6 +104,7 @@ const ORDER = {
     city: 'Karachi',
     provinceCode: 'SD',
     zip: null,
+    location: null,
   },
   lines: [
     {
@@ -160,7 +161,7 @@ function openView(
 }
 
 describe('checkoutPage', () => {
-  it('shows the cart, what delivery costs where, and the form, with no scripts', () => {
+  it('shows the cart, what delivery costs where, and the form, its one script adding a pin', () => {
     const page = checkoutPage(openView());
     expect(page.status).toBe(200);
     expect(page.html).toContain('<title>Checkout · Zari</title>');
@@ -193,7 +194,13 @@ describe('checkoutPage', () => {
     expect(page.html).toContain('Cash on delivery: you pay when your order arrives.');
     expect(page.html).toContain('Please call first');
     expect(page.html).toContain('<a href="https://zari.hatti.test/cart">');
-    expect(page.html).not.toContain('<script');
+    // Its one script finds where the phone is for the address's pin (ADR-259): allowed by its
+    // hash, and showing nothing until it runs.
+    expect(page.html.match(/<script>/g)).toHaveLength(1);
+    expect(page.html).toContain(`<script>${LOCATION_SCRIPT}</script>`);
+    expect(page.contentSecurityPolicy).toContain("script-src 'sha256-");
+    expect(page.html).toMatch(/<div class="field" data-location aria-live="polite" hidden>/);
+    expect(page.html).toContain('<input type="hidden" name="latitude" value="" />');
     expect(page.contentSecurityPolicy).toContain("form-action 'self'");
   });
 
@@ -256,6 +263,77 @@ describe('checkoutPage', () => {
     expect(page.html).toContain('Enter an email like ayesha@example.com, or leave it empty.');
     expect(page.html).toContain('Enter the city.');
     expect(page.html).not.toMatch(/id="name"[^>]*aria-invalid/s);
+  });
+
+  it('keeps the pin the shopper added, with a way to see it and to take it off (ADR-259)', () => {
+    const pinned = checkoutPage(
+      openView({ form: { ...EMPTY_FORM, latitude: '24.860700', longitude: '67.001100' } }),
+    ).html;
+    expect(pinned).toContain('<input type="hidden" name="latitude" value="24.860700" />');
+    expect(pinned).toContain('<input type="hidden" name="longitude" value="67.001100" />');
+    // Added: a link to it on the map, and a way to take it off; adding again hidden.
+    expect(pinned).toMatch(/<div data-show="added"\s*>/);
+    expect(pinned).toContain(
+      'href="https://www.google.com/maps/search/?api=1&amp;query=24.8607,67.0011"',
+    );
+    expect(pinned).toMatch(/data-add\s+data-show="none denied rough failed error"\s+hidden/);
+    expect(pinned).toMatch(/data-remove\s+data-show="added"\s*>/);
+    // Without one, the button to add it, saying when to.
+    const bare = checkoutPage(openView()).html;
+    expect(bare).toMatch(/<div data-show="none"\s*>/);
+    expect(bare).toContain('At the delivery address now? Add your location');
+    expect(bare).toMatch(/data-remove\s+data-show="added"\s+hidden/);
+
+    // A pin far from the city typed was added elsewhere: the page says how far, and from where.
+    const far = checkoutPage(
+      openView({
+        form: { ...EMPTY_FORM, city: 'Multan', latitude: '31.520400', longitude: '74.358700' },
+        problem: {
+          kind: 'address',
+          errors: [
+            {
+              field: ['latitude'],
+              code: 'INVALID',
+              message: 'The pin is 310 km from Multan: it was not added at the address',
+            },
+          ],
+        },
+      }),
+    ).html;
+    expect(far).toMatch(/<div data-show="error"\s*>/);
+    expect(far).toContain(
+      'This pin is 310 km from Multan. Add it only at the delivery address, or remove it.',
+    );
+    expect(far).toContain('ملتان');
+    // One not in Pakistan says so.
+    const abroad = checkoutPage(
+      openView({
+        form: { ...EMPTY_FORM, city: 'Multan', latitude: '25.204800', longitude: '55.270800' },
+        problem: {
+          kind: 'address',
+          errors: [{ field: ['latitude'], code: 'INVALID', message: 'The pin is not in Pakistan' }],
+        },
+      }),
+    ).html;
+    expect(abroad).toContain('This pin isn&#39;t in Pakistan.');
+
+    // The thank-you page links the pin the order keeps.
+    const placed = checkoutPage({
+      kind: 'placed',
+      shop: SHOP,
+      order: {
+        ...ORDER,
+        shippingAddress: {
+          ...(ORDER.shippingAddress as AddressValue),
+          location: { latitude: 24.8607, longitude: 67.0011 },
+        },
+      },
+      online: null,
+      payment: null,
+      storeCredit: 0n,
+    });
+    expect(placed.html).toContain('Location pin on the map');
+    expect(placed.html).not.toContain('<script');
   });
 
   it("offers a box for each channel of the shop's news and offers, ticked as the shopper left it", () => {
@@ -1202,14 +1280,16 @@ describe('checkoutPage', () => {
       checkoutPage({ kind: 'expired', shop: amber }),
       checkoutPage({ kind: 'empty', shop: amber }),
     ];
+    // The styles the policy allows, by their hashes; scripts are allowed apart (ADR-259).
+    const styles = (policy: string) => /style-src ([^;]*)/.exec(policy)![1]!.match(/'sha256-/g);
     for (const page of pages) {
       expect(page.html).toContain(`<style>${style}</style>`);
-      expect(page.contentSecurityPolicy.match(/'sha256-/g)).toHaveLength(2);
+      expect(styles(page.contentSecurityPolicy)).toHaveLength(2);
     }
     // The platform's, for a shop that leaves it, and where there is no shop to show.
     for (const page of [checkoutPage(openView()), checkoutPage({ kind: 'not_found' })]) {
       expect(page.html).not.toContain('--accent:');
-      expect(page.contentSecurityPolicy.match(/'sha256-/g)).toHaveLength(1);
+      expect(styles(page.contentSecurityPolicy)).toHaveLength(1);
     }
   });
 

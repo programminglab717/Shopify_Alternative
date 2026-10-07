@@ -355,6 +355,8 @@ describe.skipIf(!server)('Bank transfer', () => {
       city: 'Lahore',
       province: '',
       zip: '',
+      latitude: '',
+      longitude: '',
     });
     if (addressed.kind !== 'open') throw new Error(addressed.kind);
     const page = draftLinkPage(addressed).html;

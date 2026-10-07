@@ -121,7 +121,8 @@ an attacker, but it affects availability in the same way.
   device; lockouts with exponential backoff; signed device cookies for returning shoppers.
 * *Built so far:* no shopper accounts yet. The one credential a shopper holds is a link to a
   draft order or an order: 128 random bits in its path, kept only as a SHA-256 digest, working
-  for 72 hours by default and replaced by the next link. Its page runs no scripts, allows only
+  for 72 hours by default and replaced by the next link. Its page runs no script but, on its
+  address form, the pin's, allowed by its hash ([ADR-259](./13-decision-log.md#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)); it allows only
   its own styles and fonts, is never cached, indexed or framed, and sends no referrer. It shows
   the number masked, and nothing once the link has expired or the customer's details are
   erased; only a POST confirms, cancels or saves a new address, and cancelling asks first. A
@@ -132,6 +133,8 @@ an attacker, but it affects availability in the same way.
   [ADR-032](./13-decision-log.md#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order),
   [ADR-033](./13-decision-log.md#adr-033--customers-correct-an-orders-address-through-its-link-until-it-is-packed-the-number-stays-the-shops),
   [ADR-034](./13-decision-log.md#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link)).
+  An address's pin, where the customer added one, goes with the address: erased with it,
+  redacted from logs, and never sent to couriers ([ADR-259](./13-decision-log.md#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)).
 
 ### 2.4 Apps and API clients
 

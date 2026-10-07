@@ -89,7 +89,8 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
                shipping_address = jsonb_build_object(
                  'name', NULL, 'phone', NULL, 'address1', NULL, 'address2', NULL,
                  'landmark', NULL, 'city', shipping_address -> 'city',
-                 'provinceCode', shipping_address -> 'provinceCode', 'zip', NULL),
+                 'provinceCode', shipping_address -> 'provinceCode', 'zip', NULL,
+                 'location', NULL),
                customer_erased_at = now(), version = version + 1, updated_at = now()
          WHERE shop_id = ${shopId} AND customer_id = ${customerId}
         RETURNING id),
@@ -251,6 +252,9 @@ function exportedAddress(address: StoredAddressValue | null) {
         ? PK_PROVINCES[address.provinceCode as PkProvinceCode].name
         : null,
       zip: address.zip,
+      // Its pin, where their phone added one (ADR-259).
+      latitude: address.location?.latitude ?? null,
+      longitude: address.location?.longitude ?? null,
     }
   );
 }

@@ -136,6 +136,11 @@ Architecture and rules: [05 · Checkout & Payments](../architecture/05-checkout-
 * After the phone number is entered, a known shopper gets "Verify to use saved address?"
   (OTP bottom sheet).
 * The city list drives the delivery charge, ETA and COD availability immediately.
+* Under the landmark, **"Add my location"** pins the address where the phone is, for the
+  rider, asking first whether the shopper is at the address now; phones that can't say where
+  they are never see it. *Built* ([ADR-259](../architecture/13-decision-log.md#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)): a pin far
+  from the city typed is refused, the page saying how far, and "See it on the map" opens it
+  in Google Maps.
 * On submit, the risk decision may add **OTP verification** (bottom sheet, auto-read on Android)
   or **partial advance** ("Pay Rs 200 delivery online to confirm"), with polite wording.
   *Built* ([ADR-148](../architecture/13-decision-log.md#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)): from the shop's mark, the page asks

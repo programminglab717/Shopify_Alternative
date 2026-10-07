@@ -22,6 +22,7 @@ import {
 } from '@hatti/pk';
 import type { DraftLinkView } from './draft-order.service.js';
 import type { AddressForm, LinkProblem, LinkShop } from './links.js';
+import { LOCATION_SCRIPT, locationField, locationFormOf, pinLine } from './location.js';
 import {
   gatewayForm,
   gatewayOrigins,
@@ -469,39 +470,45 @@ function addressPage(options: {
           ur: 'آپ کے کھولنے کے بعد اس آرڈر میں تبدیلی ہوئی ہے۔ پتہ دوبارہ دیکھ کر محفوظ کریں۔',
         }
       : problem && problemWords(problem, options.shown);
-  return page(typed ? 422 : problem ? 409 : 200, `${title.en} · ${shop.name}`, shop, [
-    shopName(shop),
-    heading(title),
-    options.name && html`<p class="center muted">${ltr(options.name)}</p>`,
-    notice && banner(notice),
-    html`<form method="post">
-      <input type="hidden" name="action" value="address" />
-      <input type="hidden" name="shown" value="${digest}" />
-      ${textField('name', LABELS.name, form, errors, { autocomplete: 'name', required: true })}
-      ${textField('address1', LABELS.address1, form, errors, {
-        autocomplete: 'address-line1',
-        required: true,
-      })}
-      ${textField('address2', LABELS.address2, form, errors, {
-        autocomplete: 'address-line2',
-        list: 'areas',
-      })}
-      ${areaList(form.city)}
-      ${textField('landmark', LABELS.landmark, form, errors, {
-        autocomplete: 'address-line3',
-        hint: LANDMARK_HINT,
-      })}
-      ${textField('city', LABELS.city, form, errors, {
-        autocomplete: 'address-level2',
-        required: true,
-      })}
-      ${provinceField(form.province, errors)}
-      ${textField('zip', LABELS.zip, form, errors, { autocomplete: 'postal-code', kind: 'digits' })}
-      ${phoneField(options.phone, form, errors)}
-      <button class="button stack" type="submit">${say('bilingual', LABELS.saveAddress)}</button>
-    </form>`,
-    html`<p class="center"><a href="?">${say('bilingual', LABELS.backToOrder)}</a></p>`,
-  ]);
+  return page(
+    typed ? 422 : problem ? 409 : 200,
+    `${title.en} · ${shop.name}`,
+    shop,
+    [
+      shopName(shop),
+      heading(title),
+      options.name && html`<p class="center muted">${ltr(options.name)}</p>`,
+      notice && banner(notice),
+      html`<form method="post">
+        <input type="hidden" name="action" value="address" />
+        <input type="hidden" name="shown" value="${digest}" />
+        ${textField('name', LABELS.name, form, errors, { autocomplete: 'name', required: true })}
+        ${textField('address1', LABELS.address1, form, errors, {
+          autocomplete: 'address-line1',
+          required: true,
+        })}
+        ${textField('address2', LABELS.address2, form, errors, {
+          autocomplete: 'address-line2',
+          list: 'areas',
+        })}
+        ${areaList(form.city)}
+        ${textField('landmark', LABELS.landmark, form, errors, {
+          autocomplete: 'address-line3',
+          hint: LANDMARK_HINT,
+        })}
+        ${textField('city', LABELS.city, form, errors, {
+          autocomplete: 'address-level2',
+          required: true,
+        })}
+        ${provinceField(form.province, errors)}
+        ${textField('zip', LABELS.zip, form, errors, { autocomplete: 'postal-code', kind: 'digits' })}
+        ${phoneField(options.phone, form, errors)} ${locationField(form, errors, form.city)}
+        <button class="button stack" type="submit">${say('bilingual', LABELS.saveAddress)}</button>
+      </form>`,
+      html`<p class="center"><a href="?">${say('bilingual', LABELS.backToOrder)}</a></p>`,
+    ],
+    { scripts: [LOCATION_SCRIPT] },
+  );
 }
 
 /**
@@ -520,6 +527,7 @@ function formOf(to: StoredAddressValue | null): AddressForm {
       province: '',
       zip: '',
       phone: '',
+      ...locationFormOf(null),
     };
   }
   const province = to.provinceCode !== findCity(to.city)?.province ? to.provinceCode : null;
@@ -532,6 +540,7 @@ function formOf(to: StoredAddressValue | null): AddressForm {
     province: province ?? '',
     zip: to.zip ?? '',
     phone: '',
+    ...locationFormOf(to.location),
   };
 }
 
@@ -541,7 +550,7 @@ function formOf(to: StoredAddressValue | null): AddressForm {
  * script's direction, and digits and numbers left to right.
  */
 function textField(
-  name: Exclude<keyof AddressForm, 'province'>,
+  name: Exclude<keyof AddressForm, 'province' | 'latitude' | 'longitude'>,
   label: Words,
   form: AddressForm,
   errors: readonly FieldError[],
@@ -766,7 +775,7 @@ function statusPage(
         ...rest,
       ],
       // Paying online answers with a gateway's page: the form goes on there.
-      gatewayOrigins(onlinePayment?.gateways ?? []),
+      { formTargets: gatewayOrigins(onlinePayment?.gateways ?? []) },
     );
 
   switch (order.stage) {
@@ -1023,20 +1032,20 @@ function gatewayFormPage(view: Extract<OrderLinkView, { kind: 'order' }>): LinkP
     `${LABELS.payOnline.en} · ${shop.name}`,
     shop,
     [shopName(shop), heading(LABELS.payOnline), gatewayForm(started, due)],
-    [new URL(started.url).origin],
+    { formTargets: [new URL(started.url).origin] },
   );
 }
 
 /**
  * A page in the shop's colours, with its logo; its forms may go on to `formTargets`, such as the
- * shop's payment gateway (ADR-151).
+ * shop's payment gateway (ADR-151), and it runs `scripts`, such as the pin's (ADR-259).
  */
 function page(
   status: number,
   title: string,
   shop: LinkShop | null,
   body: HtmlValue[],
-  formTargets: readonly string[] = [],
+  options: { formTargets?: readonly string[]; scripts?: readonly string[] } = {},
 ): LinkPage {
   return {
     status,
@@ -1045,7 +1054,8 @@ function page(
       body: html`${body}`,
       accent: shop?.accent,
       images: shop?.logo ? [shop.logo] : [],
-      formTargets,
+      formTargets: options.formTargets ?? [],
+      scripts: options.scripts ?? [],
     }),
   };
 }
@@ -1330,9 +1340,11 @@ function address(shown: ShownOrder, options: { changeable?: boolean } = {}): Htm
     to.landmark && text(to.landmark),
     text([[to.city, to.zip].filter(Boolean).join(' '), province].filter(Boolean).join(', ')),
   ].filter((line): line is Html => Boolean(line));
+  const pin = pinLine(to.location);
   return html`<section class="section">
     <h2 class="label">${say('bilingual', LABELS.shipTo)}</h2>
     <p>${lines.map((line, index) => html`${index > 0 && html`<br />`}${line}`)}</p>
+    ${pin && html`<p>${pin}</p>`}
     ${
       options.changeable &&
       html`<p><a href="?address">${say('bilingual', LABELS.addressTitle)}</a></p>`

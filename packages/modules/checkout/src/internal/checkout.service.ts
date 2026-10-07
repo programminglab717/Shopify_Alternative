@@ -146,6 +146,12 @@ export interface CheckoutForm {
    * "whatsapp email" (ADR-187); blank, or absent, for none.
    */
   marketing?: string;
+  /**
+   * The address's pin, as its script filled it in where the shopper added their location
+   * (ADR-259): degrees, both blank, or absent, for none.
+   */
+  latitude?: string;
+  longitude?: string;
 }
 
 export const EMPTY_FORM: CheckoutForm = {
@@ -162,6 +168,8 @@ export const EMPTY_FORM: CheckoutForm = {
   resend: '',
   storeCredit: '',
   marketing: '',
+  latitude: '',
+  longitude: '',
 };
 
 /** Why cash on delivery can't take an order: the law's cap (TAX-07), or the shop's rules (CHK-07). */

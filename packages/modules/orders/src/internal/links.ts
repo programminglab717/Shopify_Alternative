@@ -77,6 +77,9 @@ export interface AddressForm {
   province: string;
   zip: string;
   phone: string;
+  /** The pin, as its script filled it in (ADR-259): degrees, both blank for none. */
+  latitude: string;
+  longitude: string;
 }
 
 /** Why what the customer asked for through a link did not happen; the page shows the order again. */

@@ -21,6 +21,7 @@ const BASE: RiskInputs = {
     city: 'Karachi',
     provinceCode: 'SD',
     zip: null,
+    location: null,
   },
   history: { orders: 3, delivered: 1, returned: 0, cancelled: 0 },
   recentOrderNumber: null,

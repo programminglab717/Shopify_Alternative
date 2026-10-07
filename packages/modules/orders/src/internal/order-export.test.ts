@@ -6,7 +6,7 @@ import { listAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { xlsxRows } from '@hatti/xlsx/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
+import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
 
@@ -57,7 +57,12 @@ describe.skipIf(!server)('Order exports', () => {
   });
 
   it('exports a row per order, as the caller may see it', async () => {
-    const shipped = await f.order(f.a, [kurta, size8], { shippingPrice: '250', tags: ['eid'] });
+    const shipped = await f.order(f.a, [kurta, size8], {
+      shippingPrice: '250',
+      tags: ['eid'],
+      // The customer's pin (ADR-259), as a link to it on the map.
+      shippingAddress: { ...ADDRESS, latitude: 24.9204, longitude: 67.0932 },
+    });
     await placedAt(shipped.id);
     unwrap(await f.orders.confirm(f.a, shipped.id));
     unwrap(
@@ -90,6 +95,7 @@ describe.skipIf(!server)('Order exports', () => {
       Address: 'House 12, Street 4, Block 5',
       Area: 'Gulshan-e-Iqbal',
       Landmark: 'Near Jamia Masjid',
+      Location: 'https://www.google.com/maps/search/?api=1&query=24.9204,67.0932',
       City: 'Karachi',
       Province: 'Sindh',
       Postcode: '75300',
@@ -109,6 +115,7 @@ describe.skipIf(!server)('Order exports', () => {
     expect(first!['Confirmed at']).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
     expect(first!.Exported).toMatch(/^tok_\w+ \d{4}-\d{2}-\d{2}T/);
     expect(second).toMatchObject({
+      Location: '',
       Placed: '2026-09-29 14:05',
       'Financial status': 'partially_refunded',
       'Amount paid': '3499.00',

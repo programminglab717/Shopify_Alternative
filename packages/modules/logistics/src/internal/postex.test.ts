@@ -321,6 +321,7 @@ describe('Couriers', () => {
       city: 'Lahore',
       provinceCode: 'PB',
       zip: null,
+      location: null,
     },
     codAmount: 200_050n,
     currency: 'PKR',

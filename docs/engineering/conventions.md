@@ -424,6 +424,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   its own, after the area. A new field of an address goes into the erasure that clears it, the
   digest of what a customer's page showed, the logger's redacted keys, and a migration for the
   addresses kept before.
+* **An address's pin is its `location`** ([ADR-259](../architecture/13-decision-log.md#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)):
+  its latitude and longitude, or null. `checkAddress` keeps it only both given, in Pakistan's
+  box and within `CITY_REACH_KM` of the centre of a city `@hatti/pk` lists; addresses compare
+  pins by their degrees.
 * **The Confirmation Desk** ([ADR-073](../architecture/13-decision-log.md#adr-073--the-confirmation-desk-deals-orders-waiting-for-their-customers-to-agents-one-at-a-time-the-most-urgent-due-first-and-keeps-the-calls-that-did-not-settle-them)):
   `ConfirmationDeskService` deals out the orders at `needs_confirmation`, due from
   `dueAtOf(waits)`: `coalesce(confirmation_due_at, created_at)`, or, where the shop's
@@ -1232,6 +1236,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   hint saying what it is for. The area's box suggests `areaSuggestions(city)` from `@hatti/pk` in
   a `datalist`: the city's areas, or, while the form has no city, every listed city's, each
   labelled by its city. Suggestions never limit what may be typed.
+* **A page's script only adds to it** (ADR-259): `renderPage({ scripts })` runs each where the
+  body ends, allowed by its hash and no other; what it shows is `hidden` until it runs. The
+  pin's (`LOCATION_SCRIPT`, laid out by `locationField`) is the only one: checkout's page and
+  links' address forms carry it.
 * **Show the customer what they need and no more:** their number masked, the address to check,
   and nothing of the order once the link has expired.
 
@@ -1687,10 +1695,11 @@ Stock follows Shopify's model too. How changes are written is decided in
   items, then delivery, whose free threshold the discounted items must reach. A page takes
   `DISCOUNT_ATTEMPTS` codes that take nothing off, then no more.
 * **The page is the core's; the address is the shop's.** `checkoutPage(view)` renders it with
-  `@hatti/documents`, in both languages and without scripts. `CheckoutController` serves it at
-  `/checkouts/{secret}`, and `StorefrontCheckoutController` gives it to storefronts as JSON with
-  the headers to send it with, for their own shop's checkouts. The storefront sends it as it
-  comes, adding only the count cookie once the order is placed.
+  `@hatti/documents`, in both languages, its one script the pin's (ADR-259).
+  `CheckoutController` serves it at `/checkouts/{secret}`, and `StorefrontCheckoutController`
+  gives it to storefronts as JSON with the headers to send it with, for their own shop's
+  checkouts. The storefront sends it as it comes, adding only the count cookie once the order is
+  placed.
 * **A post that places the order answers 303 to the page**, by a relative address that works on
   the core's and the shop's alike, so reloading it posts nothing.
 * **The cart form's `checkout` button saves the cart's changes first**, then starts a checkout;
@@ -1702,7 +1711,7 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-056](../architecture/13-decision-log.md#adr-056--a-shops-policies-are-kept-as-shopify-keeps-them-shown-in-shopifys-markup-and-drafted-from-what-the-shop-has-set-never-saved-by-themselves)):
   `CheckoutShop.policies`, from the online store's `shopPolicyVersionsOf(tx, …)`, which reads
   their kinds and current versions without their bodies. The links open in a new tab: the page
-  has no scripts to show a policy over the form, and a shopper who left it could come back to an
+  has no script to show a policy over the form, and a shopper who left it could come back to an
   empty form.
 * **A cart over the cash-on-delivery limit is paid on delivery with the rest in advance, where
   the shop has its account** ([ADR-188](../architecture/13-decision-log.md#adr-188--a-cart-past-the-laws-cap-on-cash-on-delivery-is-still-taken-on-delivery-where-the-shop-has-its-account-checkout-asks-in-advance-what-the-order-comes-to-past-rs-200000-or-the-shops-own-advance-where-that-is-more-says-so-wherever-the-order-may-pass-the-cap-and-the-cart-says-so-too)): `CheckoutPayments.capAdvance` is set when the order may
@@ -2323,7 +2332,7 @@ Stock follows Shopify's model too. How changes are written is decided in
   log keeps them.
 * **A moment's event ID is the order's number and the moment** (`order-1043-delivered`), however
   often it is sent: the platforms keep one. Only the server sends an order's moments: checkout's
-  page runs no scripts, and the pixel sends none of them.
+  page runs none of the pixel's scripts, and the pixel sends none of them.
 * **A platform's pixel is the storefront's**
   ([ADR-144](../architecture/13-decision-log.md#adr-144--a-shops-storefront-loads-its-meta-pixel-while-meta-is-connected-for-the-steps-shoppers-take-before-checkout-orders-go-from-the-server-alone-each-keeping-the-pixels-browser-and-click-ids-for-them)).
   The shop's document names it (`ShopDoc.metaPixelId`) only while the shop has the platform
@@ -2720,7 +2729,7 @@ Rules the module enforces:
 * Every process validates its environment at startup with `@hatti/config` (zod) and exits with a
   list of problems. Error messages never echo the values, which may be secrets.
 * Log with `@hatti/logger` (JSON). **Log IDs, not personal data.** Phone numbers, email, CNIC,
-  addresses, tokens and passwords are redacted automatically, but only as a backstop.
+  addresses and their pins, tokens and passwords are redacted automatically, but only as a backstop.
 * Requests carry an `x-request-id`, accepted from the caller or generated. It appears in every
   log line for that request and in the response.
 

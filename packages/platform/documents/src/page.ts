@@ -23,6 +23,12 @@ export interface PageOptions {
    * form to its policy too. Only https origins, or http on localhost.
    */
   formTargets?: readonly string[];
+  /**
+   * The page's scripts, by their text, run where its body ends: its policy allows these and no
+   * others, each by its hash. A page works without them, which only add to it, as finding where
+   * the phone is for a delivery address (ADR-259).
+   */
+  scripts?: readonly string[];
 }
 
 /** A page and the Content-Security-Policy header to send with it. */
@@ -40,6 +46,8 @@ export interface RenderedPage {
 // paragraphs are <p lang="ur" dir="rtl">. A box with something wrong has aria-invalid="true".
 const STYLES = `
 *, *::before, *::after { box-sizing: border-box; }
+/* What a script shows once it runs, such as a button, stays hidden until it does. */
+[hidden] { display: none !important; }
 html {
   color: #0F172A;
   background: #F8FAFC;
@@ -213,21 +221,21 @@ input:focus-visible, select:focus-visible { outline: 3px solid var(--link, #0F76
 `;
 
 /**
- * No scripts, frames or plug-ins; styles only from this page and Google Fonts; images only those
- * given, each at its address; forms post back to the site that served the page, and go on only
- * to the origins given. `styles` are the page's style elements, by their text.
+ * No frames or plug-ins, and no scripts but the page's own; styles only from this page and Google
+ * Fonts; images only those given, each at its address; forms post back to the site that served
+ * the page, and go on only to the origins given. `styles` and `scripts` are the page's elements,
+ * by their text.
  */
 function contentSecurityPolicy(
   styles: readonly string[],
   images: readonly string[] = [],
   formTargets: readonly string[] = [],
+  scripts: readonly string[] = [],
 ): string {
-  const hashes = styles.map(
-    (text) => `'sha256-${createHash('sha256').update(text).digest('base64')}'`,
-  );
   return [
     "default-src 'none'",
-    `style-src ${hashes.join(' ')} https://fonts.googleapis.com`,
+    scripts.length > 0 && `script-src ${scripts.map(hashOf).join(' ')}`,
+    `style-src ${styles.map(hashOf).join(' ')} https://fonts.googleapis.com`,
     'font-src https://fonts.gstatic.com',
     images.length > 0 && `img-src ${images.join(' ')}`,
     ["form-action 'self'", ...formTargets].join(' '),
@@ -236,6 +244,11 @@ function contentSecurityPolicy(
   ]
     .filter(Boolean)
     .join('; ');
+}
+
+/** An element's text as a policy allows it. */
+function hashOf(text: string): string {
+  return `'sha256-${createHash('sha256').update(text).digest('base64')}'`;
 }
 
 const CONTENT_SECURITY_POLICY = contentSecurityPolicy([STYLES]);
@@ -315,12 +328,14 @@ function luminance(hex: string): number {
 
 /**
  * A page for a customer's phone, such as a draft order's confirmation link: one column, large
- * touch targets, light or dark as the phone is. Like documents, it runs no scripts and loads Inter
- * and Noto Nastaliq Urdu from Google Fonts. It asks browsers not to send the page's address to
- * other sites, since such addresses carry secrets, and search engines not to index it.
+ * touch targets, light or dark as the phone is. It runs no scripts but those it is given, which
+ * only add to what it does without them, and loads Inter and Noto Nastaliq Urdu from Google
+ * Fonts. It asks browsers not to send the page's address to other sites, since such addresses
+ * carry secrets, and search engines not to index it.
  */
 export function renderPage(options: PageOptions): RenderedPage {
   const accent = accentStyles(options.accent);
+  const scripts = options.scripts ?? [];
   const images = (options.images ?? []).map(imageSource).filter((source) => source !== null);
   const formTargets = [
     ...new Set((options.formTargets ?? []).map(formTarget).filter((source) => source !== null)),
@@ -339,18 +354,30 @@ export function renderPage(options: PageOptions): RenderedPage {
       </head>
       <body>
         <main>${options.body}</main>
+        ${scripts.map(scriptElement)}
       </body>
     </html> `;
   return {
     html: toMarkup(page),
     contentSecurityPolicy:
-      accent === null && images.length === 0 && formTargets.length === 0
+      accent === null && images.length === 0 && formTargets.length === 0 && scripts.length === 0
         ? CONTENT_SECURITY_POLICY
-        : contentSecurityPolicy(accent === null ? [STYLES] : [STYLES, accent], images, formTargets),
+        : contentSecurityPolicy(
+            accent === null ? [STYLES] : [STYLES, accent],
+            images,
+            formTargets,
+            scripts,
+          ),
   };
 }
 
 /** Built outside the template, so that its text is exactly what the policy's hash covers. */
 function styleElement(text: string): Html {
   return trusted(`<style>${text}</style>`);
+}
+
+/** As a style element is; never one that ends itself early. */
+function scriptElement(text: string): Html {
+  if (/<\/script/i.test(text)) throw new Error('A page script may not hold </script');
+  return trusted(`<script>${text}</script>`);
 }

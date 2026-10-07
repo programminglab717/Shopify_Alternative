@@ -4383,6 +4383,14 @@ type MailingAddress {
   A place near the address the rider can ask for, such as "near Jamia Masjid". Hatti's own: `formatted` has it too, for labels.
   """
   landmark: String
+
+  """
+  Where the address is on the map, in decimal degrees, as the customer's phone found it there (ADR-259); null without a pin.
+  """
+  latitude: Float
+
+  """With `latitude`."""
+  longitude: Float
   name: String
 
   """Mobile number in E.164 form; masked like Order.phone."""
@@ -4408,6 +4416,14 @@ input MailingAddressInput {
 
   """A place near the address the rider can ask for: "near Jamia Masjid"."""
   landmark: String
+
+  """
+  Hatti's own: where the address is on the map, in decimal degrees, as the customer shared it, such as from a WhatsApp location; with `longitude`, in Pakistan and near the city (ADR-259). The address replaced without it has no pin.
+  """
+  latitude: Float
+
+  """With `latitude`."""
+  longitude: Float
   name: String!
 
   """A Pakistani mobile number, in any common format."""

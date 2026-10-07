@@ -16,13 +16,16 @@ import { POLICY_TITLES, policyHandle, type PolicyType } from '@hatti/online-stor
 import {
   COD_CASH_LIMIT,
   cashPastLimitOf,
+  LOCATION_SCRIPT,
   gatewayForm,
   gatewayNames,
   gatewayOrigins,
+  locationField,
   onlinePaidNotice,
   onlinePaymentProblemWords,
   orderName,
   payOnlineForm,
+  pinLine,
   prepaidDiscountOf,
   taxByRate,
   transferDetails,
@@ -307,89 +310,100 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
     : totals.total === null
       ? null
       : cashPastLimitOf({ currency: 'PKR', total: totals.total + codRules.fee });
-  return page(status, `${LABELS.title.en} · ${shop.name}`, shop, [
-    shopName(shop),
-    heading(LABELS.title),
-    // A code's problem is said by its field.
-    problem && problem.kind !== 'discount' && banner(problemWords(problem, ways)),
-    cartSummary(
-      cart,
-      delivery,
-      form.city,
-      code,
-      {
-        onDelivery,
-        fee: onDelivery ? codRules.fee : 0n,
-        // What the one way to pay takes off, where it is the only one.
-        off: byTransfer ? transferOff : onlineAlone ? onlineOff : 0n,
-        offWay: onlineAlone ? 'online' : 'transfer',
-        // The shop's advance or the law's, whichever is more.
-        advance: onDelivery
-          ? (advance ?? 0n) > (pastLimit ?? 0n)
-            ? (advance ?? 0n)
-            : (pastLimit ?? 0n)
-          : 0n,
-      },
-      view.tax,
-    ),
-    discountSection(discount, problem?.kind === 'discount' ? problem : null),
-    orderable &&
-      html`<form method="post">
-        <input type="hidden" name="shown" value="${view.shown}" />
-        ${field('name', LABELS.name, form, errors, { autocomplete: 'name', required: true })}
-        ${field('phone', LABELS.mobile, form, errors, {
-          autocomplete: 'tel',
-          required: true,
-          kind: 'tel',
-          hint: {
-            en: 'The shop and the courier call this number.',
-            ur: 'دکان اور کوریئر اس نمبر پر کال کریں گے۔',
-          },
-        })}
-        ${field('email', LABELS.email, form, errors, {
-          autocomplete: 'email',
-          kind: 'email',
-          hint: {
-            en: "Your order's news comes here too.",
-            ur: 'آپ کے آرڈر کی اطلاعات یہاں بھی آئیں گی۔',
-          },
-        })}
-        ${marketingChoices(shop.name, view.marketing, form.marketing)}
-        ${field('city', LABELS.city, form, errors, {
-          autocomplete: 'address-level2',
-          required: true,
-          list: 'cities',
-        })}
-        <datalist id="cities">
-          ${PK_CITIES.map((city) => html`<option value="${city.name}"></option>`)}
-        </datalist>
-        ${field('address1', LABELS.address1, form, errors, {
-          autocomplete: 'address-line1',
-          required: true,
-        })}
-        ${field('address2', LABELS.address2, form, errors, {
-          autocomplete: 'address-line2',
-          list: 'areas',
-        })}
-        ${areaList(form.city)}
-        ${field('landmark', LABELS.landmark, form, errors, {
-          autocomplete: 'address-line3',
-          hint: {
-            en: 'A mosque, school or shop near you that the rider can ask for.',
-            ur: 'آپ کے قریب کوئی مسجد، اسکول یا دکان جس کا رائیڈر پوچھ سکے۔',
-          },
-        })}
-        ${provinceField(form.province, errors)}
-        ${paymentSection(shop, payments, form.payment, { transferOff, onlineOff }, askedAhead, pastLimit)}
-        ${view.storeCredit && storeCreditChoice(form.storeCredit === '1')} ${asked && codeField()}
-        ${agreement && paragraphs(agreement, 'small muted')}
-        <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
-        ${asked && codeAgain(asked.channel)}
-      </form>`,
-    orderable && badgeList(shop, codOffered),
-    link(`${shop.storefront}/cart`, LABELS.backToCart),
-    policyLinks(shop),
-  ]);
+  return page(
+    status,
+    `${LABELS.title.en} · ${shop.name}`,
+    shop,
+    [
+      shopName(shop),
+      heading(LABELS.title),
+      // A code's problem is said by its field.
+      problem && problem.kind !== 'discount' && banner(problemWords(problem, ways)),
+      cartSummary(
+        cart,
+        delivery,
+        form.city,
+        code,
+        {
+          onDelivery,
+          fee: onDelivery ? codRules.fee : 0n,
+          // What the one way to pay takes off, where it is the only one.
+          off: byTransfer ? transferOff : onlineAlone ? onlineOff : 0n,
+          offWay: onlineAlone ? 'online' : 'transfer',
+          // The shop's advance or the law's, whichever is more.
+          advance: onDelivery
+            ? (advance ?? 0n) > (pastLimit ?? 0n)
+              ? (advance ?? 0n)
+              : (pastLimit ?? 0n)
+            : 0n,
+        },
+        view.tax,
+      ),
+      discountSection(discount, problem?.kind === 'discount' ? problem : null),
+      orderable &&
+        html`<form method="post">
+          <input type="hidden" name="shown" value="${view.shown}" />
+          ${field('name', LABELS.name, form, errors, { autocomplete: 'name', required: true })}
+          ${field('phone', LABELS.mobile, form, errors, {
+            autocomplete: 'tel',
+            required: true,
+            kind: 'tel',
+            hint: {
+              en: 'The shop and the courier call this number.',
+              ur: 'دکان اور کوریئر اس نمبر پر کال کریں گے۔',
+            },
+          })}
+          ${field('email', LABELS.email, form, errors, {
+            autocomplete: 'email',
+            kind: 'email',
+            hint: {
+              en: "Your order's news comes here too.",
+              ur: 'آپ کے آرڈر کی اطلاعات یہاں بھی آئیں گی۔',
+            },
+          })}
+          ${marketingChoices(shop.name, view.marketing, form.marketing)}
+          ${field('city', LABELS.city, form, errors, {
+            autocomplete: 'address-level2',
+            required: true,
+            list: 'cities',
+          })}
+          <datalist id="cities">
+            ${PK_CITIES.map((city) => html`<option value="${city.name}"></option>`)}
+          </datalist>
+          ${field('address1', LABELS.address1, form, errors, {
+            autocomplete: 'address-line1',
+            required: true,
+          })}
+          ${field('address2', LABELS.address2, form, errors, {
+            autocomplete: 'address-line2',
+            list: 'areas',
+          })}
+          ${areaList(form.city)}
+          ${field('landmark', LABELS.landmark, form, errors, {
+            autocomplete: 'address-line3',
+            hint: {
+              en: 'A mosque, school or shop near you that the rider can ask for.',
+              ur: 'آپ کے قریب کوئی مسجد، اسکول یا دکان جس کا رائیڈر پوچھ سکے۔',
+            },
+          })}
+          ${provinceField(form.province, errors)}
+          ${locationField(
+            { latitude: form.latitude ?? '', longitude: form.longitude ?? '' },
+            errors,
+            form.city,
+          )}
+          ${paymentSection(shop, payments, form.payment, { transferOff, onlineOff }, askedAhead, pastLimit)}
+          ${view.storeCredit && storeCreditChoice(form.storeCredit === '1')} ${asked && codeField()}
+          ${agreement && paragraphs(agreement, 'small muted')}
+          <button class="button stack" type="submit">${say('bilingual', LABELS.placeOrder)}</button>
+          ${asked && codeAgain(asked.channel)}
+        </form>`,
+      orderable && badgeList(shop, codOffered),
+      link(`${shop.storefront}/cart`, LABELS.backToCart),
+      policyLinks(shop),
+    ],
+    { scripts: orderable ? [LOCATION_SCRIPT] : [] },
+  );
 }
 
 /**
@@ -781,7 +795,7 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
         heading({ en: 'Pay online', ur: 'آن لائن ادائیگی کریں' }),
         gatewayForm(view.gatewayForm, amount(online.amount)),
       ],
-      [new URL(view.gatewayForm.url).origin],
+      { formTargets: [new URL(view.gatewayForm.url).origin] },
     );
   }
   const to = order.shippingAddress;
@@ -854,12 +868,13 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
             ${to.address2 && html`${text(to.address2)}<br />`}
             ${to.landmark && html`${text(to.landmark)}<br />`}${text(addressTail(to))}
           </p>
+          ${pinLine(to.location) && html`<p>${pinLine(to.location)}</p>`}
         </section>`,
       link(shop.storefront, LABELS.continueShopping),
       policyLinks(shop),
     ],
     // Paying online answers with a gateway's page: the form goes on there.
-    gatewayOrigins(online?.gateways ?? []),
+    { formTargets: gatewayOrigins(online?.gateways ?? []) },
   );
 }
 
@@ -1526,14 +1541,15 @@ function errorWords(error: FieldError): Sentence {
 
 /**
  * A page in its shop's colours, with its logo (CHK-14), or the platform's when it has no shop to
- * show.
+ * show; its forms may go on to `formTargets`, such as the shop's gateway, and it runs `scripts`,
+ * such as the pin's (ADR-259).
  */
 function page(
   status: number,
   title: string,
   shop: CheckoutShop | null,
   body: HtmlValue[],
-  formTargets: readonly string[] = [],
+  options: { formTargets?: readonly string[]; scripts?: readonly string[] } = {},
 ): CheckoutPage {
   return {
     status,
@@ -1542,7 +1558,8 @@ function page(
       body: html`${body}`,
       accent: shop?.accent,
       images: shop?.logo ? [shop.logo] : [],
-      formTargets,
+      formTargets: options.formTargets ?? [],
+      scripts: options.scripts ?? [],
     }),
   };
 }

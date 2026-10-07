@@ -1,3 +1,4 @@
+import type { MapPoint } from './location.js';
 import { searchKey } from './text.js';
 
 export interface PkProvince {
@@ -49,6 +50,8 @@ export interface PkCity {
   readonly province: PkProvinceCode;
   /** Short forms, old names and common spellings. */
   readonly aliases: readonly string[];
+  /** Its centre, roughly: how far an address's pin may be from it is counted from here. */
+  readonly centre: MapPoint;
 }
 
 function city(
@@ -56,9 +59,17 @@ function city(
   name: string,
   nameUr: string,
   province: PkProvinceCode,
+  [latitude, longitude]: readonly [number, number],
   aliases: readonly string[] = [],
 ): PkCity {
-  return Object.freeze({ id, name, nameUr, province, aliases: Object.freeze([...aliases]) });
+  return Object.freeze({
+    id,
+    name,
+    nameUr,
+    province,
+    aliases: Object.freeze([...aliases]),
+    centre: Object.freeze({ latitude, longitude }),
+  });
 }
 
 /**
@@ -66,55 +77,76 @@ function city(
  * Address forms use it for suggestions only: customers may type any town.
  */
 export const PK_CITIES: readonly PkCity[] = Object.freeze([
-  city('karachi', 'Karachi', 'کراچی', 'SD', ['khi']),
-  city('lahore', 'Lahore', 'لاہور', 'PB', ['lhr', 'lhe']),
-  city('faisalabad', 'Faisalabad', 'فیصل آباد', 'PB', ['lyallpur', 'fsd']),
-  city('rawalpindi', 'Rawalpindi', 'راولپنڈی', 'PB', ['pindi', 'rwp']),
-  city('gujranwala', 'Gujranwala', 'گوجرانوالہ', 'PB', ['grw']),
-  city('peshawar', 'Peshawar', 'پشاور', 'KP', ['psh']),
-  city('multan', 'Multan', 'ملتان', 'PB'),
-  city('hyderabad', 'Hyderabad', 'حیدرآباد', 'SD', ['hyd', 'haiderabad']),
-  city('islamabad', 'Islamabad', 'اسلام آباد', 'IS', ['isb']),
-  city('quetta', 'Quetta', 'کوئٹہ', 'BA', ['koita']),
-  city('bahawalpur', 'Bahawalpur', 'بہاولپور', 'PB', ['bwp']),
-  city('sargodha', 'Sargodha', 'سرگودھا', 'PB', ['sgd']),
-  city('sialkot', 'Sialkot', 'سیالکوٹ', 'PB', ['skt']),
-  city('sukkur', 'Sukkur', 'سکھر', 'SD'),
-  city('larkana', 'Larkana', 'لاڑکانہ', 'SD'),
-  city('sheikhupura', 'Sheikhupura', 'شیخوپورہ', 'PB', ['shaikhupura']),
-  city('rahim-yar-khan', 'Rahim Yar Khan', 'رحیم یار خان', 'PB', ['ryk']),
-  city('jhang', 'Jhang', 'جھنگ', 'PB'),
-  city('dera-ghazi-khan', 'Dera Ghazi Khan', 'ڈیرہ غازی خان', 'PB', ['dg khan', 'dgk']),
-  city('gujrat', 'Gujrat', 'گجرات', 'PB'),
-  city('sahiwal', 'Sahiwal', 'ساہیوال', 'PB', ['montgomery']),
-  city('wah-cantt', 'Wah Cantt', 'واہ کینٹ', 'PB', ['wah', 'wah cantonment']),
-  city('mardan', 'Mardan', 'مردان', 'KP'),
-  city('kasur', 'Kasur', 'قصور', 'PB', ['qasur']),
-  city('okara', 'Okara', 'اوکاڑہ', 'PB'),
-  city('mingora', 'Mingora', 'مینگورہ', 'KP', ['swat', 'saidu sharif']),
-  city('nawabshah', 'Nawabshah', 'نوابشاہ', 'SD', ['benazirabad', 'shaheed benazirabad']),
-  city('chiniot', 'Chiniot', 'چنیوٹ', 'PB'),
-  city('mirpur-khas', 'Mirpur Khas', 'میرپور خاص', 'SD', ['mirpurkhas']),
-  city('abbottabad', 'Abbottabad', 'ایبٹ آباد', 'KP', ['abbotabad']),
-  city('muzaffargarh', 'Muzaffargarh', 'مظفر گڑھ', 'PB'),
-  city('jhelum', 'Jhelum', 'جہلم', 'PB'),
-  city('khanewal', 'Khanewal', 'خانیوال', 'PB'),
-  city('kohat', 'Kohat', 'کوہاٹ', 'KP'),
-  city('dera-ismail-khan', 'Dera Ismail Khan', 'ڈیرہ اسماعیل خان', 'KP', ['di khan', 'dik']),
-  city('hafizabad', 'Hafizabad', 'حافظ آباد', 'PB'),
-  city('jacobabad', 'Jacobabad', 'جیکب آباد', 'SD'),
-  city('attock', 'Attock', 'اٹک', 'PB', ['campbellpur']),
-  city('mianwali', 'Mianwali', 'میانوالی', 'PB'),
-  city('vehari', 'Vehari', 'وہاڑی', 'PB'),
-  city('mansehra', 'Mansehra', 'مانسہرہ', 'KP'),
-  city('nowshera', 'Nowshera', 'نوشہرہ', 'KP'),
-  city('turbat', 'Turbat', 'تربت', 'BA', ['kech']),
-  city('khuzdar', 'Khuzdar', 'خضدار', 'BA'),
-  city('gwadar', 'Gwadar', 'گوادر', 'BA'),
-  city('muzaffarabad', 'Muzaffarabad', 'مظفرآباد', 'JK'),
-  city('mirpur-ajk', 'Mirpur', 'میرپور', 'JK', ['mirpur ajk', 'new mirpur']),
-  city('gilgit', 'Gilgit', 'گلگت', 'GB'),
-  city('skardu', 'Skardu', 'سکردو', 'GB'),
+  city('karachi', 'Karachi', 'کراچی', 'SD', [24.8607, 67.0011], ['khi']),
+  city('lahore', 'Lahore', 'لاہور', 'PB', [31.5204, 74.3587], ['lhr', 'lhe']),
+  city('faisalabad', 'Faisalabad', 'فیصل آباد', 'PB', [31.4504, 73.135], ['lyallpur', 'fsd']),
+  city('rawalpindi', 'Rawalpindi', 'راولپنڈی', 'PB', [33.5651, 73.0169], ['pindi', 'rwp']),
+  city('gujranwala', 'Gujranwala', 'گوجرانوالہ', 'PB', [32.1877, 74.1945], ['grw']),
+  city('peshawar', 'Peshawar', 'پشاور', 'KP', [34.0151, 71.5249], ['psh']),
+  city('multan', 'Multan', 'ملتان', 'PB', [30.1575, 71.5249]),
+  city('hyderabad', 'Hyderabad', 'حیدرآباد', 'SD', [25.396, 68.3578], ['hyd', 'haiderabad']),
+  city('islamabad', 'Islamabad', 'اسلام آباد', 'IS', [33.6844, 73.0479], ['isb']),
+  city('quetta', 'Quetta', 'کوئٹہ', 'BA', [30.1798, 66.975], ['koita']),
+  city('bahawalpur', 'Bahawalpur', 'بہاولپور', 'PB', [29.3956, 71.6836], ['bwp']),
+  city('sargodha', 'Sargodha', 'سرگودھا', 'PB', [32.0836, 72.6711], ['sgd']),
+  city('sialkot', 'Sialkot', 'سیالکوٹ', 'PB', [32.4945, 74.5229], ['skt']),
+  city('sukkur', 'Sukkur', 'سکھر', 'SD', [27.7052, 68.8574]),
+  city('larkana', 'Larkana', 'لاڑکانہ', 'SD', [27.56, 68.2264]),
+  city('sheikhupura', 'Sheikhupura', 'شیخوپورہ', 'PB', [31.7131, 73.9783], ['shaikhupura']),
+  city('rahim-yar-khan', 'Rahim Yar Khan', 'رحیم یار خان', 'PB', [28.4202, 70.2952], ['ryk']),
+  city('jhang', 'Jhang', 'جھنگ', 'PB', [31.2681, 72.3181]),
+  city(
+    'dera-ghazi-khan',
+    'Dera Ghazi Khan',
+    'ڈیرہ غازی خان',
+    'PB',
+    [30.0561, 70.6348],
+    ['dg khan', 'dgk'],
+  ),
+  city('gujrat', 'Gujrat', 'گجرات', 'PB', [32.5731, 74.0789]),
+  city('sahiwal', 'Sahiwal', 'ساہیوال', 'PB', [30.6682, 73.1114], ['montgomery']),
+  city('wah-cantt', 'Wah Cantt', 'واہ کینٹ', 'PB', [33.7715, 72.7511], ['wah', 'wah cantonment']),
+  city('mardan', 'Mardan', 'مردان', 'KP', [34.1986, 72.0404]),
+  city('kasur', 'Kasur', 'قصور', 'PB', [31.1187, 74.4507], ['qasur']),
+  city('okara', 'Okara', 'اوکاڑہ', 'PB', [30.8138, 73.4534]),
+  city('mingora', 'Mingora', 'مینگورہ', 'KP', [34.7717, 72.36], ['swat', 'saidu sharif']),
+  city(
+    'nawabshah',
+    'Nawabshah',
+    'نوابشاہ',
+    'SD',
+    [26.2442, 68.41],
+    ['benazirabad', 'shaheed benazirabad'],
+  ),
+  city('chiniot', 'Chiniot', 'چنیوٹ', 'PB', [31.7167, 72.9833]),
+  city('mirpur-khas', 'Mirpur Khas', 'میرپور خاص', 'SD', [25.5276, 69.0111], ['mirpurkhas']),
+  city('abbottabad', 'Abbottabad', 'ایبٹ آباد', 'KP', [34.1688, 73.2215], ['abbotabad']),
+  city('muzaffargarh', 'Muzaffargarh', 'مظفر گڑھ', 'PB', [30.0703, 71.1933]),
+  city('jhelum', 'Jhelum', 'جہلم', 'PB', [32.9425, 73.7257]),
+  city('khanewal', 'Khanewal', 'خانیوال', 'PB', [30.3017, 71.9321]),
+  city('kohat', 'Kohat', 'کوہاٹ', 'KP', [33.5869, 71.4414]),
+  city(
+    'dera-ismail-khan',
+    'Dera Ismail Khan',
+    'ڈیرہ اسماعیل خان',
+    'KP',
+    [31.8314, 70.9019],
+    ['di khan', 'dik'],
+  ),
+  city('hafizabad', 'Hafizabad', 'حافظ آباد', 'PB', [32.0709, 73.688]),
+  city('jacobabad', 'Jacobabad', 'جیکب آباد', 'SD', [28.2769, 68.4514]),
+  city('attock', 'Attock', 'اٹک', 'PB', [33.766, 72.3609], ['campbellpur']),
+  city('mianwali', 'Mianwali', 'میانوالی', 'PB', [32.5839, 71.537]),
+  city('vehari', 'Vehari', 'وہاڑی', 'PB', [30.0452, 72.3489]),
+  city('mansehra', 'Mansehra', 'مانسہرہ', 'KP', [34.3302, 73.1968]),
+  city('nowshera', 'Nowshera', 'نوشہرہ', 'KP', [34.0153, 71.9747]),
+  city('turbat', 'Turbat', 'تربت', 'BA', [26.0031, 63.0544], ['kech']),
+  city('khuzdar', 'Khuzdar', 'خضدار', 'BA', [27.8, 66.6167]),
+  city('gwadar', 'Gwadar', 'گوادر', 'BA', [25.1264, 62.3225]),
+  city('muzaffarabad', 'Muzaffarabad', 'مظفرآباد', 'JK', [34.37, 73.4711]),
+  city('mirpur-ajk', 'Mirpur', 'میرپور', 'JK', [33.1484, 73.7518], ['mirpur ajk', 'new mirpur']),
+  city('gilgit', 'Gilgit', 'گلگت', 'GB', [35.9208, 74.3089]),
+  city('skardu', 'Skardu', 'سکردو', 'GB', [35.2971, 75.6333]),
 ]);
 
 interface IndexedEntry<T> {

@@ -402,6 +402,9 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
       landmark: 'Near Nipa Chowrangi',
       city: 'Karachi',
       zip: '75300',
+      // Her phone's pin at the door (ADR-259).
+      latitude: 24.9175,
+      longitude: 67.0972,
     },
     shippingPrice: '250',
     note: 'Customer asked for delivery after 5 pm',

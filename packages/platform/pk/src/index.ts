@@ -11,6 +11,14 @@ export {
 } from './cities.js';
 export { formatIban, isValidIban, normalizePkIban } from './iban.js';
 export { normalizeCnic, normalizeNtn } from './identity.js';
+export {
+  CITY_REACH_KM,
+  PK_BOUNDS,
+  distanceKm,
+  inPakistan,
+  parseDegrees,
+  type MapPoint,
+} from './location.js';
 export { isPkMobile, maskPkMobile, parsePkMobile, type PkMobileNumber } from './phone.js';
 export {
   CORRECTIONS,

@@ -88,6 +88,8 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
     const completed = await f.order(f.a, [kurta], {
       email: 'ayesha@example.com',
       note: 'Ring twice; her name is on the gate',
+      // Her phone's pin at the address (ADR-259).
+      shippingAddress: { ...ADDRESS, latitude: '24.920400', longitude: '67.093200' },
     });
     // Placed through checkout, it keeps what she agreed to, where she placed it from, the visits
     // that brought her and the IDs the shop's Meta pixel gave her browser.
@@ -164,6 +166,8 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
     expect(steps).toEqual([{ status: 'out_for_delivery', message: null }]);
 
     const erased = (await f.orders.get(f.a, completed.id))!;
+    // Her pin goes with the rest of the address.
+    expect(erased.shippingAddress.location).toBeNull();
     expect(erased).toMatchObject({
       phone: null,
       email: null,
@@ -249,6 +253,7 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
       email: 'ayesha@example.com',
       note: 'Ring twice',
       tags: ['gift'],
+      shippingAddress: { ...ADDRESS, latitude: 24.9204, longitude: 67.0932 },
     });
     const version = '01a0f3b1-9685-7065-988d-604298214e34';
     await f.admin.query(
@@ -354,6 +359,8 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
           city: 'Karachi',
           province: 'Sindh',
           zip: '75300',
+          latitude: 24.9204,
+          longitude: 67.0932,
         },
         note: 'Ring twice',
         tags: ['gift'],
@@ -484,6 +491,8 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
       'city',
       'province',
       'zip',
+      'latitude',
+      'longitude',
     ]);
     // Their risk scores and the orders' timelines are the shop's, and stay out.
     const json = JSON.stringify(file);

@@ -179,6 +179,8 @@ export function toAddress(address: StoredAddressValue, hidePhone: boolean): Mail
     province,
     provinceCode: address.provinceCode,
     zip: address.zip,
+    latitude: address.location?.latitude ?? null,
+    longitude: address.location?.longitude ?? null,
     formatted: [
       address.name,
       address.address1,

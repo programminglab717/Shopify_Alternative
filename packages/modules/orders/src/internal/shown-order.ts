@@ -143,6 +143,8 @@ export function shownDigest(shown: ShownOrder): string {
       address.city,
       address.provinceCode,
       address.zip,
+      // Its pin, where it has one: digests of addresses without stay as they were.
+      ...(address.location ? [address.location.latitude, address.location.longitude] : []),
     ],
     shown.terms.map((term) => term.versionId),
   ]);

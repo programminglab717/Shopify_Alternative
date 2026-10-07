@@ -25,6 +25,10 @@ export const REDACTED_KEYS = [
   'address1',
   'address2',
   'landmark',
+  // An address's pin (ADR-259) says where someone lives as plainly as the address does.
+  'location',
+  'latitude',
+  'longitude',
 ] as const;
 
 export const REDACT_PATHS: readonly string[] = [

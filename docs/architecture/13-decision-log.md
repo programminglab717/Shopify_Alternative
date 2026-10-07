@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-258 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-259 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -266,6 +266,7 @@
 | 256 | What the shop's staff and apps change goes on its activity log: each event a request of the Admin API records, written in the same statement as the outbox's, by whom and to what, never what it recorded, in a table of its own kept as long as the audit log | Accepted |
 | 257 | The merchant crops a product's image and marks what matters in it: a crop's clean copy is made from the whole image's as it is set and kept beside it, each size and format made from it at an address naming the crop, the whole kept to crop again; the focal point, in percent of the image shown, is Shopify's for themes and image_tag | Accepted |
 | 258 | Products' videos: an MP4 or QuickTime file the shop uploads, H.264 and AAC as phones record them, read box by box and kept as it is but for where it was taken, served a range at a time with the preview image its uploader gives; or a YouTube or Vimeo video by its address, its host's image its preview; themes have them as Shopify's media | Accepted |
+| 259 | A delivery address may carry a pin, where the customer's phone is at the address: checkout's and customers' links' address forms add it by the pages' first script, allowed by its hash; it is kept in Pakistan and near the city typed, as Shopify's latitude and longitude | Accepted |
 
 ---
 
@@ -10725,3 +10726,53 @@
     one.
   * **Signed storage URLs to play from:** they expire, and pages the edge keeps a year would name
     dead addresses.
+
+## ADR-259 · A delivery address may carry a pin, where the customer's phone is at the address: checkout's and customers' links' address forms add it by the pages' first script, allowed by its hash; it is kept in Pakistan and near the city typed, as Shopify's latitude and longitude
+
+* **Context:** CHK-02 asks for an optional map pin, "only when the device grants location", for
+  riders (05 §2.1); [ADR-070](#adr-070--an-address-keeps-its-area-in-its-second-line-and-its-landmark-in-a-field-of-its-own-checkout-and-customers-links-ask-for-each-suggesting-the-areas-of-the-larger-cities) gave the area and the landmark boxes of their own and left
+  the pin for later, since it needs a script and the phone's location. Riders find doors by
+  landmarks and calls; Pakistani addresses don't geocode past the area (research 03 §3.4).
+  Customers' pages run no scripts ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)), their policy allowing none. Shopify's
+  `MailingAddress` has a `latitude` and `longitude`, which it geocodes itself. Customers often
+  order from work for home: a pin from wherever the phone is would send the rider to the office.
+  A map to drop the pin on needs a tile provider, priced or limited, before the infrastructure is
+  chosen.
+* **Decision:**
+  * **The pin is where the phone is**, asked for only when the customer taps "Add my location",
+    the box asking whether they are at the delivery address now: the browser's geolocation, at
+    high accuracy, kept to six decimal places; a fix further out than 500 m, as from the
+    network's address alone, is not kept. "See it on the map" opens it in Google Maps; "Remove the
+    pin" clears it. The words are in English and Urdu, and say why when the browser refuses.
+  * **The pages' first script** (`LOCATION_SCRIPT`, `@hatti/orders`) is the same text on every
+    page, run where the body ends and allowed by its hash in the page's policy (`renderPage`'s
+    `scripts`), which allows no other. Without it, or on a phone that can't say where it is, the
+    page shows nothing of the pin and works as before. Checkout's page and the address forms of
+    orders' and drafts' links carry it; no other page does.
+  * **Kept with the address** (`location`, migration 0162 giving addresses kept before none): its
+    latitude and longitude both, in Pakistan's box, and within 80 km of the centre of the city
+    typed where it is one of the 49 Hatti lists (`PK_CITIES` gain their centres). A pin further
+    off was added somewhere else: the page says how far, and from where, and the order waits for
+    it to be removed or added again.
+  * **The Admin API has Shopify's `MailingAddress.latitude` and `longitude`**; `MailingAddressInput`
+    takes them too, Hatti's own, for a pin a customer sends on WhatsApp, checked alike. An address
+    replaced without them has none.
+  * **Where the address goes, the pin goes:** the customer's pages link it on the map; order
+    exports have it in a `Location` column, as a link; a customer's own file has it with the
+    address. Erasing their details clears it, and logs never carry it.
+* **Consequences:**
+  * Riders reach doors the address alone wouldn't find, where customers add pins.
+  * A pin says only where the phone was: one a few streets off, or added elsewhere within 80 km,
+    or near a town Hatti doesn't list, passes; staff see it on the map.
+  * Couriers are not sent it: PostEx's and Leopards' bookings have no field for it. The shop
+    shares it with the rider.
+  * The pages that ask for an address run one script, which only adds to them; the rest run none.
+* **Alternatives:**
+  * **A map to drop the pin on:** it needs a tile provider and a key; next, with the
+    infrastructure.
+  * **Geocoding the address typed:** Pakistani addresses find the area at best.
+  * **The pin in the address sent to couriers:** their address fields are for the address, and
+    a link in one may break their sorting.
+  * **A script in a file the storefront serves:** the policy would allow the shop's whole origin,
+    and the storefront would relay a file it otherwise never serves.
+  * **Keeping a pin far from the city:** it would send the rider to the office.

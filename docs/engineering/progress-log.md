@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the rest of what is left to build** (asked for on 2026-10-07): a map pin at checkout, and
-couriers' city names shared across shops; then translations removed with what is deleted, and
-domains checked again. How the Free plan holds to its 50 orders a month waits on a decision.
+**Next, the rest of what is left to build** (asked for on 2026-10-07): couriers' city names
+shared across shops; then translations removed with what is deleted, and domains checked again.
+How the Free plan holds to its 50 orders a month waits on a decision.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### A map pin for the address
+
+* **Where the customer's phone is, at the delivery address** ([ADR-259](../architecture/13-decision-log.md#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)):
+  checkout's page and the address forms of orders' and drafts' links offer "Add my location",
+  the pages' first script, allowed by its hash. The pin is kept with the address when it is in
+  Pakistan and within 80 km of the city typed; the page says how far one is otherwise. The Admin
+  API has Shopify's `latitude` and `longitude`; customers' pages link the pin on the map, and
+  order exports have it in a column of its own.
+* **For it:** `renderPage` takes scripts; `@hatti/pk` has its cities' centres and how far a pin
+  is from them; migration 0162 gives addresses kept before none.
+* 1834 tests: pins read, placed, refused and taken off through checkout, links and the API;
+  the pages' script allowed by its hash alone; exports and erasure with the pin.
 
 ### 9b88acf · Products' videos
 

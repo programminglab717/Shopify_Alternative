@@ -273,7 +273,8 @@ The pixel is on the storefront's pages while the shop has Meta connected
 ([ADR-144](./13-decision-log.md#adr-144--a-shops-storefront-loads-its-meta-pixel-while-meta-is-connected-for-the-steps-shoppers-take-before-checkout-orders-go-from-the-server-alone-each-keeping-the-pixels-browser-and-click-ids-for-them)): `PageView` on every page,
 `ViewContent` on a product's page, by the catalog feed's IDs, and `AddToCart` and
 `InitiateCheckout` as shoppers send the cart's forms. Orders' events go from the server alone:
-checkout's page runs no scripts, so there is nothing to deduplicate. The pixel's browser and click
+checkout's page runs none of the pixel's scripts, so there is nothing to
+deduplicate. The pixel's browser and click
 IDs, from its `_fbp` and `_fbc` cookies, go with the order placed, and its conversions send them.
 TikTok, Google and a consent banner come later.
 

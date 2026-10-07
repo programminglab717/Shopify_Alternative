@@ -2373,9 +2373,18 @@ function tagList(tags: readonly string[]): string {
   return `${tags.length === 1 ? 'the tag' : 'the tags'} ${tags.join(', ')}`;
 }
 
-/** Field by field: Postgres returns jsonb objects with their keys reordered. */
+/**
+ * Field by field, either's: Postgres returns jsonb objects with their keys reordered, and an
+ * address without a pin has no `location` (ADR-259).
+ */
 function sameAddress(a: AddressValue, b: StoredAddressValue): boolean {
-  return (Object.keys(a) as (keyof AddressValue)[]).every((key) => a[key] === (b[key] ?? null));
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof AddressValue>;
+  return [...keys].every((key) =>
+    key === 'location'
+      ? a.location?.latitude === b.location?.latitude &&
+        a.location?.longitude === b.location?.longitude
+      : (a[key] ?? null) === (b[key] ?? null),
+  );
 }
 
 const CHANGE_NAMES: Record<string, string> = {

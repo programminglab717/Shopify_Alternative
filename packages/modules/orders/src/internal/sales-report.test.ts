@@ -139,6 +139,7 @@ describe.skipIf(!server)('SalesReportService', () => {
               city: 'Karachi',
               provinceCode: 'SD',
               zip: null,
+              location: null,
             },
             email: null,
             paymentMethod: 'cash_on_delivery',

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CITY_REACH_KM,
   PK_CITIES,
   PK_CITY_AREAS,
   areaSuggestions,
@@ -7,6 +8,7 @@ import {
   findCity,
   findProvince,
   formatIban,
+  inPakistan,
   isValidIban,
   normalizeCnic,
   normalizeDigits,
@@ -14,9 +16,11 @@ import {
   normalizePkIban,
   maskPkMobile,
   normalizeUrduScript,
+  parseDegrees,
   parsePkMobile,
   CORRECTIONS,
   correctionsOf,
+  distanceKm,
   prefixKey,
   searchCities,
   searchKey,
@@ -297,5 +301,57 @@ describe('cities', () => {
     expect(findProvince('سندھ')).toBe('SD');
     expect(findProvince('Baluchistan')).toBe('BA');
     expect(findProvince('Narnia')).toBeNull();
+  });
+});
+
+describe('map points', () => {
+  it('reads degrees as browsers and APIs give them, to six places', () => {
+    expect(parseDegrees('24.860700')).toBe(24.8607);
+    expect(parseDegrees(' 67.0011 ')).toBe(67.0011);
+    expect(parseDegrees(24.86073449)).toBe(24.860734);
+    expect(parseDegrees('-33.8')).toBe(-33.8);
+    expect(parseDegrees('۲۴٫۸')).toBeNull();
+    expect(parseDegrees('۲۴.۸۶')).toBe(24.86);
+    for (const value of ['', 'north', '24,8607', '1e3', '1234.5', '24.', Infinity, NaN]) {
+      expect(parseDegrees(value), String(value)).toBeNull();
+    }
+  });
+
+  it("knows Pakistan's box, from the coast to the Karakoram", () => {
+    // Karachi, Lahore, Gilgit, Gwadar and Skardu.
+    for (const [latitude, longitude] of [
+      [24.8607, 67.0011],
+      [31.5204, 74.3587],
+      [35.9208, 74.3089],
+      [25.1264, 62.3225],
+      [35.2971, 75.6333],
+    ] as const) {
+      expect(inPakistan({ latitude, longitude })).toBe(true);
+    }
+    // Dubai, Kolkata, Dushanbe, the equator, and Karachi's degrees the wrong way round.
+    for (const [latitude, longitude] of [
+      [25.2048, 55.2708],
+      [22.5726, 88.3639],
+      [38.5598, 68.787],
+      [0, 0],
+      [67.0011, 24.8607],
+    ] as const) {
+      expect(inPakistan({ latitude, longitude })).toBe(false);
+    }
+  });
+
+  it("measures how far a pin is from its city's centre", () => {
+    const karachi = findCity('Karachi')!.centre;
+    const lahore = findCity('lhr')!.centre;
+    // Some 1,030 km by air.
+    expect(Math.round(distanceKm(karachi, lahore) / 10)).toBe(103);
+    expect(distanceKm(karachi, karachi)).toBe(0);
+    // DHA City, Karachi's furthest suburb, is within its reach; Hyderabad is not.
+    expect(distanceKm({ latitude: 25.1194, longitude: 67.5469 }, karachi)).toBeLessThan(
+      CITY_REACH_KM,
+    );
+    expect(distanceKm(findCity('Hyderabad')!.centre, karachi)).toBeGreaterThan(CITY_REACH_KM);
+    // Every listed city's centre is in Pakistan.
+    for (const city of PK_CITIES) expect(inPakistan(city.centre), city.id).toBe(true);
   });
 });

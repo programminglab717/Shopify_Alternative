@@ -195,6 +195,34 @@ describe('renderPage', () => {
       "; form-action 'self'; ",
     );
   });
+
+  it('runs the scripts it is given where its body ends, each allowed by its hash alone', () => {
+    const script = "document.querySelector('[data-add]').hidden = false;";
+    const page = renderPage({
+      title: 'Checkout · Zari',
+      body: html`<button type="button" data-add hidden>Add</button>`,
+      scripts: [script],
+    });
+    const [, after] = page.html.split('</main>');
+    expect(after!.replace(/\s+/g, '')).toBe(
+      `<script>${script}</script></body></html>`.replace(/\s+/g, ''),
+    );
+    const hash = createHash('sha256').update(script).digest('base64');
+    expect(
+      page.contentSecurityPolicy.startsWith(
+        `default-src 'none'; script-src 'sha256-${hash}'; style-src 'sha256-`,
+      ),
+    ).toBe(true);
+    // What a script shows stays hidden until it runs, whatever else styles it.
+    expect(page.html).toContain('[hidden] { display: none !important; }');
+    // Without scripts, none may run.
+    expect(
+      renderPage({ title: 'Zari', body: html`<p>Hi</p>` }).contentSecurityPolicy,
+    ).not.toContain('script-src');
+    expect(() =>
+      renderPage({ title: 'Zari', body: html``, scripts: ['a = "</script><script>alert(1)";'] }),
+    ).toThrow('</script');
+  });
 });
 
 describe('code128', () => {

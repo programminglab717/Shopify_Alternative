@@ -1,5 +1,6 @@
 // Drizzle mirror of the orders tables. The SQL migrations in db/migrations are the source of truth;
 // orders.test.ts checks this file against the migrated database.
+import type { MapPoint } from '@hatti/pk';
 import {
   bigint,
   boolean,
@@ -209,11 +210,13 @@ export interface AddressValue {
   city: string;
   provinceCode: string | null;
   zip: string | null;
+  /** Where it is on the map, as the customer's phone found it there (ADR-259); null for none. */
+  location: MapPoint | null;
 }
 
 /**
  * What an order keeps of its address once its customer's data is erased: where it went, for the
- * shop's accounts.
+ * shop's accounts. Its pin goes with the rest.
  */
 export interface ErasedAddressValue {
   name: null;
@@ -224,6 +227,7 @@ export interface ErasedAddressValue {
   city: string;
   provinceCode: string | null;
   zip: null;
+  location: null;
 }
 
 /** An order's shipping address as stored: whole, or what is left after an erasure. */

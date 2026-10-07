@@ -458,6 +458,7 @@ export function addSales(
       city,
       provinceCode: province,
       zip: null,
+      location: null,
     };
     orders.shopId.push(shopId);
     orders.id.push(orderId);

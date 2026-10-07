@@ -120,6 +120,74 @@ describe.skipIf(!server)('migration 0040', { timeout: MIGRATION_TEST_TIMEOUT }, 
   });
 });
 
+describe.skipIf(!server)('migration 0162', { timeout: MIGRATION_TEST_TIMEOUT }, () => {
+  let db: TestDatabase | undefined;
+  let admin: pg.Client | undefined;
+
+  afterAll(async () => {
+    await admin?.end();
+    await db?.drop();
+  });
+
+  it('gives addresses kept before no pin, erased ones too', async () => {
+    db = await createTestDatabase(server, { before: '0162' });
+    admin = new pg.Client({ connectionString: db.adminUrl });
+    await admin.connect();
+
+    const shop = newId();
+    await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Old shop')`, [shop]);
+    const address = {
+      name: 'Ayesha Khan',
+      phone: '+923001234567',
+      address1: 'House 12, Street 4, Block 5',
+      address2: 'Gulshan-e-Iqbal',
+      landmark: 'Near Jamia Masjid',
+      city: 'Karachi',
+      provinceCode: 'SD',
+      zip: null,
+    };
+    const erased = { ...address, name: null, phone: null, address1: null, address2: null };
+    const order = (number: number, shippingAddress: object) =>
+      admin!.query(
+        `INSERT INTO orders.orders
+           (shop_id, id, number, source, confirmation_status, financial_status, stage,
+            payment_method, currency, subtotal, discount, shipping, total, amount_paid,
+            cod_amount, phone, shipping_address, location_id, customer_id)
+         VALUES ($1, $2, $3, 'online_store', 'pending', 'pending', 'needs_confirmation',
+                 'cash_on_delivery', 'PKR', 200000, 0, 0, 200000, 0, 200000, '+923001234567',
+                 $4, $5, $6)`,
+        [shop, newId(), number, shippingAddress, newId(), newId()],
+      );
+    await order(1001, address);
+    await order(1002, { ...erased, landmark: null });
+    const draft = (number: number, shippingAddress: object | null) =>
+      admin!.query(
+        `INSERT INTO orders.draft_orders
+           (shop_id, id, number, source, payment_method, currency, lines, subtotal, discount,
+            shipping, total, advance_paid, phone, shipping_address, actor_kind, actor_id)
+         VALUES ($1, $2, $3, 'whatsapp', 'cash_on_delivery', 'PKR', '[{}]', 200000, 0, 0,
+                 200000, 0, $4, $5, 'app', $6)`,
+        [shop, newId(), number, shippingAddress && address.phone, shippingAddress, newId()],
+      );
+    await draft(1, address);
+    await draft(2, null);
+
+    const result = await migrateThrough(db.adminUrl, '0162');
+    expect(result.applied[0]).toBe('0162_address_pins');
+
+    const { rows } = await admin.query<{ shipping_address: unknown }>(
+      `(SELECT shipping_address FROM orders.orders ORDER BY number)
+       UNION ALL (SELECT shipping_address FROM orders.draft_orders ORDER BY number)`,
+    );
+    expect(rows.map((row) => row.shipping_address)).toEqual([
+      { ...address, location: null },
+      { ...erased, landmark: null, location: null },
+      { ...address, location: null },
+      null,
+    ]);
+  });
+});
+
 describe.skipIf(!server)('migration 0065', { timeout: MIGRATION_TEST_TIMEOUT }, () => {
   let db: TestDatabase | undefined;
   let admin: pg.Client | undefined;

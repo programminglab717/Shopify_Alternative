@@ -93,6 +93,8 @@ describe.skipIf(!server)('Draft orders', () => {
     province: '',
     zip: '',
     phone: '',
+    latitude: '',
+    longitude: '',
   };
 
   it('keeps the items at the prices agreed, and the address once the customer sends it', async () => {

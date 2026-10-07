@@ -353,25 +353,52 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     const created = await mutate(tokens.a, ORDER_CREATE, {
       input: { lineItems: [{ variantId: size, quantity: 1 }], shippingAddress: ADDRESS },
     });
-    const updated = await mutate(
-      tokens.a,
-      `mutation ($id: ID!, $input: OrderUpdateInput!) {
-         orderUpdate(id: $id, input: $input) { order { phone shippingAddress { city province } note version } userErrors { code } }
-       }`,
-      {
-        id: created.order.id,
-        input: {
-          shippingAddress: { ...ADDRESS, phone: '0321 7654321', city: 'pindi', zip: null },
-          note: 'Leave with the guard',
+    const UPDATE = `mutation ($id: ID!, $input: OrderUpdateInput!) {
+      orderUpdate(id: $id, input: $input) {
+        order { phone shippingAddress { city province latitude longitude } note version }
+        userErrors { field code message }
+      }
+    }`;
+    // With the pin the customer sent on WhatsApp, as Shopify's latitude and longitude (ADR-259).
+    const updated = await mutate(tokens.a, UPDATE, {
+      id: created.order.id,
+      input: {
+        shippingAddress: {
+          ...ADDRESS,
+          phone: '0321 7654321',
+          city: 'pindi',
+          zip: null,
+          latitude: 33.6007,
+          longitude: 73.0679,
         },
+        note: 'Leave with the guard',
       },
-    );
+    });
     expect(updated.order).toEqual({
       phone: '+923217654321',
-      shippingAddress: { city: 'Rawalpindi', province: 'Punjab' },
+      shippingAddress: {
+        city: 'Rawalpindi',
+        province: 'Punjab',
+        latitude: 33.6007,
+        longitude: 73.0679,
+      },
       note: 'Leave with the guard',
       version: 2,
     });
+    // A pin far from its city was dropped somewhere else.
+    const far = await mutate(tokens.a, UPDATE, {
+      id: created.order.id,
+      input: {
+        shippingAddress: { ...ADDRESS, city: 'pindi', latitude: 24.8607, longitude: 67.0011 },
+      },
+    });
+    expect(far.userErrors).toEqual([
+      {
+        field: ['input', 'shippingAddress', 'latitude'],
+        code: 'INVALID',
+        message: 'The pin is 1130 km from Rawalpindi: it was not added at the address',
+      },
+    ]);
     const invalid = await mutate(tokens.a, ORDER_CREATE, {
       input: {
         lineItems: [{ variantId: size, quantity: 0 }],

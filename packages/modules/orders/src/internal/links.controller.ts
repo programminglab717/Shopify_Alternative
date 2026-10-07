@@ -312,6 +312,8 @@ function addressForm(body: unknown): AddressForm {
     province: field(body, 'province'),
     zip: field(body, 'zip'),
     phone: field(body, 'phone'),
+    latitude: field(body, 'latitude'),
+    longitude: field(body, 'longitude'),
   };
 }
 

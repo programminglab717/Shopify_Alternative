@@ -1,6 +1,14 @@
 // The orders module's public surface. Everything under src/internal is private to this module.
 export { checkAddress, type AddressInput } from '../internal/address.js';
 export {
+  LOCATION_SCRIPT,
+  locationField,
+  locationFormOf,
+  mapUrlOf,
+  pinLine,
+  type LocationForm,
+} from '../internal/location.js';
+export {
   VISIT_DAYS,
   attributionOf,
   type AttributionValue,

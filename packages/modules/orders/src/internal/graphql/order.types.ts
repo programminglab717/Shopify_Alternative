@@ -467,6 +467,17 @@ export class MailingAddress {
   @Field(() => String, { nullable: true })
   zip!: string | null;
 
+  @Field(() => Float, {
+    nullable: true,
+    description:
+      "Where the address is on the map, in decimal degrees, as the customer's phone found it " +
+      'there (ADR-259); null without a pin.',
+  })
+  latitude!: number | null;
+
+  @Field(() => Float, { nullable: true, description: 'With `latitude`.' })
+  longitude!: number | null;
+
   @Field(() => [String], { description: 'The address as lines for a label.' })
   formatted!: string[];
 }
@@ -1449,6 +1460,18 @@ export class MailingAddressInput {
 
   @Field(() => String, { nullable: true })
   zip?: string | null;
+
+  @Field(() => Float, {
+    nullable: true,
+    description:
+      "Hatti's own: where the address is on the map, in decimal degrees, as the customer shared " +
+      'it, such as from a WhatsApp location; with `longitude`, in Pakistan and near the city ' +
+      '(ADR-259). The address replaced without it has no pin.',
+  })
+  latitude?: number | null;
+
+  @Field(() => Float, { nullable: true, description: 'With `latitude`.' })
+  longitude?: number | null;
 }
 
 @InputType()
