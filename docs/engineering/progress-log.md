@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### Sales beside the period before, and refunds
+### 03c7f0d · Sales beside the period before, and refunds
 
 * **The period before** ([ADR-250](../architecture/13-decision-log.md#adr-250--the-sales-report-says-what-the-period-as-long-just-before-came-to-and-the-home-what-yesterday-came-to-by-this-time-of-day-refunds-are-said-beside-sales-not-taken-off-them)): the sales report gives what the period as long just before
   came to, and the home's today what yesterday came to by this time of day.
