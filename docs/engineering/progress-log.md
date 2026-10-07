@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the rest of what is left to build** (asked for on 2026-10-07): translations removed with
-what is deleted, domains checked again, and Urdu handles where shops want them. How the Free plan
-holds to its 50 orders a month waits on a decision.
+**Next, the rest of what is left to build** (asked for on 2026-10-07): domains checked again, and
+Urdu handles where shops want them. How the Free plan holds to its 50 orders a month waits on a
+decision.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### Translations deleted with what they translate
+
+* **A translation goes with what it translates** ([ADR-261](../architecture/13-decision-log.md#adr-261--a-translation-is-deleted-with-what-it-translates-whichever-way-that-goes-by-triggers-on-the-tables-of-what-may-be-translated-as-a-foreign-key-would-if-one-column-could-name-ten-kinds-a-menus-items-as-the-menu-goes-or-an-update-drops-them)):
+  triggers on the catalog's and the online store's tables delete the translations of the rows a
+  statement deletes, alone or by a cascade, and a menu's items' as the menu goes or an update
+  drops them, in the same transaction.
+* **What went before:** migration 0164 deletes the translations of what was deleted before it,
+  all but the shop's own.
+* **For it:** migration 0164; simplification 113 narrowed.
+* 1837 tests: each way a translated thing goes, and the migration.
 
 ### 1d6092b · Couriers' city names shared across shops
 

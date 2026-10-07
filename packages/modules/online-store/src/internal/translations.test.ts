@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { DnsLookup, StorefrontSite } from '@hatti/api';
+import { OptionService } from '@hatti/catalog/public';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { searchContentIn } from './content-search.js';
@@ -717,5 +718,117 @@ describe.skipIf(!server)('TranslationService', () => {
     const options = await f.translations.resources(f.b, 'productOption', { first: 5 });
     expect(options.items.map((each) => each.content[0]!.value).sort()).toEqual(['Colour', 'Size']);
     expect(await f.translations.resource(f.a, 'productOption', size.id)).toBeNull();
+  });
+
+  it('forgets translations as what they translate goes: alone, with what holds it, or dropped from its menu (ADR-261)', async () => {
+    const translate = async (kind: TranslatableKind, id: string, key: string, value: string) =>
+      unwrap(
+        await f.translations.register(f.a, kind, id, [
+          { locale: 'ur', key, value, translatableContentDigest: await digestIn(kind, id, key) },
+        ]),
+      );
+    /** Which of `ids` still have translations kept, in the table itself. */
+    const kept = async (ids: readonly string[]) => {
+      const { rows } = await f.admin.query<{ id: string }>(
+        `SELECT DISTINCT resource_id AS id FROM online_store.translations
+          WHERE resource_id = ANY($1::uuid[])`,
+        [ids],
+      );
+      return ids.filter((id) => rows.some((row) => row.id === id));
+    };
+
+    // A product's value and option deleted alone, then the product with the rest.
+    const options = new OptionService(f.db);
+    const suit = unwrap(
+      await f.products.create(f.a, {
+        title: 'Chiffon Suit',
+        options: [
+          { name: 'Size', values: ['Small', 'Large'] },
+          { name: 'Colour', values: ['Red'] },
+        ],
+        variants: [
+          { optionValues: ['Small', 'Red'], price: '4,990' },
+          { optionValues: ['Large', 'Red'], price: '5,190' },
+        ],
+      }),
+    );
+    const [size, colour] = [suit.options[0]!, suit.options[1]!];
+    const withFree = unwrap(
+      await options.update(f.a, suit.id, { optionId: size.id, valuesToAdd: ['Free'] }),
+    );
+    const free = withFree.options[0]!.values.find((value) => value.name === 'Free')!;
+    const [small, red] = [size.values[0]!, colour.values[0]!];
+    await translate('product', suit.id, 'title', 'شفون سوٹ');
+    await translate('productOption', size.id, 'name', 'سائز');
+    await translate('productOption', colour.id, 'name', 'رنگ');
+    await translate('productOptionValue', small.id, 'name', 'چھوٹا');
+    await translate('productOptionValue', red.id, 'name', 'سرخ');
+    await translate('productOptionValue', free.id, 'name', 'فری');
+    const suits = [suit.id, size.id, colour.id, small.id, red.id, free.id];
+    unwrap(await options.update(f.a, suit.id, { optionId: size.id, valuesToDelete: [free.id] }));
+    expect(await kept(suits)).toEqual([suit.id, size.id, colour.id, small.id, red.id]);
+    unwrap(await options.delete(f.a, suit.id, [colour.id]));
+    expect(await kept(suits)).toEqual([suit.id, size.id, small.id]);
+    unwrap(await f.products.delete(f.a, suit.id));
+    expect(await kept(suits)).toEqual([]);
+
+    // A collection, a page, and a blog with its article.
+    const sale = unwrap(await f.collections.create(f.a, { title: 'Sale' }));
+    const about = unwrap(await f.pages.create(f.a, { title: 'About us' }));
+    const news = unwrap(await f.blogs.create(f.a, { title: 'News' }));
+    const eid = unwrap(await f.articles.create(f.a, { blogId: news.id, title: 'Eid is here' }));
+    await translate('collection', sale.id, 'title', 'سیل');
+    await translate('page', about.id, 'title', 'ہمارے بارے میں');
+    await translate('blog', news.id, 'title', 'خبریں');
+    await translate('article', eid.id, 'title', 'عید آ گئی');
+    unwrap(await f.collections.delete(f.a, sale.id));
+    unwrap(await f.pages.delete(f.a, about.id));
+    unwrap(await f.blogs.delete(f.a, news.id));
+    expect(await kept([sale.id, about.id, news.id, eid.id])).toEqual([]);
+
+    // A policy goes once its body is blank; it comes back with another ID.
+    const site = new StorefrontSite('https://hatti.pk');
+    const policies = new PolicyService(f.db, site, new DomainService(f.db, site, new NoDns()));
+    const refund = unwrap(
+      await policies.update(f.a, { type: 'refund_policy', body: '<p>7 days.</p>' }),
+    )!;
+    await translate('shopPolicy', refund.id, 'body', '<p>سات دن۔</p>');
+    unwrap(await policies.update(f.a, { type: 'refund_policy', body: ' ' }));
+    expect(await kept([refund.id])).toEqual([]);
+
+    // A menu's item dropped from it, then the menu with the rest.
+    const footer = unwrap(
+      await f.menus.create(f.a, {
+        title: 'Footer',
+        handle: 'footer-links',
+        items: [
+          {
+            title: 'Help',
+            type: 'frontpage',
+            items: [{ title: 'Returns', type: 'http', url: '/pages/returns' }],
+          },
+          { title: 'Contact', type: 'http', url: '/pages/contact' },
+        ],
+      }),
+    );
+    const [help, contact] = [footer.items[0]!, footer.items[1]!];
+    const returns = help.items[0]!;
+    await translate('menu', footer.id, 'title', 'فوٹر');
+    await translate('menuItem', help.id, 'title', 'مدد');
+    await translate('menuItem', returns.id, 'title', 'واپسی');
+    await translate('menuItem', contact.id, 'title', 'رابطہ');
+    const links = [footer.id, help.id, returns.id, contact.id];
+    unwrap(
+      await f.menus.update(f.a, footer.id, {
+        title: 'Footer',
+        items: [
+          { id: help.id, title: 'Help', type: 'frontpage' },
+          { id: contact.id, title: 'Contact us', type: 'http', url: '/pages/contact' },
+        ],
+      }),
+    );
+    expect(await kept(links)).toEqual([footer.id, help.id, contact.id]);
+    unwrap(await f.menus.delete(f.a, footer.id));
+    expect(await kept(links)).toEqual([]);
   });
 });

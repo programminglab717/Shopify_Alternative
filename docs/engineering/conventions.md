@@ -32,7 +32,9 @@
     `Product` and `ProductVariant`, and inventory adds their stock fields; customers export
     `Customer`, and orders add a customer's orders and what they add up to.
   * The one foreign key across modules is `inventory.items → catalog.variants`: stock belongs to
-    its variant and is deleted with it.
+    its variant and is deleted with it. Translations go with what they translate the same way, by
+    the online store's triggers on the catalog's tables, since one column names ten kinds
+    ([ADR-261](../architecture/13-decision-log.md#adr-261--a-translation-is-deleted-with-what-it-translates-whichever-way-that-goes-by-triggers-on-the-tables-of-what-may-be-translated-as-a-foreign-key-would-if-one-column-could-name-ten-kinds-a-menus-items-as-the-menu-goes-or-an-update-drops-them)).
   * A module can offer an extension point that others register with at start-up, as the
     customers module's `SegmentFieldRegistry` takes the orders module's segment fields, and its
     `CustomerDataRegistry` the orders module's part in merges, erasure and a customer's own
@@ -1372,6 +1374,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   home page's, are translated as kind `shop` under the shop's own ID, and its own document carries
   them
   ([ADR-245](../architecture/13-decision-log.md#adr-245--the-shops-own-words-for-its-home-page-may-be-translated-into-urdu-the-shop-a-translatable-resource-of-its-own-by-its-own-id-as-shopifys-shop-is-its-document-carries-them-beside-its-own-words-and-its-urdu-pages-show-them)).
+* **A translation goes with what it translates**
+  ([ADR-261](../architecture/13-decision-log.md#adr-261--a-translation-is-deleted-with-what-it-translates-whichever-way-that-goes-by-triggers-on-the-tables-of-what-may-be-translated-as-a-foreign-key-would-if-one-column-could-name-ten-kinds-a-menus-items-as-the-menu-goes-or-an-update-drops-them)):
+  `online_store.forget_translations()` runs after each statement deleting from a table of what may
+  be translated, and the menus' triggers forget their items' as a menu goes or an update drops
+  them. A kind that becomes translatable gets the `translations_forgotten` trigger on its table in
+  the migration that makes it so; words kept inside a row, as menus' items are, need its updates
+  followed too.
 * **A variant is chosen by its ID, never its words**
   ([ADR-241](../architecture/13-decision-log.md#adr-241--a-products-options-and-their-values-may-have-the-shops-urdu-as-shopifys-translations-keep-them-each-by-its-own-id-the-products-document-carries-its-options-in-urdu-and-its-urdu-pages-show-each-variants-values-and-title-in-them-the-variant-chosen-by-its-id-the-same-in-either-language)):
   a product's options in Urdu are its document's `options` in their own order, and

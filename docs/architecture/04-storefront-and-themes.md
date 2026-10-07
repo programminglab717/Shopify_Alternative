@@ -412,6 +412,7 @@ the Growth phase.
   an Urdu page shows each variant's values and title in them, the variant chosen by its ID the
   same in either language. The shop's own words for its home page too, the shop translated
   as a resource of its own by its own ID ([ADR-245](./13-decision-log.md#adr-245--the-shops-own-words-for-its-home-page-may-be-translated-into-urdu-the-shop-a-translatable-resource-of-its-own-by-its-own-id-as-shopifys-shop-is-its-document-carries-them-beside-its-own-words-and-its-urdu-pages-show-them)).
+  A translation is deleted with what it translates ([ADR-261](./13-decision-log.md#adr-261--a-translation-is-deleted-with-what-it-translates-whichever-way-that-goes-by-triggers-on-the-tables-of-what-may-be-translated-as-a-foreign-key-would-if-one-column-could-name-ten-kinds-a-menus-items-as-the-menu-goes-or-an-update-drops-them)).
 * **URLs:** `/ur/products/…` prefix for Urdu. `hreflang` alternates and localised sitemaps.
 * **Numbers and currency:** default "Rs 12,500". Optional lakh/crore grouping. Diaspora
   multi-currency display (AED, SAR, GBP, USD, CAD) in the Scale phase.

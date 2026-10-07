@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-260 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-261 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -268,6 +268,7 @@
 | 258 | Products' videos: an MP4 or QuickTime file the shop uploads, H.264 and AAC as phones record them, read box by box and kept as it is but for where it was taken, served a range at a time with the preview image its uploader gives; or a YouTube or Vimeo video by its address, its host's image its preview; themes have them as Shopify's media | Accepted |
 | 259 | A delivery address may carry a pin, where the customer's phone is at the address: checkout's and customers' links' address forms add it by the pages' first script, allowed by its hash; it is kept in Pakistan and near the city typed, as Shopify's latitude and longitude | Accepted |
 | 260 | A name for a city with a courier that three shops gave alike, which no shop gave otherwise, is every shop's, after the shop's own and Hatti's; Hatti's people keep Hatti's names with a command, which settles a city shops named wrong | Accepted |
+| 261 | A translation is deleted with what it translates, whichever way that goes, by triggers on the tables of what may be translated, as a foreign key would if one column could name ten kinds; a menu's items' as the menu goes or an update drops them | Accepted |
 
 ---
 
@@ -10816,3 +10817,46 @@
     does.
   * **Counting parcels delivered to a name:** truer, but it needs couriers' deliveries kept by
     name; next, with each city's serviceability.
+
+## ADR-261 · A translation is deleted with what it translates, whichever way that goes, by triggers on the tables of what may be translated, as a foreign key would if one column could name ten kinds; a menu's items' as the menu goes or an update drops them
+
+* **Context:** [ADR-238](#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place) keeps a translation by the ID of what it translates alone,
+  which may be a product, collection, option or value of the catalog's, or a page, blog, article,
+  menu, menu item or policy of the online store's ([ADR-241](#adr-241--a-products-options-and-their-values-may-have-the-shops-urdu-as-shopifys-translations-keep-them-each-by-its-own-id-the-products-document-carries-its-options-in-urdu-and-its-urdu-pages-show-each-variants-values-and-title-in-them-the-variant-chosen-by-its-id-the-same-in-either-language)): no foreign key can name
+  ten kinds. Simplification 113 left the translations of what is deleted, unseen: no page or API
+  reads them, but they kept words the shop had deleted. What they translate goes many ways: a
+  product with its options and values, a blog with its articles, by the database's cascades; an
+  option or value by itself; a policy once its body is blank; a menu's items, a tree in its row,
+  as an update drops them. Modules use each other's facades and events, never their tables, but
+  for inventory's foreign key to variants, by which stock goes with its variant.
+* **Decision:**
+  * **Triggers do what a foreign key would:** `online_store.forget_translations()` runs after
+    each statement that deletes from the catalog's products, collections, options and values,
+    and the online store's pages, blogs, articles and policies, and deletes the translations of
+    the rows it deleted, by the IDs in its transition table. What a cascade deletes fires its own
+    table's trigger.
+  * **A menu's items:** `forget_menu_translations()` deletes the menu's and every item's in its
+    tree as the menu goes; `forget_menu_item_translations()`, after an update, those of the items
+    in no tree after it.
+  * **In the same transaction:** a translation never outlives what it translates, and nothing is
+    told: the storefront forgets what was deleted by its own events.
+  * **What went before:** migration 0164 deletes the translations whose IDs name nothing that may
+    be translated, all but the shop's own, by its own ID ([ADR-245](#adr-245--the-shops-own-words-for-its-home-page-may-be-translated-into-urdu-the-shop-a-translatable-resource-of-its-own-by-its-own-id-as-shopifys-shop-is-its-document-carries-them-beside-its-own-words-and-its-urdu-pages-show-them)).
+* **Consequences:**
+  * The shop's Urdu for what it deletes goes with it, as its own words do.
+  * The catalog's tables carry triggers of the online store's: the second link between modules
+    in the database, after inventory's foreign key. A module moved to a database of its own takes
+    both apart.
+  * Each statement deleting from those tables deletes from the translations once more, by the
+    shop and IDs, the first columns of their key; every update of a menu walks its items' trees
+    before and after, at most 256 KB each.
+  * A kind that becomes translatable needs the trigger on its table, in the same migration.
+* **Alternatives:**
+  * **The worker, on the catalog's events:** `product.deleted` does not say which options and
+    values went with the product, nor `product.updated` which an update deleted; translations
+    would keep their kinds and products to be found, and stay until the worker came.
+  * **Each service deleting its own:** the catalog would write the online store's table, and
+    what a cascade deletes is no service's.
+  * **A sweep for translations of nothing:** each run would ask every kind about every ID
+    translated, to find what is rarely there.
+  * **A column of each kind, with foreign keys:** ten columns, nine of them empty, for one ID.
