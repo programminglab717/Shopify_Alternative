@@ -13,7 +13,8 @@
     "seed": "node --env-file-if-exists=../../.env --enable-source-maps dist/seed.js",
     "support-agent": "node --env-file-if-exists=../../.env --enable-source-maps dist/support-agent.js",
     "email-suppression": "node --env-file-if-exists=../../.env --enable-source-maps dist/email-suppression.js",
-    "billing-transfers": "node --env-file-if-exists=../../.env --enable-source-maps dist/billing-transfers.js"
+    "billing-transfers": "node --env-file-if-exists=../../.env --enable-source-maps dist/billing-transfers.js",
+    "courier-cities": "node --env-file-if-exists=../../.env --enable-source-maps dist/courier-cities.js"
   },
   "dependencies": {
     "@hatti/api": "workspace:*",

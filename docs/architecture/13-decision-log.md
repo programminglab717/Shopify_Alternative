@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-259 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-260 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -267,6 +267,7 @@
 | 257 | The merchant crops a product's image and marks what matters in it: a crop's clean copy is made from the whole image's as it is set and kept beside it, each size and format made from it at an address naming the crop, the whole kept to crop again; the focal point, in percent of the image shown, is Shopify's for themes and image_tag | Accepted |
 | 258 | Products' videos: an MP4 or QuickTime file the shop uploads, H.264 and AAC as phones record them, read box by box and kept as it is but for where it was taken, served a range at a time with the preview image its uploader gives; or a YouTube or Vimeo video by its address, its host's image its preview; themes have them as Shopify's media | Accepted |
 | 259 | A delivery address may carry a pin, where the customer's phone is at the address: checkout's and customers' links' address forms add it by the pages' first script, allowed by its hash; it is kept in Pakistan and near the city typed, as Shopify's latitude and longitude | Accepted |
+| 260 | A name for a city with a courier that three shops gave alike, which no shop gave otherwise, is every shop's, after the shop's own and Hatti's; Hatti's people keep Hatti's names with a command, which settles a city shops named wrong | Accepted |
 
 ---
 
@@ -10776,3 +10777,42 @@
   * **A script in a file the storefront serves:** the policy would allow the shop's whole origin,
     and the storefront would relay a file it otherwise never serves.
   * **Keeping a pin far from the city:** it would send the rider to the office.
+
+## ADR-260 · A name for a city with a courier that three shops gave alike, which no shop gave otherwise, is every shop's, after the shop's own and Hatti's; Hatti's people keep Hatti's names with a command, which settles a city shops named wrong
+
+* **Context:** [ADR-233](#adr-233--a-parcels-city-is-booked-as-its-courier-names-it-the-shops-own-name-for-it-else-hattis-else-the-couriers-lists-matched-through-pakistans-names-for-the-city-and-their-aliases-a-city-the-list-names-none-of-fails-its-booking-with-the-couriers-nearest-names-and-the-name-staff-give-is-kept-for-the-shops-next-parcel) kept each shop's names for cities with a courier its own, and
+  Hatti's a migration's: one shop's mistake shared would send other shops' parcels astray.
+  Simplification 111 left a mapping shared across shops for when shops name the same cities over
+  and over. Every new shop meets the same towns couriers spell their own way, its bookings failing
+  until staff choose from the nearest names. Shops' names are on the courier's list, as it writes
+  them. Hatti has no console of its own: its people act through commands
+  ([ADR-156](#adr-156--hattis-support-looks-at-a-shop-only-while-its-owner-allows-it-15-minutes-to-a-day-its-agents-hattis-own-people-signed-in-with-a-second-factor-come-as-a-caller-of-their-own-with-every-read-scope-numbers-masked-change-nothing-and-each-of-their-requests-goes-on-the-shops-audit-log-before-it-runs), [ADR-254](#adr-254--a-shop-pays-hattis-invoice-by-transfer-or-raast-into-hattis-own-bank-account-its-owner-giving-the-transfers-reference-hattis-people-confirm-it-once-they-find-it-which-pays-the-invoice-as-a-gateways-payment-does-with-what-its-other-payments-brought-or-refuse-it-saying-why-and-the-owner-hears-either-way)).
+* **Decision:**
+  * **Shops agreeing share a name:** where three shops or more gave a city, by its letters and
+    digits, the same name with a courier, and none gave another, it is every shop's. A parcel's
+    city is the shop's own name, else Hatti's, else the one shops agree on, else the courier's
+    list's. One shop giving another withdraws it until it agrees again.
+  * **Read without crossing shops:** `logistics.shared_courier_cities`, a function of the
+    system's (migration 0163), reads every shop's names and returns the agreed one alone: nothing
+    of which shops gave it, nor of a name fewer gave. Shops' transactions call it; their rows stay
+    theirs.
+  * **Hatti's names are its people's:** `pnpm --filter @hatti/core courier-cities list <courier>`
+    shows the names shops gave each city, how many gave each, and whether shared, disputed or not
+    yet, with Hatti's; `keep <courier> <city> <name>` keeps Hatti's name, which comes before any
+    shops agree on and so settles a city they named wrong; `forget` drops it. Through the system
+    login (`CourierCityReview`), never the Admin API; shops cannot write them.
+  * **The Admin API says so:** `CourierCitySource.SHOPS` for a name shops agree on.
+* **Consequences:**
+  * A new shop's parcels to a town three others named book without anyone choosing.
+  * A wrong name three shops agree on sends other shops' parcels astray until a shop gives
+    another or Hatti's people keep the right one: agreement counts shops, not parcels delivered.
+  * Each match asks across shops once more, through an index of shops' names by courier and city.
+* **Alternatives:**
+  * **Learning from one shop:** its mistake, or a name only it uses, would go to every shop
+    ([ADR-233](#adr-233--a-parcels-city-is-booked-as-its-courier-names-it-the-shops-own-name-for-it-else-hattis-else-the-couriers-lists-matched-through-pakistans-names-for-the-city-and-their-aliases-a-city-the-list-names-none-of-fails-its-booking-with-the-couriers-nearest-names-and-the-name-staff-give-is-kept-for-the-shops-next-parcel)).
+  * **Hatti's people approving each name before it is shared:** every new town would wait for
+    them; agreement shares at once, and they settle what shops dispute.
+  * **A screen for Hatti's people:** Hatti has no console of its own yet; commands serve until it
+    does.
+  * **Counting parcels delivered to a name:** truer, but it needs couriers' deliveries kept by
+    name; next, with each city's serviceability.

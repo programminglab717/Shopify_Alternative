@@ -289,7 +289,9 @@ as its courier names it ([ADR-233](./13-decision-log.md#adr-233--a-parcels-city-
 else Hatti's (`logistics.courier_cities`), else the courier's list's (`CourierAdapter.cities`),
 matched through Pakistan's names for the city and their aliases. A city the list doesn't name
 fails its booking with the courier's nearest names, and the name staff choose is kept for the
-shop's next parcel; one shop's names are never another's.
+shop's next parcel. A name three shops gave a city alike, none giving another, is every
+shop's after the shop's own and Hatti's, which Hatti's people keep with a command
+([ADR-260](./13-decision-log.md#adr-260--a-name-for-a-city-with-a-courier-that-three-shops-gave-alike-which-no-shop-gave-otherwise-is-every-shops-after-the-shops-own-and-hattis-hattis-people-keep-hattis-names-with-a-command-which-settles-a-city-shops-named-wrong)).
 Booked parcels print Hatti's own labels, the courier's
 tracking number as a Code 128 barcode with the cash it collects, one to a 4×6 inch label or four
 to a sheet of A4, and each account prints a load sheet of its parcels waiting for pickup for the

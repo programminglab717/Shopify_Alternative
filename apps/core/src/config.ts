@@ -504,6 +504,15 @@ const billingTransfersSchema = z.object({
 });
 
 /**
+ * Hatti's people review couriers' names for cities across shops, and keep Hatti's own (ADR-260),
+ * with the system login, which reads every shop's.
+ */
+const courierCitiesSchema = z.object({
+  DATABASE_URL: env.postgresUrl(),
+  DATABASE_SYSTEM_URL: env.postgresUrl(),
+});
+
+/**
  * Hatti's operators see and lift suppressed addresses with the identity login, and SES's keys
  * where SES is set up, to keep its own list in step (ADR-200).
  */
@@ -524,6 +533,7 @@ export type SeedConfig = z.output<typeof seedSchema>;
 export type SupportAgentConfig = z.output<typeof supportAgentSchema>;
 export type EmailSuppressionConfig = z.output<typeof emailSuppressionSchema>;
 export type BillingTransfersConfig = z.output<typeof billingTransfersSchema>;
+export type CourierCitiesConfig = z.output<typeof courierCitiesSchema>;
 
 export const loadApiConfig = (source?: Env): ApiConfig => parseEnv(apiSchema, source);
 export const loadWorkerConfig = (source?: Env): WorkerConfig => parseEnv(workerSchema, source);
@@ -534,3 +544,5 @@ export const loadEmailSuppressionConfig = (source?: Env): EmailSuppressionConfig
   parseEnv(emailSuppressionSchema, source);
 export const loadBillingTransfersConfig = (source?: Env): BillingTransfersConfig =>
   parseEnv(billingTransfersSchema, source);
+export const loadCourierCitiesConfig = (source?: Env): CourierCitiesConfig =>
+  parseEnv(courierCitiesSchema, source);

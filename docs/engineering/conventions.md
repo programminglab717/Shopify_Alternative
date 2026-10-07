@@ -986,12 +986,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   name nobody.
 * **A new courier** is a `CourierAdapter` (`book`, `track`, `cancel`) with its `CourierInfo`: its
   key, its name, the credentials it asks for and its name for a pickup address's code, added to
-  `couriersOf` in `apps/core`. Its statuses go in `logistics.courier_statuses` through a
-  migration, in lower case, and its names for cities that are not Hatti's in
-  `logistics.courier_cities`; a courier that publishes its cities gives them through `cities`.
-  `book` says whether to try again (`retry` for a courier not
-  reached, a 5xx or a 429); `track` leaves out parcels the courier does not know, and fails the
-  round only when the courier is down or refuses the account.
+  `couriersOf` in `apps/core`. Its statuses go in `logistics.courier_statuses` through a migration,
+  in lower case, and Hatti's names for its cities in `logistics.courier_cities`, kept with the
+  `courier-cities` command; a courier that publishes its cities gives them through `cities`. `book`
+  says whether to try again (`retry` for a courier not reached, a 5xx or a 429); `track` leaves out
+  parcels the courier does not know, and fails the round only when the courier is down or refuses
+  the account.
 * **An account's credentials are sealed for that account** (`SecretBox`, bound to
   `courier-account:{shop}:{account}`), as JSON of the courier's fields, and leave the module
   only opened for the worker (`openedOf`); the audit log and events keep their last four
@@ -1004,12 +1004,14 @@ Stock follows Shopify's model too. How changes are written is decided in
   ([ADR-162](../architecture/13-decision-log.md#adr-162--leopards-is-the-second-courier-shops-book-with-through-the-same-adapter-the-accounts-key-and-password-in-each-requests-body-a-parcels-city-by-leopards-own-id-from-its-list-of-cities-kept-a-day-the-accounts-own-shipper-unless-a-shipper-id-is-given-its-parcels-asked-about-fifty-at-a-time-and-its-words-read-through-rows-of-data)).
 * **A parcel's city is the courier's name for it** ([ADR-233](../architecture/13-decision-log.md#adr-233--a-parcels-city-is-booked-as-its-courier-names-it-the-shops-own-name-for-it-else-hattis-else-the-couriers-lists-matched-through-pakistans-names-for-the-city-and-their-aliases-a-city-the-list-names-none-of-fails-its-booking-with-the-couriers-nearest-names-and-the-name-staff-give-is-kept-for-the-shops-next-parcel)):
   `CourierCityService.courierCityOf` gives the shop's own name (`logistics.shop_courier_cities`),
-  else Hatti's, else the courier's list's through `courierNameOf`, which tries the city as written
-  and then Pakistan's name for it and its aliases. Book with it in place of the address's city,
-  and fail a city it names none of with its message, never tried again. Match cities by `cityKey`,
-  their letters and digits in lower case, never by their spelling. A courier's list is kept a day
-  in its adapter, and one that can't be had leaves the city as Pakistan names it. Naming a city
-  is orders' work (`write_orders`), audited.
+  else Hatti's, else the one three shops agree on (`logistics.shared_courier_cities`, ADR-260), else
+  the courier's list's through `courierNameOf`, which tries the city as written and then Pakistan's
+  name for it and its aliases. Book with it in place of the address's city, and fail a city it names
+  none of with its message, never tried again. Match cities by `cityKey`, their letters and digits
+  in lower case, never by their spelling. A courier's list is kept a day in its adapter, and one
+  that can't be had leaves the city as Pakistan names it. Naming a city is orders' work
+  (`write_orders`), audited. Hatti's names are its people's, kept with the `courier-cities` command
+  (`CourierCityReview`) through the system login.
 * **Parcels are followed by asking,** every `TRACK_EVERY_MS` of where they are, and never after
   `TRACK_FOR_MS`. A change of `parcel_status` publishes `shipment.status_changed`, and the worker
   marks the parcel delivered (`markDelivered`) or returning (`markReturning`) through the orders

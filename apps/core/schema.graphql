@@ -2245,6 +2245,11 @@ enum CourierCitySource {
   SHOP
 
   """
+  The name three shops or more gave the city alike with the courier, which no shop gave otherwise: every shop's, where neither the shop nor Hatti names the city (ADR-260).
+  """
+  SHOPS
+
+  """
   The city as written, Pakistan's name for it where it has one: the courier publishes no list of cities, or its list could not be had now.
   """
   WRITTEN

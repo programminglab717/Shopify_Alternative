@@ -45,6 +45,7 @@ export default defineConfig(
       '**/src/support-agent.ts',
       '**/src/email-suppression.ts',
       '**/src/billing-transfers.ts',
+      '**/src/courier-cities.ts',
       'scripts/**',
     ],
     rules: { 'no-console': 'off' },

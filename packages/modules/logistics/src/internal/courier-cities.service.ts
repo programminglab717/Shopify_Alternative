@@ -19,10 +19,11 @@ import {
 import type { CourierResult, Couriers } from './couriers.js';
 
 /**
- * Where the courier's name for a city came from: the shop's own, Hatti's for every shop, the
- * courier's list of cities, or the city as written, by Pakistan's name for it where it has one.
+ * Where the courier's name for a city came from: the shop's own, Hatti's for every shop, the one
+ * shops agree on (ADR-260), the courier's list of cities, or the city as written, by Pakistan's
+ * name for it where it has one.
  */
-export const COURIER_CITY_SOURCES = ['shop', 'platform', 'list', 'written'] as const;
+export const COURIER_CITY_SOURCES = ['shop', 'platform', 'shops', 'list', 'written'] as const;
 export type CourierCitySourceValue = (typeof COURIER_CITY_SOURCES)[number];
 
 /** How long a city's names may be, and how many the shop keeps for a courier. */
@@ -68,8 +69,9 @@ type AskingAccount = Pick<OpenedCourierAccount, 'courier' | 'credentials'>;
 /**
  * Couriers' names for the cities parcels go to (SHP-03, ADR-233). A courier delivers to the
  * cities on its own list, written its own way: a parcel's city is the shop's own name for it with
- * the courier, else Hatti's for every shop, else the courier's list's, matched through Pakistan's
- * names for the city and their aliases. Where the list names none, the booking fails with its
+ * the courier, else Hatti's for every shop, else the one three shops or more gave it alike, which
+ * none gave otherwise (ADR-260), else the courier's list's, matched through Pakistan's names for
+ * the city and their aliases. Where the list names none, the booking fails with its
  * nearest names, and staff choose the courier's name for the city: the shop keeps it for the
  * next parcel. A courier that publishes no list, or whose list cannot be had now, is given the
  * city as written, by Pakistan's name for it where it has one, and says at booking if it knows it
@@ -303,10 +305,12 @@ export class CourierCityService {
   }
 }
 
+type NamedSource = 'shop' | 'platform' | 'shops';
+
 /**
- * The name for `city` with `courier` kept by the shop, else by Hatti for every shop: kept for
- * the city as written, or for Pakistan's name for it, `known`; the shop's first, then the one
- * kept for the city as written.
+ * The name for `city` with `courier` kept by the shop, else by Hatti for every shop, else agreed
+ * on by shops (ADR-260): kept for the city as written, or for Pakistan's name for it, `known`;
+ * the shop's first, then Hatti's, then shops', each the one kept for the city as written first.
  */
 async function namedIn(
   tx: Tx,
@@ -314,10 +318,10 @@ async function namedIn(
   courier: string,
   city: string,
   known: string | null,
-): Promise<{ courierCity: string; source: 'shop' | 'platform' } | null> {
+): Promise<{ courierCity: string; source: NamedSource } | null> {
   const keys = [...new Set([cityKey(city), ...(known ? [cityKey(known)] : [])])];
   const names = [...new Set([city.toLowerCase(), ...(known ? [known.toLowerCase()] : [])])];
-  const { rows } = await tx.execute<{ courier_city: string; source: 'shop' | 'platform' }>(sql`
+  const { rows } = await tx.execute<{ courier_city: string; source: NamedSource }>(sql`
     SELECT courier_city, source FROM (
       SELECT courier_city, 'shop' AS source, 0 AS rank, city_key = ${cityKey(city)} AS exact
         FROM logistics.shop_courier_cities
@@ -327,6 +331,9 @@ async function namedIn(
       SELECT courier_city, 'platform', 1, lower(city) = ${city.toLowerCase()}
         FROM logistics.courier_cities
        WHERE courier = ${courier} AND lower(city) = ANY(${sql.param(names)}::text[])
+      UNION ALL
+      SELECT courier_city, 'shops', 2, city_key = ${cityKey(city)}
+        FROM logistics.shared_courier_cities(${courier}, ${sql.param(keys)}::text[])
     ) named
     ORDER BY rank, exact DESC
     LIMIT 1`);

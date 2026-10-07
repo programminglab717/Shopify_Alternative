@@ -1,9 +1,11 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { CourierAccountService } from './courier-accounts.service.js';
 import { CourierCityService } from './courier-cities.service.js';
+import { CourierCityReview } from './courier-city-review.js';
 import { Couriers, PostExCourier, TestCourier } from './couriers.js';
 import { errorsOf, logisticsFixture, unwrap, type LogisticsFixture } from './test-support.js';
 
@@ -170,6 +172,99 @@ describe.skipIf(!server)("Couriers' names for cities (SHP-03, ADR-233)", () => {
       errorsOf(await cities.set(f.b, { accountId, city: 'Pindi', courierCity: 'Islamabad' })),
     ).toEqual([['input.accountId', 'NOT_FOUND']]);
     expect(await match('Pindi')).toMatchObject({ courierCity: 'Rawalpindi', source: 'shop' });
+  });
+
+  it("shares a name three shops gave a city alike, none giving another, after Hatti's (ADR-260)", async () => {
+    // Two shops more, each with the courier.
+    const shops = [f.a, f.b];
+    for (const name of ['C', 'D']) {
+      const shopId = newId();
+      await f.admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, $2)`, [shopId, name]);
+      shops.push({ ...f.a, shopId, actor: { kind: 'app', tokenId: newId() } });
+    }
+    const [a, b, c, d] = shops as [typeof f.a, typeof f.a, typeof f.a, typeof f.a];
+    const accountOf = new Map<string, string>([[a.shopId, accountId]]);
+    for (const shop of [b, c, d]) {
+      const connected = unwrap(
+        await accounts.connect(shop, {
+          courier: 'test',
+          credentials: [{ key: 'key', value: `key-of-${shop.shopId.slice(-4)}` }],
+        }),
+      );
+      accountOf.set(shop.shopId, connected.id);
+    }
+    const name = (shop: typeof a, courierCity: string | null) =>
+      cities.set(shop, { accountId: accountOf.get(shop.shopId)!, city: 'Gujran', courierCity });
+    const matchIn = async (shop: typeof a) =>
+      unwrap(await cities.match(shop, accountOf.get(shop.shopId)!, 'gujran'));
+
+    // Two shops agreeing is not enough: the fourth still chooses.
+    unwrap(await name(a, 'Gujranwala'));
+    unwrap(await name(b, 'gujranwala'));
+    expect(await matchIn(d)).toMatchObject({
+      courierCity: null,
+      source: null,
+      suggestions: ['Gujranwala', 'Gujrat'],
+    });
+    // A third, as the courier's list writes it: every shop's now, its own coming first.
+    unwrap(await name(c, 'GUJRANWALA'));
+    expect(await matchIn(d)).toMatchObject({ courierCity: 'Gujranwala', source: 'shops' });
+    expect(await cities.courierCityOf(d.shopId, account, 'Gujran')).toEqual({
+      ok: true,
+      value: 'Gujranwala',
+    });
+    expect(await matchIn(a)).toMatchObject({ courierCity: 'Gujranwala', source: 'shop' });
+
+    // One shop giving another withdraws it, until it agrees again.
+    unwrap(await name(b, 'Gujrat'));
+    expect(await matchIn(d)).toMatchObject({ courierCity: null, source: null });
+    const review = new CourierCityReview(f.db);
+    expect((await review.review('test')).shops).toEqual([
+      {
+        cityKey: 'gujran',
+        city: 'Gujran',
+        names: [
+          { courierCity: 'Gujranwala', shops: 2 },
+          { courierCity: 'Gujrat', shops: 1 },
+        ],
+        shared: null,
+      },
+    ]);
+    unwrap(await name(b, 'Gujranwala'));
+    expect(await matchIn(d)).toMatchObject({ courierCity: 'Gujranwala', source: 'shops' });
+    expect(await review.review('test')).toEqual({
+      shops: [
+        {
+          cityKey: 'gujran',
+          city: 'Gujran',
+          names: [{ courierCity: 'Gujranwala', shops: 3 }],
+          shared: 'Gujranwala',
+        },
+      ],
+      hatti: [],
+    });
+
+    // Hatti's people settle a city shops named wrong: Hatti's comes first, until forgotten.
+    await review.keep('test', ' gujran ', 'Gujrat');
+    expect(await matchIn(d)).toMatchObject({ courierCity: 'Gujrat', source: 'platform' });
+    await review.keep('test', 'Gujran', 'Gujrat');
+    expect((await review.review('test')).hatti).toEqual([
+      { city: 'Gujran', courierCity: 'Gujrat' },
+    ]);
+    expect(await review.forget('test', 'GUJRAN')).toBe(true);
+    expect(await review.forget('test', 'Gujran')).toBe(false);
+    expect(await matchIn(d)).toMatchObject({ courierCity: 'Gujranwala', source: 'shops' });
+    await expect(review.keep('test', 'Gujran', ' ')).rejects.toThrow("The courier's name is blank");
+    await expect(review.keep('Test!', 'Gujran', 'Gujrat')).rejects.toThrow(
+      'No courier is called Test!',
+    );
+    // Shops never write Hatti's names.
+    const denied = await f.db
+      .tenant(d.shopId, (tx) =>
+        tx.execute(sql`INSERT INTO logistics.courier_cities VALUES ('test', 'Sukkur', 'Gujrat')`),
+      )
+      .catch((error: { code?: string; cause?: { code?: string } }) => error);
+    expect((denied as { cause?: { code?: string } }).cause?.code).toBe('42501');
   });
 
   it("takes only names on the courier's list, a city and a name given, and an account the shop books with", async () => {

@@ -351,6 +351,7 @@ export class CourierDocument {
 export enum CourierCitySource {
   SHOP = 'SHOP',
   PLATFORM = 'PLATFORM',
+  SHOPS = 'SHOPS',
   LIST = 'LIST',
   WRITTEN = 'WRITTEN',
 }
@@ -361,6 +362,11 @@ registerEnumType(CourierCitySource, {
   valuesMap: {
     SHOP: { description: "The shop's own name for the city with the courier." },
     PLATFORM: { description: "Hatti's name for the city with the courier, for every shop." },
+    SHOPS: {
+      description:
+        'The name three shops or more gave the city alike with the courier, which no shop gave ' +
+        "otherwise: every shop's, where neither the shop nor Hatti names the city (ADR-260).",
+    },
     LIST: {
       description:
         "The courier's list of cities it delivers to: the city as written, or Pakistan's name " +

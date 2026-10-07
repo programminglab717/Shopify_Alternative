@@ -37,6 +37,12 @@ export {
   type CourierCitySourceValue,
 } from '../internal/courier-cities.service.js';
 export {
+  CourierCityReview,
+  SHARED_CITY_SHOPS,
+  type HattiCityName,
+  type ShopsCityNames,
+} from '../internal/courier-city-review.js';
+export {
   CourierDocumentService,
   LABEL_PAPERS,
   LOAD_SHEET_LIMIT,

@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the rest of what is left to build** (asked for on 2026-10-07): couriers' city names
-shared across shops; then translations removed with what is deleted, and domains checked again.
-How the Free plan holds to its 50 orders a month waits on a decision.
+**Next, the rest of what is left to build** (asked for on 2026-10-07): translations removed with
+what is deleted, domains checked again, and Urdu handles where shops want them. How the Free plan
+holds to its 50 orders a month waits on a decision.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### Couriers' city names shared across shops
+
+* **A name three shops gave a city alike is every shop's** ([ADR-260](../architecture/13-decision-log.md#adr-260--a-name-for-a-city-with-a-courier-that-three-shops-gave-alike-which-no-shop-gave-otherwise-is-every-shops-after-the-shops-own-and-hattis-hattis-people-keep-hattis-names-with-a-command-which-settles-a-city-shops-named-wrong)):
+  where three shops or more gave a city the same name with a courier, and none gave another, a
+  parcel to it books by that name for every shop, after the shop's own and Hatti's. A system
+  function reads the names across shops and returns the agreed one alone.
+* **Hatti's people keep Hatti's names:** `courier-cities list|keep|forget` shows shops' names by
+  city, how many gave each, and whether shared or disputed, and keeps Hatti's, which settles a city
+  shops named wrong.
+* **For it:** migration 0163; `CourierCityReview` in `@hatti/logistics`; `CourierCitySource`'s
+  `SHOPS`.
+* 1835 tests: names shared at three shops, withdrawn and shared again, Hatti's first, and
+  shops refused Hatti's.
 
 ### 68e83dd · A map pin for the address
 
