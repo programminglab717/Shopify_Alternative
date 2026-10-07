@@ -21,7 +21,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### Maintenance mode for an open shop
+### 865d6de · Maintenance mode for an open shop
 
 * **A storefront paused for a while** ([ADR-252](../architecture/13-decision-log.md#adr-252--an-open-shop-can-pause-its-storefront-for-a-while-every-page-answers-503-with-a-page-saying-when-it-is-back-and-checkout-takes-no-orders-until-its-staff-open-it-again-or-the-time-they-set-comes)): staff pause it through the Admin API with a
   message and, if they like, a time it opens again by itself; every page then answers 503 with a
