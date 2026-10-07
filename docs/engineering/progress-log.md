@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### Checkout's codes limited by internet address
+### 4f787e7 · Checkout's codes limited by internet address
 
 * **20 codes an hour from one address** ([ADR-249](../architecture/13-decision-log.md#adr-249--checkout-sends-one-internet-address-at-most-20-codes-an-hour-across-a-shops-checkouts-each-code-keeping-the-address-it-was-asked-from-until-its-checkout-goes)): each code checkout sends keeps the internet
   address it was asked from, and the shop's checkouts send one address at most 20 an hour,
