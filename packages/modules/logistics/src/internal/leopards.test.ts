@@ -332,4 +332,52 @@ describe('Leopards', () => {
       message: 'Leopards: Packet already picked',
     });
   });
+
+  it("hands parcels over through Leopards' load sheet, naming its rider (ADR-253)", async () => {
+    expect(new LeopardsCourier().info.pickups).toEqual({ rider: true });
+    answers = [{ status: 200, body: { status: 1, error: 0, load_sheet_id: 81234 } }];
+    const rider = { name: 'Imran', code: 'LHR-R-17' };
+    expect(
+      await leopards().pickup(credentials, {
+        trackingNumbers: ['LE7522377485', 'LE7522377486'],
+        pickupCode: '1234',
+        rider,
+      }),
+    ).toEqual({ ok: true, value: { reference: '81234', document: null } });
+    expect(asked).toEqual([
+      {
+        method: 'POST',
+        url: '/api/generateLoadSheet/format/json/',
+        body: {
+          ...signed,
+          cn_numbers: ['LE7522377485', 'LE7522377486'],
+          courier_name: 'Imran',
+          courier_code: 'LHR-R-17',
+        },
+      },
+    ]);
+    // Not without the rider, which Leopards' sheet names; why Leopards refused, as it says it.
+    const ask = (named: typeof rider | null) =>
+      leopards().pickup(credentials, { trackingNumbers: ['LE1'], pickupCode: null, rider: named });
+    expect(await ask(null)).toEqual({
+      ok: false,
+      retry: false,
+      message: "Leopards asks for its rider's name and code",
+    });
+    expect(asked).toHaveLength(1);
+    answers = [
+      { status: 200, body: { status: 0, error: { cn_numbers: 'Invalid CN LE1' } } },
+      { status: 200, body: { status: 1, error: 0 } },
+    ];
+    expect(await ask(rider)).toEqual({
+      ok: false,
+      retry: false,
+      message: 'Leopards: Invalid CN LE1',
+    });
+    expect(await ask(rider)).toEqual({
+      ok: false,
+      retry: false,
+      message: 'Leopards made the load sheet without a number',
+    });
+  });
 });

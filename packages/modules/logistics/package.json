@@ -30,6 +30,7 @@
     "@hatti/money": "workspace:*",
     "@hatti/orders": "workspace:*",
     "@hatti/pk": "workspace:*",
+    "@hatti/storage": "workspace:*",
     "@hatti/xlsx": "workspace:*",
     "drizzle-orm": "catalog:"
   },

@@ -1019,6 +1019,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   items are the parcel's own (`parcelShipmentFactsIn`), not what is left to ship. A tracking
   number goes on a label as `code128`, which takes printable ASCII alone: check `isCode128`
   first. Customers' numbers show as the caller sees them elsewhere.
+* **A pickup claims its parcels, then asks the courier**
+  ([ADR-253](../architecture/13-decision-log.md#adr-253--a-courier-accounts-parcels-waiting-to-be-picked-up-are-handed-to-its-courier-through-its-api-postexs-load-sheet-for-its-pickup-address-and-leopards-naming-the-rider-who-takes-them-each-pickup-keeps-its-parcels-and-the-couriers-sheet-and-a-parcel-its-rider-missed-goes-in-the-next-a-day-later)):
+  `CourierPickupService.request` claims the account's parcels waiting in
+  `logistics.pickup_parcels`, with the account's row locked, and asks the adapter's `pickup`
+  after that commits; it records the answer, or marks the pickup failed, letting its parcels
+  go, before rethrowing anything unexpected. A courier's sheet is kept in storage under
+  `shops/{shop}/pickups/`, never in Postgres.
 
 ## Payments online
 

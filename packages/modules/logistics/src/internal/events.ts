@@ -19,7 +19,17 @@ export const LogisticsEvents = {
   CourierBookingCancelled: 'courier_booking.cancelled',
   /** What the courier says of a booked parcel changed (SHP-04). */
   ShipmentStatusChanged: 'shipment.status_changed',
+  /** An account's parcels were handed to its courier through the courier's API (ADR-253). */
+  CourierPickupRequested: 'courier_pickup.requested',
 } as const;
+
+export interface CourierPickupPayload {
+  accountId: string;
+  courier: string;
+  parcelCount: number;
+  /** The courier's number for its load sheet, where it gives one. */
+  reference: string | null;
+}
 
 export interface CodRemittanceImportedPayload {
   courier: string;

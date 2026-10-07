@@ -293,8 +293,11 @@ shop's next parcel; one shop's names are never another's.
 Booked parcels print Hatti's own labels, the courier's
 tracking number as a Code 128 barcode with the cash it collects, one to a 4×6 inch label or four
 to a sheet of A4, and each account prints a load sheet of its parcels waiting for pickup for the
-rider to sign ([ADR-150](./13-decision-log.md#adr-150--couriers-labels-and-load-sheets-are-hattis-own-printed-pages-a-booked-parcels-label-carries-the-couriers-tracking-number-as-a-code-128-barcode-and-the-cash-the-courier-was-asked-to-collect-one-to-a-46-inch-label-or-four-to-a-sheet-of-a4-and-an-accounts-load-sheet-lists-its-parcels-waiting-to-be-picked-up-for-the-shop-and-the-rider-to-sign)). Not yet: couriers' own airway bills, pickups, rates, remittances
-through the APIs, TCS and Trax, and the contract tests.
+rider to sign ([ADR-150](./13-decision-log.md#adr-150--couriers-labels-and-load-sheets-are-hattis-own-printed-pages-a-booked-parcels-label-carries-the-couriers-tracking-number-as-a-code-128-barcode-and-the-cash-the-courier-was-asked-to-collect-one-to-a-46-inch-label-or-four-to-a-sheet-of-a4-and-an-accounts-load-sheet-lists-its-parcels-waiting-to-be-picked-up-for-the-shop-and-the-rider-to-sign)). An account's parcels waiting are handed to its
+courier through its API as a pickup: PostEx's load sheet for the account's pickup address,
+Leopards' naming its rider; each pickup keeps its parcels and the courier's sheet ([ADR-253](./13-decision-log.md#adr-253--a-courier-accounts-parcels-waiting-to-be-picked-up-are-handed-to-its-courier-through-its-api-postexs-load-sheet-for-its-pickup-address-and-leopards-naming-the-rider-who-takes-them-each-pickup-keeps-its-parcels-and-the-couriers-sheet-and-a-parcel-its-rider-missed-goes-in-the-next-a-day-later)).
+Not yet: couriers' own airway bills, rates, remittances through the APIs, TCS and Trax, and the
+contract tests.
 
 ### 5.2 Shipment state machine
 

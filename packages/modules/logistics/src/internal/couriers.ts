@@ -37,6 +37,11 @@ export interface CourierInfo {
   credentials: readonly CourierCredentialField[];
   /** What the courier calls its code for the shop's pickup address; null when it has none. */
   pickupCode: string | null;
+  /**
+   * Whether its API takes pickups (ADR-253), and whether it asks for the name and code of the
+   * rider who takes the parcels; null for a courier whose API takes none.
+   */
+  pickups: { rider: boolean } | null;
   /** Books nothing with any courier: for development and tests, never in production. */
   test: boolean;
 }
@@ -70,6 +75,23 @@ export interface CourierShipment {
 export type CourierResult<T> =
   { ok: true; value: T } | { ok: false; retry: boolean; message: string };
 
+/** The parcels a courier is asked to pick up (ADR-253), all booked with one account. */
+export interface CourierPickupRequest {
+  trackingNumbers: readonly string[];
+  /** The courier's code for where to pick them up; its account's default if null. */
+  pickupCode: string | null;
+  /** Who takes them, where the courier asks: its rider's name and code. */
+  rider: { name: string; code: string } | null;
+}
+
+/** What a courier answered a pickup with: its number for its load sheet, and the sheet. */
+export interface CourierPickup {
+  /** Null where the courier gives none. */
+  reference: string | null;
+  /** The courier's own load sheet, a PDF, where it gives one. */
+  document: Buffer | null;
+}
+
 /** A parcel's status as its courier says it, such as "Out For Delivery". */
 export interface CourierTracking {
   trackingNumber: string;
@@ -91,6 +113,14 @@ export interface CourierAdapter {
   ): Promise<CourierResult<CourierTracking[]>>;
   /** Cancels the parcel's booking, before it is picked up. */
   cancel(credentials: CourierCredentials, trackingNumber: string): Promise<CourierResult<null>>;
+  /**
+   * Hands the parcels to the courier through its load sheet (ADR-253), which its rider picks
+   * them up by; absent for a courier whose API takes no pickups.
+   */
+  pickup?(
+    credentials: CourierCredentials,
+    request: CourierPickupRequest,
+  ): Promise<CourierResult<CourierPickup>>;
   /**
    * The cities the courier delivers to, as it names them (ADR-233), for a parcel's city to be
    * matched to; absent for a courier that publishes none, which takes a city as written.
@@ -175,6 +205,7 @@ export class PostExCourier implements CourierAdapter {
     name: 'PostEx',
     credentials: [{ key: 'token', label: 'API token' }],
     pickupCode: 'Pickup address code',
+    pickups: { rider: false },
     test: false,
   };
 
@@ -273,6 +304,21 @@ export class PostExCourier implements CourierAdapter {
     return answer.ok ? { ok: true, value: null } : answer;
   }
 
+  /**
+   * PostEx's load sheet for the parcels (ADR-253), for the pickup address given or its account's
+   * default: PostEx's riders pick up what it lists, and it answers with the sheet itself, a PDF.
+   */
+  async pickup(
+    credentials: CourierCredentials,
+    request: CourierPickupRequest,
+  ): Promise<CourierResult<CourierPickup>> {
+    const sheet = await this.#document(credentials, 'v2/generate-load-sheet', {
+      trackingNumbers: request.trackingNumbers,
+      ...(request.pickupCode ? { pickupAddress: request.pickupCode } : {}),
+    });
+    return sheet.ok ? { ok: true, value: { reference: null, document: sheet.value } } : sheet;
+  }
+
   async #operationalCities(credentials: CourierCredentials): Promise<CourierResult<string[]>> {
     const { answer } = await this.#call(credentials, 'GET', 'v2/get-operational-city');
     if (!answer.ok) return answer;
@@ -335,6 +381,59 @@ export class PostExCourier implements CourierAdapter {
       status: response.ok ? code : response.status,
     };
   }
+
+  /** A PDF PostEx answers with, or why not: what it says in JSON as it says other refusals. */
+  async #document(
+    credentials: CourierCredentials,
+    path: string,
+    body: unknown,
+  ): Promise<CourierResult<Buffer>> {
+    const base = (this.options.baseUrl ?? POSTEX_API_URL).replace(/\/+$/, '');
+    let response: Response;
+    let bytes: Buffer;
+    try {
+      response = await fetch(`${base}/${path}`, {
+        method: 'POST',
+        headers: {
+          token: credentials.token ?? '',
+          accept: 'application/pdf, application/json',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+      });
+      bytes = Buffer.from(await response.arrayBuffer());
+    } catch (error) {
+      return {
+        ok: false,
+        retry: true,
+        message: `PostEx could not be reached: ${(error as Error).message}`.slice(0, 1_000),
+      };
+    }
+    if (response.ok && isPdf(bytes)) return { ok: true, value: bytes };
+    let json: PostExAnswer | null = null;
+    try {
+      json = JSON.parse(bytes.toString('utf8')) as PostExAnswer;
+    } catch {
+      // Neither a PDF nor what PostEx says when it refuses.
+    }
+    const code = Number(json?.statusCode ?? response.status);
+    const said = typeof json?.statusMessage === 'string' ? json.statusMessage.trim() : '';
+    return {
+      ok: false,
+      retry: response.status >= 500 || response.status === 429 || code >= 500 || code === 429,
+      message:
+        `PostEx: ${said || (response.ok ? 'it gave no load sheet' : `it answered ${response.status}`)}`.slice(
+          0,
+          1_000,
+        ),
+    };
+  }
+}
+
+/** Whether `bytes` are a PDF, as its first bytes say. */
+function isPdf(bytes: Buffer): boolean {
+  return bytes.subarray(0, 5).toString('latin1') === '%PDF-';
 }
 
 /** Leopards' merchant API; its staging API is at merchantapistaging.leopardscourier.com. */
@@ -354,6 +453,7 @@ interface LeopardsAnswer {
   status?: number | string;
   error?: unknown;
   track_number?: string;
+  load_sheet_id?: number | string | null;
   packet_list?: LeopardsPacket[];
   city_list?: LeopardsCity[];
 }
@@ -393,6 +493,7 @@ export class LeopardsCourier implements CourierAdapter {
       { key: 'apiPassword', label: 'API password' },
     ],
     pickupCode: 'Shipper ID',
+    pickups: { rider: true },
     test: false,
   };
 
@@ -504,6 +605,34 @@ export class LeopardsCourier implements CourierAdapter {
     return answer.ok ? { ok: true, value: null } : answer;
   }
 
+  /**
+   * Leopards' load sheet for the parcels (ADR-253), naming the rider who takes them by the name
+   * and code Leopards gave them: its number for the sheet, which its portal prints.
+   */
+  async pickup(
+    credentials: CourierCredentials,
+    request: CourierPickupRequest,
+  ): Promise<CourierResult<CourierPickup>> {
+    if (!request.rider) {
+      return { ok: false, retry: false, message: "Leopards asks for its rider's name and code" };
+    }
+    const answer = await this.#call(credentials, 'generateLoadSheet', {
+      cn_numbers: request.trackingNumbers,
+      courier_name: request.rider.name,
+      courier_code: request.rider.code,
+    });
+    if (!answer.ok) return answer;
+    const reference = String(answer.value.load_sheet_id ?? '').trim();
+    if (reference === '') {
+      return {
+        ok: false,
+        retry: false,
+        message: 'Leopards made the load sheet without a number',
+      };
+    }
+    return { ok: true, value: { reference, document: null } };
+  }
+
   /** Leopards' ID for `city`, from its list of cities, which is asked for once a day. */
   async #cityId(
     credentials: CourierCredentials,
@@ -599,12 +728,17 @@ export class TestCourier implements CourierAdapter {
     name: 'Test courier',
     credentials: [{ key: 'key', label: 'Any key' }],
     pickupCode: null,
+    pickups: { rider: false },
     test: true,
   };
 
   readonly #statuses = new Map<string, string>();
   /** What it was asked to book, the latest last. */
   readonly booked: CourierShipment[] = [];
+  /** The pickups it was asked for, the latest last. */
+  readonly pickups: CourierPickupRequest[] = [];
+  /** What it answers the next pickup with, where a test says; a load sheet of its own if not. */
+  nextPickup: CourierResult<CourierPickup> | null = null;
   /** The cities it delivers to, where a test gives them (ADR-233); else any city as written. */
   readonly cities?: (credentials: CourierCredentials) => Promise<CourierResult<string[]>>;
 
@@ -650,5 +784,25 @@ export class TestCourier implements CourierAdapter {
     }
     this.#statuses.set(trackingNumber, 'Cancelled');
     return { ok: true, value: null };
+  }
+
+  async pickup(
+    _credentials: CourierCredentials,
+    request: CourierPickupRequest,
+  ): Promise<CourierResult<CourierPickup>> {
+    this.pickups.push(request);
+    const answer = this.nextPickup;
+    this.nextPickup = null;
+    return (
+      answer ?? {
+        ok: true,
+        value: {
+          reference: `HTL${String(this.pickups.length).padStart(6, '0')}`,
+          document: Buffer.from(
+            `%PDF-1.4\n% Test courier's load sheet: ${request.trackingNumbers.join(', ')}\n%%EOF\n`,
+          ),
+        },
+      }
+    );
   }
 }

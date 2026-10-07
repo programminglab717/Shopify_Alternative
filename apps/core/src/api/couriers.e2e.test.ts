@@ -373,6 +373,57 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
     expect(sheet.title).toBe('Load sheet: Test courier');
     expect(sheet.bookings).toEqual([{ id: booking.id }]);
     expect(sheet.html).toContain('HT0000004242');
+
+    // Handed to the courier through its API, its own sheet kept for the shop (ADR-253).
+    const PICKUP = `mutation ($input: CourierPickupInput!) {
+      courierPickupRequest(input: $input) {
+        courierPickup {
+          id courier courierName status parcelCount reference riderName loadSheetUrl requestedAt
+          bookings { id trackingNumber }
+        }
+        userErrors { field code message }
+      }
+    }`;
+    const picked = await data(tokens.orders, PICKUP, { input: {} });
+    expect(picked).toMatchObject({
+      courierPickup: {
+        courier: 'test',
+        courierName: 'Test courier',
+        status: 'REQUESTED',
+        parcelCount: 1,
+        reference: expect.stringMatching(/^HTL\d{6}$/),
+        riderName: null,
+        loadSheetUrl: expect.stringMatching(/^http:\/\/localhost:4000\/storage\/.+\.pdf\?/),
+        requestedAt: expect.any(String),
+        bookings: [{ id: booking.id, trackingNumber: 'HT0000004242' }],
+      },
+      userErrors: [],
+    });
+    const pickupId = picked.courierPickup.id as string;
+    expect(fromPublicId(pickupId, 'courierPickup')).toMatch(/^[0-9a-f-]{36}$/);
+    expect(await data(tokens.orders, PICKUP, { input: {} })).toEqual({
+      courierPickup: null,
+      userErrors: [
+        {
+          field: ['accountId'],
+          code: 'INVALID',
+          message: "None of this account's parcels waits to be picked up",
+        },
+      ],
+    });
+    expect(await data(tokens.reader, '{ courierPickups { id status parcelCount } }')).toEqual([
+      { id: pickupId, status: 'REQUESTED', parcelCount: 1 },
+    ]);
+    expect(
+      await data(tokens.reader, `{ courierPickup(id: "${pickupId}") { id courier } }`),
+    ).toEqual({ id: pickupId, courier: 'test' });
+    const couriers = await data(tokens.reader, '{ couriers { courier pickups { rider } } }');
+    expect(couriers).toContainEqual({ courier: 'leopards', pickups: { rider: true } });
+    expect(couriers).toContainEqual({ courier: 'postex', pickups: { rider: false } });
+    // Asking for one is orders' work, as booking is.
+    expect((await gql(tokens.reader, PICKUP, { input: {} })).errors?.[0]?.extensions?.code).toBe(
+      'ACCESS_DENIED',
+    );
   });
 
   it("names cities as a courier names them, for the shop's next parcels to them (SHP-03)", async () => {

@@ -43,6 +43,7 @@ class ScriptedCourier implements CourierAdapter {
     name: 'Scripted',
     credentials: [{ key: 'key', label: 'Key' }],
     pickupCode: 'Pickup code',
+    pickups: null,
     test: true,
   };
 

@@ -1937,6 +1937,11 @@ type Courier {
   """
   pickupCode: String
 
+  """
+  How its API takes pickups, through its own load sheet (ADR-253); null where it takes none, when the account's load sheet is printed for its rider.
+  """
+  pickups: CourierPickupSupport
+
   """Books nothing with any courier: development and tests only."""
   test: Boolean!
 }
@@ -2204,6 +2209,91 @@ enum CourierParcelStatus {
 
   """On its way back: the parcel is marked returning."""
   RETURNING
+}
+
+"""
+An account's parcels waiting to be picked up, handed to its courier through the courier's API (SHP-02, ADR-253): PostEx's load sheet for the account's pickup address, or Leopards' naming the rider who takes them.
+"""
+type CourierPickup {
+  """The courier account whose parcels went."""
+  accountId: ID!
+
+  """The bookings of the parcels it handed over, the longest waiting first."""
+  bookings: [CourierBooking!]!
+
+  """The courier's key, such as "postex"."""
+  courier: String!
+
+  """Its name, such as "PostEx"."""
+  courierName: String!
+  createdAt: DateTime!
+
+  """What the courier said, when it refused."""
+  error: String
+  id: ID!
+
+  """
+  A URL that gives the courier's own load sheet, a PDF, for an hour, as PostEx makes one; null where it gave none, when its portal prints it by its number.
+  """
+  loadSheetUrl: String
+
+  """The parcels it handed over."""
+  parcelCount: Int!
+
+  """
+  The courier's number for its load sheet, as Leopards gives one; null for none.
+  """
+  reference: String
+
+  """When the courier took it; null until it did."""
+  requestedAt: DateTime
+  riderCode: String
+
+  """The rider who took them, where asked."""
+  riderName: String
+  status: CourierPickupStatus!
+}
+
+input CourierPickupInput {
+  """The courier account whose parcels go; the shop's default unless given."""
+  accountId: ID
+
+  """
+  The rider's code, as the courier gave it, where it asks: up to 100 characters.
+  """
+  riderCode: String
+
+  """
+  The name of the rider who takes the parcels, as the courier gave it, where it asks: up to 100 characters.
+  """
+  riderName: String
+}
+
+type CourierPickupPayload {
+  courierPickup: CourierPickup
+  userErrors: [UserError!]!
+}
+
+"""What became of a pickup asked of a courier."""
+enum CourierPickupStatus {
+  """
+  The courier refused it, or never answered: see error. Its parcels go in the next.
+  """
+  FAILED
+
+  """The courier took it: its rider picks up the parcels."""
+  REQUESTED
+
+  """Being asked of the courier now."""
+  REQUESTING
+}
+
+"""How a courier's API takes pickups (ADR-253)."""
+type CourierPickupSupport {
+  """
+  Whether it asks for the name and code of the rider who takes the parcels, as Leopards does: courierPickupRequest takes them.
+  """
+  rider: Boolean!
 }
 
 """The cash on delivery one courier holds for the shop."""
@@ -4875,6 +4965,11 @@ type Mutation {
   Keeps the shop's own name for a city with a courier account's courier, for the next parcel to the city: one on the courier's list of cities where it has one, as its list writes it. Null forgets it. A booking that failed for its city is booked again with ordersBook.
   """
   courierCityNameSet(input: CourierCityNameInput!): CourierCityNamePayload!
+
+  """
+  Hands a courier account's parcels waiting to be picked up, the default account's unless given, to its courier through the courier's API, the longest waiting first, up to 200: PostEx's load sheet for the account's pickup address, or Leopards' naming the rider who takes them. Parcels in a pickup the courier took go in the next only once they have waited a day since. Refused, with why, for a courier whose API takes no pickups, whose rider is not named, or that refuses them.
+  """
+  courierPickupRequest(input: CourierPickupInput!): CourierPickupPayload!
 
   """
   Adds a customer before they order. Orders add their customers themselves, by mobile number.
@@ -8141,9 +8236,18 @@ type Query {
   courierLabels(ids: [ID!]!, language: DocumentLanguage! = BILINGUAL, paper: PaperSize! = THERMAL_4X6): CourierDocument!
 
   """
-  A courier account's load sheet, the default account's unless given: its parcels waiting to be picked up, the longest waiting first, up to 1,000, with the cash each collects, and boxes for the shop and the rider to sign. On A4.
+  A courier account's load sheet, the default account's unless given: its parcels waiting to be picked up, the longest waiting first, up to 1,000, with the cash each collects, and boxes for the shop and the rider to sign; or, given a pickup, the parcels it handed to its courier (ADR-253). On A4.
   """
-  courierLoadSheet(accountId: ID, language: DocumentLanguage! = BILINGUAL): CourierDocument!
+  courierLoadSheet(accountId: ID, language: DocumentLanguage! = BILINGUAL, pickupId: ID): CourierDocument!
+  courierPickup(id: ID!): CourierPickup
+
+  """The shop's pickups, the latest first, of one courier account if given."""
+  courierPickups(
+    accountId: ID
+
+    """Up to 50."""
+    first: Int! = 20
+  ): [CourierPickup!]!
 
   """The couriers shops book parcels with here."""
   couriers: [Courier!]!

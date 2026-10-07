@@ -57,6 +57,8 @@ export {
   type CourierCredentials,
   type CourierInfo,
   type CourierParcelStatusValue,
+  type CourierPickup,
+  type CourierPickupRequest,
   type CourierResult,
   type CourierShipment,
   type CourierTracking,
@@ -66,9 +68,17 @@ export {
   type CodRemittanceImportedPayload,
   type CourierAccountChangedPayload,
   type CourierBookingPayload,
+  type CourierPickupPayload,
   type ShipmentStatusChangedPayload,
 } from '../internal/events.js';
 export { LogisticsModule } from '../internal/logistics.module.js';
+export {
+  CourierPickupService,
+  PICKUP_LIMITS,
+  type CourierPickupInput,
+  type CourierPickupRecord,
+  type PickupStatusValue,
+} from '../internal/pickups.service.js';
 export type { CodRemittanceLineRecord, CodRemittanceRecord } from '../internal/records.js';
 export {
   CodRemittanceService,

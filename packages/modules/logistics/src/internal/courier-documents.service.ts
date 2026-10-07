@@ -146,12 +146,19 @@ export class CourierDocumentService {
   /**
    * The load sheet of a courier account, the default unless given: its parcels waiting to be
    * picked up, the longest waiting first, up to {@link LOAD_SHEET_LIMIT}, with their cash and
-   * boxes for the shop and the rider to sign. On A4.
+   * boxes for the shop and the rider to sign; or a pickup's parcels, as it handed them to its
+   * courier (ADR-253). On A4.
    */
   async loadSheet(
     tenant: TenantContext,
-    request: { accountId?: string | null; language: Language; at?: Date },
+    request: {
+      accountId?: string | null;
+      pickupId?: string | null;
+      language: Language;
+      at?: Date;
+    },
   ): Promise<MutationResult<CourierDocumentRecord>> {
+    const { pickupId } = request;
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows: accounts } = await tx.execute<{
         id: string;
@@ -161,9 +168,17 @@ export class CourierDocumentService {
       }>(sql`
         SELECT id, courier, name, pickup_code FROM logistics.courier_accounts
          WHERE shop_id = ${tenant.shopId}
-           AND ${request.accountId ? sql`id = ${request.accountId}` : sql`is_default`}`);
+           AND ${
+             pickupId
+               ? sql`id = (SELECT account_id FROM logistics.pickups
+                            WHERE shop_id = ${tenant.shopId} AND id = ${pickupId})`
+               : request.accountId
+                 ? sql`id = ${request.accountId}`
+                 : sql`is_default`
+           }`);
       const account = accounts[0];
       if (!account) {
+        if (pickupId) return failOne(['pickupId'], 'NOT_FOUND', 'Pickup not found');
         return request.accountId
           ? failOne(['accountId'], 'NOT_FOUND', 'Courier account not found')
           : failOne(['accountId'], 'BLANK', 'Connect a courier account first');
@@ -171,8 +186,14 @@ export class CourierDocumentService {
       const { rows } = await tx.execute<BookingRow>(sql`
         SELECT ${BOOKING_COLUMNS}
           FROM ${BOOKING_FROM}
+          ${
+            pickupId
+              ? sql`JOIN logistics.pickup_parcels pp
+                      ON pp.shop_id = b.shop_id AND pp.booking_id = b.id AND pp.pickup_id = ${pickupId}`
+              : sql``
+          }
          WHERE b.shop_id = ${tenant.shopId} AND b.account_id = ${account.id}
-           AND b.status = 'booked' AND b.parcel_status = 'booked'
+           ${pickupId ? sql`` : sql`AND b.status = 'booked' AND b.parcel_status = 'booked'`}
          ORDER BY b.booked_at, b.id
          LIMIT ${LOAD_SHEET_LIMIT}`);
       if (rows.length === 0) {

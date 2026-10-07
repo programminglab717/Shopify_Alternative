@@ -197,6 +197,46 @@ describe('PostEx', () => {
     ]);
   });
 
+  it("hands parcels over through PostEx's load sheet, which it answers as a PDF (ADR-253)", async () => {
+    const sheet = '%PDF-1.4\n% PostEx load sheet\n%%EOF\n';
+    answers = [{ status: 200, body: sheet }];
+    const taken = await postex().pickup(credentials, {
+      trackingNumbers: ['CX-1234567', 'CX-1234568'],
+      pickupCode: 'LHR-0042',
+      rider: null,
+    });
+    expect(taken.ok && taken.value.reference).toBeNull();
+    expect(taken.ok && taken.value.document?.toString('latin1')).toBe(sheet);
+    expect(asked).toEqual([
+      {
+        method: 'POST',
+        url: '/api/order/v2/generate-load-sheet',
+        token: credentials.token,
+        body: { trackingNumbers: ['CX-1234567', 'CX-1234568'], pickupAddress: 'LHR-0042' },
+      },
+    ]);
+    // The account's own pickup address unless given; why PostEx refused, as it says it in JSON.
+    answers = [
+      { status: 400, body: { statusCode: '400', statusMessage: 'Invalid tracking number' } },
+      { status: 200, body: { statusCode: '200', dist: null } },
+      { status: 503, body: '<html>Service Unavailable</html>' },
+    ];
+    const ask = () =>
+      postex().pickup(credentials, { trackingNumbers: ['CX-9'], pickupCode: null, rider: null });
+    expect(await ask()).toEqual({
+      ok: false,
+      retry: false,
+      message: 'PostEx: Invalid tracking number',
+    });
+    expect(asked[1]!.body).toEqual({ trackingNumbers: ['CX-9'] });
+    expect(await ask()).toEqual({
+      ok: false,
+      retry: false,
+      message: 'PostEx: it gave no load sheet',
+    });
+    expect(await ask()).toEqual({ ok: false, retry: true, message: 'PostEx: it answered 503' });
+  });
+
   it('lists the cities PostEx delivers to, once a day, keeping them while it cannot say (ADR-233)', async () => {
     const courier = postex();
     const operational = {
@@ -338,5 +378,14 @@ describe('Couriers', () => {
     });
     expect(await test.cancel({ key: 'x' }, trackingNumber)).toEqual({ ok: true, value: null });
     expect(await test.cancel({ key: 'x' }, 'HT0')).toMatchObject({ ok: false, retry: false });
+    // Pickups through each API; Leopards' names its rider (ADR-253).
+    expect(couriers.list.map((info) => [info.courier, info.pickups])).toEqual([
+      ['postex', { rider: false }],
+      ['test', { rider: false }],
+    ]);
+    const pickup = { trackingNumbers: [trackingNumber], pickupCode: null, rider: null };
+    const taken = await test.pickup({ key: 'x' }, pickup);
+    expect(taken.ok && taken.value.reference).toBe('HTL000001');
+    expect(test.pickups).toEqual([pickup]);
   });
 });

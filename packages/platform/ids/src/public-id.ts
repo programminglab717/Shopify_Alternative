@@ -69,6 +69,7 @@ export const ID_PREFIXES = {
   shipment: 'shp',
   courierAccount: 'cra',
   courierBooking: 'bkg',
+  courierPickup: 'pkp',
   codRemittance: 'rmt',
   paymentGatewayAccount: 'pga',
   paymentSession: 'psn',

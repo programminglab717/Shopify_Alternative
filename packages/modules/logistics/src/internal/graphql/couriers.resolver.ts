@@ -51,6 +51,7 @@ import {
   CourierCitySource,
   CourierDocument,
   CourierParcelStatus,
+  CourierPickupSupport,
   OrderBookingRefusal,
   OrdersBookPayload,
 } from './couriers.types.js';
@@ -104,7 +105,8 @@ export class CourierResolver {
     description:
       "A courier account's load sheet, the default account's unless given: its parcels waiting " +
       'to be picked up, the longest waiting first, up to 1,000, with the cash each collects, ' +
-      'and boxes for the shop and the rider to sign. On A4.',
+      'and boxes for the shop and the rider to sign; or, given a pickup, the parcels it handed ' +
+      'to its courier (ADR-253). On A4.',
   })
   @RequireScopes('read_orders')
   async courierLoadSheet(
@@ -112,9 +114,11 @@ export class CourierResolver {
     @Args('accountId', { type: () => ID, nullable: true }) accountId?: string | null,
     @Args('language', { type: () => DocumentLanguage, defaultValue: DocumentLanguage.BILINGUAL })
     language: DocumentLanguage = DocumentLanguage.BILINGUAL,
+    @Args('pickupId', { type: () => ID, nullable: true }) pickupId?: string | null,
   ): Promise<CourierDocument> {
     const result = await this.documents.loadSheet(tenant, {
       accountId: accountId ? uuidOf('courierAccount', accountId) : null,
+      pickupId: pickupId ? uuidOf('courierPickup', pickupId) : null,
       language: language.toLowerCase() as Language,
     });
     if (!result.ok) throw badUserInput(result.errors[0]!.message);
@@ -130,6 +134,7 @@ export class CourierResolver {
         name: info.name,
         credentials: info.credentials.map((field) => ({ key: field.key, label: field.label })),
         pickupCode: info.pickupCode,
+        pickups: info.pickups && Object.assign(new CourierPickupSupport(), info.pickups),
         test: info.test,
       }),
     );
@@ -342,7 +347,7 @@ export class CourierResolver {
   }
 }
 
-function uuidOf(kind: IdKind, id: string): string {
+export function uuidOf(kind: IdKind, id: string): string {
   const uuid = tryFromPublicId(id, kind);
   if (!uuid) throw badUserInput(`Invalid ${kind} id: ${id.slice(0, 64)}`);
   return uuid;
@@ -362,7 +367,7 @@ function toAccount(record: CourierAccountRecord): CourierAccount {
   });
 }
 
-function toBooking(record: CourierBookingRecord, currency: CurrencyCode): CourierBooking {
+export function toBooking(record: CourierBookingRecord, currency: CurrencyCode): CourierBooking {
   return Object.assign(new CourierBooking(), {
     id: toPublicId('courierBooking', record.id),
     orderId: toPublicId('order', record.orderId),

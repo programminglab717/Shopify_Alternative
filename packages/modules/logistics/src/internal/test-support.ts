@@ -8,11 +8,16 @@ import { createTestDatabase, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
 import { FulfillmentService, OrderService, orderShipmentFactsIn } from '@hatti/orders/public';
+import { LocalStorage } from '@hatti/storage';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import pg from 'pg';
 import { CourierBookingService } from './bookings.service.js';
 import { CourierAccountService } from './courier-accounts.service.js';
 import { CourierDocumentService } from './courier-documents.service.js';
 import { Couriers, LeopardsCourier, PostExCourier, TestCourier } from './couriers.js';
+import { CourierPickupService } from './pickups.service.js';
 import { CodRemittanceService } from './remittance.service.js';
 
 export interface OutboxRow {
@@ -46,6 +51,9 @@ export interface LogisticsFixture {
   accounts: CourierAccountService;
   bookings: CourierBookingService;
   documents: CourierDocumentService;
+  pickups: CourierPickupService;
+  /** Where couriers' load sheets are kept, in a directory of the test's own. */
+  storage: LocalStorage;
   /**
    * As {@link confirmed}, and booked with the shop's default account as the worker books it: the
    * courier's number kept, then the order shipped as a parcel with it.
@@ -135,6 +143,11 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
   ]);
   const accounts = new CourierAccountService(db, box, couriers);
   const bookings = new CourierBookingService(db, couriers);
+  const storage = new LocalStorage({
+    directory: await mkdtemp(join(tmpdir(), 'hatti-logistics-')),
+    baseUrl: 'https://hatti.test/storage',
+    secret: 's'.repeat(32),
+  });
   const confirmed: LogisticsFixture['confirmed'] = async (owner, variantId, options = {}) => {
     const placed = unwrap(
       await orders.create(owner, {
@@ -183,6 +196,8 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
     accounts,
     bookings,
     documents: new CourierDocumentService(db, couriers, locations),
+    pickups: new CourierPickupService(db, couriers, accounts, storage),
+    storage,
     confirmed,
     async booked(owner, variantId, options = {}) {
       const order = await confirmed(owner, variantId, options);
@@ -237,6 +252,7 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
     },
     async reset() {
       await admin.query(`
+        DELETE FROM logistics.pickups;
         DELETE FROM logistics.bookings;
         DELETE FROM logistics.courier_accounts;
         DELETE FROM logistics.courier_cities;

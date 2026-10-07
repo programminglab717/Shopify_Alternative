@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-252 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-253 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -260,6 +260,7 @@
 | 250 | The sales report says what the period as long just before came to, and the home what yesterday came to by this time of day; refunds are said beside sales, not taken off them | Accepted |
 | 251 | The shop's storefront has a tracking page where a customer finds their order by its number or a tracking number with the mobile number they ordered with, and sees its parcels' steps but nothing of its address or items | Accepted |
 | 252 | An open shop can pause its storefront for a while: every page answers 503 with a page saying when it is back, and checkout takes no orders, until its staff open it again or the time they set comes | Accepted |
+| 253 | A courier account's parcels waiting to be picked up are handed to its courier through its API, PostEx's load sheet for its pickup address and Leopards' naming the rider who takes them; each pickup keeps its parcels and the courier's sheet, and a parcel its rider missed goes in the next a day later | Accepted |
 
 ---
 
@@ -10430,3 +10431,47 @@
     they cannot order; a choice for later, should shops ask for it.
   * **A job switching it off at its time:** one that can run late, where comparing the time as
     it is read is exact.
+
+## ADR-253 · A courier account's parcels waiting to be picked up are handed to its courier through its API, PostEx's load sheet for its pickup address and Leopards' naming the rider who takes them; each pickup keeps its parcels and the courier's sheet, and a parcel its rider missed goes in the next a day later
+
+* **Context:** Booked parcels wait for their courier's rider ([ADR-149](#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)). Hatti prints
+  an account's load sheet for the rider to sign ([ADR-150](#adr-150--couriers-labels-and-load-sheets-are-hattis-own-printed-pages-a-booked-parcels-label-carries-the-couriers-tracking-number-as-a-code-128-barcode-and-the-cash-the-courier-was-asked-to-collect-one-to-a-46-inch-label-or-four-to-a-sheet-of-a4-and-an-accounts-load-sheet-lists-its-parcels-waiting-to-be-picked-up-for-the-shop-and-the-rider-to-sign)), but the courier hears
+  nothing of the parcels until its rider scans them, and couriers take a pickup by a load sheet
+  of their own, made in their portals (SHP-02). PostEx's API makes its sheet for tracking numbers
+  and a pickup address; Leopards' ([ADR-162](#adr-162--leopards-is-the-second-courier-shops-book-with-through-the-same-adapter-the-accounts-key-and-password-in-each-requests-body-a-parcels-city-by-leopards-own-id-from-its-list-of-cities-kept-a-day-the-accounts-own-shipper-unless-a-shipper-id-is-given-its-parcels-asked-about-fifty-at-a-time-and-its-words-read-through-rows-of-data)) for tracking numbers and the rider who
+  takes them.
+* **Decision:**
+  * **A pickup hands over the account's parcels waiting:** `courierPickupRequest` takes the
+    account's booked parcels its courier has not picked up, the longest waiting first, up to 200,
+    and asks its courier's adapter's `pickup`: PostEx's `generate-load-sheet` for the account's
+    pickup address, which answers with the sheet, a PDF; Leopards' `generateLoadSheet`, naming
+    the rider by the name and code Leopards gave them, which answers with its number for the
+    sheet. A courier whose API takes none says so in its `CourierInfo` (`pickups`), and its
+    account's load sheet is printed for its rider as before.
+  * **Claimed, then asked outside any transaction:** the parcels are claimed for the pickup in a
+    transaction that locks their account, so no two pickups take a parcel; the courier is asked
+    once that commits; the pickup is then kept as the courier answered: requested, with its
+    number and its sheet, which staff print through a link that lasts an hour; or failed, with
+    what the courier said, its parcels left for the next. One not answered within ten minutes,
+    as when the process stopped while asking, is taken as failed.
+  * **Each pickup keeps its parcels** (`logistics.pickup_parcels`): a parcel still waiting a day
+    after the pickup it went in, its rider having missed it, goes in the next too. Hatti's load
+    sheet of a pickup lists its parcels for the rider to sign, whatever their courier says since.
+  * **Recorded** as `courier_pickup.requested`, with the account, the courier, how many parcels
+    and the courier's number for its sheet. Asking is orders' work (`write_orders`), as booking
+    is; reading needs `read_orders`.
+* **Consequences:**
+  * Staff hand a day's parcels to PostEx or Leopards in one step, and the courier knows what its
+    rider takes before it scans them.
+  * Leopards' own sheet is printed from its portal by its number: its API's download is not used
+    yet.
+  * Both couriers' load sheets are asked for as their documentation says, untried against their
+    live APIs, as their bookings were.
+  * No time is asked for: couriers come on their own rounds.
+* **Alternatives:**
+  * **Parcels marked handed over in Hatti alone:** the courier would hear of them only from its
+    rider's scans, and Leopards' riders ask for its sheet.
+  * **Through the worker, as bookings are:** a pickup is a request staff wait on, with the rider
+    at the door; its answer and its sheet are wanted at once.
+  * **The latest pickup kept on each booking:** a pickup would lose the parcels its rider missed
+    once they go in the next.

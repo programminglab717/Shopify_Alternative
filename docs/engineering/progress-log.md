@@ -6,12 +6,11 @@
 
 ## In progress
 
-**Next, the rest of what is left to build** (asked for on 2026-10-07): courier pickups through
-PostEx's and Leopards' APIs, Hatti's invoices paid by bank transfer or Raast, refunds through
-more gateways, the activity log of staff's changes, product videos and crops, a map pin at
-checkout, and couriers' city names shared across shops; then translations removed with what is
-deleted, and domains checked again. How the Free plan holds to its 50 orders a month waits on a
-decision.
+**Next, the rest of what is left to build** (asked for on 2026-10-07): Hatti's invoices paid by
+bank transfer or Raast, refunds through more gateways, the activity log of staff's changes,
+product videos and crops, a map pin at checkout, and couriers' city names shared across shops;
+then translations removed with what is deleted, and domains checked again. How the Free plan
+holds to its 50 orders a month waits on a decision.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -20,6 +19,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### Courier pickups through couriers' APIs
+
+* **A pickup hands an account's parcels to its courier** ([ADR-253](../architecture/13-decision-log.md#adr-253--a-courier-accounts-parcels-waiting-to-be-picked-up-are-handed-to-its-courier-through-its-api-postexs-load-sheet-for-its-pickup-address-and-leopards-naming-the-rider-who-takes-them-each-pickup-keeps-its-parcels-and-the-couriers-sheet-and-a-parcel-its-rider-missed-goes-in-the-next-a-day-later)): `courierPickupRequest`
+  asks PostEx for its load sheet of the parcels waiting, for the account's pickup address, and
+  keeps the PDF it sends; Leopards for its own, naming the rider who takes them, and keeps its
+  number. The parcels are claimed before the courier is asked, so none goes twice; one its rider
+  missed goes in the next a day later; a refusal leaves them for the next.
+* **For it:** migration 0156, `logistics.pickups` and the parcels each handed over; the
+  adapters' `pickup`; `courierPickups`, `courierPickup`, and `courierLoadSheet` of a pickup;
+  public IDs `pkp_…`.
+* 1802 tests: handed over, refused and asked again; Leopards' rider; PostEx's and Leopards'
+  requests and refusals; through the API end to end.
 
 ### 865d6de · Maintenance mode for an open shop
 

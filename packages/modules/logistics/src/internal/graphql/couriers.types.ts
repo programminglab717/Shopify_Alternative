@@ -72,6 +72,16 @@ export class CourierCredentialField {
   label!: string;
 }
 
+@ObjectType({ description: "How a courier's API takes pickups (ADR-253)." })
+export class CourierPickupSupport {
+  @Field({
+    description:
+      'Whether it asks for the name and code of the rider who takes the parcels, as Leopards ' +
+      'does: courierPickupRequest takes them.',
+  })
+  rider!: boolean;
+}
+
 @ObjectType({ description: 'A courier shops book parcels with (SHP-01).' })
 export class Courier {
   @Field({ description: 'Its key, such as "postex".' })
@@ -88,6 +98,14 @@ export class Courier {
     description: "What the courier calls its code for the shop's pickup address, if it has one.",
   })
   pickupCode!: string | null;
+
+  @Field(() => CourierPickupSupport, {
+    nullable: true,
+    description:
+      'How its API takes pickups, through its own load sheet (ADR-253); null where it takes ' +
+      "none, when the account's load sheet is printed for its rider.",
+  })
+  pickups!: CourierPickupSupport | null;
 
   @Field({ description: 'Books nothing with any courier: development and tests only.' })
   test!: boolean;
@@ -430,6 +448,115 @@ export class CourierCityNamePayload {
     description: "How the city matches the courier's names now.",
   })
   match!: CourierCityMatch | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+export enum CourierPickupStatus {
+  REQUESTING = 'REQUESTING',
+  REQUESTED = 'REQUESTED',
+  FAILED = 'FAILED',
+}
+
+registerEnumType(CourierPickupStatus, {
+  name: 'CourierPickupStatus',
+  description: 'What became of a pickup asked of a courier.',
+  valuesMap: {
+    REQUESTING: { description: 'Being asked of the courier now.' },
+    REQUESTED: { description: 'The courier took it: its rider picks up the parcels.' },
+    FAILED: {
+      description:
+        'The courier refused it, or never answered: see error. Its parcels go in the next.',
+    },
+  },
+});
+
+@ObjectType({
+  description:
+    "An account's parcels waiting to be picked up, handed to its courier through the courier's " +
+    "API (SHP-02, ADR-253): PostEx's load sheet for the account's pickup address, or Leopards' " +
+    'naming the rider who takes them.',
+})
+export class CourierPickup {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => ID, { description: 'The courier account whose parcels went.' })
+  accountId!: string;
+
+  @Field({ description: 'The courier\'s key, such as "postex".' })
+  courier!: string;
+
+  @Field({ description: 'Its name, such as "PostEx".' })
+  courierName!: string;
+
+  @Field(() => CourierPickupStatus)
+  status!: CourierPickupStatus;
+
+  @Field(() => Int, { description: 'The parcels it handed over.' })
+  parcelCount!: number;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "The courier's number for its load sheet, as Leopards gives one; null for none.",
+  })
+  reference!: string | null;
+
+  @Field(() => String, { nullable: true, description: 'The rider who took them, where asked.' })
+  riderName!: string | null;
+
+  @Field(() => String, { nullable: true })
+  riderCode!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "A URL that gives the courier's own load sheet, a PDF, for an hour, as PostEx makes one; " +
+      'null where it gave none, when its portal prints it by its number.',
+  })
+  loadSheetUrl!: string | null;
+
+  @Field(() => String, { nullable: true, description: 'What the courier said, when it refused.' })
+  error!: string | null;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When the courier took it; null until it did.',
+  })
+  requestedAt!: Date | null;
+
+  @Field(() => GraphQLISODateTime)
+  createdAt!: Date;
+}
+
+@InputType()
+export class CourierPickupInput {
+  @Field(() => ID, {
+    nullable: true,
+    description: "The courier account whose parcels go; the shop's default unless given.",
+  })
+  accountId?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The name of the rider who takes the parcels, as the courier gave it, where it asks: up to ' +
+      '100 characters.',
+  })
+  riderName?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "The rider's code, as the courier gave it, where it asks: up to 100 characters.",
+  })
+  riderCode?: string | null;
+}
+
+@ObjectType()
+export class CourierPickupPayload {
+  @Field(() => CourierPickup, { nullable: true })
+  courierPickup!: CourierPickup | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];
