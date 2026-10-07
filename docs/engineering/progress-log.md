@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### Courier pickups through couriers' APIs
+### b4aa0ea · Courier pickups through couriers' APIs
 
 * **A pickup hands an account's parcels to its courier** ([ADR-253](../architecture/13-decision-log.md#adr-253--a-courier-accounts-parcels-waiting-to-be-picked-up-are-handed-to-its-courier-through-its-api-postexs-load-sheet-for-its-pickup-address-and-leopards-naming-the-rider-who-takes-them-each-pickup-keeps-its-parcels-and-the-couriers-sheet-and-a-parcel-its-rider-missed-goes-in-the-next-a-day-later)): `courierPickupRequest`
   asks PostEx for its load sheet of the parcels waiting, for the account's pickup address, and
