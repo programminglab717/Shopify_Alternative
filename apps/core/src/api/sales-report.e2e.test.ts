@@ -33,10 +33,12 @@ const SALES = `
     writeOffs { amount }
     claimsRecovered { amount }
     profit { amount }
+    refunds { amount }
   }
   query ($from: DateTime!, $before: DateTime!, $interval: SalesInterval) {
     salesReport(placedFrom: $from, placedBefore: $before, interval: $interval) {
       totals { ...sales }
+      previous { placedFrom placedBefore totals { orders totalSales { amount } } }
       periods { start sales { orders } }
       topProducts { productId title unitsSold orders grossSales { amount } costOfGoods { amount } }
     }
@@ -142,6 +144,13 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
       writeOffs: { amount: '0.00' },
       claimsRecovered: { amount: '0.00' },
       profit: { amount: '2749.00' },
+      refunds: { amount: '0.00' },
+    });
+    // The two hours before, to compare with (ADR-250): no orders then.
+    expect(report.previous).toEqual({
+      placedFrom: new Date(Date.parse(period.from) - 7_200_000).toISOString(),
+      placedBefore: period.from,
+      totals: { orders: 0, totalSales: { amount: '0.00' } },
     });
     expect((report.periods as Json[]).reduce((sum, each) => sum + each.sales.orders, 0)).toBe(2);
     expect(report.topProducts).toEqual([

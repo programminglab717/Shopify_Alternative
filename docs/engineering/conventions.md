@@ -749,7 +749,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   [ADR-121](../architecture/13-decision-log.md#adr-121--the-home-says-how-the-shops-day-has-gone-from-midnight-in-its-time-zone-todays-sales-as-the-sales-report-works-them-out-and-the-parcels-delivered-and-turned-back-today-at-their-worth)) is a field resolved
   apart, so it is worked out only when asked for: `TodayService` takes the shop's midnight and the
   next in its time zone from Postgres (`date_trunc('day', now() AT TIME ZONE …)`), never from the
-  API's clock, and reads today's sales through the sales report's own statement
+  API's clock, and yesterday's midnight and the same time of day yesterday
+  ([ADR-250](../architecture/13-decision-log.md#adr-250--the-sales-report-says-what-the-period-as-long-just-before-came-to-and-the-home-what-yesterday-came-to-by-this-time-of-day-refunds-are-said-beside-sales-not-taken-off-them))
+  as well, and reads today's sales through the sales report's own statement
   (`salesPeriodsIn`), so the two never differ; a figure of a day elsewhere does the same. Parcels
   count by `delivered_at` and `returning_at`, each over its index, at `parcelWorth`.
 * **Low stock on the home** (`home.lowStock`,

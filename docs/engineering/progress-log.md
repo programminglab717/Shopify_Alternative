@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Sales against the period before, refunds taken off** (ANL-01, ANL-02): the sales report and
-the home's today saying how the period compares with the one before it, and sales net of what
-was refunded, as Shopify's reports show them.
+**A tracking page found by tracking number** (SHP-05): the shop's branded tracking page, which
+a customer reaches with their order's link today, found as well by the tracking number the
+courier's message gave them, and the number they ordered with.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,15 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### Sales beside the period before, and refunds
+
+* **The period before** ([ADR-250](../architecture/13-decision-log.md#adr-250--the-sales-report-says-what-the-period-as-long-just-before-came-to-and-the-home-what-yesterday-came-to-by-this-time-of-day-refunds-are-said-beside-sales-not-taken-off-them)): the sales report gives what the period as long just before
+  came to, and the home's today what yesterday came to by this time of day.
+* **Refunds beside sales:** each tally gives the money given back on its orders, not taken off
+  net sales, which take off the items that came back already.
+* 1785 tests: the period before and refunds in it, yesterday by this time of day, through the
+  API too.
 
 ### 4f787e7 · Checkout's codes limited by internet address
 

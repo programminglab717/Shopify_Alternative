@@ -84,6 +84,11 @@ export interface SalesTally {
   writeOffs: bigint;
   /** What couriers paid of claims for parcels lost or damaged (ADR-093, ADR-098). */
   claimsRecovered: bigint;
+  /**
+   * Money given back on the orders (ORD-09), with its tax, whenever it was (ADR-250): beside the
+   * other amounts, not taken off them, since the items that came back already are.
+   */
+  refunds: bigint;
 }
 
 export interface SalesPeriod extends SalesTally {
@@ -115,6 +120,11 @@ export interface SalesRow extends SalesTally {
 
 export interface SalesReport {
   totals: SalesTally;
+  /**
+   * The period as long just before, to compare with (ADR-250): when it began, and what its orders
+   * came to.
+   */
+  previous: { placedFrom: Date; totals: SalesTally };
   /** Every day, week or month of the period, those without orders included. */
   periods: SalesPeriod[];
   /** The products that sold most, by what they came to. */
@@ -136,6 +146,7 @@ type TallyRow = {
   shipping_costs: string;
   write_offs: string;
   claims: string;
+  refunds: string;
 };
 
 type PeriodRow = TallyRow & { start: Date | string };
@@ -215,8 +226,18 @@ export class SalesReportService {
          GROUP BY l.product_id
          ORDER BY ${gross} DESC, sum(l.quantity) DESC, l.product_id
          LIMIT ${input.topProducts}`);
+      // The period as long just before, to compare with (ADR-250).
+      const previousFrom = new Date(placedFrom.getTime() - span);
+      const previous = tallyOf(
+        await salesPeriodsIn(tx, shopId, timezone, {
+          placedFrom: previousFrom,
+          placedBefore: placedFrom,
+          interval: input.interval,
+        }),
+      );
       const report: SalesReport = {
         totals: tallyOf(periods),
+        previous: { placedFrom: previousFrom, totals: previous },
         periods,
         topProducts: products.map((row) => ({
           productId: row.product_id,
@@ -269,6 +290,10 @@ function salesWith(
            (SELECT coalesce(sum(f.claim_paid), 0)
               FROM orders.fulfillments f
              WHERE f.shop_id = o.shop_id AND f.order_id = o.id) AS claims,
+           -- Money given back on it (ADR-250).
+           (SELECT coalesce(sum(rf.amount), 0)
+              FROM orders.refunds rf
+             WHERE rf.shop_id = o.shop_id AND rf.order_id = o.id) AS refunds,
            ${key} AS key, ${title} AS title
       FROM orders.orders o
      WHERE o.shop_id = ${shopId} AND o.status <> 'cancelled'
@@ -337,7 +362,8 @@ function salesWith(
              sum(p.uncosted)::int AS uncosted,
              sum(p.shipping_costs) AS shipping_costs,
              coalesce(sum(w.cost), 0) AS write_offs,
-             sum(p.claims) AS claims
+             sum(p.claims) AS claims,
+             sum(p.refunds) AS refunds
         FROM placed p
         LEFT JOIN returned r ON r.order_id = p.id
         LEFT JOIN written w ON w.order_id = p.id
@@ -358,7 +384,8 @@ const TALLY_COLUMNS = sql`
   coalesce(s.uncosted, 0) AS uncosted,
   coalesce(s.shipping_costs, 0)::bigint::text AS shipping_costs,
   coalesce(s.write_offs, 0)::bigint::text AS write_offs,
-  coalesce(s.claims, 0)::bigint::text AS claims`;
+  coalesce(s.claims, 0)::bigint::text AS claims,
+  coalesce(s.refunds, 0)::bigint::text AS refunds`;
 
 function tallyOfRow(row: TallyRow): SalesTally {
   return {
@@ -374,6 +401,7 @@ function tallyOfRow(row: TallyRow): SalesTally {
     shippingCosts: BigInt(row.shipping_costs),
     writeOffs: BigInt(row.write_offs),
     claimsRecovered: BigInt(row.claims),
+    refunds: BigInt(row.refunds),
   };
 }
 
@@ -460,6 +488,7 @@ export function tallyOf(periods: readonly SalesTally[]): SalesTally {
     shippingCosts: 0n,
     writeOffs: 0n,
     claimsRecovered: 0n,
+    refunds: 0n,
   };
   for (const period of periods) {
     tally.orders += period.orders;
@@ -474,6 +503,7 @@ export function tallyOf(periods: readonly SalesTally[]): SalesTally {
     tally.shippingCosts += period.shippingCosts;
     tally.writeOffs += period.writeOffs;
     tally.claimsRecovered += period.claimsRecovered;
+    tally.refunds += period.refunds;
   }
   return tally;
 }

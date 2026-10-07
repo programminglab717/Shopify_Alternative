@@ -83,6 +83,7 @@ describe.skipIf(!server)('SalesReportService', () => {
     shippingCosts: 0n,
     writeOffs: 0n,
     claimsRecovered: 0n,
+    refunds: 0n,
   };
 
   const zero = {
@@ -441,6 +442,27 @@ describe.skipIf(!server)('SalesReportService', () => {
     const report = unwrap(await sales.report(f.a, days({ by: 'visit_source' })));
     expect(totalSales(report.totals)).toBe(16_000_00n);
     expect(unwrap(await sales.report(f.a, days())).rows).toEqual([]);
+  });
+
+  it('says what the period as long before came to, and what was refunded beside the rest (ADR-250)', async () => {
+    await aFewDaysOfOrders();
+    // In the three days before: a shawl, and a kurta paid ahead with Rs 300 of it given back.
+    await placedAt('2026-09-26T10:00:00Z', [shawl]);
+    const paid = await placedAt('2026-09-25T10:00:00Z', [kurta], { paymentMethod: 'prepaid' });
+    unwrap(await f.refunds.refund(f.a, paid.id, { amount: '300', method: 'cash' }));
+    // Before those three days: not in either.
+    await placedAt('2026-09-24T10:00:00Z', [shawl]);
+    const report = unwrap(await sales.report(f.a, days()));
+    expect(report.previous.placedFrom).toEqual(new Date('2026-09-25T00:00:00+05:00'));
+    expect(report.previous.totals).toMatchObject({
+      orders: 2,
+      grossSales: 7_000_00n,
+      returns: 0n,
+      refunds: 300_00n,
+    });
+    // Refunds are beside net sales, which take off only what came back.
+    expect(netSales(report.previous.totals)).toBe(7_000_00n);
+    expect(report.totals.refunds).toBe(0n);
   });
 
   it('takes a period of a year at most', async () => {

@@ -114,11 +114,13 @@ describe.skipIf(!server)("Admin GraphQL API: the admin's home", () => {
     const today = await gql(
       tokens.owner,
       `{ home { today {
-          since sales { count total { amount } } delivered { count } returnedToOrigin { count }
+          since sales { count total { amount } } salesYesterday { count }
+          delivered { count } returnedToOrigin { count }
         } } }`,
     );
     expect(today.data?.home.today).toMatchObject({
       sales: { count: 2, total: { amount: '4998.00' } },
+      salesYesterday: { count: 0 },
       delivered: { count: 0 },
       returnedToOrigin: { count: 0 },
     });

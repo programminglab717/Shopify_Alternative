@@ -39,7 +39,12 @@ describe.skipIf(!server)('TodayService', () => {
     // Midnight in Karachi is 19:00 the day before in UTC.
     expect(empty.since.getUTCHours()).toBe(19);
     expect(Date.now() - empty.since.getTime()).toBeLessThan(86_400_000);
-    expect(empty).toMatchObject({ sales: none, delivered: none, returnedToOrigin: none });
+    expect(empty).toMatchObject({
+      sales: none,
+      salesYesterday: none,
+      delivered: none,
+      returnedToOrigin: none,
+    });
     const justBefore = new Date(empty.since.getTime() - 1000);
 
     // Today: a kurta with Rs 250 for delivery, two kurtas, and a kurta cancelled; and a kurta
@@ -53,15 +58,22 @@ describe.skipIf(!server)('TodayService', () => {
       yesterdays.id,
       justBefore,
     ]);
+    // And one placed a second after yesterday's midnight: yesterday by this time of day, which
+    // the one a second before midnight was not (ADR-250).
+    const early = await f.order(f.a, [kurta]);
+    await f.admin.query('UPDATE orders.orders SET created_at = $2 WHERE id = $1', [
+      early.id,
+      new Date(empty.since.getTime() - 86_400_000 + 1000),
+    ]);
 
     // Yesterday's order delivered today, the first refused today, and the second delivered a
     // second before midnight.
     unwrap(await f.fulfillments.markDelivered(f.a, await shipped(yesterdays.id)));
     unwrap(await f.fulfillments.markReturning(f.a, await shipped(first.id)));
-    const early = await shipped(second.id);
-    unwrap(await f.fulfillments.markDelivered(f.a, early));
+    const before = await shipped(second.id);
+    unwrap(await f.fulfillments.markDelivered(f.a, before));
     await f.admin.query('UPDATE orders.fulfillments SET delivered_at = $2 WHERE id = $1', [
-      early,
+      before,
       justBefore,
     ]);
 
@@ -78,12 +90,14 @@ describe.skipIf(!server)('TodayService', () => {
     );
     expect(today.sales).toEqual({ count: 2, total: 425_000n });
     expect(today.sales.total).toBe(totalSales(report.totals));
+    expect(today.salesYesterday).toEqual({ count: 1, total: 200_000n });
     // Parcels at their items' worth, whenever their orders were placed.
     expect(today.delivered).toEqual({ count: 1, total: 200_000n });
     expect(today.returnedToOrigin).toEqual({ count: 1, total: 200_000n });
 
     expect(await days.today(f.b)).toMatchObject({
       sales: none,
+      salesYesterday: none,
       delivered: none,
       returnedToOrigin: none,
     });

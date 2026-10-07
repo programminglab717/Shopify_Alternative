@@ -40,6 +40,13 @@ export class HomeToday {
   sales!: HomeTally;
 
   @Field(() => HomeTally, {
+    description:
+      'The same of yesterday until this time of day, to compare with (ADR-250): orders placed ' +
+      "from yesterday's midnight for as long as today has gone, and their total sales.",
+  })
+  salesYesterday!: HomeTally;
+
+  @Field(() => HomeTally, {
     description: 'Parcels delivered today, and their worth: their items at the prices sold.',
   })
   delivered!: HomeTally;
@@ -188,6 +195,7 @@ export class HomeResolver {
     return Object.assign(new HomeToday(), {
       since: today.since,
       sales: tally(today.sales),
+      salesYesterday: tally(today.salesYesterday),
       delivered: tally(today.delivered),
       returnedToOrigin: tally(today.returnedToOrigin),
     });

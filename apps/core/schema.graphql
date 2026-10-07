@@ -3508,6 +3508,11 @@ type HomeToday {
   """
   sales: HomeTally!
 
+  """
+  The same of yesterday until this time of day, to compare with (ADR-250): orders placed from yesterday's midnight for as long as today has gone, and their total sales.
+  """
+  salesYesterday: HomeTally!
+
   """When today began: midnight in the shop's time zone."""
   since: DateTime!
 }
@@ -8972,6 +8977,11 @@ type Sales {
   profit: Money!
 
   """
+  Money given back on the orders (ORD-09), with its tax, whenever it was given (ADR-250). It is beside the other amounts, not taken off them: the items that came back already are.
+  """
+  refunds: Money!
+
+  """
   Items in parcels that came back, refused or undeliverable, at the prices sold, less the tax that came back with them. Refunds are the money side, and are not taken off.
   """
   returns: Money!
@@ -9003,6 +9013,18 @@ type Sales {
   What the items written off cost when sold: those of parcels that came back and were not restocked, of parcels lost, and of customers' returns checked in and not restocked.
   """
   writeOffs: Money!
+}
+
+"""
+The period as long just before a sales report's, to compare with (ADR-250).
+"""
+type SalesComparison {
+  """…and before this: the report's own placedFrom."""
+  placedBefore: DateTime!
+
+  """Orders placed at or after this…"""
+  placedFrom: DateTime!
+  totals: Sales!
 }
 
 """What a sales report's rows break its sales down by (ADR-140)."""
@@ -9047,6 +9069,9 @@ Sales analytics (ANL-02): what a period's orders came to, the products that sold
 type SalesReport {
   """Every day, week or month of the period, those without orders included."""
   periods: [SalesPeriod!]!
+
+  """The period as long just before, to compare totals with (ADR-250)."""
+  previous: SalesComparison!
 
   """By what `by` names, most total sales first; none without it."""
   rows: [SalesRow!]!

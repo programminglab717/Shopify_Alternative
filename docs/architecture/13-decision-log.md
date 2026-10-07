@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-249 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-250 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -257,6 +257,7 @@
 | 247 | Staff hear on WhatsApp the moment a customer sends the receipt of their transfer for an order still waiting for it: whoever has the order, else the shop's owners and managers, once a receipt | Accepted |
 | 248 | A payment link the shop shares once opens a checkout of each customer's own, with its items and discount code, until staff close it, its time passes or its orders run out; one taken prepaid alone offers no cash on delivery | Accepted |
 | 249 | Checkout sends one internet address at most 20 codes an hour across a shop's checkouts, each code keeping the address it was asked from until its checkout goes | Accepted |
+| 250 | The sales report says what the period as long just before came to, and the home what yesterday came to by this time of day; refunds are said beside sales, not taken off them | Accepted |
 
 ---
 
@@ -10332,3 +10333,27 @@
   * **A limit across all shops:** would need the codes of every shop in one count, outside any
     one shop's rows; an address flooding many shops is the platform's rate limit's to stop.
   * **Limiting by device:** a script has no device to count.
+
+## ADR-250 · The sales report says what the period as long just before came to, and the home what yesterday came to by this time of day; refunds are said beside sales, not taken off them
+
+* **Context:** A shop reading its sales ([ADR-117](#adr-117--the-sales-report-leaves-out-the-sales-tax-its-amounts-include-as-shopifys-does-worked-out-from-the-tax-each-order-keeps-the-tax-said-apart-and-added-back-in-total-sales)) or its day
+  ([ADR-121](#adr-121--the-home-says-how-the-shops-day-has-gone-from-midnight-in-its-time-zone-todays-sales-as-the-sales-report-works-them-out-and-the-parcels-delivered-and-turned-back-today-at-their-worth)) can't tell whether it is doing better or worse without working out
+  another period itself, and the report said nothing of money given back (ANL-01, ANL-02).
+* **Decision:**
+  * **The period before:** the report gives `previous`, the period as long just before its own,
+    worked out the same way, so a week is set beside the week before and a month beside the 30
+    or 31 days before it.
+  * **Yesterday by now:** the home's today gives `salesYesterday`, the orders placed from
+    yesterday's midnight in the shop's time zone for as long as today has gone, so the morning
+    is set beside yesterday's morning, not its whole day.
+  * **Refunds:** each tally gives `refunds`, the money given back on its orders, with its tax,
+    whenever it was given. It is beside the other amounts and not taken off net sales: the items
+    that came back are already taken off as returns, and a prepaid order's refund for them would
+    take them off twice.
+* **Consequences:**
+  * The comparison costs one more pass over the orders, as long as the report's own.
+  * A refund given today for an order of last month counts in last month's report, as returns do.
+* **Alternatives:**
+  * **The same period a year before:** most shops have no year behind them yet.
+  * **Refunds taken off net sales, returns left:** a refused parcel of cash on delivery refunds
+    nothing, and would then take nothing off.

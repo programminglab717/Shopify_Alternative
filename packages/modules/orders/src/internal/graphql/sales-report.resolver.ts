@@ -23,6 +23,7 @@ import {
 import {
   ProductSales,
   Sales,
+  SalesComparison,
   SalesPeriod,
   SalesReport,
   SalesReportArgs,
@@ -81,10 +82,16 @@ export class SalesReportResolver {
         writeOffs: amount(tally.writeOffs),
         claimsRecovered: amount(tally.claimsRecovered),
         profit: amount(profit(tally)),
+        refunds: amount(tally.refunds),
       });
     };
     return Object.assign(new SalesReport(), {
       totals: toSales(report.totals),
+      previous: Object.assign(new SalesComparison(), {
+        placedFrom: report.previous.placedFrom,
+        placedBefore: args.placedFrom,
+        totals: toSales(report.previous.totals),
+      }),
       periods: report.periods.map((period) =>
         Object.assign(new SalesPeriod(), { start: period.start, sales: toSales(period) }),
       ),

@@ -15,6 +15,11 @@ export interface OrderToday {
    * them out for today.
    */
   sales: OrderTally;
+  /**
+   * The same of yesterday until this time of day, to compare with (ADR-250): from yesterday's
+   * midnight, for as long as today has gone.
+   */
+  salesYesterday: OrderTally;
   /** Parcels delivered today, and their worth: their items at the prices sold. */
   delivered: OrderTally;
   /** Parcels their couriers turned back today, refused or undeliverable, and their worth. */
@@ -37,12 +42,32 @@ export class TodayService {
       const { timezone } = await shopProfile(tx, shopId);
       // Today's midnight and tomorrow's, by the shop's clock: where clocks change, a day may be
       // 23 hours long or 25.
-      const { rows: days } = await tx.execute<{ since: Date | string; until: Date | string }>(sql`
+      // Yesterday's midnight, and the same time of day yesterday: as long after it as now is
+      // after today's.
+      const { rows: days } = await tx.execute<{
+        since: Date | string;
+        until: Date | string;
+        yesterday: Date | string;
+        sofar: Date | string;
+      }>(sql`
         SELECT date_trunc('day', now() AT TIME ZONE ${timezone}) AT TIME ZONE ${timezone} AS since,
                (date_trunc('day', now() AT TIME ZONE ${timezone}) + interval '1 day')
-                 AT TIME ZONE ${timezone} AS until`);
+                 AT TIME ZONE ${timezone} AS until,
+               (date_trunc('day', now() AT TIME ZONE ${timezone}) - interval '1 day')
+                 AT TIME ZONE ${timezone} AS yesterday,
+               (date_trunc('day', now() AT TIME ZONE ${timezone}) - interval '1 day')
+                 AT TIME ZONE ${timezone}
+                 + (now() - date_trunc('day', now() AT TIME ZONE ${timezone}) AT TIME ZONE ${timezone})
+                 AS sofar`);
       const since = new Date(days[0]!.since);
       const until = new Date(days[0]!.until);
+      const yesterday = tallyOf(
+        await salesPeriodsIn(tx, shopId, timezone, {
+          placedFrom: new Date(days[0]!.yesterday),
+          placedBefore: new Date(days[0]!.sofar),
+          interval: 'day',
+        }),
+      );
       const sales = tallyOf(
         await salesPeriodsIn(tx, shopId, timezone, {
           placedFrom: since,
@@ -67,6 +92,7 @@ export class TodayService {
       return {
         since,
         sales: { count: sales.orders, total: totalSales(sales) },
+        salesYesterday: { count: yesterday.orders, total: totalSales(yesterday) },
         delivered: parcels('delivered'),
         returnedToOrigin: parcels('returned_to_origin'),
       };

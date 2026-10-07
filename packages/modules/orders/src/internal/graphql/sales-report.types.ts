@@ -191,6 +191,29 @@ export class Sales {
       'yet.',
   })
   profit!: Money;
+
+  @Field(() => Money, {
+    description:
+      'Money given back on the orders (ORD-09), with its tax, whenever it was given (ADR-250). ' +
+      'It is beside the other amounts, not taken off them: the items that came back already are.',
+  })
+  refunds!: Money;
+}
+
+@ObjectType({
+  description: "The period as long just before a sales report's, to compare with (ADR-250).",
+})
+export class SalesComparison {
+  @Field(() => GraphQLISODateTime, { description: 'Orders placed at or after this…' })
+  placedFrom!: Date;
+
+  @Field(() => GraphQLISODateTime, {
+    description: "…and before this: the report's own placedFrom.",
+  })
+  placedBefore!: Date;
+
+  @Field(() => Sales)
+  totals!: Sales;
 }
 
 @ObjectType({ description: 'A day, week or month of a sales report.' })
@@ -250,6 +273,11 @@ export class SalesRow {
 export class SalesReport {
   @Field(() => Sales)
   totals!: Sales;
+
+  @Field(() => SalesComparison, {
+    description: 'The period as long just before, to compare totals with (ADR-250).',
+  })
+  previous!: SalesComparison;
 
   @Field(() => [SalesPeriod], {
     description: 'Every day, week or month of the period, those without orders included.',
