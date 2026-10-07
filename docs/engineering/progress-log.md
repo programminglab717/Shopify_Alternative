@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### Couriers' city names shared across shops
+### 1d6092b · Couriers' city names shared across shops
 
 * **A name three shops gave a city alike is every shop's** ([ADR-260](../architecture/13-decision-log.md#adr-260--a-name-for-a-city-with-a-courier-that-three-shops-gave-alike-which-no-shop-gave-otherwise-is-every-shops-after-the-shops-own-and-hattis-hattis-people-keep-hattis-names-with-a-command-which-settles-a-city-shops-named-wrong)):
   where three shops or more gave a city the same name with a courier, and none gave another, a
