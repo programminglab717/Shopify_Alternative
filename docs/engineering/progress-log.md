@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### Translations deleted with what they translate
+### cd67743 · Translations deleted with what they translate
 
 * **A translation goes with what it translates** ([ADR-261](../architecture/13-decision-log.md#adr-261--a-translation-is-deleted-with-what-it-translates-whichever-way-that-goes-by-triggers-on-the-tables-of-what-may-be-translated-as-a-foreign-key-would-if-one-column-could-name-ten-kinds-a-menus-items-as-the-menu-goes-or-an-update-drops-them)):
   triggers on the catalog's and the online store's tables delete the translations of the rows a
