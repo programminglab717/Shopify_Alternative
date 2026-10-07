@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### The shop's activity log
+### 6d0b1c7 · The shop's activity log
 
 * **What staff and apps change, by whom** ([ADR-256](../architecture/13-decision-log.md#adr-256--what-the-shops-staff-and-apps-change-goes-on-its-activity-log-each-event-a-request-of-the-admin-api-records-written-in-the-same-statement-as-the-outboxs-by-whom-and-to-what-never-what-it-recorded-in-a-table-of-its-own-kept-as-long-as-the-audit-log)):
   `activityLog(first, after, subjectId, type)` lists each change made through the Admin API, the
