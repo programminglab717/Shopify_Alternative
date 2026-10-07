@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
 
-### Products' videos
+### 9b88acf · Products' videos
 
 * **Videos among a product's media** ([ADR-258](../architecture/13-decision-log.md#adr-258--products-videos-an-mp4-or-quicktime-file-the-shop-uploads-h264-and-aac-as-phones-record-them-read-box-by-box-and-kept-as-it-is-but-for-where-it-was-taken-served-a-range-at-a-time-with-the-preview-image-its-uploader-gives-or-a-youtube-or-vimeo-video-by-its-address-its-hosts-image-its-preview-themes-have-them-as-shopifys-media)):
   `productCreateMedia` takes `VIDEO`, a staged upload of an MP4 or QuickTime file with its
