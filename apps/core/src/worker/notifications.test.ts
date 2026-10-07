@@ -1556,10 +1556,12 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
               ($5, $6, 'accountant')`,
       [hina, omar, faraz, danish, zara, shopId],
     );
+    // By number: the alerts of one receipt are queued together, in no order of their own.
     const receipts = async () =>
       (await queued())
         .filter((message) => message.kind === 'order_receipt_sent')
-        .map((message) => [message.recipient, message.variables]);
+        .map((message) => [message.recipient, message.variables])
+        .sort(([a], [b]) => String(a).localeCompare(String(b)));
     // As the customer's link takes a receipt: the order says it changed so (ADR-080).
     const receiptSent = (order: { id: string; version: number }) =>
       database.tenant(shopId, (tx) =>
