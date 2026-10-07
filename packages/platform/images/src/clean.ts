@@ -113,6 +113,28 @@ export async function cleanImage(bytes: Buffer): Promise<CleanResult> {
   }
 }
 
+/** The part of an image shown, in its clean copy's pixels from its top left. */
+export interface ImageCrop {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The clean copy of the part of an image a merchant cropped it to (ADR-257), from its whole clean
+ * copy, in the same format: every size and format it is shown in is made from it, as from a
+ * whole image's.
+ */
+export async function cropImage(
+  clean: Buffer,
+  crop: ImageCrop,
+  format: CleanFormat,
+): Promise<Buffer> {
+  const part = sharp(clean, INPUT).extract(crop);
+  return (format === 'jpeg' ? part.jpeg({ quality: 90 }) : part.png()).toBuffer();
+}
+
 function problem(code: ImageProblemCode, message: string): CleanResult {
   return { ok: false, problem: { code, message } };
 }

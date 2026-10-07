@@ -3,6 +3,7 @@ import type { MediaRecord } from '../records.js';
 import {
   ArgsType,
   Field,
+  Float,
   GraphQLISODateTime,
   ID,
   InputType,
@@ -105,6 +106,38 @@ export class Image {
   altText!: string | null;
 }
 
+@ObjectType({
+  description:
+    'The part of an image shown (ADR-257), in pixels of the whole image (`ProductMedia.width` ' +
+    'and `height`) from its top left.',
+})
+export class ImageCrop {
+  @Field(() => Int)
+  left!: number;
+
+  @Field(() => Int)
+  top!: number;
+
+  @Field(() => Int)
+  width!: number;
+
+  @Field(() => Int)
+  height!: number;
+}
+
+@ObjectType({
+  description:
+    'What matters in an image (ADR-257), in percent of the image shown, across and down from ' +
+    'its top left: themes keep it in sight as they fill a frame with the image.',
+})
+export class FocalPoint {
+  @Field(() => Float)
+  x!: number;
+
+  @Field(() => Float)
+  y!: number;
+}
+
 export enum MediaContentType {
   IMAGE = 'IMAGE',
 }
@@ -186,7 +219,10 @@ export class ProductMedia {
   })
   sourceUrl!: string;
 
-  @Field(() => Int, { nullable: true, description: 'In pixels, once ready.' })
+  @Field(() => Int, {
+    nullable: true,
+    description: 'In pixels, once ready: the whole image, before any crop.',
+  })
   width!: number | null;
 
   @Field(() => Int, { nullable: true })
@@ -194,6 +230,15 @@ export class ProductMedia {
 
   @Field(() => [MediaError], { description: 'Why it failed; none unless it did.' })
   mediaErrors!: MediaError[];
+
+  @Field(() => ImageCrop, {
+    nullable: true,
+    description: 'The part of the image shown; null for all of it.',
+  })
+  crop!: ImageCrop | null;
+
+  @Field(() => FocalPoint, { nullable: true, description: 'What matters in it; null for none.' })
+  focalPoint!: FocalPoint | null;
 
   /** The media as the catalog keeps it, and its product's handle: for its image's address. */
   record!: MediaRecord;
@@ -583,6 +628,38 @@ export class CreateMediaInput {
   mediaContentType?: MediaContentType | null;
 }
 
+@InputType({
+  description:
+    'The part of an image to show (ADR-257), in pixels of the whole image (`ProductMedia.width` ' +
+    'and `height`) from its top left: at least 16 pixels a side, one side at most 20 times the ' +
+    'other.',
+})
+export class ImageCropInput {
+  @Field(() => Int)
+  left!: number;
+
+  @Field(() => Int)
+  top!: number;
+
+  @Field(() => Int)
+  width!: number;
+
+  @Field(() => Int)
+  height!: number;
+}
+
+@InputType({
+  description:
+    'What matters in an image, in percent of the image shown, across and down: 0 to 100.',
+})
+export class FocalPointInput {
+  @Field(() => Float)
+  x!: number;
+
+  @Field(() => Float)
+  y!: number;
+}
+
 @InputType()
 export class UpdateMediaInput {
   @Field(() => ID)
@@ -590,6 +667,22 @@ export class UpdateMediaInput {
 
   @Field(() => String, { nullable: true })
   alt?: string | null;
+
+  @Field(() => ImageCropInput, {
+    nullable: true,
+    description:
+      'The part of a ready image to show, at every size and in every format; null to show all ' +
+      'of it again. The whole image is kept, to be cropped again.',
+  })
+  crop?: ImageCropInput | null;
+
+  @Field(() => FocalPointInput, {
+    nullable: true,
+    description:
+      'What matters in the image shown; null for none. A new crop clears it unless it comes ' +
+      'with one.',
+  })
+  focalPoint?: FocalPointInput | null;
 }
 
 @InputType({ description: 'Moves an item to a new position; 1 is first.' })

@@ -255,4 +255,90 @@ describe.skipIf(!server)("Products' images: uploaded or fetched, checked, served
     expect((await get(behind.image.url)).statusCode).toBe(200);
     expect(await images({}).remove()).toBe(0);
   });
+
+  it('crops an image through the Admin API, serving the crop at every size and keeping the whole (ADR-257)', async () => {
+    const product = (
+      await gql('mutation { productCreate(input: { title: "Khaddar Shawl" }) { product { id } } }')
+    ).product;
+    const whole = await sharp({
+      create: { width: 800, height: 600, channels: 3, background: '#3d7a1f' },
+    })
+      .jpeg()
+      .toBuffer();
+    const created = await gql(
+      `mutation ($id: ID!, $media: [CreateMediaInput!]!) {
+        productCreateMedia(productId: $id, media: $media) { media { id } userErrors { field } } }`,
+      { id: product.id, media: [{ originalSource: 'https://cdn.example.pk/shawl.jpg' }] },
+    );
+    const mediaId = created.media[0].id as string;
+    const uuid = fromPublicId(mediaId, 'media');
+    await images({ 'https://cdn.example.pk/shawl.jpg': whole }).process(
+      shop,
+      new Date(Date.now() + 60_000),
+    );
+
+    const UPDATE = `mutation ($id: ID!, $media: [UpdateMediaInput!]!) {
+      productUpdateMedia(productId: $id, media: $media) {
+        product { media { crop { left top width height } focalPoint { x y }
+          image { url width height } wholeImage { url width height } } }
+        userErrors { field code message } } }`;
+    const refused = await gql(UPDATE, {
+      id: product.id,
+      media: [{ id: mediaId, crop: { left: 500, top: 0, width: 400, height: 300 } }],
+    });
+    expect(refused.userErrors).toEqual([
+      {
+        field: ['media', '0', 'crop'],
+        code: 'INVALID',
+        message: "Crop within the image's 800 × 600 pixels",
+      },
+    ]);
+    const cropped = await gql(UPDATE, {
+      id: product.id,
+      media: [
+        {
+          id: mediaId,
+          crop: { left: 400, top: 300, width: 400, height: 300 },
+          focalPoint: { x: 25, y: 75 },
+        },
+      ],
+    });
+    expect(cropped.userErrors).toEqual([]);
+    const base = `http://localhost:4000/images/${shop}/${uuid}`;
+    expect(cropped.product.media[0]).toEqual({
+      crop: { left: 400, top: 300, width: 400, height: 300 },
+      focalPoint: { x: 25, y: 75 },
+      image: { url: `${base}/crop-400-300-400-300/khaddar-shawl.jpg`, width: 400, height: 300 },
+      wholeImage: { url: `${base}/khaddar-shawl.jpg`, width: 800, height: 600 },
+    });
+
+    // The crop at its own size, and smaller in AVIF; the whole as it was.
+    const { image, wholeImage } = cropped.product.media[0];
+    const shown = await get(image.url);
+    expect([shown.statusCode, shown.headers['content-type']]).toEqual([200, 'image/jpeg']);
+    const shownSize = await sharp(shown.rawPayload).metadata();
+    expect([shownSize.width, shownSize.height]).toEqual([400, 300]);
+    const small = await get(`${image.url}?width=165`, CHROME);
+    const smallSize = await sharp(small.rawPayload).metadata();
+    expect([smallSize.format, smallSize.width, smallSize.height]).toEqual(['heif', 192, 144]);
+    expect(
+      await api.storage.head(`shops/${shop}/images/${uuid}/crop-400-300-400-300/192.avif`),
+    ).not.toBeNull();
+    const wholeSize = await sharp((await get(wholeImage.url)).rawPayload).metadata();
+    expect([wholeSize.width, wholeSize.height]).toEqual([800, 600]);
+    // No crop the shop did not make.
+    expect((await get(`${base}/crop-0-0-100-100/khaddar-shawl.jpg`)).statusCode).toBe(404);
+
+    // Gone with its media, crops and all.
+    await gql(
+      `mutation ($id: ID!, $ids: [ID!]!) {
+        productDeleteMedia(productId: $id, mediaIds: $ids) { deletedMediaIds } }`,
+      { id: product.id, ids: [mediaId] },
+    );
+    await images({}).remove();
+    expect(
+      await api.storage.head(`shops/${shop}/images/${uuid}/crop-400-300-400-300/clean.jpg`),
+    ).toBeNull();
+    expect((await get(image.url)).statusCode).toBe(404);
+  });
 });

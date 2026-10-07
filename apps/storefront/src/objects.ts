@@ -126,6 +126,10 @@ export class ImageDrop extends Drop {
   readonly height: number;
   readonly alt: string | null;
   readonly aspect_ratio: number;
+  /** As Shopify's image_presentation: its focal point, the middle where the shop set none. */
+  readonly presentation: { focal_point: FocalPointDrop };
+  /** The focal point the shop set (ADR-257), which `image_tag` keeps in sight; null for none. */
+  readonly #focalPoint: { x: number; y: number } | null;
 
   constructor(doc: ImageDoc) {
     super();
@@ -134,10 +138,35 @@ export class ImageDrop extends Drop {
     this.height = doc.height;
     this.alt = doc.alt;
     this.aspect_ratio = doc.height > 0 ? Math.round((doc.width / doc.height) * 1000) / 1000 : 1;
+    this.#focalPoint = doc.focalPoint ?? null;
+    const { x, y } = doc.focalPoint ?? { x: 50, y: 50 };
+    this.presentation = { focal_point: new FocalPointDrop(x, y) };
+  }
+
+  /** The focal point the shop set for `image`; null for none. */
+  static focalPointOf(image: ImageDrop): FocalPointDrop | null {
+    return image.#focalPoint && image.presentation.focal_point;
   }
 
   override valueOf(): string {
     return this.src;
+  }
+}
+
+/**
+ * What matters in an image, as Shopify's focal_point: `x` and `y` in percent of it across and
+ * down, and "x% y%" as text, as CSS's object-position takes it.
+ */
+export class FocalPointDrop extends Drop {
+  constructor(
+    readonly x: number,
+    readonly y: number,
+  ) {
+    super();
+  }
+
+  override valueOf(): string {
+    return `${this.x}% ${this.y}%`;
   }
 }
 

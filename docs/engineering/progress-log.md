@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, the rest of what is left to build** (asked for on 2026-10-07): product videos and crops,
-a map pin at checkout, and couriers' city names shared across shops; then translations removed
-with what is deleted, and domains checked again. How the Free plan holds to its 50 orders a
-month waits on a decision.
+**Next, the rest of what is left to build** (asked for on 2026-10-07): product videos, a map pin
+at checkout, and couriers' city names shared across shops; then translations removed with what
+is deleted, and domains checked again. How the Free plan holds to its 50 orders a month waits on
+a decision.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### Products' images cropped
+
+* **A crop and a focal point for each image** ([ADR-257](../architecture/13-decision-log.md#adr-257--the-merchant-crops-a-products-image-and-marks-what-matters-in-it-a-crops-clean-copy-is-made-from-the-whole-images-as-it-is-set-and-kept-beside-it-each-size-and-format-made-from-it-at-an-address-naming-the-crop-the-whole-kept-to-crop-again-the-focal-point-in-percent-of-the-image-shown-is-shopifys-for-themes-and-image_tag)):
+  `productUpdateMedia` takes `crop` and `focalPoint`; the crop's clean copy is made from the whole
+  image's as it is set, and served at an address of its own at every size and in every format;
+  `ProductMedia.image` is the crop, `wholeImage` the whole, to crop again. Themes have the focal
+  point as Shopify's `image.presentation`, and `image_tag` keeps it in sight.
+* **For it:** migration 0160; `cropImage` in `@hatti/images`, which the catalog now uses.
+* 1816 tests: crops checked and made, the whole kept, a new one clearing the focal point;
+  served through the API at their own addresses, no other crop made; focal points in Liquid.
 
 ### 6d0b1c7 · The shop's activity log
 

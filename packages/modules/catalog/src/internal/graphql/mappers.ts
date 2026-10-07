@@ -16,6 +16,8 @@ import {
   CollectionSortOrder,
 } from './collection.types.js';
 import {
+  FocalPoint,
+  ImageCrop,
   MediaContentType,
   MediaError,
   MediaErrorCode,
@@ -90,6 +92,8 @@ export function toMedia(record: MediaRecord, handle: string): ProductMedia {
           }),
         ]
       : [],
+    crop: record.crop && Object.assign(new ImageCrop(), record.crop),
+    focalPoint: record.focalPoint && Object.assign(new FocalPoint(), record.focalPoint),
     record,
     handle,
   });

@@ -4,9 +4,11 @@ export {
   MAX_IMAGE_PIXELS,
   MAX_IMAGE_SIDE,
   cleanImage,
+  cropImage,
   type CleanFormat,
   type CleanImage,
   type CleanResult,
+  type ImageCrop,
   type ImageProblem,
   type ImageProblemCode,
 } from './clean.js';

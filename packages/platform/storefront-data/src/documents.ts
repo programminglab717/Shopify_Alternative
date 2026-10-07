@@ -30,12 +30,17 @@ export type TranslationsDoc<T, K extends keyof T> = Partial<
 >;
 
 export interface ImageDoc {
-  /** Where the image service serves it, without size parameters. */
+  /** Where the image service serves it, without size parameters: cropped where it is. */
   src: string;
-  /** In pixels; 0 while not known, as before the image is processed. */
+  /** In pixels, as shown; 0 while not known, as before the image is processed. */
   width: number;
   height: number;
   alt: string | null;
+  /**
+   * What matters in it, in percent of it across and down (ADR-257), as Shopify's focal point:
+   * themes keep it in sight as they fill a frame. Absent where none is set.
+   */
+  focalPoint?: { x: number; y: number };
 }
 
 export interface VariantDoc {

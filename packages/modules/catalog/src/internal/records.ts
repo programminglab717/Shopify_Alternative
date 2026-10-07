@@ -73,6 +73,24 @@ export interface MediaRecord {
   imageSize: number | null;
   /** Why it failed, in Shopify's `MediaError`'s words; null unless it did. */
   error: MediaErrorRecord | null;
+  /** The part shown, in the clean copy's pixels (ADR-257); null for the whole image. */
+  crop: MediaCropRecord | null;
+  /** What matters in it, in percent of the image shown; null for none set. */
+  focalPoint: FocalPointRecord | null;
+}
+
+/** The part of an image shown, in its clean copy's pixels from its top left. */
+export interface MediaCropRecord {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** A point of an image, in percent of it across and down from its top left. */
+export interface FocalPointRecord {
+  x: number;
+  y: number;
 }
 
 export interface MediaErrorRecord {

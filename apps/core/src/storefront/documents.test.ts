@@ -16,6 +16,8 @@ const media = (id: string, fields: Partial<MediaRecord>): MediaRecord => ({
   imageFormat: null,
   imageSize: null,
   error: null,
+  crop: null,
+  focalPoint: null,
   ...fields,
 });
 
@@ -68,6 +70,16 @@ describe("products' documents", () => {
           imageFormat: 'jpeg',
           imageSize: 245_000,
         }),
+        // Cropped square, its focal point set (ADR-257).
+        media('cropped', {
+          status: 'ready',
+          width: 1200,
+          height: 1600,
+          imageFormat: 'jpeg',
+          imageSize: 245_000,
+          crop: { left: 0, top: 200, width: 1200, height: 1200 },
+          focalPoint: { x: 30, y: 40.5 },
+        }),
       ],
     };
     const doc = productDoc(record, new Map(), (each, handle) =>
@@ -80,6 +92,13 @@ describe("products' documents", () => {
         width: 1200,
         height: 1600,
         alt: 'Front',
+      },
+      {
+        src: 'https://hatti.pk/images/s1/cropped/lawn-kurta.jpg',
+        width: 1200,
+        height: 1200,
+        alt: null,
+        focalPoint: { x: 30, y: 40.5 },
       },
     ]);
     // The variant's image, by its place among those shown.

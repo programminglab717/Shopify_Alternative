@@ -5,8 +5,9 @@ import { join } from 'node:path';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { LocalStorage } from '@hatti/storage';
+import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { imagePathOf, parseImagePath } from './images.js';
+import { cleanImageKey, imagePathOf, parseImagePath, shownSizeOf } from './images.js';
 import { MediaProcessing } from './media-processing.js';
 import { MediaService } from './media.service.js';
 import { catalogFixture, errorsOf, unwrap, type CatalogFixture } from './test-support.js';
@@ -130,12 +131,15 @@ describe.skipIf(!server)('product images (ADR-158)', () => {
     expect(parseImagePath(`/images/${f.a.shopId}/${front}/lawn-kurta.jpg`)).toEqual({
       shopId: f.a.shopId,
       mediaId: front,
+      crop: null,
       format: 'jpeg',
     });
     for (const path of [
       `/images/${f.a.shopId}/${front}/../lawn-kurta.jpg`,
       `/images/${f.a.shopId}/${front}/lawn-kurta.gif`,
       `/images/${f.a.shopId}/lawn-kurta.jpg`,
+      `/images/${f.a.shopId}/${front}/crop-1-2-3/lawn-kurta.jpg`,
+      `/images/${f.a.shopId}/${front}/crop-1-2-3-45678/lawn-kurta.jpg`,
     ]) {
       expect(parseImagePath(path), path).toBeNull();
     }
@@ -176,6 +180,127 @@ describe.skipIf(!server)('product images (ADR-158)', () => {
       shawl.mediaIds,
     );
     expect(await processing.dueShops(later(30))).toEqual([]);
+  });
+
+  it('crops a ready image from its whole clean copy, and marks what matters in it (ADR-257)', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'hatti-crops-'));
+    try {
+      const storage = new LocalStorage({
+        directory,
+        baseUrl: 'http://localhost:4000/storage',
+        secret: 'a'.repeat(32),
+      });
+      const media = new MediaService(f.db, storage);
+      const kurta = await product(f.a, 'Lawn Kurta', 2);
+      const [front, back] = kurta.mediaIds;
+      // The worker made the front ready: 800 × 600, red growing across and blue down.
+      const raw = Buffer.alloc(800 * 600 * 3);
+      for (let at = 0; at < 800 * 600; at++) {
+        raw[at * 3] = Math.round((255 * (at % 800)) / 800);
+        raw[at * 3 + 2] = Math.round((255 * Math.floor(at / 800)) / 600);
+      }
+      const whole = await sharp(raw, { raw: { width: 800, height: 600, channels: 3 } })
+        .jpeg({ quality: 100 })
+        .toBuffer();
+      await storage.put(cleanImageKey(f.a.shopId, front!, 'jpeg'), whole, 'image/jpeg');
+      await processing.claim(f.a.shopId, now, 1, LEASE);
+      await processing.ready(f.a.shopId, front!, {
+        format: 'jpeg',
+        width: 800,
+        height: 600,
+        size: whole.length,
+      });
+
+      const crop = (crop: unknown, id = front!) =>
+        media.update(f.a, kurta.id, [{ id, crop: crop as never }]);
+      // Refused: an image not ready yet, a crop outside the image, too small, too long, in parts
+      // of pixels.
+      expect(errorsOf(await crop({ left: 0, top: 0, width: 100, height: 100 }, back))).toEqual([
+        ['media.0.crop', 'INVALID'],
+      ]);
+      for (const wrong of [
+        { left: 500, top: 0, width: 400, height: 300 },
+        { left: 0, top: 0, width: 15, height: 300 },
+        { left: 0, top: 0, width: 800, height: 39 },
+        { left: 0.5, top: 0, width: 400, height: 300 },
+        { left: -1, top: 0, width: 400, height: 300 },
+      ]) {
+        expect(errorsOf(await crop(wrong)), JSON.stringify(wrong)).toEqual([
+          ['media.0.crop', 'INVALID'],
+        ]);
+      }
+      // Nothing made of them.
+      expect(
+        await storage.head(cleanImageKey(f.a.shopId, front!, 'jpeg', 'crop-500-0-400-300')),
+      ).toBeNull();
+
+      // Cropped, with what matters in it, to the hundredth.
+      await f.admin.query('DELETE FROM platform.outbox_events');
+      const cropped = unwrap(
+        await media.update(f.a, kurta.id, [
+          {
+            id: front!,
+            crop: { left: 400, top: 300, width: 400, height: 300 },
+            focalPoint: { x: 25, y: 75.555 },
+          },
+        ]),
+      ).media[0]!;
+      expect(cropped).toMatchObject({
+        width: 800,
+        height: 600,
+        crop: { left: 400, top: 300, width: 400, height: 300 },
+        focalPoint: { x: 25, y: 75.56 },
+      });
+      expect(shownSizeOf(cropped)).toEqual({ width: 400, height: 300 });
+      const path = imagePathOf(f.a.shopId, cropped, 'lawn-kurta');
+      expect(path).toBe(`/images/${f.a.shopId}/${front}/crop-400-300-400-300/lawn-kurta.jpg`);
+      expect(parseImagePath(path!)).toEqual({
+        shopId: f.a.shopId,
+        mediaId: front,
+        crop: 'crop-400-300-400-300',
+        format: 'jpeg',
+      });
+      // Its clean copy kept beside the whole image's, which stays as it was.
+      const part = await storage.read(
+        cleanImageKey(f.a.shopId, front!, 'jpeg', 'crop-400-300-400-300'),
+      );
+      const { data, info } = await sharp(part!.body).raw().toBuffer({ resolveWithObject: true });
+      expect([info.width, info.height]).toEqual([400, 300]);
+      expect(Math.abs(data[0]! - 128)).toBeLessThan(8);
+      expect(Math.abs(data[2]! - 128)).toBeLessThan(8);
+      expect((await storage.read(cleanImageKey(f.a.shopId, front!, 'jpeg')))!.body).toEqual(whole);
+      expect((await f.outbox()).map((event) => [event.event_type, event.payload])).toEqual([
+        ['product.updated', { changed: ['media'], version: 4 }],
+      ]);
+
+      // Its focal point alone; then another crop, which clears it, as it was of the image shown.
+      const pointed = unwrap(
+        await media.update(f.a, kurta.id, [{ id: front!, focalPoint: { x: 50, y: 10 } }]),
+      ).media[0]!;
+      expect([pointed.crop?.left, pointed.focalPoint]).toEqual([400, { x: 50, y: 10 }]);
+      const square = unwrap(await crop({ left: 100, top: 0, width: 600, height: 600 })).media[0]!;
+      expect([square.crop, square.focalPoint]).toEqual([
+        { left: 100, top: 0, width: 600, height: 600 },
+        null,
+      ]);
+      expect(
+        errorsOf(
+          await media.update(f.a, kurta.id, [{ id: front!, focalPoint: { x: 101, y: 50 } }]),
+        ),
+      ).toEqual([['media.0.focalPoint', 'INVALID']]);
+      // All of it again: as a crop of all of it is.
+      expect(unwrap(await crop({ left: 0, top: 0, width: 800, height: 600 })).media[0]!.crop).toBe(
+        null,
+      );
+      unwrap(await crop({ left: 400, top: 300, width: 400, height: 300 }));
+      expect(unwrap(await crop(null)).media[0]!.crop).toBeNull();
+      // Another shop crops none of the shop's.
+      expect(errorsOf(await media.update(f.b, kurta.id, [{ id: front!, crop: null }]))).toEqual([
+        ['productId', 'NOT_FOUND'],
+      ]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it('records the media gone, alone or with their product, for their images to go', async () => {

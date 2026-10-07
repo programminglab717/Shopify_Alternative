@@ -1,12 +1,14 @@
 import type { TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
+import { CONTENT_TYPES, MAX_ASPECT_RATIO, cropImage } from '@hatti/images';
 import { ObjectStorage } from '@hatti/storage';
 import { Injectable, Optional } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
+import { cleanImageKey, cropNameOf } from './images.js';
 import { InputChecker, LIMITS, fail, failOne, type MutationResult } from './input-checker.js';
 import { loadForUpdate, loadProduct, productChanged } from './product-store.js';
-import type { ProductRecord } from './records.js';
+import type { FocalPointRecord, MediaCropRecord, MediaRecord, ProductRecord } from './records.js';
 import { productMedia } from './schema.js';
 
 export interface MediaCreateInput {
@@ -21,7 +23,20 @@ export interface MediaCreateInput {
 export interface MediaUpdateInput {
   id: string;
   alt?: string | null;
+  /**
+   * The part of a ready image shown, in its clean copy's pixels (ADR-257); null for the whole
+   * image again.
+   */
+  crop?: MediaCropRecord | null;
+  /**
+   * What matters in the image, in percent of the image shown, across and down; null for none. A
+   * new crop shows another image, so it clears the focal point unless one comes with it.
+   */
+  focalPoint?: FocalPointRecord | null;
 }
+
+/** The fewest pixels a side of a crop may have. */
+export const CROP_MIN_SIDE = 16;
 
 export interface MediaMove {
   id: string;
@@ -98,6 +113,11 @@ export class MediaService {
     });
   }
 
+  /**
+   * Changes media's alt text, and an image's crop and focal point (ADR-257). A crop's clean copy
+   * is made from the whole image's, and kept beside it, before the crop is recorded: every size
+   * and format the image is shown in is made from it.
+   */
   async update(
     tenant: TenantContext,
     productId: string,
@@ -110,12 +130,17 @@ export class MediaService {
         ? undefined
         : (check.text(['media', String(index), 'alt'], input.alt, { max: LIMITS.alt }) ?? ''),
     );
+    const focalPoints = inputs.map((input, index) =>
+      input.focalPoint
+        ? focalPointOf(check, ['media', String(index), 'focalPoint'], input.focalPoint)
+        : input.focalPoint,
+    );
     if (!check.ok) return fail(check.errors);
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const product = await loadForUpdate(tx, tenant.shopId, productId);
       if (!product) return failOne(['productId'], 'NOT_FOUND', 'Product not found');
-      const known = new Set(product.media.map((media) => media.id));
+      const known = new Map(product.media.map((media) => [media.id, media]));
       inputs.forEach((input, index) => {
         if (!known.has(input.id)) {
           check.addMessage(
@@ -126,11 +151,40 @@ export class MediaService {
         }
       });
       if (!check.ok) return fail(check.errors);
+      // Every crop checked against its image before any is made.
+      const crops = inputs.map((input, index) =>
+        input.crop === undefined
+          ? undefined
+          : cropOf(check, ['media', String(index), 'crop'], known.get(input.id)!, input.crop),
+      );
+      if (!check.ok) return fail(check.errors);
       for (const [index, input] of inputs.entries()) {
+        const media = known.get(input.id)!;
+        const changes: SQL[] = [];
         const alt = alts[index];
-        if (alt === undefined) continue;
+        if (alt !== undefined) changes.push(sql`alt = ${alt}`);
+        const crop = crops[index];
+        if (crop !== undefined && !sameCrop(crop, media.crop)) {
+          if (crop && !(await this.#keepCrop(tenant.shopId, media, crop))) {
+            return failOne(
+              ['media', String(index), 'crop'],
+              'INVALID',
+              'The image could not be cropped just now: try again',
+            );
+          }
+          changes.push(sql`crop_left = ${crop?.left ?? null}, crop_top = ${crop?.top ?? null},
+                           crop_width = ${crop?.width ?? null},
+                           crop_height = ${crop?.height ?? null}`);
+          // Its focal point was of the image shown before.
+          if (focalPoints[index] === undefined) changes.push(sql`focal_x = NULL, focal_y = NULL`);
+        }
+        const focalPoint = focalPoints[index];
+        if (focalPoint !== undefined) {
+          changes.push(sql`focal_x = ${focalPoint?.x ?? null}, focal_y = ${focalPoint?.y ?? null}`);
+        }
+        if (changes.length === 0) continue;
         await tx.execute(sql`
-          UPDATE catalog.product_media SET alt = ${alt}, updated_at = now()
+          UPDATE catalog.product_media SET ${sql.join(changes, sql`, `)}, updated_at = now()
            WHERE shop_id = ${tenant.shopId} AND id = ${input.id}`);
       }
       await productChanged(tx, tenant, productId, ['media']);
@@ -227,6 +281,21 @@ export class MediaService {
   }
 
   /**
+   * Makes and keeps the clean copy of `crop` of a ready image, from its whole clean copy, unless
+   * one was kept before. Whether it is kept.
+   */
+  async #keepCrop(shopId: string, media: MediaRecord, crop: MediaCropRecord): Promise<boolean> {
+    const format = media.imageFormat;
+    if (!this.storage || format === null) return false;
+    const key = cleanImageKey(shopId, media.id, format, cropNameOf(crop));
+    if (await this.storage.head(key)) return true;
+    const whole = await this.storage.read(cleanImageKey(shopId, media.id, format));
+    if (!whole) return false;
+    await this.storage.put(key, await cropImage(whole.body, crop, format), CONTENT_TYPES[format]);
+    return true;
+  }
+
+  /**
    * A file the shop uploaded, named by its staged upload's resource URL (ADR-079): its key in
    * storage and its location; null for anything else, such as an image's URL.
    */
@@ -235,4 +304,63 @@ export class MediaService {
     const key = url.length <= 2048 ? this.storage?.keyOf(url) : null;
     return key?.startsWith(`shops/${shopId}/files/`) ? { key, url } : null;
   }
+}
+
+/**
+ * The crop asked of `media`, checked against it: a part of a ready image, at least
+ * {@link CROP_MIN_SIDE} pixels a side, one side at most 20 times the other; null for the whole
+ * image, as a crop of all of it is.
+ */
+function cropOf(
+  check: InputChecker,
+  field: string[],
+  media: MediaRecord,
+  crop: MediaCropRecord | null,
+): MediaCropRecord | null {
+  if (crop === null) return null;
+  const { width, height } = media;
+  if (media.status !== 'ready' || width === null || height === null) {
+    check.addMessage(field, 'INVALID', 'An image is cropped once it is ready');
+    return null;
+  }
+  const { left, top } = crop;
+  const sides = [crop.width, crop.height];
+  if (![left, top, ...sides].every(Number.isInteger) || left < 0 || top < 0) {
+    check.addMessage(field, 'INVALID', 'Give the crop in whole pixels from the top left');
+    return null;
+  }
+  if (sides.some((side) => side < CROP_MIN_SIDE)) {
+    check.addMessage(field, 'INVALID', `A crop is at least ${CROP_MIN_SIDE} pixels a side`);
+    return null;
+  }
+  if (left + crop.width > width || top + crop.height > height) {
+    check.addMessage(field, 'INVALID', `Crop within the image's ${width} × ${height} pixels`);
+    return null;
+  }
+  if (Math.max(...sides) > MAX_ASPECT_RATIO * Math.min(...sides)) {
+    check.addMessage(field, 'INVALID', 'One side of a crop may be at most 20 times the other');
+    return null;
+  }
+  if (left === 0 && top === 0 && crop.width === width && crop.height === height) return null;
+  return { left, top, width: crop.width, height: crop.height };
+}
+
+/** A focal point in percent, across and down, to the hundredth. */
+function focalPointOf(
+  check: InputChecker,
+  field: string[],
+  point: FocalPointRecord,
+): FocalPointRecord | null {
+  const inside = (value: number) => Number.isFinite(value) && value >= 0 && value <= 100;
+  if (!inside(point.x) || !inside(point.y)) {
+    check.addMessage(field, 'INVALID', 'Give the focal point in percent, from 0 to 100');
+    return null;
+  }
+  return { x: Math.round(point.x * 100) / 100, y: Math.round(point.y * 100) / 100 };
+}
+
+function sameCrop(a: MediaCropRecord | null, b: MediaCropRecord | null): boolean {
+  return a === null || b === null
+    ? a === b
+    : a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
 }

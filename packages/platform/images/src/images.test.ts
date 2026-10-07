@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { crc32, deflateSync } from 'node:zlib';
 import sharp, { type Sharp } from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { MAX_IMAGE_SIDE, cleanImage } from './clean.js';
+import { MAX_IMAGE_SIDE, cleanImage, cropImage } from './clean.js';
 import { ImageFetcher, isPublicAddress } from './fetch.js';
 import { sniffImage } from './formats.js';
 import { IMAGE_WIDTHS, formatFor, imageVariant, widthFor } from './variants.js';
@@ -163,6 +163,30 @@ describe('variants', () => {
         ...size,
       ]);
     }
+  });
+});
+
+describe('crops', () => {
+  it("keep the part asked for, in the clean copy's format (ADR-257)", async () => {
+    // Red grows across and blue down: a part's first pixel says where it was taken from.
+    const clean = await (await photo(800, 600)).jpeg({ quality: 100 }).toBuffer();
+    const part = await cropImage(clean, { left: 400, top: 300, width: 200, height: 100 }, 'jpeg');
+    expect((await sharp(part).metadata()).format).toBe('jpeg');
+    const { data, info } = await sharp(part).raw().toBuffer({ resolveWithObject: true });
+    expect([info.width, info.height]).toEqual([200, 100]);
+    // Half way across and half way down the whole.
+    expect(Math.abs(data[0]! - 128)).toBeLessThan(8);
+    expect(Math.abs(data[2]! - 128)).toBeLessThan(8);
+    // What is see-through stays so.
+    const seeThrough = await (await photo(100, 100, 'png', 128)).toBuffer();
+    const kept = await cropImage(seeThrough, { left: 50, top: 0, width: 50, height: 40 }, 'png');
+    const metadata = await sharp(kept).metadata();
+    expect([metadata.format, metadata.width, metadata.height, metadata.hasAlpha]).toEqual([
+      'png',
+      50,
+      40,
+      true,
+    ]);
   });
 });
 

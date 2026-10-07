@@ -3339,6 +3339,22 @@ type FileEdge {
   node: File!
 }
 
+"""
+What matters in an image (ADR-257), in percent of the image shown, across and down from its top left: themes keep it in sight as they fill a frame with the image.
+"""
+type FocalPoint {
+  x: Float!
+  y: Float!
+}
+
+"""
+What matters in an image, in percent of the image shown, across and down: 0 to 100.
+"""
+input FocalPointInput {
+  x: Float!
+  y: Float!
+}
+
 """A parcel: items of an order shipped together, and what became of them."""
 type Fulfillment {
   """
@@ -3721,6 +3737,26 @@ type Image {
   url: String!
 
   """In pixels, at its own size."""
+  width: Int!
+}
+
+"""
+The part of an image shown (ADR-257), in pixels of the whole image (`ProductMedia.width` and `height`) from its top left.
+"""
+type ImageCrop {
+  height: Int!
+  left: Int!
+  top: Int!
+  width: Int!
+}
+
+"""
+The part of an image to show (ADR-257), in pixels of the whole image (`ProductMedia.width` and `height`) from its top left: at least 16 pixels a side, one side at most 20 times the other.
+"""
+input ImageCropInput {
+  height: Int!
+  left: Int!
+  top: Int!
   width: Int!
 }
 
@@ -7832,10 +7868,18 @@ type ProductImportRowError {
 type ProductMedia {
   """Alternative text, for screen readers and search engines."""
   alt: String!
+
+  """The part of the image shown; null for all of it."""
+  crop: ImageCrop
+
+  """What matters in it; null for none."""
+  focalPoint: FocalPoint
   height: Int
   id: ID!
 
-  """The image as Hatti serves it, once ready; null until then."""
+  """
+  The image as Hatti serves it, cropped where it is (ADR-257), once ready; null until then.
+  """
   image: Image
   mediaContentType: MediaContentType!
 
@@ -7849,7 +7893,12 @@ type ProductMedia {
   sourceUrl: String!
   status: MediaStatus!
 
-  """In pixels, once ready."""
+  """
+  The whole image, before any crop, for cropping it again (ADR-257); null until it is ready.
+  """
+  wholeImage: Image
+
+  """In pixels, once ready: the whole image, before any crop."""
   width: Int
 }
 
@@ -10545,6 +10594,16 @@ type UTMParameters {
 
 input UpdateMediaInput {
   alt: String
+
+  """
+  The part of a ready image to show, at every size and in every format; null to show all of it again. The whole image is kept, to be cropped again.
+  """
+  crop: ImageCropInput
+
+  """
+  What matters in the image shown; null for none. A new crop clears it unless it comes with one.
+  """
+  focalPoint: FocalPointInput
   id: ID!
 }
 

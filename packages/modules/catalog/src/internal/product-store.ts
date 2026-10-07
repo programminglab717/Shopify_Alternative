@@ -168,7 +168,14 @@ export async function queryProducts(
                      'imageFormat', m.image_format, 'imageSize', m.image_size,
                      'error', CASE WHEN m.error_code IS NOT NULL
                                    THEN json_build_object('code', m.error_code,
-                                                          'message', m.error_message) END)
+                                                          'message', m.error_message) END,
+                     'crop', CASE WHEN m.crop_left IS NOT NULL
+                                  THEN json_build_object('left', m.crop_left, 'top', m.crop_top,
+                                                         'width', m.crop_width,
+                                                         'height', m.crop_height) END,
+                     'focalPoint', CASE WHEN m.focal_x IS NOT NULL
+                                        THEN json_build_object('x', m.focal_x, 'y', m.focal_y)
+                                   END)
                      ORDER BY m.position), '[]'::json)
               FROM catalog.product_media m
              WHERE m.shop_id = p.shop_id AND m.product_id = p.id) AS media

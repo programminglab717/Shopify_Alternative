@@ -29,9 +29,12 @@ export { Product, ProductVariant } from '../internal/graphql/product.types.js';
 export {
   IMAGES_PATH,
   cleanImageKey,
+  cropNameOf,
   imagePathOf,
   imagesPrefixOf,
   parseImagePath,
+  shownImagesPrefixOf,
+  shownSizeOf,
 } from '../internal/images.js';
 export {
   MediaProcessing,
@@ -39,7 +42,12 @@ export {
   type ProcessedImage,
   type ReadyOutcome,
 } from '../internal/media-processing.js';
-export { MediaService, type MediaCreateInput } from '../internal/media.service.js';
+export {
+  CROP_MIN_SIDE,
+  MediaService,
+  type MediaCreateInput,
+  type MediaUpdateInput,
+} from '../internal/media.service.js';
 export { OptionService, type OptionUpdateInput } from '../internal/option.service.js';
 export { DEFAULT_VARIANT_TITLE } from '../internal/product-store.js';
 export {
@@ -91,6 +99,8 @@ export {
 export type { ImageFormatValue, ProductStatusValue } from '../internal/schema.js';
 export type {
   CollectionRecord,
+  FocalPointRecord,
+  MediaCropRecord,
   MediaErrorRecord,
   MediaRecord,
   OptionRecord,

@@ -333,6 +333,9 @@ The catalog follows Shopify's model, so merchants and importers find what they e
   checked. An image's storage keys and its path come from the catalog's `images.ts` alone, and the
   API serves nothing else of storage at `/images`. Image work runs in libvips through `sharp`,
   with its limits set before anything is decoded.
+  A crop is made from the whole clean copy as it is set, and kept in a folder named after it
+  ([ADR-257](../architecture/13-decision-log.md#adr-257--the-merchant-crops-a-products-image-and-marks-what-matters-in-it-a-crops-clean-copy-is-made-from-the-whole-images-as-it-is-set-and-kept-beside-it-each-size-and-format-made-from-it-at-an-address-naming-the-crop-the-whole-kept-to-crop-again-the-focal-point-in-percent-of-the-image-shown-is-shopifys-for-themes-and-image_tag)):
+  the route serves only crops so made, never one an address asks for.
 
 ## Inventory
 

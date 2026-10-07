@@ -1,4 +1,9 @@
-import { IMAGES_PATH, cleanImageKey, imagesPrefixOf, parseImagePath } from '@hatti/catalog/public';
+import {
+  IMAGES_PATH,
+  cleanImageKey,
+  parseImagePath,
+  shownImagesPrefixOf,
+} from '@hatti/catalog/public';
 import { CONTENT_TYPES, EXTENSIONS, formatFor, imageVariant, widthFor } from '@hatti/images';
 import type { ObjectStorage } from '@hatti/storage';
 import { imageTag } from '@hatti/storefront-data';
@@ -16,8 +21,10 @@ const MAKING_AT_ONCE = 2;
  * of the widths images are made at, in the best format the browser's Accept header names. Each
  * size and format is made the first time it is asked for and kept beside the clean copy, so it is
  * made once; the edge keeps every answer a year, varying by Accept, tagged with the image so its
- * removal forgets it. The storage's own files stay private: only images' clean copies, and what
- * is made of them, are served here.
+ * removal forgets it. A crop (ADR-257), at /images/{shop}/{media}/{crop}/{name}.jpg, is served
+ * the same way from its own clean copy, which only cropping the image makes: no other crop is
+ * made here. The storage's own files stay private: only images' clean copies, and what is made of
+ * them, are served here.
  */
 export function serveImages(fastify: FastifyInstance, storage: ObjectStorage): void {
   const making = new Turns(MAKING_AT_ONCE);
@@ -28,11 +35,11 @@ export function serveImages(fastify: FastifyInstance, storage: ObjectStorage): v
     const asked = Number(new URLSearchParams(search).get('width'));
     const width = Number.isInteger(asked) && asked > 0 ? widthFor(asked) : null;
     const format = formatFor(request.headers.accept, image.format);
-    const clean = cleanImageKey(image.shopId, image.mediaId, image.format);
+    const clean = cleanImageKey(image.shopId, image.mediaId, image.format, image.crop);
     const key =
       width === null && format === image.format
         ? clean
-        : `${imagesPrefixOf(image.shopId, image.mediaId)}${width ?? 'full'}.${EXTENSIONS[format]}`;
+        : `${shownImagesPrefixOf(image.shopId, image.mediaId, image.crop)}${width ?? 'full'}.${EXTENSIONS[format]}`;
     let body = (await storage.read(key))?.body ?? null;
     if (!body && key !== clean) {
       const source = await storage.read(clean);

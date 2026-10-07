@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-256 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-257 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -264,6 +264,7 @@
 | 254 | A shop pays Hatti's invoice by transfer or Raast into Hatti's own bank account, its owner giving the transfer's reference; Hatti's people confirm it once they find it, which pays the invoice as a gateway's payment does, with what its other payments brought, or refuse it, saying why, and the owner hears either way | Accepted |
 | 255 | What a card or a JazzCash wallet paid goes back through JazzCash's refunds, a wallet's with the MPIN the shop gives; a payment keeps how its customer paid, as its gateway said, and a voucher paid at a shop goes back another way; claimed whole until tried against its sandbox | Accepted |
 | 256 | What the shop's staff and apps change goes on its activity log: each event a request of the Admin API records, written in the same statement as the outbox's, by whom and to what, never what it recorded, in a table of its own kept as long as the audit log | Accepted |
+| 257 | The merchant crops a product's image and marks what matters in it: a crop's clean copy is made from the whole image's as it is set and kept beside it, each size and format made from it at an address naming the crop, the whole kept to crop again; the focal point, in percent of the image shown, is Shopify's for themes and image_tag | Accepted |
 
 ---
 
@@ -10619,3 +10620,49 @@
     that read them, not for people, and the log would grow with them.
   * **The caller passed to `appendEvent` by every service:** every service changed for what the
     request knows already.
+
+## ADR-257 · The merchant crops a product's image and marks what matters in it: a crop's clean copy is made from the whole image's as it is set and kept beside it, each size and format made from it at an address naming the crop, the whole kept to crop again; the focal point, in percent of the image shown, is Shopify's for themes and image_tag
+
+* **Context:** CAT-02 asks for crops. Hatti keeps each product's image as a clean copy, and makes
+  every size and format of it the first time each is asked for, kept a year at the edge at
+  addresses that never change what they show ([ADR-158](#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media),
+  [ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)); crops and focal points were left for later. Merchants photograph products
+  on their phones, often off centre or with the room around them; themes fill square cards and
+  wide banners with images through CSS, which cuts them about the middle. Shopify's themes read
+  an image's focal point (`image.presentation.focal_point`), and its `image_tag` keeps it in
+  sight.
+* **Decision:**
+  * **A crop is part of a ready image, in its clean copy's pixels** (migration 0160):
+    `productUpdateMedia`'s `crop { left top width height }`, inside the image, at least 16
+    pixels a side, one side at most 20 times the other; null, or a crop of all of it, shows the
+    whole again. `ProductMedia.crop` says it; `width` and `height` stay the whole image's.
+  * **Its clean copy is made as it is set** (`cropImage`, `@hatti/images`): from the whole
+    image's, in its format, kept in a folder named after the crop beside the whole image's files,
+    before the crop is recorded; one made before is used again.
+  * **A crop has an address of its own:** `/images/{shop}/{media}/crop-{left}-{top}-{width}-{height}/{handle}.jpg`,
+    served as the whole image's is, each size and format made from its clean copy as asked and
+    kept. The route makes no crop itself: only those the shop made are served.
+    `ProductMedia.image` is the crop, at its size, and `wholeImage` the whole, to crop again;
+    storefront documents, exports and feeds give the crop.
+  * **The focal point** (`focalPoint { x y }`, in percent of the image shown, to the
+    hundredth): Shopify's `image.presentation.focal_point` in themes, "x% y%" as text, the middle
+    where none is set; `image_tag` adds `object-position` for one the shop set. A new crop clears
+    it unless one comes with it: it was of the image shown before.
+* **Consequences:**
+  * Merchants fix a photo's framing without taking it again, and themes keep faces and products
+    in sight in square cards and wide banners.
+  * Pages show a new crop once their documents are rebuilt, from `product.updated`. Old crops'
+    addresses answer still, for pages the edge kept, and their files stay until their media goes:
+    a few for each image.
+  * Setting a crop reads and writes the image in storage while its product is locked: under a
+    second for the largest.
+* **Alternatives:**
+  * **Each size cropped from the whole clean copy as it is asked for:** any crop could be asked
+    for at an address, filling storage with crops no shop made, and every size would decode the
+    whole image.
+  * **The crop made the clean copy:** the rest of the image lost, and the crop never widened
+    again.
+  * **The crop as a parameter of the address, as Shopify's `crop` of a size:** that is the
+    theme's choice of a frame; a merchant's crop belongs to the image.
+  * **Focal points in the whole image's pixels:** kept through a new crop, but the API would
+    speak of points outside the image shown.

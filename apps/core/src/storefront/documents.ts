@@ -2,6 +2,7 @@ import type { ShopProfile } from '@hatti/api';
 import type { DeliverySettingsRecord } from '@hatti/checkout/public';
 import {
   DEFAULT_VARIANT_TITLE,
+  shownSizeOf,
   type CollectionRecord,
   type MediaRecord,
   type OptionRecord,
@@ -113,12 +114,17 @@ export function productDoc(
         : [DEFAULT_VARIANT_TITLE],
       image: variant.mediaId === null ? null : (imageAt.get(variant.mediaId) ?? null),
     })),
-    images: images.map(({ media, src }) => ({
-      src,
-      width: media.width ?? 0,
-      height: media.height ?? 0,
-      alt: media.alt || null,
-    })),
+    images: images.map(({ media, src }) => {
+      // As shown: cropped where it is (ADR-257).
+      const size = shownSizeOf(media);
+      return {
+        src,
+        width: size?.width ?? 0,
+        height: size?.height ?? 0,
+        alt: media.alt || null,
+        ...(media.focalPoint && { focalPoint: media.focalPoint }),
+      };
+    }),
     // As its collection's feed dates it (ADR-216).
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),

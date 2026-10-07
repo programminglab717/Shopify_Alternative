@@ -24,6 +24,7 @@
     "@hatti/db": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
+    "@hatti/images": "workspace:*",
     "@hatti/money": "workspace:*",
     "@hatti/pk": "workspace:*",
     "@hatti/storage": "workspace:*",
@@ -46,6 +47,7 @@
     "pg": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
+    "sharp": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

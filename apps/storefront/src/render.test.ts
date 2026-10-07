@@ -1036,6 +1036,34 @@ describe('Storefront rendering', () => {
     );
   });
 
+  it("gives themes an image's focal point, as Shopify's image.presentation, and keeps it in sight in image_tag (ADR-257)", async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const [front, back] = first!.images;
+    const pointed = {
+      ...first!,
+      images: [{ ...front!, focalPoint: { x: 25, y: 75.56 } }, back!],
+    };
+    const shop = new MemoryStore({ ...sample, products: [pointed, ...rest] });
+    const theme = loadTheme({
+      ...files,
+      'sections/main-product.liquid':
+        '{% for image in product.images limit: 2 %}<p class="focal">' +
+        '{{ image.presentation.focal_point }}|{{ image.presentation.focal_point.x }}|' +
+        "{{ image | image_url: width: 300 | image_tag: widths: '300' }}</p>{% endfor %}" +
+        '{% schema %}{ "name": "Product" }{% endschema %}',
+    });
+    const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${pointed.handle}` }, shop.fresh());
+    const [set, none] = [...page.html.matchAll(/<p class="focal">([^]*?)<\/p>/g)].map(
+      (match) => match[1]!,
+    );
+    expect(set).toMatch(/^25% 75.56%\|25\|<img [^>]*style="object-position:25% 75.56%"[^>]*>$/);
+    // None set: the middle, and nothing added to the tag.
+    expect(none).toMatch(/^50% 50%\|50\|<img /);
+    expect(none).not.toContain('object-position');
+  });
+
   it('renders what a search found, a page at a time, its links keeping the words', async () => {
     const ids = sampleStore().products.map((product) => product.id);
     const found = await render({

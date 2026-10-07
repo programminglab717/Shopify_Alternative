@@ -435,11 +435,13 @@ export function imageAddress(src: string, origin: string, width: number | null):
 
 /**
  * An `<img>` with its size, so the page does not shift as it loads, and a srcset of the widths
- * the image has, so phones fetch small ones.
+ * the image has, so phones fetch small ones; its focal point kept in sight as CSS fills a frame
+ * with it, where the shop set one (ADR-257), as Shopify's does.
  */
 function imageTag(url: unknown, options: Record<string, unknown>): string {
   if (!(url instanceof ImageUrl)) return '';
   const { image } = url;
+  const focalPoint = ImageDrop.focalPointOf(image);
   const widest = url.width ?? image.width;
   const widths = String(options.widths ?? '165, 360, 533, 720, 940, 1066')
     .split(',')
@@ -455,6 +457,7 @@ function imageTag(url: unknown, options: Record<string, unknown>): string {
     loading: options.loading ?? null,
     fetchpriority: options.fetchpriority ?? null,
     class: options.class ?? null,
+    style: options.style ?? (focalPoint && `object-position:${focalPoint.valueOf()}`),
   };
   const markup = Object.entries(attributes)
     .filter(([, value]) => value !== null && value !== undefined)
