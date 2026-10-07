@@ -18,7 +18,7 @@ import { parsePkMobile } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { OnlineStoreEvents, type PreferencesUpdatedPayload } from './events.js';
-import type { LinkPageRecord, PreferencesRecord } from './records.js';
+import type { LinkPageRecord, MaintenanceRecord, PreferencesRecord } from './records.js';
 import { ROBOTS_RULES_LIMITS, robotsRules } from './robots-rules.js';
 import { preferences } from './schema.js';
 
@@ -39,6 +39,18 @@ export interface PreferencesInput {
   seo?: SeoInputValue | null;
   /** The image link previews show of its pages without their own (ADR-243); null for none. */
   sharingImage?: { fileId: string; altText?: string | null } | null;
+  /**
+   * Pauses the open storefront for a while, or opens it again (ADR-252): shoppers see a page
+   * saying it is back soon, and checkout takes no orders. Left as it is if absent.
+   */
+  maintenanceEnabled?: boolean | null;
+  /** What the page tells shoppers, up to 1,000 characters; blank for the platform's words. */
+  maintenanceMessage?: string | null;
+  /**
+   * When the paused storefront opens again by itself, within 90 days; null for when its staff
+   * open it. Left as it is if absent; opening it takes it away.
+   */
+  maintenanceUntil?: Date | null;
 }
 
 /** What a social sharing image's words for those who cannot see it may be, as a file's alt. */
@@ -74,16 +86,20 @@ export interface PreferencesView extends PreferencesRecord {
 
 export const PASSWORD_LENGTH = { min: 4, max: 100 } as const;
 export const PASSWORD_MESSAGE_MAX = 1_000;
+/** A paused storefront's message, and how far ahead it may open again by itself (ADR-252). */
+export const MAINTENANCE_LIMITS = { message: 1_000, days: 90 } as const;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 type PreferencesRow = typeof preferences.$inferSelect;
 
 /**
  * What a shop sets for its storefront as a whole (ADR-041): the WhatsApp number its "Order on
  * WhatsApp" links and WhatsApp section go to, the password it is closed behind until it opens
- * (ADR-054), rules it adds to its robots.txt (ADR-055), and its home page's title, description
- * and social sharing image for search engines and link previews (ADR-243). A shop that set
- * nothing has no number, an open storefront, the platform's robots.txt, and its name for its home
- * page.
+ * (ADR-054), rules it adds to its robots.txt (ADR-055), its home page's title, description and
+ * social sharing image for search engines and link previews (ADR-243), and whether it is paused
+ * for a while (ADR-252). A shop that set nothing has no number, an open storefront, the
+ * platform's robots.txt, and its name for its home page.
  */
 @Injectable()
 export class PreferencesService {
@@ -147,6 +163,34 @@ export class PreferencesService {
         check.addMessage(['passwordMessage'], 'INVALID', 'Message has characters it cannot show');
       }
     }
+    let maintenanceMessage: string | undefined;
+    if (input.maintenanceMessage !== undefined) {
+      maintenanceMessage = (input.maintenanceMessage ?? '').replace(/\r\n?/g, '\n').trim();
+      if (maintenanceMessage.length > MAINTENANCE_LIMITS.message) {
+        check.addMessage(
+          ['maintenanceMessage'],
+          'TOO_LONG',
+          'Message is too long (maximum is 1,000 characters)',
+        );
+      } else if (/[^\P{Cc}\n\t]/u.test(maintenanceMessage)) {
+        check.addMessage(
+          ['maintenanceMessage'],
+          'INVALID',
+          'Message has characters it cannot show',
+        );
+      }
+    }
+    const now = new Date();
+    const until = input.maintenanceUntil;
+    if (until && !(until > now)) {
+      check.addMessage(['maintenanceUntil'], 'INVALID', 'Must be later than now');
+    } else if (until && until.getTime() - now.getTime() > MAINTENANCE_LIMITS.days * DAY_MS) {
+      check.addMessage(
+        ['maintenanceUntil'],
+        'INVALID',
+        `Must be within ${MAINTENANCE_LIMITS.days} days`,
+      );
+    }
     let robots: string | undefined;
     if (input.robotsTxtRules !== undefined) {
       const text = input.robotsTxtRules ?? '';
@@ -179,7 +223,7 @@ export class PreferencesService {
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const before = await rowOf(tx, tenant.shopId, { lock: true });
-      const was = await this.#current(tx, tenant.shopId, this.#view(tenant.shopId, before));
+      const was = await this.#current(tx, tenant.shopId, this.#view(tenant.shopId, before, now));
       if (linkPage?.productIds && linkPage.productIds.length > 0) {
         const found = await this.#found(tx, tenant.shopId, linkPage.productIds);
         const missing = missingOf(input.linkPage!, found);
@@ -215,12 +259,24 @@ export class PreferencesService {
           image === undefined
             ? was.sharingImage
             : image && { fileId: image.fileId, altText: sharingAlt },
+        maintenance: pausedUntil(
+          input.maintenanceEnabled ?? was.maintenance.enabled,
+          maintenanceMessage ?? was.maintenance.message,
+          until === undefined ? was.maintenance.until : until,
+        ),
       };
       if (next.passwordEnabled && next.password === null) {
         return failOne(
           ['password'],
           'BLANK',
           'Set a password before closing the storefront behind it',
+        );
+      }
+      if (until && !next.maintenance.enabled) {
+        return failOne(
+          ['maintenanceUntil'],
+          'INVALID',
+          'Pause the storefront to say when it opens again',
         );
       }
       const changed = [
@@ -233,6 +289,11 @@ export class PreferencesService {
         ...(JSON.stringify(next.seo) !== JSON.stringify(was.seo) ? ['seo'] : []),
         ...(JSON.stringify(next.sharingImage) !== JSON.stringify(was.sharingImage)
           ? ['sharingImage']
+          : []),
+        ...(next.maintenance.enabled !== was.maintenance.enabled ? ['maintenanceEnabled'] : []),
+        ...(next.maintenance.message !== was.maintenance.message ? ['maintenanceMessage'] : []),
+        ...(next.maintenance.until?.getTime() !== was.maintenance.until?.getTime()
+          ? ['maintenanceUntil']
           : []),
       ];
       if (changed.length === 0) return { ok: true, value: was };
@@ -254,6 +315,9 @@ export class PreferencesService {
         seoDescription: next.seo.description,
         sharingImageId: next.sharingImage?.fileId ?? null,
         sharingImageAlt: next.sharingImage?.altText ?? '',
+        maintenanceEnabled: next.maintenance.enabled,
+        maintenanceMessage: next.maintenance.message,
+        maintenanceUntil: next.maintenance.until,
       };
       const [row] = await tx
         .insert(preferences)
@@ -269,7 +333,7 @@ export class PreferencesService {
         aggregateId: tenant.shopId,
         payload: { changed },
       });
-      return { ok: true, value: this.#view(tenant.shopId, row) };
+      return { ok: true, value: this.#view(tenant.shopId, row, now) };
     });
   }
 
@@ -331,11 +395,11 @@ export class PreferencesService {
     );
   }
 
-  #view(shopId: string, row: PreferencesRow | undefined): PreferencesView {
+  #view(shopId: string, row: PreferencesRow | undefined, now = new Date()): PreferencesView {
     const password = row?.passwordSealed
       ? this.box.decrypt(row.passwordSealed, sealedFor(shopId)).toString('utf8')
       : null;
-    return { ...toRecord(row), password };
+    return { ...toRecord(row, now), password };
   }
 }
 
@@ -357,7 +421,18 @@ async function rowOf(
   return row;
 }
 
-function toRecord(row: PreferencesRow | undefined): PreferencesRecord {
+/**
+ * A paused storefront's settings as kept (ADR-252): opening it takes away the time it would have
+ * opened at, so pausing it again starts afresh.
+ */
+function pausedUntil(enabled: boolean, message: string, until: Date | null): MaintenanceRecord {
+  return { enabled, message, until: enabled ? until : null };
+}
+
+function toRecord(row: PreferencesRow | undefined, now = new Date()): PreferencesRecord {
+  // Paused until a time that has come: open again, as its staff would find it (ADR-252).
+  const until = row?.maintenanceUntil ?? null;
+  const paused = (row?.maintenanceEnabled ?? false) && (until === null || until > now);
   return {
     whatsappNumber: row?.whatsapp ?? null,
     passwordEnabled: row?.passwordEnabled ?? false,
@@ -375,6 +450,7 @@ function toRecord(row: PreferencesRow | undefined): PreferencesRecord {
     sharingImage: row?.sharingImageId
       ? { fileId: row.sharingImageId, altText: row.sharingImageAlt }
       : null,
+    maintenance: pausedUntil(paused, row?.maintenanceMessage ?? '', until),
   };
 }
 

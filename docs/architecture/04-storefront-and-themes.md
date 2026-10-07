@@ -105,6 +105,9 @@ infrastructure. A shop closed behind its password
 ([ADR-054](./13-decision-log.md#adr-054--a-shops-storefront-can-be-closed-behind-a-password-which-the-storefront-checks-against-a-verifier-in-the-shops-document))
 has nothing kept at the edge, even for shoppers who gave the password: every answer is
 `private, no-store` and `noindex` until it opens.
+An open shop paused for a while answers every page with 503 and a page saying when it
+is back, `private, no-store` and with `Retry-After`, so the edge keeps nothing and search
+engines come back rather than forget its pages; its checkouts take no orders meanwhile ([ADR-252](./13-decision-log.md#adr-252--an-open-shop-can-pause-its-storefront-for-a-while-every-page-answers-503-with-a-page-saying-when-it-is-back-and-checkout-takes-no-orders-until-its-staff-open-it-again-or-the-time-they-set-comes)).
 
 ### 2.3 Personalisation without breaking the cache
 

@@ -348,6 +348,9 @@ importers:
       '@hatti/crypto':
         specifier: workspace:*
         version: link:../../packages/platform/crypto
+      '@hatti/documents':
+        specifier: workspace:*
+        version: link:../../packages/platform/documents
       '@hatti/money':
         specifier: workspace:*
         version: link:../../packages/platform/money

@@ -440,6 +440,14 @@ export function shopDoc(
             message: textToHtml(preferences.passwordMessage),
           }
         : null,
+    // Paused for a while (ADR-252), left out while it is not, so a shop that never paused keeps
+    // its document as it was; the storefront compares the time it opens again with its own.
+    ...(preferences.maintenance.enabled && {
+      maintenance: {
+        message: preferences.maintenance.message,
+        until: preferences.maintenance.until?.toISOString() ?? null,
+      },
+    }),
     robotsRules: preferences.robotsTxtRules,
     policies: [...policies],
     // Left out without one, so a shop without one keeps its document as it was.

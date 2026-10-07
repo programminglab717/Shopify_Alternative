@@ -1,5 +1,5 @@
 import { SEO, SEOInput, UserError } from '@hatti/api';
-import { Field, ID, InputType, ObjectType } from '@nestjs/graphql';
+import { Field, GraphQLISODateTime, ID, InputType, ObjectType } from '@nestjs/graphql';
 
 @ObjectType({
   description:
@@ -132,6 +132,30 @@ export class OnlineStorePreferences {
       "Shopify's social sharing image; null for none.",
   })
   sharingImage!: SharingImage | null;
+
+  @Field({
+    description:
+      'Whether the open storefront is paused for a while (ADR-252), as for a stock-take or the ' +
+      'days couriers stop for Eid: shoppers see a page saying it is back soon, search engines ' +
+      'are told to come back later, and checkout takes no orders. Orders placed before, their ' +
+      "links and the tracking page carry on; the shop's staff see the storefront through a " +
+      'preview. False again once maintenanceUntil comes.',
+  })
+  maintenanceEnabled!: boolean;
+
+  @Field({
+    description:
+      "What the paused storefront's page tells shoppers; empty for the platform's words.",
+  })
+  maintenanceMessage!: string;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      'When the paused storefront opens again by itself, which its page says; null for when ' +
+      'its staff open it, and while it is open.',
+  })
+  maintenanceUntil!: Date | null;
 }
 
 @InputType()
@@ -244,6 +268,29 @@ export class OnlineStorePreferencesInput {
       'at best; null for none. Left as it is if not given.',
   })
   sharingImage?: SharingImageInput | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      'Pauses the open storefront for a while, or opens it again. Left as it is if not given.',
+  })
+  maintenanceEnabled?: boolean | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "What the paused storefront's page tells shoppers, up to 1,000 characters; blank for the " +
+      "platform's words, which say it is back soon.",
+  })
+  maintenanceMessage?: string | null;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      'When the paused storefront opens again by itself, within 90 days; null for when its ' +
+      'staff open it. Left as it is if not given; opening the storefront takes it away.',
+  })
+  maintenanceUntil?: Date | null;
 }
 
 @ObjectType()

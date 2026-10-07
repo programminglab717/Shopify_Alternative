@@ -6,8 +6,12 @@
 
 ## In progress
 
-**Next from the gaps found**: translations of what is deleted removed with it, the audit log
-of staff's changes, and domains checked again, each as its own change.
+**Next, the rest of what is left to build** (asked for on 2026-10-07): courier pickups through
+PostEx's and Leopards' APIs, Hatti's invoices paid by bank transfer or Raast, refunds through
+more gateways, the activity log of staff's changes, product videos and crops, a map pin at
+checkout, and couriers' city names shared across shops; then translations removed with what is
+deleted, and domains checked again. How the Free plan holds to its 50 orders a month waits on a
+decision.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +20,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-07
+
+### Maintenance mode for an open shop
+
+* **A storefront paused for a while** ([ADR-252](../architecture/13-decision-log.md#adr-252--an-open-shop-can-pause-its-storefront-for-a-while-every-page-answers-503-with-a-page-saying-when-it-is-back-and-checkout-takes-no-orders-until-its-staff-open-it-again-or-the-time-they-set-comes)): staff pause it through the Admin API with a
+  message and, if they like, a time it opens again by itself; every page then answers 503 with a
+  page saying when it is back, its WhatsApp and its tracking page, and `Retry-After`, so search
+  engines keep its pages; checkout takes no orders, at the storefront or the core's address,
+  while orders placed before, their links and the tracking page carry on.
+* **For it:** migration 0155, the pause kept with the online store's preferences; the shop's
+  document carries it; the storefront's page in the platform's markup, `@hatti/documents`; the
+  checkout's paused page.
+* 1797 tests: paused, refused and opened again, by staff or at its time; published; the
+  storefront's pages, scripts and open routes; checkouts paused and taking orders again; through
+  the API end to end.
+* **Before it, cfbaacf:** the sales report's end-to-end test reads the clock once for its
+  period, which a millisecond passing between two readings made fail now and then.
 
 ### 7a2d2e3 · A tracking page found by tracking number
 

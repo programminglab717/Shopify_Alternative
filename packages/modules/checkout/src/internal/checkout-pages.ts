@@ -108,6 +108,8 @@ const LABELS = {
   emptyTitle: { en: 'Your cart is empty', ur: 'آپ کا کارٹ خالی ہے' },
   expiredTitle: { en: 'This checkout has expired', ur: 'اس چیک آؤٹ کی مدت ختم ہو گئی ہے' },
   notFoundTitle: { en: "This checkout doesn't exist", ur: 'یہ چیک آؤٹ موجود نہیں' },
+  pausedTitle: { en: 'This shop is taking a short break', ur: 'یہ دکان کچھ دیر کے لیے بند ہے' },
+  askOnWhatsapp: { en: 'Message the shop on WhatsApp', ur: 'دکان کو واٹس ایپ پر پیغام بھیجیں' },
 } satisfies Record<string, Words>;
 
 /**
@@ -187,6 +189,8 @@ export function checkoutPage(view: CheckoutView): CheckoutPage {
         link(view.shop.storefront, LABELS.continueShopping),
       ]);
     }
+    case 'paused':
+      return pausedPage(view);
     case 'empty':
       return page(200, `${LABELS.emptyTitle.en} · ${view.shop.name}`, view.shop, [
         shopName(view.shop),
@@ -198,6 +202,53 @@ export function checkoutPage(view: CheckoutView): CheckoutPage {
     case 'placed':
       return placedPage(view);
   }
+}
+
+/**
+ * What a checkout says while the shop has paused its storefront (ADR-252): its message, when it
+ * takes orders again, and its WhatsApp, with 503, as the storefront's own pages answer.
+ */
+function pausedPage(view: Extract<CheckoutView, { kind: 'paused' }>): CheckoutPage {
+  const when = view.until && momentOf(view.until);
+  return page(503, `${LABELS.pausedTitle.en} · ${view.shop.name}`, view.shop, [
+    shopName(view.shop),
+    heading(LABELS.pausedTitle),
+    view.message && typedParagraphs(view.message),
+    paragraphs(
+      when
+        ? {
+            en: `It takes orders again from ${when}. Come back then to place your order.`,
+            ur: html`یہ دکان ${ltr(when)} سے دوبارہ آرڈر لے گی۔ تب آ کر اپنا آرڈر دیں۔`,
+          }
+        : {
+            en: 'It takes orders again soon. Come back then to place your order.',
+            ur: 'یہ دکان جلد دوبارہ آرڈر لینا شروع کرے گی۔ تب آ کر اپنا آرڈر دیں۔',
+          },
+      'center muted',
+    ),
+    view.whatsapp &&
+      html`<p class="center">
+        <a href="https://wa.me/${view.whatsapp.slice(1)}" target="_blank" rel="noopener"
+          >${say('bilingual', LABELS.askOnWhatsapp)}</a
+        >
+      </p>`,
+  ]);
+}
+
+/** What the shop typed, as it wrote it: its paragraphs apart, its lines broken where it broke them. */
+function typedParagraphs(typed: string): Html {
+  const written = typed
+    .split(/\n[^\S\n]*\n\s*/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  return html`<div class="text">
+    ${written.map(
+      (paragraph) =>
+        html`<p dir="auto">
+          ${paragraph.split('\n').map((line, index) => [index > 0 && html`<br />`, line])}
+        </p>`,
+    )}
+  </div>`;
 }
 
 /** The cart to order, what it comes to, and who receives it where; with what stopped it. */
@@ -1335,6 +1386,19 @@ function refusalWords(code: string, refusal: DiscountRefusal | { reason: 'attemp
         ur: 'یہ چیک آؤٹ مزید ڈسکاؤنٹ کوڈ نہیں لے سکتا۔',
       };
   }
+}
+
+/** "12 October 2026 at 9:00 am", in Pakistan's time. */
+function momentOf(at: Date): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Karachi',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(at);
 }
 
 /** "5 October 2026", in Pakistan's time. */

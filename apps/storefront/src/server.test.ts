@@ -2394,6 +2394,86 @@ describe('Carts', () => {
     await open.close();
   });
 
+  it('shows a paused shop its page saying it is back soon, with 503, until the time it set (ADR-252)', async () => {
+    const sample = sampleStore();
+    const paused = (maintenance: { message: string; until: string | null }) =>
+      server({
+        sample: new MemoryStore({
+          ...sample,
+          shop: { ...sample.shop, whatsapp: '+923001234567', maintenance },
+        }),
+      });
+    const until = new Date(Date.now() + 2 * 60 * 60 * 1000);
+    const app = paused({
+      message: 'Eid break <3>.\n\nOur couriers are off.',
+      until: until.toISOString(),
+    });
+    const get = (url: string, headers: Record<string, string> = {}) =>
+      app.inject({ method: 'GET', url, headers: { host: 'localhost', ...headers } });
+
+    // Every page: the page saying so, with 503 and when to ask again, never kept.
+    const home = await get('/');
+    expect([home.statusCode, home.headers['cache-control']]).toEqual([503, 'private, no-store']);
+    expect(Number(home.headers['retry-after'])).toBeGreaterThan(7_100);
+    expect(Number(home.headers['retry-after'])).toBeLessThanOrEqual(7_200);
+    expect(home.headers['cache-tag']).toBeUndefined();
+    expect(home.headers['content-security-policy']).toContain("default-src 'none'");
+    expect(home.body).toContain('This shop is taking a short break');
+    expect(home.body).toContain('یہ دکان کچھ دیر کے لیے بند ہے');
+    expect(home.body).toContain('Eid break &lt;3&gt;.');
+    expect(home.body).toContain('It takes orders again from');
+    expect(home.body).toContain('href="https://wa.me/923001234567"');
+    expect(home.body).toContain('href="/track"');
+    const urdu = await get(`/ur/products/${lawn.handle}`);
+    expect(urdu.statusCode).toBe(503);
+    expect(urdu.body).toContain('href="/ur/track"');
+    expect((await get('/pay/abcdefghijklmnopqrstuv')).statusCode).toBe(503);
+    // Scripts, sections, feeds and forms are told in a line.
+    for (const url of ['/cart.js', '/?section_id=header', PRODUCT_FEED_PATH]) {
+      const answer = await get(url);
+      expect([answer.statusCode, answer.body], url).toEqual([
+        503,
+        'This shop is taking a short break.\n',
+      ]);
+    }
+    const added = await app.inject({
+      method: 'POST',
+      url: '/cart/add',
+      headers: FORM,
+      payload: form({ id: String(variant.id), quantity: '1' }),
+    });
+    expect(added.statusCode).toBe(503);
+    expect(core.actions).toEqual([]);
+
+    // What crawlers read stays, so that they keep its pages, as do its tracking page and
+    // checkouts, which the core says are paused, and orders placed before as they were.
+    const robots = await get('/robots.txt');
+    expect(robots.statusCode).toBe(200);
+    expect(robots.body).not.toMatch(/^Disallow: \/$/m);
+    expect((await get('/sitemap.xml')).statusCode).toBe(200);
+    expect((await get('/track')).statusCode).toBe(200);
+    core.page = { placed: false, status: 503, headers: {}, html: '<p>Paused</p>' };
+    const checkout = await get('/checkouts/abcdefghijklmnopqrstuv');
+    expect([checkout.statusCode, checkout.body]).toEqual([503, '<p>Paused</p>']);
+
+    // Its staff see the shop as it is through a preview.
+    core.previews.set(PREVIEW_TOKEN, previewing('Winter', 'Winter Sale'));
+    expect((await get('/', { cookie: `hatti_preview=${PREVIEW_TOKEN}` })).statusCode).toBe(200);
+    await app.close();
+
+    // Without a message or a time, the platform's words and an hour; past its time, open again.
+    const soon = paused({ message: '', until: null });
+    const answer = await soon.inject({ method: 'GET', url: '/', headers: { host: 'localhost' } });
+    expect([answer.statusCode, answer.headers['retry-after']]).toEqual([503, '3600']);
+    expect(answer.body).toContain('It takes orders again soon.');
+    await soon.close();
+    const over = paused({ message: '', until: new Date(Date.now() - 1_000).toISOString() });
+    expect(
+      (await over.inject({ method: 'GET', url: '/', headers: { host: 'localhost' } })).statusCode,
+    ).toBe(200);
+    await over.close();
+  });
+
   it('refuses changes from other sites, forgets carts that are gone, and says when the core is not there', async () => {
     const app = server();
     const crossSite = await app.inject({

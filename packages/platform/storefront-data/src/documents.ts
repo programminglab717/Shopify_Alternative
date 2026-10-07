@@ -296,6 +296,13 @@ export interface ShopDoc {
    */
   password?: { verifier: string; message: string } | null;
   /**
+   * While its open storefront is paused for a while (ADR-252): what its page tells shoppers, as
+   * typed, empty for the platform's words; and when it opens again by itself, in ISO 8601, null
+   * for when its staff open it, a time the storefront compares with its own. Absent while it is
+   * open, as in documents written before shops could pause.
+   */
+  maintenance?: MaintenanceDoc;
+  /**
    * Rules it adds to its robots.txt (ADR-055), one a line, as the online store checked them.
    * Absent or empty for none, as in documents written before shops had them.
    */
@@ -340,6 +347,19 @@ export interface ShopDoc {
    * where it translated neither.
    */
   translations?: TranslationsDoc<ShopDoc, never>;
+}
+
+export interface MaintenanceDoc {
+  message: string;
+  until: string | null;
+}
+
+/** Whether a shop's document's `maintenance` keeps its storefront paused at `now` (ADR-252). */
+export function pausedAt(maintenance: MaintenanceDoc | undefined, now: Date): boolean {
+  return (
+    maintenance !== undefined &&
+    (maintenance.until === null || Date.parse(maintenance.until) > now.getTime())
+  );
 }
 
 export interface BrandDoc {

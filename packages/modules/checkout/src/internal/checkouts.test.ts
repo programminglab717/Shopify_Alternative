@@ -6,6 +6,7 @@ import { checkoutPagePath, type CartActionName, type CartJson } from '@hatti/sto
 import { TaxSettingsService } from '@hatti/tax/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseAction } from './cart-lines.js';
+import { checkoutPage } from './checkout-pages.js';
 import {
   CHECKOUT_PATH,
   EMPTY_FORM,
@@ -966,5 +967,49 @@ describe.skipIf(!server)('CheckoutService', () => {
     } finally {
       await f.admin.query(`UPDATE control.shops SET status = 'active' WHERE id = $1`, [f.a.shopId]);
     }
+  });
+
+  it('places nothing while the shop is paused, its orders placed before still shown (ADR-252)', async () => {
+    const before = await lawnCart();
+    const earlier = await started(before.token);
+    const order = placedOrder(await f.checkouts.place(earlier.secret, earlier.view.shown, FORM));
+    const { token } = await lawnCart();
+    const { secret, view } = await started(token);
+    const until = new Date(Date.UTC(2099, 9, 12, 4, 0));
+    await f.admin.query(
+      `INSERT INTO online_store.preferences
+         (shop_id, whatsapp, maintenance_enabled, maintenance_message, maintenance_until)
+       VALUES ($1, '+923001234567', true, $2, $3)`,
+      [f.a.shopId, 'Eid break: our couriers are off.\n\nOrders open again after Eid.', until],
+    );
+
+    const paused = await f.checkouts.view(secret);
+    expect(paused).toMatchObject({
+      kind: 'paused',
+      message: 'Eid break: our couriers are off.\n\nOrders open again after Eid.',
+      until,
+      whatsapp: '+923001234567',
+    });
+    const page = checkoutPage(paused);
+    expect(page.status).toBe(503);
+    expect(page.html).toContain('This shop is taking a short break');
+    expect(page.html).toContain('یہ دکان کچھ دیر کے لیے بند ہے');
+    expect(page.html).toContain('Eid break: our couriers are off.');
+    expect(page.html).toContain('It takes orders again from 12 October 2099 at 9:00 am.');
+    expect(page.html).toContain('href="https://wa.me/923001234567"');
+    // Placing waits on it as viewing does; the order placed before shows as it was.
+    expect((await f.checkouts.place(secret, view.shown, FORM)).kind).toBe('paused');
+    expect(await orderCount()).toBe(1);
+    expect(placedOrder(await f.checkouts.view(earlier.secret)).id).toBe(order.id);
+    // Another shop's checkouts carry on.
+    const other = await lawnCart(f.b);
+    await started(other.token, f.b);
+
+    // Once the time it set comes, the checkout takes the order.
+    await f.admin.query(
+      `UPDATE online_store.preferences SET maintenance_until = now() - interval '1 second'`,
+    );
+    placedOrder(await f.checkouts.place(secret, view.shown, FORM));
+    expect(await orderCount()).toBe(2);
   });
 });

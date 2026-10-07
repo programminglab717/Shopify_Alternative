@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-251 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-252 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -259,6 +259,7 @@
 | 249 | Checkout sends one internet address at most 20 codes an hour across a shop's checkouts, each code keeping the address it was asked from until its checkout goes | Accepted |
 | 250 | The sales report says what the period as long just before came to, and the home what yesterday came to by this time of day; refunds are said beside sales, not taken off them | Accepted |
 | 251 | The shop's storefront has a tracking page where a customer finds their order by its number or a tracking number with the mobile number they ordered with, and sees its parcels' steps but nothing of its address or items | Accepted |
+| 252 | An open shop can pause its storefront for a while: every page answers 503 with a page saying when it is back, and checkout takes no orders, until its staff open it again or the time they set comes | Accepted |
 
 ---
 
@@ -10384,3 +10385,48 @@
   * **A new link for the order, sent to the customer's WhatsApp:** would replace the link they
     have, and cost a message each time.
   * **The tracking number alone:** couriers number parcels in series, so one could be guessed.
+
+## ADR-252 · An open shop can pause its storefront for a while: every page answers 503 with a page saying when it is back, and checkout takes no orders, until its staff open it again or the time they set comes
+
+* **Context:** An open shop sometimes stops taking orders for a few days: a stock-take, a move,
+  or the days around Eid when its couriers stop. Its password ([ADR-054](#adr-054--a-shops-storefront-can-be-closed-behind-a-password-which-the-storefront-checks-against-a-verifier-in-the-shops-document)) closes it,
+  but tells search engines `noindex` and shuts robots.txt, which costs an established shop its
+  place in search results, and asks shoppers for a password they never had. OS-15 asks for a
+  maintenance mode beside the password.
+* **Decision:**
+  * **Kept with the shop's preferences** ([ADR-041](#adr-041--what-a-shop-sets-for-its-storefront-as-a-whole-is-the-online-stores-starting-with-its-whatsapp-number)): whether the storefront is paused,
+    a message of up to 1,000 characters, and when it opens again by itself, within 90 days, or
+    only when staff open it. `onlineStorePreferencesUpdate` sets them, under the settings
+    scopes; opening it takes the time away, so pausing it again lasts until staff open it. Past
+    its time, it reads as open everywhere, with no job to switch it off.
+  * **The shop's document carries it while it is paused:** the message as typed and the time,
+    which the storefront compares with its own clock. Pausing and opening change the document,
+    so the publisher purges the shop's pages ([ADR-047](#adr-047--the-edge-keeps-storefront-pages-by-the-handles-they-name-before-they-stream-and-forgets-those-whose-documents-change)).
+  * **The storefront answers 503:** each page with a page of the platform's, in English and
+    Urdu, with the shop's logo or name, its message, when it takes orders again in the shop's
+    time zone, its WhatsApp and its tracking page ([ADR-251](#adr-251--the-shops-storefront-has-a-tracking-page-where-a-customer-finds-their-order-by-its-number-or-a-tracking-number-with-the-mobile-number-they-ordered-with-and-sees-its-parcels-steps-but-nothing-of-its-address-or-items)); scripts, sections,
+    feeds and forms with a line of text. Every answer says when to ask again, `Retry-After`,
+    the seconds until it opens, between a minute and a day, or an hour without a time, and is
+    `private, no-store`: search engines come back rather than forget its pages, and the edge
+    keeps nothing. robots.txt, sitemaps, theme assets, images, the tracking page and checkouts
+    answer as ever.
+  * **Checkout takes no orders:** every view and placing of a checkout reads the preferences
+    again, so its page, on the storefront or at the core's own address, says the shop is paused,
+    with 503, and placing places nothing; an order placed before shows as it was. Orders' and
+    drafts' links, paying them, couriers and the confirmation desk carry on.
+  * **Its staff see it as it is through a preview** ([ADR-049](#adr-049--a-theme-is-previewed-through-a-link-the-core-seals-which-storefronts-keep-in-a-cookie-and-render-from-the-cores-files-never-kept)).
+* **Consequences:**
+  * A shop pauses for Eid without losing its place in search results or its customers' links,
+    and opens on time with no one there to open it.
+  * The page is the platform's, not the theme's: themes have no template for it, and it offers
+    no sign-up for news of its opening.
+  * Each page of a paused shop is answered for its visitor, never kept at the edge; paused shops
+    have few visitors, as closed ones do.
+  * Ads and catalog feeds keep sending shoppers to it: pausing them is the shop's to do.
+* **Alternatives:**
+  * **The password with another message:** `noindex` and a robots.txt shutting everything out
+    would take the shop out of search results, and shoppers would be asked for a password.
+  * **The storefront left to browse, with checkout alone paused:** shoppers would fill carts
+    they cannot order; a choice for later, should shops ask for it.
+  * **A job switching it off at its time:** one that can run late, where comparing the time as
+    it is read is exact.

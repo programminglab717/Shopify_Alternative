@@ -1378,6 +1378,12 @@ Stock follows Shopify's model too. How changes are written is decided in
   `noindex`. A new route that shows the shop's pages or data needs nothing more; one every
   visitor needs, as theme assets do, joins `OPEN_ROUTES`. `shopFor` and `lockOf` are worked out
   once a request, and the stores fetch the shop's document once, so the gate costs no round trip.
+* **A paused shop answers 503 but on its own open routes**
+  ([ADR-252](../architecture/13-decision-log.md#adr-252--an-open-shop-can-pause-its-storefront-for-a-while-every-page-answers-503-with-a-page-saying-when-it-is-back-and-checkout-takes-no-orders-until-its-staff-open-it-again-or-the-time-they-set-comes)):
+  a second `preHandler` hook, after the password's, answers pages with `maintenancePage` and
+  the rest with a line, each with `Retry-After`; a route every visitor needs while the shop is
+  paused, as its tracking page, joins `PAUSE_OPEN_ROUTES`. The core's checkout reads the pause
+  again in every view and placing, so a checkout at the core's own address is paused too.
 * **Pages go on to the shop's primary domain, or where its redirects point; nothing else
   does.** `sendPage` sends a page asked for at another of the shop's addresses on with a 301
   (given the request as `asked`), from its handle's subdomain or another of its domains, before

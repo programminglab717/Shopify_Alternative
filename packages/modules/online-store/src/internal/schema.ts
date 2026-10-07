@@ -221,6 +221,10 @@ export const preferences = onlineStoreSchema.table('preferences', {
   /** The image link previews show of pages without their own, one of its files (ADR-243). */
   sharingImageId: uuid('sharing_image_id'),
   sharingImageAlt: text('sharing_image_alt').notNull().default(''),
+  /** Its storefront paused for a while (ADR-252): what its page says, and when it opens again. */
+  maintenanceEnabled: boolean('maintenance_enabled').notNull().default(false),
+  maintenanceMessage: text('maintenance_message').notNull().default(''),
+  maintenanceUntil: timestamp('maintenance_until', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

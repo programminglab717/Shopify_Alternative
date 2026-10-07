@@ -5734,6 +5734,21 @@ type OnlineStorePreferences {
   linkPage: LinkPage!
 
   """
+  Whether the open storefront is paused for a while (ADR-252), as for a stock-take or the days couriers stop for Eid: shoppers see a page saying it is back soon, search engines are told to come back later, and checkout takes no orders. Orders placed before, their links and the tracking page carry on; the shop's staff see the storefront through a preview. False again once maintenanceUntil comes.
+  """
+  maintenanceEnabled: Boolean!
+
+  """
+  What the paused storefront's page tells shoppers; empty for the platform's words.
+  """
+  maintenanceMessage: String!
+
+  """
+  When the paused storefront opens again by itself, which its page says; null for when its staff open it, and while it is open.
+  """
+  maintenanceUntil: DateTime
+
+  """
   The storefront's password, to give those who may see it. Null until one is set.
   """
   password: String
@@ -5770,6 +5785,21 @@ type OnlineStorePreferences {
 input OnlineStorePreferencesInput {
   """Its link-in-bio page."""
   linkPage: LinkPageInput
+
+  """
+  Pauses the open storefront for a while, or opens it again. Left as it is if not given.
+  """
+  maintenanceEnabled: Boolean
+
+  """
+  What the paused storefront's page tells shoppers, up to 1,000 characters; blank for the platform's words, which say it is back soon.
+  """
+  maintenanceMessage: String
+
+  """
+  When the paused storefront opens again by itself, within 90 days; null for when its staff open it. Left as it is if not given; opening the storefront takes it away.
+  """
+  maintenanceUntil: DateTime
 
   """
   The storefront's password, 4 to 100 characters. Changed, never taken away: shoppers who gave the old one are asked for the new.
@@ -8321,7 +8351,7 @@ type Query {
   onlinePaymentSettings: OnlinePaymentSettings!
 
   """
-  What the shop sets for its storefront as a whole, such as its WhatsApp number and password.
+  What the shop sets for its storefront as a whole, such as its WhatsApp number, its password, and whether it is paused for a while.
   """
   onlineStorePreferences: OnlineStorePreferences!
 

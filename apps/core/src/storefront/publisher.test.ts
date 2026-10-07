@@ -1298,6 +1298,29 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect((await store().shop()).password).toBeNull();
   });
 
+  it("publishes the shop's storefront paused, what shoppers are told and when it opens, and opens it (ADR-252)", async () => {
+    forgotten.length = 0;
+    const until = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+    unwrap(
+      await preferences.update(tenant, {
+        maintenanceEnabled: true,
+        maintenanceMessage: 'Back after Eid <soon>.',
+        maintenanceUntil: until,
+      }),
+    );
+    await deliver();
+    // As typed: the storefront's page escapes it.
+    expect((await store().shop()).maintenance).toEqual({
+      message: 'Back after Eid <soon>.',
+      until: until.toISOString(),
+    });
+    // Every page changes: none may be kept while it is paused.
+    expect(forgotten.flat()).toContain(shopTag(shopId));
+    unwrap(await preferences.update(tenant, { maintenanceEnabled: false }));
+    await deliver();
+    expect((await store().shop()).maintenance).toBeUndefined();
+  });
+
   it("publishes the shop's own robots.txt rules, as the online store checked them", async () => {
     unwrap(await preferences.update(tenant, { robotsTxtRules: 'disallow: /collections/sale' }));
     await deliver();

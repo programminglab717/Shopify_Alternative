@@ -223,6 +223,21 @@ export interface PreferencesRecord {
    * social sharing image: one of its files; null for none.
    */
   sharingImage: SharingImageRecord | null;
+  /** Its storefront paused for a while, or not (ADR-252). */
+  maintenance: MaintenanceRecord;
+}
+
+/**
+ * A shop's storefront paused for a while (ADR-252), as for a stock-take or the days its couriers
+ * stop for Eid: shoppers see a page saying it is back soon, and checkout takes no orders.
+ */
+export interface MaintenanceRecord {
+  /** Whether it is paused now: from when its staff pause it until they open it, or `until`. */
+  enabled: boolean;
+  /** What the page tells shoppers, as typed; empty for the platform's words. */
+  message: string;
+  /** When it opens again by itself, while it is paused; null for when its staff open it. */
+  until: Date | null;
 }
 
 /** A shop's social sharing image (ADR-243): one of its files, and what it shows. */

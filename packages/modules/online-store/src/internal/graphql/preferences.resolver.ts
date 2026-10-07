@@ -18,8 +18,8 @@ export class PreferencesResolver {
 
   @Query(() => OnlineStorePreferences, {
     description:
-      'What the shop sets for its storefront as a whole, such as its WhatsApp number and ' +
-      'password.',
+      'What the shop sets for its storefront as a whole, such as its WhatsApp number, its ' +
+      'password, and whether it is paused for a while.',
   })
   @RequireScopes('read_settings')
   async onlineStorePreferences(
@@ -85,6 +85,9 @@ function toPreferences(view: PreferencesView): OnlineStorePreferences {
       }),
     }),
     seo: Object.assign(new SEO(), view.seo),
+    maintenanceEnabled: view.maintenance.enabled,
+    maintenanceMessage: view.maintenance.message,
+    maintenanceUntil: view.maintenance.until,
     sharingImage:
       view.sharingImage &&
       Object.assign(new SharingImage(), {

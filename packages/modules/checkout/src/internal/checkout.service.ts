@@ -310,6 +310,18 @@ export type CheckoutView =
    * link that opens no checkout (ADR-248).
    */
   | { kind: 'closed'; shop: CheckoutShop; reason: ClosedLinkReason }
+  /**
+   * The shop paused its storefront for a while (ADR-252): nothing is ordered until it opens
+   * again, by its staff or at `until`; its message as typed, empty for none.
+   */
+  | {
+      kind: 'paused';
+      shop: CheckoutShop;
+      message: string;
+      until: Date | null;
+      /** Its WhatsApp number, for shoppers to ask it; null for none. */
+      whatsapp: string | null;
+    }
   /** Its cart is empty, or gone. */
   | { kind: 'empty'; shop: CheckoutShop }
   | {
@@ -875,6 +887,17 @@ export class CheckoutService {
         online: gateways.length > 0 ? { gateways, amount: owed } : null,
         payment: null,
         storeCredit: await storeCreditPaidIn(tx, shopId, order.id),
+      };
+    }
+    // Paused for a while (ADR-252): placing the order waits on it too, as the view is built again.
+    const preferences = await shopPreferencesOf(tx, shopId);
+    if (preferences.maintenance.enabled) {
+      return {
+        kind: 'paused',
+        shop,
+        message: preferences.maintenance.message,
+        until: preferences.maintenance.until,
+        whatsapp: preferences.whatsappNumber,
       };
     }
     // Opened from a payment link: only while it stays open, which placing the order waits on.

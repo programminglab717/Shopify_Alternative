@@ -10,6 +10,7 @@ import {
   StorefrontKeys,
   handleTag,
   pathTag,
+  pausedAt,
   redirectKey,
   shopTag,
   type ActivityStep,
@@ -66,6 +67,7 @@ import {
   sitemapPages,
 } from './sitemap.js';
 import { LINK_TAP_PATH, linkKey, linkTargets, tapTarget } from './link-page.js';
+import { maintenancePage, retryAfterOf } from './maintenance.js';
 import { VISIT_PATH, isRobot, sessionOf } from './sessions.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
 import {
@@ -181,6 +183,22 @@ const OPEN_ROUTES = new Set([
   '/robots.txt',
   '/assets/:version/:file',
   '/images/*',
+]);
+
+/**
+ * Routes a paused shop answers as ever (ADR-252): what crawlers read, so they keep its pages;
+ * theme files and images; its tracking page, for orders placed before; and checkouts, whose
+ * pages the core shows paused, and a placed order's as it was.
+ */
+const PAUSE_OPEN_ROUTES = new Set([
+  '/robots.txt',
+  '/sitemap.xml',
+  '/sitemaps/:name',
+  '/assets/:version/:file',
+  '/images/*',
+  '/track',
+  '/ur/track',
+  '/checkouts/:token',
 ]);
 
 /** What a previewed page is: the shopper's own, never kept, and not for search engines. */
@@ -688,6 +706,50 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       !/\.(js|json)$/.test(url.pathname);
     if (page) return reply.redirect(urdu ? '/ur/password' : '/password', 302);
     return reply.code(401).type('text/plain; charset=utf-8').send('This shop is not open yet.\n');
+  });
+
+  // A shop paused for a while (ADR-252) answers each page with its page saying it is back soon,
+  // and scripts and forms in a line of text, all with 503 and when to ask again, so search
+  // engines come back rather than forget its pages, and nothing is kept at the edge. Its staff
+  // see it as it is through a preview.
+  app.addHook('preHandler', async (request, reply) => {
+    if (PAUSE_OPEN_ROUTES.has(request.routeOptions.url ?? '')) return;
+    const shop = await shopFor(request, reply);
+    if (!shop || shop.preview) return;
+    let doc: ShopDoc;
+    try {
+      doc = await shop.store.shop();
+    } catch (error) {
+      // Not published: the handler says so.
+      if (error instanceof StoreMissingError) return;
+      throw error;
+    }
+    const { maintenance } = doc;
+    const now = new Date();
+    if (!maintenance || !pausedAt(maintenance, now)) return;
+    reply
+      .header('cache-control', 'private, no-store')
+      .header('retry-after', String(retryAfterOf(maintenance, now)));
+    const url = new URL(request.url, 'http://storefront');
+    const page =
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      !fromScript(request) &&
+      !asksForSections(url) &&
+      !/\.(js|json|xml|atom)$/.test(url.pathname);
+    if (!page) {
+      return reply
+        .code(503)
+        .type('text/plain; charset=utf-8')
+        .send('This shop is taking a short break.\n');
+    }
+    const urdu = url.pathname === '/ur' || url.pathname.startsWith('/ur/');
+    const paused = maintenancePage(doc, maintenance, { urdu });
+    return reply
+      .code(503)
+      .header('content-security-policy', paused.contentSecurityPolicy)
+      .header('x-content-type-options', 'nosniff')
+      .type('text/html; charset=utf-8')
+      .send(paused.html);
   });
 
   /** The theme the shop's pages are rendered in: the one previewed, else its main theme. */

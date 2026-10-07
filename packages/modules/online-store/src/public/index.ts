@@ -26,6 +26,7 @@ export type {
   BlogRecord,
   CommentRecord,
   DomainRecord,
+  MaintenanceRecord,
   MenuItemRecord,
   MenuItemTypeValue,
   MenuRecord,
@@ -83,6 +84,7 @@ export {
   type TranslationRecord,
 } from '../internal/translation.service.js';
 export {
+  MAINTENANCE_LIMITS,
   PASSWORD_LENGTH,
   PASSWORD_MESSAGE_MAX,
   PreferencesService,

@@ -166,6 +166,51 @@ describe.skipIf(!server)('Admin GraphQL API: online store preferences', () => {
     });
   });
 
+  it("pauses the shop's open storefront for a while, and opens it again (ADR-252)", async () => {
+    const MAINTENANCE = `mutation ($input: OnlineStorePreferencesInput!) {
+      onlineStorePreferencesUpdate(input: $input) {
+        preferences { maintenanceEnabled maintenanceMessage maintenanceUntil }
+        userErrors { field code message }
+      }
+    }`;
+    const until = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const paused = await gql(tokens.a, MAINTENANCE, {
+      input: {
+        maintenanceEnabled: true,
+        maintenanceMessage: 'Back after Eid.',
+        maintenanceUntil: until.toISOString(),
+      },
+    });
+    expect(paused.data?.onlineStorePreferencesUpdate).toEqual({
+      preferences: {
+        maintenanceEnabled: true,
+        maintenanceMessage: 'Back after Eid.',
+        maintenanceUntil: until.toISOString(),
+      },
+      userErrors: [],
+    });
+    expect(
+      (await gql(tokens.reader, '{ onlineStorePreferences { maintenanceEnabled } }')).data
+        ?.onlineStorePreferences,
+    ).toEqual({ maintenanceEnabled: true });
+    const gone = await gql(tokens.a, MAINTENANCE, {
+      input: { maintenanceUntil: new Date(Date.now() - 60_000).toISOString() },
+    });
+    expect(gone.data?.onlineStorePreferencesUpdate).toEqual({
+      preferences: null,
+      userErrors: [
+        { field: ['maintenanceUntil'], code: 'INVALID', message: 'Must be later than now' },
+      ],
+    });
+    // Opened again: the time it would have opened at goes with it.
+    const opened = await gql(tokens.a, MAINTENANCE, { input: { maintenanceEnabled: false } });
+    expect(opened.data?.onlineStorePreferencesUpdate.preferences).toEqual({
+      maintenanceEnabled: false,
+      maintenanceMessage: 'Back after Eid.',
+      maintenanceUntil: null,
+    });
+  });
+
   it("sets the shop's link page, its products by their IDs (ADR-161)", async () => {
     const LINK_PAGE = `mutation ($input: OnlineStorePreferencesInput!) {
       onlineStorePreferencesUpdate(input: $input) {

@@ -38,6 +38,7 @@ describe.skipIf(!server)('PreferencesService', () => {
     linkPage: { bio: '', links: [], productIds: [], variantIds: [] },
     seo: { title: null, description: null },
     sharingImage: null,
+    maintenance: { enabled: false, message: '', until: null },
   };
 
   it("keeps a shop's WhatsApp number in E.164, recording each change", async () => {
@@ -79,6 +80,7 @@ describe.skipIf(!server)('PreferencesService', () => {
       linkPage: { bio: '', links: [], productIds: [], variantIds: [] },
       seo: { title: null, description: null },
       sharingImage: null,
+      maintenance: { enabled: false, message: '', until: null },
     });
   });
 
@@ -424,5 +426,85 @@ describe.skipIf(!server)('PreferencesService', () => {
       seo: { title: null, description: null },
       sharingImage: null,
     });
+  });
+
+  it('pauses the open storefront for a while, until its staff open it or the time it set (ADR-252)', async () => {
+    const hour = 60 * 60 * 1000;
+    const until = new Date(Math.ceil((Date.now() + 5 * 24 * hour) / 1000) * 1000);
+    const paused = unwrap(
+      await f.preferences.update(f.a, {
+        maintenanceEnabled: true,
+        maintenanceMessage: ' Eid break: couriers are off.\r\nBack on the 12th. ',
+        maintenanceUntil: until,
+      }),
+    );
+    expect(paused.maintenance).toEqual({
+      enabled: true,
+      message: 'Eid break: couriers are off.\nBack on the 12th.',
+      until,
+    });
+    // As read models are given it.
+    expect(
+      (await f.db.tenant(f.a.shopId, (tx) => shopPreferencesOf(tx, f.a.shopId))).maintenance,
+    ).toEqual(paused.maintenance);
+
+    // A time gone, too far ahead, or set while it is open; a message too long, or unshowable.
+    for (const [input, error] of [
+      [{ maintenanceUntil: new Date(Date.now() - hour) }, 'Must be later than now'],
+      [{ maintenanceUntil: new Date(Date.now() + 91 * 24 * hour) }, 'Must be within 90 days'],
+      [
+        { maintenanceEnabled: false, maintenanceUntil: until },
+        'Pause the storefront to say when it opens again',
+      ],
+      [
+        { maintenanceMessage: 'x'.repeat(1_001) },
+        'Message is too long (maximum is 1,000 characters)',
+      ],
+      [
+        { maintenanceMessage: `bell${String.fromCharCode(7)}` },
+        'Message has characters it cannot show',
+      ],
+    ] as const) {
+      expect(errorsOf(await f.preferences.update(f.a, input))).toEqual([
+        [Object.keys(input).at(-1), expect.any(String), error],
+      ]);
+    }
+
+    // Open again: no time to open at is kept, so pausing again lasts until staff open it; the
+    // message is kept for next time.
+    const opened = unwrap(await f.preferences.update(f.a, { maintenanceEnabled: false }));
+    expect(opened.maintenance).toEqual({
+      enabled: false,
+      message: 'Eid break: couriers are off.\nBack on the 12th.',
+      until: null,
+    });
+    const again = unwrap(await f.preferences.update(f.a, { maintenanceEnabled: true }));
+    expect(again.maintenance).toMatchObject({ enabled: true, until: null });
+
+    // Once the time it set comes, it reads as open, as the storefront and checkout find it.
+    unwrap(
+      await f.preferences.update(f.a, { maintenanceUntil: new Date(Date.now() + 5 * 60_000) }),
+    );
+    await f.admin.query(
+      `UPDATE online_store.preferences SET maintenance_until = now() - interval '1 minute'
+        WHERE shop_id = $1`,
+      [f.a.shopId],
+    );
+    expect((await f.preferences.get(f.a)).maintenance).toMatchObject({
+      enabled: false,
+      until: null,
+    });
+    expect(
+      (await f.db.tenant(f.a.shopId, (tx) => shopPreferencesOf(tx, f.a.shopId))).maintenance
+        .enabled,
+    ).toBe(false);
+    expect((await f.outbox()).map((event) => event.payload)).toEqual([
+      { changed: ['maintenanceEnabled', 'maintenanceMessage', 'maintenanceUntil'] },
+      { changed: ['maintenanceEnabled', 'maintenanceUntil'] },
+      { changed: ['maintenanceEnabled'] },
+      { changed: ['maintenanceUntil'] },
+    ]);
+    // Another shop's storefront stays open.
+    expect((await f.preferences.get(f.b)).maintenance.enabled).toBe(false);
   });
 });
