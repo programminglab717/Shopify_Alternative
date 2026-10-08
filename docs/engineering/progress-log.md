@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### The cash couriers hold, in the admin
+### a637b22 · The cash couriers hold, in the admin
 
 * **Cash, a section of its own** ([ADR-281](../architecture/13-decision-log.md#adr-281--the-admins-cash-section-shows-what-couriers-owe-on-delivered-cash-on-delivery-orders-and-what-is-on-its-way-by-how-long-it-has-been-owed-and-by-courier-cash-held-15-days-or-more-in-red-and-imports-a-couriers-statement-only-once-a-check-of-it-reads-right-its-lines-to-look-into-first)):
   what couriers owe and what is on its way; how long it has been owed and by which courier,
