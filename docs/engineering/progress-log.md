@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### Discount codes in the admin
+### 61e2fd5 · Discount codes in the admin
 
 * **Discounts, a section of their own** ([ADR-276](../architecture/13-decision-log.md#adr-276--the-admins-discount-codes-are-a-section-of-their-own-for-those-who-make-them-each-with-what-it-gives-in-a-line-whether-it-works-now-and-how-often-it-was-used-made-for-a-percentage-an-amount-or-free-delivery-limited-and-dated-ended-at-once-or-deleted)):
   the codes with what each gives, whether it works now and how often it was used; a new one for a
