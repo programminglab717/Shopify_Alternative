@@ -1,5 +1,14 @@
 import { Link } from '@tanstack/react-router';
-import { Banknote, ChevronRight, Landmark, MapPin, Truck, UserCog } from 'lucide-react';
+import {
+  Banknote,
+  ChevronRight,
+  CreditCard,
+  Landmark,
+  MapPin,
+  Store,
+  Truck,
+  UserCog,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { StaffMemberRole } from '../api/types';
 import type { StaffRole } from '../auth/session';
@@ -23,6 +32,8 @@ export function roleLabel(role: StaffMemberRole): MessageKey {
 
 interface Section {
   to:
+    | '/$shopId/settings/shop'
+    | '/$shopId/settings/online-payments'
     | '/$shopId/settings/delivery'
     | '/$shopId/settings/cash-on-delivery'
     | '/$shopId/settings/bank-transfer'
@@ -34,6 +45,12 @@ interface Section {
 }
 
 const SECTIONS: readonly Section[] = [
+  {
+    to: '/$shopId/settings/shop',
+    label: 'settings.shop',
+    hint: 'settings.shopHint',
+    icon: Store,
+  },
   {
     to: '/$shopId/settings/delivery',
     label: 'settings.delivery',
@@ -53,6 +70,12 @@ const SECTIONS: readonly Section[] = [
     icon: Landmark,
   },
   {
+    to: '/$shopId/settings/online-payments',
+    label: 'settings.onlinePayments',
+    hint: 'settings.onlinePaymentsHint',
+    icon: CreditCard,
+  },
+  {
     to: '/$shopId/settings/couriers',
     label: 'settings.couriers',
     hint: 'settings.couriersHint',
@@ -66,7 +89,7 @@ const SECTIONS: readonly Section[] = [
   },
 ];
 
-/** Settings (docs/design/02 §4), as far as they are built: delivery and payments, couriers, staff. */
+/** Settings (docs/design/02 §4), as far as they are built: the shop, delivery and payments, couriers, staff. */
 export function SettingsPage() {
   const { t } = useLocale();
   const shopId = useShop().id;

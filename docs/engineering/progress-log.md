@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the shop's details and online gateways in the admin's settings** (ADM-01, PAY-01): the
-shop's name, address and contact, and connecting JazzCash, Easypaisa and the others, as the
-alpha's shops need them. Urdu handles wait, as decided.
+**Next, the shop's plan and billing in the admin** (BIL-01, BIL-03): its plan and what another
+would add, its invoices paid by card, transfer or Raast, and message credit; then discount codes
+(CHK-06). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### Online payments and the shop's brand in the admin's settings
+
+* **Two more sections of settings** ([ADR-274](../architecture/13-decision-log.md#adr-274--the-admins-settings-take-the-shops-online-payments-and-its-brand-a-gateway-connected-once-the-member-confirms-who-they-are-its-webhook-address-given-to-copy-into-the-gateways-dashboard-the-gateways-put-in-the-order-customers-are-offered-them-or-archived-the-shops-logo-and-square-logo-uploaded-from-the-phone-and-its-whatsapp-number)):
+  online payments, each gateway account with its webhook address to copy, put in the order
+  customers are offered them, archived, or another connected once the member confirms who they
+  are; and the shop's logo, square logo and WhatsApp number.
+* **Tried against the core:** the seed's owner uploaded a logo from a file, which the page then
+  showed from storage; saved a WhatsApp number, a wrong one refused in the core's words; and
+  connected the test gateway, its webhook address shown; with no errors in the browser.
+* 1946 tests: connecting after confirming, reordering and archiving, and the logo and number.
 
 ### bfbf924 · The pages email links open
 

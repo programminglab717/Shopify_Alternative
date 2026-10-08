@@ -36,7 +36,9 @@ import { BankTransferPage } from './settings/bank-transfer-page';
 import { CashOnDeliveryPage } from './settings/cash-on-delivery-page';
 import { CouriersPage } from './settings/couriers-page';
 import { DeliveryPage } from './settings/delivery-page';
+import { OnlinePaymentsPage } from './settings/online-payments-page';
 import { SettingsPage } from './settings/settings-page';
+import { ShopPage } from './settings/shop-page';
 import { StaffPage } from './settings/staff-page';
 import { MorePage, Shell } from './shell/shell';
 import { ShippingPage, validateShippingSearch } from './shipping/shipping-page';
@@ -228,6 +230,18 @@ const settingsStaff = createRoute({
   component: StaffPage,
 });
 
+const settingsShop = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/shop',
+  component: ShopPage,
+});
+
+const settingsOnlinePayments = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/online-payments',
+  component: OnlinePaymentsPage,
+});
+
 const settingsDelivery = createRoute({
   getParentRoute: () => shop,
   path: 'settings/delivery',
@@ -308,6 +322,8 @@ export const routeTree = root.addChildren([
     settingsDelivery,
     settingsCashOnDelivery,
     settingsBankTransfer,
+    settingsShop,
+    settingsOnlinePayments,
   ]),
 ]);
 

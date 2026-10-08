@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-273 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-274 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -281,6 +281,7 @@
 | 271 | The admin's settings begin with courier accounts and staff: an account connected with the credentials its courier asks for, made the default or archived; staff's roles changed and staff let go by those who manage them, and people invited by a link to send on WhatsApp, which opens a page of the admin's own; a sensitive change asks the member to confirm who they are, then goes ahead | Accepted |
 | 272 | The admin's settings take delivery charges, cash on delivery's rules and bank transfer: each a form of everything it sets, saved at once as checkout will use it; risk scores are shown out of 100 for the core's 0 to 1, and the bank account is given once the member confirms who they are | Accepted |
 | 273 | The pages the core's emails link to are the admin's: a new password set from a reset link, signing every session out, this tab's too; an email proved, or changed, with a tap rather than as the page opens; and a link to set a new password asked for from signing in. The admin reads `/auth`'s field errors as the core names them | Accepted |
+| 274 | The admin's settings take the shop's online payments and its brand: a gateway connected once the member confirms who they are, its webhook address given to copy into the gateway's dashboard, the gateways put in the order customers are offered them or archived; the shop's logo and square logo uploaded from the phone, and its WhatsApp number | Accepted |
 
 ---
 
@@ -11350,3 +11351,38 @@
     the link before its person saw it.
   * **Keeping the tab signed in after a reset:** the core has revoked its session; the next request
     would sign it out less clearly.
+
+## ADR-274 · The admin's settings take the shop's online payments and its brand: a gateway connected once the member confirms who they are, its webhook address given to copy into the gateway's dashboard, the gateways put in the order customers are offered them or archived; the shop's logo and square logo uploaded from the phone, and its WhatsApp number
+
+* **Context:** A shop takes payments online through its own accounts with gateways, connected
+  with the credentials their dashboards give, sealed, each with an address the gateway sends its
+  webhooks to ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)); customers are offered them in the shop's order
+  ([ADR-221](#adr-221--a-shop-puts-its-gateways-in-the-order-its-customers-are-offered-them-the-admin-api-takes-all-its-live-accounts-at-once-those-connected-before-keep-the-order-they-were-connected-in-and-one-connected-later-goes-last)); connecting one asks a member who signed in a while ago to confirm who
+  they are ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)), and the Free plan connects none ([ADR-264](#adr-264--a-plan-says-whether-it-includes-a-domain-of-the-shops-own-and-accounts-with-payment-gateways-and-free-includes-neither-connecting-one-on-a-plan-without-it-is-refused-with-the-plan-named-through-the-port-other-modules-ask-a-plans-limits-through-and-those-connected-before-are-kept-checked-changed-and-used-as-before)). Its logo,
+  one of its files, shows on checkout and customers' links in place of its name
+  ([ADR-081](#adr-081--a-shops-logo-is-one-of-its-files-chosen-as-its-brands-the-checkouts-page-shows-it-in-place-of-the-shops-name-through-a-url-signed-for-an-hour-that-the-pages-policy-allows-alone)), its square logo atop its link page ([ADR-205](#adr-205--a-shops-brand-has-shopifys-square-logo-beside-its-logo-one-of-its-files-served-by-the-api-at-an-address-of-its-own-the-shops-document-names-where-each-logo-is-served-each-address-naming-its-file-and-the-link-page-shows-the-square-logo-else-the-logo-at-its-top)), and the
+  storefront's WhatsApp links go to the number among its preferences. Settings had delivery and
+  the other payments ([ADR-272](#adr-272--the-admins-settings-take-delivery-charges-cash-on-deliverys-rules-and-bank-transfer-each-a-form-of-everything-it-sets-saved-at-once-as-checkout-will-use-it-risk-scores-are-shown-out-of-100-for-the-cores-0-to-1-and-the-bank-account-is-given-once-the-member-confirms-who-they-are)); none of these.
+* **Decision:**
+  * **Online payments** (`settings/online-payments`): each account with its gateway, the test
+    environment where it is in it, the last characters of its credentials, what of a payment it
+    refunds through Hatti, and its webhook address to copy. Moved up or down, they are put in the
+    order customers are offered them; archived after a second tap.
+  * **Connecting** asks for a gateway the shop has no account with yet, the credentials it lists
+    (those it may go without marked optional, and left out when blank), and whether it is the
+    gateway's test environment; through the panel asking who is signed in. Once connected, the
+    webhook address is shown first, with what it is for. A plan without gateways is refused in the
+    core's words.
+  * **Your shop** (`settings/shop`): the logo and the square logo, each shown, replaced by a photo
+    chosen on the phone (made smaller as products' are, uploaded to storage, made one of the
+    shop's files, then set), or taken away; and the WhatsApp number, typed as merchants write it
+    and shown back as the core kept it.
+* **Consequences:**
+  * An owner opens a shop's online payments and brand from a phone, with no other tool.
+  * Changing a gateway's credentials waits: archiving and connecting again does it meanwhile.
+  * The shop's name, address and the rest of its storefront's preferences stay the Admin API's.
+* **Alternatives:**
+  * **Dragging gateways into order:** buttons to move one up or down are as quick for the two or
+    three a shop has, and work with a thumb and a screen reader alike.
+  * **Offering every gateway to connect:** the core keeps one live account a gateway; those
+    connected are left out rather than refused.

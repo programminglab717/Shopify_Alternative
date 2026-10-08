@@ -1296,3 +1296,148 @@ export const BankTransferSettingsUpdateMutation = /* GraphQL */ `
   ${MONEY}
   ${USER_ERRORS}
 `;
+
+const GATEWAY_ACCOUNT = /* GraphQL */ `
+  fragment GatewayAccount on PaymentGatewayAccount {
+    id
+    gateway
+    gatewayName
+    environment
+    credentialsHint
+    webhookUrl
+    createdAt
+  }
+`;
+
+/** The gateways shops take payments online through, and the shop's accounts with them (PAY-01). */
+export const PaymentGatewaysQuery = /* GraphQL */ `
+  query PaymentGateways {
+    paymentGateways {
+      gateway
+      name
+      test
+      refunds
+      credentials {
+        key
+        label
+        optional
+      }
+    }
+    paymentGatewayAccounts {
+      ...GatewayAccount
+    }
+  }
+  ${GATEWAY_ACCOUNT}
+`;
+
+/** The shop's own account with a gateway connected, its credentials sealed; confirmed recently. */
+export const PaymentGatewayAccountConnectMutation = /* GraphQL */ `
+  mutation PaymentGatewayAccountConnect($input: PaymentGatewayAccountInput!) {
+    paymentGatewayAccountConnect(input: $input) {
+      paymentGatewayAccount {
+        ...GatewayAccount
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${GATEWAY_ACCOUNT}
+  ${USER_ERRORS}
+`;
+
+/** A gateway account archived: no new payments through it. */
+export const PaymentGatewayAccountArchiveMutation = /* GraphQL */ `
+  mutation PaymentGatewayAccountArchive($id: ID!) {
+    paymentGatewayAccountArchive(id: $id) {
+      paymentGatewayAccount {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The order customers are offered the shop's gateways in (PAY-05). */
+export const PaymentGatewayAccountsReorderMutation = /* GraphQL */ `
+  mutation PaymentGatewayAccountsReorder($ids: [ID!]!) {
+    paymentGatewayAccountsReorder(ids: $ids) {
+      paymentGatewayAccounts {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The shop's logos and WhatsApp number, as its storefront, checkout and links show them. */
+export const ShopDetailsQuery = /* GraphQL */ `
+  query ShopDetails {
+    shop {
+      brand {
+        logo {
+          id
+          url
+        }
+        squareLogo {
+          id
+          url
+        }
+      }
+    }
+    onlineStorePreferences {
+      whatsappNumber
+    }
+  }
+`;
+
+/** Uploads made files of the shop's (ADR-079), to use as its logos. */
+export const FileCreateMutation = /* GraphQL */ `
+  mutation FileCreate($files: [FileCreateInput!]!) {
+    fileCreate(files: $files) {
+      files {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The shop's logo or square logo set, or taken away (ADR-081, ADR-205). */
+export const ShopBrandUpdateMutation = /* GraphQL */ `
+  mutation ShopBrandUpdate($input: ShopBrandInput!) {
+    shopBrandUpdate(input: $input) {
+      brand {
+        updatedAt
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The number the storefront's "Order on WhatsApp" links go to, among its preferences. */
+export const OnlineStorePreferencesUpdateMutation = /* GraphQL */ `
+  mutation OnlineStorePreferencesUpdate($input: OnlineStorePreferencesInput!) {
+    onlineStorePreferencesUpdate(input: $input) {
+      preferences {
+        whatsappNumber
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

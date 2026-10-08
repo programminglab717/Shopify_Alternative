@@ -638,3 +638,41 @@ export interface BankTransferSettingsData {
 export interface SettingsPayloadData {
   userErrors: UserError[];
 }
+
+export interface PaymentGatewayOffered {
+  gateway: string;
+  name: string;
+  test: boolean;
+  refunds: 'NONE' | 'PARTIAL' | 'WHOLE';
+  credentials: { key: string; label: string; optional: boolean }[];
+}
+
+export interface PaymentGatewayAccountDetail {
+  id: string;
+  gateway: string;
+  gatewayName: string;
+  environment: 'PRODUCTION' | 'SANDBOX';
+  credentialsHint: string;
+  webhookUrl: string;
+  createdAt: string;
+}
+
+export interface PaymentGatewaysData {
+  paymentGateways: PaymentGatewayOffered[];
+  paymentGatewayAccounts: PaymentGatewayAccountDetail[];
+}
+
+export interface PaymentGatewayAccountPayloadData {
+  paymentGatewayAccount: PaymentGatewayAccountDetail | null;
+  userErrors: UserError[];
+}
+
+export interface ShopDetailsData {
+  shop: {
+    brand: {
+      logo: { id: string; url: string } | null;
+      squareLogo: { id: string; url: string } | null;
+    };
+  };
+  onlineStorePreferences: { whatsappNumber: string | null };
+}
