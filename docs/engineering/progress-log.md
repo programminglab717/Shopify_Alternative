@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### Customers in the admin
+### 488d439 · Customers in the admin
 
 * **The customers section** ([ADR-269](../architecture/13-decision-log.md#adr-269--the-admins-customers-a-list-searched-by-any-part-of-a-number-a-name-or-an-email-and-a-customers-page-with-how-to-reach-them-how-their-parcels-went-their-orders-addresses-and-the-shops-note-and-tags-agents-see-the-number-when-they-ask-which-is-logged-and-owners-and-managers-block-it-from-there)):
   the list searched by any part of a number, a name or an email; a customer's page with how to
