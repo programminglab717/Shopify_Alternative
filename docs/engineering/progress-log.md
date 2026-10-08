@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### Draft orders in the admin
+### 5758fe3 · Draft orders in the admin
 
 * **Orders taken in a chat or on a call** ([ADR-277](../architecture/13-decision-log.md#adr-277--staff-take-orders-over-the-phone-or-in-a-chat-as-drafts-in-the-admin-products-found-and-added-at-the-price-agreed-where-it-was-taken-and-how-it-is-paid-its-link-sent-on-whatsapp-for-the-customer-to-give-the-address-and-confirm-or-the-draft-placed-at-once-and-tertiary-buttons-that-take-something-away-are-red)):
   drafts listed open and placed; a new one with products found and added at the price agreed,
