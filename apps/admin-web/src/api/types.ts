@@ -730,3 +730,27 @@ export interface BillingData {
     raastId: string | null;
   } | null;
 }
+
+export type DiscountCodeKind = 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_SHIPPING';
+
+export interface DiscountCodeValue {
+  id: string;
+  code: string;
+  title: string;
+  kind: DiscountCodeKind;
+  summary: string;
+  status: 'ACTIVE' | 'SCHEDULED' | 'EXPIRED';
+  usageCount: number;
+  usageLimit: number | null;
+  startsAt: string;
+  endsAt: string | null;
+}
+
+export interface DiscountCodesData {
+  discountCodes: { nodes: DiscountCodeValue[] };
+}
+
+export interface DiscountCodePayloadData {
+  discountCode: DiscountCodeValue | null;
+  userErrors: UserError[];
+}

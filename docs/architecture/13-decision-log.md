@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-275 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-276 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -283,6 +283,7 @@
 | 273 | The pages the core's emails link to are the admin's: a new password set from a reset link, signing every session out, this tab's too; an email proved, or changed, with a tap rather than as the page opens; and a link to set a new password asked for from signing in. The admin reads `/auth`'s field errors as the core names them | Accepted |
 | 274 | The admin's settings take the shop's online payments and its brand: a gateway connected once the member confirms who they are, its webhook address given to copy into the gateway's dashboard, the gateways put in the order customers are offered them or archived; the shop's logo and square logo uploaded from the phone, and its WhatsApp number | Accepted |
 | 275 | The admin's billing shows the shop's plan with Hatti and what it pays: the plans side by side, monthly or yearly, one chosen or kept by the owner once they confirm who they are; an invoice paid through Hatti's gateway, or by transfer or Raast with its reference given; and message credit bought. Managers read it | Accepted |
+| 276 | The admin's discount codes are a section of their own for those who make them: each with what it gives in a line, whether it works now and how often it was used; made for a percentage, an amount or free delivery, limited and dated; ended at once, or deleted | Accepted |
 
 ---
 
@@ -11419,3 +11420,31 @@
   * **Paying by transfer before choosing:** the core invoices first, so the transfer's purpose
     names an invoice Hatti's people can match.
   * **Hiding billing from managers:** they read the plan's limits as they plan the shop's work.
+
+## ADR-276 · The admin's discount codes are a section of their own for those who make them: each with what it gives in a line, whether it works now and how often it was used; made for a percentage, an amount or free delivery, limited and dated; ended at once, or deleted
+
+* **Context:** Discount codes are the pricing module's: a percentage or an amount off an order's
+  items, or free delivery, typed in any letter case at the cart or checkout, with a minimum, a
+  limit of uses, one use a customer, and a start and an end ([ADR-062](#adr-062--discount-codes-are-the-pricing-modules-a-percentage-or-an-amount-off-an-orders-items-or-free-delivery-matched-in-any-letter-case)). Owners, managers
+  and marketers make them. The admin had no place for them, and its bottom bar keeps five slots
+  for the busiest sections ([ADR-270](#adr-270--the-admins-shipping-packed-orders-booked-with-the-shops-courier-account-in-a-tap-each-booking-shown-as-the-worker-books-it-and-its-courier-carries-it-booked-parcels-labels-and-the-accounts-load-sheet-printed-from-a-tab-of-their-own-and-on-a-phone-the-bottom-bars-five-slots-kept-for-the-busiest-sections-the-rest-under-more)).
+* **Decision:**
+  * **Discounts** (`/shop_…/discounts`) is a section of its own, for owners, managers and
+    marketers; a marketer's five sections fill the bottom bar, the others' are under More.
+  * **The codes**, newest first: the code, what staff call it where that differs, what it gives
+    in a line as the core words it, whether it is active, scheduled or ended, and how often it
+    was used of how many.
+  * **A new code:** typed, or made up as eight letters and digits easy to read out on a call (no
+    0 and O, no 1 and I); a percentage, an amount or free delivery; a minimum, a limit of uses,
+    one order a customer; a start and an end by day, the end at the day's close.
+  * **Ending a code** sets its end to now, which keeps it and its history; **deleting** one
+    after a second tap leaves orders placed with it as they were.
+* **Consequences:**
+  * A shop runs an Eid sale, or gives an influencer a code, from a phone, and stops it the moment
+    it should stop.
+  * Changing a code's terms waits: ending it and making another does it meanwhile.
+* **Alternatives:**
+  * **Discounts under settings:** marketers, who make most codes, open no settings; and codes come
+    and go weekly, as settings do not.
+  * **A switch to turn a code off and on:** the core has no paused state; an end now says what
+    happens, and another code starts it again.

@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, discount codes in the admin** (CHK-06): listed with how often each was used, made for a
-percentage, an amount or free delivery, limited, and turned off; then draft orders staff take over
-the phone (ORD-03). Urdu handles wait, as decided.
+**Next, draft orders in the admin** (ORD-03): an order taken over the phone or WhatsApp, its items
+and customer chosen, its link sent to confirm and fill in the address; then the activity log
+(ADM-04). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### Discount codes in the admin
+
+* **Discounts, a section of their own** ([ADR-276](../architecture/13-decision-log.md#adr-276--the-admins-discount-codes-are-a-section-of-their-own-for-those-who-make-them-each-with-what-it-gives-in-a-line-whether-it-works-now-and-how-often-it-was-used-made-for-a-percentage-an-amount-or-free-delivery-limited-and-dated-ended-at-once-or-deleted)):
+  the codes with what each gives, whether it works now and how often it was used; a new one for a
+  percentage, an amount or free delivery, limited and dated, its code typed or made up to be read
+  out; one ended at once, or deleted. Owners, managers and marketers see it.
+* **Tried against the core:** the seed's owner made a 10% code for orders from Rs 2,000, which the
+  core summed up in a line; the same code again was refused in the core's words; it was ended, then
+  deleted; with no errors in the browser.
+* 1962 tests: making a code as a marketer, ending and deleting, and who sees the section.
 
 ### a87c011 · Plan and billing in the admin
 

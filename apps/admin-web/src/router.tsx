@@ -24,6 +24,7 @@ import {
   ResetPasswordPage,
   VerifyEmailPage,
 } from './auth/email-link-pages';
+import { DiscountsPage } from './discounts/discounts-page';
 import { InvitationPage } from './invitation/invitation-page';
 import { HomePage } from './home/home-page';
 import { useLocale } from './i18n/locale';
@@ -207,6 +208,12 @@ const shipping = createRoute({
   component: ShippingPage,
 });
 
+const discounts = createRoute({
+  getParentRoute: () => shop,
+  path: 'discounts',
+  component: DiscountsPage,
+});
+
 const more = createRoute({
   getParentRoute: () => shop,
   path: 'more',
@@ -322,6 +329,7 @@ export const routeTree = root.addChildren([
     customers,
     customer,
     shipping,
+    discounts,
     more,
     settings,
     settingsCouriers,

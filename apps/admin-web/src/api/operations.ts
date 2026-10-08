@@ -1586,3 +1586,75 @@ export const BillingCreditsBuyMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const DISCOUNT_CODE = /* GraphQL */ `
+  fragment Discount on DiscountCode {
+    id
+    code
+    title
+    kind
+    summary
+    status
+    usageCount
+    usageLimit
+    startsAt
+    endsAt
+  }
+`;
+
+/** The shop's discount codes, newest first, with what each gives and how often it was used. */
+export const DiscountCodesQuery = /* GraphQL */ `
+  query DiscountCodes($query: String) {
+    discountCodes(first: 100, query: $query) {
+      nodes {
+        ...Discount
+      }
+    }
+  }
+  ${DISCOUNT_CODE}
+`;
+
+/** A discount code made (CHK-06). */
+export const DiscountCodeCreateMutation = /* GraphQL */ `
+  mutation DiscountCodeCreate($discountCode: DiscountCodeInput!) {
+    discountCodeCreate(discountCode: $discountCode) {
+      discountCode {
+        ...Discount
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${DISCOUNT_CODE}
+  ${USER_ERRORS}
+`;
+
+/** A discount code changed: here, ended now. */
+export const DiscountCodeUpdateMutation = /* GraphQL */ `
+  mutation DiscountCodeUpdate($id: ID!, $discountCode: DiscountCodeInput!) {
+    discountCodeUpdate(id: $id, discountCode: $discountCode) {
+      discountCode {
+        id
+        status
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A discount code deleted; orders placed with it keep what it took off. */
+export const DiscountCodeDeleteMutation = /* GraphQL */ `
+  mutation DiscountCodeDelete($id: ID!) {
+    discountCodeDelete(id: $id) {
+      deletedDiscountCodeId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
