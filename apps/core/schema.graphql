@@ -510,6 +510,9 @@ type BillingMessagePrice {
 type BillingPlan {
   code: BillingPlanCode!
 
+  """Whether the shop may connect a domain of its own (ADR-264)."""
+  customDomains: Boolean!
+
   """Locations it has room for."""
   locationLimit: Int!
 
@@ -519,7 +522,12 @@ type BillingPlan {
   """Such as "Growth"."""
   name: String!
 
-  """Orders a month it is meant for; null for any number. Not enforced yet."""
+  """Whether the shop may connect accounts with payment gateways (ADR-264)."""
+  onlineGateways: Boolean!
+
+  """
+  Orders a month it takes before those past them are locked until the shop chooses a bigger plan (ADR-263); null for any number.
+  """
   orderLimit: Int
 
   """Members of staff it has room for, the owner among them."""
@@ -5319,7 +5327,7 @@ type Mutation {
   discountCodeUpdate(discountCode: DiscountCodeInput!, id: ID!): DiscountCodeUpdatePayload!
 
   """
-  Connects a domain of the shop's own. Point it at the `dnsTarget` the answer names, then `domainVerify` it: the storefront answers at it from then on.
+  Connects a domain of the shop's own. Point it at the `dnsTarget` the answer names, then `domainVerify` it: the storefront answers at it from then on. None on a plan without domains of its own, such as Free, which keeps those connected before (ADR-264).
   """
   domainCreate(domain: DomainCreateInput!): DomainPayload!
 
@@ -5746,7 +5754,7 @@ type Mutation {
   paymentGatewayAccountArchive(id: ID!): PaymentGatewayAccountPayload!
 
   """
-  Connects the shop's own account with a payment gateway, with the credentials its dashboard gives, kept sealed and never shown again: orders waiting for their money offer to take it online through it, on their pages. Add the account's webhookUrl in the gateway's dashboard. One live account a gateway.
+  Connects the shop's own account with a payment gateway, with the credentials its dashboard gives, kept sealed and never shown again: orders waiting for their money offer to take it online through it, on their pages. Add the account's webhookUrl in the gateway's dashboard. One live account a gateway; none on a plan without payment gateways, such as Free, which keeps those connected before (ADR-264).
   """
   paymentGatewayAccountConnect(input: PaymentGatewayAccountInput!): PaymentGatewayAccountPayload!
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-263 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-264 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -271,6 +271,7 @@
 | 261 | A translation is deleted with what it translates, whichever way that goes, by triggers on the tables of what may be translated, as a foreign key would if one column could name ten kinds; a menu's items' as the menu goes or an update drops them | Accepted |
 | 262 | Shops' verified domains are checked again every six hours by the worker: one DNS points elsewhere is noted and its shop told once, at its alerts number and its owner's email, and three days on it is disconnected, verified no more nor primary, the shop's address on the platform's domain primary in its place | Accepted |
 | 263 | A shop on a plan that limits its orders a month, Free's 50, takes every order all the same: one past the limit, counted in the shop's time zone without those cancelled, comes in with its customer hidden from staff and cannot be confirmed, packed, booked or shipped until a plan without the limit frees it or a counted order of its month is cancelled; the owner is told at four fifths of the limit and at it | Accepted |
+| 264 | A plan says whether it includes a domain of the shop's own and accounts with payment gateways, and Free includes neither: connecting one on a plan without it is refused with the plan named, through the port other modules ask a plan's limits through, and those connected before are kept, checked, changed and used as before | Accepted |
 
 ---
 
@@ -10955,3 +10956,38 @@
     business; the order is theirs as any other.
   * **Freeing orders by the next month:** an order of last month left locked would wait a month
     for a shop that cannot ship it; it stays locked until the shop upgrades or cancels it.
+
+## ADR-264 · A plan says whether it includes a domain of the shop's own and accounts with payment gateways, and Free includes neither: connecting one on a plan without it is refused with the plan named, through the port other modules ask a plan's limits through, and those connected before are kept, checked, changed and used as before
+
+* **Context:** Free gives a shop its address on Hatti's domain and takes cash on delivery, bank
+  transfer and payment links; a domain of its own and every supported gateway come with Starter
+  (docs/product/03-pricing-and-business-model.md). [ADR-154](#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port) held shops to their plans'
+  staff and locations alone, through `PlanAllowance`, and [ADR-263](#adr-263--a-shop-on-a-plan-that-limits-its-orders-a-month-frees-50-takes-every-order-all-the-same-one-past-the-limit-counted-in-the-shops-time-zone-without-those-cancelled-comes-in-with-its-customer-hidden-from-staff-and-cannot-be-confirmed-packed-booked-or-shipped-until-a-plan-without-the-limit-frees-it-or-a-counted-order-of-its-month-is-cancelled-the-owner-is-told-at-four-fifths-of-the-limit-and-at-it) to Free's orders a
+  month. Domains of a shop's own ([ADR-048](#adr-048--a-shops-own-domains-are-the-online-stores-one-shops-each-served-once-dns-points-them-at-the-platform-the-primary-one-where-pages-send-shoppers)) and its accounts with gateways
+  ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)) were connected on any plan. On 2026-10-07 it was decided: Free shops
+  cannot connect a custom domain or an online payment gateway; the API refuses and names the
+  plan; those connected already keep working.
+* **Decision:**
+  * **Each plan says what it includes** (`customDomains`, `onlineGateways` in `PLANS`, and on
+    `BillingPlan`): Free neither, Starter and up both.
+  * **Modules ask through the port:** `PlanAllowance.excludes(shopId, feature)` gives the name of
+    a plan that leaves the feature out, null otherwise; without the port, as in most tests, any
+    plan includes it.
+  * **Connecting is refused** on such a plan, with `planFeatureMessage`: `domainCreate` on the
+    host ("The Free plan doesn't include a domain of the shop's own: choose a bigger plan to
+    connect one"), and `paymentGatewayAccountConnect` on the gateway, an archived account
+    connected again among them.
+  * **What is connected stays:** a domain is checked, made primary, served and let go as before,
+    and an account is changed, offered, paid through and archived as before, whatever the plan.
+* **Consequences:**
+  * A Free shop sells through its address on Hatti's domain, by cash on delivery and transfer, and
+    sees what a bigger plan would add the moment it tries.
+  * A shop back on Free from a paid plan keeps its domain and its gateways.
+* **Alternatives:**
+  * **Disconnecting a domain and archiving gateways on Free:** a shop whose plan lapsed would lose
+    its storefront's address and its customers' way to pay at once; the plan's end is told as it
+    is.
+  * **A limit of none, as staff's and locations' limits count:** "room for 0 domains" says less
+    than a plan that does not include them.
+  * **Letting Free connect a gateway's sandbox:** nothing is sold through it; a shop tries a
+    gateway on the plan it will use it on.

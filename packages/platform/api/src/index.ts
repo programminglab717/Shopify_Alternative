@@ -36,7 +36,9 @@ export {
 export { Loaders, RequestLoaders } from './loaders.js';
 export {
   PlanAllowance,
+  planFeatureMessage,
   planLimitMessage,
+  type PlanFeature,
   type PlanLimit,
   type PlanLimitKind,
 } from './plan-allowance.js';

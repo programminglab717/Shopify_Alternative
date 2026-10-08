@@ -2,7 +2,8 @@ import type { CurrencyCode } from '@hatti/money';
 
 // What shops pay Hatti (BIL-01, ADR-154), as docs/product/03-pricing-and-business-model.md
 // proposes it: plans priced in rupees, by the month or by the year, a year being ten months'
-// price, with the staff and locations each allows. Enterprise is agreed with each shop, not here.
+// price, with the staff, locations and orders a month each allows, and whether it includes a
+// domain of the shop's own and payment gateways. Enterprise is agreed with each shop, not here.
 
 export const PLAN_CODES = ['free', 'starter', 'growth', 'pro'] as const;
 export type PlanCode = (typeof PLAN_CODES)[number];
@@ -22,8 +23,14 @@ export interface Plan {
   /** Members of staff, the owner among them, and locations it has room for. */
   staff: number;
   locations: number;
-  /** Orders a month it is meant for; null for any number. Counted, not enforced yet. */
+  /**
+   * Orders a month it takes before those past them are locked until the shop's plan has room for
+   * them (ADR-263); null for any number.
+   */
   ordersPerMonth: number | null;
+  /** Whether the shop may connect a domain of its own, and accounts with payment gateways (ADR-264). */
+  customDomains: boolean;
+  onlineGateways: boolean;
 }
 
 export const PLANS: Readonly<Record<PlanCode, Plan>> = {
@@ -34,6 +41,8 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     staff: 1,
     locations: 1,
     ordersPerMonth: 50,
+    customDomains: false,
+    onlineGateways: false,
   },
   starter: {
     code: 'starter',
@@ -42,6 +51,8 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     staff: 3,
     locations: 1,
     ordersPerMonth: null,
+    customDomains: true,
+    onlineGateways: true,
   },
   growth: {
     code: 'growth',
@@ -50,6 +61,8 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     staff: 8,
     locations: 3,
     ordersPerMonth: null,
+    customDomains: true,
+    onlineGateways: true,
   },
   pro: {
     code: 'pro',
@@ -58,6 +71,8 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     staff: 20,
     locations: 10,
     ordersPerMonth: null,
+    customDomains: true,
+    onlineGateways: true,
   },
 };
 

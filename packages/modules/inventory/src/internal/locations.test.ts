@@ -90,6 +90,10 @@ describe.skipIf(!server)('LocationService', () => {
       async limitIn(): Promise<PlanLimit> {
         return { limit: 1, plan: 'Free' };
       }
+
+      async excludes(): Promise<string | null> {
+        return null;
+      }
     }
     const planned = new LocationService(f.db, new OneLocation());
     unwrap(await planned.add(f.a, { name: 'Shop' }));

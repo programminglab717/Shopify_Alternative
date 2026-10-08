@@ -7,6 +7,7 @@ import {
   failOne,
   shopProfile,
   type MutationResult,
+  type PlanFeature,
   type PlanLimit,
   type PlanLimitKind,
   type TenantContext,
@@ -539,6 +540,12 @@ export class BillingService extends PlanAllowance {
     const limit =
       kind === 'staff' ? plan.staff : kind === 'locations' ? plan.locations : plan.ordersPerMonth;
     return limit === null ? null : { limit, plan: plan.name };
+  }
+
+  async excludes(shopId: string, feature: PlanFeature): Promise<string | null> {
+    const row = await this.db.tenant(shopId, (tx) => subscriptionIn(tx, shopId, false));
+    const plan = PLANS[row?.plan ?? 'free'];
+    return plan[feature] ? null : plan.name;
   }
 
   async subscriptionOf(shopId: string): Promise<SubscriptionRecord> {

@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { DnsLookup, StorefrontSite } from '@hatti/api';
+import { DnsLookup, PlanAllowance, StorefrontSite } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { DOMAIN_LIMIT, hostOf } from './domain-name.js';
@@ -21,6 +21,21 @@ class FakeDns extends DnsLookup {
 
   async addresses(host: string): Promise<string[]> {
     return this.records.get(host)?.addresses ?? [];
+  }
+}
+
+/** A plan, such as Free, that leaves out every feature it may. */
+class WithoutFeatures extends PlanAllowance {
+  async limitOf(): Promise<null> {
+    return null;
+  }
+
+  async limitIn(): Promise<null> {
+    return null;
+  }
+
+  async excludes(): Promise<string> {
+    return 'Free';
   }
 }
 
@@ -258,5 +273,27 @@ describe.skipIf(!server)('DomainService', () => {
       verifiedAt: expect.any(Date),
       unpointedSince: null,
     });
+  });
+
+  it('connects no domain on a plan without them, and keeps those connected before (ADR-264)', async () => {
+    const www = unwrap(await service.create(f.a, { host: 'www.zari.pk' }));
+    const free = new DomainService(
+      f.db,
+      new StorefrontSite('https://hatti.pk'),
+      dns,
+      new WithoutFeatures(),
+    );
+    expect(errorsOf(await free.create(f.a, { host: 'shop.zari.pk' }))).toEqual([
+      [
+        'host',
+        'INVALID',
+        "The Free plan doesn't include a domain of the shop's own: choose a bigger plan to " +
+          'connect one',
+      ],
+    ]);
+    expect((await free.list(f.a)).map((domain) => domain.host)).toEqual(['www.zari.pk']);
+    // The one connected before is checked, and served, as before.
+    dns.records.set('www.zari.pk', { cnames: ['shops.hatti.pk'] });
+    expect(unwrap(await free.verify(f.a, www.id))).toMatchObject({ verifiedAt: expect.any(Date) });
   });
 });

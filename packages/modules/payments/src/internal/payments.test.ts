@@ -9,7 +9,7 @@ import {
 } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { InputChecker } from '@hatti/api';
+import { InputChecker, PlanAllowance } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { toPublicId } from '@hatti/ids';
 import { checkAddress, orderLinkPage, type PrepaidDiscountInput } from '@hatti/orders/public';
@@ -359,6 +359,51 @@ describe.skipIf(!server)('Payments online', () => {
     // Archived, another may be connected.
     await f.connectTest(f.a);
     expect((await f.accounts.list(f.a)).map((each) => each.gateway)).toEqual(['test']);
+  });
+
+  it('connects no account on a plan without payment gateways, and keeps those connected before (ADR-264)', async () => {
+    const connected = await f.connectTest(f.a);
+    const free = f.accountsOn(
+      new (class extends PlanAllowance {
+        async limitOf(): Promise<null> {
+          return null;
+        }
+
+        async limitIn(): Promise<null> {
+          return null;
+        }
+
+        async excludes(): Promise<string> {
+          return 'Free';
+        }
+      })(),
+    );
+    const refused = await free.connect(f.a, {
+      gateway: 'jazzcash',
+      credentials: [
+        { key: 'merchantId', value: 'MC12345' },
+        { key: 'password', value: 'pass' },
+        { key: 'integritySalt', value: 'salt' },
+      ],
+    });
+    expect(refused.ok ? null : refused.errors).toEqual([
+      {
+        field: ['input', 'gateway'],
+        code: 'INVALID',
+        message:
+          "The Free plan doesn't include payment gateways: choose a bigger plan to connect one",
+      },
+    ]);
+    // The one connected before is changed, and offered, as before.
+    expect(
+      unwrap(
+        await free.update(f.a, connected, {
+          environment: 'sandbox',
+          credentials: [{ key: 'secret', value: 'sandbox-secret' }],
+        }),
+      ),
+    ).toMatchObject({ environment: 'sandbox' });
+    expect((await free.list(f.a)).map((each) => each.gateway)).toEqual(['test']);
   });
 
   it("takes what a transfer order waits for through the shop's gateway, from its page", async () => {

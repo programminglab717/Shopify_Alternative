@@ -1177,6 +1177,10 @@ Stock follows Shopify's model too. How changes are written is decided in
   hide its customer, and refuse what works on it with `OVER_LIMIT_MESSAGE`; what changes
   nothing of its customer or its shipping passes `{ overLimit: 'allow' }`. Its customer's own
   answers go through `confirmLocked`, which never refuses it.
+* **Ask whether a plan includes what the shop connects**
+  ([ADR-264](../architecture/13-decision-log.md#adr-264--a-plan-says-whether-it-includes-a-domain-of-the-shops-own-and-accounts-with-payment-gateways-and-free-includes-neither-connecting-one-on-a-plan-without-it-is-refused-with-the-plan-named-through-the-port-other-modules-ask-a-plans-limits-through-and-those-connected-before-are-kept-checked-changed-and-used-as-before)):
+  `PlanAllowance.excludes` before connecting a domain, a gateway's account or anything a
+  plan may leave out, refused with `planFeatureMessage`; never take away what is connected.
 * **Hatti's invoices are paid as orders are** (ADR-151): through Hatti's own gateway account
   (`HattiGateway`, from `hattiGatewayOf` in `apps/core`), each try recorded in `billing.payments`
   before the owner leaves, and the signed return or webhook paying it once

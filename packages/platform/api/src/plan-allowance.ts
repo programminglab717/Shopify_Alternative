@@ -6,6 +6,12 @@ import type { Tx } from '@hatti/db';
  */
 export type PlanLimitKind = 'staff' | 'locations' | 'ordersPerMonth';
 
+/**
+ * What a shop's plan with Hatti includes or leaves out (BIL-01, ADR-264): a domain of the shop's
+ * own, and its accounts with payment gateways.
+ */
+export type PlanFeature = 'customDomains' | 'onlineGateways';
+
 /** A limit of the shop's plan. */
 export interface PlanLimit {
   /** How many the plan allows. */
@@ -24,6 +30,20 @@ export abstract class PlanAllowance {
 
   /** {@link limitOf}, read in the shop's transaction `tx`, as placing an order asks it. */
   abstract limitIn(tx: Tx, shopId: string, kind: PlanLimitKind): Promise<PlanLimit | null>;
+
+  /**
+   * The name of the shop's plan, such as "Free", when it leaves `feature` out; null when it
+   * includes it. Asked before connecting one: those connected already are kept.
+   */
+  abstract excludes(shopId: string, feature: PlanFeature): Promise<string | null>;
+}
+
+/**
+ * Why one is not connected: "The Free plan doesn't include payment gateways: choose a bigger plan
+ * to connect one".
+ */
+export function planFeatureMessage(plan: string, what: string): string {
+  return `The ${plan} plan doesn't include ${what}: choose a bigger plan to connect one`;
 }
 
 /** Why one more is refused: "The Free plan has room for 1 location: choose a bigger plan for more". */

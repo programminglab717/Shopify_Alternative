@@ -1,5 +1,11 @@
 // Shared set-up for the payments module's database tests. Not part of the build.
-import { PublicSite, StorefrontSite, type MutationResult, type TenantContext } from '@hatti/api';
+import {
+  PublicSite,
+  StorefrontSite,
+  type MutationResult,
+  type PlanAllowance,
+  type TenantContext,
+} from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
 import { SecretBox } from '@hatti/crypto';
 import { BlocklistService, CustomerService } from '@hatti/customers/public';
@@ -51,6 +57,8 @@ export interface PaymentsFixture {
   gateways: PaymentGateways;
   testGateway: TestGateway;
   accounts: GatewayAccountService;
+  /** The shop's accounts, connected as a plan with `allowance` lets it (ADR-264). */
+  accountsOn(allowance: PlanAllowance): GatewayAccountService;
   payments: OnlinePaymentService;
   /** What paying online takes off (ADR-222). */
   settings: OnlinePaymentSettingsService;
@@ -195,6 +203,7 @@ export async function paymentsFixture(
     gateways,
     testGateway,
     accounts,
+    accountsOn: (allowance) => new GatewayAccountService(db, box, site, gateways, allowance),
     payments,
     settings: new OnlinePaymentSettingsService(db),
     async variantOf(owner, title, price) {

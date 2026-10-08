@@ -1,8 +1,10 @@
 import {
   InputChecker,
+  PlanAllowance,
   PublicSite,
   actorColumnsOf,
   failOne,
+  planFeatureMessage,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
@@ -10,7 +12,7 @@ import { SecretBox } from '@hatti/crypto';
 import { Database, toDate, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import {
   PaymentEvents,
@@ -109,6 +111,8 @@ export class GatewayAccountService {
     private readonly box: SecretBox,
     private readonly site: PublicSite,
     @Inject(PAYMENT_GATEWAYS) private readonly gateways: PaymentGateways,
+    /** Whether the shop's plan includes payment gateways (ADR-264); without it, any does. */
+    @Optional() private readonly allowance?: PlanAllowance,
   ) {}
 
   /**
@@ -139,7 +143,7 @@ export class GatewayAccountService {
 
   /**
    * Connects an account with a gateway: one live account a gateway, offered after the shop's
-   * others.
+   * others. Refused on a plan without payment gateways, which keeps those connected before.
    */
   async connect(
     tenant: TenantContext,
@@ -161,6 +165,10 @@ export class GatewayAccountService {
       ? this.#checkCredentials(check, gateway.info, input.credentials)
       : null;
     if (!check.ok || !gateway || !credentials) return { ok: false, errors: check.errors };
+    const plan = await this.allowance?.excludes(tenant.shopId, 'onlineGateways');
+    if (plan) {
+      return failOne(['input', 'gateway'], 'INVALID', planFeatureMessage(plan, 'payment gateways'));
+    }
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       await lockAccounts(tx, tenant.shopId);

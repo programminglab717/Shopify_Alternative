@@ -100,7 +100,8 @@ export class PaymentsResolver {
       "Connects the shop's own account with a payment gateway, with the credentials its " +
       'dashboard gives, kept sealed and never shown again: orders waiting for their money ' +
       "offer to take it online through it, on their pages. Add the account's webhookUrl in the " +
-      "gateway's dashboard. One live account a gateway.",
+      "gateway's dashboard. One live account a gateway; none on a plan without payment " +
+      'gateways, such as Free, which keeps those connected before (ADR-264).',
   })
   @RequireScopes('write_settings')
   @RequireRecentAuthentication()

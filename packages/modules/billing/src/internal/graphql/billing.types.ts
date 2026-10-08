@@ -145,9 +145,17 @@ export class BillingPlan {
 
   @Field(() => Int, {
     nullable: true,
-    description: 'Orders a month it is meant for; null for any number. Not enforced yet.',
+    description:
+      'Orders a month it takes before those past them are locked until the shop chooses a bigger ' +
+      'plan (ADR-263); null for any number.',
   })
   orderLimit!: number | null;
+
+  @Field({ description: 'Whether the shop may connect a domain of its own (ADR-264).' })
+  customDomains!: boolean;
+
+  @Field({ description: 'Whether the shop may connect accounts with payment gateways (ADR-264).' })
+  onlineGateways!: boolean;
 }
 
 @ObjectType({

@@ -37,7 +37,8 @@ export class DomainResolver {
   @Mutation(() => DomainPayload, {
     description:
       "Connects a domain of the shop's own. Point it at the `dnsTarget` the answer names, then " +
-      '`domainVerify` it: the storefront answers at it from then on.',
+      '`domainVerify` it: the storefront answers at it from then on. None on a plan without ' +
+      'domains of its own, such as Free, which keeps those connected before (ADR-264).',
   })
   @RequireScopes('write_domains')
   async domainCreate(

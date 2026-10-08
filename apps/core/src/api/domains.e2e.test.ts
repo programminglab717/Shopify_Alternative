@@ -84,6 +84,13 @@ describe.skipIf(!server)("Admin GraphQL API: shops' own domains", () => {
       `INSERT INTO control.shops (id, name, handle) VALUES ($1, 'Zari', 'zari'), ($2, 'Other', 'other')`,
       [shopA, shopB],
     );
+    // On Growth, which includes domains of their own (ADR-264).
+    await admin.query(
+      `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+       SELECT id, 'growth', 'monthly', now(), now() + interval '1 month'
+         FROM control.shops WHERE id IN ($1, $2)`,
+      [shopA, shopB],
+    );
     tokens.a = await issueToken(shopA, ['write_domains']);
     tokens.reader = await issueToken(shopA, ['read_domains']);
     tokens.b = await issueToken(shopB, ['write_domains']);

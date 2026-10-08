@@ -21,6 +21,10 @@ class FivePerMonth extends PlanAllowance {
     return this.#limit(kind);
   }
 
+  async excludes(): Promise<string | null> {
+    return null;
+  }
+
   #limit(kind: PlanLimitKind): PlanLimit | null {
     return kind === 'ordersPerMonth' && !this.unlimited ? { limit: 5, plan: 'Free' } : null;
   }

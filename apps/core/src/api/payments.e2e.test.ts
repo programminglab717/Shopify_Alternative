@@ -205,6 +205,12 @@ describe.skipIf(!server)('Admin GraphQL API and order pages: payments online', (
     admin = new pg.Client({ connectionString: testDb.adminUrl });
     await admin.connect();
     await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Zari')`, [shop]);
+    // On Growth, which includes payment gateways (ADR-264).
+    await admin.query(
+      `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+       VALUES ($1, 'growth', 'monthly', now(), now() + interval '1 month')`,
+      [shop],
+    );
     tokens.owner = await issueToken(['write_settings', 'write_products', 'read_orders']);
     tokens.clerk = await issueToken(['write_orders']);
     tokens.reader = await issueToken(['read_orders']);

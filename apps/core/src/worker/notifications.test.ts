@@ -1826,4 +1826,8 @@ class FivePerMonth extends PlanAllowance {
   async limitIn(_tx: unknown, shopId: string, kind: PlanLimitKind): Promise<PlanLimit | null> {
     return this.limitOf(shopId, kind);
   }
+
+  async excludes(): Promise<string | null> {
+    return null;
+  }
 }

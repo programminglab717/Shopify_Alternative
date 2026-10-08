@@ -1,14 +1,16 @@
 import {
   DnsLookup,
+  PlanAllowance,
   StorefrontSite,
   failOne,
+  planFeatureMessage,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { and, asc, count, desc, eq, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { DOMAIN_LIMIT, hostOf, sameHost } from './domain-name.js';
 import {
@@ -55,6 +57,8 @@ export class DomainService {
     private readonly db: Database,
     private readonly storefronts: StorefrontSite,
     private readonly dns: DnsLookup,
+    /** Whether the shop's plan includes a domain of its own (ADR-264); without it, any does. */
+    @Optional() private readonly allowance?: PlanAllowance,
   ) {}
 
   /** Where a shop points a domain of its own: a CNAME record naming this host. */
@@ -76,6 +80,7 @@ export class DomainService {
 
   /**
    * Connects a domain, as a shop types it: served once it is checked. Records `domain.created`.
+   * Refused on a plan without domains of the shop's own, which keeps those connected before.
    */
   async create(
     tenant: TenantContext,
@@ -87,6 +92,10 @@ export class DomainService {
     }
     if (this.storefronts.isPlatformHost(host) || sameHost(host, this.dnsTarget)) {
       return failOne(['host'], 'INVALID', `${host} is Hatti's: enter a domain of the shop's own`);
+    }
+    const plan = await this.allowance?.excludes(tenant.shopId, 'customDomains');
+    if (plan) {
+      return failOne(['host'], 'INVALID', planFeatureMessage(plan, "a domain of the shop's own"));
     }
     return this.db.tenant(tenant.shopId, async (tx) => {
       const [counts] = await tx

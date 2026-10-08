@@ -268,6 +268,8 @@ function toPlan(plan: Plan): BillingPlan {
     staffLimit: plan.staff,
     locationLimit: plan.locations,
     orderLimit: plan.ordersPerMonth,
+    customDomains: plan.customDomains,
+    onlineGateways: plan.onlineGateways,
   });
 }
 

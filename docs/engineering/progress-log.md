@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, the Free plan's other limits** (decided on 2026-10-07): no custom domain or online
-payment gateway on Free, those already connected kept. Urdu handles wait, as decided.
+**Next:** the backend the MVP still needs that waits for neither partners' sandboxes nor the
+infrastructure, as the status page's next steps list it. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,16 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### Free's domains and gateways
+
+* **Free connects no domain of the shop's own nor payment gateways** ([ADR-264](../architecture/13-decision-log.md#adr-264--a-plan-says-whether-it-includes-a-domain-of-the-shops-own-and-accounts-with-payment-gateways-and-free-includes-neither-connecting-one-on-a-plan-without-it-is-refused-with-the-plan-named-through-the-port-other-modules-ask-a-plans-limits-through-and-those-connected-before-are-kept-checked-changed-and-used-as-before)):
+  `domainCreate` and `paymentGatewayAccountConnect` refuse, naming the plan; those connected
+  before are kept, checked, changed and used as before.
+* **For it:** `PlanAllowance.excludes` and `planFeatureMessage`; `customDomains` and
+  `onlineGateways` on each plan and `BillingPlan`.
+* 1845 tests: each refusal, through HTTP too, what was connected before, and Growth connecting
+  both.
 
 ### a4664e4 · Free's orders a month
 

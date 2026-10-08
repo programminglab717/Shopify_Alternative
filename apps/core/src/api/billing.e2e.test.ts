@@ -101,7 +101,7 @@ describe.skipIf(!server)('Admin GraphQL API: what shops pay Hatti', () => {
     expect(
       await data(
         owner,
-        '{ billingPlans { code name monthlyPrice { amount } yearlyPrice { amount } staffLimit locationLimit orderLimit } }',
+        '{ billingPlans { code name monthlyPrice { amount } yearlyPrice { amount } staffLimit locationLimit orderLimit customDomains onlineGateways } }',
       ),
     ).toEqual([
       {
@@ -112,6 +112,8 @@ describe.skipIf(!server)('Admin GraphQL API: what shops pay Hatti', () => {
         staffLimit: 1,
         locationLimit: 1,
         orderLimit: 50,
+        customDomains: false,
+        onlineGateways: false,
       },
       {
         code: 'STARTER',
@@ -121,6 +123,8 @@ describe.skipIf(!server)('Admin GraphQL API: what shops pay Hatti', () => {
         staffLimit: 3,
         locationLimit: 1,
         orderLimit: null,
+        customDomains: true,
+        onlineGateways: true,
       },
       {
         code: 'GROWTH',
@@ -130,6 +134,8 @@ describe.skipIf(!server)('Admin GraphQL API: what shops pay Hatti', () => {
         staffLimit: 8,
         locationLimit: 3,
         orderLimit: null,
+        customDomains: true,
+        onlineGateways: true,
       },
       {
         code: 'PRO',
@@ -139,6 +145,8 @@ describe.skipIf(!server)('Admin GraphQL API: what shops pay Hatti', () => {
         staffLimit: 20,
         locationLimit: 10,
         orderLimit: null,
+        customDomains: true,
+        onlineGateways: true,
       },
     ]);
     expect(await data(owner, SUBSCRIPTION)).toEqual({
@@ -177,6 +185,29 @@ describe.skipIf(!server)('Admin GraphQL API: what shops pay Hatti', () => {
         field: ['input'],
         code: 'TOO_MANY',
         message: 'The Free plan has room for 1 location: choose a bigger plan for more',
+      },
+    ]);
+
+    // Nor a domain of its own, nor payment gateways (ADR-264).
+    const DOMAIN =
+      'mutation { domainCreate(domain: { host: "www.zari.pk" }) { domain { host } userErrors { field code message } } }';
+    expect((await data(owner, DOMAIN)).userErrors).toEqual([
+      {
+        field: ['domain', 'host'],
+        code: 'INVALID',
+        message:
+          "The Free plan doesn't include a domain of the shop's own: choose a bigger plan to connect one",
+      },
+    ]);
+    const CONNECT = `mutation ($input: PaymentGatewayAccountInput!) { paymentGatewayAccountConnect(input: $input) {
+      paymentGatewayAccount { gateway } userErrors { field code message } } }`;
+    const gateway = { gateway: 'test', credentials: [{ key: 'secret', value: 'secret-of-zari' }] };
+    expect((await data(owner, CONNECT, { input: gateway })).userErrors).toEqual([
+      {
+        field: ['input', 'gateway'],
+        code: 'INVALID',
+        message:
+          "The Free plan doesn't include payment gateways: choose a bigger plan to connect one",
       },
     ]);
 
@@ -249,6 +280,12 @@ describe.skipIf(!server)('Admin GraphQL API: what shops pay Hatti', () => {
       ).userErrors,
     ).toEqual([]);
     expect((await data(appToken, ADD, { name: 'Warehouse' })).userErrors).toEqual([]);
+    // And a domain of its own, and payment gateways.
+    expect(await data(owner, DOMAIN)).toEqual({ domain: { host: 'www.zari.pk' }, userErrors: [] });
+    expect(await data(owner, CONNECT, { input: gateway })).toEqual({
+      paymentGatewayAccount: { gateway: 'test' },
+      userErrors: [],
+    });
     // A forged return records nothing: the page says it waits.
     const other = await data(owner, CHANGE, { input: { plan: 'PRO', interval: 'MONTHLY' } });
     const forged = await api.app.inject({
