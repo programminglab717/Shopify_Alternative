@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### Signing in, a shop's Home and its orders in the admin
+### 0055f01 · Signing in, a shop's Home and its orders in the admin
 
 * **The merchant admin's first loop** ([ADR-265](../architecture/13-decision-log.md#adr-265--the-merchant-admin-is-a-react-app-on-an-origin-of-its-own-that-sends-auth-and-the-admin-api-on-to-the-core-staff-sign-in-by-a-code-to-their-mobile-or-by-email-with-the-second-step-their-role-needs-the-sessions-opaque-tokens-are-kept-in-the-browsers-storage-and-refreshed-by-one-tab-at-a-time-the-shop-is-in-each-pages-address-and-every-graphql-document-it-sends-is-checked-against-the-cores-schema)):
   signing in by a code to the mobile or by email, the second factor, a new account's name and
