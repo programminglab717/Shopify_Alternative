@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### Online payments and the shop's brand in the admin's settings
+### 5a5ea05 · Online payments and the shop's brand in the admin's settings
 
 * **Two more sections of settings** ([ADR-274](../architecture/13-decision-log.md#adr-274--the-admins-settings-take-the-shops-online-payments-and-its-brand-a-gateway-connected-once-the-member-confirms-who-they-are-its-webhook-address-given-to-copy-into-the-gateways-dashboard-the-gateways-put-in-the-order-customers-are-offered-them-or-archived-the-shops-logo-and-square-logo-uploaded-from-the-phone-and-its-whatsapp-number)):
   online payments, each gateway account with its webhook address to copy, put in the order
