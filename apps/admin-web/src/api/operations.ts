@@ -1823,3 +1823,56 @@ export const DraftOrderDeleteMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** What the shop's staff and apps changed, newest first, and who works there to name them by. */
+export const ActivityQuery = /* GraphQL */ `
+  query Activity($first: Int) {
+    activityLog(first: $first) {
+      nodes {
+        id
+        type
+        subjectType
+        subjectId
+        occurredAt
+        actor {
+          id
+          kind
+          role
+        }
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+    staffMembers {
+      id
+      name
+    }
+  }
+`;
+
+/** What the shop may need to account for: numbers seen, exports, erasures, support's looks. */
+export const AuditQuery = /* GraphQL */ `
+  query Audit($first: Int) {
+    auditLog(first: $first) {
+      nodes {
+        id
+        action
+        subjectId
+        occurredAt
+        actor {
+          id
+          kind
+          role
+        }
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+    staffMembers {
+      id
+      name
+    }
+  }
+`;

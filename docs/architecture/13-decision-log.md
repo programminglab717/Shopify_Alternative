@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-277 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-278 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -285,6 +285,7 @@
 | 275 | The admin's billing shows the shop's plan with Hatti and what it pays: the plans side by side, monthly or yearly, one chosen or kept by the owner once they confirm who they are; an invoice paid through Hatti's gateway, or by transfer or Raast with its reference given; and message credit bought. Managers read it | Accepted |
 | 276 | The admin's discount codes are a section of their own for those who make them: each with what it gives in a line, whether it works now and how often it was used; made for a percentage, an amount or free delivery, limited and dated; ended at once, or deleted | Accepted |
 | 277 | Staff take orders over the phone or in a chat as drafts in the admin: products found and added at the price agreed, where it was taken and how it is paid; its link sent on WhatsApp for the customer to give the address and confirm, or the draft placed at once; and tertiary buttons that take something away are red | Accepted |
+| 278 | The admin's activity says in words what changed in the shop, by whom and when, linking to what changed where it has a page; and, apart, what the shop may need to account for: numbers seen, exports, erasures and Hatti's support's looks. Owners and managers | Accepted |
 
 ---
 
@@ -11482,3 +11483,30 @@
     the orders list, where staff look for orders.
   * **Searching products as one types:** a search on tapping Find costs one request a search on a
     slow connection, and fits inside the draft's form.
+
+## ADR-278 · The admin's activity says in words what changed in the shop, by whom and when, linking to what changed where it has a page; and, apart, what the shop may need to account for: numbers seen, exports, erasures and Hatti's support's looks. Owners and managers
+
+* **Context:** What the shop's staff and apps change goes on its activity log, each change as the
+  event it recorded, by whom (a member of staff with their role, or an app) and to what
+  ([ADR-256](#adr-256--what-the-shops-staff-and-apps-change-goes-on-its-activity-log-each-event-a-request-of-the-admin-api-records-written-in-the-same-statement-as-the-outboxs-by-whom-and-to-what-never-what-it-recorded-in-a-table-of-its-own-kept-as-long-as-the-audit-log)). What it may need to account for, such as a customer's number seen
+  ([ADR-027](#adr-027--customers-numbers-are-masked-by-role-and-reveals-go-to-an-append-only-audit-log)), exports, erasures and what Hatti's support looked at
+  ([ADR-156](#adr-156--hattis-support-looks-at-a-shop-only-while-its-owner-allows-it-15-minutes-to-a-day-its-agents-hattis-own-people-signed-in-with-a-second-factor-come-as-a-caller-of-their-own-with-every-read-scope-numbers-masked-change-nothing-and-each-of-their-requests-goes-on-the-shops-audit-log-before-it-runs)), is on its audit log. Both name events as `subject.verb`, such as
+  `product.updated`, and staff by their IDs alone. Owners and managers read them.
+* **Decision:**
+  * **Activity** (`settings/activity`) lists changes newest first, fifty at a time and up to 250,
+    and on a tab of its own the audit log's entries.
+  * **Each in words:** the subject and the verb each from the admin's own words, in English and
+    Urdu ("Product updated"); one the admin has no words for reads as it is named ("gift card
+    issued"), so a new event shows before its words are added.
+  * **Who:** a member of staff by name, from the shop's staff; one who has left by the role
+    they had; an app as an app; Hatti's support as such.
+  * **What it changed** links to its page where the admin has one: a product, an order, a
+    customer, a draft.
+* **Consequences:**
+  * An owner sees who changed a price, booked a parcel or saw a number, from a phone.
+  * Filtering by subject or by member waits for shops whose logs grow long.
+* **Alternatives:**
+  * **The event's name as it is:** "product.updated" reads as code to merchants, and not at all in
+    Urdu.
+  * **A name on each entry from the core:** staff names change and people leave; the shop's own
+    list names those still there, and roles the rest.

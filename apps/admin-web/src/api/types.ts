@@ -818,3 +818,38 @@ export interface DraftVariantsData {
     }[];
   };
 }
+
+export interface ActivityActor {
+  id: string;
+  kind: 'APP' | 'STAFF' | 'SUPPORT';
+  role: string | null;
+}
+
+export interface ActivityData {
+  activityLog: {
+    nodes: {
+      id: string;
+      type: string;
+      subjectType: string;
+      subjectId: string | null;
+      occurredAt: string;
+      actor: ActivityActor;
+    }[];
+    pageInfo: { hasNextPage: boolean };
+  };
+  staffMembers: { id: string; name: string }[];
+}
+
+export interface AuditData {
+  auditLog: {
+    nodes: {
+      id: string;
+      action: string;
+      subjectId: string;
+      occurredAt: string;
+      actor: ActivityActor;
+    }[];
+    pageInfo: { hasNextPage: boolean };
+  };
+  staffMembers: { id: string; name: string }[];
+}

@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, the activity log in the admin** (ADM-04): who changed what in the shop and when, for
-owners and managers; then the home's sales over time (ANL-02). Urdu handles wait, as decided.
+**Next, sales over time in the admin** (ANL-02): the home's sales by day against the period
+before, and the products that sold most; then COD health (COD-12). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### The activity log in the admin
+
+* **Activity, in settings** ([ADR-278](../architecture/13-decision-log.md#adr-278--the-admins-activity-says-in-words-what-changed-in-the-shop-by-whom-and-when-linking-to-what-changed-where-it-has-a-page-and-apart-what-the-shop-may-need-to-account-for-numbers-seen-exports-erasures-and-hattis-supports-looks-owners-and-managers)):
+  what changed in the shop in words, by whom and when, linking to the product, order, customer or
+  draft it changed; and on a tab of its own, the numbers seen, exports, erasures and support's
+  looks the shop may need to account for.
+* **Tried against the core:** the seed's owner saw the day's fifty latest changes, from the drafts
+  placed to the stock they took, each named and timed, and the audit log's plan and credit
+  choices; with no errors in the browser.
+* 1976 tests: entries in words with who and links, older ones, the audit tab, and events
+  without words.
 
 ### 5758fe3 · Draft orders in the admin
 

@@ -3,6 +3,7 @@ import {
   Banknote,
   ChevronRight,
   CreditCard,
+  History,
   Landmark,
   MapPin,
   Receipt,
@@ -39,6 +40,7 @@ interface Section {
     | '/$shopId/settings/cash-on-delivery'
     | '/$shopId/settings/bank-transfer'
     | '/$shopId/settings/billing'
+    | '/$shopId/settings/activity'
     | '/$shopId/settings/couriers'
     | '/$shopId/settings/staff';
   label: MessageKey;
@@ -95,9 +97,15 @@ const SECTIONS: readonly Section[] = [
     hint: 'settings.billingHint',
     icon: Receipt,
   },
+  {
+    to: '/$shopId/settings/activity',
+    label: 'settings.activity',
+    hint: 'settings.activityHint',
+    icon: History,
+  },
 ];
 
-/** Settings (docs/design/02 §4), as far as they are built: the shop, delivery and payments, couriers, staff, billing. */
+/** Settings (docs/design/02 §4), as far as they are built: the shop, delivery and payments, couriers, staff, billing and activity. */
 export function SettingsPage() {
   const { t } = useLocale();
   const shopId = useShop().id;
