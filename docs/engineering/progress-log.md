@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### Free's domains and gateways
+### c63d154 · Free's domains and gateways
 
 * **Free connects no domain of the shop's own nor payment gateways** ([ADR-264](../architecture/13-decision-log.md#adr-264--a-plan-says-whether-it-includes-a-domain-of-the-shops-own-and-accounts-with-payment-gateways-and-free-includes-neither-connecting-one-on-a-plan-without-it-is-refused-with-the-plan-named-through-the-port-other-modules-ask-a-plans-limits-through-and-those-connected-before-are-kept-checked-changed-and-used-as-before)):
   `domainCreate` and `paymentGatewayAccountConnect` refuse, naming the plan; those connected
