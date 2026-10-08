@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, the cash couriers hold in the admin** (COD-10): what each courier owes from delivered
-cash-on-delivery orders, by how long it has been owed, and their statements matched against the
-parcels; then the admin's next sections as the alpha's shops need them. Urdu handles wait, as
-decided.
+**Next, parcels coming back in the admin** (COD-09): the parcels on their way back, the longest
+first, checked in by tracking number as they arrive; parcels the courier lost, and the claims on
+it; then the admin's next sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### The cash couriers hold, in the admin
+
+* **Cash, a section of its own** ([ADR-281](../architecture/13-decision-log.md#adr-281--the-admins-cash-section-shows-what-couriers-owe-on-delivered-cash-on-delivery-orders-and-what-is-on-its-way-by-how-long-it-has-been-owed-and-by-courier-cash-held-15-days-or-more-in-red-and-imports-a-couriers-statement-only-once-a-check-of-it-reads-right-its-lines-to-look-into-first)):
+  what couriers owe and what is on its way; how long it has been owed and by which courier,
+  cash held 15 days or more in red; their statements, those with lines to look into marked;
+  and a statement checked, then imported and opened, its lines to look into first.
+* **Tried against the core:** the seed's owner saw Rs 27,969 on its way on five parcels, then
+  checked a Leopards statement of three rows (one paid short, one for a parcel the shop has
+  not, one for an order paid already), imported it, and saw its three lines, #1005 linked, and
+  Rs 3,000 come off what was on its way; with no errors in the browser. Its heading first read
+  "Leopards's statement"; it now reads "Statement from Leopards".
+* 1987 tests: what is owed with late cash and its courier in red, a statement checked and
+  then imported, its page's lines to look into and all of them, ages in words, Excel read as
+  base64, and the section for those who reconcile alone.
 
 ### f35fb86 · COD health in the admin
 

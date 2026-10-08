@@ -903,3 +903,87 @@ export interface CodHealthData {
     }[];
   };
 }
+
+export interface CodCashValue {
+  amount: MoneyValue;
+  count: number;
+}
+
+export interface CodReceivableAgeValue {
+  fromDays: number;
+  toDays: number | null;
+  count: number;
+  amount: MoneyValue;
+}
+
+export interface CodRemittanceSummary {
+  id: string;
+  courier: string;
+  reference: string | null;
+  createdAt: string;
+  lineCount: number;
+  issueCount: number;
+  collected: MoneyValue;
+  paid: MoneyValue;
+  received: MoneyValue;
+}
+
+export interface CashData {
+  codReceivables: {
+    owed: CodCashValue;
+    onTheWay: CodCashValue;
+    ages: CodReceivableAgeValue[];
+    couriers: {
+      courier: string | null;
+      oldestDeliveredAt: string;
+      owed: CodCashValue;
+      ages: CodReceivableAgeValue[];
+    }[];
+  };
+  codRemittances: { nodes: CodRemittanceSummary[]; pageInfo: { hasNextPage: boolean } };
+}
+
+export type CodRemittanceOutcome =
+  'CHARGED' | 'COMPENSATED' | 'NOT_OWED' | 'OVER' | 'RECEIVED' | 'REPEATED' | 'SHORT' | 'UNMATCHED';
+
+export interface CodRemittanceLineValue {
+  row: number;
+  trackingNumber: string;
+  outcome: CodRemittanceOutcome;
+  orderId: string | null;
+  orderName: string | null;
+  collected: MoneyValue;
+  received: MoneyValue;
+  owed: MoneyValue | null;
+}
+
+export interface CashStatementData {
+  codRemittance:
+    | (CodRemittanceSummary & {
+        charges: MoneyValue;
+        tax: MoneyValue;
+        compensated: MoneyValue;
+        lines: CodRemittanceLineValue[];
+      })
+    | null;
+}
+
+export type CodRemittanceOutcomeCounts = Record<
+  'charged' | 'compensated' | 'notOwed' | 'over' | 'received' | 'repeated' | 'short' | 'unmatched',
+  number
+>;
+
+export interface CashStatementImportData {
+  codRemittanceImport: {
+    dryRun: boolean;
+    rows: number;
+    rowErrorCount: number;
+    rowErrors: { row: number; column: string | null; message: string }[];
+    outcomes: CodRemittanceOutcomeCounts;
+    collected: MoneyValue;
+    received: MoneyValue;
+    paid: MoneyValue;
+    remittance: { id: string } | null;
+    userErrors: UserError[];
+  };
+}

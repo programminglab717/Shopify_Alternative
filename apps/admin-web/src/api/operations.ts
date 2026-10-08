@@ -1993,3 +1993,172 @@ export const CodHealthQuery = /* GraphQL */ `
   ${COD_DELIVERY}
   ${MONEY}
 `;
+
+const COD_REMITTANCE_SUMMARY = /* GraphQL */ `
+  fragment CodRemittanceSummary on CodRemittance {
+    id
+    courier
+    reference
+    createdAt
+    lineCount
+    issueCount
+    collected {
+      ...Money
+    }
+    paid {
+      ...Money
+    }
+    received {
+      ...Money
+    }
+  }
+`;
+
+const COD_AGE = /* GraphQL */ `
+  fragment CodAge on CodReceivableAge {
+    fromDays
+    toDays
+    count
+    amount {
+      ...Money
+    }
+  }
+`;
+
+/** The cash couriers hold for the shop, and their statements (COD-10). */
+export const CashQuery = /* GraphQL */ `
+  query Cash {
+    codReceivables {
+      owed {
+        count
+        amount {
+          ...Money
+        }
+      }
+      onTheWay {
+        count
+        amount {
+          ...Money
+        }
+      }
+      ages {
+        ...CodAge
+      }
+      couriers {
+        courier
+        oldestDeliveredAt
+        owed {
+          count
+          amount {
+            ...Money
+          }
+        }
+        ages {
+          ...CodAge
+        }
+      }
+    }
+    codRemittances(first: 20) {
+      nodes {
+        ...CodRemittanceSummary
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+  ${COD_AGE}
+  ${COD_REMITTANCE_SUMMARY}
+  ${MONEY}
+`;
+
+/** A courier's statement and its lines, those to look into alone if asked. */
+export const CashStatementQuery = /* GraphQL */ `
+  query CashStatement($id: ID!, $issuesOnly: Boolean) {
+    codRemittance(id: $id) {
+      ...CodRemittanceSummary
+      charges {
+        ...Money
+      }
+      tax {
+        ...Money
+      }
+      compensated {
+        ...Money
+      }
+      lines(first: 250, issuesOnly: $issuesOnly) {
+        row
+        trackingNumber
+        outcome
+        orderId
+        orderName
+        collected {
+          ...Money
+        }
+        received {
+          ...Money
+        }
+        owed {
+          ...Money
+        }
+      }
+    }
+  }
+  ${COD_REMITTANCE_SUMMARY}
+  ${MONEY}
+`;
+
+/** A courier's statement read, and imported unless only checked. */
+export const CashStatementImportMutation = /* GraphQL */ `
+  mutation CashStatementImport(
+    $courier: String!
+    $csv: String
+    $xlsx: String
+    $reference: String
+    $dryRun: Boolean
+  ) {
+    codRemittanceImport(
+      courier: $courier
+      csv: $csv
+      xlsx: $xlsx
+      reference: $reference
+      dryRun: $dryRun
+    ) {
+      dryRun
+      rows
+      rowErrorCount
+      rowErrors {
+        row
+        column
+        message
+      }
+      outcomes {
+        charged
+        compensated
+        notOwed
+        over
+        received
+        repeated
+        short
+        unmatched
+      }
+      collected {
+        ...Money
+      }
+      received {
+        ...Money
+      }
+      paid {
+        ...Money
+      }
+      remittance {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${MONEY}
+  ${USER_ERRORS}
+`;

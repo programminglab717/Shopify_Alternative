@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-280 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-281 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -288,6 +288,7 @@
 | 278 | The admin's activity says in words what changed in the shop, by whom and when, linking to what changed where it has a page; and, apart, what the shop may need to account for: numbers seen, exports, erasures and Hatti's support's looks. Owners and managers | Accepted |
 | 279 | The admin's analytics show sales over the last 7, 30 or 90 whole days in the shop's time zone against the days as many before: net sales, orders, the average order and profit with how each changed, bars by day (by week over 90), what sold most and where orders came from | Accepted |
 | 280 | The admin's analytics show the period's COD health under its sales: how many cash-on-delivery orders were confirmed, delivered and came back, of those that turned out, what returns cost, and the rates by city, product, source or courier, a return rate of 30% or more in red | Accepted |
+| 281 | The admin's Cash section shows what couriers owe on delivered cash-on-delivery orders and what is on its way, by how long it has been owed and by courier, cash held 15 days or more in red; and imports a courier's statement only once a check of it reads right, its lines to look into first | Accepted |
 
 ---
 
@@ -11566,3 +11567,41 @@
     the count says what the rate is of.
   * **The shop choosing its own threshold:** 30% is where returns eat a typical shop's margin,
     and one line in the admin; a setting can come when shops ask for one.
+
+## ADR-281 · The admin's Cash section shows what couriers owe on delivered cash-on-delivery orders and what is on its way, by how long it has been owed and by courier, cash held 15 days or more in red; and imports a courier's statement only once a check of it reads right, its lines to look into first
+
+* **Context:** Couriers collect cash on delivery and pay it over days or weeks later, less their
+  charges. The core works out what they owe when asked, by courier and by days since delivery
+  ([ADR-066](#adr-066--what-couriers-owe-is-worked-out-from-the-orders-when-asked-delivered-cash-on-delivery-orders-not-yet-paid-by-courier-and-by-days-since-delivery)), and imports their statements as the CSV or Excel file they send, each
+  line's cash received on its parcel's order, with the lines that need a look kept
+  ([ADR-067](#adr-067--couriers-remittance-statements-are-imported-whole-into-a-logistics-module-each-lines-cash-received-on-its-parcels-order-at-most-what-the-order-owes-and-a-parcels-cash-once), [ADR-246](#adr-246--a-couriers-statement-may-come-as-the-excel-workbook-it-was-sent-as-read-from-its-first-sheet-shown-by-a-reader-of-hattis-own-under-a-header-found-below-the-couriers-title-rows-and-other-cash-on-a-parcel-paid-short-before-pays-what-its-order-still-owes)). It lets owners, managers and accountants do so, and
+  no one else.
+* **Decision:**
+  * **Cash** (`/shop_…/cash`) is a section for owners, managers and accountants, as the core
+    allows.
+  * **Two figures:** what couriers owe on parcels delivered, and what is on its way on parcels
+    not yet delivered.
+  * **How long it has been owed**, in the core's ages (0 to 7, 8 to 14, 15 to 30 and over 30
+    days), and **by courier**, the one owing most first with the day its oldest parcel was
+    delivered. Cash held 15 days or more is red, and so is the courier holding it: couriers pay
+    over weekly or fortnightly, so later than that is worth a call. With nothing owed, the ages
+    are left out.
+  * **A statement is checked before it is imported:** courier, reference and file go to the
+    core as a dry run, and the admin says how many rows, what would be received of what was paid
+    over, how many lines would have each outcome, and the rows that could not be read. "Import
+    it" then imports it and opens it. A CSV is sent as text, an Excel workbook in base64.
+  * **A statement's page** gives what it collected, charged, withheld and paid over, and what
+    of it was received on orders; its lines to look into first, where it has any, each with its
+    tracking number, its order linked, what was collected and received, what the order owed,
+    and what became of it as a badge (received green; paid short or over amber; no such parcel
+    red); and all its lines, up to 250, on the other tab.
+* **Consequences:**
+  * An accountant reconciles a courier's payment on a phone: the file from WhatsApp or email,
+    checked, imported, and the short and unmatched lines in front of them.
+  * Nothing reaches the orders until the check reads right; a wrong courier or file costs a
+    second check, not a statement to undo.
+* **Alternatives:**
+  * **Importing straight away:** a statement imported is imported once, and its cash is on the
+    orders; a check first costs one tap.
+  * **The shop's own payout schedule for "late":** 15 days covers both the weekly and the
+    fortnightly couriers; a setting can come when shops ask for one.

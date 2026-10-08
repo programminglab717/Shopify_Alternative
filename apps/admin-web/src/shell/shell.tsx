@@ -12,11 +12,13 @@ import {
   Tag,
   Truck,
   Users,
+  Wallet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { useMe, useSession, useSessionStore } from '../auth/context';
 import { READS_ANALYTICS } from '../analytics/analytics-page';
+import { RECONCILES_CASH } from '../cash/cash-page';
 import { READS_CUSTOMERS } from '../customers/customers-page';
 import { MANAGES_DISCOUNTS } from '../discounts/discounts-page';
 import { OPENS_SETTINGS } from '../settings/settings-page';
@@ -39,6 +41,7 @@ interface NavItem {
     | '/$shopId/shipping'
     | '/$shopId/discounts'
     | '/$shopId/analytics'
+    | '/$shopId/cash'
     | '/$shopId/settings';
   label: MessageKey;
   /** A shorter name for the phone's bottom bar, where the label is too long. */
@@ -83,6 +86,7 @@ export const NAV: readonly NavItem[] = [
   },
   { to: '/$shopId/discounts', label: 'nav.discounts', icon: Tag, roles: MANAGES_DISCOUNTS },
   { to: '/$shopId/analytics', label: 'nav.analytics', icon: ChartColumn, roles: READS_ANALYTICS },
+  { to: '/$shopId/cash', label: 'nav.cash', icon: Wallet, roles: RECONCILES_CASH },
   { to: '/$shopId/settings', label: 'nav.settings', icon: Settings, roles: OPENS_SETTINGS },
 ];
 
