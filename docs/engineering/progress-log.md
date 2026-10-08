@@ -6,8 +6,10 @@
 
 ## In progress
 
-**Next:** the backend the MVP still needs that waits for neither partners' sandboxes nor the
-infrastructure, as the status page's next steps list it. Urdu handles wait, as decided.
+**Next, the merchant admin** (decided on 2026-10-08): `apps/admin-web`, the React app and
+installable PWA the stack names; signing in, choosing a shop and the shell first, then Home, the
+orders list by stage and an order's page, confirming, cancelling and packing. Urdu handles wait,
+as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +18,16 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### The merchant admin's scaffold
+
+* **`apps/admin-web`**: React 19 and Vite, TanStack Router and Query to come, Tailwind CSS v4 over
+  Hatti UI's tokens (`themeStylesheet()` as a virtual stylesheet, light and dark), Inter and Noto
+  Nastaliq Urdu, English and Urdu with the page right to left in Urdu, and the design system's
+  formats for money, phones and dates. In development Vite sends `/auth` and `/admin/api` on to
+  the core, so the browser sees one origin.
+* **Every GraphQL document it sends is checked against `apps/core/schema.graphql`**, so a field
+  renamed in the API fails the admin's tests.
 
 ### c63d154 · Free's domains and gateways
 

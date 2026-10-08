@@ -1,0 +1,68 @@
+@import 'tailwindcss';
+
+/*
+ * Hatti UI's tokens (packages/ui/tokens) as Tailwind's theme: the variables themselves come from
+ * `virtual:hatti-tokens.css`, light and dark, so `bg-surface` or `text-secondary` follow the theme.
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+@theme inline {
+  --color-primary: var(--hatti-color-primary);
+  --color-primary-strong: var(--hatti-color-primary-strong);
+  --color-on-primary: var(--hatti-color-on-primary);
+  --color-accent: var(--hatti-color-accent);
+  --color-on-accent: var(--hatti-color-on-accent);
+  --color-canvas: var(--hatti-color-canvas);
+  --color-surface: var(--hatti-color-surface);
+  --color-text: var(--hatti-color-text);
+  --color-secondary: var(--hatti-color-text-secondary);
+  --color-line: var(--hatti-color-border);
+  --color-focus: var(--hatti-color-focus);
+  --color-success: var(--hatti-color-success);
+  --color-warning: var(--hatti-color-warning);
+  --color-danger: var(--hatti-color-danger);
+  --color-info: var(--hatti-color-info);
+  --radius-control: var(--hatti-radius-control);
+  --radius-card: var(--hatti-radius-card);
+  --radius-sheet: var(--hatti-radius-sheet);
+  --font-sans: var(--hatti-font-latin);
+  --font-urdu: var(--hatti-font-urdu);
+}
+
+html {
+  background: var(--hatti-color-canvas);
+  color: var(--hatti-color-text);
+  font-family: var(--hatti-font-latin);
+  font-size: var(--hatti-type-body-size);
+  line-height: var(--hatti-type-body-line);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Nastaliq needs a larger size and far more line height (design system §4.2). */
+html[lang='ur'] {
+  font-family: var(--hatti-font-urdu);
+  font-size: var(--hatti-type-body-size-ur);
+  line-height: var(--hatti-type-body-line-ur);
+}
+
+/* Prices, numbers and IDs stay Latin and line up in columns, in either language. */
+.num {
+  font-family: var(--hatti-font-latin);
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: isolate;
+  direction: ltr;
+}
+
+:focus-visible {
+  outline: 2px solid var(--hatti-color-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

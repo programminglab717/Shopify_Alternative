@@ -1,0 +1,11 @@
+{
+  "name": "Hatti",
+  "short_name": "Hatti",
+  "description": "Run your shop: orders, products, shipping and cash.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0F766E",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

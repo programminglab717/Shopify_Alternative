@@ -1,0 +1,38 @@
+{
+  "name": "@hatti/admin-web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The merchant admin: a React single-page app and installable PWA over the Admin API.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource/noto-nastaliq-urdu": "5.3.0",
+    "@tanstack/react-query": "5.104.1",
+    "@tanstack/react-router": "1.170.41",
+    "lucide-react": "1.52.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@hatti/tokens": "workspace:*",
+    "@tailwindcss/vite": "4.3.3",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "catalog:",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "graphql": "catalog:",
+    "happy-dom": "20.14.5",
+    "tailwindcss": "4.3.3",
+    "typescript": "catalog:",
+    "vite": "8.3.2",
+    "vitest": "catalog:"
+  }
+}
