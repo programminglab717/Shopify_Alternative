@@ -2844,6 +2844,10 @@ Rules:
   to left, and an icon always with its words. A stage is shown with `StageBadge`.
 * **Mutations** go through `useAdminMutation`, which sends an Idempotency-Key and fetches the
   shop's queries again once done; show `userErrors` in the merchant's words, beside the action.
+* **Screens are tested as merchants use them:** render the admin at a path with
+  `renderAdmin` from `src/test-support.tsx`, signed in with `signedIn()`, against `fakeCore`,
+  which answers each GraphQL operation by its name and keeps what was sent; check what the
+  screen sent and what it shows ([ADR-267](../architecture/13-decision-log.md#adr-267--the-admins-products-a-list-by-status-and-search-a-products-page-that-owners-and-managers-change-and-every-other-role-reads-and-adding-a-product-with-its-options-variants-each-with-its-price-and-stock-stock-is-counted-at-the-shops-primary-location-set-where-the-merchant-typed-it-and-refused-if-it-changed-since-it-was-read)).
 
 ## Style
 

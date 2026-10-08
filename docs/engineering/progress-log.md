@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the merchant admin's products** (CAT-01): the products list, a product's page with its
-variants, prices and stock, and adding one; then customers, shipping and settings, section by
-section, as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, products' photos in the merchant admin** (CAT-02): taken with the phone's camera or
+chosen from its gallery, uploaded and shown as they are made ready; then customers, shipping and
+settings, section by section, as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### Products in the admin
+
+* **The products section** ([ADR-267](../architecture/13-decision-log.md#adr-267--the-admins-products-a-list-by-status-and-search-a-products-page-that-owners-and-managers-change-and-every-other-role-reads-and-adding-a-product-with-its-options-variants-each-with-its-price-and-stock-stock-is-counted-at-the-shops-primary-location-set-where-the-merchant-typed-it-and-refused-if-it-changed-since-it-was-read)):
+  the list by status and search, with each product's stock and price; adding a product, with
+  options that make a variant of each combination, each with its price and stock; a product's
+  page that saves only what changed, its counts refused if they changed since they were read;
+  deleting one; and the same pages read alone by roles that do not change products.
+* **Tried against the core:** the seed's owner added a kurta in three sizes with their prices and
+  stock, changed a size's price and a count and made it a draft, added a shawl with a price before
+  its discount, and had a price that was not one caught; an agent saw the products with nothing
+  to change; in English and Urdu, on a phone and a desktop, with no errors in the browser.
+* **For it:** the admin's screen tests share a fake core and a signed-in member
+  (`src/test-support.tsx`); a status shown as a pill is the shared `Badge`; the Confirmation
+  Desk's name is shorter in the phone's bottom bar.
+* 1884 tests: adding, checking and saving products through the real screens and router.
 
 ### a459501 · The Confirmation Desk in the admin
 

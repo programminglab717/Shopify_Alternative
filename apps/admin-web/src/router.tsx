@@ -20,6 +20,9 @@ import { HomePage } from './home/home-page';
 import { useLocale } from './i18n/locale';
 import { OrderPage } from './orders/order-page';
 import { OrdersPage, validateOrdersSearch } from './orders/orders-page';
+import { NewProductPage } from './products/new-product-page';
+import { ProductPage, validateProductSearch } from './products/product-page';
+import { ProductsPage, validateProductsSearch } from './products/products-page';
 import { Shell } from './shell/shell';
 import { ShopsPage } from './shops/shops-page';
 import { EmptyState } from './ui/feedback';
@@ -137,13 +140,33 @@ const order = createRoute({
   component: OrderPage,
 });
 
+const products = createRoute({
+  getParentRoute: () => shop,
+  path: 'products',
+  validateSearch: validateProductsSearch,
+  component: ProductsPage,
+});
+
+const newProduct = createRoute({
+  getParentRoute: () => shop,
+  path: 'products/new',
+  component: NewProductPage,
+});
+
+const product = createRoute({
+  getParentRoute: () => shop,
+  path: 'products/$productId',
+  validateSearch: validateProductSearch,
+  component: ProductPage,
+});
+
 export const routeTree = root.addChildren([
   index,
   signIn,
   signUp,
   twoStep,
   shops,
-  shop.addChildren([home, orders, order, desk]),
+  shop.addChildren([home, orders, order, desk, products, newProduct, product]),
 ]);
 
 /** The admin's router; tests give it a history of their own. */

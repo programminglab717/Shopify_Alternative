@@ -451,3 +451,209 @@ export const OrderPhoneRevealMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** A page of the shop's products, newest first, by status and search (CAT-04). */
+export const ProductsQuery = /* GraphQL */ `
+  query Products($first: Int, $after: String, $query: String) {
+    products(first: $first, after: $after, query: $query) {
+      nodes {
+        id
+        title
+        status
+        productType
+        vendor
+        totalInventory
+        tracksInventory
+        priceRange {
+          minVariantPrice {
+            amount
+            currencyCode
+          }
+          maxVariantPrice {
+            amount
+            currencyCode
+          }
+        }
+        media {
+          id
+          status
+          previewImage {
+            url
+          }
+        }
+        variants {
+          id
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`;
+
+const PRODUCT = /* GraphQL */ `
+  fragment ProductDetail on Product {
+    id
+    title
+    description
+    handle
+    status
+    productType
+    vendor
+    tags
+    totalInventory
+    tracksInventory
+    options {
+      id
+      name
+      optionValues {
+        id
+        name
+      }
+    }
+    media {
+      id
+      status
+      alt
+      previewImage {
+        url
+      }
+    }
+    variants {
+      id
+      title
+      price {
+        ...Money
+      }
+      compareAtPrice {
+        ...Money
+      }
+      sku
+      selectedOptions {
+        name
+        value
+      }
+      inventoryQuantity
+      inventoryItem {
+        id
+        tracked
+        inventoryLevels {
+          available
+          location {
+            id
+          }
+        }
+      }
+    }
+  }
+`;
+
+/** One product, for its page, with the location its stock is counted at. */
+export const ProductQuery = /* GraphQL */ `
+  query Product($id: ID!) {
+    location {
+      id
+      name
+    }
+    product(id: $id) {
+      ...ProductDetail
+    }
+  }
+  ${PRODUCT}
+  ${MONEY}
+`;
+
+/** The location stock is counted at when a product is added: the shop's primary one. */
+export const PrimaryLocationQuery = /* GraphQL */ `
+  query PrimaryLocation {
+    location {
+      id
+      name
+    }
+  }
+`;
+
+/** A product added, with its options and a variant for each of their values (CAT-01). */
+export const ProductCreateMutation = /* GraphQL */ `
+  mutation ProductCreate($input: ProductCreateInput!) {
+    productCreate(input: $input) {
+      product {
+        id
+        variants {
+          id
+          inventoryItem {
+            id
+          }
+          selectedOptions {
+            name
+            value
+          }
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A product's own details changed: title, description, status, type, vendor, tags. */
+export const ProductUpdateMutation = /* GraphQL */ `
+  mutation ProductUpdate($input: ProductUpdateInput!) {
+    productUpdate(input: $input) {
+      product {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Its variants' prices and SKUs changed, together. */
+export const ProductVariantsBulkUpdateMutation = /* GraphQL */ `
+  mutation ProductVariantsBulkUpdate(
+    $productId: ID!
+    $variants: [ProductVariantsBulkUpdateInput!]!
+  ) {
+    productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+      productVariants {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Stock counted: how many are available at a location, which tracks the variant from then on. */
+export const InventorySetQuantitiesMutation = /* GraphQL */ `
+  mutation InventorySetQuantities($input: InventorySetQuantitiesInput!) {
+    inventorySetQuantities(input: $input) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A product deleted, with its variants and their stock. */
+export const ProductDeleteMutation = /* GraphQL */ `
+  mutation ProductDelete($input: ProductDeleteInput!) {
+    productDelete(input: $input) {
+      deletedProductId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

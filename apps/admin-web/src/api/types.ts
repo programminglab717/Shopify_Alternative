@@ -212,3 +212,108 @@ export interface ConfirmationQueueNextData {
 export interface OrderPhoneRevealData {
   orderPhoneReveal: { phone: string | null; userErrors: UserError[] };
 }
+
+export type ProductStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
+
+export type MediaStatus = 'UPLOADED' | 'PROCESSING' | 'READY' | 'FAILED';
+
+export interface ProductThumbnail {
+  id: string;
+  status: MediaStatus;
+  previewImage: { url: string } | null;
+}
+
+export interface ProductListItem {
+  id: string;
+  title: string;
+  status: ProductStatus;
+  productType: string | null;
+  vendor: string | null;
+  totalInventory: number;
+  tracksInventory: boolean;
+  priceRange: { minVariantPrice: MoneyValue; maxVariantPrice: MoneyValue };
+  media: ProductThumbnail[];
+  variants: { id: string }[];
+}
+
+export interface ProductsData {
+  products: {
+    nodes: ProductListItem[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+}
+
+export interface ProductVariantDetail {
+  id: string;
+  title: string;
+  price: MoneyValue;
+  compareAtPrice: MoneyValue | null;
+  sku: string | null;
+  selectedOptions: { name: string; value: string }[];
+  inventoryQuantity: number;
+  inventoryItem: {
+    id: string;
+    tracked: boolean;
+    inventoryLevels: { available: number; location: { id: string } }[];
+  };
+}
+
+export interface ProductDetail {
+  id: string;
+  title: string;
+  description: string;
+  handle: string;
+  status: ProductStatus;
+  productType: string | null;
+  vendor: string | null;
+  tags: string[];
+  totalInventory: number;
+  tracksInventory: boolean;
+  options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
+  media: (ProductThumbnail & { alt: string })[];
+  variants: ProductVariantDetail[];
+}
+
+export interface LocationRef {
+  id: string;
+  name: string;
+}
+
+export interface ProductData {
+  location: LocationRef | null;
+  product: ProductDetail | null;
+}
+
+export interface PrimaryLocationData {
+  location: LocationRef | null;
+}
+
+export interface ProductCreateData {
+  productCreate: {
+    product: {
+      id: string;
+      variants: {
+        id: string;
+        inventoryItem: { id: string };
+        selectedOptions: { name: string; value: string }[];
+      }[];
+    } | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface ProductUpdateData {
+  productUpdate: { product: { id: string } | null; userErrors: UserError[] };
+}
+
+export interface ProductVariantsBulkUpdateData {
+  productVariantsBulkUpdate: { productVariants: { id: string }[] | null; userErrors: UserError[] };
+}
+
+export interface InventorySetQuantitiesData {
+  inventorySetQuantities: { userErrors: UserError[] };
+}
+
+export interface ProductDeleteData {
+  productDelete: { deletedProductId: string | null; userErrors: UserError[] };
+}

@@ -1,5 +1,5 @@
 import { Link, Outlet, useNavigate, useParams } from '@tanstack/react-router';
-import { ArrowLeftRight, Headset, House, LogOut, ReceiptText } from 'lucide-react';
+import { ArrowLeftRight, Headset, House, LogOut, Package, ReceiptText } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { useMe, useSession, useSessionStore } from '../auth/context';
@@ -13,8 +13,10 @@ import { LanguageToggle } from '../ui/language-toggle';
 import { ShopProvider } from './shop-context';
 
 interface NavItem {
-  to: '/$shopId' | '/$shopId/orders' | '/$shopId/desk';
+  to: '/$shopId' | '/$shopId/orders' | '/$shopId/desk' | '/$shopId/products';
   label: MessageKey;
+  /** A shorter name for the phone's bottom bar, where the label is too long. */
+  short?: MessageKey;
   icon: LucideIcon;
   /** Roles that see it (docs/design/02 §6); every role when missing. */
   roles?: readonly StaffRole[];
@@ -29,9 +31,11 @@ const NAV: readonly NavItem[] = [
   {
     to: '/$shopId/desk',
     label: 'nav.desk',
+    short: 'nav.deskShort',
     icon: Headset,
     roles: ['owner', 'manager', 'confirmation_agent'],
   },
+  { to: '/$shopId/products', label: 'nav.products', icon: Package },
 ];
 
 /**
@@ -146,7 +150,7 @@ export function Shell() {
               >
                 <item.icon aria-hidden className="size-6" />
                 <span className="text-[length:var(--hatti-type-caption-size)]">
-                  {t(item.label)}
+                  {t(item.short ?? item.label)}
                 </span>
               </Link>
             ))}

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-266 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-267 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -274,6 +274,7 @@
 | 264 | A plan says whether it includes a domain of the shop's own and accounts with payment gateways, and Free includes neither: connecting one on a plan without it is refused with the plan named, through the port other modules ask a plan's limits through, and those connected before are kept, checked, changed and used as before | Accepted |
 | 265 | The merchant admin is a React app on an origin of its own that sends `/auth` and the Admin API on to the core: staff sign in by a code to their mobile or by email, with the second step their role needs; the session's opaque tokens are kept in the browser's storage and refreshed by one tab at a time; the shop is in each page's address; and every GraphQL document it sends is checked against the core's schema | Accepted |
 | 266 | The admin's Confirmation Desk deals an agent one order at a time when they ask, and the next as soon as a call's outcome is recorded; the customer's number stays masked until the agent asks to see it, which is logged, and then can be called or messaged on WhatsApp with a tap; an order whose call is recorded leaves the agent's queue at once | Accepted |
+| 267 | The admin's products: a list by status and search, a product's page that owners and managers change and every other role reads, and adding a product with its options' variants, each with its price and stock; stock is counted at the shop's primary location, set where the merchant typed it and refused if it changed since it was read | Accepted |
 
 ---
 
@@ -11086,3 +11087,40 @@
     minutes that another could have called.
   * **The number shown whole once dealt:** every order dealt would log a reveal, including those an
     agent never called.
+
+## ADR-267 · The admin's products: a list by status and search, a product's page that owners and managers change and every other role reads, and adding a product with its options' variants, each with its price and stock; stock is counted at the shop's primary location, set where the merchant typed it and refused if it changed since it was read
+
+* **Context:** The Admin API has Shopify's products: `productCreate` with options and a variant
+  for each of their values, `productUpdate`, `productVariantsBulkUpdate`, and a search that takes
+  Shopify's filters such as `status:draft` ([ADR-120](#adr-120--a-products-search-takes-shopifys-filters-among-its-words-in-the-syntax-the-orders-search-reads-which-the-admins-lists-share)). A product's description is plain
+  text. Stock is inventory's: `inventorySetQuantities` sets what is available at a location,
+  tracking the variant from then on, and refuses a count whose quantity changed since it was read
+  ([ADR-022](#adr-022--stock-changes-lock-levels-in-one-order-check-then-write)). Owners and managers change products; every other role reads them. The
+  admin had Home, orders and the Confirmation Desk ([ADR-265](#adr-265--the-merchant-admin-is-a-react-app-on-an-origin-of-its-own-that-sends-auth-and-the-admin-api-on-to-the-core-staff-sign-in-by-a-code-to-their-mobile-or-by-email-with-the-second-step-their-role-needs-the-sessions-opaque-tokens-are-kept-in-the-browsers-storage-and-refreshed-by-one-tab-at-a-time-the-shop-is-in-each-pages-address-and-every-graphql-document-it-sends-is-checked-against-the-cores-schema)).
+* **Decision:**
+  * **The list** (`/shop_…/products`) has a tab for each status, which is a filter in the search,
+    and the search itself. Each product shows its first image, its title, its stock (across its
+    variants, out of stock, or not tracked), its status and its price or range of prices.
+  * **Adding a product** asks for its title, description, status (on sale by default), type,
+    brand and tags, then its price, the price before a discount, SKU and stock. Options such as
+    size or colour, up to three, make a variant of each combination of their values, each with a
+    price of its own or the price for all, and its own stock and SKU, up to the catalog's 250.
+    Prices and counts are checked before anything is sent.
+  * **Stock is counted at the shop's primary location,** which the form names. It is set after the
+    product is made; if that fails, the product is kept and its page says so.
+  * **A product's page** is the same form, filled in. Saving sends only what changed: its details,
+    the variants whose price, price before discount or SKU changed, and the counts typed, each
+    with the count it was read at, so that one sold meanwhile is not overwritten. Owners and
+    managers delete it there too, after a second tap.
+  * **Other roles** see the same pages with nothing to change, and no button to add one.
+  * **A problem the core finds** is shown with the field it is about in the merchant's words.
+* **Consequences:**
+  * Merchants put their catalog in from their phones, in either language.
+  * A product's photos are added from its page next ([ADR-158](#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)).
+  * Stock at other locations, collections, options added later, SEO and costs stay the Admin API's
+    for now, and the CSV import's.
+* **Alternatives:**
+  * **One mutation for a product and its stock:** the core keeps catalog and inventory apart, as
+    Shopify does; two calls, the second's failure said plainly, keep them so.
+  * **Shopify's rich text editor for descriptions:** the catalog keeps plain text, which the
+    storefront and the feeds read; formatting can come later.
