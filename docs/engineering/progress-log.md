@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### The merchant admin's scaffold
+### 933a536 · The merchant admin's scaffold
 
 * **`apps/admin-web`**: React 19 and Vite, TanStack Router and Query to come, Tailwind CSS v4 over
   Hatti UI's tokens (`themeStylesheet()` as a virtual stylesheet, light and dark), Inter and Noto
