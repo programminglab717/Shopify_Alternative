@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### The activity log in the admin
+### 21a9803 · The activity log in the admin
 
 * **Activity, in settings** ([ADR-278](../architecture/13-decision-log.md#adr-278--the-admins-activity-says-in-words-what-changed-in-the-shop-by-whom-and-when-linking-to-what-changed-where-it-has-a-page-and-apart-what-the-shop-may-need-to-account-for-numbers-seen-exports-erasures-and-hattis-supports-looks-owners-and-managers)):
   what changed in the shop in words, by whom and when, linking to the product, order, customer or
