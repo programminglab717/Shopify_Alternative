@@ -853,3 +853,22 @@ export interface AuditData {
   };
   staffMembers: { id: string; name: string }[];
 }
+
+export interface SalesTotalsValue {
+  orders: number;
+  netSales: MoneyValue;
+  totalSales: MoneyValue;
+  averageOrderValue: MoneyValue | null;
+  returns: MoneyValue;
+  profit: MoneyValue;
+}
+
+export interface SalesData {
+  salesReport: {
+    totals: SalesTotalsValue;
+    previous: { totals: SalesTotalsValue };
+    periods: { start: string; sales: { orders: number; netSales: MoneyValue } }[];
+    topProducts: { productId: string; title: string; unitsSold: number; grossSales: MoneyValue }[];
+    rows: { key: string | null; title: string; sales: { orders: number; netSales: MoneyValue } }[];
+  };
+}

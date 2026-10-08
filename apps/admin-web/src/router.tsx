@@ -24,6 +24,7 @@ import {
   ResetPasswordPage,
   VerifyEmailPage,
 } from './auth/email-link-pages';
+import { AnalyticsPage } from './analytics/analytics-page';
 import { DiscountsPage } from './discounts/discounts-page';
 import { DraftPage } from './drafts/draft-page';
 import { DraftsPage } from './drafts/drafts-page';
@@ -230,6 +231,12 @@ const draft = createRoute({
   component: DraftPage,
 });
 
+const analytics = createRoute({
+  getParentRoute: () => shop,
+  path: 'analytics',
+  component: AnalyticsPage,
+});
+
 const discounts = createRoute({
   getParentRoute: () => shop,
   path: 'discounts',
@@ -361,6 +368,7 @@ export const routeTree = root.addChildren([
     newDraft,
     draft,
     discounts,
+    analytics,
     more,
     settings,
     settingsCouriers,

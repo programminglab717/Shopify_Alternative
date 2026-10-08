@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-278 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-279 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -286,6 +286,7 @@
 | 276 | The admin's discount codes are a section of their own for those who make them: each with what it gives in a line, whether it works now and how often it was used; made for a percentage, an amount or free delivery, limited and dated; ended at once, or deleted | Accepted |
 | 277 | Staff take orders over the phone or in a chat as drafts in the admin: products found and added at the price agreed, where it was taken and how it is paid; its link sent on WhatsApp for the customer to give the address and confirm, or the draft placed at once; and tertiary buttons that take something away are red | Accepted |
 | 278 | The admin's activity says in words what changed in the shop, by whom and when, linking to what changed where it has a page; and, apart, what the shop may need to account for: numbers seen, exports, erasures and Hatti's support's looks. Owners and managers | Accepted |
+| 279 | The admin's analytics show sales over the last 7, 30 or 90 whole days in the shop's time zone against the days as many before: net sales, orders, the average order and profit with how each changed, bars by day (by week over 90), what sold most and where orders came from | Accepted |
 
 ---
 
@@ -11510,3 +11511,29 @@
     Urdu.
   * **A name on each entry from the core:** staff names change and people leave; the shop's own
     list names those still there, and roles the rest.
+
+## ADR-279 · The admin's analytics show sales over the last 7, 30 or 90 whole days in the shop's time zone against the days as many before: net sales, orders, the average order and profit with how each changed, bars by day (by week over 90), what sold most and where orders came from
+
+* **Context:** The core reports a period's sales in Shopify's terms, worked out from the orders
+  when asked, by day, week or month and by where orders came from ([ADR-061](#adr-061--sales-are-reported-in-shopifys-terms-from-the-orders-when-asked-an-order-counts-on-the-day-it-was-placed-cancelled-ones-aside-and-so-do-its-items-that-came-back)), with
+  profit from what the items cost when sold ([ADR-141](#adr-141--an-orders-lines-keep-what-their-variants-cost-when-sold-and-the-sales-report-works-out-the-cost-of-goods-gross-profit-and-what-orders-made-less-couriers-charges-and-write-offs-plus-claims)) and the period as long just
+  before ([ADR-250](#adr-250--the-sales-report-says-what-the-period-as-long-just-before-came-to-and-the-home-what-yesterday-came-to-by-this-time-of-day-refunds-are-said-beside-sales-not-taken-off-them)). It is read with `read_orders`, which agents and packers have too.
+* **Decision:**
+  * **Analytics** (`/shop_…/analytics`) is a section for owners, managers, marketers and
+    accountants, those who plan the shop's selling.
+  * **Periods** are the last 7, 30 or 90 whole days, today's included, from midnight in the
+    shop's time zone, against the days as many before.
+  * **Four figures:** net sales, orders, the average order and profit, each with how much more
+    or less than before, a rise in green and a fall in red, with its arrow.
+  * **Bars** of net sales by day, by week over 90 days, drawn in the page; each says its day,
+    sales and orders to a screen reader.
+  * **What sold most**, five products linking to their pages, and **where orders came from**,
+    by source.
+* **Consequences:**
+  * A shop sees on a phone whether this month is beating the last, and what drives it.
+  * Periods of the shop's own choosing, and its COD health, come next.
+* **Alternatives:**
+  * **A charting library:** bars of a few dozen days are plain HTML, costing the admin nothing to
+    load on a slow connection.
+  * **The last 30 days to the minute:** a period from midnight matches what merchants mean by
+    "the last 30 days", and the bars' first day is a whole one.

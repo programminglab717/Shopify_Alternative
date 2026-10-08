@@ -1876,3 +1876,75 @@ export const AuditQuery = /* GraphQL */ `
     }
   }
 `;
+
+const SALES_TOTALS = /* GraphQL */ `
+  fragment SalesTotals on Sales {
+    orders
+    netSales {
+      ...Money
+    }
+    totalSales {
+      ...Money
+    }
+    averageOrderValue {
+      ...Money
+    }
+    returns {
+      ...Money
+    }
+    profit {
+      ...Money
+    }
+  }
+`;
+
+/** Sales over a period by day or week, against the period before, with what sold most (ANL-02). */
+export const SalesQuery = /* GraphQL */ `
+  query Sales($placedFrom: DateTime!, $placedBefore: DateTime!, $interval: SalesInterval!) {
+    salesReport(
+      placedFrom: $placedFrom
+      placedBefore: $placedBefore
+      interval: $interval
+      by: SOURCE
+      topProducts: 5
+    ) {
+      totals {
+        ...SalesTotals
+      }
+      previous {
+        totals {
+          ...SalesTotals
+        }
+      }
+      periods {
+        start
+        sales {
+          orders
+          netSales {
+            ...Money
+          }
+        }
+      }
+      topProducts {
+        productId
+        title
+        unitsSold
+        grossSales {
+          ...Money
+        }
+      }
+      rows {
+        key
+        title
+        sales {
+          orders
+          netSales {
+            ...Money
+          }
+        }
+      }
+    }
+  }
+  ${SALES_TOTALS}
+  ${MONEY}
+`;

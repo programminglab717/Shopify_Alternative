@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Next, sales over time in the admin** (ANL-02): the home's sales by day against the period
-before, and the products that sold most; then COD health (COD-12). Urdu handles wait, as decided.
+**Next, COD health in the admin** (COD-12): how a period's cash-on-delivery orders turned out, by
+city, product, source and courier, the rates that cost the shop most first; then the cash
+couriers hold (COD-10). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +17,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### Sales over time in the admin
+
+* **Analytics, a section of its own** ([ADR-279](../architecture/13-decision-log.md#adr-279--the-admins-analytics-show-sales-over-the-last-7-30-or-90-whole-days-in-the-shops-time-zone-against-the-days-as-many-before-net-sales-orders-the-average-order-and-profit-with-how-each-changed-bars-by-day-by-week-over-90-what-sold-most-and-where-orders-came-from)):
+  the last 7, 30 or 90 days against the days before: net sales, orders, the average order and
+  profit with how each changed; net sales as bars by day, or week; the five products that sold
+  most; and where orders came from.
+* **Tried against the core:** the seed's owner saw 30 days of Rs 77,717 from 14 orders, thirty
+  bars, the lawn suit selling most; and fourteen weekly bars over 90 days; with no errors in the
+  browser.
+* 1979 tests: the figures with their changes, the bars, products and sources, weeks over 90
+  days, and whole days in the shop's time zone.
 
 ### 21a9803 · The activity log in the admin
 

@@ -1,6 +1,7 @@
 import { Link, Outlet, useNavigate, useParams } from '@tanstack/react-router';
 import {
   ArrowLeftRight,
+  ChartColumn,
   Headset,
   House,
   LogOut,
@@ -15,6 +16,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { useMe, useSession, useSessionStore } from '../auth/context';
+import { READS_ANALYTICS } from '../analytics/analytics-page';
 import { READS_CUSTOMERS } from '../customers/customers-page';
 import { MANAGES_DISCOUNTS } from '../discounts/discounts-page';
 import { OPENS_SETTINGS } from '../settings/settings-page';
@@ -36,6 +38,7 @@ interface NavItem {
     | '/$shopId/customers'
     | '/$shopId/shipping'
     | '/$shopId/discounts'
+    | '/$shopId/analytics'
     | '/$shopId/settings';
   label: MessageKey;
   /** A shorter name for the phone's bottom bar, where the label is too long. */
@@ -79,6 +82,7 @@ export const NAV: readonly NavItem[] = [
     roles: READS_CUSTOMERS,
   },
   { to: '/$shopId/discounts', label: 'nav.discounts', icon: Tag, roles: MANAGES_DISCOUNTS },
+  { to: '/$shopId/analytics', label: 'nav.analytics', icon: ChartColumn, roles: READS_ANALYTICS },
   { to: '/$shopId/settings', label: 'nav.settings', icon: Settings, roles: OPENS_SETTINGS },
 ];
 
