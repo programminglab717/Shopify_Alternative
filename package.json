@@ -20,6 +20,7 @@
     "dev:api": "turbo run build --filter=@hatti/core --output-logs=errors-only && pnpm --filter @hatti/core run start:api",
     "dev:worker": "turbo run build --filter=@hatti/core --output-logs=errors-only && pnpm --filter @hatti/core run start:worker",
     "dev:storefront": "turbo run build --filter=@hatti/storefront --output-logs=errors-only && pnpm --filter @hatti/storefront run serve",
+    "dev:admin": "turbo run build --filter=@hatti/admin-web^... --output-logs=errors-only && pnpm --filter @hatti/admin-web run dev",
     "seed": "turbo run build --filter=@hatti/core --output-logs=errors-only && pnpm --filter @hatti/core run seed",
     "totp": "turbo run build --filter=@hatti/crypto --output-logs=errors-only && node packages/platform/crypto/dist/cli/totp.js",
     "bench:db": "turbo run build --filter=@hatti/db-bench --output-logs=errors-only && pnpm --filter @hatti/db-bench run bench",

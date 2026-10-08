@@ -29,8 +29,14 @@ export function interpolate(text: string, values?: MessageValues): string {
   );
 }
 
+/**
+ * `key`'s words in `locale`, its `{name}`s filled in; where `count` is one and the message has a
+ * singular form, `key.one` ("1 order to confirm"), that one.
+ */
 export function translate(locale: Locale, key: MessageKey, values?: MessageValues): string {
-  return interpolate(messages[locale][key], values);
+  const table = messages[locale] as Readonly<Record<string, string>>;
+  const singular = values && String(values.count) === '1' ? table[`${key}.one`] : undefined;
+  return interpolate(singular ?? table[key]!, values);
 }
 
 /** The language kept from last time; browser storage may be missing or blocked. */

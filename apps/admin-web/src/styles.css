@@ -53,6 +53,11 @@ html[lang='ur'] {
   direction: ltr;
 }
 
+/* On a line of its own, it lines up with the Urdu around it, at the right. */
+[dir='rtl'] .num {
+  text-align: right;
+}
+
 :focus-visible {
   outline: 2px solid var(--hatti-color-focus);
   outline-offset: 2px;

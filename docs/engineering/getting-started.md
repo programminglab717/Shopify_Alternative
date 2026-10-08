@@ -712,6 +712,20 @@ pnpm bench:db all       # plans, pgbench, the application code, leak checks (abo
 
 `BENCH_SCALE=smoke` loads a tiny dataset and runs for seconds, to check the tool itself.
 
+## Run the merchant admin
+
+With the core running (`pnpm dev:api`), start the admin and open it on a phone-sized window:
+
+```sh
+pnpm dev:admin          # http://localhost:5173/
+```
+
+Vite sends `/auth` and `/admin/api` on to the core at `http://localhost:4000` (`HATTI_API_URL`
+to change it). Sign in with the seed's owner: choose **Email**, give the email and password
+`pnpm seed` printed, then the code from `pnpm totp <2-step key>`. The shop opens on Home, with its
+orders a tap away; **اردو** in the header switches to Urdu, right to left. A new account signs up
+by mobile only where the core sends codes (`WHATSAPP_*` or `SMS_*`); by email, it always can.
+
 ## Look at a storefront
 
 The storefront serves shops in Hatti Base, the reference theme, each at its handle's subdomain.
@@ -929,6 +943,7 @@ server listens on.
 | `UPDATE_SCHEMA=1 pnpm --filter @hatti/core test` | Accepts GraphQL schema changes into `schema.graphql` |
 | `pnpm features:summary` | Refreshes the feature catalog summary table |
 | `pnpm totp <key>` | Prints the current authenticator code for a 2-step key |
+| `pnpm dev:admin` | The merchant admin at http://localhost:5173/, over `pnpm dev:api` |
 | `pnpm bench:db <command>` | Database benchmark: see [above](#benchmark-the-database) |
 
 ## Tests and databases

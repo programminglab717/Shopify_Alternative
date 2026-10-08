@@ -1,3 +1,4 @@
+import { parsePkMobile } from '@hatti/pk';
 import type { Locale } from './locale';
 
 // Numbers, money, phones and dates as the design system says (docs/design/01 §3): Western digits
@@ -29,8 +30,7 @@ export function formatMoney(amount: string, currency = 'PKR'): string {
 
 /** A Pakistani mobile kept as "+923001234567", shown as "0300 1234567"; others as they are. */
 export function formatPhone(phone: string): string {
-  const match = /^\+92(3\d{2})(\d{7})$/.exec(phone);
-  return match ? `0${match[1]} ${match[2]}` : phone;
+  return parsePkMobile(phone)?.display ?? phone;
 }
 
 function dateLocale(locale: Locale): string {

@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { formatMoney, formatPhone } from './format';
-import { LocaleProvider, interpolate, useLocale } from './locale';
+import { LocaleProvider, interpolate, translate, useLocale } from './locale';
 import { messages } from './messages';
 
 function Probe() {
@@ -19,8 +19,9 @@ describe("The admin's languages", () => {
     document.documentElement.dir = '';
   });
 
-  it('gives every English message in Urdu too', () => {
-    expect(Object.keys(messages.ur).sort()).toEqual(Object.keys(messages.en).sort());
+  it('gives every English message in Urdu too, the singular forms English needs aside', () => {
+    const plain = (table: object) => Object.keys(table).filter((key) => !key.endsWith('.one'));
+    expect(plain(messages.ur).sort()).toEqual(plain(messages.en).sort());
     for (const [key, text] of Object.entries(messages.ur)) expect(text, key).not.toBe('');
   });
 
@@ -35,6 +36,12 @@ describe("The admin's languages", () => {
     expect(screen.getByRole('button').textContent).toBe('ہٹی');
     expect(document.documentElement).toMatchObject({ lang: 'ur', dir: 'rtl' });
     expect(window.localStorage.getItem('hatti.locale')).toBe('ur');
+  });
+
+  it('says one in the singular where English has a form for it', () => {
+    expect(translate('en', 'home.toConfirm', { count: 1 })).toBe('1 order to confirm');
+    expect(translate('en', 'home.toConfirm', { count: 3 })).toBe('3 orders to confirm');
+    expect(translate('ur', 'home.toConfirm', { count: 1 })).toBe('1 آرڈر کنفرم کرنے ہیں');
   });
 
   it('fills placeholders, leaving one without a value as it is', () => {

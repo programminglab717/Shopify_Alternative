@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-264 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-265 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -272,6 +272,7 @@
 | 262 | Shops' verified domains are checked again every six hours by the worker: one DNS points elsewhere is noted and its shop told once, at its alerts number and its owner's email, and three days on it is disconnected, verified no more nor primary, the shop's address on the platform's domain primary in its place | Accepted |
 | 263 | A shop on a plan that limits its orders a month, Free's 50, takes every order all the same: one past the limit, counted in the shop's time zone without those cancelled, comes in with its customer hidden from staff and cannot be confirmed, packed, booked or shipped until a plan without the limit frees it or a counted order of its month is cancelled; the owner is told at four fifths of the limit and at it | Accepted |
 | 264 | A plan says whether it includes a domain of the shop's own and accounts with payment gateways, and Free includes neither: connecting one on a plan without it is refused with the plan named, through the port other modules ask a plan's limits through, and those connected before are kept, checked, changed and used as before | Accepted |
+| 265 | The merchant admin is a React app on an origin of its own that sends `/auth` and the Admin API on to the core: staff sign in by a code to their mobile or by email, with the second step their role needs; the session's opaque tokens are kept in the browser's storage and refreshed by one tab at a time; the shop is in each page's address; and every GraphQL document it sends is checked against the core's schema | Accepted |
 
 ---
 
@@ -10991,3 +10992,58 @@
     than a plan that does not include them.
   * **Letting Free connect a gateway's sandbox:** nothing is sold through it; a shop tries a
     gateway on the plan it will use it on.
+
+## ADR-265 · The merchant admin is a React app on an origin of its own that sends `/auth` and the Admin API on to the core: staff sign in by a code to their mobile or by email, with the second step their role needs; the session's opaque tokens are kept in the browser's storage and refreshed by one tab at a time; the shop is in each page's address; and every GraphQL document it sends is checked against the core's schema
+
+* **Context:** The stack names the admin a React single-page app built with Vite, TanStack Router
+  and Query, an installable PWA, on Hatti UI's tokens (architecture 02 §1). Merchants run their
+  shops from mid-range Android phones, in English or Urdu (design 01 §1). The core's `/auth`
+  gives opaque bearer tokens in JSON bodies, never cookies: an access token for 15 minutes and a
+  refresh token that rotates on every refresh and is refused if used twice, within a session of
+  30 days ([ADR-020](#adr-020--staff-identity-built-in-house-on-audited-primitives)). Staff name the shop of each Admin API request in
+  `x-hatti-shop-id`; owners, managers and accountants must have proved a second factor in the
+  session. The core answers no other origin: there is no CORS.
+* **Decision:**
+  * **`apps/admin-web`:** React 19, Vite, TanStack Router and Query, Tailwind CSS v4 over Hatti
+    UI's tokens (`themeStylesheet()`, light and dark), Inter and Noto Nastaliq Urdu, Lucide icons.
+  * **One origin:** the admin calls `/auth` and `/admin/api` on its own origin. In development,
+    Vite sends them on to the core; in production, the edge will. The core keeps no CORS.
+  * **The session** is kept in the browser's storage (`hatti.session`) and shared by the admin's
+    tabs. It is refreshed half a minute before it runs out, by one tab at a time through the
+    browser's Web Locks, the others taking what it got. A request refused with a 401 is tried
+    once more with fresh tokens. Signing out, here or in another tab, forgets what the session
+    read.
+  * **Signing in:** by a code to the merchant's mobile on WhatsApp or by SMS
+    ([ADR-159](#adr-159--merchants-open-an-account-and-sign-in-with-their-mobile-number-and-a-code-sent-to-it-on-whatsapp-or-by-sms-from-hattis-own-number-at-hattis-cost-six-digits-for-ten-minutes-and-five-tries-a-number-sent-five-an-hour-and-ten-a-day-a-number-proved-is-one-accounts-alone-one-only-typed-never-signs-in-and-an-accounts-second-factor-is-still-asked)), or by email and password; then the second factor's code where the
+    account has one. A number new to Hatti gives a name and opens its account. An account opens
+    its first shop by its name. A role that needs the second step sets it up, with an
+    authenticator app's key and recovery codes, before its shop opens.
+  * **The shop is in the address** (`/shop_…/orders`), so two tabs may have two shops open. The
+    shell lets a member into the shops `/auth/me` lists alone, and shows each role the sections
+    it may use.
+  * **The first screens:** Home's next actions in rupees, a tap from their orders, today's
+    numbers and the setup checklist; the orders list by stage, with each stage's count, a search
+    and the selected orders confirmed or packed at once; an order's page, confirmed, packed or
+    cancelled for a reason, its customer hidden past the plan's limit
+    ([ADR-263](#adr-263--a-shop-on-a-plan-that-limits-its-orders-a-month-frees-50-takes-every-order-all-the-same-one-past-the-limit-counted-in-the-shops-time-zone-without-those-cancelled-comes-in-with-its-customer-hidden-from-staff-and-cannot-be-confirmed-packed-booked-or-shipped-until-a-plan-without-the-limit-frees-it-or-a-counted-order-of-its-month-is-cancelled-the-owner-is-told-at-four-fifths-of-the-limit-and-at-it)).
+  * **Words:** every message in English and Urdu by typed keys, a singular form where English
+    needs one, the page right to left in Urdu, and the design system's formats for money, phones
+    and dates in the shop's time zone.
+  * **Every GraphQL document** the admin sends is kept in one module and checked against
+    `apps/core/schema.graphql` by its tests.
+* **Consequences:**
+  * Merchants confirm, pack and cancel orders from their phones, in either language.
+  * A script that ran on the admin's origin could read the session: the admin's origin gets a
+    strict content security policy, and no third-party scripts, with the infrastructure.
+  * Its JavaScript is about 133 KB compressed, to be split by route as screens join.
+  * Still to come: passkeys and Google in the admin ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)), the pages that email
+    links open (verifying an email, a new password, an invitation), and the rest of the sections.
+* **Alternatives:**
+  * **The refresh token in a cookie only the server reads:** script could not take it, but the
+    core would need cookie endpoints and defences against cross-site requests; to reconsider with
+    the edge.
+  * **The API on an origin of its own, with CORS:** a preflight on every request from a phone,
+    and the core's allowed origins to keep.
+  * **Types generated from the schema:** the documents are checked against it already; generated
+    types come when hand-written ones slip.
+  * **Next.js, rendered on the server:** an app for signed-in staff needs no server rendering.

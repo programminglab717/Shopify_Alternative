@@ -9,6 +9,7 @@
 | Path | Contents |
 |---|---|
 | `apps/core` | The modular monolith: Admin GraphQL API (`src/main.ts`), worker (`src/worker.ts`), seed |
+| `apps/admin-web` | The merchant admin: a React app over `/auth` and the Admin API, in English and Urdu |
 | `apps/storefront` | The storefront renderer (spike 1): Liquid, its limits, a benchmark and a dev server; it reads themes with `@hatti/themes` |
 | `themes/*` | Themes, as merchants would publish them: `hatti-base`, the reference theme |
 | `packages/platform/*` | Shared infrastructure: `ids`, `money`, `pk`, `config`, `logger`, `telemetry`, `crypto`, `ratelimit`, `db`, `events`, `api`, `csv`, `documents`, `storefront-data`, `storefront-api`, `themes` |
@@ -2823,6 +2824,26 @@ Rules:
   from Vite's transformer. `packages/platform/api` has a test that fails if it goes missing.
 * In packages that use GraphQL, `vitest.config.ts` pins `graphql` to its CommonJS build, which is
   the one NestJS and Mercurius load. Two copies of graphql cannot share a schema.
+
+## Merchant admin
+
+* **The admin is `apps/admin-web`** ([ADR-265](../architecture/13-decision-log.md#adr-265--the-merchant-admin-is-a-react-app-on-an-origin-of-its-own-that-sends-auth-and-the-admin-api-on-to-the-core-staff-sign-in-by-a-code-to-their-mobile-or-by-email-with-the-second-step-their-role-needs-the-sessions-opaque-tokens-are-kept-in-the-browsers-storage-and-refreshed-by-one-tab-at-a-time-the-shop-is-in-each-pages-address-and-every-graphql-document-it-sends-is-checked-against-the-cores-schema)):
+  it reaches the core on its own origin, `/auth` with `authRequest` and the Admin API through
+  `SessionStore.graphql`, which refreshes and tries once more on a 401. Never call `fetch`
+  directly: `browserFetch` keeps it bound to the window.
+* **GraphQL documents live in `src/api/operations.ts`** and nowhere else, so that its test checks
+  each against `apps/core/schema.graphql`. Ask what a role may not read in a document of its own,
+  so that one refused leaves the rest of the screen shown. Their answers' types are in
+  `src/api/types.ts`.
+* **Words go in `src/i18n/messages.ts`**, in English and Urdu, never in a component. A message
+  with `{count}` gets a `….one` form where English needs one. Money, phones and dates go through
+  `src/i18n/format.ts`; prices, numbers and IDs get the `num` class, which keeps them left to
+  right and in tabular figures in Urdu.
+* **Screens are phone-first:** touch targets of 48px (`min-h-12`), the design system's colours by
+  their tokens (`bg-surface`, `text-secondary`), logical sides (`ms-`, `pe-`, `start-`) for right
+  to left, and an icon always with its words. A stage is shown with `StageBadge`.
+* **Mutations** go through `useAdminMutation`, which sends an Idempotency-Key and fetches the
+  shop's queries again once done; show `userErrors` in the merchant's words, beside the action.
 
 ## Style
 

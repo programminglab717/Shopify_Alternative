@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, the merchant admin** (decided on 2026-10-08): `apps/admin-web`, the React app and
-installable PWA the stack names; signing in, choosing a shop and the shell first, then Home, the
-orders list by stage and an order's page, confirming, cancelling and packing. Urdu handles wait,
-as decided.
+**Next, the merchant admin's Confirmation Desk** (COD-04): the agents' queue, a call's outcome
+and the next order; then products, customers, shipping and settings, section by section, as the
+alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### Signing in, a shop's Home and its orders in the admin
+
+* **The merchant admin's first loop** ([ADR-265](../architecture/13-decision-log.md#adr-265--the-merchant-admin-is-a-react-app-on-an-origin-of-its-own-that-sends-auth-and-the-admin-api-on-to-the-core-staff-sign-in-by-a-code-to-their-mobile-or-by-email-with-the-second-step-their-role-needs-the-sessions-opaque-tokens-are-kept-in-the-browsers-storage-and-refreshed-by-one-tab-at-a-time-the-shop-is-in-each-pages-address-and-every-graphql-document-it-sends-is-checked-against-the-cores-schema)):
+  signing in by a code to the mobile or by email, the second factor, a new account's name and
+  first shop, and the second step set up where the role needs it; Home's next actions in rupees,
+  today's numbers and the setup checklist; the orders list by stage, searched, with orders
+  confirmed or packed at once; an order's page, confirmed, packed or cancelled for a reason.
+* **Tried against the core:** the seed's owner signed in with the second step, confirmed an
+  order from its page on a phone-sized screen, switched to Urdu and back, kept the session
+  through a reload and signed out, with no errors in the browser.
+* **For it:** the session store, sharing and refreshing tokens across tabs; the router and the
+  shell; `pnpm dev:admin`.
+* 1867 tests: signing up by mobile through the real screens, the session's refreshes, every
+  GraphQL document against the schema, and the words.
 
 ### 933a536 · The merchant admin's scaffold
 

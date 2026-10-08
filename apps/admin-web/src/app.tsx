@@ -1,29 +1,35 @@
-import { LocaleProvider, useLocale } from './i18n/locale';
-import { Button } from './ui/button';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { RouterProvider } from '@tanstack/react-router';
+import { useState } from 'react';
+import { ApiError, browserFetch } from './api/client';
+import { SessionProvider } from './auth/context';
+import { SessionStore } from './auth/session';
+import { LocaleProvider } from './i18n/locale';
+import { createAdminRouter } from './router';
 
-function Welcome() {
-  const { t, locale, setLocale } = useLocale();
-  return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-4">
-      <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
-        {t('app.name')}
-      </h1>
-      <p className="text-secondary">{t('app.tagline')}</p>
-      <Button
-        variant="secondary"
-        aria-label={t('language.toggleLabel')}
-        onClick={() => setLocale(locale === 'en' ? 'ur' : 'en')}
-      >
-        {t('language.toggle')}
-      </Button>
-    </main>
-  );
+/** Whether a failed query is worth trying again: not when the API refused it for a reason. */
+function retry(failures: number, error: unknown): boolean {
+  if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false;
+  return failures < 2;
 }
 
+/** The admin: its session, its language, the API's answers it keeps, and its screens. */
 export function App() {
+  const [session] = useState(() => new SessionStore(browserFetch));
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: { queries: { retry, staleTime: 15_000, refetchOnWindowFocus: true } },
+      }),
+  );
+  const [router] = useState(() => createAdminRouter(session));
   return (
     <LocaleProvider>
-      <Welcome />
+      <SessionProvider store={session}>
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
+      </SessionProvider>
     </LocaleProvider>
   );
 }
