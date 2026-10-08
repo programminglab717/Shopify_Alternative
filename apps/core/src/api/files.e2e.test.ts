@@ -110,7 +110,25 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
       (await call('PUT', target.url.replace('length=64', 'length=65'), png(65))).statusCode,
     ).toBe(403);
     expect((await call('GET', target.url)).statusCode).toBe(403);
-    expect((await call('PUT', target.url, png(64))).statusCode).toBe(200);
+    // The admin uploads from its own origin, as R2's CORS rule lets it (ADR-268).
+    const preflight = await app.inject({
+      method: 'OPTIONS',
+      url: target.url.replace('http://localhost:4000', ''),
+      headers: {
+        origin: 'http://localhost:5173',
+        'access-control-request-method': 'PUT',
+        'access-control-request-headers': 'content-type',
+      },
+    });
+    expect(preflight.statusCode).toBe(204);
+    expect(preflight.headers).toMatchObject({
+      'access-control-allow-origin': '*',
+      'access-control-allow-methods': 'GET, PUT',
+      'access-control-allow-headers': 'content-type',
+    });
+    const put = await call('PUT', target.url, png(64));
+    expect(put.statusCode).toBe(200);
+    expect(put.headers['access-control-allow-origin']).toBe('*');
 
     const created = await gql(tokens.owner, CREATE, {
       files: [{ originalSource: target.resourceUrl, alt: 'Three lawn suits' }],

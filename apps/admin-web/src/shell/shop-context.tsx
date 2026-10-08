@@ -20,14 +20,16 @@ export function useAdminQuery<T>(
   key: readonly unknown[],
   document: string,
   variables?: Record<string, unknown>,
-  options: { enabled?: boolean } = {},
+  options: { enabled?: boolean; refetchInterval?: (data: T | undefined) => number | false } = {},
 ) {
   const store = useSessionStore();
   const shop = useShop();
-  return useQuery({
+  const { refetchInterval } = options;
+  return useQuery<T>({
     queryKey: ['admin', shop.id, ...key, variables ?? null],
     queryFn: () => store.graphql<T>(shop.id, document, variables),
     enabled: options.enabled ?? true,
+    refetchInterval: refetchInterval ? (query) => refetchInterval(query.state.data) : undefined,
   });
 }
 

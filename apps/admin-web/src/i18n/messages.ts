@@ -339,6 +339,21 @@ const en = {
   'product.tooManyVariants': 'A product can have at most 250 variants.',
   'product.badCompareAt': 'Enter the price before discount as a number, or leave it empty.',
   'product.badStock': 'Enter stock as a whole number, or leave it empty.',
+  'photos.title': 'Photos',
+  'photos.hint':
+    'Take them with your camera or choose them from your gallery. The first is the one your store shows first.',
+  'photos.add': 'Add photos',
+  'photos.uploading': 'Uploading {count} photos…',
+  'photos.uploading.one': 'Uploading 1 photo…',
+  'photos.processing': 'Getting it ready…',
+  'photos.failed': 'This photo could not be used.',
+  'photos.main': 'Main',
+  'photos.makeMain': 'Make it the main photo',
+  'photos.remove': 'Remove photo',
+  'photos.removeYes': 'Remove',
+  'photos.badType': '{name} is not a photo we can use: choose a JPEG, PNG, WebP or GIF.',
+  'photos.tooBig': '{name} is larger than 20 MB.',
+  'photos.uploadFailed': '{name} did not upload. Check your connection and try again.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -662,6 +677,20 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'product.tooManyVariants': 'ایک پروڈکٹ کے زیادہ سے زیادہ 250 ویریئنٹس ہو سکتے ہیں۔',
   'product.badCompareAt': 'رعایت سے پہلے کی قیمت نمبر میں لکھیں، یا خالی چھوڑ دیں۔',
   'product.badStock': 'اسٹاک پورے نمبر میں لکھیں، یا خالی چھوڑ دیں۔',
+  'photos.title': 'تصویریں',
+  'photos.hint':
+    'کیمرے سے لیں یا گیلری سے چنیں۔ پہلی تصویر آپ کے اسٹور میں سب سے پہلے دکھائی جاتی ہے۔',
+  'photos.add': 'تصویریں شامل کریں',
+  'photos.uploading': '{count} تصویریں اپ لوڈ ہو رہی ہیں…',
+  'photos.processing': 'تیار ہو رہی ہے…',
+  'photos.failed': 'یہ تصویر استعمال نہیں ہو سکی۔',
+  'photos.main': 'مین',
+  'photos.makeMain': 'اسے مین تصویر بنائیں',
+  'photos.remove': 'تصویر ہٹائیں',
+  'photos.removeYes': 'ہٹائیں',
+  'photos.badType': '{name} استعمال کے قابل تصویر نہیں: JPEG، PNG، WebP یا GIF چنیں۔',
+  'photos.tooBig': '{name} کا سائز 20 MB سے زیادہ ہے۔',
+  'photos.uploadFailed': '{name} اپ لوڈ نہیں ہوئی۔ اپنا کنکشن دیکھیں اور دوبارہ کوشش کریں۔',
 };
 
 export const messages: Readonly<

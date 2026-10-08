@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-267 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-268 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -275,6 +275,7 @@
 | 265 | The merchant admin is a React app on an origin of its own that sends `/auth` and the Admin API on to the core: staff sign in by a code to their mobile or by email, with the second step their role needs; the session's opaque tokens are kept in the browser's storage and refreshed by one tab at a time; the shop is in each page's address; and every GraphQL document it sends is checked against the core's schema | Accepted |
 | 266 | The admin's Confirmation Desk deals an agent one order at a time when they ask, and the next as soon as a call's outcome is recorded; the customer's number stays masked until the agent asks to see it, which is logged, and then can be called or messaged on WhatsApp with a tap; an order whose call is recorded leaves the agent's queue at once | Accepted |
 | 267 | The admin's products: a list by status and search, a product's page that owners and managers change and every other role reads, and adding a product with its options' variants, each with its price and stock; stock is counted at the shop's primary location, set where the merchant typed it and refused if it changed since it was read | Accepted |
+| 268 | Merchants add a product's photos from its page, taken with the phone's camera or chosen from its gallery: a large photo is made 2,048 pixels a side in the browser before it goes up, straight to storage through a signed URL any origin may use, and each is shown as the core makes it ready or says why it could not | Accepted |
 
 ---
 
@@ -11124,3 +11125,40 @@
     Shopify does; two calls, the second's failure said plainly, keep them so.
   * **Shopify's rich text editor for descriptions:** the catalog keeps plain text, which the
     storefront and the feeds read; formatting can come later.
+
+## ADR-268 · Merchants add a product's photos from its page, taken with the phone's camera or chosen from its gallery: a large photo is made 2,048 pixels a side in the browser before it goes up, straight to storage through a signed URL any origin may use, and each is shown as the core makes it ready or says why it could not
+
+* **Context:** A shop's files go straight to storage through URLs `stagedUploadsCreate` signs, R2's
+  in production and a directory the API serves in development ([ADR-079](#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)). A product's
+  image is added by such an upload's resource URL; the worker reads it, checks it and keeps a
+  clean copy, and the image is ready in seconds or fails saying why ([ADR-158](#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)). The core
+  takes JPEG, PNG, WebP and GIF, up to 20 MB. Phones take photos of several megabytes, often
+  HEIC on iPhones, over mobile data the merchant pays for. The admin calls the API on its own
+  origin, which keeps no CORS ([ADR-265](#adr-265--the-merchant-admin-is-a-react-app-on-an-origin-of-its-own-that-sends-auth-and-the-admin-api-on-to-the-core-staff-sign-in-by-a-code-to-their-mobile-or-by-email-with-the-second-step-their-role-needs-the-sessions-opaque-tokens-are-kept-in-the-browsers-storage-and-refreshed-by-one-tab-at-a-time-the-shop-is-in-each-pages-address-and-every-graphql-document-it-sends-is-checked-against-the-cores-schema)); its product pages had no photos yet
+  ([ADR-267](#adr-267--the-admins-products-a-list-by-status-and-search-a-products-page-that-owners-and-managers-change-and-every-other-role-reads-and-adding-a-product-with-its-options-variants-each-with-its-price-and-stock-stock-is-counted-at-the-shops-primary-location-set-where-the-merchant-typed-it-and-refused-if-it-changed-since-it-was-read)).
+* **Decision:**
+  * **On a product's page,** "Add photos" opens the phone's choice of camera or gallery, several
+    at a time. Each photo is shown as it is made ready, or with why it could not be; the first,
+    marked, is the one listings show, and any other is made the first, or removed after a second
+    tap. Other roles see the photos alone.
+  * **In the browser first:** a photo over 1.5 MB larger than 2,048 pixels a side, the largest the
+    storefront shows, is drawn at that size and goes up as a JPEG, PNG or WebP as it was. One in a
+    format the core does not take, a HEIC, is made a JPEG where the browser can read it; else the
+    merchant is told which formats to choose.
+  * **Up to ten are staged at a time,** each put to its signed URL, and those that went up added to
+    the product in the order they were chosen, with the product's title as their alt text.
+  * **The page reads the product again every two seconds** while a photo is being made ready, and
+    the form keeps what the merchant typed meanwhile: it is filled in afresh after a save alone.
+  * **A signed storage URL may be used from any origin:** the development API's storage answers
+    CORS for it, as R2's bucket rule will let the admin's origin, since the signature is what
+    grants it. The API itself still keeps none.
+* **Consequences:**
+  * Merchants put up a product with its photos from their phones, a large photo costing them a
+    fraction of the data it would as it was taken.
+  * R2's bucket needs a CORS rule letting the admin's origin PUT and GET, with the infrastructure.
+  * Videos, crops and alt text of their own stay the Admin API's for now.
+* **Alternatives:**
+  * **Uploading through the API:** every photo would pass through the core, which signed URLs keep
+    it from carrying.
+  * **The photo sent as it was taken:** megabytes of mobile data for pixels no one is shown; the
+    core still keeps whatever comes, so a shop wanting more can import it by URL.

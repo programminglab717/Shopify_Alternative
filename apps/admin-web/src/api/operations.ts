@@ -517,8 +517,13 @@ const PRODUCT = /* GraphQL */ `
       id
       status
       alt
+      position
+      mediaContentType
       previewImage {
         url
+      }
+      mediaErrors {
+        message
       }
     }
     variants {
@@ -650,6 +655,68 @@ export const ProductDeleteMutation = /* GraphQL */ `
   mutation ProductDelete($input: ProductDeleteInput!) {
     productDelete(input: $input) {
       deletedProductId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Where to upload files the merchant chose, up to 10 at a time, for an hour (ADR-079). */
+export const StagedUploadsCreateMutation = /* GraphQL */ `
+  mutation StagedUploadsCreate($input: [StagedUploadInput!]!) {
+    stagedUploadsCreate(input: $input) {
+      stagedTargets {
+        url
+        httpMethod
+        resourceUrl
+        parameters {
+          name
+          value
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Photos uploaded, added to a product after the ones it has; each is made ready in moments. */
+export const ProductCreateMediaMutation = /* GraphQL */ `
+  mutation ProductCreateMedia($productId: ID!, $media: [CreateMediaInput!]!) {
+    productCreateMedia(productId: $productId, media: $media) {
+      media {
+        id
+        status
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Photos removed from a product. */
+export const ProductDeleteMediaMutation = /* GraphQL */ `
+  mutation ProductDeleteMedia($productId: ID!, $mediaIds: [ID!]!) {
+    productDeleteMedia(productId: $productId, mediaIds: $mediaIds) {
+      deletedMediaIds
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A photo moved, to be the product's first: the one its listings show. */
+export const ProductReorderMediaMutation = /* GraphQL */ `
+  mutation ProductReorderMedia($productId: ID!, $moves: [MoveInput!]!) {
+    productReorderMedia(productId: $productId, moves: $moves) {
       userErrors {
         ...Problems
       }

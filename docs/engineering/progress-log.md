@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, products' photos in the merchant admin** (CAT-02): taken with the phone's camera or
-chosen from its gallery, uploaded and shown as they are made ready; then customers, shipping and
-settings, section by section, as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, the merchant admin's customers** (CUS-01): the customers list, searched by name or
+mobile, and a customer's page with their orders and how they went; then shipping and settings,
+section by section, as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### Products' photos in the admin
+
+* **Photos from the phone** ([ADR-268](../architecture/13-decision-log.md#adr-268--merchants-add-a-products-photos-from-its-page-taken-with-the-phones-camera-or-chosen-from-its-gallery-a-large-photo-is-made-2048-pixels-a-side-in-the-browser-before-it-goes-up-straight-to-storage-through-a-signed-url-any-origin-may-use-and-each-is-shown-as-the-core-makes-it-ready-or-says-why-it-could-not)):
+  taken with the camera or chosen from the gallery on a product's page, a large one made 2,048
+  pixels a side in the browser, uploaded straight to storage and added to the product; each shown
+  as the core makes it ready or says why not; another made the main one, or removed.
+* **Tried against the core and its worker:** a 5.3 MB photo went up as 1.6 MB, it and a PNG were
+  made ready within seconds, a HEIC that could not be read was refused, another photo was made the
+  main one and one removed, and the list showed the product's photo; with no errors in the browser.
+* **For it:** the development API's storage answers CORS for its signed URLs, as R2's bucket rule
+  will; the product's form keeps what was typed while photos are made ready.
+* 1891 tests: uploading, refusing and reordering photos through the real screens.
 
 ### 15795d9 · Products in the admin
 

@@ -5,6 +5,9 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
  * Serves local storage at `prefix`, as R2 serves its bucket (ADR-079): a file is uploaded and
  * read only through a URL the storage signed, an upload only of the size and type it was signed
  * for. For development and tests; production's files are R2's to serve.
+ *
+ * Any origin may use a signed URL, as the bucket's CORS rule lets the admin's origin (ADR-268):
+ * the signature is what grants it, so the admin uploads from its own origin. The API keeps none.
  */
 export async function serveLocalStorage(
   fastify: FastifyInstance,
@@ -18,6 +21,18 @@ export async function serveLocalStorage(
       '*',
       { parseAs: 'buffer', bodyLimit: MAX_VIDEO_UPLOAD_BYTES },
       (_request, body, done) => done(null, body),
+    );
+
+    scope.addHook('onRequest', async (_request, reply) => {
+      reply.header('access-control-allow-origin', '*');
+    });
+    scope.options(`${prefix}/*`, async (_request, reply) =>
+      reply
+        .code(204)
+        .header('access-control-allow-methods', 'GET, PUT')
+        .header('access-control-allow-headers', 'content-type')
+        .header('access-control-max-age', '3600')
+        .send(),
     );
 
     scope.put(`${prefix}/*`, { bodyLimit: MAX_VIDEO_UPLOAD_BYTES }, async (request, reply) => {

@@ -39,6 +39,7 @@ import {
   StatusChoice,
 } from './product-form';
 import type { DetailsState } from './product-form';
+import { ProductPhotos } from './photos';
 import { EDITS_PRODUCTS, ProductStatusBadge, ProductThumb } from './status';
 
 /** A product's page's search: whether it was just added, and its stock with it. */
@@ -414,8 +415,21 @@ export function ProductPage() {
   const shop = useShop();
   const { productId } = useParams({ from: '/$shopId/products/$productId' });
   const { added } = useSearch({ from: '/$shopId/products/$productId' });
-  const query = useAdminQuery<ProductData>(['product', productId], ProductQuery, { id: productId });
-  const [saved, setSaved] = useState(false);
+  const query = useAdminQuery<ProductData>(
+    ['product', productId],
+    ProductQuery,
+    { id: productId },
+    // Read again while photos are being made ready, to show each once it is.
+    {
+      refetchInterval: (data) =>
+        data?.product?.media.some(
+          (each) => each.status === 'UPLOADED' || each.status === 'PROCESSING',
+        )
+          ? 2000
+          : false,
+    },
+  );
+  const [saved, setSaved] = useState(0);
 
   const back = (
     <Link
@@ -438,6 +452,7 @@ export function ProductPage() {
     );
   }
   const { product, location } = query.data;
+  const edits = EDITS_PRODUCTS.includes(shop.role);
   if (!product) {
     return (
       <div className="mx-auto flex max-w-5xl flex-col gap-4">
@@ -462,19 +477,21 @@ export function ProductPage() {
           <ProductStatusBadge status={product.status} />
         </div>
       </header>
-      {saved ? (
+      {saved > 0 ? (
         <Alert tone="success">{t('product.saved')}</Alert>
       ) : added === 'ok' ? (
         <Alert tone="success">{t('product.added')}</Alert>
       ) : added === 'noStock' ? (
         <Alert tone="warning">{t('product.addedNoStock')}</Alert>
       ) : null}
+      <ProductPhotos product={product} edits={edits} />
+      {/* Filled in afresh after each save, from the product read again; not as photos change. */}
       <ProductEditor
-        key={query.dataUpdatedAt}
+        key={saved}
         product={product}
         location={location}
-        edits={EDITS_PRODUCTS.includes(shop.role)}
-        onSaved={() => setSaved(true)}
+        edits={edits}
+        onSaved={() => setSaved((count) => count + 1)}
       />
     </div>
   );

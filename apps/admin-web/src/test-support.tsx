@@ -42,12 +42,23 @@ export function fakeCore(
   answer: (operation: string, variables: Record<string, unknown>) => unknown,
 ) {
   const sent: Sent[] = [];
+  /** Files put to storage's signed URLs, as a browser uploads them. */
+  const uploads: { url: string; type: string | null; size: number }[] = [];
   const json = (body: unknown) =>
     new Response(JSON.stringify(body), {
       status: 200,
       headers: { 'content-type': 'application/json' },
     });
   const fetcher = vi.fn(async (path: string, init?: RequestInit) => {
+    if (init?.method === 'PUT') {
+      const body = init.body as Blob;
+      uploads.push({
+        url: path,
+        type: new Headers(init.headers).get('content-type'),
+        size: body.size,
+      });
+      return new Response(null, { status: 200 });
+    }
     if (path === '/auth/me') {
       return json({
         user: { id: 'usr_1', name: 'Sana', language: 'en' },
@@ -76,7 +87,7 @@ export function fakeCore(
     }
     return json({ data: answer(operation, variables) });
   });
-  return { fetcher, sent };
+  return { fetcher, sent, uploads };
 }
 
 /** The admin as a browser shows it, opened at `path`. */

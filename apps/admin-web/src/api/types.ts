@@ -223,6 +223,13 @@ export interface ProductThumbnail {
   previewImage: { url: string } | null;
 }
 
+export interface ProductMedia extends ProductThumbnail {
+  alt: string;
+  position: number;
+  mediaContentType: 'IMAGE' | 'VIDEO' | 'EXTERNAL_VIDEO';
+  mediaErrors: { message: string }[];
+}
+
 export interface ProductListItem {
   id: string;
   title: string;
@@ -270,7 +277,7 @@ export interface ProductDetail {
   totalInventory: number;
   tracksInventory: boolean;
   options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
-  media: (ProductThumbnail & { alt: string })[];
+  media: ProductMedia[];
   variants: ProductVariantDetail[];
 }
 
@@ -316,4 +323,30 @@ export interface InventorySetQuantitiesData {
 
 export interface ProductDeleteData {
   productDelete: { deletedProductId: string | null; userErrors: UserError[] };
+}
+
+export interface StagedTarget {
+  url: string;
+  httpMethod: string;
+  resourceUrl: string;
+  parameters: { name: string; value: string }[];
+}
+
+export interface StagedUploadsCreateData {
+  stagedUploadsCreate: { stagedTargets: StagedTarget[] | null; userErrors: UserError[] };
+}
+
+export interface ProductCreateMediaData {
+  productCreateMedia: {
+    media: { id: string; status: MediaStatus }[] | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface ProductDeleteMediaData {
+  productDeleteMedia: { deletedMediaIds: string[] | null; userErrors: UserError[] };
+}
+
+export interface ProductReorderMediaData {
+  productReorderMedia: { userErrors: UserError[] };
 }
