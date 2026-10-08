@@ -34,6 +34,7 @@ import {
 } from './order-store.js';
 import type { OrderRecord } from './records.js';
 import { heldForRiskMessage, holdsForRisk, type RiskAssessment } from './risk.js';
+import { OVER_LIMIT_MESSAGE } from './plan-orders.js';
 import { COD_CASH_LIMIT, LIMITS, codLimitError, itemName, orderName, stageOf } from './rules.js';
 import { lines, orders, type AddressValue, type LineRow, type OrderRow } from './schema.js';
 
@@ -758,6 +759,9 @@ export class OrderEditService {
           .values({
             ...order,
             ...statuses,
+            // Part of a sale counted already, if at all (ADR-263).
+            planMonth: null,
+            overLimitAt: null,
             id: partId,
             number,
             stage: stageOf({
@@ -1082,6 +1086,7 @@ function checkEdit(
 /** Why an order's items, or its charges, can't change now; null if they can. */
 function editRefusal(order: OrderRow, what: 'items' | 'charges' = 'items'): string | null {
   if (order.status === 'cancelled') return `A cancelled order's ${what} can't change`;
+  if (order.overLimitAt) return OVER_LIMIT_MESSAGE;
   if (order.status !== 'open' || order.fulfillmentStatus !== 'unfulfilled') {
     return `Its ${what} can't change once it has shipped`;
   }
@@ -1110,6 +1115,7 @@ function discountShares(
 /** Why an order can't be split now; null if it can. */
 function splitRefusal(order: OrderRow): string | null {
   if (order.status === 'cancelled') return "A cancelled order can't be split";
+  if (order.overLimitAt) return OVER_LIMIT_MESSAGE;
   if (order.status !== 'open' || order.fulfillmentStatus !== 'unfulfilled') {
     return "It can't be split once it has shipped";
   }
@@ -1129,6 +1135,7 @@ function mergeRefusal(order: OrderRow): string | null {
   const name = orderName(order.number);
   if (order.cancelReason === 'merged') return `${name} was merged into another order already`;
   if (order.status === 'cancelled') return `${name} is cancelled`;
+  if (order.overLimitAt) return `${name}: ${OVER_LIMIT_MESSAGE}`;
   if (order.status !== 'open' || order.fulfillmentStatus !== 'unfulfilled') {
     return `${name} has shipped`;
   }

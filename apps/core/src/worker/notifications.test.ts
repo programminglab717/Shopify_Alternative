@@ -4,15 +4,18 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
   DnsLookup,
+  PlanAllowance,
   PublicSite,
   StorefrontSite,
   type MutationResult,
+  type PlanLimit,
+  type PlanLimitKind,
   type StaffRole,
   type TenantContext,
 } from '@hatti/api';
 import { BillingService, MessageWallet } from '@hatti/billing/public';
 import { ProductService, VariantService } from '@hatti/catalog/public';
-import { StoreCreditService } from '@hatti/customers/public';
+import { BlocklistService, CustomerService, StoreCreditService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { appendEvent, type DomainEvent } from '@hatti/events';
@@ -40,6 +43,7 @@ import {
   FulfillmentService,
   OrderCommentService,
   OrderEditService,
+  OrderService,
   type OrderToPlace,
 } from '@hatti/orders/public';
 import pg from 'pg';
@@ -47,6 +51,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { BillingNotices } from './billing-notices.js';
 import { DomainNotices } from './domain-notices.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
+import { PlanOrders } from './plan-orders.js';
 import {
   MessagesSender,
   OrderNotifications,
@@ -149,6 +154,7 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       staff: new StaffAlerts(database, messages()),
       storeCredit: new StoreCreditNotices(database, messages()),
       domains: new DomainNotices(database, messages()),
+      planOrders: new PlanOrders(database, messages(), orders()),
     });
     // At least once: the same event twice is one message.
     for (let time = 0; time < times; time++) {
@@ -181,9 +187,8 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     ).rows;
 
   /** Places an order as checkout does, from the online store. */
-  const placeOnline = async (overrides: Partial<OrderToPlace> = {}) => {
-    const service = orders();
-    return unwrap(
+  const placeOnline = async (overrides: Partial<OrderToPlace> = {}, service = orders()) =>
+    unwrap(
       await database.tenant(shopId, (tx) =>
         service.placeIn(
           tx,
@@ -223,7 +228,6 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
         ),
       ),
     );
-  };
 
   /** One second on: what was queued now is due. */
   const soon = () => new Date(Date.now() + 1_000);
@@ -1737,6 +1741,66 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     await dispatch(2);
     expect(await receipts()).toHaveLength(3);
   });
+  it("tells the shop as its month's orders near its plan's limit and reach it, and frees those past it on a plan without one (ADR-263)", async () => {
+    const OWNER = '+923335550009';
+    unwrap(await new MessagingSettingsService(database).update(tenant, { alertsPhone: OWNER }));
+    const limited = new OrderService(
+      database,
+      new VariantService(database),
+      new LocationService(database),
+      new StockService(),
+      new CustomerService(database),
+      new BlocklistService(database),
+      undefined,
+      new FivePerMonth(),
+    );
+    const placed = [];
+    for (let n = 0; n < 7; n++) {
+      placed.push(await placeOnline({ lines: [{ variantId, quantity: 1, price: null }] }, limited));
+    }
+    // At least once: the same event twice is one notice each.
+    await dispatch(2);
+    const shop = { shop: 'Zari Fashions', limit: '5', plan: 'Free' };
+    expect(
+      (await queued())
+        .filter((message) => message.kind.startsWith('orders_limit'))
+        .map((message) => [message.kind, message.channel, message.recipient, message.variables]),
+    ).toEqual([
+      ['orders_limit_near', 'whatsapp', OWNER, { ...shop, orders: '4' }],
+      ['orders_limit_reached', 'whatsapp', OWNER, { ...shop, orders: '5' }],
+    ]);
+    const pastLimit = async () =>
+      (
+        await admin.query<{ id: string }>(
+          `SELECT id FROM orders.orders
+            WHERE shop_id = $1 AND over_limit_at IS NOT NULL ORDER BY number`,
+          [shopId],
+        )
+      ).rows.map((row) => row.id);
+    expect(await pastLimit()).toEqual([placed[5]!.id, placed[6]!.id]);
+
+    const changed = (plan: string, reason: string) =>
+      database.tenant(shopId, (tx) =>
+        appendEvent(tx, shopId, {
+          type: 'billing_subscription.changed',
+          aggregateType: 'shop',
+          aggregateId: shopId,
+          payload: { plan, interval: null, periodEnd: null, nextPlan: null, reason },
+        }),
+      );
+    // Back on Free, or still on it, frees none.
+    await changed('free', 'ended');
+    await dispatch();
+    expect(await pastLimit()).toHaveLength(2);
+    // A plan without a limit frees them all.
+    await changed('starter', 'paid');
+    await dispatch(2);
+    expect(await pastLimit()).toEqual([]);
+    expect(await timeline(placed[6]!.id)).toContainEqual([
+      'over_limit_released',
+      "The shop's plan has room for it now: its customer shows, and it can be worked on",
+    ]);
+  });
 });
 
 function addressOf(name: string): OrderToPlace['address'] {
@@ -1751,4 +1815,15 @@ function addressOf(name: string): OrderToPlace['address'] {
     zip: null,
     location: null,
   };
+}
+
+/** A plan that allows five orders a month, as Free allows 50. */
+class FivePerMonth extends PlanAllowance {
+  async limitOf(_shopId: string, kind: PlanLimitKind): Promise<PlanLimit | null> {
+    return kind === 'ordersPerMonth' ? { limit: 5, plan: 'Free' } : null;
+  }
+
+  async limitIn(_tx: unknown, shopId: string, kind: PlanLimitKind): Promise<PlanLimit | null> {
+    return this.limitOf(shopId, kind);
+  }
 }

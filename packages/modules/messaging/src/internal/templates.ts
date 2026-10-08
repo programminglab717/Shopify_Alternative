@@ -8,8 +8,9 @@
 /**
  * The notifications a shop's customers get, the alerts the shop gets itself (ADR-157), and those
  * its staff get of their own work, each at their own number (ADR-191), each of which the shop may
- * turn off; and Hatti's notices of the shop's bills (ADR-169), and of a domain of its own DNS
- * points elsewhere (ADR-262), which it may not.
+ * turn off; and Hatti's notices of the shop's bills (ADR-169), of a domain of its own DNS points
+ * elsewhere (ADR-262), and of its orders a month nearing its plan's limit (ADR-263), which it may
+ * not.
  */
 export const MESSAGE_KINDS = [
   'order_placed',
@@ -38,6 +39,8 @@ export const MESSAGE_KINDS = [
   'transfer_confirmed',
   'transfer_refused',
   'domain_unpointed',
+  'orders_limit_near',
+  'orders_limit_reached',
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
@@ -62,7 +65,8 @@ export type AnyMessageKind = MessageKind | PlatformMessageKind;
 /**
  * Messages a shop cannot turn off: what a shopper asked for, as a code to prove their number, and
  * Hatti's notices of the shop's bills (ADR-169), among them what Hatti found of a transfer the
- * shop said it made (ADR-254), and of a domain of its own DNS points elsewhere (ADR-262).
+ * shop said it made (ADR-254), of a domain of its own DNS points elsewhere (ADR-262), and of its
+ * orders nearing its plan's limit (ADR-263).
  */
 export const ALWAYS_SENT: readonly MessageKind[] = [
   'one_time_code',
@@ -72,6 +76,8 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'transfer_confirmed',
   'transfer_refused',
   'domain_unpointed',
+  'orders_limit_near',
+  'orders_limit_reached',
 ];
 
 /** What the buttons of a message asking a customer to confirm their order answer (COD-01). */
@@ -140,6 +146,12 @@ export interface MessageVariables {
    * in `date`, when it is disconnected unless DNS points it back before.
    */
   domain?: string;
+  /**
+   * For the orders a month a shop's plan allows (ADR-263): how many it has placed this month, and
+   * how many the plan, in `plan`, allows.
+   */
+  orders?: string;
+  limit?: string;
   /**
    * For an email of an order's news (ADR-198): the shop's accent colour, "#B45309", and the
    * address of its logo, where it set them; the order's first lines, one to a line, each its name
@@ -576,6 +588,34 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: "{shop}'s domain {domain} no longer points at Hatti",
       ur: '{shop} کا ڈومین {domain} اب ہٹی کی طرف نہیں جاتا',
+    },
+  },
+  orders_limit_near: {
+    whatsapp: 'hatti_orders_limit_near',
+    category: 'utility',
+    parameters: ['shop', 'orders', 'limit', 'plan'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: {shop} has taken {orders} of the {limit} orders the {plan} plan allows this month. Orders past {limit} still come in, but their customers stay hidden and you can't ship them until you choose a bigger plan in Hatti's admin.",
+      ur: 'ہٹی: {shop} نے اس مہینے {plan} پلان کے {limit} میں سے {orders} آرڈر لے لیے ہیں۔ {limit} سے زیادہ آرڈر آتے رہیں گے، لیکن ان کے صارفین چھپے رہیں گے اور آپ انہیں بھیج نہیں سکیں گے جب تک آپ ہٹی کے ایڈمن سے بڑا پلان نہیں چنتے۔',
+    },
+    subject: {
+      en: '{shop} has taken {orders} of its {limit} orders this month',
+      ur: '{shop} نے اس مہینے اپنے {limit} میں سے {orders} آرڈر لے لیے ہیں',
+    },
+  },
+  orders_limit_reached: {
+    whatsapp: 'hatti_orders_limit_reached',
+    category: 'utility',
+    parameters: ['shop', 'limit', 'plan'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: {shop} has taken all {limit} orders the {plan} plan allows this month. New orders still come in, but their customers stay hidden and you can't confirm or ship them until you choose a bigger plan in Hatti's admin.",
+      ur: 'ہٹی: {shop} نے اس مہینے {plan} پلان کے تمام {limit} آرڈر لے لیے ہیں۔ نئے آرڈر آتے رہیں گے، لیکن ان کے صارفین چھپے رہیں گے اور آپ انہیں کنفرم یا روانہ نہیں کر سکیں گے جب تک آپ ہٹی کے ایڈمن سے بڑا پلان نہیں چنتے۔',
+    },
+    subject: {
+      en: '{shop} has taken all {limit} orders its plan allows this month',
+      ur: '{shop} نے اس مہینے اپنے پلان کے تمام {limit} آرڈر لے لیے ہیں',
     },
   },
 };

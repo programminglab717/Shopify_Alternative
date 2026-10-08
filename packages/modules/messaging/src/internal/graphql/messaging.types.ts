@@ -37,6 +37,8 @@ export enum MessageKind {
   TRANSFER_CONFIRMED = 'TRANSFER_CONFIRMED',
   TRANSFER_REFUSED = 'TRANSFER_REFUSED',
   DOMAIN_UNPOINTED = 'DOMAIN_UNPOINTED',
+  ORDERS_LIMIT_NEAR = 'ORDERS_LIMIT_NEAR',
+  ORDERS_LIMIT_REACHED = 'ORDERS_LIMIT_REACHED',
 }
 
 registerEnumType(MessageKind, {
@@ -154,6 +156,18 @@ registerEnumType(MessageKind, {
         "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
         'DNS points a domain of its own elsewhere, which is disconnected three days on unless it ' +
         'points back (ADR-262).',
+    },
+    ORDERS_LIMIT_NEAR: {
+      description:
+        "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
+        "it has placed four fifths of the orders its plan allows this month, Free's 40 of 50 " +
+        '(ADR-263).',
+    },
+    ORDERS_LIMIT_REACHED: {
+      description:
+        "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
+        'it has placed all the orders its plan allows this month; those past them come in with ' +
+        'their customers hidden (ADR-263).',
     },
   },
 });

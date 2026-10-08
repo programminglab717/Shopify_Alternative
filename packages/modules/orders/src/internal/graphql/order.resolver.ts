@@ -165,6 +165,8 @@ export class OrderResolver {
     @Loaders() loaders: RequestLoaders,
     @Parent() order: Order,
   ): Promise<Customer | null> {
+    // Hidden until the shop's plan has room for the order (ADR-263).
+    if (order.overPlanLimit) return null;
     const loader = loaders.get<string, CustomerRecord>('customers.byId', (ids) =>
       this.customers.getMany(tenant, ids),
     );

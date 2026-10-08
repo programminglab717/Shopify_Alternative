@@ -15,7 +15,8 @@ import { sql } from 'drizzle-orm';
 import { documentName, invoice, packingSlip, type DocumentKindValue } from './documents.js';
 import { loadOrders } from './order-store.js';
 import type { OrderRecord } from './records.js';
-import { LIMITS } from './rules.js';
+import { OVER_LIMIT_MESSAGE } from './plan-orders.js';
+import { LIMITS, orderName } from './rules.js';
 
 export interface DocumentRequest {
   kind: DocumentKindValue;
@@ -73,6 +74,12 @@ export class OrderDocumentService {
       },
     );
 
+    // Their customers stay hidden until the shop's plan has room for them (ADR-263).
+    const over = orders.filter((order) => order.overLimitAt !== null);
+    if (over.length > 0) {
+      const names = over.map((order) => orderName(order.number)).join(', ');
+      return failOne(['ids'], 'INVALID', `${names}: ${OVER_LIMIT_MESSAGE}`);
+    }
     const template = request.kind === 'invoice' ? invoice : packingSlip;
     const pages = orders.map((order) =>
       template(order, {

@@ -35,6 +35,7 @@ import {
 } from './order-store.js';
 import { CLAIM_LIMITS, claimedParcel, parcelWorth, writtenOffWorth } from './parcel-claims.js';
 import type { FulfillmentEventRecord, OrderRecord, Page, ParcelClaimRecord } from './records.js';
+import { OVER_LIMIT_MESSAGE } from './plan-orders.js';
 import { LIMITS, orderName } from './rules.js';
 import {
   FULFILLMENT_EVENT_STATUSES,
@@ -360,6 +361,7 @@ export class FulfillmentService {
     return this.db.tenant(tenant.shopId, async (tx): Promise<MutationResult<ParcelResult>> => {
       const order = await lockOrder(tx, tenant.shopId, orderId);
       if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
+      if (order.overLimitAt) return failOne(['id'], 'INVALID', OVER_LIMIT_MESSAGE);
       if (order.status !== 'open') {
         return failOne(['id'], 'INVALID', `A ${order.status} order can't be shipped`);
       }

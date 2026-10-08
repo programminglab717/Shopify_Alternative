@@ -2,6 +2,7 @@ import { isIP } from 'node:net';
 import {
   INPUT_LIMITS,
   InputChecker,
+  PlanAllowance,
   actorColumnsOf,
   failOne,
   shopProfile,
@@ -44,7 +45,9 @@ import {
   type OrderPaymentRemindedPayload,
   type OrderConfirmationRemindedPayload,
   type OrderUpdatedPayload,
+  type PlanOrdersCountedPayload,
 } from './events.js';
+import { OVER_LIMIT_MESSAGE, planMonthIn, planOrderOf } from './plan-orders.js';
 import { toTimelineEntry, type TimelineRow } from './order-comment.service.js';
 import { orderConditions, type OrderFilter } from './order-filter.js';
 import { callingWindowsIn, isCallingTime } from './calling-hours.js';
@@ -227,6 +230,11 @@ export interface Placement {
   how: string;
   /** Set when the customer confirmed it already, through a draft's link. */
   confirmedByCustomer?: boolean;
+  /**
+   * False for an order that is not a sale of its own, as an exchange: it never counts toward the
+   * orders its shop's plan allows in a month (ADR-263).
+   */
+  countsTowardPlan?: boolean;
 }
 
 /** Fields left out stay as they are. */
@@ -333,6 +341,8 @@ export class OrderService {
     private readonly blocklist: BlocklistService,
     /** Whether the shop takes payments online, for orders paid so (ADR-152). */
     @Optional() private readonly payments?: OnlinePayments,
+    /** The orders a month the shop's plan allows (ADR-263); without it, as in most tests, any. */
+    @Optional() private readonly allowance?: PlanAllowance,
   ) {}
 
   async create(
@@ -636,6 +646,14 @@ export class OrderService {
       fulfillmentStatus: 'unfulfilled' as const,
     };
     const number = await nextOrderNumber(tx, shopId);
+    // Counted under the shop's order counter, taken just now: no other order of the shop counts
+    // meanwhile (ADR-263).
+    const limit =
+      placement.countsTowardPlan === false
+        ? null
+        : ((await this.allowance?.limitIn(tx, shopId, 'ordersPerMonth')) ?? null);
+    const planMonth = limit ? await planMonthIn(tx, shopId) : null;
+    const planOrder = limit && planMonth ? planOrderOf(limit, planMonth.counted) : null;
     const [row] = await tx
       .insert(orders)
       .values({
@@ -643,6 +661,8 @@ export class OrderService {
         id: orderId,
         number,
         source: placement.source,
+        planMonth: planMonth?.month ?? null,
+        overLimitAt: planOrder?.overLimit ? sql`now()` : null,
         ...statuses,
         stage: stageOf({ ...statuses, paymentMethod, amountPaid, total, advanceDue }),
         paymentMethod,
@@ -710,6 +730,32 @@ export class OrderService {
       `Order ${orderName(number)} placed ${placement.how}: ${formatMoney(money(total, currency))}, ` +
         PAYMENT_METHOD_TEXT[paymentMethod],
     );
+    if (limit && planMonth && planOrder) {
+      if (planOrder.overLimit) {
+        await addTimelineEntry(
+          tx,
+          shopId,
+          orderId,
+          'system',
+          'over_limit',
+          `Came in past the ${limit.limit} orders a month the ${limit.plan} plan allows: its ` +
+            "customer is hidden from staff, and it can't be confirmed, packed, booked or shipped " +
+            'until the shop chooses a bigger plan',
+        );
+      } else if (planOrder.warn) {
+        await appendEvent<PlanOrdersCountedPayload>(tx, shopId, {
+          type: OrderEvents.PlanOrdersCounted,
+          aggregateType: 'shop',
+          aggregateId: shopId,
+          payload: {
+            month: planMonth.month,
+            placed: planMonth.counted + 1,
+            limit: limit.limit,
+            plan: limit.plan,
+          },
+        });
+      }
+    }
     if (blocked) {
       await addTimelineEntry(tx, shopId, orderId, 'system', 'held', heldMessage(blocked));
     } else if (risky) {
@@ -823,10 +869,11 @@ export class OrderService {
   async revealPhone(tenant: TenantContext, id: string): Promise<MutationResult<string | null>> {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const [order] = await tx
-        .select({ number: orders.number, phone: orders.phone })
+        .select({ number: orders.number, phone: orders.phone, overLimitAt: orders.overLimitAt })
         .from(orders)
         .where(and(eq(orders.shopId, tenant.shopId), eq(orders.id, id)));
       if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
+      if (order.overLimitAt) return failOne(['id'], 'INVALID', OVER_LIMIT_MESSAGE);
       if (order.phone !== null) {
         await recordAudit(tx, tenant.shopId, {
           action: 'order.phone_revealed',
@@ -837,6 +884,31 @@ export class OrderService {
         });
       }
       return { ok: true, value: order.phone };
+    });
+  }
+
+  /**
+   * Frees every order of the shop past its plan's limit (ADR-263), as a plan with room for them
+   * begins: how many there were.
+   */
+  async releaseOverLimit(shopId: string): Promise<number> {
+    return this.db.tenant(shopId, async (tx) => {
+      const released = await tx
+        .update(orders)
+        .set({ overLimitAt: null, version: sql`${orders.version} + 1`, updatedAt: sql`now()` })
+        .where(and(eq(orders.shopId, shopId), isNotNull(orders.overLimitAt)))
+        .returning({ id: orders.id });
+      for (const { id } of released) {
+        await addTimelineEntry(
+          tx,
+          shopId,
+          id,
+          'system',
+          'over_limit_released',
+          "The shop's plan has room for it now: its customer shows, and it can be worked on",
+        );
+      }
+      return released.length;
     });
   }
 
@@ -1131,14 +1203,19 @@ export class OrderService {
     const tags = input.tags === undefined ? undefined : check.tags(['input', 'tags'], input.tags);
     if (!check.ok) return { ok: false, errors: check.errors };
 
-    return this.#change(tenant, id, ['id'], (tx, order) =>
-      this.updateLocked(
-        tx,
-        tenant.shopId,
-        order,
-        { address: address ?? undefined, email, note, tags },
-        { actor: tenant.actor },
-      ),
+    return this.#change(
+      tenant,
+      id,
+      ['id'],
+      (tx, order) =>
+        this.updateLocked(
+          tx,
+          tenant.shopId,
+          order,
+          { address: address ?? undefined, email, note, tags },
+          { actor: tenant.actor },
+        ),
+      { overLimit: 'allow' },
     );
   }
 
@@ -1344,14 +1421,19 @@ export class OrderService {
     }
     if (!check.ok) return { ok: false, errors: check.errors };
 
-    return this.#change(tenant, id, ['id'], (tx, order) =>
-      this.cancelLocked(tx, tenant.shopId, order, {
-        actor: tenant.actor,
-        reason: options.reason,
-        message:
-          `Cancelled because ${CANCEL_REASON_TEXT[options.reason]}` +
-          (staffNote ? `: ${staffNote}` : ''),
-      }),
+    return this.#change(
+      tenant,
+      id,
+      ['id'],
+      (tx, order) =>
+        this.cancelLocked(tx, tenant.shopId, order, {
+          actor: tenant.actor,
+          reason: options.reason,
+          message:
+            `Cancelled because ${CANCEL_REASON_TEXT[options.reason]}` +
+            (staffNote ? `: ${staffNote}` : ''),
+        }),
+      { overLimit: 'allow' },
     );
   }
 
@@ -1795,58 +1877,66 @@ export class OrderService {
     assignee: { staffMemberId: string; name: string } | null,
     options: { fromOthers: boolean },
   ): Promise<MutationResult<OrderRecord>> {
-    return this.#change(tenant, id, ['id'], async (tx, order) => {
-      if (order.assigneeId === (assignee?.staffMemberId ?? null)) {
-        return { ok: true, value: order };
-      }
-      if (
-        !options.fromOthers &&
-        order.assigneeId !== null &&
-        order.assigneeId !== staffMemberOf(tenant)
-      ) {
-        return failOne(
-          ['id'],
-          'INVALID',
-          'The order is assigned to someone else; an owner or manager reassigns it',
+    return this.#change(
+      tenant,
+      id,
+      ['id'],
+      async (tx, order) => {
+        if (order.assigneeId === (assignee?.staffMemberId ?? null)) {
+          return { ok: true, value: order };
+        }
+        if (
+          !options.fromOthers &&
+          order.assigneeId !== null &&
+          order.assigneeId !== staffMemberOf(tenant)
+        ) {
+          return failOne(
+            ['id'],
+            'INVALID',
+            'The order is assigned to someone else; an owner or manager reassigns it',
+          );
+        }
+        const updated = await updateOrder(
+          tx,
+          tenant.shopId,
+          order,
+          assignee
+            ? { assigneeId: assignee.staffMemberId }
+            : { assigneeId: null, assignedAt: null },
+          assignee ? ['assignedAt'] : [],
         );
-      }
-      const updated = await updateOrder(
-        tx,
-        tenant.shopId,
-        order,
-        assignee ? { assigneeId: assignee.staffMemberId } : { assigneeId: null, assignedAt: null },
-        assignee ? ['assignedAt'] : [],
-      );
-      await addTimelineEntry(
-        tx,
-        tenant.shopId,
-        order.id,
-        tenant.actor,
-        assignee ? 'assigned' : 'unassigned',
-        assignee ? `Assigned to ${assignee.name}` : 'No longer assigned to anyone',
-      );
-      await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
-        type: OrderEvents.OrderUpdated,
-        aggregateType: 'order',
-        aggregateId: order.id,
-        payload: { changed: ['assignee'], stage: updated.stage, version: updated.version },
-      });
-      if (assignee) {
-        // For the worker to tell them, unless they took it themselves (ADR-191).
-        await appendEvent<OrderAssignedPayload>(tx, tenant.shopId, {
-          type: OrderEvents.OrderAssigned,
+        await addTimelineEntry(
+          tx,
+          tenant.shopId,
+          order.id,
+          tenant.actor,
+          assignee ? 'assigned' : 'unassigned',
+          assignee ? `Assigned to ${assignee.name}` : 'No longer assigned to anyone',
+        );
+        await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
+          type: OrderEvents.OrderUpdated,
           aggregateType: 'order',
           aggregateId: order.id,
-          payload: {
-            assigneeId: assignee.staffMemberId,
-            assignedBy: staffMemberOf(tenant),
-            stage: updated.stage,
-            version: updated.version,
-          },
+          payload: { changed: ['assignee'], stage: updated.stage, version: updated.version },
         });
-      }
-      return { ok: true, value: updated };
-    });
+        if (assignee) {
+          // For the worker to tell them, unless they took it themselves (ADR-191).
+          await appendEvent<OrderAssignedPayload>(tx, tenant.shopId, {
+            type: OrderEvents.OrderAssigned,
+            aggregateType: 'order',
+            aggregateId: order.id,
+            payload: {
+              assigneeId: assignee.staffMemberId,
+              assignedBy: staffMemberOf(tenant),
+              stage: updated.stage,
+              version: updated.version,
+            },
+          });
+        }
+        return { ok: true, value: updated };
+      },
+      { overLimit: 'allow' },
+    );
   }
 
   /**
@@ -2247,22 +2337,28 @@ export class OrderService {
     id: string,
     retag: (current: string[]) => { tags: string[]; message: string } | null,
   ): Promise<MutationResult<OrderRecord>> {
-    return this.#change(tenant, id, ['id'], async (tx, order) => {
-      const next = retag(order.tags);
-      if (!next) return { ok: true, value: order };
-      if (next.tags.length > INPUT_LIMITS.tags) {
-        return failOne(['id'], 'TOO_MANY', `An order can have at most ${INPUT_LIMITS.tags} tags`);
-      }
-      const updated = await updateOrder(tx, tenant.shopId, order, { tags: next.tags });
-      await addTimelineEntry(tx, tenant.shopId, order.id, tenant.actor, 'updated', next.message);
-      await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
-        type: OrderEvents.OrderUpdated,
-        aggregateType: 'order',
-        aggregateId: order.id,
-        payload: { changed: ['tags'], stage: updated.stage, version: updated.version },
-      });
-      return { ok: true, value: updated };
-    });
+    return this.#change(
+      tenant,
+      id,
+      ['id'],
+      async (tx, order) => {
+        const next = retag(order.tags);
+        if (!next) return { ok: true, value: order };
+        if (next.tags.length > INPUT_LIMITS.tags) {
+          return failOne(['id'], 'TOO_MANY', `An order can have at most ${INPUT_LIMITS.tags} tags`);
+        }
+        const updated = await updateOrder(tx, tenant.shopId, order, { tags: next.tags });
+        await addTimelineEntry(tx, tenant.shopId, order.id, tenant.actor, 'updated', next.message);
+        await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
+          type: OrderEvents.OrderUpdated,
+          aggregateType: 'order',
+          aggregateId: order.id,
+          payload: { changed: ['tags'], stage: updated.stage, version: updated.version },
+        });
+        return { ok: true, value: updated };
+      },
+      { overLimit: 'allow' },
+    );
   }
 
   /**
@@ -2299,15 +2395,24 @@ export class OrderService {
    * Runs `change` on the locked order in one transaction and returns the order as it ends up.
    * `change` returns user errors, or the order row to report.
    */
+  /**
+   * Changes an order under its lock as `change` says. One past its plan's limit (ADR-263) is
+   * refused, unless `overLimit` allows what changes nothing of its customer or its shipping: its
+   * note and tags, who has it, and cancelling it.
+   */
   async #change(
     tenant: TenantContext,
     id: string,
     idField: string[],
     change: (tx: Tx, order: OrderRow) => Promise<MutationResult<OrderRow>>,
+    { overLimit = 'refuse' }: { overLimit?: 'refuse' | 'allow' } = {},
   ): Promise<MutationResult<OrderRecord>> {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const order = await lockOrder(tx, tenant.shopId, id);
       if (!order) return failOne(idField, 'NOT_FOUND', 'Order not found');
+      if (order.overLimitAt && overLimit === 'refuse') {
+        return failOne(idField, 'INVALID', OVER_LIMIT_MESSAGE);
+      }
       const result = await change(tx, order);
       if (!result.ok) return result;
       return { ok: true, value: (await loadOrder(tx, tenant.shopId, id))! };

@@ -199,7 +199,8 @@ flowchart LR
 of the one database, each shop's subscription under RLS as cells' data is: Free, Starter, Growth
 and Pro in rupees, paid through Hatti's own Safepay account or by transfer into its bank account
 ([ADR-254](./13-decision-log.md#adr-254--a-shop-pays-hattis-invoice-by-transfer-or-raast-into-hattis-own-bank-account-its-owner-giving-the-transfers-reference-hattis-people-confirm-it-once-they-find-it-which-pays-the-invoice-as-a-gateways-payment-does-with-what-its-other-payments-brought-or-refuse-it-saying-why-and-the-owner-hears-either-way)), the plans' limits on staff and
-locations asked through a port; and the credit each shop's messages are paid from, bought the
+locations asked through a port, and Free's orders a month too, those past it taken but hidden
+from staff until the shop's plan has room for them ([ADR-263](./13-decision-log.md#adr-263--a-shop-on-a-plan-that-limits-its-orders-a-month-frees-50-takes-every-order-all-the-same-one-past-the-limit-counted-in-the-shops-time-zone-without-those-cancelled-comes-in-with-its-customer-hidden-from-staff-and-cannot-be-confirmed-packed-booked-or-shipped-until-a-plan-without-the-limit-frees-it-or-a-counted-order-of-its-month-is-cancelled-the-owner-is-told-at-four-fifths-of-the-limit-and-at-it)); and the credit each shop's messages are paid from, bought the
 same way, which the messaging module charges through a port of its own ([ADR-155](./13-decision-log.md#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)).
 
 | Concern | Control plane | Cell |

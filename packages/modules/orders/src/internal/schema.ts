@@ -5,6 +5,7 @@ import {
   bigint,
   boolean,
   customType,
+  date,
   integer,
   jsonb,
   pgSchema,
@@ -331,6 +332,10 @@ export const orders = ordersSchema.table(
     riskLevel: text('risk_level', { enum: RISK_LEVELS }),
     riskReasons: jsonb('risk_reasons').$type<RiskReasonValue[]>().notNull().default([]),
     customerErasedAt: timestamp('customer_erased_at', { withTimezone: true }),
+    /** The month whose plan limit it counts toward (ADR-263); null when none. */
+    planMonth: date('plan_month'),
+    /** When it came in past its month's limit, until the plan has room for it. */
+    overLimitAt: timestamp('over_limit_at', { withTimezone: true }),
     /** SHA-256 of the customer's link's secret. */
     linkTokenHash: bytea('link_token_hash'),
     linkExpiresAt: timestamp('link_expires_at', { withTimezone: true }),

@@ -59,7 +59,23 @@ export const OrderEvents = {
   SavedSearchUpdated: 'saved_search.updated',
   SavedSearchDeleted: 'saved_search.deleted',
   BankTransferSettingsUpdated: 'bank_transfer_settings.updated',
+  /**
+   * An order placed while the shop's plan limits its orders a month brought them to where the
+   * shop is told (ADR-263): near the limit, or at it.
+   */
+  PlanOrdersCounted: 'plan_orders.counted',
 } as const;
+
+/** How many of its month's orders a shop's plan allows it has placed (ADR-263). */
+export interface PlanOrdersCountedPayload {
+  /** The month's first day, in the shop's time zone: "2026-10-01". */
+  month: string;
+  /** Its orders placed in the month and not cancelled, this one among them. */
+  placed: number;
+  limit: number;
+  /** The plan's name: "Free". */
+  plan: string;
+}
 
 interface OrderState {
   stage: OrderStageValue;

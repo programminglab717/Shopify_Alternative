@@ -529,12 +529,16 @@ export class BillingService extends PlanAllowance {
     return PLAN_CODES.map((code) => PLANS[code]);
   }
 
-  async limitOf(shopId: string, kind: PlanLimitKind): Promise<PlanLimit> {
-    const plan = await this.db.tenant(shopId, async (tx) => {
-      const row = await subscriptionIn(tx, shopId, false);
-      return PLANS[row?.plan ?? 'free'];
-    });
-    return { limit: kind === 'staff' ? plan.staff : plan.locations, plan: plan.name };
+  async limitOf(shopId: string, kind: PlanLimitKind): Promise<PlanLimit | null> {
+    return this.db.tenant(shopId, (tx) => this.limitIn(tx, shopId, kind));
+  }
+
+  async limitIn(tx: Tx, shopId: string, kind: PlanLimitKind): Promise<PlanLimit | null> {
+    const row = await subscriptionIn(tx, shopId, false);
+    const plan = PLANS[row?.plan ?? 'free'];
+    const limit =
+      kind === 'staff' ? plan.staff : kind === 'locations' ? plan.locations : plan.ordersPerMonth;
+    return limit === null ? null : { limit, plan: plan.name };
   }
 
   async subscriptionOf(shopId: string): Promise<SubscriptionRecord> {

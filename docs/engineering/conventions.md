@@ -1170,6 +1170,13 @@ Stock follows Shopify's model too. How changes are written is decided in
   resolver that calls it (`StaffService.invite`'s `limit`).
 * **A limit refuses one more, never takes away what is there:** count what the shop has inside
   the transaction that adds one, and say the plan by name with `planLimitMessage`.
+* **Free's orders a month are taken, never refused**
+  ([ADR-263](../architecture/13-decision-log.md#adr-263--a-shop-on-a-plan-that-limits-its-orders-a-month-frees-50-takes-every-order-all-the-same-one-past-the-limit-counted-in-the-shops-time-zone-without-those-cancelled-comes-in-with-its-customer-hidden-from-staff-and-cannot-be-confirmed-packed-booked-or-shipped-until-a-plan-without-the-limit-frees-it-or-a-counted-order-of-its-month-is-cancelled-the-owner-is-told-at-four-fifths-of-the-limit-and-at-it)):
+  an order counts toward `plan_month` as it is placed, under the order counter's lock; one past
+  the limit has `over_limit_at`. Show it to staff through the mappers and `shownToStaff`, which
+  hide its customer, and refuse what works on it with `OVER_LIMIT_MESSAGE`; what changes
+  nothing of its customer or its shipping passes `{ overLimit: 'allow' }`. Its customer's own
+  answers go through `confirmLocked`, which never refuses it.
 * **Hatti's invoices are paid as orders are** (ADR-151): through Hatti's own gateway account
   (`HattiGateway`, from `hattiGatewayOf` in `apps/core`), each try recorded in `billing.payments`
   before the owner leaves, and the signed return or webhook paying it once
@@ -2386,7 +2393,8 @@ Stock follows Shopify's model too. How changes are written is decided in
   the number off the audit log and out of events, as any contact detail. Hatti's notices of the
   shop's bills go there too ([ADR-169](../architecture/13-decision-log.md#adr-169--hatti-tells-a-shop-on-whatsapp-at-the-number-it-gives-for-hattis-alerts-when-its-plans-next-period-is-invoiced-when-its-plan-ends-unpaid-and-when-its-message-credit-falls-below-rs-100-each-once-queued-with-its-messages-from-billings-events-at-hattis-cost-whatever-its-credit-and-never-turned-off)), queued by the worker's
   `BillingNotices` from billing's events, and of a domain DNS points elsewhere by `DomainNotices`
-  (ADR-262), both through `tellShop`: their templates say `hattiPays`, so that `paidByShop`
+  (ADR-262), and of its month's orders by `PlanOrders` (ADR-263), all through `tellShop`: their
+  templates say `hattiPays`, so that `paidByShop`
   keeps both settling and the sender's credit check from charging the shop for them, and they
   are in `ALWAYS_SENT`. Each is queued as an email to the owner too
   ([ADR-195](../architecture/13-decision-log.md#adr-195--a-shops-owner-hears-of-its-bills-with-hatti-by-email-too-at-the-address-their-account-proved-and-in-their-own-language-from-hattis-own-address-the-worker-finds-them-through-identitys-functions-for-the-shop-alone-and-queues-each-email-with-the-shops-messages-at-hattis-cost-with-an-alerts-number-or-without)), whether or not the shop

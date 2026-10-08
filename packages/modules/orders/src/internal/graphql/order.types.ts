@@ -1253,6 +1253,15 @@ export class Order {
   })
   customerErasedAt!: Date | null;
 
+  @Field({
+    description:
+      "Whether it came in past the orders the shop's plan allows in a month (ADR-263): its " +
+      "customer's name, number, email and street are hidden, and it can't be confirmed, packed, " +
+      'booked or shipped, until the shop chooses a bigger plan, or another order of its month is ' +
+      'cancelled. Its customer is none the wiser: told of it as of any order, they may confirm it.',
+  })
+  overPlanLimit!: boolean;
+
   @Field(() => OrderCustomerLink, {
     nullable: true,
     description:

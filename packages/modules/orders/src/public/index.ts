@@ -222,8 +222,10 @@ export {
   type OrderReceiptsErasedPayload,
   type OrderRefundedPayload,
   type OrderUpdatedPayload,
+  type PlanOrdersCountedPayload,
   type RiskSettingsUpdatedPayload,
 } from '../internal/events.js';
+export { OVER_LIMIT_MESSAGE } from '../internal/plan-orders.js';
 export {
   FulfillmentService,
   type ParcelCaller,

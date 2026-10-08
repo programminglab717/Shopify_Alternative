@@ -65,6 +65,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   email: string | null;
   shipping_address: StoredAddressValue;
   customer_erased_at: string | null;
+  over_limit_at: string | null;
   location_id: string;
   note: string;
   tags: string[];
@@ -208,6 +209,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     email: row.email,
     shippingAddress: row.shipping_address,
     customerErasedAt: toDateOrNull(row.customer_erased_at),
+    overLimitAt: toDateOrNull(row.over_limit_at),
     locationId: row.location_id,
     note: row.note,
     tags: row.tags,
@@ -377,7 +379,7 @@ export async function loadOrders(
            o.split_from_id,
            (SELECT s.number FROM orders.orders s
              WHERE s.shop_id = o.shop_id AND s.id = o.split_from_id) AS split_from_number,
-           o.risk_score, o.risk_level, o.risk_reasons, o.customer_erased_at,
+           o.risk_score, o.risk_level, o.risk_reasons, o.customer_erased_at, o.over_limit_at,
            o.link_token_hash IS NOT NULL AS has_link, o.link_expires_at,
            o.agreed_policy_versions::text[] AS agreed_policy_versions, o.agreed_at,
            host(o.client_ip) AS client_ip, o.client_user_agent, o.confirmed_at,

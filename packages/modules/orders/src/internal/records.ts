@@ -299,6 +299,11 @@ export interface OrderRecord {
   shippingAddress: StoredAddressValue;
   /** When the customer's data was erased, at their request. */
   customerErasedAt: Date | null;
+  /**
+   * When it came in past the orders its shop's plan allows in a month (ADR-263): staff see its
+   * customer hidden, and cannot confirm, pack, book or ship it, until the plan has room for it.
+   */
+  overLimitAt: Date | null;
   /** Where its stock was committed and where it ships from. */
   locationId: string;
   note: string;

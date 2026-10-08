@@ -22,6 +22,7 @@ import { mapUrlOf } from './location.js';
 import { orderConditions, parseOrderSearch, type OrderFilter } from './order-filter.js';
 import { staffMemberOf } from './order.service.js';
 import { loadOrders } from './order-store.js';
+import { shownToStaff } from './plan-orders.js';
 import type { OrderLineRecord, OrderRecord } from './records.js';
 import { orderName } from './rules.js';
 
@@ -123,7 +124,10 @@ export class OrderExportService {
       }
 
       const shop = await shopProfile(tx, tenant.shopId);
-      const orders = await loadOrders(tx, tenant.shopId, { where, order: sql`o.id` });
+      // Those past their plan's limit with their customers hidden, as on their pages (ADR-263).
+      const orders = (await loadOrders(tx, tenant.shopId, { where, order: sql`o.id` })).map(
+        shownToStaff,
+      );
       // On every row, so that rows copied out of the file still say where they came from.
       const exporter =
         tenant.actor.kind === 'app'

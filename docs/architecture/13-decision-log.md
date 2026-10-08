@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-262 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-263 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -270,6 +270,7 @@
 | 260 | A name for a city with a courier that three shops gave alike, which no shop gave otherwise, is every shop's, after the shop's own and Hatti's; Hatti's people keep Hatti's names with a command, which settles a city shops named wrong | Accepted |
 | 261 | A translation is deleted with what it translates, whichever way that goes, by triggers on the tables of what may be translated, as a foreign key would if one column could name ten kinds; a menu's items' as the menu goes or an update drops them | Accepted |
 | 262 | Shops' verified domains are checked again every six hours by the worker: one DNS points elsewhere is noted and its shop told once, at its alerts number and its owner's email, and three days on it is disconnected, verified no more nor primary, the shop's address on the platform's domain primary in its place | Accepted |
+| 263 | A shop on a plan that limits its orders a month, Free's 50, takes every order all the same: one past the limit, counted in the shop's time zone without those cancelled, comes in with its customer hidden from staff and cannot be confirmed, packed, booked or shipped until a plan without the limit frees it or a counted order of its month is cancelled; the owner is told at four fifths of the limit and at it | Accepted |
 
 ---
 
@@ -10908,3 +10909,49 @@
     then the worker asks DNS itself.
   * **Telling the shop again before it is disconnected:** one notice with the date, and the
     admin saying since when, is enough until the admin's notifications.
+
+## ADR-263 · A shop on a plan that limits its orders a month, Free's 50, takes every order all the same: one past the limit, counted in the shop's time zone without those cancelled, comes in with its customer hidden from staff and cannot be confirmed, packed, booked or shipped until a plan without the limit frees it or a counted order of its month is cancelled; the owner is told at four fifths of the limit and at it
+
+* **Context:** Free allows 50 orders a month (BIL-01,
+  docs/product/03-pricing-and-business-model.md). [ADR-154](#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port) counted the limit in its plan but held no shop to it, and left how to hold it
+  to a product decision: refusing orders at checkout would cost a shop its customers. On
+  2026-10-07 it was decided: every order is taken, those past the limit locked until the shop
+  upgrades; orders are counted from every channel by the calendar month in the shop's time zone,
+  those cancelled not counted; the owner is warned at 40 and at 50. Other modules ask a plan's
+  limits through `PlanAllowance`; Hatti tells shops of their bills at their alerts number and
+  their owners' email ([ADR-169](#adr-169--hatti-tells-a-shop-on-whatsapp-at-the-number-it-gives-for-hattis-alerts-when-its-plans-next-period-is-invoiced-when-its-plan-ends-unpaid-and-when-its-message-credit-falls-below-rs-100-each-once-queued-with-its-messages-from-billings-events-at-hattis-cost-whatever-its-credit-and-never-turned-off), [ADR-195](#adr-195--a-shops-owner-hears-of-its-bills-with-hatti-by-email-too-at-the-address-their-account-proved-and-in-their-own-language-from-hattis-own-address-the-worker-finds-them-through-identitys-functions-for-the-shop-alone-and-queues-each-email-with-the-shops-messages-at-hattis-cost-with-an-alerts-number-or-without)). This supersedes ADR-154's
+  consequence that Free's order limit is not enforced.
+* **Decision:**
+  * **The month an order counts toward** (`plan_month`, migration 0166) is set as it is placed
+    while the shop's plan limits orders (`PlanAllowance.limitIn`, `ordersPerMonth`), in the
+    transaction that takes the shop's order counter, so no two orders are counted at once. Orders
+    placed on a plan without the limit, a split's parts and exchanges count toward none, and
+    orders imported from Shopify will not either, once they can be (`countsTowardPlan`).
+  * **One past the limit** (`over_limit_at`) is taken as any other: its stock committed, its
+    customer told as of any order and free to confirm it through its link or WhatsApp. Staff see
+    its customer's name, number, email and street hidden, as an erased customer's are, and
+    `Order.overPlanLimit`; its number is not revealed, its export and documents leave them out or
+    refuse it. It cannot be confirmed, packed, booked, shipped, edited, split or merged; it can be
+    cancelled, tagged, noted and assigned. Its timeline says so.
+  * **A counted order cancelled**, whichever way, frees its place: a trigger frees the earliest
+    order of the same month past the limit.
+  * **A plan without the limit frees them all:** the worker hears `billing_subscription.changed`
+    and frees every order of the shop past the limit (`releaseOverLimit`), each with a timeline
+    entry.
+  * **The owner is told** (`plan_orders.counted`, then `orders_limit_near` and
+    `orders_limit_reached`, two of Hatti's notices the shop cannot turn off, at Hatti's cost):
+    as the order placed is four fifths of the limit, and as it is the last within it, once a
+    month each, through `tellShop` ([ADR-262](#adr-262--shops-verified-domains-are-checked-again-every-six-hours-by-the-worker-one-dns-points-elsewhere-is-noted-and-its-shop-told-once-at-its-alerts-number-and-its-owners-email-and-three-days-on-it-is-disconnected-verified-no-more-nor-primary-the-shops-address-on-the-platforms-domain-primary-in-its-place)).
+* **Consequences:**
+  * A Free shop never loses an order to its plan, and sees what it would gain by upgrading.
+  * Placing an order on a limited plan reads the shop's month and counts its orders, by an index
+    of orders by shop and month.
+  * An order freed by a cancellation, or a bigger plan, waits for staff as if just placed.
+* **Alternatives:**
+  * **Refusing orders past the limit at checkout:** costs the shop its customers' orders.
+  * **Counting by the 30 days before:** a month is what owners read on their bills.
+  * **Counting cancelled orders:** a shop would pay for the orders its customers cancel.
+  * **Telling the customer the order is waiting:** it is the shop's plan, not the customer's
+    business; the order is theirs as any other.
+  * **Freeing orders by the next month:** an order of last month left locked would wait a month
+    for a shop that cannot ship it; it stays locked until the shop upgrades or cancels it.

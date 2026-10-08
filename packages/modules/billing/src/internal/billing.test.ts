@@ -56,6 +56,11 @@ describe.skipIf(!server)('Billing', () => {
     });
     expect(await f.billing.limitOf(f.a.shopId, 'staff')).toEqual({ limit: 1, plan: 'Free' });
     expect(await f.billing.limitOf(f.a.shopId, 'locations')).toEqual({ limit: 1, plan: 'Free' });
+    // Free alone limits orders a month (ADR-263).
+    expect(await f.billing.limitOf(f.a.shopId, 'ordersPerMonth')).toEqual({
+      limit: 50,
+      plan: 'Free',
+    });
     expect(await f.billing.invoicesOf(f.a.shopId)).toEqual([]);
   });
 
@@ -134,6 +139,7 @@ describe.skipIf(!server)('Billing', () => {
     );
     expect(await f.billing.limitOf(f.a.shopId, 'staff')).toEqual({ limit: 8, plan: 'Growth' });
     expect(await f.billing.limitOf(f.a.shopId, 'locations')).toEqual({ limit: 3, plan: 'Growth' });
+    expect(await f.billing.limitOf(f.a.shopId, 'ordersPerMonth')).toBeNull();
     // Reloaded, nothing changes; and a paid invoice is not paid again.
     await f.billing.returned(publicId(invoice.id), f.formOf(started.url));
     expect(errorsOf(await f.billing.pay(f.a, invoice.id))).toEqual([['id', 'INVALID']]);

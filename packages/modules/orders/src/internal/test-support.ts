@@ -2,7 +2,13 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PublicSite, StorefrontSite, type MutationResult, type TenantContext } from '@hatti/api';
+import {
+  PublicSite,
+  StorefrontSite,
+  type MutationResult,
+  type PlanAllowance,
+  type TenantContext,
+} from '@hatti/api';
 import { ProductService, VariantService } from '@hatti/catalog/public';
 import {
   BlocklistService,
@@ -148,7 +154,13 @@ function tenant(shopId: string): TenantContext {
   };
 }
 
-export async function ordersFixture(server: string): Promise<OrdersFixture> {
+export async function ordersFixture(
+  server: string,
+  options: {
+    /** The orders a month the shop's plan allows (ADR-263); any without it. */
+    allowance?: PlanAllowance;
+  } = {},
+): Promise<OrdersFixture> {
   const testDb = await createTestDatabase(server);
   const db = new Database({ appUrl: testDb.appUrl, applicationName: 'orders-test' });
   const admin = new pg.Client({ connectionString: testDb.adminUrl });
@@ -171,7 +183,16 @@ export async function ordersFixture(server: string): Promise<OrdersFixture> {
   const segments = new SegmentService(db, registry);
   const dataRegistry = new CustomerDataRegistry();
   dataRegistry.register(ORDER_CUSTOMER_DATA);
-  const orders = new OrderService(db, variants, locations, stock, customers, blocklist);
+  const orders = new OrderService(
+    db,
+    variants,
+    locations,
+    stock,
+    customers,
+    blocklist,
+    undefined,
+    options.allowance,
+  );
   const site = new PublicSite('https://hatti.test');
   const directory = await mkdtemp(join(tmpdir(), 'hatti-orders-'));
   const storage = new LocalStorage({

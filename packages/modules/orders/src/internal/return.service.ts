@@ -506,6 +506,7 @@ export class ReturnService {
         actor: tenant.actor,
         source: order.source,
         how: `as an exchange for ${exchange.name}`,
+        countsTowardPlan: false,
         confirmedByCustomer: true,
       },
       {

@@ -66,6 +66,7 @@ import { CourierBookings } from './courier-bookings.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
 import { DomainChecks } from './domain-checks.js';
 import { DomainNotices } from './domain-notices.js';
+import { PlanOrders } from './plan-orders.js';
 import { ExpiredCheckouts } from './expired-checkouts.js';
 import { StoreCreditExpiry } from './store-credit-expiry.js';
 import { StoreCreditNotices } from './store-credit-notices.js';
@@ -103,6 +104,7 @@ export interface EventConsumers {
   staff?: StaffAlerts;
   storeCredit?: StoreCreditNotices;
   domains?: DomainNotices;
+  planOrders?: PlanOrders;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
@@ -121,6 +123,7 @@ export function eventHandlers(
     staff,
     storeCredit,
     domains,
+    planOrders,
   }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
@@ -176,6 +179,9 @@ export function eventHandlers(
   }
   if (domains) {
     for (const type of DomainNotices.EVENTS) registry.on(type, (event) => domains.handle(event));
+  }
+  if (planOrders) {
+    for (const type of PlanOrders.EVENTS) registry.on(type, (event) => planOrders.handle(event));
   }
   return registry;
 }
@@ -247,6 +253,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         staff: new StaffAlerts(database, new MessagesService(database)),
         storeCredit: new StoreCreditNotices(database, new MessagesService(database)),
         domains: new DomainNotices(database, new MessagesService(database)),
+        planOrders: new PlanOrders(database, new MessagesService(database), workerOrders(database)),
       }),
       concurrency: config.EVENT_CONCURRENCY,
       logger,

@@ -6,15 +6,29 @@
 
 ## In progress
 
-**Next, the Free plan's limits** (decided on 2026-10-07): orders past its 50 a month taken but
-locked until the shop upgrades, its owner warned at 40 and at 50, cancelled orders not counted;
-and no custom domain or online payment gateway on Free. Urdu handles wait, as decided.
+**Next, the Free plan's other limits** (decided on 2026-10-07): no custom domain or online
+payment gateway on Free, those already connected kept. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
+
+## 2026-10-08
+
+### Free's orders a month
+
+* **Orders past Free's 50 a month are taken but locked** ([ADR-263](../architecture/13-decision-log.md#adr-263--a-shop-on-a-plan-that-limits-its-orders-a-month-frees-50-takes-every-order-all-the-same-one-past-the-limit-counted-in-the-shops-time-zone-without-those-cancelled-comes-in-with-its-customer-hidden-from-staff-and-cannot-be-confirmed-packed-booked-or-shipped-until-a-plan-without-the-limit-frees-it-or-a-counted-order-of-its-month-is-cancelled-the-owner-is-told-at-four-fifths-of-the-limit-and-at-it)):
+  counted by the month in the shop's time zone, cancelled ones not; one past the limit comes in
+  with its customer hidden from staff, and cannot be confirmed, packed, booked or shipped until a
+  counted order of its month is cancelled or the shop chooses a plan without the limit. The owner
+  is told at 40 and at 50.
+* **For it:** migration 0166; `PlanAllowance.limitIn` and `ordersPerMonth`; `Order.overPlanLimit`;
+  `OrderService.releaseOverLimit`; the `orders_limit_near` and `orders_limit_reached` notices; the
+  worker's `PlanOrders`.
+* **Urdu handles** are not wanted for now, as decided on 2026-10-07; simplification 113 says so.
+* 1843 tests: the count, the notices, what staff see and may do, and orders freed.
 
 ## 2026-10-07
 

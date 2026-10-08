@@ -1,5 +1,10 @@
-/** What a shop's plan with Hatti counts and limits (BIL-01, ADR-154). */
-export type PlanLimitKind = 'staff' | 'locations';
+import type { Tx } from '@hatti/db';
+
+/**
+ * What a shop's plan with Hatti counts and limits (BIL-01, ADR-154): its staff and locations, and
+ * its orders a month (ADR-263).
+ */
+export type PlanLimitKind = 'staff' | 'locations' | 'ordersPerMonth';
 
 /** A limit of the shop's plan. */
 export interface PlanLimit {
@@ -16,6 +21,9 @@ export interface PlanLimit {
 export abstract class PlanAllowance {
   /** What the shop's plan allows of `kind`; null when it sets no limit. */
   abstract limitOf(shopId: string, kind: PlanLimitKind): Promise<PlanLimit | null>;
+
+  /** {@link limitOf}, read in the shop's transaction `tx`, as placing an order asks it. */
+  abstract limitIn(tx: Tx, shopId: string, kind: PlanLimitKind): Promise<PlanLimit | null>;
 }
 
 /** Why one more is refused: "The Free plan has room for 1 location: choose a bigger plan for more". */

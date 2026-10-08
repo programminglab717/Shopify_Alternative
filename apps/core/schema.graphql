@@ -4802,6 +4802,16 @@ enum MessageKind {
   """
   ONE_TIME_CODE
 
+  """
+  For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: it has placed four fifths of the orders its plan allows this month, Free's 40 of 50 (ADR-263).
+  """
+  ORDERS_LIMIT_NEAR
+
+  """
+  For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: it has placed all the orders its plan allows this month; those past them come in with their customers hidden (ADR-263).
+  """
+  ORDERS_LIMIT_REACHED
+
   """They asked to change their order's address: its page, where they can."""
   ORDER_ADDRESS
 
@@ -6393,6 +6403,11 @@ type Order {
   Of totalDiscounts, what checkout took off for paying online, where the shop takes something off for it (onlinePaymentSettings).
   """
   onlineDiscount: Money!
+
+  """
+  Whether it came in past the orders the shop's plan allows in a month (ADR-263): its customer's name, number, email and street are hidden, and it can't be confirmed, packed, booked or shipped, until the shop chooses a bigger plan, or another order of its month is cancelled. Its customer is none the wiser: told of it as of any order, they may confirm it.
+  """
+  overPlanLimit: Boolean!
 
   """When it was marked packed, which moves it from TO_PACK to TO_BOOK."""
   packedAt: DateTime

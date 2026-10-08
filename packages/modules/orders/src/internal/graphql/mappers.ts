@@ -27,6 +27,7 @@ import type {
   RefundRecord,
   ReturnRecord,
 } from '../records.js';
+import { hiddenAddressOf } from '../plan-orders.js';
 import { draftName, orderName, returnName } from '../rules.js';
 import type {
   BankAccountValue,
@@ -196,6 +197,8 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
   const currency = record.currency as CurrencyCode;
   const amount = (value: bigint) => Money.from(money(value, currency));
   const hidePhone = hidesPhones(tenant);
+  // Past its plan's limit (ADR-263): its customer hidden from everyone, as erased details are.
+  const hidden = record.overLimitAt !== null;
   const lineItems = record.lines.map((line) =>
     Object.assign(new OrderLineItem(), {
       id: toPublicId('lineItem', line.id),
@@ -225,9 +228,12 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     fulfillmentStatus: upper<OrderFulfillmentStatus>(record.fulfillmentStatus),
     paymentMethod: upper<OrderPaymentMethod>(record.paymentMethod),
     source: upper<OrderSource>(record.source),
-    phone: hidePhone ? maskPhone(record.phone) : record.phone,
-    email: record.email,
-    shippingAddress: toAddress(record.shippingAddress, hidePhone),
+    phone: hidden ? null : hidePhone ? maskPhone(record.phone) : record.phone,
+    email: hidden ? null : record.email,
+    shippingAddress: toAddress(
+      hidden ? hiddenAddressOf(record.shippingAddress) : record.shippingAddress,
+      hidePhone,
+    ),
     lineItems,
     fulfillments: record.fulfillments.map((parcel) =>
       toFulfillment(parcel, lineItemsById, currency),
@@ -271,11 +277,12 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
       : null,
     risk: record.risk ? toOrderRisk(record.risk) : null,
     customerErasedAt: record.customerErasedAt,
+    overPlanLimit: hidden,
     agreement: record.agreement
       ? Object.assign(new OrderAgreement(), {
           agreedAt: record.agreement.agreedAt,
-          ip: hidePhone ? null : record.agreement.ip,
-          userAgent: hidePhone ? null : record.agreement.userAgent,
+          ip: hidePhone || hidden ? null : record.agreement.ip,
+          userAgent: hidePhone || hidden ? null : record.agreement.userAgent,
           policyVersionIds: record.agreement.policyVersions,
         })
       : null,

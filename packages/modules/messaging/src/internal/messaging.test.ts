@@ -353,6 +353,18 @@ describe("Messages' words", () => {
       '10 Oct, 3:00 pm',
     ]);
     expect(messageText('domain_unpointed', 'ur', unpointed)).toContain('www.zari.pk');
+    // The orders a month its plan allows (ADR-263).
+    const counted = { shop: 'Zari Fashions', orders: '40', limit: '50', plan: 'Free' };
+    expect(messageText('orders_limit_near', 'en', counted)).toBe(
+      'Hatti: Zari Fashions has taken 40 of the 50 orders the Free plan allows this month. Orders ' +
+        "past 50 still come in, but their customers stay hidden and you can't ship them until you " +
+        "choose a bigger plan in Hatti's admin.",
+    );
+    expect(templateParameters('orders_limit_reached', counted)).toEqual([
+      'Zari Fashions',
+      '50',
+      'Free',
+    ]);
     // Never from the shop's credit, which may be what the notice is about; always sent.
     expect(MESSAGE_KINDS.filter((kind) => !paidByShop(kind))).toEqual([
       'invoice_due',
@@ -361,6 +373,8 @@ describe("Messages' words", () => {
       'transfer_confirmed',
       'transfer_refused',
       'domain_unpointed',
+      'orders_limit_near',
+      'orders_limit_reached',
     ]);
     expect(ALWAYS_SENT).toEqual([
       'one_time_code',
@@ -370,6 +384,8 @@ describe("Messages' words", () => {
       'transfer_confirmed',
       'transfer_refused',
       'domain_unpointed',
+      'orders_limit_near',
+      'orders_limit_reached',
     ]);
   });
 
@@ -460,6 +476,8 @@ describe("Messages' words", () => {
       'transfer_confirmed',
       'transfer_refused',
       'domain_unpointed',
+      'orders_limit_near',
+      'orders_limit_reached',
     ]);
     const shipped = messageEmail('order_shipped', 'en', SHIPPED.variables)!;
     expect(shipped.from).toBe('shop');
