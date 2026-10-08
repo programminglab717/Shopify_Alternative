@@ -40,7 +40,7 @@ const CANCELLABLE: readonly OrderStage[] = [
   'TO_BOOK',
 ];
 /** The reasons staff cancel for; MERGED is the merge's own. */
-const REASONS: readonly OrderCancelReason[] = [
+export const REASONS: readonly OrderCancelReason[] = [
   'CUSTOMER',
   'NO_RESPONSE',
   'FRAUD',

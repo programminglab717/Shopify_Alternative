@@ -160,3 +160,55 @@ export interface OrderMutationData {
 export interface OrderBulkData {
   [mutation: string]: { orders: { id: string }[]; userErrors: UserError[] };
 }
+
+export type ConfirmationCallOutcome = 'NO_ANSWER' | 'CALL_BACK' | 'WRONG_NUMBER';
+
+export interface DeskItem {
+  claimedByYou: boolean;
+  claimedUntil: string | null;
+  dueAt: string;
+  overdue: boolean;
+  unansweredCalls: number;
+  lastCall: {
+    outcome: ConfirmationCallOutcome;
+    note: string;
+    createdAt: string;
+    callBackAt: string | null;
+  } | null;
+  order: {
+    id: string;
+    name: string;
+    createdAt: string;
+    stage: OrderStage;
+    paymentMethod: OrderPaymentMethod;
+    overPlanLimit: boolean;
+    note: string;
+    phone: string | null;
+    totalPrice: MoneyValue;
+    codAmount: MoneyValue;
+    shippingAddress: { name: string | null; city: string; formatted: string[] };
+    customer: { displayName: string; numberOfOrders: number } | null;
+    risk: { level: RiskLevel; score: number; reasons: { code: string; message: string }[] } | null;
+    lineItems: { id: string; title: string; variantTitle: string; quantity: number }[];
+  };
+}
+
+export interface ConfirmationQueueData {
+  shop: { timezone: string };
+  confirmationQueue: {
+    callingNow: boolean;
+    callingOpensAt: string | null;
+    dueCount: number;
+    laterCount: number;
+    overdueCount: number;
+    nodes: DeskItem[];
+  };
+}
+
+export interface ConfirmationQueueNextData {
+  confirmationQueueNext: { callingOpensAt: string | null; item: DeskItem | null };
+}
+
+export interface OrderPhoneRevealData {
+  orderPhoneReveal: { phone: string | null; userErrors: UserError[] };
+}

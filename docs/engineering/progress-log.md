@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the merchant admin's Confirmation Desk** (COD-04): the agents' queue, a call's outcome
-and the next order; then products, customers, shipping and settings, section by section, as the
-alpha's shops need them. Urdu handles wait, as decided.
+**Next, the merchant admin's products** (CAT-01): the products list, a product's page with its
+variants, prices and stock, and adding one; then customers, shipping and settings, section by
+section, as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### The Confirmation Desk in the admin
+
+* **Agents' own screen** ([ADR-266](../architecture/13-decision-log.md#adr-266--the-admins-confirmation-desk-deals-an-agent-one-order-at-a-time-when-they-ask-and-the-next-as-soon-as-a-calls-outcome-is-recorded-the-customers-number-stays-masked-until-the-agent-asks-to-see-it-which-is-logged-and-then-can-be-called-or-messaged-on-whatsapp-with-a-tap-an-order-whose-call-is-recorded-leaves-the-agents-queue-at-once)):
+  an order dealt to the agent when they ask; the customer, the risk's reasons, the items, the
+  address and the cash to collect; the number shown when they ask, which is logged, then a tap
+  from a call or a WhatsApp chat; the call's outcome in a tap, with a note, and the next order
+  dealt at once; below, every order due now.
+* **Tried against the core:** a confirmation agent signed in by email, took the next order,
+  showed its number, recorded no answer, was dealt the next and confirmed it, leaving the desk
+  empty; in English and Urdu, on a phone and a desktop, with no errors in the browser.
+* 1872 tests: the desk through the real screens and router, against a fake core.
 
 ### 0055f01 · Signing in, a shop's Home and its orders in the admin
 

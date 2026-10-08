@@ -1,5 +1,5 @@
 import { Link, Outlet, useNavigate, useParams } from '@tanstack/react-router';
-import { ArrowLeftRight, House, LogOut, ReceiptText } from 'lucide-react';
+import { ArrowLeftRight, Headset, House, LogOut, ReceiptText } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { useMe, useSession, useSessionStore } from '../auth/context';
@@ -13,7 +13,7 @@ import { LanguageToggle } from '../ui/language-toggle';
 import { ShopProvider } from './shop-context';
 
 interface NavItem {
-  to: '/$shopId' | '/$shopId/orders';
+  to: '/$shopId' | '/$shopId/orders' | '/$shopId/desk';
   label: MessageKey;
   icon: LucideIcon;
   /** Roles that see it (docs/design/02 §6); every role when missing. */
@@ -26,6 +26,12 @@ interface NavItem {
 const NAV: readonly NavItem[] = [
   { to: '/$shopId', label: 'nav.home', icon: House, exact: true },
   { to: '/$shopId/orders', label: 'nav.orders', icon: ReceiptText },
+  {
+    to: '/$shopId/desk',
+    label: 'nav.desk',
+    icon: Headset,
+    roles: ['owner', 'manager', 'confirmation_agent'],
+  },
 ];
 
 /**

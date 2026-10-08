@@ -327,3 +327,127 @@ export const OrderBulkMarkPackedMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const DESK_ITEM = /* GraphQL */ `
+  fragment DeskItem on ConfirmationQueueItem {
+    claimedByYou
+    claimedUntil
+    dueAt
+    overdue
+    unansweredCalls
+    lastCall {
+      outcome
+      note
+      createdAt
+      callBackAt
+    }
+    order {
+      id
+      name
+      createdAt
+      stage
+      paymentMethod
+      overPlanLimit
+      note
+      phone
+      totalPrice {
+        amount
+        currencyCode
+      }
+      codAmount {
+        amount
+        currencyCode
+      }
+      shippingAddress {
+        name
+        city
+        formatted
+      }
+      customer {
+        displayName
+        numberOfOrders
+      }
+      risk {
+        level
+        score
+        reasons {
+          code
+          message
+        }
+      }
+      lineItems {
+        id
+        title
+        variantTitle
+        quantity
+      }
+    }
+  }
+`;
+
+/** The Confirmation Desk's queue (COD-04): orders due a call now, the most urgent first. */
+export const ConfirmationQueueQuery = /* GraphQL */ `
+  query ConfirmationQueue($first: Int) {
+    shop {
+      timezone
+    }
+    confirmationQueue(first: $first) {
+      callingNow
+      callingOpensAt
+      dueCount
+      laterCount
+      overdueCount
+      nodes {
+        ...DeskItem
+      }
+    }
+  }
+  ${DESK_ITEM}
+`;
+
+/** The next order due, dealt to the agent asking for 15 minutes; the one they hold already. */
+export const ConfirmationQueueNextMutation = /* GraphQL */ `
+  mutation ConfirmationQueueNext {
+    confirmationQueueNext {
+      callingOpensAt
+      item {
+        ...DeskItem
+      }
+    }
+  }
+  ${DESK_ITEM}
+`;
+
+/** A call that confirmed nothing: not answered, call back later, or someone else's number. */
+export const OrderConfirmationCallMutation = /* GraphQL */ `
+  mutation OrderConfirmationCall(
+    $id: ID!
+    $outcome: ConfirmationCallOutcome!
+    $note: String
+    $callBackAt: DateTime
+  ) {
+    orderConfirmationCall(id: $id, outcome: $outcome, note: $note, callBackAt: $callBackAt) {
+      order {
+        id
+        stage
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The customer's number in full, for an agent about to call; every reveal is logged. */
+export const OrderPhoneRevealMutation = /* GraphQL */ `
+  mutation OrderPhoneReveal($id: ID!) {
+    orderPhoneReveal(id: $id) {
+      phone
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

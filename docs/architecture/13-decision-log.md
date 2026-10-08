@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-265 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-266 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -273,6 +273,7 @@
 | 263 | A shop on a plan that limits its orders a month, Free's 50, takes every order all the same: one past the limit, counted in the shop's time zone without those cancelled, comes in with its customer hidden from staff and cannot be confirmed, packed, booked or shipped until a plan without the limit frees it or a counted order of its month is cancelled; the owner is told at four fifths of the limit and at it | Accepted |
 | 264 | A plan says whether it includes a domain of the shop's own and accounts with payment gateways, and Free includes neither: connecting one on a plan without it is refused with the plan named, through the port other modules ask a plan's limits through, and those connected before are kept, checked, changed and used as before | Accepted |
 | 265 | The merchant admin is a React app on an origin of its own that sends `/auth` and the Admin API on to the core: staff sign in by a code to their mobile or by email, with the second step their role needs; the session's opaque tokens are kept in the browser's storage and refreshed by one tab at a time; the shop is in each page's address; and every GraphQL document it sends is checked against the core's schema | Accepted |
+| 266 | The admin's Confirmation Desk deals an agent one order at a time when they ask, and the next as soon as a call's outcome is recorded; the customer's number stays masked until the agent asks to see it, which is logged, and then can be called or messaged on WhatsApp with a tap; an order whose call is recorded leaves the agent's queue at once | Accepted |
 
 ---
 
@@ -11047,3 +11048,41 @@
   * **Types generated from the schema:** the documents are checked against it already; generated
     types come when hand-written ones slip.
   * **Next.js, rendered on the server:** an app for signed-in staff needs no server rendering.
+
+## ADR-266 · The admin's Confirmation Desk deals an agent one order at a time when they ask, and the next as soon as a call's outcome is recorded; the customer's number stays masked until the agent asks to see it, which is logged, and then can be called or messaged on WhatsApp with a tap; an order whose call is recorded leaves the agent's queue at once
+
+* **Context:** The core's Confirmation Desk deals orders waiting for their customers to agents
+  one at a time, the most urgent due first, holding each for its agent for 15 minutes, and keeps
+  the calls that did not settle them ([ADR-073](#adr-073--the-confirmation-desk-deals-orders-waiting-for-their-customers-to-agents-one-at-a-time-the-most-urgent-due-first-and-keeps-the-calls-that-did-not-settle-them)). It deals nothing outside the shop's
+  calling hours ([ADR-091](#adr-091--a-shops-confirmation-desk-keeps-calling-hours-outside-which-it-deals-out-no-order-and-after-which-an-unanswered-one-falls-due-an-order-waiting-longer-for-its-first-call-than-the-shops-target-counting-those-hours-is-overdue)). Confirmation agents see customers' numbers masked, and each
+  reveal goes to an audit log ([ADR-027](#adr-027--customers-numbers-are-masked-by-role-and-reveals-go-to-an-append-only-audit-log)). The admin's first slice gave merchants Home
+  and their orders ([ADR-265](#adr-265--the-merchant-admin-is-a-react-app-on-an-origin-of-its-own-that-sends-auth-and-the-admin-api-on-to-the-core-staff-sign-in-by-a-code-to-their-mobile-or-by-email-with-the-second-step-their-role-needs-the-sessions-opaque-tokens-are-kept-in-the-browsers-storage-and-refreshed-by-one-tab-at-a-time-the-shop-is-in-each-pages-address-and-every-graphql-document-it-sends-is-checked-against-the-cores-schema)); agents had no screen of their own.
+* **Decision:**
+  * **The desk** is a section of the admin (`/shop_…/desk`) for owners, managers and confirmation
+    agents. It says how many orders are due, late for their first call, and waiting to be called
+    later; outside calling hours, when calls start again.
+  * **An order is dealt when the agent asks** ("Take the next order"), not when the page opens,
+    so that looking at the desk holds no order. The order an agent holds is shown again after a
+    reload.
+  * **The dealt order** shows what the call needs: the customer and how many orders they have
+    placed with the shop, the risk and its reasons, the items, the address, and the cash to
+    collect.
+  * **The number** stays masked until the agent taps "Show number", which the core logs; then
+    "Call" opens the phone's dialler and "WhatsApp" a chat. Owners and managers, who see numbers
+    whole, get both at once.
+  * **One tap for how the call went:** confirmed; not answered; call back in an hour, three hours
+    or tomorrow; someone else's number; or cancelled for a reason. A note may go with it. Once
+    it is recorded, the next order due is dealt at once.
+  * **Below,** every order due now, the most urgent first, with those late for their first call
+    and those another agent is calling marked. An order whose call is recorded leaves it at once,
+    though the core may still say it is held until the queue is read again.
+* **Consequences:**
+  * Agents confirm a shop's cash-on-delivery orders from their phones, an order at a time, and no
+    two agents call one customer.
+  * A risk's reasons are in the core's English words, in Urdu too, until the core gives them in
+    the merchant's language.
+* **Alternatives:**
+  * **Dealing an order as the desk opens:** an agent only looking would hold an order for 15
+    minutes that another could have called.
+  * **The number shown whole once dealt:** every order dealt would log a reveal, including those an
+    agent never called.
