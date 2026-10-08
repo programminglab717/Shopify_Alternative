@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### Free's orders a month
+### a4664e4 · Free's orders a month
 
 * **Orders past Free's 50 a month are taken but locked** ([ADR-263](../architecture/13-decision-log.md#adr-263--a-shop-on-a-plan-that-limits-its-orders-a-month-frees-50-takes-every-order-all-the-same-one-past-the-limit-counted-in-the-shops-time-zone-without-those-cancelled-comes-in-with-its-customer-hidden-from-staff-and-cannot-be-confirmed-packed-booked-or-shipped-until-a-plan-without-the-limit-frees-it-or-a-counted-order-of-its-month-is-cancelled-the-owner-is-told-at-four-fifths-of-the-limit-and-at-it)):
   counted by the month in the shop's time zone, cancelled ones not; one past the limit comes in
