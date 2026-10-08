@@ -136,8 +136,7 @@ function LogoField({
             </Button>
             {current && (
               <Button
-                variant="tertiary"
-                className="text-danger"
+                variant="danger"
                 icon={<Trash2 aria-hidden className="size-5" />}
                 disabled={busy}
                 onClick={() => void attempt(() => setLogo(null))}

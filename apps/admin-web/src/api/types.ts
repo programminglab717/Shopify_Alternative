@@ -754,3 +754,67 @@ export interface DiscountCodePayloadData {
   discountCode: DiscountCodeValue | null;
   userErrors: UserError[];
 }
+
+export type DraftSource = 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK' | 'MANUAL';
+
+export interface DraftListItem {
+  id: string;
+  name: string;
+  status: 'OPEN' | 'COMPLETED';
+  source: string;
+  createdAt: string;
+  totalPrice: MoneyValue;
+  shippingAddress: { name: string | null; city: string } | null;
+  lineItems: { quantity: number }[];
+}
+
+export interface DraftOrdersData {
+  draftOrders: { nodes: DraftListItem[] };
+}
+
+export interface DraftOrderDetail {
+  id: string;
+  name: string;
+  status: 'OPEN' | 'COMPLETED';
+  source: string;
+  paymentMethod: string;
+  note: string;
+  createdAt: string;
+  linkExpiresAt: string | null;
+  phone: string | null;
+  lineItems: {
+    variantId: string;
+    title: string;
+    variantTitle: string;
+    quantity: number;
+    unitPrice: MoneyValue;
+    totalPrice: MoneyValue;
+  }[];
+  shippingAddress: { formatted: string[] } | null;
+  subtotalPrice: MoneyValue;
+  totalShippingPrice: MoneyValue;
+  totalDiscounts: MoneyValue;
+  totalPrice: MoneyValue;
+  codAmount: MoneyValue;
+  order: { id: string; name: string } | null;
+}
+
+export interface DraftOrderData {
+  draftOrder: DraftOrderDetail | null;
+}
+
+export interface DraftVariantsData {
+  products: {
+    nodes: {
+      id: string;
+      title: string;
+      variants: {
+        id: string;
+        title: string;
+        availableForSale: boolean;
+        inventoryQuantity: number;
+        price: MoneyValue;
+      }[];
+    }[];
+  };
+}

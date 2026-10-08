@@ -25,6 +25,9 @@ import {
   VerifyEmailPage,
 } from './auth/email-link-pages';
 import { DiscountsPage } from './discounts/discounts-page';
+import { DraftPage } from './drafts/draft-page';
+import { DraftsPage } from './drafts/drafts-page';
+import { NewDraftPage } from './drafts/new-draft-page';
 import { InvitationPage } from './invitation/invitation-page';
 import { HomePage } from './home/home-page';
 import { useLocale } from './i18n/locale';
@@ -208,6 +211,24 @@ const shipping = createRoute({
   component: ShippingPage,
 });
 
+const drafts = createRoute({
+  getParentRoute: () => shop,
+  path: 'drafts',
+  component: DraftsPage,
+});
+
+const newDraft = createRoute({
+  getParentRoute: () => shop,
+  path: 'drafts/new',
+  component: NewDraftPage,
+});
+
+const draft = createRoute({
+  getParentRoute: () => shop,
+  path: 'drafts/$draftId',
+  component: DraftPage,
+});
+
 const discounts = createRoute({
   getParentRoute: () => shop,
   path: 'discounts',
@@ -329,6 +350,9 @@ export const routeTree = root.addChildren([
     customers,
     customer,
     shipping,
+    drafts,
+    newDraft,
+    draft,
     discounts,
     more,
     settings,

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-276 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-277 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -284,6 +284,7 @@
 | 274 | The admin's settings take the shop's online payments and its brand: a gateway connected once the member confirms who they are, its webhook address given to copy into the gateway's dashboard, the gateways put in the order customers are offered them or archived; the shop's logo and square logo uploaded from the phone, and its WhatsApp number | Accepted |
 | 275 | The admin's billing shows the shop's plan with Hatti and what it pays: the plans side by side, monthly or yearly, one chosen or kept by the owner once they confirm who they are; an invoice paid through Hatti's gateway, or by transfer or Raast with its reference given; and message credit bought. Managers read it | Accepted |
 | 276 | The admin's discount codes are a section of their own for those who make them: each with what it gives in a line, whether it works now and how often it was used; made for a percentage, an amount or free delivery, limited and dated; ended at once, or deleted | Accepted |
+| 277 | Staff take orders over the phone or in a chat as drafts in the admin: products found and added at the price agreed, where it was taken and how it is paid; its link sent on WhatsApp for the customer to give the address and confirm, or the draft placed at once; and tertiary buttons that take something away are red | Accepted |
 
 ---
 
@@ -11448,3 +11449,36 @@
     and go weekly, as settings do not.
   * **A switch to turn a code off and on:** the core has no paused state; an end now says what
     happens, and another code starts it again.
+
+## ADR-277 · Staff take orders over the phone or in a chat as drafts in the admin: products found and added at the price agreed, where it was taken and how it is paid; its link sent on WhatsApp for the customer to give the address and confirm, or the draft placed at once; and tertiary buttons that take something away are red
+
+* **Context:** Many orders are agreed in WhatsApp chats and on calls. A draft keeps the prices
+  agreed and holds no stock until it is placed ([ADR-031](#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)); its link lets the customer
+  give or correct the address and confirm ([ADR-034](#adr-034--customers-add-a-drafts-address-and-their-number-while-it-has-none-through-its-link)), a transfer's draft included
+  ([ADR-223](#adr-223--a-draft-paid-by-transfer-gets-a-link-too-its-customer-confirms-it-as-one-paid-on-delivery-its-order-waits-for-the-money-and-the-link-becomes-the-orders-whose-page-shows-where-to-pay-and-takes-the-payment-online)); or staff place it at once when the customer agreed and the address is
+  known. Drafts need `write_orders`, which packers have too, though they take no orders.
+* **Decision:**
+  * **Draft orders** open from the orders list, for owners, managers and confirmation agents:
+    open drafts and those placed, each with whose and where it is, its items and total.
+  * **A new draft:** products found by name or SKU, each variant with its price and stock and
+    added in a tap, its quantity stepped and its price changed to the one agreed; where it was
+    taken (WhatsApp, Instagram, Facebook, or a call or in person) and how it is paid (cash on
+    delivery or bank transfer); the delivery charge and an amount off; a note; and the address
+    when staff have it, else left for the link.
+  * **A draft's page:** its items and what it comes to, what the courier collects where an
+    advance leaves less, and the address or that the customer will give it. Its link is made, or
+    made again, and shown once to copy or send on WhatsApp; the draft is placed as an order,
+    which opens, or refused in the core's words; or deleted after a second tap.
+  * **The `danger` button**, red text without a fill, is the one for archiving, removing and
+    deleting; tertiary buttons that meant to be red had shown green, the variant's colour
+    winning over theirs.
+* **Consequences:**
+  * A confirmation agent takes an order from a chat on a phone and sends its link in the same
+    chat, without opening the Admin API.
+  * Changing a draft's items after it is made waits: deleting it and making another does it
+    meanwhile.
+* **Alternatives:**
+  * **Drafts as a section of the bottom bar:** they are a way to take an order, so they open from
+    the orders list, where staff look for orders.
+  * **Searching products as one types:** a search on tapping Find costs one request a search on a
+    slow connection, and fits inside the draft's form.

@@ -298,8 +298,7 @@ function CodeRow({ code, edits }: { code: DiscountCodeValue; edits: boolean }) {
             </>
           ) : (
             <Button
-              variant="tertiary"
-              className="text-danger"
+              variant="danger"
               icon={<Trash2 aria-hidden className="size-5" />}
               onClick={() => setDeleting(true)}
             >

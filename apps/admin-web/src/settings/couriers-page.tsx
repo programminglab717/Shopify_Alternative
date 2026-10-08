@@ -214,8 +214,7 @@ function AccountRow({ account }: { account: CourierAccountDetail }) {
           </>
         ) : (
           <Button
-            variant="tertiary"
-            className="text-danger"
+            variant="danger"
             icon={<Archive aria-hidden className="size-5" />}
             onClick={() => setArchiving(true)}
           >

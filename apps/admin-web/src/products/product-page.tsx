@@ -384,9 +384,8 @@ function ProductEditor({
             </div>
           ) : (
             <Button
-              variant="tertiary"
+              variant="danger"
               icon={<Trash2 aria-hidden className="size-5" />}
-              className="text-danger"
               onClick={() => setDeleting(true)}
             >
               {t('product.delete')}

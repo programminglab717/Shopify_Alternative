@@ -359,8 +359,8 @@ function Blocklist({ customer, timezone }: { customer: CustomerDetail; timezone:
         </div>
       ) : (
         <Button
-          variant="tertiary"
-          className="self-start text-danger"
+          variant="danger"
+          className="self-start"
           icon={<Ban aria-hidden className="size-5" />}
           onClick={() => setChoosing(true)}
         >

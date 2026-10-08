@@ -253,8 +253,7 @@ export function StaffPage() {
                       </>
                     ) : (
                       <Button
-                        variant="tertiary"
-                        className="text-danger"
+                        variant="danger"
                         icon={<Trash2 aria-hidden className="size-5" />}
                         aria-label={t('staff.remove', { name: member.name })}
                         onClick={() => setRemoving(member.id)}

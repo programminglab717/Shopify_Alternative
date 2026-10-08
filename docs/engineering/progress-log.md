@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Next, draft orders in the admin** (ORD-03): an order taken over the phone or WhatsApp, its items
-and customer chosen, its link sent to confirm and fill in the address; then the activity log
-(ADM-04). Urdu handles wait, as decided.
+**Next, the activity log in the admin** (ADM-04): who changed what in the shop and when, for
+owners and managers; then the home's sales over time (ANL-02). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +16,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### Draft orders in the admin
+
+* **Orders taken in a chat or on a call** ([ADR-277](../architecture/13-decision-log.md#adr-277--staff-take-orders-over-the-phone-or-in-a-chat-as-drafts-in-the-admin-products-found-and-added-at-the-price-agreed-where-it-was-taken-and-how-it-is-paid-its-link-sent-on-whatsapp-for-the-customer-to-give-the-address-and-confirm-or-the-draft-placed-at-once-and-tertiary-buttons-that-take-something-away-are-red)):
+  drafts listed open and placed; a new one with products found and added at the price agreed,
+  where it was taken, how it is paid, delivery and an amount off, and the address where staff
+  have it; its page with its link to copy or send on WhatsApp, placed as an order, or deleted.
+* **Fixed:** archive, remove and delete buttons showed green, their red losing to the button's
+  own colour; they are a `danger` button now, in eleven places.
+* **Tried against the core:** the seed's owner made #D5 from a search for "khussa" with a Rs 200
+  delivery charge, sent its link (WhatsApp's too), and was told to add the address first when
+  placing it; made #D6 with the address and placed it, which opened order #1015; with no errors
+  in the browser.
+* 1972 tests: making a draft at the price agreed, sending its link and placing it, and the list.
 
 ### 61e2fd5 · Discount codes in the admin
 

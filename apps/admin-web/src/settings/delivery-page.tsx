@@ -145,8 +145,7 @@ function ZoneFields({
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-semibold">{t('delivery.zoneNumber', { n: number })}</h3>
         <Button
-          variant="tertiary"
-          className="text-danger"
+          variant="danger"
           icon={<Trash2 aria-hidden className="size-5" />}
           onClick={onRemove}
         >

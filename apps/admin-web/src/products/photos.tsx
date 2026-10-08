@@ -141,8 +141,8 @@ function MediaTile({
                 />
               )}
               <Button
-                variant="tertiary"
-                className="flex-1 px-2 text-danger"
+                variant="danger"
+                className="flex-1 px-2"
                 aria-label={t('photos.remove')}
                 icon={<Trash2 aria-hidden className="size-5" />}
                 disabled={busy}

@@ -1658,3 +1658,168 @@ export const DiscountCodeDeleteMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** The shop's draft orders, newest first, open or completed (ORD-03). */
+export const DraftOrdersQuery = /* GraphQL */ `
+  query DraftOrders($query: String, $status: DraftOrderStatus) {
+    draftOrders(first: 50, query: $query, status: $status) {
+      nodes {
+        id
+        name
+        status
+        source
+        createdAt
+        totalPrice {
+          ...Money
+        }
+        shippingAddress {
+          name
+          city
+        }
+        lineItems {
+          quantity
+        }
+      }
+    }
+  }
+  ${MONEY}
+`;
+
+/** One draft, for its page. */
+export const DraftOrderQuery = /* GraphQL */ `
+  query DraftOrder($id: ID!) {
+    draftOrder(id: $id) {
+      id
+      name
+      status
+      source
+      paymentMethod
+      note
+      createdAt
+      linkExpiresAt
+      phone
+      lineItems {
+        variantId
+        title
+        variantTitle
+        quantity
+        unitPrice {
+          ...Money
+        }
+        totalPrice {
+          ...Money
+        }
+      }
+      shippingAddress {
+        formatted
+      }
+      subtotalPrice {
+        ...Money
+      }
+      totalShippingPrice {
+        ...Money
+      }
+      totalDiscounts {
+        ...Money
+      }
+      totalPrice {
+        ...Money
+      }
+      codAmount {
+        ...Money
+      }
+      order {
+        id
+        name
+      }
+    }
+  }
+  ${MONEY}
+`;
+
+/** Products found by words, with their variants' prices and stock, to add to a draft. */
+export const DraftVariantsQuery = /* GraphQL */ `
+  query DraftVariants($query: String) {
+    products(first: 10, query: $query) {
+      nodes {
+        id
+        title
+        variants {
+          id
+          title
+          availableForSale
+          inventoryQuantity
+          price {
+            ...Money
+          }
+        }
+      }
+    }
+  }
+  ${MONEY}
+`;
+
+/** A draft started, as a customer picks items in a chat or on a call. */
+export const DraftOrderCreateMutation = /* GraphQL */ `
+  mutation DraftOrderCreate($input: DraftOrderInput!) {
+    draftOrderCreate(input: $input) {
+      draftOrder {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The draft's link for its customer to fill in the address and confirm, shown once. */
+export const DraftOrderLinkCreateMutation = /* GraphQL */ `
+  mutation DraftOrderLinkCreate($id: ID!) {
+    draftOrderLinkCreate(id: $id) {
+      url
+      whatsappUrl
+      draftOrder {
+        id
+        linkExpiresAt
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The draft placed as an order, as the customer agreed in the chat. */
+export const DraftOrderCompleteMutation = /* GraphQL */ `
+  mutation DraftOrderComplete($id: ID!) {
+    draftOrderComplete(id: $id) {
+      draftOrder {
+        id
+        order {
+          id
+          name
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** An open draft deleted, and its link with it. */
+export const DraftOrderDeleteMutation = /* GraphQL */ `
+  mutation DraftOrderDelete($id: ID!) {
+    draftOrderDelete(id: $id) {
+      deletedId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

@@ -1,9 +1,10 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { ChevronRight, EyeOff, Inbox, Search, ShieldAlert } from 'lucide-react';
+import { ChevronRight, EyeOff, FilePen, Inbox, Search, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSessionStore } from '../auth/context';
+import { TAKES_DRAFTS } from '../drafts/drafts-page';
 import {
   OrderBulkConfirmMutation,
   OrderBulkMarkPackedMutation,
@@ -197,9 +198,21 @@ export function OrdersPage() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
-      <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
-        {t('orders.title')}
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
+          {t('orders.title')}
+        </h1>
+        {TAKES_DRAFTS.includes(shop.role) && (
+          <Link
+            to="/$shopId/drafts"
+            params={{ shopId: shop.id }}
+            className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium md:min-h-10"
+          >
+            <FilePen aria-hidden className="size-5" />
+            {t('drafts.title')}
+          </Link>
+        )}
+      </div>
       <form onSubmit={onSearch} role="search" className="relative">
         <Search
           aria-hidden

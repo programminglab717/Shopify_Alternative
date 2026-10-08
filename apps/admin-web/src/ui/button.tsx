@@ -1,12 +1,14 @@
 import { LoaderCircle } from 'lucide-react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive';
+export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'danger' | 'destructive';
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-primary text-on-primary hover:bg-primary-strong',
   secondary: 'border border-line bg-surface text-text hover:bg-canvas',
   tertiary: 'text-primary hover:bg-canvas',
+  /** A tertiary button for what takes something away: archive, remove, delete. */
+  danger: 'text-danger hover:bg-canvas',
   destructive: 'bg-danger text-white hover:opacity-90',
 };
 
