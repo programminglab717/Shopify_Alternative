@@ -18,7 +18,7 @@ function order(id: string, name: string, total: string) {
     codAmount: { amount: total, currencyCode: 'PKR' },
     shippingAddress: { name: 'Ayesha Khan', city: 'Karachi', formatted: ['House 12', 'Karachi'] },
     customer: { displayName: 'Ayesha Khan', numberOfOrders: 1 },
-    risk: { level: 'LOW', score: 10, reasons: [] },
+    risk: { level: 'LOW', score: 0.1, reasons: [] },
     lineItems: [{ id: `${id}-1`, title: 'Sindhi Ajrak', variantTitle: null, quantity: 1 }],
   };
 }

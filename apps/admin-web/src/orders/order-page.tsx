@@ -351,7 +351,7 @@ export function OrderPage() {
               >
                 <ShieldAlert aria-hidden className="size-5" />
                 {t(`orders.risk.${order.risk.level}` as MessageKey)} ·{' '}
-                {t('order.riskScore', { score: Math.round(order.risk.score) })}
+                {t('order.riskScore', { score: Math.round(order.risk.score * 100) })}
               </p>
               <ul className="list-disc ps-5 text-secondary">
                 {order.risk.reasons.map((reason) => (

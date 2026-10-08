@@ -26,7 +26,10 @@ import { OrdersPage, validateOrdersSearch } from './orders/orders-page';
 import { NewProductPage } from './products/new-product-page';
 import { ProductPage, validateProductSearch } from './products/product-page';
 import { ProductsPage, validateProductsSearch } from './products/products-page';
+import { BankTransferPage } from './settings/bank-transfer-page';
+import { CashOnDeliveryPage } from './settings/cash-on-delivery-page';
 import { CouriersPage } from './settings/couriers-page';
+import { DeliveryPage } from './settings/delivery-page';
 import { SettingsPage } from './settings/settings-page';
 import { StaffPage } from './settings/staff-page';
 import { MorePage, Shell } from './shell/shell';
@@ -211,6 +214,24 @@ const settingsStaff = createRoute({
   component: StaffPage,
 });
 
+const settingsDelivery = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/delivery',
+  component: DeliveryPage,
+});
+
+const settingsCashOnDelivery = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/cash-on-delivery',
+  component: CashOnDeliveryPage,
+});
+
+const settingsBankTransfer = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/bank-transfer',
+  component: BankTransferPage,
+});
+
 /** An invitation's link: open signed in or out (ADR-101). */
 const invitation = createRoute({
   getParentRoute: () => root,
@@ -240,6 +261,9 @@ export const routeTree = root.addChildren([
     settings,
     settingsCouriers,
     settingsStaff,
+    settingsDelivery,
+    settingsCashOnDelivery,
+    settingsBankTransfer,
   ]),
 ]);
 

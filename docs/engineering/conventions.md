@@ -2848,6 +2848,7 @@ Rules:
   `renderAdmin` from `src/test-support.tsx`, signed in with `signedIn()`, against `fakeCore`,
   which answers each GraphQL operation by its name and keeps what was sent; check what the
   screen sent and what it shows ([ADR-267](../architecture/13-decision-log.md#adr-267--the-admins-products-a-list-by-status-and-search-a-products-page-that-owners-and-managers-change-and-every-other-role-reads-and-adding-a-product-with-its-options-variants-each-with-its-price-and-stock-stock-is-counted-at-the-shops-primary-location-set-where-the-merchant-typed-it-and-refused-if-it-changed-since-it-was-read)).
+* **A settings page sends everything it shows** in one save, a blank as null, so that what it shows is what checkout uses; risk scores are out of 100 on screen for the core's 0 to 1. A panel with a form of its own, such as the one asking who is signed in, goes outside the page's form ([ADR-272](../architecture/13-decision-log.md#adr-272--the-admins-settings-take-delivery-charges-cash-on-deliverys-rules-and-bank-transfer-each-a-form-of-everything-it-sets-saved-at-once-as-checkout-will-use-it-risk-scores-are-shown-out-of-100-for-the-cores-0-to-1-and-the-bank-account-is-given-once-the-member-confirms-who-they-are)).
 
 ## Style
 

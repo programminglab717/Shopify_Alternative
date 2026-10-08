@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-271 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-272 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -279,6 +279,7 @@
 | 269 | The admin's customers: a list searched by any part of a number, a name or an email, and a customer's page with how to reach them, how their parcels went, their orders, addresses, and the shop's note and tags; agents see the number when they ask, which is logged, and owners and managers block it from there | Accepted |
 | 270 | The admin's shipping: packed orders booked with the shop's courier account in a tap, each booking shown as the worker books it and its courier carries it, booked parcels' labels and the account's load sheet printed from a tab of their own; and on a phone, the bottom bar's five slots kept for the busiest sections, the rest under More | Accepted |
 | 271 | The admin's settings begin with courier accounts and staff: an account connected with the credentials its courier asks for, made the default or archived; staff's roles changed and staff let go by those who manage them, and people invited by a link to send on WhatsApp, which opens a page of the admin's own; a sensitive change asks the member to confirm who they are, then goes ahead | Accepted |
+| 272 | The admin's settings take delivery charges, cash on delivery's rules and bank transfer: each a form of everything it sets, saved at once as checkout will use it; risk scores are shown out of 100 for the core's 0 to 1, and the bank account is given once the member confirms who they are | Accepted |
 
 ---
 
@@ -11272,3 +11273,47 @@
     the core says which changes are, and the admin asks when it does.
   * **The invitation's token in the page's query:** it would reach servers' logs and the edge; after
     the `#` it stays in the browser.
+
+## ADR-272 · The admin's settings take delivery charges, cash on delivery's rules and bank transfer: each a form of everything it sets, saved at once as checkout will use it; risk scores are shown out of 100 for the core's 0 to 1, and the bank account is given once the member confirms who they are
+
+* **Context:** Checkout charges for delivery by zones of cities, free above a subtotal, and says
+  how many working days it takes ([ADR-043](#adr-043--a-shop-charges-for-delivery-once-for-everywhere-by-zones-of-cities-and-not-at-all-from-a-subtotal)). Cash on delivery keeps to the orders a shop
+  trusts: a fee, a most, cities and tagged products it is not offered for, customers who refused
+  parcels, a code asked first from a risk score ([ADR-148](#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)), prepaid alone above another
+  ([ADR-099](#adr-099--an-order-paid-on-delivery-that-the-shops-risk-rules-score-at-its-limit-or-above-is-not-taken-at-checkout-placed-scored-and-undone-its-page-asks-for-a-transfer-instead)), and an advance on some or every order ([ADR-084](#adr-084--checkout-asks-for-the-advance-the-shops-rules-name-an-amount-a-share-of-the-items-or-the-delivery-charge-on-every-order-or-above-a-total-said-beside-cash-on-delivery)). Bank transfer
+  needs the shop's account, and may take something off ([ADR-074](#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into),
+  [ADR-077](#adr-077--something-off-for-paying-by-transfer-is-part-of-the-orders-discount-kept-apart-from-the-codes-off-the-items-after-any-code-to-the-rupee-said-where-the-shopper-chooses)); changing it asks a member who signed in a while ago to confirm who they
+  are ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)). All of it was the Admin API's alone, which the alpha's shops cannot
+  use, while settings had courier accounts and staff ([ADR-271](#adr-271--the-admins-settings-begin-with-courier-accounts-and-staff-an-account-connected-with-the-credentials-its-courier-asks-for-made-the-default-or-archived-staffs-roles-changed-and-staff-let-go-by-those-who-manage-them-and-people-invited-by-a-link-to-send-on-whatsapp-which-opens-a-page-of-the-admins-own-a-sensitive-change-asks-the-member-to-confirm-who-they-are-then-goes-ahead)).
+* **Decision:**
+  * **Delivery charges** (`settings/delivery`): the charge for everywhere, free delivery from a
+    subtotal, the fewest and most working days, and up to 20 zones, each a name, a charge, its
+    cities with commas between them and days of its own or everywhere's.
+  * **Cash on delivery** (`settings/cash-on-delivery`): its fee and most; the cities and
+    product tags it is not offered for; refused parcels, the score a code is asked from and the
+    score it is not taken from; and the advance: none, the delivery charge, an amount or a
+    percentage, only on orders above a total, to cities, of customers who refused parcels or are
+    new, holding tagged products, or scored at least so much. Without a bank account, the page
+    says the advance needs one and links to it.
+  * **Bank transfer** (`settings/bank-transfer`): the bank, the account's title, the IBAN shown in
+    fours, a Raast ID and what else customers are told; whether checkout offers it; and something
+    off, a percentage up to a cap or an amount.
+  * **Each page sends everything it shows**, as the core's input replaces lists and takes null for
+    none, so what the page shows on saving is what checkout uses. A blank is none, or no limit.
+    Amounts are sent as typed, commas and all, for the core to read; a problem it finds is named by
+    the field, and the zone or advance it is in.
+  * **Risk scores are out of 100** in the admin, a whole number, for the core's 0 to 1 in
+    hundredths; the order page's score too, which had shown the score rounded to 0 or 1.
+  * **Saving bank transfer** goes through the panel that asks who is signed in, as a staff change
+    does; it is outside the form, which forms may not hold.
+* **Consequences:**
+  * An owner sets checkout up from a phone: what delivery costs and how long it takes, where cash
+    on delivery stops, and the account transfers and advances are paid into.
+  * The core still checks every value: a city it does not know, a city in two zones, an IBAN whose
+    check digits are wrong, an advance without an account.
+  * Online gateways and the shop's details stay the Admin API's for now.
+* **Alternatives:**
+  * **Each field saved as it changes:** a zone half typed would reach checkout; one save makes the
+    whole of a change at once.
+  * **Scores as 0 to 1 in the admin:** merchants read "40" more readily than "0.4", and the core
+    keeps hundredths, which whole percentages give exactly.

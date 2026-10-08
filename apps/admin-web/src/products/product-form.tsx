@@ -115,8 +115,8 @@ export function FormSection({
   );
 }
 
-/** A labelled box of several lines, for a description. */
-function TextArea({
+/** A labelled box of several lines, for a description or instructions. */
+export function TextArea({
   label,
   value,
   onChange,

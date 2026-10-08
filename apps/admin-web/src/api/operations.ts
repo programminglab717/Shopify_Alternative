@@ -1123,3 +1123,176 @@ export const StaffMemberRemoveMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const DELIVERY_SETTINGS = /* GraphQL */ `
+  fragment Delivery on DeliverySettings {
+    charge {
+      ...Money
+    }
+    freeAbove {
+      ...Money
+    }
+    days {
+      min
+      max
+    }
+    zones {
+      name
+      cities
+      charge {
+        ...Money
+      }
+      days {
+        min
+        max
+      }
+    }
+    updatedAt
+  }
+`;
+
+/** What the shop charges to deliver an order, and how long delivery takes (CHK-22). */
+export const DeliverySettingsQuery = /* GraphQL */ `
+  query DeliverySettings {
+    deliverySettings {
+      ...Delivery
+    }
+  }
+  ${DELIVERY_SETTINGS}
+  ${MONEY}
+`;
+
+/** Delivery's charges and days changed, its zones replaced; for checkouts from now on. */
+export const DeliverySettingsUpdateMutation = /* GraphQL */ `
+  mutation DeliverySettingsUpdate($input: DeliverySettingsUpdateInput!) {
+    deliverySettingsUpdate(input: $input) {
+      deliverySettings {
+        ...Delivery
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${DELIVERY_SETTINGS}
+  ${MONEY}
+  ${USER_ERRORS}
+`;
+
+const COD_SETTINGS = /* GraphQL */ `
+  fragment CashOnDelivery on CashOnDeliverySettings {
+    fee {
+      ...Money
+    }
+    maxOrderTotal {
+      ...Money
+    }
+    refusedDeliveriesLimit
+    riskScoreLimit
+    verifyFromScore
+    unavailableCities
+    unavailableProductTags
+    advance {
+      kind
+      amount {
+        ...Money
+      }
+      percentage
+      above {
+        ...Money
+      }
+      cities
+      productTags
+      newCustomers
+      refusedDeliveries
+      riskScore
+    }
+    updatedAt
+  }
+`;
+
+/** The shop's rules for cash on delivery at checkout (CHK-07, CHK-08, CHK-09, CHK-10). */
+export const CashOnDeliverySettingsQuery = /* GraphQL */ `
+  query CashOnDeliverySettings {
+    cashOnDeliverySettings {
+      ...CashOnDelivery
+    }
+    bankTransferSettings {
+      enabled
+      account {
+        iban
+      }
+    }
+  }
+  ${COD_SETTINGS}
+  ${MONEY}
+`;
+
+/** Cash on delivery's rules changed, for checkouts from now on. */
+export const CashOnDeliverySettingsUpdateMutation = /* GraphQL */ `
+  mutation CashOnDeliverySettingsUpdate($input: CashOnDeliverySettingsInput!) {
+    cashOnDeliverySettingsUpdate(input: $input) {
+      cashOnDeliverySettings {
+        ...CashOnDelivery
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${COD_SETTINGS}
+  ${MONEY}
+  ${USER_ERRORS}
+`;
+
+const BANK_TRANSFER_SETTINGS = /* GraphQL */ `
+  fragment BankTransfer on BankTransferSettings {
+    enabled
+    account {
+      bankName
+      title
+      iban
+      raastId
+      instructions
+    }
+    discount {
+      kind
+      amount {
+        ...Money
+      }
+      percentage
+      cap {
+        ...Money
+      }
+    }
+    updatedAt
+  }
+`;
+
+/** The account customers pay into by bank transfer, and whether checkout offers it (PAY-02). */
+export const BankTransferSettingsQuery = /* GraphQL */ `
+  query BankTransferSettings {
+    bankTransferSettings {
+      ...BankTransfer
+    }
+  }
+  ${BANK_TRANSFER_SETTINGS}
+  ${MONEY}
+`;
+
+/** Bank transfer turned on or off, its account or discount changed; confirmed recently. */
+export const BankTransferSettingsUpdateMutation = /* GraphQL */ `
+  mutation BankTransferSettingsUpdate($input: BankTransferSettingsInput!) {
+    bankTransferSettingsUpdate(input: $input) {
+      bankTransferSettings {
+        ...BankTransfer
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${BANK_TRANSFER_SETTINGS}
+  ${MONEY}
+  ${USER_ERRORS}
+`;

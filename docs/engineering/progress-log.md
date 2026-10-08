@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the rest of the merchant admin's settings the alpha's shops need** (CHK-07, CHK-22,
-PAY-02): delivery charges, cash on delivery's rules and bank transfer; then the pages email links
-open (an email verified, a new password). Urdu handles wait, as decided.
+**Next, the pages email links open** (ONB-01): an email verified and a new password set, on the
+admin's own origin; then the shop's details and online payments' gateways in settings (PAY-01).
+Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### Delivery and payments in the admin's settings
+
+* **Three more sections of settings** ([ADR-272](../architecture/13-decision-log.md#adr-272--the-admins-settings-take-delivery-charges-cash-on-deliverys-rules-and-bank-transfer-each-a-form-of-everything-it-sets-saved-at-once-as-checkout-will-use-it-risk-scores-are-shown-out-of-100-for-the-cores-0-to-1-and-the-bank-account-is-given-once-the-member-confirms-who-they-are)):
+  delivery charges, free delivery and working days, with zones of cities; cash on delivery's fee,
+  most, cities and tags it is not offered for, refusals, risk scores and the advance; and bank
+  transfer's account, whether checkout offers it and what paying so takes off, saved after the
+  member confirms who they are.
+* **Fixed:** the order page showed the risk score rounded to 0 or 1; it is out of 100 now, as in
+  settings.
+* **Tried against the core:** the seed's owner saved delivery's charge, free delivery and days,
+  gave the bank account (refused first for a mistyped IBAN, named as such), turned transfer on
+  with 5% off up to Rs 500, and set cash on delivery's fee, cities, a code from score 40 and a 20%
+  advance of new customers; each was there after a reload, with no errors in the browser.
+* 1930 tests: delivery with a zone, a problem named by its zone, cash on delivery's rules and
+  advance, and the bank account after confirming who one is.
 
 ### a44fc88 · Settings in the admin: courier accounts and staff
 

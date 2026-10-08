@@ -559,3 +559,82 @@ export interface StaffInvitationCreateData {
     userErrors: UserError[];
   };
 }
+
+export interface DeliveryDaysValue {
+  min: number;
+  max: number;
+}
+
+export interface DeliverySettingsValue {
+  charge: MoneyValue;
+  freeAbove: MoneyValue | null;
+  days: DeliveryDaysValue | null;
+  zones: {
+    name: string;
+    cities: string[];
+    charge: MoneyValue;
+    days: DeliveryDaysValue | null;
+  }[];
+  updatedAt: string | null;
+}
+
+export interface DeliverySettingsData {
+  deliverySettings: DeliverySettingsValue;
+}
+
+export type CashOnDeliveryAdvanceKind = 'DELIVERY_CHARGE' | 'FIXED_AMOUNT' | 'PERCENTAGE';
+
+export interface CashOnDeliverySettingsValue {
+  fee: MoneyValue;
+  maxOrderTotal: MoneyValue | null;
+  refusedDeliveriesLimit: number | null;
+  riskScoreLimit: number | null;
+  verifyFromScore: number | null;
+  unavailableCities: string[];
+  unavailableProductTags: string[];
+  advance: {
+    kind: CashOnDeliveryAdvanceKind;
+    amount: MoneyValue | null;
+    percentage: number | null;
+    above: MoneyValue | null;
+    cities: string[];
+    productTags: string[];
+    newCustomers: boolean;
+    refusedDeliveries: number | null;
+    riskScore: number | null;
+  } | null;
+  updatedAt: string | null;
+}
+
+export interface CashOnDeliverySettingsData {
+  cashOnDeliverySettings: CashOnDeliverySettingsValue;
+  bankTransferSettings: { enabled: boolean; account: { iban: string } | null };
+}
+
+export type TransferDiscountKind = 'FIXED_AMOUNT' | 'PERCENTAGE';
+
+export interface BankTransferSettingsValue {
+  enabled: boolean;
+  account: {
+    bankName: string;
+    title: string;
+    iban: string;
+    raastId: string | null;
+    instructions: string;
+  } | null;
+  discount: {
+    kind: TransferDiscountKind;
+    amount: MoneyValue | null;
+    percentage: number | null;
+    cap: MoneyValue | null;
+  } | null;
+  updatedAt: string | null;
+}
+
+export interface BankTransferSettingsData {
+  bankTransferSettings: BankTransferSettingsValue;
+}
+
+export interface SettingsPayloadData {
+  userErrors: UserError[];
+}
