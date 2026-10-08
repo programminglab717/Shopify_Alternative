@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### Sales over time in the admin
+### 8e0e02e · Sales over time in the admin
 
 * **Analytics, a section of its own** ([ADR-279](../architecture/13-decision-log.md#adr-279--the-admins-analytics-show-sales-over-the-last-7-30-or-90-whole-days-in-the-shops-time-zone-against-the-days-as-many-before-net-sales-orders-the-average-order-and-profit-with-how-each-changed-bars-by-day-by-week-over-90-what-sold-most-and-where-orders-came-from)):
   the last 7, 30 or 90 days against the days before: net sales, orders, the average order and
