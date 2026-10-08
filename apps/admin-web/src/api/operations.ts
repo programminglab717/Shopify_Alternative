@@ -1441,3 +1441,148 @@ export const OnlineStorePreferencesUpdateMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const BILLING_PLAN = /* GraphQL */ `
+  fragment Plan on BillingPlan {
+    code
+    name
+    monthlyPrice {
+      ...Money
+    }
+    yearlyPrice {
+      ...Money
+    }
+    orderLimit
+    staffLimit
+    locationLimit
+    customDomains
+    onlineGateways
+  }
+`;
+
+const BILLING_INVOICE = /* GraphQL */ `
+  fragment Invoice on BillingInvoice {
+    id
+    name
+    reason
+    status
+    interval
+    createdAt
+    paidAt
+    amount {
+      ...Money
+    }
+    plan {
+      name
+    }
+    transfers {
+      id
+      reference
+      status
+      refusal
+      reportedAt
+    }
+  }
+`;
+
+/** The shop's plan with Hatti, the plans, its message credit and its invoices (BIL-01, BIL-03). */
+export const BillingQuery = /* GraphQL */ `
+  query Billing {
+    billingSubscription {
+      plan {
+        ...Plan
+      }
+      interval
+      periodEnd
+      pastDue
+      nextPlan {
+        name
+      }
+      openInvoice {
+        ...Invoice
+      }
+    }
+    billingPlans {
+      ...Plan
+    }
+    billingWallet {
+      balance {
+        ...Money
+      }
+      openInvoice {
+        ...Invoice
+      }
+    }
+    billingInvoices(first: 20) {
+      ...Invoice
+    }
+    billingBankAccount {
+      bankName
+      title
+      iban
+      raastId
+    }
+  }
+  ${BILLING_PLAN}
+  ${BILLING_INVOICE}
+  ${MONEY}
+`;
+
+/** Another plan chosen: a bigger one invoiced now, a smaller one from the period's end. */
+export const BillingPlanChangeMutation = /* GraphQL */ `
+  mutation BillingPlanChange($input: BillingPlanChangeInput!) {
+    billingPlanChange(input: $input) {
+      invoice {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** An invoice paid through Hatti's own gateway: its page to send the owner to. */
+export const BillingInvoicePayMutation = /* GraphQL */ `
+  mutation BillingInvoicePay($id: ID!) {
+    billingInvoicePay(id: $id) {
+      checkoutUrl
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** An invoice said to be paid by transfer or Raast, for Hatti's people to find. */
+export const BillingInvoiceTransferReportMutation = /* GraphQL */ `
+  mutation BillingInvoiceTransferReport($id: ID!, $reference: String!) {
+    billingInvoiceTransferReport(id: $id, reference: $reference) {
+      transfer {
+        id
+        status
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Message credit chosen to buy: an invoice, the shop's credit once paid. */
+export const BillingCreditsBuyMutation = /* GraphQL */ `
+  mutation BillingCreditsBuy($input: BillingCreditsBuyInput!) {
+    billingCreditsBuy(input: $input) {
+      invoice {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

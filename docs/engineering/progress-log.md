@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the shop's plan and billing in the admin** (BIL-01, BIL-03): its plan and what another
-would add, its invoices paid by card, transfer or Raast, and message credit; then discount codes
-(CHK-06). Urdu handles wait, as decided.
+**Next, discount codes in the admin** (CHK-06): listed with how often each was used, made for a
+percentage, an amount or free delivery, limited, and turned off; then draft orders staff take over
+the phone (ORD-03). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### Plan and billing in the admin
+
+* **The shop's plan with Hatti and what it pays** ([ADR-275](../architecture/13-decision-log.md#adr-275--the-admins-billing-shows-the-shops-plan-with-hatti-and-what-it-pays-the-plans-side-by-side-monthly-or-yearly-one-chosen-or-kept-by-the-owner-once-they-confirm-who-they-are-an-invoice-paid-through-hattis-gateway-or-by-transfer-or-raast-with-its-reference-given-and-message-credit-bought-managers-read-it)):
+  the plan and its period, the plans side by side monthly or yearly, one chosen or the current one
+  kept by the owner once they confirm who they are; invoices paid by card through Hatti's gateway,
+  or by transfer or Raast with the reference given; message credit bought; managers read it.
+* **Tried against the core:** the seed's owner, on Pro, chose Growth, which waited for the
+  period's end, then kept Pro, which dropped it; bought Rs 1,000 of credit and was sent through
+  Hatti's gateway to its invoice's page; with no errors in the admin.
+* 1955 tests: choosing and paying, a transfer said, credit bought, and a manager's view.
 
 ### 5a5ea05 · Online payments and the shop's brand in the admin's settings
 

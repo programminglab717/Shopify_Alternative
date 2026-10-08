@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-274 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-275 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -282,6 +282,7 @@
 | 272 | The admin's settings take delivery charges, cash on delivery's rules and bank transfer: each a form of everything it sets, saved at once as checkout will use it; risk scores are shown out of 100 for the core's 0 to 1, and the bank account is given once the member confirms who they are | Accepted |
 | 273 | The pages the core's emails link to are the admin's: a new password set from a reset link, signing every session out, this tab's too; an email proved, or changed, with a tap rather than as the page opens; and a link to set a new password asked for from signing in. The admin reads `/auth`'s field errors as the core names them | Accepted |
 | 274 | The admin's settings take the shop's online payments and its brand: a gateway connected once the member confirms who they are, its webhook address given to copy into the gateway's dashboard, the gateways put in the order customers are offered them or archived; the shop's logo and square logo uploaded from the phone, and its WhatsApp number | Accepted |
+| 275 | The admin's billing shows the shop's plan with Hatti and what it pays: the plans side by side, monthly or yearly, one chosen or kept by the owner once they confirm who they are; an invoice paid through Hatti's gateway, or by transfer or Raast with its reference given; and message credit bought. Managers read it | Accepted |
 
 ---
 
@@ -11386,3 +11387,35 @@
     three a shop has, and work with a thumb and a screen reader alike.
   * **Offering every gateway to connect:** the core keeps one live account a gateway; those
     connected are left out rather than refused.
+
+## ADR-275 · The admin's billing shows the shop's plan with Hatti and what it pays: the plans side by side, monthly or yearly, one chosen or kept by the owner once they confirm who they are; an invoice paid through Hatti's gateway, or by transfer or Raast with its reference given; and message credit bought. Managers read it
+
+* **Context:** Shops pay Hatti for a plan in rupees, monthly or yearly at ten months' price; a
+  bigger plan is invoiced at once and begins once paid, a smaller one from the period's end, and
+  the current plan chosen again drops a change waiting ([ADR-154](#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port)). Plans differ in
+  orders, staff, locations, gateways and domains ([ADR-264](#adr-264--a-plan-says-whether-it-includes-a-domain-of-the-shops-own-and-accounts-with-payment-gateways-and-free-includes-neither-connecting-one-on-a-plan-without-it-is-refused-with-the-plan-named-through-the-port-other-modules-ask-a-plans-limits-through-and-those-connected-before-are-kept-checked-changed-and-used-as-before)). Messages are paid from
+  credit bought by invoice ([ADR-155](#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)). An invoice is paid through Hatti's own gateway
+  or by transfer or Raast into Hatti's account, its reference given for Hatti's people to find
+  ([ADR-254](#adr-254--a-shop-pays-hattis-invoice-by-transfer-or-raast-into-hattis-own-bank-account-its-owner-giving-the-transfers-reference-hattis-people-confirm-it-once-they-find-it-which-pays-the-invoice-as-a-gateways-payment-does-with-what-its-other-payments-brought-or-refuse-it-saying-why-and-the-owner-hears-either-way)). The owner alone changes or pays, having confirmed who they are lately
+  ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)); owners and managers read. Settings had the rest of the shop's own
+  ([ADR-274](#adr-274--the-admins-settings-take-the-shops-online-payments-and-its-brand-a-gateway-connected-once-the-member-confirms-who-they-are-its-webhook-address-given-to-copy-into-the-gateways-dashboard-the-gateways-put-in-the-order-customers-are-offered-them-or-archived-the-shops-logo-and-square-logo-uploaded-from-the-phone-and-its-whatsapp-number)).
+* **Decision:**
+  * **Plan and billing** (`settings/billing`): the plan, until when it is paid and how it renews,
+    the change waiting for the period's end, and a period ended unpaid; an invoice to pay
+    beneath it.
+  * **The plans side by side**, monthly or yearly: price, orders a month, staff, locations,
+    online payments and a domain of the shop's own. The owner chooses another, or keeps the
+    current one while a change waits, through the panel asking who is signed in.
+  * **An invoice to pay:** by card or wallet, sent to Hatti's gateway's page; or by transfer or
+    Raast, with Hatti's account, the invoice's name to write as the purpose, and the transfer's
+    reference to give. A transfer being found, or refused and why, is said on the invoice.
+  * **Message credit:** what it holds, and more bought from Rs 500, its invoice paid as any other.
+  * **The invoices**, newest first, with what each was for and whether it is to pay, paid or void.
+  * **Managers** see it all and are told the owner changes and pays.
+* **Consequences:**
+  * An owner moves a shop off Free, renews it, and keeps its messages paid for, from a phone.
+  * What each message costs, and the credit's history, stay the Admin API's for now.
+* **Alternatives:**
+  * **Paying by transfer before choosing:** the core invoices first, so the transfer's purpose
+    names an invoice Hatti's people can match.
+  * **Hiding billing from managers:** they read the plan's limits as they plan the shop's work.

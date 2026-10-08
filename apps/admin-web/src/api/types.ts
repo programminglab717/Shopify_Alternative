@@ -676,3 +676,57 @@ export interface ShopDetailsData {
   };
   onlineStorePreferences: { whatsappNumber: string | null };
 }
+
+export type BillingPlanCode = 'FREE' | 'STARTER' | 'GROWTH' | 'PRO';
+export type BillingInterval = 'MONTHLY' | 'YEARLY';
+
+export interface BillingPlanValue {
+  code: BillingPlanCode;
+  name: string;
+  monthlyPrice: MoneyValue;
+  yearlyPrice: MoneyValue;
+  orderLimit: number | null;
+  staffLimit: number;
+  locationLimit: number;
+  customDomains: boolean;
+  onlineGateways: boolean;
+}
+
+export interface BillingInvoiceValue {
+  id: string;
+  name: string;
+  reason: 'CHANGE' | 'CREDITS' | 'RENEWAL';
+  status: 'OPEN' | 'PAID' | 'VOID';
+  interval: BillingInterval | null;
+  createdAt: string;
+  paidAt: string | null;
+  amount: MoneyValue;
+  plan: { name: string } | null;
+  transfers: {
+    id: string;
+    reference: string;
+    status: 'CONFIRMED' | 'REFUSED' | 'WAITING';
+    refusal: string | null;
+    reportedAt: string;
+  }[];
+}
+
+export interface BillingData {
+  billingSubscription: {
+    plan: BillingPlanValue;
+    interval: BillingInterval | null;
+    periodEnd: string | null;
+    pastDue: boolean;
+    nextPlan: { name: string } | null;
+    openInvoice: BillingInvoiceValue | null;
+  };
+  billingPlans: BillingPlanValue[];
+  billingWallet: { balance: MoneyValue; openInvoice: BillingInvoiceValue | null };
+  billingInvoices: BillingInvoiceValue[];
+  billingBankAccount: {
+    bankName: string;
+    title: string;
+    iban: string;
+    raastId: string | null;
+  } | null;
+}

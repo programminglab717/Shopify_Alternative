@@ -5,6 +5,7 @@ import {
   CreditCard,
   Landmark,
   MapPin,
+  Receipt,
   Store,
   Truck,
   UserCog,
@@ -37,6 +38,7 @@ interface Section {
     | '/$shopId/settings/delivery'
     | '/$shopId/settings/cash-on-delivery'
     | '/$shopId/settings/bank-transfer'
+    | '/$shopId/settings/billing'
     | '/$shopId/settings/couriers'
     | '/$shopId/settings/staff';
   label: MessageKey;
@@ -87,9 +89,15 @@ const SECTIONS: readonly Section[] = [
     hint: 'settings.staffHint',
     icon: UserCog,
   },
+  {
+    to: '/$shopId/settings/billing',
+    label: 'settings.billing',
+    hint: 'settings.billingHint',
+    icon: Receipt,
+  },
 ];
 
-/** Settings (docs/design/02 §4), as far as they are built: the shop, delivery and payments, couriers, staff. */
+/** Settings (docs/design/02 §4), as far as they are built: the shop, delivery and payments, couriers, staff, billing. */
 export function SettingsPage() {
   const { t } = useLocale();
   const shopId = useShop().id;
