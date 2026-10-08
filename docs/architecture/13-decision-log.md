@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-272 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-273 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -280,6 +280,7 @@
 | 270 | The admin's shipping: packed orders booked with the shop's courier account in a tap, each booking shown as the worker books it and its courier carries it, booked parcels' labels and the account's load sheet printed from a tab of their own; and on a phone, the bottom bar's five slots kept for the busiest sections, the rest under More | Accepted |
 | 271 | The admin's settings begin with courier accounts and staff: an account connected with the credentials its courier asks for, made the default or archived; staff's roles changed and staff let go by those who manage them, and people invited by a link to send on WhatsApp, which opens a page of the admin's own; a sensitive change asks the member to confirm who they are, then goes ahead | Accepted |
 | 272 | The admin's settings take delivery charges, cash on delivery's rules and bank transfer: each a form of everything it sets, saved at once as checkout will use it; risk scores are shown out of 100 for the core's 0 to 1, and the bank account is given once the member confirms who they are | Accepted |
+| 273 | The pages the core's emails link to are the admin's: a new password set from a reset link, signing every session out, this tab's too; an email proved, or changed, with a tap rather than as the page opens; and a link to set a new password asked for from signing in. The admin reads `/auth`'s field errors as the core names them | Accepted |
 
 ---
 
@@ -11317,3 +11318,35 @@
     whole of a change at once.
   * **Scores as 0 to 1 in the admin:** merchants read "40" more readily than "0.4", and the core
     keeps hundredths, which whole percentages give exactly.
+
+## ADR-273 · The pages the core's emails link to are the admin's: a new password set from a reset link, signing every session out, this tab's too; an email proved, or changed, with a tap rather than as the page opens; and a link to set a new password asked for from signing in. The admin reads `/auth`'s field errors as the core names them
+
+* **Context:** The core emails links that prove an account's email, set a new password, and
+  change the email, each to `/verify-email`, `/reset-password` or `/change-email` on the admin's
+  origin with a single-use token after the `#` ([ADR-165](#adr-165--hatti-sends-its-own-email-about-accounts-through-amazon-ses-a-link-proving-an-accounts-email-good-once-for-a-day-and-one-resetting-a-forgotten-password-good-once-for-an-hour-each-carrying-a-token-of-its-own-in-the-links-fragment-kept-as-a-digest-the-last-of-its-kind-alone-working-a-reset-ends-every-session-and-proves-the-email-and-the-accounts-second-factor-is-still-asked), [ADR-172](#adr-172--an-accounts-owner-changes-its-email-or-gives-one-to-an-account-opened-with-a-phone-from-a-session-proved-lately-and-past-its-second-factor-a-link-to-the-new-address-good-once-for-a-day-proves-it-before-it-counts-an-address-another-account-has-is-refused-and-the-address-before-is-told)). The
+  admin had none of these pages, nor a way to ask for a reset, and the invitation's page was the
+  only one of its kind ([ADR-271](#adr-271--the-admins-settings-begin-with-courier-accounts-and-staff-an-account-connected-with-the-credentials-its-courier-asks-for-made-the-default-or-archived-staffs-roles-changed-and-staff-let-go-by-those-who-manage-them-and-people-invited-by-a-link-to-send-on-whatsapp-which-opens-a-page-of-the-admins-own-a-sensitive-change-asks-the-member-to-confirm-who-they-are-then-goes-ahead)). `/auth` names a refused field as
+  `{ "password": "Use at least 10 characters" }`, where the admin's client expected a list as
+  GraphQL's `userErrors` give, and threw on it ([ADR-265](#adr-265--the-merchant-admin-is-a-react-app-on-an-origin-of-its-own-that-sends-auth-and-the-admin-api-on-to-the-core-staff-sign-in-by-a-code-to-their-mobile-or-by-email-with-the-second-step-their-role-needs-the-sessions-opaque-tokens-are-kept-in-the-browsers-storage-and-refreshed-by-one-tab-at-a-time-the-shop-is-in-each-pages-address-and-every-graphql-document-it-sends-is-checked-against-the-cores-schema)).
+* **Decision:**
+  * **Forgot your password?** under signing in by email asks for an email and says, whatever
+    the core found, that a link went if an account has it, for an hour.
+  * **A new password** (`/reset-password`): typed once, the core's own words beside it when it is
+    refused; set, it signs out every session of the account, so this tab forgets its own too and
+    offers signing in.
+  * **An email proved** (`/verify-email`) **or changed** (`/change-email`) with a tap on the page,
+    never as it opens: a mail scanner opening the link, or a page drawn twice, spends nothing.
+    Signed in, the account is read again.
+  * **Each page opens signed in or out**, its token read once from after the `#`; one without a
+    token says the link is missing a part, and a spent or expired one says to ask again.
+  * **The client takes `/auth`'s fields as the core names them**, field by field, and a list as it
+    is; signing up shows its fields' problems by the field again.
+* **Consequences:**
+  * Merchants who sign in by email recover their accounts from a phone, and new accounts' emails
+    are proved where the email sends them.
+  * Changing an account's email from the admin waits for an account page of its own.
+* **Alternatives:**
+  * **Confirming as the page opens:** one step fewer, but a scanner or a second render would spend
+    the link before its person saw it.
+  * **Keeping the tab signed in after a reset:** the core has revoked its session; the next request
+    would sign it out less clearly.

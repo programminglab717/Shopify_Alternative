@@ -312,6 +312,9 @@ export function SignInPage() {
             <Button type="submit" busy={busy}>
               {t('signIn.submit')}
             </Button>
+            <Link to="/forgot-password" className="text-primary underline-offset-4 hover:underline">
+              {t('signIn.forgot')}
+            </Link>
           </form>
         )}
         <Link to="/sign-up" className="text-primary underline-offset-4 hover:underline">

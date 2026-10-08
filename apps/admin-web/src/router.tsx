@@ -18,6 +18,12 @@ import { TwoStepPage } from './auth/two-step-page';
 import { CustomerPage } from './customers/customer-page';
 import { CustomersPage, validateCustomersSearch } from './customers/customers-page';
 import { DeskPage } from './desk/desk-page';
+import {
+  ChangeEmailPage,
+  ForgotPasswordPage,
+  ResetPasswordPage,
+  VerifyEmailPage,
+} from './auth/email-link-pages';
 import { InvitationPage } from './invitation/invitation-page';
 import { HomePage } from './home/home-page';
 import { useLocale } from './i18n/locale';
@@ -42,7 +48,15 @@ export interface RouterContext {
 }
 
 /** The screens a signed-out visitor may see. */
-const PUBLIC_PATHS = ['/sign-in', '/sign-up', '/invitation'];
+const PUBLIC_PATHS = [
+  '/sign-in',
+  '/sign-up',
+  '/invitation',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+  '/change-email',
+];
 
 /**
  * The root: sends a visitor whose session ends, here or in another tab, back to signing in, and
@@ -232,6 +246,32 @@ const settingsBankTransfer = createRoute({
   component: BankTransferPage,
 });
 
+/** Asking for a link to set a new password, signed in or out. */
+const forgotPassword = createRoute({
+  getParentRoute: () => root,
+  path: '/forgot-password',
+  component: ForgotPasswordPage,
+});
+
+/** The pages the core's emails link to (ADR-165, ADR-172): open signed in or out. */
+const resetPassword = createRoute({
+  getParentRoute: () => root,
+  path: '/reset-password',
+  component: ResetPasswordPage,
+});
+
+const verifyEmail = createRoute({
+  getParentRoute: () => root,
+  path: '/verify-email',
+  component: VerifyEmailPage,
+});
+
+const changeEmail = createRoute({
+  getParentRoute: () => root,
+  path: '/change-email',
+  component: ChangeEmailPage,
+});
+
 /** An invitation's link: open signed in or out (ADR-101). */
 const invitation = createRoute({
   getParentRoute: () => root,
@@ -246,6 +286,10 @@ export const routeTree = root.addChildren([
   twoStep,
   shops,
   invitation,
+  forgotPassword,
+  resetPassword,
+  verifyEmail,
+  changeEmail,
   shop.addChildren([
     home,
     orders,

@@ -13,7 +13,7 @@ import { useSessionStore } from './context';
 import type { Tokens } from './session';
 
 /** The field an error belongs to, from the API's `fields`: "email", "password"… */
-function fieldErrors(error: unknown): Record<string, string> {
+export function fieldErrors(error: unknown): Record<string, string> {
   if (!(error instanceof ApiError)) return {};
   return Object.fromEntries(error.fields.map((field) => [field.field.at(-1) ?? '', field.message]));
 }

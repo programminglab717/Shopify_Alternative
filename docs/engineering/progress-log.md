@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the pages email links open** (ONB-01): an email verified and a new password set, on the
-admin's own origin; then the shop's details and online payments' gateways in settings (PAY-01).
-Urdu handles wait, as decided.
+**Next, the shop's details and online gateways in the admin's settings** (ADM-01, PAY-01): the
+shop's name, address and contact, and connecting JazzCash, Easypaisa and the others, as the
+alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### The pages email links open
+
+* **Four pages of the admin's own** ([ADR-273](../architecture/13-decision-log.md#adr-273--the-pages-the-cores-emails-link-to-are-the-admins-a-new-password-set-from-a-reset-link-signing-every-session-out-this-tabs-too-an-email-proved-or-changed-with-a-tap-rather-than-as-the-page-opens-and-a-link-to-set-a-new-password-asked-for-from-signing-in-the-admin-reads-auths-field-errors-as-the-core-names-them)):
+  asking for a reset link from signing in by email; setting a new password from it, which signs
+  every session out, this tab's too; proving an email, and changing it, with a tap rather than as
+  the page opens.
+* **Fixed:** `/auth` names a refused field as an object, which the admin's client read as a list
+  and threw on, so signing up never showed which field was wrong; it reads both now.
+* **Tried against the core**, with tokens made as its emails' are: the agent's email proved, the
+  link refused when opened again; a reset refusing "password" in the core's words, then setting
+  another, signing in with it, and a reset while signed in signing the tab out; asking for a link
+  from signing in; with no errors in the browser.
+* 1935 tests: the four pages through the real screens, and a link without its token.
 
 ### f70a05c · Delivery and payments in the admin's settings
 

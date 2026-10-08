@@ -49,6 +49,20 @@ async function bodyOf(response: Response): Promise<unknown> {
   }
 }
 
+/**
+ * The fields `/auth` found wrong, which it names as `{ "password": "Too short" }`; a list as
+ * GraphQL's `userErrors` give them is taken as it is.
+ */
+function fieldsOf(fields: unknown): FieldError[] {
+  if (Array.isArray(fields)) return fields as FieldError[];
+  if (!fields || typeof fields !== 'object') return [];
+  return Object.entries(fields as Record<string, unknown>).map(([field, message]) => ({
+    field: [field],
+    code: 'INVALID',
+    message: String(message),
+  }));
+}
+
 async function send(fetcher: Fetch, path: string, init: RequestInit): Promise<Response> {
   try {
     return await fetcher(path, init);
@@ -76,14 +90,13 @@ export async function authRequest<T>(
   });
   const body = await bodyOf(response);
   if (response.ok) return body as T;
-  const error = (body as { error?: { code?: string; message?: string; fields?: FieldError[] } })
-    ?.error;
+  const error = (body as { error?: { code?: string; message?: string; fields?: unknown } })?.error;
   const retryAfter = Number(response.headers.get('retry-after'));
   throw new ApiError(
     response.status,
     error?.code ?? `HTTP_${response.status}`,
     error?.message ?? response.statusText,
-    error?.fields ?? [],
+    fieldsOf(error?.fields),
     Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null,
   );
 }

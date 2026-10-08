@@ -27,7 +27,7 @@ export function takePendingInvitation(): string | null {
   }
 }
 
-function tokenOf(hash: string): string | null {
+export function tokenOf(hash: string): string | null {
   return new URLSearchParams(hash.replace(/^#/, '')).get('token');
 }
 

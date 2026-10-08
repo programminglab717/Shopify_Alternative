@@ -618,6 +618,32 @@ const en = {
   'transfer.percentageHint': 'Of the items, after any discount code: up to 50.',
   'transfer.cap': 'At most',
   'transfer.capHint': 'In rupees. Blank for no cap.',
+  'signIn.forgot': 'Forgot your password?',
+  'error.INVALID_EMAIL_LINK': 'This link has expired or was used already. Ask for a new one.',
+  'error.EMAIL_UNAVAILABLE': 'Hatti cannot send email here yet. Sign in with your mobile number.',
+  'link.noToken': 'This link is missing a part. Open it again from the email.',
+  'link.backToSignIn': 'Back to signing in',
+  'link.openHatti': 'Open Hatti',
+  'forgot.title': 'Forgot your password?',
+  'forgot.body': 'Type the email you sign in with. We email it a link to set a new password.',
+  'forgot.submit': 'Email me a link',
+  'forgot.sent':
+    'If an account uses {email}, we have emailed it a link. It works for an hour; look in spam too.',
+  'reset.title': 'Set a new password',
+  'reset.password': 'New password',
+  'reset.submit': 'Set the password',
+  'reset.done':
+    'Your password is set. Every device signed in before is signed out: sign in with it now.',
+  'reset.another': 'Ask for a new link',
+  'verify.title': 'Confirm your email',
+  'verify.body':
+    'Tap below to confirm this email is yours. Hatti then writes to it about your account.',
+  'verify.submit': 'Confirm my email',
+  'verify.done': 'Your email {email} is confirmed.',
+  'change.title': 'Change your email',
+  'change.body': 'Tap below to make this the email you sign in with and Hatti writes to.',
+  'change.submit': 'Change my email',
+  'change.done': "Your account's email is now {email}. We have told your old address.",
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -1217,6 +1243,34 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'transfer.percentageHint': 'چیزوں کا، کسی بھی ڈسکاؤنٹ کوڈ کے بعد: 50 تک۔',
   'transfer.cap': 'زیادہ سے زیادہ',
   'transfer.capHint': 'روپوں میں۔ کوئی حد نہیں کے لیے خالی۔',
+  'signIn.forgot': 'پاس ورڈ بھول گئے؟',
+  'error.INVALID_EMAIL_LINK': 'یہ لنک ختم ہو چکا ہے یا استعمال ہو چکا ہے۔ نیا منگوائیں۔',
+  'error.EMAIL_UNAVAILABLE':
+    'ہٹی یہاں ابھی ای میل نہیں بھیج سکتا۔ اپنے موبائل نمبر سے سائن ان کریں۔',
+  'link.noToken': 'اس لنک کا ایک حصہ غائب ہے۔ ای میل سے دوبارہ کھولیں۔',
+  'link.backToSignIn': 'سائن ان پر واپس',
+  'link.openHatti': 'ہٹی کھولیں',
+  'forgot.title': 'پاس ورڈ بھول گئے؟',
+  'forgot.body':
+    'وہ ای میل لکھیں جس سے آپ سائن ان کرتے ہیں۔ ہم اس پر نیا پاس ورڈ رکھنے کا لنک بھیجیں گے۔',
+  'forgot.submit': 'مجھے لنک بھیجیں',
+  'forgot.sent':
+    'اگر کوئی اکاؤنٹ {email} استعمال کرتا ہے تو ہم نے اس پر لنک بھیج دیا ہے۔ یہ ایک گھنٹہ کام کرتا ہے؛ اسپام میں بھی دیکھیں۔',
+  'reset.title': 'نیا پاس ورڈ رکھیں',
+  'reset.password': 'نیا پاس ورڈ',
+  'reset.submit': 'پاس ورڈ رکھیں',
+  'reset.done':
+    'آپ کا پاس ورڈ رکھ دیا گیا۔ پہلے سائن ان ہر ڈیوائس سائن آؤٹ ہو گئی: اب اس سے سائن ان کریں۔',
+  'reset.another': 'نیا لنک منگوائیں',
+  'verify.title': 'اپنی ای میل کی تصدیق کریں',
+  'verify.body':
+    'تصدیق کے لیے نیچے ٹیپ کریں کہ یہ ای میل آپ کی ہے۔ پھر ہٹی آپ کے اکاؤنٹ کے بارے میں اسی پر لکھے گا۔',
+  'verify.submit': 'میری ای میل کی تصدیق کریں',
+  'verify.done': 'آپ کی ای میل {email} کی تصدیق ہو گئی۔',
+  'change.title': 'اپنی ای میل بدلیں',
+  'change.body': 'نیچے ٹیپ کریں تاکہ آپ اسی ای میل سے سائن ان کریں اور ہٹی اسی پر لکھے۔',
+  'change.submit': 'میری ای میل بدلیں',
+  'change.done': 'آپ کے اکاؤنٹ کی ای میل اب {email} ہے۔ ہم نے آپ کے پرانے پتے کو بتا دیا ہے۔',
 };
 
 export const messages: Readonly<
