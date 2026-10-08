@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### Products' photos in the admin
+### 69fba69 · Products' photos in the admin
 
 * **Photos from the phone** ([ADR-268](../architecture/13-decision-log.md#adr-268--merchants-add-a-products-photos-from-its-page-taken-with-the-phones-camera-or-chosen-from-its-gallery-a-large-photo-is-made-2048-pixels-a-side-in-the-browser-before-it-goes-up-straight-to-storage-through-a-signed-url-any-origin-may-use-and-each-is-shown-as-the-core-makes-it-ready-or-says-why-it-could-not)):
   taken with the camera or chosen from the gallery on a product's page, a large one made 2,048
