@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### Settings in the admin: courier accounts and staff
+### a44fc88 · Settings in the admin: courier accounts and staff
 
 * **Settings' first sections** ([ADR-271](../architecture/13-decision-log.md#adr-271--the-admins-settings-begin-with-courier-accounts-and-staff-an-account-connected-with-the-credentials-its-courier-asks-for-made-the-default-or-archived-staffs-roles-changed-and-staff-let-go-by-those-who-manage-them-and-people-invited-by-a-link-to-send-on-whatsapp-which-opens-a-page-of-the-admins-own-a-sensitive-change-asks-the-member-to-confirm-who-they-are-then-goes-ahead)):
   courier accounts connected with the credentials each courier asks for, made the default or
