@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### Plan and billing in the admin
+### a87c011 · Plan and billing in the admin
 
 * **The shop's plan with Hatti and what it pays** ([ADR-275](../architecture/13-decision-log.md#adr-275--the-admins-billing-shows-the-shops-plan-with-hatti-and-what-it-pays-the-plans-side-by-side-monthly-or-yearly-one-chosen-or-kept-by-the-owner-once-they-confirm-who-they-are-an-invoice-paid-through-hattis-gateway-or-by-transfer-or-raast-with-its-reference-given-and-message-credit-bought-managers-read-it)):
   the plan and its period, the plans side by side monthly or yearly, one chosen or the current one
