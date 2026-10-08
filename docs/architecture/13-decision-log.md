@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-269 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-270 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -277,6 +277,7 @@
 | 267 | The admin's products: a list by status and search, a product's page that owners and managers change and every other role reads, and adding a product with its options' variants, each with its price and stock; stock is counted at the shop's primary location, set where the merchant typed it and refused if it changed since it was read | Accepted |
 | 268 | Merchants add a product's photos from its page, taken with the phone's camera or chosen from its gallery: a large photo is made 2,048 pixels a side in the browser before it goes up, straight to storage through a signed URL any origin may use, and each is shown as the core makes it ready or says why it could not | Accepted |
 | 269 | The admin's customers: a list searched by any part of a number, a name or an email, and a customer's page with how to reach them, how their parcels went, their orders, addresses, and the shop's note and tags; agents see the number when they ask, which is logged, and owners and managers block it from there | Accepted |
+| 270 | The admin's shipping: packed orders booked with the shop's courier account in a tap, each booking shown as the worker books it and its courier carries it, booked parcels' labels and the account's load sheet printed from a tab of their own; and on a phone, the bottom bar's five slots kept for the busiest sections, the rest under More | Accepted |
 
 ---
 
@@ -11195,3 +11196,37 @@
 * **Alternatives:**
   * **The number revealed as the page opens, for agents:** every customer looked at would log a
     reveal, as the desk's decision weighed ([ADR-266](#adr-266--the-admins-confirmation-desk-deals-an-agent-one-order-at-a-time-when-they-ask-and-the-next-as-soon-as-a-calls-outcome-is-recorded-the-customers-number-stays-masked-until-the-agent-asks-to-see-it-which-is-logged-and-then-can-be-called-or-messaged-on-whatsapp-with-a-tap-an-order-whose-call-is-recorded-leaves-the-agents-queue-at-once)).
+
+## ADR-270 · The admin's shipping: packed orders booked with the shop's courier account in a tap, each booking shown as the worker books it and its courier carries it, booked parcels' labels and the account's load sheet printed from a tab of their own; and on a phone, the bottom bar's five slots kept for the busiest sections, the rest under More
+
+* **Context:** `ordersBook` takes up to 250 orders and a courier account, the default unless
+  given, each order booked on its own or refused with why; the worker books each with the
+  courier, ships the order with its tracking number and follows the parcel
+  ([ADR-149](#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)). Labels and load sheets are Hatti's own printed pages, given as whole HTML
+  documents ([ADR-150](#adr-150--couriers-labels-and-load-sheets-are-hattis-own-printed-pages-a-booked-parcels-label-carries-the-couriers-tracking-number-as-a-code-128-barcode-and-the-cash-the-courier-was-asked-to-collect-one-to-a-46-inch-label-or-four-to-a-sheet-of-a4-and-an-accounts-load-sheet-lists-its-parcels-waiting-to-be-picked-up-for-the-shop-and-the-rider-to-sign)). Packing an order moves it to To book; staff then still had to book
+  it through the API. The design gives a phone's bottom bar five slots: Home, Orders, the busiest
+  work, Shipping and More (docs/design/02 §3); the admin had more sections than that for an owner
+  ([ADR-265](#adr-265--the-merchant-admin-is-a-react-app-on-an-origin-of-its-own-that-sends-auth-and-the-admin-api-on-to-the-core-staff-sign-in-by-a-code-to-their-mobile-or-by-email-with-the-second-step-their-role-needs-the-sessions-opaque-tokens-are-kept-in-the-browsers-storage-and-refreshed-by-one-tab-at-a-time-the-shop-is-in-each-pages-address-and-every-graphql-document-it-sends-is-checked-against-the-cores-schema)).
+* **Decision:**
+  * **Shipping** (`/shop_…/shipping`), for owners, managers and packers, has two tabs.
+  * **To book:** the packed orders, chosen one by one or all at once, booked with the default
+    account, or one chosen where the shop has several. The orders sent and those refused, each by
+    its number and the core's words, are said at once; each is booked within a minute or so.
+  * **Booked:** the latest bookings, each with its order, courier, tracking number and cash to
+    collect, and what became of it: booking, not booked and why, or where the parcel is (waiting
+    for pickup, on its way, out for delivery, delivered, coming back). The page reads them again
+    every five seconds while one is being booked. One waiting is cancelled with a tap.
+  * **Printing:** booked parcels chosen print their labels, on a 4×6 label printer or four to an
+    A4 sheet; each account prints its load sheet for the rider. The tab opens on the tap, so pop-up
+    blockers let it through, and prints once its fonts are in; a blocked one is said so.
+  * **The bottom bar** shows every section a role has where they fit in five; past that, the busiest
+    (Home, Orders, the desk, Shipping) and More, which lists every section.
+* **Consequences:**
+  * A packer packs, books and prints a day's parcels from a phone, without the courier's portal.
+  * Connecting a courier account is still the Admin API's, until settings come to the admin.
+  * Pickups requested of the courier, returns checked in and claims stay the Admin API's for now.
+* **Alternatives:**
+  * **Printing in a hidden frame:** phones' browsers print frames poorly or not at all; a tab of
+    its own prints as the page it is.
+  * **Booking on packing:** some shops pack in the evening and book in the morning, or choose the
+    courier by the parcel; a tap keeps the choice theirs.

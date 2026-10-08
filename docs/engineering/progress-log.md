@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, the merchant admin's shipping** (SHP-01, SHP-02): packed orders booked with the shop's
-courier, their labels and load sheet printed, and their parcels followed; then settings, section
+**Next, the merchant admin's settings** (SHP-01, ONB-02, ADM-01): the shop's courier accounts
+connected, its details, and its staff invited and given roles; then the rest of settings, section
 by section, as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -17,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### Shipping in the admin
+
+* **The shipping section** ([ADR-270](../architecture/13-decision-log.md#adr-270--the-admins-shipping-packed-orders-booked-with-the-shops-courier-account-in-a-tap-each-booking-shown-as-the-worker-books-it-and-its-courier-carries-it-booked-parcels-labels-and-the-accounts-load-sheet-printed-from-a-tab-of-their-own-and-on-a-phone-the-bottom-bars-five-slots-kept-for-the-busiest-sections-the-rest-under-more)):
+  packed orders booked with the shop's courier in a tap, those refused said with why; bookings
+  followed as the worker books them and their couriers carry them; booked parcels' labels and
+  the load sheet printed from a tab of their own; and a phone's bottom bar kept to five, the rest
+  under More.
+* **Tried against the core and its worker:** with the development's test courier connected, the
+  seed's owner booked two packed orders, which the worker booked within seconds, printed a
+  parcel's label with its barcode and the cash to collect, and printed the load sheet; with no
+  errors in the browser.
+* 1908 tests: booking, bookings' states and printing through the real screens.
 
 ### 488d439 · Customers in the admin
 

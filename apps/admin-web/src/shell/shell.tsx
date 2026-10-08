@@ -1,5 +1,15 @@
 import { Link, Outlet, useNavigate, useParams } from '@tanstack/react-router';
-import { ArrowLeftRight, Headset, House, LogOut, Package, ReceiptText, Users } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  Headset,
+  House,
+  LogOut,
+  Menu,
+  Package,
+  ReceiptText,
+  Truck,
+  Users,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { useMe, useSession, useSessionStore } from '../auth/context';
@@ -14,7 +24,13 @@ import { LanguageToggle } from '../ui/language-toggle';
 import { ShopProvider } from './shop-context';
 
 interface NavItem {
-  to: '/$shopId' | '/$shopId/orders' | '/$shopId/desk' | '/$shopId/products' | '/$shopId/customers';
+  to:
+    | '/$shopId'
+    | '/$shopId/orders'
+    | '/$shopId/desk'
+    | '/$shopId/products'
+    | '/$shopId/customers'
+    | '/$shopId/shipping';
   label: MessageKey;
   /** A shorter name for the phone's bottom bar, where the label is too long. */
   short?: MessageKey;
@@ -23,18 +39,31 @@ interface NavItem {
   roles?: readonly StaffRole[];
   /** Whether it is active on its own path alone, not the paths under it. */
   exact?: boolean;
+  /** Kept in the phone's bottom bar when there are more sections than it holds. */
+  primary?: boolean;
 }
 
+/** Sections the phone's bottom bar holds (docs/design/02 §3); past them, "More" lists the rest. */
+const BOTTOM_SLOTS = 5;
+
 /** The admin's sections, as far as they are built; the rest join as they come. */
-const NAV: readonly NavItem[] = [
-  { to: '/$shopId', label: 'nav.home', icon: House, exact: true },
-  { to: '/$shopId/orders', label: 'nav.orders', icon: ReceiptText },
+export const NAV: readonly NavItem[] = [
+  { to: '/$shopId', label: 'nav.home', icon: House, exact: true, primary: true },
+  { to: '/$shopId/orders', label: 'nav.orders', icon: ReceiptText, primary: true },
   {
     to: '/$shopId/desk',
     label: 'nav.desk',
     short: 'nav.deskShort',
     icon: Headset,
     roles: ['owner', 'manager', 'confirmation_agent'],
+    primary: true,
+  },
+  {
+    to: '/$shopId/shipping',
+    label: 'nav.shipping',
+    icon: Truck,
+    roles: ['owner', 'manager', 'packer'],
+    primary: true,
   },
   { to: '/$shopId/products', label: 'nav.products', icon: Package },
   {
@@ -44,6 +73,49 @@ const NAV: readonly NavItem[] = [
     roles: READS_CUSTOMERS,
   },
 ];
+
+/** The sections a role sees. */
+export function sectionsOf(role: StaffRole): NavItem[] {
+  return NAV.filter((item) => !item.roles || item.roles.includes(role));
+}
+
+/** Those the phone's bottom bar shows, and whether "More" has the rest. */
+function bottomOf(items: NavItem[]): { shown: NavItem[]; more: boolean } {
+  if (items.length <= BOTTOM_SLOTS) return { shown: items, more: false };
+  return { shown: items.filter((item) => item.primary).slice(0, BOTTOM_SLOTS - 1), more: true };
+}
+
+/** "More" on a phone: every section the role sees, the bottom bar's and the rest. */
+export function MorePage() {
+  const { t } = useLocale();
+  const { shopId } = useParams({ from: '/$shopId' });
+  const me = useMe();
+  const role = me.data?.shops.find((each) => each.id === shopId)?.role;
+  if (!role) return null;
+  return (
+    <div className="mx-auto flex max-w-xl flex-col gap-4">
+      <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
+        {t('nav.more')}
+      </h1>
+      <nav
+        aria-label={t('nav.more')}
+        className="flex flex-col divide-y divide-line rounded-card border border-line bg-surface"
+      >
+        {sectionsOf(role).map((item) => (
+          <Link
+            key={item.to}
+            to={item.to}
+            params={{ shopId }}
+            className="flex min-h-14 items-center gap-3 px-4"
+          >
+            <item.icon aria-hidden className="size-6 text-secondary" />
+            {t(item.label)}
+          </Link>
+        ))}
+      </nav>
+    </div>
+  );
+}
 
 /**
  * The frame of a shop's admin (docs/design/02 §2-3): a sidebar on wide screens, a bottom bar on
@@ -87,7 +159,8 @@ export function Shell() {
     );
   }
 
-  const items = NAV.filter((item) => !item.roles || item.roles.includes(shop.role));
+  const items = sectionsOf(shop.role);
+  const bottom = bottomOf(items);
   const signOut = async () => {
     await store.signOut();
     await navigate({ to: '/sign-in' });
@@ -145,9 +218,11 @@ export function Shell() {
           <nav
             aria-label={t('nav.main')}
             className="fixed inset-x-0 bottom-0 z-10 grid border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
-            style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+            style={{
+              gridTemplateColumns: `repeat(${bottom.shown.length + (bottom.more ? 1 : 0)}, minmax(0, 1fr))`,
+            }}
           >
-            {items.map((item) => (
+            {bottom.shown.map((item) => (
               <Link
                 key={item.to}
                 to={item.to}
@@ -161,6 +236,18 @@ export function Shell() {
                 </span>
               </Link>
             ))}
+            {bottom.more && (
+              <Link
+                to="/$shopId/more"
+                params={{ shopId }}
+                className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-secondary data-[status=active]:text-primary"
+              >
+                <Menu aria-hidden className="size-6" />
+                <span className="text-[length:var(--hatti-type-caption-size)]">
+                  {t('nav.more')}
+                </span>
+              </Link>
+            )}
           </nav>
         </div>
       </div>

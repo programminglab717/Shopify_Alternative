@@ -864,3 +864,103 @@ export const BlocklistRemoveMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const BOOKING = /* GraphQL */ `
+  fragment Booking on CourierBooking {
+    id
+    orderId
+    orderName
+    courierName
+    status
+    parcelStatus
+    trackingNumber
+    error
+    createdAt
+    bookedAt
+    codAmount {
+      amount
+      currencyCode
+    }
+  }
+`;
+
+/** The shop's courier accounts and its latest bookings with them (SHP-01, SHP-02). */
+export const ShippingQuery = /* GraphQL */ `
+  query Shipping($first: Int, $after: String) {
+    shop {
+      timezone
+    }
+    courierAccounts {
+      id
+      name
+      courierName
+      isDefault
+    }
+    courierBookings(first: $first, after: $after) {
+      nodes {
+        ...Booking
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+  ${BOOKING}
+`;
+
+/** Packed orders booked with a courier account, each on its own; some refused, with why. */
+export const OrdersBookMutation = /* GraphQL */ `
+  mutation OrdersBook($ids: [ID!]!, $accountId: ID) {
+    ordersBook(ids: $ids, accountId: $accountId) {
+      bookings {
+        id
+        orderName
+      }
+      refused {
+        orderId
+        message
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A booking cancelled while it waits to be booked. */
+export const CourierBookingCancelMutation = /* GraphQL */ `
+  mutation CourierBookingCancel($id: ID!) {
+    courierBookingCancel(id: $id) {
+      courierBooking {
+        id
+        status
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Booked parcels' labels, a page to print. */
+export const CourierLabelsQuery = /* GraphQL */ `
+  query CourierLabels($ids: [ID!]!, $language: DocumentLanguage!, $paper: PaperSize!) {
+    courierLabels(ids: $ids, language: $language, paper: $paper) {
+      title
+      html
+    }
+  }
+`;
+
+/** A courier account's load sheet: its parcels waiting for the rider, a page to print. */
+export const CourierLoadSheetQuery = /* GraphQL */ `
+  query CourierLoadSheet($accountId: ID, $language: DocumentLanguage!) {
+    courierLoadSheet(accountId: $accountId, language: $language) {
+      title
+      html
+    }
+  }
+`;

@@ -430,3 +430,68 @@ export interface BlocklistAddData {
 export interface BlocklistRemoveData {
   blocklistRemove: { deletedBlocklistEntryId: string | null; userErrors: UserError[] };
 }
+
+export type CourierBookingStatus = 'PENDING' | 'BOOKED' | 'FAILED' | 'CANCELLED';
+
+export type CourierParcelStatus =
+  | 'BOOKED'
+  | 'IN_TRANSIT'
+  | 'OUT_FOR_DELIVERY'
+  | 'ATTEMPTED'
+  | 'DELIVERED'
+  | 'RETURNING'
+  | 'RETURNED'
+  | 'LOST'
+  | 'CANCELLED';
+
+export interface CourierBooking {
+  id: string;
+  orderId: string;
+  orderName: string;
+  courierName: string;
+  status: CourierBookingStatus;
+  parcelStatus: CourierParcelStatus | null;
+  trackingNumber: string | null;
+  error: string | null;
+  createdAt: string;
+  bookedAt: string | null;
+  codAmount: MoneyValue | null;
+}
+
+export interface CourierAccount {
+  id: string;
+  name: string;
+  courierName: string;
+  isDefault: boolean;
+}
+
+export interface ShippingData {
+  shop: { timezone: string };
+  courierAccounts: CourierAccount[];
+  courierBookings: {
+    nodes: CourierBooking[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+}
+
+export interface OrdersBookData {
+  ordersBook: {
+    bookings: { id: string; orderName: string }[];
+    refused: { orderId: string; message: string }[];
+    userErrors: UserError[];
+  };
+}
+
+export interface CourierBookingCancelData {
+  courierBookingCancel: {
+    courierBooking: { id: string; status: CourierBookingStatus } | null;
+    userErrors: UserError[];
+  };
+}
+
+export type PaperSize = 'THERMAL_4X6' | 'A4';
+
+export interface CourierDocumentData {
+  title: string;
+  html: string;
+}
