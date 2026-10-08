@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### The Confirmation Desk in the admin
+### a459501 · The Confirmation Desk in the admin
 
 * **Agents' own screen** ([ADR-266](../architecture/13-decision-log.md#adr-266--the-admins-confirmation-desk-deals-an-agent-one-order-at-a-time-when-they-ask-and-the-next-as-soon-as-a-calls-outcome-is-recorded-the-customers-number-stays-masked-until-the-agent-asks-to-see-it-which-is-logged-and-then-can-be-called-or-messaged-on-whatsapp-with-a-tap-an-order-whose-call-is-recorded-leaves-the-agents-queue-at-once)):
   an order dealt to the agent when they ask; the customer, the risk's reasons, the items, the
