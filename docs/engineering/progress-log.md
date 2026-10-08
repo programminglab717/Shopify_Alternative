@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### The pages email links open
+### bfbf924 · The pages email links open
 
 * **Four pages of the admin's own** ([ADR-273](../architecture/13-decision-log.md#adr-273--the-pages-the-cores-emails-link-to-are-the-admins-a-new-password-set-from-a-reset-link-signing-every-session-out-this-tabs-too-an-email-proved-or-changed-with-a-tap-rather-than-as-the-page-opens-and-a-link-to-set-a-new-password-asked-for-from-signing-in-the-admin-reads-auths-field-errors-as-the-core-names-them)):
   asking for a reset link from signing in by email; setting a new password from it, which signs
