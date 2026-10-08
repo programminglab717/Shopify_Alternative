@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### Products in the admin
+### 15795d9 · Products in the admin
 
 * **The products section** ([ADR-267](../architecture/13-decision-log.md#adr-267--the-admins-products-a-list-by-status-and-search-a-products-page-that-owners-and-managers-change-and-every-other-role-reads-and-adding-a-product-with-its-options-variants-each-with-its-price-and-stock-stock-is-counted-at-the-shops-primary-location-set-where-the-merchant-typed-it-and-refused-if-it-changed-since-it-was-read)):
   the list by status and search, with each product's stock and price; adding a product, with
