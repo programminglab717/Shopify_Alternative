@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### COD health in the admin
+### f35fb86 · COD health in the admin
 
 * **COD health under the sales** ([ADR-280](../architecture/13-decision-log.md#adr-280--the-admins-analytics-show-the-periods-cod-health-under-its-sales-how-many-cash-on-delivery-orders-were-confirmed-delivered-and-came-back-of-those-that-turned-out-what-returns-cost-and-the-rates-by-city-product-source-or-courier-a-return-rate-of-30-or-more-in-red)):
   confirmed, delivered and came back as rates of those that turned out, each with what it is
