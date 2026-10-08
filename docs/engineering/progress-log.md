@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, COD health in the admin** (COD-12): how a period's cash-on-delivery orders turned out, by
-city, product, source and courier, the rates that cost the shop most first; then the cash
-couriers hold (COD-10). Urdu handles wait, as decided.
+**Next, the cash couriers hold in the admin** (COD-10): what each courier owes from delivered
+cash-on-delivery orders, by how long it has been owed, and their statements matched against the
+parcels; then the admin's next sections as the alpha's shops need them. Urdu handles wait, as
+decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +18,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### COD health in the admin
+
+* **COD health under the sales** ([ADR-280](../architecture/13-decision-log.md#adr-280--the-admins-analytics-show-the-periods-cod-health-under-its-sales-how-many-cash-on-delivery-orders-were-confirmed-delivered-and-came-back-of-those-that-turned-out-what-returns-cost-and-the-rates-by-city-product-source-or-courier-a-return-rate-of-30-or-more-in-red)):
+  confirmed, delivered and came back as rates of those that turned out, each with what it is
+  of; what returns cost and the parcels on their way; and the rates by city, product, source or
+  courier, a return rate of 30% or more in red.
+* **Tried against the core:** the seed's owner saw 88% confirmed, 7 of 8 decided, half of two
+  finished parcels back, Multani Khussa's returns in red, and four couriers, with no errors in
+  the browser. The first try showed "7 of 12 placed" beside 88%, which is why each rate now
+  says what it is of.
+* 1981 tests: the cards and their counts, a city's high returns in red, the courier
+  breakdown asked for.
 
 ### 8e0e02e · Sales over time in the admin
 

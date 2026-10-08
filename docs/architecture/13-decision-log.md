@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-279 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-280 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -287,6 +287,7 @@
 | 277 | Staff take orders over the phone or in a chat as drafts in the admin: products found and added at the price agreed, where it was taken and how it is paid; its link sent on WhatsApp for the customer to give the address and confirm, or the draft placed at once; and tertiary buttons that take something away are red | Accepted |
 | 278 | The admin's activity says in words what changed in the shop, by whom and when, linking to what changed where it has a page; and, apart, what the shop may need to account for: numbers seen, exports, erasures and Hatti's support's looks. Owners and managers | Accepted |
 | 279 | The admin's analytics show sales over the last 7, 30 or 90 whole days in the shop's time zone against the days as many before: net sales, orders, the average order and profit with how each changed, bars by day (by week over 90), what sold most and where orders came from | Accepted |
+| 280 | The admin's analytics show the period's COD health under its sales: how many cash-on-delivery orders were confirmed, delivered and came back, of those that turned out, what returns cost, and the rates by city, product, source or courier, a return rate of 30% or more in red | Accepted |
 
 ---
 
@@ -11537,3 +11538,31 @@
     load on a slow connection.
   * **The last 30 days to the minute:** a period from midnight matches what merchants mean by
     "the last 30 days", and the bars' first day is a whole one.
+
+## ADR-280 · The admin's analytics show the period's COD health under its sales: how many cash-on-delivery orders were confirmed, delivered and came back, of those that turned out, what returns cost, and the rates by city, product, source or courier, a return rate of 30% or more in red
+
+* **Context:** The core follows a period's cash-on-delivery orders through confirmation and
+  delivery when asked, its rates of those that turned out, and breaks them down by city,
+  product, source or courier ([ADR-060](#adr-060--cod-health-follows-a-periods-cash-on-delivery-orders-worked-out-from-them-when-asked-its-rates-of-those-that-turned-out)). The admin's analytics show a period's sales
+  ([ADR-279](#adr-279--the-admins-analytics-show-sales-over-the-last-7-30-or-90-whole-days-in-the-shops-time-zone-against-the-days-as-many-before-net-sales-orders-the-average-order-and-profit-with-how-each-changed-bars-by-day-by-week-over-90-what-sold-most-and-where-orders-came-from)). Returns are what cash on delivery costs a Pakistani shop most.
+* **Decision:**
+  * **COD health sits under the sales**, for the same 7, 30 or 90 days, and for the same roles.
+  * **Four cards:** confirmed, delivered and came back, each a rate with its count beside it
+    ("7 of 8 decided", "1 of 2 parcels"), the core's rates of those that turned out; and what
+    returns cost, with the parcels still on their way.
+  * **A table by city, product, source or courier**, chosen by a select: orders (parcels for a
+    courier), the confirmation rate (not for couriers, which have only parcels) and the return
+    rate.
+  * **A return rate of 30% or more is red**, in the card and the table, bold in the table: the
+    rows that cost the shop most stand out on a phone.
+  * **Parcels with no courier named** read "No courier", in the admin's words.
+* **Consequences:**
+  * A shop sees which city, product or courier sends parcels back, and can act on it: an
+    advance there, a rule, another courier.
+  * A recent period has orders still waiting, which count once they turn out; the counts beside
+    each rate say how many it is of.
+* **Alternatives:**
+  * **Counts of all orders placed beside the rate:** "7 of 12 placed" beside 88% reads wrong;
+    the count says what the rate is of.
+  * **The shop choosing its own threshold:** 30% is where returns eat a typical shop's margin,
+    and one line in the admin; a setting can come when shops ask for one.

@@ -1948,3 +1948,48 @@ export const SalesQuery = /* GraphQL */ `
   ${SALES_TOTALS}
   ${MONEY}
 `;
+
+const COD_DELIVERY = /* GraphQL */ `
+  fragment CodDeliveryFigures on CodDelivery {
+    shipped
+    delivered
+    returned
+    inTransit
+    successRate
+    returnRate
+    returnCharges {
+      ...Money
+    }
+  }
+`;
+
+/** How a period's cash-on-delivery orders turned out, broken down by one thing (COD-12). */
+export const CodHealthQuery = /* GraphQL */ `
+  query CodHealth($placedFrom: DateTime!, $placedBefore: DateTime!, $by: CodHealthDimension) {
+    codHealth(placedFrom: $placedFrom, placedBefore: $placedBefore, by: $by, first: 20) {
+      confirmation {
+        placed
+        confirmed
+        cancelled
+        awaiting
+        rate
+      }
+      delivery {
+        ...CodDeliveryFigures
+      }
+      rows {
+        key
+        title
+        confirmation {
+          placed
+          rate
+        }
+        delivery {
+          ...CodDeliveryFigures
+        }
+      }
+    }
+  }
+  ${COD_DELIVERY}
+  ${MONEY}
+`;

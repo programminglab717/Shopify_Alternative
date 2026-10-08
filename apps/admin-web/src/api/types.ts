@@ -872,3 +872,34 @@ export interface SalesData {
     rows: { key: string | null; title: string; sales: { orders: number; netSales: MoneyValue } }[];
   };
 }
+
+export type CodHealthDimension = 'CITY' | 'PRODUCT' | 'SOURCE' | 'COURIER';
+
+export interface CodDeliveryFigures {
+  shipped: number;
+  delivered: number;
+  returned: number;
+  inTransit: number;
+  successRate: number | null;
+  returnRate: number | null;
+  returnCharges: MoneyValue;
+}
+
+export interface CodHealthData {
+  codHealth: {
+    confirmation: {
+      placed: number;
+      confirmed: number;
+      cancelled: number;
+      awaiting: number;
+      rate: number | null;
+    };
+    delivery: CodDeliveryFigures;
+    rows: {
+      key: string | null;
+      title: string;
+      confirmation: { placed: number; rate: number | null } | null;
+      delivery: CodDeliveryFigures;
+    }[];
+  };
+}

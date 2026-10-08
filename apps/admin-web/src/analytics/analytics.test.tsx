@@ -16,6 +16,35 @@ const totals = (net: string, orders: number): SalesTotalsValue => ({
   profit: rupees(String(Number(net) / 4)),
 });
 
+const delivery = (delivered: number, returned: number) => ({
+  shipped: delivered + returned,
+  delivered,
+  returned,
+  inTransit: 0,
+  successRate: delivered / (delivered + returned),
+  returnRate: returned / (delivered + returned),
+  returnCharges: rupees(String(returned * 180)),
+});
+
+const COD_HEALTH = {
+  confirmation: { placed: 42, confirmed: 32, cancelled: 8, awaiting: 2, rate: 0.8 },
+  delivery: { ...delivery(24, 6), inTransit: 2 },
+  rows: [
+    {
+      key: 'Karachi',
+      title: 'Karachi',
+      confirmation: { placed: 25, rate: 0.88 },
+      delivery: delivery(18, 2),
+    },
+    {
+      key: 'Quetta',
+      title: 'Quetta',
+      confirmation: { placed: 6, rate: 0.5 },
+      delivery: delivery(2, 2),
+    },
+  ],
+};
+
 describe('Analytics in the admin', () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -29,6 +58,7 @@ describe('Analytics in the admin', () => {
 
   it('shows sales against the period before, by day, with what sold most and from where', async () => {
     const core = fakeCore('marketer', (operation) => {
+      if (operation === 'CodHealth') return { codHealth: COD_HEALTH };
       if (operation !== 'Sales') throw new Error(`unexpected ${operation}`);
       return {
         salesReport: {
@@ -74,6 +104,35 @@ describe('Analytics in the admin', () => {
       expect(
         core.sent.filter((each) => each.operation === 'Sales').at(-1)?.variables.interval,
       ).toBe('WEEK'),
+    );
+  });
+
+  it("shows how cash-on-delivery orders turned out, a city's high returns in red", async () => {
+    const core = fakeCore('owner', (operation) => {
+      if (operation === 'CodHealth') return { codHealth: COD_HEALTH };
+      if (operation === 'Sales') throw new Error('not this time');
+      throw new Error(`unexpected ${operation}`);
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/analytics');
+
+    await screen.findByText('32 of 40 decided');
+    // 32 of 40 decided confirmed (the 2 awaiting count once decided), and 24 of 30 parcels delivered.
+    expect(screen.getAllByText('80%')).toHaveLength(2);
+    expect(screen.getByText('6 of 30 parcels')).toBeTruthy();
+    expect(screen.getByText('2 parcels on their way')).toBeTruthy();
+    const quetta = screen.getByText('Quetta').closest('tr')!;
+    expect(quetta.lastElementChild?.textContent).toBe('50%');
+    expect(quetta.lastElementChild?.className).toContain('text-danger');
+    expect(screen.getByText('Karachi').closest('tr')!.lastElementChild?.className).not.toContain(
+      'text-danger',
+    );
+
+    fireEvent.change(screen.getByLabelText('By'), { target: { value: 'COURIER' } });
+    await waitFor(() =>
+      expect(core.sent.filter((each) => each.operation === 'CodHealth').at(-1)?.variables.by).toBe(
+        'COURIER',
+      ),
     );
   });
 

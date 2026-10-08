@@ -12,6 +12,7 @@ import { FormSection } from '../products/product-form';
 import { useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Card, ErrorState, Loading } from '../ui/feedback';
+import { CodHealth } from './cod-health';
 
 /** The roles that read the shop's sales (the core asks read_orders; these are the ones who plan). */
 export const READS_ANALYTICS: readonly StaffRole[] = ['owner', 'manager', 'marketer', 'accountant'];
@@ -154,7 +155,8 @@ function Bars({ periods }: { periods: SalesData['salesReport']['periods'] }) {
 
 /**
  * Sales over time (ANL-02, ADR-250): the last 7, 30 or 90 days against the period as long before,
- * net sales by day (by week over 90), what sold most, and where the orders came from.
+ * net sales by day (by week over 90), what sold most, where the orders came from, and how its
+ * cash-on-delivery orders turned out.
  */
 export function AnalyticsPage() {
   const { t } = useLocale();
@@ -260,6 +262,7 @@ export function AnalyticsPage() {
           </div>
         </>
       )}
+      <CodHealth from={from} before={before} />
     </div>
   );
 }
