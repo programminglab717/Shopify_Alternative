@@ -15,6 +15,8 @@ import type { SessionStore } from './auth/session';
 import { SignInPage } from './auth/sign-in-page';
 import { SignUpPage } from './auth/sign-up-page';
 import { TwoStepPage } from './auth/two-step-page';
+import { CustomerPage } from './customers/customer-page';
+import { CustomersPage, validateCustomersSearch } from './customers/customers-page';
 import { DeskPage } from './desk/desk-page';
 import { HomePage } from './home/home-page';
 import { useLocale } from './i18n/locale';
@@ -160,13 +162,26 @@ const product = createRoute({
   component: ProductPage,
 });
 
+const customers = createRoute({
+  getParentRoute: () => shop,
+  path: 'customers',
+  validateSearch: validateCustomersSearch,
+  component: CustomersPage,
+});
+
+const customer = createRoute({
+  getParentRoute: () => shop,
+  path: 'customers/$customerId',
+  component: CustomerPage,
+});
+
 export const routeTree = root.addChildren([
   index,
   signIn,
   signUp,
   twoStep,
   shops,
-  shop.addChildren([home, orders, order, desk, products, newProduct, product]),
+  shop.addChildren([home, orders, order, desk, products, newProduct, product, customers, customer]),
 ]);
 
 /** The admin's router; tests give it a history of their own. */

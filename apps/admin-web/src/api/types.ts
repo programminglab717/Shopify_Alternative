@@ -350,3 +350,83 @@ export interface ProductDeleteMediaData {
 export interface ProductReorderMediaData {
   productReorderMedia: { userErrors: UserError[] };
 }
+
+export type BlocklistReason = 'FRAUD' | 'FAKE_ORDERS' | 'REFUSED_DELIVERIES' | 'ABUSE' | 'OTHER';
+
+export interface CustomerListItem {
+  id: string;
+  displayName: string;
+  phone: string;
+  numberOfOrders: number;
+  lastOrderAt: string | null;
+  tags: string[];
+  amountSpent: MoneyValue;
+  blocklistEntry: { id: string } | null;
+}
+
+export interface CustomersData {
+  customers: {
+    nodes: CustomerListItem[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+}
+
+export interface CustomerDetail {
+  id: string;
+  displayName: string;
+  name: string | null;
+  phone: string;
+  otherPhones: string[];
+  email: string | null;
+  note: string;
+  tags: string[];
+  createdAt: string;
+  numberOfOrders: number;
+  lastOrderAt: string | null;
+  amountSpent: MoneyValue;
+  deliveryHistory: {
+    delivered: number;
+    returned: number;
+    cancelled: number;
+    inProgress: number;
+    lost: number;
+  };
+  blocklistEntry: {
+    id: string;
+    reason: BlocklistReason;
+    note: string;
+    createdAt: string;
+  } | null;
+  whatsappMarketingConsent: { marketingState: 'SUBSCRIBED' | 'NOT_SUBSCRIBED' | 'UNSUBSCRIBED' };
+  addresses: { formatted: string[] }[];
+  orders: {
+    nodes: {
+      id: string;
+      name: string;
+      createdAt: string;
+      stage: OrderStage;
+      totalPrice: MoneyValue;
+    }[];
+  };
+}
+
+export interface CustomerData {
+  shop: { timezone: string };
+  customer: CustomerDetail | null;
+}
+
+export interface CustomerUpdateData {
+  customerUpdate: { customer: { id: string } | null; userErrors: UserError[] };
+}
+
+export interface CustomerPhoneRevealData {
+  customerPhoneReveal: { phone: string | null; otherPhones: string[]; userErrors: UserError[] };
+}
+
+export interface BlocklistAddData {
+  blocklistAdd: { blocklistEntry: { id: string } | null; userErrors: UserError[] };
+}
+
+export interface BlocklistRemoveData {
+  blocklistRemove: { deletedBlocklistEntryId: string | null; userErrors: UserError[] };
+}

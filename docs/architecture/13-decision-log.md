@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-268 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-269 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -276,6 +276,7 @@
 | 266 | The admin's Confirmation Desk deals an agent one order at a time when they ask, and the next as soon as a call's outcome is recorded; the customer's number stays masked until the agent asks to see it, which is logged, and then can be called or messaged on WhatsApp with a tap; an order whose call is recorded leaves the agent's queue at once | Accepted |
 | 267 | The admin's products: a list by status and search, a product's page that owners and managers change and every other role reads, and adding a product with its options' variants, each with its price and stock; stock is counted at the shop's primary location, set where the merchant typed it and refused if it changed since it was read | Accepted |
 | 268 | Merchants add a product's photos from its page, taken with the phone's camera or chosen from its gallery: a large photo is made 2,048 pixels a side in the browser before it goes up, straight to storage through a signed URL any origin may use, and each is shown as the core makes it ready or says why it could not | Accepted |
+| 269 | The admin's customers: a list searched by any part of a number, a name or an email, and a customer's page with how to reach them, how their parcels went, their orders, addresses, and the shop's note and tags; agents see the number when they ask, which is logged, and owners and managers block it from there | Accepted |
 
 ---
 
@@ -11162,3 +11163,35 @@
     it from carrying.
   * **The photo sent as it was taken:** megabytes of mobile data for pixels no one is shown; the
     core still keeps whatever comes, so a shop wanting more can import it by URL.
+
+## ADR-269 · The admin's customers: a list searched by any part of a number, a name or an email, and a customer's page with how to reach them, how their parcels went, their orders, addresses, and the shop's note and tags; agents see the number when they ask, which is logged, and owners and managers block it from there
+
+* **Context:** The Admin API keeps customers by their mobile number, with their orders, what they
+  spent and how their parcels went, worked out from the orders ([ADR-023](#adr-023--customer-order-stats-are-worked-out-from-orders-when-read)). Owners and
+  managers see numbers whole; confirmation agents see them masked and reveal one, which is logged;
+  marketers see them masked; packers and accountants see no customers
+  ([ADR-027](#adr-027--customers-numbers-are-masked-by-role-and-reveals-go-to-an-append-only-audit-log)). A blocked number's new orders wait for review (COD-07). The admin had
+  orders, the desk and products ([ADR-265](#adr-265--the-merchant-admin-is-a-react-app-on-an-origin-of-its-own-that-sends-auth-and-the-admin-api-on-to-the-core-staff-sign-in-by-a-code-to-their-mobile-or-by-email-with-the-second-step-their-role-needs-the-sessions-opaque-tokens-are-kept-in-the-browsers-storage-and-refreshed-by-one-tab-at-a-time-the-shop-is-in-each-pages-address-and-every-graphql-document-it-sends-is-checked-against-the-cores-schema)); a merchant asking "is this customer
+  reliable?" had to read the orders one by one.
+* **Decision:**
+  * **The list** (`/shop_…/customers`), for the roles that see customers, is searched by any four
+    or more digits of a number, a name or an email, newest first. Each shows the number as the role
+    sees it, how many orders and when the last, what they spent, and whether they are blocked.
+  * **A customer's page** says first how to reach them: the number, a tap from a call or a
+    WhatsApp chat, or "Show number" for an agent; other numbers, the email, and whether they
+    agreed to offers on WhatsApp. Then how their parcels went (delivered, returned, cancelled, on
+    their way, with how many of those sent they took, in red when half came back), their latest
+    orders, each a tap from its page, and their addresses.
+  * **The shop's note and tags** on them are changed by owners and managers, and read by the rest.
+  * **Owners and managers block the number** for a reason (fake orders, refusing deliveries,
+    fraud, abuse, another), with a note, and unblock it there.
+  * **An order's page** links its customer, for the roles that see customers.
+  * On a phone, how to reach them comes first; on a wider screen, beside their record.
+* **Consequences:**
+  * Before confirming or sending a parcel, staff see in a tap whether the customer takes what they
+    order.
+  * Segments, marketing consent changed by staff, merging, store credit and erasure stay the Admin
+    API's for now.
+* **Alternatives:**
+  * **The number revealed as the page opens, for agents:** every customer looked at would log a
+    reveal, as the desk's decision weighed ([ADR-266](#adr-266--the-admins-confirmation-desk-deals-an-agent-one-order-at-a-time-when-they-ask-and-the-next-as-soon-as-a-calls-outcome-is-recorded-the-customers-number-stays-masked-until-the-agent-asks-to-see-it-which-is-logged-and-then-can-be-called-or-messaged-on-whatsapp-with-a-tap-an-order-whose-call-is-recorded-leaves-the-agents-queue-at-once)).

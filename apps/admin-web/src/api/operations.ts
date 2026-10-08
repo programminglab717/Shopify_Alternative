@@ -724,3 +724,143 @@ export const ProductReorderMediaMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** A page of the shop's customers, newest first, searched by mobile, name or email (CUS-01). */
+export const CustomersQuery = /* GraphQL */ `
+  query Customers($first: Int, $after: String, $query: String) {
+    customers(first: $first, after: $after, query: $query) {
+      nodes {
+        id
+        displayName
+        phone
+        numberOfOrders
+        lastOrderAt
+        tags
+        amountSpent {
+          amount
+          currencyCode
+        }
+        blocklistEntry {
+          id
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`;
+
+/** One customer, for their page: what they ordered and how their deliveries went. */
+export const CustomerQuery = /* GraphQL */ `
+  query Customer($id: ID!) {
+    shop {
+      timezone
+    }
+    customer(id: $id) {
+      id
+      displayName
+      name
+      phone
+      otherPhones
+      email
+      note
+      tags
+      createdAt
+      numberOfOrders
+      lastOrderAt
+      amountSpent {
+        ...Money
+      }
+      deliveryHistory {
+        delivered
+        returned
+        cancelled
+        inProgress
+        lost
+      }
+      blocklistEntry {
+        id
+        reason
+        note
+        createdAt
+      }
+      whatsappMarketingConsent {
+        marketingState
+      }
+      addresses {
+        formatted
+      }
+      orders(first: 20) {
+        nodes {
+          id
+          name
+          createdAt
+          stage
+          totalPrice {
+            ...Money
+          }
+        }
+      }
+    }
+  }
+  ${MONEY}
+`;
+
+/** A customer's note or tags changed. */
+export const CustomerUpdateMutation = /* GraphQL */ `
+  mutation CustomerUpdate($id: ID!, $input: CustomerUpdateInput!) {
+    customerUpdate(id: $id, input: $input) {
+      customer {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A customer's numbers in full, for staff who see them masked; every reveal is logged. */
+export const CustomerPhoneRevealMutation = /* GraphQL */ `
+  mutation CustomerPhoneReveal($id: ID!) {
+    customerPhoneReveal(id: $id) {
+      phone
+      otherPhones
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A number blocked: its new orders wait for review (COD-07). */
+export const BlocklistAddMutation = /* GraphQL */ `
+  mutation BlocklistAdd($input: BlocklistAddInput!) {
+    blocklistAdd(input: $input) {
+      blocklistEntry {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A number taken off the blocklist; orders already held stay held. */
+export const BlocklistRemoveMutation = /* GraphQL */ `
+  mutation BlocklistRemove($phone: String!) {
+    blocklistRemove(phone: $phone) {
+      deletedBlocklistEntryId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

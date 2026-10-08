@@ -26,6 +26,7 @@ import {
 } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { READS_CUSTOMERS } from '../customers/customers-page';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
@@ -304,9 +305,19 @@ export function OrderPage() {
               </p>
             ) : (
               <div className="flex flex-col gap-1">
-                <span className="font-medium">
-                  {order.customer?.displayName ?? order.shippingAddress.name}
-                </span>
+                {order.customer && READS_CUSTOMERS.includes(shop.role) ? (
+                  <Link
+                    to="/$shopId/customers/$customerId"
+                    params={{ shopId: shop.id, customerId: order.customer.id }}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {order.customer.displayName}
+                  </Link>
+                ) : (
+                  <span className="font-medium">
+                    {order.customer?.displayName ?? order.shippingAddress.name}
+                  </span>
+                )}
                 {phone && (
                   <a href={`tel:${phone}`} className="num text-primary">
                     {formatPhone(phone)}

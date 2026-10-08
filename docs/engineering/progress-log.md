@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the merchant admin's customers** (CUS-01): the customers list, searched by name or
-mobile, and a customer's page with their orders and how they went; then shipping and settings,
-section by section, as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, the merchant admin's shipping** (SHP-01, SHP-02): packed orders booked with the shop's
+courier, their labels and load sheet printed, and their parcels followed; then settings, section
+by section, as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### Customers in the admin
+
+* **The customers section** ([ADR-269](../architecture/13-decision-log.md#adr-269--the-admins-customers-a-list-searched-by-any-part-of-a-number-a-name-or-an-email-and-a-customers-page-with-how-to-reach-them-how-their-parcels-went-their-orders-addresses-and-the-shops-note-and-tags-agents-see-the-number-when-they-ask-which-is-logged-and-owners-and-managers-block-it-from-there)):
+  the list searched by any part of a number, a name or an email; a customer's page with how to
+  reach them, how their parcels went, their latest orders and addresses, and the shop's note and
+  tags; a number blocked for a reason and unblocked; an order's page linking its customer.
+* **Tried against the core:** the seed's owner searched by four digits, read a customer who had
+  sent back the one parcel they were sent, blocked and unblocked their number and went from their
+  order back to them; an agent saw a masked number and revealed it; in English and Urdu, on a
+  phone and a desktop, with no errors in the browser.
+* 1900 tests: searching, revealing, noting and blocking through the real screens.
 
 ### 69fba69 · Products' photos in the admin
 

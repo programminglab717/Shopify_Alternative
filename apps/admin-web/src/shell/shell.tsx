@@ -1,8 +1,9 @@
 import { Link, Outlet, useNavigate, useParams } from '@tanstack/react-router';
-import { ArrowLeftRight, Headset, House, LogOut, Package, ReceiptText } from 'lucide-react';
+import { ArrowLeftRight, Headset, House, LogOut, Package, ReceiptText, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { useMe, useSession, useSessionStore } from '../auth/context';
+import { READS_CUSTOMERS } from '../customers/customers-page';
 import type { StaffRole } from '../auth/session';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
@@ -13,7 +14,7 @@ import { LanguageToggle } from '../ui/language-toggle';
 import { ShopProvider } from './shop-context';
 
 interface NavItem {
-  to: '/$shopId' | '/$shopId/orders' | '/$shopId/desk' | '/$shopId/products';
+  to: '/$shopId' | '/$shopId/orders' | '/$shopId/desk' | '/$shopId/products' | '/$shopId/customers';
   label: MessageKey;
   /** A shorter name for the phone's bottom bar, where the label is too long. */
   short?: MessageKey;
@@ -36,6 +37,12 @@ const NAV: readonly NavItem[] = [
     roles: ['owner', 'manager', 'confirmation_agent'],
   },
   { to: '/$shopId/products', label: 'nav.products', icon: Package },
+  {
+    to: '/$shopId/customers',
+    label: 'nav.customers',
+    icon: Users,
+    roles: READS_CUSTOMERS,
+  },
 ];
 
 /**
