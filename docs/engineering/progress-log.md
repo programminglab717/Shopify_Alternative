@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
 
-### Delivery and payments in the admin's settings
+### f70a05c · Delivery and payments in the admin's settings
 
 * **Three more sections of settings** ([ADR-272](../architecture/13-decision-log.md#adr-272--the-admins-settings-take-delivery-charges-cash-on-deliverys-rules-and-bank-transfer-each-a-form-of-everything-it-sets-saved-at-once-as-checkout-will-use-it-risk-scores-are-shown-out-of-100-for-the-cores-0-to-1-and-the-bank-account-is-given-once-the-member-confirms-who-they-are)):
   delivery charges, free delivery and working days, with zones of cities; cash on delivery's fee,
