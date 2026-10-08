@@ -7,6 +7,7 @@ import {
   Menu,
   Package,
   ReceiptText,
+  Settings,
   Truck,
   Users,
 } from 'lucide-react';
@@ -14,6 +15,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { useMe, useSession, useSessionStore } from '../auth/context';
 import { READS_CUSTOMERS } from '../customers/customers-page';
+import { OPENS_SETTINGS } from '../settings/settings-page';
 import type { StaffRole } from '../auth/session';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
@@ -30,7 +32,8 @@ interface NavItem {
     | '/$shopId/desk'
     | '/$shopId/products'
     | '/$shopId/customers'
-    | '/$shopId/shipping';
+    | '/$shopId/shipping'
+    | '/$shopId/settings';
   label: MessageKey;
   /** A shorter name for the phone's bottom bar, where the label is too long. */
   short?: MessageKey;
@@ -72,6 +75,7 @@ export const NAV: readonly NavItem[] = [
     icon: Users,
     roles: READS_CUSTOMERS,
   },
+  { to: '/$shopId/settings', label: 'nav.settings', icon: Settings, roles: OPENS_SETTINGS },
 ];
 
 /** The sections a role sees. */

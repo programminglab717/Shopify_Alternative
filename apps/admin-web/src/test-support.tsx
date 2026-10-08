@@ -28,6 +28,19 @@ export function signedIn(): void {
   );
 }
 
+/** What a fake core's `answer` gives for a request the core refuses, as GraphQL errors. */
+export class GraphQLErrors {
+  constructor(readonly errors: { message: string; extensions: { code: string } }[]) {}
+}
+
+/** The core's refusal of a sensitive mutation until the member confirms who they are. */
+export const REAUTHENTICATE = new GraphQLErrors([
+  {
+    message: 'Confirm who you are first',
+    extensions: { code: 'REAUTHENTICATION_REQUIRED' },
+  },
+]);
+
 export interface Sent {
   operation: string;
   variables: Record<string, unknown>;
@@ -40,6 +53,8 @@ export interface Sent {
 export function fakeCore(
   role: StaffRole,
   answer: (operation: string, variables: Record<string, unknown>) => unknown,
+  /** `/auth` paths other than `/auth/me`, answered by `auth`; a status of its own where given. */
+  auth: (path: string, body: unknown) => unknown = () => ({}),
 ) {
   const sent: Sent[] = [];
   /** Files put to storage's signed URLs, as a browser uploads them. */
@@ -66,6 +81,13 @@ export function fakeCore(
         shops: [{ id: 'shop_1', name: 'Zari', role, mfaRequired: false }],
       });
     }
+    if (path.startsWith('/auth/')) {
+      const body: unknown = init?.body ? JSON.parse(String(init.body)) : null;
+      sent.push({ operation: path, variables: (body ?? {}) as Record<string, unknown> });
+      const answered = auth(path, body);
+      if (answered instanceof Response) return answered;
+      return json(answered);
+    }
     const { query, variables } = JSON.parse(String(init!.body)) as {
       query: string;
       variables: Record<string, unknown>;
@@ -85,7 +107,9 @@ export function fakeCore(
         },
       });
     }
-    return json({ data: answer(operation, variables) });
+    const data = answer(operation, variables);
+    if (data instanceof GraphQLErrors) return json({ data: null, errors: data.errors });
+    return json({ data });
   });
   return { fetcher, sent, uploads };
 }

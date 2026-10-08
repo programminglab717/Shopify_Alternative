@@ -18,6 +18,7 @@ import { TwoStepPage } from './auth/two-step-page';
 import { CustomerPage } from './customers/customer-page';
 import { CustomersPage, validateCustomersSearch } from './customers/customers-page';
 import { DeskPage } from './desk/desk-page';
+import { InvitationPage } from './invitation/invitation-page';
 import { HomePage } from './home/home-page';
 import { useLocale } from './i18n/locale';
 import { OrderPage } from './orders/order-page';
@@ -25,6 +26,9 @@ import { OrdersPage, validateOrdersSearch } from './orders/orders-page';
 import { NewProductPage } from './products/new-product-page';
 import { ProductPage, validateProductSearch } from './products/product-page';
 import { ProductsPage, validateProductsSearch } from './products/products-page';
+import { CouriersPage } from './settings/couriers-page';
+import { SettingsPage } from './settings/settings-page';
+import { StaffPage } from './settings/staff-page';
 import { MorePage, Shell } from './shell/shell';
 import { ShippingPage, validateShippingSearch } from './shipping/shipping-page';
 import { ShopsPage } from './shops/shops-page';
@@ -35,7 +39,7 @@ export interface RouterContext {
 }
 
 /** The screens a signed-out visitor may see. */
-const PUBLIC_PATHS = ['/sign-in', '/sign-up'];
+const PUBLIC_PATHS = ['/sign-in', '/sign-up', '/invitation'];
 
 /**
  * The root: sends a visitor whose session ends, here or in another tab, back to signing in, and
@@ -189,12 +193,38 @@ const more = createRoute({
   component: MorePage,
 });
 
+const settings = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings',
+  component: SettingsPage,
+});
+
+const settingsCouriers = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/couriers',
+  component: CouriersPage,
+});
+
+const settingsStaff = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/staff',
+  component: StaffPage,
+});
+
+/** An invitation's link: open signed in or out (ADR-101). */
+const invitation = createRoute({
+  getParentRoute: () => root,
+  path: '/invitation',
+  component: InvitationPage,
+});
+
 export const routeTree = root.addChildren([
   index,
   signIn,
   signUp,
   twoStep,
   shops,
+  invitation,
   shop.addChildren([
     home,
     orders,
@@ -207,6 +237,9 @@ export const routeTree = root.addChildren([
     customer,
     shipping,
     more,
+    settings,
+    settingsCouriers,
+    settingsStaff,
   ]),
 ]);
 

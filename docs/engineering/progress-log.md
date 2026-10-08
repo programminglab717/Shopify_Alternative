@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the merchant admin's settings** (SHP-01, ONB-02, ADM-01): the shop's courier accounts
-connected, its details, and its staff invited and given roles; then the rest of settings, section
-by section, as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, the rest of the merchant admin's settings the alpha's shops need** (CHK-07, CHK-22,
+PAY-02): delivery charges, cash on delivery's rules and bank transfer; then the pages email links
+open (an email verified, a new password). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,23 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-08
+
+### Settings in the admin: courier accounts and staff
+
+* **Settings' first sections** ([ADR-271](../architecture/13-decision-log.md#adr-271--the-admins-settings-begin-with-courier-accounts-and-staff-an-account-connected-with-the-credentials-its-courier-asks-for-made-the-default-or-archived-staffs-roles-changed-and-staff-let-go-by-those-who-manage-them-and-people-invited-by-a-link-to-send-on-whatsapp-which-opens-a-page-of-the-admins-own-a-sensitive-change-asks-the-member-to-confirm-who-they-are-then-goes-ahead)):
+  courier accounts connected with the credentials each courier asks for, made the default or
+  archived; staff's roles changed and staff let go; people invited by a link to copy or send on
+  WhatsApp; invitations taken back; a refused sensitive change confirmed with the authenticator,
+  the password or a WhatsApp code, then made.
+* **The invitation's page:** who invited whom to which shop as what; joined with a tap signed
+  in, or after signing in or opening an account, which come back to it.
+* **Tried against the core:** the seed's owner connected a second courier account and made it the
+  default, invited a packer, and a new person opened the link, opened an account, came back to the
+  invitation and joined, their bottom bar a packer's; with the owner's session aged past 15
+  minutes, changing a role asked for the authenticator's code and then changed it; with no errors
+  in the browser.
+* **For it:** the fake core of the screen tests answers `/auth` paths and GraphQL errors.
+* 1920 tests: connecting, inviting after confirming, and joining through the real screens.
 
 ### dcb7d73 · Shipping in the admin
 

@@ -7,6 +7,7 @@ import { AuthLayout } from '../auth/auth-layout';
 import { ME_KEY, useMe, useSessionStore } from '../auth/context';
 import type { ShopAccess } from '../auth/session';
 import { errorText } from '../i18n/errors';
+import { takePendingInvitation } from '../invitation/invitation-page';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { Button } from '../ui/button';
@@ -68,13 +69,19 @@ export function ShopsPage() {
   const navigate = useNavigate();
   const [opening, setOpening] = useState(false);
   const shops = me.data?.shops ?? [];
-  const only = shops.length === 1 ? shops[0] : undefined;
+  // An invitation opened before signing in comes first, once signed in.
+  const [invited] = useState(takePendingInvitation);
+  const only = !invited && shops.length === 1 ? shops[0] : undefined;
 
   useEffect(() => {
-    if (only) void navigate({ to: '/$shopId', params: { shopId: only.id }, replace: true });
-  }, [only, navigate]);
+    if (invited) {
+      void navigate({ to: '/invitation', hash: `token=${invited}`, replace: true });
+    } else if (only) {
+      void navigate({ to: '/$shopId', params: { shopId: only.id }, replace: true });
+    }
+  }, [invited, only, navigate]);
 
-  if (me.isPending || only) {
+  if (me.isPending || only || invited) {
     return (
       <AuthLayout title={t('shops.title')}>
         <Loading label={t('state.loading')} />

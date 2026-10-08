@@ -495,3 +495,67 @@ export interface CourierDocumentData {
   title: string;
   html: string;
 }
+
+export interface CourierOffered {
+  courier: string;
+  name: string;
+  test: boolean;
+  pickupCode: string | null;
+  credentials: { key: string; label: string }[];
+}
+
+export interface CourierAccountDetail {
+  id: string;
+  name: string;
+  courier: string;
+  courierName: string;
+  isDefault: boolean;
+  credentialsHint: string;
+  pickupCode: string | null;
+  createdAt: string;
+}
+
+export interface CourierAccountsData {
+  couriers: CourierOffered[];
+  courierAccounts: CourierAccountDetail[];
+}
+
+export interface CourierAccountPayloadData {
+  courierAccount: { id: string; name: string; isDefault: boolean } | null;
+  userErrors: UserError[];
+}
+
+/** The API's names for staff roles. */
+export type StaffMemberRole =
+  'OWNER' | 'MANAGER' | 'CONFIRMATION_AGENT' | 'PACKER' | 'MARKETER' | 'ACCOUNTANT';
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  email: string | null;
+  role: StaffMemberRole;
+  joinedAt: string;
+}
+
+export interface StaffInvitation {
+  id: string;
+  role: StaffMemberRole;
+  note: string | null;
+  email: string | null;
+  invitedBy: string;
+  expiresAt: string;
+}
+
+export interface StaffData {
+  staffMembers: StaffMember[];
+  staffInvitations: StaffInvitation[];
+}
+
+export interface StaffInvitationCreateData {
+  staffInvitationCreate: {
+    token: string | null;
+    emailed: boolean;
+    invitation: { id: string } | null;
+    userErrors: UserError[];
+  };
+}

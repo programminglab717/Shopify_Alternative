@@ -964,3 +964,162 @@ export const CourierLoadSheetQuery = /* GraphQL */ `
     }
   }
 `;
+
+/** The couriers shops book with here, with what each asks for to connect (SHP-01). */
+export const CourierAccountsQuery = /* GraphQL */ `
+  query CourierAccounts {
+    couriers {
+      courier
+      name
+      test
+      pickupCode
+      credentials {
+        key
+        label
+      }
+    }
+    courierAccounts {
+      id
+      name
+      courier
+      courierName
+      isDefault
+      credentialsHint
+      pickupCode
+      createdAt
+    }
+  }
+`;
+
+const COURIER_ACCOUNT_PAYLOAD = /* GraphQL */ `
+  fragment AccountPayload on CourierAccountPayload {
+    courierAccount {
+      id
+      name
+      isDefault
+    }
+    userErrors {
+      ...Problems
+    }
+  }
+`;
+
+/** The shop's own account with a courier connected, its credentials sealed. */
+export const CourierAccountConnectMutation = /* GraphQL */ `
+  mutation CourierAccountConnect($input: CourierAccountInput!) {
+    courierAccountConnect(input: $input) {
+      ...AccountPayload
+    }
+  }
+  ${COURIER_ACCOUNT_PAYLOAD}
+  ${USER_ERRORS}
+`;
+
+/** A courier account renamed, given new credentials, or made the default. */
+export const CourierAccountUpdateMutation = /* GraphQL */ `
+  mutation CourierAccountUpdate($id: ID!, $input: CourierAccountInput!) {
+    courierAccountUpdate(id: $id, input: $input) {
+      ...AccountPayload
+    }
+  }
+  ${COURIER_ACCOUNT_PAYLOAD}
+  ${USER_ERRORS}
+`;
+
+/** A courier account archived: no more bookings with it; its parcels still followed. */
+export const CourierAccountArchiveMutation = /* GraphQL */ `
+  mutation CourierAccountArchive($id: ID!) {
+    courierAccountArchive(id: $id) {
+      ...AccountPayload
+    }
+  }
+  ${COURIER_ACCOUNT_PAYLOAD}
+  ${USER_ERRORS}
+`;
+
+/** Who works in the shop, and the invitations still open (ADR-101). */
+export const StaffQuery = /* GraphQL */ `
+  query Staff {
+    staffMembers {
+      id
+      name
+      email
+      role
+      joinedAt
+    }
+    staffInvitations {
+      id
+      role
+      note
+      email
+      invitedBy
+      expiresAt
+    }
+  }
+`;
+
+/** Someone invited to work in the shop by a link, emailed too where an address is given. */
+export const StaffInvitationCreateMutation = /* GraphQL */ `
+  mutation StaffInvitationCreate(
+    $role: StaffMemberRole!
+    $note: String
+    $email: String
+    $language: EmailLanguage
+  ) {
+    staffInvitationCreate(role: $role, note: $note, email: $email, language: $language) {
+      token
+      emailed
+      invitation {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** An invitation taken back: its link opens nothing after. */
+export const StaffInvitationRevokeMutation = /* GraphQL */ `
+  mutation StaffInvitationRevoke($id: ID!) {
+    staffInvitationRevoke(id: $id) {
+      invitation {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A staff member given another role, from their next request. */
+export const StaffMemberRoleUpdateMutation = /* GraphQL */ `
+  mutation StaffMemberRoleUpdate($id: ID!, $role: StaffMemberRole!) {
+    staffMemberRoleUpdate(id: $id, role: $role) {
+      staffMember {
+        id
+        role
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A staff member let go: the shop is closed to them from their next request. */
+export const StaffMemberRemoveMutation = /* GraphQL */ `
+  mutation StaffMemberRemove($id: ID!) {
+    staffMemberRemove(id: $id) {
+      removedStaffMemberId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

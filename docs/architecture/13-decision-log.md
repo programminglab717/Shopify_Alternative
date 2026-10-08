@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-270 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-271 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -278,6 +278,7 @@
 | 268 | Merchants add a product's photos from its page, taken with the phone's camera or chosen from its gallery: a large photo is made 2,048 pixels a side in the browser before it goes up, straight to storage through a signed URL any origin may use, and each is shown as the core makes it ready or says why it could not | Accepted |
 | 269 | The admin's customers: a list searched by any part of a number, a name or an email, and a customer's page with how to reach them, how their parcels went, their orders, addresses, and the shop's note and tags; agents see the number when they ask, which is logged, and owners and managers block it from there | Accepted |
 | 270 | The admin's shipping: packed orders booked with the shop's courier account in a tap, each booking shown as the worker books it and its courier carries it, booked parcels' labels and the account's load sheet printed from a tab of their own; and on a phone, the bottom bar's five slots kept for the busiest sections, the rest under More | Accepted |
+| 271 | The admin's settings begin with courier accounts and staff: an account connected with the credentials its courier asks for, made the default or archived; staff's roles changed and staff let go by those who manage them, and people invited by a link to send on WhatsApp, which opens a page of the admin's own; a sensitive change asks the member to confirm who they are, then goes ahead | Accepted |
 
 ---
 
@@ -11230,3 +11231,44 @@
     its own prints as the page it is.
   * **Booking on packing:** some shops pack in the evening and book in the morning, or choose the
     courier by the parcel; a tap keeps the choice theirs.
+
+## ADR-271 · The admin's settings begin with courier accounts and staff: an account connected with the credentials its courier asks for, made the default or archived; staff's roles changed and staff let go by those who manage them, and people invited by a link to send on WhatsApp, which opens a page of the admin's own; a sensitive change asks the member to confirm who they are, then goes ahead
+
+* **Context:** Shipping books with the shop's courier accounts ([ADR-270](#adr-270--the-admins-shipping-packed-orders-booked-with-the-shops-courier-account-in-a-tap-each-booking-shown-as-the-worker-books-it-and-its-courier-carries-it-booked-parcels-labels-and-the-accounts-load-sheet-printed-from-a-tab-of-their-own-and-on-a-phone-the-bottom-bars-five-slots-kept-for-the-busiest-sections-the-rest-under-more)), which the
+  Admin API connects with each courier's credentials, sealed and never shown again
+  ([ADR-149](#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)). Owners and managers invite people by a link good for seven days, change
+  roles they manage and let staff go ([ADR-101](#adr-101--owners-and-managers-invite-staff-by-a-link-they-send-themselves-accepted-once-by-a-signed-in-account-the-owner-manages-every-role-but-its-own-managers-those-below-them-apps-none)); those changes, and others that would hurt
+  most in the wrong hands, are refused with `REAUTHENTICATION_REQUIRED` until the member has
+  confirmed who they are within 15 minutes ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)). An invitation's link opens
+  `/invitation#token=…` on the admin's origin, which had no such page.
+* **Decision:**
+  * **Settings** (`/shop_…/settings`), for owners and managers, lists its sections as they are
+    built: courier accounts and staff first. On a phone it is under More.
+  * **Courier accounts:** each with its courier, whether it is the default, and the last
+    characters of its credentials. Connecting asks for the courier and the fields it lists (an
+    API token for PostEx; a key and a password for Leopards), the pickup address's code where the
+    courier has one, and a name. Another is made the default, or archived after a second tap.
+    Outside production the test courier is offered too, and says it books nothing.
+  * **Staff:** who works in the shop, in what role and since when; roles the member manages
+    changed in place, and staff let go after a second tap; nobody changes their own role, nor the
+    owner's. Open invitations, with whom each is for, are taken back.
+  * **Inviting:** a role, with what it does in a line; who it is for; an email, which Hatti also
+    sends the link to. The link is shown to copy or send on WhatsApp.
+  * **Confirming who you are:** a refused change opens a panel in its place: a code from the
+    authenticator app, the password, or a code sent to the member's number on WhatsApp, as their
+    account takes them. Once confirmed, the change goes ahead without being asked for again.
+  * **The invitation's page** (`/invitation`) says who invited the person to which shop as what,
+    and until when. Signed in, they join with a tap and the shop opens (its second step first
+    where the role needs one). Signed out, they sign in or open an account, and come back to the
+    invitation once they have; the token waits in the tab, never in an address sent anywhere.
+* **Consequences:**
+  * An owner sets a shop up for its staff from a phone: the courier connected, the packers and
+    agents invited over WhatsApp, each in at a tap.
+  * Passkeys and Google confirm who someone is in the admin when their sign-in comes to it.
+  * The rest of settings (delivery, cash on delivery, payments, the shop's details) stay the Admin
+    API's for now.
+* **Alternatives:**
+  * **Asking every member to confirm before opening settings:** most of settings is not sensitive;
+    the core says which changes are, and the admin asks when it does.
+  * **The invitation's token in the page's query:** it would reach servers' logs and the edge; after
+    the `#` it stays in the browser.
