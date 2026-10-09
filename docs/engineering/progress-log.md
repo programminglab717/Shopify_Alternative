@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The theme editor's live preview
+### 2dd08c3 · The theme editor's live preview
 
 * **The page beside the editor** ([ADR-325](../architecture/13-decision-log.md#adr-325--the-theme-editors-preview-frames-the-storefront-beside-the-editor-and-shows-changes-as-they-are-made-the-pages-sections-following-the-editors-files-the-themes-settings-show-once-saved)): on a computer the storefront's page sits beside the
   theme editor, at full width or a phone's, and on a phone Edit and Preview are two tabs. Changes
