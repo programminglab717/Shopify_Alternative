@@ -1037,6 +1037,28 @@ export interface SalesData {
   };
 }
 
+/** A period's sessions on the online store and how far they went (ADR-180). */
+export interface StorefrontSessionCounts {
+  sessions: number;
+  addedToCart: number;
+  reachedCheckout: number;
+  converted: number;
+  /** Converted over sessions, 0 to 1; null without sessions. */
+  conversionRate: number | null;
+}
+
+export interface StorefrontSessionsData {
+  storefrontSessions: {
+    totals: StorefrontSessionCounts;
+    periods: { start: string; sessions: { sessions: number; converted: number } }[];
+  };
+  previous: { totals: StorefrontSessionCounts };
+}
+
+export interface StorefrontLiveViewData {
+  storefrontLiveView: { visitorsNow: number; today: StorefrontSessionCounts };
+}
+
 export type CodHealthDimension = 'CITY' | 'PRODUCT' | 'SOURCE' | 'COURIER';
 
 export interface CodDeliveryFigures {

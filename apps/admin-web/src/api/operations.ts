@@ -2382,6 +2382,61 @@ export const SalesQuery = /* GraphQL */ `
   ${MONEY}
 `;
 
+const STOREFRONT_SESSION_COUNTS = /* GraphQL */ `
+  fragment StorefrontSessionCounts on StorefrontSessions {
+    sessions
+    addedToCart
+    reachedCheckout
+    converted
+    conversionRate
+  }
+`;
+
+/**
+ * The online store's sessions over a period, day by day or week by week, and the period as long
+ * before it, which ends where this one starts (ANL-02, ADR-180).
+ */
+export const StorefrontSessionsQuery = /* GraphQL */ `
+  query StorefrontSessions(
+    $from: DateTime!
+    $before: DateTime!
+    $previousFrom: DateTime!
+    $interval: SalesInterval!
+  ) {
+    storefrontSessions(from: $from, before: $before, interval: $interval) {
+      totals {
+        ...StorefrontSessionCounts
+      }
+      periods {
+        start
+        sessions {
+          sessions
+          converted
+        }
+      }
+    }
+    previous: storefrontSessions(from: $previousFrom, before: $from, interval: $interval) {
+      totals {
+        ...StorefrontSessionCounts
+      }
+    }
+  }
+  ${STOREFRONT_SESSION_COUNTS}
+`;
+
+/** Who is on the online store now, and today's sessions so far (ANL-02, ADR-180). */
+export const StorefrontLiveViewQuery = /* GraphQL */ `
+  query StorefrontLiveView {
+    storefrontLiveView {
+      visitorsNow
+      today {
+        ...StorefrontSessionCounts
+      }
+    }
+  }
+  ${STOREFRONT_SESSION_COUNTS}
+`;
+
 const COD_DELIVERY = /* GraphQL */ `
   fragment CodDeliveryFigures on CodDelivery {
     shipped

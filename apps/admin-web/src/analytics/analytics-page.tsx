@@ -1,5 +1,4 @@
 import { Link } from '@tanstack/react-router';
-import { TrendingDown, TrendingUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { SalesQuery } from '../api/operations';
 import type { MoneyValue, SalesData, SalesTotalsValue } from '../api/types';
@@ -7,12 +6,13 @@ import type { StaffRole } from '../auth/session';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
-import type { MessageKey } from '../i18n/messages';
 import { FormSection } from '../products/product-form';
 import { useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
-import { Card, ErrorState, Loading } from '../ui/feedback';
+import { ErrorState, Loading } from '../ui/feedback';
 import { CodHealth } from './cod-health';
+import { Bars, Figure } from './figures';
+import { LiveView, Visits } from './visits';
 
 /** The roles that read the shop's sales (the core asks read_orders; these are the ones who plan). */
 export const READS_ANALYTICS: readonly StaffRole[] = ['owner', 'manager', 'marketer', 'accountant'];
@@ -35,47 +35,6 @@ export function startOfDay(timeZone: string, daysAgo: number, now = new Date()):
       .find((part) => part.type === 'timeZoneName')
       ?.value.replace('GMT', '') || 'Z';
   return new Date(Date.parse(`${date}T00:00:00${offset}`) - daysAgo * DAY_MS);
-}
-
-/** How much `now` differs from `before`, as a whole percentage; null where before was nothing. */
-export function change(now: number, before: number): number | null {
-  if (before === 0) return null;
-  return Math.round(((now - before) / before) * 100);
-}
-
-function Figure({
-  label,
-  now,
-  before,
-  shown,
-}: {
-  label: MessageKey;
-  now: number;
-  before: number;
-  shown: string;
-}) {
-  const { t } = useLocale();
-  const delta = change(now, before);
-  return (
-    <Card className="flex flex-col gap-1 p-4">
-      <span className="text-secondary">{t(label)}</span>
-      <span className="num text-[length:var(--hatti-type-title-size)] font-semibold">{shown}</span>
-      {delta !== null && (
-        <span
-          className={`flex items-center gap-1 text-[length:var(--hatti-type-body-sm-size)] ${
-            delta >= 0 ? 'text-success' : 'text-danger'
-          }`}
-        >
-          {delta >= 0 ? (
-            <TrendingUp aria-hidden className="size-4" />
-          ) : (
-            <TrendingDown aria-hidden className="size-4" />
-          )}
-          {t(delta >= 0 ? 'analytics.up' : 'analytics.down', { percent: Math.abs(delta) })}
-        </span>
-      )}
-    </Card>
-  );
 }
 
 const amount = (money: MoneyValue | null) => Number(money?.amount ?? 0);
@@ -111,70 +70,31 @@ function Totals({ now, before }: { now: SalesTotalsValue; before: SalesTotalsVal
   );
 }
 
-/** Net sales by day or week as bars, each saying what it was to a screen reader. */
-function Bars({ periods }: { periods: SalesData['salesReport']['periods'] }) {
-  const { t, locale } = useLocale();
-  const timezone = useShopTimezone();
-  const most = Math.max(...periods.map((period) => amount(period.sales.netSales)), 1);
-  const first = periods[0];
-  const last = periods.at(-1);
-  return (
-    <FormSection title={t('analytics.overTime')}>
-      <ul className="flex h-40 items-end gap-px" aria-label={t('analytics.overTime')}>
-        {periods.map((period) => {
-          const value = amount(period.sales.netSales);
-          const label = t('analytics.bar', {
-            date: formatDate(period.start, timezone, locale),
-            sales: formatMoney(period.sales.netSales.amount),
-            count: period.sales.orders,
-          });
-          return (
-            <li
-              key={period.start}
-              aria-label={label}
-              title={label}
-              className="flex h-full min-w-0 flex-1 items-end"
-            >
-              <span
-                className={`w-full rounded-t-sm ${value > 0 ? 'bg-primary' : 'bg-line'}`}
-                style={{ height: `${Math.max((value / most) * 100, value > 0 ? 2 : 1)}%` }}
-              />
-            </li>
-          );
-        })}
-      </ul>
-      {first && last && (
-        <div className="flex justify-between text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-          <span>{formatDate(first.start, timezone, locale)}</span>
-          <span>{formatDate(last.start, timezone, locale)}</span>
-        </div>
-      )}
-    </FormSection>
-  );
-}
-
 /**
- * Sales over time (ANL-02, ADR-250): the last 7, 30 or 90 days against the period as long before,
- * net sales by day (by week over 90), what sold most, where the orders came from, and how its
+ * Sales over time (ANL-02, ADR-250): who is on the online store now; the last 7, 30 or 90 days
+ * against the period as long before, net sales by day (by week over 90), what sold most, where
+ * the orders came from, the online store's visits and how far they went, and how its
  * cash-on-delivery orders turned out.
  */
 export function AnalyticsPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const shopId = useShop().id;
   const timezone = useShopTimezone();
   const [days, setDays] = useState<Days>(30);
-  // Whole days in the shop's time zone, today's included.
-  const { from, before } = useMemo(
+  // Whole days in the shop's time zone, today's included, and as many before them.
+  const { from, before, previousFrom } = useMemo(
     () => ({
       from: startOfDay(timezone, days - 1).toISOString(),
       before: startOfDay(timezone, -1).toISOString(),
+      previousFrom: startOfDay(timezone, 2 * days - 1).toISOString(),
     }),
     [days, timezone],
   );
+  const interval = days === 90 ? 'WEEK' : 'DAY';
   const query = useAdminQuery<SalesData>(['sales', days], SalesQuery, {
     placedFrom: from,
     placedBefore: before,
-    interval: days === 90 ? 'WEEK' : 'DAY',
+    interval,
   });
 
   return (
@@ -182,6 +102,7 @@ export function AnalyticsPage() {
       <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
         {t('analytics.title')}
       </h1>
+      <LiveView />
       <div role="tablist" className="flex gap-2">
         {PERIODS.map((each) => (
           <button
@@ -212,7 +133,18 @@ export function AnalyticsPage() {
             now={query.data.salesReport.totals}
             before={query.data.salesReport.previous.totals}
           />
-          <Bars periods={query.data.salesReport.periods} />
+          <Bars
+            title={t('analytics.overTime')}
+            bars={query.data.salesReport.periods.map((period) => ({
+              start: period.start,
+              value: amount(period.sales.netSales),
+              label: t('analytics.bar', {
+                date: formatDate(period.start, timezone, locale),
+                sales: formatMoney(period.sales.netSales.amount),
+                count: period.sales.orders,
+              }),
+            }))}
+          />
           <div className="grid gap-4 md:grid-cols-2">
             <FormSection title={t('analytics.topProducts')}>
               {query.data.salesReport.topProducts.length === 0 ? (
@@ -262,6 +194,7 @@ export function AnalyticsPage() {
           </div>
         </>
       )}
+      <Visits from={from} before={before} previousFrom={previousFrom} interval={interval} />
       <CodHealth from={from} before={before} />
     </div>
   );

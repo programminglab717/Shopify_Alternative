@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-328 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-329 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -336,6 +336,7 @@
 | 326 | A theme's pictures are the shop's own files, uploaded in the theme editor and served by the storefront at an address of the shop's own while one of its themes names them; a preview shows any of the shop's pictures | Accepted |
 | 327 | The admin puts a product's, collection's or page's words in Urdu on a page of its own, each field of the shop's own above its Urdu and a product's options and values with it, read in one ask through Shopify's translatableResourcesByIds and saved as its translations | Accepted |
 | 328 | The admin's Urdu page serves blogs, articles, menus and the home page's words too: a menu's links each a level in under the link they sit under, the home page's words the shop's own, and a menu's Urdu for those who change menus | Accepted |
+| 329 | The admin's analytics show the online store's visits beside its sales: who is on it now, asked again every half minute, and the period's sessions against the period as long before, asked in one document, with how far they went towards an order | Accepted |
 
 ---
 
@@ -13163,3 +13164,47 @@
 * **Alternatives:**
   * **Each link's Urdu beside it in the menu's own form:** that form is long already on a phone,
     and it saves the whole menu, which a link's Urdu has no need of.
+
+## ADR-329 · The admin's analytics show the online store's visits beside its sales: who is on it now, asked again every half minute, and the period's sessions against the period as long before, asked in one document, with how far they went towards an order
+
+* **Context:** The core counts the online store's sessions as Shopify does and gives them with
+  `read_orders`: a period's, day by day, with how many added to the cart, reached checkout and
+  ordered, and who saw a page in the last five minutes ([ADR-180](#adr-180--the-online-store-counts-its-sessions-as-shopify-does-a-browsers-pages-with-no-half-hour-between-them-a-script-in-each-page-keeps-a-sessions-id-in-a-cookie-of-the-shops-and-tells-the-storefront-of-each-page-which-counts-each-days-sessions-in-the-shops-time-zone-and-those-that-added-to-the-cart-reached-checkout-and-placed-an-order-as-hyperloglogs-in-valkey-with-who-saw-a-page-in-the-last-five-minutes-the-worker-keeps-each-days-counts-in-postgres-every-minute)). The admin's analytics
+  showed sales against the period as long before ([ADR-250](#adr-250--the-sales-report-says-what-the-period-as-long-just-before-came-to-and-the-home-what-yesterday-came-to-by-this-time-of-day-refunds-are-said-beside-sales-not-taken-off-them)) and how cash-on-delivery
+  orders turned out, but nothing of the store's visits: a merchant from Shopify missed its
+  sessions, its conversion rate and its live view, and one paying for ads to the store could not
+  tell whether they brought shoppers who did not buy, or none.
+* **Decision:**
+  * **Who is on the store now, first:** the analytics page opens on a card of how many sessions
+    saw a page in the last five minutes, a green dot pulsing while there are any (still for those
+    who ask for less motion), with today's sessions, those that added to the cart and those that
+    ordered; asked again every half minute while the page is open and in view.
+  * **The period's visits beside its sales:** for the 7, 30 or 90 days the page shows, the
+    sessions and the conversion rate against the period as long before, as sales are; how far
+    the sessions went, each step's count and share of sessions to a tenth of a percent, with a
+    bar; and the sessions day by day, week by week over 90 days, each bar saying what it was to
+    a screen reader. A period with none, and none before, says so in a line.
+  * **The period before in the same ask:** the core gives a period's sessions alone; the admin
+    asks for the period before in the same document, under an alias of its own, as long and
+    ending where the period starts, both whole days in the shop's time zone as its sales are.
+  * **Said in the merchant's words:** a session is a visit to the store's pages, until half an
+    hour passes without one; orders taken on WhatsApp or by phone count in sales, not here, so a
+    shop selling mostly through WhatsApp does not read its store's conversion rate as its own.
+  * **For those who read its sales:** owners, managers, marketers and accountants, as the core
+    asks `read_orders`.
+* **Consequences:**
+  * A merchant sees from the phone how many came to the store, how far they went and who is on
+    it now, as on Shopify.
+  * The open page asks for the live view twice a minute, a few of Valkey's commands each time,
+    and not while its tab is hidden.
+  * A change in the conversion rate is said as a share of what it was, as Shopify says it: a
+    rate from 3% to 3.3% is "10% more".
+  * Not yet, as with the core: sessions by source, landing page, device or city; the live
+    view's map and pages; who is on the store on the home page.
+* **Alternatives:**
+  * **The live view on a page of its own, as Shopify's:** a page more for one number, which on
+    the analytics page is the first thing seen.
+  * **The period before from the core, as the sales report gives it:** a field more on the API
+    for what one alias in the admin's document does.
+  * **Changes in the conversion rate in points:** right for analysts, but every other figure on
+    the page says its change as a share.

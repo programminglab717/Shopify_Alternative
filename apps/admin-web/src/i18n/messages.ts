@@ -2699,6 +2699,25 @@ const en = {
   'urdu.homePage': 'Home page',
   'urdu.homePageHint': 'How Google and links shared on WhatsApp show your home page in Urdu.',
   'urdu.homePageName': 'Your home page',
+  'analytics.live': 'On your store now',
+  'analytics.sessionsToday': 'Sessions today',
+  'analytics.addedToCart': 'Added to cart',
+  'analytics.reachedCheckout': 'Reached checkout',
+  'analytics.converted': 'Ordered',
+  'analytics.visits': 'Visits to your online store',
+  'analytics.visitsHint':
+    "A session is a visit to your store's pages, until half an hour passes without one. Orders taken on WhatsApp or by phone count in sales, not here.",
+  'analytics.noVisits': 'No visits to your online store in these days.',
+  'analytics.sessions': 'Sessions',
+  'analytics.conversionRate': 'Conversion rate',
+  'analytics.funnel': 'How far sessions went',
+  'analytics.funnelHint':
+    'Of all sessions, how many added to the cart, reached checkout and ordered.',
+  'analytics.sessionsCount': '{count} sessions',
+  'analytics.sessionsCount.one': '1 session',
+  'analytics.sessionsOverTime': 'Sessions over time',
+  'analytics.sessionsBar': '{date}: {count} sessions, {converted} ordered',
+  'analytics.sessionsBar.one': '{date}: 1 session, {converted} ordered',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5380,6 +5399,25 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'urdu.homePageHint':
     'گوگل اور واٹس ایپ پر شیئر کیے گئے لنک اردو میں آپ کا ہوم پیج کیسے دکھاتے ہیں۔',
   'urdu.homePageName': 'آپ کا ہوم پیج',
+  'analytics.live': 'ابھی آپ کے اسٹور پر',
+  'analytics.sessionsToday': 'آج کے سیشنز',
+  'analytics.addedToCart': 'کارٹ میں ڈالا',
+  'analytics.reachedCheckout': 'چیک آؤٹ تک پہنچے',
+  'analytics.converted': 'آرڈر کیا',
+  'analytics.visits': 'آپ کے آن لائن اسٹور کے وزٹ',
+  'analytics.visitsHint':
+    'سیشن آپ کے اسٹور کے صفحات کا ایک وزٹ ہے، جب تک آدھا گھنٹہ کوئی صفحہ نہ دیکھا جائے۔ واٹس ایپ یا فون پر لیے گئے آرڈرز فروخت میں گنے جاتے ہیں، یہاں نہیں۔',
+  'analytics.noVisits': 'ان دنوں میں آپ کے آن لائن اسٹور پر کوئی وزٹ نہیں۔',
+  'analytics.sessions': 'سیشنز',
+  'analytics.conversionRate': 'کنورژن ریٹ',
+  'analytics.funnel': 'سیشنز کہاں تک پہنچے',
+  'analytics.funnelHint':
+    'تمام سیشنز میں سے کتنوں نے کارٹ میں ڈالا، چیک آؤٹ تک پہنچے اور آرڈر کیا۔',
+  'analytics.sessionsCount': '{count} سیشنز',
+  'analytics.sessionsCount.one': '1 سیشن',
+  'analytics.sessionsOverTime': 'وقت کے ساتھ سیشنز',
+  'analytics.sessionsBar': '{date}: {count} سیشنز، {converted} نے آرڈر کیا',
+  'analytics.sessionsBar.one': '{date}: 1 سیشن، {converted} نے آرڈر کیا',
 };
 
 export const messages: Readonly<

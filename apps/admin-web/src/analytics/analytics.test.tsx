@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SalesTotalsValue } from '../api/types';
 import { sectionsOf } from '../shell/shell';
 import { fakeCore, renderAdmin, signedIn } from '../test-support';
-import { change, startOfDay } from './analytics-page';
+import { startOfDay } from './analytics-page';
+import { change } from './figures';
 
 const rupees = (amount: string) => ({ amount, currencyCode: 'PKR' });
 
@@ -45,6 +46,23 @@ const COD_HEALTH = {
   ],
 };
 
+const none = {
+  sessions: 0,
+  addedToCart: 0,
+  reachedCheckout: 0,
+  converted: 0,
+  conversionRate: null,
+};
+
+/** The online store's visits, none: the page asks for them beside its sales. */
+const NO_VISITS: Record<string, unknown> = {
+  StorefrontLiveView: { storefrontLiveView: { visitorsNow: 0, today: none } },
+  StorefrontSessions: {
+    storefrontSessions: { totals: none, periods: [] },
+    previous: { totals: none },
+  },
+};
+
 describe('Analytics in the admin', () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -58,6 +76,7 @@ describe('Analytics in the admin', () => {
 
   it('shows sales against the period before, by day, with what sold most and from where', async () => {
     const core = fakeCore('marketer', (operation) => {
+      if (operation in NO_VISITS) return NO_VISITS[operation];
       if (operation === 'CodHealth') return { codHealth: COD_HEALTH };
       if (operation !== 'Sales') throw new Error(`unexpected ${operation}`);
       return {
@@ -109,6 +128,7 @@ describe('Analytics in the admin', () => {
 
   it("shows how cash-on-delivery orders turned out, a city's high returns in red", async () => {
     const core = fakeCore('owner', (operation) => {
+      if (operation in NO_VISITS) return NO_VISITS[operation];
       if (operation === 'CodHealth') return { codHealth: COD_HEALTH };
       if (operation === 'Sales') throw new Error('not this time');
       throw new Error(`unexpected ${operation}`);

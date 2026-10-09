@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, visits in the admin's analytics** (ANL-02): the storefront's sessions, how many of them
-ordered, and who is on it now, as the core counts them (ADR-180); then section by section as
-the alpha's shops need them.
+**Next, an order shipped by hand** (SHP-01, SHP-04): a packed order sent with a courier Hatti
+does not book with yet, TCS, Trax or M&P, or the shop's own rider, its tracking number typed
+in, and the parcel then followed on the order's page as a booked one is; then section by
+section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +19,25 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Visits in the admin's analytics
+
+* **The online store's visits beside its sales** ([ADR-329](../architecture/13-decision-log.md#adr-329--the-admins-analytics-show-the-online-stores-visits-beside-its-sales-who-is-on-it-now-asked-again-every-half-minute-and-the-periods-sessions-against-the-period-as-long-before-asked-in-one-document-with-how-far-they-went-towards-an-order)): the analytics page opens on who is on
+  the store now, sessions that saw a page in the last five minutes, and today's sessions, those
+  that added to the cart and those that ordered, asked again every half minute. Below its sales,
+  the period's sessions and conversion rate against the period as long before, asked in the same
+  document; how far the sessions went, each step's share of them; and sessions day by day. What a
+  session is, and that orders taken on WhatsApp count in sales and not here, said beside them.
+* **Tried in Chromium against the core, the storefront and the worker:** three shoppers on a
+  phone's browser came to the seed's shop: one looked, one added the Multani Khussa to the cart,
+  one went on to checkout. The admin's card said three were on the store now, three sessions
+  today and two added to the cart; a minute later, once the worker kept the day's counts, the
+  month's visits said three sessions, two of them added to the cart and one reached checkout, a
+  conversion rate of 0.0%, and the day's bar three sessions. On a phone, in one column; in Urdu,
+  right to left, its bars filling from the right. No errors in the browser.
+* 2339 tests: the period's sessions and conversion rate against the period before, the steps
+  each with its share, the day's bars, the periods asked for, weeks over 90 days; who is on the
+  store now and today's counts, asked again after half a minute; and a period with no visits.
 
 ### 7474458 · Blogs, articles, menus and the home page in Urdu, in the admin
 
