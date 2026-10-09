@@ -2861,3 +2861,133 @@ export const InventorySettingsUpdateMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** The shop's collections, found by words in their titles. */
+export const CollectionsQuery = /* GraphQL */ `
+  query Collections($query: String) {
+    collections(first: 100, query: $query) {
+      nodes {
+        id
+        title
+        productsCount
+        ruleSet {
+          appliedDisjunctively
+        }
+      }
+    }
+  }
+`;
+
+/** A collection with its rules and its products, in its order. */
+export const CollectionQuery = /* GraphQL */ `
+  query Collection($id: ID!) {
+    collection(id: $id) {
+      id
+      title
+      handle
+      description
+      sortOrder
+      productsCount
+      ruleSet {
+        appliedDisjunctively
+        rules {
+          column
+          relation
+          condition
+        }
+      }
+      products(first: 250) {
+        nodes {
+          id
+          title
+          status
+        }
+      }
+    }
+  }
+`;
+
+/** Products found by words, to add to a collection made by hand. */
+export const CollectionProductSearchQuery = /* GraphQL */ `
+  query CollectionProductSearch($query: String) {
+    products(first: 10, query: $query) {
+      nodes {
+        id
+        title
+        status
+      }
+    }
+  }
+`;
+
+const COLLECTION_PAYLOAD = /* GraphQL */ `
+  collection {
+    id
+  }
+  userErrors {
+    ...Problems
+  }
+`;
+
+/** A collection made, by hand or by rules (CAT-03). */
+export const CollectionCreateMutation = /* GraphQL */ `
+  mutation CollectionCreate($input: CollectionCreateInput!) {
+    collectionCreate(input: $input) {
+      ${COLLECTION_PAYLOAD}
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A collection's title, description, handle, order or rules changed. */
+export const CollectionUpdateMutation = /* GraphQL */ `
+  mutation CollectionUpdate($input: CollectionUpdateInput!) {
+    collectionUpdate(input: $input) {
+      ${COLLECTION_PAYLOAD}
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Products added to the end of a collection made by hand. */
+export const CollectionAddProductsMutation = /* GraphQL */ `
+  mutation CollectionAddProducts($id: ID!, $productIds: [ID!]!) {
+    collectionAddProducts(id: $id, productIds: $productIds) {
+      ${COLLECTION_PAYLOAD}
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Products taken out of a collection made by hand; they stay in the catalog. */
+export const CollectionRemoveProductsMutation = /* GraphQL */ `
+  mutation CollectionRemoveProducts($id: ID!, $productIds: [ID!]!) {
+    collectionRemoveProducts(id: $id, productIds: $productIds) {
+      ${COLLECTION_PAYLOAD}
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A product moved within a collection made by hand, to a position counted from 1. */
+export const CollectionReorderProductsMutation = /* GraphQL */ `
+  mutation CollectionReorderProducts($id: ID!, $moves: [MoveInput!]!) {
+    collectionReorderProducts(id: $id, moves: $moves) {
+      ${COLLECTION_PAYLOAD}
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A collection deleted; its products stay. */
+export const CollectionDeleteMutation = /* GraphQL */ `
+  mutation CollectionDelete($input: CollectionDeleteInput!) {
+    collectionDelete(input: $input) {
+      deletedCollectionId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

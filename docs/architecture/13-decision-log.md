@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-289 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-290 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -297,6 +297,7 @@
 | 287 | An order's page changes its items while it waits to be packed, quantities stepped and lines taken off or put back, products found and added at a price agreed, and its delivery charge waived or discount given, saying back the new total and cash at the door; a packed order is unpacked first | Accepted |
 | 288 | An order's page merges it into another of its customer's orders waiting to be packed and paid the same way, chosen from their orders, and opens that one; and sends units of it apart as an order of their own with its delivery charge, always leaving something; each order links the one it went to or came from | Accepted |
 | 289 | The admin's stock lists what runs low, the fewest for sale first, and finds any product's; each variant's stock at each location, added to or taken from with a reason and counted against what was on hand when read, by owners and managers; every role sees it, and Home says how many run low | Accepted |
+| 290 | The admin's collections, reached from the products, are listed and made by hand or by rules; one made by hand has its products found and added, taken out and moved up or down while sorted by hand, one made by rules has its rules changed; owners and managers change them, every role reads them | Accepted |
 
 ---
 
@@ -11904,3 +11905,38 @@
     and a shop counting its shelf goes product by product.
   * **Setting available rather than on hand after a count:** what is on the shelf includes what
     waits for orders; counting it whole is what staff can see.
+
+## ADR-290 · The admin's collections, reached from the products, are listed and made by hand or by rules; one made by hand has its products found and added, taken out and moved up or down while sorted by hand, one made by rules has its rules changed; owners and managers change them, every role reads them
+
+* **Context:** The core keeps collections as Shopify does: made by hand, products added, taken out
+  and moved, or made by rules, which find their products by tag, title, type, vendor, a variant's
+  title, price, compare-at price or weight, or being on sale, matching all of the rules or any
+  one; each column takes its own relations, and a collection stays the kind it was made. It
+  sorts their products by hand, by date, title or price. The admin had products
+  ([ADR-267](#adr-267--the-admins-products-a-list-by-status-and-search-a-products-page-that-owners-and-managers-change-and-every-other-role-reads-and-adding-a-product-with-its-options-variants-each-with-its-price-and-stock-stock-is-counted-at-the-shops-primary-location-set-where-the-merchant-typed-it-and-refused-if-it-changed-since-it-was-read)) but no collections, so a shop grouped nothing for its storefront's menus
+  and pages.
+* **Decision:**
+  * **Collections are reached from the products page**, as Shopify nests them, rather than a
+    section of their own: a list found by title, each made by hand or by rules with how many
+    products it holds.
+  * **A new collection** takes its title, description, how products join it and the order they
+    show in; made by rules, its rules are written there, each a column, a relation the column
+    takes and a value where the relation needs one, matching all or any. A column changed to one
+    that does not take the relation chosen falls back to its first, as the core would refuse it.
+    Its page opens once it is made.
+  * **A collection made by hand** has its products found by name and added to its end, those
+    already in it said so; each taken out, and moved up or down a place while its products are
+    sorted by hand. **One made by rules** shows what its rules find, and its rules change with its
+    details; sorting by hand is not offered for it.
+  * **Its details** (title, description, order) are saved together, sending only what changed,
+    and it is deleted after asking, its products staying in the shop.
+  * Owners and managers change collections, as they change products; every other role reads them.
+* **Consequences:**
+  * A shop groups its Eid range by hand, or keeps a "Chappals" collection up to date by a rule,
+    and links either from its menus.
+  * A product moves one place at a time; a long collection is put in order a tap at a time.
+* **Alternatives:**
+  * **Dragging products into order:** fiddly on a phone with a thumb; up and down buttons are
+    plain and reach every product.
+  * **Collections as a section of their own in the menu:** the bar is full on a phone, and
+    collections are part of the catalog.

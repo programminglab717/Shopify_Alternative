@@ -1277,3 +1277,71 @@ export interface InventoryItemData {
     };
   } | null;
 }
+
+export type CollectionSortOrder =
+  'MANUAL' | 'ALPHA_ASC' | 'ALPHA_DESC' | 'CREATED' | 'CREATED_DESC' | 'PRICE_ASC' | 'PRICE_DESC';
+
+export type CollectionRuleColumn =
+  | 'TAG'
+  | 'TITLE'
+  | 'TYPE'
+  | 'VENDOR'
+  | 'VARIANT_TITLE'
+  | 'VARIANT_PRICE'
+  | 'VARIANT_COMPARE_AT_PRICE'
+  | 'VARIANT_WEIGHT'
+  | 'IS_PRICE_REDUCED';
+
+export type CollectionRuleRelation =
+  | 'EQUALS'
+  | 'NOT_EQUALS'
+  | 'CONTAINS'
+  | 'NOT_CONTAINS'
+  | 'STARTS_WITH'
+  | 'ENDS_WITH'
+  | 'GREATER_THAN'
+  | 'LESS_THAN'
+  | 'IS_SET'
+  | 'IS_NOT_SET';
+
+export interface CollectionRule {
+  column: CollectionRuleColumn;
+  relation: CollectionRuleRelation;
+  condition: string;
+}
+
+export interface CollectionsData {
+  collections: {
+    nodes: {
+      id: string;
+      title: string;
+      productsCount: number;
+      ruleSet: { appliedDisjunctively: boolean } | null;
+    }[];
+  };
+}
+
+export interface CollectionData {
+  collection: {
+    id: string;
+    title: string;
+    handle: string;
+    description: string;
+    sortOrder: CollectionSortOrder;
+    productsCount: number;
+    ruleSet: { appliedDisjunctively: boolean; rules: CollectionRule[] } | null;
+    products: { nodes: { id: string; title: string; status: ProductStatus }[] };
+  } | null;
+}
+
+export interface CollectionProductSearchData {
+  products: { nodes: { id: string; title: string; status: ProductStatus }[] };
+}
+
+export interface CollectionMutationData {
+  [field: string]: {
+    collection?: { id: string } | null;
+    deletedCollectionId?: string | null;
+    userErrors: UserError[];
+  };
+}

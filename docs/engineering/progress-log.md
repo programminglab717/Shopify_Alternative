@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, collections in the admin** (CAT-03): collections listed, made by hand or by rules,
-products added, taken off and put in order; then the admin's next sections as the alpha's shops
-need them. Urdu handles wait, as decided.
+**Next, the online store's pages and menus in the admin** (OS-07): the shop's pages written and
+published, and its menus' links put in order; then the admin's next sections as the alpha's
+shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Collections, in the admin
+
+* **Collections from the products page** ([ADR-290](../architecture/13-decision-log.md#adr-290--the-admins-collections-reached-from-the-products-are-listed-and-made-by-hand-or-by-rules-one-made-by-hand-has-its-products-found-and-added-taken-out-and-moved-up-or-down-while-sorted-by-hand-one-made-by-rules-has-its-rules-changed-owners-and-managers-change-them-every-role-reads-them)): listed by title, made by hand or
+  by rules; one made by hand with its products found and added, taken out and moved up or
+  down; one made by rules with its rules changed; details saved and the collection deleted.
+* **Tried against the core:** the seed's two collections listed; "Eid picks" made by hand, a
+  khussa and a chappal added and the chappal moved first; "Chappals" made by a rule, title
+  contains Chappal, finding the Peshawari Chappal by itself; with no errors in the browser.
+* 2068 tests: a collection made by rules with a second rule whose relation follows its
+  column; one made by hand put in order, a product taken out and another added; details changed
+  and the collection deleted after asking; and a packer reading one made by rules with nothing
+  to change.
 
 ### a7b03d3 · Stock, in the admin
 

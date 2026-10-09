@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { ChevronRight, PackageOpen, Plus, Search } from 'lucide-react';
+import { ChevronRight, FolderOpen, PackageOpen, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { ProductsQuery } from '../api/operations';
@@ -135,16 +135,26 @@ export function ProductsPage() {
         <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
           {t('products.title')}
         </h1>
-        {edits && (
+        <div className="flex flex-wrap items-center gap-2">
           <Link
-            to="/$shopId/products/new"
+            to="/$shopId/collections"
             params={{ shopId: shop.id }}
-            className="inline-flex min-h-12 items-center gap-2 rounded-control bg-primary px-4 font-medium text-on-primary hover:bg-primary-strong md:min-h-10"
+            className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
           >
-            <Plus aria-hidden className="size-5" />
-            {t('products.add')}
+            <FolderOpen aria-hidden className="size-5" />
+            {t('collections.title')}
           </Link>
-        )}
+          {edits && (
+            <Link
+              to="/$shopId/products/new"
+              params={{ shopId: shop.id }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-control bg-primary px-4 font-medium text-on-primary hover:bg-primary-strong md:min-h-10"
+            >
+              <Plus aria-hidden className="size-5" />
+              {t('products.add')}
+            </Link>
+          )}
+        </div>
       </div>
       <form onSubmit={onSearch} role="search" className="relative">
         <Search
