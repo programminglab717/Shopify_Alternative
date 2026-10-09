@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Products, collections and pages in Urdu, in the admin
+### e22647e · Products, collections and pages in Urdu, in the admin
 
 * **The shop's words in Urdu** ([ADR-327](../architecture/13-decision-log.md#adr-327--the-admin-puts-a-products-collections-or-pages-words-in-urdu-on-a-page-of-its-own-each-field-of-the-shops-own-above-its-urdu-and-a-products-options-and-values-with-it-read-in-one-ask-through-shopifys-translatableresourcesbyids-and-saved-as-its-translations)): a product's, collection's and page's own pages say how
   much of it is in Urdu and open a page of its Urdu: each field with words of the shop's above a
