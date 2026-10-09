@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### A draft changed while it is open, in the admin
+### 814926d · A draft changed while it is open, in the admin
 
 * **The form it was made with** ([ADR-334](../architecture/13-decision-log.md#adr-334--an-open-draft-is-changed-in-the-admin-on-the-form-it-was-made-with-started-from-the-draft-as-it-is-every-line-sent-at-its-price-and-every-charge-as-it-stands-so-an-emptied-one-is-cleared-and-the-address-only-if-it-changed-its-area-landmark-and-pin-kept)): an open draft's page has Change the draft, which opens
   the new draft's form at the draft as it is. Saved, every line goes at its price, so prices
