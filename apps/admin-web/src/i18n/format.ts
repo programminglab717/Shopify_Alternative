@@ -85,3 +85,13 @@ export function localInput(iso: string): string {
     date.getHours(),
   )}:${pad(date.getMinutes())}`;
 }
+
+/** The last second of `date` (`2026-12-31`, as a date field gives it) in `timeZone`, as ISO. */
+export function endOfDayIn(date: string, timeZone: string): string {
+  const offset =
+    new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' })
+      .formatToParts(new Date(`${date}T12:00:00Z`))
+      .find((part) => part.type === 'timeZoneName')
+      ?.value.replace('GMT', '') || 'Z';
+  return new Date(`${date}T23:59:59${offset}`).toISOString();
+}

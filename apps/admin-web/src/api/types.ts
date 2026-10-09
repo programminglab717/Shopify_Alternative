@@ -1667,3 +1667,41 @@ export interface LinkPageTapsData {
     links: { url: string; title: string | null; source: LinkTapSource; taps: number }[];
   };
 }
+
+export type StoreCreditKind = 'CREDIT' | 'DEBIT' | 'DEBIT_REVERT' | 'EXPIRATION';
+export type StoreCreditEvent =
+  'ADJUSTMENT' | 'ORDER_CANCELLATION' | 'ORDER_PAYMENT' | 'ORDER_REFUND';
+
+export interface StoreCreditTransaction {
+  id: string;
+  kind: StoreCreditKind;
+  event: StoreCreditEvent | null;
+  amount: MoneyValue;
+  balanceAfterTransaction: MoneyValue;
+  remainingAmount: MoneyValue | null;
+  expiresAt: string | null;
+  createdAt: string;
+  note: string;
+  orderId: string | null;
+}
+
+export interface StoreCreditAccount {
+  id: string;
+  balance: MoneyValue;
+  transactions?: { nodes: StoreCreditTransaction[] };
+}
+
+export interface CustomerStoreCreditData {
+  customer: { id: string; storeCreditAccounts: { nodes: StoreCreditAccount[] } } | null;
+}
+
+export interface StoreCreditMoveData {
+  [field: string]: {
+    storeCreditAccountTransaction: { id: string } | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface OrderPayWithStoreCreditData {
+  orderPayWithStoreCredit: { order: { id: string } | null; userErrors: UserError[] };
+}

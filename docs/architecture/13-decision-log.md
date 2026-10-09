@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-300 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-301 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -308,6 +308,7 @@
 | 298 | The admin's segments are built from conditions in words, joined so customers match all or any, and written in the core's query language; a query the builder cannot show is kept and edited as text; what the conditions match is counted and its newest customers shown as they change, the core's reason shown where a query does not read | Accepted |
 | 299 | The admin imports customers from a CSV after the core has checked it, saying what it would add, update and leave and the rows it could not read, updating those already here only when asked; and exports everyone or a segment's customers as a CSV once the member has confirmed who they are | Accepted |
 | 300 | The admin keeps the shop's link page in the online store: where it is, to copy and open; its bio, links and products edited and saved together, each product's variant chosen where it has several, the core's reason given by the link or product it is about; and its taps over the last week, month or three months | Accepted |
+| 301 | The admin shows a customer's store credit on their page, its ledger to those who keep it, and owners and managers give credit by hand, to expire at the end of a day in the shop's time zone, and take it back; an order not yet shipped is paid with it from its page | Accepted |
 
 ---
 
@@ -12282,3 +12283,31 @@
 * **Alternatives:**
   * **Saving each part on its own,** as the storefront's preferences are: one Save fits a page
     shoppers see as a whole, and leaves no half-changed page.
+
+## ADR-301 · The admin shows a customer's store credit on their page, its ledger to those who keep it, and owners and managers give credit by hand, to expire at the end of a day in the shop's time zone, and take it back; an order not yet shipped is paid with it from its page
+
+* **Context:** A customer's store credit (ORD-09, ADR-184) is an account in the shop's currency:
+  credited by refunds given as store credit and by hand, each credit with an expiry or none;
+  debited by orders it pays and by hand, the credits that expire soonest first; given back when
+  an order it paid is cancelled. Owners and managers move it; confirmation agents read what it
+  holds; accountants read its ledger too. An order still open with nothing of it shipped is paid
+  with it, wholly or in part; on delivery, the cash at the door drops by what it paid (ADR-185).
+  The admin refunded to store credit from an order's page, but showed none of it.
+* **Decision:**
+  * **Store credit** is a section of the customer's page for those who read it: what they have.
+    Owners, managers and accountants see its ledger beneath, the newest first, each line in words
+    ("Refunded as credit", "Paid for an order", "Taken back by hand"), with what was left after
+    it, a credit's expiry, its reason, and a link to its order.
+  * **Owners and managers give credit and take it back:** an amount, a reason for the shop's
+    records, and for credit given, a day it expires, or none. The credit lasts to the end of
+    that day in the shop's time zone, whatever the phone's. More than the customer has is not
+    taken back.
+  * **An order's money** offers "Pay with store credit" where its customer has some and it is
+    still open, unpaid, and at a stage before anything ships; the amount starts at as much as it
+    owes and the credit covers.
+* **Consequences:**
+  * A shop says sorry for a late parcel with credit, and takes it off the next order, from a
+    phone; the cash its courier collects drops by it.
+* **Alternatives:**
+  * **A day's end in the phone's own time:** what a date field gives, but a phone set to another
+    zone, as the first try's browser was, would have the credit expire on the wrong day.

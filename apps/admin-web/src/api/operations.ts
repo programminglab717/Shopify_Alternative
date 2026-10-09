@@ -3800,3 +3800,104 @@ export const LinkPageTapsQuery = /* GraphQL */ `
     }
   }
 `;
+
+/** A customer's store credit (ORD-09): what each of their accounts holds, for those who read it. */
+export const CustomerStoreCreditQuery = /* GraphQL */ `
+  query CustomerStoreCredit($id: ID!) {
+    customer(id: $id) {
+      id
+      storeCreditAccounts(first: 5) {
+        nodes {
+          id
+          balance {
+            ...Money
+          }
+        }
+      }
+    }
+  }
+  ${MONEY}
+`;
+
+/** A customer's store credit with its ledger, the newest first, for those who keep it. */
+export const CustomerStoreCreditLedgerQuery = /* GraphQL */ `
+  query CustomerStoreCreditLedger($id: ID!) {
+    customer(id: $id) {
+      id
+      storeCreditAccounts(first: 5) {
+        nodes {
+          id
+          balance {
+            ...Money
+          }
+          transactions(first: 25) {
+            nodes {
+              id
+              kind
+              event
+              amount {
+                ...Money
+              }
+              balanceAfterTransaction {
+                ...Money
+              }
+              remainingAmount {
+                ...Money
+              }
+              expiresAt
+              createdAt
+              note
+              orderId
+            }
+          }
+        }
+      }
+    }
+  }
+  ${MONEY}
+`;
+
+/** Store credit given to a customer by hand, opening their account if they have none. */
+export const StoreCreditCreditMutation = /* GraphQL */ `
+  mutation StoreCreditCredit($id: ID!, $creditInput: StoreCreditAccountCreditInput!) {
+    storeCreditAccountCredit(id: $id, creditInput: $creditInput) {
+      storeCreditAccountTransaction {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Store credit taken back from a customer, the credits that expire soonest first. */
+export const StoreCreditDebitMutation = /* GraphQL */ `
+  mutation StoreCreditDebit($id: ID!, $debitInput: StoreCreditAccountDebitInput!) {
+    storeCreditAccountDebit(id: $id, debitInput: $debitInput) {
+      storeCreditAccountTransaction {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** An order paid, or part of it, with its customer's store credit (ADR-185). */
+export const OrderPayWithStoreCreditMutation = /* GraphQL */ `
+  mutation OrderPayWithStoreCredit($id: ID!, $amount: String) {
+    orderPayWithStoreCredit(id: $id, amount: $amount) {
+      order {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

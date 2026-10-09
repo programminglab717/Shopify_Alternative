@@ -32,6 +32,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { useWide } from '../ui/wide';
 import { shownPhone } from './customers-page';
+import { READS_CREDIT, StoreCredit } from './store-credit';
 
 /** The roles that change customers and the blocklist (docs/design/02 §6). */
 const EDITS_CUSTOMERS: readonly StaffRole[] = ['owner', 'manager'];
@@ -374,8 +375,8 @@ function Blocklist({ customer, timezone }: { customer: CustomerDetail; timezone:
 
 /**
  * A customer's page (CUS-01): how to reach them, how their orders went, which of them are open,
- * where they have had things delivered, and the shop's note and tags; owners and managers block
- * their number from it.
+ * where they have had things delivered, the shop's note and tags, and their store credit; owners
+ * and managers block their number from it.
  */
 export function CustomerPage() {
   const { t, locale } = useLocale();
@@ -453,6 +454,7 @@ export function CustomerPage() {
         <div className="flex flex-col gap-4">
           {wide && <Contact customer={customer} />}
           <NoteAndTags customer={customer} edits={edits} />
+          {READS_CREDIT.includes(shop.role) && <StoreCredit customerId={customer.id} />}
           {edits && <Blocklist customer={customer} timezone={details.timezone} />}
         </div>
       </div>

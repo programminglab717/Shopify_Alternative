@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, store credit in the admin** (ORD-09): a customer's store credit on their page, what it
-holds and what it went on, credit given and taken back; then the admin's next sections as the
-alpha's shops need them. Urdu handles wait, as decided.
+**Next, payment links in the admin** (PAY-04): links shared once on WhatsApp or Instagram, each
+opening a checkout of the customer's own with set items, a discount code and prepaid alone if
+the shop likes, until it closes; and how many orders each took; then the admin's next sections
+as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +18,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Store credit, in the admin
+
+* **Store credit** ([ADR-301](../architecture/13-decision-log.md#adr-301--the-admin-shows-a-customers-store-credit-on-their-page-its-ledger-to-those-who-keep-it-and-owners-and-managers-give-credit-by-hand-to-expire-at-the-end-of-a-day-in-the-shops-time-zone-and-take-it-back-an-order-not-yet-shipped-is-paid-with-it-from-its-page)) on a customer's page: what they have, for owners, managers,
+  confirmation agents and accountants; its ledger in words for all but agents; credit given by
+  owners and managers, with a reason and a day it expires, and taken back. An order still to
+  ship is paid with it from its page.
+* **Tried against the core:** on the seed's shop, Rs 1,000 given to a customer with a reason,
+  then paying Rs 1,000 of their Rs 3,699 order, whose cash to collect at the door fell to Rs
+  2,699; the ledger read "Paid for an order" with a link to it. Credit given to expire on 31
+  December first read "expires 1 Jan 2027": the day's end was taken in the browser's own zone,
+  UTC, not the shop's; it is now taken in the shop's, and read 31 Dec 2026. Taking back more than
+  they had was refused before it was sent; no errors in the browser.
+* 2162 tests: the balance and ledger; credit given to expire at the day's end in Pakistan,
+  and taken back; an order to pack paid with credit, and none offered in transit; what an agent
+  and a marketer see.
 
 ### 21b2f5b · The link page, in the admin
 

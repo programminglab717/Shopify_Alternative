@@ -71,6 +71,15 @@ function core(role: StaffRole, answer: ReturnType<typeof order>) {
         return { orderRefund: { refund: { id: 'rfd_2' }, userErrors: [] } };
       case 'OrderMarkAsPaid':
         return { orderMarkAsPaid: { userErrors: [] } };
+      case 'CustomerStoreCredit':
+        return {
+          customer: {
+            id: 'cus_1',
+            storeCreditAccounts: { nodes: [{ id: 'sca_1', balance: rupees('1500.00') }] },
+          },
+        };
+      case 'OrderPayWithStoreCredit':
+        return { orderPayWithStoreCredit: { order: { id: 'ord_7' }, userErrors: [] } };
       default:
         throw new Error(`unexpected ${operation}`);
     }
@@ -214,5 +223,34 @@ describe("An order's money, on its page", () => {
       '7199.50',
     );
     expect(refundable({ amountPaid: rupees('100'), amountRefunded: rupees('100') })).toBe('0');
+  });
+  it("pays an order not yet shipped with its customer's store credit, as much as it covers", async () => {
+    const customer = { id: 'cus_1', displayName: 'Ayesha Khan', numberOfOrders: 2 };
+    const fake = core('manager', order('0', { stage: 'TO_PACK', customer }));
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Pay with store credit (Rs 1,500)' }),
+    );
+    expect(
+      screen.getByText(/They have Rs 1,500 of store credit; the order owes Rs 7,700\./),
+    ).toBeTruthy();
+    const amount = screen.getByLabelText('Amount, at most Rs 1,500') as HTMLInputElement;
+    expect(amount.value).toBe('1500');
+    fireEvent.click(screen.getByRole('button', { name: 'Pay with store credit' }));
+    expect(await screen.findByText('Rs 1,500 paid with store credit.')).toBeTruthy();
+    expect(
+      fake.sent
+        .filter((each) => each.operation === 'OrderPayWithStoreCredit')
+        .map((each) => each.variables),
+    ).toEqual([{ id: 'ord_7', amount: '1500' }]);
+    cleanup();
+
+    // Once a parcel is on its way, credit no longer pays it.
+    vi.stubGlobal('fetch', core('owner', order('0', { stage: 'IN_TRANSIT', customer })).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    expect(await screen.findByRole('button', { name: 'Mark as paid' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Pay with store credit/ })).toBeNull();
   });
 });

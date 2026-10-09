@@ -3,12 +3,17 @@ import { useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { browserFetch } from '../api/client';
 import {
+  CustomerStoreCreditQuery,
   OrderMarkAsPaidMutation,
+  OrderPayWithStoreCreditMutation,
   OrderRefundMutation,
   StagedUploadsCreateMutation,
 } from '../api/operations';
 import type {
+  CustomerStoreCreditData,
   OrderDetail,
+  OrderPayWithStoreCreditData,
+  OrderStage,
   ParcelUserErrorsData,
   RefundMethod,
   StagedUploadsCreateData,
@@ -20,7 +25,7 @@ import type { MessageKey } from '../i18n/messages';
 import { parsePrice, priceText, problemText } from '../products/product-form';
 import { useAttempt } from '../returns/parcel';
 import { SelectField } from '../settings/settings-form';
-import { useAdminMutation, useShop } from '../shell/shop-context';
+import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
@@ -42,6 +47,15 @@ const METHODS: readonly RefundMethod[] = [
 const SENT_BY_HAND: readonly RefundMethod[] = ['CASH', 'BANK_TRANSFER', 'MOBILE_WALLET', 'OTHER'];
 
 /** A receipt the core keeps: a photo, a screenshot or a PDF of at most 10 MiB (ADR-242). */
+/** The stages of an order with nothing of it shipped yet, which store credit may still pay. */
+const UNSHIPPED: readonly OrderStage[] = [
+  'NEEDS_CONFIRMATION',
+  'NEEDS_REVIEW',
+  'AWAITING_PAYMENT',
+  'TO_PACK',
+  'TO_BOOK',
+];
+
 const RECEIPT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 const RECEIPT_BYTES = 10 * 1024 * 1024;
 
@@ -239,10 +253,76 @@ function RefundForm({
  * why and its receipt; an order recorded as paid, once its money came in; and money given back.
  * Owners and managers.
  */
+/**
+ * The order paid, or part of it, with its customer's store credit (ADR-185): as much as it owes
+ * and the credit covers unless staff say less. On delivery, the cash at the door drops by it.
+ */
+function PayWithCredit({
+  order,
+  balance,
+  owed,
+  onDone,
+}: {
+  order: OrderDetail;
+  balance: string;
+  owed: string;
+  onDone: (message: string) => void;
+}) {
+  const { t } = useLocale();
+  const most = cents(balance) < cents(owed) ? balance : owed;
+  const [amount, setAmount] = useState(priceText(most));
+  const pay = useAdminMutation<OrderPayWithStoreCreditData, { id: string; amount: string }>(
+    OrderPayWithStoreCreditMutation,
+  );
+  const { problem, attempt } = useAttempt();
+  const parsed = parsePrice(amount);
+  const tooMuch = parsed !== null && cents(parsed) > cents(most);
+  const ready = parsed !== null && cents(parsed) > 0 && !tooMuch;
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!ready) return;
+    const ok = await attempt(
+      async () =>
+        (await pay.mutateAsync({ id: order.id, amount: parsed! })).orderPayWithStoreCredit,
+    );
+    if (ok) onDone(t('money.credit.paid', { amount: formatMoney(parsed!) }));
+  };
+
+  return (
+    <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
+      <p>{t('money.credit.has', { balance: formatMoney(balance), owed: formatMoney(owed) })}</p>
+      <TextField
+        label={t('money.amount', { most: formatMoney(most) })}
+        inputMode="decimal"
+        ltr
+        value={amount}
+        error={
+          amount && parsed === null
+            ? t('returns.claim.amountWrong')
+            : tooMuch
+              ? t('money.tooMuch')
+              : null
+        }
+        onChange={(event) => setAmount(event.target.value)}
+      />
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" busy={pay.isPending} disabled={!ready}>
+          {t('money.credit.pay')}
+        </Button>
+        <Button variant="tertiary" onClick={() => onDone('')}>
+          {t('returns.cancel')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: string }) {
   const { t, locale } = useLocale();
   const { role } = useShop();
-  const [open, setOpen] = useState<'refund' | 'paid' | null>(null);
+  const [open, setOpen] = useState<'refund' | 'paid' | 'credit' | null>(null);
   const [done, setDone] = useState('');
   const markPaid = useAdminMutation<ParcelUserErrorsData, { id: string }>(OrderMarkAsPaidMutation);
   const { problem, attempt } = useAttempt();
@@ -251,6 +331,20 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
   const unpaid =
     order.status !== 'CANCELLED' && cents(order.amountPaid.amount) < cents(order.totalPrice.amount);
   const owed = ((cents(order.totalPrice.amount) - cents(order.amountPaid.amount)) / 100).toFixed(2);
+  // Store credit pays an order still open with nothing of it shipped.
+  const creditPays =
+    handles && unpaid && order.customer !== null && UNSHIPPED.includes(order.stage);
+  const credit = useAdminQuery<CustomerStoreCreditData>(
+    ['customerStoreCredit', order.customer?.id, false],
+    CustomerStoreCreditQuery,
+    { id: order.customer?.id },
+    { enabled: creditPays },
+  );
+  const balance =
+    credit.data?.customer?.storeCreditAccounts.nodes.find(
+      (account) => account.balance.currencyCode === order.totalPrice.currencyCode,
+    )?.balance.amount ?? '0.00';
+  const hasCredit = creditPays && cents(balance) > 0;
 
   return (
     <div className="flex flex-col gap-3">
@@ -318,6 +412,17 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
           }}
         />
       )}
+      {handles && open === 'credit' && (
+        <PayWithCredit
+          order={order}
+          balance={balance}
+          owed={owed}
+          onDone={(message) => {
+            setOpen(null);
+            setDone(message);
+          }}
+        />
+      )}
       {handles && open === 'paid' && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="flex-1">{t('money.paid.confirm', { amount: formatMoney(owed) })}</span>
@@ -341,6 +446,17 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
       )}
       {handles && open === null && (unpaid || cents(most) > 0) && (
         <div className="flex flex-wrap gap-2">
+          {hasCredit && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setDone('');
+                setOpen('credit');
+              }}
+            >
+              {t('money.credit.start', { balance: formatMoney(balance) })}
+            </Button>
+          )}
           {unpaid && (
             <Button
               variant="secondary"
