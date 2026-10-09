@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-283 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-284 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -291,6 +291,7 @@
 | 281 | The admin's Cash section shows what couriers owe on delivered cash-on-delivery orders and what is on its way, by how long it has been owed and by courier, cash held 15 days or more in red; and imports a courier's statement only once a check of it reads right, its lines to look into first | Accepted |
 | 282 | The admin's Returns section lists parcels on their way back, the longest first, checked in by the tracking number on their label or from the list, or marked lost; lost parcels with their worth, claimed from the courier; and the claims to follow up, settled as paid, refused or withdrawn | Accepted |
 | 283 | An order's page shows its parcels: courier and tracking number, items and the latest steps of their way; those who work orders mark one delivered or refused, add a step told of a courier Hatti does not follow, mark it lost after asking, or check it back in with what came back damaged written off | Accepted |
+| 284 | An order's page records its customer's return of delivered items, each with why, another variant sent at once in exchange if asked, checks it in with what is damaged written off or cancels it; customer returns on their way have a tab of their own; and a parcel back damaged is claimed from its courier | Accepted |
 
 ---
 
@@ -11678,3 +11679,46 @@
     Confirmation Desk, a customer's call or the orders list, so it sits with the order.
   * **Their own words for a parcel's state:** the order's stage badge says "Returning" at the
     top of the page; the parcel saying "Coming back" beneath it read as two things.
+
+## ADR-284 · An order's page records its customer's return of delivered items, each with why, another variant sent at once in exchange if asked, checks it in with what is damaged written off or cancels it; customer returns on their way have a tab of their own; and a parcel back damaged is claimed from its courier
+
+* **Context:** A customer sends back a size that did not fit, or something faulty. The core
+  records a return of delivered units, each line with its reason ([ADR-136](#adr-136--a-customers-return-of-delivered-items-is-recorded-by-staff-each-item-with-its-reason-and-checked-in-when-it-arrives-each-unit-back-in-stock-where-it-came-back-to-or-written-off-money-given-back-stays-a-refund-and-the-sales-report-counts-what-came-back)), sends
+  another variant at once as an order of its own, paid by what comes back
+  ([ADR-137](#adr-137--a-return-may-send-another-size-at-once-as-an-order-of-its-own-paid-by-what-was-paid-for-what-comes-back-credited-from-its-order-as-a-refund-by-exchange-in-which-no-money-moves-the-door-collecting-the-rest)), lists returns on their way the longest first ([ADR-138](#adr-138--customer-returns-on-their-way-are-listed-the-longest-first-with-their-days-and-items-and-counted-on-the-home-as-parcels-coming-back-are)), and
+  checks one in with so many of each line back in stock. A parcel that came back with items
+  written off is claimed from its courier ([ADR-098](#adr-098--a-parcel-that-came-back-with-items-written-off-as-damaged-is-claimed-from-its-courier-for-their-worth-as-a-lost-parcel-is-for-its-own-every-claim-is-listed-the-oldest-first-to-follow-up)). The home counted returns to
+  receive and opened nothing; the order's page showed its parcels ([ADR-283](#adr-283--an-orders-page-shows-its-parcels-courier-and-tracking-number-items-and-the-latest-steps-of-their-way-those-who-work-orders-mark-one-delivered-or-refused-add-a-step-told-of-a-courier-hatti-does-not-follow-mark-it-lost-after-asking-or-check-it-back-in-with-what-came-back-damaged-written-off)).
+* **Decision:**
+  * **Returns** is a section of the order's page wherever something was delivered or has come
+    back: each return with its name, state (on its way back, received, cancelled), date and
+    tracking, its items with why, what went back in stock and what was written off, and the
+    order sent in exchange, linked.
+  * **"Record a return"** lists the lines that can still come back: delivered, less what
+    returns not cancelled bring back. Each takes how many and why (too small, too large,
+    damaged, not as described, wrong item, changed their mind, something else) and, once some
+    come back, another variant of the product to send in exchange, its stock beside it and the
+    one coming back left out. The exchange may carry a delivery charge, and the return the
+    courier and tracking number bringing it.
+  * **An open return** is checked in with the restock form a parcel uses, or cancelled when the
+    customer keeps the items after all.
+  * **Customer returns** is a tab of the Returns section: those on their way, the longest
+    first, red from 14 days, each linked to its order, with its exchange; received there with
+    everything back in stock, or opened on its order when something is damaged. The home's
+    "returns to receive" opens it.
+  * **A parcel back** with no claim, or one withdrawn, is claimed from its courier from the
+    order's parcels by owners, managers and accountants: what was written off unless the shop
+    says less, with the claim number.
+  * Recording, checking in and cancelling need `write_orders`, so owners, managers,
+    confirmation agents and packers do them.
+* **Consequences:**
+  * A size exchange agreed on WhatsApp is recorded in one go, the new size on its way the same
+    day as an order the packers see in their queue.
+  * Money given back for a return is a refund, which the order's page does not record yet; it
+    comes next.
+* **Alternatives:**
+  * **A page of its own for recording a return:** a return is always of one order, and staff
+    reach it from the order.
+  * **Any variant of the shop for an exchange:** exchanges are nearly always another size of
+    the same product, so the choice is that product's variants; a different product is a new
+    order.

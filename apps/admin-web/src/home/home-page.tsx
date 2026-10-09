@@ -9,7 +9,7 @@ import { errorText } from '../i18n/errors';
 import { formatCount, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
-import { CLAIMS } from '../returns/parcel';
+import { CLAIMS, READS_RETURNS } from '../returns/parcel';
 import type { ReturnsTab } from '../returns/parcel';
 import { useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
@@ -36,7 +36,10 @@ const NEXT: readonly { key: HomeKey; stage?: OrderStage; opens?: Opens }[] = [
   { key: 'toPack', stage: 'TO_PACK' },
   { key: 'toBook', stage: 'TO_BOOK' },
   { key: 'returning', stage: 'RETURNING' },
-  { key: 'returnsToReceive' },
+  {
+    key: 'returnsToReceive',
+    opens: { to: '/$shopId/returns', tab: 'customer', roles: READS_RETURNS },
+  },
   { key: 'cashToCollect', opens: { to: '/$shopId/cash', roles: RECONCILES_CASH } },
   { key: 'lostToClaim', opens: { to: '/$shopId/returns', tab: 'lost', roles: CLAIMS } },
   { key: 'claimsOpen', opens: { to: '/$shopId/returns', tab: 'claims', roles: CLAIMS } },

@@ -245,7 +245,7 @@ describe('Parcels coming back, in the admin', () => {
           toPack: tally(0),
           toBook: tally(0),
           returning: tally(0),
-          returnsToReceive: tally(0),
+          returnsToReceive: tally(1, '2500'),
           cashToCollect: tally(4, '12000'),
           lostToClaim: tally(1, '5900'),
           claimsOpen: tally(2, '14100'),
@@ -270,6 +270,9 @@ describe('Parcels coming back, in the admin', () => {
     expect(
       screen.getByRole('link', { name: /Cash on delivery still to come/ }).getAttribute('href'),
     ).toBe('/shop_1/cash');
+    expect(
+      screen.getByRole('link', { name: /1 customer return to receive/ }).getAttribute('href'),
+    ).toBe('/shop_1/returns?tab=customer');
 
     expect(trackingText({ company: null, number: 'PX1' })).toBe('PX1');
     expect(validateReturnsSearch({ tab: 'claims' })).toEqual({ tab: 'claims' });
@@ -281,5 +284,52 @@ describe('Parcels coming back, in the admin', () => {
     for (const role of ['confirmation_agent', 'marketer'] as const) {
       expect(sectionsOf(role).some((item) => item.to === '/$shopId/returns')).toBe(false);
     }
+  });
+  it('lists customer returns on their way, the slow in red, and receives one all back in stock', async () => {
+    const fake = fakeCore('packer', (operation) => {
+      if (operation === 'OpenReturns') {
+        return {
+          openReturns: {
+            nodes: [
+              {
+                id: 'ret_1',
+                name: '#1007-R1',
+                orderId: 'ord_7',
+                days: 15,
+                units: 2,
+                exchangeOrderName: '#1019',
+                trackingInfo: tracking('TCS', '779000111'),
+              },
+              {
+                id: 'ret_2',
+                name: '#1011-R1',
+                orderId: 'ord_11',
+                days: 0,
+                units: 1,
+                exchangeOrderName: null,
+                trackingInfo: tracking(null as unknown as string, null as unknown as string),
+              },
+            ],
+            pageInfo: { hasNextPage: false },
+          },
+        };
+      }
+      if (operation === 'ReturnReceive') return ok('returnReceive');
+      throw new Error(`unexpected ${operation}`);
+    });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/returns?tab=customer');
+
+    const first = await screen.findByRole('link', { name: '#1007-R1' });
+    expect(first.getAttribute('href')).toBe('/shop_1/orders/ord_7');
+    expect(screen.getByText('15 days on its way').className).toContain('text-danger');
+    expect(screen.getByText('Recorded today').className).not.toContain('text-danger');
+    expect(screen.getByText('Exchange: #1019')).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Received: all back in stock' })[1]!);
+    await waitFor(() =>
+      expect(fake.sent.find((each) => each.operation === 'ReturnReceive')?.variables).toEqual({
+        id: 'ret_2',
+      }),
+    );
   });
 });

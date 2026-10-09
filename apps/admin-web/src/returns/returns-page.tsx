@@ -18,6 +18,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { Claims, Lost } from './claims';
+import { CustomerReturns } from './customer-returns';
 import { CHECKS_IN, CLAIMS, ParcelTitle, RETURNS_TABS, SLOW_RETURN_DAYS } from './parcel';
 import type { ReturnsTab } from './parcel';
 
@@ -244,7 +245,15 @@ export function ReturnsPage() {
           </button>
         ))}
       </div>
-      {showing === 'back' ? <ComingBack /> : showing === 'lost' ? <Lost /> : <Claims />}
+      {showing === 'back' ? (
+        <ComingBack />
+      ) : showing === 'customer' ? (
+        <CustomerReturns />
+      ) : showing === 'lost' ? (
+        <Lost />
+      ) : (
+        <Claims />
+      )}
     </div>
   );
 }

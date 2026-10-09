@@ -59,6 +59,7 @@ function order(fulfillments: unknown[]) {
       risk: null,
       assignee: null,
       fulfillments,
+      returns: [],
       events: { nodes: [] },
     },
   };
@@ -89,6 +90,7 @@ const parcel = (status: string, extra: Record<string, unknown> = {}) => ({
       step('evt_1', 'CONFIRMED', null, 50),
     ],
   },
+  claim: null,
   ...extra,
 });
 

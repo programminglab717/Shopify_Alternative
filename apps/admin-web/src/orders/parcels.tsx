@@ -4,6 +4,7 @@ import { PackageCheck, PackageX, Truck, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  ParcelClaimCreateMutation,
   ParcelEventCreateMutation,
   ParcelMarkDeliveredMutation,
   ParcelMarkLostMutation,
@@ -20,13 +21,16 @@ import type { StaffRole } from '../auth/session';
 import { formatCount, formatDateTime } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
-import { trackingText, useAttempt } from '../returns/parcel';
+import { CLAIMS, trackingText, useAttempt } from '../returns/parcel';
 import { SelectField } from '../settings/settings-form';
+import { parsePrice } from '../products/product-form';
 import { useAdminMutation, useShop } from '../shell/shop-context';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { RestockForm } from './restock-form';
+import type { Restock } from './restock-form';
 
 /** Those who move a parcel along, as the core lets them (`write_orders`). */
 export const WORKS_PARCELS: readonly StaffRole[] = [
@@ -114,81 +118,79 @@ function StepForm({ id, onDone }: { id: string; onDone: () => void }) {
 
 /** A parcel that came back checked in: how many of each line go back in stock, the rest written off. */
 function CheckInForm({ parcel, onDone }: { parcel: ParcelDetail; onDone: () => void }) {
-  const { t } = useLocale();
-  const [counts, setCounts] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      parcel.fulfillmentLineItems.map((each) => [each.lineItem.id, String(each.quantity)]),
-    ),
-  );
-  const receive = useAdminMutation<ParcelUserErrorsData, Record<string, unknown>>(
+  const receive = useAdminMutation<ParcelUserErrorsData, { id: string; restock: Restock }>(
     ParcelReceiveMutation,
   );
   const { problem, attempt } = useAttempt();
-  const restock = parcel.fulfillmentLineItems.map((each) => ({
-    lineItemId: each.lineItem.id,
-    quantity: /^\d+$/.test(counts[each.lineItem.id] ?? '')
-      ? Number(counts[each.lineItem.id])
-      : Number.NaN,
-    most: each.quantity,
-  }));
-  const valid = restock.every((each) => each.quantity >= 0 && each.quantity <= each.most);
-  const writtenOff = restock.reduce(
-    (sum, each) => sum + (valid ? each.most - each.quantity : 0),
-    0,
+  return (
+    <RestockForm
+      lines={parcel.fulfillmentLineItems.map((each) => ({
+        ...each.lineItem,
+        quantity: each.quantity,
+      }))}
+      busy={receive.isPending}
+      problem={problem}
+      onCancel={onDone}
+      onSubmit={(restock) =>
+        void attempt(
+          async () =>
+            (await receive.mutateAsync({ id: parcel.id, restock })).fulfillmentReceiveReturn!,
+        ).then((done) => done && onDone())
+      }
+    />
   );
+}
+
+/**
+ * A claim on the courier for what of a parcel that came back was written off as damaged
+ * (ADR-098): that worth unless the shop says less, and the courier's claim number.
+ */
+function DamageClaimForm({ id, onDone }: { id: string; onDone: () => void }) {
+  const { t } = useLocale();
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const create = useAdminMutation<ParcelUserErrorsData, Record<string, unknown>>(
+    ParcelClaimCreateMutation,
+  );
+  const { problem, attempt } = useAttempt();
+  const parsed = amount.trim() ? parsePrice(amount) : null;
+  const ready = !amount.trim() || parsed !== null;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!valid) return;
+    if (!ready) return;
     const done = await attempt(
       async () =>
-        (
-          await receive.mutateAsync({
-            id: parcel.id,
-            restock: restock.map(({ lineItemId, quantity }) => ({ lineItemId, quantity })),
-          })
-        ).fulfillmentReceiveReturn!,
+        (await create.mutateAsync({ id, amount: parsed, note: note.trim() || null }))
+          .fulfillmentClaimCreate!,
     );
     if (done) onDone();
   };
 
   return (
     <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
-      <p className="text-secondary">{t('parcels.checkIn.hint')}</p>
-      <ul className="flex flex-col gap-2">
-        {parcel.fulfillmentLineItems.map((each) => (
-          <li key={each.lineItem.id} className="flex items-end gap-3">
-            <span className="flex min-w-0 flex-1 flex-col pb-3">
-              <span dir="auto">{each.lineItem.title}</span>
-              {each.lineItem.variantTitle && each.lineItem.variantTitle !== 'Default Title' && (
-                <span className="text-secondary" dir="auto">
-                  {each.lineItem.variantTitle}
-                </span>
-              )}
-            </span>
-            <TextField
-              label={t('parcels.checkIn.back', { count: formatCount(each.quantity) })}
-              inputMode="numeric"
-              ltr
-              className="w-36"
-              value={counts[each.lineItem.id] ?? ''}
-              onChange={(event) =>
-                setCounts({ ...counts, [each.lineItem.id]: event.target.value.trim() })
-              }
-            />
-          </li>
-        ))}
-      </ul>
-      {!valid && <Alert tone="danger">{t('parcels.checkIn.wrong')}</Alert>}
-      {valid && writtenOff > 0 && (
-        <Alert tone="warning">
-          {t('parcels.checkIn.writtenOff', { count: formatCount(writtenOff) })}
-        </Alert>
-      )}
+      <div className="grid gap-3 md:grid-cols-2">
+        <TextField
+          label={t('returns.claim.amount')}
+          hint={t('parcels.damage.amountHint')}
+          inputMode="decimal"
+          ltr
+          value={amount}
+          error={ready ? null : t('returns.claim.amountWrong')}
+          onChange={(event) => setAmount(event.target.value)}
+        />
+        <TextField
+          label={t('returns.claim.note')}
+          hint={t('returns.claim.noteHint')}
+          value={note}
+          maxLength={500}
+          onChange={(event) => setNote(event.target.value)}
+        />
+      </div>
       {problem && <Alert tone="danger">{problem}</Alert>}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" busy={receive.isPending} disabled={!valid}>
-          {t('parcels.checkIn.save')}
+        <Button type="submit" busy={create.isPending} disabled={!ready}>
+          {t('returns.claim.file')}
         </Button>
         <Button variant="tertiary" onClick={onDone}>
           {t('returns.cancel')}
@@ -198,7 +200,7 @@ function CheckInForm({ parcel, onDone }: { parcel: ParcelDetail; onDone: () => v
   );
 }
 
-type Open = 'step' | 'checkIn' | 'lost' | null;
+type Open = 'step' | 'checkIn' | 'lost' | 'claim' | null;
 
 function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }) {
   const { t, locale } = useLocale();
@@ -214,6 +216,11 @@ function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }
   const lost = useAdminMutation<ParcelUserErrorsData, { id: string }>(ParcelMarkLostMutation);
   const { problem, attempt } = useAttempt();
   const works = WORKS_PARCELS.includes(role);
+  // A parcel back with items written off is claimed from its courier; a claim withdrawn, again.
+  const claimable =
+    CLAIMS.includes(role) &&
+    parcel.status === 'RETURNED' &&
+    (!parcel.claim || parcel.claim.status === 'WITHDRAWN');
   const badge = STATUS_BADGES[parcel.status];
   const steps = parcel.events.nodes;
   const shown = allSteps ? steps : steps.slice(0, FIRST_STEPS);
@@ -299,6 +306,17 @@ function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }
             {t('returns.cancel')}
           </Button>
         </div>
+      )}
+      {parcel.claim && (
+        <span className="text-secondary">
+          {t(`returns.claim.${parcel.claim.status}` as MessageKey)}
+        </span>
+      )}
+      {open === 'claim' && <DamageClaimForm id={parcel.id} onDone={() => setOpen(null)} />}
+      {claimable && open === null && (
+        <Button variant="secondary" className="self-start" onClick={() => setOpen('claim')}>
+          {t('parcels.damage.claim')}
+        </Button>
       )}
       {works && open === null && (
         <div className="flex flex-wrap gap-2">

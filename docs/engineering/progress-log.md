@@ -6,11 +6,10 @@
 
 ## In progress
 
-**Next, customer returns in the admin** (ORD-07): a return recorded from a delivered order's
-page, each item with its reason, and an exchange sent at once; returns on their way, the longest
-first; received, each unit back in stock or written off; and a parcel back damaged claimed from
-its courier; then the admin's next sections as the alpha's shops need them. Urdu handles wait, as
-decided.
+**Next, an order's money on its page in the admin** (ORD-09, PAY-04): refunds, in cash, by
+transfer, through the gateway or as store credit, with their receipts; an order marked paid; and
+the payments its customer made online; then the admin's next sections as the alpha's shops need
+them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -19,6 +18,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Customer returns, in the admin
+
+* **Returns on the order's page** ([ADR-284](../architecture/13-decision-log.md#adr-284--an-orders-page-records-its-customers-return-of-delivered-items-each-with-why-another-variant-sent-at-once-in-exchange-if-asked-checks-it-in-with-what-is-damaged-written-off-or-cancels-it-customer-returns-on-their-way-have-a-tab-of-their-own-and-a-parcel-back-damaged-is-claimed-from-its-courier)):
+  a return of delivered items recorded with why, another size sent at once in exchange, and the
+  courier bringing it; checked in with what is damaged written off, or cancelled; customer
+  returns on their way as a tab of the Returns section, which the home opens; and a parcel back
+  damaged claimed from its courier.
+* **Tried against the core:** the seed's #1006, delivered by TCS, had one Peshawari Chappal in
+  size 10 sent back as too small, size 8 sent in exchange as #1016 (size 9, out of stock,
+  said so), the return listed on its way, then received with the pair written off; and #1005's
+  parcel, back with both suits written off, claimed from Leopards; with no errors in the
+  browser.
+* 2016 tests: a return with its exchange and tracking, too many refused, the size coming
+  back not offered, a return checked in with a write-off and cancelled, a damage claim by an
+  accountant, what can still come back, and returns on their way with the home's link.
 
 ### 2f79e06 · An order's parcels, in the admin
 

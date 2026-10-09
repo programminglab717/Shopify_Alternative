@@ -172,6 +172,8 @@ export const OrderQuery = /* GraphQL */ `
       source
       lineItems {
         id
+        productId
+        variantId
         title
         variantTitle
         sku
@@ -253,6 +255,33 @@ export const OrderQuery = /* GraphQL */ `
             status
             message
             happenedAt
+          }
+        }
+        claim {
+          status
+        }
+      }
+      returns {
+        id
+        name
+        status
+        createdAt
+        closedAt
+        note
+        trackingInfo {
+          company
+          number
+        }
+        exchangeOrder {
+          id
+          name
+        }
+        returnLineItems {
+          quantity
+          restockedQuantity
+          returnReason
+          lineItem {
+            id
           }
         }
       }
@@ -2383,6 +2412,88 @@ export const ParcelEventCreateMutation = /* GraphQL */ `
 export const ParcelReceiveMutation = /* GraphQL */ `
   mutation ParcelReceive($id: ID!, $restock: [FulfillmentRestockInput!]) {
     fulfillmentReceiveReturn(id: $id, restock: $restock) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A product's variants, to send another size in exchange. */
+export const ProductVariantsQuery = /* GraphQL */ `
+  query ProductVariants($id: ID!) {
+    product(id: $id) {
+      id
+      variants {
+        id
+        title
+        availableForSale
+        inventoryQuantity
+      }
+    }
+  }
+`;
+
+/** Customer returns still on their way, the longest first (ADR-138). */
+export const OpenReturnsQuery = /* GraphQL */ `
+  query OpenReturns {
+    openReturns(first: 100) {
+      nodes {
+        id
+        name
+        orderId
+        days
+        units
+        exchangeOrderName
+        trackingInfo {
+          company
+          number
+        }
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+`;
+
+/** A customer's return of delivered items recorded, with another size sent at once if asked. */
+export const ReturnCreateMutation = /* GraphQL */ `
+  mutation ReturnCreate($input: ReturnCreateInput!) {
+    returnCreate(input: $input) {
+      return {
+        id
+        name
+        exchangeOrder {
+          id
+          name
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A return checked in as it arrives: so many of each line back in stock, the rest written off. */
+export const ReturnReceiveMutation = /* GraphQL */ `
+  mutation ReturnReceive($id: ID!, $restock: [ReturnRestockInput!]) {
+    returnReceive(id: $id, restock: $restock) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A return still on its way cancelled, as when the customer keeps the items after all. */
+export const ReturnCancelMutation = /* GraphQL */ `
+  mutation ReturnCancel($id: ID!) {
+    returnCancel(id: $id) {
       userErrors {
         ...Problems
       }

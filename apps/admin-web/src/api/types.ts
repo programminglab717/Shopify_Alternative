@@ -131,6 +131,63 @@ export interface ParcelDetail {
       happenedAt: string;
     }[];
   };
+  claim: { status: FulfillmentClaimStatus } | null;
+}
+
+export type ReturnReason =
+  | 'SIZE_TOO_SMALL'
+  | 'SIZE_TOO_LARGE'
+  | 'DEFECTIVE'
+  | 'NOT_AS_DESCRIBED'
+  | 'WRONG_ITEM'
+  | 'UNWANTED'
+  | 'OTHER';
+
+/** A customer's return of an order's delivered items, for the order's page. */
+export interface ReturnDetail {
+  id: string;
+  name: string;
+  status: 'OPEN' | 'CLOSED' | 'CANCELLED';
+  createdAt: string;
+  closedAt: string | null;
+  note: string;
+  trackingInfo: { company: string | null; number: string | null };
+  exchangeOrder: { id: string; name: string } | null;
+  returnLineItems: {
+    quantity: number;
+    restockedQuantity: number | null;
+    returnReason: ReturnReason;
+    lineItem: { id: string };
+  }[];
+}
+
+export interface ProductVariantsData {
+  product: {
+    id: string;
+    variants: { id: string; title: string; availableForSale: boolean; inventoryQuantity: number }[];
+  } | null;
+}
+
+export interface OpenReturnsData {
+  openReturns: {
+    nodes: {
+      id: string;
+      name: string;
+      orderId: string;
+      days: number;
+      units: number;
+      exchangeOrderName: string | null;
+      trackingInfo: { company: string | null; number: string | null };
+    }[];
+    pageInfo: { hasNextPage: boolean };
+  };
+}
+
+export interface ReturnCreateData {
+  returnCreate: {
+    return: { id: string; name: string; exchangeOrder: { id: string; name: string } | null } | null;
+    userErrors: UserError[];
+  };
 }
 
 export interface OrderDetail {
@@ -151,6 +208,8 @@ export interface OrderDetail {
   source: string;
   lineItems: {
     id: string;
+    productId: string;
+    variantId: string;
     title: string;
     variantTitle: string;
     sku: string | null;
@@ -174,6 +233,7 @@ export interface OrderDetail {
   } | null;
   assignee: { name: string } | null;
   fulfillments: ParcelDetail[];
+  returns: ReturnDetail[];
   events: {
     nodes: {
       id: string;

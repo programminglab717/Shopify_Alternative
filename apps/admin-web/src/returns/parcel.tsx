@@ -19,8 +19,8 @@ export const CLAIMS: readonly StaffRole[] = ['owner', 'manager', 'accountant'];
 /** Days on the way back from which a courier is slow, worth a call. */
 export const SLOW_RETURN_DAYS = 14;
 
-/** The section's tabs: coming back, lost, and the claims on couriers. */
-export const RETURNS_TABS = ['back', 'lost', 'claims'] as const;
+/** The section's tabs: parcels coming back, customers' returns, lost, and claims on couriers. */
+export const RETURNS_TABS = ['back', 'customer', 'lost', 'claims'] as const;
 export type ReturnsTab = (typeof RETURNS_TABS)[number];
 
 /** A parcel's courier and tracking number, as its label has them. */
