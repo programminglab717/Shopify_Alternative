@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The online store's pages and menus, in the admin
+### c806d77 · The online store's pages and menus, in the admin
 
 * **An Online store section** ([ADR-291](../architecture/13-decision-log.md#adr-291--the-admins-online-store-writes-the-shops-pages-as-plain-text-paragraphs-a-blank-line-apart-shown-or-hidden-keeping-html-from-elsewhere-as-html-and-changes-its-menus-links-three-levels-deep-to-the-home-page-all-products-a-collection-a-product-a-page-or-an-address-saved-whole-marketers-write-pages-owners-and-managers-both)): pages written as plain text, shown or hidden,
   their HTML kept where it is more than paragraphs; menus' links three levels deep, to the home
