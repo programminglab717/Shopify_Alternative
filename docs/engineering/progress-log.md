@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Blogs, articles, menus and the home page in Urdu, in the admin
+### 7474458 · Blogs, articles, menus and the home page in Urdu, in the admin
 
 * **The rest of the shop's words in Urdu** ([ADR-328](../architecture/13-decision-log.md#adr-328--the-admins-urdu-page-serves-blogs-articles-menus-and-the-home-pages-words-too-a-menus-links-each-a-level-in-under-the-link-they-sit-under-the-home-pages-words-the-shops-own-and-a-menus-urdu-for-those-who-change-menus)): a blog's, an article's and a menu's pages,
   and the storefront's preferences beside the home page's words for search engines, say how much
