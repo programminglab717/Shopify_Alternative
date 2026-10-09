@@ -6,20 +6,35 @@
     "theme_author": "Hatti"
   },
   {
-    "name": "Colours",
+    "name": "t:settings_schema.colours.name",
     "settings": [
-      { "type": "color", "id": "color_text", "label": "Text", "default": "#0F172A" },
-      { "type": "color", "id": "color_background", "label": "Background", "default": "#FFFFFF" },
-      { "type": "color", "id": "color_accent", "label": "Buttons and links", "default": "#0F766E" }
+      {
+        "type": "color",
+        "id": "color_text",
+        "label": "t:settings_schema.colours.settings.color_text.label",
+        "default": "#0F172A"
+      },
+      {
+        "type": "color",
+        "id": "color_background",
+        "label": "t:settings_schema.colours.settings.color_background.label",
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "id": "color_accent",
+        "label": "t:settings_schema.colours.settings.color_accent.label",
+        "default": "#0F766E"
+      }
     ]
   },
   {
-    "name": "Layout",
+    "name": "t:settings_schema.layout.name",
     "settings": [
       {
         "type": "range",
         "id": "page_width",
-        "label": "Page width",
+        "label": "t:settings_schema.layout.settings.page_width.label",
         "min": 1000,
         "max": 1600,
         "step": 100,
@@ -29,22 +44,28 @@
     ]
   },
   {
-    "name": "Orders",
+    "name": "t:settings_schema.orders.name",
     "settings": [
       {
         "type": "select",
         "id": "cart_type",
-        "label": "When a product is added to the cart",
+        "label": "t:settings_schema.orders.settings.cart_type.label",
         "options": [
-          { "value": "drawer", "label": "Show the cart in a drawer over the page" },
-          { "value": "page", "label": "Go to the cart page" }
+          {
+            "value": "drawer",
+            "label": "t:settings_schema.orders.settings.cart_type.options__1.label"
+          },
+          {
+            "value": "page",
+            "label": "t:settings_schema.orders.settings.cart_type.options__2.label"
+          }
         ],
         "default": "drawer"
       },
       {
         "type": "checkbox",
         "id": "whatsapp_orders",
-        "label": "Offer \"Order on WhatsApp\" on product pages",
+        "label": "t:settings_schema.orders.settings.whatsapp_orders.label",
         "default": true
       }
     ]

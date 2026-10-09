@@ -36,30 +36,57 @@
 
 {% schema %}
 {
-  "name": "Image banner",
+  "name": "t:sections.image-banner.name",
   "settings": [
-    { "type": "image_picker", "id": "image", "label": "Image" }
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:sections.image-banner.settings.image.label"
+    }
   ],
   "blocks": [
     {
       "type": "heading",
-      "name": "Heading",
+      "name": "t:sections.image-banner.blocks.heading.name",
       "limit": 1,
-      "settings": [{ "type": "text", "id": "heading", "label": "Heading", "default": "Welcome" }]
+      "settings": [
+        {
+          "type": "text",
+          "id": "heading",
+          "label": "t:sections.image-banner.blocks.heading.settings.heading.label",
+          "default": "Welcome"
+        }
+      ]
     },
     {
       "type": "text",
-      "name": "Text",
+      "name": "t:sections.image-banner.blocks.text.name",
       "limit": 1,
-      "settings": [{ "type": "textarea", "id": "text", "label": "Text" }]
+      "settings": [
+        {
+          "type": "textarea",
+          "id": "text",
+          "label": "t:sections.image-banner.blocks.text.settings.text.label"
+        }
+      ]
     },
     {
       "type": "button",
-      "name": "Button",
+      "name": "t:sections.image-banner.blocks.button.name",
       "limit": 2,
       "settings": [
-        { "type": "text", "id": "label", "label": "Label", "default": "Shop now" },
-        { "type": "url", "id": "link", "label": "Link", "default": "/collections/all" }
+        {
+          "type": "text",
+          "id": "label",
+          "label": "t:sections.image-banner.blocks.button.settings.label.label",
+          "default": "Shop now"
+        },
+        {
+          "type": "url",
+          "id": "link",
+          "label": "t:sections.image-banner.blocks.button.settings.link.label",
+          "default": "/collections/all"
+        }
       ]
     }
   ]

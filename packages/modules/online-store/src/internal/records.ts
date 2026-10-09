@@ -1,4 +1,5 @@
 import type { SeoValue } from '@hatti/api';
+import type { EditorSchemas } from '@hatti/themes';
 import type { PolicyType } from './policy-types.js';
 import type { CommentPolicyValue, CommentStatusValue, ThemeRoleValue } from './schema.js';
 
@@ -23,6 +24,24 @@ export interface ThemeFileRecord {
   /** JSON, as the shop saved it. */
   body: string;
   updatedAt: Date;
+}
+
+/** A JSON file of a theme as the storefront reads it, for the theme editor (ADR-323). */
+export interface ThemeEditorFileRecord {
+  filename: string;
+  body: string;
+  /** The shop's own; else the platform theme's, as the shop has none. */
+  own: boolean;
+  /** What Theme Check finds wrong with the shop's own, which the storefront then leaves out. */
+  problems: string[];
+}
+
+/**
+ * What the theme editor needs of a theme (ADR-323): the platform theme's settings and sections,
+ * their words in the editor's language, and the theme's files.
+ */
+export interface ThemeEditorRecord extends EditorSchemas {
+  files: ThemeEditorFileRecord[];
 }
 
 /** What a menu's item links to (ADR-040), pages (ADR-045), blogs and articles (ADR-178) too. */

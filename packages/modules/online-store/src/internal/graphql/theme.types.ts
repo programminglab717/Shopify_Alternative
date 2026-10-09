@@ -45,6 +45,80 @@ export class OnlineStoreThemeFile {
 
 @ObjectType({
   description:
+    'A section a theme has, as the theme editor shows it: the settings it takes, its blocks and ' +
+    'presets.',
+})
+export class OnlineStoreThemeSection {
+  @Field({ description: 'As templates and section groups place it, such as image-banner.' })
+  type!: string;
+
+  @Field({ description: 'Such as Image banner, in the language asked for.' })
+  name!: string;
+
+  @Field({
+    description:
+      "Its {% schema %}, as JSON: its settings, blocks and presets, with Shopify's fields; the " +
+      'names, labels and notes in the language asked for.',
+  })
+  schema!: string;
+}
+
+@ObjectType({
+  description:
+    "A JSON file of a theme as the storefront reads it: the shop's own, or the platform theme's " +
+    'where the shop has none.',
+})
+export class OnlineStoreThemeEditorFile {
+  @Field({
+    description:
+      'Such as templates/index.json, sections/header-group.json or config/settings_data.json.',
+  })
+  filename!: string;
+
+  @Field({ description: 'The JSON.' })
+  body!: string;
+
+  @Field({
+    description:
+      "Whether it is the shop's own. Deleting the shop's own brings the platform theme's back.",
+  })
+  own!: boolean;
+
+  @Field(() => [String], {
+    description:
+      "What Theme Check finds wrong with the shop's own file, which the storefront leaves out for " +
+      "the platform theme's, as when the platform theme changed after it was saved. Empty when " +
+      'the storefront uses it.',
+  })
+  problems!: string[];
+}
+
+@ObjectType({
+  description:
+    "What the theme editor needs of a theme (ADR-323): the platform theme's settings and " +
+    "sections, and the theme's files as the storefront reads them.",
+})
+export class OnlineStoreThemeEditor {
+  @Field({
+    description:
+      "The platform theme's config/settings_schema.json, as JSON: the theme's settings in their " +
+      "groups, with Shopify's fields; the names, labels and notes in the language asked for.",
+  })
+  settingsSchema!: string;
+
+  @Field(() => [OnlineStoreThemeSection], { description: 'Every section the theme has.' })
+  sections!: OnlineStoreThemeSection[];
+
+  @Field(() => [OnlineStoreThemeEditorFile], {
+    description:
+      'Every JSON file the shop may keep in the theme, as the storefront reads it: templates, ' +
+      'section groups and settings.',
+  })
+  files!: OnlineStoreThemeEditorFile[];
+}
+
+@ObjectType({
+  description:
     "A shop's theme: a platform theme, such as Hatti Base, with the shop's own templates, section " +
     'groups and settings over it.',
 })

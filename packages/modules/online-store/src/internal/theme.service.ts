@@ -2,7 +2,7 @@ import { InputChecker, fail, failOne, type MutationResult, type TenantContext } 
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { checkShopFile, platformTheme } from '@hatti/themes';
+import { checkShopFile, editorSchemas, platformTheme } from '@hatti/themes';
 import { Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import {
@@ -12,9 +12,15 @@ import {
   type ThemePublishedPayload,
   type ThemeUpdatedPayload,
 } from './events.js';
-import type { Page, ThemeFileRecord, ThemeRecord } from './records.js';
+import type { Page, ThemeEditorRecord, ThemeFileRecord, ThemeRecord } from './records.js';
 import { themeFiles, themes, type ThemeRoleValue, type ThemeRow } from './schema.js';
-import { BASE_THEME, BASE_THEME_NAME, THEME_LIMITS, checkThemeFile } from './theme-files.js';
+import {
+  BASE_THEME,
+  BASE_THEME_NAME,
+  THEME_LIMITS,
+  checkThemeFile,
+  isThemeFilename,
+} from './theme-files.js';
 
 export interface ThemeFileInput {
   filename: string;
@@ -122,6 +128,35 @@ export class ThemeService {
     return this.db.tenant(tenant.shopId, (tx) =>
       this.#files(tx, tenant.shopId, themeId, filenames),
     );
+  }
+
+  /**
+   * What the theme editor needs of a theme on the platform theme `base` (ADR-323): that theme's
+   * settings and sections, their words in `locale`, and each JSON file the shop may keep in the
+   * theme as the storefront reads it: the shop's own, with what Theme Check finds wrong with it,
+   * else the platform theme's.
+   */
+  async editor(
+    tenant: TenantContext,
+    themeId: string,
+    base: string,
+    locale: string,
+  ): Promise<ThemeEditorRecord> {
+    const [platform, own] = await Promise.all([platformTheme(base), this.files(tenant, themeId)]);
+    const mine = new Map(own.map((file) => [file.filename, file.body]));
+    const filenames = new Set([
+      ...Object.keys(platform.files).filter(isThemeFilename),
+      ...mine.keys(),
+    ]);
+    return {
+      ...editorSchemas(platform, locale),
+      files: [...filenames].sort().map((filename) => {
+        const body = mine.get(filename);
+        return body === undefined
+          ? { filename, body: platform.files[filename]!, own: false, problems: [] }
+          : { filename, body, own: true, problems: checkShopFile(platform, filename, body) };
+      }),
+    };
   }
 
   /**

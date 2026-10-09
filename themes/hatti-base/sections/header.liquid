@@ -173,9 +173,14 @@
 
 {% schema %}
 {
-  "name": "Header",
+  "name": "t:sections.header.name",
   "settings": [
-    { "type": "link_list", "id": "menu", "label": "Menu", "default": "main-menu" }
+    {
+      "type": "link_list",
+      "id": "menu",
+      "label": "t:sections.header.settings.menu.label",
+      "default": "main-menu"
+    }
   ]
 }
 {% endschema %}

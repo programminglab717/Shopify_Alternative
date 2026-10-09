@@ -188,13 +188,17 @@
 
 {% schema %}
 {
-  "name": "Product",
+  "name": "t:sections.main-product.name",
   "blocks": [
-    { "type": "title", "name": "Title", "limit": 1 },
-    { "type": "price", "name": "Price", "limit": 1 },
-    { "type": "buy_buttons", "name": "Buy buttons", "limit": 1 },
-    { "type": "delivery", "name": "Delivery and payment", "limit": 1 },
-    { "type": "description", "name": "Description", "limit": 1 }
+    { "type": "title", "name": "t:sections.main-product.blocks.title.name", "limit": 1 },
+    { "type": "price", "name": "t:sections.main-product.blocks.price.name", "limit": 1 },
+    {
+      "type": "buy_buttons",
+      "name": "t:sections.main-product.blocks.buy_buttons.name",
+      "limit": 1
+    },
+    { "type": "delivery", "name": "t:sections.main-product.blocks.delivery.name", "limit": 1 },
+    { "type": "description", "name": "t:sections.main-product.blocks.description.name", "limit": 1 }
   ]
 }
 {% endschema %}

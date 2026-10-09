@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the theme editor's files** (admin): a theme's files read and changed in the admin, its
-templates and settings checked by Theme Check as they are saved; then the admin's next sections
-as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, the theme editor's screens** (admin): a theme's pages with their sections, each
+section's and block's settings and the theme's own, shown or hidden and put in order, saved with
+the shop's files over the editor's data; then its live preview. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The theme editor's data, in the core
+
+* **`OnlineStoreTheme.editor(locale)`** ([ADR-323](../architecture/13-decision-log.md#adr-323--the-theme-editor-reads-a-theme-through-the-admin-api-the-platform-themes-settings-and-sections-their-words-in-english-or-urdu-through-shopifys-t-keys-and-every-json-file-the-shop-may-keep-as-the-storefront-reads-it)): the platform theme's settings and sections,
+  their names and labels in the language asked for, and every JSON file the shop may keep in the
+  theme as the storefront reads it, the shop's own with what Theme Check finds wrong with it.
+  Hatti Base's names and labels are Shopify's `t:` keys now, with English and Urdu.
+* **Tried against the core:** on the seed's shop, its main theme gave its groups of settings,
+  رنگ among them in Urdu, its 18 sections, image-banner as تصویری بینر, and its 13 files, the
+  home page and header group the shop's own, none with problems; 0.6 s the first time after the
+  core started, then 19 ms.
+* 2292 tests: Hatti Base's words in English and Urdu, every key with its words in both, a
+  language it lacks in English, the default language for a missing word and defaults as written;
+  the files as the storefront reads them, the shop's own over the platform theme's and one Theme
+  Check no longer passes; and the field through the API, in Urdu and in English.
 
 ### 69f1d17 · A parcel's tracking corrected, in the admin
 

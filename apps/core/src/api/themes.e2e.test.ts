@@ -117,6 +117,36 @@ describe.skipIf(!server)('Admin GraphQL API: online store themes', () => {
       upsertedThemeFiles: [{ filename: 'templates/index.json', size: INDEX.length }],
       userErrors: [],
     });
+    // What the editor needs: the platform theme's schemas in the language asked for, English
+    // by default, and the theme's files as the storefront reads them.
+    const EDITOR = `query ($id: ID!) {
+      theme(id: $id) {
+        urdu: editor(locale: "ur") {
+          settingsSchema sections { type name schema } files { filename own problems }
+        }
+        english: editor { sections { type name } }
+      }
+    }`;
+    const theme = await call(tokens.reader, EDITOR, { id: main.id });
+    const banner = theme.urdu.sections.find((each: Json) => each.type === 'image-banner');
+    expect(banner.name).toBe('تصویری بینر');
+    expect(JSON.parse(banner.schema).blocks.map((block: Json) => block.name)).toEqual([
+      'سرخی',
+      'متن',
+      'بٹن',
+    ]);
+    expect(JSON.parse(theme.urdu.settingsSchema)[1].name).toBe('رنگ');
+    expect(theme.urdu.files).toEqual(
+      expect.arrayContaining([
+        { filename: 'templates/index.json', own: true, problems: [] },
+        { filename: 'templates/product.json', own: false, problems: [] },
+        { filename: 'sections/header-group.json', own: false, problems: [] },
+      ]),
+    );
+    expect(theme.english.sections.find((each: Json) => each.type === 'image-banner').name).toBe(
+      'Image banner',
+    );
+
     const refused = await call(
       tokens.a,
       `mutation ($id: ID!) {

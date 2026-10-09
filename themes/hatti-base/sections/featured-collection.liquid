@@ -18,14 +18,22 @@
 
 {% schema %}
 {
-  "name": "Featured collection",
+  "name": "t:sections.featured-collection.name",
   "settings": [
-    { "type": "text", "id": "title", "label": "Heading" },
-    { "type": "collection", "id": "collection", "label": "Collection" },
+    {
+      "type": "text",
+      "id": "title",
+      "label": "t:sections.featured-collection.settings.title.label"
+    },
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "t:sections.featured-collection.settings.collection.label"
+    },
     {
       "type": "range",
       "id": "products_to_show",
-      "label": "Products to show",
+      "label": "t:sections.featured-collection.settings.products_to_show.label",
       "min": 2,
       "max": 12,
       "step": 1,

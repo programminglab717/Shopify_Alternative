@@ -1,0 +1,87 @@
+{
+  "sections": {
+    "announcement-bar": { "name": "Announcement bar", "settings": { "text": { "label": "Text" } } },
+    "cart-drawer": { "name": "Cart drawer" },
+    "featured-collection": {
+      "name": "Featured collection",
+      "settings": {
+        "title": { "label": "Heading" },
+        "collection": { "label": "Collection" },
+        "products_to_show": { "label": "Products to show" }
+      }
+    },
+    "footer": { "name": "Footer", "settings": { "menu": { "label": "Menu" } } },
+    "header": { "name": "Header", "settings": { "menu": { "label": "Menu" } } },
+    "image-banner": {
+      "name": "Image banner",
+      "settings": { "image": { "label": "Image" } },
+      "blocks": {
+        "heading": { "name": "Heading", "settings": { "heading": { "label": "Heading" } } },
+        "text": { "name": "Text", "settings": { "text": { "label": "Text" } } },
+        "button": {
+          "name": "Button",
+          "settings": { "label": { "label": "Label" }, "link": { "label": "Link" } }
+        }
+      }
+    },
+    "main-404": { "name": "Page not found" },
+    "main-article": { "name": "Article" },
+    "main-blog": {
+      "name": "Blog",
+      "settings": { "articles_per_page": { "label": "Articles per page" } }
+    },
+    "main-cart": { "name": "Cart" },
+    "main-collection": {
+      "name": "Collection",
+      "settings": { "products_per_page": { "label": "Products per page" } }
+    },
+    "main-page": { "name": "Page" },
+    "main-password": { "name": "Password" },
+    "main-product": {
+      "name": "Product",
+      "blocks": {
+        "title": { "name": "Title" },
+        "price": { "name": "Price" },
+        "buy_buttons": { "name": "Buy buttons" },
+        "delivery": { "name": "Delivery and payment" },
+        "description": { "name": "Description" }
+      }
+    },
+    "main-search": {
+      "name": "Search",
+      "settings": { "products_per_page": { "label": "Products per page" } }
+    },
+    "newsletter": { "name": "Newsletter", "settings": { "heading": { "label": "Heading" } } },
+    "predictive-search": { "name": "Predictive search" },
+    "whatsapp-cta": {
+      "name": "WhatsApp",
+      "settings": {
+        "heading": { "label": "Heading" },
+        "text": { "label": "Text" },
+        "message": { "label": "Message it starts with" }
+      }
+    }
+  },
+  "settings_schema": {
+    "colours": {
+      "name": "Colours",
+      "settings": {
+        "color_text": { "label": "Text" },
+        "color_background": { "label": "Background" },
+        "color_accent": { "label": "Buttons and links" }
+      }
+    },
+    "layout": { "name": "Layout", "settings": { "page_width": { "label": "Page width" } } },
+    "orders": {
+      "name": "Orders",
+      "settings": {
+        "cart_type": {
+          "label": "When a product is added to the cart",
+          "options__1": { "label": "Show the cart in a drawer over the page" },
+          "options__2": { "label": "Go to the cart page" }
+        },
+        "whatsapp_orders": { "label": "Offer \"Order on WhatsApp\" on product pages" }
+      }
+    }
+  }
+}

@@ -10,10 +10,18 @@ import {
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { PREVIEW_DAYS, ThemePreviewService } from '../theme-preview.js';
 import { ThemeService } from '../theme.service.js';
-import { toRoleValue, toTheme, toThemeConnection, toThemeFile, uuidOf } from './mappers.js';
+import {
+  toRoleValue,
+  toTheme,
+  toThemeConnection,
+  toThemeEditor,
+  toThemeFile,
+  uuidOf,
+} from './mappers.js';
 import {
   OnlineStoreTheme,
   OnlineStoreThemeConnection,
+  OnlineStoreThemeEditor,
   OnlineStoreThemeFile,
   OnlineStoreThemeFilesUpsertFileInput,
   ThemeCreatePayload,
@@ -72,6 +80,24 @@ export class ThemeResolver {
   ): Promise<OnlineStoreThemeFile[]> {
     const records = await this.service.files(tenant, uuidOf('theme', theme.id), filenames);
     return records.map(toThemeFile);
+  }
+
+  @ResolveField(() => OnlineStoreThemeEditor, {
+    description:
+      "What the theme editor needs of the theme (ADR-323): the platform theme's settings and " +
+      'sections, with their names, labels and notes in `locale` where the platform theme has them, ' +
+      'else in English; and every JSON file the shop may keep in the theme, as the storefront ' +
+      'reads it.',
+  })
+  @RequireScopes('read_themes')
+  async editor(
+    @CurrentTenant() tenant: TenantContext,
+    @Parent() theme: OnlineStoreTheme,
+    @Args('locale', { defaultValue: 'en', description: 'Such as en or ur.' }) locale: string,
+  ): Promise<OnlineStoreThemeEditor> {
+    return toThemeEditor(
+      await this.service.editor(tenant, uuidOf('theme', theme.id), theme.base, locale),
+    );
   }
 
   @ResolveField(() => String, {

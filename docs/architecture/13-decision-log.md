@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-322 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-323 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -330,6 +330,7 @@
 | 320 | The admin lists the shop's themes in the online store, the live one first, each previewed through its link, and adds a copy of one or the platform theme afresh, publishes one once asked, and deletes those not live | Accepted |
 | 321 | The admin searches the drafts list, with its saved searches as on orders and products, and shows a search the core refuses in the core's words at once, without trying it again | Accepted |
 | 322 | The admin corrects a parcel's courier, tracking number and link on its order's page, whatever the parcel's state, its link checked as https before it is sent | Accepted |
+| 323 | The theme editor reads a theme through the Admin API: the platform theme's settings and sections, their words in English or Urdu through Shopify's t: keys, and every JSON file the shop may keep as the storefront reads it | Accepted |
 
 ---
 
@@ -12878,3 +12879,38 @@
 * **Alternatives:**
   * **Only while the parcel is on its way:** simpler, but the statements that need the right
     number come after delivery.
+
+## ADR-323 · The theme editor reads a theme through the Admin API: the platform theme's settings and sections, their words in English or Urdu through Shopify's t: keys, and every JSON file the shop may keep as the storefront reads it
+
+* **Context:** A shop's theme is the platform theme with the shop's own JSON files over it
+  (ADR-039), changed by saving whole files with themeFilesUpsert. The theme editor (OS-02) shows
+  a page's sections and the settings each takes, in the merchant's language: but the settings
+  live in the platform theme's Liquid, in each section's `{% schema %}`, and in
+  config/settings_schema.json, which the Admin API did not give; the theme's `files` are only the
+  shop's own, so an editor could not show a page the shop had not changed; and Hatti Base's
+  names and labels were English alone, while the admin is used in Urdu too.
+* **Decision:**
+  * **`OnlineStoreTheme.editor(locale)`** gives what an editor needs of a theme in one ask: the
+    platform theme's config/settings_schema.json and each section's schema, as JSON in Shopify's
+    shape, and every JSON file the shop may keep in the theme, templates, section groups and
+    settings, as the storefront reads it: the shop's own, with what Theme Check finds wrong with
+    it, which the storefront leaves out, else the platform theme's.
+  * **Names, labels and notes come in the language asked for**, as Shopify's themes give them:
+    a `t:` key into locales/<locale>.schema.json, the theme's default language standing in for a
+    word the language lacks, and a word that is no key as written. Defaults are left as written:
+    the storefront prints them. Hatti Base's are keys now, with English and Urdu.
+  * **Schemas and files are JSON in strings**, as files' bodies are: they are the theme's own,
+    in Shopify's shape, and an editor reads them whole.
+* **Consequences:**
+  * The admin's editor shows a page's sections, their settings and blocks, in English or Urdu,
+    from one query, and saves with themeFilesUpsert as before; a file that is the shop's own can
+    be given back to the platform theme by deleting it.
+  * The first ask after the core starts reads the platform theme from disk, about 0.6 s on the
+    seed's shop, and those after it about 20 ms.
+* **Alternatives:**
+  * **`files` with the platform theme's files where the shop has none:** `files` is the shop's
+    own (ADR-039), and apps copying a theme would copy the platform's files with it.
+  * **GraphQL types for each kind of setting:** the platform theme's schemas grow with Shopify's
+    setting types; JSON keeps the editor in step with whatever the platform theme takes.
+  * **Labels translated in the admin:** the admin does not know a theme's settings, and every
+    change to the platform theme would wait on a release of the admin.

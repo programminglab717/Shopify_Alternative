@@ -15,11 +15,26 @@
 
 {% schema %}
 {
-  "name": "WhatsApp",
+  "name": "t:sections.whatsapp-cta.name",
   "settings": [
-    { "type": "text", "id": "heading", "label": "Heading", "default": "Questions? Ask us on WhatsApp" },
-    { "type": "textarea", "id": "text", "label": "Text", "default": "Sizes, colours, delivery: we reply within the hour." },
-    { "type": "text", "id": "message", "label": "Message it starts with", "default": "Hi! I have a question." }
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:sections.whatsapp-cta.settings.heading.label",
+      "default": "Questions? Ask us on WhatsApp"
+    },
+    {
+      "type": "textarea",
+      "id": "text",
+      "label": "t:sections.whatsapp-cta.settings.text.label",
+      "default": "Sizes, colours, delivery: we reply within the hour."
+    },
+    {
+      "type": "text",
+      "id": "message",
+      "label": "t:sections.whatsapp-cta.settings.message.label",
+      "default": "Hi! I have a question."
+    }
   ]
 }
 {% endschema %}

@@ -297,6 +297,68 @@ describe.skipIf(!server)('ThemeService', () => {
     ]);
   });
 
+  it("gives the editor the platform theme's schemas, and the theme's files as the storefront reads them", async () => {
+    const main = await f.themes.main(f.a);
+    const editor = () => f.themes.editor(f.a, main.id, 'hatti-base', 'ur');
+    const fileOf = async (filename: string) =>
+      (await editor()).files.find((file) => file.filename === filename);
+
+    const fresh = await editor();
+    expect(fresh.files.map((file) => file.filename)).toEqual(
+      expect.arrayContaining([
+        'config/settings_data.json',
+        'sections/footer-group.json',
+        'sections/header-group.json',
+        'templates/index.json',
+        'templates/product.json',
+      ]),
+    );
+    expect(fresh.files.every((file) => !file.own && file.problems.length === 0)).toBe(true);
+    expect(fresh.files.map((file) => file.filename)).not.toContain('config/settings_schema.json');
+    expect(JSON.parse((await fileOf('templates/index.json'))!.body)).toMatchObject({
+      order: expect.arrayContaining(['banner']),
+    });
+    // Its words in the language asked for.
+    expect(fresh.sections.find((each) => each.type === 'image-banner')?.schema.name).toBe(
+      'تصویری بینر',
+    );
+    expect(fresh.settingsSchema).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'رنگ' })]),
+    );
+
+    // The shop's own over the platform theme's, an alternate template of its own among them.
+    const unstitched = JSON.stringify({
+      sections: { main: { type: 'main-product' } },
+      order: ['main'],
+    });
+    unwrap(
+      await f.themes.upsertFiles(f.a, main.id, [
+        { filename: 'templates/index.json', body: INDEX },
+        { filename: 'templates/product.unstitched.json', body: unstitched },
+      ]),
+    );
+    expect(await fileOf('templates/index.json')).toEqual({
+      filename: 'templates/index.json',
+      body: INDEX,
+      own: true,
+      problems: [],
+    });
+    expect(await fileOf('templates/product.unstitched.json')).toMatchObject({ own: true });
+
+    // One saved before the platform theme changed is said to be left out, and why.
+    await f.admin.query(
+      `UPDATE online_store.theme_files SET body = $1 WHERE theme_id = $2 AND filename = $3`,
+      [
+        JSON.stringify({ sections: { x: { type: 'reviews' } }, order: ['x'] }),
+        main.id,
+        'templates/index.json',
+      ],
+    );
+    expect((await fileOf('templates/index.json'))?.problems).toEqual([
+      'section "x" is a "reviews", which the theme does not have',
+    ]);
+  });
+
   it('prepares a copy, publishes it in place of the main theme, and deletes the one before', async () => {
     const main = await f.themes.main(f.a);
     unwrap(

@@ -32,9 +32,14 @@
 
 {% schema %}
 {
-  "name": "Footer",
+  "name": "t:sections.footer.name",
   "settings": [
-    { "type": "link_list", "id": "menu", "label": "Menu", "default": "footer" }
+    {
+      "type": "link_list",
+      "id": "menu",
+      "label": "t:sections.footer.settings.menu.label",
+      "default": "footer"
+    }
   ]
 }
 {% endschema %}

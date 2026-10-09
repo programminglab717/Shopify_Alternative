@@ -1,0 +1,87 @@
+{
+  "sections": {
+    "announcement-bar": { "name": "اعلان کی پٹی", "settings": { "text": { "label": "متن" } } },
+    "cart-drawer": { "name": "سائیڈ کارٹ" },
+    "featured-collection": {
+      "name": "نمایاں کلیکشن",
+      "settings": {
+        "title": { "label": "سرخی" },
+        "collection": { "label": "کلیکشن" },
+        "products_to_show": { "label": "کتنی پروڈکٹس دکھائیں" }
+      }
+    },
+    "footer": { "name": "فوٹر", "settings": { "menu": { "label": "مینیو" } } },
+    "header": { "name": "ہیڈر", "settings": { "menu": { "label": "مینیو" } } },
+    "image-banner": {
+      "name": "تصویری بینر",
+      "settings": { "image": { "label": "تصویر" } },
+      "blocks": {
+        "heading": { "name": "سرخی", "settings": { "heading": { "label": "سرخی" } } },
+        "text": { "name": "متن", "settings": { "text": { "label": "متن" } } },
+        "button": {
+          "name": "بٹن",
+          "settings": { "label": { "label": "بٹن پر لکھا" }, "link": { "label": "لنک" } }
+        }
+      }
+    },
+    "main-404": { "name": "صفحہ نہیں ملا" },
+    "main-article": { "name": "مضمون" },
+    "main-blog": {
+      "name": "بلاگ",
+      "settings": { "articles_per_page": { "label": "ایک صفحے پر مضامین" } }
+    },
+    "main-cart": { "name": "کارٹ" },
+    "main-collection": {
+      "name": "کلیکشن",
+      "settings": { "products_per_page": { "label": "ایک صفحے پر پروڈکٹس" } }
+    },
+    "main-page": { "name": "صفحہ" },
+    "main-password": { "name": "پاس ورڈ" },
+    "main-product": {
+      "name": "پروڈکٹ",
+      "blocks": {
+        "title": { "name": "نام" },
+        "price": { "name": "قیمت" },
+        "buy_buttons": { "name": "خریدنے کے بٹن" },
+        "delivery": { "name": "ڈیلیوری اور ادائیگی" },
+        "description": { "name": "تفصیل" }
+      }
+    },
+    "main-search": {
+      "name": "تلاش",
+      "settings": { "products_per_page": { "label": "ایک صفحے پر پروڈکٹس" } }
+    },
+    "newsletter": { "name": "نیوز لیٹر", "settings": { "heading": { "label": "سرخی" } } },
+    "predictive-search": { "name": "فوری تلاش" },
+    "whatsapp-cta": {
+      "name": "واٹس ایپ",
+      "settings": {
+        "heading": { "label": "سرخی" },
+        "text": { "label": "متن" },
+        "message": { "label": "پیغام کی شروعات" }
+      }
+    }
+  },
+  "settings_schema": {
+    "colours": {
+      "name": "رنگ",
+      "settings": {
+        "color_text": { "label": "متن" },
+        "color_background": { "label": "پس منظر" },
+        "color_accent": { "label": "بٹن اور لنک" }
+      }
+    },
+    "layout": { "name": "لے آؤٹ", "settings": { "page_width": { "label": "صفحے کی چوڑائی" } } },
+    "orders": {
+      "name": "آرڈر",
+      "settings": {
+        "cart_type": {
+          "label": "جب کارٹ میں پروڈکٹ شامل ہو",
+          "options__1": { "label": "کارٹ کو صفحے کے اوپر سائیڈ پینل میں دکھائیں" },
+          "options__2": { "label": "کارٹ کے صفحے پر جائیں" }
+        },
+        "whatsapp_orders": { "label": "پروڈکٹ کے صفحوں پر “واٹس ایپ پر آرڈر کریں” دکھائیں" }
+      }
+    }
+  }
+}

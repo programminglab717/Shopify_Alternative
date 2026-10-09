@@ -6214,6 +6214,14 @@ type OnlineStoreTheme {
   createdAt: DateTime!
 
   """
+  What the theme editor needs of the theme (ADR-323): the platform theme's settings and sections, with their names, labels and notes in `locale` where the platform theme has them, else in English; and every JSON file the shop may keep in the theme, as the storefront reads it.
+  """
+  editor(
+    """Such as en or ur."""
+    locale: String! = "en"
+  ): OnlineStoreThemeEditor!
+
+  """
   The shop's own files in the theme, by filename: all of them, or those named. The platform theme's show where the shop has none.
   """
   files(filenames: [String!]): [OnlineStoreThemeFile!]!
@@ -6243,6 +6251,47 @@ type OnlineStoreThemeEdge {
 }
 
 """
+What the theme editor needs of a theme (ADR-323): the platform theme's settings and sections, and the theme's files as the storefront reads them.
+"""
+type OnlineStoreThemeEditor {
+  """
+  Every JSON file the shop may keep in the theme, as the storefront reads it: templates, section groups and settings.
+  """
+  files: [OnlineStoreThemeEditorFile!]!
+
+  """Every section the theme has."""
+  sections: [OnlineStoreThemeSection!]!
+
+  """
+  The platform theme's config/settings_schema.json, as JSON: the theme's settings in their groups, with Shopify's fields; the names, labels and notes in the language asked for.
+  """
+  settingsSchema: String!
+}
+
+"""
+A JSON file of a theme as the storefront reads it: the shop's own, or the platform theme's where the shop has none.
+"""
+type OnlineStoreThemeEditorFile {
+  """The JSON."""
+  body: String!
+
+  """
+  Such as templates/index.json, sections/header-group.json or config/settings_data.json.
+  """
+  filename: String!
+
+  """
+  Whether it is the shop's own. Deleting the shop's own brings the platform theme's back.
+  """
+  own: Boolean!
+
+  """
+  What Theme Check finds wrong with the shop's own file, which the storefront leaves out for the platform theme's, as when the platform theme changed after it was saved. Empty when the storefront uses it.
+  """
+  problems: [String!]!
+}
+
+"""
 One of the shop's own files in a theme, over the platform theme's file of that name: a JSON template, a section group or the theme settings.
 """
 type OnlineStoreThemeFile {
@@ -6265,6 +6314,22 @@ input OnlineStoreThemeFilesUpsertFileInput {
   templates/<name>.json (such as templates/index.json or templates/product.unstitched.json), sections/<group>.json, or config/settings_data.json.
   """
   filename: String!
+}
+
+"""
+A section a theme has, as the theme editor shows it: the settings it takes, its blocks and presets.
+"""
+type OnlineStoreThemeSection {
+  """Such as Image banner, in the language asked for."""
+  name: String!
+
+  """
+  Its {% schema %}, as JSON: its settings, blocks and presets, with Shopify's fields; the names, labels and notes in the language asked for.
+  """
+  schema: String!
+
+  """As templates and section groups place it, such as image-banner."""
+  type: String!
 }
 
 """

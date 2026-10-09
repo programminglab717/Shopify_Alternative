@@ -54,9 +54,14 @@
 
 {% schema %}
 {
-  "name": "Newsletter",
+  "name": "t:sections.newsletter.name",
   "settings": [
-    { "type": "text", "id": "heading", "label": "Heading", "default": "Our news and offers on WhatsApp" }
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:sections.newsletter.settings.heading.label",
+      "default": "Our news and offers on WhatsApp"
+    }
   ]
 }
 {% endschema %}

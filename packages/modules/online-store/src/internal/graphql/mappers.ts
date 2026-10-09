@@ -7,6 +7,7 @@ import type {
   MenuItemRecord,
   MenuRecord,
   PageRecord,
+  ThemeEditorRecord,
   ThemeFileRecord,
   PolicyRecord,
   PolicyVersionRecord,
@@ -40,7 +41,10 @@ import {
   OnlineStoreTheme,
   OnlineStoreThemeConnection,
   OnlineStoreThemeEdge,
+  OnlineStoreThemeEditor,
+  OnlineStoreThemeEditorFile,
   OnlineStoreThemeFile,
+  OnlineStoreThemeSection,
   ThemeRole,
 } from './theme.types.js';
 import { ShopPolicy, ShopPolicyVersion, type ShopPolicyType } from './policy.types.js';
@@ -75,6 +79,20 @@ export function toThemeFile(record: ThemeFileRecord): OnlineStoreThemeFile {
     body: record.body,
     size: Buffer.byteLength(record.body),
     updatedAt: record.updatedAt,
+  });
+}
+
+export function toThemeEditor(record: ThemeEditorRecord): OnlineStoreThemeEditor {
+  return Object.assign(new OnlineStoreThemeEditor(), {
+    settingsSchema: JSON.stringify(record.settingsSchema),
+    sections: record.sections.map((section) =>
+      Object.assign(new OnlineStoreThemeSection(), {
+        type: section.type,
+        name: section.schema.name ?? section.type,
+        schema: JSON.stringify(section.schema),
+      }),
+    ),
+    files: record.files.map((file) => Object.assign(new OnlineStoreThemeEditorFile(), file)),
   });
 }
 
