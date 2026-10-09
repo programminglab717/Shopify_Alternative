@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Pictures of a theme's own
+### 447b684 · Pictures of a theme's own
 
 * **A theme's pictures from the phone** ([ADR-326](../architecture/13-decision-log.md#adr-326--a-themes-pictures-are-the-shops-own-files-uploaded-in-the-theme-editor-and-served-by-the-storefront-at-an-address-of-the-shops-own-while-one-of-its-themes-names-them-a-preview-shows-any-of-the-shops-pictures)): a picture setting in the theme editor, such
   as the banner's, takes a photo uploaded from the phone, kept among the shop's files, and shows
