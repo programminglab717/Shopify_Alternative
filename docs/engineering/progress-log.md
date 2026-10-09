@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Store credit, in the admin
+### ddf191f · Store credit, in the admin
 
 * **Store credit** ([ADR-301](../architecture/13-decision-log.md#adr-301--the-admin-shows-a-customers-store-credit-on-their-page-its-ledger-to-those-who-keep-it-and-owners-and-managers-give-credit-by-hand-to-expire-at-the-end-of-a-day-in-the-shops-time-zone-and-take-it-back-an-order-not-yet-shipped-is-paid-with-it-from-its-page)) on a customer's page: what they have, for owners, managers,
   confirmation agents and accountants; its ledger in words for all but agents; credit given by
