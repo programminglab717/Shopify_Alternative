@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Customer returns, in the admin
+### 299f348 · Customer returns, in the admin
 
 * **Returns on the order's page** ([ADR-284](../architecture/13-decision-log.md#adr-284--an-orders-page-records-its-customers-return-of-delivered-items-each-with-why-another-variant-sent-at-once-in-exchange-if-asked-checks-it-in-with-what-is-damaged-written-off-or-cancels-it-customer-returns-on-their-way-have-a-tab-of-their-own-and-a-parcel-back-damaged-is-claimed-from-its-courier)):
   a return of delivered items recorded with why, another size sent at once in exchange, and the
