@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Meta and the catalog feed, in the admin
+### 7e0a3a5 · Meta and the catalog feed, in the admin
 
 * **Meta & catalog** ([ADR-306](../architecture/13-decision-log.md#adr-306--the-admin-gives-the-shops-catalog-feed-and-its-meta-dataset-a-tab-of-the-online-store-the-feeds-address-to-copy-meta-connected-with-its-datasets-id-and-a-token-sealed-which-moment-of-an-order-is-purchase-and-a-code-for-test-events-once-the-member-confirms-who-they-are-disconnected-once-asked-and-the-moments-sent-by-status)), a tab of the online store for owners, managers and marketers: the
   catalog feed's address to copy or open; Meta's dataset connected, changed and disconnected;
