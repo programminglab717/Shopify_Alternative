@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### An order's parcels, in the admin
+### 2f79e06 · An order's parcels, in the admin
 
 * **Parcels on the order's page** ([ADR-283](../architecture/13-decision-log.md#adr-283--an-orders-page-shows-its-parcels-courier-and-tracking-number-items-and-the-latest-steps-of-their-way-those-who-work-orders-mark-one-delivered-or-refused-add-a-step-told-of-a-courier-hatti-does-not-follow-mark-it-lost-after-asking-or-check-it-back-in-with-what-came-back-damaged-written-off)):
   each parcel's courier and tracking number, its items and the latest steps of its way; marked
