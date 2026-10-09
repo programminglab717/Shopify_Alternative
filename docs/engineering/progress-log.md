@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Orders tagged and cancelled many at once, in the admin
+### 7de2641 · Orders tagged and cancelled many at once, in the admin
 
 * **The rest of ORD-05's bulk actions** ([ADR-333](../architecture/13-decision-log.md#adr-333--the-orders-list-tags-the-orders-chosen-on-any-tab-and-cancels-those-not-yet-shipped-for-one-reason-from-the-bar-that-confirms-packs-and-prints-them-for-those-who-change-orders-a-refusal-names-its-order)): those who change orders choose orders on any
   tab and tag them, a comma between each tag, or take tags off; on the tabs of orders not yet
