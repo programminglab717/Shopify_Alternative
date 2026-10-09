@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Saved searches, in the admin
+### 3b7d879 · Saved searches, in the admin
 
 * **Saved searches** ([ADR-316](../architecture/13-decision-log.md#adr-316--the-admin-shows-the-saved-searches-of-the-orders-and-products-lists-above-them-each-run-in-a-tap-those-who-change-a-list-save-the-search-shown-by-a-name-and-rename-change-and-delete-those-saved-the-cores-refusals-named-by-their-field)) above the orders and products lists: each run in a tap; the
   search shown saved by a name; those saved renamed, changed and deleted by those who change the
