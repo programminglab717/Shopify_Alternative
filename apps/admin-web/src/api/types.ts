@@ -1471,6 +1471,17 @@ export interface PolicyDraftData {
   shopPolicyDraft: { title: string; body: string };
 }
 
+/** Something of the shop's with words to put in Urdu, and its Urdu as kept (OS-06). */
+export interface UrduResource {
+  resourceId: string;
+  translatableContent: { key: string; value: string | null; digest: string | null }[];
+  translations: { key: string; value: string | null; outdated: boolean }[];
+}
+
+export interface InUrduData {
+  translatableResourcesByIds: { nodes: UrduResource[] };
+}
+
 export interface PolicyTranslationData {
   translatableResource: {
     resourceId: string;

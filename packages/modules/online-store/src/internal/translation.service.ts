@@ -134,6 +134,29 @@ export class TranslationService {
     });
   }
 
+  /**
+   * Resources of any kinds by their IDs, in the order given, as Shopify's
+   * `translatableResourcesByIds`, such as a product with its options and their values; those the
+   * shop has not are left out.
+   */
+  async resourcesByIds(
+    tenant: TenantContext,
+    refs: readonly { kind: TranslatableKind; id: string }[],
+  ): Promise<TranslatableResourceRecord[]> {
+    if (refs.length === 0) return [];
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const byKind = new Map<TranslatableKind, string[]>();
+      for (const ref of refs) byKind.set(ref.kind, [...(byKind.get(ref.kind) ?? []), ref.id]);
+      const found = new Map<string, TranslatableResourceRecord>();
+      for (const [kind, ids] of byKind) {
+        for (const record of await this.#records(tx, tenant.shopId, kind, ids)) {
+          found.set(`${kind} ${record.id}`, record);
+        }
+      }
+      return refs.flatMap((ref) => found.get(`${ref.kind} ${ref.id}`) ?? []);
+    });
+  }
+
   /** The shop's resources of a kind, the newest first. */
   async resources(
     tenant: TenantContext,

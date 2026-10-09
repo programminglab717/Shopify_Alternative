@@ -9182,6 +9182,21 @@ type Query {
     first: Int
     resourceType: TranslatableResourceType!
   ): TranslatableResourceConnection!
+
+  """
+  The shop's resources that may be translated, by their IDs, of any kinds and in the order given, as Shopify's translatableResourcesByIds: a product with its options and their values, say. Those the shop has not are left out.
+  """
+  translatableResourcesByIds(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """
+    Up to 250, of any of the kinds that may be translated, in the order wanted.
+    """
+    resourceIds: [ID!]!
+  ): TranslatableResourceConnection!
   urlRedirect(id: ID!): UrlRedirect
 
   """The shop's URL redirects, oldest first."""

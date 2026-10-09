@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-326 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-327 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -334,6 +334,7 @@
 | 324 | The admin's theme editor changes a page's sections and blocks and the theme's settings in place, kept until saved together as Theme Check passes them; pictures wait for an address of their own | Accepted |
 | 325 | The theme editor's preview frames the storefront beside the editor and shows changes as they are made, the page's sections following the editor's files; the theme's settings show once saved | Accepted |
 | 326 | A theme's pictures are the shop's own files, uploaded in the theme editor and served by the storefront at an address of the shop's own while one of its themes names them; a preview shows any of the shop's pictures | Accepted |
+| 327 | The admin puts a product's, collection's or page's words in Urdu on a page of its own, each field of the shop's own above its Urdu and a product's options and values with it, read in one ask through Shopify's translatableResourcesByIds and saved as its translations | Accepted |
 
 ---
 
@@ -13081,3 +13082,53 @@
     that costs little and that the edge spares.
   * **Pictures copied into the theme as its own assets:** a theme's assets are the platform's
     ([ADR-039](#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)); a shop's themes keep only JSON.
+
+## ADR-327 · The admin puts a product's, collection's or page's words in Urdu on a page of its own, each field of the shop's own above its Urdu and a product's options and values with it, read in one ask through Shopify's translatableResourcesByIds and saved as its translations
+
+* **Context:** A shop's content could be put in Urdu through the Admin API ([ADR-238](#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)),
+  its products' options and their values too ([ADR-241](#adr-241--a-products-options-and-their-values-may-have-the-shops-urdu-as-shopifys-translations-keep-them-each-by-its-own-id-the-products-document-carries-its-options-in-urdu-and-its-urdu-pages-show-each-variants-values-and-title-in-them-the-variant-chosen-by-its-id-the-same-in-either-language)), but the admin had a place for it
+  only on the shop's policies ([ADR-239](#adr-239--a-shops-policies-may-have-its-own-urdu-as-its-other-content-may-and-the-storefront-shows-a-policys-urdu-only-while-it-translates-the-policy-as-it-is-its-own-words-once-they-change-the-checkouts-urdu-links-the-urdu-pages)): a merchant whose storefront's Urdu pages showed
+  its products' English titles under the theme's Urdu headings could change that only through
+  an app. Shopify's own admin leaves it to its Translate & Adapt app: a page of fields, each
+  beside the shop's own words.
+* **Decision:**
+  * **A page of its own for each thing's Urdu:** a product's, a collection's and a page's own
+    pages have a card saying how much of it is in Urdu (none yet, so many of so many, all, and
+    how many to check), with Write in Urdu, which opens a page of each field that has words of
+    the shop's: its title, description, type and words for search engines, a page's text, and a
+    product's options with each of their values below them. Each field shows the shop's own
+    words above a box for its Urdu, written right to left in Urdu's own font, even with the
+    admin in English.
+  * **Saved together, as Shopify keeps translations:** what changed is kept for the shop's
+    words as they are now, each naming their digest, in a call for each thing; a box emptied
+    forgets its Urdu, and the storefront shows the shop's own words again. A description goes
+    as its paragraphs, as the catalog keeps it; a page's text is written as its own is, plain
+    text with `## ` headings and `- ` lists, Latin kept left to right; one holding HTML beyond
+    that is edited as its HTML.
+  * **What changed since is said:** a field whose Urdu was written for words since changed says
+    so, and that the Urdu pages still show it; It's still right keeps it for the words as they
+    are now once saved, and changing it does too. Urdu refused because the shop's words changed
+    while it was written is said in the merchant's words and kept, to check and save again.
+  * **Read in one ask:** the core gains Shopify's `translatableResourcesByIds`, the shop's
+    things that may be translated, by their IDs, of any kinds and in the order asked, up to 250,
+    those it has not left out, a page at a time. The card and the page ask the same, so the
+    page opens from what the card read.
+  * **For those who write the shop's Urdu:** owners, managers and marketers, as
+    `write_translations` has it; others see neither the card nor the page's fields.
+* **Consequences:**
+  * A merchant puts a product's title, description, sizes and colours in Urdu from a phone, and
+    the storefront's Urdu pages show them a moment after saving.
+  * A product's options and values are saved a call for each one changed, not all at once: one
+    refused says so, and the rest are kept.
+  * Blogs, articles, menus and the home page's words have their Urdu through the API alone yet;
+    their place in the admin is the same page, next.
+  * A product's, collection's or page's own page asks for its Urdu on each visit by those who
+    write it: one more read of a few rows.
+* **Alternatives:**
+  * **Urdu boxes in each form, beside the English:** every form twice as long on a phone, for
+    words most shops write once.
+  * **One list of everything still to translate, as Translate & Adapt has:** right for a
+    catalogue translated at a sitting, but a merchant adding a product wants its Urdu then; the
+    list may come later, from `translatableResources`.
+  * **A query for each option and value:** a product with three options of ten values each
+    would ask 33 times.

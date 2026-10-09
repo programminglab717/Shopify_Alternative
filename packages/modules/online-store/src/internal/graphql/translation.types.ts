@@ -182,6 +182,20 @@ export class TranslatableResourcesArgs {
   after?: string | null;
 }
 
+@ArgsType()
+export class TranslatableResourcesByIdsArgs {
+  @Field(() => [ID], {
+    description: 'Up to 250, of any of the kinds that may be translated, in the order wanted.',
+  })
+  resourceIds!: string[];
+
+  @Field(() => Int, { nullable: true, description: '1 to 250; default 50.' })
+  first?: number | null;
+
+  @Field(() => String, { nullable: true })
+  after?: string | null;
+}
+
 @InputType({ description: "A field's translation, as Shopify's TranslationInput." })
 export class TranslationInput {
   @Field({ description: 'Its language: ur.' })

@@ -326,6 +326,82 @@ describe.skipIf(!server)('Admin GraphQL API: translations', () => {
     });
   });
 
+  it('gives a product with its options and their values in one ask, by their IDs, in the order asked', async () => {
+    const { product } = await call(
+      tokens.a,
+      `mutation {
+        productCreate(input: {
+          title: "Kurta", options: [{ name: "Colour", values: ["Mint", "Rust"] }],
+          variants: [{ optionValues: ["Mint"], price: "3,000" }, { optionValues: ["Rust"], price: "3,000" }]
+        }) { product { id options { id optionValues { id name } } } userErrors { field } }
+      }`,
+    );
+    const [colour] = product.options;
+    const [mint, rust] = colour.optionValues;
+    await register(tokens.a, mint.id, [
+      { locale: 'ur', key: 'name', value: 'پودینہ', translatableContentDigest: digestOf('Mint') },
+    ]);
+    const byIds = (ids: string[], more = '', token = tokens.reader) =>
+      gql(
+        token,
+        `query ($ids: [ID!]!) {
+          translatableResourcesByIds(resourceIds: $ids${more}) {
+            nodes { resourceId translatableContent { key value } translations(locale: "ur") { key value } }
+            pageInfo { hasNextPage endCursor }
+          }
+        }`,
+        { ids },
+      );
+    const missing = toPublicId('product', newId());
+    // Kinds mixed, in the order asked, each once; one the shop has not left out.
+    const asked = [rust.id, product.id, colour.id, missing, mint.id, product.id];
+    const all = await byIds(asked);
+    expect(all.errors).toBeUndefined();
+    expect(all.data!.translatableResourcesByIds).toEqual({
+      nodes: [
+        {
+          resourceId: rust.id,
+          translatableContent: [{ key: 'name', value: 'Rust' }],
+          translations: [],
+        },
+        {
+          resourceId: product.id,
+          translatableContent: [{ key: 'title', value: 'Kurta' }],
+          translations: [],
+        },
+        {
+          resourceId: colour.id,
+          translatableContent: [{ key: 'name', value: 'Colour' }],
+          translations: [],
+        },
+        {
+          resourceId: mint.id,
+          translatableContent: [{ key: 'name', value: 'Mint' }],
+          translations: [{ key: 'name', value: 'پودینہ' }],
+        },
+      ],
+      pageInfo: { hasNextPage: false, endCursor: expect.any(String) },
+    });
+    // A page at a time.
+    const first = (await byIds(asked, ', first: 2')).data!.translatableResourcesByIds;
+    expect(first.nodes.map((node: Json) => node.resourceId)).toEqual([rust.id, product.id]);
+    expect(first.pageInfo.hasNextPage).toBe(true);
+    const rest = (await byIds(asked, `, first: 2, after: "${first.pageInfo.endCursor}"`)).data!
+      .translatableResourcesByIds;
+    expect(rest.nodes.map((node: Json) => node.resourceId)).toEqual([colour.id, mint.id]);
+    expect(rest.pageInfo.hasNextPage).toBe(false);
+    // Another shop's are not its own; what is not translatable, too many, and the scope.
+    expect((await byIds(asked, '', tokens.b)).data!.translatableResourcesByIds.nodes).toEqual([]);
+    expect((await byIds([product.id, 'nonsense'])).errors![0]!.extensions?.code).toBe(
+      'BAD_USER_INPUT',
+    );
+    const many = Array.from({ length: 251 }, () => toPublicId('product', newId()));
+    expect((await byIds(many)).errors![0]!.message).toBe('resourceIds can have at most 250');
+    expect((await byIds([product.id], '', tokens.products)).errors![0]!.extensions?.code).toBe(
+      'ACCESS_DENIED',
+    );
+  });
+
   it("translates the shop's own words for its home page, by the shop's ID (ADR-245)", async () => {
     await admin.query(
       `INSERT INTO online_store.preferences (shop_id, seo_title, seo_description)

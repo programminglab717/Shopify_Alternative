@@ -3431,6 +3431,42 @@ export const PolicyTranslationQuery = /* GraphQL */ `
   }
 `;
 
+/**
+ * Things of the shop's whose words may be put in Urdu, by their IDs, such as a product with its
+ * options and their values (OS-06): each field with words, its digest, and its Urdu as kept.
+ */
+export const InUrduQuery = /* GraphQL */ `
+  query InUrdu($ids: [ID!]!) {
+    translatableResourcesByIds(resourceIds: $ids, first: 250) {
+      nodes {
+        resourceId
+        translatableContent {
+          key
+          value
+          digest
+        }
+        translations(locale: "ur") {
+          key
+          value
+          outdated
+        }
+      }
+    }
+  }
+`;
+
+/** Urdu forgotten: the storefront's Urdu pages show the shop's own words again (OS-06). */
+export const TranslationsRemoveMutation = /* GraphQL */ `
+  mutation TranslationsRemove($resourceId: ID!, $keys: [String!]!) {
+    translationsRemove(resourceId: $resourceId, translationKeys: $keys, locales: ["ur"]) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** Translations kept, each naming the digest of the words it translates (OS-06). */
 export const TranslationsRegisterMutation = /* GraphQL */ `
   mutation TranslationsRegister($resourceId: ID!, $translations: [TranslationInput!]!) {

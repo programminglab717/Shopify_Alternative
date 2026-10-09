@@ -78,6 +78,7 @@ import { StaffPage } from './settings/staff-page';
 import { MorePage, Shell } from './shell/shell';
 import { ShippingPage, validateShippingSearch } from './shipping/shipping-page';
 import { ShopsPage } from './shops/shops-page';
+import { CollectionUrduPage, PageUrduPage, ProductUrduPage } from './urdu/urdu-pages';
 import { EmptyState } from './ui/feedback';
 
 export interface RouterContext {
@@ -352,6 +353,24 @@ const newArticle = createRoute({
   component: NewArticlePage,
 });
 
+const productUrdu = createRoute({
+  getParentRoute: () => shop,
+  path: 'products/$productId/urdu',
+  component: ProductUrduPage,
+});
+
+const collectionUrdu = createRoute({
+  getParentRoute: () => shop,
+  path: 'collections/$collectionId/urdu',
+  component: CollectionUrduPage,
+});
+
+const pageUrdu = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store/pages/$pageId/urdu',
+  component: PageUrduPage,
+});
+
 const themeEditor = createRoute({
   getParentRoute: () => shop,
   path: 'online-store/themes/$themeId',
@@ -592,6 +611,7 @@ export const routeTree = root.addChildren([
     newProduct,
     productFiles,
     product,
+    productUrdu,
     customers,
     customer,
     shipping,
@@ -608,6 +628,7 @@ export const routeTree = root.addChildren([
     onlineStore,
     newPage,
     pageEditor,
+    pageUrdu,
     menuEditor,
     policy,
     blog,
@@ -623,6 +644,7 @@ export const routeTree = root.addChildren([
     collections,
     newCollection,
     collection,
+    collectionUrdu,
     returns,
     more,
     settings,

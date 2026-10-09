@@ -21,6 +21,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { PageUrduCard } from '../urdu/urdu-pages';
 import { BodyArea, normalized, useBody } from './body-field';
 
 /** Those who write the shop's pages, which are content: marketers too (ADR-176). */
@@ -330,6 +331,7 @@ export function PageEditorPage() {
             </p>
           </div>
           <PageForm key={page.id} page={page} />
+          <PageUrduCard pageId={page.id} />
           <DeletePage page={page} />
         </>
       )}

@@ -2654,6 +2654,41 @@ const en = {
   'editor.image.removeOf': 'Remove {label}',
   'editor.image.alt': '{label}: what it shows',
   'editor.image.altHint': "For shoppers who can't see it, and for search engines.",
+  'urdu.heading': 'In Urdu',
+  'urdu.cardHint':
+    "Your store's Urdu pages show your Urdu for these words; what you haven't written in Urdu shows as you wrote it.",
+  'urdu.write': 'Write in Urdu',
+  'urdu.none': 'Not in Urdu yet',
+  'urdu.some': '{count} of {total} in Urdu',
+  'urdu.all': 'All in Urdu',
+  'urdu.toCheck': '{count} to check',
+  'urdu.toCheck.one': '1 to check',
+  'urdu.title': '{name} in Urdu',
+  'urdu.intro':
+    "Your store's Urdu pages show what you write here in place of your own words. Leave a box empty and they show your own words.",
+  'urdu.cannot': "Only the shop's owners, managers and marketers write its Urdu.",
+  'urdu.product': 'Product',
+  'urdu.collection': 'Collection',
+  'urdu.page': 'Page',
+  'urdu.options': 'Options',
+  'urdu.optionsHint':
+    "Shown as the product's choices on its Urdu pages, and in its variants' names.",
+  'urdu.field.title': 'Title',
+  'urdu.field.description': 'Description',
+  'urdu.field.body': 'Text',
+  'urdu.field.productType': 'Type',
+  'urdu.field.metaTitle': 'Title for search engines',
+  'urdu.field.metaDescription': 'Description for search engines',
+  'urdu.inUrdu': '{label} in Urdu',
+  'urdu.outdated':
+    'Your own words changed after this Urdu was written. Your Urdu pages still show it.',
+  'urdu.stillRight': "It's still right",
+  'urdu.keptAsItIs': 'Kept as it is when you save.',
+  'urdu.stale':
+    '{label}: your own words changed while you were writing. Check the Urdu against them and save again.',
+  'urdu.saved': "Saved. Your store's Urdu pages show it in a moment.",
+  'urdu.save': 'Save the Urdu',
+  'urdu.nothing': 'Nothing here has words to put in Urdu yet.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5289,6 +5324,41 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'editor.image.removeOf': '{label} ہٹائیں',
   'editor.image.alt': '{label}: اس میں کیا ہے',
   'editor.image.altHint': 'ان خریداروں کے لیے جو اسے دیکھ نہیں سکتے، اور سرچ انجنز کے لیے۔',
+  'urdu.heading': 'اردو میں',
+  'urdu.cardHint':
+    'آپ کے اسٹور کے اردو صفحات ان الفاظ کی جگہ آپ کی اردو دکھاتے ہیں؛ جو آپ نے اردو میں نہیں لکھا وہ ویسا ہی دکھتا ہے جیسا آپ نے لکھا تھا۔',
+  'urdu.write': 'اردو میں لکھیں',
+  'urdu.none': 'ابھی اردو میں نہیں',
+  'urdu.some': '{total} میں سے {count} اردو میں',
+  'urdu.all': 'سب اردو میں',
+  'urdu.toCheck': '{count} دیکھنے ہیں',
+  'urdu.toCheck.one': '1 دیکھنا ہے',
+  'urdu.title': '{name} اردو میں',
+  'urdu.intro':
+    'آپ کے اسٹور کے اردو صفحات آپ کے اپنے الفاظ کی جگہ وہ دکھاتے ہیں جو آپ یہاں لکھیں۔ خانہ خالی چھوڑیں تو وہ آپ کے اپنے الفاظ دکھاتے ہیں۔',
+  'urdu.cannot': 'دکان کی اردو صرف اس کے مالک، مینیجر اور مارکیٹر لکھتے ہیں۔',
+  'urdu.product': 'پروڈکٹ',
+  'urdu.collection': 'کلیکشن',
+  'urdu.page': 'صفحہ',
+  'urdu.options': 'آپشنز',
+  'urdu.optionsHint':
+    'اردو صفحات پر پروڈکٹ کے انتخاب کے طور پر، اور اس کے ویریئنٹس کے ناموں میں دکھائے جاتے ہیں۔',
+  'urdu.field.title': 'عنوان',
+  'urdu.field.description': 'تفصیل',
+  'urdu.field.body': 'متن',
+  'urdu.field.productType': 'قسم',
+  'urdu.field.metaTitle': 'سرچ انجنز کے لیے عنوان',
+  'urdu.field.metaDescription': 'سرچ انجنز کے لیے تفصیل',
+  'urdu.inUrdu': '{label} اردو میں',
+  'urdu.outdated':
+    'یہ اردو لکھے جانے کے بعد آپ کے اپنے الفاظ بدل گئے۔ آپ کے اردو صفحات اب بھی یہی دکھاتے ہیں۔',
+  'urdu.stillRight': 'یہ اب بھی درست ہے',
+  'urdu.keptAsItIs': 'محفوظ کرنے پر یہ ویسے ہی رکھی جائے گی۔',
+  'urdu.stale':
+    '{label}: آپ کے لکھتے لکھتے آپ کے اپنے الفاظ بدل گئے۔ اردو ان سے ملا کر دوبارہ محفوظ کریں۔',
+  'urdu.saved': 'محفوظ ہو گیا۔ آپ کے اسٹور کے اردو صفحات اسے تھوڑی دیر میں دکھائیں گے۔',
+  'urdu.save': 'اردو محفوظ کریں',
+  'urdu.nothing': 'یہاں ابھی اردو میں لکھنے کے لیے کوئی الفاظ نہیں۔',
 };
 
 export const messages: Readonly<

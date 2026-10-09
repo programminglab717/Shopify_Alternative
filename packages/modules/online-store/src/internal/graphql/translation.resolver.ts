@@ -1,5 +1,6 @@
 import {
   CurrentTenant,
+  MAX_PAGE_SIZE,
   RequireScopes,
   UserError,
   badUserInput,
@@ -29,6 +30,7 @@ import {
   TranslatableResourceConnection,
   TranslatableResourceEdge,
   TranslatableResourcesArgs,
+  TranslatableResourcesByIdsArgs,
   Translation,
   TranslationInput,
   TranslationsRegisterPayload,
@@ -70,21 +72,34 @@ export class TranslationResolver {
       first: pageSize(args.first),
       after,
     });
-    const nodes = items.map(toResource);
-    const edges = nodes.map((node) =>
-      Object.assign(new TranslatableResourceEdge(), {
-        node,
-        cursor: encodeCursor({ id: node.resourceId }),
-      }),
-    );
-    return Object.assign(new TranslatableResourceConnection(), {
-      edges,
-      nodes,
-      pageInfo: Object.assign(new PageInfo(), {
-        hasNextPage,
-        endCursor: edges.at(-1)?.cursor ?? null,
-      }),
-    });
+    return connectionOf(items.map(toResource), hasNextPage);
+  }
+
+  @Query(() => TranslatableResourceConnection, {
+    description:
+      "The shop's resources that may be translated, by their IDs, of any kinds and in the order " +
+      "given, as Shopify's translatableResourcesByIds: a product with its options and their " +
+      'values, say. Those the shop has not are left out.',
+  })
+  @RequireScopes('read_translations')
+  async translatableResourcesByIds(
+    @CurrentTenant() tenant: TenantContext,
+    @Args() args: TranslatableResourcesByIdsArgs,
+  ): Promise<TranslatableResourceConnection> {
+    if (args.resourceIds.length > MAX_PAGE_SIZE) {
+      throw badUserInput(`resourceIds can have at most ${MAX_PAGE_SIZE}`);
+    }
+    const size = pageSize(args.first);
+    const ids = [...new Set(args.resourceIds)];
+    const refs = ids.map(resourceOf);
+    let start = 0;
+    if (args.after) {
+      const at = ids.indexOf(decodeCursor(args.after, ['id']).id);
+      if (at < 0) throw badUserInput('Invalid cursor');
+      start = at + 1;
+    }
+    const records = await this.service.resourcesByIds(tenant, refs.slice(start));
+    return connectionOf(records.slice(0, size).map(toResource), records.length > size);
   }
 
   @ResolveField(() => [Translation], {
@@ -161,6 +176,27 @@ function resourceOf(resourceId: string): { kind: TranslatableKind; id: string } 
       'option value or shop: ' +
       resourceId.slice(0, 64),
   );
+}
+
+/** A page of resources, each edge's cursor its resource's ID. */
+function connectionOf(
+  nodes: TranslatableResource[],
+  hasNextPage: boolean,
+): TranslatableResourceConnection {
+  const edges = nodes.map((node) =>
+    Object.assign(new TranslatableResourceEdge(), {
+      node,
+      cursor: encodeCursor({ id: node.resourceId }),
+    }),
+  );
+  return Object.assign(new TranslatableResourceConnection(), {
+    edges,
+    nodes,
+    pageInfo: Object.assign(new PageInfo(), {
+      hasNextPage,
+      endCursor: edges.at(-1)?.cursor ?? null,
+    }),
+  });
 }
 
 function toResource(record: TranslatableResourceRecord): TranslatableResource {

@@ -30,6 +30,7 @@ import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context'
 import { Button } from '../ui/button';
 import { Alert, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { CollectionUrduCard } from '../urdu/urdu-pages';
 import { BackToProducts } from './collections-page';
 import { RulesEditor, ruleInput, rulesComplete, sortOrders } from './collection-form';
 
@@ -405,6 +406,7 @@ export function CollectionPage() {
           </div>
           <Details key={collection.id} collection={collection} edits={edits} />
           <Products collection={collection} edits={edits} />
+          <CollectionUrduCard collectionId={collection.id} />
           {edits && <Delete collection={collection} />}
         </>
       )}

@@ -45,6 +45,13 @@ html[lang='ur'] {
   line-height: var(--hatti-type-body-line-ur);
 }
 
+/* Urdu written on a page in English, such as a product's Urdu, in Nastaliq at its own size. */
+html:not([lang='ur']) [lang='ur'] {
+  font-family: var(--hatti-font-urdu);
+  font-size: var(--hatti-type-body-size-ur);
+  line-height: var(--hatti-type-body-line-ur);
+}
+
 /* Prices, numbers and IDs stay Latin and line up in columns, in either language. */
 .num {
   font-family: var(--hatti-font-latin);

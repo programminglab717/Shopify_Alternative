@@ -46,6 +46,7 @@ import { ProductOptions } from './options';
 import { ProductPhotos } from './photos';
 import { StockRules } from './stock-rules';
 import { EDITS_PRODUCTS, ProductStatusBadge, ProductThumb } from './status';
+import { ProductUrduCard } from '../urdu/urdu-pages';
 
 /** A product's page's search: whether it was just added, and its stock with it. */
 export interface ProductSearch {
@@ -562,6 +563,7 @@ export function ProductPage() {
       />
       {edits && <ProductOptions product={product} />}
       {edits && <StockRules product={product} />}
+      <ProductUrduCard product={product} />
     </div>
   );
 }

@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Next, content in Urdu** (admin): products', collections' and pages' words in Urdu, as the
-storefront's Urdu pages show them (OS-06), through Shopify's `translatableResources` and
-`translationsRegister`, which the shop's policies use already; then section by section as
+**Next, the rest of the shop's words in Urdu** (admin): its blogs', articles' and menus' and
+its home page's, on the same page as a product's (OS-06, ADR-327); then section by section as
 the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
@@ -19,6 +18,28 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Products, collections and pages in Urdu, in the admin
+
+* **The shop's words in Urdu** ([ADR-327](../architecture/13-decision-log.md#adr-327--the-admin-puts-a-products-collections-or-pages-words-in-urdu-on-a-page-of-its-own-each-field-of-the-shops-own-above-its-urdu-and-a-products-options-and-values-with-it-read-in-one-ask-through-shopifys-translatableresourcesbyids-and-saved-as-its-translations)): a product's, collection's and page's own pages say how
+  much of it is in Urdu and open a page of its Urdu: each field with words of the shop's above a
+  box for its Urdu, written right to left in Nastaliq, a product's options and each of their
+  values with it. Saved together as the shop's translations, for its words as they are now; a box
+  emptied puts the shop's own words back on the Urdu pages. Urdu written for words since changed
+  says so, and can be kept as still right. The core gains Shopify's `translatableResourcesByIds`,
+  so a product and its options and values are read in one ask.
+* **Tried in Chromium against the core and the storefront:** on the seed's shop, the Multani
+  Khussa's card said it was not in Urdu yet; its title, its options Size and Colour and their values
+  Gold and Silver were put in Urdu, saved, and its Urdu page on the storefront showed them a moment later,
+  its English page as before, and the card then counted five of eight; on a phone, the page in
+  one column. Every box was then emptied and saved, and the Urdu page showed the shop's own words
+  again; the shop keeps no Urdu of the product. No errors in the browser.
+* 2330 tests: the core giving things of any kinds by their IDs, in the order asked, a page at a
+  time, another shop's left out, and refusing what may not be translated, more than 250, and a
+  caller without the scope; the admin putting a product's description, option and value in Urdu,
+  each for its digest, keeping an outdated title as still right and forgetting an emptied type,
+  saying when the words changed while the Urdu was written, a collection's title and a page's text
+  as its blocks, the card's count, and the page for those who write the shop's Urdu alone.
 
 ### 447b684 · Pictures of a theme's own
 
