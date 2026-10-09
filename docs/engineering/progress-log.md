@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The shop's domains, in the admin
+### 62f0d55 · The shop's domains, in the admin
 
 * **Domains** ([ADR-319](../architecture/13-decision-log.md#adr-319--the-admin-connects-the-shops-own-domains-in-settings-saying-which-record-to-add-where-it-was-bought-checks-them-again-makes-a-connected-one-primary-or-not-and-lets-one-go-once-asked-the-hatti-address-is-always-shown)) in settings: the shop's own domains connected, with the record to add where
   each was bought, checked again, made primary or not, and let go; the Hatti address shown.
