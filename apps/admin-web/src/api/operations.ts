@@ -3568,3 +3568,109 @@ export const UrlRedirectsExportQuery = /* GraphQL */ `
     }
   }
 `;
+
+/** The shop's segments, newest first, with how many customers each holds now (CUS-03). */
+export const SegmentsQuery = /* GraphQL */ `
+  query Segments {
+    segments(first: 250) {
+      nodes {
+        id
+        name
+        query
+        memberCount
+      }
+    }
+  }
+`;
+
+/** A segment to change. */
+export const SegmentQuery = /* GraphQL */ `
+  query Segment($id: ID!) {
+    segment(id: $id) {
+      id
+      name
+      query
+      memberCount
+    }
+  }
+`;
+
+/** The fields a segment's conditions can use, with the conditions each takes. */
+export const SegmentFiltersQuery = /* GraphQL */ `
+  query SegmentFilters {
+    segmentFilters {
+      name
+      type
+      description
+      example
+      operators
+    }
+  }
+`;
+
+/** What a segment's conditions match now: how many customers, and the newest of them. */
+export const SegmentPreviewQuery = /* GraphQL */ `
+  query SegmentPreview($query: String!) {
+    segmentPreview(query: $query, first: 20) {
+      memberCount
+      members {
+        id
+        displayName
+        phone
+        numberOfOrders
+        lastOrderAt
+        tags
+        amountSpent {
+          amount
+          currencyCode
+        }
+        blocklistEntry {
+          id
+        }
+      }
+    }
+  }
+`;
+
+/** A segment kept by its name; its conditions are checked by the core. */
+export const SegmentCreateMutation = /* GraphQL */ `
+  mutation SegmentCreate($name: String!, $query: String!) {
+    segmentCreate(name: $name, query: $query) {
+      segment {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A segment renamed, or its conditions changed. */
+export const SegmentUpdateMutation = /* GraphQL */ `
+  mutation SegmentUpdate($id: ID!, $name: String, $query: String) {
+    segmentUpdate(id: $id, name: $name, query: $query) {
+      segment {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A segment deleted; its customers stay. */
+export const SegmentDeleteMutation = /* GraphQL */ `
+  mutation SegmentDelete($id: ID!) {
+    segmentDelete(id: $id) {
+      deletedSegmentId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

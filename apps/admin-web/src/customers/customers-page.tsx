@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { Ban, ChevronRight, Search, Users } from 'lucide-react';
+import { Ban, ChevronRight, Search, Users, UsersRound } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { CustomersQuery } from '../api/operations';
@@ -24,6 +24,9 @@ export const READS_CUSTOMERS: readonly StaffRole[] = [
   'marketer',
 ];
 
+/** Those who keep segments, for marketing: owners, managers and marketers (CUS-03). */
+export const KEEPS_SEGMENTS: readonly StaffRole[] = ['owner', 'manager', 'marketer'];
+
 /** The customers list's search: the words searched for. */
 export interface CustomersSearch {
   q?: string;
@@ -38,7 +41,13 @@ export function shownPhone(phone: string): string {
   return phone.includes('•') ? phone : formatPhone(phone);
 }
 
-function CustomerRow({ customer, timezone }: { customer: CustomerListItem; timezone: string }) {
+export function CustomerRow({
+  customer,
+  timezone,
+}: {
+  customer: CustomerListItem;
+  timezone: string;
+}) {
   const { t, locale } = useLocale();
   const shopId = useShop().id;
   return (
@@ -117,9 +126,21 @@ export function CustomersPage() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
-      <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
-        {t('customers.title')}
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
+          {t('customers.title')}
+        </h1>
+        {KEEPS_SEGMENTS.includes(shop.role) && (
+          <Link
+            to="/$shopId/customers/segments"
+            params={{ shopId: shop.id }}
+            className="inline-flex min-h-10 items-center gap-2 rounded-control border border-line bg-surface px-3 hover:bg-canvas"
+          >
+            <UsersRound aria-hidden className="size-5" />
+            {t('segments.title')}
+          </Link>
+        )}
+      </div>
       <form onSubmit={onSearch} role="search" className="relative">
         <Search
           aria-hidden

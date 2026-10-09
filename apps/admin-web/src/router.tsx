@@ -17,6 +17,7 @@ import { SignUpPage } from './auth/sign-up-page';
 import { TwoStepPage } from './auth/two-step-page';
 import { CustomerPage } from './customers/customer-page';
 import { CustomersPage, validateCustomersSearch } from './customers/customers-page';
+import { NewSegmentPage, SegmentPage, SegmentsPage } from './customers/segments';
 import { DeskPage } from './desk/desk-page';
 import {
   ChangeEmailPage,
@@ -330,6 +331,24 @@ const articleEditor = createRoute({
   component: ArticleEditorPage,
 });
 
+const segments = createRoute({
+  getParentRoute: () => shop,
+  path: 'customers/segments',
+  component: SegmentsPage,
+});
+
+const newSegment = createRoute({
+  getParentRoute: () => shop,
+  path: 'customers/segments/new',
+  component: NewSegmentPage,
+});
+
+const segment = createRoute({
+  getParentRoute: () => shop,
+  path: 'customers/segments/$segmentId',
+  component: SegmentPage,
+});
+
 const account = createRoute({
   getParentRoute: () => shop,
   path: 'account',
@@ -492,6 +511,9 @@ export const routeTree = root.addChildren([
     blog,
     newArticle,
     articleEditor,
+    segments,
+    newSegment,
+    segment,
     collections,
     newCollection,
     collection,

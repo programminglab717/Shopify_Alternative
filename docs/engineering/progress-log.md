@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, customer segments in the admin** (CUS-03, CUS-04): customers found by what they bought,
-where they live, how their parcels went and whether they agreed to marketing, kept as segments
-with their members counted; then the admin's next sections as the alpha's shops need them. Urdu
-handles wait, as decided.
+**Next, customers in and out of the admin** (CUS-07): customers exported as CSV, everyone or a
+segment's, once the member confirms who they are; and customers imported from a CSV, checked
+first, as Shopify's export writes it; then the admin's next sections as the alpha's shops need
+them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Customer segments, in the admin
+
+* **Segments** ([ADR-298](../architecture/13-decision-log.md#adr-298--the-admins-segments-are-built-from-conditions-in-words-joined-so-customers-match-all-or-any-and-written-in-the-cores-query-language-a-query-the-builder-cannot-show-is-kept-and-edited-as-text-what-the-conditions-match-is-counted-and-its-newest-customers-shown-as-they-change-the-cores-reason-shown-where-a-query-does-not-read)), from the customers list for owners, managers and marketers: each with
+  how many customers it holds; built from conditions in words, joined as all or any, written in
+  the core's query language and read back from it; counted, with the newest customers, as the
+  conditions change; a query the builder cannot show kept as its text.
+* **Tried against the core:** on the seed's shop, a segment of customers with an order in Lahore
+  or Karachi counted five as it was built and was kept; as text, a query cut short said the
+  core's reason; one of orders or spending went back to the builder and was saved; and the
+  segment was deleted; with no errors in the browser. The first try started a new condition on
+  tags, the core's first field; it starts on the number of orders now.
+* 2142 tests: conditions written and read back; a segment built, counted and kept; one changed,
+  one kept as text with its problem said, and one deleted; and none for an agent.
 
 ### da14865 · The storefront's preferences and redirects, in the admin
 

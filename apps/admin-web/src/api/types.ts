@@ -1560,3 +1560,44 @@ export interface UrlRedirectsImportData {
 export interface UrlRedirectsExportData {
   urlRedirectsExport: { count: number; csv: string };
 }
+
+export interface SegmentValue {
+  id: string;
+  name: string;
+  query: string;
+  memberCount: number;
+}
+
+export interface SegmentsData {
+  segments: { nodes: SegmentValue[] };
+}
+
+export interface SegmentData {
+  segment: SegmentValue | null;
+}
+
+export type SegmentFieldType = 'BOOLEAN' | 'DATE' | 'MONEY' | 'NUMBER' | 'TEXT' | 'TEXT_LIST';
+
+export interface SegmentFilterValue {
+  name: string;
+  type: SegmentFieldType;
+  description: string;
+  example: string;
+  operators: string[];
+}
+
+export interface SegmentFiltersData {
+  segmentFilters: SegmentFilterValue[];
+}
+
+export interface SegmentPreviewData {
+  segmentPreview: { memberCount: number; members: CustomerListItem[] };
+}
+
+export interface SegmentMutationData {
+  [field: string]: {
+    segment?: { id: string } | null;
+    deletedSegmentId?: string | null;
+    userErrors: UserError[];
+  };
+}

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-297 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-298 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -305,6 +305,7 @@
 | 295 | The admin installs on a phone from a manifest in its language, with PNG and maskable icons, and a service worker built with it keeps the admin's own files: its page from the network and offline from the cache, its files from the cache, the shop's data never; it says when the phone is offline, and offers a new version once it has installed | Accepted |
 | 296 | The admin's online store writes the shop's blogs: a blog started by its title, its comments closed, approved or shown at once; its articles written as text like pages, with an author, tags and an image from the phone, shown now, from a time ahead or hidden; and their comments approved, marked as spam or not, and deleted | Accepted |
 | 297 | The admin's online store keeps the storefront behind its password while the shop gets ready, pauses it while open until a time or until told, and sets its home page for search engines; and sends old addresses on, redirects found, added, deleted, imported from Shopify's CSV once checked, and exported to it | Accepted |
+| 298 | The admin's segments are built from conditions in words, joined so customers match all or any, and written in the core's query language; a query the builder cannot show is kept and edited as text; what the conditions match is counted and its newest customers shown as they change, the core's reason shown where a query does not read | Accepted |
 
 ---
 
@@ -12193,3 +12194,31 @@
 * **Consequences:**
   * A shop coming from Shopify brings its old addresses in two taps, so links shared on WhatsApp
     and Instagram before still land; and opens its storefront when it is ready, from the phone.
+
+## ADR-298 · The admin's segments are built from conditions in words, joined so customers match all or any, and written in the core's query language; a query the builder cannot show is kept and edited as text; what the conditions match is counted and its newest customers shown as they change, the core's reason shown where a query does not read
+
+* **Context:** The core keeps segments (CUS-03) as a name and a query in its own language:
+  conditions on fields such as `number_of_orders`, `last_order_date`, `city`, `customer_tags`,
+  `blocked` and each channel's marketing consent, joined with AND, OR and NOT, `number_of_orders
+  >= 2 AND last_order_date < -60d`. It says which fields there are and what each takes, previews
+  what a query matches before it is saved, and refuses one that does not read with where and why.
+  Owners, managers and marketers keep segments. The admin had none of it.
+* **Decision:**
+  * **Segments**, a link from the customers list for those who keep them, list each with how
+    many customers it holds now.
+  * **A segment is built from conditions in words:** a field by its name ("Number of orders",
+    "Last order", "City", "WhatsApp marketing"), how it compares in the field's own terms (at
+    least, in the last … days, is one of, has the tag, agreed), and the answer. Several are joined
+    so customers match all of them or any. The admin writes them as the core's query, quoting text
+    as the core reads it, and reads back only queries it would write; one of AND and OR mixed, of
+    NOT or of parentheses beyond a list's is kept and edited as its text, and goes back to the
+    builder once it reads as conditions again.
+  * **Who it holds** is counted as the conditions change, half a second after the last, with its
+    newest customers listed; a query that does not read says the core's reason.
+  * **A new condition** starts on the number of orders.
+* **Consequences:**
+  * A marketer keeps "Not ordered in 60 days" or "Lahore, agreed on WhatsApp" from a phone, sees
+    who is in it before keeping it, and the shop's exports and offers can go to it.
+* **Alternatives:**
+  * **The query language alone:** what the core reads is exact, but few merchants would write
+    `last_order_date < -60d`; the builder writes it, and the text stays for what it cannot show.
