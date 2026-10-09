@@ -26,3 +26,18 @@ export interface ThemePreviewResponse {
   };
   expiresAt: string;
 }
+
+/**
+ * GET: a picture of the shop's that one of its themes shows (ADR-326), its bytes and type; with
+ * `preview`, for a page in a preview, any of its pictures, so a choice not yet saved shows. 404
+ * when there is none to show.
+ */
+export function themeImagePath(shopId: string, fileId: string, preview: boolean): string {
+  return `${STOREFRONT_API_PREFIX}shops/${shopId}/theme-images/${fileId}${preview ? '?preview=1' : ''}`;
+}
+
+/** A picture of a shop's, as the core sends it to the shop's storefront. */
+export interface ThemeImage {
+  body: Uint8Array;
+  contentType: string;
+}

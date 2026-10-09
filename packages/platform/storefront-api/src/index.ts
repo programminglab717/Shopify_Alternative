@@ -73,4 +73,10 @@ export {
   type SignUpRequest,
   type SignUpResponse,
 } from './sign-ups.js';
-export { THEME_PREVIEW_HEADER, themePreviewPath, type ThemePreviewResponse } from './theme.js';
+export {
+  THEME_PREVIEW_HEADER,
+  themeImagePath,
+  themePreviewPath,
+  type ThemeImage,
+  type ThemePreviewResponse,
+} from './theme.js';

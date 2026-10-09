@@ -6,7 +6,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
-import { startTestApi, type TestApi } from '../testing/api.js';
+import { TEST_STOREFRONT_KEY, startTestApi, type TestApi } from '../testing/api.js';
 
 const server = testDatabaseServer();
 
@@ -445,5 +445,77 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
         message: 'Nothing has been uploaded to its URL yet',
       },
     ]);
+  });
+
+  it("gives storefronts the pictures a shop's themes show, and in a preview any of its pictures (ADR-326)", async () => {
+    const writer = await issueToken(['write_files', 'write_themes']);
+    const upload = async (filename: string, mimeType: string, bytes: Buffer) => {
+      const staged = await gql(writer, STAGE, {
+        input: [{ filename, mimeType, fileSize: String(bytes.length) }],
+      });
+      const [target] = staged.data!.stagedUploadsCreate.stagedTargets;
+      expect((await call('PUT', target.url, bytes, mimeType)).statusCode).toBe(200);
+      const created = await gql(writer, CREATE, {
+        files: [{ originalSource: target.resourceUrl }],
+      });
+      return created.data!.fileCreate.files[0].id as string;
+    };
+    const banner = await upload('Eid banner.png', 'image/png', png(80));
+    const other = await upload('Not shown.png', 'image/png', png(40));
+    const catalogue = await upload('Lookbook.pdf', 'application/pdf', Buffer.from('%PDF-1.7\n'));
+    const fetchImage = (shopId: string, file: string, query = '', key = TEST_STOREFRONT_KEY) =>
+      app.inject({
+        method: 'GET',
+        url: `/storefront/shops/${shopId}/theme-images/${file}${query}`,
+        headers: { authorization: `Bearer ${key}` },
+      });
+
+    // No theme shows it yet: a preview's page alone gets it, as the editor's choice not saved.
+    expect((await fetchImage(shop, banner)).statusCode).toBe(404);
+    const previewed = await fetchImage(shop, banner, '?preview=1');
+    expect([
+      previewed.statusCode,
+      previewed.headers['content-type'],
+      previewed.headers['cache-control'],
+      previewed.headers['x-content-type-options'],
+    ]).toEqual([200, 'image/png', 'no-store', 'nosniff']);
+    expect(previewed.rawPayload.equals(png(80))).toBe(true);
+
+    // Saved in a theme, published or not: every page gets it.
+    const theme = (
+      await gql(
+        writer,
+        'mutation { themeCreate(name: "Eid") { theme { id } userErrors { message } } }',
+      )
+    ).data!.themeCreate.theme.id as string;
+    const index = JSON.stringify({
+      sections: {
+        banner: {
+          type: 'image-banner',
+          settings: { image: { src: `/theme-images/${banner}/Eid-banner.png`, alt: 'Eid' } },
+        },
+      },
+      order: ['banner'],
+    });
+    const saved = await gql(
+      writer,
+      `mutation ($id: ID!, $files: [OnlineStoreThemeFilesUpsertFileInput!]!) {
+        themeFilesUpsert(themeId: $id, files: $files) { userErrors { field message } }
+      }`,
+      { id: theme, files: [{ filename: 'templates/index.json', body: index }] },
+    );
+    expect(saved.data!.themeFilesUpsert.userErrors).toEqual([]);
+    const shown = await fetchImage(shop, banner);
+    expect([shown.statusCode, shown.headers['content-type']]).toEqual([200, 'image/png']);
+    expect(shown.rawPayload.equals(png(80))).toBe(true);
+
+    // Nothing else: a picture no theme shows, a PDF even in a preview, another shop's, what is no
+    // file of anyone's; and nothing for any but storefronts.
+    expect((await fetchImage(shop, other)).statusCode).toBe(404);
+    expect((await fetchImage(shop, catalogue, '?preview=1')).statusCode).toBe(404);
+    expect((await fetchImage(newId(), banner, '?preview=1')).statusCode).toBe(404);
+    expect((await fetchImage(shop, 'file_nonsense', '?preview=1')).statusCode).toBe(404);
+    expect((await fetchImage('zari', banner)).statusCode).toBe(404);
+    expect((await fetchImage(shop, banner, '', 'not-the-key')).statusCode).toBe(401);
   });
 });

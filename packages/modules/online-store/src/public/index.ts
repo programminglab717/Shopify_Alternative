@@ -120,6 +120,7 @@ export { PREVIEW_DAYS, ThemePreviewService, type ThemePreview } from '../interna
 export {
   ThemeService,
   shopAccentOf,
+  themesName,
   type ListThemesOptions,
   type ThemeFileInput,
 } from '../internal/theme.service.js';

@@ -46,7 +46,13 @@ import {
   type SignUpRequest,
   type SignUpResponse,
 } from './sign-ups.js';
-import { THEME_PREVIEW_HEADER, themePreviewPath, type ThemePreviewResponse } from './theme.js';
+import {
+  THEME_PREVIEW_HEADER,
+  themeImagePath,
+  themePreviewPath,
+  type ThemeImage,
+  type ThemePreviewResponse,
+} from './theme.js';
 
 export interface StorefrontApiOptions {
   /** Where the core answers storefronts, such as http://localhost:4000. */
@@ -257,6 +263,22 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return (await response.json()) as ThemePreviewResponse;
+  }
+
+  /**
+   * A picture of the shop's that one of its themes shows (ADR-326), or, for a page in a preview,
+   * any of its pictures; null when there is none to show.
+   */
+  async themeImage(shopId: string, fileId: string, preview: boolean): Promise<ThemeImage | null> {
+    const response = await this.#request('GET', themeImagePath(shopId, fileId, preview), null);
+    if (response.status === 404) return null;
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return {
+      body: new Uint8Array(await response.arrayBuffer()),
+      contentType: response.headers.get('content-type') ?? 'application/octet-stream',
+    };
   }
 
   #request(

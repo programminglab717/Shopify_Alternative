@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-325 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-326 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -333,6 +333,7 @@
 | 323 | The theme editor reads a theme through the Admin API: the platform theme's settings and sections, their words in English or Urdu through Shopify's t: keys, and every JSON file the shop may keep as the storefront reads it | Accepted |
 | 324 | The admin's theme editor changes a page's sections and blocks and the theme's settings in place, kept until saved together as Theme Check passes them; pictures wait for an address of their own | Accepted |
 | 325 | The theme editor's preview frames the storefront beside the editor and shows changes as they are made, the page's sections following the editor's files; the theme's settings show once saved | Accepted |
+| 326 | A theme's pictures are the shop's own files, uploaded in the theme editor and served by the storefront at an address of the shop's own while one of its themes names them; a preview shows any of the shop's pictures | Accepted |
 
 ---
 
@@ -13021,3 +13022,62 @@
   * **A message of its own for each move, hide and show:** the files the editor sends already
     say where every section is, and a message for each would be one more way for the page and
     the editor to disagree.
+
+## ADR-326 · A theme's pictures are the shop's own files, uploaded in the theme editor and served by the storefront at an address of the shop's own while one of its themes names them; a preview shows any of the shop's pictures
+
+* **Context:** The theme editor ([ADR-324](#adr-324--the-admins-theme-editor-changes-a-pages-sections-and-blocks-and-the-themes-settings-in-place-kept-until-saved-together-as-theme-check-passes-them-pictures-wait-for-an-address-of-their-own)) changed a page's words, collections and order,
+  but not its pictures: a banner kept the platform theme's. A shop's files are private
+  ([ADR-079](#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)), shown through URLs signed for an hour, and public only for what they were
+  chosen for, each at an address of its own: its logos ([ADR-205](#adr-205--a-shops-brand-has-shopifys-square-logo-beside-its-logo-one-of-its-files-served-by-the-api-at-an-address-of-its-own-the-shops-document-names-where-each-logo-is-served-each-address-naming-its-file-and-the-link-page-shows-the-square-logo-else-the-logo-at-its-top)), its sharing image
+  ([ADR-243](#adr-243--a-shops-home-page-has-a-title-and-description-of-its-own-for-search-engines-as-shopifys-preferences-keep-them-and-a-social-sharing-image-one-of-its-files-which-link-previews-show-of-pages-without-an-image-of-their-own-through-shopifys-page_image)) and an article's image ([ADR-213](#adr-213--an-article-has-shopifys-image-one-of-the-shops-files-with-its-alt-text-the-api-serves-it-at-an-address-of-its-own-while-the-article-is-published-the-address-naming-its-file-the-articles-document-names-that-address-and-hatti-base-shows-it-in-its-blog-and-on-the-articles-page)). Theme Check already took a picture
+  setting as a path on the storefront or a web address, with its words for those who cannot see
+  it, as Shopify's image settings keep them. A merchant whose Eid banner was to be a photo of
+  their own lawn suits had nowhere to put it.
+* **Decision:**
+  * **A picture is uploaded where it is shown:** each of a theme's picture settings in the editor
+    shows its picture, with Upload a picture, or Upload another, which takes one from the phone or
+    the computer, made smaller in the browser and put straight to storage as products' photos
+    are, then kept among the shop's files. The setting names it as `/theme-images/{file}/{name}`,
+    the file's ID and its name in lower-case letters, digits and hyphens, beside its words for
+    those who cannot see it, asked for beside the picture. Remove takes the setting's picture
+    away, the theme's own too.
+  * **The editor shows it at once:** a picture just uploaded from the phone's own copy, the
+    shop's other pictures through their files' signed URLs, and the theme's own from the
+    storefront.
+  * **The storefront serves it at the shop's own address**, as Shopify serves a shop's files on
+    its domain: at `/theme-images/{file}/{name}`, where the name is for people and search
+    engines and any will do. It asks the core (`GET /storefront/shops/{shop}/theme-images/{file}`,
+    with the storefront key), which gives one of the shop's images when one of its themes,
+    published or not, names it in any of its files, so a theme prepared before it is published
+    shows its pictures in its preview. Shoppers' browsers and the edge keep a picture an hour, and
+    an address that gives none a minute. The address is open behind the storefront's password
+    and while it is paused, as the pages shown there may show pictures too.
+  * **A preview shows any of the shop's pictures:** a page in a preview, as the theme editor's
+    frame is, asks the core for any of the shop's images, so a picture shows there before it is
+    saved; those answers are the shopper's own, `private, no-store`, as [ADR-049](#adr-049--a-theme-is-previewed-through-a-link-the-core-seals-which-storefronts-keep-in-a-cookie-and-render-from-the-cores-files-never-kept) has
+    previews.
+* **Consequences:**
+  * A merchant puts a photo of their own in the banner from a phone, sees it on the page before
+    saving it, and shoppers see it at the shop's own address once it is saved.
+  * Storage stays private, and a file is public only while a theme names it: one no theme names
+    any more gives nothing once the hour browsers and the edge keep it has passed. Whoever holds
+    a theme's preview link could see any of the shop's pictures whose ID they knew; IDs are not
+    to be guessed, and customers' transfer receipts and refunds' receipts are kept apart, never
+    among the shop's files.
+  * A picture is served as it was uploaded, a phone's large photo made at most 2,048 pixels a
+    side first, whatever width the page asks for; products' images have their sizes made, and
+    themes' pictures may follow.
+  * A picture uploaded and never saved stays among the shop's files, as Shopify's do. Pictures
+    are only uploaded: choosing among the shop's files comes with a section of the admin's own
+    for them.
+  * Each picture the edge does not keep costs the core a look through the shop's themes' JSON
+    files, a few small files for each theme.
+* **Alternatives:**
+  * **A signed URL in the theme's file:** it ends within the hour, and pages are kept longer.
+  * **All of a shop's images public:** simpler, but a file uploaded for anything else would be
+    public to anyone with its ID; Shopify's are, Hatti's are not (ADR-079).
+  * **A list of the files themes name, kept as themes are saved:** no look through the files,
+    but one more thing to keep in step with every save, copy and deletion of a theme, for a look
+    that costs little and that the edge spares.
+  * **Pictures copied into the theme as its own assets:** a theme's assets are the platform's
+    ([ADR-039](#adr-039--a-shops-theme-is-a-platform-theme-with-the-shops-own-json-files-over-it)); a shop's themes keep only JSON.

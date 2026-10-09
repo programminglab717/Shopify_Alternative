@@ -223,6 +223,25 @@ describe('StorefrontApiClient', () => {
     expect(requests[0]!.headers.get('authorization')).toBe('Bearer storefront-key');
   });
 
+  it("fetches a picture a shop's theme shows, any of its pictures in a preview, and none it has not", async () => {
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+    const { client, requests } = clientAnswering((request) =>
+      request.url.includes('/file_known')
+        ? new Response(jpeg, { headers: { 'content-type': 'image/jpeg' } })
+        : new Response('Not found', { status: 404 }),
+    );
+    expect(await client.themeImage('shop-1', 'file_known', false)).toEqual({
+      body: jpeg,
+      contentType: 'image/jpeg',
+    });
+    expect(await client.themeImage('shop-1', 'file_other', true)).toBeNull();
+    expect(requests.map((request) => [request.method, request.url])).toEqual([
+      ['GET', 'http://core.test/storefront/shops/shop-1/theme-images/file_known'],
+      ['GET', 'http://core.test/storefront/shops/shop-1/theme-images/file_other?preview=1'],
+    ]);
+    expect(requests[0]!.headers.get('authorization')).toBe('Bearer storefront-key');
+  });
+
   it('throws when the core answers otherwise', async () => {
     const { client } = clientAnswering(() => new Response('Unauthorized', { status: 401 }));
     await expect(client.read('shop-1', 'secret')).rejects.toThrow(StorefrontApiError);

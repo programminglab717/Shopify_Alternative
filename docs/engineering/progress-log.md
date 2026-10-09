@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, pictures of a theme's own** (admin): a theme's image settings, such as a banner's,
-chosen from the phone and kept as the shop's files, with an address of their own for the
-storefront to show them at (ADR-324); then section by section as the alpha's shops need them.
+**Next, content in Urdu** (admin): products', collections' and pages' words in Urdu, as the
+storefront's Urdu pages show them (OS-06), through Shopify's `translatableResources` and
+`translationsRegister`, which the shop's policies use already; then section by section as
+the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +19,27 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Pictures of a theme's own
+
+* **A theme's pictures from the phone** ([ADR-326](../architecture/13-decision-log.md#adr-326--a-themes-pictures-are-the-shops-own-files-uploaded-in-the-theme-editor-and-served-by-the-storefront-at-an-address-of-the-shops-own-while-one-of-its-themes-names-them-a-preview-shows-any-of-the-shops-pictures)): a picture setting in the theme editor, such
+  as the banner's, takes a photo uploaded from the phone, kept among the shop's files, and shows
+  it at once, in the editor and on the page beside it, before it is saved; its words for those
+  who cannot see it are asked for beside it, and it can be taken away. The storefront serves it
+  at `/theme-images/{file}/{name}` on the shop's own address, from the core, which gives a
+  picture only while one of the shop's themes names it, and any of the shop's pictures to a
+  preview.
+* **Tried in Chromium against the core and the storefront:** on the seed's shop, a photo
+  uploaded to the home page's banner showed in the editor at once and on the page in the preview,
+  while its address gave shoppers nothing; its words typed in; saved, the address gave shoppers
+  the photo, kept an hour, and the home page named it. The home page was then put back through
+  the API, its files as before, after which the address gave nothing again, and the photos
+  uploaded were deleted. No errors in the browser.
+* 2321 tests: the core giving a picture no theme names only to a preview, giving it once a
+  theme names it, and never another shop's, a PDF, an ID that is no file's or a storefront
+  without its key; the storefront asking with the preview's mark and keeping the answer as long
+  as it may; the storefront API's client; the editor uploading a picture, showing it from the
+  phone, saving it with its words, and taking it away.
 
 ### 2dd08c3 · The theme editor's live preview
 

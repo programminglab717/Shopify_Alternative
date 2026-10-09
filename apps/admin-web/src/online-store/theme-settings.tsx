@@ -1,8 +1,15 @@
-import { ImageOff } from 'lucide-react';
-import { useId } from 'react';
+import { ImageOff, ImageUp, Trash2 } from 'lucide-react';
+import { useId, useRef, useState, type ChangeEvent } from 'react';
+import { FileQuery } from '../api/operations';
+import type { ShopFileData } from '../api/types';
+import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import { TextArea } from '../products/product-form';
 import { CheckField, SelectField } from '../settings/settings-form';
+import { useAdminQuery } from '../shell/shop-context';
+import { useImageUpload } from '../shell/use-image-upload';
+import { Button } from '../ui/button';
+import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { valueOf, type Setting } from './theme-files';
 
@@ -22,6 +29,146 @@ function imageSrcOf(value: unknown): string | null {
     return typeof src === 'string' ? src : null;
   }
   return null;
+}
+
+/** An image setting's words for those who cannot see it. */
+function imageAltOf(value: unknown): string {
+  const alt = typeof value === 'object' && value !== null && (value as { alt?: unknown }).alt;
+  return typeof alt === 'string' ? alt : '';
+}
+
+/** Where the storefront shows a picture of the shop's (ADR-326): its file, then a name for people. */
+const THEME_IMAGE = /^\/theme-images\/(file_[0-9a-z]+)(?:\/|$)/;
+
+/** A file's name as part of an address: letters, digits and hyphens; "picture" for none. */
+function nameForPath(name: string): string {
+  const cut = name
+    .toLowerCase()
+    .replace(/[^a-z0-9.]+/g, '-')
+    .replace(/^[-.]+|[-.]+$/g, '')
+    .slice(0, 60);
+  return cut || 'picture';
+}
+
+/**
+ * A picture setting (ADR-326): the picture it shows, a picture of the shop's from its own files
+ * or one the theme came with; another uploaded from the phone, kept with the shop's files and
+ * shown on its storefront at an address of its own; taken away; and its words for those who
+ * cannot see it.
+ */
+function ImageSetting({
+  label,
+  info,
+  value,
+  onChange,
+  storefront,
+}: {
+  label: string;
+  info?: string;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  storefront: string;
+}) {
+  const { t } = useLocale();
+  const upload = useImageUpload();
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  // A picture just uploaded, shown from the phone until its file's address is asked for.
+  const [chosen, setChosen] = useState<{ src: string; url: string } | null>(null);
+  const src = imageSrcOf(value);
+  const fileId = src ? THEME_IMAGE.exec(src)?.[1] : undefined;
+  const local = chosen && chosen.src === src ? chosen.url : null;
+  const file = useAdminQuery<ShopFileData>(
+    ['file', fileId],
+    FileQuery,
+    { id: fileId ?? '' },
+    { enabled: fileId !== undefined && local === null },
+  );
+  const shown = !src
+    ? null
+    : (local ?? (fileId ? (file.data?.file?.url ?? null) : new URL(src, storefront).toString()));
+  const alt = imageAltOf(value);
+
+  const onChosen = (event: ChangeEvent<HTMLInputElement>) => {
+    const picked = event.target.files?.[0];
+    event.target.value = '';
+    if (!picked) return;
+    setBusy(true);
+    setProblem(null);
+    void upload(picked, label)
+      .then((made) => {
+        if ('problem' in made) {
+          setProblem(made.problem);
+          return;
+        }
+        const path = `/theme-images/${made.id}/${nameForPath(picked.name)}`;
+        setChosen({ src: path, url: URL.createObjectURL(picked) });
+        onChange({ src: path, alt });
+      })
+      .catch((failure: unknown) => setProblem(errorText(failure, t)))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="font-medium">{label}</span>
+      {shown ? (
+        <img
+          src={shown}
+          alt=""
+          className="max-h-40 self-start rounded-control border border-line object-contain"
+        />
+      ) : (
+        !src && (
+          <span className="flex items-center gap-2 text-secondary">
+            <ImageOff aria-hidden className="size-5" />
+            {t('editor.noImage')}
+          </span>
+        )
+      )}
+      {info && <p className="text-secondary">{info}</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="secondary"
+          icon={<ImageUp aria-hidden className="size-5" />}
+          busy={busy}
+          onClick={() => input.current?.click()}
+        >
+          {t(src ? 'editor.image.replace' : 'editor.image.choose')}
+        </Button>
+        {src && (
+          <Button
+            variant="danger"
+            icon={<Trash2 aria-hidden className="size-5" />}
+            disabled={busy}
+            aria-label={t('editor.image.removeOf', { label })}
+            onClick={() => onChange(undefined)}
+          >
+            {t('editor.image.remove')}
+          </Button>
+        )}
+      </div>
+      <input
+        ref={input}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        aria-label={label}
+        onChange={onChosen}
+      />
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      {src && (
+        <TextField
+          label={t('editor.image.alt', { label })}
+          hint={t('editor.image.altHint')}
+          dir="auto"
+          value={alt}
+          onChange={(event) => onChange({ src, alt: event.target.value })}
+        />
+      )}
+    </div>
+  );
 }
 
 /**
@@ -182,27 +329,16 @@ export function SettingField({
           onChange={onChange}
         />
       );
-    case 'image_picker': {
-      const src = imageSrcOf(value);
+    case 'image_picker':
       return (
-        <div className="flex flex-col gap-1">
-          <span className="font-medium">{label}</span>
-          {src ? (
-            <img
-              src={new URL(src, storefront).toString()}
-              alt=""
-              className="max-h-40 self-start rounded-control border border-line object-contain"
-            />
-          ) : (
-            <span className="flex items-center gap-2 text-secondary">
-              <ImageOff aria-hidden className="size-5" />
-              {t('editor.noImage')}
-            </span>
-          )}
-          <p className="text-secondary">{t('editor.imageSoon')}</p>
-        </div>
+        <ImageSetting
+          label={label}
+          info={setting.info}
+          value={value}
+          onChange={onChange}
+          storefront={storefront}
+        />
       );
-    }
     default:
       // A kind the editor has no control for: words as words, anything else left as it is.
       return typeof value === 'object' && value !== null ? null : (

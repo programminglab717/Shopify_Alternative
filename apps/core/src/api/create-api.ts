@@ -19,6 +19,7 @@ import { serveLocalStorage } from './local-storage.js';
 import { serveArticleImages } from './article-images.js';
 import { serveLogos } from './logos.js';
 import { serveSharingImages } from './sharing-images.js';
+import { serveThemeImages } from './theme-images.js';
 import { recentAuthenticationHook } from './recent-authentication.js';
 import { supportAccessHook } from './support-access.js';
 
@@ -111,6 +112,8 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   serveArticleImages(fastify, options.database, options.storage);
   // Shops' social sharing images, for their pages' link previews (ADR-243).
   serveSharingImages(fastify, options.database, options.storage);
+  // The pictures shops chose for their themes, for their storefronts to serve (ADR-326).
+  serveThemeImages(fastify, options.database, options.storage);
 
   const app = await NestFactory.create<NestFastifyApplication>(
     ApiModule.forRoot(hearingEmailEvents(options)),

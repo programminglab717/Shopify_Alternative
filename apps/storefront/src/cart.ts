@@ -26,6 +26,7 @@ export type CoreBackend = Pick<
   | 'search'
   | 'searchContent'
   | 'themePreview'
+  | 'themeImage'
   | 'signUp'
   | 'postComment'
 >;

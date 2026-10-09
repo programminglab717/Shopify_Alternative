@@ -6,6 +6,8 @@ import { fakeCore, renderAdmin, signedIn, type } from '../test-support';
 const EARLIER = new Date(Date.now() - 3 * 86_400_000).toISOString();
 const LATER = new Date(Date.now() + 3 * 86_400_000).toISOString();
 const STOREFRONT = 'https://zari.hatti.pk';
+const STORAGE = 'http://localhost:4000/storage/shops/shop_1/files/f1/eid-banner-2.png';
+const UPLOADED = 'file_01k7c3d3t0pqrxwzw8x9a2b4c5';
 const PREVIEW = `${STOREFRONT}/?preview=v1.k1.preview-token`;
 
 const SETTINGS_SCHEMA = [
@@ -236,6 +238,24 @@ function core(role: StaffRole, { refuseOnce = false } = {}) {
             ],
           },
         };
+      case 'StagedUploadsCreate':
+        return {
+          stagedUploadsCreate: {
+            stagedTargets: [
+              {
+                url: `${STORAGE}?expires=1&signature=s`,
+                httpMethod: 'PUT',
+                resourceUrl: STORAGE,
+                parameters: [{ name: 'content-type', value: 'image/png' }],
+              },
+            ],
+            userErrors: [],
+          },
+        };
+      case 'FileCreate':
+        return { fileCreate: { files: [{ id: UPLOADED }], userErrors: [] } };
+      case 'ShopFile':
+        return { file: { id: UPLOADED, url: `${STORAGE}?signed=1`, alt: 'Image' } };
       case 'ThemeFilesUpsert':
         if (refusals > 0) {
           refusals -= 1;
@@ -398,13 +418,11 @@ describe("A theme's editor", () => {
     renderAdmin('/shop_1/online-store/themes/thm_1');
 
     fireEvent.click(await screen.findByRole('button', { name: /^Image banner/ }));
-    // Its picture as it is, with a word on changing it.
-    expect(
-      screen.getByText('Pictures can be changed here soon. Until then this one stays.'),
-    ).toBeTruthy();
+    // Its picture as the theme placed it, at a path on the storefront.
     expect(document.querySelector('img[src$="eid.jpg"]')?.getAttribute('src')).toBe(
       'https://zari.hatti.pk/images/eid.jpg',
     );
+    expect((screen.getByLabelText('Image: what it shows') as HTMLInputElement).value).toBe('Eid');
     fireEvent.click(screen.getByRole('button', { name: /^Text\s*Unstitched suits/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove Text: Unstitched suits' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add a Button block to Image banner' }));
@@ -661,6 +679,49 @@ describe("A theme's editor", () => {
     // A section the page could not choose is no failure of the preview's.
     frame.tell({ type: 'hatti:failed', message: 'The page has no section x' });
     expect(screen.queryByText(/couldn't show your latest changes/)).toBeNull();
+  });
+
+  it("puts a picture of the shop's own in a theme, says what it shows, and takes it away (ADR-326)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store/themes/thm_1');
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Image banner/ }));
+    await act(async () =>
+      fireEvent.change(screen.getByLabelText('Image', { selector: 'input' }), {
+        target: {
+          files: [new File([new Uint8Array(4)], 'Eid Banner 2.PNG', { type: 'image/png' })],
+        },
+      }),
+    );
+    // Kept with the shop's files, put straight to storage, and shown from the phone at once.
+    expect(sentOf(fake, 'FileCreate')).toEqual([
+      { files: [{ originalSource: STORAGE, alt: 'Image' }] },
+    ]);
+    expect(fake.uploads).toEqual([
+      { url: `${STORAGE}?expires=1&signature=s`, type: 'image/png', size: 4 },
+    ]);
+    expect(screen.getByRole('button', { name: 'Upload another' })).toBeTruthy();
+    expect(document.querySelector('img[src^="blob:"]')).toBeTruthy();
+    // Its words, as the theme's picture had them, for those who cannot see it.
+    expect((screen.getByLabelText('Image: what it shows') as HTMLInputElement).value).toBe('Eid');
+    type('Image: what it shows', 'Lawn suits on a rooftop');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText('Saved. Your store shows it in a moment.');
+    const banner = (savedFiles(fake)[0]!.json as typeof INDEX).sections.banner;
+    expect(banner.settings.image).toEqual({
+      src: `/theme-images/${UPLOADED}/eid-banner-2.png`,
+      alt: 'Lawn suits on a rooftop',
+    });
+
+    // Taken away: the banner has none.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Image' }));
+    expect(screen.getByText('No picture')).toBeTruthy();
+    expect(screen.queryByLabelText('Image: what it shows')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(sentOf(fake, 'ThemeFilesUpsert')).toHaveLength(2));
+    const without = (savedFiles(fake)[0]!.json as typeof INDEX).sections.banner;
+    expect(without.settings).toEqual({});
   });
 
   it('is not open to those who do not change themes', async () => {

@@ -35,6 +35,7 @@ import {
   type SignUpRequest,
   type SignUpResult,
   type StorefrontVisit,
+  type ThemeImage,
   type ThemePreviewResponse,
 } from '@hatti/storefront-api';
 import type { InjectOptions } from 'fastify';
@@ -391,6 +392,20 @@ class FakeCore {
   async themePreview(_shopId: string, token: string): Promise<ThemePreviewResponse | null> {
     this.previewsAsked.push(token);
     return this.previews.get(token) ?? null;
+  }
+
+  /**
+   * Pictures shops' themes show, by shop and file, and those of a shop's a preview may show
+   * besides; what was asked.
+   */
+  readonly themeImages = new Map<string, ThemeImage>();
+  readonly otherImages = new Map<string, ThemeImage>();
+  readonly themeImagesAsked: { shopId: string; file: string; preview: boolean }[] = [];
+
+  async themeImage(shopId: string, file: string, preview: boolean): Promise<ThemeImage | null> {
+    this.themeImagesAsked.push({ shopId, file, preview });
+    const key = `${shopId} ${file}`;
+    return this.themeImages.get(key) ?? (preview ? (this.otherImages.get(key) ?? null) : null);
   }
 
   /** The sign-ups sent on, and how the core answers them. */
@@ -1607,6 +1622,48 @@ describe('Carts', () => {
     const asked = core.previewsAsked.length;
     expect((await get('/?preview=%3Cscript%3E')).statusCode).toBe(200);
     expect(core.previewsAsked).toHaveLength(asked);
+    await app.close();
+  });
+
+  it("serves the pictures a shop's themes show at its own address, and in a preview any of its pictures (ADR-326)", async () => {
+    const app = server();
+    const SHOWN = 'file_01k7c3d3t0pqrxwzw8x9a2b4c5';
+    const CHOSEN = 'file_01k7c3d3t0pqrxwzw8x9a2b4c6';
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+    core.themeImages.set(`sample ${SHOWN}`, { body: jpeg, contentType: 'image/jpeg' });
+    core.otherImages.set(`sample ${CHOSEN}`, { body: jpeg, contentType: 'image/jpeg' });
+    const get = (url: string, cookie?: string) =>
+      app.inject({ method: 'GET', url, headers: { host: 'localhost', ...(cookie && { cookie }) } });
+
+    const shown = await get(`/theme-images/${SHOWN}/Eid-banner.jpg`);
+    expect([
+      shown.statusCode,
+      shown.headers['content-type'],
+      shown.headers['cache-control'],
+      shown.headers['x-content-type-options'],
+    ]).toEqual([200, 'image/jpeg', 'public, max-age=3600', 'nosniff']);
+    expect(new Uint8Array(shown.rawPayload)).toEqual(jpeg);
+    expect((await get(`/theme-images/${SHOWN}`)).statusCode).toBe(200);
+    // One no theme shows yet: none, but for a page in a preview, which is the shopper's alone.
+    const none = await get(`/theme-images/${CHOSEN}/x.jpg`);
+    expect([none.statusCode, none.headers['cache-control']]).toEqual([404, 'public, max-age=60']);
+    core.previews.set(PREVIEW_TOKEN, previewing('Winter', 'Winter Sale'));
+    const previewed = await get(`/theme-images/${CHOSEN}/x.jpg`, `hatti_preview=${PREVIEW_TOKEN}`);
+    expect([previewed.statusCode, previewed.headers['cache-control']]).toEqual([
+      200,
+      'private, no-store',
+    ]);
+    expect(core.themeImagesAsked).toEqual([
+      { shopId: 'sample', file: SHOWN, preview: false },
+      { shopId: 'sample', file: SHOWN, preview: false },
+      { shopId: 'sample', file: CHOSEN, preview: false },
+      { shopId: 'sample', file: CHOSEN, preview: true },
+    ]);
+    // What is no file's ID is not asked about.
+    for (const url of ['/theme-images/eid.jpg', '/theme-images/file_x/eid.jpg']) {
+      expect((await get(url)).statusCode, url).toBe(404);
+    }
+    expect(core.themeImagesAsked).toHaveLength(4);
     await app.close();
   });
 

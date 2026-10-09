@@ -2624,7 +2624,6 @@ const en = {
   'editor.colourCode': '{label}: colour code',
   'editor.urlHint': 'A page on your store, such as /collections/all, or a web address.',
   'editor.noImage': 'No picture',
-  'editor.imageSoon': 'Pictures can be changed here soon. Until then this one stays.',
   'editor.up': 'Up',
   'editor.down': 'Down',
   'editor.removeShort': 'Remove',
@@ -2649,6 +2648,12 @@ const en = {
   'editor.preview.failedWhy':
     "The preview couldn't show your latest changes ({message}). Open the page again to try.",
   'editor.preview.leftOut': "The preview leaves out what your store can't use yet:",
+  'editor.image.choose': 'Upload a picture',
+  'editor.image.replace': 'Upload another',
+  'editor.image.remove': 'Remove',
+  'editor.image.removeOf': 'Remove {label}',
+  'editor.image.alt': '{label}: what it shows',
+  'editor.image.altHint': "For shoppers who can't see it, and for search engines.",
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5253,7 +5258,6 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'editor.colourCode': '{label}: رنگ کا کوڈ',
   'editor.urlHint': 'آپ کے اسٹور کا کوئی صفحہ، جیسے /collections/all، یا ویب ایڈریس۔',
   'editor.noImage': 'کوئی تصویر نہیں',
-  'editor.imageSoon': 'تصویریں جلد یہاں بدلی جا سکیں گی۔ تب تک یہی رہے گی۔',
   'editor.up': 'اوپر',
   'editor.down': 'نیچے',
   'editor.removeShort': 'ہٹائیں',
@@ -5279,6 +5283,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'پیش منظر آپ کی تازہ تبدیلیاں نہیں دکھا سکا ({message})۔ دوبارہ کوشش کے لیے صفحہ پھر کھولیں۔',
   'editor.preview.leftOut':
     'پیش منظر وہ چیزیں چھوڑ دیتا ہے جو آپ کا اسٹور ابھی استعمال نہیں کر سکتا:',
+  'editor.image.choose': 'تصویر اپ لوڈ کریں',
+  'editor.image.replace': 'دوسری تصویر اپ لوڈ کریں',
+  'editor.image.remove': 'ہٹائیں',
+  'editor.image.removeOf': '{label} ہٹائیں',
+  'editor.image.alt': '{label}: اس میں کیا ہے',
+  'editor.image.altHint': 'ان خریداروں کے لیے جو اسے دیکھ نہیں سکتے، اور سرچ انجنز کے لیے۔',
 };
 
 export const messages: Readonly<

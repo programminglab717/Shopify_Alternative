@@ -183,6 +183,8 @@ const OPEN_ROUTES = new Set([
   '/robots.txt',
   '/assets/:version/:file',
   '/images/*',
+  '/theme-images/:file',
+  '/theme-images/:file/:name',
 ]);
 
 /**
@@ -196,6 +198,8 @@ const PAUSE_OPEN_ROUTES = new Set([
   '/sitemaps/:name',
   '/assets/:version/:file',
   '/images/*',
+  '/theme-images/:file',
+  '/theme-images/:file/:name',
   '/track',
   '/ur/track',
   '/checkouts/:token',
@@ -215,6 +219,16 @@ const PREVIEW_TOKEN = /^[\w.-]{16,512}$/;
 
 /** A section's ID, as themes may name one (the themes package's rule). */
 const SECTION_ID = /^[A-Za-z0-9_-]{1,100}$/;
+
+/** A file's public ID, as a theme names a picture of the shop's (ADR-326). */
+const FILE_ID = /^file_[0-9a-hjkmnp-tv-z]{26}$/;
+
+/**
+ * A picture a theme shows is the shop's to change: browsers and the edge keep it an hour, and one
+ * not there a minute.
+ */
+const THEME_IMAGE_CACHE = 'public, max-age=3600';
+const NO_THEME_IMAGE_CACHE = 'public, max-age=60';
 
 /** The most sections one request may ask for, as on Shopify. */
 const SECTIONS_MAX = 5;
@@ -1105,6 +1119,35 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       return refuse(503, 'The cart cannot be reached just now. Please try again in a minute.');
     }
   });
+
+  /**
+   * The pictures a shop chose for its themes (ADR-326), at /theme-images/{file}/{name} on its own
+   * address, as Shopify serves a shop's files on its domain: from the core, which gives those one
+   * of the shop's themes shows and, to a page in a preview, any of its pictures, so the theme
+   * editor's choice shows before it is saved. The name is for people, and any will do.
+   */
+  const themeImage = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { file } = request.params as { file: string };
+    const found = FILE_ID.test(file) ? await shopFor(request, reply) : null;
+    if (!found || !core) {
+      return reply.code(404).header('cache-control', NO_THEME_IMAGE_CACHE).send();
+    }
+    let image;
+    try {
+      image = await core.themeImage(found.shopId, file, found.preview !== null);
+    } catch (error) {
+      if (!unreachable(request, error)) throw error;
+      return reply.code(503).header('cache-control', 'no-store').send();
+    }
+    if (!image) return reply.code(404).header('cache-control', NO_THEME_IMAGE_CACHE).send();
+    return reply
+      .type(image.contentType)
+      .header('cache-control', found.preview ? PREVIEWED : THEME_IMAGE_CACHE)
+      .header('x-content-type-options', 'nosniff')
+      .send(Buffer.from(image.body));
+  };
+  app.get('/theme-images/:file', themeImage);
+  app.get('/theme-images/:file/:name', themeImage);
 
   /**
    * Shopify's section rendering API on a page: `?section_id=` gives one of the page's sections as

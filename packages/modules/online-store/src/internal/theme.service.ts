@@ -455,6 +455,19 @@ export class ThemeService {
 }
 
 /**
+ * Whether one of the shop's themes, published or not, names `text` in a file of its own, as a
+ * theme names a picture of the shop's that it shows (ADR-326).
+ */
+export async function themesName(tx: Tx, shopId: string, text: string): Promise<boolean> {
+  const [row] = await tx
+    .select({ filename: themeFiles.filename })
+    .from(themeFiles)
+    .where(and(eq(themeFiles.shopId, shopId), sql`strpos(${themeFiles.body}, ${text}) > 0`))
+    .limit(1);
+  return row !== undefined;
+}
+
+/**
  * The shop's accent colour, as its main theme sets it (Hatti Base's `color_accent`), in its
  * current settings or the preset they name, for pages the core renders in the shop's name, such
  * as checkout's. Null when the theme leaves it to the platform's, or sets anything but a hex
