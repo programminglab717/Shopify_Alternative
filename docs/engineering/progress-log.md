@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Passkeys and Google, signing in to the admin
+### a246a83 · Passkeys and Google, signing in to the admin
 
 * **Signing in** ([ADR-294](../architecture/13-decision-log.md#adr-294--the-admin-signs-in-with-a-passkey-alone-a-passkey-as-the-second-step-or-googles-own-button-loaded-only-when-asked-for-and-confirms-who-is-there-the-same-ways-a-passkeys-challenge-and-googles-nonce-are-good-once-so-each-try-starts-from-the-cores-options-again)): with a passkey alone, or as the second step; or with Google's own
   button, loaded from Google only when asked for, a new Google account going on to open a shop.
