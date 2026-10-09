@@ -4153,3 +4153,79 @@ export const TaxSettingsUpdateMutation = /* GraphQL */ `
   ${TAX_SETTINGS}
   ${USER_ERRORS}
 `;
+
+const META_CONVERSIONS = /* GraphQL */ `
+  fragment MetaConversionsParts on MetaConversions {
+    pixelId
+    accessTokenHint
+    purchaseAt
+    testEventCode
+    updatedAt
+  }
+`;
+
+/** The shop's Meta dataset, if it connected one, and its catalog feed's address (ADR-142, ADR-143). */
+export const MetaConversionsQuery = /* GraphQL */ `
+  query MetaConversions {
+    metaConversions {
+      ...MetaConversionsParts
+    }
+    shop {
+      id
+      productFeedUrl
+    }
+  }
+  ${META_CONVERSIONS}
+`;
+
+/** The shop's Meta dataset connected, or how its orders go to it changed. */
+export const MetaConversionsUpdateMutation = /* GraphQL */ `
+  mutation MetaConversionsUpdate($input: MetaConversionsInput!) {
+    metaConversionsUpdate(input: $input) {
+      metaConversions {
+        ...MetaConversionsParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${META_CONVERSIONS}
+  ${USER_ERRORS}
+`;
+
+/** The shop's Meta dataset disconnected: its token forgotten, moments waiting not sent. */
+export const MetaConversionsDeleteMutation = /* GraphQL */ `
+  mutation MetaConversionsDelete {
+    metaConversionsDelete {
+      deletedPixelId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The latest moments of the shop's orders sent, or to be sent, to Meta, and how each went. */
+export const ConversionEventsQuery = /* GraphQL */ `
+  query ConversionEvents($status: ConversionStatus) {
+    conversionEvents(first: 50, status: $status) {
+      nodes {
+        id
+        orderId
+        moment
+        eventName
+        status
+        attempts
+        error
+        traceId
+        occurredAt
+        sentAt
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+`;

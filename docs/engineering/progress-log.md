@@ -6,11 +6,10 @@
 
 ## In progress
 
-**Next, Meta and the catalog feed in the admin** (MKT-10, MKT-11): the shop's Meta dataset
-connected with its pixel's ID and an access token, which moment of an order is Purchase, a code
-for test events, and disconnected; the orders' moments sent to Meta and how each went; and the
-catalog feed's address to give Google and Meta; then the admin's next sections as the alpha's
-shops need them. Urdu handles wait, as decided.
+**Next, how customers are told, in the admin** (MSG-01, MSG-03): the messages the shop sends
+its customers, on WhatsApp, by SMS or by email, which of them it turns off, their language,
+where Hatti's alerts to the shop go, and the messages sent; then the order and risk settings,
+and the admin's next sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -19,6 +18,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Meta and the catalog feed, in the admin
+
+* **Meta & catalog** ([ADR-306](../architecture/13-decision-log.md#adr-306--the-admin-gives-the-shops-catalog-feed-and-its-meta-dataset-a-tab-of-the-online-store-the-feeds-address-to-copy-meta-connected-with-its-datasets-id-and-a-token-sealed-which-moment-of-an-order-is-purchase-and-a-code-for-test-events-once-the-member-confirms-who-they-are-disconnected-once-asked-and-the-moments-sent-by-status)), a tab of the online store for owners, managers and marketers: the
+  catalog feed's address to copy or open; Meta's dataset connected, changed and disconnected;
+  and the moments sent to it, by status, with their orders.
+* **Tried against the core:** on the seed's shop, a dataset ID of letters was refused, named on
+  the page; then connected with Purchase at delivery, kept with the token's last four, and a
+  test code added alone, the token kept; the audit log held each change, the token never.
+  Nothing was sent yet. It was then disconnected, as it was before. The feed's address served
+  Google's RSS. No errors in the browser.
+* 2194 tests: the feed and Meta connected after confirming, a refused ID named; a test code
+  sent alone and the moments listed by status; disconnected once asked; none for an accountant.
 
 ### 26f6aff · The shop's sales tax, in the admin
 

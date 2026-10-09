@@ -8,6 +8,7 @@ import { EmptyState } from '../ui/feedback';
 import { BlogsList } from './blogs';
 import { LinkPageTab } from './link-page';
 import { EDITS_MENUS, MenusList } from './menus';
+import { MetaTab, SETS_META } from './meta';
 import { PagesList, WRITES_PAGES } from './pages';
 import { PoliciesList, SETS_POLICIES } from './policies';
 import { RedirectsTab } from './redirects';
@@ -21,6 +22,7 @@ export const ONLINE_STORE_TABS = [
   'storefront',
   'redirects',
   'links',
+  'meta',
 ] as const;
 export type OnlineStoreTab = (typeof ONLINE_STORE_TABS)[number];
 
@@ -53,17 +55,18 @@ const TABS: Record<
   },
   redirects: { label: 'onlineStore.redirects', roles: EDITS_MENUS, body: () => <RedirectsTab /> },
   links: { label: 'onlineStore.linkPage', roles: EDITS_MENUS, body: () => <LinkPageTab /> },
+  meta: { label: 'onlineStore.meta', roles: SETS_META, body: () => <MetaTab /> },
 };
 
 /** The roles that see the online store at all: those who work in any of its tabs. */
 export const OPENS_ONLINE_STORE: readonly StaffRole[] = [
-  ...new Set([...WRITES_PAGES, ...EDITS_MENUS]),
+  ...new Set([...WRITES_PAGES, ...EDITS_MENUS, ...SETS_META]),
 ];
 
 /**
  * The online store (OS-07, OS-09, OS-15): the shop's pages, blogs, menus and policies, its
- * storefront's password, pause and home page for search engines, its redirects, and its link page;
- * a tab for each part its role works in.
+ * storefront's password, pause and home page for search engines, its redirects, its link page,
+ * and Meta and the catalog feed (MKT-10, MKT-11); a tab for each part its role works in.
  */
 export function OnlineStorePage() {
   const { t } = useLocale();

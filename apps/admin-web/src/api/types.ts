@@ -1824,3 +1824,47 @@ export interface TaxSettingsData {
 export interface TaxSettingsUpdateData {
   taxSettingsUpdate: { taxSettings: TaxSettings | null; userErrors: UserError[] };
 }
+
+/** A moment of an order placed through checkout that the ad platforms hear of. */
+export type ConversionMoment = 'PLACED' | 'CONFIRMED' | 'DELIVERED';
+
+export type ConversionStatus = 'PENDING' | 'SENT' | 'FAILED' | 'EXPIRED' | 'SKIPPED';
+
+/** The shop's Meta dataset (ADR-143): its token never shown, its last four characters alone. */
+export interface MetaConversions {
+  pixelId: string;
+  accessTokenHint: string;
+  purchaseAt: ConversionMoment;
+  testEventCode: string | null;
+  updatedAt: string;
+}
+
+export interface MetaConversionsData {
+  metaConversions: MetaConversions | null;
+  shop: { id: string; productFeedUrl: string };
+}
+
+export interface MetaConversionsUpdateData {
+  metaConversionsUpdate: { metaConversions: MetaConversions | null; userErrors: UserError[] };
+}
+
+export interface MetaConversionsDeleteData {
+  metaConversionsDelete: { deletedPixelId: string | null; userErrors: UserError[] };
+}
+
+export interface ConversionEvent {
+  id: string;
+  orderId: string;
+  moment: ConversionMoment;
+  eventName: string | null;
+  status: ConversionStatus;
+  attempts: number;
+  error: string | null;
+  traceId: string | null;
+  occurredAt: string;
+  sentAt: string | null;
+}
+
+export interface ConversionEventsData {
+  conversionEvents: { nodes: ConversionEvent[]; pageInfo: { hasNextPage: boolean } };
+}

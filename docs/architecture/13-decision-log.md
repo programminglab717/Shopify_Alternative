@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-305 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-306 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -313,6 +313,7 @@
 | 303 | The admin's settings show whether Hatti's support may look at the shop and until when, let the owner let it in for 15 minutes to a day and a reason, having confirmed who they are, let the owner or a manager end it, and list each time it was let in; and the discounts page takes a code's days in the shop's time zone | Accepted |
 | 304 | The admin exports the orders the list shows, its tab and search, between two days in the shop's time zone, as Excel or CSV, a row per order or per item, once the member has confirmed who they are; and schedules the same of each day, week or month, emailed at an hour, listed and stopped | Accepted |
 | 305 | The admin sets the shop's sales tax in settings: whether it charges it and at what rate, included in its prices, with an example of what a price holds; on delivery too; the NTN and STRN its invoices name; and categories with rates of their own, which a product's page gives its variants | Accepted |
+| 306 | The admin gives the shop's catalog feed and its Meta dataset a tab of the online store: the feed's address to copy; Meta connected with its dataset's ID and a token, sealed, which moment of an order is Purchase, and a code for test events, once the member confirms who they are; disconnected once asked; and the moments sent, by status | Accepted |
 
 ---
 
@@ -12422,3 +12423,30 @@
 * **Alternatives:**
   * **A category per variant on the product page:** variants of one product almost always share
     one; the core keeps it per variant, for a file or the API to set where they do not.
+
+## ADR-306 · The admin gives the shop's catalog feed and its Meta dataset a tab of the online store: the feed's address to copy; Meta connected with its dataset's ID and a token, sealed, which moment of an order is Purchase, and a code for test events, once the member confirms who they are; disconnected once asked; and the moments sent, by status
+
+* **Context:** A shop's catalog feed (MKT-11, ADR-142) is an address on its storefront that
+  Google Merchant Center and Meta's catalogs fetch. Its orders placed through checkout go to its
+  Meta dataset through the conversions API (MKT-10, ADR-143) as they are placed, confirmed and
+  delivered, once it connects one: its pixel's ID and an access token, sealed and never shown
+  again, which moment is Purchase, and a code for test events. Owners, managers and marketers
+  connect it, having signed in lately; the moments sent are listed with what Meta said. The
+  admin had none of it.
+* **Decision:**
+  * **Meta & catalog** is a tab of the online store, for owners, managers and marketers.
+  * **The catalog feed** shows its address, to copy or open, with what to give it to.
+  * **Meta's conversions API** says whether it is connected, to which dataset, and whether test
+    events are on. The same form connects it and changes it: the dataset's ID; the token, which
+    once connected is left blank to keep the one ending as shown; when to tell Meta of a
+    purchase, each choice saying what it means for a shop paid on delivery; and the test code.
+    Only what changed is sent, once the member confirms who they are where they signed in a while
+    ago. Disconnecting asks first, saying the token is forgotten and moments waiting are not sent.
+  * **Sent to Meta** lists the latest 50 moments while connected, all or by status: the moment
+    and the name it went by, how it went, when, the tries, Meta's reason and trace, and its order.
+* **Consequences:**
+  * A shop selling on cash on delivery has Meta learn from parcels customers took, set up from a
+    phone in a minute, and sees when Meta refuses what it sent.
+* **Alternatives:**
+  * **In settings:** the online store is where marketers already work, and settings are owners'
+    and managers' alone.
