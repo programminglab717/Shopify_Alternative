@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Customers' care, in the admin
+### c5fdeba · Customers' care, in the admin
 
 * **Customers' care** ([ADR-309](../architecture/13-decision-log.md#adr-309--the-admin-adds-a-customer-by-hand-records-the-marketing-they-agreed-to-in-their-words-merges-a-duplicate-into-them-once-asked-and-at-their-request-downloads-their-data-and-erases-them-ten-days-on-once-the-member-confirms-who-they-are-the-erasures-waiting-are-listed-and-each-cancelled-from-its-customer)): a customer added by hand from the customers list, with the
   marketing they agreed to in their words; their consent changed by channel on their page; a
