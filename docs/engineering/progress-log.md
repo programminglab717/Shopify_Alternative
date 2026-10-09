@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, selling when out of stock in the admin** (INV-01): a variant set to keep selling when
-its stock runs out, or to stop, and its stock tracked or not, from the product page; then the
-admin's next sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, photos' descriptions in the admin** (CAT-02): what each product photo shows, written for
+screen readers and search engines, set and changed from the product page; then the admin's
+next sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Stock rules, in the admin
+
+* **Stock rules** ([ADR-317](../architecture/13-decision-log.md#adr-317--the-admin-sets-on-the-product-page-whether-each-variants-stock-is-counted-and-whether-it-keeps-selling-when-out-of-stock-each-change-saved-at-once-and-shown-at-once-put-back-if-the-core-refuses)) on the product page: each variant's stock counted or not, and kept
+  selling when out of stock or not; each change saved and shown at once.
+* **Tried against the core:** a kurta added in S, with stock counted, and M, without; S set to
+  keep selling when out of stock, M counted and then no longer, its selling box going with it;
+  the inventory items read back each time as chosen; then the kurta deleted. No errors in the
+  browser.
+* 2267 tests: a size kept selling; a refusal named and its box put back; a size no longer
+  counted; a product sold as it is counted; none of it for a packer.
 
 ### 3b7d879 · Saved searches, in the admin
 

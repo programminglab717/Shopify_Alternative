@@ -2492,6 +2492,15 @@ const en = {
   'savedSearches.deleteSure': 'Delete it',
   'savedSearches.fieldName': 'Name',
   'savedSearches.fieldQuery': 'Search',
+  'stockRules.title': 'Stock rules',
+  'stockRules.hint': 'Each change is saved at once.',
+  'stockRules.track': 'Count its stock',
+  'stockRules.trackOf': 'Count the stock of {title}',
+  'stockRules.trackHint':
+    'Orders take from it, and it stops selling when none is left. Counting stock turns this on.',
+  'stockRules.continue': 'Keep selling when out of stock',
+  'stockRules.continueOf': 'Keep selling {title} when out of stock',
+  'stockRules.continueHint': 'For what you make to order: its stock goes below zero.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -4967,6 +4976,15 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'savedSearches.deleteSure': 'حذف کریں',
   'savedSearches.fieldName': 'نام',
   'savedSearches.fieldQuery': 'تلاش',
+  'stockRules.title': 'اسٹاک کے اصول',
+  'stockRules.hint': 'ہر تبدیلی فوراً محفوظ ہوتی ہے۔',
+  'stockRules.track': 'اس کا اسٹاک گنیں',
+  'stockRules.trackOf': '{title} کا اسٹاک گنیں',
+  'stockRules.trackHint':
+    'آرڈرز اس میں سے لیتے ہیں، اور ختم ہونے پر یہ بکنا بند ہو جاتا ہے۔ اسٹاک گننے سے یہ آن ہو جاتا ہے۔',
+  'stockRules.continue': 'اسٹاک ختم ہونے پر بھی بیچتے رہیں',
+  'stockRules.continueOf': 'اسٹاک ختم ہونے پر بھی {title} بیچتے رہیں',
+  'stockRules.continueHint': 'جو آپ آرڈر پر بناتے ہیں: اس کا اسٹاک صفر سے نیچے جاتا ہے۔',
 };
 
 export const messages: Readonly<

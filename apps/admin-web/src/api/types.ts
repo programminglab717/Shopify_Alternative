@@ -393,6 +393,8 @@ export interface ProductVariantDetail {
   inventoryItem: {
     id: string;
     tracked: boolean;
+    /** Whether it is sold once none is available: CONTINUE keeps selling, DENY stops. */
+    inventoryPolicy: 'CONTINUE' | 'DENY';
     inventoryLevels: { available: number; location: { id: string } }[];
   };
 }

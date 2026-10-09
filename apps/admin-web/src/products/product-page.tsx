@@ -44,6 +44,7 @@ import {
 import type { DetailsState } from './product-form';
 import { ProductOptions } from './options';
 import { ProductPhotos } from './photos';
+import { StockRules } from './stock-rules';
 import { EDITS_PRODUCTS, ProductStatusBadge, ProductThumb } from './status';
 
 /** A product's page's search: whether it was just added, and its stock with it. */
@@ -549,15 +550,18 @@ export function ProductPage() {
         <Alert tone="warning">{t('product.addedNoStock')}</Alert>
       ) : null}
       <ProductPhotos product={product} edits={edits} />
-      {/* Filled in afresh after each save, and as variants change; not as photos change. */}
+      {/* Filled in afresh after each save, and as variants or their tracking change; not as photos change. */}
       <ProductEditor
-        key={`${saved}-${product.variants.map((variant) => `${variant.id}:${variant.title}`).join()}`}
+        key={`${saved}-${product.variants
+          .map((variant) => `${variant.id}:${variant.title}:${variant.inventoryItem.tracked}`)
+          .join()}`}
         product={product}
         location={location}
         edits={edits}
         onSaved={() => setSaved((count) => count + 1)}
       />
       {edits && <ProductOptions product={product} />}
+      {edits && <StockRules product={product} />}
     </div>
   );
 }
