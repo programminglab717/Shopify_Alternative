@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-330 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-331 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -338,6 +338,7 @@
 | 328 | The admin's Urdu page serves blogs, articles, menus and the home page's words too: a menu's links each a level in under the link they sit under, the home page's words the shop's own, and a menu's Urdu for those who change menus | Accepted |
 | 329 | The admin's analytics show the online store's visits beside its sales: who is on it now, asked again every half minute, and the period's sessions against the period as long before, asked in one document, with how far they went towards an order | Accepted |
 | 330 | The admin ships an order by hand with a courier Hatti does not book with yet, or the shop's own rider: from its page, or many packed orders at once from shipping, the courier named once and each parcel's tracking number beside its order | Accepted |
+| 331 | The admin prints packing slips and invoices as the core makes them: from an order's page, and for the orders chosen to pack or to book at once, the document, paper and language chosen in one panel and kept in the browser for the next print | Accepted |
 
 ---
 
@@ -13249,3 +13250,38 @@
     transaction either way, and the admin's loop asks nothing new of the core.
   * **Shipping straight from to pack:** it would skip the packing the pipeline counts; one tap
     packs an order first.
+
+## ADR-331 · The admin prints packing slips and invoices as the core makes them: from an order's page, and for the orders chosen to pack or to book at once, the document, paper and language chosen in one panel and kept in the browser for the next print
+
+* **Context:** The core makes packing slips and invoices for up to 250 orders at once, a page
+  each, as HTML pages set up for A4 or thermal paper, in English, Urdu or both
+  ([ADR-028](#adr-028--printable-documents-are-html-pages-with-print-styles-pdfs-will-render-the-same-pages)); a packing slip goes in the parcel without prices, and an invoice says what
+  was paid and what is left to pay. Packers put a slip in each parcel and some customers ask
+  for an invoice, but the admin printed couriers' labels and load sheets alone
+  ([ADR-270](#adr-270--the-admins-shipping-packed-orders-booked-with-the-shops-courier-account-in-a-tap-each-booking-shown-as-the-worker-books-it-and-its-courier-carries-it-booked-parcels-labels-and-the-accounts-load-sheet-printed-from-a-tab-of-their-own-and-on-a-phone-the-bottom-bars-five-slots-kept-for-the-busiest-sections-the-rest-under-more)): a shop printed slips through the Admin API, or wrote them by hand.
+* **Decision:**
+  * **One panel for both:** what to print, a packing slip or an invoice, each said in a line;
+    the paper, A4, a 4×6 label printer or an 80 mm receipt printer; and the language, English
+    and Urdu, English or Urdu. Print opens the core's page in a tab of its own, which prints
+    once its fonts are in, as labels do ([ADR-150](#adr-150--couriers-labels-and-load-sheets-are-hattis-own-printed-pages-a-booked-parcels-label-carries-the-couriers-tracking-number-as-a-code-128-barcode-and-the-cash-the-courier-was-asked-to-collect-one-to-a-46-inch-label-or-four-to-a-sheet-of-a4-and-an-accounts-load-sheet-lists-its-parcels-waiting-to-be-picked-up-for-the-shop-and-the-rider-to-sign)).
+  * **From an order's page, for whoever reads it:** Print beside the order's name and stage.
+  * **Many at once from the orders list:** the tabs to pack and to book let their orders be
+    chosen, beside Mark packed, and Print takes those chosen.
+  * **The choice kept:** the panel starts from the last print's document, paper and language,
+    kept in the browser; one that keeps nothing starts from a packing slip on A4 in both
+    languages.
+  * **A tab blocked is said:** the tab is opened while the tap is handled, so that pop-up
+    blockers let it through; a browser that blocks it even so is told to allow pop-ups for
+    Hatti, and nothing is asked of the core.
+* **Consequences:**
+  * Packers print the day's slips on the paper their printer takes, from the packing table's
+    computer or a phone, and an order's invoice is a tap from its page.
+  * The choice is the browser's, not the shop's: a second computer starts from A4 again.
+  * Not yet: a slip printed as each order is packed; slips and labels on one sheet; more than
+    250 orders at once, which the core refuses.
+* **Alternatives:**
+  * **The paper and language in the shop's settings:** one choice for every computer, but the
+    office's A4 printer and the packing table's thermal printer differ, and the browser that
+    prints is the one at the printer.
+  * **A button for each document and paper:** six buttons on a phone's order page for a
+    choice made once.

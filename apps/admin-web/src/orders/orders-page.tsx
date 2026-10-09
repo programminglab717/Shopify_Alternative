@@ -1,6 +1,15 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { ChevronRight, Download, EyeOff, FilePen, Inbox, Search, ShieldAlert } from 'lucide-react';
+import {
+  ChevronRight,
+  Download,
+  EyeOff,
+  FilePen,
+  Inbox,
+  Printer,
+  Search,
+  ShieldAlert,
+} from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSessionStore } from '../auth/context';
@@ -21,6 +30,7 @@ import { useAdminMutation, useShop, useShopTimezone } from '../shell/shop-contex
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { EXPORTS_ORDERS } from './export-page';
+import { PrintPanel } from './print';
 import { StageBadge, STAGES } from './stage';
 
 /** The stage tabs, in the pipeline's order (docs/design/02 §1). */
@@ -44,6 +54,9 @@ const BULK: Partial<Record<OrderStage, 'confirm' | 'pack'>> = {
   NEEDS_REVIEW: 'confirm',
   TO_PACK: 'pack',
 };
+
+/** The tabs whose selected orders are printed at once: packing slips as they are packed (ORD-06). */
+const PRINTS: readonly OrderStage[] = ['TO_PACK', 'TO_BOOK'];
 
 const PAGE = 50;
 
@@ -157,6 +170,8 @@ export function OrdersPage() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [outcome, setOutcome] = useState<{ done: number; failed: string[] } | null>(null);
   const bulk = stage ? BULK[stage] : undefined;
+  const prints = stage !== undefined && PRINTS.includes(stage);
+  const [printing, setPrinting] = useState(false);
   const confirm = useAdminMutation<OrderBulkData, { ids: string[] }>(OrderBulkConfirmMutation);
   const pack = useAdminMutation<OrderBulkData, { ids: string[] }>(OrderBulkMarkPackedMutation);
 
@@ -177,6 +192,7 @@ export function OrdersPage() {
   const choose = (next: OrdersSearch) => {
     setSelected(new Set());
     setOutcome(null);
+    setPrinting(false);
     void navigate({ to: '/$shopId/orders', params: { shopId: shop.id }, search: next });
   };
 
@@ -302,6 +318,13 @@ export function OrdersPage() {
           )}
         </Alert>
       )}
+      {printing && (
+        <PrintPanel
+          ids={[...selected]}
+          title={t('print.title', { count: formatCount(selected.size) })}
+          onDone={() => setPrinting(false)}
+        />
+      )}
       {orders.isPending ? (
         <Loading label={t('state.loading')} />
       ) : orders.isError ? (
@@ -319,7 +342,7 @@ export function OrdersPage() {
         </Card>
       ) : (
         <Card>
-          {bulk && (
+          {(bulk || prints) && (
             <div className="flex items-center gap-3 border-b border-line px-4 py-2">
               <input
                 type="checkbox"
@@ -343,7 +366,7 @@ export function OrdersPage() {
                 key={order.id}
                 order={order}
                 timezone={timezone}
-                selectable={Boolean(bulk)}
+                selectable={Boolean(bulk) || prints}
                 selected={selected.has(order.id)}
                 onSelect={(on) =>
                   setSelected((current) => {
@@ -369,13 +392,28 @@ export function OrdersPage() {
           )}
         </Card>
       )}
-      {bulk && selected.size > 0 && (
-        <div className="fixed inset-x-0 bottom-16 z-20 flex justify-center px-4 md:bottom-6">
-          <Button busy={confirm.isPending || pack.isPending} onClick={() => void runBulk()}>
-            {t((bulk === 'pack' ? 'orders.packSelected' : 'orders.confirmSelected') as MessageKey, {
-              count: formatCount(selected.size),
-            })}
-          </Button>
+      {(bulk || prints) && selected.size > 0 && !printing && (
+        <div className="fixed inset-x-0 bottom-16 z-20 flex flex-wrap justify-center gap-2 px-4 md:bottom-6">
+          {bulk && (
+            <Button busy={confirm.isPending || pack.isPending} onClick={() => void runBulk()}>
+              {t(
+                (bulk === 'pack' ? 'orders.packSelected' : 'orders.confirmSelected') as MessageKey,
+                { count: formatCount(selected.size) },
+              )}
+            </Button>
+          )}
+          {prints && (
+            <Button
+              variant={bulk ? 'secondary' : 'primary'}
+              icon={<Printer aria-hidden className="size-5" />}
+              onClick={() => {
+                setOutcome(null);
+                setPrinting(true);
+              }}
+            >
+              {t('print.many', { count: formatCount(selected.size) })}
+            </Button>
+          )}
         </div>
       )}
     </div>

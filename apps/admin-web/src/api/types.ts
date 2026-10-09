@@ -653,7 +653,16 @@ export interface CourierBookingCancelData {
   };
 }
 
-export type PaperSize = 'THERMAL_4X6' | 'A4';
+export type PaperSize = 'THERMAL_4X6' | 'A4' | 'THERMAL_80MM';
+
+export type DocumentLanguage = 'BILINGUAL' | 'ENGLISH' | 'URDU';
+
+/** What is printed for an order: what goes in its parcel, or what it cost and what is owed. */
+export type OrderDocumentKind = 'PACKING_SLIP' | 'INVOICE';
+
+export interface OrderDocumentData {
+  orderDocument: { title: string; html: string };
+}
 
 export interface CourierDocumentData {
   title: string;

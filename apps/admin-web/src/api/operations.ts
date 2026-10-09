@@ -1296,6 +1296,24 @@ export const CourierLabelsQuery = /* GraphQL */ `
   }
 `;
 
+/**
+ * Packing slips or invoices for orders, a page each, to print from the browser (ORD-06): on A4 or
+ * thermal paper, in English, Urdu or both.
+ */
+export const OrderDocumentQuery = /* GraphQL */ `
+  query OrderDocument(
+    $ids: [ID!]!
+    $kind: OrderDocumentKind!
+    $language: DocumentLanguage!
+    $paper: PaperSize!
+  ) {
+    orderDocument(ids: $ids, kind: $kind, language: $language, paper: $paper) {
+      title
+      html
+    }
+  }
+`;
+
 /** A courier account's load sheet: its parcels waiting for the rider, a page to print. */
 export const CourierLoadSheetQuery = /* GraphQL */ `
   query CourierLoadSheet($accountId: ID, $language: DocumentLanguage!, $pickupId: ID) {

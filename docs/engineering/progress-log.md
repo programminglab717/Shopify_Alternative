@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, packing slips and invoices** (ORD-06): printed from an order's page, and for the
-orders chosen at once from the orders list, on A4 or thermal paper, in English and Urdu, as the
-core makes them; then section by section as the alpha's shops need them.
+**Next, the shop's blocked numbers** (COD-07): the numbers whose orders wait for review, listed
+with why and since when, a number added before it ever orders, as merchants share them, and one
+taken off; then section by section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +18,23 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Packing slips and invoices, in the admin
+
+* **Printed as the core makes them** ([ADR-331](../architecture/13-decision-log.md#adr-331--the-admin-prints-packing-slips-and-invoices-as-the-core-makes-them-from-an-orders-page-and-for-the-orders-chosen-to-pack-or-to-book-at-once-the-document-paper-and-language-chosen-in-one-panel-and-kept-in-the-browser-for-the-next-print)): an order's page has Print beside its name, and
+  the orders list's tabs to pack and to book let their orders be chosen and printed at once,
+  beside Mark packed. One panel asks for a packing slip or an invoice, the paper, A4, a 4×6
+  label printer or an 80 mm receipt printer, and the language, both, English or Urdu, and keeps
+  the choice in the browser for the next print. The page opens in a tab of its own and prints
+  once its fonts are in; a tab the browser blocks is said.
+* **Tried in Chromium against the core:** on the seed's shop, the two orders to pack were chosen
+  and printed: one tab of packing slips for both on A4, each in English with its Urdu, without
+  prices. Order #1016's invoice was printed from its page on 80 mm paper, its items, total, what
+  was paid and the balance in both languages, and the panel kept the invoice and the paper for
+  next time. Printing reads and changes nothing. No errors in the browser.
+* 2347 tests: an order's invoice on the paper and in the language chosen, the choice kept for
+  the next print; the packing slips of the orders chosen to pack at once, beside Mark packed; and
+  a tab the browser blocks said, the core not asked.
 
 ### 5b1489b · Orders shipped by hand, in the admin
 

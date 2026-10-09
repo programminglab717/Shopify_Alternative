@@ -2731,6 +2731,27 @@ const en = {
   'shipping.byHand.save': 'Mark {count} as shipped',
   'shipping.byHand.done': '{count} orders marked shipped.',
   'shipping.byHand.done.one': '1 order marked shipped.',
+  'print.open': 'Print',
+  'print.many': 'Print {count}',
+  'print.title': 'Print {count} orders',
+  'print.title.one': 'Print 1 order',
+  'print.titleOne': 'Print {name}',
+  'print.kind': 'What to print',
+  'print.kind.PACKING_SLIP': 'Packing slip',
+  'print.kind.PACKING_SLIP.hint':
+    'Goes in the parcel: the items left to ship, where it goes and the cash to collect, without prices.',
+  'print.kind.INVOICE': 'Invoice',
+  'print.kind.INVOICE.hint':
+    'What was bought at what price, what was paid and what is left to pay.',
+  'print.paper': 'Paper',
+  'print.paper.A4': 'A4',
+  'print.paper.THERMAL_4X6': '4×6 label printer',
+  'print.paper.THERMAL_80MM': '80 mm receipt printer',
+  'print.language': 'Language',
+  'print.language.BILINGUAL': 'English and Urdu',
+  'print.language.ENGLISH': 'English',
+  'print.language.URDU': 'Urdu',
+  'print.go': 'Print',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5443,6 +5464,25 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'shipping.byHand.number': '{name} کا ٹریکنگ نمبر',
   'shipping.byHand.save': '{count} روانہ شدہ کریں',
   'shipping.byHand.done': '{count} آرڈر روانہ شدہ ہو گئے۔',
+  'print.open': 'پرنٹ',
+  'print.many': '{count} پرنٹ کریں',
+  'print.title': '{count} آرڈر پرنٹ کریں',
+  'print.titleOne': '{name} پرنٹ کریں',
+  'print.kind': 'کیا پرنٹ کرنا ہے',
+  'print.kind.PACKING_SLIP': 'پیکنگ سلپ',
+  'print.kind.PACKING_SLIP.hint':
+    'پارسل میں جاتی ہے: بھیجنے کو باقی چیزیں، کہاں جانا ہے اور وصول کرنے کی رقم، قیمتوں کے بغیر۔',
+  'print.kind.INVOICE': 'انوائس',
+  'print.kind.INVOICE.hint': 'کیا کس قیمت پر خریدا گیا، کتنا ادا ہوا اور کتنا ادا کرنا باقی ہے۔',
+  'print.paper': 'کاغذ',
+  'print.paper.A4': 'A4',
+  'print.paper.THERMAL_4X6': '4×6 لیبل پرنٹر',
+  'print.paper.THERMAL_80MM': '80 ملی میٹر رسید پرنٹر',
+  'print.language': 'زبان',
+  'print.language.BILINGUAL': 'انگریزی اور اردو',
+  'print.language.ENGLISH': 'انگریزی',
+  'print.language.URDU': 'اردو',
+  'print.go': 'پرنٹ کریں',
 };
 
 export const messages: Readonly<

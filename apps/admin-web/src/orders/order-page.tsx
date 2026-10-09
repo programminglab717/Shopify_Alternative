@@ -6,6 +6,7 @@ import {
   EyeOff,
   PackageCheck,
   PackageOpen,
+  Printer,
   ShieldAlert,
   Truck,
 } from 'lucide-react';
@@ -38,6 +39,7 @@ import { Assignment, DeliveryAddress, NoteAndTags, Timeline } from './details';
 import { OrderItems } from './edit-order';
 import { HANDLES_MONEY, OrderMoney } from './money';
 import { Parcels, ShipForm, WORKS_PARCELS } from './parcels';
+import { PrintPanel } from './print';
 import { OrderReturns } from './returns';
 import { StageBadge } from './stage';
 
@@ -220,6 +222,7 @@ export function OrderPage() {
   const shop = useShop();
   const { orderId } = useParams({ from: '/$shopId/orders/$orderId' });
   const query = useAdminQuery<OrderData>(['order', orderId], OrderQuery, { id: orderId });
+  const [printing, setPrinting] = useState(false);
 
   const back = (
     <Link
@@ -262,6 +265,16 @@ export function OrderPage() {
             {order.name}
           </h1>
           <StageBadge stage={order.stage} />
+          <span className="flex-1" />
+          {!printing && (
+            <Button
+              variant="tertiary"
+              icon={<Printer aria-hidden className="size-5" />}
+              onClick={() => setPrinting(true)}
+            >
+              {t('print.open')}
+            </Button>
+          )}
         </div>
         <p className="text-secondary">
           {t('order.placed', { date: formatDateTime(order.createdAt, timezone, locale) })} ·{' '}
@@ -295,6 +308,13 @@ export function OrderPage() {
         )}
       </header>
       {order.overPlanLimit && <Alert tone="warning">{t('order.overLimit')}</Alert>}
+      {printing && (
+        <PrintPanel
+          ids={[order.id]}
+          title={t('print.titleOne', { name: order.name })}
+          onDone={() => setPrinting(false)}
+        />
+      )}
       <Actions order={order} />
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
