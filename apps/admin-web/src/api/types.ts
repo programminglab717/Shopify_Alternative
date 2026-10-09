@@ -239,13 +239,23 @@ export interface OrderDetail {
   amountPaid: MoneyValue;
   codAmount: MoneyValue;
   customer: { id: string; displayName: string; numberOfOrders: number } | null;
-  shippingAddress: { name: string | null; phone: string | null; city: string; formatted: string[] };
+  shippingAddress: {
+    name: string | null;
+    phone: string | null;
+    address1: string | null;
+    address2: string | null;
+    landmark: string | null;
+    city: string;
+    province: string | null;
+    zip: string | null;
+    formatted: string[];
+  };
   risk: {
     level: RiskLevel;
     score: number;
     reasons: { code: string; message: string }[];
   } | null;
-  assignee: { name: string } | null;
+  assignee: { id: string; name: string } | null;
   fulfillments: ParcelDetail[];
   amountRefunded: MoneyValue;
   refunds: RefundDetail[];
@@ -256,7 +266,8 @@ export interface OrderDetail {
       kind: string;
       message: string;
       createdAt: string;
-      author: { name: string | null } | null;
+      editedAt: string | null;
+      author: { id: string; name: string | null } | null;
     }[];
   };
 }

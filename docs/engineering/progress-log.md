@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, an order's everyday edits in the admin** (ORD-02, ORD-10): comments on its timeline,
-naming staff; the order given to a member of staff, or taken; its note and tags; and its address
-corrected before it ships; then the admin's next sections as the alpha's shops need them. Urdu
-handles wait, as decided.
+**Next, editing an order's items in the admin** (ORD-04): quantities changed and variants added
+while it waits to be packed, its delivery charge waived and something taken off on the call,
+the cash at the door following; then the admin's next sections as the alpha's shops need them.
+Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### An order's everyday edits, in the admin
+
+* **Assignment, comments, note, tags and address on the order's page** ([ADR-286](../architecture/13-decision-log.md#adr-286--an-orders-page-gives-it-to-a-member-of-staff-comments-on-its-timeline-with-their-authors-edits-and-deletes-keeps-its-note-and-tags-and-corrects-its-address-while-nothing-has-shipped-each-for-the-roles-the-core-lets-do-it)):
+  the order given to staff or taken, comments for whoever picks it up next with their authors'
+  edits and deletes, its note and tags, and its address corrected while nothing has shipped.
+* **Tried against the core:** the seed's #1001, waiting to be confirmed, given to its owner from
+  a list of three staff, a comment written and changed (marked edited), its note and two tags
+  saved, and a landmark added to its address; the timeline said "Assigned to", "Changed the
+  note, tags" and "Changed the shipping address"; with no errors in the browser. The tests
+  found an accountant who once wrote a comment offered to change it, which the core refuses;
+  only those who work orders now are.
+* 2031 tests: an agent taking an order, commenting and changing only their own comment; an
+  owner giving it to anyone or no one and deleting another's comment; note, tags and address
+  sent as the core takes them; and nothing to change for an accountant or once a parcel ships.
 
 ### 349255e · Refunds and payments, in the admin
 

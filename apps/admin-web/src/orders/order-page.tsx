@@ -17,19 +17,14 @@ import type {
   OrderStage,
 } from '../api/types';
 import { errorText } from '../i18n/errors';
-import {
-  formatCount,
-  formatDateTime,
-  formatMoney,
-  formatPhone,
-  formatRelative,
-} from '../i18n/format';
+import { formatCount, formatDateTime, formatMoney, formatPhone } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { READS_CUSTOMERS } from '../customers/customers-page';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { Assignment, DeliveryAddress, NoteAndTags, Timeline } from './details';
 import { HANDLES_MONEY, OrderMoney } from './money';
 import { Parcels } from './parcels';
 import { OrderReturns } from './returns';
@@ -304,20 +299,13 @@ export function OrderPage() {
             </Section>
           )}
           <Section title={t('order.timeline')}>
-            <ol className="flex flex-col gap-3">
-              {order.events.nodes.map((event) => (
-                <li key={event.id} className="flex flex-col">
-                  <span>{event.message}</span>
-                  <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-                    {event.author?.name ? `${event.author.name} · ` : ''}
-                    {formatRelative(event.createdAt, timezone, locale)}
-                  </span>
-                </li>
-              ))}
-            </ol>
+            <Timeline order={order} timezone={timezone} />
           </Section>
         </div>
         <div className="flex flex-col gap-4">
+          <Section title={t('details.assigneeTitle')}>
+            <Assignment order={order} />
+          </Section>
           <Section title={t('order.customer')}>
             {order.overPlanLimit ? (
               <p className="flex items-center gap-2 text-secondary">
@@ -353,11 +341,10 @@ export function OrderPage() {
             )}
           </Section>
           <Section title={t('order.address')}>
-            <address className="not-italic">
-              {order.shippingAddress.formatted.map((line, index) => (
-                <div key={index}>{line}</div>
-              ))}
-            </address>
+            <DeliveryAddress order={order} />
+          </Section>
+          <Section title={t('details.noteAndTags')}>
+            <NoteAndTags order={order} />
           </Section>
           {order.risk && order.risk.reasons.length > 0 && (
             <Section title={t('order.risk')}>

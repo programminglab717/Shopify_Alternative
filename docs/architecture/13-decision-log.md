@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-285 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-286 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -293,6 +293,7 @@
 | 283 | An order's page shows its parcels: courier and tracking number, items and the latest steps of their way; those who work orders mark one delivered or refused, add a step told of a courier Hatti does not follow, mark it lost after asking, or check it back in with what came back damaged written off | Accepted |
 | 284 | An order's page records its customer's return of delivered items, each with why, another variant sent at once in exchange if asked, checks it in with what is damaged written off or cancels it; customer returns on their way have a tab of their own; and a parcel back damaged is claimed from its courier | Accepted |
 | 285 | An order's page shows what was paid and given back, each refund with how, its reference, why and its receipt; owners and managers record a refund, at most what is left, by hand with its receipt uploaded, through the gateway or as store credit, and mark an order paid after saying how much it records | Accepted |
+| 286 | An order's page gives it to a member of staff, comments on its timeline with their authors' edits and deletes, keeps its note and tags, and corrects its address while nothing has shipped, each for the roles the core lets do it | Accepted |
 
 ---
 
@@ -11757,3 +11758,36 @@
     in storage; it goes up when the refund does.
   * **Marking paid in one tap:** it records money received that the order then no longer asks
     for, so it says how much first.
+
+## ADR-286 · An order's page gives it to a member of staff, comments on its timeline with their authors' edits and deletes, keeps its note and tags, and corrects its address while nothing has shipped, each for the roles the core lets do it
+
+* **Context:** The core gives an order to one member of staff to see through: owners and
+  managers to anyone, others take one no one has and give back their own
+  ([ADR-127](#adr-127--an-order-is-given-to-one-member-of-staff-at-a-time-to-see-it-through-owners-managers-and-apps-give-it-to-anyone-other-staff-take-one-no-one-has-staff-find-theirs-with-assigneeme-and-those-who-leave-give-their-open-orders-back)). Staff comment on its timeline, naming each other with @ to be told on
+  WhatsApp; a comment is its author's to change, and owners and managers delete any
+  ([ADR-128](#adr-128--staff-and-apps-comment-on-an-orders-timeline-each-comment-its-authors-to-change-kept-apart-from-the-events-and-read-among-them-every-entry-saying-who-made-it-and-comments-going-with-the-customers-details-in-an-erasure)). It changes an order's note, tags and, until something ships, its whole
+  address ([ADR-070](#adr-070--an-address-keeps-its-area-in-its-second-line-and-its-landmark-in-a-field-of-its-own-checkout-and-customers-links-ask-for-each-suggesting-the-areas-of-the-larger-cities)), scoring it again ([ADR-025](#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)). Listing the staff needs
+  `read_settings`. The order's page showed the timeline and address, and changed none of it.
+* **Decision:**
+  * **Who sees it through:** owners and managers choose from the staff, themselves marked
+    "(you)", or no one; others who work orders take one no one has, or give back their own.
+    Roles that only view orders see who has it.
+  * **The timeline** opens with a comment box for those who work orders (2,000 characters, with
+    how to name staff), then the events and comments, the newest first, each signed. A comment
+    reads apart from events, marked edited once changed; its author changes or deletes it in
+    place while they still work orders, and owners and managers delete anyone's.
+  * **Note and tags** is a section of its own, changed together: tags typed with commas.
+  * **The delivery address** is corrected in full (name, mobile, house and street, area,
+    landmark, city, province) while the order is open and nothing has shipped. Its map pin is
+    dropped with it ([ADR-259](#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)), as the place the customer shared is no longer the
+    address; its postcode is kept.
+* **Consequences:**
+  * A confirmation agent takes the orders they are calling, leaves what the customer said for
+    the packer, and fixes the address on the same call.
+  * The page's timeline records each change in words, so what was changed and by whom shows
+    there without an audit screen.
+* **Alternatives:**
+  * **Editing the address field by field:** the core replaces the address whole, and couriers
+    book from the whole of it; one form says so.
+  * **Keeping the map pin on a corrected address:** a pin points where the customer stood when
+    they shared it; once the address changes it misleads the rider more than it helps.

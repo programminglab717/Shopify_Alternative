@@ -231,7 +231,12 @@ export const OrderQuery = /* GraphQL */ `
       shippingAddress {
         name
         phone
+        address1
+        address2
+        landmark
         city
+        province
+        zip
         formatted
       }
       risk {
@@ -243,6 +248,7 @@ export const OrderQuery = /* GraphQL */ `
         }
       }
       assignee {
+        id
         name
       }
       fulfillments {
@@ -308,7 +314,9 @@ export const OrderQuery = /* GraphQL */ `
           kind
           message
           createdAt
+          editedAt
           author {
+            id
             name
           }
         }
@@ -2538,6 +2546,66 @@ export const OrderRefundMutation = /* GraphQL */ `
 export const OrderMarkAsPaidMutation = /* GraphQL */ `
   mutation OrderMarkAsPaid($id: ID!) {
     orderMarkAsPaid(id: $id) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A comment on an order's timeline, for whoever picks it up next (ORD-02). */
+export const OrderCommentCreateMutation = /* GraphQL */ `
+  mutation OrderCommentCreate($orderId: ID!, $message: String!) {
+    orderCommentCreate(orderId: $orderId, message: $message) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A comment's words changed, by its author. */
+export const OrderCommentUpdateMutation = /* GraphQL */ `
+  mutation OrderCommentUpdate($id: ID!, $message: String!) {
+    orderCommentUpdate(id: $id, message: $message) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A comment deleted: its author's own, or anyone's by owners and managers. */
+export const OrderCommentDeleteMutation = /* GraphQL */ `
+  mutation OrderCommentDelete($id: ID!) {
+    orderCommentDelete(id: $id) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** An order given to a member of staff to see through, or to no one (ORD-10). */
+export const OrderAssignMutation = /* GraphQL */ `
+  mutation OrderAssign($id: ID!, $staffMemberId: ID) {
+    orderAssign(id: $id, staffMemberId: $staffMemberId) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** An order's note, tags or address changed; the address only before anything ships. */
+export const OrderUpdateMutation = /* GraphQL */ `
+  mutation OrderUpdate($id: ID!, $input: OrderUpdateInput!) {
+    orderUpdate(id: $id, input: $input) {
       userErrors {
         ...Problems
       }
