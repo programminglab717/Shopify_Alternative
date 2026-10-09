@@ -6,11 +6,10 @@
 
 ## In progress
 
-**Next, the order and risk settings in the admin** (COD-05, COD-06, ORD-01): the Confirmation
-Desk's calling hours, its target for the first call and whether it waits for WhatsApp; when
-unpaid and unreachable orders are cancelled; how customers may cancel; which orders count as
-high value and the risk score that holds an order for review; then the admin's next sections as
-the alpha's shops need them. Urdu handles wait, as decided.
+**Next, customers' care in the admin** (CUS-01, CUS-05): a customer added by hand, two records
+of one customer merged, their marketing consent changed, and their data exported or erased at
+their request, with the erasures waiting listed and cancelled; then the admin's next sections
+as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -19,6 +18,23 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Order policies, in the admin
+
+* **Order policies** ([ADR-308](../architecture/13-decision-log.md#adr-308--the-admin-sets-the-shops-order-policies-in-settings-the-confirmation-desks-calling-hours-its-target-for-the-first-call-and-whether-it-waits-for-whatsapp-after-how-many-days-unpaid-and-unreachable-orders-are-cancelled-until-when-customers-may-cancel-and-the-high-value-amount-and-the-risk-score-that-holds-an-order-for-review)) in settings: the Confirmation Desk's calling hours, its first
+  call's target and waiting for WhatsApp; the days after which unpaid orders and unreachable
+  customers' orders are cancelled; until when customers may cancel; and the high-value amount
+  and the score that holds an order for review.
+* **Tried against the core:** on the seed's shop, on the defaults, calling hours from ten at
+  night to nine in the morning were refused, named on the page; ten to eight were kept as 600
+  and 1200 minutes, with unreachable customers cancelled after four days and the desk waiting
+  for WhatsApp; high value of Rs 25,000 and a hold at 70 were kept as 2500000 and 70, the hint
+  then reading "Now Rs 25,000". The shop was then put back on the defaults. On a phone, the
+  first call's field was narrow enough to squeeze its hint into a column, and now takes the
+  width. No errors in the browser.
+* 2205 tests: calling hours refused then kept, with the desk and cancelling sent as changed
+  and nothing sent for risk; high value and the hold score alone; a target that is not a number
+  refused before anything is sent.
 
 ### 7e4337e · Customer messages, in the admin
 

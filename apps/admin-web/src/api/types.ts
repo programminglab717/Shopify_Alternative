@@ -1911,3 +1911,36 @@ export interface SentMessage {
 export interface MessagesData {
   messages: { nodes: SentMessage[]; pageInfo: { hasNextPage: boolean } };
 }
+
+export type CustomerCancellation = 'UNTIL_CONFIRMED' | 'UNTIL_PACKED';
+
+/** The shop's policies for its orders, but for risk (COD-05, ADR-168). */
+export interface OrderSettings {
+  callingHours: { opens: string; closes: string } | null;
+  firstCallMinutes: number | null;
+  deskWaitsForReminder: boolean;
+  cancelUnpaidAfterDays: number | null;
+  cancelUnreachableAfterDays: number | null;
+  customerCancellation: CustomerCancellation;
+  updatedAt: string | null;
+}
+
+/** When risky cash-on-delivery orders wait for review (COD-06). */
+export interface OrderRiskSettings {
+  highValue: MoneyValue;
+  holdAt: number | null;
+  updatedAt: string | null;
+}
+
+export interface OrderPoliciesData {
+  orderSettings: OrderSettings;
+  orderRiskSettings: OrderRiskSettings;
+}
+
+export interface OrderSettingsUpdateData {
+  orderSettingsUpdate: { orderSettings: OrderSettings | null; userErrors: UserError[] };
+}
+
+export interface OrderRiskSettingsUpdateData {
+  orderRiskSettingsUpdate: { riskSettings: OrderRiskSettings | null; userErrors: UserError[] };
+}

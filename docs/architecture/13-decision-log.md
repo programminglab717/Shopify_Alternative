@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-307 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-308 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -315,6 +315,7 @@
 | 305 | The admin sets the shop's sales tax in settings: whether it charges it and at what rate, included in its prices, with an example of what a price holds; on delivery too; the NTN and STRN its invoices name; and categories with rates of their own, which a product's page gives its variants | Accepted |
 | 306 | The admin gives the shop's catalog feed and its Meta dataset a tab of the online store: the feed's address to copy; Meta connected with its dataset's ID and a token, sealed, which moment of an order is Purchase, and a code for test events, once the member confirms who they are; disconnected once asked; and the moments sent, by status | Accepted |
 | 307 | The admin sets how the shop's customers are told of their orders in settings: WhatsApp for everything or SMS for updates, each with its price, the messages' language, which messages go to customers and to the shop, and the alerts number; it lists the messages sent, by status, and an order's page shows its own once asked | Accepted |
+| 308 | The admin sets the shop's order policies in settings: the Confirmation Desk's calling hours, its target for the first call and whether it waits for WhatsApp; after how many days unpaid and unreachable orders are cancelled; until when customers may cancel; and the high-value amount and the risk score that holds an order for review | Accepted |
 
 ---
 
@@ -12479,3 +12480,33 @@
 * **Alternatives:**
   * **An order's messages loaded with its page:** one request more on the page staff open most,
     for something they look at rarely.
+
+## ADR-308 · The admin sets the shop's order policies in settings: the Confirmation Desk's calling hours, its target for the first call and whether it waits for WhatsApp; after how many days unpaid and unreachable orders are cancelled; until when customers may cancel; and the high-value amount and the risk score that holds an order for review
+
+* **Context:** The core keeps a shop's order settings (COD-05, ADR-168, ADR-175, ADR-203): when
+  the Confirmation Desk calls, any time or between two times of one day; how many minutes of
+  them an order may wait for its first call; whether the desk waits for WhatsApp's answer
+  first; the days after which orders left unpaid, or with a customer three calls could not
+  reach, are cancelled and their stock let go; and whether customers may cancel until their
+  order is packed or only until they confirm it. Its risk settings (COD-06) say which totals
+  count as high value and the score at which a cash-on-delivery order waits for review. Owners
+  and managers change them. The admin had none of it.
+* **Decision:**
+  * **Order policies** is a section of settings, with three parts.
+  * **The Confirmation Desk:** call at any time, or untick it for two times of day, start and
+    end; the first call's target in minutes, blank for none; and waiting for WhatsApp first,
+    saying which orders it holds back and why.
+  * **Cancelling:** the days for unpaid orders and for unreachable customers, blank for never;
+    and until when customers may cancel, each choice saying what it costs the shop.
+  * **Risky orders:** the high-value amount, with what it is now, and the score that holds an
+    order for review as a percentage, as the cash-on-delivery page shows scores, blank for none,
+    with where medium and high risk start.
+  * **One save**, sending to each of the two settings only what changed in it. What is not a
+    whole number is refused before anything is sent; the core's refusals, such as calling hours
+    that close before they open, are named by their field.
+* **Consequences:**
+  * A shop sets its desk to call from ten to eight, lets customers who stop answering go after
+    four days, and holds only its riskiest orders, from a phone.
+* **Alternatives:**
+  * **A page for each:** the risk score and the desk's hours are what a shop weighs together
+    when its agents fall behind.

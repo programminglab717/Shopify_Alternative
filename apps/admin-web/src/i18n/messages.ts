@@ -2216,6 +2216,50 @@ const en = {
   'messages.none': 'No messages yet.',
   'messages.noneForOrder': 'No messages about this order.',
   'messages.latestOnly': 'Showing the latest 50.',
+  'settings.orders': 'Order policies',
+  'settings.ordersHint': 'Calling hours, cancelling, and risky orders',
+  'orderPolicies.title': 'Order policies',
+  'orderPolicies.desk': 'The Confirmation Desk',
+  'orderPolicies.deskHint': 'When your agents call customers to confirm their orders.',
+  'orderPolicies.anyTime': 'Call at any time',
+  'orderPolicies.anyTimeHint':
+    'Untick to give calling hours: outside them the desk deals out no order.',
+  'orderPolicies.callingHours': 'Calling hours',
+  'orderPolicies.opens': 'Calls start',
+  'orderPolicies.closes': 'Calls end',
+  'orderPolicies.firstCall': 'First call within (minutes)',
+  'orderPolicies.firstCallHint':
+    'Minutes of calling hours before the queue says an order is overdue. Leave it blank for no target.',
+  'orderPolicies.waits': 'Wait for WhatsApp first',
+  'orderPolicies.waitsHint':
+    'An order paid on delivery, not of high value, is called an hour after its customer is asked again on WhatsApp, so agents call only those who did not answer.',
+  'orderPolicies.cancelling': 'Cancelling',
+  'orderPolicies.cancellingHint':
+    'Orders cancelled for you, their stock let go. Leave a field blank to never cancel them.',
+  'orderPolicies.unpaidDays': 'Unpaid orders after (days)',
+  'orderPolicies.unpaidDaysHint':
+    'Waiting for a transfer, online payment or advance, with no receipt to check. 1 to 30.',
+  'orderPolicies.unreachableDays': 'Unreachable customers after (days)',
+  'orderPolicies.unreachableDaysHint': 'Three calls unanswered. 1 to 30.',
+  'orderPolicies.customerCancels': "Customers may cancel through their order's page",
+  'orderPolicies.cancel.UNTIL_PACKED': 'Until it is packed',
+  'orderPolicies.cancel.UNTIL_CONFIRMED': 'Until they confirm it',
+  'orderPolicies.cancelHint.UNTIL_PACKED':
+    'Even once confirmed: a cancellation then costs you nothing, where a parcel refused at the door costs a return.',
+  'orderPolicies.cancelHint.UNTIL_CONFIRMED': 'Only while the order waits for them to confirm it.',
+  'orderPolicies.risk': 'Risky orders',
+  'orderPolicies.riskHint':
+    "Each cash-on-delivery order gets a risk score from its customer's history, its number and its value. For orders placed from now on.",
+  'orderPolicies.highValue': 'High value from (Rs)',
+  'orderPolicies.highValueHint':
+    'Orders of this total or more count as high value and score higher. Now {amount}.',
+  'orderPolicies.holdAt': 'Hold for review at a score of (%)',
+  'orderPolicies.holdAtHint':
+    'Medium risk starts at 30, high at 60. They wait under Needs review. Leave it blank to hold none.',
+  'orderPolicies.notWhole': 'give a whole number',
+  'orderPolicies.needsAmount': 'give an amount',
+  'orderPolicies.save': 'Save order policies',
+  'orderPolicies.saved': 'Saved. Orders from now on follow these.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -4414,6 +4458,50 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.none': 'ابھی کوئی میسج نہیں۔',
   'messages.noneForOrder': 'اس آرڈر کے بارے میں کوئی میسج نہیں۔',
   'messages.latestOnly': 'تازہ ترین 50 دکھائے جا رہے ہیں۔',
+  'settings.orders': 'آرڈر پالیسیاں',
+  'settings.ordersHint': 'کالنگ اوقات، منسوخی، اور خطرناک آرڈرز',
+  'orderPolicies.title': 'آرڈر پالیسیاں',
+  'orderPolicies.desk': 'کنفرمیشن ڈیسک',
+  'orderPolicies.deskHint': 'آپ کے ایجنٹ کسٹمرز کو آرڈر کنفرم کرنے کے لیے کب کال کرتے ہیں۔',
+  'orderPolicies.anyTime': 'کسی بھی وقت کال کریں',
+  'orderPolicies.anyTimeHint':
+    'کالنگ اوقات دینے کے لیے نشان ہٹائیں: ان کے باہر ڈیسک کوئی آرڈر نہیں دیتا۔',
+  'orderPolicies.callingHours': 'کالنگ اوقات',
+  'orderPolicies.opens': 'کالز شروع',
+  'orderPolicies.closes': 'کالز ختم',
+  'orderPolicies.firstCall': 'پہلی کال اتنے منٹ میں',
+  'orderPolicies.firstCallHint':
+    'کالنگ اوقات کے منٹ جس کے بعد قطار آرڈر کو دیر سے بتاتی ہے۔ کوئی ہدف نہ ہو تو خالی چھوڑ دیں۔',
+  'orderPolicies.waits': 'پہلے واٹس ایپ کا انتظار کریں',
+  'orderPolicies.waitsHint':
+    'کیش آن ڈیلیوری کا آرڈر، جو زیادہ مالیت کا نہ ہو، کسٹمر سے واٹس ایپ پر دوبارہ پوچھنے کے ایک گھنٹے بعد کال ہوتا ہے، تاکہ ایجنٹ صرف انہیں کال کریں جنہوں نے جواب نہیں دیا۔',
+  'orderPolicies.cancelling': 'منسوخی',
+  'orderPolicies.cancellingHint':
+    'آپ کی طرف سے منسوخ ہونے والے آرڈرز، ان کا اسٹاک چھوڑ دیا جاتا ہے۔ کبھی منسوخ نہ کرنے کے لیے خانہ خالی چھوڑ دیں۔',
+  'orderPolicies.unpaidDays': 'بغیر ادائیگی آرڈرز اتنے دن بعد',
+  'orderPolicies.unpaidDaysHint':
+    'ٹرانسفر، آن لائن ادائیگی یا ایڈوانس کے انتظار میں، جانچنے کو کوئی رسید نہیں۔ 1 سے 30۔',
+  'orderPolicies.unreachableDays': 'رابطے میں نہ آنے والے کسٹمرز اتنے دن بعد',
+  'orderPolicies.unreachableDaysHint': 'تین کالز کا جواب نہیں۔ 1 سے 30۔',
+  'orderPolicies.customerCancels': 'کسٹمرز اپنے آرڈر کے پیج سے منسوخ کر سکتے ہیں',
+  'orderPolicies.cancel.UNTIL_PACKED': 'پیک ہونے تک',
+  'orderPolicies.cancel.UNTIL_CONFIRMED': 'کنفرم کرنے تک',
+  'orderPolicies.cancelHint.UNTIL_PACKED':
+    'کنفرم ہونے کے بعد بھی: تب منسوخی کا آپ کو کوئی خرچ نہیں، جبکہ دروازے پر انکار ہونے والا پارسل واپسی کا خرچ ہے۔',
+  'orderPolicies.cancelHint.UNTIL_CONFIRMED': 'صرف جب تک آرڈر ان کی کنفرمیشن کا انتظار کر رہا ہو۔',
+  'orderPolicies.risk': 'خطرناک آرڈرز',
+  'orderPolicies.riskHint':
+    'ہر کیش آن ڈیلیوری آرڈر کو کسٹمر کی تاریخ، نمبر اور مالیت سے رسک اسکور ملتا ہے۔ اب سے آنے والے آرڈرز کے لیے۔',
+  'orderPolicies.highValue': 'زیادہ مالیت (روپے) سے',
+  'orderPolicies.highValueHint':
+    'اس ٹوٹل یا اس سے زیادہ کے آرڈرز زیادہ مالیت کے گنے جاتے ہیں اور زیادہ اسکور پاتے ہیں۔ ابھی {amount}۔',
+  'orderPolicies.holdAt': 'اس اسکور (%) پر جائزے کے لیے روکیں',
+  'orderPolicies.holdAtHint':
+    'درمیانہ رسک 30 سے، زیادہ 60 سے۔ یہ جائزہ درکار میں انتظار کرتے ہیں۔ کوئی نہ روکنا ہو تو خالی چھوڑ دیں۔',
+  'orderPolicies.notWhole': 'پورا عدد دیں',
+  'orderPolicies.needsAmount': 'رقم دیں',
+  'orderPolicies.save': 'آرڈر پالیسیاں محفوظ کریں',
+  'orderPolicies.saved': 'محفوظ ہو گیا۔ اب سے آرڈرز انہی پر چلیں گے۔',
 };
 
 export const messages: Readonly<

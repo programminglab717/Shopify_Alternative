@@ -4298,3 +4298,75 @@ export const MessagesQuery = /* GraphQL */ `
     }
   }
 `;
+
+const ORDER_SETTINGS = /* GraphQL */ `
+  fragment OrderSettingsParts on OrderSettings {
+    callingHours {
+      opens
+      closes
+    }
+    firstCallMinutes
+    deskWaitsForReminder
+    cancelUnpaidAfterDays
+    cancelUnreachableAfterDays
+    customerCancellation
+    updatedAt
+  }
+`;
+
+const ORDER_RISK_SETTINGS = /* GraphQL */ `
+  fragment OrderRiskSettingsParts on OrderRiskSettings {
+    highValue {
+      amount
+      currencyCode
+    }
+    holdAt
+    updatedAt
+  }
+`;
+
+/** The shop's policies for its orders: the desk's hours, cancelling, and risky orders. */
+export const OrderPoliciesQuery = /* GraphQL */ `
+  query OrderPolicies {
+    orderSettings {
+      ...OrderSettingsParts
+    }
+    orderRiskSettings {
+      ...OrderRiskSettingsParts
+    }
+  }
+  ${ORDER_SETTINGS}
+  ${ORDER_RISK_SETTINGS}
+`;
+
+/** The shop's order settings changed, for what happens from now on. */
+export const OrderSettingsUpdateMutation = /* GraphQL */ `
+  mutation OrderSettingsUpdate($input: OrderSettingsInput!) {
+    orderSettingsUpdate(input: $input) {
+      orderSettings {
+        ...OrderSettingsParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${ORDER_SETTINGS}
+  ${USER_ERRORS}
+`;
+
+/** When risky cash-on-delivery orders wait for review, changed for orders from now on. */
+export const OrderRiskSettingsUpdateMutation = /* GraphQL */ `
+  mutation OrderRiskSettingsUpdate($input: OrderRiskSettingsInput!) {
+    orderRiskSettingsUpdate(input: $input) {
+      riskSettings {
+        ...OrderRiskSettingsParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${ORDER_RISK_SETTINGS}
+  ${USER_ERRORS}
+`;
