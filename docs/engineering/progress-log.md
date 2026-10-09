@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Parcels coming back, in the admin
+### e3a8d8b · Parcels coming back, in the admin
 
 * **Returns, a section of its own** ([ADR-282](../architecture/13-decision-log.md#adr-282--the-admins-returns-section-lists-parcels-on-their-way-back-the-longest-first-checked-in-by-the-tracking-number-on-their-label-or-from-the-list-or-marked-lost-lost-parcels-with-their-worth-claimed-from-the-courier-and-the-claims-to-follow-up-settled-as-paid-refused-or-withdrawn)):
   parcels on their way back, the longest first, a slow courier's in red, checked in by the
