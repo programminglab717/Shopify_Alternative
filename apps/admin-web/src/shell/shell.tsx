@@ -10,6 +10,7 @@ import {
   Package,
   ReceiptText,
   Settings,
+  Store,
   Tag,
   Truck,
   Undo2,
@@ -21,6 +22,7 @@ import { useEffect } from 'react';
 import { useMe, useSession, useSessionStore } from '../auth/context';
 import { READS_ANALYTICS } from '../analytics/analytics-page';
 import { RECONCILES_CASH } from '../cash/cash-page';
+import { OPENS_ONLINE_STORE } from '../online-store/online-store-page';
 import { READS_CUSTOMERS } from '../customers/customers-page';
 import { MANAGES_DISCOUNTS } from '../discounts/discounts-page';
 import { READS_RETURNS } from '../returns/parcel';
@@ -45,6 +47,7 @@ interface NavItem {
     | '/$shopId/shipping'
     | '/$shopId/returns'
     | '/$shopId/discounts'
+    | '/$shopId/online-store'
     | '/$shopId/analytics'
     | '/$shopId/cash'
     | '/$shopId/settings';
@@ -92,6 +95,12 @@ export const NAV: readonly NavItem[] = [
     roles: READS_CUSTOMERS,
   },
   { to: '/$shopId/discounts', label: 'nav.discounts', icon: Tag, roles: MANAGES_DISCOUNTS },
+  {
+    to: '/$shopId/online-store',
+    label: 'nav.onlineStore',
+    icon: Store,
+    roles: OPENS_ONLINE_STORE,
+  },
   { to: '/$shopId/analytics', label: 'nav.analytics', icon: ChartColumn, roles: READS_ANALYTICS },
   { to: '/$shopId/cash', label: 'nav.cash', icon: Wallet, roles: RECONCILES_CASH },
   { to: '/$shopId/settings', label: 'nav.settings', icon: Settings, roles: OPENS_SETTINGS },

@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the online store's pages and menus in the admin** (OS-07): the shop's pages written and
-published, and its menus' links put in order; then the admin's next sections as the alpha's
-shops need them. Urdu handles wait, as decided.
+**Next, the shop's policies in the admin** (ONB-09): its returns, privacy, terms and delivery
+policies drafted from Hatti's English and Urdu drafts, written and published; then the admin's
+next sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The online store's pages and menus, in the admin
+
+* **An Online store section** ([ADR-291](../architecture/13-decision-log.md#adr-291--the-admins-online-store-writes-the-shops-pages-as-plain-text-paragraphs-a-blank-line-apart-shown-or-hidden-keeping-html-from-elsewhere-as-html-and-changes-its-menus-links-three-levels-deep-to-the-home-page-all-products-a-collection-a-product-a-page-or-an-address-saved-whole-marketers-write-pages-owners-and-managers-both)): pages written as plain text, shown or hidden,
+  their HTML kept where it is more than paragraphs; menus' links three levels deep, to the home
+  page, all products, a collection, a product, a page or an address, put in order and saved
+  whole; marketers writing pages, owners and managers menus too.
+* **Tried against the core:** the seed's four pages listed as shown; "How to order" written in
+  two paragraphs, saved at /pages/how-to-order, then hidden; the main menu's four links read, a
+  "Chappals" collection put under "Eid edit" and still there after a reload; a "Help links" menu
+  made with a link to a page, then deleted; with no errors in the browser. The first try found
+  the page's form remade by its own save, losing "Saved."; it is now kept by the page's ID.
+* 2085 tests: text to paragraphs and back, and HTML kept; pages listed by whether they show,
+  one written hidden, one changed sending only what changed, one deleted; a menu changed three
+  levels deep and saved with its links' IDs; one made with a product link; one deleted, never
+  the main menu; and a marketer kept to pages.
 
 ### ed70e5b · Collections, in the admin
 

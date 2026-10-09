@@ -29,6 +29,9 @@ import { CashPage } from './cash/cash-page';
 import { ReturnsPage, validateReturnsSearch } from './returns/returns-page';
 import { StatementPage } from './cash/statement-page';
 import { StockPage } from './stock/stock-page';
+import { OnlineStorePage, validateOnlineStoreSearch } from './online-store/online-store-page';
+import { MenuEditorPage } from './online-store/menus';
+import { NewPagePage, PageEditorPage } from './online-store/pages';
 import { CollectionPage } from './collections/collection-page';
 import { CollectionsPage, NewCollectionPage } from './collections/collections-page';
 import { DiscountsPage } from './discounts/discounts-page';
@@ -274,6 +277,31 @@ const collection = createRoute({
   component: CollectionPage,
 });
 
+const onlineStore = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store',
+  validateSearch: validateOnlineStoreSearch,
+  component: OnlineStorePage,
+});
+
+const newPage = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store/pages/new',
+  component: NewPagePage,
+});
+
+const pageEditor = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store/pages/$pageId',
+  component: PageEditorPage,
+});
+
+const menuEditor = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store/menus/$menuId',
+  component: MenuEditorPage,
+});
+
 const stock = createRoute({
   getParentRoute: () => shop,
   path: 'stock',
@@ -421,6 +449,10 @@ export const routeTree = root.addChildren([
     cash,
     statement,
     stock,
+    onlineStore,
+    newPage,
+    pageEditor,
+    menuEditor,
     collections,
     newCollection,
     collection,

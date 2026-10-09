@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-290 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-291 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -298,6 +298,7 @@
 | 288 | An order's page merges it into another of its customer's orders waiting to be packed and paid the same way, chosen from their orders, and opens that one; and sends units of it apart as an order of their own with its delivery charge, always leaving something; each order links the one it went to or came from | Accepted |
 | 289 | The admin's stock lists what runs low, the fewest for sale first, and finds any product's; each variant's stock at each location, added to or taken from with a reason and counted against what was on hand when read, by owners and managers; every role sees it, and Home says how many run low | Accepted |
 | 290 | The admin's collections, reached from the products, are listed and made by hand or by rules; one made by hand has its products found and added, taken out and moved up or down while sorted by hand, one made by rules has its rules changed; owners and managers change them, every role reads them | Accepted |
+| 291 | The admin's online store writes the shop's pages as plain text, paragraphs a blank line apart, shown or hidden, keeping HTML from elsewhere as HTML; and changes its menus' links three levels deep, to the home page, all products, a collection, a product, a page or an address, saved whole; marketers write pages, owners and managers both | Accepted |
 
 ---
 
@@ -11940,3 +11941,38 @@
     plain and reach every product.
   * **Collections as a section of their own in the menu:** the bar is full on a phone, and
     collections are part of the catalog.
+
+## ADR-291 · The admin's online store writes the shop's pages as plain text, paragraphs a blank line apart, shown or hidden, keeping HTML from elsewhere as HTML; and changes its menus' links three levels deep, to the home page, all products, a collection, a product, a page or an address, saved whole; marketers write pages, owners and managers both
+
+* **Context:** The core keeps the shop's pages, their bodies HTML cleaned of anything that could
+  run, shown, hidden or shown from a date ([ADR-215](#adr-215--an-article-is-published-at-a-time-ahead-as-shopifys-publishdate-schedules-one-hidden-until-then-wherever-it-would-show-and-the-worker-shows-it-once-its-time-comes-with-the-articleupdated-the-storefront-follows)); pages are content, which marketers
+  write too ([ADR-176](#adr-176--a-shops-blogs-and-their-articles-are-the-online-stores-through-the-admin-api-as-shopifys-and-under-its-content-scopes-an-article-has-html-cleaned-as-a-pages-its-authors-name-tags-a-handle-unique-in-its-blog-and-when-it-was-published-never-in-the-future-and-goes-when-its-blog-is-deleted)). It keeps menus as Shopify's linklists: the main and footer menus
+  every shop has, and others, each a list of links three levels deep, to the home page, all
+  products, a collection, a product, a page, a blog, an article or an address, saved whole, the
+  links given keeping their IDs. Navigation is owners' and managers'. The admin wrote neither, so
+  a shop's storefront kept the menus and pages it was made with.
+* **Decision:**
+  * **An Online store section** for owners, managers and marketers, a tab for pages and, for owners
+    and managers, one for menus.
+  * **Pages** are listed with their address and whether they show, are hidden, or show from a
+    date. A page's text is written as plain text, a blank line between paragraphs, and sent as the
+    paragraphs and line breaks themes print; read back the same way. A page whose body has any
+    other HTML, written through the API or imported, is edited as its HTML, so nothing of it is
+    lost. A page is shown or hidden, saved sending only what changed, and deleted after saying
+    menus leave its link out.
+  * **Menus** are listed with how many links each holds. A menu's links are edited in place: each
+    a title and where it goes, a collection or page chosen from the shop's, a product found by
+    name, an address typed; moved up or down among its own, a link put under another to three
+    levels, and taken out. A link to a blog or an article keeps where it goes. The menu is saved
+    whole, only once every link has a title and somewhere to go. A new menu takes a handle from
+    its title, which themes name it by; any but the main and footer menus can be deleted.
+* **Consequences:**
+  * A shop writes its returns page and links it from the footer, and puts a collection
+    ([ADR-290](#adr-290--the-admins-collections-reached-from-the-products-are-listed-and-made-by-hand-or-by-rules-one-made-by-hand-has-its-products-found-and-added-taken-out-and-moved-up-or-down-while-sorted-by-hand-one-made-by-rules-has-its-rules-changed-owners-and-managers-change-them-every-role-reads-them)) under another in its main menu as a drop-down, without a developer.
+  * Pages are plain: headings, lists and pictures in a page wait for a richer editor, though one
+    written elsewhere keeps them.
+* **Alternatives:**
+  * **A rich-text editor:** a library's weight on a phone for headings and bold that few shops'
+    pages need yet; plain paragraphs cover returns, delivery and about pages.
+  * **Saving each link as it changes:** the core takes a menu whole, and half a menu saved shows
+    shoppers half a menu.

@@ -1345,3 +1345,71 @@ export interface CollectionMutationData {
     userErrors: UserError[];
   };
 }
+
+export interface PageSummary {
+  id: string;
+  title: string;
+  handle: string;
+  isPublished: boolean;
+  publishedAt: string | null;
+}
+
+export interface PagesData {
+  pages: { nodes: PageSummary[] };
+}
+
+export interface PageData {
+  page: (PageSummary & { body: string }) | null;
+}
+
+export interface PageMutationData {
+  [field: string]: {
+    page?: { id: string } | null;
+    deletedPageId?: string | null;
+    userErrors: UserError[];
+  };
+}
+
+export type MenuItemType =
+  | 'FRONTPAGE'
+  | 'CATALOG'
+  | 'COLLECTION'
+  | 'PRODUCT'
+  | 'PAGE'
+  | 'BLOG'
+  | 'ARTICLE'
+  | 'HTTP'
+  | 'COLLECTIONS'
+  | 'SEARCH'
+  | 'SHOP_POLICY'
+  | 'CUSTOMER_ACCOUNT_PAGE'
+  | 'METAOBJECT';
+
+export interface MenuLink {
+  id: string;
+  title: string;
+  type: MenuItemType;
+  resourceId: string | null;
+  url: string | null;
+  items?: MenuLink[];
+}
+
+export interface Menu {
+  id: string;
+  title: string;
+  handle: string;
+  isDefault: boolean;
+  items: MenuLink[];
+}
+
+export interface MenusData {
+  menus: { nodes: Menu[] };
+}
+
+export interface MenuMutationData {
+  [field: string]: {
+    menu?: { id: string } | null;
+    deletedMenuId?: string | null;
+    userErrors: UserError[];
+  };
+}

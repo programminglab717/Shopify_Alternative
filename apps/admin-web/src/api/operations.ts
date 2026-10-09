@@ -2991,3 +2991,152 @@ export const CollectionDeleteMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** The shop's pages, oldest first (OS-07). */
+export const PagesQuery = /* GraphQL */ `
+  query Pages {
+    pages(first: 250) {
+      nodes {
+        id
+        title
+        handle
+        isPublished
+        publishedAt
+      }
+    }
+  }
+`;
+
+/** A page with its body, to change. */
+export const PageQuery = /* GraphQL */ `
+  query Page($id: ID!) {
+    page(id: $id) {
+      id
+      title
+      handle
+      body
+      isPublished
+      publishedAt
+    }
+  }
+`;
+
+/** A page written, shown on the storefront unless it is hidden. */
+export const PageCreateMutation = /* GraphQL */ `
+  mutation PageCreate($page: PageCreateInput!) {
+    pageCreate(page: $page) {
+      page {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A page's fields changed: those given; the others stay. */
+export const PageUpdateMutation = /* GraphQL */ `
+  mutation PageUpdate($id: ID!, $page: PageUpdateInput!) {
+    pageUpdate(id: $id, page: $page) {
+      page {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A page deleted; menus linking to it leave the link out. */
+export const PageDeleteMutation = /* GraphQL */ `
+  mutation PageDelete($id: ID!) {
+    pageDelete(id: $id) {
+      deletedPageId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+const MENU_ITEM = /* GraphQL */ `
+  fragment MenuLink on MenuItem {
+    id
+    title
+    type
+    resourceId
+    url
+  }
+`;
+
+/** The shop's menus, the main and footer menus first, each with its links three levels deep. */
+export const MenusQuery = /* GraphQL */ `
+  query Menus {
+    menus(first: 100) {
+      nodes {
+        id
+        title
+        handle
+        isDefault
+        items {
+          ...MenuLink
+          items {
+            ...MenuLink
+            items {
+              ...MenuLink
+            }
+          }
+        }
+      }
+    }
+  }
+  ${MENU_ITEM}
+`;
+
+/** A menu made, with its links; the storefront publishes it a moment later. */
+export const MenuCreateMutation = /* GraphQL */ `
+  mutation MenuCreate($title: String!, $handle: String!, $items: [MenuItemCreateInput!]!) {
+    menuCreate(title: $title, handle: $handle, items: $items) {
+      menu {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A menu's title and all its links, those left out going. */
+export const MenuUpdateMutation = /* GraphQL */ `
+  mutation MenuUpdate($id: ID!, $title: String!, $items: [MenuItemUpdateInput!]!) {
+    menuUpdate(id: $id, title: $title, items: $items) {
+      menu {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A menu deleted: not the main or footer menu. */
+export const MenuDeleteMutation = /* GraphQL */ `
+  mutation MenuDelete($id: ID!) {
+    menuDelete(id: $id) {
+      deletedMenuId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
