@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-299 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-300 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -307,6 +307,7 @@
 | 297 | The admin's online store keeps the storefront behind its password while the shop gets ready, pauses it while open until a time or until told, and sets its home page for search engines; and sends old addresses on, redirects found, added, deleted, imported from Shopify's CSV once checked, and exported to it | Accepted |
 | 298 | The admin's segments are built from conditions in words, joined so customers match all or any, and written in the core's query language; a query the builder cannot show is kept and edited as text; what the conditions match is counted and its newest customers shown as they change, the core's reason shown where a query does not read | Accepted |
 | 299 | The admin imports customers from a CSV after the core has checked it, saying what it would add, update and leave and the rows it could not read, updating those already here only when asked; and exports everyone or a segment's customers as a CSV once the member has confirmed who they are | Accepted |
+| 300 | The admin keeps the shop's link page in the online store: where it is, to copy and open; its bio, links and products edited and saved together, each product's variant chosen where it has several, the core's reason given by the link or product it is about; and its taps over the last week, month or three months | Accepted |
 
 ---
 
@@ -12251,3 +12252,33 @@
 * **Alternatives:**
   * **Importing at once and reporting after:** fewer taps, but a file of the wrong shape would
     land before anyone saw what it would do; the core's dry run costs one more tap.
+
+## ADR-300 · The admin keeps the shop's link page in the online store: where it is, to copy and open; its bio, links and products edited and saved together, each product's variant chosen where it has several, the core's reason given by the link or product it is about; and its taps over the last week, month or three months
+
+* **Context:** A shop's link page (CH-07, ADR-161) is at /links on its storefront, for its
+  Instagram and TikTok bios and its chats: a bio of up to 300 characters, up to ten links, each
+  a path on the store or an https address, and up to 24 products to buy at once, each with one
+  of its variants chosen or none (ADR-206). It links a chat on WhatsApp where the shop has a
+  number, and its square logo at the top (ADR-205). The storefront counts each tap on its links
+  (ADR-204). The core keeps it with the storefront's preferences, which owners and managers
+  change. The admin had none of it.
+* **Decision:**
+  * **Link page** is a tab of the online store for owners and managers.
+  * **Where it is** comes first: the page's address at the shop's own, to copy or open, and
+    whether it links a chat on WhatsApp, or where the shop's number is set.
+  * **The bio, links and products** are edited in one form and saved together, each part sent
+    only where it changed. Links are titled and addressed, moved up and down, and taken off, ten
+    at most. Products are found by name and added, moved and taken off, 24 at most; each shows
+    its picture, title and price, says when it is not shown for not being active, and offers its
+    variants where it has more than one. A product already on the page as a whole is not added
+    again: the page says so, and to choose one of its variants there first.
+  * **The core's reason** for a link or product it turns down names it by its place: "Link 3:
+    Link must be a path on the store…".
+  * **Taps** over the last 7, 30 or 90 days: the total, and each link's, the chat on WhatsApp's
+    and those since taken off, the most tapped first.
+* **Consequences:**
+  * A shop sets up the page its Instagram bio links to from a phone, and sees which of its links
+    bring shoppers.
+* **Alternatives:**
+  * **Saving each part on its own,** as the storefront's preferences are: one Save fits a page
+    shoppers see as a whole, and leaves no half-changed page.

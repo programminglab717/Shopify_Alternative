@@ -3711,3 +3711,92 @@ export const CustomersImportMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const LINK_PAGE = /* GraphQL */ `
+  fragment LinkPageParts on LinkPage {
+    bio
+    links {
+      title
+      url
+    }
+    products {
+      productId
+      variantId
+    }
+  }
+`;
+
+/** The shop's link page (CH-07), where its storefront serves it, and its WhatsApp number. */
+export const LinkPageQuery = /* GraphQL */ `
+  query LinkPage {
+    shop {
+      id
+      url
+    }
+    onlineStorePreferences {
+      whatsappNumber
+      linkPage {
+        ...LinkPageParts
+      }
+    }
+  }
+  ${LINK_PAGE}
+`;
+
+/** The link page changed: its bio, its links and its products, each replacing what it had. */
+export const LinkPageUpdateMutation = /* GraphQL */ `
+  mutation LinkPageUpdate($input: OnlineStorePreferencesInput!) {
+    onlineStorePreferencesUpdate(input: $input) {
+      preferences {
+        linkPage {
+          ...LinkPageParts
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${LINK_PAGE}
+  ${USER_ERRORS}
+`;
+
+/** One of the link page's products: its title, picture and variants to choose among. */
+export const LinkPageProductQuery = /* GraphQL */ `
+  query LinkPageProduct($id: ID!) {
+    product(id: $id) {
+      id
+      title
+      status
+      media {
+        id
+        previewImage {
+          url
+        }
+      }
+      variants {
+        id
+        title
+        price {
+          ...Money
+        }
+      }
+    }
+  }
+  ${MONEY}
+`;
+
+/** Taps on the link page's links over a period (ADR-204), the most tapped first. */
+export const LinkPageTapsQuery = /* GraphQL */ `
+  query LinkPageTaps($from: DateTime!, $before: DateTime!) {
+    linkPageTaps(from: $from, before: $before) {
+      total
+      links {
+        url
+        title
+        source
+        taps
+      }
+    }
+  }
+`;

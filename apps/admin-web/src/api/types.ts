@@ -1620,3 +1620,50 @@ export interface CustomersImportResult {
 export interface CustomersImportData {
   customersImport: CustomersImportResult;
 }
+
+export interface LinkPageLink {
+  title: string;
+  url: string;
+}
+
+export interface LinkPageProduct {
+  productId: string;
+  variantId: string | null;
+}
+
+export interface LinkPage {
+  bio: string;
+  links: LinkPageLink[];
+  products: LinkPageProduct[];
+}
+
+export interface LinkPageData {
+  shop: { id: string; url: string };
+  onlineStorePreferences: { whatsappNumber: string | null; linkPage: LinkPage };
+}
+
+export interface LinkPageUpdateData {
+  onlineStorePreferencesUpdate: {
+    preferences: { linkPage: LinkPage } | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface LinkPageProductData {
+  product: {
+    id: string;
+    title: string;
+    status: ProductStatus;
+    media: { id: string; previewImage: { url: string } | null }[];
+    variants: { id: string; title: string; price: MoneyValue }[];
+  } | null;
+}
+
+export type LinkTapSource = 'LINK' | 'WHATSAPP' | 'REMOVED';
+
+export interface LinkPageTapsData {
+  linkPageTaps: {
+    total: number;
+    links: { url: string; title: string | null; source: LinkTapSource; taps: number }[];
+  };
+}

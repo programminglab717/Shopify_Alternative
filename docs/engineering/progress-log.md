@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the shop's link page in the admin** (CH-07): the link-in-bio page shops put on Instagram
-and TikTok, its links, products and image, and how often each is tapped; then the admin's next
-sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, store credit in the admin** (ORD-09): a customer's store credit on their page, what it
+holds and what it went on, credit given and taken back; then the admin's next sections as the
+alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,23 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The link page, in the admin
+
+* **Link page** ([ADR-300](../architecture/13-decision-log.md#adr-300--the-admin-keeps-the-shops-link-page-in-the-online-store-where-it-is-to-copy-and-open-its-bio-links-and-products-edited-and-saved-together-each-products-variant-chosen-where-it-has-several-the-cores-reason-given-by-the-link-or-product-it-is-about-and-its-taps-over-the-last-week-month-or-three-months)), a tab of the online store for owners and managers: the page's address
+  to copy and open, and its WhatsApp chat; its bio, links and products edited and saved together,
+  each product's variant chosen where it has several; the core's reason named by the link or
+  product it is about; and its taps over the last week, month or three months.
+* **Tried against the core:** on the seed's shop, an address without https was turned down as
+  link 3; a link to a search was added and moved up, a size of the chappal chosen, and the bio
+  changed; the storefront's /links showed all of it at once. Two taps from a phone's browser
+  were counted within the minute, the most tapped first; the headless browser's own tap was not,
+  as the storefront leaves robots out. The Urdu page read right to left, with no errors in the
+  browser. Adding a product already on the page as a whole first did nothing to see; the page now
+  says it is there, and to choose one of its variants first.
+* 2154 tests: the page's bio, links and products changed and saved together; a product not
+  added twice; the core's reason named by its link; taps over a month and a week; and no tab for
+  a marketer.
 
 ### 5866c63 · Customers in and out, in the admin
 
