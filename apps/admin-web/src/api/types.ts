@@ -2168,3 +2168,22 @@ export interface OnlineStoreTheme {
 export interface ThemesData {
   themes: { nodes: OnlineStoreTheme[] };
 }
+
+/** A theme as its editor needs it (ADR-323); schemas and files are JSON in strings. */
+export interface ThemeEditorData {
+  theme:
+    | (OnlineStoreTheme & {
+        version: number;
+        editor: {
+          settingsSchema: string;
+          sections: { type: string; name: string; schema: string }[];
+          files: { filename: string; body: string; own: boolean; problems: string[] }[];
+        };
+      })
+    | null;
+}
+
+export interface ThemeChoicesData {
+  menus: { nodes: { handle: string; title: string }[] };
+  collections: { nodes: { handle: string; title: string }[] };
+}

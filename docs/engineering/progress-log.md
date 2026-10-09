@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the theme editor's screens** (admin): a theme's pages with their sections, each
-section's and block's settings and the theme's own, shown or hidden and put in order, saved with
-the shop's files over the editor's data; then its live preview. Urdu handles wait, as decided.
+**Next, the theme editor's live preview** (admin): the theme framed beside the editor in design
+mode, changes not yet saved rendered there as they are made, and a section chosen in either
+(ADR-050); then pictures of a theme's own, uploaded from the phone. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,27 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The theme editor, in the admin
+
+* **"Customise"** ([ADR-324](../architecture/13-decision-log.md#adr-324--the-admins-theme-editor-changes-a-pages-sections-and-blocks-and-the-themes-settings-in-place-kept-until-saved-together-as-theme-check-passes-them-pictures-wait-for-an-address-of-their-own)) on each theme opens its editor: a page of the storefront at a time,
+  its sections from the header to the footer with their settings and blocks, hidden, moved or
+  removed, and the theme's own settings, saved together as Theme Check passes them; a part the
+  shop changed started again from the theme as it came. Pictures show as they are, to be
+  changed once a theme's pictures have an address of their own.
+* **Tried against the core:** on the seed's shop, its main theme's home page showed its header,
+  banner, two featured collections, WhatsApp section and footer; the Footwear collection renamed,
+  shown six at a time by its slider, moved above the Eid edit, and the WhatsApp section hidden,
+  saved at once, and the storefront's home page then showed the new heading; a javascript: link
+  refused in Theme Check's words; the theme's colour saved, then its settings started again and
+  the shop's own file gone; in Urdu, the cards, sections and labels in Urdu, right to left. The
+  rows first crowded the names out on a phone, so moving and removing went inside each open
+  section. The home page was put back as it was through the API, its files as before. No
+  errors in the browser.
+* 2305 tests: a page's sections changed, moved, hidden and saved together; blocks added
+  within their limits and removed; the theme's settings; a refusal, then the same saved; a part
+  started again; a page without the groups its layout lacks; changes discarded; the themes tab's
+  link; no editor for those who do not change themes; and the files' own rules.
 
 ### 057fa20 · The theme editor's data, in the core
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-323 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-324 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -331,6 +331,7 @@
 | 321 | The admin searches the drafts list, with its saved searches as on orders and products, and shows a search the core refuses in the core's words at once, without trying it again | Accepted |
 | 322 | The admin corrects a parcel's courier, tracking number and link on its order's page, whatever the parcel's state, its link checked as https before it is sent | Accepted |
 | 323 | The theme editor reads a theme through the Admin API: the platform theme's settings and sections, their words in English or Urdu through Shopify's t: keys, and every JSON file the shop may keep as the storefront reads it | Accepted |
+| 324 | The admin's theme editor changes a page's sections and blocks and the theme's settings in place, kept until saved together as Theme Check passes them; pictures wait for an address of their own | Accepted |
 
 ---
 
@@ -12914,3 +12915,46 @@
     setting types; JSON keeps the editor in step with whatever the platform theme takes.
   * **Labels translated in the admin:** the admin does not know a theme's settings, and every
     change to the platform theme would wait on a release of the admin.
+
+## ADR-324 · The admin's theme editor changes a page's sections and blocks and the theme's settings in place, kept until saved together as Theme Check passes them; pictures wait for an address of their own
+
+* **Context:** The admin's themes tab (ADR-320) copied, previewed, published and deleted a
+  shop's themes, but nothing in it changed what a theme shows: a merchant whose home page still
+  had the platform theme's banner and collections could not make it theirs. The Admin API gives
+  the editor what it needs, the platform theme's settings and sections in the merchant's
+  language and every JSON file as the storefront reads it ([ADR-323](#adr-323--the-theme-editor-reads-a-theme-through-the-admin-api-the-platform-themes-settings-and-sections-their-words-in-english-or-urdu-through-shopifys-t-keys-and-every-json-file-the-shop-may-keep-as-the-storefront-reads-it)).
+* **Decision:**
+  * **Each theme is customised on a page of its own**, for owners and managers, opened from the
+    themes tab: a page of the storefront at a time, its sections from the header to the footer,
+    the section groups its layout renders above and below the template's, the password page's
+    alone. Each section opens to its settings and its blocks, and is hidden or shown again as
+    Shopify's `disabled` keeps it, moved up or down among its own, or removed, all but a page's
+    own section, such as the product's; blocks are added within their limits, and hidden, moved
+    and removed the same. The theme's own settings, such as its colours, come after, in their
+    groups.
+  * **Each setting has the control of its kind**, as Shopify's editor offers them: words, a
+    number within its range, a choice, a tick, a colour as a swatch and its code, a link, and the
+    shop's menus and collections to choose from by handle; the theme's notes and headings show
+    as they are, and a kind with no control is words when it holds words and left as it is
+    otherwise.
+  * **Changes are kept in the browser until saved**, then sent together with themeFilesUpsert,
+    all of them or none, and what Theme Check refuses is said in its words, the changes kept to
+    fix. A change undone is no change, and leaving with changes not saved asks first.
+  * **A part the shop changed can be started again from the theme as it came**, once asked,
+    by deleting the shop's own file.
+  * **Pictures are shown as they are, and not yet changed:** a shop's files are private and
+    served only for what they were chosen for, its logos (ADR-198) and sharing image (ADR-243),
+    so a theme's pictures need an address of their own first.
+* **Consequences:**
+  * A merchant changes the home page's headings, collections, order and colours from a phone,
+    in English or Urdu, and the storefront shows it a moment after saving the main theme.
+  * There is no preview beside the editor yet: its Preview link opens the theme on the
+    storefront, and the next step frames it and renders changes not saved (ADR-050).
+  * Two people saving the same part of a theme at once: the later save wins, file by file.
+  * Sections are not added yet: Hatti Base's sections have no presets to add them from.
+* **Alternatives:**
+  * **Editing a theme's files as JSON:** exact, but merchants do not write JSON on their phones.
+  * **Saving each change as it is made:** a round trip, and a publish, for every keystroke;
+    Shopify's editor saves when asked too.
+  * **Dragging sections into order:** arrows work with a thumb and a screen reader alike;
+    dragging may come with the preview.

@@ -40,6 +40,7 @@ import { OnlineStorePage, validateOnlineStoreSearch } from './online-store/onlin
 import { MenuEditorPage } from './online-store/menus';
 import { NewPagePage, PageEditorPage } from './online-store/pages';
 import { PolicyPage } from './online-store/policies';
+import { ThemeEditorPage } from './online-store/theme-editor';
 import { CollectionPage } from './collections/collection-page';
 import { CollectionsPage, NewCollectionPage } from './collections/collections-page';
 import { DiscountsPage } from './discounts/discounts-page';
@@ -351,6 +352,12 @@ const newArticle = createRoute({
   component: NewArticlePage,
 });
 
+const themeEditor = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store/themes/$themeId',
+  component: ThemeEditorPage,
+});
+
 const articleEditor = createRoute({
   getParentRoute: () => shop,
   path: 'online-store/articles/$articleId',
@@ -606,6 +613,7 @@ export const routeTree = root.addChildren([
     blog,
     newArticle,
     articleEditor,
+    themeEditor,
     segments,
     newSegment,
     segment,

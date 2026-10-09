@@ -1,4 +1,5 @@
-import { Copy, ExternalLink, Palette, Plus, Trash2, Upload } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { Copy, ExternalLink, Paintbrush, Palette, Plus, Trash2, Upload } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -14,7 +15,7 @@ import { formatDate, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { FormSection } from '../products/product-form';
 import { SelectField } from '../settings/settings-form';
-import { useAdminMutation, useAdminQuery, useShopTimezone } from '../shell/shop-context';
+import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
@@ -48,9 +49,10 @@ function useChange() {
   return { problem, change };
 }
 
-/** One theme: looked at through its preview link, published, or deleted once asked. */
+/** One theme: customised, looked at through its preview link, published, or deleted once asked. */
 function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
   const { t, locale } = useLocale();
+  const { id: shopId } = useShop();
   const timezone = useShopTimezone();
   const publish = useAdminMutation<{ themePublish: { userErrors: UserError[] } }, { id: string }>(
     ThemePublishMutation,
@@ -112,6 +114,15 @@ function ThemeRow({ theme }: { theme: OnlineStoreTheme }) {
         </Alert>
       ) : (
         <div className="flex flex-wrap gap-2">
+          <Link
+            to="/$shopId/online-store/themes/$themeId"
+            params={{ shopId, themeId: theme.id }}
+            aria-label={t('themes.customiseOf', { name: theme.name })}
+            className="inline-flex min-h-12 items-center gap-2 rounded-control bg-primary px-4 font-medium text-on-primary hover:bg-primary-strong md:min-h-10"
+          >
+            <Paintbrush aria-hidden className="size-5" />
+            {t('themes.customise')}
+          </Link>
           <a
             href={theme.previewUrl}
             target="_blank"

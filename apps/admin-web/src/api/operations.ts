@@ -5137,6 +5137,81 @@ export const ThemesQuery = /* GraphQL */ `
   ${THEME}
 `;
 
+/**
+ * A theme as its editor needs it (ADR-323): the platform theme's settings and sections in the
+ * admin's language, and the theme's files as the storefront reads them.
+ */
+export const ThemeEditorQuery = /* GraphQL */ `
+  query ThemeEditor($id: ID!, $locale: String!) {
+    theme(id: $id) {
+      ...Theme
+      version
+      editor(locale: $locale) {
+        settingsSchema
+        sections {
+          type
+          name
+          schema
+        }
+        files {
+          filename
+          body
+          own
+          problems
+        }
+      }
+    }
+  }
+  ${THEME}
+`;
+
+/** What a theme's settings may point at: the shop's menus and collections, by handle. */
+export const ThemeChoicesQuery = /* GraphQL */ `
+  query ThemeChoices {
+    menus(first: 100) {
+      nodes {
+        handle
+        title
+      }
+    }
+    collections(first: 100) {
+      nodes {
+        handle
+        title
+      }
+    }
+  }
+`;
+
+/** A theme's changed files saved, all of them or none, as Theme Check passes them. */
+export const ThemeFilesUpsertMutation = /* GraphQL */ `
+  mutation ThemeFilesUpsert($themeId: ID!, $files: [OnlineStoreThemeFilesUpsertFileInput!]!) {
+    themeFilesUpsert(themeId: $themeId, files: $files) {
+      theme {
+        id
+        version
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The shop's own files of a theme deleted, so that the platform theme's show again. */
+export const ThemeFilesDeleteMutation = /* GraphQL */ `
+  mutation ThemeFilesDelete($themeId: ID!, $files: [String!]!) {
+    themeFilesDelete(themeId: $themeId, files: $files) {
+      deletedThemeFiles
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** A theme added, a copy of one the shop has or on the platform theme afresh. */
 export const ThemeCreateMutation = /* GraphQL */ `
   mutation ThemeCreate($name: String!, $copyFrom: ID) {
