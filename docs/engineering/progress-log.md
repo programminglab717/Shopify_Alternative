@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### An order's items changed, in the admin
+### 43d7dc4 · An order's items changed, in the admin
 
 * **Items, delivery charge and discount changed on the order's page** ([ADR-287](../architecture/13-decision-log.md#adr-287--an-orders-page-changes-its-items-while-it-waits-to-be-packed-quantities-stepped-and-lines-taken-off-or-put-back-products-found-and-added-at-a-price-agreed-and-its-delivery-charge-waived-or-discount-given-saying-back-the-new-total-and-cash-at-the-door-a-packed-order-is-unpacked-first)):
   lines stepped, taken off and put back, products found and added at a price agreed, delivery
