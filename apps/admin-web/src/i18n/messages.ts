@@ -2418,6 +2418,35 @@ const en = {
   'locations.addHint': 'A warehouse, a shop or a stockroom: each holds stock of its own.',
   'locations.addSubmit': 'Add location',
   'locations.added': '{name} was added.',
+  'options.title': 'Options and variants',
+  'options.hint':
+    'Each change is saved at once. Save the fields above first: they are filled in afresh when variants change.',
+  'options.nameOf': 'Name of {name}',
+  'options.rename': 'Rename',
+  'options.valuesOf': 'Values of {name}',
+  'options.removeValue': 'Remove {value}',
+  'options.addValues': 'Add values to {name}',
+  'options.addValuesHint': 'Separate them with commas.',
+  'options.add': 'Add',
+  'options.deleteAsk':
+    'Take away {name}? Its variants keep their other options; if two would then be the same, nothing is taken away.',
+  'options.deleteSure': 'Take it away',
+  'options.keep': 'Keep it',
+  'options.delete': 'Take away {name}',
+  'options.addOption': 'Add an option',
+  'options.optionName': 'Option name',
+  'options.optionNameHint': 'Such as Size, Colour or Fabric. A product has 3 options at most.',
+  'options.optionValues': 'Its values',
+  'options.everyCombination': 'Add a variant for every combination',
+  'options.everyCombinationHint':
+    'Priced like the first variant. Otherwise the variants it has take the first value.',
+  'options.addOptionSubmit': 'Add option',
+  'options.variants': 'Variants',
+  'options.deleteVariantSure': 'Delete, with its stock',
+  'options.deleteVariant': 'Delete {title}',
+  'options.price': 'Price (Rs)',
+  'options.addVariant': 'Add variant',
+  'options.variantExists': '{title} is a variant already.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -4818,6 +4847,36 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'locations.addHint': 'گودام، دکان یا اسٹاک روم: ہر ایک کا اپنا اسٹاک ہوتا ہے۔',
   'locations.addSubmit': 'مقام شامل کریں',
   'locations.added': '{name} شامل ہو گیا۔',
+  'options.title': 'آپشنز اور ویریئنٹس',
+  'options.hint':
+    'ہر تبدیلی فوراً محفوظ ہوتی ہے۔ پہلے اوپر کے خانے محفوظ کریں: ویریئنٹس بدلنے پر وہ نئے سرے سے بھرے جاتے ہیں۔',
+  'options.nameOf': '{name} کا نام',
+  'options.rename': 'نام بدلیں',
+  'options.valuesOf': '{name} کی ویلیوز',
+  'options.removeValue': '{value} ہٹائیں',
+  'options.addValues': '{name} میں ویلیوز شامل کریں',
+  'options.addValuesHint': 'انہیں کوما سے الگ کریں۔',
+  'options.add': 'شامل کریں',
+  'options.deleteAsk':
+    '{name} ہٹا دیں؟ ویریئنٹس کے باقی آپشنز رہیں گے؛ اگر دو ایک جیسے ہو جائیں تو کچھ نہیں ہٹے گا۔',
+  'options.deleteSure': 'ہٹا دیں',
+  'options.keep': 'رہنے دیں',
+  'options.delete': '{name} ہٹائیں',
+  'options.addOption': 'آپشن شامل کریں',
+  'options.optionName': 'آپشن کا نام',
+  'options.optionNameHint':
+    'جیسے سائز، رنگ یا کپڑا۔ ایک پروڈکٹ کے زیادہ سے زیادہ 3 آپشنز ہوتے ہیں۔',
+  'options.optionValues': 'اس کی ویلیوز',
+  'options.everyCombination': 'ہر جوڑ کا ویریئنٹ بنائیں',
+  'options.everyCombinationHint':
+    'پہلے ویریئنٹ کی قیمت پر۔ ورنہ موجودہ ویریئنٹس کو پہلی ویلیو ملتی ہے۔',
+  'options.addOptionSubmit': 'آپشن شامل کریں',
+  'options.variants': 'ویریئنٹس',
+  'options.deleteVariantSure': 'اسٹاک سمیت حذف کریں',
+  'options.deleteVariant': '{title} حذف کریں',
+  'options.price': 'قیمت (روپے)',
+  'options.addVariant': 'ویریئنٹ شامل کریں',
+  'options.variantExists': '{title} پہلے سے ایک ویریئنٹ ہے۔',
 };
 
 export const messages: Readonly<

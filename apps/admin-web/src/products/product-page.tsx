@@ -42,6 +42,7 @@ import {
   StatusChoice,
 } from './product-form';
 import type { DetailsState } from './product-form';
+import { ProductOptions } from './options';
 import { ProductPhotos } from './photos';
 import { EDITS_PRODUCTS, ProductStatusBadge, ProductThumb } from './status';
 
@@ -548,14 +549,15 @@ export function ProductPage() {
         <Alert tone="warning">{t('product.addedNoStock')}</Alert>
       ) : null}
       <ProductPhotos product={product} edits={edits} />
-      {/* Filled in afresh after each save, from the product read again; not as photos change. */}
+      {/* Filled in afresh after each save, and as variants change; not as photos change. */}
       <ProductEditor
-        key={saved}
+        key={`${saved}-${product.variants.map((variant) => `${variant.id}:${variant.title}`).join()}`}
         product={product}
         location={location}
         edits={edits}
         onSaved={() => setSaved((count) => count + 1)}
       />
+      {edits && <ProductOptions product={product} />}
     </div>
   );
 }

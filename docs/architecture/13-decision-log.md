@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-312 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-313 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -320,6 +320,7 @@
 | 310 | The admin sets the checkout page in settings: up to four badges under its button, in the shop's order, with the days for exchanges and returns, Help on WhatsApp offered only with the shop's number; and the boxes it offers for the shop's offers, by channel | Accepted |
 | 311 | The admin brings products in from Shopify's product CSV and exports them to it, and counts stock by Shopify's inventory CSV, each file checked first and taken in at a tap, on a page of its own beside the products list and the stock page | Accepted |
 | 312 | The admin lists the shop's locations in settings, those out of use too, and adds one with its address and the number couriers call for pickups, changes it and whether it fulfils online orders, takes it out of use and puts it back, and deletes one that never held stock; the primary one stays | Accepted |
+| 313 | The admin changes a product's options and variants after it was made: an option renamed, values added and deleted where no variant uses them, an option added with a variant for every new combination if asked, or taken away where its variants stay apart; variants added for combinations it lacks and deleted, one always kept | Accepted |
 
 ---
 
@@ -12627,3 +12628,32 @@
 * **Alternatives:**
   * **Locations under stock:** where they are used, but they are the shop's set-up, with its
     pickup numbers, beside its couriers.
+
+## ADR-313 · The admin changes a product's options and variants after it was made: an option renamed, values added and deleted where no variant uses them, an option added with a variant for every new combination if asked, or taken away where its variants stay apart; variants added for combinations it lacks and deleted, one always kept
+
+* **Context:** A product is added with one option and its values (CAT-01), and the admin then
+  changed only its variants' prices, SKUs and stock. Shops add a size later, a second colour, or
+  stop making one; the core has Shopify's productOptionUpdate, productOptionsCreate,
+  productOptionsDelete, productVariantsBulkCreate and productVariantsBulkDelete, which refuse
+  deleting a value a variant uses, taking away an option that would leave two variants the
+  same, more than three options, and deleting the last variant.
+* **Decision:**
+  * **Options and variants** is a section of the product page, below its fields, for those who
+    change products. Each change is saved at once, as the photos are; the fields above are filled
+    in afresh when the variants change, so the section says to save them first.
+  * **Each option** is renamed, has values added, comma separated, and values removed; it is
+    taken away once asked, saying its variants keep their other options. The core's refusals
+    are shown beside the option they are about.
+  * **Add an option** takes its name and values, and a box, ticked to begin with, to add a
+    variant for every combination, priced like the first; untick it and the variants it has take
+    the first value. It is offered while the product has fewer than three options.
+  * **Variants** lists them, each deleted once asked with its stock, while more than one is
+    left; a variant is added by choosing a value of each option and its price, and a combination
+    the product has is named as one already.
+  * **Not yet:** values renamed, and options and values put in order.
+* **Consequences:**
+  * A shop that starts selling a kurta in L adds the value and its variant from a phone, without
+    making the product again and losing its photos, orders and links.
+* **Alternatives:**
+  * **Options in the form above, saved with it:** one save, but a change of options remakes the
+    rows the form holds; separate, immediate changes keep each step and its refusal plain.

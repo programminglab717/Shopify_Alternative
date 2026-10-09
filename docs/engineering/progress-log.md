@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, a product's options and variants in the admin** (CAT-01): an option added to a product
-already made, renamed, its values added, renamed and put in order, and taken away; variants
-added for new combinations and deleted, at least one kept; then the admin's next sections as
-the alpha's shops need them. Urdu handles wait, as decided.
+**Next, courier pickups in the admin** (SHP-02): asking a courier to collect the day's parcels
+from a location, the pickups asked for listed with their codes and state; then the admin's next
+sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### A product's options and variants, in the admin
+
+* **Options and variants** ([ADR-313](../architecture/13-decision-log.md#adr-313--the-admin-changes-a-products-options-and-variants-after-it-was-made-an-option-renamed-values-added-and-deleted-where-no-variant-uses-them-an-option-added-with-a-variant-for-every-new-combination-if-asked-or-taken-away-where-its-variants-stay-apart-variants-added-for-combinations-it-lacks-and-deleted-one-always-kept)) on the product page: options renamed, given values and
+  values removed, added and taken away; variants added for combinations the product lacks and
+  deleted, one kept. Each change is saved at once.
+* **Tried against the core:** a kurta added in S and M; Size renamed Length and given L; M
+  refused removal while variants used it; Colour added in Maroon and Black with every
+  combination, making six variants; taking Colour away refused, as two variants would be the
+  same; S / Black deleted and added again at Rs 3,400; then the kurta deleted. No errors in the
+  browser.
+* 2245 tests: an option renamed and given values, a value in use refused, an option added
+  without new combinations and refused being taken away; a variant added and variants deleted
+  down to the last; none of it for a packer.
 
 ### 7893e59 · Locations, in the admin
 

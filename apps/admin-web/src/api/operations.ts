@@ -863,6 +863,97 @@ export const InventorySetQuantitiesMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** An option renamed, or values added to it or deleted where no variant uses them (CAT-01). */
+export const ProductOptionUpdateMutation = /* GraphQL */ `
+  mutation ProductOptionUpdate(
+    $productId: ID!
+    $option: ProductOptionUpdateInput!
+    $optionValuesToAdd: [String!]
+    $optionValuesToDelete: [ID!]
+  ) {
+    productOptionUpdate(
+      productId: $productId
+      option: $option
+      optionValuesToAdd: $optionValuesToAdd
+      optionValuesToDelete: $optionValuesToDelete
+    ) {
+      product {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Options added to a product, its variants given their first values or every combination made. */
+export const ProductOptionsCreateMutation = /* GraphQL */ `
+  mutation ProductOptionsCreate(
+    $productId: ID!
+    $options: [ProductOptionInput!]!
+    $variantStrategy: ProductOptionCreateVariantStrategy!
+  ) {
+    productOptionsCreate(
+      productId: $productId
+      options: $options
+      variantStrategy: $variantStrategy
+    ) {
+      product {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Options taken away, unless the variants would then be the same. */
+export const ProductOptionsDeleteMutation = /* GraphQL */ `
+  mutation ProductOptionsDelete($productId: ID!, $options: [ID!]!) {
+    productOptionsDelete(productId: $productId, options: $options) {
+      deletedOptionsIds
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Variants added for combinations the product lacks. */
+export const ProductVariantsBulkCreateMutation = /* GraphQL */ `
+  mutation ProductVariantsBulkCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+    productVariantsBulkCreate(productId: $productId, variants: $variants) {
+      productVariants {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Variants deleted, with their stock; one always kept. */
+export const ProductVariantsBulkDeleteMutation = /* GraphQL */ `
+  mutation ProductVariantsBulkDelete($productId: ID!, $variantsIds: [ID!]!) {
+    productVariantsBulkDelete(productId: $productId, variantsIds: $variantsIds) {
+      product {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** A product deleted, with its variants and their stock. */
 export const ProductDeleteMutation = /* GraphQL */ `
   mutation ProductDelete($input: ProductDeleteInput!) {
