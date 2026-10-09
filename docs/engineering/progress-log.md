@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The theme editor, in the admin
+### b54d06c · The theme editor, in the admin
 
 * **"Customise"** ([ADR-324](../architecture/13-decision-log.md#adr-324--the-admins-theme-editor-changes-a-pages-sections-and-blocks-and-the-themes-settings-in-place-kept-until-saved-together-as-theme-check-passes-them-pictures-wait-for-an-address-of-their-own)) on each theme opens its editor: a page of the storefront at a time,
   its sections from the header to the footer with their settings and blocks, hidden, moved or
