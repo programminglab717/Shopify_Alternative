@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Customer segments, in the admin
+### b43a9d2 · Customer segments, in the admin
 
 * **Segments** ([ADR-298](../architecture/13-decision-log.md#adr-298--the-admins-segments-are-built-from-conditions-in-words-joined-so-customers-match-all-or-any-and-written-in-the-cores-query-language-a-query-the-builder-cannot-show-is-kept-and-edited-as-text-what-the-conditions-match-is-counted-and-its-newest-customers-shown-as-they-change-the-cores-reason-shown-where-a-query-does-not-read)), from the customers list for owners, managers and marketers: each with
   how many customers it holds; built from conditions in words, joined as all or any, written in
