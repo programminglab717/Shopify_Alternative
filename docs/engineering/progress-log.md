@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### A parcel's tracking corrected, in the admin
+### 69f1d17 · A parcel's tracking corrected, in the admin
 
 * **"Change tracking"** ([ADR-322](../architecture/13-decision-log.md#adr-322--the-admin-corrects-a-parcels-courier-tracking-number-and-link-on-its-orders-page-whatever-the-parcels-state-its-link-checked-as-https-before-it-is-sent)) on each parcel of an order's page, for those who work orders,
   in any state: its courier, number and https link set anew, the link checked as typed.
