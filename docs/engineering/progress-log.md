@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The drafts list searched, in the admin
+### 16ea427 · The drafts list searched, in the admin
 
 * **A search** ([ADR-321](../architecture/13-decision-log.md#adr-321--the-admin-searches-the-drafts-list-with-its-saved-searches-as-on-orders-and-products-and-shows-a-search-the-core-refuses-in-the-cores-words-at-once-without-trying-it-again)) on the drafts list, with its saved searches; a search the core refuses
   shown in its words at once, on every page, and not tried again.
