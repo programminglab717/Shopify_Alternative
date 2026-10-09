@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, an order's money on its page in the admin** (ORD-09, PAY-04): refunds, in cash, by
-transfer, through the gateway or as store credit, with their receipts; an order marked paid; and
-the payments its customer made online; then the admin's next sections as the alpha's shops need
-them. Urdu handles wait, as decided.
+**Next, an order's everyday edits in the admin** (ORD-02, ORD-10): comments on its timeline,
+naming staff; the order given to a member of staff, or taken; its note and tags; and its address
+corrected before it ships; then the admin's next sections as the alpha's shops need them. Urdu
+handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Refunds and payments, in the admin
+
+* **Payments and refunds on the order's page** ([ADR-285](../architecture/13-decision-log.md#adr-285--an-orders-page-shows-what-was-paid-and-given-back-each-refund-with-how-its-reference-why-and-its-receipt-owners-and-managers-record-a-refund-at-most-what-is-left-by-hand-with-its-receipt-uploaded-through-the-gateway-or-as-store-credit-and-mark-an-order-paid-after-saying-how-much-it-records)):
+  what was paid and given back, each refund with how, its reference, why and its receipt; a
+  refund recorded, at most what is left, by hand with its receipt uploaded, through the gateway
+  or as store credit; and an order marked paid after saying how much.
+* **Tried against the core:** the seed's #1006, Rs 3,999 paid and Rs 3,799 given back already
+  (a wallet refund, and the exchange #1016), refused Rs 500 as more than was left; took Rs 150
+  back by bank transfer with its reference and a receipt image, whose link served it, and the
+  last Rs 50 as store credit; and #1013, nothing paid, was marked paid for Rs 3,749; with no
+  errors in the browser. Store credit's refund first showed its transaction's ID as its
+  reference; it no longer does.
+* 2022 tests: a transfer refund with its reference and receipt uploaded, past what is left
+  refused, store credit with no reference or receipt, an order marked paid after asking, what
+  was paid shown to a packer without buttons, and what is left worked out.
 
 ### 299f348 · Customer returns, in the admin
 

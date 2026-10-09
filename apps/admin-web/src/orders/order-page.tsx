@@ -30,6 +30,7 @@ import { READS_CUSTOMERS } from '../customers/customers-page';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { HANDLES_MONEY, OrderMoney } from './money';
 import { Parcels } from './parcels';
 import { OrderReturns } from './returns';
 import { StageBadge } from './stage';
@@ -284,6 +285,13 @@ export function OrderPage() {
               )}
             </dl>
           </Section>
+          {(HANDLES_MONEY.includes(shop.role) ||
+            Number(order.amountPaid.amount) > 0 ||
+            order.refunds.length > 0) && (
+            <Section title={t('money.title')}>
+              <OrderMoney order={order} timezone={timezone} />
+            </Section>
+          )}
           {order.fulfillments.length > 0 && (
             <Section title={t('parcels.title')}>
               <Parcels parcels={order.fulfillments} timezone={timezone} />

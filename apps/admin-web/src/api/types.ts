@@ -190,6 +190,20 @@ export interface ReturnCreateData {
   };
 }
 
+export type RefundMethod =
+  'CASH' | 'BANK_TRANSFER' | 'MOBILE_WALLET' | 'ONLINE' | 'STORE_CREDIT' | 'EXCHANGE' | 'OTHER';
+
+/** Money given back on an order, for its page. */
+export interface RefundDetail {
+  id: string;
+  amount: MoneyValue;
+  method: RefundMethod;
+  note: string;
+  reference: string | null;
+  createdAt: string;
+  receipt: { url: string; mimeType: string } | null;
+}
+
 export interface OrderDetail {
   id: string;
   name: string;
@@ -233,6 +247,8 @@ export interface OrderDetail {
   } | null;
   assignee: { name: string } | null;
   fulfillments: ParcelDetail[];
+  amountRefunded: MoneyValue;
+  refunds: RefundDetail[];
   returns: ReturnDetail[];
   events: {
     nodes: {

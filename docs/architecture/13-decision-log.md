@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-284 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-285 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -292,6 +292,7 @@
 | 282 | The admin's Returns section lists parcels on their way back, the longest first, checked in by the tracking number on their label or from the list, or marked lost; lost parcels with their worth, claimed from the courier; and the claims to follow up, settled as paid, refused or withdrawn | Accepted |
 | 283 | An order's page shows its parcels: courier and tracking number, items and the latest steps of their way; those who work orders mark one delivered or refused, add a step told of a courier Hatti does not follow, mark it lost after asking, or check it back in with what came back damaged written off | Accepted |
 | 284 | An order's page records its customer's return of delivered items, each with why, another variant sent at once in exchange if asked, checks it in with what is damaged written off or cancels it; customer returns on their way have a tab of their own; and a parcel back damaged is claimed from its courier | Accepted |
+| 285 | An order's page shows what was paid and given back, each refund with how, its reference, why and its receipt; owners and managers record a refund, at most what is left, by hand with its receipt uploaded, through the gateway or as store credit, and mark an order paid after saying how much it records | Accepted |
 
 ---
 
@@ -11722,3 +11723,37 @@
   * **Any variant of the shop for an exchange:** exchanges are nearly always another size of
     the same product, so the choice is that product's variants; a different product is a new
     order.
+
+## ADR-285 · An order's page shows what was paid and given back, each refund with how, its reference, why and its receipt; owners and managers record a refund, at most what is left, by hand with its receipt uploaded, through the gateway or as store credit, and mark an order paid after saying how much it records
+
+* **Context:** The core records money given back on an order, up to what was paid and not
+  refunded: sent by staff and recorded ([ADR-029](#adr-029--refunds-record-money-staff-sent-back-only-owners-and-managers-make-them)), with its receipt
+  ([ADR-242](#adr-242--a-refund-staff-sent-by-hand-may-keep-its-receipt-staged-as-any-upload-is-and-given-with-the-refund-its-order-keeps-it-among-its-receipts-never-as-one-of-the-shops-files-and-it-goes-with-the-customers-erasure-as-their-own-receipts-do)); sent back through the gateway the customer paid with
+  ([ADR-153](#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)); or credited to the customer's store credit ([ADR-184](#adr-184--a-shop-owes-its-customers-store-credit-as-shopify-keeps-it-an-account-for-each-customer-and-currency-credited-by-refunds-given-as-store-credit-or-by-hand-and-debited-by-hand-the-credits-that-expire-soonest-spent-first-its-balance-is-what-its-credits-have-left-unexpired-worked-out-when-asked-from-a-ledger-written-holding-the-accounts-lock-and-never-rewritten)). Only
+  owners and managers do so. It marks an order paid in full, as when cash came at the door or a
+  transfer was received. The order's page showed what was paid and to collect, and nothing of
+  refunds.
+* **Decision:**
+  * **Payments and refunds** is a section of the order's page for owners and managers, and for
+    anyone else once something was paid or given back: what was paid, what was refunded, and
+    each refund with how, when, its reference, why, and a link to its receipt.
+  * **"Refund"** shows while something paid is not given back. It asks how much, filled in with
+    all that is left and refused past it before it is sent; how (cash, bank transfer or Raast, a
+    JazzCash or Easypaisa wallet, back through the gateway, store credit, another way, the
+    gateway first for an order paid online); why; and, for money sent by hand, the transfer's
+    reference and its receipt, a photo, a screenshot or a PDF of up to 10 MB, uploaded as the
+    refund is recorded. Through the gateway or as store credit, the page says what happens
+    instead, and the core records its own reference.
+  * **"Mark as paid"** shows on an order not cancelled that has not been paid in full, and asks
+    first, saying how much it records received.
+  * Store credit's reference, its transaction's ID, is not shown; an exchange's names its order.
+* **Consequences:**
+  * A shop gives a delivery charge back by JazzCash and keeps the screenshot with the order, on
+    a phone, without a spreadsheet.
+  * What an exchange took of what was paid counts as given back, so a refund after it offers
+    only what is left.
+* **Alternatives:**
+  * **The receipt uploaded as it is chosen:** a receipt for a refund never recorded would sit
+    in storage; it goes up when the refund does.
+  * **Marking paid in one tap:** it records money received that the order then no longer asks
+    for, so it says how much first.

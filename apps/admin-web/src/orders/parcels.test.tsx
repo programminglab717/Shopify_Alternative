@@ -58,6 +58,8 @@ function order(fulfillments: unknown[]) {
       },
       risk: null,
       assignee: null,
+      amountRefunded: rupees('0'),
+      refunds: [],
       fulfillments,
       returns: [],
       events: { nodes: [] },

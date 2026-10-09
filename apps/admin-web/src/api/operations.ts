@@ -203,6 +203,23 @@ export const OrderQuery = /* GraphQL */ `
       amountPaid {
         ...Money
       }
+      amountRefunded {
+        ...Money
+      }
+      refunds {
+        id
+        amount {
+          ...Money
+        }
+        method
+        note
+        reference
+        createdAt
+        receipt {
+          url
+          mimeType
+        }
+      }
       codAmount {
         ...Money
       }
@@ -2494,6 +2511,33 @@ export const ReturnReceiveMutation = /* GraphQL */ `
 export const ReturnCancelMutation = /* GraphQL */ `
   mutation ReturnCancel($id: ID!) {
     returnCancel(id: $id) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Money given back on an order: sent first and recorded, through the gateway, or as store credit. */
+export const OrderRefundMutation = /* GraphQL */ `
+  mutation OrderRefund($id: ID!, $input: OrderRefundInput!) {
+    orderRefund(id: $id, input: $input) {
+      refund {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** An order recorded as paid in full: cash collected at the door, or a transfer received. */
+export const OrderMarkAsPaidMutation = /* GraphQL */ `
+  mutation OrderMarkAsPaid($id: ID!) {
+    orderMarkAsPaid(id: $id) {
       userErrors {
         ...Problems
       }

@@ -88,6 +88,8 @@ function order(fulfillments: unknown[], returns: unknown[]) {
       shippingAddress: { name: 'Ayesha', phone: '+923001234567', city: 'Lahore', formatted: [] },
       risk: null,
       assignee: null,
+      amountRefunded: rupees('0'),
+      refunds: [],
       fulfillments,
       returns,
       events: { nodes: [] },
