@@ -2014,3 +2014,54 @@ export interface CheckoutMarketingChannelsUpdateData {
     userErrors: UserError[];
   };
 }
+
+/** A row of an imported file the core could not take, the headings being row 1. */
+export interface FileRowError {
+  row: number;
+  column: string | null;
+  message: string;
+}
+
+export interface ProductsExportData {
+  productsExport: { csv: string; productCount: number; rowCount: number };
+}
+
+export interface ProductsImportResult {
+  dryRun: boolean;
+  rows: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  variants: number;
+  images: number;
+  stocked: number;
+  rowErrorCount: number;
+  rowErrors: FileRowError[];
+  userErrors: UserError[];
+}
+
+export interface ProductsImportData {
+  productsImport: ProductsImportResult;
+}
+
+export interface LocationsData {
+  locations: { nodes: { id: string; name: string; isPrimary: boolean }[] };
+}
+
+export interface InventoryExportData {
+  inventoryExport: { csv: string; productCount: number; rowCount: number };
+}
+
+export interface InventoryImportResult {
+  dryRun: boolean;
+  rows: number;
+  counted: number;
+  unchanged: number;
+  rowErrorCount: number;
+  rowErrors: FileRowError[];
+  userErrors: UserError[];
+}
+
+export interface InventoryImportData {
+  inventoryImport: InventoryImportResult;
+}

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileSpreadsheet, Search } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import {
@@ -572,13 +572,26 @@ function FindStock() {
  */
 export function StockPage() {
   const { t } = useLocale();
+  const { id: shopId, role } = useShop();
   const query = useAdminQuery<LowStockData>(['lowStock'], LowStockQuery);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
-        {t('stock.title')}
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
+          {t('stock.title')}
+        </h1>
+        {EDITS_STOCK.includes(role) && (
+          <Link
+            to="/$shopId/products/files"
+            params={{ shopId }}
+            className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
+          >
+            <FileSpreadsheet aria-hidden className="size-5" />
+            {t('files.countByFile')}
+          </Link>
+        )}
+      </div>
       {query.isPending ? (
         <Loading label={t('state.loading')} />
       ) : query.isError ? (

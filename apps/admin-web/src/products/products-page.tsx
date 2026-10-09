@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { ChevronRight, FolderOpen, PackageOpen, Plus, Search } from 'lucide-react';
+import { ChevronRight, FileSpreadsheet, FolderOpen, PackageOpen, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { ProductsQuery } from '../api/operations';
@@ -144,6 +144,16 @@ export function ProductsPage() {
             <FolderOpen aria-hidden className="size-5" />
             {t('collections.title')}
           </Link>
+          {edits && (
+            <Link
+              to="/$shopId/products/files"
+              params={{ shopId: shop.id }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
+            >
+              <FileSpreadsheet aria-hidden className="size-5" />
+              {t('files.title')}
+            </Link>
+          )}
           {edits && (
             <Link
               to="/$shopId/products/new"

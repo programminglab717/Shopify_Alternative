@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, products and stock by file in the admin** (CAT-05, ONB-05): products brought in from a
-Shopify product CSV and updated from one, exported to it, and stock counted in from a file
-and exported, each checked before anything changes; then the admin's next sections as the
-alpha's shops need them. Urdu handles wait, as decided.
+**Next, the shop's locations in the admin** (INV-01): its warehouses and shops added with their
+addresses, renamed, which fulfils online orders, deactivated and activated again, and deleted
+while they hold nothing; then the admin's next sections as the alpha's shops need them. Urdu
+handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,23 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Products and stock by file, in the admin
+
+* **Import and export** ([ADR-311](../architecture/13-decision-log.md#adr-311--the-admin-brings-products-in-from-shopifys-product-csv-and-exports-them-to-it-and-counts-stock-by-shopifys-inventory-csv-each-file-checked-first-and-taken-in-at-a-tap-on-a-page-of-its-own-beside-the-products-list-and-the-stock-page)), beside the products list and the stock page: products from
+  Shopify's product CSV, checked first; products exported to it; and stock exported as
+  Shopify's inventory CSV and counted back from it, checked first.
+* **Tried against the core:** on the seed's shop, its 12 products came as 26 rows of Shopify's
+  CSV, and the same file read back would leave all 12; a file of two products, one with a price
+  of "abc", was checked as one to add and that row refused, named; imported, its product came
+  as a draft with its stock tracked. The primary location's 21 rows of stock came as Shopify's
+  inventory CSV; with On hand (new) filled in for one, it was checked as one to count and
+  counted, the variant then holding 7. The first try's messages read "1 products" and "1
+  variants"; they now read as counts, for one or many. The products tried with were then
+  deleted. No errors in the browser.
+* 2229 tests: a product CSV checked, checked again to update, and imported; products a
+  search finds and one location's stock downloaded; a count checked and counted; a packer is
+  told it is for owners and managers.
 
 ### 95b72b2 · The checkout page, in the admin
 

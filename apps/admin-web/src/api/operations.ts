@@ -4521,3 +4521,86 @@ export const CheckoutMarketingChannelsUpdateMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** The shop's products as Shopify's product CSV, as a search finds them. */
+export const ProductsExportQuery = /* GraphQL */ `
+  query ProductsExport($query: String) {
+    productsExport(query: $query) {
+      csv
+      productCount
+      rowCount
+    }
+  }
+`;
+
+/** Products from Shopify's product CSV, checked first in a dry run. */
+export const ProductsImportMutation = /* GraphQL */ `
+  mutation ProductsImport($csv: String!, $dryRun: Boolean, $overwrite: Boolean) {
+    productsImport(csv: $csv, dryRun: $dryRun, overwrite: $overwrite) {
+      dryRun
+      rows
+      created
+      updated
+      skipped
+      variants
+      images
+      stocked
+      rowErrorCount
+      rowErrors {
+        row
+        column
+        message
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The shop's active locations, to export one's stock alone. */
+export const LocationsQuery = /* GraphQL */ `
+  query Locations {
+    locations(first: 50) {
+      nodes {
+        id
+        name
+        isPrimary
+      }
+    }
+  }
+`;
+
+/** The shop's stock as Shopify's inventory CSV, for a count in a spreadsheet. */
+export const InventoryExportQuery = /* GraphQL */ `
+  query InventoryExport($locationId: ID, $query: String) {
+    inventoryExport(locationId: $locationId, query: $query) {
+      csv
+      productCount
+      rowCount
+    }
+  }
+`;
+
+/** A stock count from Shopify's inventory CSV, checked first in a dry run. */
+export const InventoryImportMutation = /* GraphQL */ `
+  mutation InventoryImport($csv: String!, $dryRun: Boolean) {
+    inventoryImport(csv: $csv, dryRun: $dryRun) {
+      dryRun
+      rows
+      counted
+      unchanged
+      rowErrorCount
+      rowErrors {
+        row
+        column
+        message
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

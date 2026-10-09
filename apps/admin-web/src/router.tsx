@@ -62,6 +62,7 @@ import { TaxPage } from './settings/tax-page';
 import { MessagesPage } from './settings/messages-page';
 import { OrderPoliciesPage } from './settings/order-policies-page';
 import { CheckoutPage } from './settings/checkout-page';
+import { ProductFilesPage } from './products/files-page';
 import { BankTransferPage } from './settings/bank-transfer-page';
 import { BillingPage } from './settings/billing-page';
 import { CashOnDeliveryPage } from './settings/cash-on-delivery-page';
@@ -215,6 +216,12 @@ const newProduct = createRoute({
   getParentRoute: () => shop,
   path: 'products/new',
   component: NewProductPage,
+});
+
+const productFiles = createRoute({
+  getParentRoute: () => shop,
+  path: 'products/files',
+  component: ProductFilesPage,
 });
 
 const product = createRoute({
@@ -562,6 +569,7 @@ export const routeTree = root.addChildren([
     desk,
     products,
     newProduct,
+    productFiles,
     product,
     customers,
     customer,

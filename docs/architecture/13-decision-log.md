@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-310 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-311 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -318,6 +318,7 @@
 | 308 | The admin sets the shop's order policies in settings: the Confirmation Desk's calling hours, its target for the first call and whether it waits for WhatsApp; after how many days unpaid and unreachable orders are cancelled; until when customers may cancel; and the high-value amount and the risk score that holds an order for review | Accepted |
 | 309 | The admin adds a customer by hand, records the marketing they agreed to in their words, merges a duplicate into them once asked, and, at their request, downloads their data and erases them ten days on, once the member confirms who they are; the erasures waiting are listed, and each cancelled from its customer | Accepted |
 | 310 | The admin sets the checkout page in settings: up to four badges under its button, in the shop's order, with the days for exchanges and returns, Help on WhatsApp offered only with the shop's number; and the boxes it offers for the shop's offers, by channel | Accepted |
+| 311 | The admin brings products in from Shopify's product CSV and exports them to it, and counts stock by Shopify's inventory CSV, each file checked first and taken in at a tap, on a page of its own beside the products list and the stock page | Accepted |
 
 ---
 
@@ -12573,3 +12574,31 @@
 * **Alternatives:**
   * **Badges in the theme editor:** the checkout is the platform's page, not the theme's, and
     the badges are a setting of the shop's, worded by the platform in English and Urdu.
+
+## ADR-311 · The admin brings products in from Shopify's product CSV and exports them to it, and counts stock by Shopify's inventory CSV, each file checked first and taken in at a tap, on a page of its own beside the products list and the stock page
+
+* **Context:** The core imports Shopify's product CSV (ONB-05, CAT-05): products with their
+  options, variants, prices, SKUs, tags, images by address and tracked stock, those the shop has
+  left alone or, when asked, updated from the file; and exports the shop's products to the same
+  file, as a search finds them. It exports stock as Shopify's inventory CSV, at one location or
+  all, for a count in a spreadsheet, and counts it back from On hand (new), never over stock that
+  sold since. Each import has a dry run that checks the file and counts. A shop moving from
+  Shopify starts here. The admin had none of it.
+* **Decision:**
+  * **Import and export** is a page of its own, linked from the products list as that and from
+    the stock page as Count by file, for owners and managers.
+  * **Import products:** a CSV chosen from the phone is checked at once, saying in counts that
+    read for one or many what it would add, update and leave, and the variants it would make,
+    with the first rows it could not read and why; it is taken in at a tap. Updating the
+    products the shop has is a choice, which checks the file again.
+  * **Export products:** all, or those a search finds as the products list searches, saved as
+    products_export.csv.
+  * **Count stock by file:** one location's stock or every one's, saved as
+    inventory_export.csv; the filled-in file is checked, saying what it would count and leave,
+    and counted at a tap.
+* **Consequences:**
+  * A shop leaving Shopify brings its catalogue and stock across from a phone in a few minutes,
+    and counts its warehouse in a spreadsheet.
+* **Alternatives:**
+  * **Import straight away:** a file with a shifted column would change many products before
+    anyone saw what it would do.

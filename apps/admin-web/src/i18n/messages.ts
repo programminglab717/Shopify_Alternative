@@ -2349,6 +2349,42 @@ const en = {
   'checkoutPage.box.EMAIL': 'Offers by email',
   'checkoutPage.save': 'Save checkout page',
   'checkoutPage.saved': 'Saved. The checkout shows it in a moment.',
+  'files.title': 'Import and export',
+  'files.cannot': 'Owners and managers bring products in and out by file.',
+  'files.countByFile': 'Count by file',
+  'files.importProducts': 'Import products',
+  'files.importProductsHint':
+    "From Shopify's product export, as CSV: products with their options, variants, prices, SKUs, tags, images by address and stock. We check the file first and say what it would do.",
+  'files.overwrite': 'Update products I have already',
+  'files.overwriteHint':
+    'Products whose handles you have are updated from the file, their options the same; otherwise they are left as they are.',
+  'files.choose': 'Choose a CSV file',
+  'files.productsFile': 'Products file',
+  'files.productsChecked':
+    '{name}, rows: {rows}. Products to add: {created}; to update: {updated}; to leave as they are: {skipped}. Variants to make: {variants}.',
+  'files.importProductsConfirm': 'Import them',
+  'files.productsImported':
+    'Imported. Products added: {created}; updated: {updated}; left as they were: {skipped}. Images: {images}. Variants given stock: {stocked}.',
+  'files.exportProducts': 'Export products',
+  'files.exportProductsHint':
+    "As Shopify's product CSV, for a backup, an edit in a spreadsheet, or another shop. Up to 5,000 rows a file.",
+  'files.which': 'Which products',
+  'files.whichPlaceholder': 'All, or search as the products list does: tag:eid',
+  'files.downloadProducts': 'Download products',
+  'files.productsExported': 'Saved. Products: {products}; rows: {rows}.',
+  'files.stock': 'Count stock by file',
+  'files.stockHint':
+    "Download your stock as Shopify's inventory CSV, fill in On hand (new) in a spreadsheet, and bring it back. Stock that sold since you downloaded it is not counted over.",
+  'files.location': 'Location',
+  'files.everyLocation': 'Every location',
+  'files.downloadStock': 'Download stock',
+  'files.stockExported': 'Saved. Rows to count: {rows}.',
+  'files.chooseCount': 'Choose a counted file',
+  'files.stockFile': 'Stock count file',
+  'files.stockChecked':
+    '{name}, rows: {rows}. To count: {counted}; to leave as they are: {unchanged}.',
+  'files.countConfirm': 'Count them',
+  'files.counted': 'Counted: {counted}; left as they were: {unchanged}.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -4680,6 +4716,42 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'checkoutPage.box.EMAIL': 'ای میل پر آفرز',
   'checkoutPage.save': 'چیک آؤٹ پیج محفوظ کریں',
   'checkoutPage.saved': 'محفوظ ہو گیا۔ چیک آؤٹ تھوڑی دیر میں دکھائے گا۔',
+  'files.title': 'امپورٹ اور ایکسپورٹ',
+  'files.cannot': 'مالکان اور مینیجرز فائل سے پروڈکٹس لاتے اور نکالتے ہیں۔',
+  'files.countByFile': 'فائل سے گنتی',
+  'files.importProducts': 'پروڈکٹس امپورٹ کریں',
+  'files.importProductsHint':
+    'شاپیفائی کے پروڈکٹ ایکسپورٹ سے، CSV میں: پروڈکٹس اپنے آپشنز، اقسام، قیمتوں، SKU، ٹیگز، ایڈریس سے تصاویر اور اسٹاک کے ساتھ۔ ہم پہلے فائل جانچ کر بتاتے ہیں کہ یہ کیا کرے گی۔',
+  'files.overwrite': 'میرے پاس پہلے سے موجود پروڈکٹس اپ ڈیٹ کریں',
+  'files.overwriteHint':
+    'جن پروڈکٹس کے ہینڈل آپ کے پاس ہیں وہ فائل سے اپ ڈیٹ ہوتے ہیں، ان کے آپشنز وہی رہیں؛ ورنہ ویسے ہی چھوڑ دیے جاتے ہیں۔',
+  'files.choose': 'CSV فائل چنیں',
+  'files.productsFile': 'پروڈکٹس فائل',
+  'files.productsChecked':
+    '{name}، قطاریں: {rows}۔ شامل کرنے کو پروڈکٹس: {created}؛ اپ ڈیٹ کرنے کو: {updated}؛ ویسے ہی چھوڑنے کو: {skipped}۔ بنانے کو اقسام: {variants}۔',
+  'files.importProductsConfirm': 'امپورٹ کریں',
+  'files.productsImported':
+    'امپورٹ ہو گیا۔ شامل پروڈکٹس: {created}؛ اپ ڈیٹ: {updated}؛ ویسے ہی: {skipped}۔ تصاویر: {images}۔ اسٹاک والی اقسام: {stocked}۔',
+  'files.exportProducts': 'پروڈکٹس ایکسپورٹ کریں',
+  'files.exportProductsHint':
+    'شاپیفائی کی پروڈکٹ CSV میں، بیک اپ، اسپریڈشیٹ میں ترمیم یا کسی اور دکان کے لیے۔ ایک فائل میں 5,000 قطاروں تک۔',
+  'files.which': 'کون سے پروڈکٹس',
+  'files.whichPlaceholder': 'سب، یا پروڈکٹس کی فہرست کی طرح تلاش کریں: tag:eid',
+  'files.downloadProducts': 'پروڈکٹس ڈاؤن لوڈ کریں',
+  'files.productsExported': 'محفوظ۔ پروڈکٹس: {products}؛ قطاریں: {rows}۔',
+  'files.stock': 'فائل سے اسٹاک گنیں',
+  'files.stockHint':
+    'اپنا اسٹاک شاپیفائی کی انوینٹری CSV میں ڈاؤن لوڈ کریں، اسپریڈشیٹ میں On hand (new) بھریں، اور واپس لائیں۔ ڈاؤن لوڈ کے بعد بکنے والا اسٹاک دوبارہ نہیں گنا جاتا۔',
+  'files.location': 'مقام',
+  'files.everyLocation': 'ہر مقام',
+  'files.downloadStock': 'اسٹاک ڈاؤن لوڈ کریں',
+  'files.stockExported': 'محفوظ۔ گننے کو قطاریں: {rows}۔',
+  'files.chooseCount': 'گنی ہوئی فائل چنیں',
+  'files.stockFile': 'اسٹاک گنتی فائل',
+  'files.stockChecked':
+    '{name}، قطاریں: {rows}۔ گننے کو: {counted}؛ ویسے ہی چھوڑنے کو: {unchanged}۔',
+  'files.countConfirm': 'گنیں',
+  'files.counted': 'گنے گئے: {counted}؛ ویسے ہی رہے: {unchanged}۔',
 };
 
 export const messages: Readonly<
