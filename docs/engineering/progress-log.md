@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### A product's options and variants, in the admin
+### 8f05713 · A product's options and variants, in the admin
 
 * **Options and variants** ([ADR-313](../architecture/13-decision-log.md#adr-313--the-admin-changes-a-products-options-and-variants-after-it-was-made-an-option-renamed-values-added-and-deleted-where-no-variant-uses-them-an-option-added-with-a-variant-for-every-new-combination-if-asked-or-taken-away-where-its-variants-stay-apart-variants-added-for-combinations-it-lacks-and-deleted-one-always-kept)) on the product page: options renamed, given values and
   values removed, added and taken away; variants added for combinations the product lacks and
