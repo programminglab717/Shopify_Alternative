@@ -4229,3 +4229,72 @@ export const ConversionEventsQuery = /* GraphQL */ `
     }
   }
 `;
+
+const MESSAGING_SETTINGS = /* GraphQL */ `
+  fragment MessagingSettingsParts on MessagingSettings {
+    routing
+    language
+    disabledNotifications
+    alertsPhone
+    updatedAt
+  }
+`;
+
+/** How the shop's customers are told of their orders, and what a message costs it. */
+export const MessagingSettingsQuery = /* GraphQL */ `
+  query MessagingSettings {
+    messagingSettings {
+      ...MessagingSettingsParts
+    }
+    billingMessagePrices {
+      category
+      channel
+      price {
+        amount
+        currencyCode
+      }
+    }
+  }
+  ${MESSAGING_SETTINGS}
+`;
+
+/** How the shop's customers are told of their orders, changed. */
+export const MessagingSettingsUpdateMutation = /* GraphQL */ `
+  mutation MessagingSettingsUpdate($input: MessagingSettingsInput!) {
+    messagingSettingsUpdate(input: $input) {
+      messagingSettings {
+        ...MessagingSettingsParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${MESSAGING_SETTINGS}
+  ${USER_ERRORS}
+`;
+
+/** The latest messages about the shop's orders, or one order's, and how sending each went. */
+export const MessagesQuery = /* GraphQL */ `
+  query Messages($orderId: ID, $status: MessageStatus) {
+    messages(first: 50, orderId: $orderId, status: $status) {
+      nodes {
+        id
+        kind
+        channel
+        status
+        recipient
+        orderId
+        error
+        attempts
+        createdAt
+        sentAt
+        deliveredAt
+        readAt
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+`;

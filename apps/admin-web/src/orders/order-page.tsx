@@ -32,6 +32,7 @@ import { READS_CUSTOMERS } from '../customers/customers-page';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { OrderMessages } from '../settings/messages-page';
 import { Assignment, DeliveryAddress, NoteAndTags, Timeline } from './details';
 import { OrderItems } from './edit-order';
 import { HANDLES_MONEY, OrderMoney } from './money';
@@ -297,6 +298,9 @@ export function OrderPage() {
           )}
           <Section title={t('order.timeline')}>
             <Timeline order={order} timezone={timezone} />
+          </Section>
+          <Section title={t('messages.sentForOrder')}>
+            <OrderMessages orderId={order.id} />
           </Section>
         </div>
         <div className="flex flex-col gap-4">

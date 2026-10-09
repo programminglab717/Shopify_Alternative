@@ -394,7 +394,7 @@ export function MetaTab() {
         ) : (
           <p className="font-medium">{t('meta.notConnected')}</p>
         )}
-        <MetaForm key={current?.updatedAt ?? 'none'} current={current} />
+        <MetaForm current={current} />
         {current && <Disconnect pixelId={current.pixelId} />}
       </FormSection>
       {current && <EventsList />}

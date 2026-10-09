@@ -7,6 +7,7 @@ import {
   Landmark,
   LifeBuoy,
   MapPin,
+  MessageSquareText,
   Percent,
   Receipt,
   Store,
@@ -45,6 +46,7 @@ interface Section {
     | '/$shopId/settings/activity'
     | '/$shopId/settings/support'
     | '/$shopId/settings/tax'
+    | '/$shopId/settings/messages'
     | '/$shopId/settings/couriers'
     | '/$shopId/settings/staff';
   label: MessageKey;
@@ -90,6 +92,12 @@ const SECTIONS: readonly Section[] = [
     icon: CreditCard,
   },
   {
+    to: '/$shopId/settings/messages',
+    label: 'settings.messages',
+    hint: 'settings.messagesHint',
+    icon: MessageSquareText,
+  },
+  {
     to: '/$shopId/settings/couriers',
     label: 'settings.couriers',
     hint: 'settings.couriersHint',
@@ -121,7 +129,7 @@ const SECTIONS: readonly Section[] = [
   },
 ];
 
-/** Settings (docs/design/02 §4), as far as they are built: the shop, delivery and payments, sales tax, couriers, staff, billing, activity and support access. */
+/** Settings (docs/design/02 §4), as far as they are built: the shop, delivery and payments, sales tax, customer messages, couriers, staff, billing, activity and support access. */
 export function SettingsPage() {
   const { t } = useLocale();
   const shopId = useShop().id;

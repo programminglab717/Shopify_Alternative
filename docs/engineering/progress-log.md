@@ -6,10 +6,11 @@
 
 ## In progress
 
-**Next, how customers are told, in the admin** (MSG-01, MSG-03): the messages the shop sends
-its customers, on WhatsApp, by SMS or by email, which of them it turns off, their language,
-where Hatti's alerts to the shop go, and the messages sent; then the order and risk settings,
-and the admin's next sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, the order and risk settings in the admin** (COD-05, COD-06, ORD-01): the Confirmation
+Desk's calling hours, its target for the first call and whether it waits for WhatsApp; when
+unpaid and unreachable orders are cancelled; how customers may cancel; which orders count as
+high value and the risk score that holds an order for review; then the admin's next sections as
+the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +19,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Customer messages, in the admin
+
+* **Customer messages** ([ADR-307](../architecture/13-decision-log.md#adr-307--the-admin-sets-how-the-shops-customers-are-told-of-their-orders-in-settings-whatsapp-for-everything-or-sms-for-updates-each-with-its-price-the-messages-language-which-messages-go-to-customers-and-to-the-shop-and-the-alerts-number-it-lists-the-messages-sent-by-status-and-an-orders-page-shows-its-own-once-asked)) in settings: WhatsApp for everything or SMS for updates, each
+  with its price; the messages' language; which go to customers and to the shop; the alerts
+  number; and the messages sent, by status. An order's page shows its own, once asked.
+* **Tried against the core:** on the seed's shop, the prices read Rs 4.62 a WhatsApp message
+  and Rs 1.73 an SMS part; an alerts number of five digits was refused, named on the page; SMS
+  for updates, Order shipped turned off and 0300 1234567 were kept as economy, order_shipped
+  and +923001234567. The 42 messages sent were listed, and an order's three shown on its page.
+  The shop's settings were then taken back to the defaults it had. No errors in the browser.
+* 2200 tests: each way with its price, what changed sent alone, a refused number named; the
+  messages listed by status with their orders; an order's asked for only once tapped. The Meta
+  form now keeps its saved notice, as this one does.
 
 ### 7e0a3a5 · Meta and the catalog feed, in the admin
 

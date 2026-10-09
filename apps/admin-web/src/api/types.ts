@@ -1868,3 +1868,46 @@ export interface ConversionEvent {
 export interface ConversionEventsData {
   conversionEvents: { nodes: ConversionEvent[]; pageInfo: { hasNextPage: boolean } };
 }
+
+export type MessageRouting = 'RICH' | 'ECONOMY';
+export type MessageLanguage = 'EN' | 'UR';
+export type MessageChannel = 'WHATSAPP' | 'SMS' | 'EMAIL';
+export type MessageStatus = 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED' | 'SKIPPED';
+
+/** How the shop's customers are told of their orders (MSG-01, ADR-146). */
+export interface MessagingSettings {
+  routing: MessageRouting;
+  language: MessageLanguage;
+  disabledNotifications: string[];
+  alertsPhone: string | null;
+  updatedAt: string | null;
+}
+
+export interface MessagingSettingsData {
+  messagingSettings: MessagingSettings;
+  billingMessagePrices: { category: string; channel: MessageChannel; price: MoneyValue }[];
+}
+
+export interface MessagingSettingsUpdateData {
+  messagingSettingsUpdate: { messagingSettings: MessagingSettings | null; userErrors: UserError[] };
+}
+
+/** A message about an order, and how sending it went. */
+export interface SentMessage {
+  id: string;
+  kind: string;
+  channel: MessageChannel;
+  status: MessageStatus;
+  recipient: string;
+  orderId: string | null;
+  error: string | null;
+  attempts: number;
+  createdAt: string;
+  sentAt: string | null;
+  deliveredAt: string | null;
+  readAt: string | null;
+}
+
+export interface MessagesData {
+  messages: { nodes: SentMessage[]; pageInfo: { hasNextPage: boolean } };
+}

@@ -185,6 +185,7 @@ describe('Meta and the catalog feed', () => {
     expect(
       await screen.findByText(/Test events show in Events Manager under code TEST4821\./),
     ).toBeTruthy();
+    expect(screen.getByText('Saved. Orders placed from now on go to Meta like this.')).toBeTruthy();
     expect(sentOf(fake, 'MetaConversionsUpdate')).toEqual([
       { input: { testEventCode: 'TEST4821' } },
       { input: { testEventCode: 'TEST4821' } },

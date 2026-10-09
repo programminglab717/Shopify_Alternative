@@ -103,6 +103,28 @@ function core(role: StaffRole, answer = order()) {
         return ok('orderCommentDelete');
       case 'OrderUpdate':
         return ok('orderUpdate');
+      case 'Messages':
+        return {
+          messages: {
+            nodes: [
+              {
+                id: 'msg_1',
+                kind: 'ORDER_CONFIRMATION_REMINDER',
+                channel: 'WHATSAPP',
+                status: 'DELIVERED',
+                recipient: '+92300*****67',
+                orderId: 'ord_7',
+                error: null,
+                attempts: 1,
+                createdAt: LATER,
+                sentAt: LATER,
+                deliveredAt: LATER,
+                readAt: null,
+              },
+            ],
+            pageInfo: { hasNextPage: false },
+          },
+        };
       default:
         throw new Error(`unexpected ${operation}`);
     }
@@ -266,5 +288,22 @@ describe("An order's everyday edits, on its page", () => {
     expect(screen.queryByLabelText('Comment')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Take it' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+  });
+
+  it('shows what its customer was told, once asked', async () => {
+    const fake = core('confirmation_agent');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    const messages = await screen.findByRole('region', { name: 'Messages' });
+    expect(fake.sent.some((each) => each.operation === 'Messages')).toBe(false);
+    fireEvent.click(within(messages).getByRole('button', { name: 'Show the messages sent' }));
+    expect(await within(messages).findByText('Reminder to confirm')).toBeTruthy();
+    expect(within(messages).getByText('Delivered')).toBeTruthy();
+    expect(within(messages).queryByRole('link', { name: 'Its order' })).toBeNull();
+    expect(fake.sent.filter((each) => each.operation === 'Messages').at(-1)?.variables).toEqual({
+      orderId: 'ord_7',
+      status: null,
+    });
   });
 });

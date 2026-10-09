@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-306 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-307 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -314,6 +314,7 @@
 | 304 | The admin exports the orders the list shows, its tab and search, between two days in the shop's time zone, as Excel or CSV, a row per order or per item, once the member has confirmed who they are; and schedules the same of each day, week or month, emailed at an hour, listed and stopped | Accepted |
 | 305 | The admin sets the shop's sales tax in settings: whether it charges it and at what rate, included in its prices, with an example of what a price holds; on delivery too; the NTN and STRN its invoices name; and categories with rates of their own, which a product's page gives its variants | Accepted |
 | 306 | The admin gives the shop's catalog feed and its Meta dataset a tab of the online store: the feed's address to copy; Meta connected with its dataset's ID and a token, sealed, which moment of an order is Purchase, and a code for test events, once the member confirms who they are; disconnected once asked; and the moments sent, by status | Accepted |
+| 307 | The admin sets how the shop's customers are told of their orders in settings: WhatsApp for everything or SMS for updates, each with its price, the messages' language, which messages go to customers and to the shop, and the alerts number; it lists the messages sent, by status, and an order's page shows its own once asked | Accepted |
 
 ---
 
@@ -12450,3 +12451,31 @@
 * **Alternatives:**
   * **In settings:** the online store is where marketers already work, and settings are owners'
     and managers' alone.
+
+## ADR-307 · The admin sets how the shop's customers are told of their orders in settings: WhatsApp for everything or SMS for updates, each with its price, the messages' language, which messages go to customers and to the shop, and the alerts number; it lists the messages sent, by status, and an order's page shows its own once asked
+
+* **Context:** Hatti tells a shop's customers of their orders from its shared WhatsApp number,
+  or by SMS where the shop saves or WhatsApp cannot deliver (MSG-01, ADR-146), paid from the
+  shop's message credit (ADR-155), and by email too where they gave one (ADR-181). The shop
+  chooses WhatsApp for everything or SMS for updates that need no answer, the messages'
+  language, which messages it turns off, and the number Hatti's alerts to it go to (ADR-157,
+  ADR-169); codes at checkout and Hatti's notices about its bills always go. Owners and managers
+  change it; staff who read orders read the messages sent. The admin had none of it.
+* **Decision:**
+  * **Customer messages** is a section of settings. How they go is a choice of two, each with
+    what a message costs, from the core's prices: WhatsApp for everything, or SMS for updates,
+    confirmations and reminders still on WhatsApp with their buttons. Then the language.
+  * **Messages to customers** and **messages to you and your staff** are lists to tick, each
+    saying when it goes; the alerts number sits with the second. What always goes is said
+    beneath. Only what changed is sent, and the core's refusals are named by their field.
+  * **Messages sent** lists the latest 50, all or by status: what each was, how it went, by
+    which channel, to whom, as masked as the member sees numbers, when, the tries, why one
+    failed, and its order.
+  * **An order's page** has its messages behind a button, so opening an order asks for nothing
+    more until staff want to see what its customer was told.
+* **Consequences:**
+  * A shop watching its credit sends updates by SMS and keeps WhatsApp for confirmations, and
+    sees which customers' numbers fail.
+* **Alternatives:**
+  * **An order's messages loaded with its page:** one request more on the page staff open most,
+    for something they look at rarely.
