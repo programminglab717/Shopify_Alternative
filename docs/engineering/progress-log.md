@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The admin installed on a phone, and offline
+### 2b350b7 · The admin installed on a phone, and offline
 
 * **Installing** ([ADR-295](../architecture/13-decision-log.md#adr-295--the-admin-installs-on-a-phone-from-a-manifest-in-its-language-with-png-and-maskable-icons-and-a-service-worker-built-with-it-keeps-the-admins-own-files-its-page-from-the-network-and-offline-from-the-cache-its-files-from-the-cache-the-shops-data-never-it-says-when-the-phone-is-offline-and-offers-a-new-version-once-it-has-installed)): the manifest in English or Urdu as the admin is, with PNG and
   maskable icons, and an icon for iOS's home screen.
