@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Visits in the admin's analytics
+### f348ae2 · Visits in the admin's analytics
 
 * **The online store's visits beside its sales** ([ADR-329](../architecture/13-decision-log.md#adr-329--the-admins-analytics-show-the-online-stores-visits-beside-its-sales-who-is-on-it-now-asked-again-every-half-minute-and-the-periods-sessions-against-the-period-as-long-before-asked-in-one-document-with-how-far-they-went-towards-an-order)): the analytics page opens on who is on
   the store now, sessions that saw a page in the last five minutes, and today's sessions, those
