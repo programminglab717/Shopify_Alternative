@@ -4958,6 +4958,18 @@ export const ProductSavedSearchesQuery = /* GraphQL */ `
   ${SAVED_SEARCH}
 `;
 
+/** The searches of the drafts list its staff saved (ORD-03). */
+export const DraftOrderSavedSearchesQuery = /* GraphQL */ `
+  query DraftOrderSavedSearches {
+    savedSearches: draftOrderSavedSearches(first: 100) {
+      nodes {
+        ...Saved
+      }
+    }
+  }
+  ${SAVED_SEARCH}
+`;
+
 /** A search of a list kept by name for all the shop's staff (ORD-01, CAT-04). */
 export const SavedSearchCreateMutation = /* GraphQL */ `
   mutation SavedSearchCreate($input: SavedSearchCreateInput!) {

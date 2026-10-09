@@ -1,12 +1,14 @@
 import { Link } from '@tanstack/react-router';
-import { ChevronRight, FilePen, Plus } from 'lucide-react';
+import { ChevronRight, FilePen, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { DraftOrdersQuery } from '../api/operations';
 import type { DraftOrdersData } from '../api/types';
 import type { StaffRole } from '../auth/session';
 import { errorText } from '../i18n/errors';
 import { formatMoney, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
+import { SavedSearches } from '../shell/saved-searches';
 import { useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
@@ -18,16 +20,29 @@ type Status = 'OPEN' | 'COMPLETED';
 
 /**
  * Draft orders (ORD-03): those still open, put together in a chat or on a call and waiting for
- * the customer, and those placed; each opens its own page.
+ * the customer, and those placed; searched by number, mobile or the customer's name, with filters
+ * and the searches the shop's staff saved; each opens its own page.
  */
 export function DraftsPage() {
   const { t, locale } = useLocale();
   const shop = useShop();
   const timezone = useShopTimezone();
   const [status, setStatus] = useState<Status>('OPEN');
-  const query = useAdminQuery<DraftOrdersData>(['draftOrders', status], DraftOrdersQuery, {
-    status,
-  });
+  const [words, setWords] = useState('');
+  const [q, setQ] = useState<string | undefined>();
+  const query = useAdminQuery<DraftOrdersData>(
+    ['draftOrders', status, q ?? null],
+    DraftOrdersQuery,
+    {
+      status,
+      query: q ?? null,
+    },
+  );
+
+  const onSearch = (event: FormEvent) => {
+    event.preventDefault();
+    setQ(words.trim() || undefined);
+  };
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">
@@ -46,6 +61,29 @@ export function DraftsPage() {
           </Link>
         )}
       </div>
+      <form onSubmit={onSearch} role="search" className="relative">
+        <Search
+          aria-hidden
+          className="pointer-events-none absolute start-3 top-1/2 size-5 -translate-y-1/2 text-secondary"
+        />
+        <input
+          type="search"
+          value={words}
+          onChange={(event) => setWords(event.target.value)}
+          aria-label={t('drafts.search')}
+          placeholder={t('drafts.searchHint')}
+          className="min-h-12 w-full rounded-control border border-line bg-surface ps-10 pe-3 md:min-h-10"
+        />
+      </form>
+      <SavedSearches
+        resource="DRAFT_ORDER"
+        query={q}
+        manages={TAKES_DRAFTS.includes(shop.role)}
+        onApply={(next) => {
+          setWords(next ?? '');
+          setQ(next);
+        }}
+      />
       <div role="tablist" className="flex gap-2">
         {(['OPEN', 'COMPLETED'] as const).map((each) => (
           <button
@@ -73,8 +111,12 @@ export function DraftsPage() {
         <Card>
           <EmptyState
             icon={<FilePen aria-hidden className="size-8 text-secondary" />}
-            title={t(status === 'OPEN' ? 'drafts.noneOpen' : 'drafts.noneCompleted')}
-            body={t('drafts.noneBody')}
+            title={
+              q
+                ? t('drafts.noneFound')
+                : t(status === 'OPEN' ? 'drafts.noneOpen' : 'drafts.noneCompleted')
+            }
+            body={q ? undefined : t('drafts.noneBody')}
           />
         </Card>
       ) : (

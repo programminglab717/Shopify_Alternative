@@ -2563,6 +2563,9 @@ const en = {
   'themes.platform': "Hatti's theme, as it comes",
   'themes.name': 'Name',
   'themes.addSubmit': 'Add theme',
+  'drafts.search': 'Search drafts',
+  'drafts.searchHint': 'Number, mobile or name; or tag:gift, source:whatsapp',
+  'drafts.noneFound': 'No drafts match this search.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5106,6 +5109,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'themes.platform': 'ہٹی کی تھیم، جیسی ہے',
   'themes.name': 'نام',
   'themes.addSubmit': 'تھیم شامل کریں',
+  'drafts.search': 'ڈرافٹس تلاش کریں',
+  'drafts.searchHint': 'نمبر، موبائل یا نام؛ یا tag:gift، source:whatsapp',
+  'drafts.noneFound': 'اس تلاش سے کوئی ڈرافٹ نہیں ملا۔',
 };
 
 export const messages: Readonly<

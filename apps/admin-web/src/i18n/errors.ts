@@ -11,6 +11,8 @@ export function errorText(error: unknown, t: Translate): string {
     const key = `error.${error.code}`;
     if (key in messages.en) return t(key as MessageKey);
     if (error.fields[0]) return error.fields[0].message;
+    // The API's own words for input it refuses, such as a search filter it does not know.
+    if (error.code === 'BAD_USER_INPUT' && error.message) return error.message;
     if (error.status >= 400 && error.status < 500 && error.message) return error.message;
   }
   return t('state.error');

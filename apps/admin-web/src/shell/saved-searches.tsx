@@ -2,6 +2,7 @@ import { Bookmark, BookmarkPlus, Pencil, Save, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  DraftOrderSavedSearchesQuery,
   OrderSavedSearchesQuery,
   ProductSavedSearchesQuery,
   SavedSearchCreateMutation,
@@ -17,11 +18,12 @@ import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { useAdminMutation, useAdminQuery } from './shop-context';
 
-type Resource = 'ORDER' | 'PRODUCT';
+type Resource = 'ORDER' | 'PRODUCT' | 'DRAFT_ORDER';
 
 const QUERIES: Record<Resource, string> = {
   ORDER: OrderSavedSearchesQuery,
   PRODUCT: ProductSavedSearchesQuery,
+  DRAFT_ORDER: DraftOrderSavedSearchesQuery,
 };
 
 /** The fields the core's refusals name. */

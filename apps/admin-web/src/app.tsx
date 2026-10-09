@@ -11,6 +11,7 @@ import { createAdminRouter } from './router';
 /** Whether a failed query is worth trying again: not when the API refused it for a reason. */
 function retry(failures: number, error: unknown): boolean {
   if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false;
+  if (error instanceof ApiError && error.code === 'BAD_USER_INPUT') return false;
   return failures < 2;
 }
 

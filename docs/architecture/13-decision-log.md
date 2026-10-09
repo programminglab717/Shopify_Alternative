@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-320 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-321 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -328,6 +328,7 @@
 | 318 | The admin describes each product photo for screen readers and search engines, from a pencil on its tile, the description shown beneath it | Accepted |
 | 319 | The admin connects the shop's own domains in settings, saying which record to add where it was bought, checks them again, makes a connected one primary or not, and lets one go once asked; the Hatti address is always shown | Accepted |
 | 320 | The admin lists the shop's themes in the online store, the live one first, each previewed through its link, and adds a copy of one or the platform theme afresh, publishes one once asked, and deletes those not live | Accepted |
+| 321 | The admin searches the drafts list, with its saved searches as on orders and products, and shows a search the core refuses in the core's words at once, without trying it again | Accepted |
 
 ---
 
@@ -12832,3 +12833,24 @@
 * **Alternatives:**
   * **Themes beside the theme editor, when it comes:** the editor changes one theme's files;
     choosing, copying and publishing themes is the step before it, worth having now.
+
+## ADR-321 · The admin searches the drafts list, with its saved searches as on orders and products, and shows a search the core refuses in the core's words at once, without trying it again
+
+* **Context:** The core searches drafts by number, mobile and the customer's words, with
+  filters of status, source, payment method and tag (ADR-123), and keeps saved searches of the
+  drafts list as of orders and products (ADR-124). The admin's drafts list had only its Open and
+  Placed tabs, so saved searches (ADR-316) left drafts out. A search with a filter the list does
+  not know is refused as BAD_USER_INPUT with words naming the filters there are; the admin tried
+  such a refusal twice more, as it does a lost connection, and then said to check the connection.
+* **Decision:**
+  * **The drafts list** gains a search, and the saved searches of drafts between it and its tabs,
+    saved and changed by those who take drafts, as on orders and products. A search that finds
+    nothing says so.
+  * **A refusal of input** is shown in the core's words, on every page, as the API's other
+    refusals are, and is not tried again: it would be refused the same.
+* **Consequences:**
+  * An agent keeps "WhatsApp drafts" a tap away, and a mistyped filter says which filters there
+    are at once instead of a connection error seconds later.
+* **Alternatives:**
+  * **The drafts search in the address, as on orders:** a link to a search, but the drafts list's
+    tabs live in the page, and saved searches give the same quick way back.

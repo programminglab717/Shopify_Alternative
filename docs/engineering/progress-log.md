@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, the drafts list searched in the admin** (ORD-03): drafts found by name, customer and
-status, with the list's saved searches as on orders and products; then the admin's next
-sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, the admin answering a change before the shop's lists reload** (admin): a save, a
+refusal or a deletion shown as soon as the core answers, the lists the change touched read
+again behind it, not before; then the admin's next sections as the alpha's shops need them.
+Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +18,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The drafts list searched, in the admin
+
+* **A search** ([ADR-321](../architecture/13-decision-log.md#adr-321--the-admin-searches-the-drafts-list-with-its-saved-searches-as-on-orders-and-products-and-shows-a-search-the-core-refuses-in-the-cores-words-at-once-without-trying-it-again)) on the drafts list, with its saved searches; a search the core refuses
+  shown in its words at once, on every page, and not tried again.
+* **Tried against the core:** on the seed's shop, its three open drafts narrowed by
+  source:instagram to #D1; colour:red refused at first after seconds, as a lost connection, and
+  now at once, in the core's words naming the filters; source:whatsapp saved as "WhatsApp
+  drafts", which on the Placed tab found #D6 and #D3, and then deleted. No errors in the browser.
+* 2286 tests: a saved search run, a search finding nothing, a filter refused in the core's
+  words, and the search shown saved.
 
 ### 97e6d2f · The online store's themes, in the admin
 
