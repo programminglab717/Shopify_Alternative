@@ -1792,6 +1792,32 @@ const en = {
   'segments.value.subscribed': 'agreed',
   'segments.value.not_subscribed': 'never asked',
   'segments.value.unsubscribed': 'said no',
+  'moving.title': 'Import and export',
+  'moving.cannot': 'Only owners and managers import and export customers.',
+  'moving.export': 'Export',
+  'moving.exportHint':
+    "Customers as a CSV file, which opens in Excel and comes back in here. Every export is recorded in the shop's activity.",
+  'moving.who': 'Who',
+  'moving.everyone': 'Everyone',
+  'moving.segment': '{name} ({count})',
+  'moving.download': 'Download the CSV',
+  'moving.exported': '{count} customers are in the file.',
+  'moving.exported.one': '1 customer is in the file.',
+  'moving.import': 'Import',
+  'moving.importHint':
+    "A CSV from Hatti, from Shopify's customer export, or a spreadsheet with a Phone column, up to 5,000 rows. Hatti checks it first and says what it would do.",
+  'moving.overwrite': 'Update customers already here',
+  'moving.overwriteHint':
+    "They take the file's name, email, note, tags, other numbers and marketing consent, where it has them. Otherwise they are left as they are.",
+  'moving.choose': 'Choose the CSV',
+  'moving.file': 'Customers CSV',
+  'moving.checked':
+    '{name}: {rows} rows. {created} would be added, {updated} updated and {skipped} left as they are.',
+  'moving.rowErrors': '{count} rows could not be read and are left out:',
+  'moving.rowErrors.one': '1 row could not be read and is left out:',
+  'moving.rowError': 'Row {row}, {column}: {message}',
+  'moving.importConfirm': 'Import them',
+  'moving.imported': 'Added {created}, updated {updated}; {skipped} left as they were.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -3569,6 +3595,32 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'segments.value.subscribed': 'رضامند',
   'segments.value.not_subscribed': 'کبھی پوچھا نہیں',
   'segments.value.unsubscribed': 'انکار کیا',
+  'moving.title': 'امپورٹ اور ایکسپورٹ',
+  'moving.cannot': 'گاہکوں کو صرف مالکان اور مینیجر امپورٹ اور ایکسپورٹ کرتے ہیں۔',
+  'moving.export': 'ایکسپورٹ',
+  'moving.exportHint':
+    'گاہک CSV فائل کی صورت میں، جو ایکسل میں کھلتی ہے اور یہاں واپس آ سکتی ہے۔ ہر ایکسپورٹ دکان کی سرگرمی میں درج ہوتی ہے۔',
+  'moving.who': 'کون',
+  'moving.everyone': 'سب',
+  'moving.segment': '{name} ({count})',
+  'moving.download': 'CSV ڈاؤن لوڈ کریں',
+  'moving.exported': 'فائل میں {count} گاہک ہیں۔',
+  'moving.exported.one': 'فائل میں 1 گاہک ہے۔',
+  'moving.import': 'امپورٹ',
+  'moving.importHint':
+    'ہٹی کی، شاپیفائی کے گاہکوں کی ایکسپورٹ کی، یا Phone کالم والی اسپریڈشیٹ کی CSV، 5,000 قطاروں تک۔ ہٹی پہلے اسے جانچ کر بتائے گا کہ کیا ہو گا۔',
+  'moving.overwrite': 'یہاں موجود گاہکوں کو اپ ڈیٹ کریں',
+  'moving.overwriteHint':
+    'ان کا نام، ای میل، نوٹ، ٹیگ، دوسرے نمبر اور مارکیٹنگ کی رضامندی فائل سے لے لی جائے گی، جہاں فائل میں ہو۔ ورنہ وہ جیسے ہیں ویسے رہیں گے۔',
+  'moving.choose': 'CSV چنیں',
+  'moving.file': 'گاہکوں کی CSV',
+  'moving.checked':
+    '{name}: {rows} قطاریں۔ {created} شامل ہوں گے، {updated} اپ ڈیٹ ہوں گے اور {skipped} جیسے ہیں ویسے رہیں گے۔',
+  'moving.rowErrors': '{count} قطاریں پڑھی نہیں جا سکیں اور چھوڑ دی گئیں:',
+  'moving.rowErrors.one': '1 قطار پڑھی نہیں جا سکی اور چھوڑ دی گئی:',
+  'moving.rowError': 'قطار {row}، {column}: {message}',
+  'moving.importConfirm': 'امپورٹ کریں',
+  'moving.imported': '{created} شامل، {updated} اپ ڈیٹ؛ {skipped} جیسے تھے ویسے رہے۔',
 };
 
 export const messages: Readonly<

@@ -3674,3 +3674,40 @@ export const SegmentDeleteMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** Customers as CSV, everyone or a segment's (CUS-07); owners and managers, recently signed in. */
+export const CustomersExportMutation = /* GraphQL */ `
+  mutation CustomersExport($segmentId: ID) {
+    customersExport(segmentId: $segmentId) {
+      csv
+      rowCount
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Customers from a CSV: checked first as a dry run, then added, updating those here if asked. */
+export const CustomersImportMutation = /* GraphQL */ `
+  mutation CustomersImport($csv: String!, $dryRun: Boolean, $overwrite: Boolean) {
+    customersImport(csv: $csv, dryRun: $dryRun, overwrite: $overwrite) {
+      dryRun
+      rows
+      created
+      updated
+      skipped
+      rowErrorCount
+      rowErrors {
+        row
+        column
+        message
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

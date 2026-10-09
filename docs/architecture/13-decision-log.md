@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-298 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-299 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -306,6 +306,7 @@
 | 296 | The admin's online store writes the shop's blogs: a blog started by its title, its comments closed, approved or shown at once; its articles written as text like pages, with an author, tags and an image from the phone, shown now, from a time ahead or hidden; and their comments approved, marked as spam or not, and deleted | Accepted |
 | 297 | The admin's online store keeps the storefront behind its password while the shop gets ready, pauses it while open until a time or until told, and sets its home page for search engines; and sends old addresses on, redirects found, added, deleted, imported from Shopify's CSV once checked, and exported to it | Accepted |
 | 298 | The admin's segments are built from conditions in words, joined so customers match all or any, and written in the core's query language; a query the builder cannot show is kept and edited as text; what the conditions match is counted and its newest customers shown as they change, the core's reason shown where a query does not read | Accepted |
+| 299 | The admin imports customers from a CSV after the core has checked it, saying what it would add, update and leave and the rows it could not read, updating those already here only when asked; and exports everyone or a segment's customers as a CSV once the member has confirmed who they are | Accepted |
 
 ---
 
@@ -12222,3 +12223,31 @@
 * **Alternatives:**
   * **The query language alone:** what the core reads is exact, but few merchants would write
     `last_order_date < -60d`; the builder writes it, and the text stays for what it cannot show.
+
+## ADR-299 · The admin imports customers from a CSV after the core has checked it, saying what it would add, update and leave and the rows it could not read, updating those already here only when asked; and exports everyone or a segment's customers as a CSV once the member has confirmed who they are
+
+* **Context:** The core takes customers in from a CSV (CUS-07): Hatti's own export, Shopify's
+  customer export, or a spreadsheet with a Phone column, up to 5,000 rows. A dry run says how many
+  it would add, update and leave as they are, and which rows it could not read and why; with
+  overwrite, customers already here take the file's profile, other numbers and consent where it
+  has them, and those it would not change are left. It exports everyone, a segment's customers or
+  a query's as a CSV that comes back in, recording every export, and only for a member who
+  confirmed who they are in the last 15 minutes. Owners and managers move customers. The admin
+  had none of it.
+* **Decision:**
+  * **Import and export**, a link from the customers list for owners and managers, is one page.
+  * **A file chosen is checked first:** the page says what the core would add, update and leave
+    as they are, with the first five rows it could not read, by row and column, and how many there
+    were. "Update customers already here" is off at first; turning it on or off checks the file
+    again. "Import them" takes the file in, and is offered only when it would add or update
+    someone.
+  * **An export** is of everyone or a segment's customers, each segment named with how many it
+    holds. Where the member signed in a while ago, the page asks them to confirm who they are,
+    as their account takes it, and downloads `customers.csv` once they have, saying how many
+    customers are in it.
+* **Consequences:**
+  * A shop leaving Shopify brings its customers in from a phone, seeing what will happen before it
+    does; one sending an offer takes a segment's customers out to a spreadsheet.
+* **Alternatives:**
+  * **Importing at once and reporting after:** fewer taps, but a file of the wrong shape would
+    land before anyone saw what it would do; the core's dry run costs one more tap.

@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, customers in and out of the admin** (CUS-07): customers exported as CSV, everyone or a
-segment's, once the member confirms who they are; and customers imported from a CSV, checked
-first, as Shopify's export writes it; then the admin's next sections as the alpha's shops need
-them. Urdu handles wait, as decided.
+**Next, the shop's link page in the admin** (CH-07): the link-in-bio page shops put on Instagram
+and TikTok, its links, products and image, and how often each is tapped; then the admin's next
+sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,23 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Customers in and out, in the admin
+
+* **Import and export** ([ADR-299](../architecture/13-decision-log.md#adr-299--the-admin-imports-customers-from-a-csv-after-the-core-has-checked-it-saying-what-it-would-add-update-and-leave-and-the-rows-it-could-not-read-updating-those-already-here-only-when-asked-and-exports-everyone-or-a-segments-customers-as-a-csv-once-the-member-has-confirmed-who-they-are)), from the customers list for owners and managers: a CSV checked
+  by the core first, saying what it would add, update and leave and the rows it could not read,
+  then imported, updating customers already here only when asked; and everyone or a segment's
+  customers exported as `customers.csv` once the member has confirmed who they are.
+* **Tried against the core:** on the seed's shop, a file of two new customers and a bad number
+  was checked, its bad row named, and imported; the same file with a name changed, checked again
+  to update, updated one and left one; the WhatsApp subscribers' segment, after the session's
+  confirmation was set an hour back, asked for the authenticator's code and downloaded a file of
+  two customers; with no errors in the browser beyond the core's 403 that asks for the code.
+* 2147 tests: a file checked, checked again to update, and imported; a segment exported after
+  confirming with a password; and neither for a marketer.
+* **The admin's tests have 20 seconds each:** with the whole monorepo's tests running, the menus
+  test, which walks three levels of a menu, ran past vitest's 5 seconds, though no one wait in
+  it passed the 5 seconds each may take (ADR-294's entry).
 
 ### b43a9d2 · Customer segments, in the admin
 

@@ -1601,3 +1601,22 @@ export interface SegmentMutationData {
     userErrors: UserError[];
   };
 }
+
+export interface CustomersExportData {
+  customersExport: { csv: string | null; rowCount: number; userErrors: UserError[] };
+}
+
+export interface CustomersImportResult {
+  dryRun: boolean;
+  rows: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  rowErrorCount: number;
+  rowErrors: { row: number; column: string | null; message: string }[];
+  userErrors: UserError[];
+}
+
+export interface CustomersImportData {
+  customersImport: CustomersImportResult;
+}
