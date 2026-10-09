@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Collections, in the admin
+### ed70e5b · Collections, in the admin
 
 * **Collections from the products page** ([ADR-290](../architecture/13-decision-log.md#adr-290--the-admins-collections-reached-from-the-products-are-listed-and-made-by-hand-or-by-rules-one-made-by-hand-has-its-products-found-and-added-taken-out-and-moved-up-or-down-while-sorted-by-hand-one-made-by-rules-has-its-rules-changed-owners-and-managers-change-them-every-role-reads-them)): listed by title, made by hand or
   by rules; one made by hand with its products found and added, taken out and moved up or
