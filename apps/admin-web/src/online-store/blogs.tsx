@@ -27,6 +27,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { usePageState, WRITES_PAGES } from './pages';
+import { BlogUrduCard } from '../urdu/urdu-pages';
 
 const POLICIES: readonly CommentPolicy[] = ['MODERATED', 'AUTO_PUBLISHED', 'CLOSED'];
 
@@ -309,6 +310,7 @@ export function BlogPage() {
               /blogs/{blog.handle}
             </p>
           </div>
+          <BlogUrduCard blogId={blog.id} />
           <section aria-label={t('blogs.articles')} className="flex flex-col gap-3">
             <Link
               to="/$shopId/online-store/blogs/$blogId/articles/new"

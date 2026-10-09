@@ -37,6 +37,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { BodyArea, normalized, useBody } from './body-field';
 import { usePageState, WRITES_PAGES } from './pages';
+import { ArticleUrduCard } from '../urdu/urdu-pages';
 
 type When = 'now' | 'later' | 'hidden';
 
@@ -541,6 +542,7 @@ export function ArticleEditorPage() {
         </p>
       </div>
       <ArticleForm key={article.id} blogId={article.blog.id} article={article} />
+      <ArticleUrduCard articleId={article.id} />
       <Comments article={article} />
       <DeleteArticle article={article} />
     </div>

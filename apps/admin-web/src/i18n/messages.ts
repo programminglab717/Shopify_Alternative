@@ -2689,6 +2689,16 @@ const en = {
   'urdu.saved': "Saved. Your store's Urdu pages show it in a moment.",
   'urdu.save': 'Save the Urdu',
   'urdu.nothing': 'Nothing here has words to put in Urdu yet.',
+  'urdu.field.summary': 'Summary',
+  'urdu.blog': 'Blog',
+  'urdu.article': 'Article',
+  'urdu.menu': 'Menu',
+  'urdu.links': 'Links',
+  'urdu.linksHint':
+    "Each link's words as the menu shows them on your Urdu pages, those under another set in.",
+  'urdu.homePage': 'Home page',
+  'urdu.homePageHint': 'How Google and links shared on WhatsApp show your home page in Urdu.',
+  'urdu.homePageName': 'Your home page',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5359,6 +5369,17 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'urdu.saved': 'محفوظ ہو گیا۔ آپ کے اسٹور کے اردو صفحات اسے تھوڑی دیر میں دکھائیں گے۔',
   'urdu.save': 'اردو محفوظ کریں',
   'urdu.nothing': 'یہاں ابھی اردو میں لکھنے کے لیے کوئی الفاظ نہیں۔',
+  'urdu.field.summary': 'خلاصہ',
+  'urdu.blog': 'بلاگ',
+  'urdu.article': 'مضمون',
+  'urdu.menu': 'مینیو',
+  'urdu.links': 'لنکس',
+  'urdu.linksHint':
+    'ہر لنک کے الفاظ، جیسے مینیو انہیں آپ کے اردو صفحات پر دکھاتا ہے؛ دوسرے لنک کے نیچے والے اندر کی طرف۔',
+  'urdu.homePage': 'ہوم پیج',
+  'urdu.homePageHint':
+    'گوگل اور واٹس ایپ پر شیئر کیے گئے لنک اردو میں آپ کا ہوم پیج کیسے دکھاتے ہیں۔',
+  'urdu.homePageName': 'آپ کا ہوم پیج',
 };
 
 export const messages: Readonly<

@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, the rest of the shop's words in Urdu** (admin): its blogs', articles' and menus' and
-its home page's, on the same page as a product's (OS-06, ADR-327); then section by section as
+**Next, visits in the admin's analytics** (ANL-02): the storefront's sessions, how many of them
+ordered, and who is on it now, as the core counts them (ADR-180); then section by section as
 the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
@@ -18,6 +18,25 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Blogs, articles, menus and the home page in Urdu, in the admin
+
+* **The rest of the shop's words in Urdu** ([ADR-328](../architecture/13-decision-log.md#adr-328--the-admins-urdu-page-serves-blogs-articles-menus-and-the-home-pages-words-too-a-menus-links-each-a-level-in-under-the-link-they-sit-under-the-home-pages-words-the-shops-own-and-a-menus-urdu-for-those-who-change-menus)): a blog's, an article's and a menu's pages,
+  and the storefront's preferences beside the home page's words for search engines, say how much
+  is in Urdu and open the same page of its Urdu as a product's: an article's text and summary
+  written as a page's text is, a menu's links each by its own words, one under another a level in,
+  and the home page's title and description, which the shop keeps itself. A menu's Urdu is for the
+  owners and managers who change menus.
+* **Tried in Chromium against the core and the storefront:** on the seed's shop, the main menu's
+  card said it was not in Urdu yet; its page listed its five links, Chappals a level in under the
+  Eid edit; Home was put in Urdu and saved, and the storefront's Urdu pages showed it in their
+  header a moment later. The home page's title for search engines was put in Urdu from the
+  storefront's preferences, and the Urdu home page's title showed it. Every box was then emptied
+  and saved, and both showed the shop's own words again; the shop keeps no Urdu of either. No
+  errors in the browser.
+* 2334 tests: a menu's title and a link a level in put in Urdu, an article's text and summary
+  as their blocks and its blog's title, the home page's words by the shop's own ID, and a menu's
+  Urdu kept to those who change menus, its menus not even read for others.
 
 ### e22647e · Products, collections and pages in Urdu, in the admin
 

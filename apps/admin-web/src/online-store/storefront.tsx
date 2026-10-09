@@ -16,6 +16,7 @@ import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { HomeUrduCard } from '../urdu/urdu-pages';
 
 type Input = Record<string, unknown>;
 
@@ -217,6 +218,7 @@ export function StorefrontPreferencesTab() {
       <PasswordForm preferences={preferences} />
       <PauseForm preferences={preferences} />
       <SearchForm preferences={preferences} />
+      <HomeUrduCard />
     </div>
   );
 }

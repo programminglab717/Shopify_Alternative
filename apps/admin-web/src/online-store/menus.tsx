@@ -33,6 +33,7 @@ import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context'
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { MenuUrduCard } from '../urdu/urdu-pages';
 
 /** Those who change the shop's menus, as its navigation: owners and managers. */
 export const EDITS_MENUS: readonly StaffRole[] = ['owner', 'manager'];
@@ -628,6 +629,7 @@ export function MenuEditorPage() {
             {menu.title}
           </h1>
           <MenuForm key={menu.id} menu={menu} />
+          <MenuUrduCard menu={menu} />
         </>
       )}
     </div>

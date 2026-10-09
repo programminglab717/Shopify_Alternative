@@ -78,7 +78,15 @@ import { StaffPage } from './settings/staff-page';
 import { MorePage, Shell } from './shell/shell';
 import { ShippingPage, validateShippingSearch } from './shipping/shipping-page';
 import { ShopsPage } from './shops/shops-page';
-import { CollectionUrduPage, PageUrduPage, ProductUrduPage } from './urdu/urdu-pages';
+import {
+  ArticleUrduPage,
+  BlogUrduPage,
+  CollectionUrduPage,
+  HomeUrduPage,
+  MenuUrduPage,
+  PageUrduPage,
+  ProductUrduPage,
+} from './urdu/urdu-pages';
 import { EmptyState } from './ui/feedback';
 
 export interface RouterContext {
@@ -371,6 +379,30 @@ const pageUrdu = createRoute({
   component: PageUrduPage,
 });
 
+const blogUrdu = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store/blogs/$blogId/urdu',
+  component: BlogUrduPage,
+});
+
+const articleUrdu = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store/articles/$articleId/urdu',
+  component: ArticleUrduPage,
+});
+
+const menuUrdu = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store/menus/$menuId/urdu',
+  component: MenuUrduPage,
+});
+
+const homeUrdu = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store/home-page/urdu',
+  component: HomeUrduPage,
+});
+
 const themeEditor = createRoute({
   getParentRoute: () => shop,
   path: 'online-store/themes/$themeId',
@@ -630,10 +662,14 @@ export const routeTree = root.addChildren([
     pageEditor,
     pageUrdu,
     menuEditor,
+    menuUrdu,
+    homeUrdu,
     policy,
     blog,
+    blogUrdu,
     newArticle,
     articleEditor,
+    articleUrdu,
     themeEditor,
     segments,
     newSegment,

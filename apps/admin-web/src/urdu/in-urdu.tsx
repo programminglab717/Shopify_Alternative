@@ -25,13 +25,28 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 export const WRITES_URDU: readonly StaffRole[] = ['owner', 'manager', 'marketer'];
 
 /**
- * Something of the shop's whose words may be put in Urdu: a product, collection or page, with
- * fields of its own, or a product's option or one of its values, with its name alone.
+ * Something of the shop's whose words may be put in Urdu: a product, collection, page, blog,
+ * article or menu, or the shop itself for its home page, with fields of its own; or a product's
+ * option or one of its values, or a menu's link, with its name alone, `depth` levels in.
  */
 export interface UrduThing {
   id: string;
-  kind: 'product' | 'collection' | 'page' | 'option' | 'value';
+  kind:
+    | 'product'
+    | 'collection'
+    | 'page'
+    | 'blog'
+    | 'article'
+    | 'menu'
+    | 'shop'
+    | 'option'
+    | 'value'
+    | 'link';
+  depth?: number;
 }
+
+/** What is named by its own words alone, an option's say, and so labelled by them. */
+const NAMED: ReadonlySet<UrduThing['kind']> = new Set(['option', 'value', 'link']);
 
 /** Things of the shop's under a heading of their own, such as a product's options. */
 export interface UrduSection {
@@ -58,21 +73,29 @@ interface Field {
   keptAsHtml: boolean;
   /** Whether its Urdu was written for words of the shop's since changed. */
   outdated: boolean;
-  indent: boolean;
+  /** How many levels in it is, as an option's value or a menu's link under another. */
+  depth: number;
 }
 
 const LABELS: Readonly<Record<string, MessageKey>> = {
   title: 'urdu.field.title',
   body_html: 'urdu.field.description',
+  summary_html: 'urdu.field.summary',
   product_type: 'urdu.field.productType',
   meta_title: 'urdu.field.metaTitle',
   meta_description: 'urdu.field.metaDescription',
 };
 
+/** A product's or collection's description is paragraphs; a page's or article's text, a body. */
 function shapeOf(kind: UrduThing['kind'], key: string): Shape {
-  if (key === 'body_html') return kind === 'page' ? 'body' : 'paragraphs';
+  if (key === 'body_html')
+    return kind === 'product' || kind === 'collection' ? 'paragraphs' : 'body';
+  if (key === 'summary_html') return 'body';
   return key === 'meta_description' ? 'lines' : 'line';
 }
+
+/** How far in a field is, by its depth. */
+const DEPTHS = ['', 'ps-6', 'ps-12', 'ps-18'];
 
 const ESCAPES: Readonly<Record<string, string>> = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
 
@@ -132,7 +155,7 @@ function fieldsOf(things: readonly UrduThing[], nodes: readonly UrduResource[], 
   return things.flatMap((thing): Field[] => {
     const node = byId.get(thing.id);
     if (!node) return [];
-    const named = thing.kind === 'option' || thing.kind === 'value';
+    const named = NAMED.has(thing.kind);
     return node.translatableContent.flatMap((content): Field[] => {
       if (!content.digest || !content.value) return [];
       const shape = shapeOf(thing.kind, content.key);
@@ -140,7 +163,7 @@ function fieldsOf(things: readonly UrduThing[], nodes: readonly UrduResource[], 
       const urdu = kept?.value ? editable(shape, kept.value) : { text: '', asHtml: false };
       const label = named
         ? content.value
-        : thing.kind === 'page' && content.key === 'body_html'
+        : shape === 'body' && content.key === 'body_html'
           ? t('urdu.field.body')
           : t(LABELS[content.key] ?? 'urdu.field.title');
       return [
@@ -155,7 +178,7 @@ function fieldsOf(things: readonly UrduThing[], nodes: readonly UrduResource[], 
           kept: urdu.text,
           keptAsHtml: urdu.asHtml,
           outdated: kept?.outdated ?? false,
-          indent: thing.kind === 'value',
+          depth: thing.depth ?? 0,
         },
       ];
     });
@@ -213,7 +236,7 @@ function UrduField({
     }`,
   } as const;
   return (
-    <div className={`flex flex-col gap-1 ${field.indent ? 'ps-6' : ''}`}>
+    <div className={`flex flex-col gap-1 ${DEPTHS[Math.min(field.depth, 3)]}`}>
       <label htmlFor={id} className="font-medium" dir="auto">
         {field.label}
       </label>

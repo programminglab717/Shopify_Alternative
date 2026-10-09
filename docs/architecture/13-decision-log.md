@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-327 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-328 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -335,6 +335,7 @@
 | 325 | The theme editor's preview frames the storefront beside the editor and shows changes as they are made, the page's sections following the editor's files; the theme's settings show once saved | Accepted |
 | 326 | A theme's pictures are the shop's own files, uploaded in the theme editor and served by the storefront at an address of the shop's own while one of its themes names them; a preview shows any of the shop's pictures | Accepted |
 | 327 | The admin puts a product's, collection's or page's words in Urdu on a page of its own, each field of the shop's own above its Urdu and a product's options and values with it, read in one ask through Shopify's translatableResourcesByIds and saved as its translations | Accepted |
+| 328 | The admin's Urdu page serves blogs, articles, menus and the home page's words too: a menu's links each a level in under the link they sit under, the home page's words the shop's own, and a menu's Urdu for those who change menus | Accepted |
 
 ---
 
@@ -13132,3 +13133,33 @@
     list may come later, from `translatableResources`.
   * **A query for each option and value:** a product with three options of ten values each
     would ask 33 times.
+
+## ADR-328 · The admin's Urdu page serves blogs, articles, menus and the home page's words too: a menu's links each a level in under the link they sit under, the home page's words the shop's own, and a menu's Urdu for those who change menus
+
+* **Context:** The admin put products', collections' and pages' words in Urdu on a page of each
+  thing's own ([ADR-327](#adr-327--the-admin-puts-a-products-collections-or-pages-words-in-urdu-on-a-page-of-its-own-each-field-of-the-shops-own-above-its-urdu-and-a-products-options-and-values-with-it-read-in-one-ask-through-shopifys-translatableresourcesbyids-and-saved-as-its-translations)). The rest of what the storefront's Urdu pages show in the shop's
+  words, its blogs, articles and menus ([ADR-238](#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)) and its home page's words for search
+  engines ([ADR-245](#adr-245--the-shops-own-words-for-its-home-page-may-be-translated-into-urdu-the-shop-a-translatable-resource-of-its-own-by-its-own-id-as-shopifys-shop-is-its-document-carries-them-beside-its-own-words-and-its-urdu-pages-show-them)), had its Urdu through the Admin API alone.
+* **Decision:**
+  * **The same page for each:** a blog's, an article's and a menu's own pages, and the
+    storefront's preferences beside the home page's words for search engines, have the card
+    saying how much is in Urdu, and the way to a page of its Urdu, as a product's has: a blog's
+    title and words for search engines; an article's title, text, summary and words for search
+    engines, its text and summary written as a page's text is; a menu's title, then each of its
+    links by its own words, one under another a level further in, three levels as menus have;
+    the home page's title and description for search engines.
+  * **The home page's words are the shop's:** Shopify's `SHOP` resource, by the shop's own ID,
+    which the admin already has.
+  * **A menu's Urdu is for those who change menus:** owners and managers, whose menus are;
+    marketers, who write the shop's other Urdu, neither read menus nor see their Urdu. The home
+    page's card is where the storefront's preferences are, for owners and managers; its page is
+    open to all who write the shop's Urdu.
+* **Consequences:**
+  * Every word of the shop's own that the storefront's Urdu pages show may be put in Urdu from
+    the admin, its menu and home page's words for search engines as much as its products; the
+    policies keep their Urdu form of their own ([ADR-239](#adr-239--a-shops-policies-may-have-its-own-urdu-as-its-other-content-may-and-the-storefront-shows-a-policys-urdu-only-while-it-translates-the-policy-as-it-is-its-own-words-once-they-change-the-checkouts-urdu-links-the-urdu-pages)).
+  * A link's Urdu is kept by the link's own ID, as Shopify keeps it, and goes when the link
+    goes ([ADR-261](#adr-261--a-translation-is-deleted-with-what-it-translates-whichever-way-that-goes-by-triggers-on-the-tables-of-what-may-be-translated-as-a-foreign-key-would-if-one-column-could-name-ten-kinds-a-menus-items-as-the-menu-goes-or-an-update-drops-them)).
+* **Alternatives:**
+  * **Each link's Urdu beside it in the menu's own form:** that form is long already on a phone,
+    and it saves the whole menu, which a link's Urdu has no need of.
