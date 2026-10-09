@@ -32,6 +32,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { useWide } from '../ui/wide';
 import { shownPhone } from './customers-page';
+import { CustomerCare, MarketingConsent } from './care';
 import { READS_CREDIT, StoreCredit } from './store-credit';
 
 /** The roles that change customers and the blocklist (docs/design/02 §6). */
@@ -456,6 +457,8 @@ export function CustomerPage() {
           <NoteAndTags customer={customer} edits={edits} />
           {READS_CREDIT.includes(shop.role) && <StoreCredit customerId={customer.id} />}
           {edits && <Blocklist customer={customer} timezone={details.timezone} />}
+          {edits && <MarketingConsent customer={customer} />}
+          {edits && <CustomerCare customer={customer} />}
         </div>
       </div>
     </div>

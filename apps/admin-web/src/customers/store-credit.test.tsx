@@ -22,6 +22,9 @@ const CUSTOMER = {
   deliveryHistory: { delivered: 1, returned: 0, cancelled: 0, inProgress: 1, lost: 0 },
   blocklistEntry: null,
   whatsappMarketingConsent: { marketingState: 'SUBSCRIBED' },
+  smsMarketingConsent: { marketingState: 'NOT_SUBSCRIBED' },
+  emailMarketingConsent: { marketingState: 'UNSUBSCRIBED' },
+  erasureScheduledAt: null,
   addresses: [],
   orders: { nodes: [] },
 };

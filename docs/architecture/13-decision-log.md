@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-308 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-309 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -316,6 +316,7 @@
 | 306 | The admin gives the shop's catalog feed and its Meta dataset a tab of the online store: the feed's address to copy; Meta connected with its dataset's ID and a token, sealed, which moment of an order is Purchase, and a code for test events, once the member confirms who they are; disconnected once asked; and the moments sent, by status | Accepted |
 | 307 | The admin sets how the shop's customers are told of their orders in settings: WhatsApp for everything or SMS for updates, each with its price, the messages' language, which messages go to customers and to the shop, and the alerts number; it lists the messages sent, by status, and an order's page shows its own once asked | Accepted |
 | 308 | The admin sets the shop's order policies in settings: the Confirmation Desk's calling hours, its target for the first call and whether it waits for WhatsApp; after how many days unpaid and unreachable orders are cancelled; until when customers may cancel; and the high-value amount and the risk score that holds an order for review | Accepted |
+| 309 | The admin adds a customer by hand, records the marketing they agreed to in their words, merges a duplicate into them once asked, and, at their request, downloads their data and erases them ten days on, once the member confirms who they are; the erasures waiting are listed, and each cancelled from its customer | Accepted |
 
 ---
 
@@ -12510,3 +12511,38 @@
 * **Alternatives:**
   * **A page for each:** the risk score and the desk's hours are what a shop weighs together
     when its agents fall behind.
+
+## ADR-309 · The admin adds a customer by hand, records the marketing they agreed to in their words, merges a duplicate into them once asked, and, at their request, downloads their data and erases them ten days on, once the member confirms who they are; the erasures waiting are listed, and each cancelled from its customer
+
+* **Context:** The core adds a customer before they order, by their mobile, which orders then
+  find them by (CUS-01); records each change of their marketing consent with what they agreed
+  to, where and when (CUS-04); merges a duplicate record into a customer, its numbers, orders,
+  tags, note and consent with it, and deletes it (ADR-026); exports everything the shop keeps of
+  a customer as a file for them, and erases them at their request ten days on unless cancelled
+  (CUS-05, ADR-110, ADR-116); export and erasure are audited and need staff who signed in lately. Owners
+  and managers do all of it. The admin had none of it.
+* **Decision:**
+  * **Add a customer** is on the customers list: their mobile, which orders find them by, other
+    numbers, name, email, a note, tags, and the channels they agreed to, with the words they
+    were asked in, which agreeing needs. The new customer's page opens.
+  * **Marketing they agreed to**, on a customer's page, ticks WhatsApp, SMS and email; ticking
+    one asks what they agreed to, and only the channels changed are sent. A customer who
+    withdrew is shown as such.
+  * **Their records and rights**, below it:
+    * merging a duplicate found by name or number, never themselves, once staff say they mean
+      it, since it cannot be undone;
+    * their data downloaded, saved under the core's name for the file;
+    * their erasure asked for, saying their orders stay without who they were and that it can
+      be cancelled until the day it happens, which the page then shows, with keeping the
+      customer.
+    The export and the erasure ask the member to confirm who they are first where they signed in
+    a while ago.
+  * **Erasures waiting** is on the customers list: who, when, and when asked, each a tap from
+    their page to cancel it.
+* **Consequences:**
+  * A shop takes a phone order's customer in before the order, keeps one record for a customer
+    with two SIMs, and answers a customer's request for their data, or to be forgotten, from its
+    phone, with the law's record of it.
+* **Alternatives:**
+  * **Erasure at once:** what the core also has, but a customer's orders still on their way need
+    them, and a request made in error could not be taken back.

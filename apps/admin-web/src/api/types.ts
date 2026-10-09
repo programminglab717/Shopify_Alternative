@@ -529,7 +529,11 @@ export interface CustomerDetail {
     note: string;
     createdAt: string;
   } | null;
-  whatsappMarketingConsent: { marketingState: 'SUBSCRIBED' | 'NOT_SUBSCRIBED' | 'UNSUBSCRIBED' };
+  whatsappMarketingConsent: { marketingState: MarketingState };
+  smsMarketingConsent: { marketingState: MarketingState };
+  emailMarketingConsent: { marketingState: MarketingState };
+  /** When their data will be erased, as they asked; null while none is waiting. */
+  erasureScheduledAt: string | null;
   addresses: { formatted: string[] }[];
   orders: {
     nodes: {
@@ -1943,4 +1947,41 @@ export interface OrderSettingsUpdateData {
 
 export interface OrderRiskSettingsUpdateData {
   orderRiskSettingsUpdate: { riskSettings: OrderRiskSettings | null; userErrors: UserError[] };
+}
+
+export type MarketingState = 'SUBSCRIBED' | 'NOT_SUBSCRIBED' | 'UNSUBSCRIBED';
+export type MarketingChannel = 'WHATSAPP' | 'SMS' | 'EMAIL';
+
+export interface CustomerCreateData {
+  customerCreate: { customer: { id: string } | null; userErrors: UserError[] };
+}
+
+export interface CustomerMergeData {
+  customerMerge: { customer: { id: string } | null; userErrors: UserError[] };
+}
+
+export interface CustomerMarketingConsentUpdateData {
+  customerMarketingConsentUpdate: { customer: { id: string } | null; userErrors: UserError[] };
+}
+
+export interface CustomerDataExportData {
+  customerDataExport: { fileName: string | null; json: string | null; userErrors: UserError[] };
+}
+
+export interface CustomerErasureRequestData {
+  customerErasureRequest: { erasureScheduledAt: string | null; userErrors: UserError[] };
+}
+
+export interface CustomerErasureCancelData {
+  customerErasureCancel: { userErrors: UserError[] };
+}
+
+export interface CustomerErasureRequestsData {
+  customerErasureRequests: {
+    nodes: {
+      requestedAt: string;
+      scheduledAt: string;
+      customer: { id: string; displayName: string; phone: string };
+    }[];
+  };
 }

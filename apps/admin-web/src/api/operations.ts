@@ -1002,6 +1002,13 @@ export const CustomerQuery = /* GraphQL */ `
       whatsappMarketingConsent {
         marketingState
       }
+      smsMarketingConsent {
+        marketingState
+      }
+      emailMarketingConsent {
+        marketingState
+      }
+      erasureScheduledAt
       addresses {
         formatted
       }
@@ -4369,4 +4376,105 @@ export const OrderRiskSettingsUpdateMutation = /* GraphQL */ `
   }
   ${ORDER_RISK_SETTINGS}
   ${USER_ERRORS}
+`;
+
+/** A customer added by hand, before they order. */
+export const CustomerCreateMutation = /* GraphQL */ `
+  mutation CustomerCreate($input: CustomerCreateInput!) {
+    customerCreate(input: $input) {
+      customer {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A duplicate merged into a customer, and deleted. */
+export const CustomerMergeMutation = /* GraphQL */ `
+  mutation CustomerMerge($customerId: ID!, $duplicateId: ID!) {
+    customerMerge(customerId: $customerId, duplicateId: $duplicateId) {
+      customer {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** What a customer agreed to, or withdrew from, recorded in the consent ledger. */
+export const CustomerMarketingConsentUpdateMutation = /* GraphQL */ `
+  mutation CustomerMarketingConsentUpdate($id: ID!, $marketingConsent: [MarketingConsentInput!]!) {
+    customerMarketingConsentUpdate(id: $id, marketingConsent: $marketingConsent) {
+      customer {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Everything the shop keeps of a customer, as a file to give them. */
+export const CustomerDataExportMutation = /* GraphQL */ `
+  mutation CustomerDataExport($id: ID!) {
+    customerDataExport(id: $id) {
+      fileName
+      json
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A customer's erasure asked for, ten days on unless it is cancelled. */
+export const CustomerErasureRequestMutation = /* GraphQL */ `
+  mutation CustomerErasureRequest($id: ID!) {
+    customerErasureRequest(id: $id) {
+      erasureScheduledAt
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A customer's erasure waiting to happen, stopped. */
+export const CustomerErasureCancelMutation = /* GraphQL */ `
+  mutation CustomerErasureCancel($id: ID!) {
+    customerErasureCancel(id: $id) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Customers' erasures waiting to happen, the soonest first. */
+export const CustomerErasureRequestsQuery = /* GraphQL */ `
+  query CustomerErasureRequests {
+    customerErasureRequests(first: 100) {
+      nodes {
+        requestedAt
+        scheduledAt
+        customer {
+          id
+          displayName
+          phone
+        }
+      }
+    }
+  }
 `;

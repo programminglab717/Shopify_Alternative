@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, customers' care in the admin** (CUS-01, CUS-05): a customer added by hand, two records
-of one customer merged, their marketing consent changed, and their data exported or erased at
-their request, with the erasures waiting listed and cancelled; then the admin's next sections
-as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, the checkout page in the admin** (CHK-14, CUS-04): the badges it shows under its
+button, up to four in the shop's order, with the days for exchanges and returns; and the boxes
+it offers for the shop's news and offers, by channel; then the admin's next sections as the
+alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,23 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Customers' care, in the admin
+
+* **Customers' care** ([ADR-309](../architecture/13-decision-log.md#adr-309--the-admin-adds-a-customer-by-hand-records-the-marketing-they-agreed-to-in-their-words-merges-a-duplicate-into-them-once-asked-and-at-their-request-downloads-their-data-and-erases-them-ten-days-on-once-the-member-confirms-who-they-are-the-erasures-waiting-are-listed-and-each-cancelled-from-its-customer)): a customer added by hand from the customers list, with the
+  marketing they agreed to in their words; their consent changed by channel on their page; a
+  duplicate merged into them; their data downloaded and their erasure asked for, ten days on,
+  and cancelled; and the erasures waiting listed.
+* **Tried against the core:** on the seed's shop, a mobile of five digits was refused, named on
+  the page; Sara Malik was added with WhatsApp consent in the words asked, and Sara M. under a
+  second number; SMS consent was added; Sara M. was merged in, leaving one Sara; her data came
+  as customer-cus_….json in the hatti.customer-data/1 format, with her consent history, orders
+  and messages; her erasure was set for 19 October and listed among those waiting, then
+  cancelled. Sara Malik stays in the seed's shop. No errors in the browser.
+* 2216 tests: a customer added once the words and a valid number are given, their page then
+  opened; consent changed by channel; a duplicate merged, never the customer themselves; the
+  data downloaded and erasure asked for after confirming, then kept; the erasures waiting; an
+  agent sees none of it.
 
 ### adeaf4f · Order policies, in the admin
 

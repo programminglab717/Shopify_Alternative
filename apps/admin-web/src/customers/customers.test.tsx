@@ -23,6 +23,9 @@ function ayesha(phone: string) {
     deliveryHistory: { delivered: 2, returned: 1, cancelled: 1, inProgress: 0, lost: 0 },
     blocklistEntry: null,
     whatsappMarketingConsent: { marketingState: 'SUBSCRIBED' },
+    smsMarketingConsent: { marketingState: 'NOT_SUBSCRIBED' },
+    emailMarketingConsent: { marketingState: 'UNSUBSCRIBED' },
+    erasureScheduledAt: null,
     addresses: [{ formatted: ['House 12', 'Karachi'] }],
     orders: {
       nodes: [

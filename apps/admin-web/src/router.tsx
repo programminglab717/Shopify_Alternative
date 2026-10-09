@@ -19,6 +19,8 @@ import { CustomerPage } from './customers/customer-page';
 import { CustomersPage, validateCustomersSearch } from './customers/customers-page';
 import { NewSegmentPage, SegmentPage, SegmentsPage } from './customers/segments';
 import { CustomersTransferPage } from './customers/transfer-page';
+import { ErasuresPage } from './customers/care';
+import { NewCustomerPage } from './customers/new-customer-page';
 import { DeskPage } from './desk/desk-page';
 import {
   ChangeEmailPage,
@@ -369,6 +371,18 @@ const customersTransfer = createRoute({
   component: CustomersTransferPage,
 });
 
+const customersNew = createRoute({
+  getParentRoute: () => shop,
+  path: 'customers/new',
+  component: NewCustomerPage,
+});
+
+const customersErasures = createRoute({
+  getParentRoute: () => shop,
+  path: 'customers/erasures',
+  component: ErasuresPage,
+});
+
 const account = createRoute({
   getParentRoute: () => shop,
   path: 'account',
@@ -567,6 +581,8 @@ export const routeTree = root.addChildren([
     newSegment,
     segment,
     customersTransfer,
+    customersNew,
+    customersErasures,
     collections,
     newCollection,
     collection,

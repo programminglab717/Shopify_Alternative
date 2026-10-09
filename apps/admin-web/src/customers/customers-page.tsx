@@ -1,6 +1,15 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { ArrowDownUp, Ban, ChevronRight, Search, Users, UsersRound } from 'lucide-react';
+import {
+  ArrowDownUp,
+  Ban,
+  ChevronRight,
+  Search,
+  ShieldX,
+  UserPlus,
+  Users,
+  UsersRound,
+} from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { CustomersQuery } from '../api/operations';
@@ -27,6 +36,9 @@ export const READS_CUSTOMERS: readonly StaffRole[] = [
 
 /** Those who keep segments, for marketing: owners, managers and marketers (CUS-03). */
 export const KEEPS_SEGMENTS: readonly StaffRole[] = ['owner', 'manager', 'marketer'];
+
+/** Who adds customers by hand and sees the erasures waiting (CUS-01, CUS-05). */
+const ADDS_CUSTOMERS: readonly StaffRole[] = ['owner', 'manager'];
 
 /** The customers list's search: the words searched for. */
 export interface CustomersSearch {
@@ -141,6 +153,26 @@ export function CustomersPage() {
               <UsersRound aria-hidden className="size-5" />
               {t('segments.title')}
             </Link>
+          )}
+          {ADDS_CUSTOMERS.includes(shop.role) && (
+            <>
+              <Link
+                to="/$shopId/customers/erasures"
+                params={{ shopId: shop.id }}
+                className="inline-flex min-h-10 items-center gap-2 rounded-control border border-line bg-surface px-3 hover:bg-canvas"
+              >
+                <ShieldX aria-hidden className="size-5" />
+                {t('care.erasures')}
+              </Link>
+              <Link
+                to="/$shopId/customers/new"
+                params={{ shopId: shop.id }}
+                className="inline-flex min-h-10 items-center gap-2 rounded-control bg-primary px-3 font-medium text-on-primary hover:bg-primary-strong"
+              >
+                <UserPlus aria-hidden className="size-5" />
+                {t('newCustomer.title')}
+              </Link>
+            </>
           )}
           {MOVES_CUSTOMERS.includes(shop.role) && (
             <Link
