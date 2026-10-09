@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Customers in and out, in the admin
+### 5866c63 · Customers in and out, in the admin
 
 * **Import and export** ([ADR-299](../architecture/13-decision-log.md#adr-299--the-admin-imports-customers-from-a-csv-after-the-core-has-checked-it-saying-what-it-would-add-update-and-leave-and-the-rows-it-could-not-read-updating-those-already-here-only-when-asked-and-exports-everyone-or-a-segments-customers-as-a-csv-once-the-member-has-confirmed-who-they-are)), from the customers list for owners and managers: a CSV checked
   by the core first, saying what it would add, update and leave and the rows it could not read,
