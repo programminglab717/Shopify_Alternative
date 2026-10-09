@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-333 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-334 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -341,6 +341,7 @@
 | 331 | The admin prints packing slips and invoices as the core makes them: from an order's page, and for the orders chosen to pack or to book at once, the document, paper and language chosen in one panel and kept in the browser for the next print | Accepted |
 | 332 | The admin lists the shop's blocked numbers for owners and managers, the latest blocked first, each with its customer, why and since when; found by four or more of a number's digits, a number blocked before it ever orders, and one unblocked | Accepted |
 | 333 | The orders list tags the orders chosen on any tab and cancels those not yet shipped for one reason, from the bar that confirms, packs and prints them, for those who change orders; a refusal names its order | Accepted |
+| 334 | An open draft is changed in the admin on the form it was made with, started from the draft as it is: every line sent at its price and every charge as it stands, so an emptied one is cleared, and the address only if it changed, its area, landmark and pin kept | Accepted |
 
 ---
 
@@ -13352,3 +13353,37 @@
     shipped are where they are cancelled.
   * **A menu of more actions behind one button:** one more tap for each, on the bar a phone
     shows anyway.
+
+## ADR-334 · An open draft is changed in the admin on the form it was made with, started from the draft as it is: every line sent at its price and every charge as it stands, so an emptied one is cleared, and the address only if it changed, its area, landmark and pin kept
+
+* **Context:** Staff take orders from chats as drafts at the prices agreed
+  ([ADR-031](#adr-031--draft-orders-keep-agreed-prices-and-hold-no-stock-customers-confirm-them-through-a-secret-link)), in the admin ([ADR-277](#adr-277--staff-take-orders-over-the-phone-or-in-a-chat-as-drafts-in-the-admin-products-found-and-added-at-the-price-agreed-where-it-was-taken-and-how-it-is-paid-its-link-sent-on-whatsapp-for-the-customer-to-give-the-address-and-confirm-or-the-draft-placed-at-once-and-tertiary-buttons-that-take-something-away-are-red)), and send their customers links to confirm
+  them. But a chat goes on after the draft is made: the customer wants the medium, not the
+  small, a second suit, the delivery charge waived, or gives their address. The core's
+  `draftOrderUpdate` changed an open draft, only the fields given; the admin could only delete
+  the draft and make it again, its link and number lost with it.
+* **Decision:**
+  * **The same form:** an open draft's page has Change the draft, for those who take drafts,
+    which opens the form it was made with at the draft as it is: its lines at the prices agreed,
+    where the conversation was, how the customer pays (another way kept among the choices), the
+    delivery charge, the discount, the note and the address. Saving opens the draft's page.
+  * **Every line at its price:** the core sets a line it is sent without a price at the
+    variant's price now; a draft's lines are sent each at the price in its box, so a price agreed
+    in the chat is never lost to a change of the catalogue's.
+  * **Every charge as it stands:** the delivery charge, discount and note are sent each time, an
+    emptied box as nothing, so emptying one clears it, where a new draft leaves an empty one out.
+  * **The address only if it changed:** an address left as it was is not sent, so its area,
+    landmark and pin, which the form does not show, stay as the customer gave them; one changed
+    is sent with them kept; unticking it takes the address away, and the draft's link with it,
+    as the core does.
+  * **The core's refusal said by the form's field,** and the form kept to try again.
+* **Consequences:**
+  * A chat's order follows the chat while it is a draft, keeping its number and its link.
+  * A draft placed is an order: its page has no change, and its order's page changes it
+    ([ADR-287](#adr-287--an-orders-page-changes-its-items-while-it-waits-to-be-packed-quantities-stepped-and-lines-taken-off-or-put-back-products-found-and-added-at-a-price-agreed-and-its-delivery-charge-waived-or-discount-given-saying-back-the-new-total-and-cash-at-the-door-a-packed-order-is-unpacked-first)).
+  * Not yet: an advance asked of a draft changed from its form; a draft's location.
+* **Alternatives:**
+  * **Changes field by field, each saved at once:** many calls for one change in a chat, and a
+    draft half changed between them.
+  * **Sending a line's price only when typed, as a new draft does:** the core would reset every
+    other line to the catalogue's price.

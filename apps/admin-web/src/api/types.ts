@@ -980,7 +980,19 @@ export interface DraftOrderDetail {
     unitPrice: MoneyValue;
     totalPrice: MoneyValue;
   }[];
-  shippingAddress: { formatted: string[] } | null;
+  shippingAddress: {
+    formatted: string[];
+    name: string | null;
+    phone: string | null;
+    city: string;
+    address1: string | null;
+    address2: string | null;
+    landmark: string | null;
+    province: string | null;
+    zip: string | null;
+    latitude: number | null;
+    longitude: number | null;
+  } | null;
   subtotalPrice: MoneyValue;
   totalShippingPrice: MoneyValue;
   totalDiscounts: MoneyValue;

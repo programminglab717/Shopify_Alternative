@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
-import { CircleCheck, Copy, FilePen, MessageCircle, Send, Trash2 } from 'lucide-react';
+import { CircleCheck, Copy, FilePen, MessageCircle, Pencil, Send, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
   DraftOrderCompleteMutation,
@@ -248,6 +248,17 @@ export function DraftPage() {
           {t(`drafts.source.${draft.source}` as MessageKey)} ·{' '}
           {formatDate(draft.createdAt, timezone, locale)}
         </span>
+        <span className="flex-1" />
+        {draft.status === 'OPEN' && TAKES_DRAFTS.includes(shop.role) && (
+          <Link
+            to="/$shopId/drafts/$draftId/edit"
+            params={{ shopId: shop.id, draftId: draft.id }}
+            className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium md:min-h-10"
+          >
+            <Pencil aria-hidden className="size-5" />
+            {t('drafts.edit')}
+          </Link>
+        )}
       </div>
       {draft.order && (
         <Alert tone="success">

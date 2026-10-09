@@ -2231,6 +2231,16 @@ export const DraftOrderQuery = /* GraphQL */ `
       }
       shippingAddress {
         formatted
+        name
+        phone
+        city
+        address1
+        address2
+        landmark
+        province
+        zip
+        latitude
+        longitude
       }
       subtotalPrice {
         ...Money
@@ -2254,6 +2264,21 @@ export const DraftOrderQuery = /* GraphQL */ `
     }
   }
   ${MONEY}
+`;
+
+/** An open draft changed: only what is given, each line at its price as sent (ORD-03). */
+export const DraftOrderUpdateMutation = /* GraphQL */ `
+  mutation DraftOrderUpdate($id: ID!, $input: DraftOrderInput!) {
+    draftOrderUpdate(id: $id, input: $input) {
+      draftOrder {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
 `;
 
 /** Products found by words, with their variants' prices and stock, to add to a draft. */

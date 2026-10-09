@@ -49,6 +49,7 @@ import { OrdersExportPage } from './orders/export-page';
 import { PaymentLinksPage } from './payment-links/payment-links-page';
 import { DraftPage } from './drafts/draft-page';
 import { DraftsPage } from './drafts/drafts-page';
+import { EditDraftPage } from './drafts/edit-draft-page';
 import { NewDraftPage } from './drafts/new-draft-page';
 import { InvitationPage } from './invitation/invitation-page';
 import { HomePage } from './home/home-page';
@@ -280,6 +281,12 @@ const draft = createRoute({
   getParentRoute: () => shop,
   path: 'drafts/$draftId',
   component: DraftPage,
+});
+
+const draftEdit = createRoute({
+  getParentRoute: () => shop,
+  path: 'drafts/$draftId/edit',
+  component: EditDraftPage,
 });
 
 const analytics = createRoute({
@@ -657,6 +664,7 @@ export const routeTree = root.addChildren([
     drafts,
     newDraft,
     draft,
+    draftEdit,
     discounts,
     paymentLinks,
     analytics,

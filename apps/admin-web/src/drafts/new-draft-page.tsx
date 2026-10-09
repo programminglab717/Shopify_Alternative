@@ -14,7 +14,7 @@ import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context'
 import { Button } from '../ui/button';
 import { TextField } from '../ui/field';
 
-interface Line {
+export interface Line {
   variantId: string;
   title: string;
   price: MoneyValue;
@@ -123,28 +123,77 @@ export function ProductPicker({ onAdd }: { onAdd: (line: PickedVariant) => void 
   );
 }
 
+/** An address as the form keeps it: the four fields it shows, and the rest it keeps as they were. */
+export interface DraftAddress {
+  name: string;
+  phone: string;
+  city: string;
+  address1: string;
+  /** The area, landmark, province, postcode and pin it does not show, sent back as they were. */
+  rest: Record<string, unknown>;
+}
+
+/** A draft as the form shows it, to make or to change. */
+export interface DraftValues {
+  lines: Line[];
+  source: DraftSource;
+  payment: string;
+  delivery: string;
+  discount: string;
+  note: string;
+  address: DraftAddress | null;
+}
+
+const NO_ADDRESS: DraftAddress = { name: '', phone: '', city: '', address1: '', rest: {} };
+
+const FIRST: DraftValues = {
+  lines: [],
+  source: 'WHATSAPP',
+  payment: 'CASH_ON_DELIVERY',
+  delivery: '',
+  discount: '',
+  note: '',
+  address: null,
+};
+
+const shown = (address: DraftAddress) =>
+  [address.name, address.phone, address.city, address.address1].map((each) => each.trim());
+
 /**
- * A new draft order (ORD-03): what the customer picked in the chat or on the call, at the prices
- * agreed; where the conversation was, how they pay, the delivery charge and anything off; their
- * address where staff have it, or else the link asks them for it.
+ * A draft order's form (ORD-03): what the customer picked in the chat or on the call, at the
+ * prices agreed; where the conversation was, how they pay, the delivery charge and anything off;
+ * their address where staff have it, or else the link asks them for it. Changing a draft sends
+ * every line at its price and every charge, so a field emptied is cleared, and its address only
+ * if it changed, its area and pin kept.
  */
-export function NewDraftPage() {
+export function DraftForm({
+  title,
+  initial = FIRST,
+  submitLabel,
+  editing = false,
+  save,
+}: {
+  title: string;
+  initial?: DraftValues;
+  submitLabel: string;
+  editing?: boolean;
+  /** Saves the input; the core's refusals, if any. */
+  save: (input: Record<string, unknown>) => Promise<UserError[]>;
+}) {
   const { t } = useLocale();
-  const shopId = useShop().id;
-  const navigate = useNavigate();
-  const create = useAdminMutation<
-    { draftOrderCreate: { draftOrder: { id: string } | null; userErrors: UserError[] } },
-    { input: Record<string, unknown> }
-  >(DraftOrderCreateMutation);
-  const [lines, setLines] = useState<Line[]>([]);
-  const [source, setSource] = useState<DraftSource>('WHATSAPP');
-  const [payment, setPayment] = useState<'CASH_ON_DELIVERY' | 'BANK_TRANSFER'>('CASH_ON_DELIVERY');
-  const [delivery, setDelivery] = useState('');
-  const [discount, setDiscount] = useState('');
-  const [note, setNote] = useState('');
-  const [hasAddress, setHasAddress] = useState(false);
-  const [address, setAddress] = useState({ name: '', phone: '', city: '', address1: '' });
+  const [lines, setLines] = useState<Line[]>(initial.lines);
+  const [source, setSource] = useState<DraftSource>(initial.source);
+  const [payment, setPayment] = useState(initial.payment);
+  const [delivery, setDelivery] = useState(initial.delivery);
+  const [discount, setDiscount] = useState(initial.discount);
+  const [note, setNote] = useState(initial.note);
+  const [hasAddress, setHasAddress] = useState(initial.address !== null);
+  const [address, setAddress] = useState<DraftAddress>(initial.address ?? NO_ADDRESS);
   const [problems, setProblems] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const payments = ['CASH_ON_DELIVERY', 'BANK_TRANSFER'];
+  // A draft paid another way keeps it among the choices.
+  if (!payments.includes(initial.payment)) payments.push(initial.payment);
 
   const add = (line: PickedVariant) =>
     setLines((now) =>
@@ -161,6 +210,20 @@ export function NewDraftPage() {
         : now.map((each) => (each.variantId === variantId ? { ...each, ...next } : each)),
     );
 
+  /** The address to send: given when made, and when changed only if it was. */
+  const addressInput = () => {
+    if (!hasAddress) return editing && initial.address ? { shippingAddress: null } : {};
+    const [name, phone, city, address1] = shown(address);
+    if (
+      editing &&
+      initial.address &&
+      shown(initial.address).join('\n') === shown(address).join('\n')
+    ) {
+      return {};
+    }
+    return { shippingAddress: { ...address.rest, name, phone, city, address1 } };
+  };
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (lines.length === 0) {
@@ -168,40 +231,39 @@ export function NewDraftPage() {
       return;
     }
     setProblems([]);
+    setBusy(true);
     try {
-      const { draftOrderCreate } = await create.mutateAsync({
-        input: {
-          lineItems: lines.map((line) => ({
-            variantId: line.variantId,
-            quantity: line.quantity,
-            ...(line.agreed.trim() &&
-              line.agreed.trim() !== priceText(line.price.amount) && {
-                price: line.agreed.trim(),
-              }),
-          })),
-          source,
-          paymentMethod: payment,
-          ...(delivery.trim() && { shippingPrice: delivery.trim() }),
-          ...(discount.trim() && { discount: discount.trim() }),
-          ...(note.trim() && { note: note.trim() }),
-          ...(hasAddress && {
-            shippingAddress: {
-              name: address.name.trim(),
-              phone: address.phone.trim(),
-              city: address.city.trim(),
-              address1: address.address1.trim(),
-            },
-          }),
-        },
+      const errors = await save({
+        lineItems: lines.map((line) => {
+          const agreed = line.agreed.trim();
+          // A changed draft keeps each line's price; a new one, the variant's own unless agreed.
+          const price = editing
+            ? agreed || priceText(line.price.amount)
+            : agreed && agreed !== priceText(line.price.amount)
+              ? agreed
+              : null;
+          return { variantId: line.variantId, quantity: line.quantity, ...(price && { price }) };
+        }),
+        source,
+        paymentMethod: payment,
+        ...(editing
+          ? {
+              shippingPrice: delivery.trim() || '0',
+              discount: discount.trim() || '0',
+              note: note.trim(),
+            }
+          : {
+              ...(delivery.trim() && { shippingPrice: delivery.trim() }),
+              ...(discount.trim() && { discount: discount.trim() }),
+              ...(note.trim() && { note: note.trim() }),
+            }),
+        ...addressInput(),
       });
-      const made = draftOrderCreate.draftOrder;
-      if (draftOrderCreate.userErrors.length > 0 || !made) {
-        setProblems(draftOrderCreate.userErrors.map((error) => settingProblem(error, t, LABELS)));
-        return;
-      }
-      await navigate({ to: '/$shopId/drafts/$draftId', params: { shopId, draftId: made.id } });
+      setProblems(errors.map((error) => settingProblem(error, t, LABELS)));
     } catch (failure) {
       setProblems([errorText(failure, t)]);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -210,9 +272,7 @@ export function NewDraftPage() {
       onSubmit={(event) => void onSubmit(event)}
       className="mx-auto flex max-w-3xl flex-col gap-4 pb-8"
     >
-      <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
-        {t('drafts.new')}
-      </h1>
+      <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">{title}</h1>
       <FormSection title={t('drafts.items.title')}>
         <ProductPicker onAdd={add} />
         {lines.length > 0 && (
@@ -277,10 +337,14 @@ export function NewDraftPage() {
           <SelectField
             label={t('drafts.payment')}
             value={payment}
-            options={[
-              { value: 'CASH_ON_DELIVERY', label: t('drafts.payment.CASH_ON_DELIVERY') },
-              { value: 'BANK_TRANSFER', label: t('drafts.payment.BANK_TRANSFER') },
-            ]}
+            options={payments.map((each) => ({
+              value: each,
+              label: t(
+                (each === 'CASH_ON_DELIVERY' || each === 'BANK_TRANSFER'
+                  ? `drafts.payment.${each}`
+                  : `order.payment.${each}`) as MessageKey,
+              ),
+            }))}
             onChange={setPayment}
           />
         </Pair>
@@ -345,9 +409,34 @@ export function NewDraftPage() {
         )}
       </FormSection>
       <Problems problems={problems} />
-      <Button type="submit" busy={create.isPending} className="self-start">
-        {t('drafts.create')}
+      <Button type="submit" busy={busy} className="self-start">
+        {submitLabel}
       </Button>
     </form>
+  );
+}
+
+/** A new draft order (ORD-03), opened once it is made. */
+export function NewDraftPage() {
+  const { t } = useLocale();
+  const shopId = useShop().id;
+  const navigate = useNavigate();
+  const create = useAdminMutation<
+    { draftOrderCreate: { draftOrder: { id: string } | null; userErrors: UserError[] } },
+    { input: Record<string, unknown> }
+  >(DraftOrderCreateMutation);
+  return (
+    <DraftForm
+      title={t('drafts.new')}
+      submitLabel={t('drafts.create')}
+      save={async (input) => {
+        const { draftOrderCreate } = await create.mutateAsync({ input });
+        const made = draftOrderCreate.draftOrder;
+        if (draftOrderCreate.userErrors.length === 0 && made) {
+          await navigate({ to: '/$shopId/drafts/$draftId', params: { shopId, draftId: made.id } });
+        }
+        return draftOrderCreate.userErrors;
+      }}
+    />
   );
 }

@@ -2792,6 +2792,11 @@ const en = {
   'bulk.cancelSubmit': 'Cancel {count} orders',
   'bulk.cancelSubmit.one': 'Cancel 1 order',
   'bulk.cancelKeep': 'Keep them',
+  'drafts.edit': 'Change the draft',
+  'drafts.editTitle': 'Change {name}',
+  'drafts.saveChanges': 'Save the draft',
+  'drafts.cannot': 'Only owners, managers and agents take drafts.',
+  'drafts.closed': 'This draft is an order now: change the order instead.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5560,6 +5565,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'bulk.noteHint': 'ہر آرڈر کی ٹائم لائن پر، آپ کے عملے کے لیے۔',
   'bulk.cancelSubmit': '{count} آرڈر منسوخ کریں',
   'bulk.cancelKeep': 'انہیں رہنے دیں',
+  'drafts.edit': 'ڈرافٹ بدلیں',
+  'drafts.editTitle': '{name} بدلیں',
+  'drafts.saveChanges': 'ڈرافٹ محفوظ کریں',
+  'drafts.cannot': 'ڈرافٹ صرف مالکان، مینیجر اور ایجنٹ لیتے ہیں۔',
+  'drafts.closed': 'یہ ڈرافٹ اب آرڈر ہے: اس کے بجائے آرڈر بدلیں۔',
 };
 
 export const messages: Readonly<

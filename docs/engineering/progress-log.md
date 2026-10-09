@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, a draft changed after it is made** (ORD-03): its items, prices, delivery charge,
-discount, customer and address changed while it is open, as a chat's order changes before it is
-placed, its link kept or lost as the core says; then section by section as the alpha's shops
-need them.
+**Next, the confirmation agents' performance** (COD-11): for owners and managers, each agent's
+orders confirmed and cancelled over the days chosen, their calls that settled nothing, their
+hours on the desk, and how the orders they confirmed turned out, as the core works it out; then
+section by section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -19,6 +19,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### A draft changed while it is open, in the admin
+
+* **The form it was made with** ([ADR-334](../architecture/13-decision-log.md#adr-334--an-open-draft-is-changed-in-the-admin-on-the-form-it-was-made-with-started-from-the-draft-as-it-is-every-line-sent-at-its-price-and-every-charge-as-it-stands-so-an-emptied-one-is-cleared-and-the-address-only-if-it-changed-its-area-landmark-and-pin-kept)): an open draft's page has Change the draft, which opens
+  the new draft's form at the draft as it is. Saved, every line goes at its price, so prices
+  agreed in the chat stay; every charge as it stands, so an emptied one is cleared; and the
+  address only if it changed, its area, landmark and pin kept, or taken away when unticked.
+* **Tried in Chromium against the core:** on the seed's shop, draft #D2's form opened at its two
+  lines and its delivery charge of Rs 200; the charge was made Rs 150 with a note, and the
+  draft's page showed Rs 6,500, its items' Rs 6,350 as before. It was then changed back, Rs 200
+  and no note, and the draft is as the seed made it. No errors in the browser.
+* 2363 tests: a draft's lines and charges changed, each line at its price, an emptied charge
+  as nothing, the address not sent; its city changed, its area, landmark and pin sent with it,
+  and the address taken away; a refusal said by the form's field; and a placed draft left as it
+  is.
 
 ### 7de2641 · Orders tagged and cancelled many at once, in the admin
 
