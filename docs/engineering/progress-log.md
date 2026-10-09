@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Order policies, in the admin
+### adeaf4f · Order policies, in the admin
 
 * **Order policies** ([ADR-308](../architecture/13-decision-log.md#adr-308--the-admin-sets-the-shops-order-policies-in-settings-the-confirmation-desks-calling-hours-its-target-for-the-first-call-and-whether-it-waits-for-whatsapp-after-how-many-days-unpaid-and-unreachable-orders-are-cancelled-until-when-customers-may-cancel-and-the-high-value-amount-and-the-risk-score-that-holds-an-order-for-review)) in settings: the Confirmation Desk's calling hours, its first
   call's target and waiting for WhatsApp; the days after which unpaid orders and unreachable
