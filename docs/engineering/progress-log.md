@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Orders shipped by hand, in the admin
+### 5b1489b · Orders shipped by hand, in the admin
 
 * **A courier Hatti does not book with yet, or the shop's own rider** ([ADR-330](../architecture/13-decision-log.md#adr-330--the-admin-ships-an-order-by-hand-with-a-courier-hatti-does-not-book-with-yet-or-the-shops-own-rider-from-its-page-or-many-packed-orders-at-once-from-shipping-the-courier-named-once-and-each-parcels-tracking-number-beside-its-order)): a packed order's
   page, or a partly shipped one's, has Mark as shipped: the courier, offered from Pakistan's as
