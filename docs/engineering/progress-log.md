@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Products and stock by file, in the admin
+### f07b9c2 · Products and stock by file, in the admin
 
 * **Import and export** ([ADR-311](../architecture/13-decision-log.md#adr-311--the-admin-brings-products-in-from-shopifys-product-csv-and-exports-them-to-it-and-counts-stock-by-shopifys-inventory-csv-each-file-checked-first-and-taken-in-at-a-tap-on-a-page-of-its-own-beside-the-products-list-and-the-stock-page)), beside the products list and the stock page: products from
   Shopify's product CSV, checked first; products exported to it; and stock exported as
