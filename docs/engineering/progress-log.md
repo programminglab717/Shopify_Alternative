@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Packing slips and invoices, in the admin
+### 4c13271 · Packing slips and invoices, in the admin
 
 * **Printed as the core makes them** ([ADR-331](../architecture/13-decision-log.md#adr-331--the-admin-prints-packing-slips-and-invoices-as-the-core-makes-them-from-an-orders-page-and-for-the-orders-chosen-to-pack-or-to-book-at-once-the-document-paper-and-language-chosen-in-one-panel-and-kept-in-the-browser-for-the-next-print)): an order's page has Print beside its name, and
   the orders list's tabs to pack and to book let their orders be chosen and printed at once,
