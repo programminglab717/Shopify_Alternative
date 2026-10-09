@@ -4,6 +4,7 @@ import {
   Banknote,
   ChevronRight,
   CreditCard,
+  Globe,
   History,
   Landmark,
   LifeBuoy,
@@ -53,6 +54,7 @@ interface Section {
     | '/$shopId/settings/orders'
     | '/$shopId/settings/checkout'
     | '/$shopId/settings/locations'
+    | '/$shopId/settings/domains'
     | '/$shopId/settings/couriers'
     | '/$shopId/settings/staff';
   label: MessageKey;
@@ -66,6 +68,12 @@ const SECTIONS: readonly Section[] = [
     label: 'settings.shop',
     hint: 'settings.shopHint',
     icon: Store,
+  },
+  {
+    to: '/$shopId/settings/domains',
+    label: 'settings.domains',
+    hint: 'settings.domainsHint',
+    icon: Globe,
   },
   {
     to: '/$shopId/settings/orders',
@@ -153,7 +161,7 @@ const SECTIONS: readonly Section[] = [
   },
 ];
 
-/** Settings (docs/design/02 §4), as far as they are built: the shop, order policies, locations, delivery and payments, the checkout page, sales tax, customer messages, couriers, staff, billing, activity and support access. */
+/** Settings (docs/design/02 §4), as far as they are built: the shop, its domains, order policies, locations, delivery and payments, the checkout page, sales tax, customer messages, couriers, staff, billing, activity and support access. */
 export function SettingsPage() {
   const { t } = useLocale();
   const shopId = useShop().id;

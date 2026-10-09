@@ -5002,3 +5002,90 @@ export const SavedSearchDeleteMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const DOMAIN = /* GraphQL */ `
+  fragment ShopDomain on Domain {
+    id
+    host
+    url
+    dnsTarget
+    isPrimary
+    isVerified
+    verifiedAt
+    unpointedSince
+  }
+`;
+
+/** The shop's address and its own domains (ONB-07). */
+export const ShopDomainsQuery = /* GraphQL */ `
+  query ShopDomains {
+    shop {
+      url
+    }
+    domains {
+      ...ShopDomain
+    }
+  }
+  ${DOMAIN}
+`;
+
+/** A domain of the shop's own connected, to be pointed at Hatti. */
+export const DomainCreateMutation = /* GraphQL */ `
+  mutation DomainCreate($domain: DomainCreateInput!) {
+    domainCreate(domain: $domain) {
+      domain {
+        ...ShopDomain
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${DOMAIN}
+  ${USER_ERRORS}
+`;
+
+/** A domain checked: whether DNS points it at Hatti now. */
+export const DomainVerifyMutation = /* GraphQL */ `
+  mutation DomainVerify($id: ID!) {
+    domainVerify(id: $id) {
+      domain {
+        ...ShopDomain
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${DOMAIN}
+  ${USER_ERRORS}
+`;
+
+/** A verified domain made primary, where the storefront sends shoppers, or not. */
+export const DomainUpdateMutation = /* GraphQL */ `
+  mutation DomainUpdate($id: ID!, $domain: DomainUpdateInput!) {
+    domainUpdate(id: $id, domain: $domain) {
+      domain {
+        ...ShopDomain
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${DOMAIN}
+  ${USER_ERRORS}
+`;
+
+/** A domain let go: the storefront no longer answers at it. */
+export const DomainDeleteMutation = /* GraphQL */ `
+  mutation DomainDelete($id: ID!) {
+    domainDelete(id: $id) {
+      deletedDomainId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

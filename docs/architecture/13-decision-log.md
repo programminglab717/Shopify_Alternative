@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-318 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-319 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -326,6 +326,7 @@
 | 316 | The admin shows the saved searches of the orders and products lists above them, each run in a tap; those who change a list save the search shown by a name, and rename, change and delete those saved, the core's refusals named by their field | Accepted |
 | 317 | The admin sets on the product page whether each variant's stock is counted and whether it keeps selling when out of stock, each change saved at once and shown at once, put back if the core refuses | Accepted |
 | 318 | The admin describes each product photo for screen readers and search engines, from a pencil on its tile, the description shown beneath it | Accepted |
+| 319 | The admin connects the shop's own domains in settings, saying which record to add where it was bought, checks them again, makes a connected one primary or not, and lets one go once asked; the Hatti address is always shown | Accepted |
 
 ---
 
@@ -12778,3 +12779,30 @@
 * **Alternatives:**
   * **Descriptions in the product's form:** one save, but a photo is uploaded and arranged on
     its own, and its words belong with it.
+
+## ADR-319 · The admin connects the shop's own domains in settings, saying which record to add where it was bought, checks them again, makes a connected one primary or not, and lets one go once asked; the Hatti address is always shown
+
+* **Context:** A shop's storefront answers at its Hatti address and at domains of its own
+  (ONB-07): connected with domainCreate, pointed at the platform by a CNAME record to the
+  domain's dnsTarget, checked with domainVerify, one verified domain made primary, where the
+  storefront sends shoppers, and checked again every few hours, a domain pointed elsewhere for
+  three days disconnected (ADR-262). A plan without domains of its own, such as Free, connects
+  none and keeps those connected before (ADR-264). Owners and managers keep them. The admin had
+  no page for them.
+* **Decision:**
+  * **Domains** is a section of settings. It says where the store is, at its primary domain or
+    its Hatti address, and lists each domain with its state: connected, not pointed at Hatti
+    yet, or pointed elsewhere since a time; and which is primary.
+  * **A domain not pointing at Hatti** shows the record to add where it was bought: a CNAME,
+    its name and the host it points to, copied in a tap, with word that records take hours to
+    spread; **Check again** asks the core, which names what the domain points at instead.
+  * **A connected domain** is made primary, or primary no more, in a tap; **a domain** is let go
+    once asked, saying the Hatti address keeps working.
+  * **Connect a domain** takes the domain as typed or copied; the core's refusals, a plan
+    without domains of its own among them, are shown as they come.
+* **Consequences:**
+  * A shop on Basic connects www.its-name.pk from a phone, adding one record at PKNIC with the
+    words the page gives.
+* **Alternatives:**
+  * **Domains under the online store:** where Shopify puts them, but here they are the shop's
+    set-up, beside its plan, which decides whether it may have them.

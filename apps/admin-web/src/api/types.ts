@@ -2138,3 +2138,19 @@ export interface SavedSearchPayload {
   savedSearch: SavedSearch | null;
   userErrors: UserError[];
 }
+
+export interface ShopDomain {
+  id: string;
+  host: string;
+  url: string;
+  dnsTarget: string;
+  isPrimary: boolean;
+  isVerified: boolean;
+  verifiedAt: string | null;
+  unpointedSince: string | null;
+}
+
+export interface ShopDomainsData {
+  shop: { url: string };
+  domains: ShopDomain[];
+}
