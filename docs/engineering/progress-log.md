@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The shop's blocked numbers, in the admin
+### 98555d0 · The shop's blocked numbers, in the admin
 
 * **Blocked numbers under customers** ([ADR-332](../architecture/13-decision-log.md#adr-332--the-admin-lists-the-shops-blocked-numbers-for-owners-and-managers-the-latest-blocked-first-each-with-its-customer-why-and-since-when-found-by-four-or-more-of-a-numbers-digits-a-number-blocked-before-it-ever-orders-and-one-unblocked)): owners and managers see every number the shop
   blocked, the latest first, each with its customer linked, why and since when, and the shop's
