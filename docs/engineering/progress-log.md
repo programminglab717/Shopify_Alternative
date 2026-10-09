@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The online store's themes, in the admin
+### 97e6d2f · The online store's themes, in the admin
 
 * **Themes** ([ADR-320](../architecture/13-decision-log.md#adr-320--the-admin-lists-the-shops-themes-in-the-online-store-the-live-one-first-each-previewed-through-its-link-and-adds-a-copy-of-one-or-the-platform-theme-afresh-publishes-one-once-asked-and-deletes-those-not-live)), a tab of the online store: the live theme first, each previewed through
   its link; a copy of one, or the platform theme, added; one published once asked; those not
