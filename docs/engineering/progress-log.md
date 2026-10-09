@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Stock, in the admin
+### a7b03d3 · Stock, in the admin
 
 * **A Stock section** ([ADR-289](../architecture/13-decision-log.md#adr-289--the-admins-stock-lists-what-runs-low-the-fewest-for-sale-first-and-finds-any-products-each-variants-stock-at-each-location-added-to-or-taken-from-with-a-reason-and-counted-against-what-was-on-hand-when-read-by-owners-and-managers-every-role-sees-it-and-home-says-how-many-run-low)): what runs low, the fewest for sale first, and any
   product's found; each variant's stock at each location with its latest changes, added to or
