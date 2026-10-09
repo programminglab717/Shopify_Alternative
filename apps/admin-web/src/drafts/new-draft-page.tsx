@@ -36,8 +36,11 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   name: 'drafts.name',
 };
 
-/** Finding products by words, to add their variants to the draft. */
-function ProductPicker({ onAdd }: { onAdd: (line: Omit<Line, 'quantity'>) => void }) {
+/** A variant found to add, at its price now as the form shows it. */
+export type PickedVariant = Omit<Line, 'quantity'>;
+
+/** Finding products by words, to add their variants to a draft, or to an order being changed. */
+export function ProductPicker({ onAdd }: { onAdd: (line: PickedVariant) => void }) {
   const { t } = useLocale();
   const [words, setWords] = useState('');
   const [searched, setSearched] = useState<string | null>(null);
@@ -143,7 +146,7 @@ export function NewDraftPage() {
   const [address, setAddress] = useState({ name: '', phone: '', city: '', address1: '' });
   const [problems, setProblems] = useState<string[]>([]);
 
-  const add = (line: Omit<Line, 'quantity'>) =>
+  const add = (line: PickedVariant) =>
     setLines((now) =>
       now.some((each) => each.variantId === line.variantId)
         ? now.map((each) =>

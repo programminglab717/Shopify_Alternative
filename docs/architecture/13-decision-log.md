@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-286 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-287 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -294,6 +294,7 @@
 | 284 | An order's page records its customer's return of delivered items, each with why, another variant sent at once in exchange if asked, checks it in with what is damaged written off or cancels it; customer returns on their way have a tab of their own; and a parcel back damaged is claimed from its courier | Accepted |
 | 285 | An order's page shows what was paid and given back, each refund with how, its reference, why and its receipt; owners and managers record a refund, at most what is left, by hand with its receipt uploaded, through the gateway or as store credit, and mark an order paid after saying how much it records | Accepted |
 | 286 | An order's page gives it to a member of staff, comments on its timeline with their authors' edits and deletes, keeps its note and tags, and corrects its address while nothing has shipped, each for the roles the core lets do it | Accepted |
+| 287 | An order's page changes its items while it waits to be packed, quantities stepped and lines taken off or put back, products found and added at a price agreed, and its delivery charge waived or discount given, saying back the new total and cash at the door; a packed order is unpacked first | Accepted |
 
 ---
 
@@ -11791,3 +11792,41 @@
     book from the whole of it; one form says so.
   * **Keeping the map pin on a corrected address:** a pin points where the customer stood when
     they shared it; once the address changes it misleads the rider more than it helps.
+
+## ADR-287 · An order's page changes its items while it waits to be packed, quantities stepped and lines taken off or put back, products found and added at a price agreed, and its delivery charge waived or discount given, saying back the new total and cash at the door; a packed order is unpacked first
+
+* **Context:** The core changes an order's items in one call while it waits to be packed:
+  lines' new quantities, 0 taking one off, and variants added at their price now or one given,
+  the lines kept keeping their prices ([ADR-131](#adr-131--an-orders-items-change-while-it-waits-to-be-packed-quantities-set-and-variants-added-in-one-edit-the-lines-kept-keeping-their-prices-its-amounts-and-tax-worked-out-again-and-the-difference-collected-at-the-door-its-stock-committed-and-let-go-at-once)). Another call changes its delivery
+  charge and discount, never below what was taken off for paying by transfer
+  ([ADR-134](#adr-134--an-orders-delivery-charge-and-discount-change-while-it-waits-to-be-packed-as-its-items-do-its-totals-tax-and-cash-at-the-door-following-what-was-taken-off-for-paying-by-transfer-stays-part-of-the-discount-and-the-fee-stays)). Both refuse once it is packed, has shipped or has refunds. A customer
+  changes their mind on the confirmation call; the order's page showed its items and nothing
+  more, so the agent had to cancel it and take it again.
+* **Decision:**
+  * **Changing the items** opens in the items' place for those who work orders, while the
+    order is open, waiting to be confirmed, reviewed, paid or packed, with nothing shipped or
+    refunded and within the plan. Each line steps up or down, or comes off and goes back; the
+    draft's product search ([ADR-277](#adr-277--staff-take-orders-over-the-phone-or-in-a-chat-as-drafts-in-the-admin-products-found-and-added-at-the-price-agreed-where-it-was-taken-and-how-it-is-paid-its-link-sent-on-whatsapp-for-the-customer-to-give-the-address-and-confirm-or-the-draft-placed-at-once-and-tertiary-buttons-that-take-something-away-are-red)) adds variants, a price agreed typed beside
+    each. A variant already on the order adds to its line, as the core does. The items' new
+    subtotal is shown against the old as it changes; the core works the rest out.
+  * **What is sent is only what changed:** quantities for the lines changed, and the variants
+    added, with a price only where it differs from theirs now. Taking every item off is
+    refused before it is sent: that is cancelling.
+  * **Delivery and discount** are a second form: the charge, waived in a tap, and the whole
+    discount on the items, held at least at the transfer's, which is said beside it.
+  * **The page says back what the core made of it:** the new total and the cash to collect at
+    the door, which the agent reads to the customer, and that it now waits for review when the
+    change made it risky.
+  * **A packed order says to unpack it first**, and the order's actions gain Unpack while
+    nothing has shipped. The order's actions now show only to those who work orders, as the
+    core lets them, like its other changes ([ADR-286](#adr-286--an-orders-page-gives-it-to-a-member-of-staff-comments-on-its-timeline-with-their-authors-edits-and-deletes-keeps-its-note-and-tags-and-corrects-its-address-while-nothing-has-shipped-each-for-the-roles-the-core-lets-do-it)).
+* **Consequences:**
+  * An agent changes the order on the call and reads the new total back, the order keeping
+    its number, link, timeline and assignee.
+  * The timeline says what changed, in the core's words, so the page needs no record of its
+    own.
+* **Alternatives:**
+  * **Every line's quantity typed in a box:** steppers suit a phone on a call, and orders hold
+    a few units.
+  * **A preview of the new total from the core before saving:** the core has none without
+    saving; the subtotal shown is exact, and the rest is said back once saved.

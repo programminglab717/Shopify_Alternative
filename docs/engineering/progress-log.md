@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, editing an order's items in the admin** (ORD-04): quantities changed and variants added
-while it waits to be packed, its delivery charge waived and something taken off on the call,
-the cash at the door following; then the admin's next sections as the alpha's shops need them.
-Urdu handles wait, as decided.
+**Next, merging and splitting orders in the admin** (ORD-04): an order its customer placed twice
+merged into the other, and items sent apart split into an order of their own, from the order's
+page; then the admin's next sections as the alpha's shops need them. Urdu handles wait, as
+decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### An order's items changed, in the admin
+
+* **Items, delivery charge and discount changed on the order's page** ([ADR-287](../architecture/13-decision-log.md#adr-287--an-orders-page-changes-its-items-while-it-waits-to-be-packed-quantities-stepped-and-lines-taken-off-or-put-back-products-found-and-added-at-a-price-agreed-and-its-delivery-charge-waived-or-discount-given-saying-back-the-new-total-and-cash-at-the-door-a-packed-order-is-unpacked-first)):
+  lines stepped, taken off and put back, products found and added at a price agreed, delivery
+  waived and a discount given, the new total and cash at the door said back; a packed order
+  unpacked first, and the order's actions shown only to those who work orders.
+* **Tried against the core:** the seed's #1015, waiting to be confirmed, its khussa stepped up
+  and the same variant found and added, which went to its line: 3 at Rs 2,250, "Rs 6,950, with
+  Rs 6,950 to collect at the door"; then delivery waived and Rs 300 taken off, Rs 6,450; the
+  timeline said "Changed the items" and "Changed the delivery charge"; with no errors in the
+  browser.
+* 2038 tests: a line stepped up, another taken off and a variant added at a price agreed,
+  sent as only what changed; every item taken off refused; a discount below the transfer's
+  refused and delivery waived, with a review said back; a packed order unpacked; and nothing to
+  change, confirm or cancel for an accountant.
 
 ### 503f71c · An order's everyday edits, in the admin
 

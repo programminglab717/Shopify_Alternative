@@ -1,15 +1,23 @@
 import { Link, useParams } from '@tanstack/react-router';
-import { ArrowLeft, Ban, Check, EyeOff, PackageCheck, ShieldAlert } from 'lucide-react';
+import {
+  ArrowLeft,
+  Ban,
+  Check,
+  EyeOff,
+  PackageCheck,
+  PackageOpen,
+  ShieldAlert,
+} from 'lucide-react';
 import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   OrderCancelMutation,
   OrderConfirmMutation,
   OrderMarkPackedMutation,
+  OrderMarkUnpackedMutation,
   OrderQuery,
 } from '../api/operations';
 import type {
-  MoneyValue,
   OrderCancelReason,
   OrderData,
   OrderDetail,
@@ -17,7 +25,7 @@ import type {
   OrderStage,
 } from '../api/types';
 import { errorText } from '../i18n/errors';
-import { formatCount, formatDateTime, formatMoney, formatPhone } from '../i18n/format';
+import { formatCount, formatDateTime, formatPhone } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { READS_CUSTOMERS } from '../customers/customers-page';
@@ -25,8 +33,9 @@ import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context'
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { Assignment, DeliveryAddress, NoteAndTags, Timeline } from './details';
+import { OrderItems } from './edit-order';
 import { HANDLES_MONEY, OrderMoney } from './money';
-import { Parcels } from './parcels';
+import { Parcels, WORKS_PARCELS } from './parcels';
 import { OrderReturns } from './returns';
 import { StageBadge } from './stage';
 
@@ -48,10 +57,6 @@ export const REASONS: readonly OrderCancelReason[] = [
   'OTHER',
 ];
 
-function money(value: MoneyValue): string {
-  return formatMoney(value.amount, value.currencyCode);
-}
-
 function Section({ title, children }: { title: string; children: ReactNode }) {
   const id = useId();
   return (
@@ -66,20 +71,16 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className={`flex justify-between gap-4 ${strong ? 'font-semibold' : ''}`}>
-      <dt className={strong ? '' : 'text-secondary'}>{label}</dt>
-      <dd className="num">{value}</dd>
-    </div>
-  );
-}
-
-/** The order's actions for its stage: confirm, pack, or cancel for a reason. */
+/**
+ * The order's actions for its stage, for those who work orders: confirm, pack, unpack while
+ * nothing has shipped, or cancel for a reason.
+ */
 function Actions({ order }: { order: OrderDetail }) {
   const { t } = useLocale();
+  const { role } = useShop();
   const confirm = useAdminMutation<OrderMutationData, { id: string }>(OrderConfirmMutation);
   const pack = useAdminMutation<OrderMutationData, { id: string }>(OrderMarkPackedMutation);
+  const unpack = useAdminMutation<OrderMutationData, { id: string }>(OrderMarkUnpackedMutation);
   const cancel = useAdminMutation<OrderMutationData, { id: string; reason: OrderCancelReason }>(
     OrderCancelMutation,
   );
@@ -98,11 +99,12 @@ function Actions({ order }: { order: OrderDetail }) {
     }
   };
 
-  const open = order.status === 'OPEN';
+  const open = order.status === 'OPEN' && WORKS_PARCELS.includes(role);
   const canConfirm = open && !order.overPlanLimit && CONFIRMABLE.includes(order.stage);
   const canPack = open && !order.overPlanLimit && order.stage === 'TO_PACK';
+  const canUnpack = open && order.stage === 'TO_BOOK' && order.fulfillments.length === 0;
   const canCancel = open && CANCELLABLE.includes(order.stage);
-  if (!canConfirm && !canPack && !canCancel) return null;
+  if (!canConfirm && !canPack && !canUnpack && !canCancel) return null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -124,6 +126,16 @@ function Actions({ order }: { order: OrderDetail }) {
             onClick={() => void run(() => pack.mutateAsync({ id: order.id }))}
           >
             {t('order.pack')}
+          </Button>
+        )}
+        {canUnpack && (
+          <Button
+            variant="secondary"
+            icon={<PackageOpen aria-hidden className="size-5" />}
+            busy={unpack.isPending}
+            onClick={() => void run(() => unpack.mutateAsync({ id: order.id }))}
+          >
+            {t('order.unpack')}
           </Button>
         )}
         {canCancel && !cancelling && (
@@ -175,8 +187,8 @@ function Actions({ order }: { order: OrderDetail }) {
 }
 
 /**
- * An order's page (ORD-02): its stage and what can be done next, its items and totals, the cash
- * to collect, its customer and address (hidden past the plan's limit, ADR-263), why it is risky,
+ * An order's page (ORD-02): its stage and what can be done next, its items and totals, changed
+ * while it waits to be packed (ORD-04), the cash to collect, its customer and address (hidden past the plan's limit, ADR-263), why it is risky,
  * and its timeline.
  */
 export function OrderPage() {
@@ -215,9 +227,6 @@ export function OrderPage() {
     );
   }
   const timezone = details.timezone;
-  const discounted = Number(order.totalDiscounts.amount) > 0;
-  const fee = Number(order.codFee.amount) > 0;
-  const toCollect = Number(order.codAmount.amount) > 0;
   const phone = order.shippingAddress.phone ?? order.phone;
 
   return (
@@ -248,37 +257,7 @@ export function OrderPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
           <Section title={t('order.items')}>
-            <ul className="divide-y divide-line">
-              {order.lineItems.map((line) => (
-                <li key={line.id} className="flex justify-between gap-4 py-2">
-                  <span className="flex flex-col">
-                    <span className="font-medium">{line.title}</span>
-                    {line.variantTitle && line.variantTitle !== 'Default Title' && (
-                      <span className="text-secondary">{line.variantTitle}</span>
-                    )}
-                    <span className="num text-secondary">
-                      {money(line.unitPrice)} × {formatCount(line.quantity)}
-                    </span>
-                  </span>
-                  <span className="num">{money(line.totalPrice)}</span>
-                </li>
-              ))}
-            </ul>
-            <dl className="flex flex-col gap-1 border-t border-line pt-3">
-              <Row label={t('order.subtotal')} value={money(order.subtotalPrice)} />
-              <Row label={t('order.shipping')} value={money(order.totalShippingPrice)} />
-              {discounted && (
-                <Row label={t('order.discount')} value={`-${money(order.totalDiscounts)}`} />
-              )}
-              {fee && <Row label={t('order.codFee')} value={money(order.codFee)} />}
-              <Row label={t('order.total')} value={money(order.totalPrice)} strong />
-              {Number(order.amountPaid.amount) > 0 && (
-                <Row label={t('order.paid')} value={money(order.amountPaid)} />
-              )}
-              {toCollect && (
-                <Row label={t('order.toCollect')} value={money(order.codAmount)} strong />
-              )}
-            </dl>
+            <OrderItems order={order} />
           </Section>
           {(HANDLES_MONEY.includes(shop.role) ||
             Number(order.amountPaid.amount) > 0 ||

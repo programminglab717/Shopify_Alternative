@@ -194,6 +194,9 @@ export const OrderQuery = /* GraphQL */ `
       totalDiscounts {
         ...Money
       }
+      transferDiscount {
+        ...Money
+      }
       codFee {
         ...Money
       }
@@ -363,6 +366,60 @@ export const OrderMarkPackedMutation = /* GraphQL */ `
       }
     }
   }
+  ${USER_ERRORS}
+`;
+
+/** A packed mark taken back while nothing has shipped, so the order's items can change. */
+export const OrderMarkUnpackedMutation = /* GraphQL */ `
+  mutation OrderMarkUnpacked($id: ID!) {
+    orderMarkUnpacked(id: $id) {
+      order {
+        id
+        stage
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+const EDITED_ORDER = /* GraphQL */ `
+  order {
+    id
+    stage
+    totalPrice {
+      ...Money
+    }
+    codAmount {
+      ...Money
+    }
+  }
+  userErrors {
+    ...Problems
+  }
+`;
+
+/** An order's items changed while it waits to be packed (ORD-04, ADR-131). */
+export const OrderEditLineItemsMutation = /* GraphQL */ `
+  mutation OrderEditLineItems($id: ID!, $input: OrderEditLineItemsInput!) {
+    orderEditLineItems(id: $id, input: $input) {
+      ${EDITED_ORDER}
+    }
+  }
+  ${MONEY}
+  ${USER_ERRORS}
+`;
+
+/** An order's delivery charge and discount changed while it waits to be packed (ADR-134). */
+export const OrderEditChargesMutation = /* GraphQL */ `
+  mutation OrderEditCharges($id: ID!, $input: OrderEditChargesInput!) {
+    orderEditCharges(id: $id, input: $input) {
+      ${EDITED_ORDER}
+    }
+  }
+  ${MONEY}
   ${USER_ERRORS}
 `;
 

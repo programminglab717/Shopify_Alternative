@@ -234,6 +234,8 @@ export interface OrderDetail {
   subtotalPrice: MoneyValue;
   totalShippingPrice: MoneyValue;
   totalDiscounts: MoneyValue;
+  /** What was taken off for paying by transfer: part of the discount, which never goes below it. */
+  transferDiscount: MoneyValue;
   codFee: MoneyValue;
   totalPrice: MoneyValue;
   amountPaid: MoneyValue;
@@ -1162,4 +1164,17 @@ export interface ParcelCheckInData {
 
 export interface ParcelUserErrorsData {
   [mutation: string]: { userErrors: UserError[] };
+}
+
+/** What an edit of an order's items or charges left it at. */
+export interface OrderEditData {
+  [field: string]: {
+    order: {
+      id: string;
+      stage: OrderStage;
+      totalPrice: MoneyValue;
+      codAmount: MoneyValue;
+    } | null;
+    userErrors: UserError[];
+  };
 }
