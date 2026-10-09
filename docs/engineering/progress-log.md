@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The link page, in the admin
+### 21b2f5b · The link page, in the admin
 
 * **Link page** ([ADR-300](../architecture/13-decision-log.md#adr-300--the-admin-keeps-the-shops-link-page-in-the-online-store-where-it-is-to-copy-and-open-its-bio-links-and-products-edited-and-saved-together-each-products-variant-chosen-where-it-has-several-the-cores-reason-given-by-the-link-or-product-it-is-about-and-its-taps-over-the-last-week-month-or-three-months)), a tab of the online store for owners and managers: the page's address
   to copy and open, and its WhatsApp chat; its bio, links and products edited and saved together,
