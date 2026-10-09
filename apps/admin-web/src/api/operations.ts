@@ -3451,3 +3451,120 @@ export const CommentDeleteMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const STOREFRONT_PREFERENCES = /* GraphQL */ `
+  fragment StorefrontPreferences on OnlineStorePreferences {
+    passwordEnabled
+    password
+    passwordMessage
+    maintenanceEnabled
+    maintenanceMessage
+    maintenanceUntil
+    seo {
+      title
+      description
+    }
+  }
+`;
+
+/** The storefront's password, its pause, and its home page for search engines (OS-09, OS-15). */
+export const StorefrontPreferencesQuery = /* GraphQL */ `
+  query StorefrontPreferences {
+    onlineStorePreferences {
+      ...StorefrontPreferences
+    }
+  }
+  ${STOREFRONT_PREFERENCES}
+`;
+
+/** Some of the storefront's preferences changed: those given; the others stay. */
+export const StorefrontPreferencesUpdateMutation = /* GraphQL */ `
+  mutation StorefrontPreferencesUpdate($input: OnlineStorePreferencesInput!) {
+    onlineStorePreferencesUpdate(input: $input) {
+      preferences {
+        ...StorefrontPreferences
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${STOREFRONT_PREFERENCES}
+  ${USER_ERRORS}
+`;
+
+/** The shop's redirects from old addresses, found by any part of either address (OS-09). */
+export const UrlRedirectsQuery = /* GraphQL */ `
+  query UrlRedirects($query: String) {
+    urlRedirects(first: 100, query: $query) {
+      nodes {
+        id
+        path
+        target
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+`;
+
+/** A redirect from an old address to a page of the shop or another site. */
+export const UrlRedirectCreateMutation = /* GraphQL */ `
+  mutation UrlRedirectCreate($urlRedirect: UrlRedirectInput!) {
+    urlRedirectCreate(urlRedirect: $urlRedirect) {
+      urlRedirect {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A redirect deleted: its old address is not found again. */
+export const UrlRedirectDeleteMutation = /* GraphQL */ `
+  mutation UrlRedirectDelete($id: ID!) {
+    urlRedirectDelete(id: $id) {
+      deletedUrlRedirectId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Redirects from Shopify's CSV (ONB-05): checked first as a dry run, then added. */
+export const UrlRedirectsImportMutation = /* GraphQL */ `
+  mutation UrlRedirectsImport($csv: String!, $dryRun: Boolean) {
+    urlRedirectsImport(csv: $csv, dryRun: $dryRun) {
+      dryRun
+      rows
+      created
+      skipped
+      rowErrorCount
+      rowErrors {
+        row
+        column
+        message
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The shop's redirects as Shopify's CSV, to keep or to take elsewhere. */
+export const UrlRedirectsExportQuery = /* GraphQL */ `
+  query UrlRedirectsExport {
+    urlRedirectsExport {
+      count
+      csv
+    }
+  }
+`;

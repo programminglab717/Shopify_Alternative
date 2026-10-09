@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-296 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-297 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -304,6 +304,7 @@
 | 294 | The admin signs in with a passkey alone, a passkey as the second step, or Google's own button loaded only when asked for, and confirms who is there the same ways; a passkey's challenge and Google's nonce are good once, so each try starts from the core's options again | Accepted |
 | 295 | The admin installs on a phone from a manifest in its language, with PNG and maskable icons, and a service worker built with it keeps the admin's own files: its page from the network and offline from the cache, its files from the cache, the shop's data never; it says when the phone is offline, and offers a new version once it has installed | Accepted |
 | 296 | The admin's online store writes the shop's blogs: a blog started by its title, its comments closed, approved or shown at once; its articles written as text like pages, with an author, tags and an image from the phone, shown now, from a time ahead or hidden; and their comments approved, marked as spam or not, and deleted | Accepted |
+| 297 | The admin's online store keeps the storefront behind its password while the shop gets ready, pauses it while open until a time or until told, and sets its home page for search engines; and sends old addresses on, redirects found, added, deleted, imported from Shopify's CSV once checked, and exported to it | Accepted |
 
 ---
 
@@ -12163,3 +12164,32 @@
   * **Comments in a section of their own across all articles:** the core can list them by status,
     but a shop with a handful of articles reads them where they were left; a queue waits for shops
     whose blogs grow.
+
+## ADR-297 · The admin's online store keeps the storefront behind its password while the shop gets ready, pauses it while open until a time or until told, and sets its home page for search engines; and sends old addresses on, redirects found, added, deleted, imported from Shopify's CSV once checked, and exported to it
+
+* **Context:** The core keeps the storefront's preferences: a password that closes it while the
+  shop gets ready, with a message for its page; a pause of an open storefront, as for a stock-take
+  or the days couriers stop for Eid, with a message and a time to open again by itself; and the
+  home page's title and description for search engines. It keeps redirects from old addresses,
+  found by any part of either, and imports them from Shopify's CSV, a dry run first saying what it
+  would add, skip and could not read, and exports them to it. Owners and managers change both.
+  The admin's online store had pages, blogs, menus and policies ([ADR-296](#adr-296--the-admins-online-store-writes-the-shops-blogs-a-blog-started-by-its-title-its-comments-closed-approved-or-shown-at-once-its-articles-written-as-text-like-pages-with-an-author-tags-and-an-image-from-the-phone-shown-now-from-a-time-ahead-or-hidden-and-their-comments-approved-marked-as-spam-or-not-and-deleted)), and none
+  of these.
+* **Decision:**
+  * **A Storefront tab**, for owners and managers, in three parts, each saved on its own:
+    * the **password**: the storefront kept behind it or open, said in a line; the password,
+      needed while it is kept; and the message on its page;
+    * the **pause**: on or off, said in a line; the message while paused; and, while paused, the
+      time to open again, in the phone's own time, or none to open it by hand;
+    * **search engines**: the home page's title and description, how many letters each has of
+      the most a search engine shows.
+  * **A Redirects tab**, for the same roles: what redirects are for in a line; the redirects,
+    found as one types; each deleted after asking; one added, an old address and where it goes; a
+    CSV from Shopify checked first, its rows, those it would add and skip and the first it could
+    not read said, then added at a tap; and all of them downloaded as Shopify's CSV.
+  * **The online store's tabs** wrap on a phone, six of them.
+  * Counts of one read as one ("1 comment", "1 article"), through the singular forms the admin's
+    messages already take.
+* **Consequences:**
+  * A shop coming from Shopify brings its old addresses in two taps, so links shared on WhatsApp
+    and Instagram before still land; and opens its storefront when it is ready, from the phone.

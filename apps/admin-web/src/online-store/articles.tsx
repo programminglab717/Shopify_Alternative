@@ -24,7 +24,7 @@ import type {
   ShopFileData,
 } from '../api/types';
 import { errorText } from '../i18n/errors';
-import { formatDateTime } from '../i18n/format';
+import { formatDateTime, localInput } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { FormSection } from '../products/product-form';
@@ -39,15 +39,6 @@ import { BodyArea, normalized, useBody } from './body-field';
 import { usePageState, WRITES_PAGES } from './pages';
 
 type When = 'now' | 'later' | 'hidden';
-
-/** A time as a `datetime-local` field shows it: in the phone's own time. */
-function localInput(iso: string): string {
-  const date = new Date(iso);
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
-    date.getHours(),
-  )}:${pad(date.getMinutes())}`;
-}
 
 /** When an article shows: now, from a time ahead, or not at all, as its date says (ADR-215). */
 function whenOf(article?: ArticleDetail): When {

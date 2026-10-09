@@ -9,8 +9,17 @@ import { BlogsList } from './blogs';
 import { EDITS_MENUS, MenusList } from './menus';
 import { PagesList, WRITES_PAGES } from './pages';
 import { PoliciesList, SETS_POLICIES } from './policies';
+import { RedirectsTab } from './redirects';
+import { StorefrontPreferencesTab } from './storefront';
 
-export const ONLINE_STORE_TABS = ['pages', 'blogs', 'menus', 'policies'] as const;
+export const ONLINE_STORE_TABS = [
+  'pages',
+  'blogs',
+  'menus',
+  'policies',
+  'storefront',
+  'redirects',
+] as const;
 export type OnlineStoreTab = (typeof ONLINE_STORE_TABS)[number];
 
 /** The online store's tab, from its address: its pages unless it names another. */
@@ -35,6 +44,12 @@ const TABS: Record<
     roles: SETS_POLICIES,
     body: () => <PoliciesList />,
   },
+  storefront: {
+    label: 'onlineStore.storefront',
+    roles: EDITS_MENUS,
+    body: () => <StorefrontPreferencesTab />,
+  },
+  redirects: { label: 'onlineStore.redirects', roles: EDITS_MENUS, body: () => <RedirectsTab /> },
 };
 
 /** The roles that see the online store at all: those who work in any of its tabs. */
@@ -43,8 +58,9 @@ export const OPENS_ONLINE_STORE: readonly StaffRole[] = [
 ];
 
 /**
- * The online store (OS-07): the shop's pages, blogs, menus and policies, a tab for each part its
- * role works in.
+ * The online store (OS-07, OS-09, OS-15): the shop's pages, blogs, menus and policies, its
+ * storefront's password, pause and home page for search engines, and its redirects; a tab for each
+ * part its role works in.
  */
 export function OnlineStorePage() {
   const { t } = useLocale();
@@ -61,7 +77,7 @@ export function OnlineStorePage() {
         {t('onlineStore.title')}
       </h1>
       {tabs.length > 1 && (
-        <div role="tablist" className="flex gap-2">
+        <div role="tablist" className="flex flex-wrap gap-2">
           {tabs.map((each) => (
             <button
               key={each}

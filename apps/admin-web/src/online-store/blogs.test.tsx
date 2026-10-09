@@ -207,7 +207,7 @@ describe("The online store's blogs", () => {
       `${STORAGE}/eid.jpg`,
     );
     const comments = screen.getByRole('region', { name: 'Comments' });
-    expect(within(comments).getByText(/1 comments wait for you/)).toBeTruthy();
+    expect(within(comments).getByText('1 comment waits for you to approve it.')).toBeTruthy();
     const row = (name: string) => within(comments).getByText(name).closest('li')!;
     fireEvent.click(within(row('Ayesha')).getByRole('button', { name: 'Approve' }));
     await waitFor(() => expect(sentOf(fake, 'CommentApprove')).toEqual({ id: 'cmt_1' }));

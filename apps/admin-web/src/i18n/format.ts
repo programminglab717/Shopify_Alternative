@@ -76,3 +76,12 @@ export function formatRelative(
   if (abs < 86_400) return relative.format(Math.trunc(seconds / 3_600), 'hour');
   return relative.format(Math.trunc(seconds / 86_400), 'day');
 }
+
+/** A time as a `datetime-local` field shows it: in the phone's own time. */
+export function localInput(iso: string): string {
+  const date = new Date(iso);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`;
+}

@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, the online store's preferences and redirects in the admin** (OS-09, OS-15): the
-storefront's password while the shop gets ready, the home page's title and description for search
-engines, and redirects from old addresses, added, imported from Shopify's CSV and deleted; then
-the admin's next sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, customer segments in the admin** (CUS-03, CUS-04): customers found by what they bought,
+where they live, how their parcels went and whether they agreed to marketing, kept as segments
+with their members counted; then the admin's next sections as the alpha's shops need them. Urdu
+handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The storefront's preferences and redirects, in the admin
+
+* **A Storefront tab** ([ADR-297](../architecture/13-decision-log.md#adr-297--the-admins-online-store-keeps-the-storefront-behind-its-password-while-the-shop-gets-ready-pauses-it-while-open-until-a-time-or-until-told-and-sets-its-home-page-for-search-engines-and-sends-old-addresses-on-redirects-found-added-deleted-imported-from-shopifys-csv-once-checked-and-exported-to-it)): the storefront kept behind its password with a message, or open;
+  paused with a message until a time or until told; and its home page's title and description for
+  search engines.
+* **A Redirects tab:** redirects found as one types, added, deleted after asking, imported from
+  Shopify's CSV once checked, and downloaded as it.
+* **Tried against the core:** the seed's shop kept behind a password and opened again, paused
+  until tomorrow and opened again, and given a home page title; a redirect added, a CSV of three
+  rows checked (two to add, one with no target said by its row) and imported, all three
+  downloaded as Shopify's CSV, and one deleted; with no errors in the browser.
+* 2131 tests: the password, the pause and search engines saved part by part; redirects found,
+  added, deleted, imported after checking and exported; and neither tab for a marketer.
 
 ### 6c8b42a · The shop's blogs, in the admin
 

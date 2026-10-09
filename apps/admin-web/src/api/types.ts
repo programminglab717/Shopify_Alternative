@@ -1513,3 +1513,50 @@ export interface ContentMutationData {
     userErrors: UserError[];
   };
 }
+
+export interface StorefrontPreferences {
+  passwordEnabled: boolean;
+  password: string | null;
+  passwordMessage: string;
+  maintenanceEnabled: boolean;
+  maintenanceMessage: string;
+  maintenanceUntil: string | null;
+  seo: { title: string | null; description: string | null };
+}
+
+export interface StorefrontPreferencesData {
+  onlineStorePreferences: StorefrontPreferences;
+}
+
+export interface StorefrontPreferencesUpdateData {
+  onlineStorePreferencesUpdate: {
+    preferences: StorefrontPreferences | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface UrlRedirectValue {
+  id: string;
+  path: string;
+  target: string;
+}
+
+export interface UrlRedirectsData {
+  urlRedirects: { nodes: UrlRedirectValue[]; pageInfo: { hasNextPage: boolean } };
+}
+
+export interface UrlRedirectsImportData {
+  urlRedirectsImport: {
+    dryRun: boolean;
+    rows: number;
+    created: number;
+    skipped: number;
+    rowErrorCount: number;
+    rowErrors: { row: number; column: string | null; message: string }[];
+    userErrors: UserError[];
+  };
+}
+
+export interface UrlRedirectsExportData {
+  urlRedirectsExport: { count: number; csv: string };
+}
