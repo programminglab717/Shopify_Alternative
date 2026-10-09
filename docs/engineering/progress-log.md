@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, staff invitations sent again and the shop handed over, in the admin** (ADM-01): an
-invitation that waits sent again, by text or email, and the owner handing the shop to another
-of its staff; then the admin's next sections as the alpha's shops need them. Urdu handles wait,
-as decided.
+**Next, saved searches kept in the admin** (ORD-01, CAT-04): the searches saved for orders,
+products, drafts and customers listed, renamed, changed and deleted; then the admin's next
+sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Invitations sent again and the shop handed over, in the admin
+
+* **Send again** ([ADR-315](../architecture/13-decision-log.md#adr-315--the-admin-sends-an-emailed-invitation-still-waiting-again-showing-its-new-link-and-the-owner-hands-the-shop-to-one-of-its-managers-once-asked-the-cores-refusal-named-and-the-owners-own-role-read-again-after)) on an emailed invitation, its new link shown; **Hand the shop over**
+  for the owner, to a manager once asked, the account's roles read again after.
+* **Tried against the core:** on the seed's shop, the owner invited a packer by email and sent
+  it again: Hatti emailed a new link and the first opened nothing more. With the shop's agent
+  made a manager for the check, handing the shop to them was refused, as they have no second
+  factor, and the owner stayed the owner. The agent's role and the invitations were then put
+  back. No errors in the browser.
+* 2255 tests: an emailed invitation sent again after the member confirmed who they are; the
+  shop handed to a manager once asked, after a refusal named; an owner without managers told to
+  make one first.
 
 ### adc364d · Courier pickups, in the admin
 

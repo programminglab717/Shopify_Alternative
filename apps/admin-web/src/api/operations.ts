@@ -1450,6 +1450,39 @@ export const StaffInvitationCreateMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** An invitation still waiting emailed again, by a new link that takes its place (ADR-196). */
+export const StaffInvitationResendMutation = /* GraphQL */ `
+  mutation StaffInvitationResend($id: ID!, $language: EmailLanguage) {
+    staffInvitationResend(id: $id, language: $language) {
+      token
+      emailed
+      invitation {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The shop handed to one of its managers; the owner stays on as a manager. */
+export const ShopOwnershipTransferMutation = /* GraphQL */ `
+  mutation ShopOwnershipTransfer($staffMemberId: ID!) {
+    shopOwnershipTransfer(staffMemberId: $staffMemberId) {
+      owner {
+        id
+        name
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** An invitation taken back: its link opens nothing after. */
 export const StaffInvitationRevokeMutation = /* GraphQL */ `
   mutation StaffInvitationRevoke($id: ID!) {

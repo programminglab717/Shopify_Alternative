@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-314 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-315 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -322,6 +322,7 @@
 | 312 | The admin lists the shop's locations in settings, those out of use too, and adds one with its address and the number couriers call for pickups, changes it and whether it fulfils online orders, takes it out of use and puts it back, and deletes one that never held stock; the primary one stays | Accepted |
 | 313 | The admin changes a product's options and variants after it was made: an option renamed, values added and deleted where no variant uses them, an option added with a variant for every new combination if asked, or taken away where its variants stay apart; variants added for combinations it lacks and deleted, one always kept | Accepted |
 | 314 | The admin asks a courier whose API takes pickups to collect the parcels waiting, naming its rider where it asks, and lists the pickups asked for with their parcels, the courier's number or load sheet and why one was refused; our load sheet of a pickup is printed for the rider | Accepted |
+| 315 | The admin sends an emailed invitation still waiting again, showing its new link, and the owner hands the shop to one of its managers once asked, the core's refusal named and the owner's own role read again after | Accepted |
 
 ---
 
@@ -12684,3 +12685,28 @@
 * **Alternatives:**
   * **A pickup button on Booked:** one tap fewer, but the pickups asked for, and what couriers
     said, would have nowhere to be seen.
+
+## ADR-315 · The admin sends an emailed invitation still waiting again, showing its new link, and the owner hands the shop to one of its managers once asked, the core's refusal named and the owner's own role read again after
+
+* **Context:** Invitations are links good for seven days, emailed where an address is given
+  (ADR-101, ADR-167); one still waiting is emailed again as a new invitation in its place
+  (ADR-196). The owner hands the shop to a manager with a second factor and stays on as a manager
+  (ADR-104). Both are sensitive: staff confirm who they are first when they signed in a while
+  ago. The admin's staff page made and took back invitations, but sent none again and handed
+  nothing over.
+* **Decision:**
+  * **Send again** is offered on an invitation with an address. Once the member confirms who
+    they are, if asked, its new link is shown as a new invitation's is, saying whether Hatti
+    emailed it; the link before opens nothing.
+  * **Hand the shop over** is a section of the staff page for the owner alone. It says what the
+    manager gains and that the owner stays a manager, offers the managers to choose from, and
+    asks before it goes; the core's refusal, such as the manager having no second factor, is
+    named there. Once handed over, the account's roles are read again, so the admin shows the
+    former owner as the manager they are now.
+  * **No manager yet:** the section says to make someone a manager first.
+* **Consequences:**
+  * An owner whose invitation went to spam sends it again from their phone; an owner selling or
+    leaving the business hands it to their manager without Hatti's support.
+* **Alternatives:**
+  * **Handing over to any member, made a manager on the way:** fewer steps, but a shop's owner
+    is chosen from those already trusted to run it, as the core asks.

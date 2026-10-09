@@ -2469,6 +2469,17 @@ const en = {
   'pickups.rider': 'Rider: {name}',
   'pickups.printLoadSheet': 'Print load sheet',
   'pickups.courierLoadSheet': "{courier}'s load sheet",
+  'staff.resend': 'Send again',
+  'staff.resendTo': 'Send the invitation to {email} again',
+  'staff.handOver': 'Hand the shop over',
+  'staff.handOverHint':
+    "One of your managers becomes the shop's owner, with its billing and its staff. You stay on as a manager. They need a passkey or an authenticator app.",
+  'staff.handOverNoManager': 'Make someone a manager first: the shop is handed to a manager.',
+  'staff.handOverTo': 'To',
+  'staff.handOverButton': 'Hand it to {name}',
+  'staff.handOverSure': 'Hand the shop to {name}? Only they can hand it back.',
+  'staff.handOverYes': 'Hand it over',
+  'staff.handedOver': '{name} owns the shop now. You are a manager.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -4921,6 +4932,17 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'pickups.rider': 'رائیڈر: {name}',
   'pickups.printLoadSheet': 'لوڈ شیٹ پرنٹ کریں',
   'pickups.courierLoadSheet': '{courier} کی لوڈ شیٹ',
+  'staff.resend': 'دوبارہ بھیجیں',
+  'staff.resendTo': '{email} کو دعوت دوبارہ بھیجیں',
+  'staff.handOver': 'دکان سونپیں',
+  'staff.handOverHint':
+    'آپ کا کوئی مینیجر دکان کا مالک بن جاتا ہے، بلنگ اور اسٹاف سمیت۔ آپ مینیجر کے طور پر رہتے ہیں۔ انہیں پاس کی یا آتھنٹیکیٹر ایپ چاہیے۔',
+  'staff.handOverNoManager': 'پہلے کسی کو مینیجر بنائیں: دکان مینیجر کو سونپی جاتی ہے۔',
+  'staff.handOverTo': 'کسے',
+  'staff.handOverButton': '{name} کو سونپیں',
+  'staff.handOverSure': 'دکان {name} کو سونپ دیں؟ صرف وہی اسے واپس سونپ سکتے ہیں۔',
+  'staff.handOverYes': 'سونپ دیں',
+  'staff.handedOver': 'اب {name} دکان کے مالک ہیں۔ آپ مینیجر ہیں۔',
 };
 
 export const messages: Readonly<

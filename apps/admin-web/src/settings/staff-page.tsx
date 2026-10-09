@@ -1,8 +1,11 @@
-import { Copy, MessageCircle, Trash2, UserPlus } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Copy, Crown, MessageCircle, Send, Trash2, UserPlus } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  ShopOwnershipTransferMutation,
   StaffInvitationCreateMutation,
+  StaffInvitationResendMutation,
   StaffInvitationRevokeMutation,
   StaffMemberRemoveMutation,
   StaffMemberRoleUpdateMutation,
@@ -16,7 +19,7 @@ import type {
   StaffMemberRole,
   UserError,
 } from '../api/types';
-import { useMe } from '../auth/context';
+import { ME_KEY, useMe } from '../auth/context';
 import { useRecentAuthentication } from '../auth/confirm-identity';
 import { errorText } from '../i18n/errors';
 import { formatDate, formatRelative } from '../i18n/format';
@@ -26,6 +29,7 @@ import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../sh
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { SelectField } from './settings-form';
 import { apiRole, BackToSettings, roleLabel } from './settings-page';
 
 /** Roles from the most to the least power over the shop. */
@@ -95,6 +99,94 @@ function Invited({ token, emailed }: { token: string; emailed: string | null }) 
 }
 
 /**
+ * The shop handed to one of its managers, by its owner alone: the manager needs a passkey or an
+ * authenticator app, and the owner stays on as a manager.
+ */
+function HandOver({
+  managers,
+  run,
+}: {
+  managers: StaffMember[];
+  run: ReturnType<typeof useRecentAuthentication>['run'];
+}) {
+  const { t } = useLocale();
+  const queryClient = useQueryClient();
+  const transfer = useAdminMutation<
+    { shopOwnershipTransfer: { owner: { name: string } | null; userErrors: UserError[] } },
+    { staffMemberId: string }
+  >(ShopOwnershipTransferMutation);
+  const [chosen, setChosen] = useState(managers[0]?.id ?? '');
+  const [asking, setAsking] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [handed, setHanded] = useState<string | null>(null);
+  const manager = managers.find((each) => each.id === chosen) ?? managers[0];
+
+  const onHandOver = () => {
+    if (!manager) return;
+    setProblem(null);
+    void run(
+      async () => {
+        const { shopOwnershipTransfer } = await transfer.mutateAsync({
+          staffMemberId: manager.id,
+        });
+        setAsking(false);
+        const failed = failedWith(shopOwnershipTransfer.userErrors, t);
+        if (failed) setProblem(failed);
+        else {
+          setHanded(shopOwnershipTransfer.owner?.name ?? manager.name);
+          // Who the signed-in member is in the shop changed: a manager now.
+          void queryClient.invalidateQueries({ queryKey: ME_KEY });
+        }
+      },
+      (failure) => setProblem(errorText(failure, t)),
+    );
+  };
+
+  if (handed) return <Alert tone="success">{t('staff.handedOver', { name: handed })}</Alert>;
+  return (
+    <Card className="p-4">
+      <section aria-labelledby="staff-hand-over" className="flex flex-col gap-3">
+        <h2 id="staff-hand-over" className="inline-flex items-center gap-2 font-semibold">
+          <Crown aria-hidden className="size-5" />
+          {t('staff.handOver')}
+        </h2>
+        <p className="text-secondary">{t('staff.handOverHint')}</p>
+        {!manager ? (
+          <p className="text-secondary">{t('staff.handOverNoManager')}</p>
+        ) : asking ? (
+          <Alert tone="warning">
+            <p>{t('staff.handOverSure', { name: manager.name })}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button variant="destructive" busy={transfer.isPending} onClick={onHandOver}>
+                {t('staff.handOverYes')}
+              </Button>
+              <Button variant="secondary" onClick={() => setAsking(false)}>
+                {t('action.back')}
+              </Button>
+            </div>
+          </Alert>
+        ) : (
+          <>
+            {managers.length > 1 && (
+              <SelectField
+                label={t('staff.handOverTo')}
+                value={manager.id}
+                options={managers.map((each) => ({ value: each.id, label: each.name }))}
+                onChange={setChosen}
+              />
+            )}
+            <Button variant="secondary" className="self-start" onClick={() => setAsking(true)}>
+              {t('staff.handOverButton', { name: manager.name })}
+            </Button>
+          </>
+        )}
+        {problem && <Alert tone="danger">{problem}</Alert>}
+      </section>
+    </Card>
+  );
+}
+
+/**
  * Staff (ADR-101): who works in the shop and in what role, changed or let go by those who manage
  * it; and invitations, sent as a link to share on WhatsApp or emailed, taken back while open.
  * The core asks the member to confirm who they are first when they signed in a while ago.
@@ -122,6 +214,10 @@ export function StaffPage() {
     { staffMemberRemove: { userErrors: UserError[] } },
     { id: string }
   >(StaffMemberRemoveMutation);
+  const resend = useAdminMutation<
+    { staffInvitationResend: StaffInvitationCreateData['staffInvitationCreate'] },
+    { id: string; language: 'EN' | 'UR' }
+  >(StaffInvitationResendMutation);
   const managed = rolesManagedBy(apiRole(shop.role));
   const [role, setRole] = useState<StaffMemberRole>(managed.at(-1) ?? 'PACKER');
   const roleField = useId();
@@ -171,6 +267,25 @@ export function StaffPage() {
       const { staffMemberRemove } = await remove.mutateAsync({ id: member.id });
       setProblem(failedWith(staffMemberRemove.userErrors, t));
       setRemoving(null);
+    }, onError);
+  };
+
+  const onResend = (invitation: StaffInvitation) => {
+    setProblem(null);
+    setInvited(null);
+    void run(async () => {
+      const { staffInvitationResend } = await resend.mutateAsync({
+        id: invitation.id,
+        language: locale === 'ur' ? 'UR' : 'EN',
+      });
+      const failed = failedWith(staffInvitationResend.userErrors, t);
+      if (failed) setProblem(failed);
+      else if (staffInvitationResend.token) {
+        setInvited({
+          token: staffInvitationResend.token,
+          emailed: staffInvitationResend.emailed ? invitation.email : null,
+        });
+      }
     }, onError);
   };
 
@@ -286,6 +401,17 @@ export function StaffPage() {
                       })}
                     </span>
                   </span>
+                  {invitation.email && (
+                    <Button
+                      variant="secondary"
+                      icon={<Send aria-hidden className="size-5" />}
+                      disabled={resend.isPending}
+                      aria-label={t('staff.resendTo', { email: invitation.email })}
+                      onClick={() => onResend(invitation)}
+                    >
+                      {t('staff.resend')}
+                    </Button>
+                  )}
                   <Button
                     variant="tertiary"
                     disabled={revoke.isPending}
@@ -350,6 +476,12 @@ export function StaffPage() {
         </Card>
       )}
       {invited && <Invited token={invited.token} emailed={invited.emailed} />}
+      {shop.role === 'owner' && (
+        <HandOver
+          managers={members.filter((member) => member.role === 'MANAGER' && member.id !== myId)}
+          run={run}
+        />
+      )}
     </div>
   );
 }
