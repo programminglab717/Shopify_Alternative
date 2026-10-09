@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Customer messages, in the admin
+### 7e4337e · Customer messages, in the admin
 
 * **Customer messages** ([ADR-307](../architecture/13-decision-log.md#adr-307--the-admin-sets-how-the-shops-customers-are-told-of-their-orders-in-settings-whatsapp-for-everything-or-sms-for-updates-each-with-its-price-the-messages-language-which-messages-go-to-customers-and-to-the-shop-and-the-alerts-number-it-lists-the-messages-sent-by-status-and-an-orders-page-shows-its-own-once-asked)) in settings: WhatsApp for everything or SMS for updates, each
   with its price; the messages' language; which go to customers and to the shop; the alerts
