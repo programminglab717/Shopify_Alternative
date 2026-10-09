@@ -1213,3 +1213,67 @@ export interface OrderMergeSplitData {
     userErrors: UserError[];
   };
 }
+
+export interface HomeStockData {
+  home: { lowStock: { low: number; out: number; threshold: number } };
+}
+
+export interface LowStockData {
+  inventorySettings: { lowStockThreshold: number };
+  inventoryLowStock: {
+    nodes: {
+      variantId: string;
+      variantTitle: string;
+      productId: string;
+      productTitle: string;
+      sku: string | null;
+      available: number;
+      inventoryItem: { id: string };
+    }[];
+  };
+}
+
+export interface StockSearchData {
+  products: {
+    nodes: {
+      id: string;
+      title: string;
+      variants: {
+        id: string;
+        title: string;
+        sku: string | null;
+        inventoryQuantity: number;
+        inventoryItem: { id: string; tracked: boolean };
+      }[];
+    }[];
+  };
+}
+
+export interface StockLevel {
+  id: string;
+  available: number;
+  onHand: number;
+  committed: number;
+  reserved: number;
+  safetyStock: number;
+  location: { id: string; name: string };
+}
+
+export interface InventoryItemData {
+  location: { id: string; name: string } | null;
+  inventoryItem: {
+    id: string;
+    tracked: boolean;
+    inventoryLevels: StockLevel[];
+    changes: {
+      nodes: {
+        createdAt: string;
+        delta: number;
+        name: string;
+        reason: string;
+        quantityAfterChange: number;
+        location: { id: string; name: string };
+      }[];
+    };
+  } | null;
+}

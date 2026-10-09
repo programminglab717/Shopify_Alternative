@@ -28,6 +28,7 @@ import { AnalyticsPage } from './analytics/analytics-page';
 import { CashPage } from './cash/cash-page';
 import { ReturnsPage, validateReturnsSearch } from './returns/returns-page';
 import { StatementPage } from './cash/statement-page';
+import { StockPage } from './stock/stock-page';
 import { DiscountsPage } from './discounts/discounts-page';
 import { DraftPage } from './drafts/draft-page';
 import { DraftsPage } from './drafts/drafts-page';
@@ -253,6 +254,12 @@ const cash = createRoute({
   component: CashPage,
 });
 
+const stock = createRoute({
+  getParentRoute: () => shop,
+  path: 'stock',
+  component: StockPage,
+});
+
 const statement = createRoute({
   getParentRoute: () => shop,
   path: 'cash/$remittanceId',
@@ -393,6 +400,7 @@ export const routeTree = root.addChildren([
     analytics,
     cash,
     statement,
+    stock,
     returns,
     more,
     settings,

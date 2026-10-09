@@ -1,6 +1,7 @@
 import { Link, Outlet, useNavigate, useParams } from '@tanstack/react-router';
 import {
   ArrowLeftRight,
+  Boxes,
   ChartColumn,
   Headset,
   House,
@@ -39,6 +40,7 @@ interface NavItem {
     | '/$shopId/orders'
     | '/$shopId/desk'
     | '/$shopId/products'
+    | '/$shopId/stock'
     | '/$shopId/customers'
     | '/$shopId/shipping'
     | '/$shopId/returns'
@@ -82,6 +84,7 @@ export const NAV: readonly NavItem[] = [
   },
   { to: '/$shopId/returns', label: 'nav.returns', icon: Undo2, roles: READS_RETURNS },
   { to: '/$shopId/products', label: 'nav.products', icon: Package },
+  { to: '/$shopId/stock', label: 'nav.stock', icon: Boxes },
   {
     to: '/$shopId/customers',
     label: 'nav.customers',

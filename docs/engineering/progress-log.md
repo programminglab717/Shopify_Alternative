@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, stock in the admin** (INV-01): each variant's stock at each location, low stock first,
-adjusted with a reason and counted; then the admin's next sections as the alpha's shops need
-them. Urdu handles wait, as decided.
+**Next, collections in the admin** (CAT-03): collections listed, made by hand or by rules,
+products added, taken off and put in order; then the admin's next sections as the alpha's shops
+need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Stock, in the admin
+
+* **A Stock section** ([ADR-289](../architecture/13-decision-log.md#adr-289--the-admins-stock-lists-what-runs-low-the-fewest-for-sale-first-and-finds-any-products-each-variants-stock-at-each-location-added-to-or-taken-from-with-a-reason-and-counted-against-what-was-on-hand-when-read-by-owners-and-managers-every-role-sees-it-and-home-says-how-many-run-low)): what runs low, the fewest for sale first, and any
+  product's found; each variant's stock at each location with its latest changes, added to or
+  taken from with a reason and counted by owners and managers; the threshold changed there;
+  Home saying how many run low and how many are out.
+* **Tried against the core:** Home said "5 running low · 2 out of stock"; the list put the
+  seed's chappal in size 9, out of stock, first; 3 received at the Lahore warehouse made it 3 for
+  sale, then a count of 2 made it 2, its changes saying "+3 on hand · received" and "-1 on
+  hand · counted"; with no errors in the browser.
+* 2055 tests: what runs low listed with its product linked; damaged stock taken away, never
+  more than on hand; a shelf counted against what was on hand when read; the threshold changed;
+  a product found whose stock is not counted, then counted at the primary location; and a
+  packer seeing stock without changing it, and Home's count.
 
 ### cb41088 · Orders merged and split, in the admin
 

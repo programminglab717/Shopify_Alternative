@@ -2741,3 +2741,123 @@ export const OrderUpdateMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** How many variants run low or out of stock, for Home (INV-01, ADR-125). */
+export const HomeStockQuery = /* GraphQL */ `
+  query HomeStock {
+    home {
+      lowStock {
+        low
+        out
+        threshold
+      }
+    }
+  }
+`;
+
+/** The variants running low or out, the fewest for sale first, and what the shop calls low. */
+export const LowStockQuery = /* GraphQL */ `
+  query LowStock {
+    inventorySettings {
+      lowStockThreshold
+    }
+    inventoryLowStock(first: 100) {
+      nodes {
+        variantId
+        variantTitle
+        productId
+        productTitle
+        sku
+        available
+        inventoryItem {
+          id
+        }
+      }
+    }
+  }
+`;
+
+/** Products found by words, each variant with what it has for sale and its stock's item. */
+export const StockSearchQuery = /* GraphQL */ `
+  query StockSearch($query: String) {
+    products(first: 10, query: $query) {
+      nodes {
+        id
+        title
+        variants {
+          id
+          title
+          sku
+          inventoryQuantity
+          inventoryItem {
+            id
+            tracked
+          }
+        }
+      }
+    }
+  }
+`;
+
+/** A variant's stock at each location, its latest changes, and the primary location. */
+export const InventoryItemQuery = /* GraphQL */ `
+  query InventoryItem($id: ID!) {
+    location {
+      id
+      name
+    }
+    inventoryItem(id: $id) {
+      id
+      tracked
+      inventoryLevels {
+        id
+        available
+        onHand
+        committed
+        reserved
+        safetyStock
+        location {
+          id
+          name
+        }
+      }
+      changes(first: 10) {
+        nodes {
+          createdAt
+          delta
+          name
+          reason
+          quantityAfterChange
+          location {
+            id
+            name
+          }
+        }
+      }
+    }
+  }
+`;
+
+/** Stock added or taken away at a location, and why (INV-01). */
+export const InventoryAdjustMutation = /* GraphQL */ `
+  mutation InventoryAdjust($input: InventoryAdjustQuantitiesInput!) {
+    inventoryAdjustQuantities(input: $input) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** What the shop calls low stock. */
+export const InventorySettingsUpdateMutation = /* GraphQL */ `
+  mutation InventorySettingsUpdate($input: InventorySettingsInput!) {
+    inventorySettingsUpdate(input: $input) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-288 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-289 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -296,6 +296,7 @@
 | 286 | An order's page gives it to a member of staff, comments on its timeline with their authors' edits and deletes, keeps its note and tags, and corrects its address while nothing has shipped, each for the roles the core lets do it | Accepted |
 | 287 | An order's page changes its items while it waits to be packed, quantities stepped and lines taken off or put back, products found and added at a price agreed, and its delivery charge waived or discount given, saying back the new total and cash at the door; a packed order is unpacked first | Accepted |
 | 288 | An order's page merges it into another of its customer's orders waiting to be packed and paid the same way, chosen from their orders, and opens that one; and sends units of it apart as an order of their own with its delivery charge, always leaving something; each order links the one it went to or came from | Accepted |
+| 289 | The admin's stock lists what runs low, the fewest for sale first, and finds any product's; each variant's stock at each location, added to or taken from with a reason and counted against what was on hand when read, by owners and managers; every role sees it, and Home says how many run low | Accepted |
 
 ---
 
@@ -11867,3 +11868,39 @@
     the core takes, and listing them saves the agent asking.
   * **Merging from the orders list, two orders ticked:** which order takes the other matters,
     as it keeps its address and delivery charge; the order's page says which.
+
+## ADR-289 · The admin's stock lists what runs low, the fewest for sale first, and finds any product's; each variant's stock at each location, added to or taken from with a reason and counted against what was on hand when read, by owners and managers; every role sees it, and Home says how many run low
+
+* **Context:** The core keeps each variant's stock at each location, on hand, for orders, in
+  checkouts, kept back and for sale, with every change and why; it lists the variants running
+  low or out at the shop's threshold, and Home counts them ([ADR-125](#adr-125--low-stock-is-a-variant-of-an-active-product-with-the-shops-threshold-or-fewer-units-for-sale-online-five-until-it-says-otherwise-worked-out-from-the-levels-when-asked-counted-on-the-home-and-listed-the-fewest-first)). It adds to and
+  takes from stock with a reason, and sets it after a count, refusing a count when stock moved
+  since it was read. Every role reads stock; owners and managers change it. The admin set stock
+  only from a product's page, at the primary location ([ADR-267](#adr-267--the-admins-products-a-list-by-status-and-search-a-products-page-that-owners-and-managers-change-and-every-other-role-reads-and-adding-a-product-with-its-options-variants-each-with-its-price-and-stock-stock-is-counted-at-the-shops-primary-location-set-where-the-merchant-typed-it-and-refused-if-it-changed-since-it-was-read)), and showed nothing
+  of what was running out.
+* **Decision:**
+  * **A Stock section for every role**, after Products. It opens on what runs low, the fewest for
+    sale first, each with its product linked, its SKU and how many are for sale, out of stock in
+    red; then a search finds any product's variants, those whose stock is not counted said so.
+  * **A variant opens in place** to its stock at each location: on hand, for orders and for
+    sale, and in checkouts and kept back where there are any; and its ten latest changes, each
+    with its amount, what it changed and why in words, and when.
+  * **Owners and managers add or take away** at a location: how many and why, the reasons offered
+    by direction (received, came back, correction, other; damaged, lost or stolen, failed a
+    check, correction, other). Taking more than is on hand is refused before it is sent.
+  * **A count sets on hand**, filled with what was on hand when read and sent with it, so a
+    count made while an order took stock is refused rather than undoing the order; a variant not
+    counted yet is counted at the primary location, which starts counting it.
+  * **What the shop calls low** is shown above the list, and changed there by owners and
+    managers.
+  * **Home** shows how many variants run low and how many are out, a tap from the Stock section,
+    and nothing when none are.
+* **Consequences:**
+  * A packer sees what is short before packing; the owner restocks from the list, and the
+    storefront sells the new stock at once.
+  * A variant restocked past the threshold leaves the list once saved; search finds it again.
+* **Alternatives:**
+  * **Stock on each product's page alone:** the products list does not say what is running out,
+    and a shop counting its shelf goes product by product.
+  * **Setting available rather than on hand after a count:** what is on the shelf includes what
+    waits for orders; counting it whole is what staff can see.

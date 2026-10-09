@@ -1,8 +1,8 @@
 import { Link } from '@tanstack/react-router';
-import { ChevronRight, CircleCheck, Circle, PartyPopper } from 'lucide-react';
+import { Boxes, ChevronRight, CircleCheck, Circle, PartyPopper } from 'lucide-react';
 import { ApiError } from '../api/client';
-import { HomeQuery, SetupChecklistQuery } from '../api/operations';
-import type { HomeData, OrderStage, SetupChecklistData, Tally } from '../api/types';
+import { HomeQuery, HomeStockQuery, SetupChecklistQuery } from '../api/operations';
+import type { HomeData, HomeStockData, OrderStage, SetupChecklistData, Tally } from '../api/types';
 import type { StaffRole } from '../auth/session';
 import { RECONCILES_CASH } from '../cash/cash-page';
 import { errorText } from '../i18n/errors';
@@ -131,6 +131,38 @@ function Stat({
   );
 }
 
+/** Variants running low or out of stock (INV-01), a tap from the stock page; nothing if none. */
+function StockRunningLow() {
+  const { t } = useLocale();
+  const { id: shopId } = useShop();
+  const query = useAdminQuery<HomeStockData>(['homeStock'], HomeStockQuery);
+  const stock = query.data?.home.lowStock;
+  if (!stock || stock.low + stock.out === 0) return null;
+  return (
+    <Card>
+      <Link
+        to="/$shopId/stock"
+        params={{ shopId }}
+        className="flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-canvas"
+      >
+        <Boxes aria-hidden className="size-5 text-warning" />
+        <span className="flex flex-1 flex-col">
+          <span className="font-medium">{t('home.stock')}</span>
+          <span className="text-secondary">
+            {[
+              stock.low > 0 && t('home.stockLow', { count: formatCount(stock.low) }),
+              stock.out > 0 && t('home.stockOut', { count: formatCount(stock.out) }),
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+        </span>
+        <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />
+      </Link>
+    </Card>
+  );
+}
+
 /** The setup checklist (ONB-02), for owners and managers until every step is done. */
 function SetupChecklist() {
   const { t } = useLocale();
@@ -172,7 +204,8 @@ function SetupChecklist() {
 
 /**
  * Home (ANL-01, docs/design/02 §2): what needs the merchant now, each with its count and what it
- * comes to in rupees, a tap from its orders; how today has gone; and the setup checklist.
+ * comes to in rupees, a tap from its orders, and stock running low; how today has gone; and the
+ * setup checklist.
  */
 export function HomePage() {
   const { t } = useLocale();
@@ -228,6 +261,7 @@ export function HomePage() {
             </ul>
           </Card>
         )}
+        <StockRunningLow />
       </section>
       <section aria-labelledby="home-today" className="flex flex-col gap-2">
         <h2 id="home-today" className="font-semibold">
