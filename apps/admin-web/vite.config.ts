@@ -29,5 +29,5 @@ export default defineConfig({
     },
   },
   build: { sourcemap: true, target: 'es2022' },
-  test: { environment: 'happy-dom' },
+  test: { environment: 'happy-dom', setupFiles: ['./src/test-setup.ts'] },
 });

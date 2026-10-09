@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, signing in with a passkey or Google** (ADM-02, ONB-01): the sign-in page asking the
-browser for a passkey, Google's button where the core has its client IDs, and Google connected
-from your account; then the admin's next sections as the alpha's shops need them. Urdu handles
-wait, as decided.
+**Next, the admin installed on a phone** (roadmap: a responsive, installable admin until the
+app): a web app manifest in English and Urdu, its icons, and a service worker that keeps the
+admin's own files so it opens without a connection and says it is offline; then the admin's next
+sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Passkeys and Google, signing in to the admin
+
+* **Signing in** ([ADR-294](../architecture/13-decision-log.md#adr-294--the-admin-signs-in-with-a-passkey-alone-a-passkey-as-the-second-step-or-googles-own-button-loaded-only-when-asked-for-and-confirms-who-is-there-the-same-ways-a-passkeys-challenge-and-googles-nonce-are-good-once-so-each-try-starts-from-the-cores-options-again)): with a passkey alone, or as the second step; or with Google's own
+  button, loaded from Google only when asked for, a new Google account going on to open a shop.
+* **Confirming who you are** with a passkey or Google too, a new challenge or nonce for each
+  try; and Google connected from your account.
+* **Tried against the core:** the seed's owner added a passkey in Chromium's virtual
+  authenticator, signed out, and signed in with it alone; then by email and password with the
+  passkey as the second step; then, the session's proof made an hour old, removed the passkey
+  after confirming with it. Google, with no client ID set here, said it is not set up.
+* 2101 tests: a passkey signing in alone, turned away and then used; a passkey as the second
+  step; Google's button and a new account; Google not set up; confirming with a passkey, turned
+  away, then with Google; and Google connected from the account.
 
 ### d40b1f1 · Your own account, in the admin
 

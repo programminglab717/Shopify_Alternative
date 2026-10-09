@@ -11,6 +11,8 @@ import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ME_KEY, useMe, useSessionStore } from '../auth/context';
 import { useRecentAuthentication } from '../auth/confirm-identity';
+import { GoogleButton } from '../auth/google';
+import type { GoogleOptions } from '../auth/google';
 import { errorText } from '../i18n/errors';
 import { formatDateTime, formatPhone } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -348,11 +350,24 @@ function Language({ language }: { language: 'en' | 'ur' }) {
   );
 }
 
-/** The Google account connected to sign in with, taken off where it is not the only way in. */
+/**
+ * The Google account connected to sign in with: connected through Google's own button, with a
+ * nonce of the core's good once, and taken off where it is not the only way in.
+ */
 function Google({ google }: { google: { email: string } | null }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const store = useSessionStore();
   const change = useChange();
+  const [options, setOptions] = useState<GoogleOptions | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const start = async () => {
+    setProblem(null);
+    try {
+      setOptions(await store.auth<GoogleOptions>('/auth/google/options', { method: 'POST' }));
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
   return (
     <div className="flex flex-col gap-2">
       <Row label={t('account.google')}>
@@ -377,6 +392,36 @@ function Google({ google }: { google: { email: string } | null }) {
           {t('account.googleRemove')}
         </Button>
       )}
+      {!google &&
+        (options ? (
+          <GoogleButton
+            options={options}
+            onToken={(idToken) => {
+              setOptions(null);
+              void change.run(async () => {
+                await store.auth('/auth/google', {
+                  method: 'POST',
+                  body: { idToken, language: locale },
+                });
+                return t('account.googleAdded');
+              });
+            }}
+            onError={(failure) => {
+              setOptions(null);
+              setProblem(errorText(failure, t));
+            }}
+          />
+        ) : (
+          <Button
+            variant="secondary"
+            className="self-start"
+            busy={change.busy}
+            onClick={() => void start()}
+          >
+            {t('account.googleAdd')}
+          </Button>
+        ))}
+      {problem && <Alert tone="danger">{problem}</Alert>}
       {change.said}
     </div>
   );

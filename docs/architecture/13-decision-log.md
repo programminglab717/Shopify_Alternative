@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-293 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-294 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -301,6 +301,7 @@
 | 291 | The admin's online store writes the shop's pages as plain text, paragraphs a blank line apart, shown or hidden, keeping HTML from elsewhere as HTML; and changes its menus' links three levels deep, to the home page, all products, a collection, a product, a page or an address, saved whole; marketers write pages, owners and managers both | Accepted |
 | 292 | The admin's policies start from Hatti's drafts and are written as text with headings, lists and links, kept or taken away by owners and managers; each policy's Urdu is kept as a translation of its words, said to be out of date once they change | Accepted |
 | 293 | The admin's account page keeps your email, number and language, the Google account and passkeys you sign in with, and the browsers you are signed in on, each change proved again when the core asks; passkeys are made by the browser from the core's options as WebAuthn's JSON | Accepted |
+| 294 | The admin signs in with a passkey alone, a passkey as the second step, or Google's own button loaded only when asked for, and confirms who is there the same ways; a passkey's challenge and Google's nonce are good once, so each try starts from the core's options again | Accepted |
 
 ---
 
@@ -12049,3 +12050,41 @@
     staff who cannot reach settings still need it.
   * **A library for WebAuthn's JSON in the browser:** two functions of base64url are all it
     needs, and browsers' own JSON methods are not yet everywhere.
+
+## ADR-294 · The admin signs in with a passkey alone, a passkey as the second step, or Google's own button loaded only when asked for, and confirms who is there the same ways; a passkey's challenge and Google's nonce are good once, so each try starts from the core's options again
+
+* **Context:** The core signs staff in with a passkey alone, with no email or number first
+  ([ADR-100](#adr-100--staff-sign-in-with-a-passkey-alone-which-passes-the-second-factor-or-answer-the-second-step-after-their-password-with-one-once-an-account-has-a-second-factor-only-a-session-that-passed-one-adds-another)); takes a passkey as the second step after a password, a code or Google,
+  its options given with the challenge to answer; signs in with Google's ID token, carrying a
+  nonce the core gave out once and opening an account for a Google account new to Hatti
+  ([ADR-164](#adr-164--merchants-sign-up-and-in-with-google-through-googles-own-sign-in-its-id-token-checked-against-the-keys-google-publishes-for-one-of-hattis-client-ids-and-carrying-a-nonce-hatti-gave-out-once-names-the-account-by-googles-id-a-google-account-new-to-hatti-opens-an-account-with-the-email-google-confirmed-an-email-alike-never-connects-one-and-an-accounts-owner-connects-or-disconnects-google-from-a-session-that-proved-who-is-at-it)); and confirms who is at a session with a passkey or Google as well as a
+  password or a code. The admin's account page added passkeys and showed Google
+  ([ADR-293](#adr-293--the-admins-account-page-keeps-your-email-number-and-language-the-google-account-and-passkeys-you-sign-in-with-and-the-browsers-you-are-signed-in-on-each-change-proved-again-when-the-core-asks-passkeys-are-made-by-the-browser-from-the-cores-options-as-webauthns-json)), but signing in and confirming took codes and passwords alone.
+* **Decision:**
+  * **The sign-in page** offers, under the number and the email, "Sign in with a passkey" where
+    the browser makes them, and "Continue with Google". A passkey signs straight in. Google's
+    script is loaded from Google only once "Continue with Google" is tapped, with the core's
+    client ID and a new nonce, and Google's own button takes it from there; a Google account new
+    to Hatti goes on to open its first shop. Where the core has no Google client ID, the page
+    says Google is not set up here.
+  * **The second step** offers the passkey first where the account has one, and the code from
+    the authenticator app or a recovery code where it has those.
+  * **Confirming who you are** offers the account's ways in this order: a passkey, the
+    authenticator app, the password, Google and a code to the number. A try that fails or is
+    turned away asks the core for new options, a passkey's challenge and Google's nonce being
+    good once.
+  * **The account page** connects Google through the same button, once the member has confirmed
+    who they are.
+  * A passkey prompt turned away or left to time out says no passkey was used, rather than
+    that something went wrong; the core's refusals of passkeys and Google are put in English
+    and Urdu.
+* **Consequences:**
+  * Staff with a passkey sign in with a fingerprint, and confirm sensitive changes the same way.
+  * The edge's content security policy, when it comes, has to allow Google's script, frames and
+    connections on the admin's origin.
+  * Nothing is fetched from Google for staff who never tap it.
+* **Alternatives:**
+  * **Google's One Tap prompt on every visit:** a request to Google, and a nonce of the core's,
+    for every sign-in page opened, and a prompt over the page the merchant came for.
+  * **Google's OAuth redirect:** leaves the admin for Google and back; the button's popup keeps
+    the page and what was typed.

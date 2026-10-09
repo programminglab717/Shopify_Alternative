@@ -1,7 +1,9 @@
 import { parsePkMobile } from '@hatti/pk';
 import { Link, useNavigate } from '@tanstack/react-router';
+import { KeyRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
+import { getPasskey, passkeysWork, passkeyTurnedAway } from '../account/webauthn';
 import { authRequest, browserFetch } from '../api/client';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
@@ -10,19 +12,28 @@ import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { AuthLayout } from './auth-layout';
 import { useSessionStore } from './context';
+import { GoogleButton } from './google';
+import type { GoogleOptions } from './google';
 import type { Tokens } from './session';
 
-/** What `/auth/sign-in`, `/auth/phone/sign-in` and `/auth/sign-in/verify` answer. */
+type PasskeyRequest = Parameters<typeof getPasskey>[0];
+
+/** What `/auth/sign-in`, `/auth/phone/sign-in`, Google's, a passkey's and `/verify` answer. */
 type SignInAnswer =
-  | ({ status: 'signed_in' } & Tokens)
-  | { status: 'mfa_required'; challengeToken: string; methods: string[] }
+  | ({ status: 'signed_in'; signedUp?: boolean } & Tokens)
+  | {
+      status: 'mfa_required';
+      challengeToken: string;
+      methods: string[];
+      passkeyOptions: PasskeyRequest | null;
+    }
   | { status: 'sign_up_required'; signUpToken: string; phone: string };
 
 type Step =
   | { kind: 'phone' }
   | { kind: 'code'; phone: string; shown: string; resendAt: number }
   | { kind: 'email' }
-  | { kind: 'mfa'; challengeToken: string }
+  | { kind: 'mfa'; challengeToken: string; methods: string[]; passkey: PasskeyRequest | null }
   | { kind: 'name'; signUpToken: string };
 
 /** Seconds until `at`, counting down while the screen is open. */
@@ -38,8 +49,9 @@ function useSecondsUntil(at: number | null): number {
 
 /**
  * Signing in (docs/design/03 F1): by a code sent to the merchant's mobile on WhatsApp, or SMS
- * (ADR-159), or by email and password; then the second factor where the account has one, and a
- * name for a number new to Hatti, which opens its account.
+ * (ADR-159), by email and password, by a passkey (ADR-100) or with Google (ADR-164); then the
+ * second factor where the account has one, a code or a passkey, and a name for a number new to
+ * Hatti, which opens its account.
  */
 export function SignInPage() {
   const { t, locale } = useLocale();
@@ -53,6 +65,7 @@ export function SignInPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [google, setGoogle] = useState<GoogleOptions | null>(null);
   const resendIn = useSecondsUntil(step.kind === 'code' ? step.resendAt : null);
 
   const go = (next: Step) => {
@@ -68,7 +81,7 @@ export function SignInPage() {
     try {
       await call();
     } catch (failure) {
-      setError(errorText(failure, t));
+      setError(passkeyTurnedAway(failure) ? t('signIn.passkeyTurnedAway') : errorText(failure, t));
     } finally {
       setBusy(false);
     }
@@ -77,9 +90,14 @@ export function SignInPage() {
   const answered = async (answer: SignInAnswer) => {
     if (answer.status === 'signed_in') {
       store.signedIn(answer);
-      await navigate({ to: '/' });
+      await navigate({ to: answer.signedUp ? '/shops' : '/' });
     } else if (answer.status === 'mfa_required') {
-      go({ kind: 'mfa', challengeToken: answer.challengeToken });
+      go({
+        kind: 'mfa',
+        challengeToken: answer.challengeToken,
+        methods: answer.methods,
+        passkey: passkeysWork() ? answer.passkeyOptions : null,
+      });
     } else {
       go({ kind: 'name', signUpToken: answer.signUpToken });
     }
@@ -140,6 +158,54 @@ export function SignInPage() {
     );
   };
 
+  const onPasskey = () =>
+    void run(async () => {
+      const { options } = await authRequest<{ options: PasskeyRequest }>(
+        browserFetch,
+        '/auth/sign-in/passkey/options',
+        { method: 'POST' },
+      );
+      const response = await getPasskey(options);
+      await answered(
+        await authRequest<SignInAnswer>(browserFetch, '/auth/sign-in/passkey', {
+          body: { response },
+        }),
+      );
+    });
+
+  const onMfaPasskey = () => {
+    if (step.kind !== 'mfa' || !step.passkey) return;
+    const { challengeToken, passkey } = step;
+    void run(async () =>
+      answered(
+        await authRequest<SignInAnswer>(browserFetch, '/auth/sign-in/verify', {
+          body: { challengeToken, passkey: await getPasskey(passkey) },
+        }),
+      ),
+    );
+  };
+
+  /** Google's nonce is good once: each try at Google starts from the core's options again. */
+  const startGoogle = () =>
+    void run(async () => {
+      setGoogle(
+        await authRequest<GoogleOptions>(browserFetch, '/auth/google/options', {
+          method: 'POST',
+        }),
+      );
+    });
+
+  const onGoogleToken = (idToken: string) => {
+    setGoogle(null);
+    void run(async () =>
+      answered(
+        await authRequest<SignInAnswer>(browserFetch, '/auth/google/sign-in', {
+          body: { idToken, language: locale },
+        }),
+      ),
+    );
+  };
+
   const onName = (event: FormEvent) => {
     event.preventDefault();
     if (step.kind !== 'name') return;
@@ -179,24 +245,41 @@ export function SignInPage() {
   const alert = error && <Alert tone="danger">{error}</Alert>;
 
   if (step.kind === 'mfa') {
+    const byCode = step.methods.some((method) => method !== 'passkey');
     return (
       <AuthLayout title={t('signIn.mfaTitle')}>
-        <form onSubmit={onMfa} className="flex flex-col gap-4">
-          <p className="text-secondary">{t('signIn.mfaBody')}</p>
-          <TextField
-            label={t('signIn.mfaCode')}
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            autoComplete="one-time-code"
-            autoFocus
-            required
-            ltr
-          />
+        <div className="flex flex-col gap-4">
+          {step.passkey && (
+            <>
+              <p className="text-secondary">{t('signIn.mfaPasskeyBody')}</p>
+              <Button
+                busy={busy}
+                icon={<KeyRound aria-hidden className="size-5" />}
+                onClick={onMfaPasskey}
+              >
+                {t('signIn.mfaPasskey')}
+              </Button>
+            </>
+          )}
+          {byCode && (
+            <form onSubmit={onMfa} className="flex flex-col gap-4">
+              <p className="text-secondary">{t('signIn.mfaBody')}</p>
+              <TextField
+                label={t('signIn.mfaCode')}
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                autoComplete="one-time-code"
+                autoFocus={!step.passkey}
+                required
+                ltr
+              />
+              <Button type="submit" busy={busy} variant={step.passkey ? 'secondary' : 'primary'}>
+                {t('action.continue')}
+              </Button>
+            </form>
+          )}
           {alert}
-          <Button type="submit" busy={busy}>
-            {t('action.continue')}
-          </Button>
-        </form>
+        </div>
       </AuthLayout>
     );
   }
@@ -316,6 +399,37 @@ export function SignInPage() {
               {t('signIn.forgot')}
             </Link>
           </form>
+        )}
+        {step.kind !== 'code' && (
+          <div className="flex flex-col gap-3">
+            <p className="flex items-center gap-3 text-secondary before:h-px before:flex-1 before:bg-line after:h-px after:flex-1 after:bg-line">
+              {t('signIn.or')}
+            </p>
+            {passkeysWork() && (
+              <Button
+                variant="secondary"
+                busy={busy}
+                icon={<KeyRound aria-hidden className="size-5" />}
+                onClick={onPasskey}
+              >
+                {t('signIn.withPasskey')}
+              </Button>
+            )}
+            {google ? (
+              <GoogleButton
+                options={google}
+                onToken={onGoogleToken}
+                onError={(failure) => {
+                  setGoogle(null);
+                  setError(errorText(failure, t));
+                }}
+              />
+            ) : (
+              <Button variant="secondary" disabled={busy} onClick={startGoogle}>
+                {t('signIn.withGoogle')}
+              </Button>
+            )}
+          </div>
         )}
         <Link to="/sign-up" className="text-primary underline-offset-4 hover:underline">
           {t('signIn.newAccount')}

@@ -1558,6 +1558,29 @@ const en = {
   'account.thisBrowser': 'this browser',
   'account.signOutOf': 'Sign out of {device}',
   'account.signedOut': 'Signed out of {device}.',
+  'signIn.or': 'or',
+  'signIn.withPasskey': 'Sign in with a passkey',
+  'signIn.withGoogle': 'Continue with Google',
+  'signIn.passkeyTurnedAway': 'No passkey was used. Try again, or sign in another way.',
+  'signIn.mfaPasskeyBody': 'Use the passkey on your phone or computer to finish signing in.',
+  'signIn.mfaPasskey': 'Use a passkey',
+  'confirm.passkey': 'Confirm with your passkey',
+  'confirm.use.passkey': 'Use a passkey',
+  'confirm.use.google': 'Use Google',
+  'account.googleAdd': 'Connect Google',
+  'account.googleAdded': 'Google is connected. It signs you in from now on.',
+  'error.GOOGLE_SIGN_IN_UNAVAILABLE':
+    'Signing in with Google is not set up here. Sign in another way.',
+  'error.GOOGLE_UNREACHABLE':
+    'Google could not be reached to check your sign-in. Try again in a moment.',
+  'error.INVALID_GOOGLE_SIGN_IN': 'That Google sign-in did not work. Try again.',
+  'error.GOOGLE_EMAIL_UNCONFIRMED':
+    "Google has not confirmed this account's email. Confirm it with Google, or use another way.",
+  'error.GOOGLE_NOT_CONNECTED':
+    'An account has this email. Sign in to it your usual way, then connect Google from your account.',
+  'error.GOOGLE_TAKEN':
+    'This Google account signs in to another Hatti account. Disconnect it there first.',
+  'error.INVALID_PASSKEY': 'That passkey did not work here. Try again, or use another way.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -3098,6 +3121,31 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'account.thisBrowser': 'یہ براؤزر',
   'account.signOutOf': '{device} سے سائن آؤٹ کریں',
   'account.signedOut': '{device} سے سائن آؤٹ ہو گیا۔',
+  'signIn.or': 'یا',
+  'signIn.withPasskey': 'پاس کی سے سائن ان کریں',
+  'signIn.withGoogle': 'گوگل کے ساتھ جاری رکھیں',
+  'signIn.passkeyTurnedAway':
+    'کوئی پاس کی استعمال نہیں ہوئی۔ دوبارہ کوشش کریں، یا کسی اور طریقے سے سائن ان کریں۔',
+  'signIn.mfaPasskeyBody': 'سائن ان مکمل کرنے کے لیے اپنے فون یا کمپیوٹر کی پاس کی استعمال کریں۔',
+  'signIn.mfaPasskey': 'پاس کی استعمال کریں',
+  'confirm.passkey': 'اپنی پاس کی سے تصدیق کریں',
+  'confirm.use.passkey': 'پاس کی استعمال کریں',
+  'confirm.use.google': 'گوگل استعمال کریں',
+  'account.googleAdd': 'گوگل منسلک کریں',
+  'account.googleAdded': 'گوگل منسلک ہو گیا۔ اب سے یہ آپ کو سائن ان کرے گا۔',
+  'error.GOOGLE_SIGN_IN_UNAVAILABLE':
+    'یہاں گوگل سے سائن ان کی سہولت موجود نہیں۔ کسی اور طریقے سے سائن ان کریں۔',
+  'error.GOOGLE_UNREACHABLE':
+    'آپ کا سائن ان جانچنے کے لیے گوگل سے رابطہ نہیں ہو سکا۔ تھوڑی دیر میں دوبارہ کوشش کریں۔',
+  'error.INVALID_GOOGLE_SIGN_IN': 'گوگل سے سائن ان نہیں ہو سکا۔ دوبارہ کوشش کریں۔',
+  'error.GOOGLE_EMAIL_UNCONFIRMED':
+    'گوگل نے اس اکاؤنٹ کی ای میل کی تصدیق نہیں کی۔ گوگل سے تصدیق کریں، یا کوئی اور طریقہ استعمال کریں۔',
+  'error.GOOGLE_NOT_CONNECTED':
+    'اس ای میل سے ایک اکاؤنٹ موجود ہے۔ معمول کے طریقے سے اس میں سائن ان کریں، پھر اپنے اکاؤنٹ سے گوگل منسلک کریں۔',
+  'error.GOOGLE_TAKEN':
+    'یہ گوگل اکاؤنٹ ہٹی کے کسی اور اکاؤنٹ میں سائن ان کرتا ہے۔ پہلے اسے وہاں سے الگ کریں۔',
+  'error.INVALID_PASSKEY':
+    'یہ پاس کی یہاں کام نہیں کر سکی۔ دوبارہ کوشش کریں، یا کوئی اور طریقہ استعمال کریں۔',
 };
 
 export const messages: Readonly<

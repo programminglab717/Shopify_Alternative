@@ -1,6 +1,7 @@
-import { ShieldCheck } from 'lucide-react';
+import { KeyRound, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { getPasskey, passkeysWork, passkeyTurnedAway } from '../account/webauthn';
 import { ApiError } from '../api/client';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
@@ -9,21 +10,35 @@ import { Button } from '../ui/button';
 import { Alert, Card, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { useSessionStore } from './context';
+import { GoogleButton } from './google';
+import type { GoogleOptions } from './google';
 
-/** The ways a member confirms who they are here; passkeys and Google come with their sign-in. */
-type Way = 'totp' | 'password' | 'phone';
+/** The ways a member confirms who they are, the first their account takes offered first. */
+type Way = 'passkey' | 'totp' | 'password' | 'google' | 'phone';
 
-const WAYS: readonly Way[] = ['totp', 'password', 'phone'];
+const WAYS: readonly Way[] = ['passkey', 'totp', 'password', 'google', 'phone'];
 
 interface Options {
   methods: string[];
+  passkeyOptions: Parameters<typeof getPasskey>[0] | null;
+  googleOptions: GoogleOptions | null;
   phone: string | null;
 }
 
+/** The ways these options take here: a passkey where the browser has them, Google where set up. */
+const waysOf = (options: Options) =>
+  WAYS.filter(
+    (way) =>
+      options.methods.includes(way) &&
+      (way !== 'passkey' || (options.passkeyOptions && passkeysWork())) &&
+      (way !== 'google' || options.googleOptions),
+  );
+
 /**
- * Asks the signed-in member to confirm who they are (ADR-103): a code from their authenticator
- * app, their password, or a code sent to their number, as their account takes them. The core
- * then lets them do sensitive things for 15 minutes.
+ * Asks the signed-in member to confirm who they are (ADR-103): a passkey, a code from their
+ * authenticator app, their password, Google, or a code sent to their number, as their account
+ * takes them. The core then lets them do sensitive things for 15 minutes. A passkey's challenge
+ * and Google's nonce are good once, so a try that fails asks the core for new options.
  */
 function ConfirmIdentity({
   onConfirmed,
@@ -40,6 +55,7 @@ function ConfirmIdentity({
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [round, setRound] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -48,13 +64,33 @@ function ConfirmIdentity({
       .then((answer) => {
         if (!live) return;
         setOptions(answer);
-        setWay(WAYS.find((each) => answer.methods.includes(each)) ?? null);
+        setWay((chosen) => {
+          const ways = waysOf(answer);
+          return chosen && ways.includes(chosen) ? chosen : (ways[0] ?? null);
+        });
       })
       .catch((failure: unknown) => live && setProblem(errorText(failure, t)));
     return () => {
       live = false;
     };
-  }, [store, t]);
+  }, [store, t, round]);
+
+  /** Confirms with `proof`; a failure says why, and fetches options good for another try. */
+  const confirm = async (proof: () => Promise<Record<string, unknown>>) => {
+    setProblem(null);
+    setBusy(true);
+    try {
+      await store.auth('/auth/reauthenticate', { method: 'POST', body: await proof() });
+      onConfirmed();
+    } catch (failure) {
+      setProblem(
+        passkeyTurnedAway(failure) ? t('signIn.passkeyTurnedAway') : errorText(failure, t),
+      );
+      setRound((count) => count + 1);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const sendCode = async () => {
     setProblem(null);
@@ -96,7 +132,8 @@ function ConfirmIdentity({
     }
   };
 
-  const others = WAYS.filter((each) => each !== way && options?.methods.includes(each));
+  const others = options ? waysOf(options).filter((each) => each !== way) : [];
+  const typed = way === 'totp' || way === 'password' || way === 'phone';
   return (
     <Card className="flex flex-col gap-3 border-primary p-4">
       <h2 className="inline-flex items-center gap-2 font-semibold">
@@ -106,7 +143,49 @@ function ConfirmIdentity({
       <p className="text-secondary">{t('confirm.body')}</p>
       {!options && !problem && <Loading label={t('state.loading')} />}
       {options && !way && <Alert tone="warning">{t('confirm.noWay')}</Alert>}
-      {way && (
+      {way === 'passkey' && options?.passkeyOptions && (
+        <Button
+          busy={busy}
+          icon={<KeyRound aria-hidden className="size-5" />}
+          onClick={() => {
+            const passkeyOptions = options.passkeyOptions!;
+            void confirm(async () => ({ passkey: await getPasskey(passkeyOptions) }));
+          }}
+        >
+          {t('confirm.passkey')}
+        </Button>
+      )}
+      {way === 'google' && options?.googleOptions && (
+        <GoogleButton
+          options={options.googleOptions}
+          onToken={(googleIdToken) => void confirm(async () => ({ googleIdToken }))}
+          onError={(failure) => setProblem(errorText(failure, t))}
+        />
+      )}
+      {way && !typed && (
+        <>
+          {problem && <Alert tone="danger">{problem}</Alert>}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="tertiary" onClick={onCancel}>
+              {t('action.back')}
+            </Button>
+            {others.map((other) => (
+              <Button
+                key={other}
+                variant="tertiary"
+                onClick={() => {
+                  setWay(other);
+                  setValue('');
+                  setProblem(null);
+                }}
+              >
+                {t(`confirm.use.${other}` as MessageKey)}
+              </Button>
+            ))}
+          </div>
+        </>
+      )}
+      {way && typed && (
         <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-3">
           {way === 'phone' && !sent ? (
             <Button variant="secondary" busy={busy} onClick={() => void sendCode()}>
