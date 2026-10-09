@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Photos' descriptions, in the admin
+### 8d54eb6 · Photos' descriptions, in the admin
 
 * **Each photo** ([ADR-318](../architecture/13-decision-log.md#adr-318--the-admin-describes-each-product-photo-for-screen-readers-and-search-engines-from-a-pencil-on-its-tile-the-description-shown-beneath-it)) described from a pencil on its tile, for screen readers and search
   engines, the description shown beneath it.
