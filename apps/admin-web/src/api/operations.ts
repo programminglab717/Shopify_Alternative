@@ -3966,3 +3966,60 @@ export const PaymentLinkUpdateMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const SUPPORT_GRANT = /* GraphQL */ `
+  fragment SupportGrant on SupportAccessGrant {
+    id
+    open
+    note
+    grantedBy
+    createdAt
+    expiresAt
+    endedAt
+    endedBy
+  }
+`;
+
+/** Whether Hatti's support may look at the shop now (ADM-08), and each time it was let in. */
+export const SupportAccessQuery = /* GraphQL */ `
+  query SupportAccess {
+    supportAccess {
+      ...SupportGrant
+    }
+    supportAccessGrants(first: 20) {
+      ...SupportGrant
+    }
+  }
+  ${SUPPORT_GRANT}
+`;
+
+/** Hatti's support let in to look for a while: the owner alone, signed in lately. */
+export const SupportAccessGrantMutation = /* GraphQL */ `
+  mutation SupportAccessGrant($minutes: Int, $note: String) {
+    supportAccessGrant(minutes: $minutes, note: $note) {
+      grant {
+        ...SupportGrant
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SUPPORT_GRANT}
+  ${USER_ERRORS}
+`;
+
+/** Hatti's support's access ended now. */
+export const SupportAccessEndMutation = /* GraphQL */ `
+  mutation SupportAccessEnd {
+    supportAccessEnd {
+      grant {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

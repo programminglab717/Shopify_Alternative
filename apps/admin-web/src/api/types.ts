@@ -1736,3 +1736,27 @@ export interface PaymentLinkUpdateData {
     userErrors: UserError[];
   };
 }
+
+export interface SupportGrant {
+  id: string;
+  open: boolean;
+  note: string | null;
+  grantedBy: string;
+  createdAt: string;
+  expiresAt: string;
+  endedAt: string | null;
+  endedBy: string | null;
+}
+
+export interface SupportAccessData {
+  supportAccess: SupportGrant | null;
+  supportAccessGrants: SupportGrant[];
+}
+
+export interface SupportAccessGrantData {
+  supportAccessGrant: { grant: SupportGrant | null; userErrors: UserError[] };
+}
+
+export interface SupportAccessEndData {
+  supportAccessEnd: { grant: { id: string } | null; userErrors: UserError[] };
+}

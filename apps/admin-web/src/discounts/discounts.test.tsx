@@ -64,7 +64,8 @@ describe('Discount codes in the admin', () => {
         minimumSubtotal: '3,000',
         usageLimit: 100,
         oncePerCustomer: true,
-        endsAt: new Date('2026-12-31T23:59:59').toISOString(),
+        // The end of the day in Pakistan, whatever the phone's time zone.
+        endsAt: '2026-12-31T18:59:59.000Z',
       },
     });
   });

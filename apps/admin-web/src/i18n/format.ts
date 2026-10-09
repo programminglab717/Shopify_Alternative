@@ -86,12 +86,22 @@ export function localInput(iso: string): string {
   )}:${pad(date.getMinutes())}`;
 }
 
-/** The last second of `date` (`2026-12-31`, as a date field gives it) in `timeZone`, as ISO. */
-export function endOfDayIn(date: string, timeZone: string): string {
-  const offset =
+/** `timeZone`'s offset from UTC on `date`, as an ISO time writes it: `+05:00`, or `Z`. */
+function offsetOn(date: string, timeZone: string): string {
+  return (
     new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' })
       .formatToParts(new Date(`${date}T12:00:00Z`))
       .find((part) => part.type === 'timeZoneName')
-      ?.value.replace('GMT', '') || 'Z';
-  return new Date(`${date}T23:59:59${offset}`).toISOString();
+      ?.value.replace('GMT', '') || 'Z'
+  );
+}
+
+/** The first moment of `date` (`2026-12-31`, as a date field gives it) in `timeZone`, as ISO. */
+export function startOfDayIn(date: string, timeZone: string): string {
+  return new Date(`${date}T00:00:00${offsetOn(date, timeZone)}`).toISOString();
+}
+
+/** The last second of `date` in `timeZone`, as ISO. */
+export function endOfDayIn(date: string, timeZone: string): string {
+  return new Date(`${date}T23:59:59${offsetOn(date, timeZone)}`).toISOString();
 }

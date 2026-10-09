@@ -5,6 +5,7 @@ import {
   CreditCard,
   History,
   Landmark,
+  LifeBuoy,
   MapPin,
   Receipt,
   Store,
@@ -41,6 +42,7 @@ interface Section {
     | '/$shopId/settings/bank-transfer'
     | '/$shopId/settings/billing'
     | '/$shopId/settings/activity'
+    | '/$shopId/settings/support'
     | '/$shopId/settings/couriers'
     | '/$shopId/settings/staff';
   label: MessageKey;
@@ -103,9 +105,15 @@ const SECTIONS: readonly Section[] = [
     hint: 'settings.activityHint',
     icon: History,
   },
+  {
+    to: '/$shopId/settings/support',
+    label: 'settings.support',
+    hint: 'settings.supportHint',
+    icon: LifeBuoy,
+  },
 ];
 
-/** Settings (docs/design/02 §4), as far as they are built: the shop, delivery and payments, couriers, staff, billing and activity. */
+/** Settings (docs/design/02 §4), as far as they are built: the shop, delivery and payments, couriers, staff, billing, activity and support access. */
 export function SettingsPage() {
   const { t } = useLocale();
   const shopId = useShop().id;

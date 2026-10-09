@@ -16,7 +16,7 @@ import type {
 } from '../api/types';
 import type { StaffRole } from '../auth/session';
 import { errorText } from '../i18n/errors';
-import { formatDate } from '../i18n/format';
+import { endOfDayIn, formatDate, startOfDayIn } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { problemText } from '../products/product-form';
@@ -42,10 +42,10 @@ export function newCode(random: () => number = Math.random): string {
   return Array.from({ length: 8 }, () => letters[Math.floor(random() * letters.length)]).join('');
 }
 
-/** The start of a day typed in a date field, or its end, as the browser's clock has it. */
-function dayInput(date: string, end: boolean): string | null {
+/** The start of a day typed in a date field, or its end, in the shop's time zone. */
+function dayInput(date: string, end: boolean, timeZone: string): string | null {
   if (!date) return null;
-  return new Date(`${date}T${end ? '23:59:59' : '00:00:00'}`).toISOString();
+  return end ? endOfDayIn(date, timeZone) : startOfDayIn(date, timeZone);
 }
 
 const LABELS: Partial<Record<string, MessageKey>> = {
@@ -60,6 +60,7 @@ const LABELS: Partial<Record<string, MessageKey>> = {
 
 function NewCodeForm({ onDone }: { onDone: (code: DiscountCodeValue) => void }) {
   const { t } = useLocale();
+  const timezone = useShopTimezone();
   const create = useAdminMutation<
     { discountCodeCreate: DiscountCodePayloadData },
     { discountCode: Record<string, unknown> }
@@ -92,8 +93,8 @@ function NewCodeForm({ onDone }: { onDone: (code: DiscountCodeValue) => void }) 
           minimumSubtotal: minimum.trim() || null,
           usageLimit,
           oncePerCustomer: once,
-          ...(starts && { startsAt: dayInput(starts, false) }),
-          endsAt: dayInput(ends, true),
+          ...(starts && { startsAt: dayInput(starts, false, timezone) }),
+          endsAt: dayInput(ends, true, timezone),
         },
       });
       if (discountCodeCreate.userErrors.length > 0 || !discountCodeCreate.discountCode) {

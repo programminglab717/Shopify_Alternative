@@ -54,6 +54,7 @@ import { NewProductPage } from './products/new-product-page';
 import { ProductPage, validateProductSearch } from './products/product-page';
 import { ProductsPage, validateProductsSearch } from './products/products-page';
 import { ActivityPage } from './settings/activity-page';
+import { SupportAccessPage } from './settings/support-page';
 import { BankTransferPage } from './settings/bank-transfer-page';
 import { BillingPage } from './settings/billing-page';
 import { CashOnDeliveryPage } from './settings/cash-on-delivery-page';
@@ -417,6 +418,12 @@ const settingsActivity = createRoute({
   component: ActivityPage,
 });
 
+const settingsSupport = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/support',
+  component: SupportAccessPage,
+});
+
 const settingsBilling = createRoute({
   getParentRoute: () => shop,
   path: 'settings/billing',
@@ -545,6 +552,7 @@ export const routeTree = root.addChildren([
     settingsOnlinePayments,
     settingsBilling,
     settingsActivity,
+    settingsSupport,
   ]),
 ]);
 

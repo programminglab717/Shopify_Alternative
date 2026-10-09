@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, support access in the admin** (ADM-08): the owner letting Hatti's support in for a while,
-seeing who came in and when, and ending it; and the discounts page's days taken in the shop's
-time zone, as store credit's and payment links' are; then the admin's next sections as the
-alpha's shops need them. Urdu handles wait, as decided.
+**Next, order exports in the admin** (ORD-11): the orders a search finds, as CSV or Excel, at
+once or by email on a schedule; then the shop's sales tax settings, and the admin's next
+sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Support access, in the admin
+
+* **Support access** ([ADR-303](../architecture/13-decision-log.md#adr-303--the-admins-settings-show-whether-hattis-support-may-look-at-the-shop-and-until-when-let-the-owner-let-it-in-for-15-minutes-to-a-day-and-a-reason-having-confirmed-who-they-are-let-the-owner-or-a-manager-end-it-and-list-each-time-it-was-let-in-and-the-discounts-page-takes-a-codes-days-in-the-shops-time-zone)) in settings: whether Hatti's support may look at the shop, until
+  when, as who allowed and why; the owner lets it in for a quarter of an hour to a day, with a
+  reason, confirming who they are where they signed in a while ago; the owner or a manager ends
+  it; each time it was let in is listed. And the discounts page takes a code's days in the shop's
+  time zone.
+* **Tried against the core:** on the seed's shop, the owner let support in for an hour, "Order
+  #1017 won't book with the courier", and the page said until when; ended, it was listed with who
+  ended it. A code made to end on 31 December was kept to 18:59:59 UTC, the day's end in
+  Pakistan. No errors in the browser. In the tests, the first try let support in twice: the
+  confirming form sat inside the asking one, and its Confirm sent both; it now sits beside it.
+  The duration's label, "For", matched "What it is for" too; it is "How long" now.
+* 2173 tests: support let in once after confirming, ended, and the times before listed; a
+  manager ending it and not letting it in; a discount's end in Pakistan.
 
 ### 5060864 · Payment links, in the admin
 

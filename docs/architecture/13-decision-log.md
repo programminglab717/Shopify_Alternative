@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-302 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-303 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -310,6 +310,7 @@
 | 300 | The admin keeps the shop's link page in the online store: where it is, to copy and open; its bio, links and products edited and saved together, each product's variant chosen where it has several, the core's reason given by the link or product it is about; and its taps over the last week, month or three months | Accepted |
 | 301 | The admin shows a customer's store credit on their page, its ledger to those who keep it, and owners and managers give credit by hand, to expire at the end of a day in the shop's time zone, and take it back; an order not yet shipped is paid with it from its page | Accepted |
 | 302 | The admin keeps the shop's payment links: what each sells and how many orders it took, whether it is open and why not, copied or sent on WhatsApp, closed and opened again; made of items found by name, with a discount code, a limit, a day it closes in the shop's time zone, and prepaid alone if the shop likes | Accepted |
+| 303 | The admin's settings show whether Hatti's support may look at the shop and until when, let the owner let it in for 15 minutes to a day and a reason, having confirmed who they are, let the owner or a manager end it, and list each time it was let in; and the discounts page takes a code's days in the shop's time zone | Accepted |
 
 ---
 
@@ -12338,3 +12339,30 @@
 * **Alternatives:**
   * **A link per customer,** as a draft order's is: a draft order does that already; a payment
     link is for many.
+
+## ADR-303 · The admin's settings show whether Hatti's support may look at the shop and until when, let the owner let it in for 15 minutes to a day and a reason, having confirmed who they are, let the owner or a manager end it, and list each time it was let in; and the discounts page takes a code's days in the shop's time zone
+
+* **Context:** Hatti's support looks at a shop only with its owner's consent (ADM-08): the owner,
+  having signed in lately, lets it in for 15 minutes to a day, with a note of what it is for;
+  support reads, numbers masked, changes nothing, and each of its requests is on the audit log;
+  the owner or a manager ends it early. The admin had none of it. And the discounts page took a
+  code's first and last days as the phone's clock has them, as store credit's expiry first did
+  (ADR-301).
+* **Decision:**
+  * **Support access** is a section of settings. It says what support can and cannot do, and
+    whether it may look now: until when, as who allowed, and why, with "End it now" for the
+    owner or a manager. While it is closed, the owner chooses how long, a quarter of an hour, an
+    hour, four hours or a day, and what it is for, and lets it in, confirming who they are where
+    they signed in a while ago; a manager is told the owner alone lets it in. Each time it was
+    let in is listed: by whom and when, why, and when it ended and by whom, or ran out.
+  * **Confirming who they are** has a form of its own, so it sits beside the form that asked
+    for it, not in it: inside, its Confirm also sent the asking form, and support was let in
+    twice. The admin's other uses of it were already beside their forms.
+  * **A discount code's days** are taken in the shop's time zone: its first day from midnight
+    there, its last to the day's last second there.
+* **Consequences:**
+  * An owner stuck on an order lets support look for an hour from a phone, says what for, and
+    sees afterwards that it ended.
+* **Alternatives:**
+  * **Support access always open, logged:** simpler for support, but a shop's customers and
+    orders are the shop's; the owner's consent each time is the point.

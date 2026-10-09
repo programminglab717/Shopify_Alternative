@@ -1944,6 +1944,30 @@ const en = {
   'links.closedOn': 'closed {date}',
   'links.close': 'Close it',
   'links.reopen': 'Open it again',
+  'settings.support': 'Support access',
+  'settings.supportHint': "Letting Hatti's support look at the shop for a while",
+  'support.title': 'Support access',
+  'support.hint':
+    "When you ask Hatti's support for help, they can look at the shop for a while if you let them: they see what you see, numbers masked, change nothing, and every page they open is on the activity log.",
+  'support.closed': 'Support cannot look at the shop now.',
+  'support.open': 'Support may look at the shop until {date}, as {name} allowed.',
+  'support.end': 'End it now',
+  'support.span': 'How long',
+  'support.span.15': '15 minutes',
+  'support.span.60': 'An hour',
+  'support.span.240': '4 hours',
+  'support.span.1440': 'A day',
+  'support.note': 'What it is for',
+  'support.noteHint':
+    "So support knows where to look, like “Order #1043 won't ship”; up to 200 characters.",
+  'support.grant': 'Let support look',
+  'support.ownerOnly': 'Only the owner lets support in.',
+  'support.history': 'Each time support was let in',
+  'support.by': '{name}, {date}',
+  'support.openNow': 'Open now',
+  'support.until': 'Until {date}',
+  'support.endedBy': 'Ended by {name}, {date}',
+  'support.ran': 'Ran out {date}',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -3873,6 +3897,30 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'links.closedOn': '{date} کو بند ہوا',
   'links.close': 'بند کریں',
   'links.reopen': 'دوبارہ کھولیں',
+  'settings.support': 'سپورٹ کی رسائی',
+  'settings.supportHint': 'ہٹی کی سپورٹ کو کچھ دیر دکان دیکھنے دینا',
+  'support.title': 'سپورٹ کی رسائی',
+  'support.hint':
+    'جب آپ ہٹی کی سپورٹ سے مدد مانگیں، آپ اجازت دیں تو وہ کچھ دیر دکان دیکھ سکتے ہیں: وہ وہی دیکھتے ہیں جو آپ، نمبر چھپے ہوئے، کچھ تبدیل نہیں کرتے، اور ان کا کھولا ہر صفحہ سرگرمی کے ریکارڈ میں ہوتا ہے۔',
+  'support.closed': 'سپورٹ ابھی دکان نہیں دیکھ سکتی۔',
+  'support.open': 'سپورٹ {date} تک دکان دیکھ سکتی ہے، جیسا {name} نے اجازت دی۔',
+  'support.end': 'ابھی ختم کریں',
+  'support.span': 'کتنی دیر',
+  'support.span.15': '15 منٹ',
+  'support.span.60': 'ایک گھنٹہ',
+  'support.span.240': '4 گھنٹے',
+  'support.span.1440': 'ایک دن',
+  'support.note': 'کس لیے',
+  'support.noteHint':
+    'تاکہ سپورٹ کو پتا ہو کہاں دیکھنا ہے، جیسے “آرڈر #1043 بھیجا نہیں جا رہا”؛ 200 حروف تک۔',
+  'support.grant': 'سپورٹ کو دیکھنے دیں',
+  'support.ownerOnly': 'سپورٹ کو اجازت صرف مالک دیتا ہے۔',
+  'support.history': 'ہر بار جب سپورٹ کو اجازت ملی',
+  'support.by': '{name}، {date}',
+  'support.openNow': 'ابھی کھلی ہے',
+  'support.until': '{date} تک',
+  'support.endedBy': '{name} نے ختم کی، {date}',
+  'support.ran': 'وقت پورا ہوا، {date}',
 };
 
 export const messages: Readonly<
