@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### An order's everyday edits, in the admin
+### 503f71c · An order's everyday edits, in the admin
 
 * **Assignment, comments, note, tags and address on the order's page** ([ADR-286](../architecture/13-decision-log.md#adr-286--an-orders-page-gives-it-to-a-member-of-staff-comments-on-its-timeline-with-their-authors-edits-and-deletes-keeps-its-note-and-tags-and-corrects-its-address-while-nothing-has-shipped-each-for-the-roles-the-core-lets-do-it)):
   the order given to staff or taken, comments for whoever picks it up next with their authors'
