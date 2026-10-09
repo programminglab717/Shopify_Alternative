@@ -3,18 +3,32 @@ import { ChevronRight, CircleCheck, Circle, PartyPopper } from 'lucide-react';
 import { ApiError } from '../api/client';
 import { HomeQuery, SetupChecklistQuery } from '../api/operations';
 import type { HomeData, OrderStage, SetupChecklistData, Tally } from '../api/types';
+import type { StaffRole } from '../auth/session';
+import { RECONCILES_CASH } from '../cash/cash-page';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { CLAIMS } from '../returns/parcel';
+import type { ReturnsTab } from '../returns/parcel';
 import { useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 
 type HomeKey = Exclude<keyof HomeData['home'], 'today'>;
 
-/** Home's next actions in the pipeline's order, each with the orders tab it opens, if any. */
-const NEXT: readonly { key: HomeKey; stage?: OrderStage }[] = [
+/** A page of its own that a next action opens, for the roles that use it. */
+interface Opens {
+  to: '/$shopId/returns' | '/$shopId/cash';
+  tab?: ReturnsTab;
+  roles: readonly StaffRole[];
+}
+
+/**
+ * Home's next actions in the pipeline's order, each with the orders tab it opens, or the page of
+ * its own for the roles that use it, if any.
+ */
+const NEXT: readonly { key: HomeKey; stage?: OrderStage; opens?: Opens }[] = [
   { key: 'toConfirm', stage: 'NEEDS_CONFIRMATION' },
   { key: 'toReview', stage: 'NEEDS_REVIEW' },
   { key: 'awaitingPayment', stage: 'AWAITING_PAYMENT' },
@@ -23,13 +37,24 @@ const NEXT: readonly { key: HomeKey; stage?: OrderStage }[] = [
   { key: 'toBook', stage: 'TO_BOOK' },
   { key: 'returning', stage: 'RETURNING' },
   { key: 'returnsToReceive' },
-  { key: 'cashToCollect' },
-  { key: 'lostToClaim' },
-  { key: 'claimsOpen' },
+  { key: 'cashToCollect', opens: { to: '/$shopId/cash', roles: RECONCILES_CASH } },
+  { key: 'lostToClaim', opens: { to: '/$shopId/returns', tab: 'lost', roles: CLAIMS } },
+  { key: 'claimsOpen', opens: { to: '/$shopId/returns', tab: 'claims', roles: CLAIMS } },
 ];
 
-function NextAction({ label, tally, stage }: { label: string; tally: Tally; stage?: OrderStage }) {
-  const shopId = useShop().id;
+function NextAction({
+  label,
+  tally,
+  stage,
+  opens,
+}: {
+  label: string;
+  tally: Tally;
+  stage?: OrderStage;
+  opens?: Opens;
+}) {
+  const { id: shopId, role } = useShop();
+  const page = opens && opens.roles.includes(role) ? opens : undefined;
   const body = (
     <>
       <span className="flex flex-1 flex-col">
@@ -38,7 +63,9 @@ function NextAction({ label, tally, stage }: { label: string; tally: Tally; stag
           {formatMoney(tally.total.amount, tally.total.currencyCode)}
         </span>
       </span>
-      {stage && <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />}
+      {(stage || page) && (
+        <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />
+      )}
     </>
   );
   return (
@@ -48,6 +75,23 @@ function NextAction({ label, tally, stage }: { label: string; tally: Tally; stag
           to="/$shopId/orders"
           params={{ shopId }}
           search={{ stage }}
+          className="flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-canvas"
+        >
+          {body}
+        </Link>
+      ) : page?.to === '/$shopId/returns' ? (
+        <Link
+          to="/$shopId/returns"
+          params={{ shopId }}
+          search={page.tab ? { tab: page.tab } : {}}
+          className="flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-canvas"
+        >
+          {body}
+        </Link>
+      ) : page ? (
+        <Link
+          to={page.to}
+          params={{ shopId }}
           className="flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-canvas"
         >
           {body}
@@ -169,12 +213,13 @@ export function HomePage() {
         ) : (
           <Card>
             <ul className="divide-y divide-line">
-              {next.map(({ key, stage }) => (
+              {next.map(({ key, stage, opens }) => (
                 <NextAction
                   key={key}
                   label={t(`home.${key}` as MessageKey, { count: formatCount(tallies[key].count) })}
                   tally={tallies[key]}
                   stage={stage}
+                  opens={opens}
                 />
               ))}
             </ul>

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-281 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-282 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -289,6 +289,7 @@
 | 279 | The admin's analytics show sales over the last 7, 30 or 90 whole days in the shop's time zone against the days as many before: net sales, orders, the average order and profit with how each changed, bars by day (by week over 90), what sold most and where orders came from | Accepted |
 | 280 | The admin's analytics show the period's COD health under its sales: how many cash-on-delivery orders were confirmed, delivered and came back, of those that turned out, what returns cost, and the rates by city, product, source or courier, a return rate of 30% or more in red | Accepted |
 | 281 | The admin's Cash section shows what couriers owe on delivered cash-on-delivery orders and what is on its way, by how long it has been owed and by courier, cash held 15 days or more in red; and imports a courier's statement only once a check of it reads right, its lines to look into first | Accepted |
+| 282 | The admin's Returns section lists parcels on their way back, the longest first, checked in by the tracking number on their label or from the list, or marked lost; lost parcels with their worth, claimed from the courier; and the claims to follow up, settled as paid, refused or withdrawn | Accepted |
 
 ---
 
@@ -11605,3 +11606,41 @@
     orders; a check first costs one tap.
   * **The shop's own payout schedule for "late":** 15 days covers both the weekly and the
     fortnightly couriers; a setting can come when shops ask for one.
+
+## ADR-282 · The admin's Returns section lists parcels on their way back, the longest first, checked in by the tracking number on their label or from the list, or marked lost; lost parcels with their worth, claimed from the courier; and the claims to follow up, settled as paid, refused or withdrawn
+
+* **Context:** A refused parcel comes back days later, and a shop needs to know which are slow,
+  check each in as it arrives, and claim from the courier for those it lost. The core lists
+  parcels on their way back the longest first and checks one in by the tracking number on its
+  label ([ADR-071](#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)); writes a lost parcel off ([ADR-072](#adr-072--a-parcel-the-courier-lost-is-written-off-and-an-order-with-nothing-delivered-or-back-ends-at-a-stage-of-its-own-lost-before-reaching-the-customer-it-is-never-their-refusal)); and follows a claim
+  on the courier for a lost parcel, or one back damaged, until it is paid, refused or withdrawn
+  ([ADR-093](#adr-093--a-claim-on-the-courier-that-lost-a-parcel-is-the-parcels-followed-until-the-courier-pays-it-or-refuses-it-a-statements-cash-for-a-lost-parcel-pays-its-claim-filed-or-not), [ADR-098](#adr-098--a-parcel-that-came-back-with-items-written-off-as-damaged-is-claimed-from-its-courier-for-their-worth-as-a-lost-parcel-is-for-its-own-every-claim-is-listed-the-oldest-first-to-follow-up)). Checking in and marking lost need `write_orders`;
+  claims, an owner, a manager or an accountant. The home counted these, and opened none of them.
+* **Decision:**
+  * **Returns** (`/shop_…/returns`) is a section for owners, managers, packers and accountants,
+    with three tabs: coming back, lost, and claims, the last for those who claim alone. A link
+    names its tab (`?tab=lost`).
+  * **Coming back:** a tracking number typed or scanned checks a parcel in, everything in it
+    back in stock, and says which order it was. Each parcel on its way back shows its order,
+    courier and tracking number, its days on the way, red from 14, and its items; and is
+    checked in from the list, or marked lost after a second tap saying its items are written
+    off. Packers, owners and managers do these; accountants see the list.
+  * **Lost:** each lost parcel with its worth and its claim's state (not claimed, open, paid,
+    refused, withdrawn). One not claimed, or whose claim was withdrawn, is claimed from the
+    courier for its worth or less, with the courier's claim number as its note.
+  * **Claims:** those open or refused, the oldest first, or every claim if asked; each lost or
+    back damaged, with what was claimed, when, what was paid and the note. One is settled as
+    paid otherwise than in a statement (with the amount), refused (with why) or withdrawn.
+  * **The home's** "lost parcels to claim" and "claims open" open their tabs, and "cash on
+    delivery still to come" opens Cash, for the roles those pages are for.
+* **Consequences:**
+  * A packer checks the day's returns in at the door with a scanner; an accountant files and
+    follows the claims, and a courier's statement that pays one settles it on its own
+    (ADR-093).
+  * Checking in from here puts everything back in stock. Items damaged on the way are written
+    off from the order's page, which comes next.
+* **Alternatives:**
+  * **Each parcel's items asked at check-in:** most returns come back whole; a damaged one is
+    the exception, and the order's page is where its items are.
+  * **Marking lost in one tap:** a lost parcel's items are written off, so a second tap says so
+    first.

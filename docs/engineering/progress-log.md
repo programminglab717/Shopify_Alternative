@@ -6,15 +6,35 @@
 
 ## In progress
 
-**Next, parcels coming back in the admin** (COD-09): the parcels on their way back, the longest
-first, checked in by tracking number as they arrive; parcels the courier lost, and the claims on
-it; then the admin's next sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, an order's parcels on its page in the admin** (SHP-04, ADR-160): each parcel's courier,
+tracking number and way, the latest step first; marked delivered, refused or lost; and a step
+told of a courier Hatti does not follow; then the admin's next sections as the alpha's shops need
+them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
+
+## 2026-10-09
+
+### Parcels coming back, in the admin
+
+* **Returns, a section of its own** ([ADR-282](../architecture/13-decision-log.md#adr-282--the-admins-returns-section-lists-parcels-on-their-way-back-the-longest-first-checked-in-by-the-tracking-number-on-their-label-or-from-the-list-or-marked-lost-lost-parcels-with-their-worth-claimed-from-the-courier-and-the-claims-to-follow-up-settled-as-paid-refused-or-withdrawn)):
+  parcels on their way back, the longest first, a slow courier's in red, checked in by the
+  tracking number on their label or from the list, or marked lost; lost parcels with their
+  worth, claimed from the courier; and the claims to follow up, settled as paid, refused or
+  withdrawn. The home's lost parcels, claims and cash to come open their pages.
+* **Tried against the core:** two of the seed's parcels refused at the door; one checked in by
+  its tracking number typed in lower case with spaces round it, the other marked lost, claimed
+  for its worth of Rs 4,990 with the courier's claim number, and settled as Rs 4,000 paid; with
+  no errors in the browser. The first try showed "0 days on its way back", a per-parcel button
+  reading "Checked in" like a state, and the tracking field half the card's width on a phone;
+  they now read "Coming back since today" and "Check it in", and the field takes the width.
+* 1998 tests: checking in by number and from the list, a slow return in red, marking lost
+  after asking, a lost parcel claimed with its worth filled in, a claim refused with why,
+  settled claims shown when asked, the home's links, and who sees the section and its tabs.
 
 ## 2026-10-08
 

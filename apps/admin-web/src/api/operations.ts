@@ -2162,3 +2162,153 @@ export const CashStatementImportMutation = /* GraphQL */ `
   ${MONEY}
   ${USER_ERRORS}
 `;
+
+const PARCEL_CLAIM = /* GraphQL */ `
+  fragment ParcelClaim on FulfillmentClaim {
+    status
+    amount {
+      ...Money
+    }
+    paid {
+      ...Money
+    }
+    note
+    claimedAt
+    settledAt
+  }
+`;
+
+/** Parcels on their way back, the longest first (COD-09). */
+export const ReturningParcelsQuery = /* GraphQL */ `
+  query ReturningParcels {
+    returningParcels(first: 100) {
+      nodes {
+        id
+        orderId
+        orderName
+        days
+        units
+        trackingInfo {
+          company
+          number
+        }
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+`;
+
+/** Parcels the courier lost, the longest lost first, with their worth and claims (COD-09). */
+export const LostParcelsQuery = /* GraphQL */ `
+  query LostParcels {
+    lostParcels(first: 100) {
+      nodes {
+        id
+        orderId
+        orderName
+        days
+        units
+        worth {
+          ...Money
+        }
+        trackingInfo {
+          company
+          number
+        }
+        claim {
+          ...ParcelClaim
+        }
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+  ${PARCEL_CLAIM}
+  ${MONEY}
+`;
+
+/** Parcels with claims on their couriers, the oldest claim first, in the states asked for. */
+export const ParcelClaimsQuery = /* GraphQL */ `
+  query ParcelClaims($status: [FulfillmentClaimStatus!]) {
+    parcelClaims(first: 100, status: $status) {
+      nodes {
+        id
+        orderId
+        orderName
+        status
+        trackingInfo {
+          company
+          number
+        }
+        claim {
+          ...ParcelClaim
+        }
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+  ${PARCEL_CLAIM}
+  ${MONEY}
+`;
+
+/** A parcel that came back checked in, by its ID or the tracking number on its label. */
+export const ParcelCheckInMutation = /* GraphQL */ `
+  mutation ParcelCheckIn($id: ID, $trackingNumber: String) {
+    fulfillmentReceiveReturn(id: $id, trackingNumber: $trackingNumber) {
+      order {
+        id
+        name
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The courier lost a parcel on its way back: its items are written off. */
+export const ParcelMarkLostMutation = /* GraphQL */ `
+  mutation ParcelMarkLost($id: ID!) {
+    fulfillmentMarkLost(id: $id) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A claim on the courier for a parcel it lost: its worth, or what the shop says. */
+export const ParcelClaimCreateMutation = /* GraphQL */ `
+  mutation ParcelClaimCreate($id: ID!, $amount: String, $note: String) {
+    fulfillmentClaimCreate(id: $id, amount: $amount, note: $note) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** What became of a claim: paid, refused or withdrawn. */
+export const ParcelClaimSettleMutation = /* GraphQL */ `
+  mutation ParcelClaimSettle(
+    $id: ID!
+    $status: FulfillmentClaimSettlement!
+    $amount: String
+    $note: String
+  ) {
+    fulfillmentClaimSettle(id: $id, status: $status, amount: $amount, note: $note) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

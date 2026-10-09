@@ -11,6 +11,7 @@ import {
   Settings,
   Tag,
   Truck,
+  Undo2,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -21,6 +22,7 @@ import { READS_ANALYTICS } from '../analytics/analytics-page';
 import { RECONCILES_CASH } from '../cash/cash-page';
 import { READS_CUSTOMERS } from '../customers/customers-page';
 import { MANAGES_DISCOUNTS } from '../discounts/discounts-page';
+import { READS_RETURNS } from '../returns/parcel';
 import { OPENS_SETTINGS } from '../settings/settings-page';
 import type { StaffRole } from '../auth/session';
 import { errorText } from '../i18n/errors';
@@ -39,6 +41,7 @@ interface NavItem {
     | '/$shopId/products'
     | '/$shopId/customers'
     | '/$shopId/shipping'
+    | '/$shopId/returns'
     | '/$shopId/discounts'
     | '/$shopId/analytics'
     | '/$shopId/cash'
@@ -77,6 +80,7 @@ export const NAV: readonly NavItem[] = [
     roles: ['owner', 'manager', 'packer'],
     primary: true,
   },
+  { to: '/$shopId/returns', label: 'nav.returns', icon: Undo2, roles: READS_RETURNS },
   { to: '/$shopId/products', label: 'nav.products', icon: Package },
   {
     to: '/$shopId/customers',

@@ -987,3 +987,55 @@ export interface CashStatementImportData {
     userErrors: UserError[];
   };
 }
+
+export type FulfillmentClaimStatus = 'OPEN' | 'PAID' | 'REFUSED' | 'WITHDRAWN';
+
+export interface ParcelClaimValue {
+  status: FulfillmentClaimStatus;
+  amount: MoneyValue;
+  paid: MoneyValue | null;
+  note: string | null;
+  claimedAt: string;
+  settledAt: string | null;
+}
+
+interface ParcelBase {
+  id: string;
+  orderId: string;
+  orderName: string;
+  trackingInfo: { company: string | null; number: string | null };
+}
+
+export interface ReturningParcelsData {
+  returningParcels: {
+    nodes: (ParcelBase & { days: number; units: number })[];
+    pageInfo: { hasNextPage: boolean };
+  };
+}
+
+export interface LostParcelsData {
+  lostParcels: {
+    nodes: (ParcelBase & {
+      days: number;
+      units: number;
+      worth: MoneyValue;
+      claim: ParcelClaimValue | null;
+    })[];
+    pageInfo: { hasNextPage: boolean };
+  };
+}
+
+export interface ParcelClaimsData {
+  parcelClaims: {
+    nodes: (ParcelBase & { status: 'LOST' | 'RETURNED'; claim: ParcelClaimValue })[];
+    pageInfo: { hasNextPage: boolean };
+  };
+}
+
+export interface ParcelCheckInData {
+  fulfillmentReceiveReturn: { order: { id: string; name: string } | null; userErrors: UserError[] };
+}
+
+export interface ParcelUserErrorsData {
+  [mutation: string]: { userErrors: UserError[] };
+}
