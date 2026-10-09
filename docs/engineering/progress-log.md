@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The shop's policies, in the admin
+### 49cff6e · The shop's policies, in the admin
 
 * **A Policies tab** ([ADR-292](../architecture/13-decision-log.md#adr-292--the-admins-policies-start-from-hattis-drafts-and-are-written-as-text-with-headings-lists-and-links-kept-or-taken-away-by-owners-and-managers-each-policys-urdu-is-kept-as-a-translation-of-its-words-said-to-be-out-of-date-once-they-change)): the five policies, each started from Hatti's draft
   and written as text with headings, lists and links, saved or taken away; its Urdu kept as a
