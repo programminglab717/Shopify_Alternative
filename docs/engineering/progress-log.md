@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, photos' descriptions in the admin** (CAT-02): what each product photo shows, written for
-screen readers and search engines, set and changed from the product page; then the admin's
-next sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, the shop's domains in the admin** (ONB-07): its own domains added, checked and made
+primary, the Hatti address kept, and a domain taken away, on plans that allow them; then the
+admin's next sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,15 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Photos' descriptions, in the admin
+
+* **Each photo** ([ADR-318](../architecture/13-decision-log.md#adr-318--the-admin-describes-each-product-photo-for-screen-readers-and-search-engines-from-a-pencil-on-its-tile-the-description-shown-beneath-it)) described from a pencil on its tile, for screen readers and search
+  engines, the description shown beneath it.
+* **Tried against the core:** on the seed's Ajrak Shawl Test, its second photo was described as
+  a red and indigo shawl; the core kept it and the photo's alt said it; then its description was
+  put back. No errors in the browser.
+* 2269 tests: a photo described after a refusal named, its words trimmed and shown.
 
 ### a18fe86 · Stock rules, in the admin
 

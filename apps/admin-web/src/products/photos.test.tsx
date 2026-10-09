@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeCore, press, renderAdmin, signedIn } from '../test-support';
 import { preparePhoto } from './photos';
@@ -43,10 +43,31 @@ const AJRAK = {
 const STORAGE = 'http://localhost:4000/storage/shops/shop_1/files/f1/ajrak.jpg';
 
 function photosCore() {
-  return fakeCore('owner', (operation) => {
+  let media = AJRAK.media;
+  return fakeCore('owner', (operation, variables) => {
     switch (operation) {
       case 'Product':
-        return { location: { id: 'loc_1', name: 'Shop' }, product: AJRAK };
+        return { location: { id: 'loc_1', name: 'Shop' }, product: { ...AJRAK, media } };
+      case 'ProductUpdateMedia': {
+        const [change] = variables.media as { id: string; alt: string }[];
+        if (change!.alt.startsWith('http')) {
+          return {
+            productUpdateMedia: {
+              userErrors: [
+                {
+                  field: ['media', '0', 'alt'],
+                  code: 'INVALID',
+                  message: 'is a link, not a description',
+                },
+              ],
+            },
+          };
+        }
+        media = media.map((each) =>
+          each.id === change!.id ? { ...each, alt: change!.alt } : each,
+        );
+        return { productUpdateMedia: { userErrors: [] } };
+      }
       case 'StagedUploadsCreate':
         return {
           stagedUploadsCreate: {
@@ -136,5 +157,33 @@ describe("A product's photos", () => {
         { productId: 'prod_1', moves: [{ id: 'media_2', newPosition: 1 }] },
       ),
     );
+  });
+
+  it('describes a photo for screen readers and search engines, after a refusal named', async () => {
+    const core = photosCore();
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/products/prod_1');
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Change the description of photo 2' }),
+    );
+    const tile = screen.getByLabelText('What photo 2 shows').closest('li')!;
+    fireEvent.change(within(tile).getByLabelText('What photo 2 shows'), {
+      target: { value: 'https://example.com/ajrak' },
+    });
+    fireEvent.click(within(tile).getByRole('button', { name: 'Save' }));
+    expect(await within(tile).findByText('is a link, not a description')).toBeTruthy();
+    fireEvent.change(within(tile).getByLabelText('What photo 2 shows'), {
+      target: { value: '  Blue and red ajrak, folded  ' },
+    });
+    fireEvent.click(within(tile).getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Blue and red ajrak, folded')).toBeTruthy();
+    expect(screen.queryByLabelText('What photo 2 shows')).toBeNull();
+    expect(
+      core.sent.filter((each) => each.operation === 'ProductUpdateMedia').at(-1)?.variables,
+    ).toEqual({
+      productId: 'prod_1',
+      media: [{ id: 'media_2', alt: 'Blue and red ajrak, folded' }],
+    });
   });
 });

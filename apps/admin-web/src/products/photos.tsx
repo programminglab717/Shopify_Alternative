@@ -1,10 +1,11 @@
-import { Camera, ImageOff, LoaderCircle, Star, Trash2 } from 'lucide-react';
+import { Camera, ImageOff, LoaderCircle, Pencil, Star, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import {
   ProductCreateMediaMutation,
   ProductDeleteMediaMutation,
   ProductReorderMediaMutation,
+  ProductUpdateMediaMutation,
   StagedUploadsCreateMutation,
 } from '../api/operations';
 import { browserFetch } from '../api/client';
@@ -13,6 +14,7 @@ import type {
   ProductDeleteMediaData,
   ProductDetail,
   ProductMedia,
+  UserError,
   ProductReorderMediaData,
   StagedUploadsCreateData,
 } from '../api/types';
@@ -20,6 +22,7 @@ import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import { useAdminMutation } from '../shell/shop-context';
 import { Button } from '../ui/button';
+import { TextField } from '../ui/field';
 import { Alert } from '../ui/feedback';
 import { FormSection, problemText } from './product-form';
 
@@ -64,23 +67,90 @@ export async function preparePhoto(file: File): Promise<File | null> {
   }
 }
 
-function MediaTile({
+/** The longest description a photo takes. */
+const ALT_LENGTH = 512;
+
+/** What a photo shows, in words, written for screen readers and search engines. */
+function Describe({
+  productId,
   media,
-  first,
+  position,
+  onDone,
+}: {
+  productId: string;
+  media: ProductMedia;
+  position: number;
+  onDone: () => void;
+}) {
+  const { t } = useLocale();
+  const update = useAdminMutation<
+    { productUpdateMedia: { userErrors: UserError[] } },
+    { productId: string; media: { id: string; alt: string }[] }
+  >(ProductUpdateMediaMutation);
+  const [alt, setAlt] = useState(media.alt);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const onSave = async (event: FormEvent) => {
+    event.preventDefault();
+    setProblem(null);
+    try {
+      const { productUpdateMedia } = await update.mutateAsync({
+        productId,
+        media: [{ id: media.id, alt: alt.trim() }],
+      });
+      const error = productUpdateMedia.userErrors[0];
+      if (error) setProblem(problemText(error, t));
+      else onDone();
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  return (
+    <form onSubmit={(event) => void onSave(event)} className="flex flex-col gap-2">
+      <TextField
+        label={t('photos.altOf', { position })}
+        hint={t('photos.altHint')}
+        dir="auto"
+        maxLength={ALT_LENGTH}
+        value={alt}
+        onChange={(event) => setAlt(event.target.value)}
+      />
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      <div className="flex gap-1">
+        <Button type="submit" className="flex-1 px-2" busy={update.isPending}>
+          {t('photos.altSave')}
+        </Button>
+        <Button variant="tertiary" className="px-2" onClick={onDone}>
+          {t('action.back')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function MediaTile({
+  productId,
+  media,
+  position,
   edits,
   busy,
   onRemove,
   onMakeFirst,
 }: {
+  productId: string;
   media: ProductMedia;
-  first: boolean;
+  /** Its place among the photos, from 1: the first is the one listings show. */
+  position: number;
   edits: boolean;
   busy: boolean;
   onRemove: () => void;
   onMakeFirst: () => void;
 }) {
   const { t } = useLocale();
+  const first = position === 1;
   const [removing, setRemoving] = useState(false);
+  const [describing, setDescribing] = useState(false);
   const url = media.previewImage?.url;
   const at = (width: number) => `${url}${url?.includes('?') ? '&' : '?'}width=${width}`;
   return (
@@ -112,7 +182,14 @@ function MediaTile({
           </span>
         )}
       </div>
-      {edits && (
+      {edits && describing ? (
+        <Describe
+          productId={productId}
+          media={media}
+          position={position}
+          onDone={() => setDescribing(false)}
+        />
+      ) : edits ? (
         <div className="flex gap-1">
           {removing ? (
             <>
@@ -130,6 +207,14 @@ function MediaTile({
             </>
           ) : (
             <>
+              <Button
+                variant="tertiary"
+                className="flex-1 px-2"
+                aria-label={t(media.alt ? 'photos.altChange' : 'photos.altAdd', { position })}
+                icon={<Pencil aria-hidden className="size-5" />}
+                disabled={busy}
+                onClick={() => setDescribing(true)}
+              />
               {!first && (
                 <Button
                   variant="tertiary"
@@ -151,6 +236,11 @@ function MediaTile({
             </>
           )}
         </div>
+      ) : null}
+      {!describing && media.alt && edits && (
+        <p className="text-secondary text-[length:var(--hatti-type-caption-size)]" dir="auto">
+          {media.alt}
+        </p>
       )}
     </li>
   );
@@ -285,9 +375,10 @@ export function ProductPhotos({ product, edits }: { product: ProductDetail; edit
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {images.map((media, index) => (
             <MediaTile
-              key={media.id}
+              key={`${media.id}-${media.alt}`}
+              productId={product.id}
               media={media}
-              first={index === 0}
+              position={index + 1}
               edits={edits}
               busy={busy}
               onRemove={() => void onRemove(media)}

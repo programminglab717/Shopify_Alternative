@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-317 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-318 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -325,6 +325,7 @@
 | 315 | The admin sends an emailed invitation still waiting again, showing its new link, and the owner hands the shop to one of its managers once asked, the core's refusal named and the owner's own role read again after | Accepted |
 | 316 | The admin shows the saved searches of the orders and products lists above them, each run in a tap; those who change a list save the search shown by a name, and rename, change and delete those saved, the core's refusals named by their field | Accepted |
 | 317 | The admin sets on the product page whether each variant's stock is counted and whether it keeps selling when out of stock, each change saved at once and shown at once, put back if the core refuses | Accepted |
+| 318 | The admin describes each product photo for screen readers and search engines, from a pencil on its tile, the description shown beneath it | Accepted |
 
 ---
 
@@ -12758,3 +12759,22 @@
 * **Alternatives:**
   * **The rules among the variant rows of the form above:** one save, but a row's stock field
     means nothing while it is not counted, and the form would have to change as it is filled.
+
+## ADR-318 · The admin describes each product photo for screen readers and search engines, from a pencil on its tile, the description shown beneath it
+
+* **Context:** A product's photos carry Shopify's alt text (CAT-02, ADR-158): the storefront puts
+  it in each image's alt, screen readers read it aloud, and search engines index it. A photo
+  added in the admin took the product's title, and the core's productUpdateMedia changes it,
+  but the admin offered no way to.
+* **Decision:**
+  * **Each photo's tile** gains a pencil, named for the photo's place, "Describe photo 2" or
+    "Change the description of photo 2", for those who change products.
+  * **The description** is written in the tile, up to 512 characters, with an example of a
+    good one; saved, it is shown beneath the photo, and the core's refusal is named there.
+  * **Crops and focal points**, which productUpdateMedia also takes, wait for a later section.
+* **Consequences:**
+  * "Red and indigo ajrak shawl, block printed" reaches a blind shopper and Google where the
+    product's title said only "Ajrak Shawl".
+* **Alternatives:**
+  * **Descriptions in the product's form:** one save, but a photo is uploaded and arranged on
+    its own, and its words belong with it.

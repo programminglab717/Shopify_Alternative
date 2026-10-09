@@ -2501,6 +2501,12 @@ const en = {
   'stockRules.continue': 'Keep selling when out of stock',
   'stockRules.continueOf': 'Keep selling {title} when out of stock',
   'stockRules.continueHint': 'For what you make to order: its stock goes below zero.',
+  'photos.altAdd': 'Describe photo {position}',
+  'photos.altChange': 'Change the description of photo {position}',
+  'photos.altOf': 'What photo {position} shows',
+  'photos.altHint':
+    "Read aloud to those who can't see it, and by search engines: “Maroon lawn suit with gold embroidery”.",
+  'photos.altSave': 'Save',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -4985,6 +4991,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'stockRules.continue': 'اسٹاک ختم ہونے پر بھی بیچتے رہیں',
   'stockRules.continueOf': 'اسٹاک ختم ہونے پر بھی {title} بیچتے رہیں',
   'stockRules.continueHint': 'جو آپ آرڈر پر بناتے ہیں: اس کا اسٹاک صفر سے نیچے جاتا ہے۔',
+  'photos.altAdd': 'تصویر {position} کی تفصیل لکھیں',
+  'photos.altChange': 'تصویر {position} کی تفصیل بدلیں',
+  'photos.altOf': 'تصویر {position} میں کیا ہے',
+  'photos.altHint':
+    'جو دیکھ نہیں سکتے انہیں پڑھ کر سنائی جاتی ہے، اور سرچ انجن بھی پڑھتے ہیں: “سنہری کڑھائی والا میرون لان سوٹ”۔',
+  'photos.altSave': 'محفوظ کریں',
 };
 
 export const messages: Readonly<

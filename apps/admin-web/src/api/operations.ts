@@ -1035,6 +1035,18 @@ export const ProductDeleteMediaMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** A photo's description, for screen readers and search engines (CAT-02). */
+export const ProductUpdateMediaMutation = /* GraphQL */ `
+  mutation ProductUpdateMedia($productId: ID!, $media: [UpdateMediaInput!]!) {
+    productUpdateMedia(productId: $productId, media: $media) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** A photo moved, to be the product's first: the one its listings show. */
 export const ProductReorderMediaMutation = /* GraphQL */ `
   mutation ProductReorderMedia($productId: ID!, $moves: [MoveInput!]!) {
