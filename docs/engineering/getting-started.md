@@ -725,6 +725,9 @@ to change it). Sign in with the seed's owner: choose **Email**, give the email a
 `pnpm seed` printed, then the code from `pnpm totp <2-step key>`. The shop opens on Home, with its
 orders a tap away; **اردو** in the header switches to Urdu, right to left. A new account signs up
 by mobile only where the core sends codes (`WHATSAPP_*` or `SMS_*`); by email, it always can.
+Passkeys added under **Account** belong to the admin's origin, which the core takes from
+`PASSKEY_ORIGINS=http://localhost:5173` in `.env` (`.env.example` has it); the links in the core's
+emails open the admin there too.
 
 ## Look at a storefront
 

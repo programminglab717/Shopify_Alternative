@@ -33,6 +33,10 @@ export interface AccountUser {
   phone: string | null;
   language: 'en' | 'ur';
   mfaEnabled: boolean;
+  /** Whether the email was proved, by a link or by Google. */
+  emailVerified?: boolean;
+  /** Whether the number was proved with a code, which signs the account in. */
+  phoneVerified?: boolean;
 }
 
 /** `GET /auth/me`. */
@@ -40,6 +44,8 @@ export interface Me {
   user: AccountUser;
   session: { id: string; mfaVerified: boolean; authenticatedAt: string };
   shops: ShopAccess[];
+  /** The Google account that signs it in, if one is connected. */
+  google?: { email: string; connectedAt: string } | null;
 }
 
 const STORAGE_KEY = 'hatti.session';

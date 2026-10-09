@@ -14,6 +14,7 @@ import {
   Tag,
   Truck,
   Undo2,
+  UserRound,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -234,6 +235,14 @@ export function Shell() {
             )}
             <span className="flex-1" />
             <LanguageToggle />
+            <Link
+              to="/$shopId/account"
+              params={{ shopId }}
+              aria-label={t('nav.account')}
+              className="inline-flex min-h-12 items-center gap-2 rounded-control px-3 text-secondary hover:bg-canvas md:min-h-10"
+            >
+              <UserRound aria-hidden className="size-5" />
+            </Link>
             <button
               type="button"
               onClick={() => void signOut()}

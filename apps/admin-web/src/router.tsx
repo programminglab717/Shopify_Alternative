@@ -29,6 +29,7 @@ import { CashPage } from './cash/cash-page';
 import { ReturnsPage, validateReturnsSearch } from './returns/returns-page';
 import { StatementPage } from './cash/statement-page';
 import { StockPage } from './stock/stock-page';
+import { AccountPage } from './account/account-page';
 import { OnlineStorePage, validateOnlineStoreSearch } from './online-store/online-store-page';
 import { MenuEditorPage } from './online-store/menus';
 import { NewPagePage, PageEditorPage } from './online-store/pages';
@@ -309,6 +310,12 @@ const policy = createRoute({
   component: PolicyPage,
 });
 
+const account = createRoute({
+  getParentRoute: () => shop,
+  path: 'account',
+  component: AccountPage,
+});
+
 const stock = createRoute({
   getParentRoute: () => shop,
   path: 'stock',
@@ -456,6 +463,7 @@ export const routeTree = root.addChildren([
     cash,
     statement,
     stock,
+    account,
     onlineStore,
     newPage,
     pageEditor,

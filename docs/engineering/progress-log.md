@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, your own account in the admin** (ADM-02): your name and language, email and numbers,
-password, passkeys and Google, and the browsers you are signed in on; then the admin's next
-sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, signing in with a passkey or Google** (ADM-02, ONB-01): the sign-in page asking the
+browser for a passkey, Google's button where the core has its client IDs, and Google connected
+from your account; then the admin's next sections as the alpha's shops need them. Urdu handles
+wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +18,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Your own account, in the admin
+
+* **An Account page** ([ADR-293](../architecture/13-decision-log.md#adr-293--the-admins-account-page-keeps-your-email-number-and-language-the-google-account-and-passkeys-you-sign-in-with-and-the-browsers-you-are-signed-in-on-each-change-proved-again-when-the-core-asks-passkeys-are-made-by-the-browser-from-the-cores-options-as-webauthns-json)), from the header on every page: your email and number, each
+  proved or not and changed by a link or a code; the language Hatti writes to you in; Google;
+  passkeys added and removed; and the browsers you are signed in on, any other signed out.
+* **Tried against the core:** the seed's owner chose Urdu and English again; a passkey was made
+  by Chromium's virtual authenticator, named, listed and removed; with no errors in the browser.
+  The first try found the language's choice waiting for the core before it showed; it shows at
+  once now, and goes back if the core refuses. The passkey was refused at first because the core
+  took passkeys from its own origin alone: `.env.example` now names the admin's.
+* 2098 tests: the account shown as it is; the language chosen; a new email sent its link and
+  a new number proved; a passkey made from WebAuthn's JSON and removed; another browser signed
+  out; the number and Google taken off; and an account with no email offered one.
 
 ### 49cff6e · The shop's policies, in the admin
 

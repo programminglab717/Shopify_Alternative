@@ -142,6 +142,7 @@ describe('The pages email links open', () => {
     expect(core.sent.find((each) => each.operation === '/auth/email/change/confirm')).toEqual({
       operation: '/auth/email/change/confirm',
       variables: { token: 'hce_abc' },
+      method: 'POST',
     });
   });
 

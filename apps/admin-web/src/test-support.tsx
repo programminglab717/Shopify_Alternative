@@ -44,6 +44,8 @@ export const REAUTHENTICATE = new GraphQLErrors([
 export interface Sent {
   operation: string;
   variables: Record<string, unknown>;
+  /** For `/auth` paths, as they take more than one. */
+  method?: string;
 }
 
 /**
@@ -54,7 +56,9 @@ export function fakeCore(
   role: StaffRole,
   answer: (operation: string, variables: Record<string, unknown>) => unknown,
   /** `/auth` paths other than `/auth/me`, answered by `auth`; a status of its own where given. */
-  auth: (path: string, body: unknown) => unknown = () => ({}),
+  auth: (path: string, body: unknown, method: string) => unknown = () => ({}),
+  /** Laid over `/auth/me`'s account: its user's details, its Google account. */
+  account: { user?: object; google?: object | null } = {},
 ) {
   const sent: Sent[] = [];
   /** Files put to storage's signed URLs, as a browser uploads them. */
@@ -74,17 +78,19 @@ export function fakeCore(
       });
       return new Response(null, { status: 200 });
     }
+    const method = init?.method ?? 'GET';
     if (path === '/auth/me') {
       return json({
-        user: { id: 'usr_1', name: 'Sana', language: 'en' },
         session: { id: 'ses_1', mfaVerified: true },
         shops: [{ id: 'shop_1', name: 'Zari', role, mfaRequired: false }],
+        ...account,
+        user: { id: 'usr_1', name: 'Sana', language: 'en', ...account.user },
       });
     }
     if (path.startsWith('/auth/')) {
       const body: unknown = init?.body ? JSON.parse(String(init.body)) : null;
-      sent.push({ operation: path, variables: (body ?? {}) as Record<string, unknown> });
-      const answered = auth(path, body);
+      sent.push({ operation: path, variables: (body ?? {}) as Record<string, unknown>, method });
+      const answered = auth(path, body, method);
       if (answered instanceof Response) return answered;
       return json(answered);
     }

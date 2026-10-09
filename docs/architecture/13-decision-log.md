@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-292 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-293 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -300,6 +300,7 @@
 | 290 | The admin's collections, reached from the products, are listed and made by hand or by rules; one made by hand has its products found and added, taken out and moved up or down while sorted by hand, one made by rules has its rules changed; owners and managers change them, every role reads them | Accepted |
 | 291 | The admin's online store writes the shop's pages as plain text, paragraphs a blank line apart, shown or hidden, keeping HTML from elsewhere as HTML; and changes its menus' links three levels deep, to the home page, all products, a collection, a product, a page or an address, saved whole; marketers write pages, owners and managers both | Accepted |
 | 292 | The admin's policies start from Hatti's drafts and are written as text with headings, lists and links, kept or taken away by owners and managers; each policy's Urdu is kept as a translation of its words, said to be out of date once they change | Accepted |
+| 293 | The admin's account page keeps your email, number and language, the Google account and passkeys you sign in with, and the browsers you are signed in on, each change proved again when the core asks; passkeys are made by the browser from the core's options as WebAuthn's JSON | Accepted |
 
 ---
 
@@ -12012,3 +12013,39 @@
     tag breaks the page.
   * **Urdu as a policy of its own:** the core keeps one policy of each kind, and a translation
     knows when the words it translates have changed.
+
+## ADR-293 · The admin's account page keeps your email, number and language, the Google account and passkeys you sign in with, and the browsers you are signed in on, each change proved again when the core asks; passkeys are made by the browser from the core's options as WebAuthn's JSON
+
+* **Context:** The core keeps each account's email and mobile number, each proved or not; the
+  language its emails and messages are in; a Google account connected to sign in with; passkeys
+  ([ADR-100](#adr-100--staff-sign-in-with-a-passkey-alone-which-passes-the-second-factor-or-answer-the-second-step-after-their-password-with-one-once-an-account-has-a-second-factor-only-a-session-that-passed-one-adds-another)); and the browsers signed in, each one signed out on its own. Changing any
+  of these asks for proof of who is there when the last proof is old, as REAUTHENTICATION_REQUIRED,
+  which the admin already answers with a code, a passkey or Google. A new email is proved by a
+  link to it before it replaces the old one; a new number by a code on WhatsApp. Passkeys'
+  options and the new credential go to and from the core as WebAuthn's JSON, their binary parts
+  in base64url. None of this had a page in the admin.
+* **Decision:**
+  * **An Account page**, a tap from the header's person icon on every page, for everyone signed
+    in whatever their role: their own account, not the shop's.
+  * **Email, number and language:** each shown as proved or not. A new email is sent a link,
+    and the page says to open it; the email stays as it was until then. An unproved email can be
+    sent its link again. A new number gets a code on WhatsApp, typed in on the page. The number
+    is taken off after saying it will not sign in any more. The language is chosen at once, and
+    said to be what Hatti's emails and messages are in from now on.
+  * **Signing in:** the Google account connected, disconnected with a tap; passkeys listed by
+    name, added by the browser with the name given (such as the phone it is on) and removed.
+    Where a browser makes no passkeys, the page says so instead of offering one.
+  * **Where you are signed in:** each browser with when it was last used and from where, this
+    one marked; any other signed out with a tap.
+  * **Every change** goes through the confirm-identity panel the rest of the admin uses, then
+    reads the account again.
+  * **Locally**, passkeys belong to the admin's origin: `.env.example` sets
+    `PASSKEY_ORIGINS=http://localhost:5173`, which the core's emails' links take too.
+* **Consequences:**
+  * Staff keep their own way in without asking the owner, on the phone they work from.
+  * A shop's staff can see a browser they do not know and sign it out.
+* **Alternatives:**
+  * **Account settings under the shop's settings:** an account is a person's across shops, and
+    staff who cannot reach settings still need it.
+  * **A library for WebAuthn's JSON in the browser:** two functions of base64url are all it
+    needs, and browsers' own JSON methods are not yet everywhere.
