@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The shop's sales tax, in the admin
+### 26f6aff · The shop's sales tax, in the admin
 
 * **Sales tax** ([ADR-305](../architecture/13-decision-log.md#adr-305--the-admin-sets-the-shops-sales-tax-in-settings-whether-it-charges-it-and-at-what-rate-included-in-its-prices-with-an-example-of-what-a-price-holds-on-delivery-too-the-ntn-and-strn-its-invoices-name-and-categories-with-rates-of-their-own-which-a-products-page-gives-its-variants)) in settings: whether the shop charges it, its rate with an example of
   what a price holds, delivery taxed too, its NTN and STRN, and categories with rates of their
