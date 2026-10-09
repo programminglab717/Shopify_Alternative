@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Courier pickups, in the admin
+### adc364d · Courier pickups, in the admin
 
 * **Pickups** ([ADR-314](../architecture/13-decision-log.md#adr-314--the-admin-asks-a-courier-whose-api-takes-pickups-to-collect-the-parcels-waiting-naming-its-rider-where-it-asks-and-lists-the-pickups-asked-for-with-their-parcels-the-couriers-number-or-load-sheet-and-why-one-was-refused-our-load-sheet-of-a-pickup-is-printed-for-the-rider)), a tab of shipping: a courier whose API takes pickups asked for a rider,
   its rider named where it asks; the pickups asked for listed with their parcels, the courier's
