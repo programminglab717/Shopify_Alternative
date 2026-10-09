@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-332 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-333 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -340,6 +340,7 @@
 | 330 | The admin ships an order by hand with a courier Hatti does not book with yet, or the shop's own rider: from its page, or many packed orders at once from shipping, the courier named once and each parcel's tracking number beside its order | Accepted |
 | 331 | The admin prints packing slips and invoices as the core makes them: from an order's page, and for the orders chosen to pack or to book at once, the document, paper and language chosen in one panel and kept in the browser for the next print | Accepted |
 | 332 | The admin lists the shop's blocked numbers for owners and managers, the latest blocked first, each with its customer, why and since when; found by four or more of a number's digits, a number blocked before it ever orders, and one unblocked | Accepted |
+| 333 | The orders list tags the orders chosen on any tab and cancels those not yet shipped for one reason, from the bar that confirms, packs and prints them, for those who change orders; a refusal names its order | Accepted |
 
 ---
 
@@ -13318,3 +13319,36 @@
   * **The list in settings, beside the risk rules:** the blocklist is of customers' numbers, and
     who keeps customers looks for it among them.
   * **Blocking from an order alone:** a number that never ordered has no order to block it from.
+
+## ADR-333 · The orders list tags the orders chosen on any tab and cancels those not yet shipped for one reason, from the bar that confirms, packs and prints them, for those who change orders; a refusal names its order
+
+* **Context:** The admin's orders list confirmed or packed the orders chosen at once
+  ([ADR-265](#adr-265--the-merchant-admin-is-a-react-app-on-an-origin-of-its-own-that-sends-auth-and-the-admin-api-on-to-the-core-staff-sign-in-by-a-code-to-their-mobile-or-by-email-with-the-second-step-their-role-needs-the-sessions-opaque-tokens-are-kept-in-the-browsers-storage-and-refreshed-by-one-tab-at-a-time-the-shop-is-in-each-pages-address-and-every-graphql-document-it-sends-is-checked-against-the-cores-schema)) and printed their packing slips ([ADR-331](#adr-331--the-admin-prints-packing-slips-and-invoices-as-the-core-makes-them-from-an-orders-page-and-for-the-orders-chosen-to-pack-or-to-book-at-once-the-document-paper-and-language-chosen-in-one-panel-and-kept-in-the-browser-for-the-next-print)), but ORD-05 has orders
+  cancelled and tagged at once too: a shop whose lawn sold out cancels the day's orders for it
+  together, and tags orders for a sale, a wholesale customer or a courier to sort them by. The
+  core's `orderBulkCancel`, `orderBulkAddTags` and `orderBulkRemoveTags` took up to 250 orders
+  each, from the Admin API alone.
+* **Decision:**
+  * **Tags on any tab:** those who change orders (owners, managers, agents and packers) choose
+    orders on any tab, every order's included, and Tag opens a panel of tags, a comma between
+    each, added to the orders chosen or taken off them; those an order has already stay as
+    they are.
+  * **Cancelled for one reason:** on the tabs of orders not yet shipped, to confirm, to review,
+    awaiting payment, to pack and to book, Cancel opens a panel asking why, as an order's page
+    does, and a note for each timeline; the panel says that their items go back into stock,
+    each customer is told, and an order that has shipped is left as it is.
+  * **One bar:** Confirm or Mark packed, Print, Tag and Cancel share the bar the orders chosen
+    open, one panel at a time; marketers and accountants print, and neither tag nor cancel.
+  * **A refusal names its order:** the core names each order it refused by its place among
+    those sent; the list says it by the order's name, for confirming and packing too.
+* **Consequences:**
+  * Orders are tagged and cancelled from the phone in a few taps, as Shopify's list does.
+  * Up to 250 orders a call, as the core takes; a list showing more than 250 chosen is refused
+    whole.
+  * Not yet: tags offered from the shop's own as they are typed; orders chosen across tabs.
+* **Alternatives:**
+  * **Cancelling from every order's tab:** the tab mixes orders that shipped with those that
+    did not, and a slip of the thumb would cancel the day's orders; the tabs of orders not yet
+    shipped are where they are cancelled.
+  * **A menu of more actions behind one button:** one more tap for each, on the bar a phone
+    shows anyway.

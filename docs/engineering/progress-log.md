@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, orders cancelled and tagged many at once** (ORD-05): the orders chosen in the list
-cancelled for a reason, and tags added to them or taken off, as the core does each in one call;
-then section by section as the alpha's shops need them.
+**Next, a draft changed after it is made** (ORD-03): its items, prices, delivery charge,
+discount, customer and address changed while it is open, as a chat's order changes before it is
+placed, its link kept or lost as the core says; then section by section as the alpha's shops
+need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +19,23 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Orders tagged and cancelled many at once, in the admin
+
+* **The rest of ORD-05's bulk actions** ([ADR-333](../architecture/13-decision-log.md#adr-333--the-orders-list-tags-the-orders-chosen-on-any-tab-and-cancels-those-not-yet-shipped-for-one-reason-from-the-bar-that-confirms-packs-and-prints-them-for-those-who-change-orders-a-refusal-names-its-order)): those who change orders choose orders on any
+  tab and tag them, a comma between each tag, or take tags off; on the tabs of orders not yet
+  shipped, they cancel the orders chosen for one reason, with a note for each timeline. Confirm,
+  Mark packed, Print, Tag and Cancel share the bar the orders chosen open, and a refusal names
+  its order, for confirming and packing too.
+* **Tried in Chromium against the core:** on the seed's shop, the orders tagged live-check were
+  found by `tag:live-check`; two of them, the last check's returned order #1019 and a new order
+  #1022 placed for this one, were chosen, the bar offering Tag alone there, and tagged checked,
+  given twice in two cases and kept once; the tag was then taken off both. From the tab of
+  orders to confirm, #1022 was cancelled as out of stock with a note, and is cancelled for
+  INVENTORY. No errors in the browser.
+* 2358 tests: tags added to the orders chosen on every order's tab, once each, and taken off
+  one; orders to pack cancelled for a reason and a note, one refused named by its order; and
+  neither offered to a marketer, who prints, nor any choosing to an accountant.
 
 ### 98555d0 · The shop's blocked numbers, in the admin
 

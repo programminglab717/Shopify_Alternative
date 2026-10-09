@@ -1,6 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import {
+  Ban,
   ChevronRight,
   Download,
   EyeOff,
@@ -9,6 +10,7 @@ import {
   Printer,
   Search,
   ShieldAlert,
+  Tags,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
@@ -29,7 +31,10 @@ import { SavedSearches } from '../shell/saved-searches';
 import { useAdminMutation, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { CancelPanel, refusals, TagsPanel } from './bulk';
+import type { BulkOutcome } from './bulk';
 import { EXPORTS_ORDERS } from './export-page';
+import { CANCELLABLE } from './order-page';
 import { PrintPanel } from './print';
 import { StageBadge, STAGES } from './stage';
 
@@ -168,10 +173,14 @@ export function OrdersPage() {
   const { stage, q } = useSearch({ from: '/$shopId/orders' });
   const [words, setWords] = useState(q ?? '');
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const [outcome, setOutcome] = useState<{ done: number; failed: string[] } | null>(null);
+  const [outcome, setOutcome] = useState<BulkOutcome | null>(null);
   const bulk = stage ? BULK[stage] : undefined;
   const prints = stage !== undefined && PRINTS.includes(stage);
-  const [printing, setPrinting] = useState(false);
+  // Those who change orders tag them on any tab, and cancel those not yet shipped.
+  const changes = SAVES_ORDER_SEARCHES.includes(shop.role);
+  const cancels = changes && stage !== undefined && CANCELLABLE.includes(stage);
+  const selecting = Boolean(bulk) || prints || changes;
+  const [panel, setPanel] = useState<'print' | 'tags' | 'cancel' | null>(null);
   const confirm = useAdminMutation<OrderBulkData, { ids: string[] }>(OrderBulkConfirmMutation);
   const pack = useAdminMutation<OrderBulkData, { ids: string[] }>(OrderBulkMarkPackedMutation);
 
@@ -192,7 +201,7 @@ export function OrdersPage() {
   const choose = (next: OrdersSearch) => {
     setSelected(new Set());
     setOutcome(null);
-    setPrinting(false);
+    setPanel(null);
     void navigate({ to: '/$shopId/orders', params: { shopId: shop.id }, search: next });
   };
 
@@ -206,20 +215,30 @@ export function OrdersPage() {
   );
   const shown = orders.data?.pages.flatMap((page) => page.orders.nodes) ?? [];
   const selectable = shown.filter((order) => !order.overPlanLimit);
+  const names = new Map(shown.map((order) => [order.id, order.name]));
+  const ids = [...selected];
 
   const runBulk = async () => {
-    const ids = [...selected];
     const mutation = bulk === 'pack' ? pack : confirm;
     try {
       const data = await mutation.mutateAsync({ ids });
       const payload = Object.values(data)[0]!;
       setOutcome({
         done: payload.orders.length,
-        failed: payload.userErrors.map((error) => error.message),
+        failed: refusals(payload.userErrors, ids, names),
       });
       setSelected(new Set());
     } catch (failure) {
       setOutcome({ done: 0, failed: [errorText(failure, t)] });
+    }
+  };
+
+  /** A panel's bulk action done, or put away: what came of it said, the choice cleared. */
+  const closePanel = (done: BulkOutcome | null) => {
+    setPanel(null);
+    if (done) {
+      setOutcome(done);
+      setSelected(new Set());
     }
   };
 
@@ -318,13 +337,15 @@ export function OrdersPage() {
           )}
         </Alert>
       )}
-      {printing && (
+      {panel === 'print' && (
         <PrintPanel
-          ids={[...selected]}
+          ids={ids}
           title={t('print.title', { count: formatCount(selected.size) })}
-          onDone={() => setPrinting(false)}
+          onDone={() => setPanel(null)}
         />
       )}
+      {panel === 'tags' && <TagsPanel ids={ids} names={names} onDone={closePanel} />}
+      {panel === 'cancel' && <CancelPanel ids={ids} names={names} onDone={closePanel} />}
       {orders.isPending ? (
         <Loading label={t('state.loading')} />
       ) : orders.isError ? (
@@ -342,7 +363,7 @@ export function OrdersPage() {
         </Card>
       ) : (
         <Card>
-          {(bulk || prints) && (
+          {selecting && (
             <div className="flex items-center gap-3 border-b border-line px-4 py-2">
               <input
                 type="checkbox"
@@ -366,7 +387,7 @@ export function OrdersPage() {
                 key={order.id}
                 order={order}
                 timezone={timezone}
-                selectable={Boolean(bulk) || prints}
+                selectable={selecting}
                 selected={selected.has(order.id)}
                 onSelect={(on) =>
                   setSelected((current) => {
@@ -392,7 +413,7 @@ export function OrdersPage() {
           )}
         </Card>
       )}
-      {(bulk || prints) && selected.size > 0 && !printing && (
+      {selecting && selected.size > 0 && !panel && (
         <div className="fixed inset-x-0 bottom-16 z-20 flex flex-wrap justify-center gap-2 px-4 md:bottom-6">
           {bulk && (
             <Button busy={confirm.isPending || pack.isPending} onClick={() => void runBulk()}>
@@ -408,10 +429,34 @@ export function OrdersPage() {
               icon={<Printer aria-hidden className="size-5" />}
               onClick={() => {
                 setOutcome(null);
-                setPrinting(true);
+                setPanel('print');
               }}
             >
               {t('print.many', { count: formatCount(selected.size) })}
+            </Button>
+          )}
+          {changes && (
+            <Button
+              variant={bulk || prints ? 'secondary' : 'primary'}
+              icon={<Tags aria-hidden className="size-5" />}
+              onClick={() => {
+                setOutcome(null);
+                setPanel('tags');
+              }}
+            >
+              {t('bulk.tag', { count: formatCount(selected.size) })}
+            </Button>
+          )}
+          {cancels && (
+            <Button
+              variant="secondary"
+              icon={<Ban aria-hidden className="size-5" />}
+              onClick={() => {
+                setOutcome(null);
+                setPanel('cancel');
+              }}
+            >
+              {t('bulk.cancel', { count: formatCount(selected.size) })}
             </Button>
           )}
         </div>

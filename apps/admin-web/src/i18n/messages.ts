@@ -2775,6 +2775,23 @@ const en = {
   'blocked.noneFound': 'No blocked number matches.',
   'blocked.search': 'Find a number',
   'blocked.cannot': "Only owners and managers keep the shop's blocked numbers.",
+  'bulk.tag': 'Tag {count}',
+  'bulk.cancel': 'Cancel {count}',
+  'bulk.tagsTitle': 'Tag {count} orders',
+  'bulk.tagsTitle.one': 'Tag 1 order',
+  'bulk.tags': 'Tags',
+  'bulk.tagsHint': 'A comma between each, as on an order: eid, wholesale.',
+  'bulk.addTags': 'Add the tags',
+  'bulk.removeTags': 'Take the tags off',
+  'bulk.cancelTitle': 'Cancel {count} orders?',
+  'bulk.cancelTitle.one': 'Cancel 1 order?',
+  'bulk.cancelBody':
+    'Their items go back into stock, and each customer is told their order was cancelled. An order that has shipped is left as it is.',
+  'bulk.note': 'Note',
+  'bulk.noteHint': "On each order's timeline, for your staff.",
+  'bulk.cancelSubmit': 'Cancel {count} orders',
+  'bulk.cancelSubmit.one': 'Cancel 1 order',
+  'bulk.cancelKeep': 'Keep them',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5529,6 +5546,20 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'blocked.noneFound': 'کوئی بلاک نمبر نہیں ملا۔',
   'blocked.search': 'نمبر تلاش کریں',
   'blocked.cannot': 'دکان کے بلاک نمبر صرف مالکان اور مینیجر رکھتے ہیں۔',
+  'bulk.tag': '{count} پر ٹیگ',
+  'bulk.cancel': '{count} منسوخ کریں',
+  'bulk.tagsTitle': '{count} آرڈرز پر ٹیگ',
+  'bulk.tags': 'ٹیگز',
+  'bulk.tagsHint': 'ہر ایک کے بیچ کاما، جیسے آرڈر پر: eid, wholesale۔',
+  'bulk.addTags': 'ٹیگز لگائیں',
+  'bulk.removeTags': 'ٹیگز ہٹائیں',
+  'bulk.cancelTitle': '{count} آرڈر منسوخ کریں؟',
+  'bulk.cancelBody':
+    'ان کی چیزیں اسٹاک میں واپس جاتی ہیں، اور ہر خریدار کو بتایا جاتا ہے کہ اس کا آرڈر منسوخ ہوا۔ روانہ ہو چکا آرڈر جیسا ہے ویسا رہتا ہے۔',
+  'bulk.note': 'نوٹ',
+  'bulk.noteHint': 'ہر آرڈر کی ٹائم لائن پر، آپ کے عملے کے لیے۔',
+  'bulk.cancelSubmit': '{count} آرڈر منسوخ کریں',
+  'bulk.cancelKeep': 'انہیں رہنے دیں',
 };
 
 export const messages: Readonly<

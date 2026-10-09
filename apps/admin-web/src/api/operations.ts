@@ -540,6 +540,51 @@ export const OrderBulkMarkPackedMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** Up to 250 orders cancelled at once for one reason, as each is on its own (ORD-05). */
+export const OrderBulkCancelMutation = /* GraphQL */ `
+  mutation OrderBulkCancel($ids: [ID!]!, $reason: OrderCancelReason!, $staffNote: String) {
+    orderBulkCancel(ids: $ids, reason: $reason, staffNote: $staffNote) {
+      orders {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Tags added to up to 250 orders at once; those they have already stay as they are (ORD-05). */
+export const OrderBulkAddTagsMutation = /* GraphQL */ `
+  mutation OrderBulkAddTags($ids: [ID!]!, $tags: [String!]!) {
+    orderBulkAddTags(ids: $ids, tags: $tags) {
+      orders {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Tags taken off up to 250 orders at once, in any case (ORD-05). */
+export const OrderBulkRemoveTagsMutation = /* GraphQL */ `
+  mutation OrderBulkRemoveTags($ids: [ID!]!, $tags: [String!]!) {
+    orderBulkRemoveTags(ids: $ids, tags: $tags) {
+      orders {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 const DESK_ITEM = /* GraphQL */ `
   fragment DeskItem on ConfirmationQueueItem {
     claimedByYou

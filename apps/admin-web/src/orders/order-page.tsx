@@ -44,7 +44,8 @@ import { OrderReturns } from './returns';
 import { StageBadge } from './stage';
 
 const CONFIRMABLE: readonly OrderStage[] = ['NEEDS_CONFIRMATION', 'NEEDS_REVIEW'];
-const CANCELLABLE: readonly OrderStage[] = [
+/** The stages an order is cancelled from: any before it ships. */
+export const CANCELLABLE: readonly OrderStage[] = [
   'NEEDS_CONFIRMATION',
   'NEEDS_REVIEW',
   'AWAITING_PAYMENT',
