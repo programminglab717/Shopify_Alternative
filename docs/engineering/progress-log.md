@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Support access, in the admin
+### 9af1731 · Support access, in the admin
 
 * **Support access** ([ADR-303](../architecture/13-decision-log.md#adr-303--the-admins-settings-show-whether-hattis-support-may-look-at-the-shop-and-until-when-let-the-owner-let-it-in-for-15-minutes-to-a-day-and-a-reason-having-confirmed-who-they-are-let-the-owner-or-a-manager-end-it-and-list-each-time-it-was-let-in-and-the-discounts-page-takes-a-codes-days-in-the-shops-time-zone)) in settings: whether Hatti's support may look at the shop, until
   when, as who allowed and why; the owner lets it in for a quarter of an hour to a day, with a
