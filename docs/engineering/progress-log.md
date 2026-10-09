@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The storefront's preferences and redirects, in the admin
+### da14865 · The storefront's preferences and redirects, in the admin
 
 * **A Storefront tab** ([ADR-297](../architecture/13-decision-log.md#adr-297--the-admins-online-store-keeps-the-storefront-behind-its-password-while-the-shop-gets-ready-pauses-it-while-open-until-a-time-or-until-told-and-sets-its-home-page-for-search-engines-and-sends-old-addresses-on-redirects-found-added-deleted-imported-from-shopifys-csv-once-checked-and-exported-to-it)): the storefront kept behind its password with a message, or open;
   paused with a message until a time or until told; and its home page's title and description for
