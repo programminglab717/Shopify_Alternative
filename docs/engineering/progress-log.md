@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, an order shipped by hand** (SHP-01, SHP-04): a packed order sent with a courier Hatti
-does not book with yet, TCS, Trax or M&P, or the shop's own rider, its tracking number typed
-in, and the parcel then followed on the order's page as a booked one is; then section by
-section as the alpha's shops need them.
+**Next, packing slips and invoices** (ORD-06): printed from an order's page, and for the
+orders chosen at once from the orders list, on A4 or thermal paper, in English and Urdu, as the
+core makes them; then section by section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -19,6 +18,29 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Orders shipped by hand, in the admin
+
+* **A courier Hatti does not book with yet, or the shop's own rider** ([ADR-330](../architecture/13-decision-log.md#adr-330--the-admin-ships-an-order-by-hand-with-a-courier-hatti-does-not-book-with-yet-or-the-shops-own-rider-from-its-page-or-many-packed-orders-at-once-from-shipping-the-courier-named-once-and-each-parcels-tracking-number-beside-its-order)): a packed order's
+  page, or a partly shipped one's, has Mark as shipped: the courier, offered from Pakistan's as
+  it is typed, and the parcel's tracking number and link, any of them left out. From shipping,
+  the packed orders chosen are marked shipped at once, the courier named once and each parcel's
+  number beside its order, those refused named with the core's reason. The parcel is then
+  followed on the order's page as a booked one is. Shipping by hand and correcting a parcel's
+  tracking share one form.
+* **Tried in Chromium against the core:** three orders of the seed's Sindhi Ajrak were placed
+  through the Admin API for the check, confirmed and packed. From shipping, two were marked
+  shipped at once with TCS, the first by its number and the second with none; the first order's
+  page showed its parcel as TCS · 7712345678, in transit, with delivered, refused and the rest,
+  and its timeline Shipped 1 item with TCS 7712345678. The third was marked shipped from its own
+  page with Own rider and no number. Each parcel was then refused and checked back in, so the
+  three orders ended returned; the Sindhi Ajrak's stock is not tracked in the seed, so none
+  moved. They stay in the shop, tagged live-check, on the seed's customer of that number. No
+  errors in the browser.
+* 2343 tests: a packed order shipped by hand from its page, a part refused named and the
+  number trimmed; the form offered where something is left to ship and to those who work orders,
+  not before packing; and packed orders shipped at once from shipping without a courier account,
+  each with its own number and key, one refused named.
 
 ### f348ae2 · Visits in the admin's analytics
 

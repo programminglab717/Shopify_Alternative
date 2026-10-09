@@ -1,10 +1,11 @@
 import type { OrderStage as BadgeColour } from '@hatti/tokens';
 import type { LucideIcon } from 'lucide-react';
 import { PackageCheck, PackageX, Pencil, Truck, Undo2 } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   FulfillmentTrackingInfoUpdateMutation,
+  OrderFulfillMutation,
   ParcelClaimCreateMutation,
   ParcelEventCreateMutation,
   ParcelMarkDeliveredMutation,
@@ -22,6 +23,7 @@ import type {
 import type { StaffRole } from '../auth/session';
 import { formatCount, formatDateTime } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
+import type { Translate } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { CLAIMS, trackingText, useAttempt } from '../returns/parcel';
 import { SelectField } from '../settings/settings-form';
@@ -29,7 +31,7 @@ import { parsePrice } from '../products/product-form';
 import { useAdminMutation, useShop } from '../shell/shop-context';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { Alert } from '../ui/feedback';
+import { Alert, Card } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { RestockForm } from './restock-form';
 import type { Restock } from './restock-form';
@@ -209,57 +211,102 @@ const TRACKING_FIELDS: Record<string, MessageKey> = {
   url: 'parcels.tracking.url',
 };
 
+/** A refusal of a parcel's tracking, with the part it is about in the form's words. */
+export function trackingProblem(error: UserError, t: Translate): string {
+  const key = TRACKING_FIELDS[error.field?.at(-1) ?? ''];
+  return key ? `${t(key)}: ${error.message}` : error.message;
+}
+
+/** A parcel's courier, tracking number and link, as its courier gave them. */
+interface Tracking {
+  company: string | null;
+  number: string | null;
+  url: string | null;
+}
+
+/** Couriers the shop may name, offered as it types; any other is typed as it is. */
+export const COURIERS = [
+  'TCS',
+  'Leopards',
+  'PostEx',
+  'Trax',
+  'M&P',
+  'Call Courier',
+  'BlueEx',
+  'Rider',
+  'Swyft',
+  'Daewoo',
+  'Pakistan Post',
+];
+
 /**
- * A parcel's tracking corrected: its courier, tracking number and link, as the courier gave
- * them; the number is how the courier's statements and returned parcels find it again.
+ * A parcel's courier, tracking number and link, as the courier gave them; the number is how the
+ * courier's statements and returned parcels find it again. A part the core refuses is said in
+ * the form's words.
  */
-function TrackingForm({ parcel, onDone }: { parcel: ParcelDetail; onDone: () => void }) {
+function TrackingForm({
+  initial,
+  hint,
+  submit,
+  busy,
+  save,
+  onDone,
+}: {
+  initial: Tracking;
+  hint: string;
+  /** The button's words. */
+  submit: string;
+  busy: boolean;
+  save: (tracking: Tracking) => Promise<{ userErrors: UserError[] }>;
+  onDone: () => void;
+}) {
   const { t } = useLocale();
-  const [company, setCompany] = useState(parcel.trackingInfo.company ?? '');
-  const [number, setNumber] = useState(parcel.trackingInfo.number ?? '');
-  const [url, setUrl] = useState(parcel.trackingInfo.url ?? '');
-  const update = useAdminMutation<ParcelUserErrorsData, Record<string, unknown>>(
-    FulfillmentTrackingInfoUpdateMutation,
-  );
+  const couriers = useId();
+  const [company, setCompany] = useState(initial.company ?? '');
+  const [number, setNumber] = useState(initial.number ?? '');
+  const [url, setUrl] = useState(initial.url ?? '');
   const { problem, attempt } = useAttempt();
   const urlRight = !url.trim() || /^https:\/\/\S+$/i.test(url.trim());
 
-  const submit = async (event: FormEvent) => {
+  const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!urlRight) return;
     const done = await attempt(async () => {
-      const result = (
-        await update.mutateAsync({
-          id: parcel.id,
-          trackingInfo: {
-            company: company.trim() || null,
-            number: number.trim() || null,
-            url: url.trim() || null,
-          },
-        })
-      ).fulfillmentTrackingInfoUpdate!;
+      const result = await save({
+        company: company.trim() || null,
+        number: number.trim() || null,
+        url: url.trim() || null,
+      });
       // The core names the part it refused; say it in the form's words.
-      const named = (error: UserError) => {
-        const key = TRACKING_FIELDS[error.field?.at(-1) ?? ''];
-        return key ? { ...error, field: null, message: `${t(key)}: ${error.message}` } : error;
+      return {
+        userErrors: result.userErrors.map((error) => ({
+          ...error,
+          field: null,
+          message: trackingProblem(error, t),
+        })),
       };
-      return { userErrors: result.userErrors.map(named) };
     });
     if (done) onDone();
   };
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
-      <p className="text-secondary">{t('parcels.tracking.hint')}</p>
+    <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-3">
+      <p className="text-secondary">{hint}</p>
       <div className="grid gap-3 md:grid-cols-2">
         <TextField
           label={t('parcels.tracking.company')}
           hint={t('parcels.tracking.companyHint')}
           dir="auto"
           maxLength={100}
+          list={couriers}
           value={company}
           onChange={(event) => setCompany(event.target.value)}
         />
+        <datalist id={couriers}>
+          {COURIERS.map((each) => (
+            <option key={each} value={each} />
+          ))}
+        </datalist>
         <TextField
           label={t('parcels.tracking.number')}
           ltr
@@ -282,14 +329,67 @@ function TrackingForm({ parcel, onDone }: { parcel: ParcelDetail; onDone: () => 
       />
       {problem && <Alert tone="danger">{problem}</Alert>}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" busy={update.isPending} disabled={!urlRight}>
-          {t('parcels.tracking.save')}
+        <Button type="submit" busy={busy} disabled={!urlRight}>
+          {submit}
         </Button>
         <Button variant="tertiary" onClick={onDone}>
           {t('returns.cancel')}
         </Button>
       </div>
     </form>
+  );
+}
+
+/** A parcel's tracking corrected, whatever its state: a mistyped number, or one given later. */
+function CorrectTracking({ parcel, onDone }: { parcel: ParcelDetail; onDone: () => void }) {
+  const { t } = useLocale();
+  const update = useAdminMutation<ParcelUserErrorsData, { id: string; trackingInfo: Tracking }>(
+    FulfillmentTrackingInfoUpdateMutation,
+  );
+  return (
+    <TrackingForm
+      initial={parcel.trackingInfo}
+      hint={t('parcels.tracking.hint')}
+      submit={t('parcels.tracking.save')}
+      busy={update.isPending}
+      save={async (trackingInfo) =>
+        (await update.mutateAsync({ id: parcel.id, trackingInfo })).fulfillmentTrackingInfoUpdate!
+      }
+      onDone={onDone}
+    />
+  );
+}
+
+/**
+ * What is left of an order shipped in one parcel by a courier Hatti does not book with, or the
+ * shop's own rider (SHP-04): its courier, tracking number and link as the courier gave them,
+ * any of them left out. The parcel is then followed on the order's page as a booked one is.
+ */
+export function ShipForm({
+  order,
+  onDone,
+}: {
+  order: { id: string; name: string };
+  onDone: () => void;
+}) {
+  const { t } = useLocale();
+  const fulfill = useAdminMutation<ParcelUserErrorsData, { id: string; trackingInfo: Tracking }>(
+    OrderFulfillMutation,
+  );
+  return (
+    <Card className="flex flex-col gap-3 p-4">
+      <h2 className="font-semibold">{t('parcels.ship.title', { name: order.name })}</h2>
+      <TrackingForm
+        initial={{ company: null, number: null, url: null }}
+        hint={t('parcels.ship.hint')}
+        submit={t('parcels.ship')}
+        busy={fulfill.isPending}
+        save={async (trackingInfo) =>
+          (await fulfill.mutateAsync({ id: order.id, trackingInfo })).orderFulfill!
+        }
+        onDone={onDone}
+      />
+    </Card>
   );
 }
 
@@ -383,7 +483,7 @@ function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }
       {problem && <Alert tone="danger">{problem}</Alert>}
       {works && open === 'step' && <StepForm id={parcel.id} onDone={() => setOpen(null)} />}
       {works && open === 'tracking' && (
-        <TrackingForm parcel={parcel} onDone={() => setOpen(null)} />
+        <CorrectTracking parcel={parcel} onDone={() => setOpen(null)} />
       )}
       {works && open === 'checkIn' && <CheckInForm parcel={parcel} onDone={() => setOpen(null)} />}
       {works && open === 'lost' && (

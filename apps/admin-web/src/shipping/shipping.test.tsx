@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakeCore, press, renderAdmin, signedIn } from '../test-support';
+import { fakeCore, press, renderAdmin, signedIn, type } from '../test-support';
 
 const pkr = (amount: string) => ({ amount, currencyCode: 'PKR' });
 const AGO = new Date(Date.now() - 3_600_000).toISOString();
@@ -45,13 +45,13 @@ function booking(
 
 const ACCOUNT = { id: 'acc_1', name: 'PostEx', courierName: 'PostEx', isDefault: true };
 
-function shippingCore() {
-  return fakeCore('owner', (operation) => {
+function shippingCore(accounts = [ACCOUNT]) {
+  return fakeCore('owner', (operation, variables) => {
     switch (operation) {
       case 'Shipping':
         return {
           shop: { timezone: 'Asia/Karachi' },
-          courierAccounts: [ACCOUNT],
+          courierAccounts: accounts,
           courierBookings: {
             nodes: [
               booking('b1', '#1001', 'BOOKED', {
@@ -79,6 +79,21 @@ function shippingCore() {
             bookings: [{ id: 'b4', orderName: '#1011' }],
             refused: [{ orderId: 'ord_2', message: 'is booked already' }],
             userErrors: [],
+          },
+        };
+      case 'OrderFulfill':
+        return {
+          orderFulfill: {
+            userErrors:
+              variables.id === 'ord_2'
+                ? [
+                    {
+                      field: ['id'],
+                      code: 'INVALID',
+                      message: 'Confirm the order with the customer before shipping it',
+                    },
+                  ]
+                : [],
           },
         };
       case 'CourierLabels':
@@ -114,6 +129,39 @@ describe('Shipping in the admin', () => {
       ids: ['ord_1', 'ord_2'],
       accountId: 'acc_1',
     });
+  });
+
+  it('ships packed orders by hand at once, each by its tracking number, those refused named', async () => {
+    const core = shippingCore([]);
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/shipping');
+
+    await screen.findByText('#1011');
+    // No courier to book with: the orders are shipped by hand, by the courier the shop uses.
+    expect(screen.getByText(/Choose packed orders to mark them shipped/)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('Select all shown'));
+    expect(screen.queryByRole('button', { name: 'Book 2 with the courier' })).toBeNull();
+    await press('Mark 2 as shipped');
+    expect(screen.getByRole('heading', { name: 'Mark 2 orders as shipped' })).toBeTruthy();
+
+    type('Courier', 'TCS');
+    type('Tracking number for #1011', ' 7712345678 ');
+    await press('Mark 2 as shipped');
+    await screen.findByText('1 order marked shipped.');
+    expect(
+      screen.getByText('#1012: Confirm the order with the customer before shipping it'),
+    ).toBeTruthy();
+    expect(
+      core.sent.filter((each) => each.operation === 'OrderFulfill').map((each) => each.variables),
+    ).toEqual([
+      { id: 'ord_1', trackingInfo: { company: 'TCS', number: '7712345678', url: null } },
+      { id: 'ord_2', trackingInfo: { company: 'TCS', number: null, url: null } },
+    ]);
+    // Each its own request, never taken for the other's repeat.
+    const keys = core.fetcher.mock.calls
+      .filter(([, init]) => String(init?.body).includes('OrderFulfill'))
+      .map(([, init]) => (init?.headers as Record<string, string>)['idempotency-key']);
+    expect(new Set(keys).size).toBe(2);
   });
 
   it("shows each booking's state, and prints the labels of those booked", async () => {

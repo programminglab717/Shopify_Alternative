@@ -14,6 +14,7 @@ import type {
   CourierBooking,
   CourierBookingCancelData,
   CourierDocumentData,
+  OrderListItem,
   OrdersBookData,
   OrdersData,
   PaperSize,
@@ -28,6 +29,7 @@ import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../sh
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { openPrintTab } from '../ui/print';
+import { ShipByHand } from './by-hand';
 import { Pickups } from './pickups';
 
 type Tab = 'book' | 'booked' | 'pickups';
@@ -52,7 +54,17 @@ function accountName(account: CourierAccount): string {
     : `${account.name} (${account.courierName})`;
 }
 
-/** Packed orders, booked with the shop's courier at a tap, all or those chosen. */
+/** What became of the orders chosen: booked with the courier, or shipped by hand, and refusals. */
+interface Outcome {
+  booked: number;
+  shipped: number;
+  refused: string[];
+}
+
+/**
+ * Packed orders, booked with the shop's courier at a tap, all or those chosen; or shipped by
+ * hand with a courier Hatti does not book with, each by its tracking number.
+ */
 function ToBook({ accounts }: { accounts: CourierAccount[] }) {
   const { t, locale } = useLocale();
   const shopId = useShop().id;
@@ -68,7 +80,9 @@ function ToBook({ accounts }: { accounts: CourierAccount[] }) {
   const [accountId, setAccountId] = useState(
     accounts.find((account) => account.isDefault)?.id ?? accounts[0]?.id ?? '',
   );
-  const [outcome, setOutcome] = useState<{ booked: number; refused: string[] } | null>(null);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  // The orders being shipped by hand, as they were chosen.
+  const [byHand, setByHand] = useState<readonly OrderListItem[] | null>(null);
 
   if (orders.isPending) return <Loading label={t('state.loading')} />;
   if (orders.isError) {
@@ -91,6 +105,7 @@ function ToBook({ accounts }: { accounts: CourierAccount[] }) {
       });
       setOutcome({
         booked: ordersBook.bookings.length,
+        shipped: 0,
         refused: [
           ...ordersBook.refused.map((refusal) =>
             `${names.get(refusal.orderId) ?? ''} ${refusal.message}`.trim(),
@@ -100,7 +115,7 @@ function ToBook({ accounts }: { accounts: CourierAccount[] }) {
       });
       setSelected(new Set());
     } catch (failure) {
-      setOutcome({ booked: 0, refused: [errorText(failure, t)] });
+      setOutcome({ booked: 0, shipped: 0, refused: [errorText(failure, t)] });
     }
   };
 
@@ -110,6 +125,9 @@ function ToBook({ accounts }: { accounts: CourierAccount[] }) {
       {outcome && (
         <Alert tone={outcome.refused.length > 0 ? 'warning' : 'success'}>
           {outcome.booked > 0 && <p>{t('shipping.booked', { count: outcome.booked })}</p>}
+          {outcome.shipped > 0 && (
+            <p>{t('shipping.byHand.done', { count: formatCount(outcome.shipped) })}</p>
+          )}
           {outcome.refused.length > 0 && (
             <ul className="list-disc ps-5">
               {outcome.refused.map((message, index) => (
@@ -119,7 +137,17 @@ function ToBook({ accounts }: { accounts: CourierAccount[] }) {
           )}
         </Alert>
       )}
-      {shown.length === 0 ? (
+      {byHand ? (
+        <ShipByHand
+          orders={byHand}
+          onCancel={() => setByHand(null)}
+          onDone={(done) => {
+            setOutcome({ booked: 0, ...done });
+            setByHand(null);
+            setSelected(new Set());
+          }}
+        />
+      ) : shown.length === 0 ? (
         <Card>
           <EmptyState
             icon={<PackageCheck aria-hidden className="size-8 text-secondary" />}
@@ -184,7 +212,7 @@ function ToBook({ accounts }: { accounts: CourierAccount[] }) {
           </ul>
         </Card>
       )}
-      {selected.size > 0 && accounts.length > 0 && (
+      {selected.size > 0 && !byHand && (
         <div className="fixed inset-x-0 bottom-16 z-20 flex flex-wrap items-center justify-center gap-2 px-4 md:bottom-6">
           {accounts.length > 1 && (
             <select
@@ -200,12 +228,25 @@ function ToBook({ accounts }: { accounts: CourierAccount[] }) {
               ))}
             </select>
           )}
+          {accounts.length > 0 && (
+            <Button
+              busy={book.isPending}
+              icon={<Truck aria-hidden className="size-5" />}
+              onClick={() => void onBook()}
+            >
+              {t('shipping.book', { count: formatCount(selected.size) })}
+            </Button>
+          )}
           <Button
-            busy={book.isPending}
-            icon={<Truck aria-hidden className="size-5" />}
-            onClick={() => void onBook()}
+            variant={accounts.length > 0 ? 'secondary' : 'primary'}
+            icon={<PackageCheck aria-hidden className="size-5" />}
+            disabled={book.isPending}
+            onClick={() => {
+              setOutcome(null);
+              setByHand(shown.filter((order) => selected.has(order.id)));
+            }}
           >
-            {t('shipping.book', { count: formatCount(selected.size) })}
+            {t('shipping.byHand', { count: formatCount(selected.size) })}
           </Button>
         </div>
       )}

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-329 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-330 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -337,6 +337,7 @@
 | 327 | The admin puts a product's, collection's or page's words in Urdu on a page of its own, each field of the shop's own above its Urdu and a product's options and values with it, read in one ask through Shopify's translatableResourcesByIds and saved as its translations | Accepted |
 | 328 | The admin's Urdu page serves blogs, articles, menus and the home page's words too: a menu's links each a level in under the link they sit under, the home page's words the shop's own, and a menu's Urdu for those who change menus | Accepted |
 | 329 | The admin's analytics show the online store's visits beside its sales: who is on it now, asked again every half minute, and the period's sessions against the period as long before, asked in one document, with how far they went towards an order | Accepted |
+| 330 | The admin ships an order by hand with a courier Hatti does not book with yet, or the shop's own rider: from its page, or many packed orders at once from shipping, the courier named once and each parcel's tracking number beside its order | Accepted |
 
 ---
 
@@ -13208,3 +13209,43 @@
     for what one alias in the admin's document does.
   * **Changes in the conversion rate in points:** right for analysts, but every other figure on
     the page says its change as a share.
+
+## ADR-330 · The admin ships an order by hand with a courier Hatti does not book with yet, or the shop's own rider: from its page, or many packed orders at once from shipping, the courier named once and each parcel's tracking number beside its order
+
+* **Context:** Shops book their parcels with their own courier accounts through Hatti's
+  adapters ([ADR-149](#adr-149--shops-book-orders-with-their-own-courier-accounts-their-credentials-sealed-for-each-account-each-booking-waits-in-postgres-until-the-worker-books-it-through-the-couriers-adapter-keeps-the-couriers-number-before-shipping-the-order-with-it-and-follows-the-parcel-by-asking-the-couriers-words-read-through-mappings-kept-as-data)), PostEx's and Leopards' so far ([ADR-162](#adr-162--leopards-is-the-second-courier-shops-book-with-through-the-same-adapter-the-accounts-key-and-password-in-each-requests-body-a-parcels-city-by-leopards-own-id-from-its-list-of-cities-kept-a-day-the-accounts-own-shipper-unless-a-shipper-id-is-given-its-parcels-asked-about-fifty-at-a-time-and-its-words-read-through-rows-of-data)), from the admin's
+  shipping page ([ADR-270](#adr-270--the-admins-shipping-packed-orders-booked-with-the-shops-courier-account-in-a-tap-each-booking-shown-as-the-worker-books-it-and-its-courier-carries-it-booked-parcels-labels-and-the-accounts-load-sheet-printed-from-a-tab-of-their-own-and-on-a-phone-the-bottom-bars-five-slots-kept-for-the-busiest-sections-the-rest-under-more)). TCS, Trax, M&P and the rest wait for their API documents,
+  which come with merchants' accounts, and many small shops send parcels with a rider of their
+  own or book them on the courier's own site. A packed order with no account to book it with had
+  no way on in the admin: the core's `orderFulfill`, Shopify's way to ship an order with any
+  carrier's tracking, was the Admin API's alone. A parcel once shipped is followed on its order's
+  page as any is ([ADR-283](#adr-283--an-orders-page-shows-its-parcels-courier-and-tracking-number-items-and-the-latest-steps-of-their-way-those-who-work-orders-mark-one-delivered-or-refused-add-a-step-told-of-a-courier-hatti-does-not-follow-mark-it-lost-after-asking-or-check-it-back-in-with-what-came-back-damaged-written-off)): delivered, refused, a step told of its courier, lost, or its
+  tracking corrected ([ADR-322](#adr-322--the-admin-corrects-a-parcels-courier-tracking-number-and-link-on-its-orders-page-whatever-the-parcels-state-its-link-checked-as-https-before-it-is-sent)).
+* **Decision:**
+  * **From the order's page:** a packed order, or one partly shipped, has Mark as shipped for
+    those who work orders: its courier, typed or picked from Pakistan's couriers as it is typed,
+    its tracking number and link, any of them left out; everything still to ship goes in one
+    parcel, its stock with it. An order still to pack is packed first, as the pipeline has it.
+  * **Many at once from shipping:** the packed orders chosen there are marked shipped beside
+    Book with the courier, or alone where the shop has no courier account: the courier named
+    once and each parcel's tracking number beside its order, sent one after another, each with
+    an idempotency key of its own; those shipped are counted, and those refused named with the
+    core's reason, still packed.
+  * **One form for a parcel's tracking:** shipping by hand and correcting a parcel's tracking
+    share it, its link checked as https before it is sent and a refusal named by the part it is
+    about.
+* **Consequences:**
+  * A shop with TCS, Trax or its own rider ships from the admin, and its parcels are followed,
+    taken back and counted in COD health as booked ones are; by their tracking numbers, parcels
+    coming back are checked in ([ADR-071](#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)), couriers' statements find them ([ADR-067](#adr-067--couriers-remittance-statements-are-imported-whole-into-a-logistics-module-each-lines-cash-received-on-its-parcels-order-at-most-what-the-order-owes-and-a-parcels-cash-once)),
+    and customers find them on the tracking page ([ADR-251](#adr-251--the-shops-storefront-has-a-tracking-page-where-a-customer-finds-their-order-by-its-number-or-a-tracking-number-with-the-mobile-number-they-ordered-with-and-sees-its-parcels-steps-but-nothing-of-its-address-or-items)).
+  * Twenty parcels marked shipped are twenty requests, each order in its own transaction: one
+    refused stops none of the others, and a page closed midway leaves those not reached packed.
+  * Not yet: a tracking link made from a courier's number; some of an order's items shipped by
+    hand from the admin, which the Admin API takes by its lines; the steps of a courier without
+    an adapter followed for the shop.
+* **Alternatives:**
+  * **A bulk mutation in the core:** one request for many, but each order ships in its own
+    transaction either way, and the admin's loop asks nothing new of the core.
+  * **Shipping straight from to pack:** it would skip the packing the pipeline counts; one tap
+    packs an order first.

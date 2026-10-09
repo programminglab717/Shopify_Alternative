@@ -402,7 +402,7 @@ const en = {
   'shipping.bookings': 'Booked',
   'shipping.account': 'Courier account',
   'shipping.noAccount':
-    'No courier account is connected yet, so orders cannot be booked from here.',
+    "No courier account is connected yet, so orders aren't booked from here. Choose packed orders to mark them shipped with a courier of your own.",
   'shipping.nothingToBook': 'Nothing to book.',
   'shipping.nothingToBookBody': 'Orders show here once they are packed.',
   'shipping.book': 'Book {count} with the courier',
@@ -2718,6 +2718,19 @@ const en = {
   'analytics.sessionsOverTime': 'Sessions over time',
   'analytics.sessionsBar': '{date}: {count} sessions, {converted} ordered',
   'analytics.sessionsBar.one': '{date}: 1 session, {converted} ordered',
+  'parcels.ship': 'Mark as shipped',
+  'parcels.ship.title': 'Mark {name} as shipped',
+  'parcels.ship.hint':
+    "For a courier Hatti doesn't book with yet, or your own rider: everything still to ship goes in one parcel. Its tracking number lets your customer follow it, and finds it again when it comes back.",
+  'shipping.byHand': 'Mark {count} as shipped',
+  'shipping.byHand.title': 'Mark {count} orders as shipped',
+  'shipping.byHand.title.one': 'Mark 1 order as shipped',
+  'shipping.byHand.hint':
+    "With a courier Hatti doesn't book with yet, or your own rider: name the courier once, and type each parcel's tracking number beside its order. Everything an order has left to ship goes in one parcel.",
+  'shipping.byHand.number': 'Tracking number for {name}',
+  'shipping.byHand.save': 'Mark {count} as shipped',
+  'shipping.byHand.done': '{count} orders marked shipped.',
+  'shipping.byHand.done.one': '1 order marked shipped.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -3102,7 +3115,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'shipping.toBook': 'بک کرنا ہے',
   'shipping.bookings': 'بک ہو چکے',
   'shipping.account': 'کوریئر اکاؤنٹ',
-  'shipping.noAccount': 'ابھی کوئی کوریئر اکاؤنٹ منسلک نہیں، اس لیے یہاں سے آرڈر بک نہیں ہو سکتے۔',
+  'shipping.noAccount':
+    'ابھی کوئی کوریئر اکاؤنٹ منسلک نہیں، اس لیے یہاں سے آرڈر بک نہیں ہو سکتے۔ پیک شدہ آرڈر چن کر انہیں اپنے کوریئر کے ساتھ روانہ شدہ کریں۔',
   'shipping.nothingToBook': 'بک کرنے کو کچھ نہیں۔',
   'shipping.nothingToBookBody': 'پیک ہونے کے بعد آرڈر یہاں نظر آئیں گے۔',
   'shipping.book': '{count} کوریئر کے ساتھ بک کریں',
@@ -5418,6 +5432,17 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'analytics.sessionsOverTime': 'وقت کے ساتھ سیشنز',
   'analytics.sessionsBar': '{date}: {count} سیشنز، {converted} نے آرڈر کیا',
   'analytics.sessionsBar.one': '{date}: 1 سیشن، {converted} نے آرڈر کیا',
+  'parcels.ship': 'روانہ شدہ کریں',
+  'parcels.ship.title': '{name} روانہ شدہ کریں',
+  'parcels.ship.hint':
+    'اس کوریئر کے لیے جس کے ساتھ ہٹی ابھی بک نہیں کرتا، یا آپ کے اپنے رائیڈر کے لیے: جو کچھ بھیجنا باقی ہے وہ ایک پارسل میں جاتا ہے۔ اس کے ٹریکنگ نمبر سے آپ کا خریدار اسے دیکھ سکتا ہے، اور واپس آنے پر یہ پھر مل جاتا ہے۔',
+  'shipping.byHand': '{count} روانہ شدہ کریں',
+  'shipping.byHand.title': '{count} آرڈر روانہ شدہ کریں',
+  'shipping.byHand.hint':
+    'اس کوریئر کے ساتھ جس سے ہٹی ابھی بک نہیں کرتا، یا اپنے رائیڈر کے ساتھ: کوریئر کا نام ایک بار لکھیں، اور ہر آرڈر کے ساتھ اس کے پارسل کا ٹریکنگ نمبر۔ آرڈر کی جو چیزیں بھیجنا باقی ہیں سب ایک پارسل میں جاتی ہیں۔',
+  'shipping.byHand.number': '{name} کا ٹریکنگ نمبر',
+  'shipping.byHand.save': '{count} روانہ شدہ کریں',
+  'shipping.byHand.done': '{count} آرڈر روانہ شدہ ہو گئے۔',
 };
 
 export const messages: Readonly<

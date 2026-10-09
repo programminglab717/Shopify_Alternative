@@ -7,6 +7,7 @@ import {
   PackageCheck,
   PackageOpen,
   ShieldAlert,
+  Truck,
 } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -36,7 +37,7 @@ import { OrderMessages } from '../settings/messages-page';
 import { Assignment, DeliveryAddress, NoteAndTags, Timeline } from './details';
 import { OrderItems } from './edit-order';
 import { HANDLES_MONEY, OrderMoney } from './money';
-import { Parcels, WORKS_PARCELS } from './parcels';
+import { Parcels, ShipForm, WORKS_PARCELS } from './parcels';
 import { OrderReturns } from './returns';
 import { StageBadge } from './stage';
 
@@ -72,9 +73,13 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+/** Where what is left of an order may be shipped by hand: packed, or partly shipped already. */
+const SHIPPABLE: readonly OrderStage[] = ['TO_BOOK', 'PARTIALLY_FULFILLED'];
+
 /**
  * The order's actions for its stage, for those who work orders: confirm, pack, unpack while
- * nothing has shipped, or cancel for a reason.
+ * nothing has shipped, ship by hand with a courier Hatti does not book with, or cancel for a
+ * reason.
  */
 function Actions({ order }: { order: OrderDetail }) {
   const { t } = useLocale();
@@ -86,6 +91,7 @@ function Actions({ order }: { order: OrderDetail }) {
     OrderCancelMutation,
   );
   const [cancelling, setCancelling] = useState(false);
+  const [shipping, setShipping] = useState(false);
   const [reason, setReason] = useState<OrderCancelReason>('CUSTOMER');
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -104,8 +110,9 @@ function Actions({ order }: { order: OrderDetail }) {
   const canConfirm = open && !order.overPlanLimit && CONFIRMABLE.includes(order.stage);
   const canPack = open && !order.overPlanLimit && order.stage === 'TO_PACK';
   const canUnpack = open && order.stage === 'TO_BOOK' && order.fulfillments.length === 0;
+  const canShip = open && !order.overPlanLimit && SHIPPABLE.includes(order.stage);
   const canCancel = open && CANCELLABLE.includes(order.stage);
-  if (!canConfirm && !canPack && !canUnpack && !canCancel) return null;
+  if (!canConfirm && !canPack && !canUnpack && !canShip && !canCancel) return null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -139,16 +146,32 @@ function Actions({ order }: { order: OrderDetail }) {
             {t('order.unpack')}
           </Button>
         )}
+        {canShip && !shipping && (
+          <Button
+            variant="secondary"
+            icon={<Truck aria-hidden className="size-5" />}
+            onClick={() => {
+              setShipping(true);
+              setCancelling(false);
+            }}
+          >
+            {t('parcels.ship')}
+          </Button>
+        )}
         {canCancel && !cancelling && (
           <Button
             variant="secondary"
             icon={<Ban aria-hidden className="size-5" />}
-            onClick={() => setCancelling(true)}
+            onClick={() => {
+              setCancelling(true);
+              setShipping(false);
+            }}
           >
             {t('order.cancel')}
           </Button>
         )}
       </div>
+      {shipping && canShip && <ShipForm order={order} onDone={() => setShipping(false)} />}
       {cancelling && (
         <Card className="flex flex-col gap-3 p-4">
           <h2 className="font-semibold">{t('order.cancelTitle', { name: order.name })}</h2>

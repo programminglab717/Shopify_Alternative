@@ -2760,7 +2760,22 @@ export const ParcelCheckInMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
-/** The courier lost a parcel on its way back: its items are written off. */
+/**
+ * What is left of an order shipped in one parcel, with its courier's tracking: a courier Hatti
+ * does not book with, or the shop's own rider (SHP-04). Its stock goes as it ships.
+ */
+export const OrderFulfillMutation = /* GraphQL */ `
+  mutation OrderFulfill($id: ID!, $trackingInfo: FulfillmentTrackingInput) {
+    orderFulfill(id: $id, input: { trackingInfo: $trackingInfo }) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A parcel's courier, tracking number and link, corrected or added later. */
 export const FulfillmentTrackingInfoUpdateMutation = /* GraphQL */ `
   mutation FulfillmentTrackingInfoUpdate($id: ID!, $trackingInfo: FulfillmentTrackingInput!) {
     fulfillmentTrackingInfoUpdate(id: $id, trackingInfo: $trackingInfo) {
@@ -2772,6 +2787,7 @@ export const FulfillmentTrackingInfoUpdateMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** The courier lost a parcel on its way out or back: its items are written off. */
 export const ParcelMarkLostMutation = /* GraphQL */ `
   mutation ParcelMarkLost($id: ID!) {
     fulfillmentMarkLost(id: $id) {

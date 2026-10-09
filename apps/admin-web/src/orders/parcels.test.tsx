@@ -22,14 +22,14 @@ const step = (id: string, status: string, message: string | null, hoursAgo: numb
   happenedAt: new Date(Date.now() - hoursAgo * 3_600_000).toISOString(),
 });
 
-function order(fulfillments: unknown[]) {
+function order(fulfillments: unknown[], stage = 'IN_TRANSIT') {
   return {
     shop: { timezone: 'Asia/Karachi' },
     order: {
       id: 'ord_7',
       name: '#1007',
       createdAt: LATER,
-      stage: 'IN_TRANSIT',
+      stage,
       status: 'OPEN',
       paymentMethod: 'CASH_ON_DELIVERY',
       financialStatus: 'PENDING',
@@ -96,11 +96,25 @@ const parcel = (status: string, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-function core(role: StaffRole, fulfillments: unknown[]) {
+function core(role: StaffRole, fulfillments: unknown[], stage?: string) {
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'Order':
-        return order(fulfillments);
+        return order(fulfillments, stage);
+      case 'OrderFulfill': {
+        const number = (variables.trackingInfo as { number: string | null }).number;
+        const userErrors =
+          number === '77 12'
+            ? [
+                {
+                  field: ['input', 'trackingInfo', 'number'],
+                  code: 'INVALID',
+                  message: 'is too short',
+                },
+              ]
+            : [];
+        return { orderFulfill: { userErrors } };
+      }
       case 'ParcelMarkDelivered':
         return { fulfillmentMarkDelivered: { userErrors: [] } };
       case 'ParcelMarkReturning':
@@ -259,6 +273,61 @@ describe("An order's parcels, on its page", () => {
         url: 'https://leopardscourier.com/track?cn=LE4402918',
       },
     });
+  });
+
+  it("ships a packed order by hand with any courier's tracking, a part refused named", async () => {
+    const fake = core('packer', [], 'TO_BOOK');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark as shipped' }));
+    expect(screen.getByRole('heading', { name: 'Mark #1007 as shipped' })).toBeTruthy();
+    // Couriers offered as the merchant types, any other typed as it is.
+    const courier = screen.getByLabelText('Courier') as HTMLInputElement;
+    const offered = document.getElementById(courier.getAttribute('list')!)!;
+    expect([...offered.querySelectorAll('option')].map((each) => each.value)).toContain('TCS');
+    // One form at a time: the button that opened it waits until it is done.
+    expect(screen.getAllByRole('button', { name: 'Mark as shipped' })).toHaveLength(1);
+
+    type('Courier', 'TCS');
+    type('Tracking number', '77 12');
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as shipped' }));
+    expect(await screen.findByText('Tracking number: is too short')).toBeTruthy();
+
+    type('Tracking number', ' 7712345678 ');
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as shipped' }));
+    await waitFor(() => expect(screen.queryByLabelText('Tracking number')).toBeNull());
+    expect(
+      fake.sent
+        .filter((each) => each.operation === 'OrderFulfill')
+        .map((each) => each.variables)
+        .at(-1),
+    ).toEqual({
+      id: 'ord_7',
+      trackingInfo: { company: 'TCS', number: '7712345678', url: null },
+    });
+  });
+
+  it('offers shipping by hand where something is left to ship, to those who work orders', async () => {
+    const left = core('owner', [parcel('IN_TRANSIT')], 'PARTIALLY_FULFILLED');
+    vi.stubGlobal('fetch', left.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark as shipped' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByLabelText('Tracking number')).toBeNull();
+    cleanup();
+
+    // To pack: packed first, as the pipeline has it.
+    vi.stubGlobal('fetch', core('owner', [], 'TO_PACK').fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    await screen.findByRole('button', { name: 'Mark packed' });
+    expect(screen.queryByRole('button', { name: 'Mark as shipped' })).toBeNull();
+    cleanup();
+
+    vi.stubGlobal('fetch', core('accountant', [], 'TO_BOOK').fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    await screen.findByRole('heading', { name: '#1007' });
+    expect(screen.queryByRole('button', { name: 'Mark as shipped' })).toBeNull();
   });
 
   it('leaves parcels as they are for those who only view orders', async () => {
