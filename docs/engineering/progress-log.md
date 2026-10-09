@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Locations, in the admin
+### 7893e59 · Locations, in the admin
 
 * **Locations** ([ADR-312](../architecture/13-decision-log.md#adr-312--the-admin-lists-the-shops-locations-in-settings-those-out-of-use-too-and-adds-one-with-its-address-and-the-number-couriers-call-for-pickups-changes-it-and-whether-it-fulfils-online-orders-takes-it-out-of-use-and-puts-it-back-and-deletes-one-that-never-held-stock-the-primary-one-stays)) in settings: the shop's warehouses and shops, with their addresses and
   pickup numbers, added, changed, taken out of use and put back, and deleted while they never
