@@ -1760,3 +1760,42 @@ export interface SupportAccessGrantData {
 export interface SupportAccessEndData {
   supportAccessEnd: { grant: { id: string } | null; userErrors: UserError[] };
 }
+
+export type OrderExportFormat = 'CSV' | 'XLSX';
+export type OrderExportLayout = 'ORDERS' | 'LINE_ITEMS';
+export type OrderExportFrequency = 'DAILY' | 'WEEKLY' | 'MONTHLY';
+
+export interface OrdersExportData {
+  ordersExport: {
+    rowCount: number;
+    file: { content: string; contentType: string; filename: string } | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface ExportSchedule {
+  id: string;
+  frequency: OrderExportFrequency;
+  hour: number;
+  format: OrderExportFormat;
+  layout: OrderExportLayout;
+  query: string;
+  staffMemberId: string;
+  nextSendAt: string;
+  nextPeriodFirstDay: string;
+  nextPeriodLastDay: string;
+  lastSentAt: string | null;
+  lastError: string | null;
+}
+
+export interface OrderExportSchedulesData {
+  orderExportSchedules: ExportSchedule[];
+}
+
+export interface OrderExportScheduleCreateData {
+  orderExportScheduleCreate: { exportSchedule: ExportSchedule | null; userErrors: UserError[] };
+}
+
+export interface OrderExportScheduleDeleteData {
+  orderExportScheduleDelete: { deletedExportScheduleId: string | null; userErrors: UserError[] };
+}

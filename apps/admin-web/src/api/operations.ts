@@ -4023,3 +4023,91 @@ export const SupportAccessEndMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** Orders as CSV or Excel, filtered as the list is (ORD-11): every export is on the audit log. */
+export const OrdersExportMutation = /* GraphQL */ `
+  mutation OrdersExport(
+    $format: OrderExportFormat!
+    $layout: OrderExportLayout!
+    $query: String
+    $stage: OrderStage
+    $placedFrom: DateTime
+    $placedBefore: DateTime
+  ) {
+    ordersExport(
+      format: $format
+      layout: $layout
+      query: $query
+      stage: $stage
+      placedFrom: $placedFrom
+      placedBefore: $placedBefore
+    ) {
+      rowCount
+      file {
+        content
+        contentType
+        filename
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+const EXPORT_SCHEDULE = /* GraphQL */ `
+  fragment ExportSchedule on OrderExportSchedule {
+    id
+    frequency
+    hour
+    format
+    layout
+    query
+    staffMemberId
+    nextSendAt
+    nextPeriodFirstDay
+    nextPeriodLastDay
+    lastSentAt
+    lastError
+  }
+`;
+
+/** The shop's scheduled order exports, each emailed to the member of staff who made it. */
+export const OrderExportSchedulesQuery = /* GraphQL */ `
+  query OrderExportSchedules {
+    orderExportSchedules {
+      ...ExportSchedule
+    }
+  }
+  ${EXPORT_SCHEDULE}
+`;
+
+/** An order export scheduled, emailed to the member asking every day, week or month. */
+export const OrderExportScheduleCreateMutation = /* GraphQL */ `
+  mutation OrderExportScheduleCreate($input: OrderExportScheduleInput!) {
+    orderExportScheduleCreate(input: $input) {
+      exportSchedule {
+        ...ExportSchedule
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${EXPORT_SCHEDULE}
+  ${USER_ERRORS}
+`;
+
+/** A scheduled order export stopped. */
+export const OrderExportScheduleDeleteMutation = /* GraphQL */ `
+  mutation OrderExportScheduleDelete($id: ID!) {
+    orderExportScheduleDelete(id: $id) {
+      deletedExportScheduleId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

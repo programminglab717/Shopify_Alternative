@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { ChevronRight, EyeOff, FilePen, Inbox, Search, ShieldAlert } from 'lucide-react';
+import { ChevronRight, Download, EyeOff, FilePen, Inbox, Search, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSessionStore } from '../auth/context';
@@ -18,6 +18,7 @@ import type { MessageKey } from '../i18n/messages';
 import { useAdminMutation, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { EXPORTS_ORDERS } from './export-page';
 import { StageBadge, STAGES } from './stage';
 
 /** The stage tabs, in the pipeline's order (docs/design/02 §1). */
@@ -202,16 +203,29 @@ export function OrdersPage() {
         <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
           {t('orders.title')}
         </h1>
-        {TAKES_DRAFTS.includes(shop.role) && (
-          <Link
-            to="/$shopId/drafts"
-            params={{ shopId: shop.id }}
-            className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium md:min-h-10"
-          >
-            <FilePen aria-hidden className="size-5" />
-            {t('drafts.title')}
-          </Link>
-        )}
+        <span className="flex flex-wrap gap-2">
+          {EXPORTS_ORDERS.includes(shop.role) && (
+            <Link
+              to="/$shopId/orders/export"
+              params={{ shopId: shop.id }}
+              search={{ stage, q }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium md:min-h-10"
+            >
+              <Download aria-hidden className="size-5" />
+              {t('exports.link')}
+            </Link>
+          )}
+          {TAKES_DRAFTS.includes(shop.role) && (
+            <Link
+              to="/$shopId/drafts"
+              params={{ shopId: shop.id }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium md:min-h-10"
+            >
+              <FilePen aria-hidden className="size-5" />
+              {t('drafts.title')}
+            </Link>
+          )}
+        </span>
       </div>
       <form onSubmit={onSearch} role="search" className="relative">
         <Search

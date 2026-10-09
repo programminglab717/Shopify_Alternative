@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-303 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-304 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -311,6 +311,7 @@
 | 301 | The admin shows a customer's store credit on their page, its ledger to those who keep it, and owners and managers give credit by hand, to expire at the end of a day in the shop's time zone, and take it back; an order not yet shipped is paid with it from its page | Accepted |
 | 302 | The admin keeps the shop's payment links: what each sells and how many orders it took, whether it is open and why not, copied or sent on WhatsApp, closed and opened again; made of items found by name, with a discount code, a limit, a day it closes in the shop's time zone, and prepaid alone if the shop likes | Accepted |
 | 303 | The admin's settings show whether Hatti's support may look at the shop and until when, let the owner let it in for 15 minutes to a day and a reason, having confirmed who they are, let the owner or a manager end it, and list each time it was let in; and the discounts page takes a code's days in the shop's time zone | Accepted |
+| 304 | The admin exports the orders the list shows, its tab and search, between two days in the shop's time zone, as Excel or CSV, a row per order or per item, once the member has confirmed who they are; and schedules the same of each day, week or month, emailed at an hour, listed and stopped | Accepted |
 
 ---
 
@@ -12366,3 +12367,31 @@
 * **Alternatives:**
   * **Support access always open, logged:** simpler for support, but a shop's customers and
     orders are the shop's; the owner's consent each time is the point.
+
+## ADR-304 · The admin exports the orders the list shows, its tab and search, between two days in the shop's time zone, as Excel or CSV, a row per order or per item, once the member has confirmed who they are; and schedules the same of each day, week or month, emailed at an hour, listed and stopped
+
+* **Context:** The core exports a shop's orders (ORD-11, ADR-182, ADR-183): filtered as the order
+  list is, by stage, search and the days they were placed, up to 10,000, as CSV with a byte-order
+  mark for Excel or as an Excel workbook, a row per order or per line item; and schedules the same
+  every day, week or month, the period that ended, emailed to the member who asked at an hour in
+  the shop's time zone, while they keep a role that exports and a proved email. Owners, managers
+  and accountants export, confirming who they are where they signed in a while ago; every export
+  is on the audit log. The admin had none of it.
+* **Decision:**
+  * **Export** is a link on the orders list for owners, managers and accountants. It carries the
+    list's tab and search to a page of its own that says which orders those are, in words.
+  * **Download now** takes those orders, between two days if asked, from the first's start to
+    the last's end in the shop's time zone, as Excel or CSV, a row per order or per item; the
+    file is saved under the name the core gives it, and the page says how many rows it holds.
+  * **Emailed on a schedule** lists the shop's scheduled exports: how often and at what hour,
+    the file, the search, whether it goes to you, and when it goes next with which days; one
+    that failed says why. It is stopped there. A new one takes the list's tab and search, written
+    as the search language writes them (`stage:to_pack lahore`), how often and the hour. Where
+    the member's email is not proved, the page says so, with the way to their account, in place
+    of the form.
+* **Consequences:**
+  * An accountant takes last month's delivered orders into Excel from a phone, and has every
+    Monday's in their inbox after.
+* **Alternatives:**
+  * **Exports in settings:** further from the orders they are of; the list's tab and search are
+    the filter staff already know.

@@ -41,6 +41,7 @@ import { PolicyPage } from './online-store/policies';
 import { CollectionPage } from './collections/collection-page';
 import { CollectionsPage, NewCollectionPage } from './collections/collections-page';
 import { DiscountsPage } from './discounts/discounts-page';
+import { OrdersExportPage } from './orders/export-page';
 import { PaymentLinksPage } from './payment-links/payment-links-page';
 import { DraftPage } from './drafts/draft-page';
 import { DraftsPage } from './drafts/drafts-page';
@@ -182,6 +183,13 @@ const desk = createRoute({
   getParentRoute: () => shop,
   path: 'desk',
   component: DeskPage,
+});
+
+const ordersExport = createRoute({
+  getParentRoute: () => shop,
+  path: 'orders/export',
+  validateSearch: validateOrdersSearch,
+  component: OrdersExportPage,
 });
 
 const order = createRoute({
@@ -507,6 +515,7 @@ export const routeTree = root.addChildren([
   shop.addChildren([
     home,
     orders,
+    ordersExport,
     order,
     desk,
     products,

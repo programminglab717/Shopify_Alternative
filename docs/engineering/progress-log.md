@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, order exports in the admin** (ORD-11): the orders a search finds, as CSV or Excel, at
-once or by email on a schedule; then the shop's sales tax settings, and the admin's next
-sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, the shop's sales tax in the admin** (TAX-01): whether the shop charges sales tax and at
+what rate, included in its prices, on delivery too; the NTN and STRN its invoices name; and
+rates of its own for some products; then the admin's next sections as the alpha's shops need
+them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +18,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Order exports, in the admin
+
+* **Export** ([ADR-304](../architecture/13-decision-log.md#adr-304--the-admin-exports-the-orders-the-list-shows-its-tab-and-search-between-two-days-in-the-shops-time-zone-as-excel-or-csv-a-row-per-order-or-per-item-once-the-member-has-confirmed-who-they-are-and-schedules-the-same-of-each-day-week-or-month-emailed-at-an-hour-listed-and-stopped)) from the orders list, for owners, managers and accountants: the orders
+  of its tab and search, between two days if asked, as Excel or CSV, a row per order or per
+  item, saved at once after confirming who they are; and the same of each day, week or month
+  emailed at an hour, listed and stopped.
+* **Tried against the core:** on the seed's shop, the orders needing confirmation came as an
+  Excel workbook of three rows, and as a CSV of their items with the byte-order mark Excel needs.
+  The owner's email was not proved, so the page asked for it in place of a schedule; proved for
+  the try, a weekly export at nine read "Next on 12 Oct 2026, 9:00 am, with 5 Oct 2026 to 11 Oct
+  2026", and was stopped; the email was then put back as it was. No errors in the browser.
+* 2181 tests: the list as the search language reads it; a download between two days in
+  Pakistan after confirming; schedules listed, made and stopped; a proved email asked for; no
+  link for a packer.
 
 ### 9af1731 · Support access, in the admin
 
