@@ -1248,6 +1248,30 @@ const en = {
   'orderEdit.saved.collect': 'Saved. Its total is now {total}, with {cash} to collect at the door.',
   'orderEdit.saved.plain': 'Saved.',
   'orderEdit.review': 'The change makes it risky, so it waits for review.',
+  'order.mergedInto': 'Its items went to',
+  'order.splitFrom': 'Sent apart from',
+  'orderMerge.start': 'Merge into another order',
+  'orderMerge.title': 'Merge {name} into another of their orders',
+  'orderMerge.into': 'The order that takes its items',
+  'orderMerge.none':
+    'This customer has no other order waiting to be packed and paid the same way to merge it into.',
+  'orderMerge.explain':
+    '{into} takes the items of {name} at the prices they were sold at, with its discount, and keeps its own address and delivery charge. {name} is cancelled as merged.',
+  'orderMerge.choose': 'Choose an order',
+  'orderMerge.submit': 'Merge into {into}',
+  'orderSplit.start': 'Send part apart',
+  'orderSplit.title': 'Send part of it apart',
+  'orderSplit.explain':
+    'The units chosen become an order of their own, with their share of the discount, and the cash for each is collected apart.',
+  'orderSplit.of': 'Send apart, of {count}',
+  'orderSplit.fewer': 'One fewer {title} sent apart',
+  'orderSplit.more': 'One more {title} sent apart',
+  'orderSplit.delivery': 'Delivery charge of the part sent apart',
+  'orderSplit.deliveryHint': "Leave it empty to send it at the shop's cost.",
+  'orderSplit.all': 'Something has to stay on this order. To send it all later, leave it as it is.',
+  'orderSplit.submit': 'Send {count} apart',
+  'orderSplit.done': 'Sent apart as {name}.',
+  'orderSplit.open': 'Open {name}',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -2475,6 +2499,31 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'محفوظ ہو گیا۔ اب اس کا کل {total} ہے، اور دروازے پر {cash} وصول کرنے ہیں۔',
   'orderEdit.saved.plain': 'محفوظ ہو گیا۔',
   'orderEdit.review': 'اس تبدیلی سے یہ رسکی ہو گیا ہے، اس لیے یہ ریویو کا انتظار کرے گا۔',
+  'order.mergedInto': 'اس کے آئٹمز اس آرڈر میں گئے:',
+  'order.splitFrom': 'اس آرڈر سے الگ کیا گیا:',
+  'orderMerge.start': 'دوسرے آرڈر میں شامل کریں',
+  'orderMerge.title': '{name} کو ان کے کسی دوسرے آرڈر میں شامل کریں',
+  'orderMerge.into': 'وہ آرڈر جو اس کے آئٹمز لے گا',
+  'orderMerge.none':
+    'اس کسٹمر کا کوئی اور آرڈر نہیں جو پیکنگ کا انتظار کر رہا ہو اور اسی طرح ادا ہو، جس میں اسے شامل کیا جا سکے۔',
+  'orderMerge.explain':
+    '{into} میں {name} کے آئٹمز انہی قیمتوں پر، اس کے ڈسکاؤنٹ کے ساتھ، شامل ہو جائیں گے، اور اس کا اپنا پتہ اور ڈیلیوری چارج رہے گا۔ {name} شامل کیے جانے کی وجہ سے کینسل ہو جائے گا۔',
+  'orderMerge.choose': 'ایک آرڈر چنیں',
+  'orderMerge.submit': '{into} میں شامل کریں',
+  'orderSplit.start': 'کچھ حصہ الگ بھیجیں',
+  'orderSplit.title': 'اس کا کچھ حصہ الگ بھیجیں',
+  'orderSplit.explain':
+    'چنے گئے یونٹس اپنا الگ آرڈر بن جائیں گے، ڈسکاؤنٹ میں اپنے حصے کے ساتھ، اور ہر ایک کی رقم الگ وصول ہو گی۔',
+  'orderSplit.of': '{count} میں سے الگ بھیجیں',
+  'orderSplit.fewer': 'الگ بھیجے جانے والے {title} ایک کم',
+  'orderSplit.more': 'الگ بھیجے جانے والے {title} ایک زیادہ',
+  'orderSplit.delivery': 'الگ بھیجے جانے والے حصے کا ڈیلیوری چارج',
+  'orderSplit.deliveryHint': 'دکان کے خرچ پر بھیجنا ہو تو خالی چھوڑ دیں۔',
+  'orderSplit.all':
+    'اس آرڈر میں کچھ نہ کچھ رہنا چاہیے۔ سب بعد میں بھیجنا ہو تو اسے ویسے ہی رہنے دیں۔',
+  'orderSplit.submit': '{count} الگ بھیجیں',
+  'orderSplit.done': '{name} کے طور پر الگ بھیج دیا گیا۔',
+  'orderSplit.open': '{name} کھولیں',
 };
 
 export const messages: Readonly<

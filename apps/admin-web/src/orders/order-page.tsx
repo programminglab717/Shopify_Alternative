@@ -251,6 +251,24 @@ export function OrderPage() {
             })}
           </p>
         )}
+        {[
+          { key: 'order.mergedInto' as const, other: order.mergedInto },
+          { key: 'order.splitFrom' as const, other: order.splitFrom },
+        ].map(
+          ({ key, other }) =>
+            other && (
+              <p key={key} className="text-secondary">
+                {t(key)}{' '}
+                <Link
+                  to="/$shopId/orders/$orderId"
+                  params={{ shopId: shop.id, orderId: other.id }}
+                  className="num font-medium text-primary hover:underline"
+                >
+                  {other.name}
+                </Link>
+              </p>
+            ),
+        )}
       </header>
       {order.overPlanLimit && <Alert tone="warning">{t('order.overLimit')}</Alert>}
       <Actions order={order} />

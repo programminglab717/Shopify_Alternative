@@ -1,4 +1,5 @@
-import { Minus, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { Merge, Minus, Pencil, Plus, Split, Trash2, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { OrderEditChargesMutation, OrderEditLineItemsMutation } from '../api/operations';
@@ -13,6 +14,8 @@ import { useAdminMutation, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { MergeForm, mergeable, SplitForm, splittable } from './merge-split';
+import type { Made } from './merge-split';
 import { WORKS_PARCELS } from './parcels';
 
 /** The stages an order waits to be packed in, when its items and charges may change. */
@@ -400,14 +403,15 @@ function ChargesForm({ order, onDone }: { order: OrderDetail; onDone: (said: str
 
 /**
  * An order's items and totals (ORD-02), changed while it waits to be packed (ORD-04) by those who
- * work orders: what it holds, on the call, and what it charges for delivery and takes off. A
- * packed order is unpacked first.
+ * work orders: what it holds, on the call, and what it charges for delivery and takes off; part
+ * of it sent apart, or the whole merged into another of its customer's orders. A packed order is
+ * unpacked first.
  */
 export function OrderItems({ order }: { order: OrderDetail }) {
   const { t } = useLocale();
-  const { role } = useShop();
-  const [open, setOpen] = useState<'items' | 'charges' | null>(null);
-  const [done, setDone] = useState('');
+  const { role, id: shopId } = useShop();
+  const [open, setOpen] = useState<'items' | 'charges' | 'merge' | 'split' | null>(null);
+  const [done, setDone] = useState<Made | null>(null);
   const works = WORKS_PARCELS.includes(role);
   const editable = works && changeable(order);
   const packed =
@@ -417,11 +421,27 @@ export function OrderItems({ order }: { order: OrderDetail }) {
     order.fulfillments.length === 0;
   const finish = (said: string) => {
     setOpen(null);
-    setDone(said);
+    setDone(said ? { said } : null);
+  };
+  const start = (form: NonNullable<typeof open>) => {
+    setDone(null);
+    setOpen(form);
   };
 
   if (open === 'items') return <ItemsForm order={order} onDone={finish} />;
   if (open === 'charges') return <ChargesForm order={order} onDone={finish} />;
+  if (open === 'merge') return <MergeForm order={order} onDone={() => setOpen(null)} />;
+  if (open === 'split') {
+    return (
+      <SplitForm
+        order={order}
+        onDone={(made) => {
+          setOpen(null);
+          setDone(made);
+        }}
+      />
+    );
+  }
 
   return (
     <>
@@ -458,28 +478,53 @@ export function OrderItems({ order }: { order: OrderDetail }) {
           <Row label={t('order.toCollect')} value={money(order.codAmount)} strong />
         )}
       </dl>
-      {done && <Alert tone="success">{done}</Alert>}
+      {done && (
+        <Alert tone="success">
+          {done.said}
+          {done.order && (
+            <>
+              {' '}
+              <Link
+                to="/$shopId/orders/$orderId"
+                params={{ shopId, orderId: done.order.id }}
+                className="font-medium underline"
+              >
+                {t('orderSplit.open', { name: done.order.name })}
+              </Link>
+            </>
+          )}
+        </Alert>
+      )}
       {editable && (
         <div className="flex flex-wrap gap-2">
           <Button
             variant="secondary"
             icon={<Pencil aria-hidden className="size-5" />}
-            onClick={() => {
-              setDone('');
-              setOpen('items');
-            }}
+            onClick={() => start('items')}
           >
             {t('orderEdit.items')}
           </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setDone('');
-              setOpen('charges');
-            }}
-          >
+          <Button variant="secondary" onClick={() => start('charges')}>
             {t('orderEdit.charges')}
           </Button>
+          {splittable(order) && (
+            <Button
+              variant="secondary"
+              icon={<Split aria-hidden className="size-5" />}
+              onClick={() => start('split')}
+            >
+              {t('orderSplit.start')}
+            </Button>
+          )}
+          {mergeable(order) && (
+            <Button
+              variant="secondary"
+              icon={<Merge aria-hidden className="size-5" />}
+              onClick={() => start('merge')}
+            >
+              {t('orderMerge.start')}
+            </Button>
+          )}
         </div>
       )}
       {packed && <p className="text-secondary">{t('orderEdit.packed')}</p>}

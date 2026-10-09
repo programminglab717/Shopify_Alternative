@@ -254,6 +254,14 @@ export const OrderQuery = /* GraphQL */ `
         id
         name
       }
+      mergedInto {
+        id
+        name
+      }
+      splitFrom {
+        id
+        name
+      }
       fulfillments {
         id
         status
@@ -420,6 +428,69 @@ export const OrderEditChargesMutation = /* GraphQL */ `
     }
   }
   ${MONEY}
+  ${USER_ERRORS}
+`;
+
+/** The customer's orders an order might be merged into: those waiting to be packed. */
+export const OrderMergeCandidatesQuery = /* GraphQL */ `
+  query OrderMergeCandidates($id: ID!) {
+    order(id: $id) {
+      id
+      customer {
+        id
+        orders(first: 20) {
+          nodes {
+            id
+            name
+            createdAt
+            stage
+            status
+            paymentMethod
+            totalPrice {
+              ...Money
+            }
+            lineItems {
+              id
+              title
+              quantity
+            }
+          }
+        }
+      }
+    }
+  }
+  ${MONEY}
+`;
+
+/** An order its customer placed twice merged into the other (ORD-04, ADR-132). */
+export const OrderMergeMutation = /* GraphQL */ `
+  mutation OrderMerge($id: ID!, $intoId: ID!) {
+    orderMerge(id: $id, intoId: $intoId) {
+      order {
+        id
+        name
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Items sent apart from an order paid on delivery, as an order of their own (ADR-135). */
+export const OrderSplitMutation = /* GraphQL */ `
+  mutation OrderSplit($id: ID!, $input: OrderSplitInput!) {
+    orderSplit(id: $id, input: $input) {
+      splitOrder {
+        id
+        name
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
   ${USER_ERRORS}
 `;
 

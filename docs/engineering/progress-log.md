@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, merging and splitting orders in the admin** (ORD-04): an order its customer placed twice
-merged into the other, and items sent apart split into an order of their own, from the order's
-page; then the admin's next sections as the alpha's shops need them. Urdu handles wait, as
-decided.
+**Next, stock in the admin** (INV-01): each variant's stock at each location, low stock first,
+adjusted with a reason and counted; then the admin's next sections as the alpha's shops need
+them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Orders merged and split, in the admin
+
+* **Merging and sending apart on the order's page** ([ADR-288](../architecture/13-decision-log.md#adr-288--an-orders-page-merges-it-into-another-of-its-customers-orders-waiting-to-be-packed-and-paid-the-same-way-chosen-from-their-orders-and-opens-that-one-and-sends-units-of-it-apart-as-an-order-of-their-own-with-its-delivery-charge-always-leaving-something-each-order-links-the-one-it-went-to-or-came-from)): an order merged into
+  another of its customer's waiting orders, chosen from their orders, and that one opened;
+  units sent apart as an order of their own with its delivery charge; each order linking the
+  one it went to or came from.
+* **Tried against the core:** a second order for #1015's customer, #1017, 2 chappals, one
+  sent apart with a Rs 150 delivery charge as #1018, "Sent apart from #1017" on its page;
+  #1018 then merged into #1015, chosen over #1017, and #1015's page opened with the chappal
+  added, Rs 9,949 in all, its timeline saying "Merged #1018 into this order"; with no errors in
+  the browser.
+* 2045 tests: an order merged into the customer's one other order waiting and paid the same
+  way, that order then opened; a customer with none to merge into; units sent apart with their
+  delivery charge, never all of them; and an order merged away linking where its items went.
 
 ### 43d7dc4 · An order's items changed, in the admin
 

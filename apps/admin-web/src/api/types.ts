@@ -258,6 +258,10 @@ export interface OrderDetail {
     reasons: { code: string; message: string }[];
   } | null;
   assignee: { id: string; name: string } | null;
+  /** The order it was merged into, cancelled as MERGED (ADR-132). */
+  mergedInto: { id: string; name: string } | null;
+  /** The order its items were sent apart from (ADR-135). */
+  splitFrom: { id: string; name: string } | null;
   fulfillments: ParcelDetail[];
   amountRefunded: MoneyValue;
   refunds: RefundDetail[];
@@ -1175,6 +1179,37 @@ export interface OrderEditData {
       totalPrice: MoneyValue;
       codAmount: MoneyValue;
     } | null;
+    userErrors: UserError[];
+  };
+}
+
+/** The customer's orders, to choose one to merge into. */
+export interface OrderMergeCandidatesData {
+  order: {
+    id: string;
+    customer: {
+      id: string;
+      orders: {
+        nodes: {
+          id: string;
+          name: string;
+          createdAt: string;
+          stage: OrderStage;
+          status: OrderDetail['status'];
+          paymentMethod: OrderPaymentMethod;
+          totalPrice: MoneyValue;
+          lineItems: { id: string; title: string; quantity: number }[];
+        }[];
+      };
+    } | null;
+  } | null;
+}
+
+/** An order merged into another, or items sent apart as one: the order that came of it. */
+export interface OrderMergeSplitData {
+  [field: string]: {
+    order?: { id: string; name: string } | null;
+    splitOrder?: { id: string; name: string } | null;
     userErrors: UserError[];
   };
 }

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-287 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-288 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -295,6 +295,7 @@
 | 285 | An order's page shows what was paid and given back, each refund with how, its reference, why and its receipt; owners and managers record a refund, at most what is left, by hand with its receipt uploaded, through the gateway or as store credit, and mark an order paid after saying how much it records | Accepted |
 | 286 | An order's page gives it to a member of staff, comments on its timeline with their authors' edits and deletes, keeps its note and tags, and corrects its address while nothing has shipped, each for the roles the core lets do it | Accepted |
 | 287 | An order's page changes its items while it waits to be packed, quantities stepped and lines taken off or put back, products found and added at a price agreed, and its delivery charge waived or discount given, saying back the new total and cash at the door; a packed order is unpacked first | Accepted |
+| 288 | An order's page merges it into another of its customer's orders waiting to be packed and paid the same way, chosen from their orders, and opens that one; and sends units of it apart as an order of their own with its delivery charge, always leaving something; each order links the one it went to or came from | Accepted |
 
 ---
 
@@ -11830,3 +11831,39 @@
     a few units.
   * **A preview of the new total from the core before saving:** the core has none without
     saving; the subtotal shown is exact, and the rest is said back once saved.
+
+## ADR-288 · An order's page merges it into another of its customer's orders waiting to be packed and paid the same way, chosen from their orders, and opens that one; and sends units of it apart as an order of their own with its delivery charge, always leaving something; each order links the one it went to or came from
+
+* **Context:** The core merges an order into another of its customer's, as when they placed it
+  twice: the other, waiting to be packed and paid the same way, takes its items and discount
+  and keeps its own address and delivery charge, and the order merged is cancelled as merged
+  ([ADR-132](#adr-132--an-order-its-customer-placed-twice-is-merged-into-the-other-while-both-wait-to-be-packed-the-other-takes-its-items-and-discount-and-keeps-its-own-delivery-charge-as-one-parcel-the-order-merged-is-cancelled-as-merged-naming-it-and-counts-for-nothing-in-its-customers-history)). It sends units of an order paid on delivery apart as an order of their
+  own, with a delivery charge given or none, something staying behind ([ADR-135](#adr-135--items-sent-apart-from-an-order-paid-on-delivery-become-an-order-of-their-own-as-its-cash-is-collected-by-order-at-their-prices-with-their-share-of-the-discount-the-rest-of-the-order-as-it-is-and-its-stock-where-it-was-both-orders-scored-as-the-one-their-customer-placed)). An
+  order names the one it was merged into, `mergedInto`, and the one it was split from,
+  `splitFrom`. The order's page did neither.
+* **Decision:**
+  * **Both sit with the order's other changes** ([ADR-287](#adr-287--an-orders-page-changes-its-items-while-it-waits-to-be-packed-quantities-stepped-and-lines-taken-off-or-put-back-products-found-and-added-at-a-price-agreed-and-its-delivery-charge-waived-or-discount-given-saying-back-the-new-total-and-cash-at-the-door-a-packed-order-is-unpacked-first)), for those who work
+    orders while it waits to be packed with nothing shipped or refunded: merging when it has a
+    customer and nothing paid, sending apart when it is paid on delivery, nothing is paid yet,
+    and it holds two units or more.
+  * **The order to merge into is chosen from the customer's orders**, read through
+    `Customer.orders`, which needs only `read_orders`: those open, waiting to be packed and
+    paid the same way, each with its number, date, total and items. Choosing one says what
+    happens, in the core's terms, before the button names the order. Once merged, that order's
+    page opens, as this one is cancelled; a customer with none to merge into is told so.
+  * **Sending apart steps each line's units** from none to all of it, with the delivery charge
+    of the order sent apart, empty for the shop's own cost. Every unit chosen is refused before
+    it is sent, as something has to stay. Once sent apart, the page says the new order's number
+    with a link to it.
+  * **An order merged away or split off says so under its header**, linking the order its items
+    went to, or the order it was sent apart from.
+* **Consequences:**
+  * An agent who finds a customer's second order on the call merges it into the first in two
+    taps, and one parcel goes out.
+  * A customer who wants the suit now and the shoes when they come gets two orders, each
+    with its cash to collect, without anyone typing either again.
+* **Alternatives:**
+  * **Finding the order to merge into by its number:** the customer's orders are the only ones
+    the core takes, and listing them saves the agent asking.
+  * **Merging from the orders list, two orders ticked:** which order takes the other matters,
+    as it keeps its address and delivery charge; the order's page says which.
