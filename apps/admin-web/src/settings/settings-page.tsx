@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import {
+  BadgeCheck,
   Banknote,
   ChevronRight,
   CreditCard,
@@ -49,6 +50,7 @@ interface Section {
     | '/$shopId/settings/tax'
     | '/$shopId/settings/messages'
     | '/$shopId/settings/orders'
+    | '/$shopId/settings/checkout'
     | '/$shopId/settings/couriers'
     | '/$shopId/settings/staff';
   label: MessageKey;
@@ -86,6 +88,12 @@ const SECTIONS: readonly Section[] = [
     label: 'settings.bankTransfer',
     hint: 'settings.bankTransferHint',
     icon: Landmark,
+  },
+  {
+    to: '/$shopId/settings/checkout',
+    label: 'settings.checkout',
+    hint: 'settings.checkoutHint',
+    icon: BadgeCheck,
   },
   {
     to: '/$shopId/settings/tax',
@@ -137,7 +145,7 @@ const SECTIONS: readonly Section[] = [
   },
 ];
 
-/** Settings (docs/design/02 §4), as far as they are built: the shop, order policies, delivery and payments, sales tax, customer messages, couriers, staff, billing, activity and support access. */
+/** Settings (docs/design/02 §4), as far as they are built: the shop, order policies, delivery and payments, the checkout page, sales tax, customer messages, couriers, staff, billing, activity and support access. */
 export function SettingsPage() {
   const { t } = useLocale();
   const shopId = useShop().id;

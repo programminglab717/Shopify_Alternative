@@ -4478,3 +4478,46 @@ export const CustomerErasureRequestsQuery = /* GraphQL */ `
     }
   }
 `;
+
+/** What the checkout's page shows under its button, and the boxes it offers for marketing. */
+export const CheckoutPageQuery = /* GraphQL */ `
+  query CheckoutPage {
+    checkoutTrustBadges {
+      kind
+      days
+    }
+    checkoutMarketingChannels
+    onlineStorePreferences {
+      whatsappNumber
+    }
+  }
+`;
+
+/** The checkout's badges replaced, in the order given. */
+export const CheckoutTrustBadgesUpdateMutation = /* GraphQL */ `
+  mutation CheckoutTrustBadgesUpdate($badges: [CheckoutTrustBadgeInput!]!) {
+    checkoutTrustBadgesUpdate(badges: $badges) {
+      checkoutTrustBadges {
+        kind
+        days
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The channels the checkout offers a box for the shop's news and offers on. */
+export const CheckoutMarketingChannelsUpdateMutation = /* GraphQL */ `
+  mutation CheckoutMarketingChannelsUpdate($channels: [MarketingChannel!]!) {
+    checkoutMarketingChannelsUpdate(channels: $channels) {
+      checkoutMarketingChannels
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

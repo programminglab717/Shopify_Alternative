@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-309 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-310 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -317,6 +317,7 @@
 | 307 | The admin sets how the shop's customers are told of their orders in settings: WhatsApp for everything or SMS for updates, each with its price, the messages' language, which messages go to customers and to the shop, and the alerts number; it lists the messages sent, by status, and an order's page shows its own once asked | Accepted |
 | 308 | The admin sets the shop's order policies in settings: the Confirmation Desk's calling hours, its target for the first call and whether it waits for WhatsApp; after how many days unpaid and unreachable orders are cancelled; until when customers may cancel; and the high-value amount and the risk score that holds an order for review | Accepted |
 | 309 | The admin adds a customer by hand, records the marketing they agreed to in their words, merges a duplicate into them once asked, and, at their request, downloads their data and erases them ten days on, once the member confirms who they are; the erasures waiting are listed, and each cancelled from its customer | Accepted |
+| 310 | The admin sets the checkout page in settings: up to four badges under its button, in the shop's order, with the days for exchanges and returns, Help on WhatsApp offered only with the shop's number; and the boxes it offers for the shop's offers, by channel | Accepted |
 
 ---
 
@@ -12546,3 +12547,29 @@
 * **Alternatives:**
   * **Erasure at once:** what the core also has, but a customer's orders still on their way need
     them, and a request made in error could not be taken back.
+
+## ADR-310 · The admin sets the checkout page in settings: up to four badges under its button, in the shop's order, with the days for exchanges and returns, Help on WhatsApp offered only with the shop's number; and the boxes it offers for the shop's offers, by channel
+
+* **Context:** A shop's checkout page shows up to four badges under the button that places the
+  order (CHK-14, ADR-086): cash on delivery and opening the parcel before paying, where the cart may be
+  paid on delivery; original products; exchanges and returns within days of the shop's, linked
+  to its refund policy; and help on WhatsApp, which needs the shop's number. It offers boxes for
+  the shop's news and offers by channel, never ticked for the shopper, a ticked one recording
+  their consent with the order (ADR-187). Owners and managers change both. The admin had
+  neither.
+* **Decision:**
+  * **Checkout page** is a section of settings.
+  * **Badges** are listed in the order the checkout shows them, each saying when it shows,
+    moved up and down and removed; exchanges and returns take their days, 1 to 90, and read as
+    the shopper will see them ("14-day exchange"). A badge is added from those not yet chosen,
+    while fewer than four are; Help on WhatsApp is offered only once the shop has a WhatsApp
+    number, and the page says where to set it.
+  * **Boxes for your offers** ticks WhatsApp, SMS and email.
+  * **One save** sends the badges, whole, if they changed, and the channels if they changed; days
+    out of range are refused before anything is sent, naming the badge.
+* **Consequences:**
+  * A shop selling on cash on delivery puts "Open your parcel before you pay" first, the
+    reassurance its shoppers look for, from a phone.
+* **Alternatives:**
+  * **Badges in the theme editor:** the checkout is the platform's page, not the theme's, and
+    the badges are a setting of the shop's, worded by the platform in English and Urdu.

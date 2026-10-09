@@ -1985,3 +1985,32 @@ export interface CustomerErasureRequestsData {
     }[];
   };
 }
+
+export type CheckoutTrustBadgeKind =
+  'CASH_ON_DELIVERY' | 'OPEN_PARCEL' | 'ORIGINAL' | 'EXCHANGE' | 'RETURNS' | 'WHATSAPP';
+
+/** A badge under the checkout's button (CHK-14): days for exchanges and returns alone. */
+export interface CheckoutTrustBadge {
+  kind: CheckoutTrustBadgeKind;
+  days: number | null;
+}
+
+export interface CheckoutPageData {
+  checkoutTrustBadges: CheckoutTrustBadge[];
+  checkoutMarketingChannels: MarketingChannel[];
+  onlineStorePreferences: { whatsappNumber: string | null };
+}
+
+export interface CheckoutTrustBadgesUpdateData {
+  checkoutTrustBadgesUpdate: {
+    checkoutTrustBadges: CheckoutTrustBadge[] | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface CheckoutMarketingChannelsUpdateData {
+  checkoutMarketingChannelsUpdate: {
+    checkoutMarketingChannels: MarketingChannel[] | null;
+    userErrors: UserError[];
+  };
+}

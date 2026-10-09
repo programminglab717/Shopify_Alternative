@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the checkout page in the admin** (CHK-14, CUS-04): the badges it shows under its
-button, up to four in the shop's order, with the days for exchanges and returns; and the boxes
-it offers for the shop's news and offers, by channel; then the admin's next sections as the
+**Next, products and stock by file in the admin** (CAT-05, ONB-05): products brought in from a
+Shopify product CSV and updated from one, exported to it, and stock counted in from a file
+and exported, each checked before anything changes; then the admin's next sections as the
 alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +18,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The checkout page, in the admin
+
+* **Checkout page** ([ADR-310](../architecture/13-decision-log.md#adr-310--the-admin-sets-the-checkout-page-in-settings-up-to-four-badges-under-its-button-in-the-shops-order-with-the-days-for-exchanges-and-returns-help-on-whatsapp-offered-only-with-the-shops-number-and-the-boxes-it-offers-for-the-shops-offers-by-channel)) in settings: up to four badges under its button, in the shop's
+  order, with the days for exchanges and returns; and the boxes for the shop's offers, by
+  channel.
+* **Tried against the core:** on the seed's shop, with its four badges, 100% original products
+  was removed, the exchange given 14 days, returns added and Help on WhatsApp moved up; returns
+  at 0 days were refused, named on the page; at 10 they were kept as cash on delivery,
+  WhatsApp, a 14-day exchange and 10-day returns, with boxes for WhatsApp and SMS. The shop's
+  badges and boxes were then put back as they were. No errors in the browser.
+* 2221 tests: badges added, put in order and given days, with days out of range refused
+  before anything is sent; a box added; Help on WhatsApp offered only with a number; a badge
+  removed alone.
 
 ### c5fdeba · Customers' care, in the admin
 

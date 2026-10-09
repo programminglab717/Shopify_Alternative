@@ -61,6 +61,7 @@ import { SupportAccessPage } from './settings/support-page';
 import { TaxPage } from './settings/tax-page';
 import { MessagesPage } from './settings/messages-page';
 import { OrderPoliciesPage } from './settings/order-policies-page';
+import { CheckoutPage } from './settings/checkout-page';
 import { BankTransferPage } from './settings/bank-transfer-page';
 import { BillingPage } from './settings/billing-page';
 import { CashOnDeliveryPage } from './settings/cash-on-delivery-page';
@@ -467,6 +468,12 @@ const settingsOrders = createRoute({
   component: OrderPoliciesPage,
 });
 
+const settingsCheckout = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/checkout',
+  component: CheckoutPage,
+});
+
 const settingsBilling = createRoute({
   getParentRoute: () => shop,
   path: 'settings/billing',
@@ -602,6 +609,7 @@ export const routeTree = root.addChildren([
     settingsTax,
     settingsMessages,
     settingsOrders,
+    settingsCheckout,
   ]),
 ]);
 
