@@ -71,6 +71,12 @@ export function LocaleProvider({
   useEffect(() => {
     document.documentElement.lang = locale;
     document.documentElement.dir = dir;
+    document
+      .querySelector('link[rel="manifest"]')
+      ?.setAttribute(
+        'href',
+        locale === 'ur' ? '/manifest.ur.webmanifest' : '/manifest.webmanifest',
+      );
   }, [locale, dir]);
 
   const setLocale = useCallback((next: Locale) => {

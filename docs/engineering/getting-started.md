@@ -729,6 +729,8 @@ Passkeys added under **Account** belong to the admin's origin, which the core ta
 `PASSKEY_ORIGINS=http://localhost:5173` in `.env` (`.env.example` has it); the links in the core's
 emails open the admin there too.
 
+The service worker that lets the admin open offline (ADR-295) is registered by builds alone: `pnpm --filter @hatti/admin-web build`, then `pnpm --filter @hatti/admin-web preview` serves the build at http://localhost:4173/, sending `/auth` and `/admin/api` on to the core as the dev server does. Chrome's DevTools, under Application, show the worker, what it keeps and the manifest, and Network's Offline tries it without a connection.
+
 ## Look at a storefront
 
 The storefront serves shops in Hatti Base, the reference theme, each at its handle's subdomain.

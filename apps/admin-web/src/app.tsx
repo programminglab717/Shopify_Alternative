@@ -5,6 +5,7 @@ import { ApiError, browserFetch } from './api/client';
 import { SessionProvider } from './auth/context';
 import { SessionStore } from './auth/session';
 import { LocaleProvider } from './i18n/locale';
+import { AppNotices } from './offline/notices';
 import { createAdminRouter } from './router';
 
 /** Whether a failed query is worth trying again: not when the API refused it for a reason. */
@@ -25,6 +26,7 @@ export function App() {
   const [router] = useState(() => createAdminRouter(session));
   return (
     <LocaleProvider>
+      <AppNotices />
       <SessionProvider store={session}>
         <QueryClientProvider client={queryClient}>
           <RouterProvider router={router} />

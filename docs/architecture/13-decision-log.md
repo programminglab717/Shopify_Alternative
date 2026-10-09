@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-294 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-295 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -302,6 +302,7 @@
 | 292 | The admin's policies start from Hatti's drafts and are written as text with headings, lists and links, kept or taken away by owners and managers; each policy's Urdu is kept as a translation of its words, said to be out of date once they change | Accepted |
 | 293 | The admin's account page keeps your email, number and language, the Google account and passkeys you sign in with, and the browsers you are signed in on, each change proved again when the core asks; passkeys are made by the browser from the core's options as WebAuthn's JSON | Accepted |
 | 294 | The admin signs in with a passkey alone, a passkey as the second step, or Google's own button loaded only when asked for, and confirms who is there the same ways; a passkey's challenge and Google's nonce are good once, so each try starts from the core's options again | Accepted |
+| 295 | The admin installs on a phone from a manifest in its language, with PNG and maskable icons, and a service worker built with it keeps the admin's own files: its page from the network and offline from the cache, its files from the cache, the shop's data never; it says when the phone is offline, and offers a new version once it has installed | Accepted |
 
 ---
 
@@ -12088,3 +12089,42 @@
     for every sign-in page opened, and a prompt over the page the merchant came for.
   * **Google's OAuth redirect:** leaves the admin for Google and back; the button's popup keeps
     the page and what was typed.
+
+## ADR-295 · The admin installs on a phone from a manifest in its language, with PNG and maskable icons, and a service worker built with it keeps the admin's own files: its page from the network and offline from the cache, its files from the cache, the shop's data never; it says when the phone is offline, and offers a new version once it has installed
+
+* **Context:** Until the app, merchants run their shops from the admin on a phone
+  ([ADR-265](#adr-265--the-merchant-admin-is-a-react-app-on-an-origin-of-its-own-that-sends-auth-and-the-admin-api-on-to-the-core-staff-sign-in-by-a-code-to-their-mobile-or-by-email-with-the-second-step-their-role-needs-the-sessions-opaque-tokens-are-kept-in-the-browsers-storage-and-refreshed-by-one-tab-at-a-time-the-shop-is-in-each-pages-address-and-every-graphql-document-it-sends-is-checked-against-the-cores-schema)), and the roadmap has it installed there like an app. It had a manifest
+  with an SVG icon alone, which Android does not install from, and no service worker, so it could
+  not open without a connection: a phone on a weak signal in a market showed the browser's own
+  error, in English.
+* **Decision:**
+  * **Installing:** the manifest names Hatti in English and, in Urdu, ہٹی, right to left; the
+    page points at the one in the language the admin is in. Both carry PNG icons of 192 and 512
+    pixels and a maskable one for Android's shapes, and the page an icon for iOS's home screen.
+  * **A service worker**, src/offline/service-worker.ts, is built with the admin to /sw.js. The
+    build tells it its version and the files to keep as it installs: the page, its scripts and
+    styles, the manifests and icons. Fonts are kept as pages first use them. The version comes
+    from the build's file names, which carry their content's hash, and the public folder's
+    files, so a build that changes none of them installs no new worker.
+  * **How it answers:** the admin's page from the network, so a new build shows, and from the
+    cache when offline; its own files from the cache, else fetched and kept. The core's paths
+    (`/auth`, `/admin`, `/storage`, `/images`), anything not a GET and anything from elsewhere
+    always go to the network: the shop's data and sessions are never kept by the worker.
+  * **A new version** installs beside the running one and waits; the admin says it is ready,
+    and its Reload has it take over and reloads the page onto it, so a page never runs the
+    scripts of two builds. The admin looks for one each time it comes back into view.
+  * **Offline**, every page says so above itself: Hatti shows and saves the shop's work again
+    once the phone is back online. The admin's requests wait for the connection, as TanStack
+    Query pauses them, and go on by themselves once it is back.
+  * **Development** registers no worker: Vite serves files that change as they are edited.
+* **Consequences:**
+  * The admin installs from Chrome on Android, opens from the home screen without the browser's
+    bars, and opens offline to say so rather than to the browser's error.
+  * The edge has to serve /sw.js and the page with no long cache, and the hashed files with a
+    long one.
+* **Alternatives:**
+  * **The shop's last data kept for offline use:** orders and customers in the browser's storage
+    on shared phones in shops; it waits for what merchants ask of the alpha, and for the
+    session's own keeping of data to be thought through.
+  * **A plugin for service workers:** the rules are a dozen lines, and the build's list of
+    files is all the plugin would add.

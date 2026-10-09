@@ -1581,6 +1581,10 @@ const en = {
   'error.GOOGLE_TAKEN':
     'This Google account signs in to another Hatti account. Disconnect it there first.',
   'error.INVALID_PASSKEY': 'That passkey did not work here. Try again, or use another way.',
+  'offline.notice':
+    "You're offline. Hatti shows and saves your shop's work again once you're back online.",
+  'update.ready': 'A new version of Hatti is ready.',
+  'update.reload': 'Reload',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -3146,6 +3150,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'یہ گوگل اکاؤنٹ ہٹی کے کسی اور اکاؤنٹ میں سائن ان کرتا ہے۔ پہلے اسے وہاں سے الگ کریں۔',
   'error.INVALID_PASSKEY':
     'یہ پاس کی یہاں کام نہیں کر سکی۔ دوبارہ کوشش کریں، یا کوئی اور طریقہ استعمال کریں۔',
+  'offline.notice':
+    'آپ آف لائن ہیں۔ انٹرنیٹ واپس آنے پر ہٹی آپ کی دکان کا کام پھر سے دکھائے گا اور محفوظ کرے گا۔',
+  'update.ready': 'ہٹی کا نیا ورژن تیار ہے۔',
+  'update.reload': 'نیا ورژن کھولیں',
 };
 
 export const messages: Readonly<

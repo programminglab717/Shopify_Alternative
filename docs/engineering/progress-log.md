@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, the admin installed on a phone** (roadmap: a responsive, installable admin until the
-app): a web app manifest in English and Urdu, its icons, and a service worker that keeps the
-admin's own files so it opens without a connection and says it is offline; then the admin's next
-sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, the online store's blogs in the admin** (OS-07): blogs and their articles written as
+text like pages, with an image, published now or at a time ahead, and their comments approved
+or taken down; then the admin's next sections as the alpha's shops need them. Urdu handles
+wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The admin installed on a phone, and offline
+
+* **Installing** ([ADR-295](../architecture/13-decision-log.md#adr-295--the-admin-installs-on-a-phone-from-a-manifest-in-its-language-with-png-and-maskable-icons-and-a-service-worker-built-with-it-keeps-the-admins-own-files-its-page-from-the-network-and-offline-from-the-cache-its-files-from-the-cache-the-shops-data-never-it-says-when-the-phone-is-offline-and-offers-a-new-version-once-it-has-installed)): the manifest in English or Urdu as the admin is, with PNG and
+  maskable icons, and an icon for iOS's home screen.
+* **A service worker** built with the admin to /sw.js, keeping its page, scripts, styles,
+  manifests and icons, never the shop's data; the page from the network, and from the cache
+  offline. Every page says when the phone is offline, and a new version, once installed, is
+  offered with a Reload that has it take over.
+* **Tried in Chromium** on the build served by `vite preview`: the worker took the page over and
+  kept its ten files; the manifest had no errors, and Chromium's only reason not to offer to
+  install it was the test's incognito window; offline, the admin reopened from its cache to say
+  it is offline, and the notice went once it was back; in Urdu, the browser read ہٹی's manifest.
+* 2104 tests: what the worker keeps and never keeps; a build's files to keep; offline said and
+  unsaid; a new version offered and told to take over; and the manifest in each language.
 
 ### a246a83 · Passkeys and Google, signing in to the admin
 
