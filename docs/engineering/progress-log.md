@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Invitations sent again and the shop handed over, in the admin
+### 1780593 · Invitations sent again and the shop handed over, in the admin
 
 * **Send again** ([ADR-315](../architecture/13-decision-log.md#adr-315--the-admin-sends-an-emailed-invitation-still-waiting-again-showing-its-new-link-and-the-owner-hands-the-shop-to-one-of-its-managers-once-asked-the-cores-refusal-named-and-the-owners-own-role-read-again-after)) on an emailed invitation, its new link shown; **Hand the shop over**
   for the owner, to a manager once asked, the account's roles read again after.
