@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Orders merged and split, in the admin
+### cb41088 · Orders merged and split, in the admin
 
 * **Merging and sending apart on the order's page** ([ADR-288](../architecture/13-decision-log.md#adr-288--an-orders-page-merges-it-into-another-of-its-customers-orders-waiting-to-be-packed-and-paid-the-same-way-chosen-from-their-orders-and-opens-that-one-and-sends-units-of-it-apart-as-an-order-of-their-own-with-its-delivery-charge-always-leaving-something-each-order-links-the-one-it-went-to-or-came-from)): an order merged into
   another of its customer's waiting orders, chosen from their orders, and that one opened;
