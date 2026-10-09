@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The shop's blogs, in the admin
+### 6c8b42a · The shop's blogs, in the admin
 
 * **A Blogs tab** ([ADR-296](../architecture/13-decision-log.md#adr-296--the-admins-online-store-writes-the-shops-blogs-a-blog-started-by-its-title-its-comments-closed-approved-or-shown-at-once-its-articles-written-as-text-like-pages-with-an-author-tags-and-an-image-from-the-phone-shown-now-from-a-time-ahead-or-hidden-and-their-comments-approved-marked-as-spam-or-not-and-deleted)): blogs started by their title, their comments closed, approved or shown
   at once, and deleted; articles written as text, with an author, tags and an image from the
