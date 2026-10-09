@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Refunds and payments, in the admin
+### 349255e · Refunds and payments, in the admin
 
 * **Payments and refunds on the order's page** ([ADR-285](../architecture/13-decision-log.md#adr-285--an-orders-page-shows-what-was-paid-and-given-back-each-refund-with-how-its-reference-why-and-its-receipt-owners-and-managers-record-a-refund-at-most-what-is-left-by-hand-with-its-receipt-uploaded-through-the-gateway-or-as-store-credit-and-mark-an-order-paid-after-saying-how-much-it-records)):
   what was paid and given back, each refund with how, its reference, why and its receipt; a
