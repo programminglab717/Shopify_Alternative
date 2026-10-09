@@ -601,6 +601,32 @@ export interface CourierAccount {
   isDefault: boolean;
 }
 
+export interface CourierPickup {
+  id: string;
+  accountId: string;
+  courierName: string;
+  status: 'REQUESTING' | 'REQUESTED' | 'FAILED';
+  parcelCount: number;
+  reference: string | null;
+  loadSheetUrl: string | null;
+  error: string | null;
+  riderName: string | null;
+  riderCode: string | null;
+  createdAt: string;
+  requestedAt: string | null;
+}
+
+export interface PickupsData {
+  shop: { timezone: string };
+  couriers: { courier: string; pickups: { rider: boolean } | null }[];
+  courierAccounts: (CourierAccount & { courier: string })[];
+  courierPickups: CourierPickup[];
+}
+
+export interface CourierPickupRequestData {
+  courierPickupRequest: { courierPickup: CourierPickup | null; userErrors: UserError[] };
+}
+
 export interface ShippingData {
   shop: { timezone: string };
   courierAccounts: CourierAccount[];

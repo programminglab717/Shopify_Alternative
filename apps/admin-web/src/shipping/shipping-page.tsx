@@ -28,8 +28,9 @@ import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../sh
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { openPrintTab } from '../ui/print';
+import { Pickups } from './pickups';
 
-type Tab = 'book' | 'booked';
+type Tab = 'book' | 'booked' | 'pickups';
 
 /** The shipping page's search: which tab. */
 export interface ShippingSearch {
@@ -37,7 +38,8 @@ export interface ShippingSearch {
 }
 
 export function validateShippingSearch(search: Record<string, unknown>): ShippingSearch {
-  return search.tab === 'booked' ? { tab: 'booked' } : {};
+  const tab = search.tab;
+  return tab === 'booked' || tab === 'pickups' ? { tab } : {};
 }
 
 /** Orders a page asks to book, the most a booking takes being 250. */
@@ -473,6 +475,7 @@ export function ShippingPage() {
   const tabs: [Tab, MessageKey][] = [
     ['book', 'shipping.toBook'],
     ['booked', 'shipping.bookings'],
+    ['pickups', 'pickups.title'],
   ];
 
   return (
@@ -513,8 +516,10 @@ export function ShippingPage() {
         />
       ) : tab === 'book' ? (
         <ToBook accounts={accounts.data.courierAccounts} />
-      ) : (
+      ) : tab === 'booked' ? (
         <Booked accounts={accounts.data.courierAccounts} />
+      ) : (
+        <Pickups />
       )}
     </div>
   );

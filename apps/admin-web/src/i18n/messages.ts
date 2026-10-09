@@ -2447,6 +2447,28 @@ const en = {
   'options.price': 'Price (Rs)',
   'options.addVariant': 'Add variant',
   'options.variantExists': '{title} is a variant already.',
+  'pickups.title': 'Pickups',
+  'pickups.none':
+    'None of your couriers takes pickups through its API. Print the load sheet under Booked and hand it to the rider when they come.',
+  'pickups.ask': 'Ask for a pickup',
+  'pickups.askHint':
+    'The courier sends a rider for the parcels waiting, the longest waiting first, up to 200. Parcels in a pickup it took go in the next only after a day.',
+  'pickups.account': 'Courier account',
+  'pickups.riderName': "Rider's name",
+  'pickups.riderHint': 'As {courier} gave it to you.',
+  'pickups.riderCode': "Rider's code",
+  'pickups.asked': 'Asked {courier}. Its answer shows below in a moment.',
+  'pickups.askSubmit': 'Ask {courier} for a pickup',
+  'pickups.empty': 'No pickups asked for yet.',
+  'pickups.list': 'Pickups asked for',
+  'pickups.status.REQUESTING': 'Asking the courier…',
+  'pickups.status.REQUESTED': 'Courier is sending a rider',
+  'pickups.status.FAILED': 'Refused',
+  'pickups.parcels': 'Parcels: {count}',
+  'pickups.reference': 'Load sheet no.',
+  'pickups.rider': 'Rider: {name}',
+  'pickups.printLoadSheet': 'Print load sheet',
+  'pickups.courierLoadSheet': "{courier}'s load sheet",
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -4877,6 +4899,28 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'options.price': 'قیمت (روپے)',
   'options.addVariant': 'ویریئنٹ شامل کریں',
   'options.variantExists': '{title} پہلے سے ایک ویریئنٹ ہے۔',
+  'pickups.title': 'پک اپ',
+  'pickups.none':
+    'آپ کا کوئی کوریئر اپنی API سے پک اپ نہیں لیتا۔ بک ہو چکے میں لوڈ شیٹ پرنٹ کریں اور رائیڈر آنے پر اسے دیں۔',
+  'pickups.ask': 'پک اپ منگوائیں',
+  'pickups.askHint':
+    'کوریئر انتظار کرتے پارسلز کے لیے رائیڈر بھیجتا ہے، سب سے پرانے پہلے، 200 تک۔ جو پک اپ اس نے لے لیا اس کے پارسلز ایک دن بعد ہی اگلے میں جاتے ہیں۔',
+  'pickups.account': 'کوریئر اکاؤنٹ',
+  'pickups.riderName': 'رائیڈر کا نام',
+  'pickups.riderHint': 'جیسا {courier} نے بتایا۔',
+  'pickups.riderCode': 'رائیڈر کا کوڈ',
+  'pickups.asked': '{courier} سے کہہ دیا۔ اس کا جواب کچھ دیر میں نیچے نظر آئے گا۔',
+  'pickups.askSubmit': '{courier} سے پک اپ منگوائیں',
+  'pickups.empty': 'ابھی کوئی پک اپ نہیں منگوایا۔',
+  'pickups.list': 'منگوائے گئے پک اپ',
+  'pickups.status.REQUESTING': 'کوریئر سے پوچھ رہے ہیں…',
+  'pickups.status.REQUESTED': 'کوریئر رائیڈر بھیج رہا ہے',
+  'pickups.status.FAILED': 'انکار ہوا',
+  'pickups.parcels': 'پارسلز: {count}',
+  'pickups.reference': 'لوڈ شیٹ نمبر',
+  'pickups.rider': 'رائیڈر: {name}',
+  'pickups.printLoadSheet': 'لوڈ شیٹ پرنٹ کریں',
+  'pickups.courierLoadSheet': '{courier} کی لوڈ شیٹ',
 };
 
 export const messages: Readonly<

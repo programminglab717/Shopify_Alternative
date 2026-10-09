@@ -1268,12 +1268,71 @@ export const CourierLabelsQuery = /* GraphQL */ `
 
 /** A courier account's load sheet: its parcels waiting for the rider, a page to print. */
 export const CourierLoadSheetQuery = /* GraphQL */ `
-  query CourierLoadSheet($accountId: ID, $language: DocumentLanguage!) {
-    courierLoadSheet(accountId: $accountId, language: $language) {
+  query CourierLoadSheet($accountId: ID, $language: DocumentLanguage!, $pickupId: ID) {
+    courierLoadSheet(accountId: $accountId, language: $language, pickupId: $pickupId) {
       title
       html
     }
   }
+`;
+
+const PICKUP = /* GraphQL */ `
+  fragment Pickup on CourierPickup {
+    id
+    accountId
+    courierName
+    status
+    parcelCount
+    reference
+    loadSheetUrl
+    error
+    riderName
+    riderCode
+    createdAt
+    requestedAt
+  }
+`;
+
+/** The pickups asked of couriers, the latest first, and which couriers take them (SHP-02). */
+export const PickupsQuery = /* GraphQL */ `
+  query Pickups {
+    shop {
+      timezone
+    }
+    couriers {
+      courier
+      pickups {
+        rider
+      }
+    }
+    courierAccounts {
+      id
+      name
+      courier
+      courierName
+      isDefault
+    }
+    courierPickups(first: 20) {
+      ...Pickup
+    }
+  }
+  ${PICKUP}
+`;
+
+/** A courier asked to collect the parcels waiting, through its API. */
+export const CourierPickupRequestMutation = /* GraphQL */ `
+  mutation CourierPickupRequest($input: CourierPickupInput!) {
+    courierPickupRequest(input: $input) {
+      courierPickup {
+        ...Pickup
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${PICKUP}
+  ${USER_ERRORS}
 `;
 
 /** The couriers shops book with here, with what each asks for to connect (SHP-01). */

@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, courier pickups in the admin** (SHP-02): asking a courier to collect the day's parcels
-from a location, the pickups asked for listed with their codes and state; then the admin's next
-sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, staff invitations sent again and the shop handed over, in the admin** (ADM-01): an
+invitation that waits sent again, by text or email, and the owner handing the shop to another
+of its staff; then the admin's next sections as the alpha's shops need them. Urdu handles wait,
+as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +18,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Courier pickups, in the admin
+
+* **Pickups** ([ADR-314](../architecture/13-decision-log.md#adr-314--the-admin-asks-a-courier-whose-api-takes-pickups-to-collect-the-parcels-waiting-naming-its-rider-where-it-asks-and-lists-the-pickups-asked-for-with-their-parcels-the-couriers-number-or-load-sheet-and-why-one-was-refused-our-load-sheet-of-a-pickup-is-printed-for-the-rider)), a tab of shipping: a courier whose API takes pickups asked for a rider,
+  its rider named where it asks; the pickups asked for listed with their parcels, the courier's
+  number or load sheet, and why one was refused; our load sheet of a pickup printed.
+* **Tried against the core:** on the seed's shop, its test courier account was asked for a
+  pickup, which took five parcels with load sheet HTL000001; the load sheet printed those five
+  with their cash; asking again, and the Karachi account, was refused as nothing waited. The
+  pickup was then removed. No errors in the browser.
+* 2250 tests: pickups listed, one's load sheet printed, one refused with why; a courier asked,
+  refused, then another asked with its rider and its answer read again; a shop with no courier
+  taking pickups told so.
 
 ### 8f05713 · A product's options and variants, in the admin
 

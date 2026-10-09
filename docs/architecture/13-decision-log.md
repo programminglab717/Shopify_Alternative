@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-313 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-314 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -321,6 +321,7 @@
 | 311 | The admin brings products in from Shopify's product CSV and exports them to it, and counts stock by Shopify's inventory CSV, each file checked first and taken in at a tap, on a page of its own beside the products list and the stock page | Accepted |
 | 312 | The admin lists the shop's locations in settings, those out of use too, and adds one with its address and the number couriers call for pickups, changes it and whether it fulfils online orders, takes it out of use and puts it back, and deletes one that never held stock; the primary one stays | Accepted |
 | 313 | The admin changes a product's options and variants after it was made: an option renamed, values added and deleted where no variant uses them, an option added with a variant for every new combination if asked, or taken away where its variants stay apart; variants added for combinations it lacks and deleted, one always kept | Accepted |
+| 314 | The admin asks a courier whose API takes pickups to collect the parcels waiting, naming its rider where it asks, and lists the pickups asked for with their parcels, the courier's number or load sheet and why one was refused; our load sheet of a pickup is printed for the rider | Accepted |
 
 ---
 
@@ -12657,3 +12658,29 @@
 * **Alternatives:**
   * **Options in the form above, saved with it:** one save, but a change of options remakes the
     rows the form holds; separate, immediate changes keep each step and its refusal plain.
+
+## ADR-314 · The admin asks a courier whose API takes pickups to collect the parcels waiting, naming its rider where it asks, and lists the pickups asked for with their parcels, the courier's number or load sheet and why one was refused; our load sheet of a pickup is printed for the rider
+
+* **Context:** Couriers collect a shop's parcels at its door (SHP-02). PostEx and Leopards take
+  pickups through their APIs (ADR-253): the core's courierPickupRequest hands an account's
+  parcels waiting, up to 200, to its courier, Leopards naming the rider, and records the pickup,
+  being asked, taken, or refused with the courier's words; its parcels go in the next pickup only
+  a day after one was taken. The admin printed an account's load sheet, but asked no courier for
+  a rider.
+* **Decision:**
+  * **Pickups** is a third tab of shipping, for those who book parcels, packers too, as the core
+    allows.
+  * **Ask for a pickup** offers the accounts whose courier takes pickups through its API, the
+    default first, asks the rider's name and code where the courier does, and names the
+    courier on its button. The core's refusals, such as no parcels waiting, are shown; a shop
+    with no such courier is told to print the load sheet under Booked for the rider.
+  * **The pickups asked for** are listed, the latest first, read again every few seconds while a
+    courier is being asked: each with its account, its state, its parcels, the courier's load
+    sheet number or its own load sheet, and why a courier refused. Our load sheet of a pickup
+    taken prints the parcels it handed over, for the rider to sign.
+* **Consequences:**
+  * A packer finishing the day's parcels asks PostEx for a rider from the phone they pack with,
+    and hands over the sheet the rider signs.
+* **Alternatives:**
+  * **A pickup button on Booked:** one tap fewer, but the pickups asked for, and what couriers
+    said, would have nowhere to be seen.
