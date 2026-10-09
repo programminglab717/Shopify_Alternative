@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Order exports, in the admin
+### 2975d49 · Order exports, in the admin
 
 * **Export** ([ADR-304](../architecture/13-decision-log.md#adr-304--the-admin-exports-the-orders-the-list-shows-its-tab-and-search-between-two-days-in-the-shops-time-zone-as-excel-or-csv-a-row-per-order-or-per-item-once-the-member-has-confirmed-who-they-are-and-schedules-the-same-of-each-day-week-or-month-emailed-at-an-hour-listed-and-stopped)) from the orders list, for owners, managers and accountants: the orders
   of its tab and search, between two days if asked, as Excel or CSV, a row per order or per
