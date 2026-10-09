@@ -2566,6 +2566,16 @@ const en = {
   'drafts.search': 'Search drafts',
   'drafts.searchHint': 'Number, mobile or name; or tag:gift, source:whatsapp',
   'drafts.noneFound': 'No drafts match this search.',
+  'parcels.tracking.edit': 'Change tracking',
+  'parcels.tracking.hint':
+    'Correct a mistyped number, or add what the courier gave later. A field left empty is cleared.',
+  'parcels.tracking.company': 'Courier',
+  'parcels.tracking.companyHint': 'For example TCS, Leopards or PostEx.',
+  'parcels.tracking.number': 'Tracking number',
+  'parcels.tracking.url': 'Tracking link',
+  'parcels.tracking.urlHint': 'The courier’s page for this parcel, starting https://',
+  'parcels.tracking.urlWrong': 'A tracking link starts with https://',
+  'parcels.tracking.save': 'Save tracking',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5112,6 +5122,16 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'drafts.search': 'ڈرافٹس تلاش کریں',
   'drafts.searchHint': 'نمبر، موبائل یا نام؛ یا tag:gift، source:whatsapp',
   'drafts.noneFound': 'اس تلاش سے کوئی ڈرافٹ نہیں ملا۔',
+  'parcels.tracking.edit': 'ٹریکنگ بدلیں',
+  'parcels.tracking.hint':
+    'غلط لکھا نمبر درست کریں، یا کوریئر کا بعد میں دیا ہوا شامل کریں۔ خالی چھوڑا خانہ مٹا دیا جاتا ہے۔',
+  'parcels.tracking.company': 'کوریئر',
+  'parcels.tracking.companyHint': 'مثلاً TCS، Leopards یا PostEx۔',
+  'parcels.tracking.number': 'ٹریکنگ نمبر',
+  'parcels.tracking.url': 'ٹریکنگ لنک',
+  'parcels.tracking.urlHint': 'اس پارسل کے لیے کوریئر کا صفحہ، جو https:// سے شروع ہو',
+  'parcels.tracking.urlWrong': 'ٹریکنگ لنک https:// سے شروع ہوتا ہے',
+  'parcels.tracking.save': 'ٹریکنگ محفوظ کریں',
 };
 
 export const messages: Readonly<

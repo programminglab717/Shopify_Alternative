@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, the admin answering a change before the shop's lists reload** (admin): a save, a
-refusal or a deletion shown as soon as the core answers, the lists the change touched read
-again behind it, not before; then the admin's next sections as the alpha's shops need them.
-Urdu handles wait, as decided.
+**Next, the theme editor's files** (admin): a theme's files read and changed in the admin, its
+templates and settings checked by Theme Check as they are saved; then the admin's next sections
+as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### A parcel's tracking corrected, in the admin
+
+* **"Change tracking"** ([ADR-322](../architecture/13-decision-log.md#adr-322--the-admin-corrects-a-parcels-courier-tracking-number-and-link-on-its-orders-page-whatever-the-parcels-state-its-link-checked-as-https-before-it-is-sent)) on each parcel of an order's page, for those who work orders,
+  in any state: its courier, number and https link set anew, the link checked as typed.
+* **Tried against the core:** on the seed's shop, order #1014's parcel, Test courier
+  HT2560410001, set to TCS 779012345679 with its tracking link; an http link held back; the
+  parcel then linked to TCS's page, the core holding the same, and the timeline saying "Tracking
+  set to TCS 779012345679". The parcel and its order were put back as they were. No errors in the
+  browser.
+* 2288 tests: the form starting from the parcel's tracking, an http link held back, a refusal
+  named by its field, an empty courier cleared, and no form for those who only view orders.
 
 ### 16ea427 · The drafts list searched, in the admin
 

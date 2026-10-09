@@ -1,9 +1,10 @@
 import type { OrderStage as BadgeColour } from '@hatti/tokens';
 import type { LucideIcon } from 'lucide-react';
-import { PackageCheck, PackageX, Truck, Undo2 } from 'lucide-react';
+import { PackageCheck, PackageX, Pencil, Truck, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  FulfillmentTrackingInfoUpdateMutation,
   ParcelClaimCreateMutation,
   ParcelEventCreateMutation,
   ParcelMarkDeliveredMutation,
@@ -16,6 +17,7 @@ import type {
   FulfillmentStatus,
   ParcelDetail,
   ParcelUserErrorsData,
+  UserError,
 } from '../api/types';
 import type { StaffRole } from '../auth/session';
 import { formatCount, formatDateTime } from '../i18n/format';
@@ -200,7 +202,98 @@ function DamageClaimForm({ id, onDone }: { id: string; onDone: () => void }) {
   );
 }
 
-type Open = 'step' | 'checkIn' | 'lost' | 'claim' | null;
+/** The parts of a parcel's tracking, by the field the core names when it refuses one. */
+const TRACKING_FIELDS: Record<string, MessageKey> = {
+  company: 'parcels.tracking.company',
+  number: 'parcels.tracking.number',
+  url: 'parcels.tracking.url',
+};
+
+/**
+ * A parcel's tracking corrected: its courier, tracking number and link, as the courier gave
+ * them; the number is how the courier's statements and returned parcels find it again.
+ */
+function TrackingForm({ parcel, onDone }: { parcel: ParcelDetail; onDone: () => void }) {
+  const { t } = useLocale();
+  const [company, setCompany] = useState(parcel.trackingInfo.company ?? '');
+  const [number, setNumber] = useState(parcel.trackingInfo.number ?? '');
+  const [url, setUrl] = useState(parcel.trackingInfo.url ?? '');
+  const update = useAdminMutation<ParcelUserErrorsData, Record<string, unknown>>(
+    FulfillmentTrackingInfoUpdateMutation,
+  );
+  const { problem, attempt } = useAttempt();
+  const urlRight = !url.trim() || /^https:\/\/\S+$/i.test(url.trim());
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!urlRight) return;
+    const done = await attempt(async () => {
+      const result = (
+        await update.mutateAsync({
+          id: parcel.id,
+          trackingInfo: {
+            company: company.trim() || null,
+            number: number.trim() || null,
+            url: url.trim() || null,
+          },
+        })
+      ).fulfillmentTrackingInfoUpdate!;
+      // The core names the part it refused; say it in the form's words.
+      const named = (error: UserError) => {
+        const key = TRACKING_FIELDS[error.field?.at(-1) ?? ''];
+        return key ? { ...error, field: null, message: `${t(key)}: ${error.message}` } : error;
+      };
+      return { userErrors: result.userErrors.map(named) };
+    });
+    if (done) onDone();
+  };
+
+  return (
+    <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
+      <p className="text-secondary">{t('parcels.tracking.hint')}</p>
+      <div className="grid gap-3 md:grid-cols-2">
+        <TextField
+          label={t('parcels.tracking.company')}
+          hint={t('parcels.tracking.companyHint')}
+          dir="auto"
+          maxLength={100}
+          value={company}
+          onChange={(event) => setCompany(event.target.value)}
+        />
+        <TextField
+          label={t('parcels.tracking.number')}
+          ltr
+          autoCapitalize="characters"
+          maxLength={100}
+          value={number}
+          onChange={(event) => setNumber(event.target.value)}
+        />
+      </div>
+      <TextField
+        label={t('parcels.tracking.url')}
+        hint={t('parcels.tracking.urlHint')}
+        ltr
+        inputMode="url"
+        autoCapitalize="none"
+        maxLength={2048}
+        value={url}
+        error={urlRight ? null : t('parcels.tracking.urlWrong')}
+        onChange={(event) => setUrl(event.target.value)}
+      />
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" busy={update.isPending} disabled={!urlRight}>
+          {t('parcels.tracking.save')}
+        </Button>
+        <Button variant="tertiary" onClick={onDone}>
+          {t('returns.cancel')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+type Open = 'step' | 'checkIn' | 'lost' | 'claim' | 'tracking' | null;
 
 function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }) {
   const { t, locale } = useLocale();
@@ -289,6 +382,9 @@ function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }
       )}
       {problem && <Alert tone="danger">{problem}</Alert>}
       {works && open === 'step' && <StepForm id={parcel.id} onDone={() => setOpen(null)} />}
+      {works && open === 'tracking' && (
+        <TrackingForm parcel={parcel} onDone={() => setOpen(null)} />
+      )}
       {works && open === 'checkIn' && <CheckInForm parcel={parcel} onDone={() => setOpen(null)} />}
       {works && open === 'lost' && (
         <div className="flex flex-wrap items-center gap-2">
@@ -360,6 +456,13 @@ function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }
               {t('returns.lost.it')}
             </Button>
           )}
+          <Button
+            variant="tertiary"
+            icon={<Pencil aria-hidden className="size-5" />}
+            onClick={() => setOpen('tracking')}
+          >
+            {t('parcels.tracking.edit')}
+          </Button>
         </div>
       )}
     </li>
@@ -370,7 +473,7 @@ function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }
  * An order's parcels (SHP-04, ADR-160, ADR-071, ADR-072): each with its courier and tracking
  * number, its items and the latest steps of its way; moved along by those who work orders:
  * delivered, refused, a step told of a courier Hatti does not follow, lost after asking, or
- * checked back in with what is damaged written off.
+ * checked back in with what is damaged written off; its tracking corrected, whatever its state.
  */
 export function Parcels({ parcels, timezone }: { parcels: ParcelDetail[]; timezone: string }) {
   return (

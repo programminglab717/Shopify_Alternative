@@ -97,7 +97,7 @@ const parcel = (status: string, extra: Record<string, unknown> = {}) => ({
 });
 
 function core(role: StaffRole, fulfillments: unknown[]) {
-  return fakeCore(role, (operation) => {
+  return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'Order':
         return order(fulfillments);
@@ -109,6 +109,20 @@ function core(role: StaffRole, fulfillments: unknown[]) {
         return { fulfillmentEventCreate: { userErrors: [] } };
       case 'ParcelReceive':
         return { fulfillmentReceiveReturn: { userErrors: [] } };
+      case 'FulfillmentTrackingInfoUpdate': {
+        const number = (variables.trackingInfo as { number: string | null }).number;
+        const userErrors =
+          number === 'LE 44'
+            ? [
+                {
+                  field: ['trackingInfo', 'number'],
+                  code: 'INVALID',
+                  message: 'has no spaces in Leopards numbers',
+                },
+              ]
+            : [];
+        return { fulfillmentTrackingInfoUpdate: { userErrors } };
+      }
       default:
         throw new Error(`unexpected ${operation}`);
     }
@@ -208,6 +222,45 @@ describe("An order's parcels, on its page", () => {
     );
   });
 
+  it("corrects a delivered parcel's tracking, its link https and its refusal named", async () => {
+    const fake = core('packer', [parcel('DELIVERED', { deliveredAt: LATER })]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Change tracking' }));
+    expect((screen.getByLabelText('Courier') as HTMLInputElement).value).toBe('Leopards');
+    expect((screen.getByLabelText('Tracking number') as HTMLInputElement).value).toBe('LE4402917');
+    const save = screen.getByRole('button', { name: 'Save tracking' }) as HTMLButtonElement;
+    type('Tracking link', 'http://leopardscourier.com/track');
+    expect(screen.getByText('A tracking link starts with https://')).toBeTruthy();
+    expect(save.disabled).toBe(true);
+
+    type('Tracking link', ' https://leopardscourier.com/track?cn=LE4402918 ');
+    type('Tracking number', 'LE 44');
+    fireEvent.click(save);
+    expect(
+      await screen.findByText('Tracking number: has no spaces in Leopards numbers'),
+    ).toBeTruthy();
+
+    type('Tracking number', 'LE4402918');
+    type('Courier', ' ');
+    fireEvent.click(save);
+    await waitFor(() => expect(screen.queryByLabelText('Tracking number')).toBeNull());
+    expect(
+      fake.sent
+        .filter((each) => each.operation === 'FulfillmentTrackingInfoUpdate')
+        .map((each) => each.variables)
+        .at(-1),
+    ).toEqual({
+      id: 'ful_1',
+      trackingInfo: {
+        company: null,
+        number: 'LE4402918',
+        url: 'https://leopardscourier.com/track?cn=LE4402918',
+      },
+    });
+  });
+
   it('leaves parcels as they are for those who only view orders', async () => {
     const fake = core('accountant', [parcel('IN_TRANSIT')]);
     vi.stubGlobal('fetch', fake.fetcher);
@@ -219,5 +272,6 @@ describe("An order's parcels, on its page", () => {
     expect(within(parcels).getAllByText('On its way')).toHaveLength(2);
     expect(within(parcels).queryByRole('button', { name: 'Delivered' })).toBeNull();
     expect(within(parcels).queryByRole('button', { name: 'Courier lost it' })).toBeNull();
+    expect(within(parcels).queryByRole('button', { name: 'Change tracking' })).toBeNull();
   });
 });

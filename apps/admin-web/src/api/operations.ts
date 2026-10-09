@@ -2706,6 +2706,17 @@ export const ParcelCheckInMutation = /* GraphQL */ `
 `;
 
 /** The courier lost a parcel on its way back: its items are written off. */
+export const FulfillmentTrackingInfoUpdateMutation = /* GraphQL */ `
+  mutation FulfillmentTrackingInfoUpdate($id: ID!, $trackingInfo: FulfillmentTrackingInput!) {
+    fulfillmentTrackingInfoUpdate(id: $id, trackingInfo: $trackingInfo) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const ParcelMarkLostMutation = /* GraphQL */ `
   mutation ParcelMarkLost($id: ID!) {
     fulfillmentMarkLost(id: $id) {

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-321 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-322 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -329,6 +329,7 @@
 | 319 | The admin connects the shop's own domains in settings, saying which record to add where it was bought, checks them again, makes a connected one primary or not, and lets one go once asked; the Hatti address is always shown | Accepted |
 | 320 | The admin lists the shop's themes in the online store, the live one first, each previewed through its link, and adds a copy of one or the platform theme afresh, publishes one once asked, and deletes those not live | Accepted |
 | 321 | The admin searches the drafts list, with its saved searches as on orders and products, and shows a search the core refuses in the core's words at once, without trying it again | Accepted |
+| 322 | The admin corrects a parcel's courier, tracking number and link on its order's page, whatever the parcel's state, its link checked as https before it is sent | Accepted |
 
 ---
 
@@ -12854,3 +12855,26 @@
 * **Alternatives:**
   * **The drafts search in the address, as on orders:** a link to a search, but the drafts list's
     tabs live in the page, and saved searches give the same quick way back.
+
+## ADR-322 · The admin corrects a parcel's courier, tracking number and link on its order's page, whatever the parcel's state, its link checked as https before it is sent
+
+* **Context:** A parcel shipped by hand carries the courier, tracking number and link staff
+  typed when they shipped it, and a number mistyped there, or one the courier gave only later,
+  stayed so in the admin: the core sets a parcel's tracking anew with
+  fulfillmentTrackingInfoUpdate, which replaces all three, clears what is left out, takes only
+  https links, and puts the change on the order's timeline. The number is how the courier's
+  statements of cash and its returned parcels find the parcel again, so a wrong one costs more
+  than a dead link.
+* **Decision:**
+  * **On the order's page,** each parcel offers those who work orders "Change tracking", in any
+    state, delivered and returned too, since statements come after delivery. Its form starts from
+    the parcel's tracking; a field left empty is cleared, as the core does.
+  * **The link** is checked to start with https:// as it is typed, and the form is not sent
+    until it does; a refusal of the core is named by the part it is about, the courier, number
+    or link.
+* **Consequences:**
+  * A packer corrects LE4402917 to LE4402918 in a tap, and the courier's statement then matches
+    the parcel; the timeline says the tracking was changed and by whom.
+* **Alternatives:**
+  * **Only while the parcel is on its way:** simpler, but the statements that need the right
+    number come after delivery.
