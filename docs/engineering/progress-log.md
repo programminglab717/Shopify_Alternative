@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The theme editor's data, in the core
+### 057fa20 · The theme editor's data, in the core
 
 * **`OnlineStoreTheme.editor(locale)`** ([ADR-323](../architecture/13-decision-log.md#adr-323--the-theme-editor-reads-a-theme-through-the-admin-api-the-platform-themes-settings-and-sections-their-words-in-english-or-urdu-through-shopifys-t-keys-and-every-json-file-the-shop-may-keep-as-the-storefront-reads-it)): the platform theme's settings and sections,
   their names and labels in the language asked for, and every JSON file the shop may keep in the
