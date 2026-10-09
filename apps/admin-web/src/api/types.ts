@@ -386,6 +386,8 @@ export interface ProductVariantDetail {
   price: MoneyValue;
   compareAtPrice: MoneyValue | null;
   sku: string | null;
+  /** One of the shop's tax categories' codes; null for the shop's own rate. */
+  taxCode: string | null;
   selectedOptions: { name: string; value: string }[];
   inventoryQuantity: number;
   inventoryItem: {
@@ -1798,4 +1800,27 @@ export interface OrderExportScheduleCreateData {
 
 export interface OrderExportScheduleDeleteData {
   orderExportScheduleDelete: { deletedExportScheduleId: string | null; userErrors: UserError[] };
+}
+
+export interface TaxCategory {
+  code: string;
+  name: string;
+  rate: number;
+}
+
+export interface TaxSettings {
+  rate: number | null;
+  taxDelivery: boolean;
+  ntn: string | null;
+  strn: string | null;
+  updatedAt: string | null;
+  categories: TaxCategory[];
+}
+
+export interface TaxSettingsData {
+  taxSettings: TaxSettings;
+}
+
+export interface TaxSettingsUpdateData {
+  taxSettingsUpdate: { taxSettings: TaxSettings | null; userErrors: UserError[] };
 }

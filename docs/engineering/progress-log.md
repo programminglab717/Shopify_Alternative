@@ -6,10 +6,11 @@
 
 ## In progress
 
-**Next, the shop's sales tax in the admin** (TAX-01): whether the shop charges sales tax and at
-what rate, included in its prices, on delivery too; the NTN and STRN its invoices name; and
-rates of its own for some products; then the admin's next sections as the alpha's shops need
-them. Urdu handles wait, as decided.
+**Next, Meta and the catalog feed in the admin** (MKT-10, MKT-11): the shop's Meta dataset
+connected with its pixel's ID and an access token, which moment of an order is Purchase, a code
+for test events, and disconnected; the orders' moments sent to Meta and how each went; and the
+catalog feed's address to give Google and Meta; then the admin's next sections as the alpha's
+shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +19,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The shop's sales tax, in the admin
+
+* **Sales tax** ([ADR-305](../architecture/13-decision-log.md#adr-305--the-admin-sets-the-shops-sales-tax-in-settings-whether-it-charges-it-and-at-what-rate-included-in-its-prices-with-an-example-of-what-a-price-holds-on-delivery-too-the-ntn-and-strn-its-invoices-name-and-categories-with-rates-of-their-own-which-a-products-page-gives-its-variants)) in settings: whether the shop charges it, its rate with an example of
+  what a price holds, delivery taxed too, its NTN and STRN, and categories with rates of their
+  own; a product's page gives its variants the shop's rate or a category.
+* **Tried against the core:** on the seed's shop, 18% was kept as 1800 hundredths, and a
+  category REDUCED at 10% beside it; an STRN of a few digits was refused as "STRN must be 13
+  digits", named on the page; a product's three variants were given REDUCED. All of it was then
+  put back as it was: no rate, no categories, no numbers, the variants on the shop's rate. No
+  errors in the browser.
+* 2186 tests: a rate, delivery, numbers and a category sent as changed alone; a refusal
+  named by its row; the rate taken away; a product's variants given a category, all at once.
 
 ### 2975d49 · Order exports, in the admin
 

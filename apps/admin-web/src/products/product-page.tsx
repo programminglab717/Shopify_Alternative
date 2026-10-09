@@ -8,6 +8,7 @@ import {
   ProductQuery,
   ProductUpdateMutation,
   ProductVariantsBulkUpdateMutation,
+  TaxSettingsQuery,
 } from '../api/operations';
 import type {
   InventorySetQuantitiesData,
@@ -18,11 +19,13 @@ import type {
   ProductUpdateData,
   ProductVariantDetail,
   ProductVariantsBulkUpdateData,
+  TaxSettingsData,
   UserError,
 } from '../api/types';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
+import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, EmptyState, ErrorState, Loading } from '../ui/feedback';
@@ -207,6 +210,54 @@ function VariantFields({
   );
 }
 
+/** The choice that stands for variants taxed at different rates, until one is chosen for all. */
+const MIXED = '*';
+
+/**
+ * The rate the product's sales tax is at (TAX-01, ADR-097): the shop's own, or one of its tax
+ * categories, for all the product's variants at once.
+ */
+function TaxChoice({
+  taxCode,
+  read,
+  onChange,
+}: {
+  taxCode: string;
+  read: string;
+  onChange: (taxCode: string) => void;
+}) {
+  const { t } = useLocale();
+  const taxes = useAdminQuery<TaxSettingsData>(['taxSettings'], TaxSettingsQuery);
+  const settings = taxes.data?.taxSettings;
+  if (!settings || (settings.categories.length === 0 && read === '')) return null;
+  const known = settings.categories.some((each) => each.code === read);
+  return (
+    <FormSection title={t('product.tax')} hint={t('product.taxHint')}>
+      <SelectField
+        label={t('product.taxRate')}
+        value={taxCode}
+        options={[
+          {
+            value: '',
+            label:
+              settings.rate === null
+                ? t('product.taxNone')
+                : t('product.taxShop', { rate: String(settings.rate) }),
+          },
+          ...settings.categories.map((each) => ({
+            value: each.code,
+            label: `${each.name} (${each.rate}%)`,
+          })),
+          // A code no category has now, as the variants keep it, until another is chosen.
+          ...(read !== '' && read !== MIXED && !known ? [{ value: read, label: read }] : []),
+          ...(read === MIXED ? [{ value: MIXED, label: t('product.taxMixed') }] : []),
+        ]}
+        onChange={onChange}
+      />
+    </FormSection>
+  );
+}
+
 /** The form for a product as read: what changed is saved, the rest left as it is. */
 function ProductEditor({
   product,
@@ -232,6 +283,10 @@ function ProductEditor({
   };
   const [details, setDetails] = useState(read);
   const [rows, setRows] = useState(() => rowsOf(product, location));
+  const codes = new Set(product.variants.map((variant) => variant.taxCode ?? ''));
+  const readTax = codes.size === 1 ? [...codes][0]! : MIXED;
+  const [taxCode, setTaxCode] = useState(readTax);
+  const taxChanged = taxCode !== readTax && taxCode !== MIXED;
   const [problems, setProblems] = useState<string[]>([]);
   const [showInvalid, setShowInvalid] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -262,7 +317,8 @@ function ProductEditor({
   const stockChanges = rows.filter(
     (row) => row.stock.trim() !== '' && parseStock(row.stock) !== row.stockWas,
   );
-  const changed = detailsChanged || variantChanges.length > 0 || stockChanges.length > 0;
+  const changed =
+    detailsChanged || variantChanges.length > 0 || stockChanges.length > 0 || taxChanged;
 
   const onSave = async (event: FormEvent) => {
     event.preventDefault();
@@ -292,15 +348,22 @@ function ProductEditor({
         });
         if (failed(productUpdate.userErrors)) return;
       }
-      if (variantChanges.length > 0) {
-        const { productVariantsBulkUpdate } = await variants.mutateAsync({
-          productId: product.id,
-          variants: variantChanges.map((row) => ({
-            id: row.variant.id,
+      // Every variant takes a tax rate chosen for the product; those changed, their own fields.
+      const variantInputs = rows
+        .filter((row) => taxChanged || variantChanges.includes(row))
+        .map((row) => ({
+          id: row.variant.id,
+          ...(variantChanges.includes(row) && {
             price: parsePrice(row.price),
             compareAtPrice: parsePrice(row.compareAtPrice),
             sku: row.sku.trim() || null,
-          })),
+          }),
+          ...(taxChanged && { taxCode: taxCode || null }),
+        }));
+      if (variantInputs.length > 0) {
+        const { productVariantsBulkUpdate } = await variants.mutateAsync({
+          productId: product.id,
+          variants: variantInputs,
         });
         if (failed(productVariantsBulkUpdate.userErrors)) return;
       }
@@ -358,6 +421,7 @@ function ProductEditor({
               onChange={(status) => setDetails({ ...details, status })}
             />
             <OrganiseFields details={details} onChange={setDetails} />
+            {edits && <TaxChoice taxCode={taxCode} read={readTax} onChange={setTaxCode} />}
           </div>
         </div>
       </fieldset>

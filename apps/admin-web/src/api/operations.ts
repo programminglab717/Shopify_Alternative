@@ -748,6 +748,7 @@ const PRODUCT = /* GraphQL */ `
         ...Money
       }
       sku
+      taxCode
       selectedOptions {
         name
         value
@@ -4109,5 +4110,46 @@ export const OrderExportScheduleDeleteMutation = /* GraphQL */ `
       }
     }
   }
+  ${USER_ERRORS}
+`;
+
+const TAX_SETTINGS = /* GraphQL */ `
+  fragment TaxSettingsParts on TaxSettings {
+    rate
+    taxDelivery
+    ntn
+    strn
+    updatedAt
+    categories {
+      code
+      name
+      rate
+    }
+  }
+`;
+
+/** The sales tax the shop charges (TAX-01), included in its prices, and its registration. */
+export const TaxSettingsQuery = /* GraphQL */ `
+  query TaxSettings {
+    taxSettings {
+      ...TaxSettingsParts
+    }
+  }
+  ${TAX_SETTINGS}
+`;
+
+/** The shop's sales tax changed, for orders placed from now on. */
+export const TaxSettingsUpdateMutation = /* GraphQL */ `
+  mutation TaxSettingsUpdate($input: TaxSettingsUpdateInput!) {
+    taxSettingsUpdate(input: $input) {
+      taxSettings {
+        ...TaxSettingsParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${TAX_SETTINGS}
   ${USER_ERRORS}
 `;

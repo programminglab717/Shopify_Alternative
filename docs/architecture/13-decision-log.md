@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-304 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-305 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -312,6 +312,7 @@
 | 302 | The admin keeps the shop's payment links: what each sells and how many orders it took, whether it is open and why not, copied or sent on WhatsApp, closed and opened again; made of items found by name, with a discount code, a limit, a day it closes in the shop's time zone, and prepaid alone if the shop likes | Accepted |
 | 303 | The admin's settings show whether Hatti's support may look at the shop and until when, let the owner let it in for 15 minutes to a day and a reason, having confirmed who they are, let the owner or a manager end it, and list each time it was let in; and the discounts page takes a code's days in the shop's time zone | Accepted |
 | 304 | The admin exports the orders the list shows, its tab and search, between two days in the shop's time zone, as Excel or CSV, a row per order or per item, once the member has confirmed who they are; and schedules the same of each day, week or month, emailed at an hour, listed and stopped | Accepted |
+| 305 | The admin sets the shop's sales tax in settings: whether it charges it and at what rate, included in its prices, with an example of what a price holds; on delivery too; the NTN and STRN its invoices name; and categories with rates of their own, which a product's page gives its variants | Accepted |
 
 ---
 
@@ -12395,3 +12396,29 @@
 * **Alternatives:**
   * **Exports in settings:** further from the orders they are of; the list's tab and search are
     the filter staff already know.
+
+## ADR-305 · The admin sets the shop's sales tax in settings: whether it charges it and at what rate, included in its prices, with an example of what a price holds; on delivery too; the NTN and STRN its invoices name; and categories with rates of their own, which a product's page gives its variants
+
+* **Context:** A shop's sales tax (TAX-01, ADR-096, ADR-097) is included in its prices: a rate
+  of 0.01% to 50% or none, on its delivery charge too if it says so; its NTN and STRN, which its
+  invoices name (TAX-02); and up to 20 categories, each a code, a name and a rate of its own,
+  which variants name by Shopify's tax code, every other variant taxed at the shop's rate. Orders
+  keep the tax they were placed with. Owners, managers and accountants change it. The admin had
+  none of it.
+* **Decision:**
+  * **Sales tax** is a section of settings. Its page says whether the shop charges it; where it
+    does, the rate, with an example of what it means for a price ("At 17%, an item priced Rs
+    1,170 holds Rs 170 of tax"), since prices already include it; and whether delivery is
+    taxed too.
+  * **Registration** holds the NTN and STRN, as the shop types them; the core checks their
+    digits and says which is wrong.
+  * **Categories** are rows of a name, a code, typed in capitals, and a rate, added up to 20
+    and removed. Only what changed is sent; the core's refusals name the category by its row.
+  * **A product's page** offers its variants the shop's rate or a category, all of them at
+    once; one whose variants differ says so until it is changed.
+* **Consequences:**
+  * A shop registered for sales tax sets its rate and numbers from a phone, and its reduced-rate
+    products at theirs, before its first invoice goes out.
+* **Alternatives:**
+  * **A category per variant on the product page:** variants of one product almost always share
+    one; the core keeps it per variant, for a file or the API to set where they do not.
