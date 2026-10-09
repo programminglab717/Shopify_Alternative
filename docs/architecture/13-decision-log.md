@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-301 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-302 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -309,6 +309,7 @@
 | 299 | The admin imports customers from a CSV after the core has checked it, saying what it would add, update and leave and the rows it could not read, updating those already here only when asked; and exports everyone or a segment's customers as a CSV once the member has confirmed who they are | Accepted |
 | 300 | The admin keeps the shop's link page in the online store: where it is, to copy and open; its bio, links and products edited and saved together, each product's variant chosen where it has several, the core's reason given by the link or product it is about; and its taps over the last week, month or three months | Accepted |
 | 301 | The admin shows a customer's store credit on their page, its ledger to those who keep it, and owners and managers give credit by hand, to expire at the end of a day in the shop's time zone, and take it back; an order not yet shipped is paid with it from its page | Accepted |
+| 302 | The admin keeps the shop's payment links: what each sells and how many orders it took, whether it is open and why not, copied or sent on WhatsApp, closed and opened again; made of items found by name, with a discount code, a limit, a day it closes in the shop's time zone, and prepaid alone if the shop likes | Accepted |
 
 ---
 
@@ -12311,3 +12312,29 @@
 * **Alternatives:**
   * **A day's end in the phone's own time:** what a date field gives, but a phone set to another
     zone, as the first try's browser was, would have the credit expire on the wrong day.
+
+## ADR-302 · The admin keeps the shop's payment links: what each sells and how many orders it took, whether it is open and why not, copied or sent on WhatsApp, closed and opened again; made of items found by name, with a discount code, a limit, a day it closes in the shop's time zone, and prepaid alone if the shop likes
+
+* **Context:** A payment link (PAY-04, ADR-248) is one address a shop shares on WhatsApp or
+  Instagram, /pay/<token> on its storefront: each customer who opens it gets a checkout of their
+  own with its items, up to 20 of the shop's variants, its discount code applied, and cash on
+  delivery left out where it is prepaid alone, until staff close it, its day passes or it has
+  taken as many orders as it may. Staff with write_orders make and close them. The admin had
+  none of it.
+* **Decision:**
+  * **Payment links** is a section of its own for owners and managers, beside discounts.
+  * **Each link** says what it sells ("2 × Lawn suit · Large"), how many orders it took of how
+    many it may, its code, whether it is prepaid alone and the day it closes, and whether it is
+    open now, or why not: closed by staff, used up, or past its day. An open one is copied or
+    sent on WhatsApp with its title; staff close it, and open it again.
+  * **A new link** is a title for staff and items found by name, as a draft order finds them,
+    each found again counted once more; a discount code, how many orders it takes, the day it
+    closes, at that day's end in the shop's time zone, and whether it is paid before it ships.
+    The core's reasons name the field, or the item by its place. Once made, its address is shown
+    to copy or send at once.
+* **Consequences:**
+  * A shop selling its last ten khussas in a story makes the link from a phone, sends it, and
+    sees the orders it took.
+* **Alternatives:**
+  * **A link per customer,** as a draft order's is: a draft order does that already; a payment
+    link is for many.

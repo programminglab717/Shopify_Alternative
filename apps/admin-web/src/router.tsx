@@ -41,6 +41,7 @@ import { PolicyPage } from './online-store/policies';
 import { CollectionPage } from './collections/collection-page';
 import { CollectionsPage, NewCollectionPage } from './collections/collections-page';
 import { DiscountsPage } from './discounts/discounts-page';
+import { PaymentLinksPage } from './payment-links/payment-links-page';
 import { DraftPage } from './drafts/draft-page';
 import { DraftsPage } from './drafts/drafts-page';
 import { NewDraftPage } from './drafts/new-draft-page';
@@ -380,6 +381,12 @@ const discounts = createRoute({
   component: DiscountsPage,
 });
 
+const paymentLinks = createRoute({
+  getParentRoute: () => shop,
+  path: 'payment-links',
+  component: PaymentLinksPage,
+});
+
 const more = createRoute({
   getParentRoute: () => shop,
   path: 'more',
@@ -505,6 +512,7 @@ export const routeTree = root.addChildren([
     newDraft,
     draft,
     discounts,
+    paymentLinks,
     analytics,
     cash,
     statement,

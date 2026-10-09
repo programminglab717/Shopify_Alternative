@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, payment links in the admin** (PAY-04): links shared once on WhatsApp or Instagram, each
-opening a checkout of the customer's own with set items, a discount code and prepaid alone if
-the shop likes, until it closes; and how many orders each took; then the admin's next sections
-as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, support access in the admin** (ADM-08): the owner letting Hatti's support in for a while,
+seeing who came in and when, and ending it; and the discounts page's days taken in the shop's
+time zone, as store credit's and payment links' are; then the admin's next sections as the
+alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,24 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Payment links, in the admin
+
+* **Payment links** ([ADR-302](../architecture/13-decision-log.md#adr-302--the-admin-keeps-the-shops-payment-links-what-each-sells-and-how-many-orders-it-took-whether-it-is-open-and-why-not-copied-or-sent-on-whatsapp-closed-and-opened-again-made-of-items-found-by-name-with-a-discount-code-a-limit-a-day-it-closes-in-the-shops-time-zone-and-prepaid-alone-if-the-shop-likes)), a section for owners and managers: what each link sells and how
+  many orders it took, open or why not, copied or sent on WhatsApp, closed and opened again;
+  made of items found by name, with a discount code, a limit, a day it closes and prepaid alone.
+* **Tried against the core:** on the seed's shop, a code of another shop was turned down by the
+  core, named as the discount code's problem; a link of one khussa, size 38, closing on 31
+  December, opened a checkout of its own with the item and the shop's delivery charges; one of
+  two of a size with one in stock said it was sold out, as it should. Closed, the link said it no
+  longer takes orders; opened again, it was open. A link closed by staff first read "closed 31
+  Dec 2026" of its future day; the day now says "closes" until it has passed. No errors in the
+  browser.
+* 2168 tests: links listed with what they sell and took, sent on WhatsApp and closed; one made
+  of items found by name, a code turned down and then made, closing at the day's end in
+  Pakistan; none for a marketer.
+* **Seen on the way:** the discounts page takes a code's first and last days in the phone's own
+  time, as store credit's expiry first did; it is next, with support access.
 
 ### ddf191f · Store credit, in the admin
 

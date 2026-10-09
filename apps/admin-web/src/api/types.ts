@@ -1705,3 +1705,34 @@ export interface StoreCreditMoveData {
 export interface OrderPayWithStoreCreditData {
   orderPayWithStoreCredit: { order: { id: string } | null; userErrors: UserError[] };
 }
+
+export interface PaymentLinkValue {
+  id: string;
+  title: string;
+  url: string;
+  active: boolean;
+  open: boolean;
+  ordersPlaced: number;
+  usageLimit: number | null;
+  prepaidOnly: boolean;
+  discountCode: string | null;
+  expiresAt: string | null;
+  lastOrderAt: string | null;
+  createdAt: string;
+  items: { variantId: string; title: string | null; quantity: number }[];
+}
+
+export interface PaymentLinksData {
+  paymentLinks: PaymentLinkValue[];
+}
+
+export interface PaymentLinkCreateData {
+  paymentLinkCreate: { paymentLink: PaymentLinkValue | null; userErrors: UserError[] };
+}
+
+export interface PaymentLinkUpdateData {
+  paymentLinkUpdate: {
+    paymentLink: { id: string; active: boolean; open: boolean } | null;
+    userErrors: UserError[];
+  };
+}

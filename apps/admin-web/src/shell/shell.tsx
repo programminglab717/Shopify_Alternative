@@ -5,6 +5,7 @@ import {
   ChartColumn,
   Headset,
   House,
+  Link2,
   LogOut,
   Menu,
   Package,
@@ -26,6 +27,7 @@ import { RECONCILES_CASH } from '../cash/cash-page';
 import { OPENS_ONLINE_STORE } from '../online-store/online-store-page';
 import { READS_CUSTOMERS } from '../customers/customers-page';
 import { MANAGES_DISCOUNTS } from '../discounts/discounts-page';
+import { MAKES_PAYMENT_LINKS } from '../payment-links/payment-links-page';
 import { READS_RETURNS } from '../returns/parcel';
 import { OPENS_SETTINGS } from '../settings/settings-page';
 import type { StaffRole } from '../auth/session';
@@ -48,6 +50,7 @@ interface NavItem {
     | '/$shopId/shipping'
     | '/$shopId/returns'
     | '/$shopId/discounts'
+    | '/$shopId/payment-links'
     | '/$shopId/online-store'
     | '/$shopId/analytics'
     | '/$shopId/cash'
@@ -96,6 +99,12 @@ export const NAV: readonly NavItem[] = [
     roles: READS_CUSTOMERS,
   },
   { to: '/$shopId/discounts', label: 'nav.discounts', icon: Tag, roles: MANAGES_DISCOUNTS },
+  {
+    to: '/$shopId/payment-links',
+    label: 'nav.paymentLinks',
+    icon: Link2,
+    roles: MAKES_PAYMENT_LINKS,
+  },
   {
     to: '/$shopId/online-store',
     label: 'nav.onlineStore',

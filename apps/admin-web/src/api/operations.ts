@@ -3901,3 +3901,68 @@ export const OrderPayWithStoreCreditMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const PAYMENT_LINK = /* GraphQL */ `
+  fragment PaymentLinkParts on PaymentLink {
+    id
+    title
+    url
+    active
+    open
+    ordersPlaced
+    usageLimit
+    prepaidOnly
+    discountCode
+    expiresAt
+    lastOrderAt
+    createdAt
+    items {
+      variantId
+      title
+      quantity
+    }
+  }
+`;
+
+/** The shop's payment links (PAY-04), the newest first: what each sells, and its orders. */
+export const PaymentLinksQuery = /* GraphQL */ `
+  query PaymentLinks {
+    paymentLinks(first: 50) {
+      ...PaymentLinkParts
+    }
+  }
+  ${PAYMENT_LINK}
+`;
+
+/** A payment link made, open at once at its own address. */
+export const PaymentLinkCreateMutation = /* GraphQL */ `
+  mutation PaymentLinkCreate($input: PaymentLinkInput!) {
+    paymentLinkCreate(input: $input) {
+      paymentLink {
+        ...PaymentLinkParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${PAYMENT_LINK}
+  ${USER_ERRORS}
+`;
+
+/** A payment link changed: closed, or opened again. */
+export const PaymentLinkUpdateMutation = /* GraphQL */ `
+  mutation PaymentLinkUpdate($id: ID!, $input: PaymentLinkInput!) {
+    paymentLinkUpdate(id: $id, input: $input) {
+      paymentLink {
+        id
+        active
+        open
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
