@@ -2065,3 +2065,33 @@ export interface InventoryImportResult {
 export interface InventoryImportData {
   inventoryImport: InventoryImportResult;
 }
+
+/** A warehouse or shop of the business's, as settings shows it (INV-01). */
+export interface ShopLocation {
+  id: string;
+  name: string;
+  isPrimary: boolean;
+  isActive: boolean;
+  fulfillsOnlineOrders: boolean;
+  address: {
+    address1: string | null;
+    address2: string | null;
+    city: string | null;
+    province: string | null;
+    zip: string | null;
+    phone: string | null;
+    formatted: string[];
+  };
+}
+
+export interface ShopLocationsData {
+  locations: { nodes: ShopLocation[] };
+}
+
+/** What adding, changing, deactivating or activating a location answers, by its field. */
+export interface LocationPayloadData {
+  locationAdd?: { location: ShopLocation | null; userErrors: UserError[] };
+  locationEdit?: { location: ShopLocation | null; userErrors: UserError[] };
+  locationDeactivate?: { location: ShopLocation | null; userErrors: UserError[] };
+  locationActivate?: { location: ShopLocation | null; userErrors: UserError[] };
+}

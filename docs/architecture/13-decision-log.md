@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-311 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-312 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -319,6 +319,7 @@
 | 309 | The admin adds a customer by hand, records the marketing they agreed to in their words, merges a duplicate into them once asked, and, at their request, downloads their data and erases them ten days on, once the member confirms who they are; the erasures waiting are listed, and each cancelled from its customer | Accepted |
 | 310 | The admin sets the checkout page in settings: up to four badges under its button, in the shop's order, with the days for exchanges and returns, Help on WhatsApp offered only with the shop's number; and the boxes it offers for the shop's offers, by channel | Accepted |
 | 311 | The admin brings products in from Shopify's product CSV and exports them to it, and counts stock by Shopify's inventory CSV, each file checked first and taken in at a tap, on a page of its own beside the products list and the stock page | Accepted |
+| 312 | The admin lists the shop's locations in settings, those out of use too, and adds one with its address and the number couriers call for pickups, changes it and whether it fulfils online orders, takes it out of use and puts it back, and deletes one that never held stock; the primary one stays | Accepted |
 
 ---
 
@@ -12602,3 +12603,27 @@
 * **Alternatives:**
   * **Import straight away:** a file with a shifted column would change many products before
     anyone saw what it would do.
+
+## ADR-312 · The admin lists the shop's locations in settings, those out of use too, and adds one with its address and the number couriers call for pickups, changes it and whether it fulfils online orders, takes it out of use and puts it back, and deletes one that never held stock; the primary one stays
+
+* **Context:** A shop keeps stock at locations (INV-01): its warehouses, shops and stockrooms,
+  each with an address, known cities spelled the standard way and the province taken from the
+  city, a mobile couriers call for pickups, and whether it fulfils online orders. The first is
+  the primary one. A location is taken out of use once it holds no stock and no order or
+  checkout waits on it, and deleted only if it never held stock. Owners and managers keep them.
+  The admin showed stock by location, but kept no locations.
+* **Decision:**
+  * **Locations** is a section of settings, listing every location with its address, whether
+    it fulfils online orders, and which is primary or out of use.
+  * **Add a location** takes its name, address, postcode and pickup number, and whether it
+    fulfils online orders, ticked to begin with; the core's refusals, such as a postcode not of
+    five digits, are named by their field.
+  * **Each location** is changed in place, taken out of use and put back, and deleted once asked,
+    which says only a location that never held stock can be; the core says why it cannot when it
+    holds stock or orders wait on it. The primary one is neither taken out of use nor deleted.
+* **Consequences:**
+  * A shop opening a second shop in Karachi adds it from a phone, stocks it, and keeps its online
+    orders packed in Lahore.
+* **Alternatives:**
+  * **Locations under stock:** where they are used, but they are the shop's set-up, with its
+    pickup numbers, beside its couriers.

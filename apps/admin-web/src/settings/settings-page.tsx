@@ -15,6 +15,7 @@ import {
   Store,
   Truck,
   UserCog,
+  Warehouse,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { StaffMemberRole } from '../api/types';
@@ -51,6 +52,7 @@ interface Section {
     | '/$shopId/settings/messages'
     | '/$shopId/settings/orders'
     | '/$shopId/settings/checkout'
+    | '/$shopId/settings/locations'
     | '/$shopId/settings/couriers'
     | '/$shopId/settings/staff';
   label: MessageKey;
@@ -70,6 +72,12 @@ const SECTIONS: readonly Section[] = [
     label: 'settings.orders',
     hint: 'settings.ordersHint',
     icon: ListChecks,
+  },
+  {
+    to: '/$shopId/settings/locations',
+    label: 'settings.locations',
+    hint: 'settings.locationsHint',
+    icon: Warehouse,
   },
   {
     to: '/$shopId/settings/delivery',
@@ -145,7 +153,7 @@ const SECTIONS: readonly Section[] = [
   },
 ];
 
-/** Settings (docs/design/02 §4), as far as they are built: the shop, order policies, delivery and payments, the checkout page, sales tax, customer messages, couriers, staff, billing, activity and support access. */
+/** Settings (docs/design/02 §4), as far as they are built: the shop, order policies, locations, delivery and payments, the checkout page, sales tax, customer messages, couriers, staff, billing, activity and support access. */
 export function SettingsPage() {
   const { t } = useLocale();
   const shopId = useShop().id;

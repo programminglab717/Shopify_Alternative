@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, the shop's locations in the admin** (INV-01): its warehouses and shops added with their
-addresses, renamed, which fulfils online orders, deactivated and activated again, and deleted
-while they hold nothing; then the admin's next sections as the alpha's shops need them. Urdu
-handles wait, as decided.
+**Next, a product's options and variants in the admin** (CAT-01): an option added to a product
+already made, renamed, its values added, renamed and put in order, and taken away; variants
+added for new combinations and deleted, at least one kept; then the admin's next sections as
+the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Locations, in the admin
+
+* **Locations** ([ADR-312](../architecture/13-decision-log.md#adr-312--the-admin-lists-the-shops-locations-in-settings-those-out-of-use-too-and-adds-one-with-its-address-and-the-number-couriers-call-for-pickups-changes-it-and-whether-it-fulfils-online-orders-takes-it-out-of-use-and-puts-it-back-and-deletes-one-that-never-held-stock-the-primary-one-stays)) in settings: the shop's warehouses and shops, with their addresses and
+  pickup numbers, added, changed, taken out of use and put back, and deleted while they never
+  held stock; the primary one stays.
+* **Tried against the core:** on the seed's shop, with its Lahore warehouse and Karachi store, a
+  stockroom in "isb" with a two-digit postcode was refused, named on the page; with 44000 it was
+  added in Islamabad, renamed, set not to fulfil online orders, taken out of use, put back, and
+  deleted, leaving the shop's two locations as they were. No errors in the browser.
+* 2237 tests: locations listed with the primary one kept; one added after a refusal named;
+  one changed and no longer fulfilling online orders; why one cannot be taken out of use; one
+  deleted once asked.
 
 ### f07b9c2 · Products and stock by file, in the admin
 

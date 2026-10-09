@@ -4604,3 +4604,111 @@ export const InventoryImportMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const SHOP_LOCATION = /* GraphQL */ `
+  fragment ShopLocationParts on Location {
+    id
+    name
+    isPrimary
+    isActive
+    fulfillsOnlineOrders
+    address {
+      address1
+      address2
+      city
+      province
+      zip
+      phone
+      formatted
+    }
+  }
+`;
+
+/** The shop's locations, those out of use too, for settings. */
+export const ShopLocationsQuery = /* GraphQL */ `
+  query ShopLocations {
+    locations(first: 100, includeInactive: true) {
+      nodes {
+        ...ShopLocationParts
+      }
+    }
+  }
+  ${SHOP_LOCATION}
+`;
+
+/** A location added: a warehouse or a shop of the business's. */
+export const LocationAddMutation = /* GraphQL */ `
+  mutation LocationAdd($input: LocationAddInput!) {
+    locationAdd(input: $input) {
+      location {
+        ...ShopLocationParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SHOP_LOCATION}
+  ${USER_ERRORS}
+`;
+
+/** A location's name, address or whether it fulfils online orders, changed. */
+export const LocationEditMutation = /* GraphQL */ `
+  mutation LocationEdit($id: ID!, $input: LocationEditInput!) {
+    locationEdit(id: $id, input: $input) {
+      location {
+        ...ShopLocationParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SHOP_LOCATION}
+  ${USER_ERRORS}
+`;
+
+/** A location taken out of use, holding no stock and waited on by no order. */
+export const LocationDeactivateMutation = /* GraphQL */ `
+  mutation LocationDeactivate($locationId: ID!) {
+    locationDeactivate(locationId: $locationId) {
+      location {
+        ...ShopLocationParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SHOP_LOCATION}
+  ${USER_ERRORS}
+`;
+
+/** A location put back in use. */
+export const LocationActivateMutation = /* GraphQL */ `
+  mutation LocationActivate($locationId: ID!) {
+    locationActivate(locationId: $locationId) {
+      location {
+        ...ShopLocationParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SHOP_LOCATION}
+  ${USER_ERRORS}
+`;
+
+/** A location that never held stock, deleted. */
+export const LocationDeleteMutation = /* GraphQL */ `
+  mutation LocationDelete($locationId: ID!) {
+    locationDelete(locationId: $locationId) {
+      deletedLocationId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
