@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, the theme editor's live preview** (admin): the theme framed beside the editor in design
-mode, changes not yet saved rendered there as they are made, and a section chosen in either
-(ADR-050); then pictures of a theme's own, uploaded from the phone. Urdu handles wait, as decided.
+**Next, pictures of a theme's own** (admin): a theme's image settings, such as a banner's,
+chosen from the phone and kept as the shop's files, with an address of their own for the
+storefront to show them at (ADR-324); then section by section as the alpha's shops need them.
+Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +18,35 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The theme editor's live preview
+
+* **The page beside the editor** ([ADR-325](../architecture/13-decision-log.md#adr-325--the-theme-editors-preview-frames-the-storefront-beside-the-editor-and-shows-changes-as-they-are-made-the-pages-sections-following-the-editors-files-the-themes-settings-show-once-saved)): on a computer the storefront's page sits beside the
+  theme editor, at full width or a phone's, and on a phone Edit and Preview are two tabs. Changes
+  show there as they are made, before they are saved: the sections a change touches rendered
+  again, and the page's sections moved, hidden and shown again as the editor has them, which the
+  storefront's script now does from the files it is sent. A section opened in the editor is
+  chosen in the page, and one tapped in the page opens in the editor. Each template opens a page
+  of the shop's that shows it, and the editor follows the merchant through the preview. The
+  theme's settings show once saved, as the preview says.
+* **Tried in Chromium against the core and the storefront:** on the seed's shop, the home page
+  framed in design mode with its eight sections; the Footwear section chosen in the page as it
+  opened in the editor, its heading changed and shown on the page before saving, moved above the
+  Eid edit, and the WhatsApp section hidden and shown again in its place; the announcement bar
+  tapped in the page and opened in the editor; the Products page opening a product; the merchant
+  going home through the page's own link, the editor following, the changes shown there too; the
+  colour changed and the preview saying it shows once saved; discarded, the page as saved again;
+  on a phone, the Edit and Preview tabs; in Urdu, right to left. A first run left a product's page
+  before it said it was ready, and the editor then missed the way home: it now compares the page
+  with the one it opened. A heading saved at the end, and the page, already as saved, was not
+  opened again; the home page was then put back through the API, its files as before. No errors
+  in the browser.
+* 2317 tests: the page's sections put in a file's order, those hidden taken away, those shown
+  again put back even where a group had none on the page, a section rendered again in its place,
+  answers with their render's id, and the comment that starts each list in design mode; the
+  editor's renders, choices both ways, a page for each template, following the merchant, the
+  settings' note and the page opened again once saved, a failure and what the storefront left
+  out, and only the page in the preview heard; sample pages, section IDs and what to render.
 
 ### b54d06c · The theme editor, in the admin
 

@@ -2186,4 +2186,23 @@ export interface ThemeEditorData {
 export interface ThemeChoicesData {
   menus: { nodes: { handle: string; title: string }[] };
   collections: { nodes: { handle: string; title: string }[] };
+  products: { nodes: { handle: string }[] };
+  pages: {
+    nodes: {
+      handle: string;
+      templateSuffix: string | null;
+      isPublished: boolean;
+      publishedAt: string | null;
+    }[];
+  };
+  blogs: { nodes: { handle: string; templateSuffix: string | null }[] };
+  articles: {
+    nodes: {
+      handle: string;
+      templateSuffix: string | null;
+      isPublished: boolean;
+      publishedAt: string | null;
+      blog: { handle: string };
+    }[];
+  };
 }

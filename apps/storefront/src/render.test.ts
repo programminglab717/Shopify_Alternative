@@ -1690,6 +1690,12 @@ describe('Storefront rendering', () => {
       { origins: ['https://admin.hatti.pk'], template: 'templates/index.json' },
     ]);
     expect(home).toContain('window.Shopify.designMode = true');
+    // Where each template's and section group's sections start, for its script to order them.
+    expect([...home.matchAll(/<!--hatti-editor-list ([^>]*)-->/g)].map((mark) => mark[1])).toEqual([
+      'sections/header-group.json',
+      'templates/index.json',
+      'sections/footer-group.json',
+    ]);
     const product = (await render({ path: '/products/bridal-lehenga-heavy', editor })).html;
     expect(marks(product, 'data-hatti-editor-block').map((block) => block.id)).toEqual([
       'title',
@@ -1713,6 +1719,7 @@ describe('Storefront rendering', () => {
     // Outside the frame: nothing of the editor's.
     const plain = (await render({ path: '/products/bridal-lehenga-heavy' })).html;
     expect(plain).not.toContain('data-hatti-editor');
+    expect(plain).not.toContain('hatti-editor-list');
     expect(plain).not.toContain('designMode');
   });
 

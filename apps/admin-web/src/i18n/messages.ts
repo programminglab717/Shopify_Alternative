@@ -2628,6 +2628,27 @@ const en = {
   'editor.up': 'Up',
   'editor.down': 'Down',
   'editor.removeShort': 'Remove',
+  'editor.views': 'Edit or preview',
+  'editor.view.edit': 'Edit',
+  'editor.view.preview': 'Preview',
+  'editor.preview.heading': 'Preview',
+  'editor.preview.title': '{name} on your store',
+  'editor.preview.loading': 'Opening the page…',
+  'editor.preview.updating': 'Showing your changes…',
+  'editor.preview.full': 'Full width',
+  'editor.preview.phone': 'Phone width',
+  'editor.preview.reload': 'Open the page again',
+  'editor.preview.open': 'Open the preview in a new tab',
+  'editor.preview.otherPage':
+    'No page of your store uses this template yet, so the preview shows another page.',
+  'editor.preview.settingsLater': 'Theme settings show in the preview once you save them.',
+  'editor.preview.silent':
+    "This preview can't show changes as you make them. Save them to see them.",
+  'editor.preview.failed':
+    "The preview couldn't show your latest changes. Open the page again to try.",
+  'editor.preview.failedWhy':
+    "The preview couldn't show your latest changes ({message}). Open the page again to try.",
+  'editor.preview.leftOut': "The preview leaves out what your store can't use yet:",
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5236,6 +5257,28 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'editor.up': 'اوپر',
   'editor.down': 'نیچے',
   'editor.removeShort': 'ہٹائیں',
+  'editor.views': 'ترمیم یا پیش منظر',
+  'editor.view.edit': 'ترمیم',
+  'editor.view.preview': 'پیش منظر',
+  'editor.preview.heading': 'پیش منظر',
+  'editor.preview.title': 'آپ کے اسٹور پر {name}',
+  'editor.preview.loading': 'صفحہ کھل رہا ہے…',
+  'editor.preview.updating': 'آپ کی تبدیلیاں دکھائی جا رہی ہیں…',
+  'editor.preview.full': 'پوری چوڑائی',
+  'editor.preview.phone': 'فون کی چوڑائی',
+  'editor.preview.reload': 'صفحہ دوبارہ کھولیں',
+  'editor.preview.open': 'پیش منظر نئے ٹیب میں کھولیں',
+  'editor.preview.otherPage':
+    'آپ کے اسٹور کا کوئی صفحہ ابھی یہ ٹیمپلیٹ استعمال نہیں کرتا، اس لیے پیش منظر کوئی اور صفحہ دکھا رہا ہے۔',
+  'editor.preview.settingsLater': 'تھیم کی سیٹنگز محفوظ کرنے کے بعد پیش منظر میں دکھتی ہیں۔',
+  'editor.preview.silent':
+    'یہ پیش منظر تبدیلیاں ساتھ ساتھ نہیں دکھا سکتا۔ انہیں دیکھنے کے لیے محفوظ کریں۔',
+  'editor.preview.failed':
+    'پیش منظر آپ کی تازہ تبدیلیاں نہیں دکھا سکا۔ دوبارہ کوشش کے لیے صفحہ پھر کھولیں۔',
+  'editor.preview.failedWhy':
+    'پیش منظر آپ کی تازہ تبدیلیاں نہیں دکھا سکا ({message})۔ دوبارہ کوشش کے لیے صفحہ پھر کھولیں۔',
+  'editor.preview.leftOut':
+    'پیش منظر وہ چیزیں چھوڑ دیتا ہے جو آپ کا اسٹور ابھی استعمال نہیں کر سکتا:',
 };
 
 export const messages: Readonly<

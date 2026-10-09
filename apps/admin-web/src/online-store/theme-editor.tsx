@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   ArrowUp,
   ChevronDown,
-  ExternalLink,
   Eye,
   EyeOff,
   Plus,
@@ -12,7 +11,7 @@ import {
   Save,
   Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ThemeChoicesQuery,
   ThemeEditorQuery,
@@ -52,6 +51,8 @@ import {
   type SettingsData,
   type SettingsGroup,
 } from './theme-files';
+import { pageSectionId, placeOfSection, samplePathOf, type Samples } from './preview-plan';
+import { LivePreview, type FramedPage, type Selection } from './theme-preview';
 import { SettingsForm, type Choices } from './theme-settings';
 import { EDITS_THEMES } from './themes';
 
@@ -84,6 +85,11 @@ function prepare(editor: Theme['editor']): Prepared {
     names: new Map(editor.sections.map((each) => [each.type, each.name])),
     files: editor.files,
   };
+}
+
+/** The element an item of the editor's is, for the preview's choice to bring it into view. */
+function itemIdOf(key: string): string {
+  return `editor-item-${key.replace(/[^A-Za-z0-9_-]/g, '-')}`;
 }
 
 /** The templates with names in the merchant's words; others go by their own. */
@@ -231,6 +237,7 @@ function ItemTools({
 
 /** One of a section's blocks: its settings, shown or hidden, moved, or removed. */
 function BlockItem({
+  itemId,
   name,
   schema,
   block,
@@ -245,6 +252,7 @@ function BlockItem({
   choices,
   storefront,
 }: {
+  itemId: string;
   name: string;
   schema: BlockSchema | undefined;
   block: { type: string; settings?: Record<string, unknown>; disabled?: boolean };
@@ -262,7 +270,7 @@ function BlockItem({
   const summary = summaryOf(schema?.settings, block.settings);
   const title = summary ? `${name}: ${summary}` : name;
   return (
-    <li className="flex flex-col gap-2 rounded-control border border-line px-2">
+    <li id={itemId} className="flex flex-col gap-2 rounded-control border border-line px-2">
       <ItemRow
         name={name}
         summary={summary}
@@ -293,6 +301,7 @@ function BlockItem({
  * others of its template or group, and, unless it is the page's main section, removed.
  */
 function SectionItem({
+  itemKey,
   id,
   list,
   data,
@@ -300,10 +309,14 @@ function SectionItem({
   last,
   open,
   onOpen,
+  openBlock,
+  onOpenBlock,
   change,
   choices,
   storefront,
 }: {
+  /** The section's file and key, as the editor keeps which is open. */
+  itemKey: string;
   id: string;
   list: SectionList;
   data: Prepared;
@@ -311,12 +324,13 @@ function SectionItem({
   last: boolean;
   open: boolean;
   onOpen: () => void;
+  openBlock: string | null;
+  onOpenBlock: (block: string | null) => void;
   change: (fn: (list: SectionList) => SectionList) => void;
   choices: Choices;
   storefront: string;
 }) {
   const { t } = useLocale();
-  const [openBlock, setOpenBlock] = useState<string | null>(null);
   const placement = list.sections[id]!;
   const schema = data.schemas.get(placement.type);
   const name = data.names.get(placement.type) ?? placement.type;
@@ -328,7 +342,7 @@ function SectionItem({
   const left = blockTypesLeft(schema, placement);
 
   return (
-    <li className="flex flex-col gap-3 py-2">
+    <li id={itemIdOf(itemKey)} className="flex flex-col gap-3 py-2">
       <ItemRow
         name={name}
         summary={summary}
@@ -368,13 +382,14 @@ function SectionItem({
                     return (
                       <BlockItem
                         key={blockId}
+                        itemId={itemIdOf(`${itemKey}#${blockId}`)}
                         name={blockSchema?.name ?? block.type}
                         schema={blockSchema}
                         block={block}
                         first={index === 0}
                         last={index === order.length - 1}
                         open={openBlock === blockId}
-                        onOpen={() => setOpenBlock(openBlock === blockId ? null : blockId)}
+                        onOpen={() => onOpenBlock(openBlock === blockId ? null : blockId)}
                         onSetting={(setting, value) =>
                           change((all) => withBlockSetting(all, id, blockId, setting, value))
                         }
@@ -430,6 +445,8 @@ function FileCard({
   data,
   open,
   setOpen,
+  openBlock,
+  onOpenBlock,
   change,
   onRestore,
   choices,
@@ -442,6 +459,8 @@ function FileCard({
   data: Prepared;
   open: string | null;
   setOpen: (key: string | null) => void;
+  openBlock: string | null;
+  onOpenBlock: (block: string | null) => void;
   change: (fn: (list: SectionList) => SectionList) => void;
   onRestore: () => void;
   choices: Choices;
@@ -483,6 +502,7 @@ function FileCard({
             return (
               <SectionItem
                 key={key}
+                itemKey={key}
                 id={id}
                 list={list}
                 data={data}
@@ -490,6 +510,8 @@ function FileCard({
                 last={index === order.length - 1}
                 open={open === key}
                 onOpen={() => setOpen(open === key ? null : key)}
+                openBlock={open === key ? openBlock : null}
+                onOpenBlock={onOpenBlock}
                 change={change}
                 choices={choices}
                 storefront={storefront}
@@ -572,21 +594,59 @@ function ThemeSettings({
   );
 }
 
+/** A page's path without the preview's token, as the editor opens it again. */
+function pathOf(path: string): string {
+  const url = new URL(path, 'http://storefront');
+  url.searchParams.delete('preview');
+  return `${url.pathname}${url.search}`;
+}
+
+/** The theme's section groups by file, which every page on the theme's layout shows. */
+function groupFilesOf(files: readonly EditorFile[]): string[] {
+  return files
+    .map((file) => file.filename)
+    .filter((name) => /^sections\/[a-z0-9_-]+\.json$/.test(name));
+}
+
 /**
  * A theme's editor (OS-02, ADR-323): a page of the storefront at a time, its sections from the
  * header to the footer, each one's settings and blocks, shown or hidden and put in order, and the
  * theme's own settings; every change kept here until saved, all at once, as Theme Check passes
- * it. A part the shop changed may be started again from the platform theme's.
+ * it. A part the shop changed may be started again from the platform theme's. Beside it, or a
+ * tap away on a phone, the page itself shows the changes as they are made (ADR-325).
  */
-function Editor({ theme, data, choices }: { theme: Theme; data: Prepared; choices: Choices }) {
+function Editor({
+  theme,
+  data,
+  choices,
+  samples,
+}: {
+  theme: Theme;
+  data: Prepared;
+  choices: Choices;
+  samples: Samples;
+}) {
   const { t } = useLocale();
   const templateName = useTemplateName();
   const [drafts, setDrafts] = useState<Record<string, unknown>>({});
   const [template, setTemplate] = useState('index');
   const [open, setOpen] = useState<string | null>(null);
+  const [openBlock, setOpenBlock] = useState<string | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const [restoring, setRestoring] = useState<string | null>(null);
+  // On a phone, the editor or the preview; side by side on a wide screen.
+  const [view, setView] = useState<'edit' | 'preview'>('edit');
+  // The page the preview opens, opened again whenever `load` changes.
+  const [frame, setFrame] = useState({ path: '/', load: 0 });
+  const [framed, setFramed] = useState<FramedPage | null>(null);
+  // Where the preview is, or was last sent: another page there is one the merchant went to.
+  const framedPath = useRef('/');
+  // The preview's link as first given: each time the theme is read again its token is new, and
+  // the page in the preview would open again with it.
+  const [previewUrl] = useState(theme.previewUrl);
+  // An item chosen in the preview, to bring into view once shown.
+  const reveal = useRef<string | null>(null);
   const save = useAdminMutation<
     { themeFilesUpsert: { userErrors: UserError[] } },
     { themeId: string; files: { filename: string; body: string }[] }
@@ -603,6 +663,12 @@ function Editor({ theme, data, choices }: { theme: Theme; data: Prepared; choice
     disabled: changed === 0,
     enableBeforeUnload: () => changed > 0,
   });
+
+  useEffect(() => {
+    if (!reveal.current) return;
+    document.getElementById(itemIdOf(reveal.current))?.scrollIntoView({ block: 'nearest' });
+    reveal.current = null;
+  }, [open, openBlock, view]);
 
   const fileOf = (filename: string) => data.files.find((file) => file.filename === filename);
   const original = (filename: string): unknown => {
@@ -625,6 +691,71 @@ function Editor({ theme, data, choices }: { theme: Theme; data: Prepared; choice
       });
     };
 
+  const templates = templatesOf(data.files);
+  const storefront = new URL(previewUrl).origin;
+  // The page at the preview's link, which shows this theme on any of the storefront's pages.
+  const frameSrc = new URL(previewUrl);
+  const framePage = new URL(frame.path, storefront);
+  frameSrc.pathname = framePage.pathname;
+  framePage.searchParams.forEach((value, name) => frameSrc.searchParams.set(name, value));
+  // The preview opened again where it is, as saved now.
+  const reload = () => setFrame((old) => ({ path: framedPath.current, load: old.load + 1 }));
+
+  const choose = (name: string) => {
+    setTemplate(name);
+    setOpen(null);
+    setOpenBlock(null);
+    const path = samplePathOf(name, samples);
+    if (path === null) return;
+    framedPath.current = path;
+    setFrame((old) => ({ path, load: old.load + 1 }));
+  };
+
+  // The merchant went to another page in the preview, the editor's own or one it never said it
+  // was ready on: the editor shows its template.
+  const onPage = (page: FramedPage) => {
+    const path = pathOf(page.path);
+    const moved = path !== framedPath.current;
+    framedPath.current = path;
+    setFramed(page);
+    const name = /^templates\/(.+)\.json$/.exec(page.template ?? '')?.[1];
+    if (moved && name !== undefined && name !== template && templates.includes(name)) {
+      setTemplate(name);
+      setOpen(null);
+      setOpenBlock(null);
+    }
+  };
+
+  // A section chosen in the preview is opened here, and a block of it.
+  const onSelected = ({ section, block }: Selection) => {
+    const place = placeOfSection(section, framed?.template ?? null, data.files);
+    const list = place ? (read(place.filename) as SectionList | null) : null;
+    const placement = place ? list?.sections[place.key] : undefined;
+    if (!place || !placement) return;
+    const name = /^templates\/(.+)\.json$/.exec(place.filename)?.[1];
+    if (name !== undefined && name !== template && templates.includes(name)) setTemplate(name);
+    const key = `${place.filename}#${place.key}`;
+    const shown = block !== null && placement.blocks?.[block] ? block : null;
+    setOpen(key);
+    setOpenBlock(shown);
+    setView('edit');
+    reveal.current = shown === null ? key : `${key}#${shown}`;
+  };
+
+  const selection = ((): Selection | null => {
+    if (open === null) return null;
+    const at = open.indexOf('#');
+    const section = pageSectionId(open.slice(0, at), open.slice(at + 1));
+    return section === null ? null : { section, block: openBlock };
+  })();
+
+  const filesOnPage = (templateFile: string | null) => {
+    const name = /^templates\/(.+)\.json$/.exec(templateFile ?? '')?.[1];
+    if (name === undefined || !fileOf(templateFile!)) return groupFilesOf(data.files);
+    const files = pageFilesOf(name, read, data.files);
+    return [...files.above, files.template, ...files.below];
+  };
+
   const onSave = async () => {
     setProblems([]);
     setSaved(false);
@@ -641,6 +772,8 @@ function Editor({ theme, data, choices }: { theme: Theme; data: Prepared; choice
       }
       setDrafts({});
       setSaved(true);
+      // The theme's settings show in the preview only on a page loaded with them.
+      if (SETTINGS_FILE in drafts) reload();
     } catch (failure) {
       setProblems([errorText(failure, t)]);
     }
@@ -657,14 +790,13 @@ function Editor({ theme, data, choices }: { theme: Theme; data: Prepared; choice
       }
       setRestoring(null);
       setDrafts(({ [filename]: _dropped, ...rest }) => rest);
+      if (filename === SETTINGS_FILE) reload();
     } catch (failure) {
       setProblems([errorText(failure, t)]);
     }
   };
 
-  const templates = templatesOf(data.files);
   const page = pageFilesOf(template, read, data.files);
-  const storefront = new URL(theme.previewUrl).origin;
   const groupTitle = (filename: string) => {
     const group = read(filename) as SectionList | null;
     if (group?.type === 'header') return t('editor.group.header');
@@ -680,7 +812,12 @@ function Editor({ theme, data, choices }: { theme: Theme; data: Prepared; choice
       list={read(filename) as SectionList | null}
       data={data}
       open={open}
-      setOpen={setOpen}
+      setOpen={(key) => {
+        setOpen(key);
+        setOpenBlock(null);
+      }}
+      openBlock={openBlock}
+      onOpenBlock={setOpenBlock}
       change={change<SectionList>(filename)}
       onRestore={() => setRestoring(filename)}
       choices={choices}
@@ -690,96 +827,132 @@ function Editor({ theme, data, choices }: { theme: Theme; data: Prepared; choice
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-48 flex-1">
-          <SelectField
-            label={t('editor.pageLabel')}
-            value={template}
-            options={templates.map((name) => ({ value: name, label: templateName(name) }))}
-            onChange={(name) => {
-              setTemplate(name);
-              setOpen(null);
-            }}
+      <div className="max-w-md">
+        <SelectField
+          label={t('editor.pageLabel')}
+          value={template}
+          options={templates.map((name) => ({ value: name, label: templateName(name) }))}
+          onChange={choose}
+        />
+      </div>
+      <div
+        role="tablist"
+        aria-label={t('editor.views')}
+        className="grid grid-cols-2 gap-1 rounded-control border border-line p-1 lg:hidden"
+      >
+        {(['edit', 'preview'] as const).map((each) => (
+          <button
+            key={each}
+            type="button"
+            role="tab"
+            aria-selected={view === each}
+            onClick={() => setView(each)}
+            className={`min-h-12 rounded-control md:min-h-10 ${
+              view === each ? 'bg-primary text-on-primary' : 'text-secondary'
+            }`}
+          >
+            {t(each === 'edit' ? 'editor.view.edit' : 'editor.view.preview')}
+          </button>
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(22rem,28rem)_minmax(0,1fr)] lg:items-start">
+        <div className={`flex-col gap-4 ${view === 'edit' ? 'flex' : 'hidden lg:flex'}`}>
+          {restoring && (
+            <Alert tone="warning">
+              <p>
+                {t('editor.restoreAsk', {
+                  part:
+                    restoring === SETTINGS_FILE
+                      ? t('editor.themeSettings')
+                      : restoring.startsWith('templates/')
+                        ? templateName(template)
+                        : groupTitle(restoring),
+                })}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  variant="destructive"
+                  busy={restore.isPending}
+                  onClick={() => void onRestore(restoring)}
+                >
+                  {t('editor.restoreSure')}
+                </Button>
+                <Button variant="secondary" onClick={() => setRestoring(null)}>
+                  {t('action.back')}
+                </Button>
+              </div>
+            </Alert>
+          )}
+          {page.above.map((filename) => card(filename, groupTitle(filename)))}
+          {card(page.template, templateName(template))}
+          {page.below.map((filename) => card(filename, groupTitle(filename)))}
+          <ThemeSettings
+            data={data}
+            settings={read(SETTINGS_FILE) as SettingsData | null}
+            file={fileOf(SETTINGS_FILE)}
+            change={change<SettingsData | null>(SETTINGS_FILE)}
+            onRestore={() => setRestoring(SETTINGS_FILE)}
+            choices={choices}
+            storefront={storefront}
+          />
+          {problems.length > 0 && (
+            <Alert tone="danger">
+              <p>{t('editor.refused')}</p>
+              <ul className="mt-1 list-disc ps-5">
+                {problems.map((problem) => (
+                  <li key={problem}>{problem}</li>
+                ))}
+              </ul>
+            </Alert>
+          )}
+          {saved && (
+            <Alert tone="success">
+              {theme.role === 'MAIN' ? t('editor.savedLive') : t('editor.saved')}
+            </Alert>
+          )}
+        </div>
+        <div
+          className={`h-[75dvh] min-h-96 flex-col lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100dvh-6.5rem)] ${
+            view === 'preview' ? 'flex' : 'hidden lg:flex'
+          }`}
+        >
+          <LivePreview
+            src={frameSrc.toString()}
+            load={frame.load}
+            storefront={storefront}
+            title={t('editor.preview.title', { name: theme.name })}
+            changes={drafts}
+            filesOnPage={filesOnPage}
+            nowOf={(filename) => JSON.stringify(read(filename))}
+            savedOf={(filename) => JSON.stringify(original(filename))}
+            selection={selection}
+            onPage={onPage}
+            onSelected={onSelected}
+            onReload={reload}
+            settingsUnsaved={SETTINGS_FILE in drafts}
+            missing={
+              framed !== null &&
+              framed.template !== page.template &&
+              samplePathOf(template, samples) === null
+            }
           />
         </div>
-        <a
-          href={theme.previewUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium md:min-h-10"
-        >
-          <ExternalLink aria-hidden className="size-5" />
-          {t('themes.preview')}
-        </a>
-      </div>
-      {restoring && (
-        <Alert tone="warning">
-          <p>
-            {t('editor.restoreAsk', {
-              part:
-                restoring === SETTINGS_FILE
-                  ? t('editor.themeSettings')
-                  : restoring.startsWith('templates/')
-                    ? templateName(template)
-                    : groupTitle(restoring),
-            })}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Button
-              variant="destructive"
-              busy={restore.isPending}
-              onClick={() => void onRestore(restoring)}
-            >
-              {t('editor.restoreSure')}
+        {changed > 0 && (
+          <div className="sticky bottom-20 z-10 flex flex-wrap items-center gap-2 rounded-control border border-line bg-surface p-3 shadow-lg md:bottom-4 lg:col-start-1">
+            <span className="flex-1 font-medium">{t('editor.unsaved')}</span>
+            <Button variant="secondary" onClick={() => setDrafts({})}>
+              {t('editor.discard')}
             </Button>
-            <Button variant="secondary" onClick={() => setRestoring(null)}>
-              {t('action.back')}
+            <Button
+              busy={save.isPending}
+              icon={<Save aria-hidden className="size-5" />}
+              onClick={() => void onSave()}
+            >
+              {t('editor.save')}
             </Button>
           </div>
-        </Alert>
-      )}
-      {page.above.map((filename) => card(filename, groupTitle(filename)))}
-      {card(page.template, templateName(template))}
-      {page.below.map((filename) => card(filename, groupTitle(filename)))}
-      <ThemeSettings
-        data={data}
-        settings={read(SETTINGS_FILE) as SettingsData | null}
-        file={fileOf(SETTINGS_FILE)}
-        change={change<SettingsData | null>(SETTINGS_FILE)}
-        onRestore={() => setRestoring(SETTINGS_FILE)}
-        choices={choices}
-        storefront={storefront}
-      />
-      {problems.length > 0 && (
-        <Alert tone="danger">
-          <p>{t('editor.refused')}</p>
-          <ul className="mt-1 list-disc ps-5">
-            {problems.map((problem) => (
-              <li key={problem}>{problem}</li>
-            ))}
-          </ul>
-        </Alert>
-      )}
-      {saved && (
-        <Alert tone="success">
-          {theme.role === 'MAIN' ? t('editor.savedLive') : t('editor.saved')}
-        </Alert>
-      )}
-      {changed > 0 && (
-        <div className="sticky bottom-20 z-10 flex flex-wrap items-center gap-2 rounded-control border border-line bg-surface p-3 shadow-lg md:bottom-4">
-          <span className="flex-1 font-medium">{t('editor.unsaved')}</span>
-          <Button variant="secondary" onClick={() => setDrafts({})}>
-            {t('editor.discard')}
-          </Button>
-          <Button
-            busy={save.isPending}
-            icon={<Save aria-hidden className="size-5" />}
-            onClick={() => void onSave()}
-          >
-            {t('editor.save')}
-          </Button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -835,9 +1008,23 @@ export function ThemeEditorPage() {
       label: each.title,
     })),
   };
+  // The pages the storefront shows now, for the preview to open a template on.
+  const now = Date.now();
+  const shown = (each: { isPublished: boolean; publishedAt: string | null }) =>
+    each.isPublished && (each.publishedAt === null || Date.parse(each.publishedAt) <= now);
+  const samples: Samples = {
+    product: picks.data.products.nodes[0]?.handle ?? null,
+    pages: picks.data.pages.nodes.filter(shown),
+    blogs: picks.data.blogs.nodes,
+    articles: picks.data.articles.nodes.filter(shown).map((each) => ({
+      handle: each.handle,
+      templateSuffix: each.templateSuffix,
+      blog: each.blog.handle,
+    })),
+  };
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">
+    <div className="mx-auto flex w-full max-w-[120rem] flex-col gap-4 pb-8">
       {back}
       {!theme ? (
         <EmptyState title={t('editor.notFound')} />
@@ -851,7 +1038,7 @@ export function ThemeEditorPage() {
               </span>
             )}
           </h1>
-          <Editor theme={theme} data={prepare(theme.editor)} choices={choices} />
+          <Editor theme={theme} data={prepare(theme.editor)} choices={choices} samples={samples} />
         </>
       )}
     </div>

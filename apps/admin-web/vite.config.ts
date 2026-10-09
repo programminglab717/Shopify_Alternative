@@ -72,6 +72,11 @@ export default defineConfig({
   },
   test: {
     environment: 'happy-dom',
+    // The theme editor frames the storefront (ADR-325): its tests say what the page there says,
+    // and no page is fetched for it.
+    environmentOptions: {
+      happyDOM: { settings: { navigation: { disableChildFrameNavigation: true } } },
+    },
     setupFiles: ['./src/test-setup.ts'],
     // A test waits up to 5 seconds for each thing it looks for (test-setup.ts); one that walks
     // through several pages needs longer than vitest's own 5 seconds on a busy machine.

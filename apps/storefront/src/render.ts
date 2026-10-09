@@ -8,7 +8,7 @@ import {
   type StoreData,
 } from '@hatti/storefront-data';
 import { cartProducts } from './cart.js';
-import { editorAttribute, editorScript, type EditorPlace } from './editor.js';
+import { editorAttribute, editorListMark, editorScript, type EditorPlace } from './editor.js';
 import {
   DEFAULT_TIMEZONE,
   PAGE,
@@ -426,12 +426,14 @@ export class PageRenderer {
       this.#section(id, placement, {}, globals, ctx, renders, { place: editor ? place : null });
     const renderList = async (list: SectionList, prefix: string, file: string) => {
       const run = (id: string) => render(`${prefix}${id}`, list.sections[id]!, { file, key: id });
+      // In the editor's frame, where the list starts, for its script to keep the list's order.
+      const mark = editor ? editorListMark(file) : '';
       if (this.options.concurrent === false) {
         const done: string[] = [];
         for (const id of list.order) done.push(await run(id));
-        return done.join('');
+        return mark + done.join('');
       }
-      return (await Promise.all(list.order.map(run))).join('');
+      return mark + (await Promise.all(list.order.map(run))).join('');
     };
     for (const part of parts) {
       const key = `${part.group ? 'group' : 'section'}:${part.name}`;

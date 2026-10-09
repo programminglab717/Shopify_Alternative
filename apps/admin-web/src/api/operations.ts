@@ -5165,7 +5165,11 @@ export const ThemeEditorQuery = /* GraphQL */ `
   ${THEME}
 `;
 
-/** What a theme's settings may point at: the shop's menus and collections, by handle. */
+/**
+ * What a theme's settings may point at, the shop's menus and collections by handle, and pages of
+ * the shop's for the editor's preview to open a template on: a product, and pages, blogs and
+ * posts with the templates they ask for.
+ */
 export const ThemeChoicesQuery = /* GraphQL */ `
   query ThemeChoices {
     menus(first: 100) {
@@ -5178,6 +5182,36 @@ export const ThemeChoicesQuery = /* GraphQL */ `
       nodes {
         handle
         title
+      }
+    }
+    products(first: 1, query: "status:active") {
+      nodes {
+        handle
+      }
+    }
+    pages(first: 100) {
+      nodes {
+        handle
+        templateSuffix
+        isPublished
+        publishedAt
+      }
+    }
+    blogs(first: 50) {
+      nodes {
+        handle
+        templateSuffix
+      }
+    }
+    articles(first: 100) {
+      nodes {
+        handle
+        templateSuffix
+        isPublished
+        publishedAt
+        blog {
+          handle
+        }
       }
     }
   }

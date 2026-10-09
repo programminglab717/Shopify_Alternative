@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-324 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-325 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -332,6 +332,7 @@
 | 322 | The admin corrects a parcel's courier, tracking number and link on its order's page, whatever the parcel's state, its link checked as https before it is sent | Accepted |
 | 323 | The theme editor reads a theme through the Admin API: the platform theme's settings and sections, their words in English or Urdu through Shopify's t: keys, and every JSON file the shop may keep as the storefront reads it | Accepted |
 | 324 | The admin's theme editor changes a page's sections and blocks and the theme's settings in place, kept until saved together as Theme Check passes them; pictures wait for an address of their own | Accepted |
+| 325 | The theme editor's preview frames the storefront beside the editor and shows changes as they are made, the page's sections following the editor's files; the theme's settings show once saved | Accepted |
 
 ---
 
@@ -12958,3 +12959,65 @@
     Shopify's editor saves when asked too.
   * **Dragging sections into order:** arrows work with a thumb and a screen reader alike;
     dragging may come with the preview.
+
+## ADR-325 · The theme editor's preview frames the storefront beside the editor and shows changes as they are made, the page's sections following the editor's files; the theme's settings show once saved
+
+* **Context:** The admin's theme editor ([ADR-324](#adr-324--the-admins-theme-editor-changes-a-pages-sections-and-blocks-and-the-themes-settings-in-place-kept-until-saved-together-as-theme-check-passes-them-pictures-wait-for-an-address-of-their-own)) changed a page's sections and the
+  theme's settings and saved them, but showed none of it: a merchant saved to see what a change
+  did. The storefront's side of the editor's protocol was ready ([ADR-050](#adr-050--the-theme-editor-talks-to-its-preview-through-postmessage-a-framed-preview-is-in-design-mode-and-renders-sections-with-the-editors-unsaved-files)): a preview the
+  editor frames is in design mode, and its script renders sections again with the files the
+  editor has not saved. That script could only put a section rendered again where it already
+  was, though: a section moved stayed where it was, and one hidden then shown again had no
+  place on the page to come back to.
+* **Decision:**
+  * **The page sits beside the editor:** on a wide screen, the storefront's page is beside the
+    editor, staying in view as the editor scrolls, at full width or a phone's; on a phone, Edit
+    and Preview are two tabs of one page. The frame opens the theme's preview link at the page
+    it shows, which takes the link's token on any of the storefront's paths, and the page is in
+    design mode there. The frame keeps the link it was first given, though each read of the
+    theme seals a new one, and is sandboxed: the storefront's scripts and forms work there, but
+    it cannot take the admin's place in the tab. The page opens in a tab of its own too, and
+    again where it is.
+  * **A page of the shop's for each template:** the home page, all products, the first active
+    product, the first page, blog or post shown now that asks for the template, an alternate as
+    much as its kind's own, then search, the cart, the password page and a page not found. A
+    template no page shows yet leaves the preview where it is, saying so. The merchant may go
+    anywhere in the preview, and the editor follows: a page other than the one it opened shows
+    its template in the editor too.
+  * **Changes show as they are made:** a quarter second after the merchant pauses, the sections
+    a change touches are rendered again with the page's files as the editor has them, five at a
+    time and one render at a time, each answer matched to its render by an id the page's script
+    sends back. A page loaded afresh shows the theme as saved, and is brought up to the editor's
+    changes at once.
+  * **The page follows the editor's files:** the storefront's script now puts the page's
+    sections from each template or section group it is sent as the file has them, in its order,
+    those it hides or no longer has taken away, and those rendered that were not on the page put
+    in their places, after a comment that starts each file's sections in design mode, which no
+    theme's styles see. Themes' scripts hear Shopify's `shopify:section:load`, `unload` and
+    `reorder`; a render of no sections only puts the page in order.
+  * **A section is chosen in both:** one opened in the editor, or a block of it, is chosen in
+    the page; one the merchant taps in the page opens in the editor, which on a phone turns to
+    it.
+  * **What shows only once saved is said:** the theme's settings, such as its colours, are in
+    the layout's head, which no section's render reaches; the preview says they show once saved,
+    and opens the page again when they are. What the storefront cannot use of a change is said
+    in its words, a render that fails is said too, and so is a page that never says it is ready,
+    where the storefront does not let the editor frame it.
+* **Consequences:**
+  * A merchant sees a heading, a collection, the sections' order, and a section hidden or shown
+    again, on the page as the change is made, on a phone or a computer, before saving it.
+  * The editor and the storefront's script change together: the protocol is the platform's own,
+    and both are tested with it, the script in a page of its own.
+  * The editor says hello once the page has loaded, its pictures too, as ADR-050 has it: on a
+    slow connection the preview takes a moment before it shows changes, and a page left before
+    it is ready is never heard from.
+  * The preview shows the storefront in its main language.
+* **Alternatives:**
+  * **Opening the page again for every change:** simple, but the page jumps to its top, a phone
+    fetches it whole each time, and a page opened afresh shows nothing not saved.
+  * **Rendering the whole page with the unsaved files and writing it into the frame:** the
+    colours would show too, but the theme's scripts and the editor's own would run again over a
+    page far larger than the sections changed.
+  * **A message of its own for each move, hide and show:** the files the editor sends already
+    say where every section is, and a message for each would be one more way for the page and
+    the editor to disagree.
