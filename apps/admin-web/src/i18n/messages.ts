@@ -1412,8 +1412,9 @@ const en = {
   'pages.content': 'Content',
   'pages.titleLabel': 'Title',
   'pages.body': 'Text',
-  'pages.bodyHint': 'Leave a blank line between paragraphs.',
-  'pages.bodyHtml': 'Text, as HTML',
+  'pages.bodyHint':
+    'Leave a blank line between paragraphs. Start a line with ## for a heading, or with - for each item of a list.',
+  'pages.bodyHtmlLabel': '{label}, as HTML',
   'pages.bodyHtmlHint':
     'This page has formatting from elsewhere, so it is edited as HTML to keep it.',
   'pages.visibility': 'On the storefront',
@@ -1477,6 +1478,36 @@ const en = {
   'menus.type.SHOP_POLICY': 'A policy',
   'menus.type.CUSTOMER_ACCOUNT_PAGE': 'Customer account',
   'menus.type.METAOBJECT': 'Other',
+  'onlineStore.policies': 'Policies',
+  'policies.intro':
+    "What customers agree to at checkout, linked from its footer. Start each from Hatti's draft, filled in from your settings.",
+  'policies.written': 'Written',
+  'policies.notWritten': 'Not written',
+  'policies.back': 'Policies',
+  'policies.cannot': "Only owners and managers set the shop's policies.",
+  'policies.notFound': 'There is no such policy.',
+  'policies.ownWords': 'In your words',
+  'policies.notAdvice':
+    "Hatti's drafts are a start, not legal advice: read yours through and make it true for your shop.",
+  'policies.startDraft': "Start from Hatti's draft",
+  'policies.body': 'Policy',
+  'policies.save': 'Save',
+  'policies.saved': 'Saved. The storefront shows it in a moment.',
+  'policies.remove': 'Take it away',
+  'policies.removeAsk': 'Take this policy away? The storefront and checkout stop linking to it.',
+  'policies.removeConfirm': 'Take it away',
+  'policies.urdu': 'In Urdu',
+  'policies.urduHint': "Shown on your storefront's Urdu pages in place of your words.",
+  'policies.urduOutdated':
+    'Your words changed since this was written: the Urdu pages show it until you save it again.',
+  'policies.startUrduDraft': "Start from Hatti's Urdu draft",
+  'policies.urduBody': 'Policy in Urdu',
+  'policies.saveUrdu': 'Save the Urdu',
+  'policies.type.REFUND_POLICY': 'Returns and refunds',
+  'policies.type.SHIPPING_POLICY': 'Delivery',
+  'policies.type.PRIVACY_POLICY': 'Privacy',
+  'policies.type.TERMS_OF_SERVICE': 'Terms of service',
+  'policies.type.CONTACT_INFORMATION': 'Contact information',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -2870,8 +2901,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'pages.content': 'مواد',
   'pages.titleLabel': 'عنوان',
   'pages.body': 'متن',
-  'pages.bodyHint': 'پیراگراف کے درمیان ایک خالی لائن چھوڑیں۔',
-  'pages.bodyHtml': 'متن، HTML میں',
+  'pages.bodyHint':
+    'پیراگراف کے درمیان ایک خالی لائن چھوڑیں۔ سرخی کے لیے لائن ## سے شروع کریں، اور فہرست کی ہر چیز - سے۔',
+  'pages.bodyHtmlLabel': '{label}، HTML میں',
   'pages.bodyHtmlHint':
     'اس صفحے میں کہیں اور سے فارمیٹنگ ہے، اس لیے اسے محفوظ رکھنے کے لیے HTML میں بدلا جاتا ہے۔',
   'pages.visibility': 'اسٹور فرنٹ پر',
@@ -2936,6 +2968,36 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'menus.type.SHOP_POLICY': 'ایک پالیسی',
   'menus.type.CUSTOMER_ACCOUNT_PAGE': 'کسٹمر اکاؤنٹ',
   'menus.type.METAOBJECT': 'دیگر',
+  'onlineStore.policies': 'پالیسیاں',
+  'policies.intro':
+    'جس سے کسٹمر چیک آؤٹ پر اتفاق کرتے ہیں، اس کے فوٹر سے منسلک۔ ہر ایک ہٹی کے مسودے سے شروع کریں، جو آپ کی سیٹنگز سے بھرا ہوتا ہے۔',
+  'policies.written': 'لکھی گئی',
+  'policies.notWritten': 'نہیں لکھی گئی',
+  'policies.back': 'پالیسیاں',
+  'policies.cannot': 'دکان کی پالیسیاں صرف مالک اور مینیجر طے کرتے ہیں۔',
+  'policies.notFound': 'ایسی کوئی پالیسی نہیں۔',
+  'policies.ownWords': 'آپ کے الفاظ میں',
+  'policies.notAdvice':
+    'ہٹی کے مسودے ایک شروعات ہیں، قانونی مشورہ نہیں: اپنی پالیسی پڑھیں اور اسے اپنی دکان کے مطابق درست کریں۔',
+  'policies.startDraft': 'ہٹی کے مسودے سے شروع کریں',
+  'policies.body': 'پالیسی',
+  'policies.save': 'محفوظ کریں',
+  'policies.saved': 'محفوظ ہو گیا۔ اسٹور فرنٹ پر یہ ایک لمحے میں نظر آئے گی۔',
+  'policies.remove': 'ہٹا دیں',
+  'policies.removeAsk': 'یہ پالیسی ہٹا دیں؟ اسٹور فرنٹ اور چیک آؤٹ اس کا لنک دکھانا بند کر دیں گے۔',
+  'policies.removeConfirm': 'ہٹا دیں',
+  'policies.urdu': 'اردو میں',
+  'policies.urduHint': 'آپ کے اسٹور فرنٹ کے اردو صفحات پر آپ کے الفاظ کی جگہ دکھائی جاتی ہے۔',
+  'policies.urduOutdated':
+    'یہ لکھے جانے کے بعد آپ کے الفاظ بدل گئے ہیں: دوبارہ محفوظ کرنے تک اردو صفحات یہی دکھائیں گے۔',
+  'policies.startUrduDraft': 'ہٹی کے اردو مسودے سے شروع کریں',
+  'policies.urduBody': 'اردو میں پالیسی',
+  'policies.saveUrdu': 'اردو محفوظ کریں',
+  'policies.type.REFUND_POLICY': 'واپسی اور رقم کی واپسی',
+  'policies.type.SHIPPING_POLICY': 'ڈیلیوری',
+  'policies.type.PRIVACY_POLICY': 'رازداری',
+  'policies.type.TERMS_OF_SERVICE': 'سروس کی شرائط',
+  'policies.type.CONTACT_INFORMATION': 'رابطے کی معلومات',
 };
 
 export const messages: Readonly<

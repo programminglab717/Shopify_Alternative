@@ -1413,3 +1413,34 @@ export interface MenuMutationData {
     userErrors: UserError[];
   };
 }
+
+export type ShopPolicyType =
+  | 'REFUND_POLICY'
+  | 'SHIPPING_POLICY'
+  | 'PRIVACY_POLICY'
+  | 'TERMS_OF_SERVICE'
+  | 'CONTACT_INFORMATION';
+
+export interface ShopPolicy {
+  id: string;
+  type: ShopPolicyType;
+  title: string;
+  body: string;
+  url: string;
+}
+
+export interface PoliciesData {
+  shop: { shopPolicies: ShopPolicy[] };
+}
+
+export interface PolicyDraftData {
+  shopPolicyDraft: { title: string; body: string };
+}
+
+export interface PolicyTranslationData {
+  translatableResource: {
+    resourceId: string;
+    translatableContent: { key: string; digest: string | null }[];
+    translations: { key: string; value: string | null; outdated: boolean }[];
+  } | null;
+}

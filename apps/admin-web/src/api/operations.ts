@@ -3140,3 +3140,73 @@ export const MenuDeleteMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** The shop's policies as the storefront shows them at /policies/ (ONB-09). */
+export const PoliciesQuery = /* GraphQL */ `
+  query Policies {
+    shop {
+      shopPolicies {
+        id
+        type
+        title
+        body
+        url
+      }
+    }
+  }
+`;
+
+/** Hatti's first draft of a policy in English or Urdu, filled in from the shop's settings. */
+export const PolicyDraftQuery = /* GraphQL */ `
+  query PolicyDraft($type: ShopPolicyType!, $locale: String!) {
+    shopPolicyDraft(type: $type, locale: $locale) {
+      title
+      body
+    }
+  }
+`;
+
+/** A policy set, or taken away with a blank body. */
+export const PolicyUpdateMutation = /* GraphQL */ `
+  mutation PolicyUpdate($shopPolicy: ShopPolicyInput!) {
+    shopPolicyUpdate(shopPolicy: $shopPolicy) {
+      shopPolicy {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A policy's words as kept, with their digests, and its Urdu. */
+export const PolicyTranslationQuery = /* GraphQL */ `
+  query PolicyTranslation($id: ID!) {
+    translatableResource(resourceId: $id) {
+      resourceId
+      translatableContent {
+        key
+        digest
+      }
+      translations(locale: "ur") {
+        key
+        value
+        outdated
+      }
+    }
+  }
+`;
+
+/** Translations kept, each naming the digest of the words it translates (OS-06). */
+export const TranslationsRegisterMutation = /* GraphQL */ `
+  mutation TranslationsRegister($resourceId: ID!, $translations: [TranslationInput!]!) {
+    translationsRegister(resourceId: $resourceId, translations: $translations) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

@@ -32,6 +32,7 @@ import { StockPage } from './stock/stock-page';
 import { OnlineStorePage, validateOnlineStoreSearch } from './online-store/online-store-page';
 import { MenuEditorPage } from './online-store/menus';
 import { NewPagePage, PageEditorPage } from './online-store/pages';
+import { PolicyPage } from './online-store/policies';
 import { CollectionPage } from './collections/collection-page';
 import { CollectionsPage, NewCollectionPage } from './collections/collections-page';
 import { DiscountsPage } from './discounts/discounts-page';
@@ -302,6 +303,12 @@ const menuEditor = createRoute({
   component: MenuEditorPage,
 });
 
+const policy = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store/policies/$policy',
+  component: PolicyPage,
+});
+
 const stock = createRoute({
   getParentRoute: () => shop,
   path: 'stock',
@@ -453,6 +460,7 @@ export const routeTree = root.addChildren([
     newPage,
     pageEditor,
     menuEditor,
+    policy,
     collections,
     newCollection,
     collection,

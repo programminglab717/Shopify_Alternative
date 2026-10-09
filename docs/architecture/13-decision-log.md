@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-291 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-292 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -299,6 +299,7 @@
 | 289 | The admin's stock lists what runs low, the fewest for sale first, and finds any product's; each variant's stock at each location, added to or taken from with a reason and counted against what was on hand when read, by owners and managers; every role sees it, and Home says how many run low | Accepted |
 | 290 | The admin's collections, reached from the products, are listed and made by hand or by rules; one made by hand has its products found and added, taken out and moved up or down while sorted by hand, one made by rules has its rules changed; owners and managers change them, every role reads them | Accepted |
 | 291 | The admin's online store writes the shop's pages as plain text, paragraphs a blank line apart, shown or hidden, keeping HTML from elsewhere as HTML; and changes its menus' links three levels deep, to the home page, all products, a collection, a product, a page or an address, saved whole; marketers write pages, owners and managers both | Accepted |
+| 292 | The admin's policies start from Hatti's drafts and are written as text with headings, lists and links, kept or taken away by owners and managers; each policy's Urdu is kept as a translation of its words, said to be out of date once they change | Accepted |
 
 ---
 
@@ -11976,3 +11977,38 @@
     pages need yet; plain paragraphs cover returns, delivery and about pages.
   * **Saving each link as it changes:** the core takes a menu whole, and half a menu saved shows
     shoppers half a menu.
+
+## ADR-292 · The admin's policies start from Hatti's drafts and are written as text with headings, lists and links, kept or taken away by owners and managers; each policy's Urdu is kept as a translation of its words, said to be out of date once they change
+
+* **Context:** The core keeps the shop's five policies as Shopify does (returns and refunds,
+  delivery, privacy, terms of service and contact information), sets one or takes it away with a
+  blank body, and writes a first draft of each in English or Urdu from the shop's settings: its
+  name, address, WhatsApp number and delivery charges. A policy's Urdu is a translation of its
+  body, kept against the digest of the words it translates and shown as out of date once they
+  change. Checkout links the policies the shop has. Policies are owners' and managers'. The
+  drafts are headings, lists and paragraphs, with links and, in Urdu, numbers kept left to right
+  in spans; the admin's plain text ([ADR-291](#adr-291--the-admins-online-store-writes-the-shops-pages-as-plain-text-paragraphs-a-blank-line-apart-shown-or-hidden-keeping-html-from-elsewhere-as-html-and-changes-its-menus-links-three-levels-deep-to-the-home-page-all-products-a-collection-a-product-a-page-or-an-address-saved-whole-marketers-write-pages-owners-and-managers-both)) took paragraphs alone, so a draft would
+  have opened as HTML.
+* **Decision:**
+  * **The plain text grows to what policies are:** a block starting "## " is a heading, a block
+    whose lines all start "- " is a list, and a web address is a link. In Urdu, runs of Latin
+    letters and digits, such as "Rs 200" or a phone number, are kept left to right as the drafts
+    keep them. A body read back gives the same text, so Hatti's drafts open as text; any other
+    HTML is still edited as HTML. Pages write the same way.
+  * **A Policies tab** in the online store, for owners and managers, lists the five, each written
+    or not. A policy not written starts from Hatti's draft, asked for when wanted so it reads the
+    settings as they are, said plainly to be a start and not legal advice. It is saved, or taken
+    away after saying checkout stops linking to it.
+  * **Its Urdu** starts from Hatti's Urdu draft and is kept as the translation of the policy's
+    words, naming their digest; once those words change, the page says the Urdu is out of date
+    and starts again from it.
+* **Consequences:**
+  * A shop has a returns policy its customers can read in Urdu in two taps each, and changes it
+    as its own words.
+  * A policy written once in the admin is the same HTML as Hatti's draft would be: themes and
+    checkout print it as they did.
+* **Alternatives:**
+  * **Policies as HTML alone:** the drafts' markup put in front of a shop on a phone; one wrong
+    tag breaks the page.
+  * **Urdu as a policy of its own:** the core keeps one policy of each kind, and a translation
+    knows when the words it translates have changed.

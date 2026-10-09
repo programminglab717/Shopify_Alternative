@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { ArrowLeft, Clock, Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   PageCreateMutation,
@@ -21,7 +21,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
-import { htmlFromText, textFromHtml } from './page-body';
+import { BodyArea, normalized, useBody } from './body-field';
 
 /** Those who write the shop's pages, which are content: marketers too (ADR-176). */
 export const WRITES_PAGES: readonly StaffRole[] = ['owner', 'manager', 'marketer'];
@@ -122,14 +122,13 @@ function BackToPages() {
 }
 
 /**
- * A page's title, body and whether it shows. The body is written as plain text, paragraphs a
- * blank line apart; one with more formatting than that, written elsewhere, is edited as HTML.
+ * A page's title, body and whether it shows. The body is written as plain text, blocks a blank
+ * line apart, headings and lists marked; one with more formatting than that is edited as HTML.
  */
 function PageForm({ page }: { page?: NonNullable<PageData['page']> }) {
   const { t } = useLocale();
   const { id: shopId } = useShop();
   const navigate = useNavigate();
-  const bodyId = useId();
   const create = useAdminMutation<PageMutationData, { page: Record<string, unknown> }>(
     PageCreateMutation,
   );
@@ -137,17 +136,15 @@ function PageForm({ page }: { page?: NonNullable<PageData['page']> }) {
     PageUpdateMutation,
   );
   const { problem, attempt } = useAttempt();
-  const plain = page ? textFromHtml(page.body) : '';
-  const asHtml = plain === null;
+  const body = useBody(page?.body ?? '');
   const [title, setTitle] = useState(page?.title ?? '');
-  const [body, setBody] = useState(plain ?? page?.body ?? '');
   const [shown, setShown] = useState(page ? page.isPublished : true);
   const [saved, setSaved] = useState(false);
-  const html = asHtml ? body : htmlFromText(body);
+  const html = body.html;
   const input = page
     ? {
         ...(title.trim() !== page.title && { title: title.trim() }),
-        ...(html !== (asHtml ? page.body : htmlFromText(plain ?? '')) && { body: html }),
+        ...(html !== normalized(page.body) && { body: html }),
         ...(shown !== page.isPublished && { isPublished: shown }),
       }
     : { title: title.trim(), body: html, isPublished: shown };
@@ -188,22 +185,7 @@ function PageForm({ page }: { page?: NonNullable<PageData['page']> }) {
           value={title}
           onChange={(event) => setTitle(event.target.value)}
         />
-        <div className="flex flex-col gap-1">
-          <label htmlFor={bodyId} className="font-medium">
-            {t(asHtml ? 'pages.bodyHtml' : 'pages.body')}
-          </label>
-          <p className="text-secondary">{t(asHtml ? 'pages.bodyHtmlHint' : 'pages.bodyHint')}</p>
-          <textarea
-            id={bodyId}
-            value={body}
-            rows={12}
-            dir={asHtml ? 'ltr' : 'auto'}
-            onChange={(event) => setBody(event.target.value)}
-            className={`rounded-control border border-line bg-surface px-3 py-2 text-text ${
-              asHtml ? 'font-mono text-[length:var(--hatti-type-body-sm-size)]' : ''
-            }`}
-          />
-        </div>
+        <BodyArea body={body} label={t('pages.body')} />
       </FormSection>
       <FormSection title={t('pages.visibility')}>
         <fieldset className="flex flex-col gap-1">

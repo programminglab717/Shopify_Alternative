@@ -7,8 +7,9 @@ import { useShop } from '../shell/shop-context';
 import { EmptyState } from '../ui/feedback';
 import { EDITS_MENUS, MenusList } from './menus';
 import { PagesList, WRITES_PAGES } from './pages';
+import { PoliciesList, SETS_POLICIES } from './policies';
 
-export const ONLINE_STORE_TABS = ['pages', 'menus'] as const;
+export const ONLINE_STORE_TABS = ['pages', 'menus', 'policies'] as const;
 export type OnlineStoreTab = (typeof ONLINE_STORE_TABS)[number];
 
 /** The online store's tab, from its address: its pages unless it names another. */
@@ -27,6 +28,11 @@ const TABS: Record<
 > = {
   pages: { label: 'onlineStore.pages', roles: WRITES_PAGES, body: () => <PagesList /> },
   menus: { label: 'onlineStore.menus', roles: EDITS_MENUS, body: () => <MenusList /> },
+  policies: {
+    label: 'onlineStore.policies',
+    roles: SETS_POLICIES,
+    body: () => <PoliciesList />,
+  },
 };
 
 /** The roles that see the online store at all: those who work in any of its tabs. */
@@ -34,7 +40,7 @@ export const OPENS_ONLINE_STORE: readonly StaffRole[] = [
   ...new Set([...WRITES_PAGES, ...EDITS_MENUS]),
 ];
 
-/** The online store (OS-07): the shop's pages and menus, a tab for each part its role works in. */
+/** The online store (OS-07): the shop's pages, menus and policies, a tab for each part its role works in. */
 export function OnlineStorePage() {
   const { t } = useLocale();
   const shop = useShop();

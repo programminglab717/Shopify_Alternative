@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the shop's policies in the admin** (ONB-09): its returns, privacy, terms and delivery
-policies drafted from Hatti's English and Urdu drafts, written and published; then the admin's
-next sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, your own account in the admin** (ADM-02): your name and language, email and numbers,
+password, passkeys and Google, and the browsers you are signed in on; then the admin's next
+sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The shop's policies, in the admin
+
+* **A Policies tab** ([ADR-292](../architecture/13-decision-log.md#adr-292--the-admins-policies-start-from-hattis-drafts-and-are-written-as-text-with-headings-lists-and-links-kept-or-taken-away-by-owners-and-managers-each-policys-urdu-is-kept-as-a-translation-of-its-words-said-to-be-out-of-date-once-they-change)): the five policies, each started from Hatti's draft
+  and written as text with headings, lists and links, saved or taken away; its Urdu kept as a
+  translation of its words, said to be out of date once they change. Pages write the same way.
+* **Tried against the core:** the seed's shop had no policies; its delivery policy's draft opened
+  as text, its zones and free-delivery total filled in, and was saved; its Urdu draft opened as
+  text with "Rs 200" and "Rs 5,000" in it, and was saved as the translation; the returns policy
+  saved from its draft too; with no errors in the browser. The first try found a new policy's
+  form remade by its own save, losing "Saved."; it is now kept by the policy's kind.
+* 2094 tests: drafts to text and back to the same HTML, English and Urdu; the five listed and
+  one written from its draft; the Urdu kept against its words' digest and said out of date;
+  one taken away; and none for a marketer.
 
 ### c806d77 · The online store's pages and menus, in the admin
 
