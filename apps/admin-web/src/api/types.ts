@@ -2154,3 +2154,17 @@ export interface ShopDomainsData {
   shop: { url: string };
   domains: ShopDomain[];
 }
+
+export interface OnlineStoreTheme {
+  id: string;
+  name: string;
+  role: 'MAIN' | 'UNPUBLISHED';
+  base: string;
+  previewUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ThemesData {
+  themes: { nodes: OnlineStoreTheme[] };
+}

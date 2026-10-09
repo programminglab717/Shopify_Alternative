@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-319 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-320 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -327,6 +327,7 @@
 | 317 | The admin sets on the product page whether each variant's stock is counted and whether it keeps selling when out of stock, each change saved at once and shown at once, put back if the core refuses | Accepted |
 | 318 | The admin describes each product photo for screen readers and search engines, from a pencil on its tile, the description shown beneath it | Accepted |
 | 319 | The admin connects the shop's own domains in settings, saying which record to add where it was bought, checks them again, makes a connected one primary or not, and lets one go once asked; the Hatti address is always shown | Accepted |
+| 320 | The admin lists the shop's themes in the online store, the live one first, each previewed through its link, and adds a copy of one or the platform theme afresh, publishes one once asked, and deletes those not live | Accepted |
 
 ---
 
@@ -12806,3 +12807,28 @@
 * **Alternatives:**
   * **Domains under the online store:** where Shopify puts them, but here they are the shop's
     set-up, beside its plan, which decides whether it may have them.
+
+## ADR-320 · The admin lists the shop's themes in the online store, the live one first, each previewed through its link, and adds a copy of one or the platform theme afresh, publishes one once asked, and deletes those not live
+
+* **Context:** A shop's theme is the platform theme with the shop's own JSON files over it
+  (ADR-039); the core keeps several, one MAIN that the storefront shows, the rest UNPUBLISHED,
+  each with a sealed preview link good for 14 days (ADR-049). themeCreate makes one on the
+  platform theme or as a copy of another's files, themePublish makes one the main one, and
+  themeDelete deletes any but the main one. Owners and managers keep them. The admin had no
+  page for them, and the theme editor (ADR-050) waits.
+* **Decision:**
+  * **Themes** is a tab of the online store, for owners and managers. It lists the live theme
+    first, marked Live, then the rest by when they last changed, each with the date it was
+    added, when it changed and the platform theme it is built on; names may repeat, so the
+    dates tell two apart.
+  * **Preview** opens the theme's link on the storefront, live or not.
+  * **Publish** and **Delete** are offered on themes not live, each once asked; publishing says
+    the storefront shows it in a moment and the live theme is kept to publish again.
+  * **Add a theme** starts from a copy of the live theme, chosen to begin with, of another, or
+    of the platform theme as it comes, with a name.
+* **Consequences:**
+  * A shop prepares its Eid look in a copy, looks at it on its phone through the preview link,
+    and publishes it on the day, with the old one kept to go back to.
+* **Alternatives:**
+  * **Themes beside the theme editor, when it comes:** the editor changes one theme's files;
+    choosing, copying and publishing themes is the step before it, worth having now.

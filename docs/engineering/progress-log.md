@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the online store's themes in the admin** (OS-02): the shop's themes listed, a copy made,
-renamed, published and deleted; then the admin's next sections as the alpha's shops need them.
-Urdu handles wait, as decided.
+**Next, the drafts list searched in the admin** (ORD-03): drafts found by name, customer and
+status, with the list's saved searches as on orders and products; then the admin's next
+sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The online store's themes, in the admin
+
+* **Themes** ([ADR-320](../architecture/13-decision-log.md#adr-320--the-admin-lists-the-shops-themes-in-the-online-store-the-live-one-first-each-previewed-through-its-link-and-adds-a-copy-of-one-or-the-platform-theme-afresh-publishes-one-once-asked-and-deletes-those-not-live)), a tab of the online store: the live theme first, each previewed through
+  its link; a copy of one, or the platform theme, added; one published once asked; those not
+  live deleted.
+* **Tried against the core:** on the seed's shop, a copy of its live Hatti Base was added under
+  the same name, which the core allows, and another as "Eid check", each with the live theme's
+  two files; "Eid check" was published, the storefront's theme with it, and Hatti Base
+  published back; the two copies were then deleted, leaving the shop's one theme live. Two
+  themes of one name looked the same, so each row now says when it was added. No errors in the
+  browser.
+* 2284 tests: the live theme first with each one's preview; a copy added after a refusal
+  named, and one on the platform theme; one published once asked and another deleted; none of it
+  for a marketer.
 
 ### 62f0d55 · The shop's domains, in the admin
 

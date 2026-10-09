@@ -5089,3 +5089,72 @@ export const DomainDeleteMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const THEME = /* GraphQL */ `
+  fragment Theme on OnlineStoreTheme {
+    id
+    name
+    role
+    base
+    previewUrl
+    createdAt
+    updatedAt
+  }
+`;
+
+/** The shop's themes: the one its storefront shows, and those being prepared (OS-02). */
+export const ThemesQuery = /* GraphQL */ `
+  query Themes {
+    themes(first: 50) {
+      nodes {
+        ...Theme
+      }
+    }
+  }
+  ${THEME}
+`;
+
+/** A theme added, a copy of one the shop has or on the platform theme afresh. */
+export const ThemeCreateMutation = /* GraphQL */ `
+  mutation ThemeCreate($name: String!, $copyFrom: ID) {
+    themeCreate(name: $name, copyFrom: $copyFrom) {
+      theme {
+        ...Theme
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${THEME}
+  ${USER_ERRORS}
+`;
+
+/** A theme made the one the storefront shows; the one before it unpublished. */
+export const ThemePublishMutation = /* GraphQL */ `
+  mutation ThemePublish($id: ID!) {
+    themePublish(id: $id) {
+      theme {
+        ...Theme
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${THEME}
+  ${USER_ERRORS}
+`;
+
+/** A theme other than the live one deleted. */
+export const ThemeDeleteMutation = /* GraphQL */ `
+  mutation ThemeDelete($id: ID!) {
+    themeDelete(id: $id) {
+      deletedThemeId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
