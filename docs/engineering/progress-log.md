@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Your own account, in the admin
+### d40b1f1 · Your own account, in the admin
 
 * **An Account page** ([ADR-293](../architecture/13-decision-log.md#adr-293--the-admins-account-page-keeps-your-email-number-and-language-the-google-account-and-passkeys-you-sign-in-with-and-the-browsers-you-are-signed-in-on-each-change-proved-again-when-the-core-asks-passkeys-are-made-by-the-browser-from-the-cores-options-as-webauthns-json)), from the header on every page: your email and number, each
   proved or not and changed by a link or a code; the language Hatti writes to you in; Google;
