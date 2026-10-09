@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### The checkout page, in the admin
+### 95b72b2 · The checkout page, in the admin
 
 * **Checkout page** ([ADR-310](../architecture/13-decision-log.md#adr-310--the-admin-sets-the-checkout-page-in-settings-up-to-four-badges-under-its-button-in-the-shops-order-with-the-days-for-exchanges-and-returns-help-on-whatsapp-offered-only-with-the-shops-number-and-the-boxes-it-offers-for-the-shops-offers-by-channel)) in settings: up to four badges under its button, in the shop's
   order, with the days for exchanges and returns; and the boxes for the shop's offers, by
