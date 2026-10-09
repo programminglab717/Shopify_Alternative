@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Stock rules, in the admin
+### a18fe86 · Stock rules, in the admin
 
 * **Stock rules** ([ADR-317](../architecture/13-decision-log.md#adr-317--the-admin-sets-on-the-product-page-whether-each-variants-stock-is-counted-and-whether-it-keeps-selling-when-out-of-stock-each-change-saved-at-once-and-shown-at-once-put-back-if-the-core-refuses)) on the product page: each variant's stock counted or not, and kept
   selling when out of stock or not; each change saved and shown at once.
