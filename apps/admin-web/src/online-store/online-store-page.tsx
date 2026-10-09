@@ -5,11 +5,12 @@ import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { useShop } from '../shell/shop-context';
 import { EmptyState } from '../ui/feedback';
+import { BlogsList } from './blogs';
 import { EDITS_MENUS, MenusList } from './menus';
 import { PagesList, WRITES_PAGES } from './pages';
 import { PoliciesList, SETS_POLICIES } from './policies';
 
-export const ONLINE_STORE_TABS = ['pages', 'menus', 'policies'] as const;
+export const ONLINE_STORE_TABS = ['pages', 'blogs', 'menus', 'policies'] as const;
 export type OnlineStoreTab = (typeof ONLINE_STORE_TABS)[number];
 
 /** The online store's tab, from its address: its pages unless it names another. */
@@ -27,6 +28,7 @@ const TABS: Record<
   { label: MessageKey; roles: readonly StaffRole[]; body: () => ReactNode }
 > = {
   pages: { label: 'onlineStore.pages', roles: WRITES_PAGES, body: () => <PagesList /> },
+  blogs: { label: 'onlineStore.blogs', roles: WRITES_PAGES, body: () => <BlogsList /> },
   menus: { label: 'onlineStore.menus', roles: EDITS_MENUS, body: () => <MenusList /> },
   policies: {
     label: 'onlineStore.policies',
@@ -40,7 +42,10 @@ export const OPENS_ONLINE_STORE: readonly StaffRole[] = [
   ...new Set([...WRITES_PAGES, ...EDITS_MENUS]),
 ];
 
-/** The online store (OS-07): the shop's pages, menus and policies, a tab for each part its role works in. */
+/**
+ * The online store (OS-07): the shop's pages, blogs, menus and policies, a tab for each part its
+ * role works in.
+ */
 export function OnlineStorePage() {
   const { t } = useLocale();
   const shop = useShop();

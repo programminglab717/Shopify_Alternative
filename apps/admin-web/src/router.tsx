@@ -30,6 +30,8 @@ import { ReturnsPage, validateReturnsSearch } from './returns/returns-page';
 import { StatementPage } from './cash/statement-page';
 import { StockPage } from './stock/stock-page';
 import { AccountPage } from './account/account-page';
+import { ArticleEditorPage, NewArticlePage } from './online-store/articles';
+import { BlogPage } from './online-store/blogs';
 import { OnlineStorePage, validateOnlineStoreSearch } from './online-store/online-store-page';
 import { MenuEditorPage } from './online-store/menus';
 import { NewPagePage, PageEditorPage } from './online-store/pages';
@@ -310,6 +312,24 @@ const policy = createRoute({
   component: PolicyPage,
 });
 
+const blog = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store/blogs/$blogId',
+  component: BlogPage,
+});
+
+const newArticle = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store/blogs/$blogId/articles/new',
+  component: NewArticlePage,
+});
+
+const articleEditor = createRoute({
+  getParentRoute: () => shop,
+  path: 'online-store/articles/$articleId',
+  component: ArticleEditorPage,
+});
+
 const account = createRoute({
   getParentRoute: () => shop,
   path: 'account',
@@ -469,6 +489,9 @@ export const routeTree = root.addChildren([
     pageEditor,
     menuEditor,
     policy,
+    blog,
+    newArticle,
+    articleEditor,
     collections,
     newCollection,
     collection,

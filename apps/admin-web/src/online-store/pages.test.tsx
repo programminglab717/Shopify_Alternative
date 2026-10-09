@@ -39,6 +39,7 @@ function core(role: StaffRole) {
                 id: 'pag_3',
                 title: 'Eid sale',
                 handle: 'eid-sale',
+                isPublished: false,
                 publishedAt: LATER,
               },
             ].map(({ body: _body, ...page }) => page),

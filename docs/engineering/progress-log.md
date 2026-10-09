@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, the online store's blogs in the admin** (OS-07): blogs and their articles written as
-text like pages, with an image, published now or at a time ahead, and their comments approved
-or taken down; then the admin's next sections as the alpha's shops need them. Urdu handles
-wait, as decided.
+**Next, the online store's preferences and redirects in the admin** (OS-09, OS-15): the
+storefront's password while the shop gets ready, the home page's title and description for search
+engines, and redirects from old addresses, added, imported from Shopify's CSV and deleted; then
+the admin's next sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The shop's blogs, in the admin
+
+* **A Blogs tab** ([ADR-296](../architecture/13-decision-log.md#adr-296--the-admins-online-store-writes-the-shops-blogs-a-blog-started-by-its-title-its-comments-closed-approved-or-shown-at-once-its-articles-written-as-text-like-pages-with-an-author-tags-and-an-image-from-the-phone-shown-now-from-a-time-ahead-or-hidden-and-their-comments-approved-marked-as-spam-or-not-and-deleted)): blogs started by their title, their comments closed, approved or shown
+  at once, and deleted; articles written as text, with an author, tags and an image from the
+  phone, shown now, from a time ahead or hidden; and their comments approved, marked as spam or
+  not, and deleted. Logos and articles' images share one upload.
+* **Tried against the core:** a blog started on the seed's shop; an article written with a
+  heading and a list, an author, tags and an image, to show tomorrow at 09:30, kept as such; two
+  comments left on it, one approved and one marked as spam; with no errors in the browser. The
+  first try found the article scheduled for tomorrow shown as hidden, as were pages scheduled
+  ahead: the core says `isPublished` of one shown now alone, and the admin now reads the date.
+* 2121 tests: a blog started and an article written with an image to show from a time ahead;
+  an article changed and hidden, its comments moderated, and deleted; a blog's comments closed
+  and the blog deleted; and none for a packer.
 
 ### 2b350b7 · The admin installed on a phone, and offline
 

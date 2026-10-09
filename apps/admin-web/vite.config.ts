@@ -5,7 +5,7 @@ import { themeStylesheet } from '@hatti/tokens';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vitest/config';
-import { precacheOf } from './src/offline/rules';
+import { precacheOf } from './src/offline/rules.ts';
 
 const TOKENS = 'virtual:hatti-tokens.css';
 

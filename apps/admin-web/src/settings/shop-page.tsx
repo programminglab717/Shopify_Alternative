@@ -1,28 +1,23 @@
 import { ImageUp, Store, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { browserFetch } from '../api/client';
 import {
-  FileCreateMutation,
   OnlineStorePreferencesUpdateMutation,
   ShopBrandUpdateMutation,
   ShopDetailsQuery,
-  StagedUploadsCreateMutation,
 } from '../api/operations';
-import type { ShopDetailsData, StagedUploadsCreateData, UserError } from '../api/types';
+import type { ShopDetailsData, UserError } from '../api/types';
 import { errorText } from '../i18n/errors';
 import { formatPhone } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { FormSection, problemText } from '../products/product-form';
-import { preparePhoto } from '../products/photos';
 import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
+import { useImageUpload } from '../shell/use-image-upload';
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { BackToSettings } from './settings-page';
-
-const MAX_BYTES = 20 * 1024 * 1024;
 
 type LogoKind = 'logo' | 'squareLogo';
 
@@ -36,13 +31,7 @@ function LogoField({
 }) {
   const { t } = useLocale();
   const input = useRef<HTMLInputElement>(null);
-  const stage = useAdminMutation<StagedUploadsCreateData, { input: Record<string, string>[] }>(
-    StagedUploadsCreateMutation,
-  );
-  const create = useAdminMutation<
-    { fileCreate: { files: { id: string }[] | null; userErrors: UserError[] } },
-    { files: { originalSource: string; alt: string }[] }
-  >(FileCreateMutation);
+  const uploadImage = useImageUpload();
   const update = useAdminMutation<
     { shopBrandUpdate: { userErrors: UserError[] } },
     { input: Partial<Record<LogoKind, string | null>> }
@@ -71,32 +60,8 @@ function LogoField({
 
   const upload = (file: File) =>
     attempt(async () => {
-      const photo = await preparePhoto(file);
-      if (!photo) return t('photos.badType', { name: file.name });
-      if (photo.size > MAX_BYTES) return t('photos.tooBig', { name: file.name });
-      const { stagedUploadsCreate } = await stage.mutateAsync({
-        input: [{ filename: photo.name, mimeType: photo.type, fileSize: String(photo.size) }],
-      });
-      const target = stagedUploadsCreate.stagedTargets?.[0];
-      if (!target) {
-        const error = stagedUploadsCreate.userErrors[0];
-        return error ? problemText(error, t) : t('state.error');
-      }
-      const response = await browserFetch(target.url, {
-        method: target.httpMethod,
-        headers: Object.fromEntries(target.parameters.map((each) => [each.name, each.value])),
-        body: photo,
-      });
-      if (!response.ok) return t('photos.uploadFailed', { name: photo.name });
-      const { fileCreate } = await create.mutateAsync({
-        files: [{ originalSource: target.resourceUrl, alt: t(`shop.${kind}` as MessageKey) }],
-      });
-      const made = fileCreate.files?.[0];
-      if (!made) {
-        const error = fileCreate.userErrors[0];
-        return error ? problemText(error, t) : t('state.error');
-      }
-      return setLogo(made.id);
+      const made = await uploadImage(file, t(`shop.${kind}` as MessageKey));
+      return 'problem' in made ? made.problem : setLogo(made.id);
     });
 
   const onChosen = (event: ChangeEvent<HTMLInputElement>) => {

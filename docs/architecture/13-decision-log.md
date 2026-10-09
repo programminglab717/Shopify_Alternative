@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-295 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-296 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -303,6 +303,7 @@
 | 293 | The admin's account page keeps your email, number and language, the Google account and passkeys you sign in with, and the browsers you are signed in on, each change proved again when the core asks; passkeys are made by the browser from the core's options as WebAuthn's JSON | Accepted |
 | 294 | The admin signs in with a passkey alone, a passkey as the second step, or Google's own button loaded only when asked for, and confirms who is there the same ways; a passkey's challenge and Google's nonce are good once, so each try starts from the core's options again | Accepted |
 | 295 | The admin installs on a phone from a manifest in its language, with PNG and maskable icons, and a service worker built with it keeps the admin's own files: its page from the network and offline from the cache, its files from the cache, the shop's data never; it says when the phone is offline, and offers a new version once it has installed | Accepted |
+| 296 | The admin's online store writes the shop's blogs: a blog started by its title, its comments closed, approved or shown at once; its articles written as text like pages, with an author, tags and an image from the phone, shown now, from a time ahead or hidden; and their comments approved, marked as spam or not, and deleted | Accepted |
 
 ---
 
@@ -12128,3 +12129,37 @@
     session's own keeping of data to be thought through.
   * **A plugin for service workers:** the rules are a dozen lines, and the build's list of
     files is all the plugin would add.
+
+## ADR-296 · The admin's online store writes the shop's blogs: a blog started by its title, its comments closed, approved or shown at once; its articles written as text like pages, with an author, tags and an image from the phone, shown now, from a time ahead or hidden; and their comments approved, marked as spam or not, and deleted
+
+* **Context:** The core keeps the shop's blogs as Shopify does: each with its comment policy
+  (closed, which it starts as, moderated, or shown at once), and its articles with a body, an
+  author, tags, an image from the shop's files, and a time to show from. Comments come from the
+  storefront and wait, show, or are spam. An article published at a time ahead is not
+  `isPublished` until the worker shows it; one hidden has no date ([ADR-215](#adr-215--an-article-is-published-at-a-time-ahead-as-shopifys-publishdate-schedules-one-hidden-until-then-wherever-it-would-show-and-the-worker-shows-it-once-its-time-comes-with-the-articleupdated-the-storefront-follows)). The
+  admin's online store wrote pages, menus and policies ([ADR-291](#adr-291--the-admins-online-store-writes-the-shops-pages-as-plain-text-paragraphs-a-blank-line-apart-shown-or-hidden-keeping-html-from-elsewhere-as-html-and-changes-its-menus-links-three-levels-deep-to-the-home-page-all-products-a-collection-a-product-a-page-or-an-address-saved-whole-marketers-write-pages-owners-and-managers-both)), and not blogs.
+* **Decision:**
+  * **A Blogs tab** in the online store, for those who write pages (owners, managers and
+    marketers), lists the blogs with how many articles each has; a new one is started by its
+    title alone and opened.
+  * **A blog's page** lists its articles, each shown, showing from its date, or hidden, with how
+    many comments it has; a new article is written from there. The blog's title and comments are
+    changed, each choice of comments said in a line, and the blog is deleted after saying how many
+    articles go with it.
+  * **An article** is written as text as pages are, with its author and its tags, commas between
+    them. Its image is chosen from the phone, made smaller in the browser and uploaded as the
+    shop's logos are, the upload now shared by both; it is shown from the file's address, or
+    taken away. It shows now, from a time ahead in the phone's own time, or not at all.
+  * **Its comments**, the latest first: how many wait is said above them; one waiting is
+    approved, any is marked as spam, one marked by mistake is put back, and any is deleted after
+    asking. A blog closed to comments says so, and where to open it.
+  * **Whether a page or an article shows** is read from its date as the core keeps it: none,
+    hidden; ahead, or come but not yet shown by the worker, showing from it; else shown. Pages
+    scheduled ahead had shown as hidden.
+* **Consequences:**
+  * A shop writes about its products and its customers' questions from the phone, and answers
+    the comments it gets, in English or Urdu.
+* **Alternatives:**
+  * **Comments in a section of their own across all articles:** the core can list them by status,
+    but a shop with a handful of articles reads them where they were left; a queue waits for shops
+    whose blogs grow.

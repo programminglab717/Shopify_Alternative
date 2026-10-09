@@ -3210,3 +3210,244 @@ export const TranslationsRegisterMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** The shop's blogs, oldest first, with how many articles each has (OS-07). */
+export const BlogsQuery = /* GraphQL */ `
+  query Blogs {
+    blogs(first: 250) {
+      nodes {
+        id
+        title
+        handle
+        commentPolicy
+        articlesCount
+      }
+    }
+  }
+`;
+
+/** A blog with its articles, the newest last, and each article's comments waiting. */
+export const BlogQuery = /* GraphQL */ `
+  query Blog($id: ID!) {
+    blog(id: $id) {
+      id
+      title
+      handle
+      commentPolicy
+      articlesCount
+      articles(first: 250) {
+        nodes {
+          id
+          title
+          handle
+          isPublished
+          publishedAt
+          commentsCount
+        }
+      }
+    }
+  }
+`;
+
+/** A blog started; its articles are written on their own pages. */
+export const BlogCreateMutation = /* GraphQL */ `
+  mutation BlogCreate($blog: BlogCreateInput!) {
+    blogCreate(blog: $blog) {
+      blog {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A blog's title or comment policy changed. */
+export const BlogUpdateMutation = /* GraphQL */ `
+  mutation BlogUpdate($id: ID!, $blog: BlogUpdateInput!) {
+    blogUpdate(id: $id, blog: $blog) {
+      blog {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A blog deleted with its articles and their comments. */
+export const BlogDeleteMutation = /* GraphQL */ `
+  mutation BlogDelete($id: ID!) {
+    blogDelete(id: $id) {
+      deletedBlogId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+const COMMENT = /* GraphQL */ `
+  fragment ArticleComment on Comment {
+    id
+    body
+    status
+    createdAt
+    author {
+      name
+      email
+    }
+  }
+`;
+
+/** An article to change, its blog, and its comments, the latest first. */
+export const ArticleQuery = /* GraphQL */ `
+  query Article($id: ID!) {
+    article(id: $id) {
+      id
+      title
+      handle
+      body
+      summary
+      tags
+      isPublished
+      publishedAt
+      author {
+        name
+      }
+      image {
+        fileId
+        altText
+      }
+      blog {
+        id
+        title
+        handle
+        commentPolicy
+      }
+      comments(first: 100) {
+        nodes {
+          ...ArticleComment
+        }
+      }
+    }
+  }
+  ${COMMENT}
+`;
+
+/** A file the shop uploaded, for its address: an article's image shown from it. */
+export const FileQuery = /* GraphQL */ `
+  query ShopFile($id: ID!) {
+    file(id: $id) {
+      id
+      url
+      alt
+    }
+  }
+`;
+
+/** An article written in a blog, shown now, at a time ahead, or hidden. */
+export const ArticleCreateMutation = /* GraphQL */ `
+  mutation ArticleCreate($article: ArticleCreateInput!) {
+    articleCreate(article: $article) {
+      article {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** An article's fields changed: those given; the others stay. */
+export const ArticleUpdateMutation = /* GraphQL */ `
+  mutation ArticleUpdate($id: ID!, $article: ArticleUpdateInput!) {
+    articleUpdate(id: $id, article: $article) {
+      article {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** An article deleted with its comments. */
+export const ArticleDeleteMutation = /* GraphQL */ `
+  mutation ArticleDelete($id: ID!) {
+    articleDelete(id: $id) {
+      deletedArticleId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A comment shown on its article. */
+export const CommentApproveMutation = /* GraphQL */ `
+  mutation CommentApprove($id: ID!) {
+    commentApprove(id: $id) {
+      comment {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A comment marked as spam, and hidden. */
+export const CommentSpamMutation = /* GraphQL */ `
+  mutation CommentSpam($id: ID!) {
+    commentSpam(id: $id) {
+      comment {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A comment marked as spam by mistake, back to waiting. */
+export const CommentNotSpamMutation = /* GraphQL */ `
+  mutation CommentNotSpam($id: ID!) {
+    commentNotSpam(id: $id) {
+      comment {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A comment deleted for good. */
+export const CommentDeleteMutation = /* GraphQL */ `
+  mutation CommentDelete($id: ID!) {
+    commentDelete(id: $id) {
+      deletedCommentId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

@@ -1444,3 +1444,72 @@ export interface PolicyTranslationData {
     translations: { key: string; value: string | null; outdated: boolean }[];
   } | null;
 }
+
+export type CommentPolicy = 'CLOSED' | 'MODERATED' | 'AUTO_PUBLISHED';
+export type CommentStatus = 'PENDING' | 'PUBLISHED' | 'SPAM';
+
+export interface BlogSummary {
+  id: string;
+  title: string;
+  handle: string;
+  commentPolicy: CommentPolicy;
+  articlesCount: number;
+}
+
+export interface BlogsData {
+  blogs: { nodes: BlogSummary[] };
+}
+
+export interface ArticleSummary {
+  id: string;
+  title: string;
+  handle: string;
+  isPublished: boolean;
+  publishedAt: string | null;
+  commentsCount: number;
+}
+
+export interface BlogData {
+  blog: (BlogSummary & { articles: { nodes: ArticleSummary[] } }) | null;
+}
+
+export interface ArticleComment {
+  id: string;
+  body: string;
+  status: CommentStatus;
+  createdAt: string;
+  author: { name: string; email: string };
+}
+
+export interface ArticleDetail {
+  id: string;
+  title: string;
+  handle: string;
+  body: string;
+  summary: string | null;
+  tags: string[];
+  isPublished: boolean;
+  publishedAt: string | null;
+  author: { name: string } | null;
+  image: { fileId: string; altText: string | null } | null;
+  blog: Pick<BlogSummary, 'id' | 'title' | 'handle' | 'commentPolicy'>;
+  comments: { nodes: ArticleComment[] };
+}
+
+export interface ArticleData {
+  article: ArticleDetail | null;
+}
+
+export interface ShopFileData {
+  file: { id: string; url: string; alt: string } | null;
+}
+
+/** What a blog's, an article's or a comment's mutation answers: what it made, or why not. */
+export interface ContentMutationData {
+  [field: string]: {
+    blog?: { id: string } | null;
+    article?: { id: string } | null;
+    comment?: { id: string } | null;
+    userErrors: UserError[];
+  };
+}

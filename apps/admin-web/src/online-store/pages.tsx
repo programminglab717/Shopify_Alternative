@@ -26,15 +26,19 @@ import { BodyArea, normalized, useBody } from './body-field';
 /** Those who write the shop's pages, which are content: marketers too (ADR-176). */
 export const WRITES_PAGES: readonly StaffRole[] = ['owner', 'manager', 'marketer'];
 
-/** Whether a page shows on the storefront now, waits for its date, or is hidden. */
-function usePageState() {
+/**
+ * Whether a page or article shows on the storefront now, waits for its date, or is hidden. The
+ * core says `isPublished` of one shown now alone: one hidden has no date, and one waiting for its
+ * date, or for the worker to show it once the date has come, is not published yet.
+ */
+export function usePageState() {
   const { t, locale } = useLocale();
   const timezone = useShopTimezone();
   return (page: Pick<PageSummary, 'isPublished' | 'publishedAt'>) => {
-    if (!page.isPublished || !page.publishedAt) {
+    if (!page.publishedAt) {
       return { colour: 'cancelled' as const, icon: EyeOff, label: t('pages.hidden') };
     }
-    if (new Date(page.publishedAt).getTime() > Date.now()) {
+    if (!page.isPublished || new Date(page.publishedAt).getTime() > Date.now()) {
       return {
         colour: 'needsConfirmation' as const,
         icon: Clock,
@@ -138,14 +142,15 @@ function PageForm({ page }: { page?: NonNullable<PageData['page']> }) {
   const { problem, attempt } = useAttempt();
   const body = useBody(page?.body ?? '');
   const [title, setTitle] = useState(page?.title ?? '');
-  const [shown, setShown] = useState(page ? page.isPublished : true);
+  const published = page ? page.publishedAt !== null : true;
+  const [shown, setShown] = useState(published);
   const [saved, setSaved] = useState(false);
   const html = body.html;
   const input = page
     ? {
         ...(title.trim() !== page.title && { title: title.trim() }),
         ...(html !== normalized(page.body) && { body: html }),
-        ...(shown !== page.isPublished && { isPublished: shown }),
+        ...(shown !== published && { isPublished: shown }),
       }
     : { title: title.trim(), body: html, isPublished: shown };
   const changed = Object.keys(input).length > 0;
