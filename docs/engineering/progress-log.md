@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
 
-### Payment links, in the admin
+### 5060864 · Payment links, in the admin
 
 * **Payment links** ([ADR-302](../architecture/13-decision-log.md#adr-302--the-admin-keeps-the-shops-payment-links-what-each-sells-and-how-many-orders-it-took-whether-it-is-open-and-why-not-copied-or-sent-on-whatsapp-closed-and-opened-again-made-of-items-found-by-name-with-a-discount-code-a-limit-a-day-it-closes-in-the-shops-time-zone-and-prepaid-alone-if-the-shop-likes)), a section for owners and managers: what each link sells and how
   many orders it took, open or why not, copied or sent on WhatsApp, closed and opened again;
