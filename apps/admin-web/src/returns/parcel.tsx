@@ -1,5 +1,10 @@
 import { Link } from '@tanstack/react-router';
+import { useState } from 'react';
+import type { UserError } from '../api/types';
 import type { StaffRole } from '../auth/session';
+import { errorText } from '../i18n/errors';
+import { useLocale } from '../i18n/locale';
+import { problemText } from '../products/product-form';
 import { useShop } from '../shell/shop-context';
 
 /** The roles that see parcels coming back: those who check them in, and those who claim. */
@@ -48,4 +53,27 @@ export function ParcelTitle({
       </span>
     </span>
   );
+}
+
+type Run = () => Promise<{ userErrors: UserError[] }>;
+
+/** Runs a parcel's mutation, saying why it was refused; true when it went through. */
+export function useAttempt() {
+  const { t } = useLocale();
+  const [problem, setProblem] = useState<string | null>(null);
+  const attempt = async (run: Run): Promise<boolean> => {
+    setProblem(null);
+    try {
+      const result = await run();
+      if (result.userErrors.length > 0) {
+        setProblem(result.userErrors.map((error) => problemText(error, t)).join(' '));
+        return false;
+      }
+      return true;
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+      return false;
+    }
+  };
+  return { problem, attempt };
 }

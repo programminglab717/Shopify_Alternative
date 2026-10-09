@@ -97,6 +97,42 @@ export interface OrdersData {
   orderStageCounts: { stage: OrderStage; count: number }[];
 }
 
+export type FulfillmentStatus = 'IN_TRANSIT' | 'DELIVERED' | 'RETURNING' | 'RETURNED' | 'LOST';
+
+export type FulfillmentEventStatus =
+  | 'CONFIRMED'
+  | 'IN_TRANSIT'
+  | 'OUT_FOR_DELIVERY'
+  | 'ATTEMPTED_DELIVERY'
+  | 'DELIVERED'
+  | 'RETURNING'
+  | 'RETURNED'
+  | 'FAILURE';
+
+/** A parcel of an order, for its page. */
+export interface ParcelDetail {
+  id: string;
+  status: FulfillmentStatus;
+  shippedAt: string;
+  deliveredAt: string | null;
+  returningAt: string | null;
+  returnedAt: string | null;
+  lostAt: string | null;
+  trackingInfo: { company: string | null; number: string | null; url: string | null };
+  fulfillmentLineItems: {
+    quantity: number;
+    lineItem: { id: string; title: string; variantTitle: string | null };
+  }[];
+  events: {
+    nodes: {
+      id: string;
+      status: FulfillmentEventStatus;
+      message: string | null;
+      happenedAt: string;
+    }[];
+  };
+}
+
 export interface OrderDetail {
   id: string;
   name: string;
@@ -137,6 +173,7 @@ export interface OrderDetail {
     reasons: { code: string; message: string }[];
   } | null;
   assignee: { name: string } | null;
+  fulfillments: ParcelDetail[];
   events: {
     nodes: {
       id: string;

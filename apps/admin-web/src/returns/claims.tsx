@@ -16,20 +16,19 @@ import type {
   ParcelClaimsData,
   ParcelClaimValue,
   ParcelUserErrorsData,
-  UserError,
 } from '../api/types';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
-import { parsePrice, priceText, problemText } from '../products/product-form';
+import { parsePrice, priceText } from '../products/product-form';
 import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
-import { CLAIMS, ParcelTitle } from './parcel';
+import { CLAIMS, ParcelTitle, useAttempt } from './parcel';
 
 /** How a claim's state shows: open amber, paid green, refused red, withdrawn grey. */
 const CLAIM_BADGES: Record<
@@ -75,29 +74,6 @@ function ClaimLine({ claim }: { claim: ParcelClaimValue }) {
       )}
     </span>
   );
-}
-
-type Run = () => Promise<{ userErrors: UserError[] }>;
-
-/** Runs a claim's mutation, saying why it was refused; true when it went through. */
-function useAttempt() {
-  const { t } = useLocale();
-  const [problem, setProblem] = useState<string | null>(null);
-  const attempt = async (run: Run): Promise<boolean> => {
-    setProblem(null);
-    try {
-      const result = await run();
-      if (result.userErrors.length > 0) {
-        setProblem(result.userErrors.map((error) => problemText(error, t)).join(' '));
-        return false;
-      }
-      return true;
-    } catch (failure) {
-      setProblem(errorText(failure, t));
-      return false;
-    }
-  };
-  return { problem, attempt };
 }
 
 /** A claim filed for a lost parcel: its worth unless the shop says less, and the claim number. */

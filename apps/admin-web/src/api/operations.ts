@@ -226,6 +226,36 @@ export const OrderQuery = /* GraphQL */ `
       assignee {
         name
       }
+      fulfillments {
+        id
+        status
+        shippedAt
+        deliveredAt
+        returningAt
+        returnedAt
+        lostAt
+        trackingInfo {
+          company
+          number
+          url
+        }
+        fulfillmentLineItems {
+          quantity
+          lineItem {
+            id
+            title
+            variantTitle
+          }
+        }
+        events(first: 20, reverse: true) {
+          nodes {
+            id
+            status
+            message
+            happenedAt
+          }
+        }
+      }
       events(first: 50) {
         nodes {
           id
@@ -2305,6 +2335,54 @@ export const ParcelClaimSettleMutation = /* GraphQL */ `
     $note: String
   ) {
     fulfillmentClaimSettle(id: $id, status: $status, amount: $amount, note: $note) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The courier delivered a parcel. */
+export const ParcelMarkDeliveredMutation = /* GraphQL */ `
+  mutation ParcelMarkDelivered($id: ID!) {
+    fulfillmentMarkDelivered(id: $id) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The customer refused a parcel, or it could not be delivered: it is coming back. */
+export const ParcelMarkReturningMutation = /* GraphQL */ `
+  mutation ParcelMarkReturning($id: ID!) {
+    fulfillmentMarkReturning(id: $id) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A step of a parcel's way, told of a courier Hatti does not follow (ADR-160). */
+export const ParcelEventCreateMutation = /* GraphQL */ `
+  mutation ParcelEventCreate($fulfillmentEvent: FulfillmentEventInput!) {
+    fulfillmentEventCreate(fulfillmentEvent: $fulfillmentEvent) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A parcel that came back checked in, so many of each line back on the shelf, the rest written off. */
+export const ParcelReceiveMutation = /* GraphQL */ `
+  mutation ParcelReceive($id: ID!, $restock: [FulfillmentRestockInput!]) {
+    fulfillmentReceiveReturn(id: $id, restock: $restock) {
       userErrors {
         ...Problems
       }

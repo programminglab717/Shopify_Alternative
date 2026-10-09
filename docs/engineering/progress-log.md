@@ -6,10 +6,11 @@
 
 ## In progress
 
-**Next, an order's parcels on its page in the admin** (SHP-04, ADR-160): each parcel's courier,
-tracking number and way, the latest step first; marked delivered, refused or lost; and a step
-told of a courier Hatti does not follow; then the admin's next sections as the alpha's shops need
-them. Urdu handles wait, as decided.
+**Next, customer returns in the admin** (ORD-07): a return recorded from a delivered order's
+page, each item with its reason, and an exchange sent at once; returns on their way, the longest
+first; received, each unit back in stock or written off; and a parcel back damaged claimed from
+its courier; then the admin's next sections as the alpha's shops need them. Urdu handles wait, as
+decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +19,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### An order's parcels, in the admin
+
+* **Parcels on the order's page** ([ADR-283](../architecture/13-decision-log.md#adr-283--an-orders-page-shows-its-parcels-courier-and-tracking-number-items-and-the-latest-steps-of-their-way-those-who-work-orders-mark-one-delivered-or-refused-add-a-step-told-of-a-courier-hatti-does-not-follow-mark-it-lost-after-asking-or-check-it-back-in-with-what-came-back-damaged-written-off)):
+  each parcel's courier and tracking number, its items and the latest steps of its way; marked
+  delivered or refused, a step added for a courier Hatti does not follow, marked lost after
+  asking, or checked back in with so many of each line back in stock and the rest written off.
+* **Tried against the core:** the seed's Leopards parcel for #1005 given an "out for delivery"
+  step with the rider's name, marked refused, and checked back in with both suits written off
+  as damaged; the order's timeline said each; with no errors in the browser. The parcel first
+  read "Coming back" under the order's "Returning"; it now uses the order stages' words.
+* 2006 tests: the parcel's tracking link, items and latest steps then all of them, delivered
+  and refused, a step added with the courier's words, a check-in with an item written off and
+  too many refused, and no buttons for an accountant.
 
 ### e3a8d8b · Parcels coming back, in the admin
 

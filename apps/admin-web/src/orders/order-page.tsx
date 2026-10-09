@@ -30,6 +30,7 @@ import { READS_CUSTOMERS } from '../customers/customers-page';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { Parcels } from './parcels';
 import { StageBadge } from './stage';
 
 const CONFIRMABLE: readonly OrderStage[] = ['NEEDS_CONFIRMATION', 'NEEDS_REVIEW'];
@@ -282,6 +283,11 @@ export function OrderPage() {
               )}
             </dl>
           </Section>
+          {order.fulfillments.length > 0 && (
+            <Section title={t('parcels.title')}>
+              <Parcels parcels={order.fulfillments} timezone={timezone} />
+            </Section>
+          )}
           <Section title={t('order.timeline')}>
             <ol className="flex flex-col gap-3">
               {order.events.nodes.map((event) => (

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-282 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-283 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -290,6 +290,7 @@
 | 280 | The admin's analytics show the period's COD health under its sales: how many cash-on-delivery orders were confirmed, delivered and came back, of those that turned out, what returns cost, and the rates by city, product, source or courier, a return rate of 30% or more in red | Accepted |
 | 281 | The admin's Cash section shows what couriers owe on delivered cash-on-delivery orders and what is on its way, by how long it has been owed and by courier, cash held 15 days or more in red; and imports a courier's statement only once a check of it reads right, its lines to look into first | Accepted |
 | 282 | The admin's Returns section lists parcels on their way back, the longest first, checked in by the tracking number on their label or from the list, or marked lost; lost parcels with their worth, claimed from the courier; and the claims to follow up, settled as paid, refused or withdrawn | Accepted |
+| 283 | An order's page shows its parcels: courier and tracking number, items and the latest steps of their way; those who work orders mark one delivered or refused, add a step told of a courier Hatti does not follow, mark it lost after asking, or check it back in with what came back damaged written off | Accepted |
 
 ---
 
@@ -11644,3 +11645,36 @@
     the exception, and the order's page is where its items are.
   * **Marking lost in one tap:** a lost parcel's items are written off, so a second tap says so
     first.
+
+## ADR-283 · An order's page shows its parcels: courier and tracking number, items and the latest steps of their way; those who work orders mark one delivered or refused, add a step told of a courier Hatti does not follow, mark it lost after asking, or check it back in with what came back damaged written off
+
+* **Context:** The admin's order page showed an order's items, timeline, customer and risk, and
+  nothing of its parcels. The core keeps each parcel's way step by step, what its courier said
+  through Hatti and what staff recorded for a courier Hatti does not follow ([ADR-160](#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)),
+  and moves a parcel along: delivered, refused, lost ([ADR-072](#adr-072--a-parcel-the-courier-lost-is-written-off-and-an-order-with-nothing-delivered-or-back-ends-at-a-stage-of-its-own-lost-before-reaching-the-customer-it-is-never-their-refusal)), or checked back in
+  with so many of each line back in stock and the rest written off ([ADR-071](#adr-071--a-parcel-coming-back-is-checked-in-by-the-tracking-number-on-its-label-matched-as-couriers-statements-are-those-on-their-way-back-are-listed-the-longest-first)). The
+  Returns section checks parcels in whole ([ADR-282](#adr-282--the-admins-returns-section-lists-parcels-on-their-way-back-the-longest-first-checked-in-by-the-tracking-number-on-their-label-or-from-the-list-or-marked-lost-lost-parcels-with-their-worth-claimed-from-the-courier-and-the-claims-to-follow-up-settled-as-paid-refused-or-withdrawn)). All of it needs `write_orders`,
+  which owners, managers, confirmation agents and packers have.
+* **Decision:**
+  * **Parcels** is a section of the order's page, under its items, where it has any: each with
+    its courier and tracking number (linked to the courier's tracking where it has a link), its
+    state in the order stages' words, its items, and its latest three steps, all of them if
+    asked.
+  * **On its way:** "Delivered", "Refused or not delivered", "Add a step" (on its way, out for
+    delivery or a delivery tried, with the courier's words), and "Courier lost it", which asks
+    first.
+  * **Coming back:** "Check it in" asks how many of each line go back in stock, all of them to
+    begin with, and says how many will be written off as damaged; a number past what the parcel
+    had is refused before it is sent. "Courier lost it" too.
+  * **Lost:** "It turned up: check it in", as coming back.
+  * Roles that only view orders see the parcels and their steps, and no buttons.
+* **Consequences:**
+  * A shop whose courier Hatti does not follow, or that delivers itself, keeps each parcel's
+    way and outcome from its phone, and its customer's tracking page shows the same steps.
+  * A parcel back with items written off can be claimed from its courier (ADR-098); the admin
+    files such claims with customer returns, next.
+* **Alternatives:**
+  * **Parcels as a page of their own:** staff come to a parcel through its order, from the
+    Confirmation Desk, a customer's call or the orders list, so it sits with the order.
+  * **Their own words for a parcel's state:** the order's stage badge says "Returning" at the
+    top of the page; the parcel saying "Coming back" beneath it read as two things.
