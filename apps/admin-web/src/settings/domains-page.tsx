@@ -240,7 +240,7 @@ export function DomainsPage() {
               className="num font-medium text-primary hover:underline"
               dir="ltr"
             >
-              {query.data.shop.url.replace(/^https:\/\//, '')}
+              {query.data.shop.url.replace(/^https?:\/\//, '')}
             </a>
           </p>
           {query.data.domains.length > 0 && (

@@ -1978,8 +1978,8 @@ revisiting it.
 
 ## Next steps
 
-1. **Merchant admin, next:** the domains page tried in a browser, then the online store's
-   themes; then section by section as the alpha's shops need them; the edge's security policy and R2's CORS rule.
+1. **Merchant admin, next:** the online store's themes; then section by section as the
+   alpha's shops need them; the edge's security policy and R2's CORS rule.
 1. **Observability, remaining:** Sentry for errors; Grafana dashboards and SLO burn-rate alerts
    (admin GraphQL p95 ≤ 500 ms, outbox lag, parked events, sign-in failures); the production
    collector with tail sampling, set up with the infrastructure.

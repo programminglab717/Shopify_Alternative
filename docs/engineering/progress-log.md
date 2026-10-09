@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, the domains page tried in a browser, then the online store's themes in the admin**
-(ONB-07, OS-02): the domains page checked against the core once the local servers run again;
-then the shop's themes listed, a copy made, published and deleted; then the admin's next
-sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, the online store's themes in the admin** (OS-02): the shop's themes listed, a copy made,
+renamed, published and deleted; then the admin's next sections as the alpha's shops need them.
+Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -23,8 +22,13 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 * **Domains** ([ADR-319](../architecture/13-decision-log.md#adr-319--the-admin-connects-the-shops-own-domains-in-settings-saying-which-record-to-add-where-it-was-bought-checks-them-again-makes-a-connected-one-primary-or-not-and-lets-one-go-once-asked-the-hatti-address-is-always-shown)) in settings: the shop's own domains connected, with the record to add where
   each was bought, checked again, made primary or not, and let go; the Hatti address shown.
-* **Not yet tried against the core in a browser:** the local API, worker and admin servers had
-  stopped at their time limit; the page is to be tried with the next section.
+* **Tried against the core**, once the local servers ran again: on the seed's shop, on Pro,
+  https://Shop.Hatti-Check.pk/ was connected as shop.hatti-check.pk and told to point a CNAME
+  at the platform's host; checking it was refused, the core naming the record to add. Marked
+  verified in the database for the check, it was made primary, the store's address following
+  it, then primary no more and removed, leaving the shop with no domains. The store's address
+  had shown with its http:// on the local servers; it is now shown without its scheme. No
+  errors in the browser.
 * 2277 tests: a domain connected and told where to point; a check refused with what the domain
   points at; one made primary no more; one let go once asked; a plan without domains told why.
 
