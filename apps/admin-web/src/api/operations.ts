@@ -4895,3 +4895,80 @@ export const LocationDeleteMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const SAVED_SEARCH = /* GraphQL */ `
+  fragment Saved on SavedSearch {
+    id
+    name
+    query
+  }
+`;
+
+/** The searches of the orders list its staff saved, oldest first, as their tabs were added. */
+export const OrderSavedSearchesQuery = /* GraphQL */ `
+  query OrderSavedSearches {
+    savedSearches: orderSavedSearches(first: 100) {
+      nodes {
+        ...Saved
+      }
+    }
+  }
+  ${SAVED_SEARCH}
+`;
+
+/** The searches of the products list its staff saved. */
+export const ProductSavedSearchesQuery = /* GraphQL */ `
+  query ProductSavedSearches {
+    savedSearches: productSavedSearches(first: 100) {
+      nodes {
+        ...Saved
+      }
+    }
+  }
+  ${SAVED_SEARCH}
+`;
+
+/** A search of a list kept by name for all the shop's staff (ORD-01, CAT-04). */
+export const SavedSearchCreateMutation = /* GraphQL */ `
+  mutation SavedSearchCreate($input: SavedSearchCreateInput!) {
+    savedSearchCreate(input: $input) {
+      savedSearch {
+        ...Saved
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SAVED_SEARCH}
+  ${USER_ERRORS}
+`;
+
+/** A saved search renamed, or its search changed. */
+export const SavedSearchUpdateMutation = /* GraphQL */ `
+  mutation SavedSearchUpdate($input: SavedSearchUpdateInput!) {
+    savedSearchUpdate(input: $input) {
+      savedSearch {
+        ...Saved
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SAVED_SEARCH}
+  ${USER_ERRORS}
+`;
+
+/** A saved search deleted. */
+export const SavedSearchDeleteMutation = /* GraphQL */ `
+  mutation SavedSearchDelete($input: SavedSearchDeleteInput!) {
+    savedSearchDelete(input: $input) {
+      deletedSavedSearchId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

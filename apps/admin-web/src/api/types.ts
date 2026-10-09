@@ -2121,3 +2121,18 @@ export interface LocationPayloadData {
   locationDeactivate?: { location: ShopLocation | null; userErrors: UserError[] };
   locationActivate?: { location: ShopLocation | null; userErrors: UserError[] };
 }
+
+export interface SavedSearch {
+  id: string;
+  name: string;
+  query: string;
+}
+
+export interface SavedSearchesData {
+  savedSearches: { nodes: SavedSearch[] };
+}
+
+export interface SavedSearchPayload {
+  savedSearch: SavedSearch | null;
+  userErrors: UserError[];
+}

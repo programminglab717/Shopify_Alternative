@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-315 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-316 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -323,6 +323,7 @@
 | 313 | The admin changes a product's options and variants after it was made: an option renamed, values added and deleted where no variant uses them, an option added with a variant for every new combination if asked, or taken away where its variants stay apart; variants added for combinations it lacks and deleted, one always kept | Accepted |
 | 314 | The admin asks a courier whose API takes pickups to collect the parcels waiting, naming its rider where it asks, and lists the pickups asked for with their parcels, the courier's number or load sheet and why one was refused; our load sheet of a pickup is printed for the rider | Accepted |
 | 315 | The admin sends an emailed invitation still waiting again, showing its new link, and the owner hands the shop to one of its managers once asked, the core's refusal named and the owner's own role read again after | Accepted |
+| 316 | The admin shows the saved searches of the orders and products lists above them, each run in a tap; those who change a list save the search shown by a name, and rename, change and delete those saved, the core's refusals named by their field | Accepted |
 
 ---
 
@@ -12710,3 +12711,27 @@
 * **Alternatives:**
   * **Handing over to any member, made a manager on the way:** fewer steps, but a shop's owner
     is chosen from those already trusted to run it, as the core asks.
+
+## ADR-316 · The admin shows the saved searches of the orders and products lists above them, each run in a tap; those who change a list save the search shown by a name, and rename, change and delete those saved, the core's refusals named by their field
+
+* **Context:** The core keeps searches of the orders, drafts and products lists by name for all
+  of a shop's staff, as Shopify's saved searches (ADR-119, ADR-124): up to 100 a list, each name
+  unique in any letter case, each query checked by its list's search, changed by those who may
+  change the list. The admin's lists searched, but kept nothing.
+* **Decision:**
+  * **Saved searches** sit between a list's search and its tabs, on the orders and products
+    lists: each a button that runs it, shown pressed while it is the search shown, and tapped
+    again to clear it; its query is its title.
+  * **Save this search** is offered while the search shown is not saved, to those who change the
+    list: on orders, owners, managers, agents and packers; on products, owners and managers. It
+    asks for a name, saying the search is for everyone in the shop.
+  * **Edit saved** lists each with its name and search to change, saved together, and deletes
+    one once asked. The core's refusals, a name taken or a filter the list does not know, are
+    named by their field.
+  * **Drafts** wait: their list has no search in the admin yet.
+* **Consequences:**
+  * A confirmation agent keeps "Risky orders" and "COD orders" one tap away, and the whole team
+    sees the same tabs.
+* **Alternatives:**
+  * **Saved searches as more stage tabs:** one row, but stages and searches mix, and a stage tab
+    and a saved search could not be chosen together.

@@ -113,11 +113,22 @@ export function fakeCore(
         },
       });
     }
-    const data = answer(operation, variables);
+    // A list's saved searches, asked by every orders and products page: none unless answered.
+    const data = /SavedSearches$/.test(operation)
+      ? savedSearches(() => answer(operation, variables))
+      : answer(operation, variables);
     if (data instanceof GraphQLErrors) return json({ data: null, errors: data.errors });
     return json({ data });
   });
   return { fetcher, sent, uploads };
+}
+
+function savedSearches(answer: () => unknown): unknown {
+  try {
+    return answer();
+  } catch {
+    return { savedSearches: { nodes: [] } };
+  }
 }
 
 /** The admin as a browser shows it, opened at `path`. */

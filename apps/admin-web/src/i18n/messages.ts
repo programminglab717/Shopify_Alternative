@@ -2480,6 +2480,18 @@ const en = {
   'staff.handOverSure': 'Hand the shop to {name}? Only they can hand it back.',
   'staff.handOverYes': 'Hand it over',
   'staff.handedOver': '{name} owns the shop now. You are a manager.',
+  'savedSearches.title': 'Saved searches',
+  'savedSearches.saveThis': 'Save this search',
+  'savedSearches.name': 'Name it',
+  'savedSearches.nameHint': 'For everyone in the shop: {query}',
+  'savedSearches.save': 'Save',
+  'savedSearches.edit': 'Edit saved',
+  'savedSearches.nameOf': 'Name of {name}',
+  'savedSearches.queryOf': 'Search of {name}',
+  'savedSearches.delete': 'Delete {name}',
+  'savedSearches.deleteSure': 'Delete it',
+  'savedSearches.fieldName': 'Name',
+  'savedSearches.fieldQuery': 'Search',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -4943,6 +4955,18 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'staff.handOverSure': 'دکان {name} کو سونپ دیں؟ صرف وہی اسے واپس سونپ سکتے ہیں۔',
   'staff.handOverYes': 'سونپ دیں',
   'staff.handedOver': 'اب {name} دکان کے مالک ہیں۔ آپ مینیجر ہیں۔',
+  'savedSearches.title': 'محفوظ تلاشیں',
+  'savedSearches.saveThis': 'یہ تلاش محفوظ کریں',
+  'savedSearches.name': 'نام رکھیں',
+  'savedSearches.nameHint': 'دکان کے سب لوگوں کے لیے: {query}',
+  'savedSearches.save': 'محفوظ کریں',
+  'savedSearches.edit': 'محفوظ تلاشیں بدلیں',
+  'savedSearches.nameOf': '{name} کا نام',
+  'savedSearches.queryOf': '{name} کی تلاش',
+  'savedSearches.delete': '{name} حذف کریں',
+  'savedSearches.deleteSure': 'حذف کریں',
+  'savedSearches.fieldName': 'نام',
+  'savedSearches.fieldQuery': 'تلاش',
 };
 
 export const messages: Readonly<

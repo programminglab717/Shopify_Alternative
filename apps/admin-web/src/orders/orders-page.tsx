@@ -4,6 +4,7 @@ import { ChevronRight, Download, EyeOff, FilePen, Inbox, Search, ShieldAlert } f
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSessionStore } from '../auth/context';
+import type { StaffRole } from '../auth/session';
 import { TAKES_DRAFTS } from '../drafts/drafts-page';
 import {
   OrderBulkConfirmMutation,
@@ -15,6 +16,7 @@ import { errorText } from '../i18n/errors';
 import { formatCount, formatMoney, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { SavedSearches } from '../shell/saved-searches';
 import { useAdminMutation, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
@@ -44,6 +46,14 @@ const BULK: Partial<Record<OrderStage, 'confirm' | 'pack'>> = {
 };
 
 const PAGE = 50;
+
+/** Those who change orders, and so keep the list's searches: all but marketers and accountants. */
+export const SAVES_ORDER_SEARCHES: readonly StaffRole[] = [
+  'owner',
+  'manager',
+  'confirmation_agent',
+  'packer',
+];
 
 /** The orders list's search: a stage tab and the words searched for. */
 export interface OrdersSearch {
@@ -241,6 +251,15 @@ export function OrdersPage() {
           className="min-h-12 w-full rounded-control border border-line bg-surface ps-10 pe-3 md:min-h-10"
         />
       </form>
+      <SavedSearches
+        resource="ORDER"
+        query={q}
+        manages={SAVES_ORDER_SEARCHES.includes(shop.role)}
+        onApply={(query) => {
+          setWords(query ?? '');
+          choose({ stage, q: query });
+        }}
+      />
       <div role="tablist" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
         {TABS.map((tab) => {
           const active = (tab ?? undefined) === stage;

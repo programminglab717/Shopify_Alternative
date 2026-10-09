@@ -9,6 +9,7 @@ import { useSessionStore } from '../auth/context';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
+import { SavedSearches } from '../shell/saved-searches';
 import { useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
@@ -180,6 +181,15 @@ export function ProductsPage() {
           className="min-h-12 w-full rounded-control border border-line bg-surface ps-10 pe-3 md:min-h-10"
         />
       </form>
+      <SavedSearches
+        resource="PRODUCT"
+        query={q}
+        manages={edits}
+        onApply={(query) => {
+          setWords(query ?? '');
+          choose({ status, q: query });
+        }}
+      />
       <div role="tablist" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
         {TABS.map((tab) => {
           const active = (tab ?? undefined) === status;

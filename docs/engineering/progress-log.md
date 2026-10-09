@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, saved searches kept in the admin** (ORD-01, CAT-04): the searches saved for orders,
-products, drafts and customers listed, renamed, changed and deleted; then the admin's next
-sections as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, selling when out of stock in the admin** (INV-01): a variant set to keep selling when
+its stock runs out, or to stop, and its stock tracked or not, from the product page; then the
+admin's next sections as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### Saved searches, in the admin
+
+* **Saved searches** ([ADR-316](../architecture/13-decision-log.md#adr-316--the-admin-shows-the-saved-searches-of-the-orders-and-products-lists-above-them-each-run-in-a-tap-those-who-change-a-list-save-the-search-shown-by-a-name-and-rename-change-and-delete-those-saved-the-cores-refusals-named-by-their-field)) above the orders and products lists: each run in a tap; the
+  search shown saved by a name; those saved renamed, changed and deleted by those who change the
+  list.
+* **Tried against the core:** on the seed's shop, a search by city was refused, as orders take no
+  city filter, and its words shown; risk_level:high saved as "Risky orders" ran to the one risky
+  order; its search changed to a colour was refused, then to payment_method:cash_on_delivery as
+  "COD orders", and deleted; status:active saved on products and deleted. No saved search was
+  left. No errors in the browser.
+* 2263 tests: one run and cleared; the search shown saved after a refusal named; one renamed
+  after a refusal named, one deleted; a marketer kept from saving and changing them.
 
 ### 1780593 · Invitations sent again and the shop handed over, in the admin
 
