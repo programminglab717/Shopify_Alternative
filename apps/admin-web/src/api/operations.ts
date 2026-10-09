@@ -1178,6 +1178,29 @@ export const CustomerPhoneRevealMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** The shop's blocked numbers, the latest blocked first, found by a number or its digits (COD-07). */
+export const BlocklistQuery = /* GraphQL */ `
+  query Blocklist($first: Int!, $after: String, $query: String) {
+    blocklist(first: $first, after: $after, query: $query) {
+      nodes {
+        id
+        phone
+        reason
+        note
+        createdAt
+        customer {
+          id
+          displayName
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`;
+
 /** A number blocked: its new orders wait for review (COD-07). */
 export const BlocklistAddMutation = /* GraphQL */ `
   mutation BlocklistAdd($input: BlocklistAddInput!) {

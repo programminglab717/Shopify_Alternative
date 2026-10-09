@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-331 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-332 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -339,6 +339,7 @@
 | 329 | The admin's analytics show the online store's visits beside its sales: who is on it now, asked again every half minute, and the period's sessions against the period as long before, asked in one document, with how far they went towards an order | Accepted |
 | 330 | The admin ships an order by hand with a courier Hatti does not book with yet, or the shop's own rider: from its page, or many packed orders at once from shipping, the courier named once and each parcel's tracking number beside its order | Accepted |
 | 331 | The admin prints packing slips and invoices as the core makes them: from an order's page, and for the orders chosen to pack or to book at once, the document, paper and language chosen in one panel and kept in the browser for the next print | Accepted |
+| 332 | The admin lists the shop's blocked numbers for owners and managers, the latest blocked first, each with its customer, why and since when; found by four or more of a number's digits, a number blocked before it ever orders, and one unblocked | Accepted |
 
 ---
 
@@ -13285,3 +13286,35 @@
     prints is the one at the printer.
   * **A button for each document and paper:** six buttons on a phone's order page for a
     choice made once.
+
+## ADR-332 · The admin lists the shop's blocked numbers for owners and managers, the latest blocked first, each with its customer, why and since when; found by four or more of a number's digits, a number blocked before it ever orders, and one unblocked
+
+* **Context:** A shop blocks a number whose orders should wait for its review before they go
+  ahead (COD-07): the core holds them for review, beside the orders its risk rules hold
+  ([ADR-025](#adr-025--order-risk-is-a-snapshot-taken-when-an-order-is-placed-or-re-addressed)), and the admin blocked and unblocked a customer's number from their page
+  ([ADR-269](#adr-269--the-admins-customers-a-list-searched-by-any-part-of-a-number-a-name-or-an-email-and-a-customers-page-with-how-to-reach-them-how-their-parcels-went-their-orders-addresses-and-the-shops-note-and-tags-agents-see-the-number-when-they-ask-which-is-logged-and-owners-and-managers-block-it-from-there)). But the numbers blocked were nowhere to be seen together, and a number that
+  had never ordered could not be blocked at all, though sellers in Pakistan warn each other of
+  numbers that place fake orders or refuse parcels, in groups on WhatsApp.
+* **Decision:**
+  * **A page of its own under customers:** Blocked numbers, linked from the customers list,
+    lists the core's `blocklist`, the latest blocked first, fifty at a time: each number, the
+    customer it is if any, linked to their page, why and since when in the shop's time zone,
+    and the shop's note.
+  * **Found by its digits:** a search takes a number in any format, or four or more of its
+    digits, as the core does.
+  * **Blocked before it orders:** Block a number asks for the mobile number, why (fake orders,
+    refused deliveries, fraud, abuse or another reason) and a note for the shop's staff; the
+    core's refusal of a number not Pakistan's mobile is said.
+  * **Unblocked from the list:** Unblock takes it off at once, saying that orders already held
+    stay held, as the core keeps them.
+  * **For owners and managers:** those who block a customer from their page; others are told the
+    page is theirs, and the list is not asked for.
+* **Consequences:**
+  * A number another seller warns of is blocked before its first order, and the shop sees every
+    number it blocked, and why, in one place.
+  * Not yet: a number shared by sellers across Hatti's shops (COD-07's network tier); numbers
+    blocked from a file; who blocked a number, which neither the list nor the activity log says.
+* **Alternatives:**
+  * **The list in settings, beside the risk rules:** the blocklist is of customers' numbers, and
+    who keeps customers looks for it among them.
+  * **Blocking from an order alone:** a number that never ordered has no order to block it from.

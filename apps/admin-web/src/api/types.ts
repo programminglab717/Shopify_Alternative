@@ -561,6 +561,23 @@ export interface CustomerPhoneRevealData {
   customerPhoneReveal: { phone: string | null; otherPhones: string[]; userErrors: UserError[] };
 }
 
+export interface BlocklistEntryValue {
+  id: string;
+  /** E.164, masked for staff who see numbers masked. */
+  phone: string;
+  reason: BlocklistReason;
+  note: string;
+  createdAt: string;
+  customer: { id: string; displayName: string } | null;
+}
+
+export interface BlocklistData {
+  blocklist: {
+    nodes: BlocklistEntryValue[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+}
+
 export interface BlocklistAddData {
   blocklistAdd: { blocklistEntry: { id: string } | null; userErrors: UserError[] };
 }

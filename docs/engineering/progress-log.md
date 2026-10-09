@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the shop's blocked numbers** (COD-07): the numbers whose orders wait for review, listed
-with why and since when, a number added before it ever orders, as merchants share them, and one
-taken off; then section by section as the alpha's shops need them.
+**Next, orders cancelled and tagged many at once** (ORD-05): the orders chosen in the list
+cancelled for a reason, and tags added to them or taken off, as the core does each in one call;
+then section by section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +18,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-09
+
+### The shop's blocked numbers, in the admin
+
+* **Blocked numbers under customers** ([ADR-332](../architecture/13-decision-log.md#adr-332--the-admin-lists-the-shops-blocked-numbers-for-owners-and-managers-the-latest-blocked-first-each-with-its-customer-why-and-since-when-found-by-four-or-more-of-a-numbers-digits-a-number-blocked-before-it-ever-orders-and-one-unblocked)): owners and managers see every number the shop
+  blocked, the latest first, each with its customer linked, why and since when, and the shop's
+  note; find one by four or more of its digits; block a number before it ever orders, as sellers
+  warn each other of them, with why and a note; and unblock one, orders already held staying
+  held.
+* **Tried in Chromium against the core:** on the seed's shop, the page listed its two blocked
+  numbers, Kamran's for prank orders and another for refused parcels, each with its note. A
+  number too short was refused in the core's words; 0345 0000123 was then blocked for fake
+  orders with a note, listed first, found by 0123, and unblocked, the list then as it was. No
+  errors in the browser.
+* 2352 tests: the numbers with why and since when in the shop's time zone, a customer's
+  linked, and one unblocked; a number blocked before it orders, a refusal said; one found by its
+  last digits, and none said; the page kept to owners and managers, the list not asked for.
 
 ### 4c13271 · Packing slips and invoices, in the admin
 

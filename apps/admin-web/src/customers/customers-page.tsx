@@ -157,6 +157,14 @@ export function CustomersPage() {
           {ADDS_CUSTOMERS.includes(shop.role) && (
             <>
               <Link
+                to="/$shopId/customers/blocked"
+                params={{ shopId: shop.id }}
+                className="inline-flex min-h-10 items-center gap-2 rounded-control border border-line bg-surface px-3 hover:bg-canvas"
+              >
+                <Ban aria-hidden className="size-5" />
+                {t('blocked.title')}
+              </Link>
+              <Link
                 to="/$shopId/customers/erasures"
                 params={{ shopId: shop.id }}
                 className="inline-flex min-h-10 items-center gap-2 rounded-control border border-line bg-surface px-3 hover:bg-canvas"

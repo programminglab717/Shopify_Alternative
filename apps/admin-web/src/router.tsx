@@ -19,6 +19,7 @@ import { CustomerPage } from './customers/customer-page';
 import { CustomersPage, validateCustomersSearch } from './customers/customers-page';
 import { NewSegmentPage, SegmentPage, SegmentsPage } from './customers/segments';
 import { CustomersTransferPage } from './customers/transfer-page';
+import { BlockedPage } from './customers/blocked-page';
 import { ErasuresPage } from './customers/care';
 import { NewCustomerPage } from './customers/new-customer-page';
 import { DeskPage } from './desk/desk-page';
@@ -439,6 +440,12 @@ const customersTransfer = createRoute({
   component: CustomersTransferPage,
 });
 
+const customersBlocked = createRoute({
+  getParentRoute: () => shop,
+  path: 'customers/blocked',
+  component: BlockedPage,
+});
+
 const customersNew = createRoute({
   getParentRoute: () => shop,
   path: 'customers/new',
@@ -676,6 +683,7 @@ export const routeTree = root.addChildren([
     segment,
     customersTransfer,
     customersNew,
+    customersBlocked,
     customersErasures,
     collections,
     newCollection,
