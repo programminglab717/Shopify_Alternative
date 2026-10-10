@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### New orders said as they come, in the admin
+### 819d2e2 · New orders said as they come, in the admin
 
 * **Asked every half minute** ([ADR-342](../architecture/13-decision-log.md#adr-342--while-the-orders-list-is-open-in-view-or-not-it-asks-every-half-minute-for-its-tabs-newest-orders-and-says-how-many-are-newer-than-it-shows-above-it-and-in-the-pages-title-shown-at-a-tap-so-its-rows-move-only-when-staff-ask-home-and-the-confirmation-desk-ask-again-every-half-minute-while-in-view)): the orders list asks while it is open, in view or not,
   for its tab's newest 20 orders, and says those newer than it shows above it, "Show 3 new
