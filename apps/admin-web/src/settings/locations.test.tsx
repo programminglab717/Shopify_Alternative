@@ -102,7 +102,7 @@ function core(role: StaffRole) {
         }));
         return ok(
           'locationMakePrimary',
-          locations.find((each) => each.id === variables.locationId),
+          locations.find((each) => each.id === variables.locationId) ?? null,
         );
       case 'LocationDelete':
         locations = locations.filter((each) => each.id !== variables.locationId);
