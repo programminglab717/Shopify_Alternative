@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### Suppliers kept, and an open purchase order changed, in the core and the admin
+### cc13564 · Suppliers kept, and an open purchase order changed, in the core and the admin
 
 * **Orders changed** ([ADR-351](../architecture/13-decision-log.md#adr-351--an-open-purchase-order-is-changed-in-one-request-its-suppliers-number-note-and-day-expected-lines-added-their-quantities-or-costs-changed-never-below-what-came-and-lines-none-of-which-came-removed-received-once-all-of-it-has-suppliers-kept-on-a-page-of-their-own-in-the-admin-each-with-its-orders)): `purchaseOrderUpdate` changes an open order in one request: its
   details, lines added, their quantities or costs changed, never below what came, and lines none of
