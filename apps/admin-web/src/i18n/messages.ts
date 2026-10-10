@@ -3081,6 +3081,21 @@ const en = {
   'po.closeConfirm': 'Close it',
   'po.closeKeep': 'Keep it open',
   'stock.itsPurchaseOrder': 'Its purchase order',
+  'po.suppliers': 'Suppliers',
+  'po.noSuppliers': 'No suppliers yet. Add one, or add one as you order.',
+  'po.supplierNote': 'Note',
+  'po.supplierSave': 'Save the supplier',
+  'po.supplierChange': 'Change {name}',
+  'po.change': 'Change',
+  'po.orders': 'Orders',
+  'po.ordersFrom': 'Purchase orders from {name}',
+  'po.fromOne': 'Orders from one supplier.',
+  'po.fromAll': "Show every supplier's",
+  'po.note': 'Note',
+  'po.edit': 'Change the order',
+  'po.saveChanges': 'Save the changes',
+  'po.cameAlready': '{count} came already',
+  'po.atLeast': 'At least {count}.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6136,6 +6151,21 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'po.closeConfirm': 'بند کریں',
   'po.closeKeep': 'کھلا رکھیں',
   'stock.itsPurchaseOrder': 'اس کا خریداری آرڈر',
+  'po.suppliers': 'سپلائرز',
+  'po.noSuppliers': 'ابھی کوئی سپلائر نہیں۔ ایک شامل کریں، یا آرڈر کرتے وقت شامل کریں۔',
+  'po.supplierNote': 'نوٹ',
+  'po.supplierSave': 'سپلائر محفوظ کریں',
+  'po.supplierChange': '{name} بدلیں',
+  'po.change': 'بدلیں',
+  'po.orders': 'آرڈر',
+  'po.ordersFrom': '{name} سے خریداری آرڈر',
+  'po.fromOne': 'ایک سپلائر کے آرڈر۔',
+  'po.fromAll': 'سب سپلائرز کے دکھائیں',
+  'po.note': 'نوٹ',
+  'po.edit': 'آرڈر بدلیں',
+  'po.saveChanges': 'تبدیلیاں محفوظ کریں',
+  'po.cameAlready': '{count} پہلے ہی آ چکے',
+  'po.atLeast': 'کم از کم {count}۔',
 };
 
 export const messages: Readonly<

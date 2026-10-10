@@ -35,6 +35,7 @@ import {
   PurchaseOrderPayload,
   PurchaseOrderReceiveInput,
   PurchaseOrderStatus,
+  PurchaseOrderUpdateInput,
   PurchaseOrdersArgs,
   Supplier,
   SupplierInput,
@@ -200,6 +201,35 @@ export class PurchaseOrderResolver {
         ...line,
         inventoryItemId: uuidOf('inventoryItem', line.inventoryItemId),
       })),
+    });
+    return payload(result, tenant);
+  }
+
+  @Mutation(() => PurchaseOrderPayload, {
+    description:
+      "Changes an open order: the supplier's number, note and day expected; lines added, their " +
+      'quantities or costs changed, never below what came already, and lines none of which came ' +
+      'removed. An order whose every line has come in full after it is RECEIVED.',
+  })
+  @RequireScopes('write_inventory')
+  async purchaseOrderUpdate(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('input') input: PurchaseOrderUpdateInput,
+  ): Promise<PurchaseOrderPayload> {
+    const result = await this.service.update(tenant, uuidOf('purchaseOrder', id), {
+      reference: input.reference,
+      note: input.note,
+      expectedOn: input.expectedOn,
+      linesToAdd: input.linesToAdd?.map((line) => ({
+        ...line,
+        inventoryItemId: uuidOf('inventoryItem', line.inventoryItemId),
+      })),
+      linesToUpdate: input.linesToUpdate?.map((line) => ({
+        ...line,
+        lineId: uuidOf('purchaseOrderLine', line.lineId),
+      })),
+      lineIdsToRemove: input.lineIdsToRemove?.map((lineId) => uuidOf('purchaseOrderLine', lineId)),
     });
     return payload(result, tenant);
   }

@@ -263,4 +263,88 @@ describe.skipIf(!server)('PurchaseOrderService (INV-05)', () => {
       1,
     );
   });
+
+  it('changes an open order, never below what came, and is received once all of it has', async () => {
+    const [large] = await f.variantsOf(f.a, 'Lawn suit L');
+    const order = unwrap(
+      await f.purchaseOrders.create(f.a, {
+        supplierId: (await supplier()).id,
+        locationId: warehouse.id,
+        lines: [
+          { inventoryItemId: variants[0]!, quantity: 10, unitCost: '1450' },
+          { inventoryItemId: variants[1]!, quantity: 6 },
+        ],
+      }),
+    );
+    const [small, medium] = order.lines as [(typeof order.lines)[0], (typeof order.lines)[0]];
+    unwrap(
+      await f.purchaseOrders.receive(f.a, order.id, { lines: [{ lineId: small.id, quantity: 4 }] }),
+    );
+
+    expect(
+      errorsOf(
+        await f.purchaseOrders.update(f.a, order.id, {
+          expectedOn: 'soon',
+          linesToAdd: [{ inventoryItemId: variants[1]!, quantity: 1 }],
+          linesToUpdate: [{ lineId: small.id, quantity: 3 }],
+          lineIdsToRemove: [small.id],
+        }),
+      ),
+    ).toEqual([['input.expectedOn', 'INVALID']]);
+    const refused = await f.purchaseOrders.update(f.a, order.id, {
+      linesToAdd: [{ inventoryItemId: variants[1]!, quantity: 1 }],
+      linesToUpdate: [{ lineId: small.id, quantity: 3 }],
+      lineIdsToRemove: [small.id, newId()],
+    });
+    expect(errorsOf(refused)).toEqual([
+      ['input.lineIdsToRemove.0', 'INVALID'],
+      ['input.lineIdsToRemove.1', 'NOT_FOUND'],
+      ['input.linesToUpdate.0.lineId', 'INVALID'],
+      ['input.linesToAdd.0.inventoryItemId', 'INVALID'],
+    ]);
+    expect(!refused.ok && refused.errors[0]!.message).toBe(
+      "4 came already; the line can't be removed",
+    );
+    expect(
+      errorsOf(
+        await f.purchaseOrders.update(f.a, order.id, {
+          linesToUpdate: [{ lineId: small.id, quantity: 3 }],
+        }),
+      ),
+    ).toEqual([['input.linesToUpdate.0.quantity', 'INVALID']]);
+
+    const changed = unwrap(
+      await f.purchaseOrders.update(f.a, order.id, {
+        reference: 'Bill 4471',
+        expectedOn: '2026-12-01',
+        linesToAdd: [{ inventoryItemId: large!, quantity: 2, unitCost: '1600' }],
+        linesToUpdate: [{ lineId: small.id, quantity: 8, unitCost: '' }],
+        lineIdsToRemove: [medium.id],
+      }),
+    );
+    expect(changed).toMatchObject({
+      status: 'open',
+      reference: 'Bill 4471',
+      expectedOn: '2026-12-01',
+      lines: [
+        { variantTitle: 'S', quantity: 8, received: 4, unitCost: null },
+        { productTitle: 'Lawn suit L', quantity: 2, received: 0, unitCost: 160000n },
+      ],
+    });
+    // Nothing left to come once the large is taken off and the small cut to what came.
+    const done = unwrap(
+      await f.purchaseOrders.update(f.a, order.id, {
+        linesToUpdate: [{ lineId: small.id, quantity: 4 }],
+        lineIdsToRemove: [changed.lines[1]!.id],
+      }),
+    );
+    expect(done).toMatchObject({ status: 'received', lines: [{ quantity: 4, received: 4 }] });
+    expect(done.closedAt).toBeInstanceOf(Date);
+    expect(errorsOf(await f.purchaseOrders.update(f.a, order.id, { note: 'x' }))).toEqual([
+      ['id', 'INVALID'],
+    ]);
+    expect(errorsOf(await f.purchaseOrders.update(f.b, order.id, { note: 'x' }))).toEqual([
+      ['id', 'NOT_FOUND'],
+    ]);
+  });
 });

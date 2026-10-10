@@ -50,8 +50,8 @@ function order(received: [number, number], status = 'OPEN') {
  * A fake core with one open purchase order from Nishat Mills, of which 12 small and 5 medium came
  * once received; a supplier of the shop's, and a product to order.
  */
-function poCore(role: StaffRole) {
-  let received: [number, number] = [0, 0];
+function poCore(role: StaffRole, start: [number, number] = [0, 0]) {
+  let received: [number, number] = start;
   let status = 'OPEN';
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
@@ -59,7 +59,7 @@ function poCore(role: StaffRole) {
         return {
           purchaseOrders: {
             nodes:
-              variables.status === status
+              variables.status === status && (variables.supplierId ?? 'sup_1') === 'sup_1'
                 ? [
                     {
                       ...order(received, status),
@@ -72,6 +72,17 @@ function poCore(role: StaffRole) {
         };
       case 'PurchaseOrder':
         return { purchaseOrder: variables.id === 'po_1' ? order(received, status) : null };
+      case 'Suppliers':
+        return {
+          suppliers: [
+            { id: 'sup_1', name: 'Nishat Mills', phone: '+923007654321', note: null },
+            { id: 'sup_9', name: 'Ajrak House', phone: null, note: 'Hala' },
+          ],
+        };
+      case 'SupplierUpdate':
+        return { supplierUpdate: { supplier: { id: 'sup_1' }, userErrors: [] } };
+      case 'PurchaseOrderUpdate':
+        return { purchaseOrderUpdate: { purchaseOrder: { id: 'po_1' }, userErrors: [] } };
       case 'PurchaseOrderForm':
         return {
           suppliers: [{ id: 'sup_1', name: 'Nishat Mills', phone: null }],
@@ -94,6 +105,14 @@ function poCore(role: StaffRole) {
                     barcode: null,
                     inventoryQuantity: 0,
                     inventoryItem: { id: 'invi_1', tracked: true },
+                  },
+                  {
+                    id: 'var_3',
+                    title: 'L',
+                    sku: 'KS-L',
+                    barcode: null,
+                    inventoryQuantity: 0,
+                    inventoryItem: { id: 'invi_3', tracked: true },
                   },
                 ],
               },
@@ -260,6 +279,94 @@ describe('Purchase orders (INV-05)', () => {
     expect(screen.getAllByText('Closed').length).toBeGreaterThan(0);
   });
 
+  it("keeps suppliers: one changed, one added, and one's orders alone", async () => {
+    const fake = poCore('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/purchase-orders/suppliers');
+
+    expect(await screen.findByText('Nishat Mills')).toBeTruthy();
+    expect(screen.getByText('Hala')).toBeTruthy();
+    await press('Change Nishat Mills');
+    expect((screen.getByLabelText("Supplier's name") as HTMLInputElement).value).toBe(
+      'Nishat Mills',
+    );
+    type('Note', 'Pays on delivery');
+    await press('Save the supplier');
+    await waitFor(() =>
+      expect(sentOf(fake, 'SupplierUpdate')).toEqual([
+        {
+          id: 'sup_1',
+          input: {
+            name: 'Nishat Mills',
+            phone: expect.stringMatching(/300/),
+            note: 'Pays on delivery',
+          },
+        },
+      ]),
+    );
+    await press('A new supplier');
+    type("Supplier's name", 'Gul Ahmed');
+    await press('Add the supplier');
+    await waitFor(() =>
+      expect(sentOf(fake, 'SupplierCreate')).toEqual([
+        { input: { name: 'Gul Ahmed', phone: null, note: null } },
+      ]),
+    );
+
+    fireEvent.click(await screen.findByRole('link', { name: 'Purchase orders from Ajrak House' }));
+    expect(await screen.findByText('Orders from one supplier.')).toBeTruthy();
+    expect(await screen.findByText('No goods are on their way from suppliers.')).toBeTruthy();
+    expect(sentOf(fake, 'PurchaseOrders').at(-1)).toMatchObject({ supplierId: 'sup_9' });
+  });
+
+  it('changes an open order: no fewer than came, its cost, a line taken off and goods added', async () => {
+    const fake = poCore('owner', [4, 0]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/purchase-orders/po_1');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Change the order' }));
+    expect(await screen.findByText('4 came already')).toBeTruthy();
+    type('How many of Khaddar suit · S', '3');
+    expect(screen.getByText('At least 4.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Save the changes' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    type('How many of Khaddar suit · S', '10');
+    expect((screen.getByLabelText('Cost of one Khaddar suit · S') as HTMLInputElement).value).toBe(
+      '2100',
+    );
+    type('Cost of one Khaddar suit · S', '2000');
+    // Some of the small came, so only the medium can be taken off.
+    expect(screen.queryByRole('button', { name: 'Remove Khaddar suit · S' })).toBeNull();
+    await press('Remove Khaddar suit · M');
+    type('Find products to order', 'khaddar');
+    await press('Find');
+    expect(await screen.findByRole('button', { name: 'Order Khaddar suit · S' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    await press('Order Khaddar suit · L');
+    type('How many of Khaddar suit · L', '3');
+    await press('Save the changes');
+    await waitFor(() =>
+      expect(sentOf(fake, 'PurchaseOrderUpdate')).toEqual([
+        {
+          id: 'po_1',
+          input: {
+            reference: 'INV-88',
+            expectedOn: '2026-11-15',
+            note: '',
+            linesToUpdate: [{ lineId: 'poli_1', quantity: 10, unitCost: '2000' }],
+            lineIdsToRemove: ['poli_2'],
+            linesToAdd: [{ inventoryItemId: 'invi_3', quantity: 3, unitCost: null }],
+          },
+        },
+      ]),
+    );
+    expect(await screen.findByRole('heading', { name: 'Goods that came' })).toBeTruthy();
+  });
+
   it('shows purchase orders to a packer without changing them', async () => {
     vi.stubGlobal('fetch', poCore('packer').fetcher);
     renderAdmin('/shop_1/purchase-orders');
@@ -273,5 +380,6 @@ describe('Purchase orders (INV-05)', () => {
     expect(await screen.findByRole('heading', { name: 'PO-1' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Goods that came' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Close the order' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Change the order' })).toBeNull();
   });
 });

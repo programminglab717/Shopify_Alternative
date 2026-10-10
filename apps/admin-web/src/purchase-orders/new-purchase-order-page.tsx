@@ -19,7 +19,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 
-interface Line {
+export interface Line {
   itemId: string;
   title: string;
   quantity: string;
@@ -29,7 +29,8 @@ interface Line {
 type Created<K extends string, T> = Record<K, { userErrors: UserError[] } & T>;
 
 const NEW_SUPPLIER = '+new';
-const AMOUNT = /^\d+(\.\d{1,2})?$/;
+/** An amount as typed: whole rupees, or with paisa. */
+export const AMOUNT = /^\d+(\.\d{1,2})?$/;
 
 const variantTitle = (product: string, variant: string) =>
   variant && variant !== 'Default Title' ? `${product} · ${variant}` : product;
@@ -89,7 +90,13 @@ function NewSupplier({
 }
 
 /** Variants found by words, each added to the order with one tap. */
-function FindVariants({ chosen, onAdd }: { chosen: Set<string>; onAdd: (line: Line) => void }) {
+export function FindVariants({
+  chosen,
+  onAdd,
+}: {
+  chosen: Set<string>;
+  onAdd: (line: Line) => void;
+}) {
   const { t } = useLocale();
   const [words, setWords] = useState('');
   const [searched, setSearched] = useState<string | null>(null);

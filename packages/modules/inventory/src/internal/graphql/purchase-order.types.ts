@@ -226,6 +226,45 @@ export class PurchaseOrderCreateInput {
 }
 
 @InputType()
+export class PurchaseOrderLineUpdateInput {
+  @Field(() => ID)
+  lineId!: string;
+
+  @Field(() => Int, { nullable: true, description: 'No fewer than came already.' })
+  quantity?: number | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'What one costs; blank clears it, left out keeps it.',
+  })
+  unitCost?: string | null;
+}
+
+@InputType({ description: 'What changes on an open order; what is left out stays as it is.' })
+export class PurchaseOrderUpdateInput {
+  @Field(() => String, { nullable: true, description: 'Blank clears it.' })
+  reference?: string | null;
+
+  @Field(() => String, { nullable: true, description: 'Blank clears it.' })
+  note?: string | null;
+
+  @Field(() => String, { nullable: true, description: 'YYYY-MM-DD; blank clears it.' })
+  expectedOn?: string | null;
+
+  @Field(() => [PurchaseOrderLineInput], {
+    nullable: true,
+    description: 'Items not on the order yet.',
+  })
+  linesToAdd?: PurchaseOrderLineInput[] | null;
+
+  @Field(() => [PurchaseOrderLineUpdateInput], { nullable: true })
+  linesToUpdate?: PurchaseOrderLineUpdateInput[] | null;
+
+  @Field(() => [ID], { nullable: true, description: 'Lines none of which came yet.' })
+  lineIdsToRemove?: string[] | null;
+}
+
+@InputType()
 export class PurchaseOrderReceiveLineInput {
   @Field(() => ID)
   lineId!: string;

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-350 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-351 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -358,6 +358,7 @@
 | 348 | The admin finds a variant by its barcode on the stock page: typed, or by a scanner that types it, as digits alone, or read through the phone's camera where the browser can read barcodes; the core's search by barcode, the variant with it alone shown, its stock open | Accepted |
 | 349 | The admin counts stock at a location by scanning: each barcode scanned, or barcode or SKU typed, adds its variant or one more of it, the counts kept in the page and saved together as one stock count, each against what was on hand when it was read; those that moved since are read again and said, and nothing is saved until they are checked | Accepted |
 | 350 | Purchase orders: the shop's suppliers, goods ordered from one for a location, numbered PO-1 onwards, each line a variant as it was named, how many and what one costs; goods received into stock as they come, in one adjustment naming the order, never more than is still to come; received in full or closed with what came; in the core and the admin | Accepted |
+| 351 | An open purchase order is changed in one request: its supplier's number, note and day expected; lines added, their quantities or costs changed, never below what came, and lines none of which came removed; received once all of it has; suppliers kept on a page of their own in the admin, each with its orders | Accepted |
 
 ---
 
@@ -13990,3 +13991,30 @@
   * **Lines referring to the variant alone:** a deleted variant would leave an order unreadable.
   * **Receiving more than ordered:** a supplier's extra is adjusted in as received, apart, so the
     order says what was agreed.
+
+## ADR-351 · An open purchase order is changed in one request: its supplier's number, note and day expected; lines added, their quantities or costs changed, never below what came, and lines none of which came removed; received once all of it has; suppliers kept on a page of their own in the admin, each with its orders
+
+* **Context:**
+  * A supplier rings: the large is out of stock, they can send more of the small, at a better
+    price; the bill came with a number (INV-05). Purchase orders (ADR-350) could only be made,
+    received and closed.
+  * Suppliers were added from a new order's form, and not changed after.
+* **Decision:**
+  * **`purchaseOrderUpdate`** on an open order, all at once or not at all: the supplier's number,
+    note and day expected, each replaced when given, blank clearing it; `linesToAdd`, items not on
+    the order; `linesToUpdate`, a quantity no fewer than came already, a cost or none; and
+    `lineIdsToRemove`, lines none of which came. At least one line stays, and at most 250.
+  * An order whose every line has come in full after the change, as when the rest is taken off,
+    is RECEIVED, as when the last goods come.
+  * **In the admin:** "Change the order" on an open order's page, for owners and managers: its
+    number, day and note; each line's quantity, said in red below what came, and its cost; lines
+    none of which came taken off; goods found by name added. **Suppliers** has a page of its own
+    from the purchase orders: each with its number and note, changed in place, a new one added,
+    and its orders alone a tap away.
+* **Consequences:**
+  * An order says what was agreed as it changes, and what came of each line stays as it was.
+  * Not yet: a history of an order's changes; a supplier's orders summed.
+* **Alternatives:**
+  * **A new order for every change:** the shop would chase two numbers for one delivery.
+  * **Lines changed one request at a time:** a supplier's call changes several, and the order
+    would be half changed between them.

@@ -701,6 +701,86 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     expect(theirs.data).toEqual({ purchaseOrder: null, suppliers: [] });
   });
 
+  it('changes an open purchase order: lines added, changed and removed (ADR-351)', async () => {
+    const shed = (
+      await addLocation(tokens.a, { name: 'Gujranwala shed', address: { city: 'Gujranwala' } })
+    ).location;
+    const [one, two, three] = (
+      await stockedProduct(tokens.a, 'Steel pateela', ['Small', 'Medium', 'Large'])
+    ).variants.map((variant) => variant.inventoryItem.id) as [string, string, string];
+    const supplier = await mutate(
+      tokens.a,
+      `mutation { supplierCreate(input: { name: "Bhatti Metals" }) { supplier { id } userErrors { code } } }`,
+    );
+    const LINES = `purchaseOrder { status reference lines { id variantTitle quantity received unitCost { amount } } }
+      userErrors { field code message }`;
+    const created = await mutate(
+      tokens.a,
+      `mutation ($input: PurchaseOrderCreateInput!) { purchaseOrderCreate(input: $input) { ${LINES} } }`,
+      {
+        input: {
+          supplierId: supplier.supplier.id,
+          locationId: shed.id,
+          lines: [
+            { inventoryItemId: one, quantity: 5 },
+            { inventoryItemId: two, quantity: 5 },
+          ],
+        },
+      },
+    );
+    const [small, medium] = created.purchaseOrder.lines;
+    const UPDATE = `mutation ($id: ID!, $input: PurchaseOrderUpdateInput!) {
+      purchaseOrderUpdate(id: $id, input: $input) { ${LINES} }
+    }`;
+    const orderId = (
+      await gql(tokens.aStockReader, `{ purchaseOrders(first: 1) { nodes { id } } }`)
+    ).data?.purchaseOrders.nodes[0].id;
+    expect(
+      await mutate(tokens.a, UPDATE, {
+        id: orderId,
+        input: {
+          reference: 'Challan 12',
+          linesToAdd: [{ inventoryItemId: three, quantity: 2, unitCost: '3200' }],
+          linesToUpdate: [{ lineId: small.id, quantity: 7 }],
+          lineIdsToRemove: [medium.id],
+        },
+      }),
+    ).toEqual({
+      purchaseOrder: {
+        status: 'OPEN',
+        reference: 'Challan 12',
+        lines: [
+          { id: small.id, variantTitle: 'Small', quantity: 7, received: 0, unitCost: null },
+          {
+            id: expect.stringMatching(/^poli_/),
+            variantTitle: 'Large',
+            quantity: 2,
+            received: 0,
+            unitCost: { amount: '3200.00' },
+          },
+        ],
+      },
+      userErrors: [],
+    });
+    expect(
+      await mutate(tokens.a, UPDATE, {
+        id: orderId,
+        input: { linesToAdd: [{ inventoryItemId: one, quantity: 1 }] },
+      }),
+    ).toEqual({
+      purchaseOrder: null,
+      userErrors: [
+        {
+          field: ['input', 'linesToAdd', '0', 'inventoryItemId'],
+          code: 'INVALID',
+          message: 'The item is on the order already',
+        },
+      ],
+    });
+    const forbidden = await gql(tokens.aStockReader, UPDATE, { id: orderId, input: { note: 'x' } });
+    expect(forbidden.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
   it("duplicates a product, its variants' stock tracked as its are with none of it (ADR-343)", async () => {
     const warehouse = (
       await addLocation(tokens.a, { name: 'Multan warehouse', address: { city: 'Multan' } })

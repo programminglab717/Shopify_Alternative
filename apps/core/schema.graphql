@@ -5936,6 +5936,11 @@ type Mutation {
   purchaseOrderReceive(id: ID!, input: PurchaseOrderReceiveInput!): PurchaseOrderPayload!
 
   """
+  Changes an open order: the supplier's number, note and day expected; lines added, their quantities or costs changed, never below what came already, and lines none of which came removed. An order whose every line has come in full after it is RECEIVED.
+  """
+  purchaseOrderUpdate(id: ID!, input: PurchaseOrderUpdateInput!): PurchaseOrderPayload!
+
+  """
   Cancels a return still on its way back, as when its customer keeps the items after all.
   """
   returnCancel(id: ID!): ReturnCancelPayload!
@@ -8615,6 +8620,16 @@ input PurchaseOrderLineInput {
   unitCost: String
 }
 
+input PurchaseOrderLineUpdateInput {
+  lineId: ID!
+
+  """No fewer than came already."""
+  quantity: Int
+
+  """What one costs; blank clears it, left out keeps it."""
+  unitCost: String
+}
+
 type PurchaseOrderPayload {
   purchaseOrder: PurchaseOrder
   userErrors: [UserError!]!
@@ -8642,6 +8657,25 @@ enum PurchaseOrderStatus {
 
   """Every line came in full."""
   RECEIVED
+}
+
+"""What changes on an open order; what is left out stays as it is."""
+input PurchaseOrderUpdateInput {
+  """YYYY-MM-DD; blank clears it."""
+  expectedOn: String
+
+  """Lines none of which came yet."""
+  lineIdsToRemove: [ID!]
+
+  """Items not on the order yet."""
+  linesToAdd: [PurchaseOrderLineInput!]
+  linesToUpdate: [PurchaseOrderLineUpdateInput!]
+
+  """Blank clears it."""
+  note: String
+
+  """Blank clears it."""
+  reference: String
 }
 
 type Query {

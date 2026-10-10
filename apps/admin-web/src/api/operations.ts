@@ -6071,8 +6071,8 @@ const PURCHASE_ORDER = /* GraphQL */ `
 
 /** Purchase orders by status, the newest first, a page at a time. */
 export const PurchaseOrdersQuery = /* GraphQL */ `
-  query PurchaseOrders($status: PurchaseOrderStatus, $after: String) {
-    purchaseOrders(first: 25, status: $status, after: $after) {
+  query PurchaseOrders($status: PurchaseOrderStatus, $after: String, $supplierId: ID) {
+    purchaseOrders(first: 25, status: $status, after: $after, supplierId: $supplierId) {
       nodes {
         id
         name
@@ -6170,6 +6170,47 @@ export const PurchaseOrderReceiveMutation = /* GraphQL */ `
 export const PurchaseOrderCloseMutation = /* GraphQL */ `
   mutation PurchaseOrderClose($id: ID!) {
     purchaseOrderClose(id: $id) {
+      purchaseOrder {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The shop's suppliers, by name. */
+export const SuppliersQuery = /* GraphQL */ `
+  query Suppliers {
+    suppliers {
+      id
+      name
+      phone
+      note
+    }
+  }
+`;
+
+export const SupplierUpdateMutation = /* GraphQL */ `
+  mutation SupplierUpdate($id: ID!, $input: SupplierInput!) {
+    supplierUpdate(id: $id, input: $input) {
+      supplier {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** An open order changed: its details, and lines added, changed or removed. */
+export const PurchaseOrderUpdateMutation = /* GraphQL */ `
+  mutation PurchaseOrderUpdate($id: ID!, $input: PurchaseOrderUpdateInput!) {
+    purchaseOrderUpdate(id: $id, input: $input) {
       purchaseOrder {
         id
       }

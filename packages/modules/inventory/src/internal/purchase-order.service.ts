@@ -85,6 +85,25 @@ export interface PurchaseOrderCreateInput {
   lines: PurchaseOrderLineInput[];
 }
 
+export interface PurchaseOrderLineUpdateInput {
+  lineId: string;
+  /** No fewer than came already. */
+  quantity?: number | null;
+  /** Blank or null clears it. */
+  unitCost?: string | null;
+}
+
+export interface PurchaseOrderUpdateInput {
+  /** Each of these, when given, replaces what the order had; blank or null clears it. */
+  reference?: string | null;
+  note?: string | null;
+  expectedOn?: string | null;
+  linesToAdd?: PurchaseOrderLineInput[] | null;
+  linesToUpdate?: PurchaseOrderLineUpdateInput[] | null;
+  /** Lines none of which came yet. */
+  lineIdsToRemove?: string[] | null;
+}
+
 export interface PurchaseOrderReceiveInput {
   lines: { lineId: string; quantity: number }[];
 }
@@ -476,25 +495,229 @@ export class PurchaseOrderService {
                         ${sql.param(targets.map((target) => target.quantity))}::int[])
                  AS r(id, quantity)
            WHERE l.shop_id = ${tenant.shopId} AND l.id = r.id`);
-        await tx.execute(sql`
-          UPDATE inventory.purchase_orders o
-             SET status = CASE WHEN NOT EXISTS (
-                            SELECT 1 FROM inventory.purchase_order_lines l
-                             WHERE l.shop_id = o.shop_id AND l.purchase_order_id = o.id
-                               AND l.received < l.quantity)
-                          THEN 'received' ELSE 'open' END,
-                 closed_at = CASE WHEN NOT EXISTS (
-                            SELECT 1 FROM inventory.purchase_order_lines l
-                             WHERE l.shop_id = o.shop_id AND l.purchase_order_id = o.id
-                               AND l.received < l.quantity)
-                          THEN now() END,
-                 version = o.version + 1,
-                 updated_at = now()
-           WHERE o.shop_id = ${tenant.shopId} AND o.id = ${id}`);
+        await this.#settle(tx, tenant.shopId, id);
         const [received] = await this.#load(tx, tenant.shopId, { ids: [id] });
         return { ok: true, value: received! };
       }),
     );
+  }
+
+  /**
+   * Changes an open order: its supplier's number, note and day expected; lines added, their
+   * quantities or costs changed, never below what came already, and lines none of which came
+   * removed. An order whose every line has come in full after it is received.
+   */
+  async update(
+    tenant: TenantContext,
+    id: string,
+    input: PurchaseOrderUpdateInput,
+  ): Promise<MutationResult<PurchaseOrderRecord>> {
+    const check = new InputChecker();
+    const reference =
+      input.reference === undefined
+        ? undefined
+        : check.text(['input', 'reference'], input.reference, { max: 255 });
+    const note =
+      input.note === undefined
+        ? undefined
+        : check.text(['input', 'note'], input.note, { max: 5000 });
+    const expectedOn =
+      input.expectedOn === undefined
+        ? undefined
+        : checkDay(check, ['input', 'expectedOn'], input.expectedOn);
+    const seen = new Set<string>();
+    const adds = (input.linesToAdd ?? []).map((line, index) => {
+      const field = ['input', 'linesToAdd', String(index)];
+      if (seen.has(line.inventoryItemId)) {
+        check.addMessage(field, 'INVALID', 'The same item is listed twice');
+      }
+      seen.add(line.inventoryItemId);
+      check.integer([...field, 'quantity'], line.quantity, { min: 1, max: LIMITS.quantity });
+      return {
+        variantId: line.inventoryItemId,
+        quantity: line.quantity,
+        unitCost: check.price([...field, 'unitCost'], line.unitCost, tenant.currency),
+        field,
+      };
+    });
+    const updated = new Set<string>();
+    const updates = (input.linesToUpdate ?? []).map((line, index) => {
+      const field = ['input', 'linesToUpdate', String(index)];
+      if (updated.has(line.lineId)) {
+        check.addMessage(field, 'INVALID', 'The same line is listed twice');
+      }
+      updated.add(line.lineId);
+      if (line.quantity !== undefined && line.quantity !== null) {
+        check.integer([...field, 'quantity'], line.quantity, { min: 1, max: LIMITS.quantity });
+      }
+      return {
+        lineId: line.lineId,
+        quantity: line.quantity ?? null,
+        unitCost:
+          line.unitCost === undefined
+            ? undefined
+            : check.price([...field, 'unitCost'], line.unitCost, tenant.currency),
+        field,
+      };
+    });
+    const removes = [...new Set(input.lineIdsToRemove ?? [])];
+    if (!check.ok) return { ok: false, errors: check.errors };
+
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const [order] = await tx
+        .select({ status: purchaseOrders.status })
+        .from(purchaseOrders)
+        .where(and(eq(purchaseOrders.shopId, tenant.shopId), eq(purchaseOrders.id, id)))
+        .for('update');
+      if (!order) return failOne(['id'], 'NOT_FOUND', 'Purchase order not found');
+      if (order.status !== 'open') {
+        return failOne(['id'], 'INVALID', `The purchase order is ${order.status} already`);
+      }
+      const lines = await tx
+        .select()
+        .from(purchaseOrderLines)
+        .where(
+          and(
+            eq(purchaseOrderLines.shopId, tenant.shopId),
+            eq(purchaseOrderLines.purchaseOrderId, id),
+          ),
+        );
+      const byId = new Map(lines.map((line) => [line.id, line]));
+      const errors: FieldError[] = [];
+      removes.forEach((lineId, index) => {
+        const line = byId.get(lineId);
+        const field = ['input', 'lineIdsToRemove', String(index)];
+        if (!line) errors.push({ field, code: 'NOT_FOUND', message: 'Line not found' });
+        else if (line.received > 0) {
+          errors.push({
+            field,
+            code: 'INVALID',
+            message: `${line.received} came already; the line can't be removed`,
+          });
+        }
+      });
+      for (const update of updates) {
+        const line = byId.get(update.lineId);
+        if (!line) {
+          errors.push({
+            field: [...update.field, 'lineId'],
+            code: 'NOT_FOUND',
+            message: 'Line not found',
+          });
+        } else if (removes.includes(line.id)) {
+          errors.push({
+            field: [...update.field, 'lineId'],
+            code: 'INVALID',
+            message: 'The line is removed in the same change',
+          });
+        } else if (update.quantity !== null && update.quantity < line.received) {
+          errors.push({
+            field: [...update.field, 'quantity'],
+            code: 'INVALID',
+            message: `${line.received} came already; it can't be fewer`,
+          });
+        }
+      }
+      const snapshots = await this.variants.snapshotsOf(
+        tx,
+        tenant.shopId,
+        adds.map((add) => add.variantId),
+      );
+      const kept = new Set(
+        lines.filter((line) => !removes.includes(line.id)).map((line) => line.variantId),
+      );
+      for (const add of adds) {
+        if (!snapshots.has(add.variantId)) {
+          errors.push({
+            field: [...add.field, 'inventoryItemId'],
+            code: 'NOT_FOUND',
+            message: 'Inventory item not found',
+          });
+        } else if (kept.has(add.variantId)) {
+          errors.push({
+            field: [...add.field, 'inventoryItemId'],
+            code: 'INVALID',
+            message: 'The item is on the order already',
+          });
+        }
+      }
+      const remaining = lines.length - removes.length + adds.length;
+      if (remaining === 0) {
+        errors.push({
+          field: ['input'],
+          code: 'INVALID',
+          message: 'An order needs at least one line',
+        });
+      }
+      if (remaining > LIMITS.changes) {
+        errors.push({
+          field: ['input', 'linesToAdd'],
+          code: 'TOO_MANY',
+          message: `An order can have at most ${LIMITS.changes} lines`,
+        });
+      }
+      if (errors.length > 0) return { ok: false, errors };
+
+      if (removes.length > 0) {
+        await tx
+          .delete(purchaseOrderLines)
+          .where(
+            and(
+              eq(purchaseOrderLines.shopId, tenant.shopId),
+              sql`${purchaseOrderLines.id} = ANY(${sql.param(removes)}::uuid[])`,
+            ),
+          );
+      }
+      for (const update of updates) {
+        if (update.quantity === null && update.unitCost === undefined) continue;
+        await tx
+          .update(purchaseOrderLines)
+          .set({
+            ...(update.quantity !== null && { quantity: update.quantity }),
+            ...(update.unitCost !== undefined && { unitCost: update.unitCost }),
+          })
+          .where(
+            and(
+              eq(purchaseOrderLines.shopId, tenant.shopId),
+              eq(purchaseOrderLines.id, update.lineId),
+            ),
+          );
+      }
+      if (adds.length > 0) {
+        const after = Math.max(-1, ...lines.map((line) => line.position));
+        await tx.insert(purchaseOrderLines).values(
+          adds.map((add, index) => {
+            const snapshot = snapshots.get(add.variantId)!;
+            return {
+              shopId: tenant.shopId,
+              purchaseOrderId: id,
+              id: newId(),
+              position: after + 1 + index,
+              variantId: add.variantId,
+              productTitle: snapshot.productTitle,
+              variantTitle: snapshot.variantTitle,
+              sku: snapshot.sku,
+              quantity: add.quantity,
+              unitCost: add.unitCost,
+            };
+          }),
+        );
+      }
+      const fields = {
+        ...(reference !== undefined && { reference }),
+        ...(note !== undefined && { note }),
+        ...(expectedOn !== undefined && { expectedOn }),
+      };
+      if (Object.keys(fields).length > 0) {
+        await tx
+          .update(purchaseOrders)
+          .set(fields)
+          .where(and(eq(purchaseOrders.shopId, tenant.shopId), eq(purchaseOrders.id, id)));
+      }
+      await this.#settle(tx, tenant.shopId, id);
+      const [changed] = await this.#load(tx, tenant.shopId, { ids: [id] });
+      return { ok: true, value: changed! };
+    });
   }
 
   /** Closes an open order with what came: the rest is no longer expected. */
@@ -521,6 +744,27 @@ export class PurchaseOrderService {
       const [closed] = await this.#load(tx, tenant.shopId, { ids: [id] });
       return { ok: true, value: closed! };
     });
+  }
+
+  /**
+   * After a change to an open order's lines: received once every line has come in full, with
+   * when; its version moves on either way.
+   */
+  async #settle(tx: Tx, shopId: string, id: string): Promise<void> {
+    await tx.execute(sql`
+      WITH done AS (
+        SELECT NOT EXISTS (
+                 SELECT 1 FROM inventory.purchase_order_lines l
+                  WHERE l.shop_id = ${shopId} AND l.purchase_order_id = ${id}
+                    AND l.received < l.quantity) AS all_came
+      )
+      UPDATE inventory.purchase_orders o
+         SET status = CASE WHEN done.all_came THEN 'received' ELSE 'open' END,
+             closed_at = CASE WHEN done.all_came THEN now() END,
+             version = o.version + 1,
+             updated_at = now()
+        FROM done
+       WHERE o.shop_id = ${shopId} AND o.id = ${id}`);
   }
 
   /** Purchase orders with their supplier, location and lines, the newest first. */

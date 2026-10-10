@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useSearch } from '@tanstack/react-router';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { PurchaseOrdersQuery } from '../api/operations';
@@ -18,6 +18,17 @@ export const STATUS_LABELS: Record<PurchaseOrderStatus, MessageKey> = {
   CLOSED: 'po.status.CLOSED',
 };
 
+export interface PurchaseOrdersSearch {
+  /** Only the orders from this supplier. */
+  supplier?: string;
+}
+
+export function validatePurchaseOrdersSearch(
+  search: Record<string, unknown>,
+): PurchaseOrdersSearch {
+  return { supplier: typeof search.supplier === 'string' ? search.supplier : undefined };
+}
+
 /** A day the goods are expected, as the core keeps it (YYYY-MM-DD), in words. */
 export function useDay() {
   const { locale } = useLocale();
@@ -32,12 +43,13 @@ export function PurchaseOrdersPage() {
   const { t } = useLocale();
   const { id: shopId, role } = useShop();
   const day = useDay();
+  const { supplier } = useSearch({ from: '/$shopId/purchase-orders' });
   const [status, setStatus] = useState<PurchaseOrderStatus>('OPEN');
   const [after, setAfter] = useState<string | null>(null);
   const query = useAdminQuery<PurchaseOrdersData>(
     ['purchaseOrders'],
     PurchaseOrdersQuery,
-    { status, after },
+    { status, after, supplierId: supplier ?? null },
     { keepPrevious: true },
   );
 
@@ -55,17 +67,38 @@ export function PurchaseOrdersPage() {
         <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
           {t('po.title')}
         </h1>
-        {EDITS_STOCK.includes(role) && (
+        <div className="flex flex-wrap gap-2">
           <Link
-            to="/$shopId/purchase-orders/new"
+            to="/$shopId/purchase-orders/suppliers"
             params={{ shopId }}
-            className="inline-flex min-h-12 items-center gap-2 rounded-control bg-primary px-4 font-medium text-on-primary md:min-h-10"
+            className="inline-flex min-h-12 items-center rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
           >
-            <Plus aria-hidden className="size-5" />
-            {t('po.new')}
+            {t('po.suppliers')}
           </Link>
-        )}
+          {EDITS_STOCK.includes(role) && (
+            <Link
+              to="/$shopId/purchase-orders/new"
+              params={{ shopId }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-control bg-primary px-4 font-medium text-on-primary md:min-h-10"
+            >
+              <Plus aria-hidden className="size-5" />
+              {t('po.new')}
+            </Link>
+          )}
+        </div>
       </div>
+      {supplier && (
+        <p className="flex flex-wrap items-center gap-2">
+          {t('po.fromOne')}
+          <Link
+            to="/$shopId/purchase-orders"
+            params={{ shopId }}
+            className="font-medium text-primary underline"
+          >
+            {t('po.fromAll')}
+          </Link>
+        </p>
+      )}
       <div role="tablist" className="flex gap-2 overflow-x-auto pb-1">
         {(Object.keys(STATUS_LABELS) as PurchaseOrderStatus[]).map((each) => (
           <button

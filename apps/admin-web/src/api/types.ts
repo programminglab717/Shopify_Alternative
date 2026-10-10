@@ -2548,3 +2548,14 @@ export interface PurchaseOrderFormData {
   suppliers: { id: string; name: string; phone: string | null }[];
   locations: { nodes: { id: string; name: string; isPrimary: boolean }[] };
 }
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone: string | null;
+  note: string | null;
+}
+
+export interface SuppliersData {
+  suppliers: Supplier[];
+}

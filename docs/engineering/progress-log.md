@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, suppliers kept, and an open purchase order changed, in the core and the admin**
-(INV-05): a page of the shop's suppliers, each changed in place with its orders; lines added to
-or taken from an order still open, and how many changed; then section by section as the alpha's
-shops need them. Urdu handles wait, as decided.
+**Next, what goods cost, from purchase orders, in the core and the admin** (INV-05, ANL-03):
+a line's cost carried to its variant's cost as the goods are received, so true profit counts what
+they cost; then section by section as the alpha's shops need them. Urdu handles wait, as
+decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### Suppliers kept, and an open purchase order changed, in the core and the admin
+
+* **Orders changed** ([ADR-351](../architecture/13-decision-log.md#adr-351--an-open-purchase-order-is-changed-in-one-request-its-suppliers-number-note-and-day-expected-lines-added-their-quantities-or-costs-changed-never-below-what-came-and-lines-none-of-which-came-removed-received-once-all-of-it-has-suppliers-kept-on-a-page-of-their-own-in-the-admin-each-with-its-orders)): `purchaseOrderUpdate` changes an open order in one request: its
+  details, lines added, their quantities or costs changed, never below what came, and lines none of
+  which came removed; an order with nothing left to come after it is received.
+* **In the admin:** "Change the order" on an open order's page; suppliers on a page of their own,
+  each changed in place, a new one added, and its orders alone.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, Nishat Mills'
+  note changed and Gul Ahmed added on the suppliers' page; Gul Ahmed's orders alone, none still to
+  come. PO-2 from Nishat Mills, 5 each of "Peshawari Chappal" 8 and 9, changed: 7 of size 8 at
+  Rs 1,400, size 9 taken off, 4 of size 10 added and the number "Challan 7": the order said 0 of 11
+  came, Rs 9,800. No errors in the browser.
+* 2470 tests: an order changed and refused in the inventory module and through the Admin API;
+  in the admin, suppliers kept and an order changed; and the documents checked against the core's
+  schema.
 
 ### 051036e · Purchase orders from suppliers, in the core and the admin
 

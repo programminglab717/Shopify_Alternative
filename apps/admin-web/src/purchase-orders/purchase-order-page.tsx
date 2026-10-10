@@ -1,11 +1,12 @@
 import { Link, useParams } from '@tanstack/react-router';
-import { ArrowLeft, ScanBarcode } from 'lucide-react';
+import { ArrowLeft, ScanBarcode, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   PurchaseOrderCloseMutation,
   PurchaseOrderQuery,
   PurchaseOrderReceiveMutation,
+  PurchaseOrderUpdateMutation,
   StockCountFindQuery,
 } from '../api/operations';
 import type { PurchaseOrder, PurchaseOrderData, StockCountFindData, UserError } from '../api/types';
@@ -20,6 +21,8 @@ import { Scanner, canScan } from '../stock/scanner';
 import { EDITS_STOCK } from '../stock/stock-page';
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
+import { TextField } from '../ui/field';
+import { AMOUNT, FindVariants, type Line } from './new-purchase-order-page';
 import { STATUS_LABELS, useDay } from './purchase-orders-page';
 
 type Mutated = Record<string, { userErrors: UserError[] }>;
@@ -216,6 +219,214 @@ function Receive({ order }: { order: PurchaseOrder }) {
   );
 }
 
+/** An amount as the core gives it, as one would type it: "1450.00" reads "1450". */
+const typed = (amount: string) => amount.replace(/\.00$/, '');
+
+/**
+ * An open order changed: its supplier's number, day expected and note; each line's quantity, no
+ * fewer than came, and cost; lines none of which came removed; goods added.
+ */
+function EditOrder({ order, onDone }: { order: PurchaseOrder; onDone: () => void }) {
+  const { t } = useLocale();
+  const update = useAdminMutation<Mutated, { id: string; input: Record<string, unknown> }>(
+    PurchaseOrderUpdateMutation,
+  );
+  const { problem, attempt } = useAttempt();
+  const [reference, setReference] = useState(order.reference ?? '');
+  const [expectedOn, setExpectedOn] = useState(order.expectedOn ?? '');
+  const [note, setNote] = useState(order.note ?? '');
+  const [lines, setLines] = useState(
+    order.lines.map((line) => ({
+      line,
+      quantity: String(line.quantity),
+      unitCost: line.unitCost ? typed(line.unitCost.amount) : '',
+      removed: false,
+    })),
+  );
+  const [added, setAdded] = useState<Line[]>([]);
+  const kept = lines.filter((each) => !each.removed);
+  const tooFew = (each: (typeof lines)[number]) => {
+    const units = parseStock(each.quantity);
+    return units === null || units < Math.max(1, each.line.received);
+  };
+  const badCost = (cost: string) => cost.trim() !== '' && !AMOUNT.test(cost.trim());
+  const valid =
+    kept.length + added.length > 0 &&
+    kept.every((each) => !tooFew(each) && !badCost(each.unitCost)) &&
+    added.every((each) => (parseStock(each.quantity) ?? 0) > 0 && !badCost(each.unitCost));
+  const change = (id: string, patch: Partial<(typeof lines)[number]>) =>
+    setLines((now) => now.map((each) => (each.line.id === id ? { ...each, ...patch } : each)));
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!valid) return;
+    const ok = await attempt(
+      async () =>
+        Object.values(
+          await update.mutateAsync({
+            id: order.id,
+            input: {
+              reference: reference.trim(),
+              expectedOn,
+              note: note.trim(),
+              linesToUpdate: kept
+                .filter(
+                  (each) =>
+                    each.quantity !== String(each.line.quantity) ||
+                    each.unitCost !== (each.line.unitCost ? typed(each.line.unitCost.amount) : ''),
+                )
+                .map((each) => ({
+                  lineId: each.line.id,
+                  quantity: parseStock(each.quantity),
+                  unitCost: each.unitCost.trim(),
+                })),
+              lineIdsToRemove: lines.filter((each) => each.removed).map((each) => each.line.id),
+              linesToAdd: added.map((each) => ({
+                inventoryItemId: each.itemId,
+                quantity: parseStock(each.quantity),
+                unitCost: each.unitCost.trim() || null,
+              })),
+            },
+          }),
+        )[0]!,
+    );
+    if (ok) onDone();
+  };
+
+  return (
+    <Card className="p-4">
+      <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-3">
+        <h2 className="font-semibold">{t('po.edit')}</h2>
+        <div className="flex flex-wrap gap-3">
+          <TextField
+            label={t('po.reference')}
+            value={reference}
+            onChange={(event) => setReference(event.target.value)}
+          />
+          <TextField
+            label={t('po.expectedOn')}
+            type="date"
+            ltr
+            value={expectedOn}
+            onChange={(event) => setExpectedOn(event.target.value)}
+          />
+        </div>
+        <TextField
+          label={t('po.note')}
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+        />
+        <ul className="flex flex-col divide-y divide-line">
+          {kept.map((each) => (
+            <li key={each.line.id} className="flex flex-wrap items-end gap-3 py-2">
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="font-medium" dir="auto">
+                  {titleOf(each.line)}
+                </span>
+                {each.line.received > 0 && (
+                  <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                    {t('po.cameAlready', { count: formatCount(each.line.received) })}
+                  </span>
+                )}
+              </span>
+              <TextField
+                label={t('po.quantityOf', { title: titleOf(each.line) })}
+                inputMode="numeric"
+                ltr
+                className="w-24"
+                value={each.quantity}
+                error={
+                  tooFew(each)
+                    ? t('po.atLeast', { count: formatCount(Math.max(1, each.line.received)) })
+                    : null
+                }
+                onChange={(event) => change(each.line.id, { quantity: event.target.value })}
+              />
+              <TextField
+                label={t('po.unitCostOf', { title: titleOf(each.line) })}
+                inputMode="decimal"
+                ltr
+                className="w-32"
+                value={each.unitCost}
+                error={badCost(each.unitCost) ? t('po.badCost') : null}
+                onChange={(event) => change(each.line.id, { unitCost: event.target.value })}
+              />
+              {each.line.received === 0 && (
+                <Button
+                  variant="tertiary"
+                  aria-label={t('po.removeLine', { title: titleOf(each.line) })}
+                  icon={<Trash2 aria-hidden className="size-5" />}
+                  onClick={() => change(each.line.id, { removed: true })}
+                />
+              )}
+            </li>
+          ))}
+          {added.map((each, index) => (
+            <li key={each.itemId} className="flex flex-wrap items-end gap-3 py-2">
+              <span className="min-w-0 flex-1 font-medium" dir="auto">
+                {each.title}
+              </span>
+              <TextField
+                label={t('po.quantityOf', { title: each.title })}
+                inputMode="numeric"
+                ltr
+                className="w-24"
+                value={each.quantity}
+                onChange={(event) =>
+                  setAdded((now) =>
+                    now.map((line, at) =>
+                      at === index ? { ...line, quantity: event.target.value } : line,
+                    ),
+                  )
+                }
+              />
+              <TextField
+                label={t('po.unitCostOf', { title: each.title })}
+                inputMode="decimal"
+                ltr
+                className="w-32"
+                value={each.unitCost}
+                error={badCost(each.unitCost) ? t('po.badCost') : null}
+                onChange={(event) =>
+                  setAdded((now) =>
+                    now.map((line, at) =>
+                      at === index ? { ...line, unitCost: event.target.value } : line,
+                    ),
+                  )
+                }
+              />
+              <Button
+                variant="tertiary"
+                aria-label={t('po.removeLine', { title: each.title })}
+                icon={<Trash2 aria-hidden className="size-5" />}
+                onClick={() => setAdded((now) => now.filter((_, at) => at !== index))}
+              />
+            </li>
+          ))}
+        </ul>
+        <FindVariants
+          chosen={
+            new Set([
+              ...kept.map((each) => each.line.inventoryItem.id),
+              ...added.map((each) => each.itemId),
+            ])
+          }
+          onAdd={(line) => setAdded((now) => [...now, line])}
+        />
+        {problem && <Alert tone="danger">{problem}</Alert>}
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" busy={update.isPending} disabled={!valid}>
+            {t('po.saveChanges')}
+          </Button>
+          <Button variant="tertiary" onClick={onDone}>
+            {t('returns.cancel')}
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
 /** Closing an open order with what came, once sure. */
 function Close({ order }: { order: PurchaseOrder }) {
   const { t } = useLocale();
@@ -256,6 +467,7 @@ export function PurchaseOrderPage() {
   const { t } = useLocale();
   const { id: shopId, role } = useShop();
   const day = useDay();
+  const [editing, setEditing] = useState(false);
   const { purchaseOrderId } = useParams({ from: '/$shopId/purchase-orders/$purchaseOrderId' });
   const query = useAdminQuery<PurchaseOrderData>(
     ['purchaseOrder', purchaseOrderId],
@@ -286,6 +498,15 @@ export function PurchaseOrderPage() {
     );
   }
   const edits = EDITS_STOCK.includes(role) && order.status === 'OPEN';
+  if (editing && edits) {
+    return (
+      <div className="mx-auto flex max-w-3xl flex-col gap-4">
+        {back}
+        <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">{order.name}</h1>
+        <EditOrder order={order} onDone={() => setEditing(false)} />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -324,6 +545,14 @@ export function PurchaseOrderPage() {
             <div>
               <dt className="text-secondary">{t('po.expectedOn')}</dt>
               <dd>{day(order.expectedOn)}</dd>
+            </div>
+          )}
+          {order.note && (
+            <div className="sm:col-span-2">
+              <dt className="text-secondary">{t('po.note')}</dt>
+              <dd dir="auto" className="whitespace-pre-line">
+                {order.note}
+              </dd>
             </div>
           )}
           <div>
@@ -376,7 +605,14 @@ export function PurchaseOrderPage() {
         </ul>
       </Card>
       {edits && <Receive order={order} />}
-      {edits && <Close order={order} />}
+      {edits && (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setEditing(true)}>
+            {t('po.edit')}
+          </Button>
+          <Close order={order} />
+        </div>
+      )}
     </div>
   );
 }
