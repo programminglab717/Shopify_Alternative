@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### Customers tagged many at once, in the core and the admin
+### e24847a · Customers tagged many at once, in the core and the admin
 
 * **`customerBulkAddTags` and `customerBulkRemoveTags`** ([ADR-345](../architecture/13-decision-log.md#adr-345--customers-are-tagged-and-untagged-many-at-once-as-orders-and-products-are-up-to-250-each-in-its-own-transaction-one-refused-said-at-its-place-their-marketing-consent-is-not-as-each-customer-gives-or-withdraws-their-own)): up to 250 customers, each
   retagged in its own transaction, one refused said at its place in the IDs while the rest are
