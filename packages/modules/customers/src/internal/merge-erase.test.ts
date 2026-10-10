@@ -355,9 +355,9 @@ describe.skipIf(!server)("Customers' numbers, merging, erasure and their own exp
       );
       return customer;
     };
-    const ayesha = await ask(JAZZ, 'Ayesha', '2026-10-11T10:00:00.123456Z');
-    const bilal = await ask(ZONG, 'Bilal', '2026-10-11T10:00:00.123457Z');
-    const sana = await ask(UFONE, 'Sana', '2026-10-10T09:00:00.5Z');
+    const ayesha = await ask(JAZZ, 'Ayesha', '2096-10-11T10:00:00.123456Z');
+    const bilal = await ask(ZONG, 'Bilal', '2096-10-11T10:00:00.123457Z');
+    const sana = await ask(UFONE, 'Sana', '2096-10-10T09:00:00.5Z');
     // Another shop's are its own.
     const other = unwrap(await f.customers.create(f.b, { phone: JAZZ, name: 'Ayesha' }));
     unwrap(await f.data.requestErasure(f.b, other.id));
@@ -371,9 +371,9 @@ describe.skipIf(!server)("Customers' numbers, merging, erasure and their own exp
       after = { at: items[0]!.dueAtExactly, id: items[0]!.customer.id };
     }
     expect(seen).toEqual([
-      ['Sana', '2026-10-10T09:00:00.500000Z', true],
-      ['Ayesha', '2026-10-11T10:00:00.123456Z', true],
-      ['Bilal', '2026-10-11T10:00:00.123457Z', false],
+      ['Sana', '2096-10-10T09:00:00.500000Z', true],
+      ['Ayesha', '2096-10-11T10:00:00.123456Z', true],
+      ['Bilal', '2096-10-11T10:00:00.123457Z', false],
     ]);
     const all = await f.data.waitingErasures(f.a, { first: 10 });
     expect(all.items.map((item) => [item.customer.id, item.request])).toEqual([
@@ -384,7 +384,7 @@ describe.skipIf(!server)("Customers' numbers, merging, erasure and their own exp
 
     // Cancelled, or carried out, an erasure is no longer waiting.
     unwrap(await f.data.cancelErasure(f.a, bilal.id));
-    expect(await f.data.eraseDue(f.a.shopId, new Date('2026-10-10T12:00:00Z'))).toEqual({
+    expect(await f.data.eraseDue(f.a.shopId, new Date('2096-10-10T12:00:00Z'))).toEqual({
       erased: 1,
       waiting: 0,
     });

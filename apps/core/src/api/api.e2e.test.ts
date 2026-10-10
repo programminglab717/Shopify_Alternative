@@ -467,6 +467,70 @@ describe.skipIf(!server)('Admin GraphQL API', () => {
       });
       expect(read.body.data?.product).toBeNull();
     });
+
+    it('acts on many products at once, saying each refused at its place (CAT-04)', async () => {
+      const lawn = (await createProduct(tokens.a, { title: 'Lawn Suit', tags: ['Lawn'] })).product!;
+      const shawl = (await createProduct(tokens.a, { title: 'Ajrak Shawl' })).product!;
+      const theirs = (await createProduct(tokens.b, { title: 'Khussa' })).product!;
+      const ids = [lawn.id, theirs.id, shawl.id];
+
+      const shown = await gql(
+        tokens.a,
+        `mutation ($ids: [ID!]!) {
+           productBulkUpdateStatus(ids: $ids, status: ACTIVE) {
+             products { title status } userErrors { field code }
+           }
+         }`,
+        { ids },
+      );
+      expect(shown.body.data?.productBulkUpdateStatus).toEqual({
+        products: [
+          { title: 'Lawn Suit', status: 'ACTIVE' },
+          { title: 'Ajrak Shawl', status: 'ACTIVE' },
+        ],
+        userErrors: [{ field: ['ids', '1'], code: 'NOT_FOUND' }],
+      });
+      const tagged = await gql(
+        tokens.a,
+        `mutation ($ids: [ID!]!) {
+           added: productBulkAddTags(ids: $ids, tags: ["Eid", "lawn"]) { products { tags } }
+           removed: productBulkRemoveTags(ids: $ids, tags: ["LAWN"]) { products { tags } }
+         }`,
+        { ids: [lawn.id, shawl.id] },
+      );
+      expect(tagged.body.data).toEqual({
+        added: { products: [{ tags: ['Lawn', 'Eid'] }, { tags: ['Eid', 'lawn'] }] },
+        removed: { products: [{ tags: ['Eid'] }, { tags: ['Eid'] }] },
+      });
+
+      const readOnly = await gql(
+        tokens.aReadOnly,
+        'mutation ($ids: [ID!]!) { productBulkDelete(ids: $ids) { deletedProductIds } }',
+        { ids },
+      );
+      expect(readOnly.body.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+      const deleted = await gql(
+        tokens.a,
+        `mutation ($ids: [ID!]!) {
+           productBulkDelete(ids: $ids) { deletedProductIds userErrors { field code } }
+         }`,
+        { ids },
+      );
+      expect(deleted.body.data?.productBulkDelete).toEqual({
+        deletedProductIds: [lawn.id, shawl.id],
+        userErrors: [{ field: ['ids', '1'], code: 'NOT_FOUND' }],
+      });
+      const left = await gql(tokens.b, `query ($id: ID!) { product(id: $id) { title } }`, {
+        id: theirs.id,
+      });
+      expect(left.body.data?.product).toEqual({ title: 'Khussa' });
+      const own = await gql(
+        tokens.b,
+        'mutation ($ids: [ID!]!) { productBulkDelete(ids: $ids) { deletedProductIds } }',
+        { ids: [theirs.id] },
+      );
+      expect(own.body.data?.productBulkDelete).toEqual({ deletedProductIds: [theirs.id] });
+    });
   });
 
   describe('collections', () => {

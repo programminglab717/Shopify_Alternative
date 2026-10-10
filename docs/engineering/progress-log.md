@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, products acted on many at once, in the core and the admin** (CAT-04): products chosen on
-the list shown, hidden or archived, tagged and untagged, put in a collection or deleted together,
-as orders are; then section by section as the alpha's shops need them.
+**Next, customers acted on many at once, in the core and the admin** (CUS-01, CUS-04): customers
+chosen on the list tagged and untagged together, and their marketing consent recorded as they gave
+it, as orders and products are; then section by section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +18,28 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### Products acted on many at once, in the core and the admin
+
+* **`productBulkUpdateStatus`, `productBulkAddTags`, `productBulkRemoveTags` and
+  `productBulkDelete`** ([ADR-344](../architecture/13-decision-log.md#adr-344--products-are-shown-hidden-or-archived-tagged-untagged-and-deleted-many-at-once-as-orders-are-up-to-250-each-in-its-own-transaction-as-it-would-be-alone-one-refused-said-at-its-place-in-the-ids-while-the-rest-are-done-the-products-list-chooses-them-and-puts-them-in-a-collection-made-by-hand-too)): up to 250 products, each in its own transaction as it would be
+  alone, one refused said at its place in the IDs while the rest are done. The core's product
+  update and these share one path.
+* **In the admin:** owners and managers choose products on the list and set their status, tag
+  them, add them to a collection made by hand or delete them, from a bar as on orders.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, three drafts
+  made for the check were chosen on the list searched for them and shown together, "3 products
+  updated."; two tagged "eid-test, Summer-Test"; one added to "Eid picks"; then all three deleted
+  once asked. No errors in the browser.
+* **A test that ran out of time:** the customers module's erasure test fixed due times on 10 and
+  11 October 2026, which were past by today's run (CI run 395), so the database refused them;
+  they are in 2096 now.
+* 2423 tests: products shown, hidden or archived each once, those refused said at their place;
+  told only of those that changed; tags added in any case and taken off, one past the most
+  refused, smart collections following; deleted, another shop's left; no IDs, too many or no tags
+  refused; through the Admin API with its scope; in the admin, chosen, a collection made by hand
+  offered, deleting asked first, those refused said by title; and the mutations checked against
+  the core's schema.
 
 ### 8da2dec · A product duplicated, in the core and the admin
 

@@ -5782,6 +5782,24 @@ type Mutation {
   Settles a refund through the gateway whose answer never came (UNKNOWN, or PENDING past a few minutes), as the gateway's dashboard shows it: given back, which records the order's refund, or not, which frees what it held. Staff need to be an owner or a manager.
   """
   paymentRefundSettle(id: ID!, input: PaymentRefundSettleInput!): PaymentRefundSettlePayload!
+
+  """
+  Adds tags to up to 250 products (CAT-04). Tags a product has already, in any case, stay as they are; one with too many is refused.
+  """
+  productBulkAddTags(ids: [ID!]!, tags: [String!]!): ProductBulkPayload!
+
+  """
+  Deletes up to 250 products (CAT-04) with their variants, options and media, each as productDelete would.
+  """
+  productBulkDelete(ids: [ID!]!): ProductBulkDeletePayload!
+
+  """Takes tags off up to 250 products (CAT-04), ignoring case."""
+  productBulkRemoveTags(ids: [ID!]!, tags: [String!]!): ProductBulkPayload!
+
+  """
+  Shows, hides or archives up to 250 products (CAT-04), each as productUpdate would; one refused leaves the rest done.
+  """
+  productBulkUpdateStatus(ids: [ID!]!, status: ProductStatus!): ProductBulkPayload!
   productCreate(input: ProductCreateInput!): ProductCreatePayload!
 
   """Adds images by URL, after the existing ones."""
@@ -5794,7 +5812,7 @@ type Mutation {
   productDeleteMedia(mediaIds: [ID!]!, productId: ID!): ProductDeleteMediaPayload!
 
   """
-  Copies a product (ADR-343), as Shopify's productDuplicate does: titled `newTitle`, its handle made from that, with its description, vendor, type, tags and words for search engines; its options and variants with their prices, costs, weights and tax, not their SKUs or barcodes; in the manual collections it is in; and its variants tracked as its are, with none of their stock. With `includeImages`, its photos and videos too, made again from where they came. Its status is `newStatus`, else the product's own.
+  Copies a product (ADR-343), as Shopify's productDuplicate does: titled `newTitle`, its handle made from that, with its description, vendor, type, tags and words for search engines; its options and variants with their prices, costs, weights and tax, not their SKUs or barcodes; in the manual collections it is in; and its variants tracked as its are, with none of their stock. With `includeImages`, its photos and videos too, made again from what was kept of them, or from where they came once that is gone. Its status is `newStatus`, else the product's own.
   """
   productDuplicate(includeImages: Boolean = false, newStatus: ProductStatus, newTitle: String!, productId: ID!): ProductDuplicatePayload!
 
@@ -7971,6 +7989,26 @@ type Product {
 
   """Starts at 1 and increases with every change."""
   version: Int!
+}
+
+"""Products deleted many at once (CAT-04)."""
+type ProductBulkDeletePayload {
+  """The products deleted, in the order asked."""
+  deletedProductIds: [ID!]!
+
+  """
+  Why products were not deleted, each at its place in `ids`: ["ids", "3"].
+  """
+  userErrors: [UserError!]!
+}
+
+"""Products acted on many at once (CAT-04)."""
+type ProductBulkPayload {
+  """The products done, in the order asked; those refused are left out."""
+  products: [Product!]!
+
+  """Why products were refused, each at its place in `ids`: ["ids", "3"]."""
+  userErrors: [UserError!]!
 }
 
 type ProductConnection {

@@ -821,6 +821,30 @@ export class ProductDuplicatePayload {
   userErrors!: UserError[];
 }
 
+@ObjectType({ description: 'Products acted on many at once (CAT-04).' })
+export class ProductBulkPayload {
+  @Field(() => [Product], {
+    description: 'The products done, in the order asked; those refused are left out.',
+  })
+  products!: Product[];
+
+  @Field(() => [UserError], {
+    description: 'Why products were refused, each at its place in `ids`: ["ids", "3"].',
+  })
+  userErrors!: UserError[];
+}
+
+@ObjectType({ description: 'Products deleted many at once (CAT-04).' })
+export class ProductBulkDeletePayload {
+  @Field(() => [ID], { description: 'The products deleted, in the order asked.' })
+  deletedProductIds!: string[];
+
+  @Field(() => [UserError], {
+    description: 'Why products were not deleted, each at its place in `ids`: ["ids", "3"].',
+  })
+  userErrors!: UserError[];
+}
+
 @ObjectType()
 export class ProductUpdatePayload {
   @Field(() => Product, { nullable: true })

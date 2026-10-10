@@ -1109,6 +1109,58 @@ export const InventoryItemUpdateMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+const PRODUCT_BULK_PAYLOAD = /* GraphQL */ `
+  products {
+    id
+  }
+  userErrors {
+    ...Problems
+  }
+`;
+
+/** Products chosen on the list shown, hidden or archived at once (CAT-04). */
+export const ProductBulkUpdateStatusMutation = /* GraphQL */ `
+  mutation ProductBulkUpdateStatus($ids: [ID!]!, $status: ProductStatus!) {
+    productBulkUpdateStatus(ids: $ids, status: $status) {
+      ${PRODUCT_BULK_PAYLOAD}
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Tags added to the products chosen, those they have already left as they are. */
+export const ProductBulkAddTagsMutation = /* GraphQL */ `
+  mutation ProductBulkAddTags($ids: [ID!]!, $tags: [String!]!) {
+    productBulkAddTags(ids: $ids, tags: $tags) {
+      ${PRODUCT_BULK_PAYLOAD}
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Tags taken off the products chosen. */
+export const ProductBulkRemoveTagsMutation = /* GraphQL */ `
+  mutation ProductBulkRemoveTags($ids: [ID!]!, $tags: [String!]!) {
+    productBulkRemoveTags(ids: $ids, tags: $tags) {
+      ${PRODUCT_BULK_PAYLOAD}
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The products chosen deleted, with their variants and photos. */
+export const ProductBulkDeleteMutation = /* GraphQL */ `
+  mutation ProductBulkDelete($ids: [ID!]!) {
+    productBulkDelete(ids: $ids) {
+      deletedProductIds
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** A product deleted, with its variants and their stock. */
 export const ProductDeleteMutation = /* GraphQL */ `
   mutation ProductDelete($input: ProductDeleteInput!) {

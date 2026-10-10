@@ -1,6 +1,17 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { ChevronRight, FileSpreadsheet, FolderOpen, PackageOpen, Plus, Search } from 'lucide-react';
+import {
+  ChevronRight,
+  FileSpreadsheet,
+  FolderOpen,
+  FolderPlus,
+  PackageOpen,
+  Plus,
+  Search,
+  Tags,
+  ToggleRight,
+  Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { ProductsQuery } from '../api/operations';
@@ -9,10 +20,12 @@ import { useSessionStore } from '../auth/context';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
+import type { BulkOutcome } from '../orders/bulk';
 import { SavedSearches } from '../shell/saved-searches';
 import { useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
-import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { CollectionPanel, DeletePanel, ProductTagsPanel, StatusPanel } from './bulk';
 import {
   EDITS_PRODUCTS,
   PRODUCT_STATUSES,
@@ -60,14 +73,34 @@ function Stock({ product }: { product: ProductListItem }) {
   );
 }
 
-function ProductRow({ product }: { product: ProductListItem }) {
+function ProductRow({
+  product,
+  selectable,
+  selected,
+  onSelect,
+}: {
+  product: ProductListItem;
+  selectable: boolean;
+  selected: boolean;
+  onSelect: (selected: boolean) => void;
+}) {
+  const { t } = useLocale();
   const shopId = useShop().id;
   return (
-    <li>
+    <li className="flex items-center gap-3 ps-4">
+      {selectable && (
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={(event) => onSelect(event.target.checked)}
+          aria-label={t('orders.select', { name: product.title })}
+          className="size-5 shrink-0 accent-[var(--hatti-color-primary)]"
+        />
+      )}
       <Link
         to="/$shopId/products/$productId"
         params={{ shopId, productId: product.id }}
-        className="flex items-center gap-3 px-4 py-3"
+        className="flex min-w-0 flex-1 items-center gap-3 py-3 pe-4"
       >
         <ProductThumb media={product.media} />
         <span className="flex min-w-0 flex-1 flex-col gap-1 md:flex-row md:items-center md:gap-4">
@@ -93,9 +126,13 @@ function ProductRow({ product }: { product: ProductListItem }) {
   );
 }
 
+/** The bulk actions' panels, one open at a time. */
+type Panel = 'status' | 'tags' | 'collection' | 'delete';
+
 /**
  * The products list (CAT-04, docs/design/02 §2): a tab for each status, a search that knows Roman
- * Urdu spellings, newest first a page at a time; owners and managers add products from it.
+ * Urdu spellings, newest first a page at a time; owners and managers add products from it, and
+ * show, hide, tag, collect or delete those they choose on it at once.
  */
 export function ProductsPage() {
   const { t } = useLocale();
@@ -104,6 +141,9 @@ export function ProductsPage() {
   const navigate = useNavigate();
   const { status, q } = useSearch({ from: '/$shopId/products' });
   const [words, setWords] = useState(q ?? '');
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [outcome, setOutcome] = useState<BulkOutcome | null>(null);
+  const [panel, setPanel] = useState<Panel | null>(null);
   const query = [q, status && `status:${status.toLowerCase()}`].filter(Boolean).join(' ') || null;
 
   const products = useInfiniteQuery({
@@ -119,8 +159,12 @@ export function ProductsPage() {
       last.products.pageInfo.hasNextPage ? last.products.pageInfo.endCursor : undefined,
   });
 
-  const choose = (next: ProductsSearch) =>
+  const choose = (next: ProductsSearch) => {
+    setSelected(new Set());
+    setOutcome(null);
+    setPanel(null);
     void navigate({ to: '/$shopId/products', params: { shopId: shop.id }, search: next });
+  };
 
   const onSearch = (event: FormEvent) => {
     event.preventDefault();
@@ -129,6 +173,22 @@ export function ProductsPage() {
 
   const shown = products.data?.pages.flatMap((page) => page.products.nodes) ?? [];
   const edits = EDITS_PRODUCTS.includes(shop.role);
+  const names = new Map(shown.map((product) => [product.id, product.title]));
+  const ids = [...selected];
+
+  const open = (next: Panel) => {
+    setOutcome(null);
+    setPanel(next);
+  };
+
+  /** A panel's bulk action done, or put away: what came of it said, the choice cleared. */
+  const closePanel = (done: BulkOutcome | null) => {
+    setPanel(null);
+    if (done) {
+      setOutcome(done);
+      setSelected(new Set());
+    }
+  };
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
@@ -211,6 +271,27 @@ export function ProductsPage() {
           );
         })}
       </div>
+      {outcome && (
+        <Alert tone={outcome.failed.length ? 'warning' : 'success'}>
+          {outcome.done > 0 && <p>{t('productBulk.done', { count: outcome.done })}</p>}
+          {outcome.failed.length > 0 && (
+            <>
+              <p>{t('orders.someFailed', { count: outcome.failed.length })}</p>
+              <ul className="list-disc ps-5">
+                {outcome.failed.map((message, index) => (
+                  <li key={index} dir="auto">
+                    {message}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </Alert>
+      )}
+      {panel === 'status' && <StatusPanel ids={ids} names={names} onDone={closePanel} />}
+      {panel === 'tags' && <ProductTagsPanel ids={ids} names={names} onDone={closePanel} />}
+      {panel === 'collection' && <CollectionPanel ids={ids} names={names} onDone={closePanel} />}
+      {panel === 'delete' && <DeletePanel ids={ids} names={names} onDone={closePanel} />}
       {products.isPending ? (
         <Loading label={t('state.loading')} />
       ) : products.isError ? (
@@ -230,9 +311,40 @@ export function ProductsPage() {
         </Card>
       ) : (
         <Card>
+          {edits && (
+            <div className="flex items-center gap-3 border-b border-line px-4 py-2">
+              <input
+                type="checkbox"
+                checked={selected.size === shown.length}
+                onChange={(event) =>
+                  setSelected(
+                    event.target.checked ? new Set(shown.map((product) => product.id)) : new Set(),
+                  )
+                }
+                aria-label={t('orders.selectAll')}
+                className="size-5 accent-[var(--hatti-color-primary)]"
+              />
+              <span className="text-secondary">
+                {t('orders.selected', { count: formatCount(selected.size) })}
+              </span>
+            </div>
+          )}
           <ul className="divide-y divide-line">
             {shown.map((product) => (
-              <ProductRow key={product.id} product={product} />
+              <ProductRow
+                key={product.id}
+                product={product}
+                selectable={edits}
+                selected={selected.has(product.id)}
+                onSelect={(on) =>
+                  setSelected((current) => {
+                    const next = new Set(current);
+                    if (on) next.add(product.id);
+                    else next.delete(product.id);
+                    return next;
+                  })
+                }
+              />
             ))}
           </ul>
           {products.hasNextPage && (
@@ -247,6 +359,37 @@ export function ProductsPage() {
             </div>
           )}
         </Card>
+      )}
+      {edits && selected.size > 0 && !panel && (
+        <div className="fixed inset-x-0 bottom-16 z-20 flex flex-wrap justify-center gap-2 px-4 md:bottom-6">
+          <Button
+            icon={<ToggleRight aria-hidden className="size-5" />}
+            onClick={() => open('status')}
+          >
+            {t('productBulk.status.button', { count: formatCount(selected.size) })}
+          </Button>
+          <Button
+            variant="secondary"
+            icon={<Tags aria-hidden className="size-5" />}
+            onClick={() => open('tags')}
+          >
+            {t('bulk.tag', { count: formatCount(selected.size) })}
+          </Button>
+          <Button
+            variant="secondary"
+            icon={<FolderPlus aria-hidden className="size-5" />}
+            onClick={() => open('collection')}
+          >
+            {t('productBulk.collection.button', { count: formatCount(selected.size) })}
+          </Button>
+          <Button
+            variant="secondary"
+            icon={<Trash2 aria-hidden className="size-5" />}
+            onClick={() => open('delete')}
+          >
+            {t('productBulk.delete.button', { count: formatCount(selected.size) })}
+          </Button>
+        </div>
       )}
     </div>
   );

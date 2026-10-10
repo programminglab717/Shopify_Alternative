@@ -142,6 +142,30 @@ interface CheckedProduct {
   variants: { title?: string; fields: VariantFields; optionValues: string[] }[];
 }
 
+/** What a product's own row may be changed in. */
+type ProductChanges = Partial<
+  Pick<
+    ProductRow,
+    | 'title'
+    | 'handle'
+    | 'description'
+    | 'status'
+    | 'vendor'
+    | 'productType'
+    | 'tags'
+    | 'seoTitle'
+    | 'seoDescription'
+  >
+>;
+
+/** What became of products acted on many at once (CAT-04). */
+export interface ProductBulkResult<T> {
+  /** In the order given; products that failed are left out. */
+  done: T[];
+  /** One or more for each product that failed, at its place in the IDs: ["ids", "3"]. */
+  errors: FieldError[];
+}
+
 /**
  * Products, with their options and variants. Every method runs in a tenant transaction for the
  * caller's shop, and also filters by shop explicitly, so isolation holds even if row-level security
@@ -468,20 +492,7 @@ export class ProductService {
     input: UpdateProductInput,
   ): Promise<MutationResult<ProductRecord>> {
     const check = new InputChecker();
-    const changes: Partial<
-      Pick<
-        ProductRow,
-        | 'title'
-        | 'handle'
-        | 'description'
-        | 'status'
-        | 'vendor'
-        | 'productType'
-        | 'tags'
-        | 'seoTitle'
-        | 'seoDescription'
-      >
-    > = {};
+    const changes: ProductChanges = {};
     if (input.title !== undefined) {
       const title = check.text(['input', 'title'], input.title, {
         required: true,
@@ -517,12 +528,27 @@ export class ProductService {
     if (seo.description !== undefined) changes.seoDescription = seo.description;
     if (!check.ok) return fail(check.errors);
 
+    return this.#change(tenant, input.id, ['input', 'id'], () => changes, input.redirectNewHandle);
+  }
+
+  /**
+   * Changes a product under its lock, in one transaction, as `changesOf` says of it as it is: its
+   * version bumped, `product.updated` recorded and its smart collections looked at again only for
+   * what changed; null changes nothing, and errors refuse it. The product as it ends up.
+   */
+  async #change(
+    tenant: TenantContext,
+    id: string,
+    field: string[],
+    changesOf: (current: ProductRow) => ProductChanges | FieldError[] | null,
+    redirectNewHandle?: boolean | null,
+  ): Promise<MutationResult<ProductRecord>> {
     try {
       return await this.db.tenant(tenant.shopId, async (tx) => {
-        const current = await lockProduct(tx, tenant.shopId, input.id);
-        if (!current) {
-          return failOne<ProductRecord>(['input', 'id'], 'NOT_FOUND', 'Product not found');
-        }
+        const current = await lockProduct(tx, tenant.shopId, id);
+        if (!current) return failOne<ProductRecord>(field, 'NOT_FOUND', 'Product not found');
+        const changes = changesOf(current) ?? {};
+        if (Array.isArray(changes)) return fail<ProductRecord>(changes);
 
         const changed = (Object.keys(changes) as (keyof typeof changes)[]).filter(
           (key) => JSON.stringify(changes[key]) !== JSON.stringify(current[key]),
@@ -568,7 +594,7 @@ export class ProductService {
             payload: {
               changed,
               version: updated.version,
-              ...movedFrom(current.handle, changed, input.redirectNewHandle),
+              ...movedFrom(current.handle, changed, redirectNewHandle),
             },
           });
           await refreshMemberships(tx, tenant, { productIds: [current.id] });
@@ -584,6 +610,98 @@ export class ProductService {
       }
       throw error;
     }
+  }
+
+  /** Shows, hides or archives many products at once (CAT-04); see {@link update}. */
+  bulkSetStatus(
+    tenant: TenantContext,
+    ids: readonly string[],
+    status: ProductStatusValue,
+  ): Promise<MutationResult<ProductBulkResult<ProductRecord>>> {
+    return this.#bulk(ids, (id) => this.#change(tenant, id, ['id'], () => ({ status })));
+  }
+
+  /** Adds tags to many products; tags a product has already, in any case, are left as they are. */
+  bulkAddTags(
+    tenant: TenantContext,
+    ids: readonly string[],
+    tags: readonly string[],
+  ): Promise<MutationResult<ProductBulkResult<ProductRecord>>> {
+    const check = new InputChecker();
+    const added = check.tags(['tags'], [...tags]);
+    if (added.length === 0) check.add(['tags'], 'BLANK', "can't be blank");
+    if (!check.ok) return Promise.resolve(fail(check.errors));
+    return this.#bulk(ids, (id) =>
+      this.#change(tenant, id, ['id'], (current) => {
+        const known = new Set(current.tags.map((tag) => tag.toLowerCase()));
+        const fresh = added.filter((tag) => !known.has(tag.toLowerCase()));
+        if (fresh.length === 0) return null;
+        // A product's tags have a most, as when they are set.
+        const tagged = new InputChecker();
+        const next = tagged.tags(['tags'], [...current.tags, ...fresh]);
+        return tagged.ok ? { tags: next } : tagged.errors;
+      }),
+    );
+  }
+
+  /** Takes tags off many products, ignoring case. */
+  bulkRemoveTags(
+    tenant: TenantContext,
+    ids: readonly string[],
+    tags: readonly string[],
+  ): Promise<MutationResult<ProductBulkResult<ProductRecord>>> {
+    const check = new InputChecker();
+    const removed = check.tags(['tags'], [...tags]);
+    if (removed.length === 0) check.add(['tags'], 'BLANK', "can't be blank");
+    if (!check.ok) return Promise.resolve(fail(check.errors));
+    const gone = new Set(removed.map((tag) => tag.toLowerCase()));
+    return this.#bulk(ids, (id) =>
+      this.#change(tenant, id, ['id'], (current) => {
+        const kept = current.tags.filter((tag) => !gone.has(tag.toLowerCase()));
+        return kept.length === current.tags.length ? null : { tags: kept };
+      }),
+    );
+  }
+
+  /** Deletes many products; see {@link delete}. */
+  bulkDelete(
+    tenant: TenantContext,
+    ids: readonly string[],
+  ): Promise<MutationResult<ProductBulkResult<{ id: string }>>> {
+    return this.#bulk(ids, async (id) => {
+      const deleted = await this.delete(tenant, id);
+      return deleted.ok
+        ? deleted
+        : fail(deleted.errors.map((error) => ({ ...error, field: ['id'] })));
+    });
+  }
+
+  /**
+   * Runs `run` on each product, once, each in its own transaction: one that fails is said at its
+   * place in `ids`, and the rest are done all the same, as orders are (ORD-05).
+   */
+  async #bulk<T>(
+    ids: readonly string[],
+    run: (id: string) => Promise<MutationResult<T>>,
+  ): Promise<MutationResult<ProductBulkResult<T>>> {
+    if (ids.length === 0) return failOne(['ids'], 'BLANK', 'Ids must include at least one');
+    if (ids.length > LIMITS.batch) {
+      return failOne(['ids'], 'TOO_MANY', `Ids can have at most ${LIMITS.batch}`);
+    }
+    const result: ProductBulkResult<T> = { done: [], errors: [] };
+    const seen = new Set<string>();
+    for (const [index, id] of ids.entries()) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const done = await run(id);
+      if (done.ok) result.done.push(done.value);
+      else {
+        for (const error of done.errors) {
+          result.errors.push({ ...error, field: ['ids', String(index)] });
+        }
+      }
+    }
+    return { ok: true, value: result };
   }
 
   /** Deletes a product with its variants, options and media, and takes it out of collections. */

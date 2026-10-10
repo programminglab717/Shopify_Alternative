@@ -8,10 +8,12 @@ import {
   pageSize,
   type TenantContext,
 } from '@hatti/api';
+import { toPublicId } from '@hatti/ids';
 import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { CollectionService } from '../collection.service.js';
-import { ProductService } from '../product.service.js';
-import type { CollectionRecord, Page } from '../records.js';
+import type { MutationResult } from '../input-checker.js';
+import { ProductService, type ProductBulkResult } from '../product.service.js';
+import type { CollectionRecord, Page, ProductRecord } from '../records.js';
 import { CollectionConnection } from './collection.types.js';
 import {
   productSearch,
@@ -25,6 +27,8 @@ import {
 import {
   PageArgs,
   Product,
+  ProductBulkDeletePayload,
+  ProductBulkPayload,
   ProductConnection,
   ProductCreateInput,
   ProductCreatePayload,
@@ -36,6 +40,22 @@ import {
   ProductUpdatePayload,
   ProductsArgs,
 } from './product.types.js';
+
+/** What became of products acted on many at once. */
+function bulkPayload(
+  result: MutationResult<ProductBulkResult<ProductRecord>>,
+  tenant: TenantContext,
+): ProductBulkPayload {
+  return Object.assign(new ProductBulkPayload(), {
+    products: result.ok ? result.value.done.map((done) => toProduct(done, tenant.currency)) : [],
+    userErrors: toUserErrors(result.ok ? result.value.errors : result.errors),
+  });
+}
+
+/** Product IDs of a bulk action, as UUIDs; a malformed one is a BAD_USER_INPUT error. */
+function productIds(ids: readonly string[]): string[] {
+  return ids.map((id) => uuidOf('product', id));
+}
 
 const FACET_LIMIT = { defaultValue: 100, description: '1 to 250, most used first.' };
 
@@ -155,8 +175,9 @@ export class ProductResolver {
       'handle made from that, with its description, vendor, type, tags and words for search ' +
       'engines; its options and variants with their prices, costs, weights and tax, not their ' +
       'SKUs or barcodes; in the manual collections it is in; and its variants tracked as its are, ' +
-      'with none of their stock. With `includeImages`, its photos and videos too, made again from ' +
-      "where they came. Its status is `newStatus`, else the product's own.",
+      'with none of their stock. With `includeImages`, its photos and videos too, made again ' +
+      'from what was kept of them, or from where they came once that is gone. Its status is ' +
+      "`newStatus`, else the product's own.",
   })
   @RequireScopes('write_products')
   async productDuplicate(
@@ -209,6 +230,68 @@ export class ProductResolver {
     return Object.assign(new ProductDeletePayload(), {
       deletedProductId: result.ok ? input.id : null,
       userErrors: result.ok ? [] : toUserErrors(result.errors),
+    });
+  }
+
+  @Mutation(() => ProductBulkPayload, {
+    description:
+      'Shows, hides or archives up to 250 products (CAT-04), each as productUpdate would; one ' +
+      'refused leaves the rest done.',
+  })
+  @RequireScopes('write_products')
+  async productBulkUpdateStatus(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+    @Args('status', { type: () => ProductStatus }) status: ProductStatus,
+  ): Promise<ProductBulkPayload> {
+    return bulkPayload(
+      await this.service.bulkSetStatus(tenant, productIds(ids), toStatusValue(status)),
+      tenant,
+    );
+  }
+
+  @Mutation(() => ProductBulkPayload, {
+    description:
+      'Adds tags to up to 250 products (CAT-04). Tags a product has already, in any case, stay ' +
+      'as they are; one with too many is refused.',
+  })
+  @RequireScopes('write_products')
+  async productBulkAddTags(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+    @Args('tags', { type: () => [String] }) tags: string[],
+  ): Promise<ProductBulkPayload> {
+    return bulkPayload(await this.service.bulkAddTags(tenant, productIds(ids), tags), tenant);
+  }
+
+  @Mutation(() => ProductBulkPayload, {
+    description: 'Takes tags off up to 250 products (CAT-04), ignoring case.',
+  })
+  @RequireScopes('write_products')
+  async productBulkRemoveTags(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+    @Args('tags', { type: () => [String] }) tags: string[],
+  ): Promise<ProductBulkPayload> {
+    return bulkPayload(await this.service.bulkRemoveTags(tenant, productIds(ids), tags), tenant);
+  }
+
+  @Mutation(() => ProductBulkDeletePayload, {
+    description:
+      'Deletes up to 250 products (CAT-04) with their variants, options and media, each as ' +
+      'productDelete would.',
+  })
+  @RequireScopes('write_products')
+  async productBulkDelete(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+  ): Promise<ProductBulkDeletePayload> {
+    const result = await this.service.bulkDelete(tenant, productIds(ids));
+    return Object.assign(new ProductBulkDeletePayload(), {
+      deletedProductIds: result.ok
+        ? result.value.done.map((deleted) => toPublicId('product', deleted.id))
+        : [],
+      userErrors: toUserErrors(result.ok ? result.value.errors : result.errors),
     });
   }
 }

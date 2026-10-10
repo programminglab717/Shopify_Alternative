@@ -2966,6 +2966,30 @@ const en = {
   'duplicate.submit': 'Duplicate',
   'product.copied':
     'Copied as a draft. Change what differs, enter its stock, and show it when it is ready.',
+  'productBulk.done': '{count} products updated.',
+  'productBulk.done.one': '1 product updated.',
+  'productBulk.status': 'Status',
+  'productBulk.status.button': 'Set status of {count}',
+  'productBulk.statusTitle': 'Status of {count} products',
+  'productBulk.statusTitle.one': 'Status of 1 product',
+  'productBulk.statusSubmit': 'Save for {count} products',
+  'productBulk.statusSubmit.one': 'Save for 1 product',
+  'productBulk.tagsTitle': 'Tag {count} products',
+  'productBulk.tagsTitle.one': 'Tag 1 product',
+  'productBulk.tagsHint': 'A comma between each, as on a product: lawn, eid.',
+  'productBulk.collection.button': 'Add {count} to a collection',
+  'productBulk.collectionTitle': 'Add {count} products to a collection',
+  'productBulk.collectionTitle.one': 'Add 1 product to a collection',
+  'productBulk.collection': 'Collection',
+  'productBulk.noCollections':
+    'You have no collections made by hand yet. Collections with rules take products by their rules.',
+  'productBulk.collectionSubmit': 'Add to the collection',
+  'productBulk.delete.button': 'Delete {count}',
+  'productBulk.deleteTitle': 'Delete {count} products?',
+  'productBulk.deleteTitle.one': 'Delete 1 product?',
+  'productBulk.deleteBody': 'Their variants, photos and stock go with them, for good.',
+  'productBulk.deleteSubmit': 'Delete {count} products',
+  'productBulk.deleteSubmit.one': 'Delete 1 product',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5906,6 +5930,30 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'duplicate.submit': 'کاپی بنائیں',
   'product.copied':
     'ڈرافٹ کے طور پر کاپی بن گئی۔ جو مختلف ہے وہ بدلیں، اس کا اسٹاک لکھیں، اور تیار ہونے پر اسے دکھائیں۔',
+  'productBulk.done': '{count} پروڈکٹس اپ ڈیٹ ہو گئیں۔',
+  'productBulk.done.one': '1 پروڈکٹ اپ ڈیٹ ہو گئی۔',
+  'productBulk.status': 'اسٹیٹس',
+  'productBulk.status.button': '{count} کا اسٹیٹس بدلیں',
+  'productBulk.statusTitle': '{count} پروڈکٹس کا اسٹیٹس',
+  'productBulk.statusTitle.one': '1 پروڈکٹ کا اسٹیٹس',
+  'productBulk.statusSubmit': '{count} پروڈکٹس کے لیے محفوظ کریں',
+  'productBulk.statusSubmit.one': '1 پروڈکٹ کے لیے محفوظ کریں',
+  'productBulk.tagsTitle': '{count} پروڈکٹس پر ٹیگ',
+  'productBulk.tagsTitle.one': '1 پروڈکٹ پر ٹیگ',
+  'productBulk.tagsHint': 'ہر ایک کے بیچ کوما، جیسے پروڈکٹ پر: lawn, eid۔',
+  'productBulk.collection.button': '{count} کو کلیکشن میں ڈالیں',
+  'productBulk.collectionTitle': '{count} پروڈکٹس کو کلیکشن میں ڈالیں',
+  'productBulk.collectionTitle.one': '1 پروڈکٹ کو کلیکشن میں ڈالیں',
+  'productBulk.collection': 'کلیکشن',
+  'productBulk.noCollections':
+    'ابھی ہاتھ سے بنائی کوئی کلیکشن نہیں۔ اصولوں والی کلیکشنز پروڈکٹس اپنے اصولوں سے لیتی ہیں۔',
+  'productBulk.collectionSubmit': 'کلیکشن میں ڈالیں',
+  'productBulk.delete.button': '{count} ڈیلیٹ کریں',
+  'productBulk.deleteTitle': '{count} پروڈکٹس ڈیلیٹ کریں؟',
+  'productBulk.deleteTitle.one': '1 پروڈکٹ ڈیلیٹ کریں؟',
+  'productBulk.deleteBody': 'ان کے ویریئنٹس، تصویریں اور اسٹاک بھی ہمیشہ کے لیے چلے جائیں گے۔',
+  'productBulk.deleteSubmit': '{count} پروڈکٹس ڈیلیٹ کریں',
+  'productBulk.deleteSubmit.one': '1 پروڈکٹ ڈیلیٹ کریں',
 };
 
 export const messages: Readonly<

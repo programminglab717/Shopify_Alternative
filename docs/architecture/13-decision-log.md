@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-343 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-344 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -351,6 +351,7 @@
 | 341 | A product's type and brand are offered from those the shop already uses as they are typed, and a redirect's old address or where it goes is changed in place | Accepted |
 | 342 | While the orders list is open, in view or not, it asks every half minute for its tab's newest orders and says how many are newer than it shows, above it and in the page's title, shown at a tap, so its rows move only when staff ask; Home and the Confirmation Desk ask again every half minute while in view | Accepted |
 | 343 | A product is duplicated as Shopify's productDuplicate does it: the copy made in one transaction with the product's words, options, variants and prices, none of its SKUs, barcodes or stock, and put in its manual collections; its photos and videos, if asked, made again by the worker from what was kept of them; the admin makes the copy a draft and opens it | Accepted |
+| 344 | Products are shown, hidden or archived, tagged, untagged and deleted many at once, as orders are: up to 250, each in its own transaction as it would be alone, one refused said at its place in the IDs while the rest are done; the products list chooses them, and puts them in a collection made by hand too | Accepted |
 
 ---
 
@@ -13753,3 +13754,42 @@
     what is kept under that media's ID, and with it the copy's.
   * **The admin creating the copy from the product it read, through `productCreate`:** no stock
     settings, collections or photos, in several requests that can stop halfway.
+
+## ADR-344 · Products are shown, hidden or archived, tagged, untagged and deleted many at once, as orders are: up to 250, each in its own transaction as it would be alone, one refused said at its place in the IDs while the rest are done; the products list chooses them, and puts them in a collection made by hand too
+
+* **Context:**
+  * Shops change many products at once as seasons turn: last summer's lawn archived, the Eid
+    edit tagged, prints shown together on launch day, test products deleted. The admin changed
+    them one product page at a time.
+  * Orders are confirmed, packed, tagged and cancelled many at once from their list
+    ([ADR-333](#adr-333--the-orders-list-tags-the-orders-chosen-on-any-tab-and-cancels-those-not-yet-shipped-for-one-reason-from-the-bar-that-confirms-packs-and-prints-them-for-those-who-change-orders-a-refusal-names-its-order)): each in its own transaction, a refusal said at its place in the IDs.
+  * Shopify does it through bulk operations, a file of mutations run in the background, and
+    `tagsAdd` one resource at a time.
+* **Decision:**
+  * **`productBulkUpdateStatus`, `productBulkAddTags`, `productBulkRemoveTags` and
+    `productBulkDelete`**, for those who change products, take up to 250 IDs. Each product is
+    changed under its lock in its own transaction, as `productUpdate` or `productDelete` would:
+    its version bumped and `product.updated` recorded only when something changed, its smart
+    collections looked at again, `product.deleted` for one deleted. One refused, not found or past
+    250 tags, is said at its place, `["ids", "3"]`, and the rest are done; an ID given twice is
+    done once.
+  * **Tags** are added where missing, in any case, and taken off ignoring case, as on orders.
+  * **The core's own update** shares one path with these, so a product changed alone and with
+    others is changed the same way.
+  * **In the admin:** owners and managers choose products on the list, each or all shown; a bar
+    sets their status, tags them, adds them to a collection or deletes them, each from a panel.
+    The collection panel offers those made by hand, as rules take products by themselves, and adds
+    them through `collectionAddProducts`. Deleting asks first. What came of it is said above the
+    list, those refused by their titles, and the choice is let go.
+* **Consequences:**
+  * A season's products are archived or tagged in one go, and a launch's shown together.
+  * 250 products are 250 short transactions, a second or two, each telling the storefront.
+  * Not yet: prices changed many at once, products chosen beyond those shown, and a sheet to edit
+    many products' fields together (CAT-01, V1).
+* **Alternatives:**
+  * **Shopify's bulk operations:** a file uploaded and a job polled, for what a request does at
+    the alpha's scale; for when shops change thousands.
+  * **One transaction for all:** one product refused would refuse them all, and many locks held
+    at once.
+  * **The admin sending `productUpdate` for each:** a request each, and nothing to say which
+    failed in one answer.

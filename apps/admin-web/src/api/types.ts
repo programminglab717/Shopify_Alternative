@@ -299,6 +299,15 @@ export interface OrderMutationData {
   [mutation: string]: { order: { id: string; stage: OrderStage } | null; userErrors: UserError[] };
 }
 
+/** What a bulk action on products did: those done, and why others not (CAT-04). */
+export interface ProductBulkData {
+  [mutation: string]: {
+    products?: { id: string }[];
+    deletedProductIds?: string[];
+    userErrors: UserError[];
+  };
+}
+
 export interface OrderBulkData {
   [mutation: string]: { orders: { id: string }[]; userErrors: UserError[] };
 }
