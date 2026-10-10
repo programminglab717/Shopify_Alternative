@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SalesTotalsValue } from '../api/types';
 import { sectionsOf } from '../shell/shell';
 import { fakeCore, renderAdmin, signedIn } from '../test-support';
-import { startOfDay } from './analytics-page';
 import { change } from './figures';
+import { startOfDay } from './period';
 
 const rupees = (amount: string) => ({ amount, currencyCode: 'PKR' });
 
@@ -118,6 +118,8 @@ describe('Analytics in the admin', () => {
       30 * 86_400_000,
     );
 
+    expect(screen.queryByRole('link', { name: "Agents' performance" })).toBeNull();
+
     fireEvent.click(screen.getByRole('tab', { name: 'Last 90 days' }));
     await waitFor(() =>
       expect(
@@ -146,6 +148,11 @@ describe('Analytics in the admin', () => {
     expect(quetta.lastElementChild?.className).toContain('text-danger');
     expect(screen.getByText('Karachi').closest('tr')!.lastElementChild?.className).not.toContain(
       'text-danger',
+    );
+
+    // The owner goes on from here to how each agent of the desk did.
+    expect(screen.getByRole('link', { name: "Agents' performance" }).getAttribute('href')).toBe(
+      '/shop_1/desk/agents',
     );
 
     fireEvent.change(screen.getByLabelText('By'), { target: { value: 'COURIER' } });

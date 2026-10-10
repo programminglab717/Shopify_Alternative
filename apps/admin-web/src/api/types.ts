@@ -1128,6 +1128,24 @@ export interface CodHealthData {
   };
 }
 
+/** An agent of the Confirmation Desk over a period: a member of staff, or an app by its token. */
+export interface ConfirmationAgentValue {
+  id: string;
+  kind: 'STAFF' | 'APP';
+  confirmed: number;
+  cancelled: number;
+  confirmationRate: number | null;
+  confirmationsPerHour: number | null;
+  activeHours: number;
+  calls: { noAnswer: number; callBack: number; wrongNumber: number };
+  delivery: CodDeliveryFigures;
+}
+
+export interface ConfirmationAgentsData {
+  confirmationAgents: ConfirmationAgentValue[];
+  staffMembers: { id: string; name: string }[];
+}
+
 export interface CodCashValue {
   amount: MoneyValue;
   count: number;

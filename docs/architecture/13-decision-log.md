@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-334 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-335 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -342,6 +342,7 @@
 | 332 | The admin lists the shop's blocked numbers for owners and managers, the latest blocked first, each with its customer, why and since when; found by four or more of a number's digits, a number blocked before it ever orders, and one unblocked | Accepted |
 | 333 | The orders list tags the orders chosen on any tab and cancels those not yet shipped for one reason, from the bar that confirms, packs and prints them, for those who change orders; a refusal names its order | Accepted |
 | 334 | An open draft is changed in the admin on the form it was made with, started from the draft as it is: every line sent at its price and every charge as it stands, so an emptied one is cleared, and the address only if it changed, its area, landmark and pin kept | Accepted |
+| 335 | Owners and managers see how each agent of the Confirmation Desk did on a page of the desk's that analytics links to: over the last 7, 30 or 90 whole days, the orders each confirmed and cancelled, how many an hour on the desk, their calls that settled nothing, and how many parcels of the orders they confirmed came back; staff by name, those who left as former staff, and apps by the end of their token | Accepted |
 
 ---
 
@@ -13387,3 +13388,42 @@
     draft half changed between them.
   * **Sending a line's price only when typed, as a new draft does:** the core would reset every
     other line to the catalogue's price.
+
+## ADR-335 · Owners and managers see how each agent of the Confirmation Desk did on a page of the desk's that analytics links to: over the last 7, 30 or 90 whole days, the orders each confirmed and cancelled, how many an hour on the desk, their calls that settled nothing, and how many parcels of the orders they confirmed came back; staff by name, those who left as former staff, and apps by the end of their token
+
+* **Context:** The core works out agents' performance when asked (COD-11, [ADR-090](#adr-090--agents-performance-is-worked-out-when-asked-from-the-calls-the-desk-keeps-and-the-confirmations-and-cancellations-on-orders-timelines-by-who-made-them-with-how-the-orders-each-agent-confirmed-turned-out)):
+  for each agent of the Confirmation Desk, staff or app, the orders they confirmed and
+  cancelled over a period, their calls that settled nothing, their hours on the desk, and how
+  the parcels of the orders they confirmed went; owners and managers see it. The admin deals
+  agents their orders ([ADR-266](#adr-266--the-admins-confirmation-desk-deals-an-agent-one-order-at-a-time-when-they-ask-and-the-next-as-soon-as-a-calls-outcome-is-recorded-the-customers-number-stays-masked-until-the-agent-asks-to-see-it-which-is-logged-and-then-can-be-called-or-messaged-on-whatsapp-with-a-tap-an-order-whose-call-is-recorded-leaves-the-agents-queue-at-once)) and shows the shop's COD health ([ADR-280](#adr-280--the-admins-analytics-show-the-periods-cod-health-under-its-sales-how-many-cash-on-delivery-orders-were-confirmed-delivered-and-came-back-of-those-that-turned-out-what-returns-cost-and-the-rates-by-city-product-source-or-courier-a-return-rate-of-30-or-more-in-red)), but not
+  who confirmed what. An agent who confirms orders the customer never meant costs the shop a
+  courier's charge both ways for each, and the owner had no way to see it.
+* **Decision:**
+  * **A page of the desk's:** Agents' performance, under the desk, for owners and managers,
+    linked from the desk's header and from analytics under COD health. Other staff are told
+    only owners and managers see it, and the page asks the core nothing for them.
+  * **The days analytics shows:** the last 7, 30 or 90 whole days in the shop's time zone,
+    today's included, chosen by the tabs analytics has, which both pages now share; the work
+    done in those days, whenever the orders were placed.
+  * **An agent to a card, as the core puts them,** those who settled most first: the orders
+    they confirmed, with their share of the orders they decided; those they cancelled; how many
+    they confirmed an hour, to one place, over their hours on the desk; and how many of the
+    parcels of the orders they confirmed came back, of those delivered or back, in red from
+    30% as COD health marks a city, with those still on their way; then their calls that
+    settled nothing: not answered, to call back and wrong numbers. Cards put the figures two
+    abreast on a phone and four on a wider screen.
+  * **Who each is:** staff by the names the shop's staff list gives, asked in the same document;
+    someone who has left as former staff; an app as an app with the end of its token, to tell
+    two apart.
+* **Consequences:**
+  * An owner sees an agent who confirms fast but whose parcels come back beside one who is
+    slower and whose parcels arrive, and whose calls go unanswered.
+  * The figures are the core's as it works them out when asked, so the page shows nothing the
+    core does not.
+  * Not yet: the period before to compare with; agents seeing their own figures; apps named,
+    which waits for apps' pages.
+* **Alternatives:**
+  * **A section of analytics:** marketers and accountants read analytics, and the core keeps
+    agents' performance from them; a page of the desk's, linked from analytics, is for those
+    who run the desk.
+  * **A table with a column for each figure:** too wide for a phone.

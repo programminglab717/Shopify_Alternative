@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, the confirmation agents' performance** (COD-11): for owners and managers, each agent's
-orders confirmed and cancelled over the days chosen, their calls that settled nothing, their
-hours on the desk, and how the orders they confirmed turned out, as the core works it out; then
-section by section as the alpha's shops need them.
+**Next, a booking that failed for its city** (SHP-03): the courier's names nearest to the city
+an order gives, one kept as the shop's own name for the city with that courier and the order
+booked again; and the shop's own names for cities with each courier account, changed or
+forgotten; then section by section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -17,6 +17,27 @@ TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
+
+## 2026-10-10
+
+### Agents' performance, in the admin
+
+* **A page of the desk's** ([ADR-335](../architecture/13-decision-log.md#adr-335--owners-and-managers-see-how-each-agent-of-the-confirmation-desk-did-on-a-page-of-the-desks-that-analytics-links-to-over-the-last-7-30-or-90-whole-days-the-orders-each-confirmed-and-cancelled-how-many-an-hour-on-the-desk-their-calls-that-settled-nothing-and-how-many-parcels-of-the-orders-they-confirmed-came-back-staff-by-name-those-who-left-as-former-staff-and-apps-by-the-end-of-their-token)): owners and managers open Agents' performance from the
+  Confirmation Desk, or from analytics under COD health, and see each agent of the last 7, 30
+  or 90 days: the orders they confirmed, with their share of those they decided, those they
+  cancelled, how many an hour on the desk, how many parcels of the orders they confirmed came
+  back, in red from 30%, and their calls that settled nothing. Staff by name, those who left as
+  former staff, apps by the end of their token. Analytics' period tabs are shared with it.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, the page
+  showed what the Admin API's `confirmationAgents` gave for the same days, figure for figure:
+  an app with 5 confirmed, 83% of those it decided, 3 of 4 parcels back and one on its way;
+  the owner with 3 of 3 parcels back, from the orders an earlier check returned; and Sana Agent
+  with one call not answered. It read the same over 7 days, and right to left in Urdu; the
+  desk's and analytics' links led to it. No errors in the browser.
+* 2367 tests: an owner's agents, each figure, a high share of returns in red, a parcel's count
+  singular, former staff and an app by its token, and the days chosen; a manager taken there
+  from the desk, told no one worked it; other staff told only owners and managers see it, the
+  core not asked; and the desk's and analytics' links for owners and managers alone.
 
 ## 2026-10-09
 

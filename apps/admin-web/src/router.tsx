@@ -22,6 +22,7 @@ import { CustomersTransferPage } from './customers/transfer-page';
 import { BlockedPage } from './customers/blocked-page';
 import { ErasuresPage } from './customers/care';
 import { NewCustomerPage } from './customers/new-customer-page';
+import { AgentsPage } from './desk/agents-page';
 import { DeskPage } from './desk/desk-page';
 import {
   ChangeEmailPage,
@@ -204,6 +205,12 @@ const desk = createRoute({
   getParentRoute: () => shop,
   path: 'desk',
   component: DeskPage,
+});
+
+const deskAgents = createRoute({
+  getParentRoute: () => shop,
+  path: 'desk/agents',
+  component: AgentsPage,
 });
 
 const ordersExport = createRoute({
@@ -653,6 +660,7 @@ export const routeTree = root.addChildren([
     ordersExport,
     order,
     desk,
+    deskAgents,
     products,
     newProduct,
     productFiles,

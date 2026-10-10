@@ -99,6 +99,8 @@ describe('The Confirmation Desk', () => {
     renderAdmin('/shop_1/desk');
 
     await screen.findByText('2 due');
+    // How each agent did is for owners and managers.
+    expect(screen.queryByRole('link', { name: "Agents' performance" })).toBeNull();
     await press('Take the next order');
     await screen.findByText('How did the call go?');
     expect(screen.getAllByText('#1001')).toHaveLength(2);

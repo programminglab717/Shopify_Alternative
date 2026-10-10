@@ -1,8 +1,10 @@
 import { Link } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
+import { Gauge } from 'lucide-react';
+import { useState } from 'react';
 import { SalesQuery } from '../api/operations';
 import type { MoneyValue, SalesData, SalesTotalsValue } from '../api/types';
 import type { StaffRole } from '../auth/session';
+import { SEES_AGENTS } from '../desk/agents-page';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -12,30 +14,11 @@ import { Button } from '../ui/button';
 import { ErrorState, Loading } from '../ui/feedback';
 import { CodHealth } from './cod-health';
 import { Bars, Figure } from './figures';
+import { type Days, PeriodTabs, usePeriod } from './period';
 import { LiveView, Visits } from './visits';
 
 /** The roles that read the shop's sales (the core asks read_orders; these are the ones who plan). */
 export const READS_ANALYTICS: readonly StaffRole[] = ['owner', 'manager', 'marketer', 'accountant'];
-
-const DAY_MS = 86_400_000;
-const PERIODS = [7, 30, 90] as const;
-type Days = (typeof PERIODS)[number];
-
-/** The start of the day `daysAgo` days before today, in the shop's time zone. */
-export function startOfDay(timeZone: string, daysAgo: number, now = new Date()): Date {
-  const date = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
-  const offset =
-    new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' })
-      .formatToParts(now)
-      .find((part) => part.type === 'timeZoneName')
-      ?.value.replace('GMT', '') || 'Z';
-  return new Date(Date.parse(`${date}T00:00:00${offset}`) - daysAgo * DAY_MS);
-}
 
 const amount = (money: MoneyValue | null) => Number(money?.amount ?? 0);
 
@@ -74,22 +57,16 @@ function Totals({ now, before }: { now: SalesTotalsValue; before: SalesTotalsVal
  * Sales over time (ANL-02, ADR-250): who is on the online store now; the last 7, 30 or 90 days
  * against the period as long before, net sales by day (by week over 90), what sold most, where
  * the orders came from, the online store's visits and how far they went, and how its
- * cash-on-delivery orders turned out.
+ * cash-on-delivery orders turned out; for owners and managers, the way to how each agent of the
+ * Confirmation Desk did.
  */
 export function AnalyticsPage() {
   const { t, locale } = useLocale();
-  const shopId = useShop().id;
+  const shop = useShop();
+  const shopId = shop.id;
   const timezone = useShopTimezone();
   const [days, setDays] = useState<Days>(30);
-  // Whole days in the shop's time zone, today's included, and as many before them.
-  const { from, before, previousFrom } = useMemo(
-    () => ({
-      from: startOfDay(timezone, days - 1).toISOString(),
-      before: startOfDay(timezone, -1).toISOString(),
-      previousFrom: startOfDay(timezone, 2 * days - 1).toISOString(),
-    }),
-    [days, timezone],
-  );
+  const { from, before, previousFrom } = usePeriod(days);
   const interval = days === 90 ? 'WEEK' : 'DAY';
   const query = useAdminQuery<SalesData>(['sales', days], SalesQuery, {
     placedFrom: from,
@@ -103,22 +80,7 @@ export function AnalyticsPage() {
         {t('analytics.title')}
       </h1>
       <LiveView />
-      <div role="tablist" className="flex gap-2">
-        {PERIODS.map((each) => (
-          <button
-            key={each}
-            type="button"
-            role="tab"
-            aria-selected={days === each}
-            onClick={() => setDays(each)}
-            className={`min-h-10 rounded-full border px-4 ${
-              days === each ? 'border-primary bg-primary text-on-primary' : 'border-line'
-            }`}
-          >
-            {t('analytics.days', { count: each })}
-          </button>
-        ))}
-      </div>
+      <PeriodTabs days={days} onChange={setDays} />
       {query.isPending ? (
         <Loading label={t('state.loading')} />
       ) : query.isError ? (
@@ -196,6 +158,16 @@ export function AnalyticsPage() {
       )}
       <Visits from={from} before={before} previousFrom={previousFrom} interval={interval} />
       <CodHealth from={from} before={before} />
+      {SEES_AGENTS.includes(shop.role) && (
+        <Link
+          to="/$shopId/desk/agents"
+          params={{ shopId: shop.id }}
+          className="inline-flex min-h-10 items-center gap-2 self-start rounded-control border border-line bg-surface px-3 hover:bg-canvas"
+        >
+          <Gauge aria-hidden className="size-5" />
+          {t('agents.title')}
+        </Link>
+      )}
     </div>
   );
 }

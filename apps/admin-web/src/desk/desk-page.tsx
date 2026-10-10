@@ -5,6 +5,7 @@ import {
   Check,
   Clock,
   Eye,
+  Gauge,
   MessageCircle,
   Phone,
   PhoneMissed,
@@ -43,6 +44,7 @@ import { REASONS } from '../orders/order-page';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { SEES_AGENTS } from './agents-page';
 
 const HOUR = 3_600_000;
 
@@ -356,10 +358,11 @@ function DealtOrder({
  * The Confirmation Desk (COD-04, docs/design/03 F3): the order due a call dealt to the agent, one
  * at a time and no two agents on one customer; the customer's number shown when they call, which
  * is logged; one tap for how the call went, and the next order dealt at once. Below it, every
- * order due now, the most urgent first.
+ * order due now, the most urgent first. Owners and managers go on from it to how each agent did.
  */
 export function DeskPage() {
   const { t, locale } = useLocale();
+  const { id: shopId, role } = useShop();
   const queue = useAdminQuery<ConfirmationQueueData>(
     ['confirmationQueue'],
     ConfirmationQueueQuery,
@@ -402,9 +405,21 @@ export function DeskPage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <header className="flex flex-col gap-1">
-        <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
-          {t('desk.title')}
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
+            {t('desk.title')}
+          </h1>
+          {SEES_AGENTS.includes(role) && (
+            <Link
+              to="/$shopId/desk/agents"
+              params={{ shopId }}
+              className="inline-flex min-h-10 items-center gap-2 rounded-control border border-line bg-surface px-3 hover:bg-canvas"
+            >
+              <Gauge aria-hidden className="size-5" />
+              {t('agents.title')}
+            </Link>
+          )}
+        </div>
         <p className="text-secondary">
           {t('desk.due', { count: formatCount(desk.dueCount) })}
           {desk.overdueCount > 0 &&

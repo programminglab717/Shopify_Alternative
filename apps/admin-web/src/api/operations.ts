@@ -2593,6 +2593,38 @@ export const CodHealthQuery = /* GraphQL */ `
   ${MONEY}
 `;
 
+/**
+ * How each agent of the Confirmation Desk did over a period (COD-11), and the staff's names for
+ * them: both for owners and managers alone.
+ */
+export const ConfirmationAgentsQuery = /* GraphQL */ `
+  query ConfirmationAgents($from: DateTime!, $before: DateTime!) {
+    confirmationAgents(from: $from, before: $before) {
+      id
+      kind
+      confirmed
+      cancelled
+      confirmationRate
+      confirmationsPerHour
+      activeHours
+      calls {
+        noAnswer
+        callBack
+        wrongNumber
+      }
+      delivery {
+        ...CodDeliveryFigures
+      }
+    }
+    staffMembers {
+      id
+      name
+    }
+  }
+  ${COD_DELIVERY}
+  ${MONEY}
+`;
+
 const COD_REMITTANCE_SUMMARY = /* GraphQL */ `
   fragment CodRemittanceSummary on CodRemittance {
     id
