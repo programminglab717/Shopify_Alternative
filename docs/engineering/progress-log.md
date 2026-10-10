@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### Agents' performance, in the admin
+### 172a750 · Agents' performance, in the admin
 
 * **A page of the desk's** ([ADR-335](../architecture/13-decision-log.md#adr-335--owners-and-managers-see-how-each-agent-of-the-confirmation-desk-did-on-a-page-of-the-desks-that-analytics-links-to-over-the-last-7-30-or-90-whole-days-the-orders-each-confirmed-and-cancelled-how-many-an-hour-on-the-desk-their-calls-that-settled-nothing-and-how-many-parcels-of-the-orders-they-confirmed-came-back-staff-by-name-those-who-left-as-former-staff-and-apps-by-the-end-of-their-token)): owners and managers open Agents' performance from the
   Confirmation Desk, or from analytics under COD health, and see each agent of the last 7, 30
