@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### A booking that failed for its city, in the admin
+### 6daaf59 · A booking that failed for its city, in the admin
 
 * **Put right from the bookings list** ([ADR-336](../architecture/13-decision-log.md#adr-336--a-booking-that-failed-is-put-right-from-the-bookings-list-where-it-is-its-orders-latest-the-city-its-orders-address-writes-matched-against-the-couriers-names-where-the-courier-has-none-one-of-its-nearest-chosen-or-another-typed-kept-as-the-shops-own-and-the-order-booked-again-with-the-same-account-and-each-courier-accounts-own-names-listed-in-settings-looked-up-named-and-forgotten)): a failed booking that is its order's latest
   has Fix and book again. The admin asks for the order's city and how the courier knows it;
