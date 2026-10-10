@@ -238,6 +238,12 @@ export interface OrderDetail {
   transferDiscount: MoneyValue;
   codFee: MoneyValue;
   totalPrice: MoneyValue;
+  /** What a cash-on-delivery order asks for in advance, by transfer, before it ships; zero for none. */
+  advanceDue: MoneyValue;
+  /** Receipts its customer sent through its page for its transfer or advance, oldest first. */
+  transferReceipts: { id: string; createdAt: string; mimeType: string; url: string }[];
+  /** The customer's link, while it has one: when it stops working, null while it lasts. */
+  customerLink: { expiresAt: string | null } | null;
   amountPaid: MoneyValue;
   codAmount: MoneyValue;
   customer: { id: string; displayName: string; numberOfOrders: number } | null;
@@ -1851,6 +1857,22 @@ export interface CustomerStoreCreditData {
 export interface StoreCreditMoveData {
   [field: string]: {
     storeCreditAccountTransaction: { id: string } | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface OrderCreateManualPaymentData {
+  orderCreateManualPayment: {
+    order: { id: string; stage: OrderStage; amountPaid: MoneyValue } | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface OrderLinkCreateData {
+  orderLinkCreate: {
+    url: string | null;
+    whatsappUrl: string | null;
+    order: { id: string; customerLink: { expiresAt: string | null } | null } | null;
     userErrors: UserError[];
   };
 }

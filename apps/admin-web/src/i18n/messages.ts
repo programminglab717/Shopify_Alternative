@@ -2856,6 +2856,28 @@ const en = {
   'cities.keep': 'Keep the name',
   'cities.kept': 'From now on {courier} is given {courierCity} for {city}.',
   'cities.missing': "This courier account is not one of the shop's.",
+  'money.waitsAdvance': 'Waiting for its advance of {amount}, by transfer.',
+  'money.waitsTransfer': 'Waiting for {amount} by transfer.',
+  'money.receipts': 'Receipts the customer sent',
+  'money.receiptNumber': 'Receipt {number}',
+  'money.receiptPdf': 'Receipt {number} (PDF)',
+  'money.record.start': 'Record a payment',
+  'money.record.hintAdvance':
+    'Once its advance is in, the order moves on to be packed, and the courier collects the rest.',
+  'money.record.hintTransfer': 'Once its transfer is in, the order moves on to be packed.',
+  'money.record.tooMuch': 'More than the {owed} it owes.',
+  'money.record.save': 'Record the payment',
+  'money.record.done': '{amount} recorded as received.',
+  'customerLink.label': "The customer's link",
+  'customerLink.none': 'None made for this order yet.',
+  'customerLink.lasting': 'It works until 30 days after the order ends.',
+  'customerLink.until': 'It works until {date}.',
+  'customerLink.new': 'New link',
+  'customerLink.replaces': 'The link sent before stops working.',
+  'customerLink.make': 'Make a new link',
+  'customerLink.made':
+    'A new link for the customer to confirm or follow the order. It is shown this once: copy it or send it now.',
+  'customerLink.field': 'The link',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5686,6 +5708,28 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'cities.keep': 'نام رکھیں',
   'cities.kept': 'اب سے {city} کے لیے {courier} کو {courierCity} دیا جائے گا۔',
   'cities.missing': 'یہ کوریئر اکاؤنٹ دکان کا نہیں۔',
+  'money.waitsAdvance': '{amount} ایڈوانس کا انتظار ہے، ٹرانسفر سے۔',
+  'money.waitsTransfer': 'ٹرانسفر سے {amount} کا انتظار ہے۔',
+  'money.receipts': 'گاہک کی بھیجی ہوئی رسیدیں',
+  'money.receiptNumber': 'رسید {number}',
+  'money.receiptPdf': 'رسید {number} (PDF)',
+  'money.record.start': 'ادائیگی درج کریں',
+  'money.record.hintAdvance':
+    'ایڈوانس آتے ہی آرڈر پیکنگ کے لیے آگے بڑھ جائے گا، اور باقی رقم کوریئر وصول کرے گا۔',
+  'money.record.hintTransfer': 'ٹرانسفر آتے ہی آرڈر پیکنگ کے لیے آگے بڑھ جائے گا۔',
+  'money.record.tooMuch': 'واجب الادا {owed} سے زیادہ۔',
+  'money.record.save': 'ادائیگی درج کریں',
+  'money.record.done': '{amount} وصول شدہ درج ہو گئے۔',
+  'customerLink.label': 'گاہک کا لنک',
+  'customerLink.none': 'اس آرڈر کا ابھی کوئی لنک نہیں بنا۔',
+  'customerLink.lasting': 'یہ آرڈر ختم ہونے کے 30 دن بعد تک چلے گا۔',
+  'customerLink.until': 'یہ {date} تک چلے گا۔',
+  'customerLink.new': 'نیا لنک',
+  'customerLink.replaces': 'پہلے بھیجا گیا لنک کام کرنا بند کر دے گا۔',
+  'customerLink.make': 'نیا لنک بنائیں',
+  'customerLink.made':
+    'گاہک کے لیے آرڈر کنفرم کرنے یا اس کا حال دیکھنے کا نیا لنک۔ یہ صرف ایک بار دکھایا جائے گا: ابھی کاپی کریں یا بھیج دیں۔',
+  'customerLink.field': 'لنک',
 };
 
 export const messages: Readonly<

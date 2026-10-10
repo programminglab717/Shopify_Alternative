@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-336 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-337 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -344,6 +344,7 @@
 | 334 | An open draft is changed in the admin on the form it was made with, started from the draft as it is: every line sent at its price and every charge as it stands, so an emptied one is cleared, and the address only if it changed, its area, landmark and pin kept | Accepted |
 | 335 | Owners and managers see how each agent of the Confirmation Desk did on a page of the desk's that analytics links to: over the last 7, 30 or 90 whole days, the orders each confirmed and cancelled, how many an hour on the desk, their calls that settled nothing, and how many parcels of the orders they confirmed came back; staff by name, those who left as former staff, and apps by the end of their token | Accepted |
 | 336 | A booking that failed is put right from the bookings list, where it is its order's latest: the city its order's address writes matched against the courier's names; where the courier has none, one of its nearest chosen, or another typed, kept as the shop's own and the order booked again with the same account; and each courier account's own names listed in settings, looked up, named and forgotten | Accepted |
+| 337 | An order waiting for its money says on its page what it waits for, its advance or its transfer, and shows the receipts its customer sent; owners and managers record money received by hand, what it waits for unless they say otherwise, and an order waiting for an advance is not marked paid in full; and those who speak with customers make a new link for the order, shown once to copy or send on WhatsApp, the one before stopping | Accepted |
 
 ---
 
@@ -13467,3 +13468,40 @@
     words in English, for people; the order's city and the match are asked for as data.
   * **A city's name in settings alone:** the failure is seen in the bookings list, and the name
     is wanted there, with the booking put right at once.
+
+## ADR-337 · An order waiting for its money says on its page what it waits for, its advance or its transfer, and shows the receipts its customer sent; owners and managers record money received by hand, what it waits for unless they say otherwise, and an order waiting for an advance is not marked paid in full; and those who speak with customers make a new link for the order, shown once to copy or send on WhatsApp, the one before stopping
+
+* **Context:** A cash-on-delivery order may ask for an advance, paid by transfer before it
+  ships ([ADR-083](#adr-083--a-cash-on-delivery-order-may-ask-for-an-advance-paid-by-transfer-before-it-ships-it-waits-for-it-as-a-transfer-waits-for-its-money-and-staff-record-it-when-it-is-in)), as a bank transfer order waits for its money ([ADR-074](#adr-074--a-shop-that-gives-its-bank-account-offers-bank-transfer-the-order-waits-for-the-money-at-a-stage-of-its-own-and-keeps-the-account-its-customer-was-told-to-pay-into)).
+  Customers send the receipt through their order's page ([ADR-080](#adr-080--a-customer-sends-the-receipt-of-their-transfer-through-their-orders-page-in-a-form-the-core-reads-and-keeps-in-storage-by-order-the-shop-sees-it-with-the-order)), but the admin's
+  order page showed neither what the order waited for nor the receipts, and its money section
+  ([ADR-285](#adr-285--an-orders-page-shows-what-was-paid-and-given-back-each-refund-with-how-its-reference-why-and-its-receipt-owners-and-managers-record-a-refund-at-most-what-is-left-by-hand-with-its-receipt-uploaded-through-the-gateway-or-as-store-credit-and-mark-an-order-paid-after-saying-how-much-it-records)) offered Mark as paid alone: for an order waiting for its advance, that paid it
+  in full, leaving the courier nothing to collect. Customers who lost the message with their
+  link had no way back to it ([ADR-032](#adr-032--customers-confirm-or-cancel-cash-on-delivery-orders-through-a-link-that-then-follows-the-order)) but a new order or a call.
+* **Decision:**
+  * **What it waits for:** an order at Awaiting payment says, in its money section, what it waits
+    for by transfer as the core works it out: a cash-on-delivery order's advance, or a transfer's
+    or online payment's total, less what came.
+  * **Its receipts:** those its customer sent, each with when: a picture shown small, opening
+    whole, a PDF as a link.
+  * **A payment recorded by hand:** for owners and managers, Record a payment takes an amount,
+    what the order waits for unless they say otherwise, else the rest, never more than it owes,
+    through `orderCreateManualPayment`; the order moves on as the core moves it once its advance
+    or transfer is in.
+  * **Not paid in full while the advance is due:** Mark as paid is not offered for an order
+    waiting for its advance; a whole payment is still recorded as an amount.
+  * **The customer's link:** the customer card says whether the order has a link and until when,
+    and those who speak with customers, owners, managers and confirmation agents, make a new one
+    with `orderLinkCreate`, told first that the one before stops working. Hatti keeps only its
+    digest, so it is shown that once, to copy or to send on WhatsApp, to the customer's number for
+    those who see it whole.
+* **Consequences:**
+  * An advance that came by WhatsApp's screenshot or the receipt sent through the link is
+    recorded where it is checked, and the order goes on to be packed with the rest at the door.
+  * A customer who lost their link is sent another in a tap, from the order.
+  * Not yet: a receipt rejected with a word to the customer; the transfers to check listed
+    together, which Home counts.
+* **Alternatives:**
+  * **Mark as paid alone, as before:** wrong for an advance, and no part payments.
+  * **Keeping the link to show it again:** Hatti keeps links' digests alone, so a link leaked from
+    the admin cannot be read back; a new one is made instead.

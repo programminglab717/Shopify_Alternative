@@ -4,6 +4,7 @@ import type { ChangeEvent, FormEvent } from 'react';
 import { browserFetch } from '../api/client';
 import {
   CustomerStoreCreditQuery,
+  OrderCreateManualPaymentMutation,
   OrderMarkAsPaidMutation,
   OrderPayWithStoreCreditMutation,
   OrderRefundMutation,
@@ -11,6 +12,7 @@ import {
 } from '../api/operations';
 import type {
   CustomerStoreCreditData,
+  OrderCreateManualPaymentData,
   OrderDetail,
   OrderPayWithStoreCreditData,
   OrderStage,
@@ -19,7 +21,7 @@ import type {
   StagedUploadsCreateData,
 } from '../api/types';
 import type { StaffRole } from '../auth/session';
-import { formatDate, formatMoney } from '../i18n/format';
+import { formatDate, formatDateTime, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { parsePrice, priceText, problemText } from '../products/product-form';
@@ -60,6 +62,23 @@ const RECEIPT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf
 const RECEIPT_BYTES = 10 * 1024 * 1024;
 
 const cents = (amount: string) => Math.round(Number(amount) * 100);
+
+/**
+ * What the order waits for by transfer before it ships, as the core works it out: the whole of a
+ * transfer's or an online payment's total, a cash-on-delivery order's advance; less what came.
+ */
+export function transferOwed(
+  order: Pick<OrderDetail, 'paymentMethod' | 'totalPrice' | 'advanceDue' | 'amountPaid'>,
+): string {
+  const awaited =
+    order.paymentMethod === 'BANK_TRANSFER' || order.paymentMethod === 'ONLINE'
+      ? cents(order.totalPrice.amount)
+      : order.paymentMethod === 'CASH_ON_DELIVERY'
+        ? cents(order.advanceDue.amount)
+        : 0;
+  const left = awaited - cents(order.amountPaid.amount);
+  return left > 0 ? (left / 100).toFixed(2) : '0';
+}
 
 /** What can still be given back: paid, less refunded. */
 export function refundable(order: Pick<OrderDetail, 'amountPaid' | 'amountRefunded'>): string {
@@ -254,6 +273,77 @@ function RefundForm({
  * Owners and managers.
  */
 /**
+ * Money the customer sent, recorded by hand (CHK-10, PAY-02): what the order waits for by transfer
+ * unless staff say otherwise, else the rest, at most what it owes. Its advance or its transfer in,
+ * the order moves on to be packed, and on delivery the courier collects the rest.
+ */
+function RecordPayment({
+  order,
+  owed,
+  onDone,
+}: {
+  order: OrderDetail;
+  owed: string;
+  onDone: (message: string) => void;
+}) {
+  const { t } = useLocale();
+  const waiting = transferOwed(order);
+  const [amount, setAmount] = useState(priceText(cents(waiting) > 0 ? waiting : owed));
+  const record = useAdminMutation<OrderCreateManualPaymentData, { id: string; amount: string }>(
+    OrderCreateManualPaymentMutation,
+  );
+  const { problem, attempt } = useAttempt();
+  const parsed = parsePrice(amount);
+  const tooMuch = parsed !== null && cents(parsed) > cents(owed);
+  const ready = parsed !== null && cents(parsed) > 0 && !tooMuch;
+  const hint =
+    cents(waiting) === 0
+      ? undefined
+      : order.paymentMethod === 'CASH_ON_DELIVERY'
+        ? t('money.record.hintAdvance')
+        : t('money.record.hintTransfer');
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!ready) return;
+    const ok = await attempt(
+      async () =>
+        (await record.mutateAsync({ id: order.id, amount: parsed! })).orderCreateManualPayment,
+    );
+    if (ok) onDone(t('money.record.done', { amount: formatMoney(parsed!) }));
+  };
+
+  return (
+    <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
+      <TextField
+        label={t('money.amount', { most: formatMoney(owed) })}
+        hint={hint}
+        inputMode="decimal"
+        ltr
+        value={amount}
+        error={
+          amount && parsed === null
+            ? t('returns.claim.amountWrong')
+            : tooMuch
+              ? t('money.record.tooMuch', { owed: formatMoney(owed) })
+              : null
+        }
+        onChange={(event) => setAmount(event.target.value)}
+      />
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" busy={record.isPending} disabled={!ready}>
+          {t('money.record.save')}
+        </Button>
+        <Button variant="tertiary" onClick={() => onDone('')}>
+          {t('returns.cancel')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/**
  * The order paid, or part of it, with its customer's store credit (ADR-185): as much as it owes
  * and the credit covers unless staff say less. On delivery, the cash at the door drops by it.
  */
@@ -322,7 +412,7 @@ function PayWithCredit({
 export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: string }) {
   const { t, locale } = useLocale();
   const { role } = useShop();
-  const [open, setOpen] = useState<'refund' | 'paid' | 'credit' | null>(null);
+  const [open, setOpen] = useState<'refund' | 'paid' | 'credit' | 'record' | null>(null);
   const [done, setDone] = useState('');
   const markPaid = useAdminMutation<ParcelUserErrorsData, { id: string }>(OrderMarkAsPaidMutation);
   const { problem, attempt } = useAttempt();
@@ -331,6 +421,9 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
   const unpaid =
     order.status !== 'CANCELLED' && cents(order.amountPaid.amount) < cents(order.totalPrice.amount);
   const owed = ((cents(order.totalPrice.amount) - cents(order.amountPaid.amount)) / 100).toFixed(2);
+  // What it waits for by transfer before it ships: its advance, or the transfer's total.
+  const waiting = order.stage === 'AWAITING_PAYMENT' ? transferOwed(order) : '0';
+  const advance = order.paymentMethod === 'CASH_ON_DELIVERY' && cents(waiting) > 0;
   // Store credit pays an order still open with nothing of it shipped.
   const creditPays =
     handles && unpaid && order.customer !== null && UNSHIPPED.includes(order.stage);
@@ -360,6 +453,47 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
           </div>
         )}
       </dl>
+      {cents(waiting) > 0 && (
+        <p className="font-medium">
+          {t(advance ? 'money.waitsAdvance' : 'money.waitsTransfer', {
+            amount: formatMoney(waiting),
+          })}
+        </p>
+      )}
+      {order.transferReceipts.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <span className="text-secondary">{t('money.receipts')}</span>
+          <ul className="flex flex-wrap gap-3">
+            {order.transferReceipts.map((receipt, index) => {
+              const name = t('money.receiptNumber', { number: index + 1 });
+              return (
+                <li key={receipt.id} className="flex flex-col gap-1">
+                  <a
+                    href={receipt.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    {receipt.mimeType.startsWith('image/') ? (
+                      <img
+                        src={receipt.url}
+                        alt={name}
+                        loading="lazy"
+                        className="max-h-40 rounded-control border border-line"
+                      />
+                    ) : (
+                      t('money.receiptPdf', { number: index + 1 })
+                    )}
+                  </a>
+                  <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                    {formatDateTime(receipt.createdAt, timezone, locale)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       {order.refunds.length > 0 && (
         <ul className="flex flex-col divide-y divide-line">
           {order.refunds.map((refund) => (
@@ -423,6 +557,16 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
           }}
         />
       )}
+      {handles && open === 'record' && (
+        <RecordPayment
+          order={order}
+          owed={owed}
+          onDone={(message) => {
+            setOpen(null);
+            setDone(message);
+          }}
+        />
+      )}
       {handles && open === 'paid' && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="flex-1">{t('money.paid.confirm', { amount: formatMoney(owed) })}</span>
@@ -458,6 +602,18 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
             </Button>
           )}
           {unpaid && (
+            <Button
+              variant={cents(waiting) > 0 ? 'primary' : 'secondary'}
+              onClick={() => {
+                setDone('');
+                setOpen('record');
+              }}
+            >
+              {t('money.record.start')}
+            </Button>
+          )}
+          {/* Paid in full would leave the courier nothing to collect: not while it waits for its advance. */}
+          {unpaid && !advance && (
             <Button
               variant="secondary"
               onClick={() => {

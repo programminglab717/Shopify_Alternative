@@ -209,6 +209,18 @@ export const OrderQuery = /* GraphQL */ `
       amountRefunded {
         ...Money
       }
+      advanceDue {
+        ...Money
+      }
+      transferReceipts {
+        id
+        createdAt
+        mimeType
+        url
+      }
+      customerLink {
+        expiresAt
+      }
       refunds {
         id
         amount {
@@ -3173,6 +3185,52 @@ export const OrderRefundMutation = /* GraphQL */ `
     orderRefund(id: $id, input: $input) {
       refund {
         id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/**
+ * Money an order's customer sent, recorded by hand: the amount given, or what the order waits for
+ * by transfer (its advance, or the rest), else the rest; an order waiting for it moves on.
+ */
+export const OrderCreateManualPaymentMutation = /* GraphQL */ `
+  mutation OrderCreateManualPayment($id: ID!, $amount: String) {
+    orderCreateManualPayment(id: $id, amount: $amount) {
+      order {
+        id
+        stage
+        amountPaid {
+          ...Money
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${MONEY}
+  ${USER_ERRORS}
+`;
+
+/**
+ * A new link for the order's customer, to confirm or follow it, shown once: the one before stops
+ * working. With it, WhatsApp opened with a message carrying it.
+ */
+export const OrderLinkCreateMutation = /* GraphQL */ `
+  mutation OrderLinkCreate($id: ID!) {
+    orderLinkCreate(id: $id) {
+      url
+      whatsappUrl
+      order {
+        id
+        customerLink {
+          expiresAt
+        }
       }
       userErrors {
         ...Problems

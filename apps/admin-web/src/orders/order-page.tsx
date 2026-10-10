@@ -37,6 +37,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { OrderMessages } from '../settings/messages-page';
 import { Assignment, DeliveryAddress, NoteAndTags, Timeline } from './details';
 import { OrderItems } from './edit-order';
+import { CustomerLink, SENDS_LINKS } from './customer-link';
 import { HANDLES_MONEY, OrderMoney } from './money';
 import { Parcels, ShipForm, WORKS_PARCELS } from './parcels';
 import { PrintPanel } from './print';
@@ -383,6 +384,9 @@ export function OrderPage() {
                   </span>
                 )}
               </div>
+            )}
+            {!order.overPlanLimit && SENDS_LINKS.includes(shop.role) && (
+              <CustomerLink order={order} timezone={timezone} />
             )}
           </Section>
           <Section title={t('order.address')}>

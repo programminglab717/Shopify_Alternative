@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, money an order's customer sent, recorded by hand, and the order's link sent again**
-(CHK-10, COD-02): an advance or a transfer that came outside the shop's receipts recorded on the
-order's page, the order moving on once it is in; and a new link for the customer to confirm or
-follow the order, to send on WhatsApp; then section by section as the alpha's shops need them.
+**Next, online payments in the admin** (PAY-01, PAY-05, PAY-06): the payments an order's customer
+started online, which were paid and how, and a refund through the gateway whose answer never came
+settled as the gateway's dashboard shows it; and what checkout takes off orders paid online, set
+beside the shop's gateways; then section by section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -19,6 +19,28 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### Payments recorded by hand, and an order's link made again, in the admin
+
+* **What an order waits for** ([ADR-337](../architecture/13-decision-log.md#adr-337--an-order-waiting-for-its-money-says-on-its-page-what-it-waits-for-its-advance-or-its-transfer-and-shows-the-receipts-its-customer-sent-owners-and-managers-record-money-received-by-hand-what-it-waits-for-unless-they-say-otherwise-and-an-order-waiting-for-an-advance-is-not-marked-paid-in-full-and-those-who-speak-with-customers-make-a-new-link-for-the-order-shown-once-to-copy-or-send-on-whatsapp-the-one-before-stopping)): an order awaiting payment says what it waits for, its
+  advance or its transfer, and shows the receipts its customer sent through their link, a
+  picture small and opening whole, a PDF as a link.
+* **A payment recorded by hand:** owners and managers record an amount received, what the order
+  waits for unless they say otherwise, never more than it owes; an order waiting for its advance
+  is not offered Mark as paid, which would leave the courier nothing to collect.
+* **The customer's link:** the customer card says whether the order has a link and until when;
+  owners, managers and confirmation agents make a new one, told first that the one before stops
+  working, and it is shown once, to copy or send on WhatsApp.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, two orders
+  were placed through the Admin API for a customer not in the seed, Live Check, on
+  +92 300 9876543, cash on delivery with an advance of Rs 500, tagged live-check: #1023 and
+  #1024. Each page said it waited for its advance; a new link was made, copied and offered to
+  WhatsApp at the customer's number; on #1024 the link was opened as the customer, who sent a
+  receipt, which the order's page then showed. Recording the Rs 500 offered moved each order on
+  to be packed, Rs 1,350 left to collect. Both were then cancelled. No errors in the browser.
+* 2380 tests: an advance waited for with its receipts, recorded and moving the order on, without
+  Mark as paid; part of a transfer recorded, more than it owes refused; a new link after its
+  warning, shown once, copied and sent; links kept from packers; and what a transfer waits for.
 
 ### 6daaf59 · A booking that failed for its city, in the admin
 
