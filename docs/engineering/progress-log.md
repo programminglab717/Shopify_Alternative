@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### A gateway's credentials changed, and what changed the message credit, in the admin
+### 37fba00 · A gateway's credentials changed, and what changed the message credit, in the admin
 
 * **A gateway's credentials** ([ADR-339](../architecture/13-decision-log.md#adr-339--a-gateway-accounts-credentials-are-changed-in-place-every-one-or-the-account-moved-between-its-test-environment-and-the-real-one-with-that-ones-credentials-once-the-member-confirms-who-they-are-and-the-billing-page-lists-what-changed-the-message-credit-the-newest-first-with-the-balance-after-each)): each of the shop's online payment accounts offers to
   change its credentials, every one its gateway asks for, which replace those it has once the
