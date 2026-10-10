@@ -6221,3 +6221,14 @@ export const PurchaseOrderUpdateMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** A purchase order as a page to print for its supplier. */
+export const PurchaseOrderDocumentQuery = /* GraphQL */ `
+  query PurchaseOrderDocument($id: ID!, $language: DocumentLanguage) {
+    purchaseOrderDocument(id: $id, language: $language) {
+      html
+      title
+      fileName
+    }
+  }
+`;

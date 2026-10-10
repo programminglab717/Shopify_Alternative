@@ -68,6 +68,7 @@ export {
   SEOInput,
   UserError,
 } from './graphql/types.js';
+export { DocumentLanguage, PaperSize } from './graphql/documents.js';
 export { NO_SEO, SEO_LIMITS, checkSeo, type SeoInputValue, type SeoValue } from './seo.js';
 export {
   ACCESS_SCOPES,

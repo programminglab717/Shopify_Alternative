@@ -81,6 +81,14 @@ function poCore(role: StaffRole, start: [number, number] = [0, 0]) {
         };
       case 'SupplierUpdate':
         return { supplierUpdate: { supplier: { id: 'sup_1' }, userErrors: [] } };
+      case 'PurchaseOrderDocument':
+        return {
+          purchaseOrderDocument: {
+            html: `<p>PO-1 for Nishat Mills, ${String(variables.language)}</p>`,
+            title: 'Purchase order PO-1',
+            fileName: 'purchase-order-1.html',
+          },
+        };
       case 'PurchaseOrderUpdate':
         return { purchaseOrderUpdate: { purchaseOrder: { id: 'po_1' }, userErrors: [] } };
       case 'PurchaseOrderForm':
@@ -370,6 +378,35 @@ describe('Purchase orders (INV-05)', () => {
       ]),
     );
     expect(await screen.findByRole('heading', { name: 'Goods that came' })).toBeTruthy();
+  });
+
+  it('prints an order for its supplier, in the language chosen, whoever looks', async () => {
+    const fake = poCore('packer');
+    vi.stubGlobal('fetch', fake.fetcher);
+    const written: string[] = [];
+    const tab = {
+      document: {
+        open: vi.fn(),
+        write: (html: string) => written.push(html),
+        close: vi.fn(),
+        fonts: { ready: Promise.resolve() },
+      },
+      focus: vi.fn(),
+      print: vi.fn(),
+      close: vi.fn(),
+    };
+    vi.stubGlobal(
+      'open',
+      vi.fn(() => tab),
+    );
+    renderAdmin('/shop_1/purchase-orders/po_1');
+
+    const language = (await screen.findByLabelText('Language')) as HTMLSelectElement;
+    fireEvent.change(language, { target: { value: 'URDU' } });
+    await press('Print for the supplier');
+    await waitFor(() => expect(written).toEqual(['<p>PO-1 for Nishat Mills, URDU</p>']));
+    expect(tab.print).toHaveBeenCalled();
+    expect(sentOf(fake, 'PurchaseOrderDocument')).toEqual([{ id: 'po_1', language: 'URDU' }]);
   });
 
   it('shows purchase orders to a packer without changing them', async () => {

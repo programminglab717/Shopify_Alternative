@@ -296,3 +296,17 @@ export class PurchaseOrderPayload {
   @Field(() => [UserError])
   userErrors!: UserError[];
 }
+
+@ObjectType({
+  description: 'A purchase order as one HTML page, to print or save for its supplier.',
+})
+export class PurchaseOrderDocument {
+  @Field({ description: 'A complete HTML page, set up for A4.' })
+  html!: string;
+
+  @Field({ description: 'For the browser tab, such as "Purchase order PO-12".' })
+  title!: string;
+
+  @Field({ description: 'A file name to save it as.' })
+  fileName!: string;
+}

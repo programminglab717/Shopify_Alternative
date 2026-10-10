@@ -8587,6 +8587,18 @@ input PurchaseOrderCreateInput {
   supplierId: ID!
 }
 
+"""A purchase order as one HTML page, to print or save for its supplier."""
+type PurchaseOrderDocument {
+  """A file name to save it as."""
+  fileName: String!
+
+  """A complete HTML page, set up for A4."""
+  html: String!
+
+  """For the browser tab, such as "Purchase order PO-12"."""
+  title: String!
+}
+
 type PurchaseOrderEdge {
   cursor: String!
   node: PurchaseOrder!
@@ -9316,6 +9328,11 @@ type Query {
 
   """A purchase order by ID."""
   purchaseOrder(id: ID!): PurchaseOrder
+
+  """
+  A purchase order as a page to print or save for its supplier: the shop, the order and its date, where the goods go and by when, and each line with what it costs where the shop said; in English and Urdu by default. Null if the shop has no such order.
+  """
+  purchaseOrderDocument(id: ID!, language: DocumentLanguage! = BILINGUAL): PurchaseOrderDocument
 
   """Purchase orders, the newest first."""
   purchaseOrders(

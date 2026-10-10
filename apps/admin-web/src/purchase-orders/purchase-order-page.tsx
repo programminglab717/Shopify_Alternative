@@ -1,27 +1,38 @@
 import { Link, useParams } from '@tanstack/react-router';
-import { ArrowLeft, ScanBarcode, Trash2 } from 'lucide-react';
+import { ArrowLeft, Printer, ScanBarcode, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   PurchaseOrderCloseMutation,
+  PurchaseOrderDocumentQuery,
   PurchaseOrderQuery,
   PurchaseOrderReceiveMutation,
   PurchaseOrderUpdateMutation,
   StockCountFindQuery,
 } from '../api/operations';
-import type { PurchaseOrder, PurchaseOrderData, StockCountFindData, UserError } from '../api/types';
+import type {
+  DocumentLanguage,
+  PurchaseOrder,
+  PurchaseOrderData,
+  PurchaseOrderDocumentData,
+  StockCountFindData,
+  UserError,
+} from '../api/types';
 import { useSessionStore } from '../auth/context';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatMoney, formatPhone } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
+import type { MessageKey } from '../i18n/messages';
 import { parseStock } from '../products/product-form';
 import { useAttempt } from '../returns/parcel';
+import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Scanner, canScan } from '../stock/scanner';
 import { EDITS_STOCK } from '../stock/stock-page';
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { openPrintTab } from '../ui/print';
 import { AMOUNT, FindVariants, type Line } from './new-purchase-order-page';
 import { STATUS_LABELS, useDay } from './purchase-orders-page';
 
@@ -430,6 +441,68 @@ function EditOrder({ order, onDone }: { order: PurchaseOrder; onDone: () => void
   );
 }
 
+const LANGUAGES: readonly DocumentLanguage[] = ['BILINGUAL', 'ENGLISH', 'URDU'];
+
+/** The order as a page for its supplier, in the language chosen, opened in a tab to print. */
+function PrintOrder({ order }: { order: PurchaseOrder }) {
+  const { t } = useLocale();
+  const store = useSessionStore();
+  const shopId = useShop().id;
+  const [language, setLanguage] = useState<DocumentLanguage>('BILINGUAL');
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const print = async () => {
+    setProblem(null);
+    // Opened while the tap is still being handled, so that pop-up blockers let it through.
+    const tab = openPrintTab();
+    if (!tab) {
+      setProblem(t('shipping.popupBlocked'));
+      return;
+    }
+    setBusy(true);
+    try {
+      const { purchaseOrderDocument } = await store.graphql<PurchaseOrderDocumentData>(
+        shopId,
+        PurchaseOrderDocumentQuery,
+        { id: order.id, language },
+      );
+      if (!purchaseOrderDocument) throw new Error(t('po.gone'));
+      tab.show(purchaseOrderDocument.html);
+    } catch (failure) {
+      tab.close();
+      setProblem(errorText(failure, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-end gap-2">
+        <SelectField<DocumentLanguage>
+          label={t('print.language')}
+          value={language}
+          options={LANGUAGES.map((each) => ({
+            value: each,
+            label: t(`print.language.${each}` as MessageKey),
+          }))}
+          onChange={setLanguage}
+        />
+        <Button
+          variant="secondary"
+          busy={busy}
+          icon={<Printer aria-hidden className="size-5" />}
+          onClick={() => void print()}
+        >
+          {t('po.print')}
+        </Button>
+      </div>
+      {problem && <Alert tone="danger">{problem}</Alert>}
+    </div>
+  );
+}
+
 /** Closing an open order with what came, once sure. */
 function Close({ order }: { order: PurchaseOrder }) {
   const { t } = useLocale();
@@ -607,6 +680,7 @@ export function PurchaseOrderPage() {
           ))}
         </ul>
       </Card>
+      <PrintOrder order={order} />
       {edits && <Receive order={order} />}
       {edits && (
         <div className="flex flex-wrap gap-2">

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-352 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-353 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -360,6 +360,7 @@
 | 350 | Purchase orders: the shop's suppliers, goods ordered from one for a location, numbered PO-1 onwards, each line a variant as it was named, how many and what one costs; goods received into stock as they come, in one adjustment naming the order, never more than is still to come; received in full or closed with what came; in the core and the admin | Accepted |
 | 351 | An open purchase order is changed in one request: its supplier's number, note and day expected; lines added, their quantities or costs changed, never below what came, and lines none of which came removed; received once all of it has; suppliers kept on a page of their own in the admin, each with its orders | Accepted |
 | 352 | Goods received on a purchase order set what their variants cost: a line's cost averaged with what was on hand at the variant's cost before, weighted by units, rounded to the paisa; the order's cost where none was on hand or none was known; in the same transaction as the receipt | Accepted |
+| 353 | A purchase order printed for its supplier: one A4 page from the core's documents, in English, Urdu or both, with the shop, the order and its date, the supplier and their reference, where the goods go and by when, and each line with what it costs where the shop said; the shared document enums moved to the API package | Accepted |
 
 ---
 
@@ -14045,3 +14046,30 @@
   * **The last cost:** a small top-up at a high price would make all the stock on hand look dear.
   * **First in, first out:** cost per unit sold from the batch it came in; truer, but a ledger
     of batches no shop in the alpha has asked for.
+
+## ADR-353 · A purchase order printed for its supplier: one A4 page from the core's documents, in English, Urdu or both, with the shop, the order and its date, the supplier and their reference, where the goods go and by when, and each line with what it costs where the shop said; the shared document enums moved to the API package
+
+* **Context:**
+  * A supplier in the bazaar works from paper, or a photo of it on WhatsApp: what to send, how
+    many, where, and for how much (INV-05). Purchase orders (ADR-350) lived only in the admin.
+  * The core prints packing slips and invoices (ADR-028) from HTML templates in `@hatti/documents`,
+    in English, Urdu or both, the admin opening them in a tab to print or save as PDF.
+  * The enums `DocumentLanguage` and `PaperSize` belonged to the orders module, which inventory
+    cannot depend on: orders depend on inventory.
+* **Decision:**
+  * **`purchaseOrderDocument(id, language)`**, for those who read stock: one A4 page with the shop's
+    name; "Purchase order", its number and the day it was made; the supplier, their number and
+    reference; where the goods go, its address and number, and the day expected; each line, the
+    product, its variant and SKU, how many, and, where the shop gave costs, each and the amount;
+    the units and the total; the note; and a line asking for the goods. A received or closed order
+    says so across the top. Null for another shop's order.
+  * **In the admin**, "Print for the supplier" on every order's page, in the language chosen,
+    opened in a tab as order documents are.
+  * **The document enums** move to `@hatti/api`, unchanged in the schema; orders re-export them.
+* **Consequences:**
+  * The page saved as a PDF goes to the supplier on WhatsApp, in Urdu where they read it.
+  * Not yet: sending it from Hatti on the shop's WhatsApp number; the shop's logo on it.
+* **Alternatives:**
+  * **A PDF made in the core:** the browser saves the page as one already, and keeps the core free
+    of a PDF renderer.
+  * **The enums copied into inventory:** two GraphQL types of one name cannot be in one schema.

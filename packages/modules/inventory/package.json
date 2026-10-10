@@ -22,6 +22,7 @@
     "@hatti/api": "workspace:*",
     "@hatti/catalog": "workspace:*",
     "@hatti/db": "workspace:*",
+    "@hatti/documents": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/money": "workspace:*",

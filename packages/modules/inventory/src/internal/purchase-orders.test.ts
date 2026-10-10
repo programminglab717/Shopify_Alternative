@@ -392,4 +392,44 @@ describe.skipIf(!server)('PurchaseOrderService (INV-05)', () => {
     // (20 × 1,150 + 7 × 1,300) / 27 = 1,188.888…, to the paisa.
     expect(await costs()).toEqual([118889n, 90050n]);
   });
+
+  it('prints an order for its supplier, in English and Urdu, with what it costs where said', async () => {
+    const order = unwrap(
+      await f.purchaseOrders.create(f.a, {
+        supplierId: (await supplier()).id,
+        locationId: warehouse.id,
+        reference: 'Bill 4471',
+        expectedOn: '2026-11-30',
+        note: 'Pack sizes apart',
+        lines: [
+          { inventoryItemId: variants[0]!, quantity: 10, unitCost: '1450' },
+          { inventoryItemId: variants[1]!, quantity: 6 },
+        ],
+      }),
+    );
+    const both = (await f.purchaseOrders.document(f.a, order.id, 'bilingual'))!;
+    expect(both).toMatchObject({
+      title: 'Purchase order PO-1',
+      fileName: 'purchase-order-1.html',
+    });
+    for (const shown of [
+      'Purchase order',
+      'خریداری آرڈر',
+      'PO-1',
+      'Faisalabad Textiles',
+      '0300 1234567',
+      'Bill 4471',
+      'Warehouse',
+      '30 Nov 2026',
+      'Lawn suit',
+      'Rs 14,500',
+      'Pack sizes apart',
+    ]) {
+      expect(both.html).toContain(shown);
+    }
+    const urdu = (await f.purchaseOrders.document(f.a, order.id, 'urdu'))!;
+    expect(urdu.html).toContain('خریداری آرڈر');
+    expect(urdu.html).not.toContain('>Purchase order<');
+    expect(await f.purchaseOrders.document(f.b, order.id, 'english')).toBeNull();
+  });
 });

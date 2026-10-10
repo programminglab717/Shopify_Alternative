@@ -3,6 +3,7 @@ import {
   UserErrorsRollback,
   failOne,
   rollbackResult,
+  shopProfile,
   type FieldError,
   type MutationResult,
   type TenantContext,
@@ -10,9 +11,12 @@ import {
 import { VariantService } from '@hatti/catalog/public';
 import { Database, isUniqueViolation, toDate, type Tx } from '@hatti/db';
 import { newId, toPublicId } from '@hatti/ids';
+import type { Language } from '@hatti/documents';
+import type { CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { InventoryService, levelChange } from './inventory.service.js';
+import { purchaseOrderDocument } from './purchase-order-document.js';
 import { locationFromJson, type LocationJson } from './location-store.js';
 import type { LocationRecord, Page } from './records.js';
 import { LIMITS } from './rules.js';
@@ -260,6 +264,26 @@ export class PurchaseOrderService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const [found] = await this.#load(tx, tenant.shopId, { ids: [id] });
       return found ?? null;
+    });
+  }
+
+  /**
+   * A purchase order as a page to print or save for its supplier, in `language`; null if the shop
+   * has none with `id`.
+   */
+  document(
+    tenant: TenantContext,
+    id: string,
+    language: Language,
+  ): Promise<{ html: string; title: string; fileName: string } | null> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const [order] = await this.#load(tx, tenant.shopId, { ids: [id] });
+      if (!order) return null;
+      return purchaseOrderDocument(order, {
+        language,
+        shop: await shopProfile(tx, tenant.shopId),
+        currency: tenant.currency as CurrencyCode,
+      });
     });
   }
 

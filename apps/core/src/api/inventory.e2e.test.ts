@@ -680,6 +680,17 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       },
     });
 
+    // A page to print for the supplier, for anyone who reads stock (ADR-353).
+    const printed = await gql(
+      tokens.aStockReader,
+      `query ($id: ID!) { purchaseOrderDocument(id: $id, language: ENGLISH) { title fileName html } }`,
+      { id: order.id },
+    );
+    expect(printed.data?.purchaseOrderDocument).toMatchObject({
+      title: 'Purchase order PO-1',
+      fileName: 'purchase-order-1.html',
+      html: expect.stringContaining('Nishat Mills'),
+    });
     const closed = await mutate(
       tokens.a,
       `mutation ($id: ID!) { purchaseOrderClose(id: $id) { purchaseOrder { status closedAt } userErrors { code } } }`,

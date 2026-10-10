@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, a purchase order printed for its supplier, in the core and the admin** (INV-05): the
-order as a page to print or save as a PDF, in English or Urdu, with the shop's name, the
-supplier, where the goods go and each line; then section by section as the alpha's shops need
+**Next, a purchase order from what runs low, in the admin** (INV-05, INV-01): the variants
+running low or out chosen on the stock page and ordered at once from a supplier, each with what
+it would take to reach a level the shop sets; then section by section as the alpha's shops need
 them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +18,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### A purchase order printed for its supplier, in the core and the admin
+
+* **Printed** ([ADR-353](../architecture/13-decision-log.md#adr-353--a-purchase-order-printed-for-its-supplier-one-a4-page-from-the-cores-documents-in-english-urdu-or-both-with-the-shop-the-order-and-its-date-the-supplier-and-their-reference-where-the-goods-go-and-by-when-and-each-line-with-what-it-costs-where-the-shop-said-the-shared-document-enums-moved-to-the-api-package)): `purchaseOrderDocument` makes an order one A4 page for its supplier, in
+  English, Urdu or both: the shop, the order and its date, the supplier and their reference, where
+  the goods go and by when, and each line with its cost where the shop gave one. "Print for the
+  supplier" on every order's page opens it in a tab. The document enums moved to `@hatti/api`.
+* **Tried in Chromium against the core:** on the seed's shop, PO-2 printed in both languages and in
+  Urdu: Hatti Demo Bazaar, Nishat Mills and "Challan 7", Lahore warehouse's address, 7 of
+  "Peshawari Chappal" 8 at Rs 1,400 and 4 of size 10, 11 units, Rs 9,800, right to left in Urdu.
+  No errors in the browser.
+* 2474 tests: an order printed in both languages and in Urdu, and another shop's refused, in
+  the inventory module; through the Admin API; in the admin, printed in the language chosen.
 
 ### 525d04f · What goods cost, from purchase orders, in the core and the admin
 

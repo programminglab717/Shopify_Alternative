@@ -1,5 +1,6 @@
 import {
   CurrentTenant,
+  DocumentLanguage,
   Loaders,
   Money,
   PageInfo,
@@ -13,6 +14,7 @@ import {
   pageSize,
   type TenantContext,
 } from '@hatti/api';
+import type { Language } from '@hatti/documents';
 import { toPublicId } from '@hatti/ids';
 import { money } from '@hatti/money';
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
@@ -30,6 +32,7 @@ import {
   PurchaseOrder,
   PurchaseOrderConnection,
   PurchaseOrderCreateInput,
+  PurchaseOrderDocument,
   PurchaseOrderEdge,
   PurchaseOrderLine,
   PurchaseOrderPayload,
@@ -125,6 +128,28 @@ export class PurchaseOrderResolver {
   ): Promise<PurchaseOrder | null> {
     const record = await this.service.get(tenant, uuidOf('purchaseOrder', id));
     return record ? toPurchaseOrder(record, tenant) : null;
+  }
+
+  @Query(() => PurchaseOrderDocument, {
+    nullable: true,
+    description:
+      'A purchase order as a page to print or save for its supplier: the shop, the order and ' +
+      'its date, where the goods go and by when, and each line with what it costs where the ' +
+      'shop said; in English and Urdu by default. Null if the shop has no such order.',
+  })
+  @RequireScopes('read_inventory')
+  async purchaseOrderDocument(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('language', { type: () => DocumentLanguage, defaultValue: DocumentLanguage.BILINGUAL })
+    language: DocumentLanguage,
+  ): Promise<PurchaseOrderDocument | null> {
+    const document = await this.service.document(
+      tenant,
+      uuidOf('purchaseOrder', id),
+      language.toLowerCase() as Language,
+    );
+    return document ? Object.assign(new PurchaseOrderDocument(), document) : null;
   }
 
   @Query(() => PurchaseOrderConnection, { description: 'Purchase orders, the newest first.' })

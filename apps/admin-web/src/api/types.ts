@@ -2559,3 +2559,7 @@ export interface Supplier {
 export interface SuppliersData {
   suppliers: Supplier[];
 }
+
+export interface PurchaseOrderDocumentData {
+  purchaseOrderDocument: { html: string; title: string; fileName: string } | null;
+}
