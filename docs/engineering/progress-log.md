@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### Products acted on many at once, in the core and the admin
+### 5df365c · Products acted on many at once, in the core and the admin
 
 * **`productBulkUpdateStatus`, `productBulkAddTags`, `productBulkRemoveTags` and
   `productBulkDelete`** ([ADR-344](../architecture/13-decision-log.md#adr-344--products-are-shown-hidden-or-archived-tagged-untagged-and-deleted-many-at-once-as-orders-are-up-to-250-each-in-its-own-transaction-as-it-would-be-alone-one-refused-said-at-its-place-in-the-ids-while-the-rest-are-done-the-products-list-chooses-them-and-puts-them-in-a-collection-made-by-hand-too)): up to 250 products, each in its own transaction as it would be
