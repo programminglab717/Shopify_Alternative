@@ -95,6 +95,15 @@ function core(role: StaffRole) {
             ],
           },
         };
+      case 'LocationMakePrimary':
+        locations = locations.map((each) => ({
+          ...each,
+          isPrimary: each.id === variables.locationId,
+        }));
+        return ok(
+          'locationMakePrimary',
+          locations.find((each) => each.id === variables.locationId),
+        );
       case 'LocationDelete':
         locations = locations.filter((each) => each.id !== variables.locationId);
         return { locationDelete: { deletedLocationId: variables.locationId, userErrors: [] } };
@@ -178,5 +187,25 @@ describe("The shop's locations", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.queryByText('Karachi Clifton shop')).toBeNull());
     expect(sentOf(fake, 'LocationDelete')).toEqual([{ locationId: 'loc_2' }]);
+  });
+
+  it('makes another active location the primary one', async () => {
+    const fake = core('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/locations');
+
+    await screen.findByText('12 Mall Road, Lahore 54000, Punjab');
+    expect(
+      screen.queryByRole('button', { name: 'Make Lahore warehouse the primary location' }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Make Karachi shop the primary location' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'LocationMakePrimary')).toEqual([{ locationId: 'loc_2' }]),
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Make Lahore warehouse the primary location' }),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Delete Lahore warehouse' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Delete Karachi shop' })).toBeNull();
   });
 });

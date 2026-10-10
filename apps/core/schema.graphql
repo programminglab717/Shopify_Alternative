@@ -4347,6 +4347,11 @@ type LocationEditPayload {
   userErrors: [UserError!]!
 }
 
+type LocationMakePrimaryPayload {
+  location: Location
+  userErrors: [UserError!]!
+}
+
 """
 A parcel the courier lost, with its worth and its claim: the longest lost come first, for following the claims up.
 """
@@ -5557,6 +5562,11 @@ type Mutation {
   """Deletes a location that never held stock; deactivate others instead."""
   locationDelete(locationId: ID!): LocationDeletePayload!
   locationEdit(id: ID!, input: LocationEditInput!): LocationEditPayload!
+
+  """
+  Makes an active location the shop's primary one, where stock is counted in the admin and orders ship from when none has all of an order; the one before stops being it.
+  """
+  locationMakePrimary(locationId: ID!): LocationMakePrimaryPayload!
 
   """
   A new menu, which the storefront publishes a moment later. Its handle names it to themes.
@@ -9101,7 +9111,9 @@ type Query {
   """A location by ID, or the primary location when no ID is given."""
   location(id: ID): Location
 
-  """Locations in the order they were added; the first is primary."""
+  """
+  Locations in the order they were added; the first is primary until another is made so.
+  """
   locations(
     after: String
 

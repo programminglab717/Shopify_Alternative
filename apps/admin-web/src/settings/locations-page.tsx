@@ -1,4 +1,4 @@
-import { Pencil, Plus, Power, PowerOff, Save, Trash2, Warehouse } from 'lucide-react';
+import { Pencil, Plus, Power, PowerOff, Save, Star, Trash2, Warehouse } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -7,6 +7,7 @@ import {
   LocationDeactivateMutation,
   LocationDeleteMutation,
   LocationEditMutation,
+  LocationMakePrimaryMutation,
   ShopLocationsQuery,
 } from '../api/operations';
 import type { LocationPayloadData, ShopLocation, ShopLocationsData, UserError } from '../api/types';
@@ -185,6 +186,9 @@ function LocationRow({ location }: { location: ShopLocation }) {
   const activate = useAdminMutation<LocationPayloadData, { locationId: string }>(
     LocationActivateMutation,
   );
+  const makePrimary = useAdminMutation<LocationPayloadData, { locationId: string }>(
+    LocationMakePrimaryMutation,
+  );
   const remove = useAdminMutation<
     { locationDelete: { deletedLocationId: string | null; userErrors: UserError[] } },
     { locationId: string }
@@ -273,6 +277,23 @@ function LocationRow({ location }: { location: ShopLocation }) {
           >
             {t('locations.edit')}
           </Button>
+          {!location.isPrimary && location.isActive && (
+            <Button
+              variant="tertiary"
+              busy={makePrimary.isPending}
+              icon={<Star aria-hidden className="size-5" />}
+              aria-label={t('locations.makePrimaryOf', { name: location.name })}
+              onClick={() =>
+                void act(
+                  async () =>
+                    (await makePrimary.mutateAsync({ locationId: location.id }))
+                      .locationMakePrimary!.userErrors,
+                )
+              }
+            >
+              {t('locations.makePrimary')}
+            </Button>
+          )}
           {!location.isPrimary &&
             (location.isActive ? (
               <Button
@@ -324,7 +345,7 @@ function LocationRow({ location }: { location: ShopLocation }) {
  * The shop's locations (INV-01): its warehouses and shops, with their addresses and the number
  * couriers call for pickups, which of them fulfil online orders; added, changed, taken out of use
  * once they hold no stock and wait on no orders, put back, and deleted if they never held stock.
- * The primary one stays.
+ * The primary one stays, until another active one is made primary (ADR-357).
  */
 export function LocationsPage() {
   const { t } = useLocale();

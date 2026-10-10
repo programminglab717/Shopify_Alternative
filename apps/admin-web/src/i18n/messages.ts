@@ -3111,6 +3111,8 @@ const en = {
   'shipsFrom.save': 'Move its stock there',
   'shipsFrom.hint': 'Until it is packed, its stock can be set aside at another location instead.',
   'shipsFrom.all': 'Every location',
+  'locations.makePrimary': 'Make primary',
+  'locations.makePrimaryOf': 'Make {name} the primary location',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6197,6 +6199,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'shipsFrom.save': 'اس کا اسٹاک وہاں منتقل کریں',
   'shipsFrom.hint': 'پیک ہونے تک، اس کا اسٹاک کسی اور جگہ الگ رکھا جا سکتا ہے۔',
   'shipsFrom.all': 'ہر جگہ',
+  'locations.makePrimary': 'بنیادی بنائیں',
+  'locations.makePrimaryOf': '{name} کو بنیادی جگہ بنائیں',
 };
 
 export const messages: Readonly<

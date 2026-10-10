@@ -5675,6 +5675,22 @@ export const LocationDeactivateMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** Another location made the primary one (ADR-357). */
+export const LocationMakePrimaryMutation = /* GraphQL */ `
+  mutation LocationMakePrimary($locationId: ID!) {
+    locationMakePrimary(locationId: $locationId) {
+      location {
+        ...ShopLocationParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SHOP_LOCATION}
+  ${USER_ERRORS}
+`;
+
 /** A location put back in use. */
 export const LocationActivateMutation = /* GraphQL */ `
   mutation LocationActivate($locationId: ID!) {

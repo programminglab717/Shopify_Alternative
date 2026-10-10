@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-356 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-357 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -364,6 +364,7 @@
 | 354 | What runs low is ordered from the stock page: each low variant with what of it is on order and who supplied it last, those chosen opening a new purchase order filled in with enough of each for twice the low mark, from the supplier most came from, at the cost paid last | Accepted |
 | 355 | An order ships from the first location fulfilling online orders that has all of it, the primary first, or the primary; and from another chosen on its page until it is packed, its stock committed there and let go where it was in one change | Accepted |
 | 356 | The orders each location ships: a location_id filter in the orders search, stage counts by location, and the admin's orders list by the location chosen, kept in the browser | Accepted |
+| 357 | Another active location is made the shop's primary one, from the admin's location settings, the one before no longer it, both locked in one change | Accepted |
 
 ---
 
@@ -14170,3 +14171,29 @@
     here; a choice they make is enough until shops ask for more.
   * **The location as a saved search:** saved searches are shared by the shop, and a packer's
     place is theirs.
+
+## ADR-357 · Another active location is made the shop's primary one, from the admin's location settings, the one before no longer it, both locked in one change
+
+* **Context:**
+  * A shop's first location is its primary one (ADR-312): the admin counts stock there (ADR-267),
+    orders ship from it when none has all of an order (ADR-355), and it can be neither taken out
+    of use nor deleted. A shop that opened with its home as "Main location" and moved to a
+    warehouse was tied to the home (INV-01).
+  * Shopify lets a merchant change the default location in settings.
+* **Decision:**
+  * **`locationMakePrimary(locationId)`**, with `write_locations`: an active location becomes
+    primary and the one before stops being it, each a `location.updated` naming `isPrimary`.
+    Both rows are locked in the order of their IDs, as every writer locks locations, and the
+    one-primary index holds throughout. The primary again changes nothing; one out of use is
+    refused, to be put back in use first.
+  * **The storefront is not rebuilt**: what a product has for sale online does not depend on
+    which location is primary.
+  * **In the admin**, "Make primary" on every other active location in settings; the one before
+    can then be taken out of use or deleted as any other.
+* **Consequences:**
+  * A shop moves its main stock to a warehouse without losing its history at the first place.
+  * A primary need not fulfil online orders; orders fall back to it all the same when no location
+    that does has all of one, and are refused there if short.
+* **Alternatives:**
+  * **The primary as the location fulfilling online orders, chosen for the shop:** shops decide
+    where their stock is counted; the two are separate settings.

@@ -132,7 +132,7 @@ export class LocationService {
     @Optional() private readonly allowance?: PlanAllowance,
   ) {}
 
-  /** Locations in the order they were added, the first being primary. */
+  /** Locations in the order they were added; the first is primary until another is made so. */
   async list(tenant: TenantContext, options: ListLocationsOptions): Promise<Page<LocationRecord>> {
     return this.db.tenant(tenant.shopId, async (tx) => {
       await ensurePrimaryLocation(tx, tenant.shopId);
@@ -392,6 +392,37 @@ export class LocationService {
         ['isActive'],
       );
       return { ok: true, value };
+    });
+  }
+
+  /**
+   * Makes an active location the shop's primary one (ADR-357): the one stock is counted at in the
+   * admin, and orders ship from where none has all of an order. The one before stops being it.
+   * Both are locked, in the order of their IDs, as every writer locks locations.
+   */
+  async makePrimary(tenant: TenantContext, id: string): Promise<MutationResult<LocationRecord>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { shopId } = tenant;
+      const current = await ensurePrimaryLocation(tx, shopId);
+      const rows = new Map<string, LocationRow>();
+      for (const each of [current.id, id].sort()) {
+        const row = await this.#lock(tx, shopId, each);
+        if (row) rows.set(each, row);
+      }
+      const row = rows.get(id);
+      if (!row) return failOne(['locationId'], 'NOT_FOUND', 'Location not found');
+      if (row.isPrimary) return { ok: true, value: toLocationRecord(row) };
+      if (!row.isActive) {
+        return failOne(['locationId'], 'INVALID', 'Activate the location before making it primary');
+      }
+      const before = rows.get(current.id);
+      if (before?.isPrimary) {
+        await this.#update(tx, shopId, before, { isPrimary: false }, ['isPrimary']);
+      }
+      return {
+        ok: true,
+        value: await this.#update(tx, shopId, row, { isPrimary: true }, ['isPrimary']),
+      };
     });
   }
 

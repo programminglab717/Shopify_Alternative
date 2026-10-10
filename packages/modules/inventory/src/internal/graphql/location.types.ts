@@ -201,6 +201,15 @@ export class LocationActivatePayload {
 }
 
 @ObjectType()
+export class LocationMakePrimaryPayload {
+  @Field(() => Location, { nullable: true })
+  location!: Location | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
 export class LocationDeletePayload {
   @Field(() => ID, { nullable: true })
   deletedLocationId!: string | null;

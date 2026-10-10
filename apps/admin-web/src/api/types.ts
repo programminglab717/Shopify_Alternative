@@ -2421,6 +2421,7 @@ export interface LocationPayloadData {
   locationEdit?: { location: ShopLocation | null; userErrors: UserError[] };
   locationDeactivate?: { location: ShopLocation | null; userErrors: UserError[] };
   locationActivate?: { location: ShopLocation | null; userErrors: UserError[] };
+  locationMakePrimary?: { location: ShopLocation | null; userErrors: UserError[] };
 }
 
 export interface SavedSearch {

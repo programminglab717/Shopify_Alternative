@@ -19,6 +19,7 @@ import {
   LocationDeletePayload,
   LocationEditInput,
   LocationEditPayload,
+  LocationMakePrimaryPayload,
   LocationsArgs,
 } from './location.types.js';
 import { toLocation, toLocationConnection, uuidOf } from './mappers.js';
@@ -43,7 +44,8 @@ export class LocationResolver {
   }
 
   @Query(() => LocationConnection, {
-    description: 'Locations in the order they were added; the first is primary.',
+    description:
+      'Locations in the order they were added; the first is primary until another is made so.',
   })
   @RequireScopes('read_locations')
   async locations(
@@ -113,6 +115,23 @@ export class LocationResolver {
   ): Promise<LocationActivatePayload> {
     const result = await this.service.activate(tenant, uuidOf('location', locationId));
     return Object.assign(new LocationActivatePayload(), {
+      location: result.ok ? toLocation(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => LocationMakePrimaryPayload, {
+    description:
+      "Makes an active location the shop's primary one, where stock is counted in the admin and " +
+      'orders ship from when none has all of an order; the one before stops being it.',
+  })
+  @RequireScopes('write_locations')
+  async locationMakePrimary(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('locationId', { type: () => ID }) locationId: string,
+  ): Promise<LocationMakePrimaryPayload> {
+    const result = await this.service.makePrimary(tenant, uuidOf('location', locationId));
+    return Object.assign(new LocationMakePrimaryPayload(), {
       location: result.ok ? toLocation(result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });

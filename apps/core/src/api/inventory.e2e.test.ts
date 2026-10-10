@@ -232,6 +232,23 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       userErrors: [{ field: ['locationId'], code: 'INVALID' }],
     });
 
+    // Another made primary, and back (ADR-357).
+    const MAKE_PRIMARY = `mutation ($id: ID!) {
+      locationMakePrimary(locationId: $id) { location { name isPrimary } userErrors { code } }
+    }`;
+    expect(await mutate(tokens.a, MAKE_PRIMARY, { id: storeId })).toEqual({
+      location: { name: 'Tariq Road store', isPrimary: true },
+      userErrors: [],
+    });
+    expect((await gql(tokens.a, '{ location { name } }')).data?.location).toEqual({
+      name: 'Tariq Road store',
+    });
+    const readOnly = await gql(tokens.aStockReader, MAKE_PRIMARY, { id: storeId });
+    expect(readOnly.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+    expect(
+      (await mutate(tokens.a, MAKE_PRIMARY, { id: primary.data?.location.id })).location,
+    ).toEqual({ name: 'Main location', isPrimary: true });
+
     const deactivated = await mutate(
       tokens.a,
       `mutation ($id: ID!) { locationDeactivate(locationId: $id) { location { isActive deactivatedAt } userErrors { code } } }`,

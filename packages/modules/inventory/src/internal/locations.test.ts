@@ -219,6 +219,40 @@ describe.skipIf(!server)('LocationService', () => {
     unwrap(await stock(1));
   });
 
+  it('makes another active location the primary one, the one before no longer it', async () => {
+    const warehouse = await f.location(f.a, 'Warehouse');
+    const store = await f.location(f.a, 'Store');
+    const closed = await f.location(f.a, 'Closed');
+    unwrap(await f.locations.deactivate(f.a, closed.id));
+    await f.admin.query('DELETE FROM platform.outbox_events');
+
+    const made = unwrap(await f.locations.makePrimary(f.a, store.id));
+    expect(made).toMatchObject({ id: store.id, isPrimary: true, version: 2 });
+    expect((await f.locations.primary(f.a)).id).toBe(store.id);
+    const { items } = await f.locations.list(f.a, { first: 10 });
+    expect(items.map((each) => [each.name, each.isPrimary])).toEqual([
+      ['Warehouse', false],
+      ['Store', true],
+    ]);
+    expect((await f.outbox()).map((event) => [event.event_type, event.payload])).toEqual([
+      ['location.updated', { changed: ['isPrimary'], version: 2 }],
+      ['location.updated', { changed: ['isPrimary'], version: 2 }],
+    ]);
+    // The primary again changes nothing; one out of use, missing or another shop's is refused.
+    expect(unwrap(await f.locations.makePrimary(f.a, store.id)).version).toBe(2);
+    expect(errorsOf(await f.locations.makePrimary(f.a, closed.id))).toEqual([
+      ['locationId', 'INVALID'],
+    ]);
+    expect(errorsOf(await f.locations.makePrimary(f.a, newId()))).toEqual([
+      ['locationId', 'NOT_FOUND'],
+    ]);
+    expect(errorsOf(await f.locations.makePrimary(f.b, warehouse.id))).toEqual([
+      ['locationId', 'NOT_FOUND'],
+    ]);
+    // The warehouse, no longer primary, can be taken out of use.
+    unwrap(await f.locations.deactivate(f.a, warehouse.id));
+  });
+
   it('deletes only a location that never held stock', async () => {
     const primary = await f.location(f.a, 'Warehouse');
     const unused = await f.location(f.a, 'Unused');

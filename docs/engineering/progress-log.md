@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, another location made the primary, in the admin** (INV-01): the shop's primary
-location changed in its locations' settings, the one stock is counted at and orders fall back
-to; then section by section as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, the home's counts for one location, in the admin** (INV-10, ANL-01): the home's orders to
+confirm, pack and book counted for the location chosen on the orders list, so a branch sees its
+own day; then section by section as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### Another location made the primary, in the core and the admin
+
+* **Made primary** ([ADR-357](../architecture/13-decision-log.md#adr-357--another-active-location-is-made-the-shops-primary-one-from-the-admins-location-settings-the-one-before-no-longer-it-both-locked-in-one-change)): `locationMakePrimary` makes an active location the shop's primary
+  one, the one before no longer it, both locked in one change. Every other active location in
+  the admin's settings has "Make primary"; the one before can then be taken out of use.
+* **Tried in Chromium against the core:** on the seed's shop, Karachi store was made primary from
+  settings, the badge and the core's default location following, and Lahore warehouse made
+  primary again the same way. No errors in the browser.
+* 2489 tests: another location made primary, and refused for one out of use, missing or
+  another shop's, in the inventory module; through the Admin API; in the admin, from settings.
 
 ### 39596c1 · The orders each location ships, in the core and the admin
 
