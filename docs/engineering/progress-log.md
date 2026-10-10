@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### Product types and brands suggested, and a redirect changed in place, in the admin
+### 6881494 · Product types and brands suggested, and a redirect changed in place, in the admin
 
 * **Types and brands** ([ADR-341](../architecture/13-decision-log.md#adr-341--a-products-type-and-brand-are-offered-from-those-the-shop-already-uses-as-they-are-typed-and-a-redirects-old-address-or-where-it-goes-is-changed-in-place)): the product form's Type and Brand fields offer the shop's own as
   they are typed, the most used first; anything new is typed as before.
