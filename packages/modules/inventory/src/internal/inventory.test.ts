@@ -4,7 +4,11 @@ import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { AdjustQuantitiesInput, SetQuantitiesInput } from './inventory.service.js';
+import type {
+  AdjustQuantitiesInput,
+  InventoryMoveInput,
+  SetQuantitiesInput,
+} from './inventory.service.js';
 import { availableForSale, sellableQuantity, untrackedItem } from './item-store.js';
 import type { LocationRecord } from './records.js';
 import { LIMITS } from './rules.js';
@@ -34,6 +38,14 @@ describe.skipIf(!server)('InventoryService', () => {
     extra: Partial<AdjustQuantitiesInput> = {},
   ) =>
     f.inventory.adjustQuantities(f.a, { name: 'available', reason: 'received', changes, ...extra });
+  const move = (variantId: string, quantity: number, from: LocationRecord, to: LocationRecord) => ({
+    inventoryItemId: variantId,
+    quantity,
+    from: { locationId: from.id, name: 'available' },
+    to: { locationId: to.id, name: 'available' },
+  });
+  const moveAll = (changes: InventoryMoveInput[]) =>
+    f.inventory.moveQuantities(f.a, { reason: 'movement_created', changes });
   const item = async (variantId: string) => (await f.inventory.item(f.a, variantId))!;
   const levelAt = async (variantId: string, location: LocationRecord) =>
     (await item(variantId)).levels.find((level) => level.location.id === location.id);
@@ -231,6 +243,82 @@ describe.skipIf(!server)('InventoryService', () => {
       ]),
     );
     expect((await levelAt(variants[0]!, warehouse))?.available).toBe(8);
+  });
+
+  it('moves stock between locations in one adjustment, never more than is available', async () => {
+    unwrap(await set([{ inventoryItemId: variants[0]!, locationId: warehouse.id, quantity: 10 }]));
+    unwrap(
+      await set([{ inventoryItemId: variants[0]!, locationId: warehouse.id, quantity: 2 }], {
+        name: 'safety_stock',
+        reason: 'safety_stock',
+      }),
+    );
+    const group = unwrap(
+      await f.inventory.moveQuantities(f.a, {
+        reason: 'movement_created',
+        referenceDocumentUri: 'https://erp.example.com/transfers/7',
+        changes: [move(variants[0]!, 5, warehouse, store)],
+      }),
+    )!;
+    expect(group).toMatchObject({
+      reason: 'movement_created',
+      referenceDocumentUri: 'https://erp.example.com/transfers/7',
+    });
+    expect(
+      group.changes.map((change) => [change.location.name, change.name, change.delta]),
+    ).toEqual([
+      ['Warehouse', 'on_hand', -5],
+      ['Store', 'on_hand', 5],
+    ]);
+    expect(await levelAt(variants[0]!, warehouse)).toMatchObject({ onHand: 5, available: 3 });
+    expect(await levelAt(variants[0]!, store)).toMatchObject({ onHand: 5, available: 5 });
+
+    // Safety stock is not sent: only 3 of the 5 on hand are available.
+    const tooMany = await moveAll([move(variants[0]!, 4, warehouse, store)]);
+    expect(errorsOf(tooMany)).toEqual([['input.changes.0.quantity', 'INVALID']]);
+    expect(!tooMany.ok && tooMany.errors[0]!.message).toBe(
+      "Only 3 available at the location it's moved from; can't move 4",
+    );
+    // All moves apply or none: a size never stocked can't be sent, so the other stays too.
+    expect(
+      errorsOf(
+        await moveAll([
+          move(variants[0]!, 2, store, warehouse),
+          move(variants[1]!, 1, warehouse, store),
+        ]),
+      ),
+    ).toEqual([['input.changes.1.quantity', 'INVALID']]);
+    expect((await levelAt(variants[0]!, store))?.onHand).toBe(5);
+    expect(await levelAt(variants[1]!, store)).toBeUndefined();
+
+    expect(
+      errorsOf(
+        await f.inventory.moveQuantities(f.a, {
+          reason: 'theft',
+          changes: [
+            {
+              ...move(variants[0]!, 0, warehouse, store),
+              from: { locationId: warehouse.id, name: 'on_hand' },
+            },
+            move(variants[1]!, 1, store, store),
+            // Store and warehouse were named in the first already.
+            move(variants[0]!, 1, store, warehouse),
+          ],
+        }),
+      ),
+    ).toEqual([
+      ['input.reason', 'INVALID'],
+      ['input.changes.0.quantity', 'INVALID'],
+      ['input.changes.0.from.name', 'INVALID'],
+      ['input.changes.1.to.locationId', 'INVALID'],
+      ['input.changes.2.from', 'INVALID'],
+      ['input.changes.2.to', 'INVALID'],
+    ]);
+    expect(errorsOf(await moveAll([]))).toEqual([['input.changes', 'BLANK']]);
+    // An unknown item is reported once, not at both ends.
+    expect(errorsOf(await moveAll([move(newId(), 1, warehouse, store)]))).toEqual([
+      ['input.changes.0.inventoryItemId', 'NOT_FOUND'],
+    ]);
   });
 
   it('checks input before touching the database', async () => {

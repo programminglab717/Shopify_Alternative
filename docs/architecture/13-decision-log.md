@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-346 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-347 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -354,6 +354,7 @@
 | 344 | Products are shown, hidden or archived, tagged, untagged and deleted many at once, as orders are: up to 250, each in its own transaction as it would be alone, one refused said at its place in the IDs while the rest are done; the products list chooses them, and puts them in a collection made by hand too | Accepted |
 | 345 | Customers are tagged and untagged many at once, as orders and products are: up to 250, each in its own transaction, one refused said at its place; their marketing consent is not, as each customer gives or withdraws their own | Accepted |
 | 346 | The admin shows a variant's whole stock history as the core keeps it: its latest changes with its stock, older ones a page at a time as asked, at every location or the one chosen, each with what was left and a link to the order it was for | Accepted |
+| 347 | Stock moves between a shop's locations as Shopify's inventoryMoveQuantities: each move takes from on hand where it leaves, no more than is available there, and adds to on hand where it arrives, in one adjustment; the admin moves a variant's stock from its level to another location | Accepted |
 
 ---
 
@@ -13849,3 +13850,37 @@
   * **Every change at once:** a variant sold for a year has thousands.
   * **The order's name on each line:** the core would join orders for every change; the link
     opens it.
+
+## ADR-347 · Stock moves between a shop's locations as Shopify's inventoryMoveQuantities: each move takes from on hand where it leaves, no more than is available there, and adds to on hand where it arrives, in one adjustment; the admin moves a variant's stock from its level to another location
+
+* **Context:**
+  * Shops in the alpha keep stock in a warehouse and sell from a shop as well (INV-04). Sending
+    ten suits across was two adjustments: taken away at one, added at the other, each with a
+    reason that was not quite right, and nothing tying them together.
+  * Shopify's `inventoryMoveQuantities` moves a quantity from one location, and one quantity
+    name, to another, with a reason and a reference.
+* **Decision:**
+  * **`inventoryMoveQuantities`** in the Admin API, shaped as Shopify's: changes of an item, a
+    quantity of 1 or more, and `from` and `to` each a location and the name `available`, the only
+    one Hatti has to move between. Up to 250 moves, all applied or none, with an Idempotency-Key
+    header and `write_inventory`.
+  * **What leaves** comes off on hand where it leaves, and no more than is available there: what
+    orders are owed and safety stock stay. **What arrives** goes on hand where it arrives; a
+    level there is made if there was none.
+  * **One adjustment** holds both sides, with the reason `movement_created`, as Shopify's, or any
+    reason an adjustment takes, and a reference if given. History shows each side at its
+    location as "moved".
+  * **Refused:** a move to the same location; a location named twice for an item across the
+    moves, since one write changes each level once; an unknown item, said once.
+  * **In the admin**, a level with stock for sale offers "Move" to those who change stock: how
+    many, no more than is for sale there, and to which of the shop's other active locations; a
+    shop with one location is told to add one, with a link.
+* **Consequences:**
+  * A warehouse's stock sent to the shop is one change, at both ends, in the history of each.
+  * Not yet: stock on its way, sent but not yet received (Shopify's transfers, with "incoming"
+    and "reserved" quantities); a move of many variants at once in the admin.
+* **Alternatives:**
+  * **Two adjustments in one request:** the history would not say the stock moved, and either
+    could take from what orders are owed.
+  * **Transfers with a stage in between:** the alpha's shops send stock across a city in a day;
+    a quantity on its way is for when shops ask.

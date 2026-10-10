@@ -5,13 +5,16 @@ import type { FormEvent, ReactNode } from 'react';
 import {
   InventoryAdjustMutation,
   InventoryItemQuery,
+  InventoryMoveMutation,
   InventorySetQuantitiesMutation,
   InventorySettingsUpdateMutation,
+  LocationsQuery,
   LowStockQuery,
   StockSearchQuery,
 } from '../api/operations';
 import type {
   InventoryItemData,
+  LocationsData,
   LowStockData,
   StockLevel,
   StockSearchData,
@@ -170,6 +173,112 @@ function AdjustForm({
 }
 
 /**
+ * Stock sent from this location to another of the shop's, as from a warehouse to a shop: no
+ * more than is available here, so what orders are owed stays.
+ */
+function MoveForm({
+  itemId,
+  level,
+  onDone,
+}: {
+  itemId: string;
+  level: StockLevel;
+  onDone: () => void;
+}) {
+  const { t } = useLocale();
+  const shopId = useShop().id;
+  const locations = useAdminQuery<LocationsData>(['locations'], LocationsQuery);
+  const move = useAdminMutation<Mutated, { input: Record<string, unknown> }>(InventoryMoveMutation);
+  const { problem, attempt } = useAttempt();
+  const [count, setCount] = useState('');
+  const [chosen, setChosen] = useState('');
+  const units = parseStock(count);
+  const tooMany = units !== null && units > level.available;
+  if (locations.isPending) return <Loading label={t('state.loading')} />;
+  if (locations.isError) return <Alert tone="danger">{errorText(locations.error, t)}</Alert>;
+  const others = locations.data.locations.nodes.filter((each) => each.id !== level.location.id);
+  if (others.length === 0) {
+    return (
+      <div className="flex flex-col items-start gap-2">
+        <p className="text-secondary">{t('stock.moveNowhere')}</p>
+        <Link
+          to="/$shopId/settings/locations"
+          params={{ shopId }}
+          className="font-medium text-primary underline"
+        >
+          {t('stock.moveAddLocation')}
+        </Link>
+        <Button variant="tertiary" onClick={onDone}>
+          {t('returns.cancel')}
+        </Button>
+      </div>
+    );
+  }
+  const to = others.find((each) => each.id === chosen) ?? others[0]!;
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!units || tooMany) return;
+    const ok = await attempt(
+      async () =>
+        Object.values(
+          await move.mutateAsync({
+            input: {
+              reason: 'movement_created',
+              changes: [
+                {
+                  inventoryItemId: itemId,
+                  quantity: units,
+                  from: { locationId: level.location.id, name: 'available' },
+                  to: { locationId: to.id, name: 'available' },
+                },
+              ],
+            },
+          }),
+        )[0]!,
+    );
+    if (ok) onDone();
+  };
+
+  return (
+    <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-end gap-3">
+        <TextField
+          label={t('stock.howMany')}
+          inputMode="numeric"
+          ltr
+          className="w-28"
+          value={count}
+          error={
+            count.trim() && !units
+              ? t('stock.badCount')
+              : tooMany
+                ? t('stock.moveTooMany', { count: formatCount(level.available) })
+                : null
+          }
+          onChange={(event) => setCount(event.target.value)}
+        />
+        <SelectField
+          label={t('stock.moveTo')}
+          value={to.id}
+          options={others.map((each) => ({ value: each.id, label: each.name }))}
+          onChange={setChosen}
+        />
+      </div>
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" busy={move.isPending} disabled={!units || tooMany}>
+          {t('stock.moveSubmit', { count: formatCount(units ?? 0), location: to.name })}
+        </Button>
+        <Button variant="tertiary" onClick={onDone}>
+          {t('returns.cancel')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/**
  * What a count found on the shelf, set as on hand; refused, and said so, if stock moved since it
  * was read, as an order took some.
  */
@@ -245,7 +354,7 @@ function CountForm({
 function Level({ itemId, level }: { itemId: string; level: StockLevel }) {
   const { t } = useLocale();
   const { role } = useShop();
-  const [open, setOpen] = useState<'adjust' | 'count' | null>(null);
+  const [open, setOpen] = useState<'adjust' | 'count' | 'move' | null>(null);
   const edits = EDITS_STOCK.includes(role);
   const figures: [MessageKey, number][] = [
     ['stock.onHand', level.onHand],
@@ -285,8 +394,14 @@ function Level({ itemId, level }: { itemId: string; level: StockLevel }) {
           <Button variant="secondary" onClick={() => setOpen('count')}>
             {t('stock.count')}
           </Button>
+          {level.available > 0 && (
+            <Button variant="secondary" onClick={() => setOpen('move')}>
+              {t('stock.move')}
+            </Button>
+          )}
         </div>
       )}
+      {open === 'move' && <MoveForm itemId={itemId} level={level} onDone={() => setOpen(null)} />}
       {open === 'adjust' && (
         <AdjustForm itemId={itemId} level={level} onDone={() => setOpen(null)} />
       )}

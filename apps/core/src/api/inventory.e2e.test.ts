@@ -451,6 +451,85 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     ]);
   });
 
+  it('moves stock from a warehouse to a shop in one change (ADR-347)', async () => {
+    const warehouse = (
+      await addLocation(tokens.a, { name: 'Sialkot warehouse', address: { city: 'Sialkot' } })
+    ).location;
+    const shop = (
+      await addLocation(tokens.a, { name: 'Gulberg shop', address: { city: 'Lahore' } })
+    ).location;
+    const [ball] = (await stockedProduct(tokens.a, 'Football', ['5'])).variants.map(
+      (variant) => variant.inventoryItem.id,
+    );
+    const counted = await mutate(tokens.a, SET_QUANTITIES, {
+      input: {
+        name: 'available',
+        reason: 'cycle_count_available',
+        quantities: [{ inventoryItemId: ball, locationId: warehouse.id, quantity: 20 }],
+      },
+    });
+    expect(counted.userErrors).toEqual([]);
+
+    const MOVE = `
+      mutation ($input: InventoryMoveQuantitiesInput!) {
+        inventoryMoveQuantities(input: $input) {
+          inventoryAdjustmentGroup {
+            reason referenceDocumentUri
+            changes { name delta quantityAfterChange location { name } }
+          }
+          userErrors { field code message }
+        }
+      }`;
+    const sent = (quantity: number) => ({
+      input: {
+        reason: 'movement_created',
+        referenceDocumentUri: 'hatti://transfers/1',
+        changes: [
+          {
+            inventoryItemId: ball,
+            quantity,
+            from: { locationId: warehouse.id, name: 'available' },
+            to: { locationId: shop.id, name: 'available' },
+          },
+        ],
+      },
+    });
+    expect(await mutate(tokens.a, MOVE, sent(8))).toEqual({
+      inventoryAdjustmentGroup: {
+        reason: 'movement_created',
+        referenceDocumentUri: 'hatti://transfers/1',
+        changes: [
+          {
+            name: 'on_hand',
+            delta: -8,
+            quantityAfterChange: 12,
+            location: { name: 'Sialkot warehouse' },
+          },
+          { name: 'on_hand', delta: 8, quantityAfterChange: 8, location: { name: 'Gulberg shop' } },
+        ],
+      },
+      userErrors: [],
+    });
+    expect(await mutate(tokens.a, MOVE, sent(13))).toEqual({
+      inventoryAdjustmentGroup: null,
+      userErrors: [
+        {
+          field: ['input', 'changes', '0', 'quantity'],
+          code: 'INVALID',
+          message: "Only 12 available at the location it's moved from; can't move 13",
+        },
+      ],
+    });
+    // Moving needs writing stock, and another shop's item isn't found.
+    const readOnly = await gql(tokens.aStockReader, MOVE, sent(1));
+    expect(readOnly.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+    expect((await mutate(tokens.b, MOVE, sent(1))).userErrors).toMatchObject([
+      { field: ['input', 'changes', '0', 'inventoryItemId'], code: 'NOT_FOUND' },
+      { field: ['input', 'changes', '0', 'from', 'locationId'], code: 'NOT_FOUND' },
+      { field: ['input', 'changes', '0', 'to', 'locationId'], code: 'NOT_FOUND' },
+    ]);
+  });
+
   it("duplicates a product, its variants' stock tracked as its are with none of it (ADR-343)", async () => {
     const warehouse = (
       await addLocation(tokens.a, { name: 'Multan warehouse', address: { city: 'Multan' } })

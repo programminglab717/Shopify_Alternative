@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, stock moved between locations, in the core and the admin** (INV-04): stock sent from a
-warehouse to a shop, taken from one location's on hand and added to the other's in one change,
-as Shopify's inventoryMoveQuantities; then section by section as the alpha's shops need them.
-Urdu handles wait, as decided.
+**Next, a variant found by its barcode, in the admin** (INV-07): on the stock page, a barcode
+scanned with the phone's camera, or typed, finds the variant to count, adjust or move it; then
+section by section as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### Stock moved between locations, in the core and the admin
+
+* **Moves** ([ADR-347](../architecture/13-decision-log.md#adr-347--stock-moves-between-a-shops-locations-as-shopifys-inventorymovequantities-each-move-takes-from-on-hand-where-it-leaves-no-more-than-is-available-there-and-adds-to-on-hand-where-it-arrives-in-one-adjustment-the-admin-moves-a-variants-stock-from-its-level-to-another-location)): `inventoryMoveQuantities`, as Shopify's, takes stock off on hand where it
+  leaves, no more than is available there, and adds it where it arrives, both in one adjustment
+  with the reason `movement_created`; all moves or none.
+* **In the admin:** a level with stock for sale offers "Move" to owners and managers, to any of
+  the shop's other active locations; a shop with one location is told to add one.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, "Lawn 3-Piece
+  Suit (Unstitched)" had 22 on hand at Lahore warehouse, 5 of them for orders; asking to move
+  100,000 said only 17 were available; 2 moved to Karachi store left 20 and 7 on hand, and the
+  history showed both sides as "moved". No errors in the browser.
+* 2440 tests: moves in the inventory module, through the Admin API with its scopes and
+  another shop's items not found, and in the admin, with the mutation checked against the core's
+  schema.
 
 ### 6b27026 · A variant's stock history, in the admin
 

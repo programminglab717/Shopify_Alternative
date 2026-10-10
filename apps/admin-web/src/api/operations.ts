@@ -3704,6 +3704,18 @@ export const InventoryAdjustMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** Stock sent from one location to another, taken from one's on hand and added to the other's. */
+export const InventoryMoveMutation = /* GraphQL */ `
+  mutation InventoryMove($input: InventoryMoveQuantitiesInput!) {
+    inventoryMoveQuantities(input: $input) {
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** What the shop calls low stock. */
 export const InventorySettingsUpdateMutation = /* GraphQL */ `
   mutation InventorySettingsUpdate($input: InventorySettingsInput!) {

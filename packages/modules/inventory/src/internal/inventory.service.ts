@@ -33,6 +33,7 @@ import type {
 import {
   ADJUSTMENT_REASONS,
   LIMITS,
+  MOVE_REASONS,
   SETTABLE_NAMES,
   isDocumentUri,
   type SettableName,
@@ -71,6 +72,28 @@ export interface SetQuantitiesInput {
   quantities: InventoryQuantityInput[];
 }
 
+/** One end of a move: where stock leaves or arrives, and which quantity. */
+export interface MoveTerminalInput {
+  locationId: string;
+  /** Only "available", as Hatti has no other quantity stock can move between. */
+  name: string;
+}
+
+export interface InventoryMoveInput {
+  inventoryItemId: string;
+  /** Units to move, 1 or more. */
+  quantity: number;
+  from: MoveTerminalInput;
+  to: MoveTerminalInput;
+}
+
+export interface MoveQuantitiesInput {
+  /** One of {@link MOVE_REASONS}. */
+  reason: string;
+  referenceDocumentUri?: string | null;
+  changes: InventoryMoveInput[];
+}
+
 export interface InventoryItemUpdateInput {
   tracked?: boolean | null;
   inventoryPolicy?: InventoryPolicyValue | null;
@@ -88,6 +111,8 @@ interface Target {
   variantId: string;
   locationId: string;
   field: string[];
+  /** Where an unknown item is reported, when not at `field`. */
+  itemField?: string[];
 }
 
 interface Header {
@@ -109,19 +134,33 @@ function checkHeader(check: InputChecker, input: AdjustQuantitiesInput | SetQuan
   if (!reason) {
     check.add(['input', 'reason'], 'INVALID', `must be one of: ${ADJUSTMENT_REASONS.join(', ')}`);
   }
-  const field = ['input', 'referenceDocumentUri'];
-  const referenceDocumentUri = check.text(field, input.referenceDocumentUri, { max: LIMITS.uri });
-  if (referenceDocumentUri !== null && !isDocumentUri(referenceDocumentUri)) {
-    check.add(field, 'INVALID', 'must be a URI with a scheme, like https://… or hatti://…');
-  }
+  const referenceDocumentUri = checkUri(check, input.referenceDocumentUri);
   return name && reason ? { name, reason, referenceDocumentUri } : null;
 }
 
-function checkTargets(check: InputChecker, listField: string[], targets: readonly Target[]): void {
-  if (targets.length === 0) check.add(listField, 'BLANK', 'must include at least one');
-  if (targets.length > LIMITS.changes) {
+function checkUri(check: InputChecker, value: string | null | undefined): string | null {
+  const field = ['input', 'referenceDocumentUri'];
+  const uri = check.text(field, value, { max: LIMITS.uri });
+  if (uri !== null && !isDocumentUri(uri)) {
+    check.add(field, 'INVALID', 'must be a URI with a scheme, like https://… or hatti://…');
+  }
+  return uri;
+}
+
+function checkCount(check: InputChecker, listField: string[], count: number): void {
+  if (count === 0) check.add(listField, 'BLANK', 'must include at least one');
+  if (count > LIMITS.changes) {
     check.add(listField, 'TOO_MANY', `can have at most ${LIMITS.changes}`);
   }
+}
+
+function checkTargets(check: InputChecker, listField: string[], targets: readonly Target[]): void {
+  checkCount(check, listField, targets.length);
+  checkRepeats(check, targets);
+}
+
+/** Refuses a level named twice: one write can change each level once. */
+function checkRepeats(check: InputChecker, targets: readonly Target[]): void {
   const seen = new Set<string>();
   for (const target of targets) {
     const key = levelKey(target.variantId, target.locationId);
@@ -381,6 +420,70 @@ export class InventoryService {
     });
   }
 
+  /**
+   * Moves stock between locations, like Shopify's inventoryMoveQuantities: goods sent from a
+   * warehouse to a shop. Each move takes from one location's on hand what is available there and
+   * adds it to the other's, in one adjustment. All moves apply, or none.
+   */
+  async moveQuantities(
+    tenant: TenantContext,
+    input: MoveQuantitiesInput,
+  ): Promise<MutationResult<AdjustmentGroupRecord | null>> {
+    const check = new InputChecker();
+    const reason = (MOVE_REASONS as readonly string[]).includes(input.reason) ? input.reason : null;
+    if (!reason) {
+      check.add(['input', 'reason'], 'INVALID', `must be one of: ${MOVE_REASONS.join(', ')}`);
+    }
+    const referenceDocumentUri = checkUri(check, input.referenceDocumentUri);
+    checkCount(check, ['input', 'changes'], input.changes.length);
+    const targets = input.changes.flatMap((change, index) => {
+      const field = ['input', 'changes', String(index)];
+      const quantityField = [...field, 'quantity'];
+      check.integer(quantityField, change.quantity, { min: 1, max: LIMITS.quantity });
+      for (const side of ['from', 'to'] as const) {
+        if (change[side].name !== 'available') {
+          check.add([...field, side, 'name'], 'INVALID', 'must be "available"');
+        }
+      }
+      if (change.from.locationId === change.to.locationId) {
+        check.addMessage(
+          [...field, 'to', 'locationId'],
+          'INVALID',
+          'Stock must move to a different location',
+        );
+        return [];
+      }
+      return (['from', 'to'] as const).map((side) => ({
+        variantId: change.inventoryItemId,
+        locationId: change[side].locationId,
+        field: [...field, side],
+        itemField: [...field, 'inventoryItemId'],
+        quantityField,
+        delta: side === 'from' ? -change.quantity : change.quantity,
+      }));
+    });
+    checkRepeats(check, targets);
+    if (!check.ok || !reason) return { ok: false, errors: check.errors };
+
+    const header = { name: 'available' as const, reason, referenceDocumentUri };
+    return this.#change(tenant, header, targets, (level, target, errors) => {
+      if (target.delta > 0) {
+        return levelChange(errors, target.quantityField, level, 'available', target.delta);
+      }
+      if (level.available < -target.delta) {
+        errors.push({
+          field: target.quantityField,
+          code: 'INVALID',
+          message:
+            `Only ${Math.max(0, level.available)} available at the location it's moved from; ` +
+            `can't move ${-target.delta}`,
+        });
+        return null;
+      }
+      return { level, onHand: target.delta, committed: 0, reserved: 0, safetyStock: 0 };
+    });
+  }
+
   /** Changes to an item's quantities, newest first. */
   async history(
     tenant: TenantContext,
@@ -515,13 +618,12 @@ export class InventoryService {
       );
     const active = new Map(found.map((location) => [location.id, location.isActive]));
     const errors: FieldError[] = [];
+    const unknownItems = new Set<string>();
     for (const target of targets) {
-      if (!productIds.has(target.variantId)) {
-        errors.push({
-          field: [...target.field, 'inventoryItemId'],
-          code: 'NOT_FOUND',
-          message: 'Inventory item not found',
-        });
+      const itemField = target.itemField ?? [...target.field, 'inventoryItemId'];
+      if (!productIds.has(target.variantId) && !unknownItems.has(itemField.join('.'))) {
+        unknownItems.add(itemField.join('.'));
+        errors.push({ field: itemField, code: 'NOT_FOUND', message: 'Inventory item not found' });
       }
       const isActive = active.get(target.locationId);
       if (isActive === undefined) {

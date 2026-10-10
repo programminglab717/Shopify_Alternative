@@ -3001,6 +3001,13 @@ const en = {
   'stock.after': '{count} after',
   'stock.itsOrder': 'Its order',
   'stock.olderChanges': 'Older changes',
+  'stock.move': 'Move',
+  'stock.moveTo': 'To',
+  'stock.moveSubmit': 'Move {count} to {location}',
+  'stock.moveTooMany': 'Only {count} are available here.',
+  'stock.moveNowhere': 'The shop has no other location to move stock to.',
+  'stock.moveAddLocation': 'Add a location',
+  'stock.reason.movement_created': 'moved',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5976,6 +5983,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'stock.after': 'بعد میں {count}',
   'stock.itsOrder': 'اس کا آرڈر',
   'stock.olderChanges': 'پرانی تبدیلیاں',
+  'stock.move': 'منتقل کریں',
+  'stock.moveTo': 'کہاں',
+  'stock.moveSubmit': '{count} کو {location} منتقل کریں',
+  'stock.moveTooMany': 'یہاں صرف {count} دستیاب ہیں۔',
+  'stock.moveNowhere': 'دکان کی کوئی اور جگہ نہیں جہاں اسٹاک منتقل ہو۔',
+  'stock.moveAddLocation': 'جگہ شامل کریں',
+  'stock.reason.movement_created': 'منتقل کیا گیا',
 };
 
 export const messages: Readonly<

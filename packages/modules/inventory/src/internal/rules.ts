@@ -41,6 +41,9 @@ export const ADJUSTMENT_REASONS = [
 ] as const;
 export type AdjustmentReason = (typeof ADJUSTMENT_REASONS)[number];
 
+/** Why stock moved between locations: sent, as in Shopify, or any reason for an adjustment. */
+export const MOVE_REASONS = ['movement_created', ...ADJUSTMENT_REASONS] as const;
+
 /** Reasons that checkouts and orders record through StockService. */
 export const STOCK_REASONS = {
   reserve: 'reserved',

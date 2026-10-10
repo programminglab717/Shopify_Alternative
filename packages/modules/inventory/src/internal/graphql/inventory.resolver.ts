@@ -23,6 +23,8 @@ import {
   InventoryItemInput,
   InventoryItemUpdatePayload,
   InventoryLevel,
+  InventoryMoveQuantitiesInput,
+  InventoryMoveQuantitiesPayload,
   InventorySetQuantitiesInput,
   InventorySetQuantitiesPayload,
 } from './inventory.types.js';
@@ -133,6 +135,37 @@ export class InventoryItemResolver {
       })),
     });
     return Object.assign(new InventoryAdjustQuantitiesPayload(), {
+      inventoryAdjustmentGroup: result.ok && result.value ? toAdjustmentGroup(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => InventoryMoveQuantitiesPayload, {
+    description:
+      'Moves stock between locations: goods sent from a warehouse to a shop. Each move takes ' +
+      'from on hand where it leaves, as much as is available there, and adds to on hand where ' +
+      'it arrives. All moves apply, or none. Needs an Idempotency-Key header.',
+  })
+  @RequireScopes('write_inventory')
+  @RequireIdempotencyKey()
+  async inventoryMoveQuantities(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('input') input: InventoryMoveQuantitiesInput,
+  ): Promise<InventoryMoveQuantitiesPayload> {
+    const terminal = (end: { locationId: string; name: string }) => ({
+      locationId: uuidOf('location', end.locationId),
+      name: end.name,
+    });
+    const result = await this.service.moveQuantities(tenant, {
+      ...input,
+      changes: input.changes.map((change) => ({
+        inventoryItemId: uuidOf('inventoryItem', change.inventoryItemId),
+        quantity: change.quantity,
+        from: terminal(change.from),
+        to: terminal(change.to),
+      })),
+    });
+    return Object.assign(new InventoryMoveQuantitiesPayload(), {
       inventoryAdjustmentGroup: result.ok && result.value ? toAdjustmentGroup(result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });

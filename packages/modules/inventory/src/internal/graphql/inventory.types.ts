@@ -9,7 +9,7 @@ import {
   ObjectType,
   registerEnumType,
 } from '@nestjs/graphql';
-import { ADJUSTMENT_REASONS, SETTABLE_NAMES } from '../rules.js';
+import { ADJUSTMENT_REASONS, MOVE_REASONS, SETTABLE_NAMES } from '../rules.js';
 import { Location } from './location.types.js';
 
 export enum InventoryPolicy {
@@ -240,6 +240,50 @@ export class InventorySetQuantitiesInput {
   quantities!: InventoryQuantityInput[];
 }
 
+@InputType({ description: 'One end of a move: where stock leaves or arrives.' })
+export class InventoryMoveQuantityTerminalInput {
+  @Field(() => ID)
+  locationId!: string;
+
+  @Field({ description: 'Which quantity: only "available".' })
+  name!: string;
+}
+
+@InputType()
+export class InventoryMoveQuantityChange {
+  @Field(() => ID)
+  inventoryItemId!: string;
+
+  @Field(() => Int, { description: 'Units to move, 1 or more.' })
+  quantity!: number;
+
+  @Field(() => InventoryMoveQuantityTerminalInput, {
+    description: 'Where it leaves: as much must be available there.',
+  })
+  from!: InventoryMoveQuantityTerminalInput;
+
+  @Field(() => InventoryMoveQuantityTerminalInput, {
+    description: 'Where it arrives: another location.',
+  })
+  to!: InventoryMoveQuantityTerminalInput;
+}
+
+@InputType()
+export class InventoryMoveQuantitiesInput {
+  @Field({
+    description: `Why: ${MOVE_REASONS.map((reason) => `"${reason}"`).join(', ')}.`,
+  })
+  reason!: string;
+
+  @Field(() => String, { nullable: true, description: URI_DESCRIPTION })
+  referenceDocumentUri?: string | null;
+
+  @Field(() => [InventoryMoveQuantityChange], {
+    description: 'Up to 250; each item and location once.',
+  })
+  changes!: InventoryMoveQuantityChange[];
+}
+
 @ObjectType()
 export class InventoryItemUpdatePayload {
   @Field(() => InventoryItem, { nullable: true })
@@ -266,6 +310,18 @@ export class InventorySetQuantitiesPayload {
   @Field(() => InventoryAdjustmentGroup, {
     nullable: true,
     description: 'Null when there were errors, or nothing changed.',
+  })
+  inventoryAdjustmentGroup!: InventoryAdjustmentGroup | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class InventoryMoveQuantitiesPayload {
+  @Field(() => InventoryAdjustmentGroup, {
+    nullable: true,
+    description: 'Null when there were errors.',
   })
   inventoryAdjustmentGroup!: InventoryAdjustmentGroup | null;
 

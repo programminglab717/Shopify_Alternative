@@ -61,9 +61,19 @@ function item(id: string) {
   };
 }
 
-function core(role: StaffRole) {
+const SHOP = { id: 'loc_2', name: 'Gulberg shop' };
+
+function core(role: StaffRole, places = [MAIN, SHOP]) {
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
+      case 'Locations':
+        return {
+          locations: {
+            nodes: places.map((place) => ({ ...place, isPrimary: place.id === MAIN.id })),
+          },
+        };
+      case 'InventoryMove':
+        return { inventoryMoveQuantities: { userErrors: [] } };
       case 'LowStock':
         return {
           inventorySettings: { lowStockThreshold: 5 },
@@ -176,6 +186,51 @@ describe('Stock', () => {
     );
   });
 
+  it('moves stock to another location, no more than is available, or says to add one', async () => {
+    const fake = core('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/stock');
+
+    const low = await screen.findByRole('region', { name: 'Running low' });
+    fireEvent.click(within(low).getByRole('button', { name: 'Show the stock of Lawn suit · M' }));
+    fireEvent.click(await within(low).findByRole('button', { name: 'Move' }));
+    // Only other locations are offered; 2 of the 4 on hand are owed to orders.
+    const to = (await within(low).findByLabelText('To')) as HTMLSelectElement;
+    expect([...to.options].map((option) => option.text)).toEqual(['Gulberg shop']);
+    type('How many', '3');
+    expect(within(low).getByText('Only 2 are available here.')).toBeTruthy();
+    type('How many', '2');
+    fireEvent.click(within(low).getByRole('button', { name: 'Move 2 to Gulberg shop' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'InventoryMove')).toEqual({
+        input: {
+          reason: 'movement_created',
+          changes: [
+            {
+              inventoryItemId: 'inv_1',
+              quantity: 2,
+              from: { locationId: 'loc_1', name: 'available' },
+              to: { locationId: 'loc_2', name: 'available' },
+            },
+          ],
+        },
+      }),
+    );
+    cleanup();
+
+    vi.stubGlobal('fetch', core('owner', [MAIN]).fetcher);
+    renderAdmin('/shop_1/stock');
+    const again = await screen.findByRole('region', { name: 'Running low' });
+    fireEvent.click(within(again).getByRole('button', { name: 'Show the stock of Dupatta' }));
+    fireEvent.click(await within(again).findByRole('button', { name: 'Move' }));
+    expect(
+      await within(again).findByText('The shop has no other location to move stock to.'),
+    ).toBeTruthy();
+    expect(within(again).getByRole('link', { name: 'Add a location' }).getAttribute('href')).toBe(
+      '/shop_1/settings/locations',
+    );
+  });
+
   it('counts a shelf against what was on hand when read, and changes what the shop calls low', async () => {
     const fake = core('manager');
     vi.stubGlobal('fetch', fake.fetcher);
@@ -244,6 +299,7 @@ describe('Stock', () => {
     await within(low).findByText('Main warehouse');
     expect(within(low).queryByRole('button', { name: 'Add or take away' })).toBeNull();
     expect(within(low).queryByRole('button', { name: 'Count' })).toBeNull();
+    expect(within(low).queryByRole('button', { name: 'Move' })).toBeNull();
     expect(within(low).queryByRole('button', { name: 'Change' })).toBeNull();
     cleanup();
 
