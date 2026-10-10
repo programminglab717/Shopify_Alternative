@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-344 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-345 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -352,6 +352,7 @@
 | 342 | While the orders list is open, in view or not, it asks every half minute for its tab's newest orders and says how many are newer than it shows, above it and in the page's title, shown at a tap, so its rows move only when staff ask; Home and the Confirmation Desk ask again every half minute while in view | Accepted |
 | 343 | A product is duplicated as Shopify's productDuplicate does it: the copy made in one transaction with the product's words, options, variants and prices, none of its SKUs, barcodes or stock, and put in its manual collections; its photos and videos, if asked, made again by the worker from what was kept of them; the admin makes the copy a draft and opens it | Accepted |
 | 344 | Products are shown, hidden or archived, tagged, untagged and deleted many at once, as orders are: up to 250, each in its own transaction as it would be alone, one refused said at its place in the IDs while the rest are done; the products list chooses them, and puts them in a collection made by hand too | Accepted |
+| 345 | Customers are tagged and untagged many at once, as orders and products are: up to 250, each in its own transaction, one refused said at its place; their marketing consent is not, as each customer gives or withdraws their own | Accepted |
 
 ---
 
@@ -13793,3 +13794,33 @@
     at once.
   * **The admin sending `productUpdate` for each:** a request each, and nothing to say which
     failed in one answer.
+
+## ADR-345 · Customers are tagged and untagged many at once, as orders and products are: up to 250, each in its own transaction, one refused said at its place; their marketing consent is not, as each customer gives or withdraws their own
+
+* **Context:**
+  * Shops sort their customers by tags, "wholesale", "VIP", "Eid 2026", and segments and
+    filters read them (CUS-03). The admin tagged them one customer page at a time.
+  * Orders and products are acted on many at once from their lists ([ADR-333](#adr-333--the-orders-list-tags-the-orders-chosen-on-any-tab-and-cancels-those-not-yet-shipped-for-one-reason-from-the-bar-that-confirms-packs-and-prints-them-for-those-who-change-orders-a-refusal-names-its-order),
+    [ADR-344](#adr-344--products-are-shown-hidden-or-archived-tagged-untagged-and-deleted-many-at-once-as-orders-are-up-to-250-each-in-its-own-transaction-as-it-would-be-alone-one-refused-said-at-its-place-in-the-ids-while-the-rest-are-done-the-products-list-chooses-them-and-puts-them-in-a-collection-made-by-hand-too)).
+  * Marketing consent is the customer's: each change is recorded with the words agreed to, where
+    and when ([ADR-187](#adr-187--a-shops-checkout-offers-a-box-for-its-news-and-offers-on-each-channel-it-chooses-whatsapp-until-it-does-unticked-until-the-shopper-ticks-it-a-box-ticked-records-the-customers-consent-as-the-order-is-placed-in-the-words-beside-it-where-the-number-or-email-typed-is-the-customers-own)).
+* **Decision:**
+  * **`customerBulkAddTags` and `customerBulkRemoveTags`**, for those who change customers, take
+    up to 250 IDs. Each customer is retagged under their lock in their own transaction, recorded
+    as `customer.updated` with `tags` changed, as `customerUpdate` records it, and only when their
+    tags change. Tags are added where missing, in any case, one past the most tags refused, and
+    taken off ignoring case. One refused is said at its place, `["ids", "3"]`, and the rest are
+    done.
+  * **Marketing consent is not set many at once:** staff choosing customers on a list cannot say
+    what each agreed to, where or when, so each change stays the customer's own, through
+    checkout, sign-up forms, their link or one customer's page.
+  * **In the admin:** owners and managers choose customers on the list, each or all shown, and
+    tag them or take tags off from a panel; what came of it is said above the list, those refused
+    by name.
+* **Consequences:**
+  * A shop marks its wholesale buyers or its Eid customers in a few taps, and its segments follow.
+  * Not yet: customers chosen beyond those shown, or every member of a segment at once.
+* **Alternatives:**
+  * **Consent recorded for many at once, as "staff recorded":** a ledger of consents no customer
+    gave in those words, which would not stand as consent.
+  * **One transaction for all:** one customer refused would refuse them all.

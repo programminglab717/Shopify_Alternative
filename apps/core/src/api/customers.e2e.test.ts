@@ -276,6 +276,51 @@ describe.skipIf(!server)('Admin GraphQL API: customers and the blocklist', () =>
     });
   });
 
+  it('tags many customers at once, saying each refused at its place', async () => {
+    const make = async (phone: string, tags: string[]) =>
+      (
+        (await call(
+          tokens.a,
+          `mutation ($input: CustomerCreateInput!) { customerCreate(input: $input) {
+             customer { id } } }`,
+          { input: { phone, tags } },
+        )) as { customer: { id: string } }
+      ).customer.id;
+    const ayesha = await make('0300 7777001', ['VIP']);
+    const bilal = await make('0300 7777002', []);
+    const theirs = (
+      (await call(
+        tokens.b,
+        `mutation { customerCreate(input: { phone: "0300 7777003" }) { customer { id } } }`,
+      )) as { customer: { id: string } }
+    ).customer.id;
+
+    const added = await call(
+      tokens.a,
+      `mutation ($ids: [ID!]!) { customerBulkAddTags(ids: $ids, tags: ["vip", "Eid"]) {
+         customers { tags } userErrors { field code } } }`,
+      { ids: [ayesha, theirs, bilal] },
+    );
+    expect(added).toEqual({
+      customers: [{ tags: ['VIP', 'Eid'] }, { tags: ['vip', 'Eid'] }],
+      userErrors: [{ field: ['ids', '1'], code: 'NOT_FOUND' }],
+    });
+    const removed = await call(
+      tokens.a,
+      `mutation ($ids: [ID!]!) { customerBulkRemoveTags(ids: $ids, tags: ["VIP"]) {
+         customers { tags } userErrors { field code } } }`,
+      { ids: [ayesha, bilal] },
+    );
+    expect(removed).toEqual({ customers: [{ tags: ['Eid'] }, { tags: ['Eid'] }], userErrors: [] });
+
+    const readOnly = await gql(
+      tokens.aCustomers,
+      'mutation ($ids: [ID!]!) { customerBulkAddTags(ids: $ids, tags: ["x"]) { userErrors { code } } }',
+      { ids: [ayesha] },
+    );
+    expect(readOnly.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
   it('blocks numbers: their orders wait for staff to review', async () => {
     const added = await call(
       tokens.a,

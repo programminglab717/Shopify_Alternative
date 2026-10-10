@@ -8,6 +8,8 @@ export const LIMITS = {
   otherPhones: 10,
   blocklistNote: 1_000,
   segmentName: 255,
+  /** Customers a bulk action takes at once, as orders and products (CAT-04). */
+  batch: 250,
 } as const;
 
 /**

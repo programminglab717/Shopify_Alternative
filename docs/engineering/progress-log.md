@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, customers acted on many at once, in the core and the admin** (CUS-01, CUS-04): customers
-chosen on the list tagged and untagged together, and their marketing consent recorded as they gave
-it, as orders and products are; then section by section as the alpha's shops need them.
+**Next, a variant's stock history, in the admin** (INV-03): each change to its stock at each
+location, why and by what, as the core keeps them, so an owner can see where a count went; then
+section by section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +18,23 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### Customers tagged many at once, in the core and the admin
+
+* **`customerBulkAddTags` and `customerBulkRemoveTags`** ([ADR-345](../architecture/13-decision-log.md#adr-345--customers-are-tagged-and-untagged-many-at-once-as-orders-and-products-are-up-to-250-each-in-its-own-transaction-one-refused-said-at-its-place-their-marketing-consent-is-not-as-each-customer-gives-or-withdraws-their-own)): up to 250 customers, each
+  retagged in its own transaction, one refused said at its place in the IDs while the rest are
+  done. Marketing consent is not set many at once: each customer gives or withdraws their own.
+* **In the admin:** owners and managers choose customers on the list and tag them or take tags
+  off, from a bar as on orders and products.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, two customers
+  chosen on the list were tagged "bulk-test, Bulk-Eid", "2 customers updated."; then all sixteen
+  shown chosen and the tags taken off in other cases, "16 customers updated.", none left with
+  them. No errors in the browser.
+* 2428 tests: tags added where missing in any case, each customer once, one past the most,
+  another shop's and one not found refused at their place; taken off ignoring case, told only of
+  those changed; no IDs, too many or no tags refused; through the Admin API with its scope; in the
+  admin, for owners and managers, those refused said by name; and the mutations checked against
+  the core's schema.
 
 ### 5df365c · Products acted on many at once, in the core and the admin
 

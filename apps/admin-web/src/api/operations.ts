@@ -1248,6 +1248,36 @@ export const ProductReorderMediaMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** Tags added to the customers chosen, those they have already left as they are (CUS-01). */
+export const CustomerBulkAddTagsMutation = /* GraphQL */ `
+  mutation CustomerBulkAddTags($ids: [ID!]!, $tags: [String!]!) {
+    customerBulkAddTags(ids: $ids, tags: $tags) {
+      customers {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Tags taken off the customers chosen. */
+export const CustomerBulkRemoveTagsMutation = /* GraphQL */ `
+  mutation CustomerBulkRemoveTags($ids: [ID!]!, $tags: [String!]!) {
+    customerBulkRemoveTags(ids: $ids, tags: $tags) {
+      customers {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** A page of the shop's customers, newest first, searched by mobile, name or email (CUS-01). */
 export const CustomersQuery = /* GraphQL */ `
   query Customers($first: Int, $after: String, $query: String) {

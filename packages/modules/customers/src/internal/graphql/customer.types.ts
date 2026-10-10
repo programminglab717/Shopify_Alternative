@@ -334,6 +334,19 @@ export class CustomerCreatePayload {
   userErrors!: UserError[];
 }
 
+@ObjectType({ description: 'Customers tagged many at once.' })
+export class CustomerBulkPayload {
+  @Field(() => [Customer], {
+    description: 'The customers done, in the order asked; those refused are left out.',
+  })
+  customers!: Customer[];
+
+  @Field(() => [UserError], {
+    description: 'Why customers were refused, each at its place in `ids`: ["ids", "3"].',
+  })
+  userErrors!: UserError[];
+}
+
 @ObjectType()
 export class CustomerUpdatePayload {
   @Field(() => Customer, { nullable: true })

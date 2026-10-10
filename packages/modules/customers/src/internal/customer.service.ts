@@ -62,6 +62,14 @@ export interface CustomerUpdateInput {
   tags?: string[] | null;
 }
 
+/** What became of customers tagged many at once. */
+export interface CustomerBulkResult {
+  /** In the order given; customers that failed are left out. */
+  customers: CustomerRecord[];
+  /** One or more for each customer that failed, at its place in the IDs: ["ids", "3"]. */
+  errors: FieldError[];
+}
+
 export interface ListCustomersOptions {
   first: number;
   after?: string | null;
@@ -355,6 +363,114 @@ export class CustomerService {
       if (isNumberTaken(error)) return failOne(['input', 'phone'], 'TAKEN', PHONE_TAKEN);
       throw error;
     }
+  }
+
+  /** Adds tags to many customers; tags a customer has already, in any case, stay as they are. */
+  bulkAddTags(
+    tenant: TenantContext,
+    ids: readonly string[],
+    tags: readonly string[],
+  ): Promise<MutationResult<CustomerBulkResult>> {
+    const check = new InputChecker();
+    const added = check.tags(['tags'], [...tags]);
+    if (added.length === 0) check.add(['tags'], 'BLANK', "can't be blank");
+    if (!check.ok) return Promise.resolve(fail(check.errors));
+    return this.#bulk(ids, (id) =>
+      this.#retag(tenant, id, (current) => {
+        const known = new Set(current.map((tag) => tag.toLowerCase()));
+        const fresh = added.filter((tag) => !known.has(tag.toLowerCase()));
+        if (fresh.length === 0) return null;
+        // A customer's tags have a most, as when they are set.
+        const tagged = new InputChecker();
+        const next = tagged.tags(['tags'], [...current, ...fresh]);
+        return tagged.ok ? next : { errors: tagged.errors };
+      }),
+    );
+  }
+
+  /** Takes tags off many customers, ignoring case. */
+  bulkRemoveTags(
+    tenant: TenantContext,
+    ids: readonly string[],
+    tags: readonly string[],
+  ): Promise<MutationResult<CustomerBulkResult>> {
+    const check = new InputChecker();
+    const removed = check.tags(['tags'], [...tags]);
+    if (removed.length === 0) check.add(['tags'], 'BLANK', "can't be blank");
+    if (!check.ok) return Promise.resolve(fail(check.errors));
+    const gone = new Set(removed.map((tag) => tag.toLowerCase()));
+    return this.#bulk(ids, (id) =>
+      this.#retag(tenant, id, (current) => {
+        const kept = current.filter((tag) => !gone.has(tag.toLowerCase()));
+        return kept.length === current.length ? null : kept;
+      }),
+    );
+  }
+
+  /**
+   * Gives a customer the tags `next` says of theirs, under their lock: `customer.updated` recorded
+   * as `customerUpdate` records it; null changes nothing, and errors refuse it.
+   */
+  async #retag(
+    tenant: TenantContext,
+    id: string,
+    next: (current: string[]) => string[] | { errors: FieldError[] } | null,
+  ): Promise<MutationResult<CustomerRecord>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(customers)
+        .where(and(eq(customers.shopId, tenant.shopId), eq(customers.id, id)))
+        .for('update');
+      if (!current) return failOne(['id'], 'NOT_FOUND', 'Customer not found');
+      const tags = next(current.tags);
+      if (tags === null) return { ok: true, value: toCustomerRecord(current) };
+      if (!Array.isArray(tags)) return fail(tags.errors);
+      const [row] = await tx
+        .update(customers)
+        .set({
+          tags,
+          version: sql`${customers.version} + 1`,
+          updatedAt: sql`now()`,
+        })
+        .where(and(eq(customers.shopId, tenant.shopId), eq(customers.id, id)))
+        .returning();
+      await appendEvent<CustomerUpdatedPayload>(tx, tenant.shopId, {
+        type: CustomerEvents.CustomerUpdated,
+        aggregateType: 'customer',
+        aggregateId: id,
+        payload: { changed: ['tags'], version: row!.version },
+      });
+      return { ok: true, value: toCustomerRecord(row!) };
+    });
+  }
+
+  /**
+   * Runs `run` on each customer, once, each in its own transaction: one that fails is said at its
+   * place in `ids`, and the rest are done all the same, as orders are (ORD-05).
+   */
+  async #bulk(
+    ids: readonly string[],
+    run: (id: string) => Promise<MutationResult<CustomerRecord>>,
+  ): Promise<MutationResult<CustomerBulkResult>> {
+    if (ids.length === 0) return failOne(['ids'], 'BLANK', 'Ids must include at least one');
+    if (ids.length > LIMITS.batch) {
+      return failOne(['ids'], 'TOO_MANY', `Ids can have at most ${LIMITS.batch}`);
+    }
+    const result: CustomerBulkResult = { customers: [], errors: [] };
+    const seen = new Set<string>();
+    for (const [index, id] of ids.entries()) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const done = await run(id);
+      if (done.ok) result.customers.push(done.value);
+      else {
+        for (const error of done.errors) {
+          result.errors.push({ ...error, field: ['ids', String(index)] });
+        }
+      }
+    }
+    return { ok: true, value: result };
   }
 
   /**

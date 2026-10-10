@@ -30,7 +30,7 @@ import {
   ERASURE_WAIT_DAYS,
   type ErasureRequestRecord,
 } from '../customer-data.service.js';
-import { CustomerService } from '../customer.service.js';
+import { CustomerService, type CustomerBulkResult } from '../customer.service.js';
 import type { BlocklistEntryRecord, CustomerRecord } from '../records.js';
 import type { MarketingConsentInput as ConsentInput } from '../consent.js';
 import {
@@ -38,6 +38,7 @@ import {
   ConsentEventConnection,
   ConsentHistoryArgs,
   Customer,
+  CustomerBulkPayload,
   CustomerConnection,
   CustomerCreateInput,
   CustomerCreatePayload,
@@ -79,6 +80,17 @@ function toConsentInputs(inputs: MarketingConsentInput[]): ConsentInput[] {
 }
 
 type Payload = { customer: Customer | null; userErrors: UserError[] };
+
+/** What became of customers tagged many at once. */
+function bulkPayload(
+  result: MutationResult<CustomerBulkResult>,
+  tenant: TenantContext,
+): CustomerBulkPayload {
+  return Object.assign(new CustomerBulkPayload(), {
+    customers: result.ok ? result.value.customers.map((each) => toCustomer(each, tenant)) : [],
+    userErrors: UserError.list(result.ok ? result.value.errors : result.errors),
+  });
+}
 
 function payload<T extends Payload>(
   type: new () => T,
@@ -400,5 +412,45 @@ export class CustomerResolver {
       after: cursorAfter(args.after),
     });
     return toConsentEventConnection(items, hasNextPage, tenant);
+  }
+
+  @Mutation(() => CustomerBulkPayload, {
+    description:
+      'Adds tags to up to 250 customers, each as customerUpdate would. Tags a customer has ' +
+      'already, in any case, stay as they are; one with too many is refused.',
+  })
+  @RequireScopes('write_customers')
+  async customerBulkAddTags(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+    @Args('tags', { type: () => [String] }) tags: string[],
+  ): Promise<CustomerBulkPayload> {
+    return bulkPayload(
+      await this.service.bulkAddTags(
+        tenant,
+        ids.map((id) => uuidOf('customer', id)),
+        tags,
+      ),
+      tenant,
+    );
+  }
+
+  @Mutation(() => CustomerBulkPayload, {
+    description: 'Takes tags off up to 250 customers, ignoring case.',
+  })
+  @RequireScopes('write_customers')
+  async customerBulkRemoveTags(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('ids', { type: () => [ID] }) ids: string[],
+    @Args('tags', { type: () => [String] }) tags: string[],
+  ): Promise<CustomerBulkPayload> {
+    return bulkPayload(
+      await this.service.bulkRemoveTags(
+        tenant,
+        ids.map((id) => uuidOf('customer', id)),
+        tags,
+      ),
+      tenant,
+    );
   }
 }

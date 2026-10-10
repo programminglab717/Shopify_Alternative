@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Search,
   ShieldX,
+  Tags,
   UserPlus,
   Users,
   UsersRound,
@@ -17,11 +18,13 @@ import type { CustomerListItem, CustomersData } from '../api/types';
 import { useSessionStore } from '../auth/context';
 import type { StaffRole } from '../auth/session';
 import { errorText } from '../i18n/errors';
-import { formatMoney, formatPhone, formatRelative } from '../i18n/format';
+import { formatCount, formatMoney, formatPhone, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
+import type { BulkOutcome } from '../orders/bulk';
 import { useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
-import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { CustomerTagsPanel } from './bulk';
 import { MOVES_CUSTOMERS } from './transfer-page';
 
 const PAGE = 50;
@@ -57,18 +60,30 @@ export function shownPhone(phone: string): string {
 export function CustomerRow({
   customer,
   timezone,
+  selection,
 }: {
   customer: CustomerListItem;
   timezone: string;
+  /** Whether the customer is chosen, where customers are chosen on the list. */
+  selection?: { selected: boolean; onSelect: (selected: boolean) => void };
 }) {
   const { t, locale } = useLocale();
   const shopId = useShop().id;
   return (
-    <li>
+    <li className="flex items-center gap-3 ps-4">
+      {selection && (
+        <input
+          type="checkbox"
+          checked={selection.selected}
+          onChange={(event) => selection.onSelect(event.target.checked)}
+          aria-label={t('orders.select', { name: customer.displayName })}
+          className="size-5 shrink-0 accent-[var(--hatti-color-primary)]"
+        />
+      )}
       <Link
         to="/$shopId/customers/$customerId"
         params={{ shopId, customerId: customer.id }}
-        className="flex items-center gap-3 px-4 py-3"
+        className="flex min-w-0 flex-1 items-center gap-3 py-3 pe-4"
       >
         <span className="flex min-w-0 flex-1 flex-col gap-1 md:flex-row md:items-center md:gap-4">
           <span className="flex min-w-0 flex-1 items-center gap-2">
@@ -102,7 +117,8 @@ export function CustomerRow({
 
 /**
  * The customers list (CUS-01, docs/design/02 §2): newest first, searched by any part of a mobile
- * number, a name or an email, each with their orders and what they spent.
+ * number, a name or an email, each with their orders and what they spent; owners and managers tag
+ * those they choose on it at once.
  */
 export function CustomersPage() {
   const { t } = useLocale();
@@ -112,6 +128,10 @@ export function CustomersPage() {
   const navigate = useNavigate();
   const { q } = useSearch({ from: '/$shopId/customers' });
   const [words, setWords] = useState(q ?? '');
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [outcome, setOutcome] = useState<BulkOutcome | null>(null);
+  const [tagging, setTagging] = useState(false);
+  const tags = ADDS_CUSTOMERS.includes(shop.role);
 
   const customers = useInfiniteQuery({
     queryKey: ['admin', shop.id, 'customers', q ?? null],
@@ -128,6 +148,9 @@ export function CustomersPage() {
 
   const onSearch = (event: FormEvent) => {
     event.preventDefault();
+    setSelected(new Set());
+    setOutcome(null);
+    setTagging(false);
     void navigate({
       to: '/$shopId/customers',
       params: { shopId: shop.id },
@@ -136,6 +159,16 @@ export function CustomersPage() {
   };
 
   const shown = customers.data?.pages.flatMap((page) => page.customers.nodes) ?? [];
+  const names = new Map(shown.map((customer) => [customer.id, customer.displayName]));
+
+  /** Tagging done, or put away: what came of it said, the choice cleared. */
+  const doneTagging = (done: BulkOutcome | null) => {
+    setTagging(false);
+    if (done) {
+      setOutcome(done);
+      setSelected(new Set());
+    }
+  };
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
@@ -208,6 +241,24 @@ export function CustomersPage() {
           className="min-h-12 w-full rounded-control border border-line bg-surface ps-10 pe-3 md:min-h-10"
         />
       </form>
+      {outcome && (
+        <Alert tone={outcome.failed.length ? 'warning' : 'success'}>
+          {outcome.done > 0 && <p>{t('customerBulk.done', { count: outcome.done })}</p>}
+          {outcome.failed.length > 0 && (
+            <>
+              <p>{t('orders.someFailed', { count: outcome.failed.length })}</p>
+              <ul className="list-disc ps-5">
+                {outcome.failed.map((message, index) => (
+                  <li key={index} dir="auto">
+                    {message}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </Alert>
+      )}
+      {tagging && <CustomerTagsPanel ids={[...selected]} names={names} onDone={doneTagging} />}
       {customers.isPending ? (
         <Loading label={t('state.loading')} />
       ) : customers.isError ? (
@@ -225,9 +276,47 @@ export function CustomersPage() {
         </Card>
       ) : (
         <Card>
+          {tags && (
+            <div className="flex items-center gap-3 border-b border-line px-4 py-2">
+              <input
+                type="checkbox"
+                checked={selected.size === shown.length}
+                onChange={(event) =>
+                  setSelected(
+                    event.target.checked
+                      ? new Set(shown.map((customer) => customer.id))
+                      : new Set(),
+                  )
+                }
+                aria-label={t('orders.selectAll')}
+                className="size-5 accent-[var(--hatti-color-primary)]"
+              />
+              <span className="text-secondary">
+                {t('orders.selected', { count: formatCount(selected.size) })}
+              </span>
+            </div>
+          )}
           <ul className="divide-y divide-line">
             {shown.map((customer) => (
-              <CustomerRow key={customer.id} customer={customer} timezone={timezone} />
+              <CustomerRow
+                key={customer.id}
+                customer={customer}
+                timezone={timezone}
+                selection={
+                  tags
+                    ? {
+                        selected: selected.has(customer.id),
+                        onSelect: (on) =>
+                          setSelected((current) => {
+                            const next = new Set(current);
+                            if (on) next.add(customer.id);
+                            else next.delete(customer.id);
+                            return next;
+                          }),
+                      }
+                    : undefined
+                }
+              />
             ))}
           </ul>
           {customers.hasNextPage && (
@@ -242,6 +331,19 @@ export function CustomersPage() {
             </div>
           )}
         </Card>
+      )}
+      {tags && selected.size > 0 && !tagging && (
+        <div className="fixed inset-x-0 bottom-16 z-20 flex flex-wrap justify-center gap-2 px-4 md:bottom-6">
+          <Button
+            icon={<Tags aria-hidden className="size-5" />}
+            onClick={() => {
+              setOutcome(null);
+              setTagging(true);
+            }}
+          >
+            {t('bulk.tag', { count: formatCount(selected.size) })}
+          </Button>
+        </div>
       )}
     </div>
   );

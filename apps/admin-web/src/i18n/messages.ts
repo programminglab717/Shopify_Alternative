@@ -2990,6 +2990,11 @@ const en = {
   'productBulk.deleteBody': 'Their variants, photos and stock go with them, for good.',
   'productBulk.deleteSubmit': 'Delete {count} products',
   'productBulk.deleteSubmit.one': 'Delete 1 product',
+  'customerBulk.done': '{count} customers updated.',
+  'customerBulk.done.one': '1 customer updated.',
+  'customerBulk.tagsTitle': 'Tag {count} customers',
+  'customerBulk.tagsTitle.one': 'Tag 1 customer',
+  'customerBulk.tagsHint': 'A comma between each, as on a customer: wholesale, vip.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5954,6 +5959,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'productBulk.deleteBody': 'ان کے ویریئنٹس، تصویریں اور اسٹاک بھی ہمیشہ کے لیے چلے جائیں گے۔',
   'productBulk.deleteSubmit': '{count} پروڈکٹس ڈیلیٹ کریں',
   'productBulk.deleteSubmit.one': '1 پروڈکٹ ڈیلیٹ کریں',
+  'customerBulk.done': '{count} کسٹمرز اپ ڈیٹ ہو گئے۔',
+  'customerBulk.done.one': '1 کسٹمر اپ ڈیٹ ہو گیا۔',
+  'customerBulk.tagsTitle': '{count} کسٹمرز پر ٹیگ',
+  'customerBulk.tagsTitle.one': '1 کسٹمر پر ٹیگ',
+  'customerBulk.tagsHint': 'ہر ایک کے بیچ کوما، جیسے کسٹمر پر: wholesale, vip۔',
 };
 
 export const messages: Readonly<

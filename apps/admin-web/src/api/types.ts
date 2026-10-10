@@ -308,6 +308,11 @@ export interface ProductBulkData {
   };
 }
 
+/** What tagging customers many at once did: those done, and why others not. */
+export interface CustomerBulkData {
+  [mutation: string]: { customers: { id: string }[]; userErrors: UserError[] };
+}
+
 export interface OrderBulkData {
   [mutation: string]: { orders: { id: string }[]; userErrors: UserError[] };
 }

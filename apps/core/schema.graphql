@@ -2541,6 +2541,15 @@ type Customer {
   whatsappMarketingConsent: CustomerMarketingConsent!
 }
 
+"""Customers tagged many at once."""
+type CustomerBulkPayload {
+  """The customers done, in the order asked; those refused are left out."""
+  customers: [Customer!]!
+
+  """Why customers were refused, each at its place in `ids`: ["ids", "3"]."""
+  userErrors: [UserError!]!
+}
+
 """
 How long a cash-on-delivery customer may cancel their order through its link, while nothing has been paid or shipped.
 """
@@ -5238,6 +5247,14 @@ type Mutation {
   Hands a courier account's parcels waiting to be picked up, the default account's unless given, to its courier through the courier's API, the longest waiting first, up to 200: PostEx's load sheet for the account's pickup address, or Leopards' naming the rider who takes them. Parcels in a pickup the courier took go in the next only once they have waited a day since. Refused, with why, for a courier whose API takes no pickups, whose rider is not named, or that refuses them.
   """
   courierPickupRequest(input: CourierPickupInput!): CourierPickupPayload!
+
+  """
+  Adds tags to up to 250 customers, each as customerUpdate would. Tags a customer has already, in any case, stay as they are; one with too many is refused.
+  """
+  customerBulkAddTags(ids: [ID!]!, tags: [String!]!): CustomerBulkPayload!
+
+  """Takes tags off up to 250 customers, ignoring case."""
+  customerBulkRemoveTags(ids: [ID!]!, tags: [String!]!): CustomerBulkPayload!
 
   """
   Adds a customer before they order. Orders add their customers themselves, by mobile number.
