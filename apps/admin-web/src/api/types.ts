@@ -211,6 +211,8 @@ export interface RefundDetail {
 export interface OrderDetail {
   id: string;
   name: string;
+  /** Where it ships from, and where its stock is set aside. */
+  location: { id: string; name: string };
   createdAt: string;
   stage: OrderStage;
   status: 'OPEN' | 'CLOSED' | 'CANCELLED';

@@ -178,6 +178,41 @@ export class LocationService {
     return ensurePrimaryLocation(tx, shopId);
   }
 
+  /**
+   * Where an order's goods ship from when no one says (INV-10, ADR-355): the first active location
+   * that fulfils online orders and has every tracked one of `lines` for sale there, the primary
+   * first, then by name; the primary where none has them all. Read without locks: committing the
+   * stock checks it again.
+   */
+  async forOrderIn(
+    tx: Tx,
+    shopId: string,
+    lines: readonly { variantId: string; quantity: number }[],
+  ): Promise<LocationRecord> {
+    const wanted = new Map<string, number>();
+    for (const line of lines) {
+      wanted.set(line.variantId, (wanted.get(line.variantId) ?? 0) + line.quantity);
+    }
+    const { rows } = await tx.execute<{ id: string }>(sql`
+      SELECT loc.id
+        FROM inventory.locations loc
+       WHERE loc.shop_id = ${shopId} AND loc.is_active AND loc.fulfills_online_orders
+         AND NOT EXISTS (
+               SELECT 1
+                 FROM unnest(${sql.param([...wanted.keys()])}::uuid[],
+                             ${sql.param([...wanted.values()])}::int[]) AS want(variant_id, quantity)
+                 JOIN inventory.items i
+                   ON i.shop_id = loc.shop_id AND i.variant_id = want.variant_id AND i.tracked
+                 LEFT JOIN inventory.levels l
+                   ON l.shop_id = loc.shop_id AND l.location_id = loc.id
+                  AND l.variant_id = want.variant_id
+                WHERE coalesce(l.available, 0) < want.quantity)
+       ORDER BY loc.is_primary DESC, lower(loc.name), loc.id
+       LIMIT 1`);
+    const found = rows[0] && (await this.locationsOf(tx, shopId, [rows[0].id])).get(rows[0].id);
+    return found ?? this.primaryOf(tx, shopId);
+  }
+
   /** Like {@link getMany}, in another module's tenant transaction `tx`. */
   async locationsOf(
     tx: Tx,

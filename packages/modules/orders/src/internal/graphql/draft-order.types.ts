@@ -274,7 +274,8 @@ export class DraftOrderInput {
 
   @Field(() => ID, {
     nullable: true,
-    description: 'Where the order will ship from; the primary location when it is placed, if none.',
+    description:
+      'Where the order will ship from; one chosen when it is placed, as orderCreate does, if none.',
   })
   locationId?: string | null;
 

@@ -717,7 +717,7 @@ export const draftOrders = ordersSchema.table(
     phone: text('phone'),
     email: text('email'),
     shippingAddress: jsonb('shipping_address').$type<AddressValue>(),
-    /** Null: the primary location when it is placed. */
+    /** Null: one chosen when it is placed (ADR-355). */
     locationId: uuid('location_id'),
     note: text('note').notNull().default(''),
     tags: text('tags').array().notNull().default([]),

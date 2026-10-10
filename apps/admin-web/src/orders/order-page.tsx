@@ -43,6 +43,7 @@ import { OnlinePayments } from './online-payments';
 import { Parcels, ShipForm, WORKS_PARCELS } from './parcels';
 import { PrintPanel } from './print';
 import { OrderReturns } from './returns';
+import { ShipsFrom } from './ships-from';
 import { StageBadge } from './stage';
 
 const CONFIRMABLE: readonly OrderStage[] = ['NEEDS_CONFIRMATION', 'NEEDS_REVIEW'];
@@ -396,6 +397,9 @@ export function OrderPage() {
           </Section>
           <Section title={t('order.address')}>
             <DeliveryAddress order={order} />
+          </Section>
+          <Section title={t('shipsFrom.title')}>
+            <ShipsFrom order={order} />
           </Section>
           <Section title={t('details.noteAndTags')}>
             <NoteAndTags order={order} />

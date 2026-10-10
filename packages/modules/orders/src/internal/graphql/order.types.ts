@@ -1541,7 +1541,9 @@ export class OrderCreateInput {
 
   @Field(() => ID, {
     nullable: true,
-    description: 'Where it ships from and its stock is committed; the primary location by default.',
+    description:
+      'Where it ships from and its stock is committed; by default the first location fulfilling ' +
+      'online orders with all of it for sale, the primary first, or the primary.',
   })
   locationId?: string | null;
 
@@ -1620,6 +1622,15 @@ export class OrderPhoneRevealPayload {
 
 @ObjectType()
 export class OrderMarkPackedPayload {
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class OrderLocationChangePayload {
   @Field(() => Order, { nullable: true })
   order!: Order | null;
 

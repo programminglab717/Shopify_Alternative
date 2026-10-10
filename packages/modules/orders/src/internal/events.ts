@@ -103,7 +103,7 @@ export interface OrderCreatedPayload extends OrderState {
 export interface OrderUpdatedPayload extends OrderState {
   /**
    * Names of what changed, e.g. "shippingAddress", "note", "tags"; "customer" with a new number,
-   * "packed" when marked packed or not, "link" when a link was made for the customer, "risk" when
+   * "packed" when marked packed or not, "location" when it ships from another (ADR-355), "link" when a link was made for the customer, "risk" when
    * scored again as the customer's history changed (ADR-112), "transferReceipt" when its customer
    * sent the receipt of their transfer (ADR-080), which staff are told of (ADR-247).
    */

@@ -3105,6 +3105,11 @@ const en = {
   'stock.orderChosen': 'Order the chosen ({count})',
   'po.fromLow':
     'Filled in from what runs low: of each, enough to reach twice the low mark less what is on order, at what it cost last.',
+  'shipsFrom.title': 'Ships from',
+  'shipsFrom.change': 'Ship from another location',
+  'shipsFrom.location': 'Location',
+  'shipsFrom.save': 'Move its stock there',
+  'shipsFrom.hint': 'Until it is packed, its stock can be set aside at another location instead.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6185,6 +6190,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'stock.orderChosen': 'چنے ہوئے منگوائیں ({count})',
   'po.fromLow':
     'کم ہونے والے مال سے بھرا گیا: ہر ایک اتنا کہ کم کی حد سے دگنا ہو جائے، جو آرڈر پر ہے وہ گھٹا کر، پچھلی قیمت پر۔',
+  'shipsFrom.title': 'یہاں سے جائے گا',
+  'shipsFrom.change': 'کسی اور جگہ سے بھیجیں',
+  'shipsFrom.location': 'جگہ',
+  'shipsFrom.save': 'اس کا اسٹاک وہاں منتقل کریں',
+  'shipsFrom.hint': 'پیک ہونے تک، اس کا اسٹاک کسی اور جگہ الگ رکھا جا سکتا ہے۔',
 };
 
 export const messages: Readonly<

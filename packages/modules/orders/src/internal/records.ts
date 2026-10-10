@@ -389,7 +389,7 @@ export interface DraftOrderRecord {
   phone: string | null;
   email: string | null;
   shippingAddress: AddressValue | null;
-  /** Where the order will ship from; the primary location when it is placed, if null. */
+  /** Where the order will ship from; one chosen when it is placed (ADR-355), if null. */
   locationId: string | null;
   note: string;
   tags: string[];

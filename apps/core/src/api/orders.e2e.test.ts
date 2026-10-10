@@ -615,6 +615,97 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(reader.errors?.[0]?.message).toContain('write_orders');
   });
 
+  it('ships an order from a location that has its goods, and from another before it is packed (ADR-355)', async () => {
+    const made = await mutate(
+      tokens.a,
+      `mutation ($input: ProductCreateInput!) {
+         productCreate(input: $input) {
+           product { variants { id inventoryItem { id } } } userErrors { code }
+         }
+       }`,
+      { input: { title: 'Lawn Kurta', status: 'ACTIVE' } },
+    );
+    const kurta = made.product.variants[0].id as string;
+    const kurtaItem = made.product.variants[0].inventoryItem.id as string;
+    // On Pro, which has room for a second location (ADR-154).
+    await admin.query(
+      `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+       VALUES ($1, 'pro', 'monthly', now(), now() + interval '1 month')
+       ON CONFLICT DO NOTHING`,
+      [shopA],
+    );
+    // The primary first, so that the shop has one before the branch is added.
+    const primary = (await gql(tokens.a, '{ location { id name } }')).data?.location as Json;
+    const added = await mutate(
+      tokens.a,
+      `mutation ($input: LocationAddInput!) {
+         locationAdd(input: $input) { location { id } userErrors { field code message } }
+       }`,
+      { input: { name: 'Liberty branch', address: { city: 'Lahore' } } },
+    );
+    expect(added.userErrors).toEqual([]);
+    const gulberg = added.location.id as string;
+    const counted = await mutate(
+      tokens.a,
+      `mutation ($input: InventorySetQuantitiesInput!) {
+         inventorySetQuantities(input: $input) { userErrors { code } }
+       }`,
+      {
+        input: {
+          name: 'available',
+          reason: 'received',
+          quantities: [
+            { inventoryItemId: kurtaItem, locationId: primary.id, quantity: 1 },
+            { inventoryItemId: kurtaItem, locationId: gulberg, quantity: 4 },
+          ],
+        },
+      },
+    );
+    expect(counted.userErrors).toEqual([]);
+
+    // The primary has one; Gulberg has the two asked for, and ships them.
+    const created = await mutate(tokens.a, ORDER_CREATE, {
+      input: { lineItems: [{ variantId: kurta, quantity: 2 }], shippingAddress: ADDRESS },
+    });
+    expect(created.userErrors).toEqual([]);
+    const id = created.order.id as string;
+    const LOCATION = `query ($id: ID!) { order(id: $id) { location { name } } }`;
+    expect((await gql(tokens.aReader, LOCATION, { id })).data?.order.location).toEqual({
+      name: 'Liberty branch',
+    });
+
+    const MOVE = `mutation ($id: ID!, $locationId: ID!) {
+      orderLocationChange(id: $id, locationId: $locationId) {
+        order { location { name } } userErrors { field code message }
+      }
+    }`;
+    expect(await mutate(tokens.a, MOVE, { id, locationId: primary.id })).toEqual({
+      order: null,
+      userErrors: [
+        {
+          field: ['locationId'],
+          code: 'OUT_OF_STOCK',
+          message: `Only 1 of "Lawn Kurta" left at ${primary.name as string}`,
+        },
+      ],
+    });
+    const back = await mutate(tokens.a, ORDER_CREATE, {
+      input: { lineItems: [{ variantId: kurta, quantity: 1 }], shippingAddress: ADDRESS },
+    });
+    expect(back.userErrors).toEqual([]);
+    expect(await mutate(tokens.a, MOVE, { id: back.order.id, locationId: gulberg })).toEqual({
+      order: { location: { name: 'Liberty branch' } },
+      userErrors: [],
+    });
+
+    // Moving needs write_orders; another shop's order is not found.
+    const denied = await gql(tokens.aReader, MOVE, { id, locationId: primary.id });
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+    expect((await mutate(tokens.b, MOVE, { id, locationId: primary.id })).userErrors).toEqual([
+      { field: ['id'], code: 'NOT_FOUND', message: 'Order not found' },
+    ]);
+  });
+
   it('splits an order in two, the items sent apart an order of their own (ADR-135)', async () => {
     const [size] = await stockedVariants(tokens.a, 'Multani Khussa', ['8'], 4);
     const created = await mutate(tokens.a, ORDER_CREATE, {

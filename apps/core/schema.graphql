@@ -3143,7 +3143,7 @@ type DraftOrder {
   linkExpiresAt: DateTime
 
   """
-  Where the order will ship from; null for the primary location when it is placed.
+  Where the order will ship from; null for one chosen when it is placed, as orderCreate does.
   """
   location: Location
 
@@ -3244,7 +3244,7 @@ input DraftOrderInput {
   lineItems: [OrderLineItemInput!]
 
   """
-  Where the order will ship from; the primary location when it is placed, if none.
+  Where the order will ship from; one chosen when it is placed, as orderCreate does, if none.
   """
   locationId: ID
   note: String
@@ -5722,6 +5722,11 @@ type Mutation {
   ): OrderLinkCreatePayload!
 
   """
+  Ships the order from another active location: its stock committed there and let go where it was, refused if that location is short. Only before it is packed or anything has shipped.
+  """
+  orderLocationChange(id: ID!, locationId: ID!): OrderLocationChangePayload!
+
+  """
   Records that the order is paid in full: cash collected at the door, or a transfer received.
   """
   orderMarkAsPaid(id: ID!): OrderMarkAsPaidPayload!
@@ -6815,7 +6820,7 @@ input OrderCreateInput {
   lineItems: [OrderLineItemInput!]!
 
   """
-  Where it ships from and its stock is committed; the primary location by default.
+  Where it ships from and its stock is committed; by default the first location fulfilling online orders with all of it for sale, the primary first, or the primary.
   """
   locationId: ID
   note: String
@@ -7186,6 +7191,11 @@ type OrderLinkCreatePayload {
   Opens WhatsApp with a message carrying the link: to the customer's number for staff who see numbers whole, and apps; to a chat of your choosing for the rest.
   """
   whatsappUrl: String
+}
+
+type OrderLocationChangePayload {
+  order: Order
+  userErrors: [UserError!]!
 }
 
 type OrderMarkAsPaidPayload {

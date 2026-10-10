@@ -29,6 +29,7 @@ function order(extra: Record<string, unknown> = {}) {
       confirmationStatus: 'CONFIRMED',
       cancelReason: null,
       overPlanLimit: false,
+      location: { id: 'loc_1', name: 'Main location' },
       note: 'Call before 6 pm',
       tags: ['eid'],
       phone: '+923001234567',
@@ -85,8 +86,33 @@ function order(extra: Record<string, unknown> = {}) {
 const ok = (field: string) => ({ [field]: { userErrors: [] } });
 
 function core(role: StaffRole, answer = order()) {
-  return fakeCore(role, (operation) => {
+  return fakeCore(role, (operation, variables) => {
     switch (operation) {
+      case 'Locations':
+        return {
+          locations: {
+            nodes: [
+              { id: 'loc_1', name: 'Main location', isPrimary: true },
+              { id: 'loc_2', name: 'Gulberg shop', isPrimary: false },
+              { id: 'loc_3', name: 'Liberty branch', isPrimary: false },
+            ],
+          },
+        };
+      case 'OrderLocationChange':
+        return variables.locationId === 'loc_2'
+          ? {
+              orderLocationChange: {
+                order: null,
+                userErrors: [
+                  {
+                    field: ['locationId'],
+                    code: 'OUT_OF_STOCK',
+                    message: '"Lawn Kurta" is out of stock at Gulberg shop',
+                  },
+                ],
+              },
+            }
+          : ok('orderLocationChange');
       case 'Order':
         return answer;
       case 'Staff':
@@ -309,5 +335,46 @@ describe("An order's everyday edits, on its page", () => {
       orderId: 'ord_7',
       status: null,
     });
+  });
+
+  it('ships an order from another location until it is packed, for those who work parcels', async () => {
+    const fake = core('packer');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    const from = await screen.findByRole('region', { name: 'Ships from' });
+    expect(within(from).getByText('Main location')).toBeTruthy();
+    fireEvent.click(within(from).getByRole('button', { name: 'Ship from another location' }));
+    const where = (await within(from).findByLabelText('Location')) as HTMLSelectElement;
+    expect([...where.options].map((option) => option.text)).toEqual([
+      'Gulberg shop',
+      'Liberty branch',
+    ]);
+    fireEvent.click(within(from).getByRole('button', { name: 'Move its stock there' }));
+    expect(
+      await within(from).findByText('"Lawn Kurta" is out of stock at Gulberg shop'),
+    ).toBeTruthy();
+    fireEvent.change(where, { target: { value: 'loc_3' } });
+    fireEvent.click(within(from).getByRole('button', { name: 'Move its stock there' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'OrderLocationChange')).toEqual({ id: 'ord_7', locationId: 'loc_3' }),
+    );
+    expect(
+      await within(from).findByRole('button', { name: 'Ship from another location' }),
+    ).toBeTruthy();
+  });
+
+  it('keeps a packed order where it is, and shows a marketer where it ships from alone', async () => {
+    vi.stubGlobal('fetch', core('packer', order({ stage: 'TO_BOOK' })).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    const packed = await screen.findByRole('region', { name: 'Ships from' });
+    expect(within(packed).getByText('Main location')).toBeTruthy();
+    expect(within(packed).queryByRole('button')).toBeNull();
+    cleanup();
+
+    vi.stubGlobal('fetch', core('marketer').fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    const read = await screen.findByRole('region', { name: 'Ships from' });
+    expect(within(read).queryByRole('button')).toBeNull();
   });
 });

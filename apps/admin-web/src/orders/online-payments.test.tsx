@@ -19,6 +19,7 @@ const ORDER = {
   confirmationStatus: 'CONFIRMED',
   cancelReason: null,
   overPlanLimit: false,
+  location: { id: 'loc_1', name: 'Main location' },
   note: null,
   tags: [],
   phone: '+923001234567',

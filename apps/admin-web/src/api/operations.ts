@@ -187,6 +187,10 @@ export const OrderQuery = /* GraphQL */ `
       phone
       email
       source
+      location {
+        id
+        name
+      }
       lineItems {
         id
         productId
@@ -437,6 +441,25 @@ export const OrderMarkPackedMutation = /* GraphQL */ `
 `;
 
 /** A packed mark taken back while nothing has shipped, so the order's items can change. */
+/** An order shipped from another location, its stock moved there (INV-10). */
+export const OrderLocationChangeMutation = /* GraphQL */ `
+  mutation OrderLocationChange($id: ID!, $locationId: ID!) {
+    orderLocationChange(id: $id, locationId: $locationId) {
+      order {
+        id
+        location {
+          id
+          name
+        }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const OrderMarkUnpackedMutation = /* GraphQL */ `
   mutation OrderMarkUnpacked($id: ID!) {
     orderMarkUnpacked(id: $id) {

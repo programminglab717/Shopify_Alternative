@@ -135,7 +135,7 @@ export interface OrderCreateInput {
   advanceDue?: string | null;
   shippingPrice?: string | null;
   discount?: string | null;
-  /** Where it ships from, and where its stock is committed; the primary location if left out. */
+  /** Where it ships from, and where its stock is committed; chosen (ADR-355) if left out. */
   locationId?: string | null;
   note?: string | null;
   tags?: string[] | null;
@@ -179,7 +179,7 @@ export interface OrderToPlace {
   transferDiscount?: bigint;
   /** Of `discount`, what is taken off for paying online, as checkout takes it (ADR-222). */
   onlineDiscount?: bigint;
-  /** Where it ships from; the primary location if null. */
+  /** Where it ships from; chosen (ADR-355) if null. */
   locationId: string | null;
   note: string;
   tags: string[];
@@ -456,10 +456,13 @@ export class OrderService {
       shopId,
       order.lines.map((line) => line.variantId),
     );
-    const location = await this.#location(tx, shopId, order.locationId, [
-      ...order.field,
-      'locationId',
-    ]);
+    const location = await this.#location(
+      tx,
+      shopId,
+      order.locationId,
+      [...order.field, 'locationId'],
+      order.lines,
+    );
     const errors: FieldError[] = [];
     if (!location.ok) errors.push(location.error);
     order.lines.forEach((line, index) => {
@@ -2016,6 +2019,83 @@ export class OrderService {
     });
   }
 
+  /**
+   * Ships the order from another location (INV-10, ADR-355): its stock committed there and let go
+   * where it was, in one change, refused if the new location is short of any of it. Only before it
+   * is packed or anything has shipped; the same location changes nothing.
+   */
+  async changeLocation(
+    tenant: TenantContext,
+    id: string,
+    locationId: string,
+  ): Promise<MutationResult<OrderRecord>> {
+    return this.#change(tenant, id, ['id'], async (tx, order) => {
+      const { shopId } = tenant;
+      if (order.status === 'cancelled') {
+        return failOne(['id'], 'INVALID', "A cancelled order doesn't ship from anywhere");
+      }
+      if (order.status !== 'open' || order.fulfillmentStatus !== 'unfulfilled') {
+        return failOne(['id'], 'INVALID', 'Only orders that have not shipped change location');
+      }
+      if (order.packedAt) {
+        return failOne(
+          ['id'],
+          'INVALID',
+          'A packed order ships from where it was packed: mark it not packed first',
+        );
+      }
+      if (order.locationId === locationId) return { ok: true, value: order };
+      const location = await this.#location(tx, shopId, locationId, ['locationId'], []);
+      if (!location.ok) return { ok: false, errors: [location.error] };
+      const orderLines = await tx
+        .select({ variantId: lines.variantId, quantity: lines.quantity, title: lines.title })
+        .from(lines)
+        .where(and(eq(lines.shopId, shopId), eq(lines.orderId, order.id)));
+      const moved = await this.stock.recommit(
+        tx,
+        { shopId, actor: tenant.actor },
+        {
+          commit: orderLines.map((line) => ({ ...line, locationId })),
+          release: orderLines.map((line) => ({ ...line, locationId: order.locationId })),
+        },
+        { referenceDocumentUri: orderReference(order.id) },
+      );
+      if (!moved.ok) {
+        return {
+          ok: false,
+          errors: moved.shortages.map((shortage) => {
+            const title = orderLines.find((line) => line.variantId === shortage.variantId)!.title;
+            const left = Math.max(shortage.available, 0);
+            return {
+              field: ['locationId'],
+              code: 'OUT_OF_STOCK',
+              message:
+                left === 0
+                  ? `"${title}" is out of stock at ${location.value.name}`
+                  : `Only ${left} of "${title}" left at ${location.value.name}`,
+            };
+          }),
+        };
+      }
+      const updated = await updateOrder(tx, shopId, order, { locationId });
+      await addTimelineEntry(
+        tx,
+        shopId,
+        order.id,
+        tenant.actor,
+        'location_changed',
+        `Ships from ${location.value.name}`,
+      );
+      await appendEvent<OrderUpdatedPayload>(tx, shopId, {
+        type: OrderEvents.OrderUpdated,
+        aggregateType: 'order',
+        aggregateId: order.id,
+        payload: { changed: ['location'], stage: updated.stage, version: updated.version },
+      });
+      return { ok: true, value: updated };
+    });
+  }
+
   /** Confirms many orders; see {@link confirm}. */
   bulkConfirm(tenant: TenantContext, ids: readonly string[]): Promise<MutationResult<BulkResult>> {
     return this.#bulk(ids, (id) => this.confirm(tenant, id));
@@ -2419,14 +2499,20 @@ export class OrderService {
     });
   }
 
-  /** The location named, which must be active; or the primary location. */
+  /**
+   * The location named, which must be active; or, with none named, the first fulfilling online
+   * orders that has all of `lines` for sale, the primary otherwise (INV-10, ADR-355).
+   */
   async #location(
     tx: Tx,
     shopId: string,
     locationId: string | null,
     field: string[],
+    lines: readonly { variantId: string; quantity: number }[],
   ): Promise<{ ok: true; value: LocationRecord } | { ok: false; error: FieldError }> {
-    if (!locationId) return { ok: true, value: await this.locations.primaryOf(tx, shopId) };
+    if (!locationId) {
+      return { ok: true, value: await this.locations.forOrderIn(tx, shopId, lines) };
+    }
     const location = (await this.locations.locationsOf(tx, shopId, [locationId])).get(locationId);
     if (!location) {
       return { ok: false, error: { field, code: 'NOT_FOUND', message: 'Location not found' } };

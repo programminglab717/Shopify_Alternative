@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-354 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-355 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -362,6 +362,7 @@
 | 352 | Goods received on a purchase order set what their variants cost: a line's cost averaged with what was on hand at the variant's cost before, weighted by units, rounded to the paisa; the order's cost where none was on hand or none was known; in the same transaction as the receipt | Accepted |
 | 353 | A purchase order printed for its supplier: one A4 page from the core's documents, in English, Urdu or both, with the shop, the order and its date, the supplier and their reference, where the goods go and by when, and each line with what it costs where the shop said; the shared document enums moved to the API package | Accepted |
 | 354 | What runs low is ordered from the stock page: each low variant with what of it is on order and who supplied it last, those chosen opening a new purchase order filled in with enough of each for twice the low mark, from the supplier most came from, at the cost paid last | Accepted |
+| 355 | An order ships from the first location fulfilling online orders that has all of it, the primary first, or the primary; and from another chosen on its page until it is packed, its stock committed there and let go where it was in one change | Accepted |
 
 ---
 
@@ -14108,3 +14109,35 @@
     levels can follow with forecasting.
   * **Incoming on every inventory level:** the stock page asks only of what runs low; levels can
     carry it when transfers in transit need it too.
+
+## ADR-355 · An order ships from the first location fulfilling online orders that has all of it, the primary first, or the primary; and from another chosen on its page until it is packed, its stock committed there and let go where it was in one change
+
+* **Context:**
+  * Every order ships from one location and commits its stock there (ADR-044, ADR-131). With none
+    named, as at checkout, that was the primary, always.
+  * The storefront counts stock at every active location that fulfils online orders (ADR-125), so
+    an item kept only at a second shop showed as for sale, and checkout then refused it as out of
+    stock at the primary.
+  * Nothing moved an order to another location once placed, short of cancelling it (INV-10).
+* **Decision:**
+  * **Chosen when placed:** with no location named, by checkout, staff, apps or a draft placed, the
+    first active location that fulfils online orders and has every tracked item of the order for
+    sale, the primary first, then by name; the primary where none has it all, which refuses it
+    as before. Read without locks; committing checks it again (ADR-022).
+  * **`orderLocationChange(id, locationId)`**, with `write_orders`: the order's stock committed at
+    the new active location and let go at the old in one change (`recommit`, ADR-131), refused
+    with OUT_OF_STOCK naming what is short there. Only before it is packed or anything has
+    shipped; a packed order is unpacked first. The timeline says "Ships from Karachi store", and
+    `order.updated` carries `location`.
+  * **In the admin**, every order's page says where it ships from; those who work parcels choose
+    another until it is packed.
+* **Consequences:**
+  * An item a shop keeps only in Karachi sells online and ships from Karachi.
+  * A shop moves an order to the branch nearer its customer, or to one that has it.
+  * Not yet: an order split between locations by itself (ADR-135 splits it by hand); rules by the
+    customer's city; the orders list by location.
+* **Alternatives:**
+  * **The nearest location by the customer's city:** most shops here ship from one city; which one
+    has the goods matters more, and staff can move it.
+  * **Splitting the order among locations at once:** two parcels cost two delivery charges the
+    customer did not agree to.

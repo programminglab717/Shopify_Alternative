@@ -130,7 +130,8 @@ export class DraftOrderResolver {
 
   @ResolveField(() => Location, {
     nullable: true,
-    description: 'Where the order will ship from; null for the primary location when it is placed.',
+    description:
+      'Where the order will ship from; null for one chosen when it is placed, as orderCreate does.',
   })
   async location(
     @CurrentTenant() tenant: TenantContext,

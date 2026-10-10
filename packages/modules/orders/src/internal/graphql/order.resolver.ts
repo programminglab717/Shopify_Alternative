@@ -55,6 +55,7 @@ import {
   OrderEventConnection,
   OrderEventsArgs,
   OrderMarkAsPaidPayload,
+  OrderLocationChangePayload,
   OrderMarkPackedPayload,
   OrderMarkUnpackedPayload,
   OrderPhoneRevealPayload,
@@ -322,6 +323,25 @@ export class OrderResolver {
   ): Promise<OrderMarkUnpackedPayload> {
     const result = await this.service.markUnpacked(tenant, uuidOf('order', id));
     return payload(OrderMarkUnpackedPayload, result, tenant);
+  }
+
+  @Mutation(() => OrderLocationChangePayload, {
+    description:
+      'Ships the order from another active location: its stock committed there and let go where ' +
+      'it was, refused if that location is short. Only before it is packed or anything has shipped.',
+  })
+  @RequireScopes('write_orders')
+  async orderLocationChange(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('locationId', { type: () => ID }) locationId: string,
+  ): Promise<OrderLocationChangePayload> {
+    const result = await this.service.changeLocation(
+      tenant,
+      uuidOf('order', id),
+      uuidOf('location', locationId),
+    );
+    return payload(OrderLocationChangePayload, result, tenant);
   }
 
   @Mutation(() => OrderBulkPayload, {

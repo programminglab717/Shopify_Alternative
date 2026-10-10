@@ -103,7 +103,7 @@ export interface DraftOrderInput {
   advanceDue?: string | null;
   shippingPrice?: string | null;
   discount?: string | null;
-  /** Where the order will ship from; the primary location when it is placed, if left out. */
+  /** Where the order will ship from; chosen when it is placed (ADR-355), if left out. */
   locationId?: string | null;
   note?: string | null;
   tags?: string[] | null;

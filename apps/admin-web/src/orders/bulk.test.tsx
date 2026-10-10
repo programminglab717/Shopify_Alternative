@@ -12,6 +12,7 @@ const listed = (id: string, name: string, stage: string) => ({
   stage,
   paymentMethod: 'CASH_ON_DELIVERY',
   overPlanLimit: false,
+  location: { id: 'loc_1', name: 'Main location' },
   totalPrice: rupees('2700'),
   customer: { displayName: 'Ayesha Khan' },
   shippingAddress: { name: 'Ayesha Khan', city: 'Lahore' },

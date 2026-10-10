@@ -40,6 +40,7 @@ function order(extra: Record<string, unknown> = {}) {
       confirmationStatus: 'PENDING',
       cancelReason: null,
       overPlanLimit: false,
+      location: { id: 'loc_1', name: 'Main location' },
       note: '',
       tags: [],
       phone: '+923001234567',

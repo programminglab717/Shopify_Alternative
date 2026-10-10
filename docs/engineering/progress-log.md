@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, which location an order's stock comes from** (INV-10): rules for the shop's locations
-that fulfil online orders, the one with all of an order's goods first, shown on the order's page
-and changed there before it is packed; then section by section as the alpha's shops need them.
-Urdu handles wait, as decided.
+**Next, the orders each location ships, in the admin** (INV-10, ORD-01): the orders list and
+its stages filtered by the location they ship from, so that each shop's or warehouse's packers
+see their own; then section by section as the alpha's shops need them. Urdu handles wait, as
+decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### Where an order ships from, in the core and the admin
+
+* **Chosen and changed** ([ADR-355](../architecture/13-decision-log.md#adr-355--an-order-ships-from-the-first-location-fulfilling-online-orders-that-has-all-of-it-the-primary-first-or-the-primary-and-from-another-chosen-on-its-page-until-it-is-packed-its-stock-committed-there-and-let-go-where-it-was-in-one-change)): an order placed with no location named ships from the first
+  location fulfilling online orders that has all of it, the primary first, so an item kept only at
+  a second shop sells and ships from there. `orderLocationChange` moves an order's stock to another
+  location until it is packed, refused where that location is short. Every order's page says
+  where it ships from, and those who work parcels move it.
+* **Tried in Chromium against the core:** on the seed's shop, #1003 shipped from Lahore warehouse;
+  moving it to Karachi store was refused as out of stock there; with three in Karachi it moved,
+  its unit committed in Karachi and let go in Lahore, the timeline saying "Ships from Karachi
+  store"; and it moved back. No errors in the browser.
+* 2483 tests: an order placed where all of it is, and moved, refused or kept, in the orders
+  module; through the Admin API; in the admin, moved by a packer and kept once packed.
 
 ### 7acba5f · What runs low ordered from the stock page, in the core and the admin
 
