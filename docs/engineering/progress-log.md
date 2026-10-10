@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, a gateway's credentials and the message credit's history in the admin** (PAY-01, BIL-03):
-a gateway account's credentials changed, or the account moved from its test environment to the
-live one, once the member confirms who they are; and what added to and spent the shop's message
-credit, the newest first; then section by section as the alpha's shops need them.
+**Next, what is left to put in Urdu, in the admin** (OS-06): the shop's products, collections,
+pages, blogs, articles and menus, each with how much of it has its Urdu and what of that is out of
+date since its words changed, opening where its Urdu is written; then section by section as the
+alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -19,6 +19,30 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### A gateway's credentials changed, and what changed the message credit, in the admin
+
+* **A gateway's credentials** ([ADR-339](../architecture/13-decision-log.md#adr-339--a-gateway-accounts-credentials-are-changed-in-place-every-one-or-the-account-moved-between-its-test-environment-and-the-real-one-with-that-ones-credentials-once-the-member-confirms-who-they-are-and-the-billing-page-lists-what-changed-the-message-credit-the-newest-first-with-the-balance-after-each)): each of the shop's online payment accounts offers to
+  change its credentials, every one its gateway asks for, which replace those it has once the
+  member confirms who they are; the same form moves it between its test environment and the real
+  one, saying first what that means. It keeps its webhook address and its place among the
+  gateways.
+* **What changed the credit:** under the message credit's balance on the billing page, credit
+  bought or given by Hatti, each message paid for by its channel and kind, an SMS's parts, and a
+  WhatsApp message's price given back, each with when and the balance after, the newest first:
+  20, then up to 100.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, the test
+  gateway's account was moved to its test environment with a new secret, which the page and the
+  core's row then showed, ending in 5678, and back to the real one with another, ending in 1234
+  as the one before did; its secret is now the check's own, which the test gateway signs with as
+  it would any. No confirmation was asked, as the owner had signed in minutes before. The billing
+  page listed the latest 20 of the credit's 60 changes, WhatsApp messages at Rs 4.62 each with the
+  balance after each, then all 60 down to the Rs 1,000 Hatti gave to try messages with. No errors
+  in the browser.
+* 2392 tests: a gateway's credentials changed once the owner confirms who they are and moved
+  to its real environment after its warning, credentials the core refused said, and optional
+  ones sent when given; the credit's changes listed, a message, one given back, an SMS in parts,
+  credit bought and given, then more; and nothing yet.
 
 ### b136f57 · Online payments on an order's page, and what paying online takes off, in the admin
 

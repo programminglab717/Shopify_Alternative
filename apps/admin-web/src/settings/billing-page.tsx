@@ -7,18 +7,22 @@ import {
   BillingInvoiceTransferReportMutation,
   BillingPlanChangeMutation,
   BillingQuery,
+  BillingWalletEntriesQuery,
 } from '../api/operations';
 import type {
   BillingData,
   BillingInterval,
   BillingInvoiceValue,
   BillingPlanValue,
+  BillingWalletEntriesData,
+  BillingWalletEntryValue,
   UserError,
 } from '../api/types';
 import { useRecentAuthentication } from '../auth/confirm-identity';
 import { errorText } from '../i18n/errors';
-import { formatDate, formatMoney } from '../i18n/format';
+import { formatDate, formatDateTime, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
+import type { Translate } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { FormSection, problemText } from '../products/product-form';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
@@ -276,6 +280,93 @@ function Plans({ data, owner, run }: { data: BillingData; owner: boolean; run: R
   );
 }
 
+/** The most of the credit's changes the core lists. */
+const MOST_ENTRIES = 100;
+
+/** What a change to the credit was, in the merchant's words. */
+function entryText(entry: BillingWalletEntryValue, t: Translate): string {
+  const channel = entry.channel ? t(`messages.channel.${entry.channel}` as MessageKey) : '';
+  switch (entry.kind) {
+    case 'TOP_UP':
+      return t('wallet.kind.TOP_UP');
+    case 'GRANT':
+      return entry.note
+        ? t('wallet.kind.GRANT_NOTE', { note: entry.note })
+        : t('wallet.kind.GRANT');
+    case 'MESSAGE_REFUND':
+      return t('wallet.kind.MESSAGE_REFUND', { channel });
+    case 'MESSAGE': {
+      const what = entry.category
+        ? t(`wallet.category.${entry.category}` as MessageKey)
+        : t('wallet.category.OTHER');
+      return entry.parts && entry.parts > 1
+        ? t('wallet.kind.MESSAGE_PARTS', { channel, what, parts: String(entry.parts) })
+        : t('wallet.kind.MESSAGE', { channel, what });
+    }
+  }
+}
+
+/**
+ * What changed the shop's message credit, the newest first (BIL-03, ADR-155): credit bought or
+ * given by Hatti, each message paid for at its price, and what an undelivered WhatsApp message
+ * was given back; with what the credit held after each. The latest 20, then up to 100.
+ */
+function CreditHistory() {
+  const { t, locale } = useLocale();
+  const timezone = useShopTimezone();
+  const [first, setFirst] = useState(20);
+  const query = useAdminQuery<BillingWalletEntriesData>(
+    ['billingWalletEntries'],
+    BillingWalletEntriesQuery,
+    { first },
+    { keepPrevious: true },
+  );
+
+  if (query.isPending) return <p className="text-secondary">{t('state.loading')}</p>;
+  if (query.isError) return <Alert tone="danger">{errorText(query.error, t)}</Alert>;
+  const entries = query.data.billingWalletEntries;
+  return (
+    <div className="flex flex-col gap-2 border-t border-line pt-3">
+      <h3 className="font-medium">{t('wallet.history')}</h3>
+      {entries.length === 0 ? (
+        <p className="text-secondary">{t('wallet.none')}</p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-line">
+          {entries.map((entry) => {
+            const added = Number(entry.amount.amount) > 0;
+            return (
+              <li key={entry.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2">
+                <span className="min-w-0 flex-1">{entryText(entry, t)}</span>
+                <span className={`num font-medium ${added ? 'text-success' : ''}`}>
+                  {added ? '+' : ''}
+                  {formatMoney(entry.amount.amount)}
+                </span>
+                <span className="w-full text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                  {formatDateTime(entry.createdAt, timezone, locale)}
+                  {' · '}
+                  <span className="whitespace-nowrap">
+                    {t('wallet.after', { amount: formatMoney(entry.balance.amount) })}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {entries.length === first && first < MOST_ENTRIES && (
+        <Button
+          variant="tertiary"
+          className="self-start"
+          busy={query.isFetching}
+          onClick={() => setFirst(MOST_ENTRIES)}
+        >
+          {t('wallet.more')}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function Credit({ data, owner, run }: { data: BillingData; owner: boolean; run: Recent }) {
   const { t } = useLocale();
   const buy = useAdminMutation<
@@ -334,6 +425,7 @@ function Credit({ data, owner, run }: { data: BillingData; owner: boolean; run: 
         </form>
       )}
       <Problems problems={problems} />
+      <CreditHistory />
     </FormSection>
   );
 }

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-338 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-339 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -346,6 +346,7 @@
 | 336 | A booking that failed is put right from the bookings list, where it is its order's latest: the city its order's address writes matched against the courier's names; where the courier has none, one of its nearest chosen, or another typed, kept as the shop's own and the order booked again with the same account; and each courier account's own names listed in settings, looked up, named and forgotten | Accepted |
 | 337 | An order waiting for its money says on its page what it waits for, its advance or its transfer, and shows the receipts its customer sent; owners and managers record money received by hand, what it waits for unless they say otherwise, and an order waiting for an advance is not marked paid in full; and those who speak with customers make a new link for the order, shown once to copy or send on WhatsApp, the one before stopping | Accepted |
 | 338 | An order's page lists the payments its customer started online and the refunds asked of their gateway, and owners and managers settle a refund whose answer never came as the gateway's dashboard shows it; what paying online takes off is set beside the shop's gateways, in the fields the transfer's uses | Accepted |
+| 339 | A gateway account's credentials are changed in place, every one, or the account moved between its test environment and the real one with that one's credentials, once the member confirms who they are; and the billing page lists what changed the message credit, the newest first, with the balance after each | Accepted |
 
 ---
 
@@ -13551,3 +13552,39 @@
     its money.
   * **Settling from the refunds in the money section:** a refund whose answer never came is not
     the order's refund until it is settled, so it sits under its payment.
+
+## ADR-339 · A gateway account's credentials are changed in place, every one, or the account moved between its test environment and the real one with that one's credentials, once the member confirms who they are; and the billing page lists what changed the message credit, the newest first, with the balance after each
+
+* **Context:**
+  * A shop's gateway accounts keep their credentials sealed ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)), connected from the
+    admin once the member confirms who they are ([ADR-274](#adr-274--the-admins-settings-take-the-shops-online-payments-and-its-brand-a-gateway-connected-once-the-member-confirms-who-they-are-its-webhook-address-given-to-copy-into-the-gateways-dashboard-the-gateways-put-in-the-order-customers-are-offered-them-or-archived-the-shops-logo-and-square-logo-uploaded-from-the-phone-and-its-whatsapp-number)). A gateway's keys are changed
+    now and then, and a shop tries a gateway in its test environment before it takes real
+    payments; the admin offered only to archive the account and connect another, which has a new
+    webhook address to set in the gateway's dashboard and comes last among the gateways.
+  * The message credit pays for each message as it is sent, in a ledger beside the balance
+    ([ADR-155](#adr-155--a-shops-messages-are-paid-from-credit-in-rupees-it-buys-from-hatti-with-an-invoice-of-its-own-each-is-charged-as-it-is-sent-at-what-it-costs-hatti-and-hattis-fee-in-a-ledger-kept-beside-the-balance-a-message-the-credit-cannot-pay-for-waits-and-a-code-is-not-sent-and-what-whatsapp-could-not-deliver-is-given-back)); the admin's billing ([ADR-275](#adr-275--the-admins-billing-shows-the-shops-plan-with-hatti-and-what-it-pays-the-plans-side-by-side-monthly-or-yearly-one-chosen-or-kept-by-the-owner-once-they-confirm-who-they-are-an-invoice-paid-through-hattis-gateway-or-by-transfer-or-raast-with-its-reference-given-and-message-credit-bought-managers-read-it)) showed the balance alone, so a shop
+    could not see what its credit went on.
+* **Decision:**
+  * **Credentials changed:** each account offers to change its credentials: every field its
+    gateway asks for, as its dashboard shows them now, replacing those it has, through
+    `paymentGatewayAccountUpdate`; optional ones left blank are not sent. The core asks who is
+    signed in to confirm it first, as it does for connecting one.
+  * **Test or real:** the same form moves the account between its test environment and the real
+    one, saying first what that means, with that environment's credentials, which the core
+    requires. The account keeps its webhook address and its place among the shop's gateways.
+  * **What changed the credit:** under the balance, the billing page lists `billingWalletEntries`,
+    the newest first: credit bought, credit given by Hatti with its note, each message paid for by
+    its channel and kind, an SMS's parts, and a WhatsApp message's price given back when it could
+    not be delivered; each with when and what the credit held after it. The latest 20, then up to
+    the core's 100. Owners and managers read it, as they read the rest of billing.
+* **Consequences:**
+  * A shop changes a gateway's keys, or starts taking real payments after testing, without
+    connecting the gateway again.
+  * A shop sees where its message credit went, message by message, before it buys more.
+  * Not yet: the order a message was about, from the credit's list; the credit's changes beyond
+    the latest 100.
+* **Alternatives:**
+  * **Archive and connect again:** a new webhook address to copy into the gateway's dashboard, and
+    the account last in the order customers are offered gateways.
+  * **The credit's changes on a page of their own:** they explain the balance, so they sit under
+    it.

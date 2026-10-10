@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext } from 'react';
 import { ShopQuery } from '../api/operations';
 import { useSessionStore } from '../auth/context';
@@ -20,7 +20,12 @@ export function useAdminQuery<T>(
   key: readonly unknown[],
   document: string,
   variables?: Record<string, unknown>,
-  options: { enabled?: boolean; refetchInterval?: (data: T | undefined) => number | false } = {},
+  options: {
+    enabled?: boolean;
+    refetchInterval?: (data: T | undefined) => number | false;
+    /** Shows what the variables before fetched while new ones are fetched, as for "Show more". */
+    keepPrevious?: boolean;
+  } = {},
 ) {
   const store = useSessionStore();
   const shop = useShop();
@@ -30,6 +35,7 @@ export function useAdminQuery<T>(
     queryFn: () => store.graphql<T>(shop.id, document, variables),
     enabled: options.enabled ?? true,
     refetchInterval: refetchInterval ? (query) => refetchInterval(query.state.data) : undefined,
+    placeholderData: options.keepPrevious ? keepPreviousData : undefined,
   });
 }
 

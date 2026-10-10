@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BillingInvoiceValue, BillingPlanValue } from '../api/types';
+import type { BillingInvoiceValue, BillingPlanValue, BillingWalletEntryValue } from '../api/types';
 import {
   fakeCore,
   LATER,
@@ -54,15 +54,34 @@ const BANK = {
   raastId: null,
 };
 
-/** The core's billing for a shop on Free, as each mutation leaves it. */
+const entry = (
+  id: string,
+  kind: BillingWalletEntryValue['kind'],
+  amount: string,
+  balance: string,
+  extra: Partial<BillingWalletEntryValue> = {},
+): BillingWalletEntryValue => ({
+  id,
+  kind,
+  amount: rupees(amount),
+  balance: rupees(balance),
+  channel: null,
+  category: null,
+  parts: null,
+  note: null,
+  createdAt: LATER,
+  ...extra,
+});
+
+/** The core's billing for a shop on Free, as each mutation leaves it; and its credit's changes. */
 function billingCore(
   role: 'owner' | 'manager',
-  state: { open: BillingInvoiceValue | null },
+  state: { open: BillingInvoiceValue | null; entries?: BillingWalletEntryValue[] },
   confirmed = { value: true },
 ) {
   return fakeCore(
     role,
-    (operation) => {
+    (operation, variables) => {
       switch (operation) {
         case 'Billing':
           return {
@@ -107,6 +126,10 @@ function billingCore(
           };
         case 'BillingCreditsBuy':
           return { billingCreditsBuy: { invoice: { id: 'inv_2' }, userErrors: [] } };
+        case 'BillingWalletEntries':
+          return {
+            billingWalletEntries: (state.entries ?? []).slice(0, variables.first as number),
+          };
         default:
           throw new Error(`unexpected ${operation}`);
       }
@@ -195,6 +218,63 @@ describe('Plan and billing in the admin', () => {
         input: { amount: '2000' },
       }),
     );
+  });
+
+  it('lists what changed the message credit, the newest first, and shows more of it', async () => {
+    signedIn();
+    const whatsapp = { channel: 'WHATSAPP', category: 'UTILITY' } as const;
+    const entries = [
+      entry('we_1', 'MESSAGE', '-4.50', '120.50', whatsapp),
+      entry('we_2', 'MESSAGE_REFUND', '4.50', '125.00', whatsapp),
+      entry('we_3', 'MESSAGE', '-3.00', '120.50', {
+        channel: 'SMS',
+        category: 'AUTHENTICATION',
+        parts: 2,
+      }),
+      entry('we_4', 'TOP_UP', '100.00', '123.50'),
+      entry('we_5', 'GRANT', '25.00', '23.50', { note: 'Welcome credit' }),
+      ...Array.from({ length: 18 }, (_, index) =>
+        entry(`we_${6 + index}`, 'MESSAGE', '-1.50', '0.00', {
+          channel: 'WHATSAPP',
+          category: 'MARKETING',
+        }),
+      ),
+    ];
+    const core = billingCore('manager', { open: null, entries });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/billing');
+
+    const heading = await screen.findByText('What changed it');
+    const rows = () => heading.parentElement!.querySelectorAll('li');
+    expect(rows()).toHaveLength(20);
+    expect([...rows()].slice(0, 5).map((row) => row.firstElementChild?.textContent)).toEqual([
+      "WhatsApp: an order's news",
+      'Given back: a WhatsApp message not delivered',
+      'SMS in 2 parts: a code to prove a number',
+      'Credit bought',
+      'Given by Hatti: Welcome credit',
+    ]);
+    expect(rows()[0]!.textContent).toContain('-Rs 4.50');
+    expect(rows()[0]!.textContent).toContain('Balance after: Rs 120.50');
+    expect(rows()[3]!.textContent).toContain('+Rs 100');
+
+    await press('Show more');
+    await waitFor(() => expect(rows()).toHaveLength(23));
+    expect(
+      core.sent
+        .filter((each) => each.operation === 'BillingWalletEntries')
+        .map((each) => each.variables),
+    ).toEqual([{ first: 20 }, { first: 100 }]);
+    expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
+  });
+
+  it('says nothing changed the credit yet', async () => {
+    signedIn();
+    vi.stubGlobal('fetch', billingCore('owner', { open: null }).fetcher);
+    renderAdmin('/shop_1/settings/billing');
+
+    await screen.findByText('Nothing yet: credit bought and the messages it pays for show here.');
+    expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
   });
 
   it('shows a manager the plan and invoices, which the owner alone changes and pays', async () => {

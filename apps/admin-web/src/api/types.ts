@@ -940,6 +940,25 @@ export interface BillingInvoiceValue {
   }[];
 }
 
+export type BillingWalletEntryKind = 'GRANT' | 'MESSAGE' | 'MESSAGE_REFUND' | 'TOP_UP';
+
+/** A change to the shop's message credit: bought, given, or taken for a message (BIL-03). */
+export interface BillingWalletEntryValue {
+  id: string;
+  kind: BillingWalletEntryKind;
+  amount: MoneyValue;
+  balance: MoneyValue;
+  channel: MessageChannel | null;
+  category: 'AUTHENTICATION' | 'MARKETING' | 'UTILITY' | null;
+  parts: number | null;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface BillingWalletEntriesData {
+  billingWalletEntries: BillingWalletEntryValue[];
+}
+
 export interface BillingData {
   billingSubscription: {
     plan: BillingPlanValue;

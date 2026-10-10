@@ -1,4 +1,4 @@
-import { Archive, ArrowDown, ArrowUp, Copy, CreditCard, Plus } from 'lucide-react';
+import { Archive, ArrowDown, ArrowUp, Copy, CreditCard, KeyRound, Plus } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -6,6 +6,7 @@ import {
   PaymentGatewayAccountArchiveMutation,
   PaymentGatewayAccountConnectMutation,
   PaymentGatewayAccountsReorderMutation,
+  PaymentGatewayAccountUpdateMutation,
   PaymentGatewaysQuery,
 } from '../api/operations';
 import type {
@@ -156,16 +157,116 @@ function ConnectForm({
   );
 }
 
+/**
+ * An account's credentials replaced, every one, as the gateway's dashboard shows them now; or the
+ * account moved between its test environment and the real one, with that one's credentials. The
+ * core asks who is signed in to confirm it first.
+ */
+function CredentialsForm({
+  account,
+  offered,
+  onDone,
+  onCancel,
+}: {
+  account: PaymentGatewayAccountDetail;
+  offered: PaymentGatewayOffered;
+  onDone: (message: string) => void;
+  onCancel: () => void;
+}) {
+  const { t } = useLocale();
+  const { run, panel } = useRecentAuthentication();
+  const update = useAdminMutation<
+    { paymentGatewayAccountUpdate: PaymentGatewayAccountPayloadData },
+    { id: string; input: Record<string, unknown> }
+  >(PaymentGatewayAccountUpdateMutation);
+  const wasSandbox = account.environment === 'SANDBOX';
+  const [sandbox, setSandbox] = useState(wasSandbox);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [problems, setProblems] = useState<string[]>([]);
+  const gateway = account.gatewayName;
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    setProblems([]);
+    const credentials = offered.credentials
+      .map((field) => ({ key: field.key, value: (values[field.key] ?? '').trim() }))
+      .filter((credential) => credential.value);
+    void run(
+      async () => {
+        const { paymentGatewayAccountUpdate: payload } = await update.mutateAsync({
+          id: account.id,
+          input: { environment: sandbox ? 'SANDBOX' : 'PRODUCTION', credentials },
+        });
+        if (payload.userErrors.length > 0) {
+          setProblems(payload.userErrors.map((error) => problemText(error, t)));
+        } else if (payload.paymentGatewayAccount) {
+          onDone(
+            sandbox === wasSandbox
+              ? t('gateways.changed', { gateway })
+              : t(sandbox ? 'gateways.nowTest' : 'gateways.nowLive', { gateway }),
+          );
+        }
+      },
+      (failure) => setProblems([errorText(failure, t)]),
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <form
+        onSubmit={onSubmit}
+        className="flex flex-col gap-3 rounded-control border border-line p-3"
+      >
+        <span className="font-medium">{t('gateways.changeTitle', { gateway })}</span>
+        <p className="text-secondary">{t('gateways.changeHint')}</p>
+        {offered.credentials.map((field) => (
+          <TextField
+            key={field.key}
+            label={field.optional ? t('gateways.optional', { label: field.label }) : field.label}
+            type="password"
+            autoComplete="off"
+            ltr
+            required={!field.optional}
+            value={values[field.key] ?? ''}
+            onChange={(event) => setValues({ ...values, [field.key]: event.target.value })}
+          />
+        ))}
+        <CheckField
+          label={t('gateways.sandbox')}
+          hint={t('gateways.sandboxHint')}
+          checked={sandbox}
+          onChange={setSandbox}
+        />
+        {sandbox !== wasSandbox && (
+          <Alert tone={sandbox ? 'warning' : 'info'}>
+            {t(sandbox ? 'gateways.movingToTest' : 'gateways.movingToLive', { gateway })}
+          </Alert>
+        )}
+        <Problems problems={problems} />
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" busy={update.isPending}>
+            {t('gateways.saveCredentials')}
+          </Button>
+          <Button variant="tertiary" onClick={onCancel}>
+            {t('returns.cancel')}
+          </Button>
+        </div>
+      </form>
+      {panel}
+    </div>
+  );
+}
+
 function AccountRow({
   account,
-  refunds,
+  offered,
   first,
   last,
   busy,
   onMove,
 }: {
   account: PaymentGatewayAccountDetail;
-  refunds: PaymentGatewayOffered['refunds'] | undefined;
+  offered: PaymentGatewayOffered | undefined;
   first: boolean;
   last: boolean;
   busy: boolean;
@@ -177,7 +278,10 @@ function AccountRow({
     { id: string }
   >(PaymentGatewayAccountArchiveMutation);
   const [archiving, setArchiving] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const [said, setSaid] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
+  const refunds = offered?.refunds;
 
   const onArchive = async () => {
     setProblem(null);
@@ -230,6 +334,18 @@ function AccountRow({
             {t('gateways.down')}
           </Button>
         )}
+        {offered && !changing && (
+          <Button
+            variant="tertiary"
+            icon={<KeyRound aria-hidden className="size-5" />}
+            onClick={() => {
+              setChanging(true);
+              setSaid('');
+            }}
+          >
+            {t('gateways.change')}
+          </Button>
+        )}
         {archiving ? (
           <>
             <span className="self-center">{t('gateways.archiveSure')}</span>
@@ -250,6 +366,18 @@ function AccountRow({
           </Button>
         )}
       </div>
+      {offered && changing && (
+        <CredentialsForm
+          account={account}
+          offered={offered}
+          onDone={(message) => {
+            setChanging(false);
+            setSaid(message);
+          }}
+          onCancel={() => setChanging(false)}
+        />
+      )}
+      {said && <Alert tone="success">{said}</Alert>}
       {problem && <Alert tone="danger">{problem}</Alert>}
     </li>
   );
@@ -400,7 +528,7 @@ export function OnlinePaymentsPage() {
               <AccountRow
                 key={account.id}
                 account={account}
-                refunds={gateways.find((each) => each.gateway === account.gateway)?.refunds}
+                offered={gateways.find((each) => each.gateway === account.gateway)}
                 first={index === 0}
                 last={index === accounts.length - 1}
                 busy={reorder.isPending}

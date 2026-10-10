@@ -2905,6 +2905,32 @@ const en = {
   'online.refund.notSure':
     "Only if {gateway}'s dashboard shows it was not given back: its amount can then be refunded again.",
   'online.refund.saveNot': 'Record it not given back',
+  'gateways.change': 'Change its credentials',
+  'gateways.changeTitle': "{gateway}'s credentials",
+  'gateways.changeHint':
+    'Give all of them, as its dashboard shows them now: they replace those it has.',
+  'gateways.saveCredentials': 'Save the credentials',
+  'gateways.movingToLive':
+    "{gateway} moves to its real environment: give that environment's credentials. Customers pay through it for real from then on.",
+  'gateways.movingToTest':
+    "{gateway} moves to its test environment: give that environment's credentials. Payments through it move no money until it moves back.",
+  'gateways.changed': "{gateway}'s credentials are changed.",
+  'gateways.nowLive': '{gateway} now takes real payments.',
+  'gateways.nowTest': '{gateway} now takes test payments, which move no money.',
+  'wallet.history': 'What changed it',
+  'wallet.none': 'Nothing yet: credit bought and the messages it pays for show here.',
+  'wallet.more': 'Show more',
+  'wallet.after': 'Balance after: {amount}',
+  'wallet.kind.TOP_UP': 'Credit bought',
+  'wallet.kind.GRANT': 'Given by Hatti',
+  'wallet.kind.GRANT_NOTE': 'Given by Hatti: {note}',
+  'wallet.kind.MESSAGE': '{channel}: {what}',
+  'wallet.kind.MESSAGE_PARTS': '{channel} in {parts} parts: {what}',
+  'wallet.kind.MESSAGE_REFUND': 'Given back: a {channel} message not delivered',
+  'wallet.category.UTILITY': "an order's news",
+  'wallet.category.AUTHENTICATION': 'a code to prove a number',
+  'wallet.category.MARKETING': 'marketing',
+  'wallet.category.OTHER': 'a message',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5785,6 +5811,31 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'online.refund.notSure':
     'صرف تب جب {gateway} کا ڈیش بورڈ دکھائے کہ یہ واپس نہیں ہوئے: پھر یہ رقم دوبارہ واپس کی جا سکتی ہے۔',
   'online.refund.saveNot': 'واپس نہیں کیے گئے درج کریں',
+  'gateways.change': 'کریڈینشلز بدلیں',
+  'gateways.changeTitle': '{gateway} کے کریڈینشلز',
+  'gateways.changeHint': 'سب دیں، جیسے اس کا ڈیش بورڈ اب دکھاتا ہے: یہ پہلے والوں کی جگہ لیں گے۔',
+  'gateways.saveCredentials': 'کریڈینشلز محفوظ کریں',
+  'gateways.movingToLive':
+    '{gateway} اپنے اصل ماحول میں چلا جائے گا: اسی ماحول کے کریڈینشلز دیں۔ اس کے بعد کسٹمرز اس کے ذریعے اصل ادائیگی کریں گے۔',
+  'gateways.movingToTest':
+    '{gateway} اپنے ٹیسٹ ماحول میں چلا جائے گا: اسی ماحول کے کریڈینشلز دیں۔ واپس آنے تک اس کے ذریعے ادائیگیوں سے کوئی رقم منتقل نہیں ہوگی۔',
+  'gateways.changed': '{gateway} کے کریڈینشلز بدل گئے۔',
+  'gateways.nowLive': '{gateway} اب اصل ادائیگیاں لیتا ہے۔',
+  'gateways.nowTest': '{gateway} اب ٹیسٹ ادائیگیاں لیتا ہے، جن سے کوئی رقم منتقل نہیں ہوتی۔',
+  'wallet.history': 'اس میں کیا بدلا',
+  'wallet.none': 'ابھی کچھ نہیں: خریدا گیا کریڈٹ اور اس سے ادا ہونے والے میسجز یہاں دکھیں گے۔',
+  'wallet.more': 'مزید دکھائیں',
+  'wallet.after': 'اس کے بعد بیلنس: {amount}',
+  'wallet.kind.TOP_UP': 'کریڈٹ خریدا گیا',
+  'wallet.kind.GRANT': 'ہٹی کی طرف سے دیا گیا',
+  'wallet.kind.GRANT_NOTE': 'ہٹی کی طرف سے دیا گیا: {note}',
+  'wallet.kind.MESSAGE': '{channel}: {what}',
+  'wallet.kind.MESSAGE_PARTS': '{channel}، {parts} حصوں میں: {what}',
+  'wallet.kind.MESSAGE_REFUND': 'واپس ملا: {channel} میسج جو ڈیلیور نہ ہو سکا',
+  'wallet.category.UTILITY': 'آرڈر کی خبر',
+  'wallet.category.AUTHENTICATION': 'نمبر کی تصدیق کا کوڈ',
+  'wallet.category.MARKETING': 'مارکیٹنگ',
+  'wallet.category.OTHER': 'ایک میسج',
 };
 
 export const messages: Readonly<

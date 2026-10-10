@@ -2012,6 +2012,25 @@ export const PaymentGatewayAccountConnectMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/**
+ * A gateway account's credentials replaced, every one, or the account moved between its test
+ * environment and the real one with that one's credentials; confirmed recently.
+ */
+export const PaymentGatewayAccountUpdateMutation = /* GraphQL */ `
+  mutation PaymentGatewayAccountUpdate($id: ID!, $input: PaymentGatewayAccountInput!) {
+    paymentGatewayAccountUpdate(id: $id, input: $input) {
+      paymentGatewayAccount {
+        ...GatewayAccount
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${GATEWAY_ACCOUNT}
+  ${USER_ERRORS}
+`;
+
 /** A gateway account archived: no new payments through it. */
 export const PaymentGatewayAccountArchiveMutation = /* GraphQL */ `
   mutation PaymentGatewayAccountArchive($id: ID!) {
@@ -2191,6 +2210,28 @@ export const BillingQuery = /* GraphQL */ `
   }
   ${BILLING_PLAN}
   ${BILLING_INVOICE}
+  ${MONEY}
+`;
+
+/** What changed the shop's message credit, the newest first (BIL-03). */
+export const BillingWalletEntriesQuery = /* GraphQL */ `
+  query BillingWalletEntries($first: Int!) {
+    billingWalletEntries(first: $first) {
+      id
+      kind
+      amount {
+        ...Money
+      }
+      balance {
+        ...Money
+      }
+      channel
+      category
+      parts
+      note
+      createdAt
+    }
+  }
   ${MONEY}
 `;
 

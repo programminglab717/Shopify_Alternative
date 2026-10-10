@@ -112,6 +112,117 @@ describe('The shop and its online payments in settings', () => {
     });
   });
 
+  it("changes a gateway's credentials once the owner confirms who they are, and moves it to real payments", async () => {
+    let confirmed = false;
+    let current = { ...account('pga_1', JAZZCASH), environment: 'SANDBOX' };
+    const core = fakeCore(
+      'owner',
+      (operation, variables) => {
+        if (operation === 'PaymentGateways') {
+          return {
+            paymentGateways: [JAZZCASH],
+            paymentGatewayAccounts: [current],
+            onlinePaymentSettings: { updatedAt: null, discount: null },
+          };
+        }
+        if (operation === 'PaymentGatewayAccountUpdate') {
+          if (!confirmed) return REAUTHENTICATE;
+          const input = variables.input as {
+            environment: string;
+            credentials: { key: string; value: string }[];
+          };
+          if (input.credentials[0]?.value === 'MC-OLD') {
+            return {
+              paymentGatewayAccountUpdate: {
+                paymentGatewayAccount: null,
+                userErrors: [
+                  {
+                    field: ['input', 'credentials'],
+                    code: 'INVALID',
+                    message: 'JazzCash did not take these credentials',
+                  },
+                ],
+              },
+            };
+          }
+          current = { ...current, environment: input.environment, credentialsHint: 'be9f' };
+          return {
+            paymentGatewayAccountUpdate: { paymentGatewayAccount: current, userErrors: [] },
+          };
+        }
+        throw new Error(`unexpected ${operation}`);
+      },
+      (path) => {
+        if (path === '/auth/reauthenticate/options') return { methods: ['password'], phone: null };
+        if (path === '/auth/reauthenticate') {
+          confirmed = true;
+          return { authenticatedAt: LATER, sensitiveActionsUntil: LATER };
+        }
+        throw new Error(`unexpected ${path}`);
+      },
+    );
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/online-payments');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Change its credentials' }));
+    await screen.findByText("JazzCash's credentials");
+    const test = screen.getByRole('checkbox', { name: /Use its test environment/ });
+    expect(test).toHaveProperty('checked', true);
+    fireEvent.click(test);
+    expect(
+      screen.getByText(
+        "JazzCash moves to its real environment: give that environment's credentials. Customers pay through it for real from then on.",
+      ),
+    ).toBeTruthy();
+    type('Merchant ID', ' MC-LIVE ');
+    type('Password', 'live-secret');
+    await press('Save the credentials');
+    await screen.findByText('Confirm it is you');
+    fireEvent.change(screen.getAllByLabelText('Password').at(-1)!, {
+      target: { value: 'owner-password' },
+    });
+    await press('Confirm');
+
+    await screen.findByText('JazzCash now takes real payments.');
+    const updates = () =>
+      core.sent.filter((each) => each.operation === 'PaymentGatewayAccountUpdate');
+    expect(updates()).toHaveLength(2);
+    expect(updates()[1]?.variables).toEqual({
+      id: 'pga_1',
+      input: {
+        environment: 'PRODUCTION',
+        credentials: [
+          { key: 'merchantId', value: 'MC-LIVE' },
+          { key: 'password', value: 'live-secret' },
+        ],
+      },
+    });
+    await screen.findByText('ends in be9f');
+    expect(screen.queryByText('Test environment')).toBeNull();
+
+    // Credentials the core will not take are said, and the form stays.
+    await press('Change its credentials');
+    type('Merchant ID', 'MC-OLD');
+    type('Password', 'old');
+    type('Wallet MPIN (optional)', '1234');
+    await press('Save the credentials');
+    await screen.findByText('JazzCash did not take these credentials');
+    type('Merchant ID', 'MC-NEW');
+    await press('Save the credentials');
+    await screen.findByText("JazzCash's credentials are changed.");
+    expect(updates().at(-1)?.variables).toEqual({
+      id: 'pga_1',
+      input: {
+        environment: 'PRODUCTION',
+        credentials: [
+          { key: 'merchantId', value: 'MC-NEW' },
+          { key: 'password', value: 'old' },
+          { key: 'mpin', value: '1234' },
+        ],
+      },
+    });
+  });
+
   it('puts the gateways in the order customers are offered them, and archives one', async () => {
     const core = fakeCore('manager', (operation) => {
       switch (operation) {
