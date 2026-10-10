@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### What is left to put in Urdu, in the admin
+### a76bc4d · What is left to put in Urdu, in the admin
 
 * **In Urdu, kind by kind** ([ADR-340](../architecture/13-decision-log.md#adr-340--the-online-stores-in-urdu-tab-lists-the-shops-products-collections-pages-blogs-articles-menus-and-home-page-kind-by-kind-the-newest-first-each-with-how-much-of-its-own-words-is-in-urdu-and-how-much-is-out-of-date-at-first-only-what-is-left-each-opens-its-own-urdu-page)): the online store's In Urdu tab lists the shop's products,
   collections, pages, blogs, articles and menus, and its home page, the newest first, each with
