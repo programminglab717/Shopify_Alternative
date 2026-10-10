@@ -17,16 +17,18 @@ import {
 import type { Language } from '@hatti/documents';
 import { toPublicId } from '@hatti/ids';
 import { money } from '@hatti/money';
-import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { InventoryService } from '../inventory.service.js';
 import {
   PurchaseOrderService,
   type PurchaseOrderRecord,
+  type ReorderRecord,
   type SupplierRecord,
 } from '../purchase-order.service.js';
 import type { PurchaseOrderStatusValue } from '../schema.js';
 import { InventoryItem } from './inventory.types.js';
 import { loadItem } from './inventory.resolver.js';
+import { LowStockItem } from './low-stock.types.js';
 import { toInventoryItem, toLocation, uuidOf } from './mappers.js';
 import {
   PurchaseOrder,
@@ -304,5 +306,60 @@ export class PurchaseOrderLineResolver {
     @Parent() line: PurchaseOrderLine,
   ): Promise<InventoryItem> {
     return toInventoryItem(await loadItem(loaders, this.inventory, tenant, line.variantId));
+  }
+}
+
+/** What of a low variant is on order, and who supplied it last (INV-05), for reordering it. */
+@Resolver(() => LowStockItem)
+export class LowStockReorderResolver {
+  constructor(private readonly service: PurchaseOrderService) {}
+
+  #reorder(
+    tenant: TenantContext,
+    loaders: RequestLoaders,
+    item: LowStockItem,
+  ): Promise<ReorderRecord | undefined> {
+    return loaders
+      .get<string, ReorderRecord>('inventory.reorders', (ids) =>
+        this.service.reordersOf(tenant, ids),
+      )
+      .load(item.record.variantId);
+  }
+
+  @ResolveField(() => Int, {
+    description: 'Units on open purchase orders, not yet received: already on their way.',
+  })
+  async incoming(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() item: LowStockItem,
+  ): Promise<number> {
+    return (await this.#reorder(tenant, loaders, item))?.incoming ?? 0;
+  }
+
+  @ResolveField(() => Supplier, {
+    nullable: true,
+    description: 'The supplier of its latest purchase order; null if it was never ordered.',
+  })
+  async lastSupplier(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() item: LowStockItem,
+  ): Promise<Supplier | null> {
+    const supplier = (await this.#reorder(tenant, loaders, item))?.lastSupplier;
+    return supplier ? toSupplier(supplier) : null;
+  }
+
+  @ResolveField(() => Money, {
+    nullable: true,
+    description: 'What one cost on its latest purchase order, where the shop said.',
+  })
+  async lastUnitCost(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() item: LowStockItem,
+  ): Promise<Money | null> {
+    const cost = (await this.#reorder(tenant, loaders, item))?.lastUnitCost ?? null;
+    return cost === null ? null : Money.from(money(cost, tenant.currency));
   }
 }

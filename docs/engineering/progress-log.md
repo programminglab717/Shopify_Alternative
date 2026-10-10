@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, a purchase order from what runs low, in the admin** (INV-05, INV-01): the variants
-running low or out chosen on the stock page and ordered at once from a supplier, each with what
-it would take to reach a level the shop sets; then section by section as the alpha's shops need
-them. Urdu handles wait, as decided.
+**Next, which location an order's stock comes from** (INV-10): rules for the shop's locations
+that fulfil online orders, the one with all of an order's goods first, shown on the order's page
+and changed there before it is packed; then section by section as the alpha's shops need them.
+Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### What runs low ordered from the stock page, in the core and the admin
+
+* **Ordered from the low list** ([ADR-354](../architecture/13-decision-log.md#adr-354--what-runs-low-is-ordered-from-the-stock-page-each-low-variant-with-what-of-it-is-on-order-and-who-supplied-it-last-those-chosen-opening-a-new-purchase-order-filled-in-with-enough-of-each-for-twice-the-low-mark-from-the-supplier-most-came-from-at-the-cost-paid-last)): each low variant says what of it is on open purchase
+  orders and who supplied it last, at what cost (migration 0169 indexes the lines by variant).
+  Those who change stock choose variants, or all, and "Order the chosen" opens a new purchase
+  order filled in with enough of each for twice the low mark, less what is on order, from the
+  supplier most came from last, at the cost paid last.
+* **Tried in Chromium against the core:** on the seed's shop, six variants ran low; the lawn suit
+  oversold by 2 and a khussa out of stock were chosen and filled in as 12 and 10, saved as PO-3,
+  and the low list then said 12 and 10 on order from Gul Ahmed. No errors in the browser.
+* 2477 tests: what is on order and came last, open orders only, and another shop's none, in
+  the inventory module; through the Admin API; in the admin, a new order filled in from what was
+  chosen, all chosen at once, and none for a packer.
 
 ### 363838a · A purchase order printed for its supplier, in the core and the admin
 

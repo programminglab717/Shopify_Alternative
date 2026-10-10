@@ -35,7 +35,10 @@ import { CashPage } from './cash/cash-page';
 import { ReturnsPage, validateReturnsSearch } from './returns/returns-page';
 import { StatementPage } from './cash/statement-page';
 import { StockPage } from './stock/stock-page';
-import { NewPurchaseOrderPage } from './purchase-orders/new-purchase-order-page';
+import {
+  NewPurchaseOrderPage,
+  validateNewPurchaseOrderSearch,
+} from './purchase-orders/new-purchase-order-page';
 import { PurchaseOrderPage } from './purchase-orders/purchase-order-page';
 import {
   PurchaseOrdersPage,
@@ -508,6 +511,7 @@ const suppliers = createRoute({
 const newPurchaseOrder = createRoute({
   getParentRoute: () => shop,
   path: 'purchase-orders/new',
+  validateSearch: validateNewPurchaseOrderSearch,
   component: NewPurchaseOrderPage,
 });
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-353 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-354 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -361,6 +361,7 @@
 | 351 | An open purchase order is changed in one request: its supplier's number, note and day expected; lines added, their quantities or costs changed, never below what came, and lines none of which came removed; received once all of it has; suppliers kept on a page of their own in the admin, each with its orders | Accepted |
 | 352 | Goods received on a purchase order set what their variants cost: a line's cost averaged with what was on hand at the variant's cost before, weighted by units, rounded to the paisa; the order's cost where none was on hand or none was known; in the same transaction as the receipt | Accepted |
 | 353 | A purchase order printed for its supplier: one A4 page from the core's documents, in English, Urdu or both, with the shop, the order and its date, the supplier and their reference, where the goods go and by when, and each line with what it costs where the shop said; the shared document enums moved to the API package | Accepted |
+| 354 | What runs low is ordered from the stock page: each low variant with what of it is on order and who supplied it last, those chosen opening a new purchase order filled in with enough of each for twice the low mark, from the supplier most came from, at the cost paid last | Accepted |
 
 ---
 
@@ -14073,3 +14074,37 @@
   * **A PDF made in the core:** the browser saves the page as one already, and keeps the core free
     of a PDF renderer.
   * **The enums copied into inventory:** two GraphQL types of one name cannot be in one schema.
+
+## ADR-354 · What runs low is ordered from the stock page: each low variant with what of it is on order and who supplied it last, those chosen opening a new purchase order filled in with enough of each for twice the low mark, from the supplier most came from, at the cost paid last
+
+* **Context:**
+  * The stock page lists what runs low or out (ADR-125), and purchase orders (ADR-350) order goods
+    from a supplier, but staff found each variant again by name to order it, and could not tell
+    what was already on its way.
+  * Shopify shows a level's "incoming" units from transfers and purchase orders; its reorder
+    suggestions need an app.
+* **Decision:**
+  * **On each low variant** (`LowStockItem`): `incoming`, the units on open purchase orders not yet
+    received; `lastSupplier`, the supplier of its latest purchase order, whatever its status; and
+    `lastUnitCost`, what one cost on that order where the shop said. Read in one query for the
+    page's variants through the request's loader, by an index on the lines' variant (migration
+    0169).
+  * **In the admin**, the low list says "4 on order · last from Nishat Mills". Those who change
+    stock choose variants, or all, and "Order the chosen" opens a new purchase order with them.
+  * **Filled in:** of each, enough for twice the shop's low mark to be for sale, units sold beyond
+    none made up too, less what is on order, at least one; at the cost paid last; from the supplier
+    most of them came from last, the shop's first otherwise. Everything stays editable; nothing is
+    saved until staff save it.
+  * **The link carries the variants' IDs**, and the page reads them from the low list, so a reload
+    or a shared link fills it in the same.
+* **Consequences:**
+  * A morning's reorder is a few taps from the stock page, and what is already coming is not
+    ordered twice.
+  * Variants no longer low when the page opens are left out.
+  * Not yet: a reorder level and quantity of the shop's per variant; suggestions from how fast each
+    sells (INV-08); one order per supplier where the chosen came from several.
+* **Alternatives:**
+  * **A reorder point per variant:** the shop's one low mark is what staff set today; per-variant
+    levels can follow with forecasting.
+  * **Incoming on every inventory level:** the stock page asks only of what runs low; levels can
+    carry it when transfers in transit need it too.

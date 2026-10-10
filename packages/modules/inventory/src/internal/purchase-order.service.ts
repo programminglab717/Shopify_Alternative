@@ -120,6 +120,16 @@ export interface PurchaseOrderListOptions {
   supplierId?: string | null;
 }
 
+/** What of a variant is on order, and who supplied it last, to reorder it. */
+export interface ReorderRecord {
+  /** Units on open purchase orders, not yet received. */
+  incoming: number;
+  /** The supplier of its latest purchase order, whatever its status. */
+  lastSupplier: SupplierRecord | null;
+  /** What one cost on that order, in minor units; null where the shop gave none. */
+  lastUnitCost: bigint | null;
+}
+
 /** At most this many suppliers a shop, all listed at once. */
 export const SUPPLIER_LIMIT = 250;
 
@@ -178,6 +188,68 @@ export class PurchaseOrderService {
         .orderBy(sql`lower(${suppliers.name})`)
         .limit(SUPPLIER_LIMIT);
       return rows.map(toSupplier);
+    });
+  }
+
+  /**
+   * For each of these variants: the units on open purchase orders not yet received, and the
+   * supplier and unit cost of its latest purchase order. Variants never ordered are left out.
+   */
+  reordersOf(
+    tenant: TenantContext,
+    variantIds: readonly string[],
+  ): Promise<Map<string, ReorderRecord>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{
+        variant_id: string;
+        incoming: number;
+        unit_cost: string | null;
+        supplier: {
+          id: string;
+          name: string;
+          phone: string | null;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+      }>(sql`
+        WITH ordered AS (
+          SELECT l.variant_id, l.unit_cost, o.supplier_id, o.number,
+                 CASE WHEN o.status = 'open' THEN l.quantity - l.received ELSE 0 END AS incoming
+            FROM inventory.purchase_order_lines l
+            JOIN inventory.purchase_orders o
+              ON o.shop_id = l.shop_id AND o.id = l.purchase_order_id
+           WHERE l.shop_id = ${tenant.shopId}
+             AND l.variant_id = ANY(${sql.param([...variantIds])}::uuid[])
+        ),
+        latest AS (
+          SELECT DISTINCT ON (variant_id) variant_id, unit_cost, supplier_id
+            FROM ordered
+           ORDER BY variant_id, number DESC
+        )
+        SELECT latest.variant_id, latest.unit_cost::text AS unit_cost, to_jsonb(s) AS supplier,
+               (SELECT coalesce(sum(incoming), 0)::int FROM ordered
+                 WHERE ordered.variant_id = latest.variant_id) AS incoming
+          FROM latest
+          JOIN inventory.suppliers s
+            ON s.shop_id = ${tenant.shopId} AND s.id = latest.supplier_id`);
+      return new Map(
+        rows.map((row) => [
+          row.variant_id,
+          {
+            incoming: row.incoming,
+            lastSupplier: {
+              id: row.supplier.id,
+              name: row.supplier.name,
+              phone: row.supplier.phone,
+              note: row.supplier.note,
+              createdAt: new Date(row.supplier.created_at),
+              updatedAt: new Date(row.supplier.updated_at),
+            },
+            lastUnitCost: row.unit_cost === null ? null : BigInt(row.unit_cost),
+          },
+        ]),
+      );
     });
   }
 

@@ -3098,6 +3098,13 @@ const en = {
   'po.atLeast': 'At least {count}.',
   'po.costHint': "What each costs on this order becomes its cost, averaged with what's on hand.",
   'po.print': 'Print for the supplier',
+  'stock.incoming': '{count} on order',
+  'stock.lastFrom': 'last from {name}',
+  'stock.choose': 'Choose {title} to order',
+  'stock.chooseAll': 'Choose all',
+  'stock.orderChosen': 'Order the chosen ({count})',
+  'po.fromLow':
+    'Filled in from what runs low: of each, enough to reach twice the low mark less what is on order, at what it cost last.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6171,6 +6178,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'po.costHint':
     'اس آرڈر پر ہر چیز کی قیمت اس کی لاگت بن جاتی ہے، موجود اسٹاک کے ساتھ اوسط نکال کر۔',
   'po.print': 'سپلائر کے لیے پرنٹ کریں',
+  'stock.incoming': '{count} آرڈر پر',
+  'stock.lastFrom': 'پچھلی بار {name} سے',
+  'stock.choose': 'منگوانے کے لیے {title} چنیں',
+  'stock.chooseAll': 'سب چنیں',
+  'stock.orderChosen': 'چنے ہوئے منگوائیں ({count})',
+  'po.fromLow':
+    'کم ہونے والے مال سے بھرا گیا: ہر ایک اتنا کہ کم کی حد سے دگنا ہو جائے، جو آرڈر پر ہے وہ گھٹا کر، پچھلی قیمت پر۔',
 };
 
 export const messages: Readonly<

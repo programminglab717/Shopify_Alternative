@@ -1420,6 +1420,10 @@ export interface LowStockData {
       productTitle: string;
       sku: string | null;
       available: number;
+      /** Units on open purchase orders, not yet received. */
+      incoming: number;
+      lastSupplier: { id: string; name: string } | null;
+      lastUnitCost: { amount: string } | null;
       inventoryItem: { id: string };
     }[];
   };

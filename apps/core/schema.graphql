@@ -4411,8 +4411,19 @@ type LowStockItem {
   """
   available: Int!
 
+  """Units on open purchase orders, not yet received: already on their way."""
+  incoming: Int!
+
   """How its stock is counted, and where it is."""
   inventoryItem: InventoryItem!
+
+  """
+  The supplier of its latest purchase order; null if it was never ordered.
+  """
+  lastSupplier: Supplier
+
+  """What one cost on its latest purchase order, where the shop said."""
+  lastUnitCost: Money
   productId: ID!
   productTitle: String!
   sku: String

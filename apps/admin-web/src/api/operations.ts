@@ -3601,6 +3601,14 @@ export const LowStockQuery = /* GraphQL */ `
         productTitle
         sku
         available
+        incoming
+        lastSupplier {
+          id
+          name
+        }
+        lastUnitCost {
+          amount
+        }
         inventoryItem {
           id
         }

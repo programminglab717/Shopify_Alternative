@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { ChevronDown, ChevronUp, FileSpreadsheet, ScanBarcode, Search, Truck } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
@@ -481,6 +481,10 @@ function Row({
   available,
   tracked = true,
   opened = false,
+  incoming = 0,
+  lastFrom = null,
+  chosen,
+  onChoose,
 }: {
   productId: string;
   title: string;
@@ -491,6 +495,13 @@ function Row({
   tracked?: boolean;
   /** Open at first, as the one variant a barcode found. */
   opened?: boolean;
+  /** Units on open purchase orders, not yet received. */
+  incoming?: number;
+  /** The supplier it was ordered from last. */
+  lastFrom?: string | null;
+  /** Chosen to order, where it can be. */
+  chosen?: boolean;
+  onChoose?: (chosen: boolean) => void;
 }) {
   const { t } = useLocale();
   const { id: shopId } = useShop();
@@ -498,7 +509,16 @@ function Row({
   return (
     <li className="flex flex-col gap-2 py-2">
       <div className="flex items-center justify-between gap-3">
-        <span className="flex min-w-0 flex-col">
+        {onChoose && (
+          <input
+            type="checkbox"
+            checked={chosen ?? false}
+            onChange={(event) => onChoose(event.target.checked)}
+            aria-label={t('stock.choose', { title })}
+            className="size-5 shrink-0 accent-[var(--hatti-color-primary)]"
+          />
+        )}
+        <span className="flex min-w-0 flex-1 flex-col">
           <Link
             to="/$shopId/products/$productId"
             params={{ shopId, productId }}
@@ -513,6 +533,8 @@ function Row({
               : available <= 0
                 ? t('stock.out')
                 : t('stock.left', { count: formatCount(available) })}
+            {incoming > 0 && ` · ${t('stock.incoming', { count: formatCount(incoming) })}`}
+            {lastFrom && ` · ${t('stock.lastFrom', { name: lastFrom })}`}
             {[sku, barcode].map(
               (code) =>
                 code && (
@@ -724,7 +746,18 @@ function FindStock() {
 export function StockPage() {
   const { t } = useLocale();
   const { id: shopId, role } = useShop();
+  const navigate = useNavigate();
   const query = useAdminQuery<LowStockData>(['lowStock'], LowStockQuery);
+  const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
+  const edits = EDITS_STOCK.includes(role);
+  const low = query.data?.inventoryLowStock.nodes ?? [];
+  const choose = (variantId: string, on: boolean) =>
+    setChosen((now) => {
+      const next = new Set(now);
+      if (on) next.add(variantId);
+      else next.delete(variantId);
+      return next;
+    });
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -766,25 +799,61 @@ export function StockPage() {
           {query.data.inventoryLowStock.nodes.length === 0 ? (
             <EmptyState title={t('stock.noneLow')} />
           ) : (
-            <ul className="flex flex-col divide-y divide-line">
-              {query.data.inventoryLowStock.nodes.map((each) => (
-                <Row
-                  key={each.variantId}
-                  productId={each.productId}
-                  title={variantTitle(each.productTitle, each.variantTitle)}
-                  sku={each.sku}
-                  itemId={each.inventoryItem.id}
-                  available={each.available}
-                />
-              ))}
-            </ul>
+            <>
+              <ul className="flex flex-col divide-y divide-line">
+                {low.map((each) => (
+                  <Row
+                    key={each.variantId}
+                    productId={each.productId}
+                    title={variantTitle(each.productTitle, each.variantTitle)}
+                    sku={each.sku}
+                    itemId={each.inventoryItem.id}
+                    available={each.available}
+                    incoming={each.incoming}
+                    lastFrom={each.lastSupplier?.name ?? null}
+                    chosen={chosen.has(each.variantId)}
+                    onChoose={edits ? (on) => choose(each.variantId, on) : undefined}
+                  />
+                ))}
+              </ul>
+              {edits && (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    disabled={chosen.size === 0}
+                    icon={<Truck aria-hidden className="size-5" />}
+                    onClick={() =>
+                      void navigate({
+                        to: '/$shopId/purchase-orders/new',
+                        params: { shopId },
+                        search: {
+                          variants: low
+                            .filter((each) => chosen.has(each.variantId))
+                            .map((each) => each.variantId)
+                            .join(','),
+                        },
+                      })
+                    }
+                  >
+                    {t('stock.orderChosen', { count: formatCount(chosen.size) })}
+                  </Button>
+                  {chosen.size < low.length && (
+                    <Button
+                      variant="tertiary"
+                      onClick={() => setChosen(new Set(low.map((each) => each.variantId)))}
+                    >
+                      {t('stock.chooseAll')}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </Section>
       )}
       <Section title={t('stock.find')}>
         <FindStock />
       </Section>
-      {EDITS_STOCK.includes(role) && (
+      {edits && (
         <Section title={t('stock.countScan.title')}>
           <StockCount />
         </Section>

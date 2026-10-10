@@ -432,4 +432,49 @@ describe.skipIf(!server)('PurchaseOrderService (INV-05)', () => {
     expect(urdu.html).not.toContain('>Purchase order<');
     expect(await f.purchaseOrders.document(f.b, order.id, 'english')).toBeNull();
   });
+
+  it("tells what of a variant is on order, and its latest order's supplier and cost", async () => {
+    const [small, medium] = variants;
+    expect(await f.purchaseOrders.reordersOf(f.a, [small!, medium!])).toEqual(new Map());
+    const first = unwrap(
+      await f.purchaseOrders.create(f.a, {
+        supplierId: (await supplier()).id,
+        locationId: warehouse.id,
+        lines: [
+          { inventoryItemId: small!, quantity: 10, unitCost: '1450' },
+          { inventoryItemId: medium!, quantity: 4 },
+        ],
+      }),
+    );
+    unwrap(
+      await f.purchaseOrders.receive(f.a, first.id, {
+        lines: [{ lineId: first.lines[0]!.id, quantity: 3 }],
+      }),
+    );
+    const ajrak = await supplier('Ajrak House');
+    const second = unwrap(
+      await f.purchaseOrders.create(f.a, {
+        supplierId: ajrak.id,
+        locationId: warehouse.id,
+        lines: [{ inventoryItemId: small!, quantity: 5, unitCost: '1300.50' }],
+      }),
+    );
+    let reorders = await f.purchaseOrders.reordersOf(f.a, [small!, medium!]);
+    expect(reorders.get(small!)).toMatchObject({
+      incoming: 7 + 5,
+      lastSupplier: { name: 'Ajrak House' },
+      lastUnitCost: 130050n,
+    });
+    expect(reorders.get(medium!)).toMatchObject({
+      incoming: 4,
+      lastSupplier: { name: 'Faisalabad Textiles' },
+      lastUnitCost: null,
+    });
+    unwrap(await f.purchaseOrders.close(f.a, first.id));
+    unwrap(await f.purchaseOrders.close(f.a, second.id));
+    reorders = await f.purchaseOrders.reordersOf(f.a, [small!, medium!]);
+    expect(reorders.get(small!)).toMatchObject({ incoming: 0, lastSupplier: { id: ajrak.id } });
+    expect(reorders.get(medium!)).toMatchObject({ incoming: 0 });
+    expect(await f.purchaseOrders.reordersOf(f.b, [small!])).toEqual(new Map());
+  });
 });

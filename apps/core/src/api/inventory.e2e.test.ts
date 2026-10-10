@@ -920,6 +920,42 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       },
     });
 
+    // What of each is on order, and from whom it came last, to reorder it (ADR-354).
+    const supplier = await mutate(
+      token,
+      `mutation { supplierCreate(input: { name: "Gul Ahmed" }) { supplier { id } userErrors { code } } }`,
+    );
+    const ordered = await mutate(
+      token,
+      `mutation ($input: PurchaseOrderCreateInput!) {
+         purchaseOrderCreate(input: $input) { purchaseOrder { id } userErrors { field code } }
+       }`,
+      {
+        input: {
+          supplierId: supplier.supplier.id,
+          locationId: warehouse.id,
+          lines: [{ inventoryItemId: small, quantity: 20, unitCost: '950' }],
+        },
+      },
+    );
+    expect(ordered.userErrors).toEqual([]);
+    expect(
+      (
+        await gql(
+          token,
+          '{ inventoryLowStock(first: 5) { nodes { variantTitle incoming lastSupplier { name } lastUnitCost { amount } } } }',
+        )
+      ).data?.inventoryLowStock.nodes,
+    ).toEqual([
+      {
+        variantTitle: 'S',
+        incoming: 20,
+        lastSupplier: { name: 'Gul Ahmed' },
+        lastUnitCost: { amount: '950.00' },
+      },
+      { variantTitle: 'M', incoming: 0, lastSupplier: null, lastUnitCost: null },
+    ]);
+
     const changed = await mutate(
       token,
       `mutation {

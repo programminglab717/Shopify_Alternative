@@ -150,6 +150,30 @@ function poCore(role: StaffRole, start: [number, number] = [0, 0]) {
                 : [],
           },
         };
+      case 'LowStock':
+        return {
+          inventorySettings: { lowStockThreshold: 5 },
+          inventoryLowStock: {
+            nodes: [
+              ['var_1', 'S', -2, 0, 'Nishat Mills', '2100.00'],
+              ['var_2', 'M', 3, 4, 'Nishat Mills', null],
+              ['var_3', 'L', 2, 0, null, null],
+            ].map(([id, title, available, incoming, from, cost], index) => ({
+              variantId: id,
+              variantTitle: title,
+              productId: 'prod_1',
+              productTitle: 'Khaddar suit',
+              sku: null,
+              available,
+              incoming,
+              lastSupplier: from ? { id: 'sup_1', name: from } : null,
+              lastUnitCost: cost ? pkr(cost as string) : null,
+              inventoryItem: { id: `invi_${index + 1}` },
+            })),
+          },
+        };
+      case 'Locations':
+        return { locations: { nodes: [{ ...GODOWN, isPrimary: true, isActive: true }] } };
       case 'PurchaseOrderCreate':
         return { purchaseOrderCreate: { purchaseOrder: { id: 'po_1' }, userErrors: [] } };
       case 'PurchaseOrderReceive':
@@ -407,6 +431,64 @@ describe('Purchase orders (INV-05)', () => {
     await waitFor(() => expect(written).toEqual(['<p>PO-1 for Nishat Mills, URDU</p>']));
     expect(tab.print).toHaveBeenCalled();
     expect(sentOf(fake, 'PurchaseOrderDocument')).toEqual([{ id: 'po_1', language: 'URDU' }]);
+  });
+
+  it('orders what runs low, chosen on the stock page, filled in from what is on order and came last', async () => {
+    const fake = poCore('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/stock');
+
+    expect(await screen.findByText(/Out of stock · last from Nishat Mills/)).toBeTruthy();
+    expect(screen.getByText(/3 for sale · 4 on order · last from Nishat Mills/)).toBeTruthy();
+    const order = screen.getByRole('button', { name: 'Order the chosen (0)' });
+    expect(order).toHaveProperty('disabled', true);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Choose Khaddar suit · S to order' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Choose Khaddar suit · M to order' }));
+    await press('Order the chosen (2)');
+
+    expect(await screen.findByText(/Filled in from what runs low/)).toBeTruthy();
+    expect((screen.getByLabelText('Supplier') as HTMLSelectElement).value).toBe('sup_1');
+    expect(screen.getByLabelText('How many of Khaddar suit · S')).toHaveProperty('value', '12');
+    expect(screen.getByLabelText('Cost of one Khaddar suit · S')).toHaveProperty('value', '2100');
+    expect(screen.getByLabelText('How many of Khaddar suit · M')).toHaveProperty('value', '3');
+    expect(screen.getByLabelText('Cost of one Khaddar suit · M')).toHaveProperty('value', '');
+    expect(screen.queryByLabelText('How many of Khaddar suit · L')).toBeNull();
+    await press('Save the purchase order');
+    await waitFor(() =>
+      expect(sentOf(fake, 'PurchaseOrderCreate')).toEqual([
+        {
+          input: {
+            supplierId: 'sup_1',
+            locationId: 'loc_1',
+            reference: null,
+            expectedOn: null,
+            lines: [
+              { inventoryItemId: 'invi_1', quantity: 12, unitCost: '2100' },
+              { inventoryItemId: 'invi_2', quantity: 3, unitCost: null },
+            ],
+          },
+        },
+      ]),
+    );
+  });
+
+  it('chooses all that runs low at once, and none for a packer', async () => {
+    vi.stubGlobal('fetch', poCore('manager').fetcher);
+    renderAdmin('/shop_1/stock');
+    await screen.findByRole('button', { name: 'Choose all' });
+    await press('Choose all');
+    expect(screen.getByRole('button', { name: 'Order the chosen (3)' })).toHaveProperty(
+      'disabled',
+      false,
+    );
+    expect(screen.queryByRole('button', { name: 'Choose all' })).toBeNull();
+    cleanup();
+
+    vi.stubGlobal('fetch', poCore('packer').fetcher);
+    renderAdmin('/shop_1/stock');
+    await screen.findByText(/Out of stock · last from Nishat Mills/);
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Order the chosen/ })).toBeNull();
   });
 
   it('shows purchase orders to a packer without changing them', async () => {
