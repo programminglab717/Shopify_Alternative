@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### The admin's tests wait for the field of the panel confirming who is signed in
+### 9e0979c · The admin's tests wait for the field of the panel confirming who is signed in
 
 * CI run 391 failed in the admin's support test, which nothing in that push touched: it waited
   for the panel asking the owner to confirm who they are by its title, then looked for its
