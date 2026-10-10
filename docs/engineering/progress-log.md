@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### A variant found by its barcode, in the admin
+### f2ff73f · A variant found by its barcode, in the admin
 
 * **By barcode** ([ADR-348](../architecture/13-decision-log.md#adr-348--the-admin-finds-a-variant-by-its-barcode-on-the-stock-page-typed-or-by-a-scanner-that-types-it-as-digits-alone-or-read-through-the-phones-camera-where-the-browser-can-read-barcodes-the-cores-search-by-barcode-the-variant-with-it-alone-shown-its-stock-open)): on the stock page, digits typed, or typed by a scanner, are searched
   as a barcode, and the one variant with it opens at its stock; where the browser reads barcodes,
