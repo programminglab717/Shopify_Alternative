@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### Payments recorded by hand, and an order's link made again, in the admin
+### 711efc8 · Payments recorded by hand, and an order's link made again, in the admin
 
 * **What an order waits for** ([ADR-337](../architecture/13-decision-log.md#adr-337--an-order-waiting-for-its-money-says-on-its-page-what-it-waits-for-its-advance-or-its-transfer-and-shows-the-receipts-its-customer-sent-owners-and-managers-record-money-received-by-hand-what-it-waits-for-unless-they-say-otherwise-and-an-order-waiting-for-an-advance-is-not-marked-paid-in-full-and-those-who-speak-with-customers-make-a-new-link-for-the-order-shown-once-to-copy-or-send-on-whatsapp-the-one-before-stopping)): an order awaiting payment says what it waits for, its
   advance or its transfer, and shows the receipts its customer sent through their link, a
