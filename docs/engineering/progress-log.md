@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### A product duplicated, in the core and the admin
+### 8da2dec · A product duplicated, in the core and the admin
 
 * **`productDuplicate`** ([ADR-343](../architecture/13-decision-log.md#adr-343--a-product-is-duplicated-as-shopifys-productduplicate-does-it-the-copy-made-in-one-transaction-with-the-products-words-options-variants-and-prices-none-of-its-skus-barcodes-or-stock-and-put-in-its-manual-collections-its-photos-and-videos-if-asked-made-again-by-the-worker-from-what-was-kept-of-them-the-admin-makes-the-copy-a-draft-and-opens-it)): the copy made in one transaction with the product's words,
   options, variants and prices, not its SKUs, barcodes or stock; its variants' stock settings
