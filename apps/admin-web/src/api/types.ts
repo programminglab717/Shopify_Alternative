@@ -287,6 +287,8 @@ export interface OrderDetail {
 export interface OrderData {
   shop: { timezone: string };
   order: OrderDetail | null;
+  /** The payments its customer started online, the latest first. */
+  paymentSessions: PaymentSessionValue[];
 }
 
 export interface OrderMutationData {
@@ -886,6 +888,7 @@ export interface PaymentGatewayAccountDetail {
 export interface PaymentGatewaysData {
   paymentGateways: PaymentGatewayOffered[];
   paymentGatewayAccounts: PaymentGatewayAccountDetail[];
+  onlinePaymentSettings: OnlinePaymentSettingsValue;
 }
 
 export interface PaymentGatewayAccountPayloadData {
@@ -1857,6 +1860,61 @@ export interface CustomerStoreCreditData {
 export interface StoreCreditMoveData {
   [field: string]: {
     storeCreditAccountTransaction: { id: string } | null;
+    userErrors: UserError[];
+  };
+}
+
+export type PaymentSessionStatus = 'OPEN' | 'PAID' | 'FAILED';
+export type PaymentRefundStatus = 'PENDING' | 'REFUNDED' | 'REFUSED' | 'UNKNOWN';
+
+/** A refund asked of the gateway for an online payment. */
+export interface PaymentRefundValue {
+  id: string;
+  status: PaymentRefundStatus;
+  reference: string | null;
+  error: string | null;
+  createdAt: string;
+  amount: MoneyValue;
+}
+
+/** A payment an order's customer started online, through the shop's gateway account. */
+export interface PaymentSessionValue {
+  id: string;
+  gatewayName: string;
+  environment: 'PRODUCTION' | 'SANDBOX';
+  status: PaymentSessionStatus;
+  method: string | null;
+  reference: string | null;
+  error: string | null;
+  createdAt: string;
+  paidAt: string | null;
+  amount: MoneyValue;
+  paidAmount: MoneyValue | null;
+  applied: MoneyValue | null;
+  refunds: PaymentRefundValue[];
+}
+
+export interface PaymentRefundSettleData {
+  paymentRefundSettle: {
+    paymentRefund: { id: string; status: PaymentRefundStatus; reference: string | null } | null;
+    userErrors: UserError[];
+  };
+}
+
+/** What checkout takes off orders paid online (PAY-05, CHK-08). */
+export interface OnlinePaymentSettingsValue {
+  updatedAt: string | null;
+  discount: {
+    kind: 'PERCENTAGE' | 'FIXED_AMOUNT';
+    percentage: number | null;
+    cap: MoneyValue | null;
+    amount: MoneyValue | null;
+  } | null;
+}
+
+export interface OnlinePaymentSettingsUpdateData {
+  onlinePaymentSettingsUpdate: {
+    onlinePaymentSettings: OnlinePaymentSettingsValue | null;
     userErrors: UserError[];
   };
 }

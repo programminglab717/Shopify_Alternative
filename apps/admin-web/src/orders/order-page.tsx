@@ -39,6 +39,7 @@ import { Assignment, DeliveryAddress, NoteAndTags, Timeline } from './details';
 import { OrderItems } from './edit-order';
 import { CustomerLink, SENDS_LINKS } from './customer-link';
 import { HANDLES_MONEY, OrderMoney } from './money';
+import { OnlinePayments } from './online-payments';
 import { Parcels, ShipForm, WORKS_PARCELS } from './parcels';
 import { PrintPanel } from './print';
 import { OrderReturns } from './returns';
@@ -246,7 +247,7 @@ export function OrderPage() {
       />
     );
   }
-  const { order, shop: details } = query.data;
+  const { order, shop: details, paymentSessions } = query.data;
   if (!order) {
     return (
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -325,9 +326,13 @@ export function OrderPage() {
           </Section>
           {(HANDLES_MONEY.includes(shop.role) ||
             Number(order.amountPaid.amount) > 0 ||
-            order.refunds.length > 0) && (
+            order.refunds.length > 0 ||
+            paymentSessions.length > 0) && (
             <Section title={t('money.title')}>
               <OrderMoney order={order} timezone={timezone} />
+              {paymentSessions.length > 0 && (
+                <OnlinePayments sessions={paymentSessions} timezone={timezone} />
+              )}
             </Section>
           )}
           {order.fulfillments.length > 0 && (

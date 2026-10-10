@@ -55,6 +55,7 @@ describe('The shop and its online payments in settings', () => {
           return {
             paymentGateways: [JAZZCASH],
             paymentGatewayAccounts: confirmed ? [account('pga_1', JAZZCASH)] : [],
+            onlinePaymentSettings: { updatedAt: null, discount: null },
           };
         }
         if (operation === 'PaymentGatewayAccountConnect') {
@@ -118,6 +119,7 @@ describe('The shop and its online payments in settings', () => {
           return {
             paymentGateways: [JAZZCASH, SAFEPAY],
             paymentGatewayAccounts: [account('pga_1', JAZZCASH), account('pga_2', SAFEPAY)],
+            onlinePaymentSettings: { updatedAt: null, discount: null },
           };
         case 'PaymentGatewayAccountsReorder':
           return { paymentGatewayAccountsReorder: { paymentGatewayAccounts: [], userErrors: [] } };
@@ -154,6 +156,102 @@ describe('The shop and its online payments in settings', () => {
         core.sent.find((each) => each.operation === 'PaymentGatewayAccountArchive')?.variables,
       ).toEqual({ id: 'pga_2' }),
     );
+  });
+
+  it('takes something off orders paid online once there is a gateway, or nothing again', async () => {
+    let discount: Record<string, unknown> | null = null;
+    const core = fakeCore('owner', (operation, variables) => {
+      switch (operation) {
+        case 'PaymentGateways':
+          return {
+            paymentGateways: [JAZZCASH],
+            paymentGatewayAccounts: [account('pga_1', JAZZCASH)],
+            onlinePaymentSettings: { updatedAt: null, discount },
+          };
+        case 'OnlinePaymentSettingsUpdate': {
+          const input = (variables.input as { discount: Record<string, unknown> | null }).discount;
+          if (input && 'amount' in input && input.amount === '0') {
+            return {
+              onlinePaymentSettingsUpdate: {
+                onlinePaymentSettings: null,
+                userErrors: [
+                  {
+                    field: ['input', 'discount', 'amount'],
+                    code: 'INVALID',
+                    message: 'must be more than zero',
+                  },
+                ],
+              },
+            };
+          }
+          discount = input && {
+            kind: 'percentage' in input ? 'PERCENTAGE' : 'FIXED_AMOUNT',
+            percentage: input.percentage ?? null,
+            cap: input.cap ? { amount: `${String(input.cap)}.00`, currencyCode: 'PKR' } : null,
+            amount: null,
+          };
+          return {
+            onlinePaymentSettingsUpdate: {
+              onlinePaymentSettings: { updatedAt: LATER, discount },
+              userErrors: [],
+            },
+          };
+        }
+        default:
+          throw new Error(`unexpected ${operation}`);
+      }
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/online-payments');
+
+    const choice = (await screen.findByLabelText(
+      'Something off for paying online',
+    )) as HTMLSelectElement;
+    expect(choice.value).toBe('NONE');
+    const sent = () => core.sent.filter((each) => each.operation === 'OnlinePaymentSettingsUpdate');
+
+    fireEvent.change(choice, { target: { value: 'FIXED_AMOUNT' } });
+    type('Amount off', '0');
+    await press('Save');
+    await screen.findByText('Amount off: must be more than zero');
+
+    fireEvent.change(choice, { target: { value: 'PERCENTAGE' } });
+    type('Percentage off', 'five');
+    await press('Save');
+    await screen.findByText('Percentage off: type a percentage, such as 10 or 12.5');
+    expect(sent()).toHaveLength(1);
+
+    type('Percentage off', '5%');
+    type('At most', '300');
+    await press('Save');
+    await screen.findByText('Saved. Checkout uses it from now on.');
+    expect(sent().at(-1)?.variables).toEqual({
+      input: { discount: { percentage: 5, cap: '300' } },
+    });
+
+    fireEvent.change(choice, { target: { value: 'NONE' } });
+    expect(screen.queryByLabelText('Percentage off')).toBeNull();
+    await press('Save');
+    await waitFor(() => expect(sent()).toHaveLength(3));
+    expect(sent().at(-1)?.variables).toEqual({ input: { discount: null } });
+  });
+
+  it('asks nothing of paying online while no gateway is connected and nothing is taken off', async () => {
+    vi.stubGlobal(
+      'fetch',
+      fakeCore('owner', (operation) => {
+        if (operation !== 'PaymentGateways') throw new Error(`unexpected ${operation}`);
+        return {
+          paymentGateways: [JAZZCASH],
+          paymentGatewayAccounts: [],
+          onlinePaymentSettings: { updatedAt: null, discount: null },
+        };
+      }).fetcher,
+    );
+    renderAdmin('/shop_1/settings/online-payments');
+
+    await screen.findByText('No online payments yet.');
+    expect(screen.queryByLabelText('Something off for paying online')).toBeNull();
   });
 
   it('uploads a logo for the shop, and saves its WhatsApp number', async () => {

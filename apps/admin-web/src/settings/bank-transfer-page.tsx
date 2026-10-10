@@ -5,44 +5,37 @@ import type {
   BankTransferSettingsData,
   BankTransferSettingsValue,
   SettingsPayloadData,
-  TransferDiscountKind,
 } from '../api/types';
 import { useRecentAuthentication } from '../auth/confirm-identity';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
-import { FormSection, priceText, TextArea } from '../products/product-form';
+import { FormSection, TextArea } from '../products/product-form';
 import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import {
-  amountInput,
-  CheckField,
-  Pair,
-  Problems,
-  SelectField,
-  settingProblem,
-} from './settings-form';
+  badPercentage,
+  prepaidDiscountInput,
+  prepaidDiscountState,
+  PrepaidDiscountFields,
+} from './prepaid-discount';
+import type { PrepaidDiscountState } from './prepaid-discount';
+import { CheckField, Pair, Problems, settingProblem } from './settings-form';
 import { BackToSettings } from './settings-page';
 
-type DiscountChoice = 'NONE' | TransferDiscountKind;
-
-interface TransferState {
+interface TransferState extends PrepaidDiscountState {
   enabled: boolean;
   bankName: string;
   title: string;
   iban: string;
   raastId: string;
   instructions: string;
-  discount: DiscountChoice;
-  amount: string;
-  percentage: string;
-  cap: string;
 }
 
 function stateOf(settings: BankTransferSettingsValue): TransferState {
-  const { account, discount } = settings;
+  const { account } = settings;
   return {
     enabled: settings.enabled,
     bankName: account?.bankName ?? '',
@@ -51,10 +44,7 @@ function stateOf(settings: BankTransferSettingsValue): TransferState {
     iban: account?.iban.replace(/(.{4})(?=.)/g, '$1 ') ?? '',
     raastId: account?.raastId ?? '',
     instructions: account?.instructions ?? '',
-    discount: discount?.kind ?? 'NONE',
-    amount: priceText(discount?.amount?.amount),
-    percentage: discount?.percentage?.toString() ?? '',
-    cap: priceText(discount?.cap?.amount),
+    ...prepaidDiscountState(settings.discount),
   };
 }
 
@@ -71,15 +61,7 @@ function inputOf(state: TransferState) {
           instructions: state.instructions.trim(),
         }
       : null,
-    discount:
-      state.discount === 'NONE'
-        ? null
-        : state.discount === 'FIXED_AMOUNT'
-          ? { amount: state.amount.trim() }
-          : {
-              percentage: Number(state.percentage.trim().replace(/%$/, '')),
-              cap: amountInput(state.cap),
-            },
+    discount: prepaidDiscountInput(state),
   };
 }
 
@@ -110,10 +92,7 @@ function BankTransferForm({ settings }: { settings: BankTransferSettingsValue })
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     setSaved(false);
-    if (
-      state.discount === 'PERCENTAGE' &&
-      !/^\d{1,2}(\.\d{1,2})?$/.test(state.percentage.trim().replace(/%$/, ''))
-    ) {
+    if (badPercentage(state)) {
       setProblems([`${t('transfer.percentage')}: ${t('settings.badPercentage')}`]);
       return;
     }
@@ -130,12 +109,6 @@ function BankTransferForm({ settings }: { settings: BankTransferSettingsValue })
       (failure) => setProblems([errorText(failure, t)]),
     );
   };
-
-  const discounts: { value: DiscountChoice; label: string }[] = [
-    { value: 'NONE', label: t('transfer.discount.NONE') },
-    { value: 'PERCENTAGE', label: t('transfer.discount.PERCENTAGE') },
-    { value: 'FIXED_AMOUNT', label: t('transfer.discount.FIXED_AMOUNT') },
-  ];
 
   // The panel asking who is signed in has a form of its own, so it sits below this one.
   return (
@@ -191,43 +164,7 @@ function BankTransferForm({ settings }: { settings: BankTransferSettingsValue })
             checked={state.enabled}
             onChange={(enabled) => set({ enabled })}
           />
-          <SelectField
-            label={t('transfer.discount')}
-            value={state.discount}
-            options={discounts}
-            onChange={(discount) => set({ discount })}
-          />
-          {state.discount === 'FIXED_AMOUNT' && (
-            <TextField
-              label={t('transfer.amount')}
-              required
-              inputMode="decimal"
-              ltr
-              value={state.amount}
-              onChange={(event) => set({ amount: event.target.value })}
-            />
-          )}
-          {state.discount === 'PERCENTAGE' && (
-            <Pair>
-              <TextField
-                label={t('transfer.percentage')}
-                hint={t('transfer.percentageHint')}
-                required
-                inputMode="decimal"
-                ltr
-                value={state.percentage}
-                onChange={(event) => set({ percentage: event.target.value })}
-              />
-              <TextField
-                label={t('transfer.cap')}
-                hint={t('transfer.capHint')}
-                inputMode="decimal"
-                ltr
-                value={state.cap}
-                onChange={(event) => set({ cap: event.target.value })}
-              />
-            </Pair>
-          )}
+          <PrepaidDiscountFields label={t('transfer.discount')} state={state} onChange={set} />
         </FormSection>
         <Problems problems={problems} />
         {saved && <Alert tone="success">{t('settings.saved')}</Alert>}

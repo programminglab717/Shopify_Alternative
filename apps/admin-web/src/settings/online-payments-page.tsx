@@ -2,12 +2,15 @@ import { Archive, ArrowDown, ArrowUp, Copy, CreditCard, Plus } from 'lucide-reac
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  OnlinePaymentSettingsUpdateMutation,
   PaymentGatewayAccountArchiveMutation,
   PaymentGatewayAccountConnectMutation,
   PaymentGatewayAccountsReorderMutation,
   PaymentGatewaysQuery,
 } from '../api/operations';
 import type {
+  OnlinePaymentSettingsUpdateData,
+  OnlinePaymentSettingsValue,
   PaymentGatewayAccountDetail,
   PaymentGatewayAccountPayloadData,
   PaymentGatewayOffered,
@@ -18,13 +21,25 @@ import { useRecentAuthentication } from '../auth/confirm-identity';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
-import { problemText } from '../products/product-form';
+import { FormSection, problemText } from '../products/product-form';
 import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
-import { CheckField, Problems, SelectField } from './settings-form';
+import {
+  badPercentage,
+  prepaidDiscountInput,
+  prepaidDiscountState,
+  PrepaidDiscountFields,
+} from './prepaid-discount';
+import { CheckField, Problems, SelectField, settingProblem } from './settings-form';
 import { BackToSettings } from './settings-page';
+
+const DISCOUNT_LABELS: Partial<Record<string, MessageKey>> = {
+  amount: 'transfer.amount',
+  percentage: 'transfer.percentage',
+  cap: 'transfer.cap',
+};
 
 /** The address a gateway sends its webhooks to, to copy into its dashboard. */
 function WebhookUrl({ url }: { url: string }) {
@@ -241,10 +256,73 @@ function AccountRow({
 }
 
 /**
+ * What checkout takes off orders paid online (PAY-05, ADR-222), as it takes the shop's own off
+ * orders paid by transfer: nothing, a percentage up to a cap, or an amount, for orders placed
+ * from then on. Offered once the shop has a gateway, or while something is taken off without one.
+ */
+function OnlineDiscountForm({
+  settings,
+  offered,
+}: {
+  settings: OnlinePaymentSettingsValue;
+  offered: boolean;
+}) {
+  const { t } = useLocale();
+  // Kept once shown, so that taking the discount away says it is saved.
+  const [shown] = useState(() => offered || settings.discount !== null);
+  const save = useAdminMutation<
+    OnlinePaymentSettingsUpdateData,
+    { input: { discount: ReturnType<typeof prepaidDiscountInput> } }
+  >(OnlinePaymentSettingsUpdateMutation);
+  const [state, setState] = useState(() => prepaidDiscountState(settings.discount));
+  const [problems, setProblems] = useState<string[]>([]);
+  const [saved, setSaved] = useState(false);
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaved(false);
+    if (badPercentage(state)) {
+      setProblems([`${t('transfer.percentage')}: ${t('settings.badPercentage')}`]);
+      return;
+    }
+    setProblems([]);
+    try {
+      const { onlinePaymentSettingsUpdate: payload } = await save.mutateAsync({
+        input: { discount: prepaidDiscountInput(state) },
+      });
+      if (payload.userErrors.length > 0) {
+        setProblems(payload.userErrors.map((error) => settingProblem(error, t, DISCOUNT_LABELS)));
+      } else setSaved(true);
+    } catch (failure) {
+      setProblems([errorText(failure, t)]);
+    }
+  };
+
+  if (!offered && !shown) return null;
+  return (
+    <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-4">
+      <FormSection title={t('transfer.checkout')} hint={t('gateways.discountHint')}>
+        <PrepaidDiscountFields
+          label={t('gateways.discount')}
+          state={state}
+          onChange={(change) => setState({ ...state, ...change })}
+        />
+      </FormSection>
+      <Problems problems={problems} />
+      {saved && <Alert tone="success">{t('settings.saved')}</Alert>}
+      <Button type="submit" busy={save.isPending} className="self-start">
+        {t('product.save')}
+      </Button>
+    </form>
+  );
+}
+
+/**
  * Online payments (PAY-01, PAY-05): the shop's accounts with payment gateways, in the order its
  * customers are offered them, each with the address its dashboard sends webhooks to; another
- * connected once the member confirms who they are, or one archived. The Free plan connects none,
- * which the core says.
+ * connected once the member confirms who they are, or one archived; and what paying through
+ * them takes off, once there is one to pay through, or while something is taken off. The Free plan
+ * connects none, which the core says.
  */
 export function OnlinePaymentsPage() {
   const { t } = useLocale();
@@ -266,7 +344,11 @@ export function OnlinePaymentsPage() {
       />
     );
   }
-  const { paymentGateways: gateways, paymentGatewayAccounts: accounts } = query.data;
+  const {
+    paymentGateways: gateways,
+    paymentGatewayAccounts: accounts,
+    onlinePaymentSettings: settings,
+  } = query.data;
   // One live account a gateway: those connected already are not offered again.
   const open = gateways.filter(
     (each) => !accounts.some((account) => account.gateway === each.gateway),
@@ -352,6 +434,7 @@ export function OnlinePaymentsPage() {
           </Button>
         )
       )}
+      <OnlineDiscountForm settings={settings} offered={accounts.length > 0} />
     </div>
   );
 }

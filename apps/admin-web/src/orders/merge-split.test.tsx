@@ -22,6 +22,7 @@ const line = (id: string, title: string, variantTitle: string, quantity: number)
 function order(extra: Record<string, unknown> = {}) {
   return {
     shop: { timezone: 'Asia/Karachi' },
+    paymentSessions: [],
     order: {
       id: 'ord_7',
       name: '#1007',

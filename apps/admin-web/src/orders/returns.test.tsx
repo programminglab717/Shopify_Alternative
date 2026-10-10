@@ -60,6 +60,7 @@ const back = (status: string, extra: Record<string, unknown> = {}) => ({
 function order(fulfillments: unknown[], returns: unknown[]) {
   return {
     shop: { timezone: 'Asia/Karachi' },
+    paymentSessions: [],
     order: {
       id: 'ord_7',
       name: '#1007',

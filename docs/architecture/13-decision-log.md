@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-337 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-338 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -345,6 +345,7 @@
 | 335 | Owners and managers see how each agent of the Confirmation Desk did on a page of the desk's that analytics links to: over the last 7, 30 or 90 whole days, the orders each confirmed and cancelled, how many an hour on the desk, their calls that settled nothing, and how many parcels of the orders they confirmed came back; staff by name, those who left as former staff, and apps by the end of their token | Accepted |
 | 336 | A booking that failed is put right from the bookings list, where it is its order's latest: the city its order's address writes matched against the courier's names; where the courier has none, one of its nearest chosen, or another typed, kept as the shop's own and the order booked again with the same account; and each courier account's own names listed in settings, looked up, named and forgotten | Accepted |
 | 337 | An order waiting for its money says on its page what it waits for, its advance or its transfer, and shows the receipts its customer sent; owners and managers record money received by hand, what it waits for unless they say otherwise, and an order waiting for an advance is not marked paid in full; and those who speak with customers make a new link for the order, shown once to copy or send on WhatsApp, the one before stopping | Accepted |
+| 338 | An order's page lists the payments its customer started online and the refunds asked of their gateway, and owners and managers settle a refund whose answer never came as the gateway's dashboard shows it; what paying online takes off is set beside the shop's gateways, in the fields the transfer's uses | Accepted |
 
 ---
 
@@ -13505,3 +13506,48 @@
   * **Mark as paid alone, as before:** wrong for an advance, and no part payments.
   * **Keeping the link to show it again:** Hatti keeps links' digests alone, so a link leaked from
     the admin cannot be read back; a new one is made instead.
+
+## ADR-338 · An order's page lists the payments its customer started online and the refunds asked of their gateway, and owners and managers settle a refund whose answer never came as the gateway's dashboard shows it; what paying online takes off is set beside the shop's gateways, in the fields the transfer's uses
+
+* **Context:**
+  * Payments made online are recorded as sessions ([ADR-151](#adr-151--shops-take-payments-online-through-their-own-gateway-accounts-safepay-first-their-credentials-sealed-for-each-account-an-order-waiting-for-its-money-offers-to-take-it-on-its-page-a-session-is-recorded-before-the-customer-leaves-for-the-gateway-and-the-gateways-signed-return-or-webhook-whichever-comes-first-records-it-paid-once-and-pays-what-the-order-owes-of-it-a-sandboxs-payments-pay-nothing)): a paid one pays what the
+    order owed, the rest on its timeline to give back, and a test one pays nothing. Refunds go
+    back through the gateway that took the money ([ADR-153](#adr-153--money-paid-online-goes-back-through-the-gateway-that-took-it-as-far-as-its-adapter-can-give-it-back-safepay-a-payment-whole-each-refund-is-recorded-before-the-gateway-is-asked-and-written-on-its-order-once-the-gateway-says-it-is-sent-a-refusal-is-said-and-a-refund-without-an-answer-holds-its-amount-until-staff-settle-it-from-the-gateways-dashboard)), and one whose answer never
+    came holds its amount until it is settled.
+  * The admin's money section ([ADR-285](#adr-285--an-orders-page-shows-what-was-paid-and-given-back-each-refund-with-how-its-reference-why-and-its-receipt-owners-and-managers-record-a-refund-at-most-what-is-left-by-hand-with-its-receipt-uploaded-through-the-gateway-or-as-store-credit-and-mark-an-order-paid-after-saying-how-much-it-records)) showed what was paid and the refunds recorded, but
+    not the payments started online: one the gateway would not start, one never finished or one
+    paid twice could not be seen, and a refund whose answer was lost could be settled only
+    through the API.
+  * What checkout takes off orders paid online ([ADR-222](#adr-222--a-shop-may-take-something-off-orders-paid-online-as-it-may-off-those-paid-by-transfer-a-percentage-up-to-a-cap-or-an-amount-of-its-own-which-checkout-takes-off-the-items-after-any-code-and-the-order-keeps-apart)) had no place in the admin, while
+    the transfer's had ([ADR-272](#adr-272--the-admins-settings-take-delivery-charges-cash-on-deliverys-rules-and-bank-transfer-each-a-form-of-everything-it-sets-saved-at-once-as-checkout-will-use-it-risk-scores-are-shown-out-of-100-for-the-cores-0-to-1-and-the-bank-account-is-given-once-the-member-confirms-who-they-are)).
+* **Decision:**
+  * **The payments online:** the money section lists them, the latest first: the gateway, a test
+    environment's marked, what was asked, and whether it was paid and how much, how the customer
+    paid and the gateway's reference; or that it is not paid yet, or why the gateway would not
+    start it. Where a paid one paid the order less than it took, it says so: none of a test one,
+    none where the order owed nothing more, else how much, the rest on the timeline to give back.
+  * **Their refunds:** under each payment, what was asked back of its gateway: given back with
+    its reference, refused with why, being asked, or not answered for over five minutes, as the
+    core counts it.
+  * **Settled by hand:** owners and managers settle a refund whose answer never came, unknown or
+    late, once they check the gateway's dashboard: given back, with its reference if they have
+    it, through `paymentRefundSettle`, which records the order's refund; or not given back, once
+    they say they are sure, which frees what it held to be refunded again. Other roles see the
+    refunds and settle none, as the core lets only owners and managers.
+  * **What paying online takes off:** the online payments settings take it beside the gateways,
+    once one is connected or while something is taken off: nothing, a percentage up to a cap,
+    or an amount, saved through `onlinePaymentSettingsUpdate` for orders placed from then on.
+    Its fields are the bank transfer's, shared by both pages, and a percentage that is not a
+    number is refused before it is sent.
+* **Consequences:**
+  * Staff answer "did my payment go through?" from the order: what the gateway said, when, and
+    the reference to look it up by.
+  * A refund whose answer was lost no longer holds its amount until someone uses the API.
+  * A shop sets its prepaid incentive for paying online where it connects its gateways.
+  * Not yet: asking the gateway again from the order, which the worker does for payments left
+    open ([ADR-208](#adr-208--a-payment-started-online-whose-customer-never-came-back-is-asked-after-the-worker-asks-the-gateways-status-inquiry-jazzcashs-first-from-a-quarter-of-an-hour-after-it-began-at-most-once-an-hour-for-two-days-and-records-one-the-gateway-vouches-for-paid-through-the-inquiry)); a gateway account's credentials changed in place.
+* **Alternatives:**
+  * **The payments online on a page of their own:** they matter to one order at a time, beside
+    its money.
+  * **Settling from the refunds in the money section:** a refund whose answer never came is not
+    the order's refund until it is settled, so it sits under its payment.

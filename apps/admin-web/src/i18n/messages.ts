@@ -2878,6 +2878,33 @@ const en = {
   'customerLink.made':
     'A new link for the customer to confirm or follow the order. It is shown this once: copy it or send it now.',
   'customerLink.field': 'The link',
+  'online.title': 'Online payments',
+  'online.paid': '{amount} paid',
+  'online.open': 'Started: the gateway has not said it is paid.',
+  'online.failed': 'The gateway would not start it. {error}',
+  'online.sandboxPaid': 'A test payment: none of it was paid on the order.',
+  'online.applied':
+    '{amount} of it was paid on the order; the rest is on its timeline, to give back.',
+  'online.noneApplied': 'The order owed none of it: it is on its timeline, to give back.',
+  'online.refund.PENDING': '{amount} being asked back of {gateway}.',
+  'online.refund.late': '{amount} asked back of {gateway}, which has not answered.',
+  'online.refund.REFUNDED': '{amount} given back through {gateway}.',
+  'online.refund.REFUSED': '{gateway} would not give {amount} back: {error}',
+  'online.refund.UNKNOWN':
+    '{gateway} did not say whether it gave {amount} back. It is held meanwhile, so it is not refunded twice.',
+  'online.refund.check': "Check {gateway}'s dashboard, then say what it shows.",
+  'online.refund.givenBack': 'It was given back',
+  'online.refund.notGivenBack': 'It was not given back',
+  'online.refund.reference': "{gateway}'s reference for it (optional)",
+  'online.refund.save': 'Record it given back',
+  'online.refund.settledBack': '{amount} recorded as given back.',
+  'online.refund.settledNot': 'Recorded as not given back: it can be refunded again.',
+  'gateways.discount': 'Something off for paying online',
+  'gateways.discountHint':
+    'Checkout takes it off orders paid through your gateways, after any discount code. Orders placed before keep what was taken off them.',
+  'online.refund.notSure':
+    "Only if {gateway}'s dashboard shows it was not given back: its amount can then be refunded again.",
+  'online.refund.saveNot': 'Record it not given back',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5730,6 +5757,34 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'customerLink.made':
     'گاہک کے لیے آرڈر کنفرم کرنے یا اس کا حال دیکھنے کا نیا لنک۔ یہ صرف ایک بار دکھایا جائے گا: ابھی کاپی کریں یا بھیج دیں۔',
   'customerLink.field': 'لنک',
+  'online.title': 'آن لائن ادائیگیاں',
+  'online.paid': '{amount} ادا ہوئے',
+  'online.open': 'شروع ہوئی: گیٹ وے نے ابھی ادائیگی کا نہیں بتایا۔',
+  'online.failed': 'گیٹ وے نے اسے شروع نہیں کیا۔ {error}',
+  'online.sandboxPaid': 'ٹیسٹ ادائیگی: اس میں سے کچھ بھی آرڈر پر ادا نہیں ہوا۔',
+  'online.applied':
+    'اس میں سے {amount} آرڈر پر ادا ہوئے؛ باقی اس کی ٹائم لائن پر ہے، واپس کرنے کو۔',
+  'online.noneApplied':
+    'آرڈر پر اس میں سے کچھ واجب نہیں تھا: یہ اس کی ٹائم لائن پر ہے، واپس کرنے کو۔',
+  'online.refund.PENDING': '{gateway} سے {amount} واپس مانگے جا رہے ہیں۔',
+  'online.refund.late': '{gateway} سے {amount} واپس مانگے گئے، جس نے جواب نہیں دیا۔',
+  'online.refund.REFUNDED': '{amount} {gateway} کے ذریعے واپس کیے گئے۔',
+  'online.refund.REFUSED': '{gateway} نے {amount} واپس نہیں کیے: {error}',
+  'online.refund.UNKNOWN':
+    '{gateway} نے نہیں بتایا کہ {amount} واپس کیے یا نہیں۔ تب تک یہ رقم روکی گئی ہے، تاکہ دو بار واپس نہ ہو۔',
+  'online.refund.check': '{gateway} کا ڈیش بورڈ دیکھیں، پھر بتائیں وہ کیا دکھاتا ہے۔',
+  'online.refund.givenBack': 'واپس کر دیے گئے',
+  'online.refund.notGivenBack': 'واپس نہیں کیے گئے',
+  'online.refund.reference': '{gateway} کا ریفرنس (اختیاری)',
+  'online.refund.save': 'واپس کیے گئے درج کریں',
+  'online.refund.settledBack': '{amount} واپس کیے گئے درج ہو گئے۔',
+  'online.refund.settledNot': 'واپس نہیں کیے گئے درج ہو گیا: یہ رقم دوبارہ واپس کی جا سکتی ہے۔',
+  'gateways.discount': 'آن لائن ادائیگی پر رعایت',
+  'gateways.discountHint':
+    'چیک آؤٹ اسے آپ کے گیٹ وے سے ادا ہونے والے آرڈرز سے کم کرتا ہے، کسی بھی ڈسکاؤنٹ کوڈ کے بعد۔ پہلے کے آرڈرز پر جو کم ہوا وہی رہتا ہے۔',
+  'online.refund.notSure':
+    'صرف تب جب {gateway} کا ڈیش بورڈ دکھائے کہ یہ واپس نہیں ہوئے: پھر یہ رقم دوبارہ واپس کی جا سکتی ہے۔',
+  'online.refund.saveNot': 'واپس نہیں کیے گئے درج کریں',
 };
 
 export const messages: Readonly<

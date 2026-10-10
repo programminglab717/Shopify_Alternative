@@ -345,6 +345,36 @@ export const OrderQuery = /* GraphQL */ `
         }
       }
     }
+    paymentSessions(orderId: $id) {
+      id
+      gatewayName
+      environment
+      status
+      method
+      reference
+      error
+      createdAt
+      paidAt
+      amount {
+        ...Money
+      }
+      paidAmount {
+        ...Money
+      }
+      applied {
+        ...Money
+      }
+      refunds {
+        id
+        status
+        reference
+        error
+        createdAt
+        amount {
+          ...Money
+        }
+      }
+    }
   }
   ${MONEY}
 `;
@@ -1906,6 +1936,23 @@ const GATEWAY_ACCOUNT = /* GraphQL */ `
   }
 `;
 
+/** What checkout takes off orders paid online (PAY-05, CHK-08). */
+const ONLINE_PAYMENT_SETTINGS = /* GraphQL */ `
+  fragment OnlinePaymentSettingsFields on OnlinePaymentSettings {
+    updatedAt
+    discount {
+      kind
+      percentage
+      cap {
+        ...Money
+      }
+      amount {
+        ...Money
+      }
+    }
+  }
+`;
+
 /** The gateways shops take payments online through, and the shop's accounts with them (PAY-01). */
 export const PaymentGatewaysQuery = /* GraphQL */ `
   query PaymentGateways {
@@ -1923,8 +1970,30 @@ export const PaymentGatewaysQuery = /* GraphQL */ `
     paymentGatewayAccounts {
       ...GatewayAccount
     }
+    onlinePaymentSettings {
+      ...OnlinePaymentSettingsFields
+    }
   }
   ${GATEWAY_ACCOUNT}
+  ${ONLINE_PAYMENT_SETTINGS}
+  ${MONEY}
+`;
+
+/** What checkout takes off orders paid online, replaced; null takes it away (PAY-05, CHK-08). */
+export const OnlinePaymentSettingsUpdateMutation = /* GraphQL */ `
+  mutation OnlinePaymentSettingsUpdate($input: OnlinePaymentSettingsInput!) {
+    onlinePaymentSettingsUpdate(input: $input) {
+      onlinePaymentSettings {
+        ...OnlinePaymentSettingsFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${ONLINE_PAYMENT_SETTINGS}
+  ${MONEY}
+  ${USER_ERRORS}
 `;
 
 /** The shop's own account with a gateway connected, its credentials sealed; confirmed recently. */
@@ -3185,6 +3254,26 @@ export const OrderRefundMutation = /* GraphQL */ `
     orderRefund(id: $id, input: $input) {
       refund {
         id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/**
+ * A refund through the gateway whose answer never came, settled as its dashboard shows it: given
+ * back, with its reference, which records the order's refund; or not, which frees what it held.
+ */
+export const PaymentRefundSettleMutation = /* GraphQL */ `
+  mutation PaymentRefundSettle($id: ID!, $input: PaymentRefundSettleInput!) {
+    paymentRefundSettle(id: $id, input: $input) {
+      paymentRefund {
+        id
+        status
+        reference
       }
       userErrors {
         ...Problems

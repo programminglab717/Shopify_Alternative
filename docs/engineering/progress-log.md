@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, online payments in the admin** (PAY-01, PAY-05, PAY-06): the payments an order's customer
-started online, which were paid and how, and a refund through the gateway whose answer never came
-settled as the gateway's dashboard shows it; and what checkout takes off orders paid online, set
-beside the shop's gateways; then section by section as the alpha's shops need them.
+**Next, a gateway's credentials and the message credit's history in the admin** (PAY-01, BIL-03):
+a gateway account's credentials changed, or the account moved from its test environment to the
+live one, once the member confirms who they are; and what added to and spent the shop's message
+credit, the newest first; then section by section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -19,6 +19,38 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### Online payments on an order's page, and what paying online takes off, in the admin
+
+* **An order's payments online** ([ADR-338](../architecture/13-decision-log.md#adr-338--an-orders-page-lists-the-payments-its-customer-started-online-and-the-refunds-asked-of-their-gateway-and-owners-and-managers-settle-a-refund-whose-answer-never-came-as-the-gateways-dashboard-shows-it-what-paying-online-takes-off-is-set-beside-the-shops-gateways-in-the-fields-the-transfers-uses)): the money section lists the payments its customer
+  started online, the latest first, with the gateway, a test one marked, what was asked and
+  paid, how and the gateway's reference; one not finished, or that the gateway would not start,
+  says so; what of a paid one the order did not take is said to be on its timeline to give back,
+  and a test one paid nothing on it.
+* **Refunds through the gateway:** each under its payment, given back with its reference,
+  refused with why, being asked, or late; one whose answer never came, unknown or asked over
+  five minutes before, is settled by owners and managers as the gateway's dashboard shows it:
+  given back with its reference, which records the order's refund, or not, once they say they
+  are sure, which frees what it held.
+* **What paying online takes off:** set beside the shop's gateways once one is connected, or while
+  something is taken off: nothing, a percentage up to a cap, or an amount, for orders placed
+  from then on, in the bank transfer's fields, now shared by both pages.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width: 5% up to Rs 300
+  saved for paying online and read back, 75% refused with the core's words, then nothing off
+  again, as before. An order placed through the Admin API for Live Check, #1025, by bank
+  transfer for Rs 1,850, tagged live-check, was paid from its link through the test gateway,
+  which its page then showed with the gateway's reference; Rs 500 was refunded through the
+  gateway, which gave it back at once. The test gateway answers every refund, so two whose
+  answer never came, Rs 300 and Rs 200, were written into the database as unknown, asked 20
+  minutes before: the first was settled as given back with a reference, which recorded the
+  order's refund, the second as not, and the core's rows said so. The page was seen in Urdu
+  too. #1025 was then cancelled with Rs 1,050 of its payment not given back: the test gateway
+  takes no money. No errors in the browser.
+* 2387 tests: an order's payments online, paid, open, failed, a test one's and one the order owed
+  none of, with their refunds given back, refused, being asked and late; a refund settled as given
+  back with its reference and one as not, once sure; settling kept from packers, and when an
+  answer is late; and what paying online takes off saved, refused before sending, taken away, and
+  not asked while no gateway is connected.
 
 ### 711efc8 · Payments recorded by hand, and an order's link made again, in the admin
 

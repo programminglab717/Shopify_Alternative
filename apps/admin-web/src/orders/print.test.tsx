@@ -7,6 +7,7 @@ const rupees = (amount: string) => ({ amount, currencyCode: 'PKR' });
 /** An order to pack, as its page reads it. */
 const ORDER = {
   shop: { timezone: 'Asia/Karachi' },
+  paymentSessions: [],
   order: {
     id: 'ord_7',
     name: '#1007',

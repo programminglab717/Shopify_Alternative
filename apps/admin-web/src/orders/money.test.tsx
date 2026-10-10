@@ -10,6 +10,7 @@ const STORAGE = 'http://localhost:4000/storage/shops/shop_1/files/f9/receipt.jpg
 function order(paid: string, extra: Record<string, unknown> = {}) {
   return {
     shop: { timezone: 'Asia/Karachi' },
+    paymentSessions: [],
     order: {
       id: 'ord_7',
       name: '#1007',

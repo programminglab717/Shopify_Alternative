@@ -25,6 +25,7 @@ const step = (id: string, status: string, message: string | null, hoursAgo: numb
 function order(fulfillments: unknown[], stage = 'IN_TRANSIT') {
   return {
     shop: { timezone: 'Asia/Karachi' },
+    paymentSessions: [],
     order: {
       id: 'ord_7',
       name: '#1007',

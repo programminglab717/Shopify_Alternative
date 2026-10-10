@@ -61,7 +61,7 @@ function core(role: StaffRole, first: ReturnType<typeof order>) {
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'Order':
-        return { shop: { timezone: 'Asia/Karachi' }, order: current };
+        return { shop: { timezone: 'Asia/Karachi' }, order: current, paymentSessions: [] };
       case 'OrderCreateManualPayment': {
         const paid = Number(current.amountPaid.amount) + Number(variables.amount);
         current = {
