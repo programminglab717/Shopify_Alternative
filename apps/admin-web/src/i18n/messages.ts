@@ -2952,6 +2952,10 @@ const en = {
   'redirects.changeOne': 'Change the redirect from {path}',
   'redirects.save': 'Save the redirect',
   'redirects.changed': 'The redirect from {path} is changed.',
+  'orders.fresh': 'Show {count} new orders',
+  'orders.fresh.one': 'Show 1 new order',
+  'orders.freshSaid': '{count} new orders',
+  'orders.freshSaid.one': '1 new order',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5878,6 +5882,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'redirects.changeOne': '{path} سے ری ڈائریکٹ بدلیں',
   'redirects.save': 'ری ڈائریکٹ محفوظ کریں',
   'redirects.changed': '{path} سے ری ڈائریکٹ بدل گیا۔',
+  'orders.fresh': '{count} نئے آرڈر دیکھیں',
+  'orders.fresh.one': '1 نیا آرڈر دیکھیں',
+  'orders.freshSaid': '{count} نئے آرڈر',
+  'orders.freshSaid.one': '1 نیا آرڈر',
 };
 
 export const messages: Readonly<

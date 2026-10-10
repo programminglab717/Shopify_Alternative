@@ -9,6 +9,7 @@ import { errorText } from '../i18n/errors';
 import { formatCount, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { ASK_AGAIN_MS } from '../orders/fresh-orders';
 import { CLAIMS, READS_RETURNS } from '../returns/parcel';
 import type { ReturnsTab } from '../returns/parcel';
 import { useAdminQuery, useShop } from '../shell/shop-context';
@@ -209,7 +210,10 @@ function SetupChecklist() {
  */
 export function HomePage() {
   const { t } = useLocale();
-  const home = useAdminQuery<HomeData>(['home'], HomeQuery);
+  // Asked again every half minute while open, as orders come and staff move them on (ADR-342).
+  const home = useAdminQuery<HomeData>(['home'], HomeQuery, undefined, {
+    refetchInterval: () => ASK_AGAIN_MS,
+  });
 
   if (home.isPending) return <Loading label={t('state.loading')} />;
   if (home.isError) {

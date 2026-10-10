@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, new orders as they come, in the admin** (ORD-01, COD-04): the orders list and Home asked
-again every half minute while open, new orders said above the list and shown in a tap rather than
-moved under one's thumb, and how many in the page's title; then section by section as the alpha's
-shops need them.
+**Next, a product duplicated, in the core and the admin** (CAT-01): a product copied as a draft to
+change, its words, options, variants and prices with it, for the next print of a suit; then
+section by section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -19,6 +18,24 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### New orders said as they come, in the admin
+
+* **Asked every half minute** ([ADR-342](../architecture/13-decision-log.md#adr-342--while-the-orders-list-is-open-in-view-or-not-it-asks-every-half-minute-for-its-tabs-newest-orders-and-says-how-many-are-newer-than-it-shows-above-it-and-in-the-pages-title-shown-at-a-tap-so-its-rows-move-only-when-staff-ask-home-and-the-confirmation-desk-ask-again-every-half-minute-while-in-view)): the orders list asks while it is open, in view or not,
+  for its tab's newest 20 orders, and says those newer than it shows above it, "Show 3 new
+  orders", and in the page's title, "(3) Hatti". A tap shows them, its first page read again; no
+  row moves as staff come back to the list. A tab with none shows them as they come. Home and the
+  Confirmation Desk ask again every half minute while in view.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, with the orders
+  list open on #1025 to #1022, an order placed through the Admin API, #1026, was said half a
+  minute later, "Show 1 new order", the title "(1) Hatti", the rows as they were. The tap put
+  #1026 at the top and the title back. On Home, its "4 orders to confirm" became 3 half a minute
+  after #1026 was cancelled for the check. No errors in the browser.
+* 2406 tests: orders placed while the list is open said and counted in the title, nothing
+  moved as staff come back, shown at a tap with the orders chosen kept; the first page alone read
+  again; a tab with none showing them as they come; more than 20 said as such; only those newer
+  than the newest shown counted; Home and the desk asked again; and the query checked against the
+  core's schema.
 
 ### 9e0979c · The admin's tests wait for the field of the panel confirming who is signed in
 

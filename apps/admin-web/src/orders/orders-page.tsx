@@ -1,4 +1,5 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import {
   Ban,
@@ -12,7 +13,7 @@ import {
   ShieldAlert,
   Tags,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSessionStore } from '../auth/context';
 import type { StaffRole } from '../auth/session';
@@ -34,6 +35,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { CancelPanel, refusals, TagsPanel } from './bulk';
 import type { BulkOutcome } from './bulk';
 import { EXPORTS_ORDERS } from './export-page';
+import { FreshOrdersNotice, useFreshOrders } from './fresh-orders';
 import { CANCELLABLE } from './order-page';
 import { PrintPanel } from './print';
 import { StageBadge, STAGES } from './stage';
@@ -162,7 +164,9 @@ function OrderRow({
 /**
  * The orders list (ORD-01, docs/design/02 §2): a tab for each stage with its count, a search that
  * understands numbers, mobiles, tracking numbers and names, newest first a page at a time, and the
- * selected orders of the tabs that move on together confirmed or packed at once (ORD-05).
+ * selected orders of the tabs that move on together confirmed or packed at once (ORD-05). Orders
+ * placed while it is open are said above it and shown at a tap (ADR-342); its rows move only when
+ * staff ask, never as they come back to it.
  */
 export function OrdersPage() {
   const { t } = useLocale();
@@ -183,9 +187,12 @@ export function OrdersPage() {
   const [panel, setPanel] = useState<'print' | 'tags' | 'cancel' | null>(null);
   const confirm = useAdminMutation<OrderBulkData, { ids: string[] }>(OrderBulkConfirmMutation);
   const pack = useAdminMutation<OrderBulkData, { ids: string[] }>(OrderBulkMarkPackedMutation);
+  const queryClient = useQueryClient();
+  const [showing, setShowing] = useState(false);
 
+  const listKey = ['admin', shop.id, 'orders', stage ?? null, q ?? null];
   const orders = useInfiniteQuery({
-    queryKey: ['admin', shop.id, 'orders', stage ?? null, q ?? null],
+    queryKey: listKey,
     queryFn: ({ pageParam }) =>
       store.graphql<OrdersData>(shop.id, OrdersQuery, {
         first: PAGE,
@@ -196,6 +203,8 @@ export function OrdersPage() {
     initialPageParam: null as string | null,
     getNextPageParam: (last) =>
       last.orders.pageInfo.hasNextPage ? last.orders.pageInfo.endCursor : undefined,
+    // Orders placed since are said above the list instead, so no row moves as staff come back.
+    refetchOnWindowFocus: false,
   });
 
   const choose = (next: OrdersSearch) => {
@@ -217,6 +226,33 @@ export function OrdersPage() {
   const selectable = shown.filter((order) => !order.overPlanLimit);
   const names = new Map(shown.map((order) => [order.id, order.name]));
   const ids = [...selected];
+
+  const fresh = useFreshOrders(
+    { stage: stage ?? null, query: q ?? null },
+    orders.isSuccess ? { shown, more: orders.hasNextPage, at: orders.dataUpdatedAt } : null,
+  );
+
+  /**
+   * The newest orders shown in place of those read before: the first page read again alone, the
+   * orders chosen that it no longer shows let go.
+   */
+  const showFresh = async () => {
+    setShowing(true);
+    queryClient.setQueryData<InfiniteData<OrdersData, string | null>>(listKey, (data) =>
+      data ? { pages: data.pages.slice(0, 1), pageParams: data.pageParams.slice(0, 1) } : data,
+    );
+    const { data } = await orders.refetch();
+    setShowing(false);
+    const still = new Set(data?.pages.flatMap((page) => page.orders.nodes.map(({ id }) => id)));
+    setSelected((current) => new Set([...current].filter((id) => still.has(id))));
+  };
+
+  // A list with nothing in it has no row to move: orders that come to it are shown as they come,
+  // the list read again each time the core says some came.
+  const empty = orders.isSuccess && shown.length === 0;
+  useEffect(() => {
+    if (empty && fresh.count > 0) void orders.refetch();
+  }, [empty, fresh.askedAt]);
 
   const runBulk = async () => {
     const mutation = bulk === 'pack' ? pack : confirm;
@@ -346,6 +382,7 @@ export function OrdersPage() {
       )}
       {panel === 'tags' && <TagsPanel ids={ids} names={names} onDone={closePanel} />}
       {panel === 'cancel' && <CancelPanel ids={ids} names={names} onDone={closePanel} />}
+      {!empty && <FreshOrdersNotice fresh={fresh} busy={showing} onShow={() => void showFresh()} />}
       {orders.isPending ? (
         <Loading label={t('state.loading')} />
       ) : orders.isError ? (

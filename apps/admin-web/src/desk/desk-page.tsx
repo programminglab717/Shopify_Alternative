@@ -40,6 +40,7 @@ import {
 } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { ASK_AGAIN_MS } from '../orders/fresh-orders';
 import { REASONS } from '../orders/order-page';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
@@ -363,12 +364,12 @@ function DealtOrder({
 export function DeskPage() {
   const { t, locale } = useLocale();
   const { id: shopId, role } = useShop();
+  // Asked again every half minute while open: an order that falls due shows at an empty desk.
   const queue = useAdminQuery<ConfirmationQueueData>(
     ['confirmationQueue'],
     ConfirmationQueueQuery,
-    {
-      first: 50,
-    },
+    { first: 50 },
+    { refetchInterval: () => ASK_AGAIN_MS },
   );
   const next = useAdminMutation<ConfirmationQueueNextData, Record<string, never>>(
     ConfirmationQueueNextMutation,

@@ -141,6 +141,23 @@ export const OrdersQuery = /* GraphQL */ `
   }
 `;
 
+/**
+ * The newest orders of a list's tab and search, which the list asks for while it is open to
+ * count those newer than it shows (ADR-342): their IDs alone, which keep the order they were placed in.
+ */
+export const FreshOrdersQuery = /* GraphQL */ `
+  query FreshOrders($first: Int, $query: String, $stage: OrderStage) {
+    orders(first: $first, query: $query, stage: $stage) {
+      nodes {
+        id
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+`;
+
 const MONEY = /* GraphQL */ `
   fragment Money on Money {
     amount

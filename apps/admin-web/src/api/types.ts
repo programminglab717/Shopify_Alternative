@@ -97,6 +97,10 @@ export interface OrdersData {
   orderStageCounts: { stage: OrderStage; count: number }[];
 }
 
+export interface FreshOrdersData {
+  orders: { nodes: { id: string }[]; pageInfo: { hasNextPage: boolean } };
+}
+
 export type FulfillmentStatus = 'IN_TRANSIT' | 'DELIVERED' | 'RETURNING' | 'RETURNED' | 'LOST';
 
 export type FulfillmentEventStatus =

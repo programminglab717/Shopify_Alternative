@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-341 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-342 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -349,6 +349,7 @@
 | 339 | A gateway account's credentials are changed in place, every one, or the account moved between its test environment and the real one with that one's credentials, once the member confirms who they are; and the billing page lists what changed the message credit, the newest first, with the balance after each | Accepted |
 | 340 | The online store's In Urdu tab lists the shop's products, collections, pages, blogs, articles, menus and home page kind by kind, the newest first, each with how much of its own words is in Urdu and how much is out of date, at first only what is left; each opens its own Urdu page | Accepted |
 | 341 | A product's type and brand are offered from those the shop already uses as they are typed, and a redirect's old address or where it goes is changed in place | Accepted |
+| 342 | While the orders list is open, in view or not, it asks every half minute for its tab's newest orders and says how many are newer than it shows, above it and in the page's title, shown at a tap, so its rows move only when staff ask; Home and the Confirmation Desk ask again every half minute while in view | Accepted |
 
 ---
 
@@ -13649,3 +13650,52 @@
   * **A picker of types alone:** a shop's first product of a new type has none to pick; the
     browser's list offers without forbidding.
   * **Delete and add again:** two steps, and a moment with no redirect.
+
+## ADR-342 · While the orders list is open, in view or not, it asks every half minute for its tab's newest orders and says how many are newer than it shows, above it and in the page's title, shown at a tap, so its rows move only when staff ask; Home and the Confirmation Desk ask again every half minute while in view
+
+* **Context:**
+  * The admin ([ADR-265](#adr-265--the-merchant-admin-is-a-react-app-on-an-origin-of-its-own-that-sends-auth-and-the-admin-api-on-to-the-core-staff-sign-in-by-a-code-to-their-mobile-or-by-email-with-the-second-step-their-role-needs-the-sessions-opaque-tokens-are-kept-in-the-browsers-storage-and-refreshed-by-one-tab-at-a-time-the-shop-is-in-each-pages-address-and-every-graphql-document-it-sends-is-checked-against-the-cores-schema)) read the orders list, Home and the Confirmation Desk once, and
+    again only as staff came back to the window after a quarter of a minute. An owner with the
+    orders list open did not see an order come until they left it and came back; an agent at an
+    empty desk ([ADR-266](#adr-266--the-admins-confirmation-desk-deals-an-agent-one-order-at-a-time-when-they-ask-and-the-next-as-soon-as-a-calls-outcome-is-recorded-the-customers-number-stays-masked-until-the-agent-asks-to-see-it-which-is-logged-and-then-can-be-called-or-messaged-on-whatsapp-with-a-tap-an-order-whose-call-is-recorded-leaves-the-agents-queue-at-once)) did not see one fall due.
+  * Coming back read the list again and moved its rows down as new orders came in at the top,
+    just as staff reached for one, so a tap could open the order below the one meant.
+  * The core tells the admin nothing of itself; the analytics' live view asks again every half
+    minute ([ADR-329](#adr-329--the-admins-analytics-show-the-online-stores-visits-beside-its-sales-who-is-on-it-now-asked-again-every-half-minute-and-the-periods-sessions-against-the-period-as-long-before-asked-in-one-document-with-how-far-they-went-towards-an-order)).
+* **Decision:**
+  * **The orders list asks** every half minute while it is open, in view or not, for its tab's
+    and search's newest 20 orders, their IDs alone, through the list's own query. Those newer
+    than the newest it shows are new. An order's ID sorts after those of the orders placed before
+    it, UUIDv7's time order kept by public IDs ([ADR-004](#adr-004--uuidv7-keys-with-type-prefixed-public-ids)), and the list is in that
+    order, so they are those whose IDs sort after its newest, even once that one has left the
+    tab. More than 20 are said as "20+". The list's own answer is the first, so a list read is
+    not asked again at once.
+  * **Said, and shown at a tap:** "Show 3 new orders" above the list, said to screen readers as
+    they come, and "(3) Hatti" as the page's title, so staff in another tab see them come. The
+    tap reads the list's first page again alone, the newest at the top; the orders chosen that it
+    no longer shows are let go. A tab with nothing in it has no row to move, and shows its orders
+    as they come.
+  * **Rows that stay:** the list is not read again as staff come back to the window. It moves
+    when they choose a tab, search, ask for more, act on orders, or tap to see the new ones.
+  * **Home and the desk** ask again every half minute while in view: Home's next actions and
+    today follow orders as they come and as staff move them on, and an order that falls due shows
+    at an empty desk, with "Take the next order".
+* **Consequences:**
+  * Staff with the list open see an order within half a minute of its coming, from another tab
+    by its title, and no row moves under their thumb.
+  * Each open list asks the core twice a minute for 21 orders as the list reads them, in view or
+    not, though browsers slow a hidden tab's timers after a while. At the alpha's scale this is
+    nothing; a count of their own, or the core telling the admin as orders come, once many
+    shops' open tabs make it matter.
+  * The tabs' counts come with the list, so they say what they were when it was read until it
+    is read again.
+  * Not yet: a sound, or a notification on the phone, as an order comes (APP-03, V1).
+* **Alternatives:**
+  * **Reading the list again every half minute:** its rows would move as staff reach for one,
+    and with them the orders they chose.
+  * **Orders placed since a time (`placedFrom`):** an order's time is when its transaction began
+    and the list is in the order of its IDs, so an order begun before the newest shown and saved
+    after would be missed; and with the filter the core reads on past the newest of a shop with
+    many orders.
+  * **The core telling the admin (server-sent events):** a connection held open for each open
+    tab, for what a question every half minute does at the alpha's scale.
