@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-351 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-352 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -359,6 +359,7 @@
 | 349 | The admin counts stock at a location by scanning: each barcode scanned, or barcode or SKU typed, adds its variant or one more of it, the counts kept in the page and saved together as one stock count, each against what was on hand when it was read; those that moved since are read again and said, and nothing is saved until they are checked | Accepted |
 | 350 | Purchase orders: the shop's suppliers, goods ordered from one for a location, numbered PO-1 onwards, each line a variant as it was named, how many and what one costs; goods received into stock as they come, in one adjustment naming the order, never more than is still to come; received in full or closed with what came; in the core and the admin | Accepted |
 | 351 | An open purchase order is changed in one request: its supplier's number, note and day expected; lines added, their quantities or costs changed, never below what came, and lines none of which came removed; received once all of it has; suppliers kept on a page of their own in the admin, each with its orders | Accepted |
+| 352 | Goods received on a purchase order set what their variants cost: a line's cost averaged with what was on hand at the variant's cost before, weighted by units, rounded to the paisa; the order's cost where none was on hand or none was known; in the same transaction as the receipt | Accepted |
 
 ---
 
@@ -14018,3 +14019,29 @@
   * **A new order for every change:** the shop would chase two numbers for one delivery.
   * **Lines changed one request at a time:** a supplier's call changes several, and the order
     would be half changed between them.
+
+## ADR-352 · Goods received on a purchase order set what their variants cost: a line's cost averaged with what was on hand at the variant's cost before, weighted by units, rounded to the paisa; the order's cost where none was on hand or none was known; in the same transaction as the receipt
+
+* **Context:**
+  * True profit (ANL-03) counts what each unit sold cost the shop, from the variant's cost when
+    the order is placed. Shops set it by hand, once, and prices from suppliers change (INV-05).
+  * A purchase order's lines say what one costs (ADR-350), and goods come in parts.
+  * Shopify keeps one cost per item, which Stocky can average as goods are received.
+* **Decision:**
+  * **As goods are received**, each line with a cost sets its variant's cost: what was on hand
+    across the shop's locations before, at the variant's cost then, and what came, at the line's,
+    weighted by units: `(cost × on hand + line cost × received) / (on hand + received)`, rounded
+    to the paisa, half up.
+  * **The line's cost alone** where nothing was on hand (or less than nothing, after selling
+    ahead), or the variant had no cost.
+  * In the same transaction as the receipt, through the catalog's `setCostsIn`; lines without a
+    cost leave theirs as it was. Cost is not shown to customers, so nothing is published.
+  * The admin says so where an order has costs: "What each costs on this order becomes its cost,
+    averaged with what's on hand."
+* **Consequences:**
+  * Orders placed after a delivery count its cost in their profit; those before keep theirs.
+  * Not yet: a history of a variant's costs; landed costs, freight shared over the lines.
+* **Alternatives:**
+  * **The last cost:** a small top-up at a high price would make all the stock on hand look dear.
+  * **First in, first out:** cost per unit sold from the batch it came in; truer, but a ledger
+    of batches no shop in the alpha has asked for.

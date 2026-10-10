@@ -347,4 +347,49 @@ describe.skipIf(!server)('PurchaseOrderService (INV-05)', () => {
       ['id', 'NOT_FOUND'],
     ]);
   });
+
+  it("averages a line's cost into its variant's as the goods come, with what was on hand", async () => {
+    const costs = () =>
+      f.db.tenant(f.a.shopId, async (tx) => {
+        const found = await f.variants.snapshotsOf(tx, f.a.shopId, variants);
+        return variants.map((id) => found.get(id)?.cost ?? null);
+      });
+    // 10 small on hand at Rs 1,000 each; no medium, nor its cost.
+    await f.db.tenant(f.a.shopId, (tx) =>
+      f.variants.setCostsIn(tx, f.a.shopId, new Map([[variants[0]!, 100000n]])),
+    );
+    unwrap(
+      await f.inventory.setQuantities(f.a, {
+        name: 'on_hand',
+        reason: 'cycle_count_available',
+        quantities: [{ inventoryItemId: variants[0]!, locationId: warehouse.id, quantity: 10 }],
+      }),
+    );
+    const order = unwrap(
+      await f.purchaseOrders.create(f.a, {
+        supplierId: (await supplier()).id,
+        locationId: warehouse.id,
+        lines: [
+          { inventoryItemId: variants[0]!, quantity: 30, unitCost: '1300' },
+          { inventoryItemId: variants[1]!, quantity: 5, unitCost: '900.50' },
+        ],
+      }),
+    );
+    const [small, medium] = order.lines as [(typeof order.lines)[0], (typeof order.lines)[0]];
+    unwrap(
+      await f.purchaseOrders.receive(f.a, order.id, {
+        lines: [
+          { lineId: small.id, quantity: 10 },
+          { lineId: medium.id, quantity: 5 },
+        ],
+      }),
+    );
+    // (10 × 1,000 + 10 × 1,300) / 20 = 1,150; the medium at what the order says.
+    expect(await costs()).toEqual([115000n, 90050n]);
+    unwrap(
+      await f.purchaseOrders.receive(f.a, order.id, { lines: [{ lineId: small.id, quantity: 7 }] }),
+    );
+    // (20 × 1,150 + 7 × 1,300) / 27 = 1,188.888…, to the paisa.
+    expect(await costs()).toEqual([118889n, 90050n]);
+  });
 });

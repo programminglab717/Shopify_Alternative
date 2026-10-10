@@ -392,8 +392,8 @@ export class PurchaseOrderService {
 
   /**
    * Goods come: each line's quantity added to on hand at the order's location, in one adjustment
-   * with the reason "received" naming the order, never more than is still to come. Once every
-   * line has come in full, the order is received.
+   * with the reason "received" naming the order, never more than is still to come; a line's cost
+   * averaged into its variant's. Once every line has come in full, the order is received.
    */
   async receive(
     tenant: TenantContext,
@@ -464,6 +464,7 @@ export class PurchaseOrderService {
           return [
             {
               lineId: line.id,
+              unitCost: line.unitCost,
               variantId: line.variantId,
               locationId: order.locationId,
               field,
@@ -495,6 +496,7 @@ export class PurchaseOrderService {
                         ${sql.param(targets.map((target) => target.quantity))}::int[])
                  AS r(id, quantity)
            WHERE l.shop_id = ${tenant.shopId} AND l.id = r.id`);
+        await this.#averageCosts(tx, tenant.shopId, targets);
         await this.#settle(tx, tenant.shopId, id);
         const [received] = await this.#load(tx, tenant.shopId, { ids: [id] });
         return { ok: true, value: received! };
@@ -744,6 +746,42 @@ export class PurchaseOrderService {
       const [closed] = await this.#load(tx, tenant.shopId, { ids: [id] });
       return { ok: true, value: closed! };
     });
+  }
+
+  /**
+   * What one of each variant received costs the shop, from the order's cost where it has one:
+   * averaged with what was on hand before, at what it cost then, or the order's cost where none was
+   * on hand or no cost was known. Rounded to the paisa, half up.
+   */
+  async #averageCosts(
+    tx: Tx,
+    shopId: string,
+    received: readonly { variantId: string; quantity: number; unitCost: bigint | null }[],
+  ): Promise<void> {
+    const costed = received.filter((each) => each.unitCost !== null);
+    if (costed.length === 0) return;
+    const ids = costed.map((each) => each.variantId);
+    const snapshots = await this.variants.snapshotsOf(tx, shopId, ids);
+    const { rows } = await tx.execute<{ variant_id: string; on_hand: number }>(sql`
+      SELECT variant_id, sum(on_hand)::int AS on_hand
+        FROM inventory.levels
+       WHERE shop_id = ${shopId} AND variant_id = ANY(${sql.param(ids)}::uuid[])
+       GROUP BY variant_id`);
+    const onHand = new Map(rows.map((row) => [row.variant_id, row.on_hand]));
+    const costs = new Map<string, bigint>();
+    for (const each of costed) {
+      const before = BigInt((onHand.get(each.variantId) ?? 0) - each.quantity);
+      const old = snapshots.get(each.variantId)?.cost ?? null;
+      const unit = each.unitCost!;
+      if (old === null || before <= 0n) {
+        costs.set(each.variantId, unit);
+        continue;
+      }
+      const total = before + BigInt(each.quantity);
+      const sum = old * before + unit * BigInt(each.quantity);
+      costs.set(each.variantId, (sum * 2n + total) / (2n * total));
+    }
+    await this.variants.setCostsIn(tx, shopId, costs);
   }
 
   /**

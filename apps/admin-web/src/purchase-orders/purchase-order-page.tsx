@@ -120,6 +120,9 @@ function Receive({ order }: { order: PurchaseOrder }) {
     <Card className="flex flex-col gap-3 p-4">
       <h2 className="font-semibold">{t('po.receive')}</h2>
       <p className="text-secondary">{t('po.receiveAbout', { location: order.location.name })}</p>
+      {order.lines.some((line) => line.unitCost) && (
+        <p className="text-secondary">{t('po.costHint')}</p>
+      )}
       <div className="flex flex-wrap gap-2">
         <form
           className="flex min-w-0 flex-1 gap-2"

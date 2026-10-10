@@ -228,6 +228,11 @@ describe('Purchase orders (INV-05)', () => {
     expect(screen.getByText('Rs 42,004')).toBeTruthy();
 
     const receive = screen.getByRole('heading', { name: 'Goods that came' }).parentElement!;
+    expect(
+      within(receive).getByText(
+        "What each costs on this order becomes its cost, averaged with what's on hand.",
+      ),
+    ).toBeTruthy();
     await press('All that is still to come');
     const small = within(receive).getByLabelText('Came of Khaddar suit · S') as HTMLInputElement;
     const medium = within(receive).getByLabelText('Came of Khaddar suit · M') as HTMLInputElement;

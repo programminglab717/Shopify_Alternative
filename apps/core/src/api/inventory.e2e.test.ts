@@ -534,9 +534,11 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     const godown = (
       await addLocation(tokens.a, { name: 'Faisalabad godown', address: { city: 'Faisalabad' } })
     ).location;
-    const [small, medium] = (
-      await stockedProduct(tokens.a, 'Khaddar suit', ['S', 'M'])
-    ).variants.map((variant) => variant.inventoryItem.id) as [string, string];
+    const khaddar = await stockedProduct(tokens.a, 'Khaddar suit', ['S', 'M']);
+    const [small, medium] = khaddar.variants.map((variant) => variant.inventoryItem.id) as [
+      string,
+      string,
+    ];
     const supplier = await mutate(
       tokens.a,
       `mutation ($input: SupplierInput!) {
@@ -655,6 +657,16 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
        }`,
       { id: small },
     );
+    // What one costs is the order's, none having been on hand (ADR-352).
+    const costs = await gql(
+      tokens.aStockReader,
+      `query ($id: ID!) { product(id: $id) { variants { title cost { amount } } } }`,
+      { id: khaddar.id },
+    );
+    expect(costs.data?.product.variants).toEqual([
+      { title: 'S', cost: { amount: '2100.00' } },
+      { title: 'M', cost: { amount: '2100.50' } },
+    ]);
     expect(stock.data?.inventoryItem).toEqual({
       inventoryLevels: [{ onHand: 12, location: { name: 'Faisalabad godown' } }],
       changes: {

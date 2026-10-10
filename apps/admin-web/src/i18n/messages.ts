@@ -3096,6 +3096,7 @@ const en = {
   'po.saveChanges': 'Save the changes',
   'po.cameAlready': '{count} came already',
   'po.atLeast': 'At least {count}.',
+  'po.costHint': "What each costs on this order becomes its cost, averaged with what's on hand.",
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6166,6 +6167,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'po.saveChanges': 'تبدیلیاں محفوظ کریں',
   'po.cameAlready': '{count} پہلے ہی آ چکے',
   'po.atLeast': 'کم از کم {count}۔',
+  'po.costHint':
+    'اس آرڈر پر ہر چیز کی قیمت اس کی لاگت بن جاتی ہے، موجود اسٹاک کے ساتھ اوسط نکال کر۔',
 };
 
 export const messages: Readonly<

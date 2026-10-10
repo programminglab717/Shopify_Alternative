@@ -171,6 +171,21 @@ export class VariantService {
     return new Map(rows.map(({ id, ...snapshot }) => [id, snapshot]));
   }
 
+  /**
+   * Sets what one of each variant costs the shop, in minor units, in the caller's tenant
+   * transaction `tx`: for inventory, as goods received on a purchase order average into it.
+   * Variants not in the shop are left out. Cost is not shown to customers, so no event follows.
+   */
+  async setCostsIn(tx: Tx, shopId: string, costs: ReadonlyMap<string, bigint>): Promise<void> {
+    if (costs.size === 0) return;
+    await tx.execute(sql`
+      UPDATE catalog.variants v
+         SET cost = c.cost, updated_at = now()
+        FROM unnest(${sql.param([...costs.keys()])}::uuid[],
+                    ${sql.param([...costs.values()].map(String))}::bigint[]) AS c(id, cost)
+       WHERE v.shop_id = ${shopId} AND v.id = c.id`);
+  }
+
   async bulkCreate(
     tenant: TenantContext,
     productId: string,

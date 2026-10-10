@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, what goods cost, from purchase orders, in the core and the admin** (INV-05, ANL-03):
-a line's cost carried to its variant's cost as the goods are received, so true profit counts what
-they cost; then section by section as the alpha's shops need them. Urdu handles wait, as
-decided.
+**Next, a purchase order printed for its supplier, in the core and the admin** (INV-05): the
+order as a page to print or save as a PDF, in English or Urdu, with the shop's name, the
+supplier, where the goods go and each line; then section by section as the alpha's shops need
+them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### What goods cost, from purchase orders, in the core and the admin
+
+* **Costs from what came** ([ADR-352](../architecture/13-decision-log.md#adr-352--goods-received-on-a-purchase-order-set-what-their-variants-cost-a-lines-cost-averaged-with-what-was-on-hand-at-the-variants-cost-before-weighted-by-units-rounded-to-the-paisa-the-orders-cost-where-none-was-on-hand-or-none-was-known-in-the-same-transaction-as-the-receipt)): goods received on a purchase order set their variants' cost,
+  each line's averaged with what was on hand at the cost before, weighted by units, in the same
+  transaction as the receipt; the line's own where nothing was on hand or no cost was known. The
+  admin says so on an order with costs.
+* **Tried in Chromium against the core:** on the seed's shop, PO-2's 7 of "Peshawari Chappal · 8"
+  at Rs 1,400 received at Lahore warehouse, 11 on hand at Rs 1,950 before: its cost became
+  Rs 1,736.11, (11 × 1,950 + 7 × 1,400) / 18; size 10, its line without a cost, kept Rs 2,050. No
+  errors in the browser.
+* 2471 tests: a cost averaged as goods come in two receipts, and one without stock before, in
+  the inventory module; through the Admin API, the variants' costs read back after a receipt.
 
 ### cc13564 · Suppliers kept, and an open purchase order changed, in the core and the admin
 
