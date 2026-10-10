@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-335 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-336 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -343,6 +343,7 @@
 | 333 | The orders list tags the orders chosen on any tab and cancels those not yet shipped for one reason, from the bar that confirms, packs and prints them, for those who change orders; a refusal names its order | Accepted |
 | 334 | An open draft is changed in the admin on the form it was made with, started from the draft as it is: every line sent at its price and every charge as it stands, so an emptied one is cleared, and the address only if it changed, its area, landmark and pin kept | Accepted |
 | 335 | Owners and managers see how each agent of the Confirmation Desk did on a page of the desk's that analytics links to: over the last 7, 30 or 90 whole days, the orders each confirmed and cancelled, how many an hour on the desk, their calls that settled nothing, and how many parcels of the orders they confirmed came back; staff by name, those who left as former staff, and apps by the end of their token | Accepted |
+| 336 | A booking that failed is put right from the bookings list, where it is its order's latest: the city its order's address writes matched against the courier's names; where the courier has none, one of its nearest chosen, or another typed, kept as the shop's own and the order booked again with the same account; and each courier account's own names listed in settings, looked up, named and forgotten | Accepted |
 
 ---
 
@@ -13427,3 +13428,42 @@
     agents' performance from them; a page of the desk's, linked from analytics, is for those
     who run the desk.
   * **A table with a column for each figure:** too wide for a phone.
+
+## ADR-336 · A booking that failed is put right from the bookings list, where it is its order's latest: the city its order's address writes matched against the courier's names; where the courier has none, one of its nearest chosen, or another typed, kept as the shop's own and the order booked again with the same account; and each courier account's own names listed in settings, looked up, named and forgotten
+
+* **Context:** A parcel is booked with the courier's name for its city ([ADR-233](#adr-233--a-parcels-city-is-booked-as-its-courier-names-it-the-shops-own-name-for-it-else-hattis-else-the-couriers-lists-matched-through-pakistans-names-for-the-city-and-their-aliases-a-city-the-list-names-none-of-fails-its-booking-with-the-couriers-nearest-names-and-the-name-staff-give-is-kept-for-the-shops-next-parcel)): the
+  shop's own, else Hatti's, else one three shops gave alike ([ADR-260](#adr-260--a-name-for-a-city-with-a-courier-that-three-shops-gave-alike-which-no-shop-gave-otherwise-is-every-shops-after-the-shops-own-and-hattis-hattis-people-keep-hattis-names-with-a-command-which-settles-a-city-shops-named-wrong)), else the
+  courier's list's. Where the list names none, the booking fails saying so, with the courier's
+  nearest names, and staff give the courier's name and book the order again. The admin showed
+  the failure in the bookings list ([ADR-270](#adr-270--the-admins-shipping-packed-orders-booked-with-the-shops-courier-account-in-a-tap-each-booking-shown-as-the-worker-books-it-and-its-courier-carries-it-booked-parcels-labels-and-the-accounts-load-sheet-printed-from-a-tab-of-their-own-and-on-a-phone-the-bottom-bars-five-slots-kept-for-the-busiest-sections-the-rest-under-more)) and nothing more: a customer's "Pindi" or
+  "Gujran" left the order unbooked until someone outside the admin named the city.
+* **Decision:**
+  * **From the bookings list:** a failed booking that is its order's latest, the first of the
+    order's in the list, has Fix and book again; an older one, since booked or waiting again,
+    has not. It opens under the booking, for those who see shipping.
+  * **The city as the order writes it, matched:** the order's city is asked for by itself, then
+    `courierCityMatch` with the booking's account. An order whose address names no city is
+    sent to its page to correct it.
+  * **Where the courier has no name for it:** its nearest names to choose from, the nearest
+    first and chosen, or another typed out as the courier's list writes it, which the core
+    checks; saved with `courierCityNameSet` as the shop's own name, then the order booked again
+    with `ordersBook` and the same account, and said so above the list. A name refused is said
+    and nothing is booked.
+  * **Where it has one:** the name and where it came from (the shop's own, Hatti's, other
+    shops', the list's, or the city's usual name where the list is not to hand), with Book
+    again, and another name given for a booking the courier refused all the same.
+  * **The shop's own names in settings:** each courier account has City names: the account's
+    names, the latest changed first, each forgotten when wrong; a city looked up as orders write
+    it, how the courier knows it, and named, all for the next parcel there.
+* **Consequences:**
+  * A failed booking for its city is put right in a few taps where it is seen, and the next
+    parcel to the city is booked with the name kept.
+  * The core books what it will: an order confirmed but not yet packed is booked again too, as
+    `ordersBook` takes it.
+  * Not yet: a failure for its city seen on the order's page; the cities couriers deliver to
+    listed, which waits for couriers' lists in the core.
+* **Alternatives:**
+  * **Reading the city and the nearest names from the failure's words:** they are the core's
+    words in English, for people; the order's city and the match are asked for as data.
+  * **A city's name in settings alone:** the failure is seen in the bookings list, and the name
+    is wanted there, with the booking put right at once.

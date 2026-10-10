@@ -72,6 +72,7 @@ import { ProductFilesPage } from './products/files-page';
 import { BankTransferPage } from './settings/bank-transfer-page';
 import { BillingPage } from './settings/billing-page';
 import { CashOnDeliveryPage } from './settings/cash-on-delivery-page';
+import { CityNamesPage } from './settings/city-names-page';
 import { CouriersPage } from './settings/couriers-page';
 import { DeliveryPage } from './settings/delivery-page';
 import { OnlinePaymentsPage } from './settings/online-payments-page';
@@ -520,6 +521,12 @@ const settingsCouriers = createRoute({
   component: CouriersPage,
 });
 
+const settingsCityNames = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/couriers/$accountId/cities',
+  component: CityNamesPage,
+});
+
 const settingsStaff = createRoute({
   getParentRoute: () => shop,
   path: 'settings/staff',
@@ -709,6 +716,7 @@ export const routeTree = root.addChildren([
     more,
     settings,
     settingsCouriers,
+    settingsCityNames,
     settingsStaff,
     settingsDelivery,
     settingsCashOnDelivery,

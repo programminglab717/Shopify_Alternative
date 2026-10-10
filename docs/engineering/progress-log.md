@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, a booking that failed for its city** (SHP-03): the courier's names nearest to the city
-an order gives, one kept as the shop's own name for the city with that courier and the order
-booked again; and the shop's own names for cities with each courier account, changed or
-forgotten; then section by section as the alpha's shops need them.
+**Next, money an order's customer sent, recorded by hand, and the order's link sent again**
+(CHK-10, COD-02): an advance or a transfer that came outside the shop's receipts recorded on the
+order's page, the order moving on once it is in; and a new link for the customer to confirm or
+follow the order, to send on WhatsApp; then section by section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -19,6 +19,30 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### A booking that failed for its city, in the admin
+
+* **Put right from the bookings list** ([ADR-336](../architecture/13-decision-log.md#adr-336--a-booking-that-failed-is-put-right-from-the-bookings-list-where-it-is-its-orders-latest-the-city-its-orders-address-writes-matched-against-the-couriers-names-where-the-courier-has-none-one-of-its-nearest-chosen-or-another-typed-kept-as-the-shops-own-and-the-order-booked-again-with-the-same-account-and-each-courier-accounts-own-names-listed-in-settings-looked-up-named-and-forgotten)): a failed booking that is its order's latest
+  has Fix and book again. The admin asks for the order's city and how the courier knows it;
+  where the courier has no name for it, its nearest names are offered, or another typed, which
+  the core checks, and the name is kept as the shop's own before the order is booked again with
+  the same account. Where it knows the city, the order is booked again as it is. An order
+  without a city is sent to its page.
+* **The shop's own names, in settings:** each courier account has City names: the names kept,
+  the latest first, each forgotten when wrong, and a city looked up and named.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, a failed
+  booking was put in the database for #1016, to Peshawar, as the test courier, which has no list
+  of cities, never fails one. Its fix said the test courier knows Peshawar as Peshawar, and Book
+  again booked it: the core books orders confirmed but not yet packed, so #1016, which waited to
+  be packed, is now in transit as HT1574386001. The list then showed the new booking above
+  the failed one, which offered no fix, and the failed booking put in was deleted afterwards.
+  In settings, Pindi was looked up (Rawalpindi, the city's usual name), named Rawalpindi
+  Cantt, found again as the shop's own name when looked up as "pindi", and forgotten, leaving
+  the shop's names as they were. No errors in the browser.
+* 2374 tests: a failed booking's nearest names, one refused by the core and nothing booked, then
+  one kept and the order booked again with its account; a city the courier knows booked again
+  without a name; an order without a city sent to its page; no fix for a booking superseded;
+  and an account's names listed, forgotten, looked up and named.
 
 ### 172a750 · Agents' performance, in the admin
 

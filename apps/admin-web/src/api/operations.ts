@@ -1277,6 +1277,7 @@ export const BlocklistRemoveMutation = /* GraphQL */ `
 const BOOKING = /* GraphQL */ `
   fragment Booking on CourierBooking {
     id
+    accountId
     orderId
     orderName
     courierName
@@ -1335,6 +1336,71 @@ export const OrdersBookMutation = /* GraphQL */ `
       }
     }
   }
+  ${USER_ERRORS}
+`;
+
+const COURIER_CITY_MATCH = /* GraphQL */ `
+  fragment CityMatch on CourierCityMatch {
+    city
+    courierCity
+    source
+    suggestions
+    listError
+  }
+`;
+
+/** The city an order goes to, as its address writes it, for its courier's name for it. */
+export const OrderCityQuery = /* GraphQL */ `
+  query OrderCity($id: ID!) {
+    order(id: $id) {
+      id
+      name
+      shippingAddress {
+        city
+      }
+    }
+  }
+`;
+
+/** How a city matches a courier account's courier's names for its cities, or the nearest (SHP-03). */
+export const CourierCityMatchQuery = /* GraphQL */ `
+  query CourierCityMatch($accountId: ID!, $city: String!) {
+    courierCityMatch(accountId: $accountId, city: $city) {
+      ...CityMatch
+    }
+  }
+  ${COURIER_CITY_MATCH}
+`;
+
+/** The shop's own names for cities with a courier account's courier, and its accounts. */
+export const CourierCityNamesQuery = /* GraphQL */ `
+  query CourierCityNames($accountId: ID!) {
+    courierAccounts {
+      id
+      name
+      courierName
+    }
+    courierCityNames(accountId: $accountId) {
+      city
+      courierCity
+      updatedAt
+    }
+  }
+`;
+
+/** The shop's own name for a city with a courier account's courier kept, or forgotten (null). */
+export const CourierCityNameSetMutation = /* GraphQL */ `
+  mutation CourierCityNameSet($input: CourierCityNameInput!) {
+    courierCityNameSet(input: $input) {
+      match {
+        ...CityMatch
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${COURIER_CITY_MATCH}
   ${USER_ERRORS}
 `;
 

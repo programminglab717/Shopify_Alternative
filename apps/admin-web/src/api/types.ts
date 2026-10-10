@@ -601,6 +601,7 @@ export type CourierParcelStatus =
 
 export interface CourierBooking {
   id: string;
+  accountId: string;
   orderId: string;
   orderName: string;
   courierName: string;
@@ -611,6 +612,35 @@ export interface CourierBooking {
   createdAt: string;
   bookedAt: string | null;
   codAmount: MoneyValue | null;
+}
+
+/** Where a courier's name for a city came from (SHP-03). */
+export type CourierCitySource = 'SHOP' | 'PLATFORM' | 'SHOPS' | 'LIST' | 'WRITTEN';
+
+/** How a city matches a courier's names: its name for it, or the nearest where it has none. */
+export interface CourierCityMatchValue {
+  city: string;
+  courierCity: string | null;
+  source: CourierCitySource | null;
+  suggestions: string[];
+  listError: string | null;
+}
+
+export interface OrderCityData {
+  order: { id: string; name: string; shippingAddress: { city: string } | null } | null;
+}
+
+export interface CourierCityMatchData {
+  courierCityMatch: CourierCityMatchValue;
+}
+
+export interface CourierCityNamesData {
+  courierAccounts: { id: string; name: string; courierName: string }[];
+  courierCityNames: { city: string; courierCity: string; updatedAt: string }[];
+}
+
+export interface CourierCityNameSetData {
+  courierCityNameSet: { match: CourierCityMatchValue | null; userErrors: UserError[] };
 }
 
 export interface CourierAccount {

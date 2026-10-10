@@ -1,5 +1,5 @@
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { FileText, PackageCheck, Printer, Truck, X } from 'lucide-react';
+import { FileText, PackageCheck, Printer, Truck, Wrench, X } from 'lucide-react';
 import { useState } from 'react';
 import {
   CourierBookingCancelMutation,
@@ -30,6 +30,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { openPrintTab } from '../ui/print';
 import { ShipByHand } from './by-hand';
+import { CityFix } from './city-names';
 import { Pickups } from './pickups';
 
 type Tab = 'book' | 'booked' | 'pickups';
@@ -297,6 +298,9 @@ function Booked({ accounts }: { accounts: CourierAccount[] }) {
   const [paper, setPaper] = useState<PaperSize>('THERMAL_4X6');
   const [printing, setPrinting] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // The failed booking being put right, and what became of the last one.
+  const [fixing, setFixing] = useState<string | null>(null);
+  const [said, setSaid] = useState('');
 
   const print = async (fetchDocument: () => Promise<CourierDocumentData>) => {
     setProblem(null);
@@ -358,6 +362,15 @@ function Booked({ accounts }: { accounts: CourierAccount[] }) {
   }
   const bookings = query.data.courierBookings.nodes;
   const printable = bookings.filter((booking) => booking.status === 'BOOKED');
+  // An order's latest booking, the first of its in the list: one that failed is put right there.
+  const latest = new Set(
+    bookings
+      .filter(
+        (booking, index) =>
+          bookings.findIndex((each) => each.orderId === booking.orderId) === index,
+      )
+      .map((booking) => booking.id),
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -377,6 +390,7 @@ function Booked({ accounts }: { accounts: CourierAccount[] }) {
         ))}
       </div>
       {problem && <Alert tone="danger">{problem}</Alert>}
+      {said && <Alert tone="success">{said}</Alert>}
       {bookings.length === 0 ? (
         <Card>
           <EmptyState
@@ -408,68 +422,94 @@ function Booked({ accounts }: { accounts: CourierAccount[] }) {
           )}
           <ul className="divide-y divide-line">
             {bookings.map((booking) => (
-              <li key={booking.id} className="flex items-center gap-3 px-4 py-3">
-                {booking.status === 'BOOKED' ? (
-                  <input
-                    type="checkbox"
-                    checked={selected.has(booking.id)}
-                    onChange={(event) =>
-                      setSelected((current) => {
-                        const next = new Set(current);
-                        if (event.target.checked) next.add(booking.id);
-                        else next.delete(booking.id);
-                        return next;
-                      })
-                    }
-                    aria-label={t('orders.select', { name: booking.orderName })}
-                    className="size-5 shrink-0 accent-[var(--hatti-color-primary)]"
-                  />
-                ) : (
-                  <span aria-hidden className="size-5 shrink-0" />
-                )}
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <Link
-                      to="/$shopId/orders/$orderId"
-                      params={{ shopId: shop.id, orderId: booking.orderId }}
-                      className="num font-semibold hover:underline"
-                    >
-                      {booking.orderName}
-                    </Link>
-                    <span className="text-secondary">
-                      {booking.courierName}
-                      {booking.trackingNumber && (
-                        <>
-                          {' · '}
-                          <span className="num">{booking.trackingNumber}</span>
-                        </>
-                      )}
-                    </span>
-                    <span className="flex-1" />
-                    {booking.codAmount && Number(booking.codAmount.amount) > 0 && (
-                      <span className="num font-medium">
-                        {formatMoney(booking.codAmount.amount, booking.codAmount.currencyCode)}
+              <li key={booking.id} className="flex flex-col gap-3 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  {booking.status === 'BOOKED' ? (
+                    <input
+                      type="checkbox"
+                      checked={selected.has(booking.id)}
+                      onChange={(event) =>
+                        setSelected((current) => {
+                          const next = new Set(current);
+                          if (event.target.checked) next.add(booking.id);
+                          else next.delete(booking.id);
+                          return next;
+                        })
+                      }
+                      aria-label={t('orders.select', { name: booking.orderName })}
+                      className="size-5 shrink-0 accent-[var(--hatti-color-primary)]"
+                    />
+                  ) : (
+                    <span aria-hidden className="size-5 shrink-0" />
+                  )}
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <Link
+                        to="/$shopId/orders/$orderId"
+                        params={{ shopId: shop.id, orderId: booking.orderId }}
+                        className="num font-semibold hover:underline"
+                      >
+                        {booking.orderName}
+                      </Link>
+                      <span className="text-secondary">
+                        {booking.courierName}
+                        {booking.trackingNumber && (
+                          <>
+                            {' · '}
+                            <span className="num">{booking.trackingNumber}</span>
+                          </>
+                        )}
                       </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-3 text-[length:var(--hatti-type-body-sm-size)]">
-                    <BookingStatus booking={booking} />
-                    <span className="text-secondary">
-                      {formatRelative(
-                        booking.bookedAt ?? booking.createdAt,
-                        query.data.shop.timezone,
-                        locale,
+                      <span className="flex-1" />
+                      {booking.codAmount && Number(booking.codAmount.amount) > 0 && (
+                        <span className="num font-medium">
+                          {formatMoney(booking.codAmount.amount, booking.codAmount.currencyCode)}
+                        </span>
                       )}
-                    </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 text-[length:var(--hatti-type-body-sm-size)]">
+                      <BookingStatus booking={booking} />
+                      <span className="text-secondary">
+                        {formatRelative(
+                          booking.bookedAt ?? booking.createdAt,
+                          query.data.shop.timezone,
+                          locale,
+                        )}
+                      </span>
+                    </div>
                   </div>
+                  {booking.status === 'PENDING' && (
+                    <Button
+                      variant="tertiary"
+                      aria-label={t('shipping.cancelBooking', { name: booking.orderName })}
+                      icon={<X aria-hidden className="size-5" />}
+                      disabled={cancel.isPending}
+                      onClick={() => void onCancel(booking)}
+                    />
+                  )}
+                  {booking.status === 'FAILED' &&
+                    latest.has(booking.id) &&
+                    fixing !== booking.id && (
+                      <Button
+                        variant="secondary"
+                        aria-label={t('cities.fixFor', { name: booking.orderName })}
+                        icon={<Wrench aria-hidden className="size-5" />}
+                        onClick={() => {
+                          setSaid('');
+                          setFixing(booking.id);
+                        }}
+                      >
+                        {t('cities.fix')}
+                      </Button>
+                    )}
                 </div>
-                {booking.status === 'PENDING' && (
-                  <Button
-                    variant="tertiary"
-                    aria-label={t('shipping.cancelBooking', { name: booking.orderName })}
-                    icon={<X aria-hidden className="size-5" />}
-                    disabled={cancel.isPending}
-                    onClick={() => void onCancel(booking)}
+                {fixing === booking.id && (
+                  <CityFix
+                    booking={booking}
+                    onDone={(done) => {
+                      setFixing(null);
+                      setSaid(done);
+                    }}
                   />
                 )}
               </li>

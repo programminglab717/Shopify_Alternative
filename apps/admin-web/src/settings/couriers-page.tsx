@@ -1,4 +1,5 @@
-import { Archive, Plus, Star, Truck } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { Archive, MapPin, Plus, Star, Truck } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -16,7 +17,7 @@ import type {
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import { problemText } from '../products/product-form';
-import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
+import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
@@ -136,6 +137,7 @@ function ConnectForm({ couriers, onDone }: { couriers: CourierOffered[]; onDone:
 
 function AccountRow({ account }: { account: CourierAccountDetail }) {
   const { t } = useLocale();
+  const shopId = useShop().id;
   const update = useAdminMutation<
     { courierAccountUpdate: CourierAccountPayloadData },
     { id: string; input: { isDefault: true } }
@@ -178,6 +180,14 @@ function AccountRow({ account }: { account: CourierAccountDetail }) {
         </span>
       </div>
       <div className="flex flex-wrap gap-2">
+        <Link
+          to="/$shopId/settings/couriers/$accountId/cities"
+          params={{ shopId, accountId: account.id }}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-control px-4 font-medium text-primary hover:bg-canvas md:min-h-10"
+        >
+          <MapPin aria-hidden className="size-5" />
+          {t('cities.link')}
+        </Link>
         {!account.isDefault && (
           <Button
             variant="tertiary"
