@@ -921,6 +921,14 @@ export const ProductUpdateMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** The product types and vendors the shop uses, the most used first, to suggest (CAT-01). */
+export const ProductSuggestionsQuery = /* GraphQL */ `
+  query ProductSuggestions {
+    productTypes(first: 100)
+    productVendors(first: 100)
+  }
+`;
+
 /** Its variants' prices and SKUs changed, together. */
 export const ProductVariantsBulkUpdateMutation = /* GraphQL */ `
   mutation ProductVariantsBulkUpdate(
@@ -4275,6 +4283,23 @@ export const UrlRedirectCreateMutation = /* GraphQL */ `
     urlRedirectCreate(urlRedirect: $urlRedirect) {
       urlRedirect {
         id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A redirect's old address or where it goes changed, in place (OS-09). */
+export const UrlRedirectUpdateMutation = /* GraphQL */ `
+  mutation UrlRedirectUpdate($id: ID!, $urlRedirect: UrlRedirectInput!) {
+    urlRedirectUpdate(id: $id, urlRedirect: $urlRedirect) {
+      urlRedirect {
+        id
+        path
+        target
       }
       userErrors {
         ...Problems

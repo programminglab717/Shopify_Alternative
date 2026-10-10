@@ -1,9 +1,11 @@
 import { useId } from 'react';
 import type { ReactNode } from 'react';
-import type { ProductStatus, UserError } from '../api/types';
+import { ProductSuggestionsQuery } from '../api/operations';
+import type { ProductStatus, ProductSuggestionsData, UserError } from '../api/types';
 import { useLocale } from '../i18n/locale';
 import type { Translate } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { useAdminQuery } from '../shell/shop-context';
 import { Card } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { PRODUCT_STATUSES } from './status';
@@ -222,6 +224,13 @@ export function OrganiseFields({
   onChange: (details: DetailsState) => void;
 }) {
   const { t } = useLocale();
+  const id = useId();
+  // The types and vendors the shop already uses, offered as they are typed, so one is not written
+  // two ways; a new one is typed as before.
+  const suggestions = useAdminQuery<ProductSuggestionsData>(
+    ['productSuggestions'],
+    ProductSuggestionsQuery,
+  );
   return (
     <FormSection title={t('product.organise')}>
       <TextField
@@ -229,16 +238,30 @@ export function OrganiseFields({
         value={details.productType}
         maxLength={255}
         dir="auto"
+        list={`${id}-types`}
+        autoComplete="off"
         placeholder={t('product.typeHint')}
         onChange={(event) => onChange({ ...details, productType: event.target.value })}
       />
+      <datalist id={`${id}-types`}>
+        {suggestions.data?.productTypes.map((each) => (
+          <option key={each} value={each} />
+        ))}
+      </datalist>
       <TextField
         label={t('product.vendor')}
         value={details.vendor}
         maxLength={255}
         dir="auto"
+        list={`${id}-vendors`}
+        autoComplete="off"
         onChange={(event) => onChange({ ...details, vendor: event.target.value })}
       />
+      <datalist id={`${id}-vendors`}>
+        {suggestions.data?.productVendors.map((each) => (
+          <option key={each} value={each} />
+        ))}
+      </datalist>
       <TextField
         label={t('product.tags')}
         hint={t('product.tagsHint')}

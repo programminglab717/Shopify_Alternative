@@ -1,4 +1,4 @@
-import { ArrowRight, Download, FileUp, Plus, Search, Trash2 } from 'lucide-react';
+import { ArrowRight, Download, FileUp, PenLine, Plus, Search, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import {
@@ -7,12 +7,14 @@ import {
   UrlRedirectsExportQuery,
   UrlRedirectsImportMutation,
   UrlRedirectsQuery,
+  UrlRedirectUpdateMutation,
 } from '../api/operations';
 import type {
   ContentMutationData,
   UrlRedirectsData,
   UrlRedirectsExportData,
   UrlRedirectsImportData,
+  UrlRedirectUpdateData,
   UrlRedirectValue,
 } from '../api/types';
 import { errorText } from '../i18n/errors';
@@ -25,12 +27,41 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 
-/** A redirect, deleted after asking. */
+/** A redirect, its old address or where it goes changed in place, or deleted after asking. */
 function RedirectRow({ redirect }: { redirect: UrlRedirectValue }) {
   const { t } = useLocale();
   const remove = useAdminMutation<ContentMutationData, { id: string }>(UrlRedirectDeleteMutation);
+  const update = useAdminMutation<
+    UrlRedirectUpdateData,
+    { id: string; urlRedirect: { path: string; target: string } }
+  >(UrlRedirectUpdateMutation);
   const { problem, attempt } = useAttempt();
   const [asking, setAsking] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [path, setPath] = useState(redirect.path);
+  const [target, setTarget] = useState(redirect.target);
+  const [changed, setChanged] = useState<string | null>(null);
+
+  const onSave = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!path.trim() || !target.trim()) return;
+    setChanged(null);
+    let saved = path.trim();
+    const ok = await attempt(async () => {
+      const { urlRedirectUpdate } = await update.mutateAsync({
+        id: redirect.id,
+        urlRedirect: { path: path.trim(), target: target.trim() },
+      });
+      // As the core keeps it: an address pasted whole is kept as its path.
+      saved = urlRedirectUpdate.urlRedirect?.path ?? saved;
+      return urlRedirectUpdate;
+    });
+    if (ok) {
+      setEditing(false);
+      setChanged(saved);
+    }
+  };
+
   return (
     <li className="flex flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -39,15 +70,52 @@ function RedirectRow({ redirect }: { redirect: UrlRedirectValue }) {
           <ArrowRight aria-hidden className="size-4 shrink-0 text-secondary" />
           <span className="break-all text-secondary">{redirect.target}</span>
         </span>
-        {!asking && (
-          <Button
-            variant="tertiary"
-            aria-label={t('redirects.deleteOne', { path: redirect.path })}
-            icon={<Trash2 aria-hidden className="size-5" />}
-            onClick={() => setAsking(true)}
-          />
+        {!asking && !editing && (
+          <span className="flex gap-1">
+            <Button
+              variant="tertiary"
+              aria-label={t('redirects.changeOne', { path: redirect.path })}
+              icon={<PenLine aria-hidden className="size-5" />}
+              onClick={() => {
+                setPath(redirect.path);
+                setTarget(redirect.target);
+                setChanged(null);
+                setEditing(true);
+              }}
+            />
+            <Button
+              variant="tertiary"
+              aria-label={t('redirects.deleteOne', { path: redirect.path })}
+              icon={<Trash2 aria-hidden className="size-5" />}
+              onClick={() => setAsking(true)}
+            />
+          </span>
         )}
       </div>
+      {editing && (
+        <form onSubmit={(event) => void onSave(event)} className="flex flex-col gap-3">
+          <TextField
+            label={t('redirects.path')}
+            ltr
+            value={path}
+            onChange={(event) => setPath(event.target.value)}
+          />
+          <TextField
+            label={t('redirects.target')}
+            ltr
+            value={target}
+            onChange={(event) => setTarget(event.target.value)}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" busy={update.isPending} disabled={!path.trim() || !target.trim()}>
+              {t('redirects.save')}
+            </Button>
+            <Button variant="tertiary" onClick={() => setEditing(false)}>
+              {t('returns.cancel')}
+            </Button>
+          </div>
+        </form>
+      )}
       {asking && (
         <div className="flex flex-wrap items-center gap-2">
           <span>{t('redirects.deleteAsk', { path: redirect.path })}</span>
@@ -67,6 +135,7 @@ function RedirectRow({ redirect }: { redirect: UrlRedirectValue }) {
           </Button>
         </div>
       )}
+      {changed && <Alert tone="success">{t('redirects.changed', { path: changed })}</Alert>}
       {problem && <Alert tone="danger">{problem}</Alert>}
     </li>
   );

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
 import { fakeCore, press, renderAdmin, signedIn, type } from '../test-support';
@@ -66,6 +66,8 @@ function catalogCore(role: StaffRole) {
         };
       case 'PrimaryLocation':
         return { location: LOCATION };
+      case 'ProductSuggestions':
+        return { productTypes: ['Kurtas', 'Shawls'], productVendors: ['Zari Studio'] };
       case 'Product':
         return { location: LOCATION, product: KURTA };
       case 'ProductCreate':
@@ -145,6 +147,21 @@ describe('Products in the admin', () => {
         quantities: [{ inventoryItemId: 'item_S', quantity: 5, locationId: 'loc_1' }],
       },
     });
+  });
+
+  it("offers the shop's own product types and vendors as they are typed", async () => {
+    vi.stubGlobal('fetch', catalogCore('owner').fetcher);
+    renderAdmin('/shop_1/products/new');
+
+    await screen.findByRole('heading', { name: 'Add product' });
+    const offered = async (label: string) => {
+      const input = screen.getByLabelText(label);
+      const list = document.getElementById(input.getAttribute('list')!)!;
+      await waitFor(() => expect(list.querySelectorAll('option').length).toBeGreaterThan(0));
+      return [...list.querySelectorAll('option')].map((option) => option.value);
+    };
+    expect(await offered('Type')).toEqual(['Kurtas', 'Shawls']);
+    expect(await offered('Brand')).toEqual(['Zari Studio']);
   });
 
   it('catches a price that is not one before sending anything', async () => {

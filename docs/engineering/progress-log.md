@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, product types and vendors suggested, and a redirect changed in place, in the admin**
-(CAT-01, OS-09): a product's type and vendor offered from those the shop already uses as they are
-typed, and a redirect's path or target changed without deleting it; then section by section as the
-alpha's shops need them.
+**Next, new orders as they come, in the admin** (ORD-01, COD-04): the orders list and Home asked
+again every half minute while open, new orders said above the list and shown in a tap rather than
+moved under one's thumb, and how many in the page's title; then section by section as the alpha's
+shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -19,6 +19,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### Product types and brands suggested, and a redirect changed in place, in the admin
+
+* **Types and brands** ([ADR-341](../architecture/13-decision-log.md#adr-341--a-products-type-and-brand-are-offered-from-those-the-shop-already-uses-as-they-are-typed-and-a-redirects-old-address-or-where-it-goes-is-changed-in-place)): the product form's Type and Brand fields offer the shop's own as
+  they are typed, the most used first; anything new is typed as before.
+* **A redirect changed:** each redirect's row changes its old address or where it goes, in place;
+  what the core refuses, such as a redirect to its own address, is said in the row.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, a new
+  product's Type offered the seed's five types, Kurta to Unstitched, and Brand its five vendors,
+  as the core lists them. A redirect added for the check, /live-check-old to /collections/all,
+  was refused when pointed at itself ("/live-check-old would send shoppers back to
+  /live-check-old"), then changed to /live-check-old-2 going to /products, which the core's row
+  then held, and deleted. No errors in the browser.
+* 2400 tests: the shop's types and brands offered on a new product's form; a redirect changed
+  in place, a refusal said, and an address pasted whole kept as its path.
 
 ### a76bc4d · What is left to put in Urdu, in the admin
 

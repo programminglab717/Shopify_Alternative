@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-340 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-341 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -348,6 +348,7 @@
 | 338 | An order's page lists the payments its customer started online and the refunds asked of their gateway, and owners and managers settle a refund whose answer never came as the gateway's dashboard shows it; what paying online takes off is set beside the shop's gateways, in the fields the transfer's uses | Accepted |
 | 339 | A gateway account's credentials are changed in place, every one, or the account moved between its test environment and the real one with that one's credentials, once the member confirms who they are; and the billing page lists what changed the message credit, the newest first, with the balance after each | Accepted |
 | 340 | The online store's In Urdu tab lists the shop's products, collections, pages, blogs, articles, menus and home page kind by kind, the newest first, each with how much of its own words is in Urdu and how much is out of date, at first only what is left; each opens its own Urdu page | Accepted |
+| 341 | A product's type and brand are offered from those the shop already uses as they are typed, and a redirect's old address or where it goes is changed in place | Accepted |
 
 ---
 
@@ -13621,3 +13622,30 @@
   * **A count on each list of products, pages and the rest:** spread over the admin, where one
     place shows what is left.
   * **Asking each thing's Urdu by its ID:** a list of each kind gives the same in one ask.
+
+## ADR-341 · A product's type and brand are offered from those the shop already uses as they are typed, and a redirect's old address or where it goes is changed in place
+
+* **Context:**
+  * Collections by rules and the products search find products by their type and vendor, which
+    the admin's product form ([ADR-267](#adr-267--the-admins-products-a-list-by-status-and-search-a-products-page-that-owners-and-managers-change-and-every-other-role-reads-and-adding-a-product-with-its-options-variants-each-with-its-price-and-stock-stock-is-counted-at-the-shops-primary-location-set-where-the-merchant-typed-it-and-refused-if-it-changed-since-it-was-read)) took as typed: a shop that writes "Kurta" on one
+    product and "Kurtas" on another has two types, and a rule on one misses the other. The core
+    lists the types and vendors in use, the most used first (`productTypes`, `productVendors`).
+  * A redirect ([ADR-052](#adr-052--a-shops-url-redirects-are-the-online-stores-and-the-storefront-follows-one-only-where-it-has-no-page)) was put right in the admin ([ADR-297](#adr-297--the-admins-online-store-keeps-the-storefront-behind-its-password-while-the-shop-gets-ready-pauses-it-while-open-until-a-time-or-until-told-and-sets-its-home-page-for-search-engines-and-sends-old-addresses-on-redirects-found-added-deleted-imported-from-shopifys-csv-once-checked-and-exported-to-it)) only by deleting it
+    and adding it again, though the core changes one in place (`urlRedirectUpdate`).
+* **Decision:**
+  * **Types and brands offered:** the product form's Type and Brand fields offer the shop's own,
+    the most used first, up to 100 of each, as the browser offers a list's options while one
+    types; anything else is typed as before.
+  * **A redirect changed:** each redirect's row changes its old address or where it goes, in
+    place, through `urlRedirectUpdate`. An address pasted whole is kept as its path, as the core
+    keeps it, and what the core refuses, such as a redirect that would go to its own address, is
+    said in the row.
+* **Consequences:**
+  * A shop's products keep to the same types and brands, so collections by rules and searches
+    find them all.
+  * A redirect's mistake is put right without deleting it.
+  * Not yet: a type or brand renamed across all the shop's products at once.
+* **Alternatives:**
+  * **A picker of types alone:** a shop's first product of a new type has none to pick; the
+    browser's list offers without forbidding.
+  * **Delete and add again:** two steps, and a moment with no redirect.

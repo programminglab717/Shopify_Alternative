@@ -43,6 +43,34 @@ function core(role: StaffRole) {
         return { urlRedirectCreate: { urlRedirect: { id: 'red_2' }, userErrors: [] } };
       case 'UrlRedirectDelete':
         return { urlRedirectDelete: { deletedUrlRedirectId: variables.id, userErrors: [] } };
+      case 'UrlRedirectUpdate': {
+        const input = variables.urlRedirect as { path: string; target: string };
+        if (input.target === input.path) {
+          return {
+            urlRedirectUpdate: {
+              urlRedirect: null,
+              userErrors: [
+                {
+                  field: ['urlRedirect', 'target'],
+                  code: 'INVALID',
+                  message: 'A redirect cannot go to its own address',
+                },
+              ],
+            },
+          };
+        }
+        return {
+          urlRedirectUpdate: {
+            // An address pasted whole is kept as its path, as the core keeps it.
+            urlRedirect: {
+              id: variables.id,
+              path: input.path.replace(/^https?:\/\/[^/]+/, ''),
+              target: input.target,
+            },
+            userErrors: [],
+          },
+        };
+      }
       case 'UrlRedirectsImport':
         return {
           urlRedirectsImport: variables.dryRun
@@ -125,6 +153,39 @@ describe("The storefront's preferences and redirects", () => {
         },
       }),
     );
+  });
+
+  it('changes a redirect in place, and says what the core refuses', async () => {
+    const fake = core('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=redirects');
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Change the redirect from /products/old-lawn' }),
+    );
+    const row = screen.getByRole('button', { name: 'Save the redirect' }).closest('li')!;
+    const path = within(row).getByLabelText('Old address') as HTMLInputElement;
+    const target = within(row).getByLabelText('Goes to') as HTMLInputElement;
+    expect([path.value, target.value]).toEqual(['/products/old-lawn', '/products/lawn']);
+
+    fireEvent.change(target, { target: { value: '/products/old-lawn' } });
+    fireEvent.click(within(row).getByRole('button', { name: 'Save the redirect' }));
+    expect((await within(row).findByRole('alert')).textContent).toBe(
+      'A redirect cannot go to its own address',
+    );
+
+    fireEvent.change(path, { target: { value: ' https://zari.hatti.pk/products/old-lawn-2 ' } });
+    fireEvent.change(target, { target: { value: '/products/lawn-suit' } });
+    fireEvent.click(within(row).getByRole('button', { name: 'Save the redirect' }));
+    await screen.findByText('The redirect from /products/old-lawn-2 is changed.');
+    expect(sentOf(fake, 'UrlRedirectUpdate').at(-1)).toEqual({
+      id: 'red_1',
+      urlRedirect: {
+        path: 'https://zari.hatti.pk/products/old-lawn-2',
+        target: '/products/lawn-suit',
+      },
+    });
+    expect(screen.queryByRole('button', { name: 'Save the redirect' })).toBeNull();
   });
 
   it('finds, adds, deletes, imports after checking, and exports redirects', async () => {

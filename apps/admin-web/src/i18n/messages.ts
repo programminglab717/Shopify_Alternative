@@ -2949,6 +2949,9 @@ const en = {
   'urduAll.summaryNewest': '{done} of the newest {count} all in Urdu.',
   'urduAll.newest': 'The newest {count} are shown here; find the others from their own pages.',
   'urduAll.untitled': 'Without a title',
+  'redirects.changeOne': 'Change the redirect from {path}',
+  'redirects.save': 'Save the redirect',
+  'redirects.changed': 'The redirect from {path} is changed.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5872,6 +5875,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'urduAll.summaryNewest': 'سب سے نئے {count} میں سے {done} پورے اردو میں۔',
   'urduAll.newest': 'یہاں سب سے نئے {count} دکھائے گئے ہیں؛ باقی ان کے اپنے صفحات سے ڈھونڈیں۔',
   'urduAll.untitled': 'بغیر عنوان',
+  'redirects.changeOne': '{path} سے ری ڈائریکٹ بدلیں',
+  'redirects.save': 'ری ڈائریکٹ محفوظ کریں',
+  'redirects.changed': '{path} سے ری ڈائریکٹ بدل گیا۔',
 };
 
 export const messages: Readonly<

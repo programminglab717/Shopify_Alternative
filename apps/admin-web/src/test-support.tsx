@@ -113,21 +113,24 @@ export function fakeCore(
         },
       });
     }
-    // A list's saved searches, asked by every orders and products page: none unless answered.
+    // A list's saved searches, asked by every orders and products page, and the product types
+    // and vendors a product's form suggests: none unless answered.
     const data = /SavedSearches$/.test(operation)
-      ? savedSearches(() => answer(operation, variables))
-      : answer(operation, variables);
+      ? orElse(() => answer(operation, variables), { savedSearches: { nodes: [] } })
+      : operation === 'ProductSuggestions'
+        ? orElse(() => answer(operation, variables), { productTypes: [], productVendors: [] })
+        : answer(operation, variables);
     if (data instanceof GraphQLErrors) return json({ data: null, errors: data.errors });
     return json({ data });
   });
   return { fetcher, sent, uploads };
 }
 
-function savedSearches(answer: () => unknown): unknown {
+function orElse(answer: () => unknown, otherwise: unknown): unknown {
   try {
     return answer();
   } catch {
-    return { savedSearches: { nodes: [] } };
+    return otherwise;
   }
 }
 

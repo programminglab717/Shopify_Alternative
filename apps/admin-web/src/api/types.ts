@@ -1736,6 +1736,16 @@ export interface UrlRedirectValue {
   target: string;
 }
 
+export interface UrlRedirectUpdateData {
+  urlRedirectUpdate: { urlRedirect: UrlRedirectValue | null; userErrors: UserError[] };
+}
+
+/** The product types and vendors a shop uses, to suggest as products are written. */
+export interface ProductSuggestionsData {
+  productTypes: string[];
+  productVendors: string[];
+}
+
 export interface UrlRedirectsData {
   urlRedirects: { nodes: UrlRedirectValue[]; pageInfo: { hasNextPage: boolean } };
 }
