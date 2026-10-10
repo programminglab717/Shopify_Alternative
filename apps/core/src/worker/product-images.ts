@@ -1,5 +1,6 @@
 import {
   cleanImageKey,
+  cropNameOf,
   hostPreviewsOf,
   imagesPrefixOf,
   videoKeyOf,
@@ -13,6 +14,7 @@ import {
   MAX_VIDEO_BYTES,
   cleanImage,
   cleanVideo,
+  cropImage,
   type CleanVideo,
   type ImageFetcher,
 } from '@hatti/images';
@@ -149,6 +151,21 @@ export class ProductImages {
       CONTENT_TYPES[image.format],
     );
     if (video) await storage.put(videoKeyOf(shopId, media.id), video.body, 'video/mp4');
+    // A copy is cropped as the one it copies, where the image is the same (ADR-343).
+    const copied = media.copyOf?.crop;
+    const crop =
+      copied &&
+      copied.left + copied.width <= image.width &&
+      copied.top + copied.height <= image.height
+        ? copied
+        : null;
+    if (crop) {
+      await storage.put(
+        cleanImageKey(shopId, media.id, image.format, cropNameOf(crop)),
+        await cropImage(image.body, crop, image.format),
+        CONTENT_TYPES[image.format],
+      );
+    }
     const outcome = await processing.ready(
       shopId,
       media.id,
@@ -159,6 +176,7 @@ export class ProductImages {
         height: video.height,
         durationMs: video.durationMs,
       },
+      crop,
     );
     // Gone while it was made: what was kept of it goes too.
     if (outcome === 'gone') await storage.deletePrefix(imagesPrefixOf(shopId, media.id));
@@ -170,6 +188,11 @@ export class ProductImages {
    * largest its host has, or the one Vimeo names.
    */
   async #imageOf(shopId: string, media: ClaimedMedia): Promise<Read> {
+    // A copy's, from the clean copy kept of the one it copies, while it is there (ADR-343).
+    const copyOf = media.copyOf;
+    const kept =
+      copyOf && (await this.options.storage.read(cleanImageKey(shopId, copyOf.id, copyOf.format)));
+    if (kept) return { ok: true, body: kept.body };
     if (media.mediaType === 'image') {
       return this.#read(shopId, { url: media.sourceUrl, key: media.sourceKey });
     }
@@ -228,9 +251,11 @@ export class ProductImages {
       code: 'GENERIC_FILE_DOWNLOAD_FAILURE',
       message: 'The uploaded video is gone: upload it again',
     };
-    const key = media.sourceKey;
+    // A copy's, from the video kept of the one it copies, while it is there (ADR-343).
+    const kept = media.copyOf?.video ? videoKeyOf(shopId, media.copyOf.id) : null;
+    const key = kept && (await this.options.storage.head(kept)) ? kept : media.sourceKey;
     // The database checks it too: the shop's own files alone.
-    if (key === null || !key.startsWith(`shops/${shopId}/files/`)) return gone;
+    if (key === null || (key !== kept && !key.startsWith(`shops/${shopId}/files/`))) return gone;
     const stored = await this.options.storage.head(key);
     if (!stored) return gone;
     if (stored.size > MAX_VIDEO_BYTES) {

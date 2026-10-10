@@ -101,6 +101,7 @@ describe.skipIf(!server)('product images (ADR-158)', () => {
         previewSourceKey: null,
         externalVideo: null,
         attempts: 1,
+        copyOf: null,
       },
       expect.objectContaining({ id: back, attempts: 1 }),
     ]);

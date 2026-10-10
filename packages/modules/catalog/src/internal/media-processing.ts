@@ -2,7 +2,7 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { and, eq, sql } from 'drizzle-orm';
 import { CatalogEvents, type ProductUpdatedPayload } from './events.js';
-import type { VideoRecord } from './records.js';
+import type { MediaCropRecord, VideoRecord } from './records.js';
 import { products, type ImageFormatValue, type MediaTypeValue } from './schema.js';
 import type { VideoHostValue } from './videos.js';
 
@@ -23,6 +23,19 @@ export interface ClaimedMedia {
   externalVideo: { host: VideoHostValue; id: string } | null;
   /** Its tries, this one counted. */
   attempts: number;
+  /**
+   * What is kept of the media it is a copy of, a product duplicated (ADR-343), while that one is
+   * ready: the clean copy's format, its crop, and whether a video the shop uploaded is kept.
+   */
+  copyOf: CopiedMedia | null;
+}
+
+/** The ready media a copy is made from. */
+export interface CopiedMedia {
+  id: string;
+  format: ImageFormatValue;
+  crop: MediaCropRecord | null;
+  video: boolean;
 }
 
 /** A clean copy the worker kept (ADR-158). */
@@ -77,6 +90,15 @@ export class MediaProcessing {
         video_host: VideoHostValue | null;
         video_external_id: string | null;
         attempts: number;
+        copy_of: {
+          id: string;
+          format: ImageFormatValue;
+          left: number | null;
+          top: number | null;
+          width: number | null;
+          height: number | null;
+          video: boolean;
+        } | null;
       }>(sql`
         -- Chosen once: a subquery in UPDATE's FROM may be run again, and take more.
         WITH due AS MATERIALIZED (
@@ -94,7 +116,14 @@ export class MediaProcessing {
          WHERE m.shop_id = ${shopId} AND m.id = due.id
         RETURNING m.id, m.product_id, m.media_type, m.source_url, m.source_key,
                   m.preview_source_url, m.preview_source_key, m.video_host, m.video_external_id,
-                  m.attempts`),
+                  m.attempts,
+                  (SELECT jsonb_build_object(
+                            'id', o.id, 'format', o.image_format, 'left', o.crop_left,
+                            'top', o.crop_top, 'width', o.crop_width, 'height', o.crop_height,
+                            'video', o.video_size IS NOT NULL)
+                     FROM catalog.product_media o
+                    WHERE o.shop_id = m.shop_id AND o.id = m.copied_from
+                      AND o.status = 'ready') AS copy_of`),
     );
     return (
       rows
@@ -111,6 +140,20 @@ export class MediaProcessing {
               ? { host: row.video_host, id: row.video_external_id }
               : null,
           attempts: row.attempts,
+          copyOf: row.copy_of && {
+            id: row.copy_of.id,
+            format: row.copy_of.format,
+            crop:
+              row.copy_of.left === null
+                ? null
+                : {
+                    left: row.copy_of.left,
+                    top: row.copy_of.top!,
+                    width: row.copy_of.width!,
+                    height: row.copy_of.height!,
+                  },
+            video: row.copy_of.video,
+          },
         }))
         // The first added first: their IDs follow the time they were made.
         .sort((a, b) => (a.id < b.id ? -1 : 1))
@@ -119,13 +162,15 @@ export class MediaProcessing {
 
   /**
    * Marks a taken media ready, its image's clean copy as given: an image's own, or a video's
-   * preview; and a video the shop uploaded, as kept (ADR-258).
+   * preview; a video the shop uploaded, as kept (ADR-258); and the crop of the one it copies,
+   * its crop's clean copy kept (ADR-343).
    */
   async ready(
     shopId: string,
     mediaId: string,
     image: ProcessedImage,
     video: VideoRecord | null = null,
+    crop: MediaCropRecord | null = null,
   ): Promise<ReadyOutcome> {
     return this.db.tenant(shopId, async (tx) => {
       const { rows } = await tx.execute<{ product_id: string }>(sql`
@@ -134,7 +179,9 @@ export class MediaProcessing {
                width = ${image.width}, height = ${image.height}, next_attempt_at = NULL,
                video_size = ${video?.size ?? null}, video_width = ${video?.width ?? null},
                video_height = ${video?.height ?? null},
-               video_duration_ms = ${video?.durationMs ?? null}, updated_at = now()
+               video_duration_ms = ${video?.durationMs ?? null}, crop_left = ${crop?.left ?? null},
+               crop_top = ${crop?.top ?? null}, crop_width = ${crop?.width ?? null},
+               crop_height = ${crop?.height ?? null}, updated_at = now()
          WHERE shop_id = ${shopId} AND id = ${mediaId} AND status = 'processing'
         RETURNING product_id`);
       if (rows[0]) {

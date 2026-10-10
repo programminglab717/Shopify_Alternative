@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-342 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-343 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -350,6 +350,7 @@
 | 340 | The online store's In Urdu tab lists the shop's products, collections, pages, blogs, articles, menus and home page kind by kind, the newest first, each with how much of its own words is in Urdu and how much is out of date, at first only what is left; each opens its own Urdu page | Accepted |
 | 341 | A product's type and brand are offered from those the shop already uses as they are typed, and a redirect's old address or where it goes is changed in place | Accepted |
 | 342 | While the orders list is open, in view or not, it asks every half minute for its tab's newest orders and says how many are newer than it shows, above it and in the page's title, shown at a tap, so its rows move only when staff ask; Home and the Confirmation Desk ask again every half minute while in view | Accepted |
+| 343 | A product is duplicated as Shopify's productDuplicate does it: the copy made in one transaction with the product's words, options, variants and prices, none of its SKUs, barcodes or stock, and put in its manual collections; its photos and videos, if asked, made again by the worker from what was kept of them; the admin makes the copy a draft and opens it | Accepted |
 
 ---
 
@@ -13699,3 +13700,56 @@
     many orders.
   * **The core telling the admin (server-sent events):** a connection held open for each open
     tab, for what a question every half minute does at the alpha's scale.
+
+## ADR-343 · A product is duplicated as Shopify's productDuplicate does it: the copy made in one transaction with the product's words, options, variants and prices, none of its SKUs, barcodes or stock, and put in its manual collections; its photos and videos, if asked, made again by the worker from what was kept of them; the admin makes the copy a draft and opens it
+
+* **Context:**
+  * A shop selling lawn adds the next print of a suit as a product of its own: the same words,
+    sizes and prices, another colour. In the admin ([ADR-265](#adr-265--the-merchant-admin-is-a-react-app-on-an-origin-of-its-own-that-sends-auth-and-the-admin-api-on-to-the-core-staff-sign-in-by-a-code-to-their-mobile-or-by-email-with-the-second-step-their-role-needs-the-sessions-opaque-tokens-are-kept-in-the-browsers-storage-and-refreshed-by-one-tab-at-a-time-the-shop-is-in-each-pages-address-and-every-graphql-document-it-sends-is-checked-against-the-cores-schema)) that meant typing it all
+    again, its variants one by one.
+  * Shopify's Admin API has `productDuplicate`, which apps and staff already know.
+  * A photo the shop uploads is a staged upload never made a file, which the files module sweeps
+    a day after ([ADR-079](#adr-079--files-are-kept-in-object-storage-under-each-shops-prefix-uploaded-straight-there-through-urls-the-admin-api-signs-and-shown-only-through-short-lived-signed-urls-a-directory-stands-in-for-r2-in-development)). What lasts is what the worker kept of it, its clean copy
+    under the media's own ID ([ADR-158](#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)), a crop's beside it ([ADR-257](#adr-257--the-merchant-crops-a-products-image-and-marks-what-matters-in-it-a-crops-clean-copy-is-made-from-the-whole-images-as-it-is-set-and-kept-beside-it-each-size-and-format-made-from-it-at-an-address-naming-the-crop-the-whole-kept-to-crop-again-the-focal-point-in-percent-of-the-image-shown-is-shopifys-for-themes-and-image_tag)), and a video
+    as browsers play it ([ADR-258](#adr-258--products-videos-an-mp4-or-quicktime-file-the-shop-uploads-h264-and-aac-as-phones-record-them-read-box-by-box-and-kept-as-it-is-but-for-where-it-was-taken-served-a-range-at-a-time-with-the-preview-image-its-uploader-gives-or-a-youtube-or-vimeo-video-by-its-address-its-hosts-image-its-preview-themes-have-them-as-shopifys-media)).
+  * A crop is recorded only on a ready image, inside it (migration 0160).
+* **Decision:**
+  * **`productDuplicate(productId, newTitle, newStatus, includeImages)`**, as Shopify's, for those
+    who change products. In one transaction the copy takes the product's description, type,
+    brand, tags, SEO title and description, its options and values, and its variants with their
+    prices, prices before, costs, weights and whether each is taxed. Its handle comes from the
+    new title, numbered when taken. Its status is the product's unless one is given.
+  * **Not copied:** SKUs and barcodes, as two variants with one would scan, import and sync as
+    one, and stock. Each variant's stock settings are copied, whether it is tracked and whether it
+    sells on when out, with nothing in stock. The inventory module keeps them, which the catalog
+    cannot reach, so the catalog names a port, `CopiedVariantStock`, that the API binds to
+    inventory's in its global module, in the duplicate's transaction, as the plan's allowance is
+    ([ADR-154](#adr-154--shops-pay-hatti-for-a-plan-in-rupees-by-the-month-or-the-year-through-hattis-own-payment-gateway-account-a-bigger-plan-begins-once-its-invoice-is-paid-less-what-is-left-of-the-period-it-cuts-short-a-smaller-one-when-the-period-ends-each-period-is-invoiced-a-week-ahead-and-a-week-unpaid-puts-the-shop-on-free-other-modules-ask-each-plans-limits-through-a-port)). Without it, a copy's variants are untracked until their stock is first set.
+  * **Collections:** the copy is put last in each manual collection the product is in, each
+    collection's version bumped and `collection.updated` recorded; smart ones take it by their
+    rules. The copy is recorded as `product.created`.
+  * **Photos and videos, if asked:** each is copied where it was, its alt text and focal point
+    with it, and made again by the worker under its own ID, as staff may delete one product's
+    photo and not the other's. Each copy records the media it copies (migration 0167). While that
+    one is ready, the worker makes the copy from its clean copy, and an uploaded video from the
+    video kept; otherwise from its source, as any other. A copy is cropped as the one it copies
+    once ready, its crop's clean copy made, as a crop is only a ready image's. Each variant shows
+    its photo's copy.
+  * **In the admin:** "Duplicate" on a product's page, for those who change products, asks for
+    the copy's title, "Copy of Lawn Suit" to start, and, where the product has any, whether to
+    copy its photos and videos. The copy is always made a draft, hidden from the store until
+    shown, and its page opened, saying it was copied as a draft and what is left to do.
+* **Consequences:**
+  * The next print of a suit is a title and a tap away, its prices and sizes as the last one's.
+  * A copy's photos and videos are ready as soon as the worker comes to them, a day or a year
+    after their upload, while the product's are kept; one whose original was deleted meanwhile
+    is made from its source, which may be gone, and fails saying so.
+  * The copy's words in Urdu (OS-06) are not copied: staff enter them again for it.
+  * Not yet: duplicating many products at once, and copying stock.
+* **Alternatives:**
+  * **Copying the files in the mutation:** storage has no copy, and files written before the
+    transaction commits are left behind when it does not.
+  * **The copy sharing the product's images:** deleting the product, or one photo, removes
+    what is kept under that media's ID, and with it the copy's.
+  * **The admin creating the copy from the product it read, through `productCreate`:** no stock
+    settings, collections or photos, in several requests that can stop halfway.

@@ -39,6 +39,7 @@ export {
 export {
   MediaProcessing,
   type ClaimedMedia,
+  type CopiedMedia,
   type ProcessedImage,
   type ReadyOutcome,
 } from '../internal/media-processing.js';

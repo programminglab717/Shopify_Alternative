@@ -264,4 +264,119 @@ describe.skipIf(!server)("The worker's product images and videos (ADR-158, ADR-2
     });
     expect(await storage.head(`shops/${tenant.shopId}/images/${refused}/video.mp4`)).toBeNull();
   });
+
+  it('makes a copy of a product duplicated from what was kept of the one it copies, its upload swept, cropped as that one (ADR-343)', async () => {
+    const product = await products.create(tenant, { title: 'Lawn Kurta' });
+    if (!product.ok) throw new Error('no product');
+    const upload = async (name: string, body: Buffer, type: string) => {
+      const key = `shops/${tenant.shopId}/files/${newId()}/${name}`;
+      await storage.put(key, body, type);
+      return { key, location: storage.locationOf(key) };
+    };
+    const photo = await upload(
+      'kurta.jpg',
+      await sharp({ create: { width: 800, height: 600, channels: 3, background: '#7a1f3d' } })
+        .jpeg()
+        .toBuffer(),
+      'image/jpeg',
+    );
+    const film = await upload('kurta.mov', phoneVideo('avc1'), 'video/quicktime');
+    const frame = await upload(
+      'frame.jpg',
+      await sharp({ create: { width: 90, height: 160, channels: 3, background: '#335577' } })
+        .jpeg()
+        .toBuffer(),
+      'image/jpeg',
+    );
+    const created = await media.create(tenant, product.value.id, [
+      { originalSource: photo.location, alt: 'Front' },
+      {
+        originalSource: film.location,
+        mediaContentType: 'VIDEO',
+        previewImageSource: frame.location,
+      },
+    ]);
+    if (!created.ok) throw new Error(JSON.stringify(created.errors));
+    const [image] = created.value.mediaIds as [string];
+    expect(await worker().sweep(new Date(Date.now() + 60_000))).toEqual({ ready: 2, removed: 0 });
+    const cropped = await media.update(tenant, product.value.id, [
+      {
+        id: image,
+        crop: { left: 100, top: 0, width: 600, height: 600 },
+        focalPoint: { x: 40, y: 30 },
+      },
+    ]);
+    if (!cropped.ok) throw new Error(JSON.stringify(cropped.errors));
+    // The uploads swept, as staged uploads are a day after.
+    for (const { key } of [photo, film, frame]) await storage.delete(key);
+
+    const copy = await new ProductService(database).duplicate(tenant, {
+      productId: product.value.id,
+      newTitle: 'Lawn Kurta - Maroon',
+      includeImages: true,
+    });
+    if (!copy.ok) throw new Error(JSON.stringify(copy.errors));
+    expect(await worker().sweep(new Date(Date.now() + 60_000))).toEqual({ ready: 2, removed: 0 });
+    const [copiedImage, copiedVideo] = copy.value.media.map((each) => each.id) as [string, string];
+    const { rows } = await admin.query(
+      `SELECT id, status, width, height, crop_left, crop_top, crop_width, crop_height, focal_x,
+              video_width, video_duration_ms, error_message
+         FROM catalog.product_media WHERE id = ANY($1) ORDER BY position`,
+      [[copiedImage, copiedVideo]],
+    );
+    expect(rows).toEqual([
+      {
+        id: copiedImage,
+        status: 'ready',
+        width: 800,
+        height: 600,
+        crop_left: 100,
+        crop_top: 0,
+        crop_width: 600,
+        crop_height: 600,
+        focal_x: '40.00',
+        video_width: null,
+        video_duration_ms: null,
+        error_message: null,
+      },
+      {
+        id: copiedVideo,
+        status: 'ready',
+        width: 90,
+        height: 160,
+        crop_left: null,
+        crop_top: null,
+        crop_width: null,
+        crop_height: null,
+        focal_x: null,
+        video_width: 1080,
+        video_duration_ms: 12_000,
+        error_message: null,
+      },
+    ]);
+    // Its own clean copies, its crop's among them, kept apart from the one it copies.
+    const images = `shops/${tenant.shopId}/images/${copiedImage}`;
+    const crop = await sharp(
+      (await storage.read(`${images}/crop-100-0-600-600/clean.jpg`))!.body,
+    ).metadata();
+    expect([crop.width, crop.height]).toEqual([600, 600]);
+    expect(await storage.head(`${images}/clean.jpg`)).not.toBeNull();
+    expect(
+      await storage.head(`shops/${tenant.shopId}/images/${copiedVideo}/video.mp4`),
+    ).not.toBeNull();
+
+    // The one it copies gone too, a copy has its source alone, and fails as an upload gone.
+    const again = await new ProductService(database).duplicate(tenant, {
+      productId: product.value.id,
+      newTitle: 'Lawn Kurta - Firozi',
+      includeImages: true,
+    });
+    if (!again.ok) throw new Error(JSON.stringify(again.errors));
+    await admin.query('DELETE FROM catalog.product_media WHERE id = $1', [image]);
+    await worker().sweep(new Date(Date.now() + 60_000));
+    expect(await row(again.value.media[0]!.id)).toMatchObject({
+      status: 'failed',
+      error_message: 'The uploaded file is gone: upload it again',
+    });
+  });
 });

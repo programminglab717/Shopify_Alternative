@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, a product duplicated, in the core and the admin** (CAT-01): a product copied as a draft to
-change, its words, options, variants and prices with it, for the next print of a suit; then
-section by section as the alpha's shops need them.
+**Next, products acted on many at once, in the core and the admin** (CAT-04): products chosen on
+the list shown, hidden or archived, tagged and untagged, put in a collection or deleted together,
+as orders are; then section by section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +18,33 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### A product duplicated, in the core and the admin
+
+* **`productDuplicate`** ([ADR-343](../architecture/13-decision-log.md#adr-343--a-product-is-duplicated-as-shopifys-productduplicate-does-it-the-copy-made-in-one-transaction-with-the-products-words-options-variants-and-prices-none-of-its-skus-barcodes-or-stock-and-put-in-its-manual-collections-its-photos-and-videos-if-asked-made-again-by-the-worker-from-what-was-kept-of-them-the-admin-makes-the-copy-a-draft-and-opens-it)): the copy made in one transaction with the product's words,
+  options, variants and prices, not its SKUs, barcodes or stock; its variants' stock settings
+  copied through a port the API binds to inventory's; put last in the product's manual
+  collections. Its photos and videos, if asked, are made again by the worker from what was kept of
+  them (migration 0167), as the uploads they came from are swept a day after, and cropped as they
+  are once ready.
+* **In the admin:** "Duplicate" on a product's page asks for the copy's title and whether to copy
+  its photos, makes the copy a draft, and opens it, saying what is left to do.
+* **Tried in Chromium against the core:** on the seed's shop, "Ajrak Shawl Test", its three
+  photos' uploads long swept, duplicated from its page as "Ajrak Shawl - Maroon" with its photos:
+  the copy opened as a draft, saying so, its price, tracked with no stock, its photos ready a few
+  seconds later. Before the worker read what was kept, those photos failed as uploads gone, which
+  is how this was found. "Multani Khussa" duplicated through the Admin API kept its three
+  variants and prices without SKUs and joined its three collections. Both copies were deleted
+  after. No errors in the browser.
+* 2417 tests: a product's words, options and variants copied with their prices, not their
+  SKUs; its stock settings asked to follow in its transaction, nothing written when they cannot;
+  its status kept unless given, a handle taken numbered; its photos copied only when asked, its
+  variants showing theirs; put last in its manual collections; a blank title and another shop's
+  product refused; inventory's stock settings copied with no stock, in the API too; the worker's
+  copies made from what was kept once the uploads are swept, cropped as the originals, and from
+  their source when the original is gone; in the admin, a copy made a draft and opened, photos
+  asked of only where there are some, refusals said, the button for those who change products;
+  and the mutation checked against the core's schema.
 
 ### 819d2e2 · New orders said as they come, in the admin
 

@@ -27,9 +27,10 @@ export abstract class CopiedVariantStock {
 }
 
 /**
- * The product's photos and videos copied to its copy, where they were: each made again from the
- * file or address it came from, its crop and focal point kept, the worker showing it once made;
- * and each variant showing its photo's copy.
+ * The product's photos and videos copied to its copy, where they were: each made again by the
+ * worker, from what was kept of the one it copies where that is still there, as the file the
+ * shop uploaded is swept a day after, else from its source; its focal point kept, and its crop
+ * once made, as only a ready image is cropped. Each variant shows its photo's copy.
  */
 export async function copyMedia(
   tx: Tx,
@@ -43,11 +44,11 @@ export async function copyMedia(
   await tx.execute(sql`
     INSERT INTO catalog.product_media
            (shop_id, id, product_id, media_type, source_url, source_key, alt, position,
-            crop_left, crop_top, crop_width, crop_height, focal_x, focal_y,
-            preview_source_url, preview_source_key, video_host, video_external_id)
+            focal_x, focal_y, preview_source_url, preview_source_key, video_host,
+            video_external_id, copied_from)
     SELECT m.shop_id, u.new_id, ${copyId}, m.media_type, m.source_url, m.source_key, m.alt,
-           m.position, m.crop_left, m.crop_top, m.crop_width, m.crop_height, m.focal_x, m.focal_y,
-           m.preview_source_url, m.preview_source_key, m.video_host, m.video_external_id
+           m.position, m.focal_x, m.focal_y, m.preview_source_url, m.preview_source_key,
+           m.video_host, m.video_external_id, m.id
       FROM unnest(${sql.param([...ids.keys()])}::uuid[], ${sql.param([...ids.values()])}::uuid[])
            AS u(old_id, new_id)
       JOIN catalog.product_media m ON m.shop_id = ${shopId} AND m.id = u.old_id

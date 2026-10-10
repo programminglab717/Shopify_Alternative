@@ -143,6 +143,7 @@ export const productMedia = catalogSchema.table(
     videoWidth: integer('video_width'),
     videoHeight: integer('video_height'),
     videoDurationMs: integer('video_duration_ms'),
+    copiedFrom: uuid('copied_from'),
     ...timestamps,
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],
