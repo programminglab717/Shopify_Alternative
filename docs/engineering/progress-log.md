@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### Another location made the primary, in the core and the admin
+### b0418ec · Another location made the primary, in the core and the admin
 
 * **Made primary** ([ADR-357](../architecture/13-decision-log.md#adr-357--another-active-location-is-made-the-shops-primary-one-from-the-admins-location-settings-the-one-before-no-longer-it-both-locked-in-one-change)): `locationMakePrimary` makes an active location the shop's primary
   one, the one before no longer it, both locked in one change. Every other active location in
