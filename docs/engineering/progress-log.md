@@ -20,7 +20,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### Online payments on an order's page, and what paying online takes off, in the admin
+### b136f57 · Online payments on an order's page, and what paying online takes off, in the admin
 
 * **An order's payments online** ([ADR-338](../architecture/13-decision-log.md#adr-338--an-orders-page-lists-the-payments-its-customer-started-online-and-the-refunds-asked-of-their-gateway-and-owners-and-managers-settle-a-refund-whose-answer-never-came-as-the-gateways-dashboard-shows-it-what-paying-online-takes-off-is-set-beside-the-shops-gateways-in-the-fields-the-transfers-uses)): the money section lists the payments its customer
   started online, the latest first, with the gateway, a test one marked, what was asked and
