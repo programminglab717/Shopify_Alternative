@@ -15,6 +15,9 @@ const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr
 /** How often a frame is read: often enough to feel at once, rarely enough for an old phone. */
 const EVERY_MS = 250;
 
+/** In a count, the wait after a code is read, for the box to be put down and the next held up. */
+const BETWEEN_MS = 1500;
+
 function readerClass(): BarcodeReaderClass | null {
   const found = (globalThis as { BarcodeDetector?: BarcodeReaderClass }).BarcodeDetector;
   return found && typeof navigator !== 'undefined' && navigator.mediaDevices ? found : null;
@@ -27,14 +30,17 @@ export function canScan(): boolean {
 
 /**
  * The back camera, read until a barcode is seen; then the camera is let go and the code given to
- * `onCode`. Refused or missing, it says so, and a code can still be typed.
+ * `onCode`, or, `continuous`, kept reading for the next after a pause. Refused or missing, it says
+ * so, and a code can still be typed.
  */
 export function Scanner({
   onCode,
   onClose,
+  continuous = false,
 }: {
   onCode: (code: string) => void;
   onClose: () => void;
+  continuous?: boolean;
 }) {
   const { t } = useLocale();
   const video = useRef<HTMLVideoElement>(null);
@@ -59,8 +65,9 @@ export function Scanner({
       try {
         const [first] = await reader.detect(video.current);
         if (first?.rawValue && !stopped) {
-          stop();
+          if (!continuous) stop();
           done.current(first.rawValue.trim());
+          if (continuous) timer = setTimeout(() => void look(), BETWEEN_MS);
           return;
         }
       } catch {
@@ -83,7 +90,7 @@ export function Scanner({
         if (!stopped) setRefused(true);
       });
     return stop;
-  }, []);
+  }, [continuous]);
 
   return (
     <div className="flex flex-col gap-2">

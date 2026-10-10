@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, a stock count by scanning, in the admin** (INV-07): at a location, variants scanned or
-found one after another, each count kept until all are saved together, and those that changed
-since they were read said; then section by section as the alpha's shops need them. Urdu
+**Next, purchase orders from suppliers, in the core and the admin** (INV-05): the shop's
+suppliers, orders of their goods for a location, and goods received into stock as they come, in
+part or in full, scanned or typed; then section by section as the alpha's shops need them. Urdu
 handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +18,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### Stock counted by scanning, in the admin
+
+* **A count by scanning** ([ADR-349](../architecture/13-decision-log.md#adr-349--the-admin-counts-stock-at-a-location-by-scanning-each-barcode-scanned-or-barcode-or-sku-typed-adds-its-variant-or-one-more-of-it-the-counts-kept-in-the-page-and-saved-together-as-one-stock-count-each-against-what-was-on-hand-when-it-was-read-those-that-moved-since-are-read-again-and-said-and-nothing-is-saved-until-they-are-checked)): at a location, each barcode scanned, or barcode or SKU typed,
+  adds its variant or one more of it; the counts are corrected as needed and saved together as one
+  stock count, each against what was on hand when read; those that moved since are read again and
+  said before anything is saved.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, a count at
+  Lahore warehouse: "Lawn 3-Piece Suit (Unstitched)" by its barcode three times, 20 on hand when
+  read, and "Peshawari Chappal · 8" by its SKU PC-08, 4 on hand; NOPE-1 said nothing has it. Saving
+  said 2 counts saved, and the suit's history showed the count, -17 to 3. No errors in the browser.
+* 2446 tests: codes added and added again, a barcode then a SKU, nothing found; saved
+  together, a count that moved read again and saved once checked; the location chosen, a line
+  removed, the camera reading one box after another; for those who change stock; and the query
+  checked against the core's schema.
 
 ### f2ff73f · A variant found by its barcode, in the admin
 

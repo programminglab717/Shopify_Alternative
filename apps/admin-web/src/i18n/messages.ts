@@ -3014,6 +3014,28 @@ const en = {
   'stock.scanStop': 'Stop scanning',
   'stock.cameraRefused': 'The camera could not be used. Type the barcode instead.',
   'stock.barcodeNone': 'No variant has the barcode {barcode}.',
+  'stock.countScan.title': 'Count by scanning',
+  'stock.countScan.about':
+    "Scan or type each item's barcode or SKU at one location, then save every count together.",
+  'stock.countScan.start': 'Start a count',
+  'stock.countScan.where': 'Location counted',
+  'stock.countScan.at': 'Counting at {location}',
+  'stock.countScan.code': 'Barcode or SKU',
+  'stock.countScan.add': 'Add',
+  'stock.countScan.none': 'Nothing has the barcode or SKU {code}.',
+  'stock.countScan.was': '{count} on hand when scanned',
+  'stock.countScan.changed': 'Changed since: {count} on hand now. Check the count.',
+  'stock.countScan.counted': 'Counted of {title}',
+  'stock.countScan.remove': 'Remove {title} from the count',
+  'stock.countScan.save': 'Save {count} counts',
+  'stock.countScan.save.one': 'Save 1 count',
+  'stock.countScan.clear': 'Clear the count',
+  'stock.countScan.stale':
+    '{count} items changed since they were scanned, so nothing was saved. Check them and save again.',
+  'stock.countScan.stale.one':
+    '1 item changed since it was scanned, so nothing was saved. Check it and save again.',
+  'stock.countScan.saved': '{count} counts saved at {location}.',
+  'stock.countScan.saved.one': '1 count saved at {location}.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6002,6 +6024,28 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'stock.scanStop': 'اسکین بند کریں',
   'stock.cameraRefused': 'کیمرا استعمال نہیں ہو سکا۔ بارکوڈ لکھ دیں۔',
   'stock.barcodeNone': 'کسی ویریئنٹ کا بارکوڈ {barcode} نہیں۔',
+  'stock.countScan.title': 'اسکین کر کے گنتی',
+  'stock.countScan.about':
+    'ایک جگہ پر ہر چیز کا بارکوڈ یا SKU اسکین کریں یا لکھیں، پھر ساری گنتی ایک ساتھ محفوظ کریں۔',
+  'stock.countScan.start': 'گنتی شروع کریں',
+  'stock.countScan.where': 'گنتی کی جگہ',
+  'stock.countScan.at': '{location} پر گنتی',
+  'stock.countScan.code': 'بارکوڈ یا SKU',
+  'stock.countScan.add': 'شامل کریں',
+  'stock.countScan.none': 'بارکوڈ یا SKU {code} کسی کا نہیں۔',
+  'stock.countScan.was': 'اسکین کے وقت {count} موجود تھے',
+  'stock.countScan.changed': 'اس کے بعد بدل گیا: اب {count} موجود ہیں۔ گنتی دیکھ لیں۔',
+  'stock.countScan.counted': '{title} کی گنتی',
+  'stock.countScan.remove': '{title} کو گنتی سے نکالیں',
+  'stock.countScan.save': '{count} گنتیاں محفوظ کریں',
+  'stock.countScan.save.one': '1 گنتی محفوظ کریں',
+  'stock.countScan.clear': 'گنتی صاف کریں',
+  'stock.countScan.stale':
+    'اسکین کے بعد {count} چیزیں بدل گئیں، اس لیے کچھ محفوظ نہیں ہوا۔ انہیں دیکھ کر دوبارہ محفوظ کریں۔',
+  'stock.countScan.stale.one':
+    'اسکین کے بعد 1 چیز بدل گئی، اس لیے کچھ محفوظ نہیں ہوا۔ اسے دیکھ کر دوبارہ محفوظ کریں۔',
+  'stock.countScan.saved': '{location} پر {count} گنتیاں محفوظ ہو گئیں۔',
+  'stock.countScan.saved.one': '{location} پر 1 گنتی محفوظ ہو گئی۔',
 };
 
 export const messages: Readonly<

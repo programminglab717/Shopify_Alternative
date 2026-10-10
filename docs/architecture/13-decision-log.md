@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-348 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-349 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -356,6 +356,7 @@
 | 346 | The admin shows a variant's whole stock history as the core keeps it: its latest changes with its stock, older ones a page at a time as asked, at every location or the one chosen, each with what was left and a link to the order it was for | Accepted |
 | 347 | Stock moves between a shop's locations as Shopify's inventoryMoveQuantities: each move takes from on hand where it leaves, no more than is available there, and adds to on hand where it arrives, in one adjustment; the admin moves a variant's stock from its level to another location | Accepted |
 | 348 | The admin finds a variant by its barcode on the stock page: typed, or by a scanner that types it, as digits alone, or read through the phone's camera where the browser can read barcodes; the core's search by barcode, the variant with it alone shown, its stock open | Accepted |
+| 349 | The admin counts stock at a location by scanning: each barcode scanned, or barcode or SKU typed, adds its variant or one more of it, the counts kept in the page and saved together as one stock count, each against what was on hand when it was read; those that moved since are read again and said, and nothing is saved until they are checked | Accepted |
 
 ---
 
@@ -13915,3 +13916,35 @@
     for the few phones without a reader; for when shops ask.
   * **Searching words and barcodes together:** a name of digits alone is rare, and the search
     would show every product whose words matched.
+
+## ADR-349 · The admin counts stock at a location by scanning: each barcode scanned, or barcode or SKU typed, adds its variant or one more of it, the counts kept in the page and saved together as one stock count, each against what was on hand when it was read; those that moved since are read again and said, and nothing is saved until they are checked
+
+* **Context:**
+  * A count of a shelf or a store room is many variants at once (INV-07). Counting each on its
+    own, by search and a form, takes as long as the count itself.
+  * The core sets on hand for up to 250 variants in one request, all or none, each only if it is
+    still what the caller read (`compareQuantity`), else STALE.
+  * The stock page finds a variant by its barcode, and reads barcodes through the camera where
+    the browser can (ADR-348).
+* **Decision:**
+  * **"Count by scanning"** on the stock page, for owners and managers: a location chosen, the
+    primary at first, kept once anything is counted.
+  * **Each code** scanned, or typed or typed by a scanner, is found as a barcode, then as a SKU,
+    exactly; its variant is added with 1 counted and what was on hand there when it was read, 0
+    where it was never stocked. Scanned again, it is one more, without asking the core. The camera
+    stays open through a count, pausing a moment and a half after each code for the next box.
+  * **Counts can be corrected** and lines removed before saving; nothing found says the code.
+  * **Saved together** as one stock count (`cycle_count_available`), each against what was on
+    hand when read. Where any moved since, as an order took some, nothing is saved: those are read
+    again, said in red with what is on hand now, to be checked and saved again.
+  * The count lives in the page until saved; leaving the page loses it.
+* **Consequences:**
+  * A shelf is counted as fast as its boxes are picked up, and one save sets it all.
+  * A count never overwrites what orders took meanwhile without the counter seeing it.
+  * Not yet: a count kept on the server, shared between staff or resumed later; variants not
+    scanned counted as none.
+* **Alternatives:**
+  * **Each scan saved at once:** a count half done would show half counted stock, and the
+    history would have a change per box.
+  * **Saving those that did not move and leaving the rest:** the core sets all or none, and a
+    count is one thing, seen in history as one change.

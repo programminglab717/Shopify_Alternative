@@ -3632,6 +3632,30 @@ export const StockSearchQuery = /* GraphQL */ `
   }
 `;
 
+/** Variants found by a barcode or SKU in a count, with what was on hand at the location counted. */
+export const StockCountFindQuery = /* GraphQL */ `
+  query StockCountFind($query: String!, $locationId: ID!) {
+    products(first: 5, query: $query) {
+      nodes {
+        id
+        title
+        variants {
+          id
+          title
+          sku
+          barcode
+          inventoryItem {
+            id
+            inventoryLevel(locationId: $locationId) {
+              onHand
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
 /** A page of a variant's stock changes: each with why, what was left and what it was for. */
 const STOCK_CHANGES = /* GraphQL */ `
   nodes {

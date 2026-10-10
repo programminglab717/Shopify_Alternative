@@ -34,6 +34,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { Scanner, canScan } from './scanner';
+import { StockCount } from './stock-count';
 import { StockChanges } from './stock-changes';
 
 /** Those who change stock, as the core lets them (`write_inventory`); every role sees it. */
@@ -773,6 +774,11 @@ export function StockPage() {
       <Section title={t('stock.find')}>
         <FindStock />
       </Section>
+      {EDITS_STOCK.includes(role) && (
+        <Section title={t('stock.countScan.title')}>
+          <StockCount />
+        </Section>
+      )}
     </div>
   );
 }

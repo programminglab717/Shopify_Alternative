@@ -1442,6 +1442,22 @@ export interface StockSearchData {
   };
 }
 
+export interface StockCountFindData {
+  products: {
+    nodes: {
+      id: string;
+      title: string;
+      variants: {
+        id: string;
+        title: string;
+        sku: string | null;
+        barcode: string | null;
+        inventoryItem: { id: string; inventoryLevel: { onHand: number } | null };
+      }[];
+    }[];
+  };
+}
+
 export interface StockLevel {
   id: string;
   available: number;
