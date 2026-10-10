@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### Stock moved between locations, in the core and the admin
+### 11734aa · Stock moved between locations, in the core and the admin
 
 * **Moves** ([ADR-347](../architecture/13-decision-log.md#adr-347--stock-moves-between-a-shops-locations-as-shopifys-inventorymovequantities-each-move-takes-from-on-hand-where-it-leaves-no-more-than-is-available-there-and-adds-to-on-hand-where-it-arrives-in-one-adjustment-the-admin-moves-a-variants-stock-from-its-level-to-another-location)): `inventoryMoveQuantities`, as Shopify's, takes stock off on hand where it
   leaves, no more than is available there, and adds it where it arrives, both in one adjustment
