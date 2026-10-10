@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### A variant's stock history, in the admin
+### 6b27026 · A variant's stock history, in the admin
 
 * **The whole history** ([ADR-346](../architecture/13-decision-log.md#adr-346--the-admin-shows-a-variants-whole-stock-history-as-the-core-keeps-it-its-latest-changes-with-its-stock-older-ones-a-page-at-a-time-as-asked-at-every-location-or-the-one-chosen-each-with-what-was-left-and-a-link-to-the-order-it-was-for)): a variant's latest stock changes come with its stock, older ones
   twenty at a time as asked, at every location or the one chosen; each says what was left after
