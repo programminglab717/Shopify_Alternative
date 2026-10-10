@@ -1618,6 +1618,20 @@ export interface InUrduData {
   translatableResourcesByIds: { nodes: UrduResource[] };
 }
 
+/** The kinds of the shop's things whose words are put in Urdu, each on its own Urdu page. */
+export type UrduKind =
+  | 'PRODUCT'
+  | 'COLLECTION'
+  | 'ONLINE_STORE_PAGE'
+  | 'ONLINE_STORE_BLOG'
+  | 'ONLINE_STORE_ARTICLE'
+  | 'MENU'
+  | 'SHOP';
+
+export interface UrduOverviewData {
+  translatableResources: { nodes: UrduResource[]; pageInfo: { hasNextPage: boolean } };
+}
+
 export interface PolicyTranslationData {
   translatableResource: {
     resourceId: string;

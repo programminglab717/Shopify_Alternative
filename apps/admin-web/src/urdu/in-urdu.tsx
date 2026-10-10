@@ -185,8 +185,43 @@ function fieldsOf(things: readonly UrduThing[], nodes: readonly UrduResource[], 
   });
 }
 
+/** How much of something's words is in Urdu. */
+export interface UrduCount {
+  total: number;
+  written: number;
+  /** Written for words of the shop's since changed. */
+  outdated: number;
+}
+
+/** What a count says, as badges: none, some or all in Urdu, and how many to check. */
+export function urduBadges(
+  count: UrduCount,
+  t: Translate,
+): { colour: OrderStage; icon: LucideIcon; label: string }[] {
+  const main: { colour: OrderStage; icon: LucideIcon; label: string } =
+    count.written === 0
+      ? { colour: 'cancelled', icon: CircleDashed, label: t('urdu.none') }
+      : count.written === count.total
+        ? { colour: 'delivered', icon: CircleCheck, label: t('urdu.all') }
+        : {
+            colour: 'confirmed',
+            icon: Languages,
+            label: t('urdu.some', { count: count.written, total: count.total }),
+          };
+  return count.outdated > 0
+    ? [
+        main,
+        {
+          colour: 'needsConfirmation',
+          icon: TriangleAlert,
+          label: t('urdu.toCheck', { count: count.outdated }),
+        },
+      ]
+    : [main];
+}
+
 /** How much of `fields` is in Urdu: written, and written for words since changed. */
-function countOf(fields: readonly Field[]) {
+function countOf(fields: readonly Field[]): UrduCount {
   const written = fields.filter((field) => field.kept.trim() !== '');
   return {
     total: fields.length,
@@ -466,17 +501,7 @@ export function UrduSummary({
         fieldsOf(section.things, query.data.translatableResourcesByIds.nodes, t),
       )
     : [];
-  const { total, written, outdated } = countOf(fields);
-  const badge: { colour: OrderStage; icon: LucideIcon; label: string } =
-    written === 0
-      ? { colour: 'cancelled', icon: CircleDashed, label: t('urdu.none') }
-      : written === total
-        ? { colour: 'delivered', icon: CircleCheck, label: t('urdu.all') }
-        : {
-            colour: 'confirmed',
-            icon: Languages,
-            label: t('urdu.some', { count: written, total }),
-          };
+  const count = countOf(fields);
   return (
     <Card className="p-4">
       <section aria-labelledby={id} className="flex flex-wrap items-center justify-between gap-3">
@@ -489,16 +514,11 @@ export function UrduSummary({
             <p className="text-danger">{errorText(query.error, t)}</p>
           ) : (
             query.data &&
-            total > 0 && (
+            count.total > 0 && (
               <div className="flex flex-wrap items-center gap-2">
-                <Badge {...badge} />
-                {outdated > 0 && (
-                  <Badge
-                    colour="needsConfirmation"
-                    icon={TriangleAlert}
-                    label={t('urdu.toCheck', { count: outdated })}
-                  />
-                )}
+                {urduBadges(count, t).map((badge) => (
+                  <Badge key={badge.label} {...badge} />
+                ))}
               </div>
             )
           )}

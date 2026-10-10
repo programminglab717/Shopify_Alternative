@@ -3923,6 +3923,30 @@ export const InUrduQuery = /* GraphQL */ `
   }
 `;
 
+/** The shop's things of a kind that may be put in Urdu, the newest first, with their Urdu (OS-06). */
+export const UrduOverviewQuery = /* GraphQL */ `
+  query UrduOverview($type: TranslatableResourceType!, $first: Int!) {
+    translatableResources(resourceType: $type, first: $first) {
+      nodes {
+        resourceId
+        translatableContent {
+          key
+          value
+          digest
+        }
+        translations(locale: "ur") {
+          key
+          value
+          outdated
+        }
+      }
+      pageInfo {
+        hasNextPage
+      }
+    }
+  }
+`;
+
 /** Urdu forgotten: the storefront's Urdu pages show the shop's own words again (OS-06). */
 export const TranslationsRemoveMutation = /* GraphQL */ `
   mutation TranslationsRemove($resourceId: ID!, $keys: [String!]!) {

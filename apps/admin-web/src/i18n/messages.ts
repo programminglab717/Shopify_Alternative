@@ -2931,6 +2931,24 @@ const en = {
   'wallet.category.AUTHENTICATION': 'a code to prove a number',
   'wallet.category.MARKETING': 'marketing',
   'wallet.category.OTHER': 'a message',
+  'onlineStore.urdu': 'In Urdu',
+  'urduAll.hint':
+    "Your store's Urdu pages show your Urdu where you wrote it, and your own words where you didn't. Each counts its own words; a product's options are on its Urdu page.",
+  'urduAll.show': 'Show',
+  'urduAll.kind.PRODUCT': 'Products',
+  'urduAll.kind.COLLECTION': 'Collections',
+  'urduAll.kind.ONLINE_STORE_PAGE': 'Pages',
+  'urduAll.kind.ONLINE_STORE_BLOG': 'Blogs',
+  'urduAll.kind.ONLINE_STORE_ARTICLE': 'Articles',
+  'urduAll.kind.MENU': 'Menus',
+  'urduAll.kind.SHOP': 'Home page',
+  'urduAll.leftOnly': 'Only what is left to write or check',
+  'urduAll.none': 'None with words of their own yet.',
+  'urduAll.allDone': 'All of these are in Urdu.',
+  'urduAll.summary': '{done} of {count} all in Urdu.',
+  'urduAll.summaryNewest': '{done} of the newest {count} all in Urdu.',
+  'urduAll.newest': 'The newest {count} are shown here; find the others from their own pages.',
+  'urduAll.untitled': 'Without a title',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5836,6 +5854,24 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'wallet.category.AUTHENTICATION': 'نمبر کی تصدیق کا کوڈ',
   'wallet.category.MARKETING': 'مارکیٹنگ',
   'wallet.category.OTHER': 'ایک میسج',
+  'onlineStore.urdu': 'اردو میں',
+  'urduAll.hint':
+    'آپ کے اسٹور کے اردو صفحات وہاں آپ کی اردو دکھاتے ہیں جہاں آپ نے لکھی، اور جہاں نہیں لکھی وہاں آپ کے اپنے الفاظ۔ ہر چیز اپنے الفاظ گنتی ہے؛ پروڈکٹ کے آپشنز اس کے اردو صفحے پر ہیں۔',
+  'urduAll.show': 'دکھائیں',
+  'urduAll.kind.PRODUCT': 'پروڈکٹس',
+  'urduAll.kind.COLLECTION': 'کلیکشنز',
+  'urduAll.kind.ONLINE_STORE_PAGE': 'صفحات',
+  'urduAll.kind.ONLINE_STORE_BLOG': 'بلاگ',
+  'urduAll.kind.ONLINE_STORE_ARTICLE': 'مضامین',
+  'urduAll.kind.MENU': 'مینیو',
+  'urduAll.kind.SHOP': 'ہوم پیج',
+  'urduAll.leftOnly': 'صرف وہ جو لکھنا یا دیکھنا باقی ہے',
+  'urduAll.none': 'ابھی ان میں سے کسی کے اپنے الفاظ نہیں۔',
+  'urduAll.allDone': 'یہ سب اردو میں ہیں۔',
+  'urduAll.summary': '{count} میں سے {done} پورے اردو میں۔',
+  'urduAll.summaryNewest': 'سب سے نئے {count} میں سے {done} پورے اردو میں۔',
+  'urduAll.newest': 'یہاں سب سے نئے {count} دکھائے گئے ہیں؛ باقی ان کے اپنے صفحات سے ڈھونڈیں۔',
+  'urduAll.untitled': 'بغیر عنوان',
 };
 
 export const messages: Readonly<

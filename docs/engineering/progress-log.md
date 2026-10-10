@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, what is left to put in Urdu, in the admin** (OS-06): the shop's products, collections,
-pages, blogs, articles and menus, each with how much of it has its Urdu and what of that is out of
-date since its words changed, opening where its Urdu is written; then section by section as the
+**Next, product types and vendors suggested, and a redirect changed in place, in the admin**
+(CAT-01, OS-09): a product's type and vendor offered from those the shop already uses as they are
+typed, and a redirect's path or target changed without deleting it; then section by section as the
 alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
@@ -19,6 +19,23 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### What is left to put in Urdu, in the admin
+
+* **In Urdu, kind by kind** ([ADR-340](../architecture/13-decision-log.md#adr-340--the-online-stores-in-urdu-tab-lists-the-shops-products-collections-pages-blogs-articles-menus-and-home-page-kind-by-kind-the-newest-first-each-with-how-much-of-its-own-words-is-in-urdu-and-how-much-is-out-of-date-at-first-only-what-is-left-each-opens-its-own-urdu-page)): the online store's In Urdu tab lists the shop's products,
+  collections, pages, blogs, articles and menus, and its home page, the newest first, each with
+  how much of its own words is in Urdu and how much was written for words since changed; at
+  first only what is left to write or check, with how many are all in Urdu above; each opening
+  its own Urdu page. Those who write the shop's Urdu see it: owners, managers and marketers.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, each kind's
+  count matched the core's own answer, none of the seed's in Urdu: 11 products, 4 collections,
+  6 pages, 4 blogs, 4 articles, 2 menus and the home page. A test product, Ajrak Shawl Test, was
+  given an Urdu title on its Urdu page and was then listed all in Urdu; its own title changed
+  through the Admin API put it to check, and changed back cleared that; its Urdu taken away
+  listed it not in Urdu again, as before. No errors in the browser.
+* 2396 tests: what is left listed by kind with its badges, all of it shown when asked, a kind
+  with nothing in it and one all in Urdu, each opening its Urdu page; more of a long list up to
+  250; the tab kept from those who do not write Urdu; and only words of their own counted.
 
 ### 37fba00 · A gateway's credentials changed, and what changed the message credit, in the admin
 

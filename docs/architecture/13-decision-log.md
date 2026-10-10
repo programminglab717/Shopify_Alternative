@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-339 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-340 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -347,6 +347,7 @@
 | 337 | An order waiting for its money says on its page what it waits for, its advance or its transfer, and shows the receipts its customer sent; owners and managers record money received by hand, what it waits for unless they say otherwise, and an order waiting for an advance is not marked paid in full; and those who speak with customers make a new link for the order, shown once to copy or send on WhatsApp, the one before stopping | Accepted |
 | 338 | An order's page lists the payments its customer started online and the refunds asked of their gateway, and owners and managers settle a refund whose answer never came as the gateway's dashboard shows it; what paying online takes off is set beside the shop's gateways, in the fields the transfer's uses | Accepted |
 | 339 | A gateway account's credentials are changed in place, every one, or the account moved between its test environment and the real one with that one's credentials, once the member confirms who they are; and the billing page lists what changed the message credit, the newest first, with the balance after each | Accepted |
+| 340 | The online store's In Urdu tab lists the shop's products, collections, pages, blogs, articles, menus and home page kind by kind, the newest first, each with how much of its own words is in Urdu and how much is out of date, at first only what is left; each opens its own Urdu page | Accepted |
 
 ---
 
@@ -13588,3 +13589,35 @@
     the account last in the order customers are offered gateways.
   * **The credit's changes on a page of their own:** they explain the balance, so they sit under
     it.
+
+## ADR-340 · The online store's In Urdu tab lists the shop's products, collections, pages, blogs, articles, menus and home page kind by kind, the newest first, each with how much of its own words is in Urdu and how much is out of date, at first only what is left; each opens its own Urdu page
+
+* **Context:**
+  * The shop's Urdu is kept as a translation of each field, written for the digest of the words
+    it translates ([ADR-238](#adr-238--a-shops-products-collections-pages-blogs-articles-and-menus-may-have-its-own-urdu-as-shopifys-translations-keep-a-field-each-written-for-the-digest-of-the-shops-own-words-their-documents-carry-it-beside-those-words-and-the-storefronts-urdu-pages-show-it-in-their-place)), with options and values of their own ([ADR-241](#adr-241--a-products-options-and-their-values-may-have-the-shops-urdu-as-shopifys-translations-keep-them-each-by-its-own-id-the-products-document-carries-its-options-in-urdu-and-its-urdu-pages-show-each-variants-values-and-title-in-them-the-variant-chosen-by-its-id-the-same-in-either-language)) and the
+    home page's words ([ADR-245](#adr-245--the-shops-own-words-for-its-home-page-may-be-translated-into-urdu-the-shop-a-translatable-resource-of-its-own-by-its-own-id-as-shopifys-shop-is-its-document-carries-them-beside-its-own-words-and-its-urdu-pages-show-them)). The admin writes them on each thing's Urdu page
+    ([ADR-327](#adr-327--the-admin-puts-a-products-collections-or-pages-words-in-urdu-on-a-page-of-its-own-each-field-of-the-shops-own-above-its-urdu-and-a-products-options-and-values-with-it-read-in-one-ask-through-shopifys-translatableresourcesbyids-and-saved-as-its-translations), [ADR-328](#adr-328--the-admins-urdu-page-serves-blogs-articles-menus-and-the-home-pages-words-too-a-menus-links-each-a-level-in-under-the-link-they-sit-under-the-home-pages-words-the-shops-own-and-a-menus-urdu-for-those-who-change-menus)), and a product's, blog's or the home page's card says how much
+    of it is in Urdu.
+  * To find what was left, a shop opened each thing in turn; and Urdu put out of date when the
+    shop changed its own words showed only on that thing's page.
+* **Decision:**
+  * **One list a kind:** the online store's In Urdu tab, for those who write the shop's Urdu
+    (owners, managers and marketers), asks `translatableResources` for a kind, products first,
+    the newest first, with their Urdu: for each, its fields with words of their own, how many
+    have Urdu, and how many of those were written for words since changed, in the badges the Urdu
+    cards use.
+  * **What is left:** at first only those with words still to write or Urdu to check; those all
+    in Urdu shown when asked; how many of the kind are all in Urdu above the list.
+  * **Each to its page:** a row opens the thing's own Urdu page; the home page is a row of its
+    own. A product counts its own words: its options and values are on its Urdu page.
+  * **As many as the core gives:** 100, then 250, the most it lists at once; past that the list
+    says that only the newest are shown.
+* **Consequences:**
+  * A shop going into Urdu sees what is left, kind by kind, and what its own changes put out of
+    date.
+  * Not yet: options and values in a product's count; policies, which their own tab puts in
+    Urdu; more than the newest 250 of a kind.
+* **Alternatives:**
+  * **A count on each list of products, pages and the rest:** spread over the admin, where one
+    place shows what is left.
+  * **Asking each thing's Urdu by its ID:** a list of each kind gives the same in one ask.
