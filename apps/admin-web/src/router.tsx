@@ -35,6 +35,9 @@ import { CashPage } from './cash/cash-page';
 import { ReturnsPage, validateReturnsSearch } from './returns/returns-page';
 import { StatementPage } from './cash/statement-page';
 import { StockPage } from './stock/stock-page';
+import { NewPurchaseOrderPage } from './purchase-orders/new-purchase-order-page';
+import { PurchaseOrderPage } from './purchase-orders/purchase-order-page';
+import { PurchaseOrdersPage } from './purchase-orders/purchase-orders-page';
 import { AccountPage } from './account/account-page';
 import { ArticleEditorPage, NewArticlePage } from './online-store/articles';
 import { BlogPage } from './online-store/blogs';
@@ -485,6 +488,24 @@ const stock = createRoute({
   component: StockPage,
 });
 
+const purchaseOrders = createRoute({
+  getParentRoute: () => shop,
+  path: 'purchase-orders',
+  component: PurchaseOrdersPage,
+});
+
+const newPurchaseOrder = createRoute({
+  getParentRoute: () => shop,
+  path: 'purchase-orders/new',
+  component: NewPurchaseOrderPage,
+});
+
+const purchaseOrder = createRoute({
+  getParentRoute: () => shop,
+  path: 'purchase-orders/$purchaseOrderId',
+  component: PurchaseOrderPage,
+});
+
 const statement = createRoute({
   getParentRoute: () => shop,
   path: 'cash/$remittanceId',
@@ -686,6 +707,9 @@ export const routeTree = root.addChildren([
     cash,
     statement,
     stock,
+    purchaseOrders,
+    newPurchaseOrder,
+    purchaseOrder,
     account,
     onlineStore,
     newPage,

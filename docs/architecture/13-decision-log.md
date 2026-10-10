@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-349 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-350 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -357,6 +357,7 @@
 | 347 | Stock moves between a shop's locations as Shopify's inventoryMoveQuantities: each move takes from on hand where it leaves, no more than is available there, and adds to on hand where it arrives, in one adjustment; the admin moves a variant's stock from its level to another location | Accepted |
 | 348 | The admin finds a variant by its barcode on the stock page: typed, or by a scanner that types it, as digits alone, or read through the phone's camera where the browser can read barcodes; the core's search by barcode, the variant with it alone shown, its stock open | Accepted |
 | 349 | The admin counts stock at a location by scanning: each barcode scanned, or barcode or SKU typed, adds its variant or one more of it, the counts kept in the page and saved together as one stock count, each against what was on hand when it was read; those that moved since are read again and said, and nothing is saved until they are checked | Accepted |
+| 350 | Purchase orders: the shop's suppliers, goods ordered from one for a location, numbered PO-1 onwards, each line a variant as it was named, how many and what one costs; goods received into stock as they come, in one adjustment naming the order, never more than is still to come; received in full or closed with what came; in the core and the admin | Accepted |
 
 ---
 
@@ -13948,3 +13949,44 @@
     history would have a change per box.
   * **Saving those that did not move and leaving the rest:** the core sets all or none, and a
     count is one thing, seen in history as one change.
+
+## ADR-350 · Purchase orders: the shop's suppliers, goods ordered from one for a location, numbered PO-1 onwards, each line a variant as it was named, how many and what one costs; goods received into stock as they come, in one adjustment naming the order, never more than is still to come; received in full or closed with what came; in the core and the admin
+
+* **Context:**
+  * Shops buy stock from suppliers: a mill, a workshop, a wholesaler in the bazaar (INV-05).
+    Goods come in parts, days apart, and the shop wants to know what is still owed and what it
+    paid.
+  * Stock was added by adjustments with the reason "received", one at a time, tied to nothing.
+  * Shopify keeps purchase orders in an app of its own (Stocky), not its Admin API; Hatti's are
+    its own, in the inventory module beside the ledger.
+* **Decision:**
+  * **Suppliers:** a name, unique in the shop in any letter case, a mobile number and a note; at
+    most 250, listed by name. `supplierCreate`, `supplierUpdate` and `suppliers`.
+  * **Purchase orders** (migration 0168): a supplier, an active location the goods go to, the
+    supplier's own number, a note and the day expected; numbered PO-1 onwards per shop, the number
+    taken last in the transaction. Up to 250 lines, each a variant once, how many (1 or more) and
+    what one costs, if the shop says. A line keeps the variant's titles and SKU as they were, so
+    the order reads the same after the catalog changes. `purchaseOrderCreate`,
+    `purchaseOrder(id)`, `purchaseOrders(status, supplierId)`, newest first, a page at a time.
+  * **Receiving** (`purchaseOrderReceive`, with an Idempotency-Key header): how many came of each
+    line, never more than is still to come, added to on hand at the order's location in one
+    adjustment with the reason "received" and the reference `hatti://purchase-orders/po_…`, through
+    the same path as every stock change, in the same transaction as the lines' counts. All lines or
+    none. Every line in full, the order is RECEIVED.
+  * **Closing** (`purchaseOrderClose`): an open order closed with what came; the rest is no longer
+    expected.
+  * **In the admin:** "Purchase orders" from the stock page, still to come, received and closed;
+    a new order with a supplier chosen or added there, its goods found by name with how many and
+    the cost of one; an order's page with what came of each line, receiving by count, all that is
+    still to come at once, or each box scanned or typed by its barcode or SKU; closing once sure.
+    Every role sees them; owners and managers order and receive. Stock history links a receipt to
+    its purchase order.
+* **Consequences:**
+  * A shop sees what each supplier still owes, and each unit received is in the ledger with the
+    order it came on.
+  * Not yet: a supplier's page; lines changed on an open order; costs carried to the variant's cost;
+    paying suppliers.
+* **Alternatives:**
+  * **Lines referring to the variant alone:** a deleted variant would leave an order unreadable.
+  * **Receiving more than ordered:** a supplier's extra is adjusted in as received, apart, so the
+    order says what was agreed.

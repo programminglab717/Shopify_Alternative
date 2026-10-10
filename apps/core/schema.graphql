@@ -5922,6 +5922,19 @@ type Mutation {
     overwrite: Boolean
   ): ProductsImportPayload!
 
+  """Closes an open order with what came; the rest is no longer expected."""
+  purchaseOrderClose(id: ID!): PurchaseOrderPayload!
+
+  """
+  Orders goods from a supplier for a location, numbered PO-1 onwards. Nothing is in stock until it is received.
+  """
+  purchaseOrderCreate(input: PurchaseOrderCreateInput!): PurchaseOrderPayload!
+
+  """
+  Goods that came: each line's quantity added to on hand at the order's location, in one adjustment with the reason "received" naming the order, never more than is still to come. Received in full, the order is RECEIVED. Needs an Idempotency-Key header.
+  """
+  purchaseOrderReceive(id: ID!, input: PurchaseOrderReceiveInput!): PurchaseOrderPayload!
+
   """
   Cancels a return still on its way back, as when its customer keeps the items after all.
   """
@@ -6037,6 +6050,12 @@ type Mutation {
   Debits a store credit account, as Shopify's storeCreditAccountDebit, such as when its credit is given back another way: the credits that expire soonest first. `id` is the account's, or its customer's. Audited. Needs an Idempotency-Key header.
   """
   storeCreditAccountDebit(debitInput: StoreCreditAccountDebitInput!, id: ID!): StoreCreditAccountDebitPayload!
+
+  """Adds a supplier, named uniquely in the shop."""
+  supplierCreate(input: SupplierInput!): SupplierPayload!
+
+  """Changes a supplier's name, number or note."""
+  supplierUpdate(id: ID!, input: SupplierInput!): SupplierPayload!
 
   """Ends Hatti's support's access to the shop now. The owner or a manager."""
   supportAccessEnd: SupportAccessEndPayload!
@@ -8508,6 +8527,123 @@ type ProductsImportPayload {
   variants: Int!
 }
 
+"""
+Goods ordered from a supplier for a location, received into stock there as they come.
+"""
+type PurchaseOrder {
+  """When it was received in full or closed."""
+  closedAt: DateTime
+  createdAt: DateTime!
+
+  """The day the goods are expected, YYYY-MM-DD."""
+  expectedOn: String
+  id: ID!
+  lines: [PurchaseOrderLine!]!
+
+  """Where the goods are received."""
+  location: Location!
+
+  """PO-1 onwards, per shop."""
+  name: String!
+  note: String
+  number: Int!
+  receivedQuantity: Int!
+
+  """The supplier's own number for it."""
+  reference: String
+  status: PurchaseOrderStatus!
+  supplier: Supplier!
+
+  """What the lines with a cost come to; null when none has one."""
+  totalCost: Money
+  totalQuantity: Int!
+  updatedAt: DateTime!
+}
+
+type PurchaseOrderConnection {
+  edges: [PurchaseOrderEdge!]!
+  nodes: [PurchaseOrder!]!
+  pageInfo: PageInfo!
+}
+
+input PurchaseOrderCreateInput {
+  """The day expected, YYYY-MM-DD."""
+  expectedOn: String
+
+  """1 to 250; each item once."""
+  lines: [PurchaseOrderLineInput!]!
+
+  """An active location, where the goods are received."""
+  locationId: ID!
+  note: String
+
+  """The supplier's own number for it."""
+  reference: String
+  supplierId: ID!
+}
+
+type PurchaseOrderEdge {
+  cursor: String!
+  node: PurchaseOrder!
+}
+
+"""A variant ordered from a supplier, as it was named when ordered."""
+type PurchaseOrderLine {
+  id: ID!
+
+  """The variant's item, as it is now."""
+  inventoryItem: InventoryItem!
+  productTitle: String!
+  quantity: Int!
+
+  """How many came so far."""
+  received: Int!
+  sku: String
+
+  """What one costs, where the shop said."""
+  unitCost: Money
+  variantTitle: String!
+}
+
+input PurchaseOrderLineInput {
+  inventoryItemId: ID!
+
+  """1 or more."""
+  quantity: Int!
+
+  """What one costs, in major units of the shop currency, e.g. "1450"."""
+  unitCost: String
+}
+
+type PurchaseOrderPayload {
+  purchaseOrder: PurchaseOrder
+  userErrors: [UserError!]!
+}
+
+input PurchaseOrderReceiveInput {
+  """1 to 250; each line once."""
+  lines: [PurchaseOrderReceiveLineInput!]!
+}
+
+input PurchaseOrderReceiveLineInput {
+  lineId: ID!
+
+  """How many came: 1 to as many as are still to come."""
+  quantity: Int!
+}
+
+"""Where a purchase order is: goods still to come, or not."""
+enum PurchaseOrderStatus {
+  """Closed with what came; the rest is no longer expected."""
+  CLOSED
+
+  """Goods still to come."""
+  OPEN
+
+  """Every line came in full."""
+  RECEIVED
+}
+
 type Query {
   """
   What the shop's staff and apps changed, the latest first: each change as the event it recorded, by whom and to what. What needs accounting for, with more about it, is on auditLog. Owners and managers, and apps with read_settings.
@@ -9144,6 +9280,19 @@ type Query {
     query: String
   ): ProductsExport!
 
+  """A purchase order by ID."""
+  purchaseOrder(id: ID!): PurchaseOrder
+
+  """Purchase orders, the newest first."""
+  purchaseOrders(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+    status: PurchaseOrderStatus
+    supplierId: ID
+  ): PurchaseOrderConnection!
+
   """
   Parcels on their way back, refused or undeliverable, the longest on its way first, with how many days each has been: those a courier is slow to bring back, to chase.
   """
@@ -9251,6 +9400,9 @@ type Query {
     from: DateTime!
     interval: SalesInterval! = DAY
   ): StorefrontSessionsReport!
+
+  """The shop's suppliers, by name; at most 250."""
+  suppliers: [Supplier!]!
 
   """
   Whether Hatti's support may look at the shop now, and until when. Staff need to be the owner or a manager.
@@ -10500,6 +10652,33 @@ type StorefrontSessionsReport {
   """
   periods: [StorefrontSessionsPeriod!]!
   totals: StorefrontSessions!
+}
+
+"""Someone the shop buys goods from."""
+type Supplier {
+  createdAt: DateTime!
+  id: ID!
+  name: String!
+  note: String
+
+  """A mobile number in E.164 form."""
+  phone: String
+}
+
+input SupplierInput {
+  """Required to add one; up to 255 characters."""
+  name: String
+
+  """Null clears it."""
+  note: String
+
+  """A Pakistani mobile number; null clears it."""
+  phone: String
+}
+
+type SupplierPayload {
+  supplier: Supplier
+  userErrors: [UserError!]!
 }
 
 type SupportAccessEndPayload {

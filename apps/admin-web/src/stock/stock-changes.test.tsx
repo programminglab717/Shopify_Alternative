@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeCore, LATER, press, renderAdmin, signedIn } from '../test-support';
+import { orderOf, purchaseOrderOf } from './stock-changes';
 
 const MAIN = { id: 'loc_1', name: 'Main warehouse' };
 const SHOP = { id: 'loc_2', name: 'Liberty shop' };
@@ -138,5 +139,14 @@ describe("A variant's stock history (INV-03)", () => {
       after: null,
       locationId: 'loc_2',
     });
+  });
+
+  it('knows the order or purchase order a change was for by its reference', () => {
+    const of = (referenceDocumentUri: string | null) => ({ referenceDocumentUri });
+    expect(orderOf(of('hatti://orders/ord_01abc'))).toBe('ord_01abc');
+    expect(purchaseOrderOf(of('hatti://purchase-orders/po_01abc'))).toBe('po_01abc');
+    expect(purchaseOrderOf(of('hatti://orders/ord_01abc'))).toBeNull();
+    expect(orderOf(of('https://erp.example.com/grn/42'))).toBeNull();
+    expect(purchaseOrderOf(of(null))).toBeNull();
   });
 });

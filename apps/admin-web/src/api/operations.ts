@@ -6026,3 +6026,157 @@ export const ThemeDeleteMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** A purchase order's fields as its page shows them (INV-05). */
+const PURCHASE_ORDER = /* GraphQL */ `
+  id
+  name
+  status
+  reference
+  note
+  expectedOn
+  totalQuantity
+  receivedQuantity
+  totalCost {
+    amount
+    currencyCode
+  }
+  supplier {
+    id
+    name
+    phone
+  }
+  location {
+    id
+    name
+  }
+  closedAt
+  createdAt
+  lines {
+    id
+    productTitle
+    variantTitle
+    sku
+    quantity
+    received
+    unitCost {
+      amount
+      currencyCode
+    }
+    inventoryItem {
+      id
+    }
+  }
+`;
+
+/** Purchase orders by status, the newest first, a page at a time. */
+export const PurchaseOrdersQuery = /* GraphQL */ `
+  query PurchaseOrders($status: PurchaseOrderStatus, $after: String) {
+    purchaseOrders(first: 25, status: $status, after: $after) {
+      nodes {
+        id
+        name
+        status
+        expectedOn
+        totalQuantity
+        receivedQuantity
+        supplier {
+          name
+        }
+        location {
+          name
+        }
+        createdAt
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`;
+
+export const PurchaseOrderQuery = /* GraphQL */ `
+  query PurchaseOrder($id: ID!) {
+    purchaseOrder(id: $id) {
+      ${PURCHASE_ORDER}
+    }
+  }
+`;
+
+/** What a new purchase order is made from: the shop's suppliers and active locations. */
+export const PurchaseOrderFormQuery = /* GraphQL */ `
+  query PurchaseOrderForm {
+    suppliers {
+      id
+      name
+      phone
+    }
+    locations(first: 50) {
+      nodes {
+        id
+        name
+        isPrimary
+      }
+    }
+  }
+`;
+
+export const SupplierCreateMutation = /* GraphQL */ `
+  mutation SupplierCreate($input: SupplierInput!) {
+    supplierCreate(input: $input) {
+      supplier {
+        id
+        name
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+export const PurchaseOrderCreateMutation = /* GraphQL */ `
+  mutation PurchaseOrderCreate($input: PurchaseOrderCreateInput!) {
+    purchaseOrderCreate(input: $input) {
+      purchaseOrder {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Goods that came, into stock at the order's location. */
+export const PurchaseOrderReceiveMutation = /* GraphQL */ `
+  mutation PurchaseOrderReceive($id: ID!, $input: PurchaseOrderReceiveInput!) {
+    purchaseOrderReceive(id: $id, input: $input) {
+      purchaseOrder {
+        id
+        status
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+export const PurchaseOrderCloseMutation = /* GraphQL */ `
+  mutation PurchaseOrderClose($id: ID!) {
+    purchaseOrderClose(id: $id) {
+      purchaseOrder {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

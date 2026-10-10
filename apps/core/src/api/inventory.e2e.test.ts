@@ -530,6 +530,177 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     ]);
   });
 
+  it('orders goods from a supplier and receives them into stock as they come (ADR-350)', async () => {
+    const godown = (
+      await addLocation(tokens.a, { name: 'Faisalabad godown', address: { city: 'Faisalabad' } })
+    ).location;
+    const [small, medium] = (
+      await stockedProduct(tokens.a, 'Khaddar suit', ['S', 'M'])
+    ).variants.map((variant) => variant.inventoryItem.id) as [string, string];
+    const supplier = await mutate(
+      tokens.a,
+      `mutation ($input: SupplierInput!) {
+         supplierCreate(input: $input) { supplier { id name phone } userErrors { field code } }
+       }`,
+      { input: { name: 'Nishat Mills', phone: '0300 7654321' } },
+    );
+    expect(supplier).toEqual({
+      supplier: {
+        id: expect.stringMatching(/^sup_/),
+        name: 'Nishat Mills',
+        phone: '+923007654321',
+      },
+      userErrors: [],
+    });
+
+    const PO_FIELDS = `id name status reference expectedOn totalQuantity receivedQuantity
+      totalCost { amount } supplier { name } location { name }
+      lines { id variantTitle quantity received unitCost { amount } inventoryItem { id } }`;
+    const created = await mutate(
+      tokens.a,
+      `mutation ($input: PurchaseOrderCreateInput!) {
+         purchaseOrderCreate(input: $input) { purchaseOrder { ${PO_FIELDS} } userErrors { field code } }
+       }`,
+      {
+        input: {
+          supplierId: supplier.supplier.id,
+          locationId: godown.id,
+          reference: 'INV-88',
+          expectedOn: '2026-11-15',
+          lines: [
+            { inventoryItemId: small, quantity: 12, unitCost: '2100' },
+            { inventoryItemId: medium, quantity: 8, unitCost: '2100.50' },
+          ],
+        },
+      },
+    );
+    expect(created.userErrors).toEqual([]);
+    const order = created.purchaseOrder;
+    expect(order).toMatchObject({
+      id: expect.stringMatching(/^po_/),
+      name: 'PO-1',
+      status: 'OPEN',
+      reference: 'INV-88',
+      expectedOn: '2026-11-15',
+      totalQuantity: 20,
+      receivedQuantity: 0,
+      totalCost: { amount: '42004.00' },
+      supplier: { name: 'Nishat Mills' },
+      location: { name: 'Faisalabad godown' },
+      lines: [
+        {
+          variantTitle: 'S',
+          quantity: 12,
+          received: 0,
+          unitCost: { amount: '2100.00' },
+          inventoryItem: { id: small },
+        },
+        {
+          variantTitle: 'M',
+          quantity: 8,
+          received: 0,
+          unitCost: { amount: '2100.50' },
+          inventoryItem: { id: medium },
+        },
+      ],
+    });
+
+    const RECEIVE = `mutation ($id: ID!, $input: PurchaseOrderReceiveInput!) {
+      purchaseOrderReceive(id: $id, input: $input) {
+        purchaseOrder { status receivedQuantity lines { received } }
+        userErrors { field code message }
+      }
+    }`;
+    const [smallLine, mediumLine] = order.lines;
+    expect(
+      await mutate(tokens.a, RECEIVE, {
+        id: order.id,
+        input: {
+          lines: [
+            { lineId: smallLine.id, quantity: 12 },
+            { lineId: mediumLine.id, quantity: 5 },
+          ],
+        },
+      }),
+    ).toEqual({
+      purchaseOrder: {
+        status: 'OPEN',
+        receivedQuantity: 17,
+        lines: [{ received: 12 }, { received: 5 }],
+      },
+      userErrors: [],
+    });
+    expect(
+      await mutate(tokens.a, RECEIVE, {
+        id: order.id,
+        input: { lines: [{ lineId: mediumLine.id, quantity: 4 }] },
+      }),
+    ).toEqual({
+      purchaseOrder: null,
+      userErrors: [
+        {
+          field: ['input', 'lines', '0', 'quantity'],
+          code: 'INVALID',
+          message: "Only 3 still to come of 8; can't receive 4",
+        },
+      ],
+    });
+    const stock = await gql(
+      tokens.aStockReader,
+      `query ($id: ID!) {
+         inventoryItem(id: $id) {
+           inventoryLevels { onHand location { name } }
+           changes(first: 1) { nodes { reason delta referenceDocumentUri } }
+         }
+       }`,
+      { id: small },
+    );
+    expect(stock.data?.inventoryItem).toEqual({
+      inventoryLevels: [{ onHand: 12, location: { name: 'Faisalabad godown' } }],
+      changes: {
+        nodes: [
+          {
+            reason: 'received',
+            delta: 12,
+            referenceDocumentUri: `hatti://purchase-orders/${order.id}`,
+          },
+        ],
+      },
+    });
+
+    const closed = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) { purchaseOrderClose(id: $id) { purchaseOrder { status closedAt } userErrors { code } } }`,
+      { id: order.id },
+    );
+    expect(closed).toEqual({
+      purchaseOrder: { status: 'CLOSED', closedAt: expect.stringMatching(ISO_TIME) },
+      userErrors: [],
+    });
+    const listed = await gql(
+      tokens.aStockReader,
+      `{ suppliers { name } purchaseOrders(first: 5, status: CLOSED) { nodes { name } pageInfo { hasNextPage } } }`,
+    );
+    expect(listed.data).toEqual({
+      suppliers: [{ name: 'Nishat Mills' }],
+      purchaseOrders: { nodes: [{ name: 'PO-1' }], pageInfo: { hasNextPage: false } },
+    });
+
+    // Reading needs read_inventory, changing write_inventory; another shop sees none of it.
+    const forbidden = await gql(
+      tokens.aStockReader,
+      `mutation ($id: ID!) { purchaseOrderClose(id: $id) { userErrors { code } } }`,
+      { id: order.id },
+    );
+    expect(forbidden.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+    const theirs = await gql(
+      tokens.b,
+      `query ($id: ID!) { purchaseOrder(id: $id) { id } suppliers { id } }`,
+      { id: order.id },
+    );
+    expect(theirs.data).toEqual({ purchaseOrder: null, suppliers: [] });
+  });
+
   it("duplicates a product, its variants' stock tracked as its are with none of it (ADR-343)", async () => {
     const warehouse = (
       await addLocation(tokens.a, { name: 'Multan warehouse', address: { city: 'Multan' } })

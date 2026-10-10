@@ -1,7 +1,17 @@
 // Drizzle mirror of the inventory tables. The SQL migrations in db/migrations are the source of
 // truth; inventory.test.ts checks this file against the migrated database.
 import { sql } from 'drizzle-orm';
-import { boolean, integer, pgSchema, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  boolean,
+  date,
+  integer,
+  pgSchema,
+  primaryKey,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 export const inventorySchema = pgSchema('inventory');
 
@@ -107,6 +117,65 @@ export const movements = inventorySchema.table(
     quantityAfter: integer('quantity_after').notNull(),
     availableAfter: integer('available_after').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export const PURCHASE_ORDER_STATUSES = ['open', 'received', 'closed'] as const;
+export type PurchaseOrderStatusValue = (typeof PURCHASE_ORDER_STATUSES)[number];
+
+export const suppliers = inventorySchema.table(
+  'suppliers',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    name: text('name').notNull(),
+    phone: text('phone'),
+    note: text('note'),
+    version: integer('version').notNull().default(1),
+    ...timestamps,
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export const purchaseOrderCounters = inventorySchema.table('purchase_order_counters', {
+  shopId: uuid('shop_id').primaryKey(),
+  nextNumber: integer('next_number').notNull(),
+});
+
+export const purchaseOrders = inventorySchema.table(
+  'purchase_orders',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    number: integer('number').notNull(),
+    supplierId: uuid('supplier_id').notNull(),
+    locationId: uuid('location_id').notNull(),
+    status: text('status', { enum: PURCHASE_ORDER_STATUSES }).notNull().default('open'),
+    reference: text('reference'),
+    note: text('note'),
+    expectedOn: date('expected_on'),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    version: integer('version').notNull().default(1),
+    ...timestamps,
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export const purchaseOrderLines = inventorySchema.table(
+  'purchase_order_lines',
+  {
+    shopId: uuid('shop_id').notNull(),
+    purchaseOrderId: uuid('purchase_order_id').notNull(),
+    id: uuid('id').notNull(),
+    position: integer('position').notNull(),
+    variantId: uuid('variant_id').notNull(),
+    productTitle: text('product_title').notNull(),
+    variantTitle: text('variant_title').notNull(),
+    sku: text('sku'),
+    quantity: integer('quantity').notNull(),
+    received: integer('received').notNull().default(0),
+    unitCost: bigint('unit_cost', { mode: 'bigint' }),
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],
 );

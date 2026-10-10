@@ -107,7 +107,7 @@ export interface HistoryOptions {
 }
 
 /** An item and location named by one entry of a request, and where to report problems. */
-interface Target {
+export interface Target {
   variantId: string;
   locationId: string;
   field: string[];
@@ -115,7 +115,7 @@ interface Target {
   itemField?: string[];
 }
 
-interface Header {
+export interface Header {
   name: SettableName;
   reason: string;
   referenceDocumentUri: string | null;
@@ -181,7 +181,7 @@ function current(level: LockedLevel, name: SettableName): number {
  * Checks a level's quantities after a change of `delta` to `name`, and returns the change, or
  * null after adding an error at `field`.
  */
-function levelChange(
+export function levelChange(
   errors: FieldError[],
   field: string[],
   level: LockedLevel,
@@ -544,56 +544,69 @@ export class InventoryService {
     decide: (level: LockedLevel, target: T, errors: FieldError[]) => LevelChange | null,
   ): Promise<MutationResult<AdjustmentGroupRecord | null>> {
     return rollbackResult(() =>
-      this.db.tenant(tenant.shopId, async (tx) => {
-        const productIds = await this.#checkTargets(tx, tenant.shopId, targets);
-        if (!(productIds instanceof Map)) return { ok: false, errors: productIds };
-
-        const created = await ensureItems(tx, tenant.shopId, productIds);
-        await ensureLevels(tx, tenant.shopId, targets);
-        const levels = await lockLevels(tx, tenant.shopId, targets);
-        const errors: FieldError[] = [];
-        const changes: LevelChange[] = [];
-        for (const target of targets) {
-          const level = levels.get(levelKey(target.variantId, target.locationId))!;
-          if (!level.locationActive) {
-            // Deactivated since the check above.
-            errors.push({
-              field: [...target.field, 'locationId'],
-              code: 'INVALID',
-              message: 'The location is not active',
-            });
-            continue;
-          }
-          const change = decide(level, target, errors);
-          if (change) changes.push(change);
-        }
-        if (errors.length > 0) throw new UserErrorsRollback(errors);
-
-        await appendEvents<InventoryItemUpdatedPayload>(
-          tx,
-          tenant.shopId,
-          created.map((variantId) => ({
-            type: InventoryEvents.InventoryItemUpdated,
-            aggregateType: 'inventory_item',
-            aggregateId: variantId,
-            payload: {
-              productId: productIds.get(variantId)!,
-              changed: ['tracked'],
-              tracked: true,
-              inventoryPolicy: 'deny',
-              version: 1,
-            },
-          })),
-        );
-        const group = await writeChanges(
-          tx,
-          tenant.shopId,
-          { ...header, actor: tenant.actor },
-          changes,
-        );
-        return { ok: true, value: group };
-      }),
+      this.db.tenant(tenant.shopId, (tx) => this.changeIn(tx, tenant, header, targets, decide)),
     );
+  }
+
+  /**
+   * {@link #change} in the caller's tenant transaction `tx`, for other parts of inventory that
+   * change stock with what they keep, such as goods received for a purchase order. Errors throw
+   * {@link UserErrorsRollback}, for the caller's `rollbackResult` to undo the whole transaction.
+   */
+  async changeIn<T extends Target>(
+    tx: Tx,
+    tenant: TenantContext,
+    header: Header,
+    targets: readonly T[],
+    decide: (level: LockedLevel, target: T, errors: FieldError[]) => LevelChange | null,
+  ): Promise<MutationResult<AdjustmentGroupRecord | null>> {
+    const productIds = await this.#checkTargets(tx, tenant.shopId, targets);
+    if (!(productIds instanceof Map)) throw new UserErrorsRollback(productIds);
+
+    const created = await ensureItems(tx, tenant.shopId, productIds);
+    await ensureLevels(tx, tenant.shopId, targets);
+    const levels = await lockLevels(tx, tenant.shopId, targets);
+    const errors: FieldError[] = [];
+    const changes: LevelChange[] = [];
+    for (const target of targets) {
+      const level = levels.get(levelKey(target.variantId, target.locationId))!;
+      if (!level.locationActive) {
+        // Deactivated since the check above.
+        errors.push({
+          field: [...target.field, 'locationId'],
+          code: 'INVALID',
+          message: 'The location is not active',
+        });
+        continue;
+      }
+      const change = decide(level, target, errors);
+      if (change) changes.push(change);
+    }
+    if (errors.length > 0) throw new UserErrorsRollback(errors);
+
+    await appendEvents<InventoryItemUpdatedPayload>(
+      tx,
+      tenant.shopId,
+      created.map((variantId) => ({
+        type: InventoryEvents.InventoryItemUpdated,
+        aggregateType: 'inventory_item',
+        aggregateId: variantId,
+        payload: {
+          productId: productIds.get(variantId)!,
+          changed: ['tracked'],
+          tracked: true,
+          inventoryPolicy: 'deny',
+          version: 1,
+        },
+      })),
+    );
+    const group = await writeChanges(
+      tx,
+      tenant.shopId,
+      { ...header, actor: tenant.actor },
+      changes,
+    );
+    return { ok: true, value: group };
   }
 
   /** The product of each target's variant, or errors for unknown variants and locations. */

@@ -18,6 +18,14 @@ export function orderOf(change: Pick<StockChange, 'referenceDocumentUri'>): stri
   return /^hatti:\/\/orders\/(ord_[0-9a-z]+)$/.exec(change.referenceDocumentUri ?? '')?.[1] ?? null;
 }
 
+/** The purchase order a change received goods for, by its ID (ADR-350). */
+export function purchaseOrderOf(change: Pick<StockChange, 'referenceDocumentUri'>): string | null {
+  return (
+    /^hatti:\/\/purchase-orders\/(po_[0-9a-z]+)$/.exec(change.referenceDocumentUri ?? '')?.[1] ??
+    null
+  );
+}
+
 /**
  * A variant's stock changes, newest first: the latest as its stock was read, older ones a page at a
  * time as asked, at every location or the one chosen. Each says by how much, which quantity, why,
@@ -84,6 +92,7 @@ export function StockChanges({
         <ul className="flex flex-col gap-1">
           {shown.map((change, index) => {
             const order = orderOf(change);
+            const purchase = purchaseOrderOf(change);
             return (
               <li
                 key={`${change.createdAt}-${index}`}
@@ -110,6 +119,18 @@ export function StockChanges({
                         className="text-primary underline"
                       >
                         {t('stock.itsOrder')}
+                      </Link>
+                    </>
+                  )}
+                  {purchase && (
+                    <>
+                      {' · '}
+                      <Link
+                        to="/$shopId/purchase-orders/$purchaseOrderId"
+                        params={{ shopId: shop.id, purchaseOrderId: purchase }}
+                        className="text-primary underline"
+                      >
+                        {t('stock.itsPurchaseOrder')}
                       </Link>
                     </>
                   )}

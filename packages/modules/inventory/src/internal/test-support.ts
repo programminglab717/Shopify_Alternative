@@ -7,6 +7,7 @@ import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { InventoryService } from './inventory.service.js';
 import { LocationService } from './location.service.js';
+import { PurchaseOrderService } from './purchase-order.service.js';
 import type { LocationRecord } from './records.js';
 import { StockService } from './stock.service.js';
 
@@ -29,6 +30,7 @@ export interface InventoryFixture {
   locations: LocationService;
   inventory: InventoryService;
   stock: StockService;
+  purchaseOrders: PurchaseOrderService;
   /** A product with one variant per size, or one variant without sizes; returns variant ids. */
   variantsOf(tenant: TenantContext, title: string, sizes?: string[]): Promise<string[]>;
   /** Adds a location, failing the test on user errors. */
@@ -67,6 +69,7 @@ export async function inventoryFixture(server: string): Promise<InventoryFixture
   const products = new ProductService(db);
   const variants = new VariantService(db);
   const locations = new LocationService(db);
+  const inventory = new InventoryService(db, variants);
   return {
     testDb,
     db,
@@ -76,8 +79,9 @@ export async function inventoryFixture(server: string): Promise<InventoryFixture
     products,
     variants,
     locations,
-    inventory: new InventoryService(db, variants),
+    inventory,
     stock: new StockService(),
+    purchaseOrders: new PurchaseOrderService(db, variants, inventory),
     async variantsOf(owner, title, sizes) {
       const result = await products.create(owner, {
         title,
@@ -98,6 +102,9 @@ export async function inventoryFixture(server: string): Promise<InventoryFixture
     async reset() {
       await admin.query(`
         DELETE FROM catalog.products;
+        DELETE FROM inventory.purchase_orders;
+        DELETE FROM inventory.purchase_order_counters;
+        DELETE FROM inventory.suppliers;
         DELETE FROM inventory.movements;
         DELETE FROM inventory.adjustments;
         DELETE FROM inventory.locations;

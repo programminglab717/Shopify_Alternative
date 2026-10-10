@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { ChevronDown, ChevronUp, FileSpreadsheet, ScanBarcode, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileSpreadsheet, ScanBarcode, Search, Truck } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import {
@@ -732,16 +732,26 @@ export function StockPage() {
         <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
           {t('stock.title')}
         </h1>
-        {EDITS_STOCK.includes(role) && (
+        <div className="flex flex-wrap gap-2">
           <Link
-            to="/$shopId/products/files"
+            to="/$shopId/purchase-orders"
             params={{ shopId }}
             className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
           >
-            <FileSpreadsheet aria-hidden className="size-5" />
-            {t('files.countByFile')}
+            <Truck aria-hidden className="size-5" />
+            {t('po.title')}
           </Link>
-        )}
+          {EDITS_STOCK.includes(role) && (
+            <Link
+              to="/$shopId/products/files"
+              params={{ shopId }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
+            >
+              <FileSpreadsheet aria-hidden className="size-5" />
+              {t('files.countByFile')}
+            </Link>
+          )}
+        </div>
       </div>
       {query.isPending ? (
         <Loading label={t('state.loading')} />

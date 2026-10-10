@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, purchase orders from suppliers, in the core and the admin** (INV-05): the shop's
-suppliers, orders of their goods for a location, and goods received into stock as they come, in
-part or in full, scanned or typed; then section by section as the alpha's shops need them. Urdu
-handles wait, as decided.
+**Next, suppliers kept, and an open purchase order changed, in the core and the admin**
+(INV-05): a page of the shop's suppliers, each changed in place with its orders; lines added to
+or taken from an order still open, and how many changed; then section by section as the alpha's
+shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,25 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### Purchase orders from suppliers, in the core and the admin
+
+* **Purchase orders** ([ADR-350](../architecture/13-decision-log.md#adr-350--purchase-orders-the-shops-suppliers-goods-ordered-from-one-for-a-location-numbered-po-1-onwards-each-line-a-variant-as-it-was-named-how-many-and-what-one-costs-goods-received-into-stock-as-they-come-in-one-adjustment-naming-the-order-never-more-than-is-still-to-come-received-in-full-or-closed-with-what-came-in-the-core-and-the-admin)): the shop's suppliers; goods ordered from one for a location, PO-1
+  onwards, each line a variant as it was named, how many and what one costs; goods received into
+  stock as they come, in one adjustment with the reason "received" naming the order, never more
+  than is still to come; received in full, or closed with what came. Migration 0168.
+* **In the admin:** "Purchase orders" from the stock page; a new order with a supplier chosen or
+  added there; an order's page receiving by count, all that is still to come, or each box scanned
+  or typed by barcode or SKU; closing once sure. Stock history links a receipt to its order.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, a new supplier,
+  Nishat Mills, added from the new order's form; PO-1 for Lahore warehouse of 12 "Peshawari
+  Chappal · 8" at Rs 1,450 and 6 of size 9; on its page, PC-08 typed counted one box, then 10 and
+  6 received: on hand went from 1 to 11 and from 2 to 8, each change "received" naming PO-1, and
+  the order said 16 of 18 came, Rs 17,400; closed, it said Closed. No errors in the browser.
+* 2463 tests: suppliers, orders checked and numbered, goods received and closed in the
+  inventory module; through the Admin API with its scopes and another shop's orders; in the admin,
+  ordering from a new supplier, receiving by count and by scan, closing, a packer only looking,
+  and the history's references; and the documents checked against the core's schema.
 
 ### 0d480dd · Stock counted by scanning, in the admin
 

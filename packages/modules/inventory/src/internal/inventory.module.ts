@@ -4,12 +4,17 @@ import { InventoryChangeResolver, InventoryItemResolver } from './graphql/invent
 import { LocationResolver } from './graphql/location.resolver.js';
 import { LowStockItemResolver, LowStockResolver } from './graphql/low-stock.resolver.js';
 import {
+  PurchaseOrderLineResolver,
+  PurchaseOrderResolver,
+} from './graphql/purchase-order.resolver.js';
+import {
   ProductInventoryResolver,
   VariantInventoryResolver,
 } from './graphql/variant-inventory.resolver.js';
 import { InventoryService } from './inventory.service.js';
 import { LocationService } from './location.service.js';
 import { LowStockService } from './low-stock.service.js';
+import { PurchaseOrderService } from './purchase-order.service.js';
 import { StockService } from './stock.service.js';
 
 /**
@@ -23,7 +28,10 @@ import { StockService } from './stock.service.js';
     InventoryService,
     StockService,
     LowStockService,
+    PurchaseOrderService,
     LocationResolver,
+    PurchaseOrderResolver,
+    PurchaseOrderLineResolver,
     LowStockResolver,
     LowStockItemResolver,
     InventoryItemResolver,
@@ -31,6 +39,6 @@ import { StockService } from './stock.service.js';
     VariantInventoryResolver,
     ProductInventoryResolver,
   ],
-  exports: [LocationService, InventoryService, StockService, LowStockService],
+  exports: [LocationService, InventoryService, StockService, LowStockService, PurchaseOrderService],
 })
 export class InventoryModule {}

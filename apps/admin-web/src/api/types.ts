@@ -2499,3 +2499,52 @@ export interface ThemeChoicesData {
     }[];
   };
 }
+
+export type PurchaseOrderStatus = 'OPEN' | 'RECEIVED' | 'CLOSED';
+
+export interface PurchaseOrderLine {
+  id: string;
+  productTitle: string;
+  variantTitle: string;
+  sku: string | null;
+  quantity: number;
+  received: number;
+  unitCost: MoneyValue | null;
+  inventoryItem: { id: string };
+}
+
+export interface PurchaseOrder {
+  id: string;
+  name: string;
+  status: PurchaseOrderStatus;
+  reference: string | null;
+  note: string | null;
+  expectedOn: string | null;
+  totalQuantity: number;
+  receivedQuantity: number;
+  totalCost: MoneyValue | null;
+  supplier: { id: string; name: string; phone: string | null };
+  location: { id: string; name: string };
+  closedAt: string | null;
+  createdAt: string;
+  lines: PurchaseOrderLine[];
+}
+
+export interface PurchaseOrdersData {
+  purchaseOrders: {
+    nodes: (Pick<
+      PurchaseOrder,
+      'id' | 'name' | 'status' | 'expectedOn' | 'totalQuantity' | 'receivedQuantity' | 'createdAt'
+    > & { supplier: { name: string }; location: { name: string } })[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+}
+
+export interface PurchaseOrderData {
+  purchaseOrder: PurchaseOrder | null;
+}
+
+export interface PurchaseOrderFormData {
+  suppliers: { id: string; name: string; phone: string | null }[];
+  locations: { nodes: { id: string; name: string; isPrimary: boolean }[] };
+}
