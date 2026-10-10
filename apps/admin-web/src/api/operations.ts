@@ -3620,6 +3620,7 @@ export const StockSearchQuery = /* GraphQL */ `
           id
           title
           sku
+          barcode
           inventoryQuantity
           inventoryItem {
             id

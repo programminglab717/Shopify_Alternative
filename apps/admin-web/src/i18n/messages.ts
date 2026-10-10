@@ -3008,6 +3008,12 @@ const en = {
   'stock.moveNowhere': 'The shop has no other location to move stock to.',
   'stock.moveAddLocation': 'Add a location',
   'stock.reason.movement_created': 'moved',
+  'stock.findWords': 'Find by name, SKU or barcode',
+  'stock.scan': 'Scan a barcode',
+  'stock.scanning': 'Point the camera at a barcode.',
+  'stock.scanStop': 'Stop scanning',
+  'stock.cameraRefused': 'The camera could not be used. Type the barcode instead.',
+  'stock.barcodeNone': 'No variant has the barcode {barcode}.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5990,6 +5996,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'stock.moveNowhere': 'دکان کی کوئی اور جگہ نہیں جہاں اسٹاک منتقل ہو۔',
   'stock.moveAddLocation': 'جگہ شامل کریں',
   'stock.reason.movement_created': 'منتقل کیا گیا',
+  'stock.findWords': 'نام، SKU یا بارکوڈ سے ڈھونڈیں',
+  'stock.scan': 'بارکوڈ اسکین کریں',
+  'stock.scanning': 'کیمرا بارکوڈ کی طرف کریں۔',
+  'stock.scanStop': 'اسکین بند کریں',
+  'stock.cameraRefused': 'کیمرا استعمال نہیں ہو سکا۔ بارکوڈ لکھ دیں۔',
+  'stock.barcodeNone': 'کسی ویریئنٹ کا بارکوڈ {barcode} نہیں۔',
 };
 
 export const messages: Readonly<

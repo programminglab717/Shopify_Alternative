@@ -1434,6 +1434,7 @@ export interface StockSearchData {
         id: string;
         title: string;
         sku: string | null;
+        barcode: string | null;
         inventoryQuantity: number;
         inventoryItem: { id: string; tracked: boolean };
       }[];

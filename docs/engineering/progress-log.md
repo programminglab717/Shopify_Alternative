@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, a variant found by its barcode, in the admin** (INV-07): on the stock page, a barcode
-scanned with the phone's camera, or typed, finds the variant to count, adjust or move it; then
-section by section as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, a stock count by scanning, in the admin** (INV-07): at a location, variants scanned or
+found one after another, each count kept until all are saved together, and those that changed
+since they were read said; then section by section as the alpha's shops need them. Urdu
+handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +18,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### A variant found by its barcode, in the admin
+
+* **By barcode** ([ADR-348](../architecture/13-decision-log.md#adr-348--the-admin-finds-a-variant-by-its-barcode-on-the-stock-page-typed-or-by-a-scanner-that-types-it-as-digits-alone-or-read-through-the-phones-camera-where-the-browser-can-read-barcodes-the-cores-search-by-barcode-the-variant-with-it-alone-shown-its-stock-open)): on the stock page, digits typed, or typed by a scanner, are searched
+  as a barcode, and the one variant with it opens at its stock; where the browser reads barcodes,
+  "Scan a barcode" reads one through the back camera and lets the camera go.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, "Lawn 3-Piece
+  Suit (Unstitched)" given the barcode 8964000000017; typing it opened its stock at Lahore
+  warehouse and Karachi store, the barcode beside its SKU; 1234567 said no variant has it.
+  Chromium on Linux reads no barcodes, so no camera was offered. No errors in the browser.
+* 2442 tests: a barcode typed, only its variant shown and opened, none found said; the camera
+  read until a code, let go, and refused.
 
 ### 11734aa · Stock moved between locations, in the core and the admin
 

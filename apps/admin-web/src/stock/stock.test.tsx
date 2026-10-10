@@ -103,6 +103,39 @@ function core(role: StaffRole, places = [MAIN, SHOP]) {
       case 'InventoryItem':
         return item(variables.id as string);
       case 'StockSearch':
+        if (String(variables.query).startsWith('barcode:')) {
+          // The core finds products with any variant of the barcode; the admin shows that one.
+          return {
+            products: {
+              nodes: String(variables.query).includes('8964000000017')
+                ? [
+                    {
+                      id: 'prod_1',
+                      title: 'Lawn suit',
+                      variants: [
+                        {
+                          id: 'var_1',
+                          title: 'M',
+                          sku: 'LS-M',
+                          barcode: '8964000000017',
+                          inventoryQuantity: 2,
+                          inventoryItem: { id: 'inv_1', tracked: true },
+                        },
+                        {
+                          id: 'var_9',
+                          title: 'L',
+                          sku: 'LS-L',
+                          barcode: '8964000000024',
+                          inventoryQuantity: 6,
+                          inventoryItem: { id: 'inv_9', tracked: true },
+                        },
+                      ],
+                    },
+                  ]
+                : [],
+            },
+          };
+        }
         return {
           products: {
             nodes: [
@@ -114,6 +147,7 @@ function core(role: StaffRole, places = [MAIN, SHOP]) {
                     id: 'var_3',
                     title: 'Default Title',
                     sku: null,
+                    barcode: null,
                     inventoryQuantity: 0,
                     inventoryItem: { id: 'inv_3', tracked: false },
                   },
@@ -269,7 +303,7 @@ describe('Stock', () => {
     renderAdmin('/shop_1/stock');
 
     const find = await screen.findByRole('region', { name: 'Find a product' });
-    fireEvent.change(within(find).getByLabelText('Find products by name or SKU'), {
+    fireEvent.change(within(find).getByLabelText('Find by name, SKU or barcode'), {
       target: { value: 'khussa' },
     });
     fireEvent.click(within(find).getByRole('button', { name: 'Find' }));
@@ -288,6 +322,79 @@ describe('Stock', () => {
         },
       }),
     );
+  });
+
+  it('finds a variant by a barcode typed or scanned by a scanner at the keyboard, and opens its stock', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/stock');
+
+    const find = await screen.findByRole('region', { name: 'Find a product' });
+    // This browser has no barcode reader, so no camera is offered.
+    expect(within(find).queryByRole('button', { name: 'Scan a barcode' })).toBeNull();
+    const words = within(find).getByLabelText('Find by name, SKU or barcode');
+    fireEvent.change(words, { target: { value: ' 8964000000017 ' } });
+    fireEvent.click(within(find).getByRole('button', { name: 'Find' }));
+    // Only the size with the barcode, its stock open.
+    expect(await within(find).findByText('Main warehouse')).toBeTruthy();
+    expect(sentOf(fake, 'StockSearch')).toEqual({ query: 'barcode:"8964000000017"' });
+    expect(within(find).getByRole('link', { name: 'Lawn suit · M' })).toBeTruthy();
+    expect(within(find).queryByRole('link', { name: 'Lawn suit · L' })).toBeNull();
+    expect(within(find).getByText('8964000000017')).toBeTruthy();
+
+    fireEvent.change(words, { target: { value: '123456' } });
+    fireEvent.click(within(find).getByRole('button', { name: 'Find' }));
+    expect(await within(find).findByText('No variant has the barcode 123456.')).toBeTruthy();
+  });
+
+  it("reads a barcode through the phone's camera, letting the camera go once read", async () => {
+    const fake = core('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    const stopped = vi.fn();
+    let frames = 0;
+    vi.stubGlobal(
+      'BarcodeDetector',
+      class {
+        detect() {
+          frames += 1;
+          return Promise.resolve(frames < 2 ? [] : [{ rawValue: '8964000000017' }]);
+        }
+      },
+    );
+    // The camera's stream, as the browser gives it, with one track to stop.
+    const camera = () => Object.assign(new MediaStream(), { getTracks: () => [{ stop: stopped }] });
+    const getUserMedia = vi.fn(() => Promise.resolve(camera()));
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: { getUserMedia },
+      configurable: true,
+    });
+    try {
+      renderAdmin('/shop_1/stock');
+      const find = await screen.findByRole('region', { name: 'Find a product' });
+      fireEvent.click(within(find).getByRole('button', { name: 'Scan a barcode' }));
+      expect(within(find).getByLabelText('Point the camera at a barcode.')).toBeTruthy();
+      expect(await within(find).findByText('Main warehouse', {}, { timeout: 3000 })).toBeTruthy();
+      expect(getUserMedia).toHaveBeenCalledWith({
+        video: { facingMode: 'environment' },
+        audio: false,
+      });
+      expect(stopped).toHaveBeenCalled();
+      expect(sentOf(fake, 'StockSearch')).toEqual({ query: 'barcode:"8964000000017"' });
+      expect(
+        (within(find).getByLabelText('Find by name, SKU or barcode') as HTMLInputElement).value,
+      ).toBe('8964000000017');
+
+      // A camera refused is said, and the barcode can be typed instead.
+      getUserMedia.mockImplementationOnce(() => Promise.reject(new Error('NotAllowedError')));
+      fireEvent.click(within(find).getByRole('button', { name: 'Scan a barcode' }));
+      expect(
+        await within(find).findByText('The camera could not be used. Type the barcode instead.'),
+      ).toBeTruthy();
+      fireEvent.click(within(find).getByRole('button', { name: 'Stop scanning' }));
+      expect(within(find).getByRole('button', { name: 'Scan a barcode' })).toBeTruthy();
+    } finally {
+      Reflect.deleteProperty(navigator, 'mediaDevices');
+    }
   });
 
   it('shows stock to a packer without changing it, and running low on Home', async () => {

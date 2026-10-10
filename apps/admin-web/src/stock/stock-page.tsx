@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { ChevronDown, ChevronUp, FileSpreadsheet, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileSpreadsheet, ScanBarcode, Search } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import {
@@ -33,6 +33,7 @@ import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context'
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { Scanner, canScan } from './scanner';
 import { StockChanges } from './stock-changes';
 
 /** Those who change stock, as the core lets them (`write_inventory`); every role sees it. */
@@ -474,20 +475,25 @@ function Row({
   productId,
   title,
   sku,
+  barcode = null,
   itemId,
   available,
   tracked = true,
+  opened = false,
 }: {
   productId: string;
   title: string;
   sku: string | null;
+  barcode?: string | null;
   itemId: string;
   available: number;
   tracked?: boolean;
+  /** Open at first, as the one variant a barcode found. */
+  opened?: boolean;
 }) {
   const { t } = useLocale();
   const { id: shopId } = useShop();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(opened);
   return (
     <li className="flex flex-col gap-2 py-2">
       <div className="flex items-center justify-between gap-3">
@@ -506,11 +512,14 @@ function Row({
               : available <= 0
                 ? t('stock.out')
                 : t('stock.left', { count: formatCount(available) })}
-            {sku && (
-              <>
-                {' · '}
-                <span dir="ltr">{sku}</span>
-              </>
+            {[sku, barcode].map(
+              (code) =>
+                code && (
+                  <span key={code}>
+                    {' · '}
+                    <span dir="ltr">{code}</span>
+                  </span>
+                ),
             )}
           </span>
         </span>
@@ -599,16 +608,40 @@ function Threshold({ threshold }: { threshold: number }) {
   );
 }
 
-/** Products found by words, each variant's stock a tap away. */
+/** Digits alone, as a barcode on goods reads (EAN, UPC), or typed by a scanner at the keyboard. */
+const BARCODE = /^\d{6,14}$/;
+
+interface Search {
+  query: string;
+  /** The barcode searched for, whose variants alone are shown. */
+  barcode: string | null;
+}
+
+/** A search for the variants with `code` as their barcode, in the core's search syntax. */
+function byBarcode(code: string): Search {
+  return { query: `barcode:"${code.replace(/["\\]/g, '')}"`, barcode: code };
+}
+
+/**
+ * Products found by words, each variant's stock a tap away; or the variant with a barcode, typed,
+ * scanned with the phone's camera, or by a scanner that types it, opened at once.
+ */
 function FindStock() {
   const { t } = useLocale();
   const [words, setWords] = useState('');
-  const [searched, setSearched] = useState<string | null>(null);
+  const [searched, setSearched] = useState<Search | null>(null);
+  const [scanning, setScanning] = useState(false);
   const query = useAdminQuery<StockSearchData>(
-    ['stockSearch', searched],
+    ['stockSearch', searched?.query ?? null],
     StockSearchQuery,
-    { query: searched },
+    { query: searched?.query ?? null },
     { enabled: searched !== null },
+  );
+  const code = searched?.barcode?.toLowerCase() ?? null;
+  const found = (query.data?.products.nodes ?? []).flatMap((product) =>
+    product.variants
+      .filter((variant) => code === null || variant.barcode?.toLowerCase() === code)
+      .map((variant) => ({ product, variant })),
   );
   return (
     <div className="flex flex-col gap-3">
@@ -617,40 +650,65 @@ function FindStock() {
         className="flex gap-2"
         onSubmit={(event) => {
           event.preventDefault();
-          setSearched(words.trim());
+          const typed = words.trim();
+          setSearched(BARCODE.test(typed) ? byBarcode(typed) : { query: typed, barcode: null });
         }}
       >
         <input
           type="search"
           value={words}
           onChange={(event) => setWords(event.target.value)}
-          aria-label={t('drafts.findProducts')}
-          placeholder={t('drafts.findProducts')}
+          aria-label={t('stock.findWords')}
+          placeholder={t('stock.findWords')}
           className="min-h-12 min-w-0 flex-1 rounded-control border border-line bg-surface px-3 md:min-h-10"
         />
         <Button type="submit" variant="secondary" icon={<Search aria-hidden className="size-5" />}>
           {t('drafts.find')}
         </Button>
       </form>
+      {canScan() &&
+        (scanning ? (
+          <Scanner
+            onCode={(scanned) => {
+              setScanning(false);
+              setWords(scanned);
+              setSearched(byBarcode(scanned));
+            }}
+            onClose={() => setScanning(false)}
+          />
+        ) : (
+          <Button
+            variant="secondary"
+            className="self-start"
+            icon={<ScanBarcode aria-hidden className="size-5" />}
+            onClick={() => setScanning(true)}
+          >
+            {t('stock.scan')}
+          </Button>
+        ))}
       {query.isError && <Alert tone="danger">{errorText(query.error, t)}</Alert>}
       {query.data &&
-        (query.data.products.nodes.length === 0 ? (
-          <p className="text-secondary">{t('drafts.noProducts')}</p>
+        (found.length === 0 ? (
+          <p className="text-secondary">
+            {searched?.barcode
+              ? t('stock.barcodeNone', { barcode: searched.barcode })
+              : t('drafts.noProducts')}
+          </p>
         ) : (
           <ul className="flex flex-col divide-y divide-line">
-            {query.data.products.nodes.flatMap((product) =>
-              product.variants.map((variant) => (
-                <Row
-                  key={variant.id}
-                  productId={product.id}
-                  title={variantTitle(product.title, variant.title)}
-                  sku={variant.sku}
-                  itemId={variant.inventoryItem.id}
-                  available={variant.inventoryQuantity}
-                  tracked={variant.inventoryItem.tracked}
-                />
-              )),
-            )}
+            {found.map(({ product, variant }) => (
+              <Row
+                key={`${searched?.query}:${variant.id}`}
+                productId={product.id}
+                title={variantTitle(product.title, variant.title)}
+                sku={variant.sku}
+                barcode={variant.barcode}
+                itemId={variant.inventoryItem.id}
+                available={variant.inventoryQuantity}
+                tracked={variant.inventoryItem.tracked}
+                opened={code !== null && found.length === 1}
+              />
+            ))}
           </ul>
         ))}
     </div>

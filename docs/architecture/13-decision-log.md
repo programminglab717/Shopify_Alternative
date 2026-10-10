@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-347 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-348 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -355,6 +355,7 @@
 | 345 | Customers are tagged and untagged many at once, as orders and products are: up to 250, each in its own transaction, one refused said at its place; their marketing consent is not, as each customer gives or withdraws their own | Accepted |
 | 346 | The admin shows a variant's whole stock history as the core keeps it: its latest changes with its stock, older ones a page at a time as asked, at every location or the one chosen, each with what was left and a link to the order it was for | Accepted |
 | 347 | Stock moves between a shop's locations as Shopify's inventoryMoveQuantities: each move takes from on hand where it leaves, no more than is available there, and adds to on hand where it arrives, in one adjustment; the admin moves a variant's stock from its level to another location | Accepted |
+| 348 | The admin finds a variant by its barcode on the stock page: typed, or by a scanner that types it, as digits alone, or read through the phone's camera where the browser can read barcodes; the core's search by barcode, the variant with it alone shown, its stock open | Accepted |
 
 ---
 
@@ -13884,3 +13885,33 @@
     could take from what orders are owed.
   * **Transfers with a stage in between:** the alpha's shops send stock across a city in a day;
     a quantity on its way is for when shops ask.
+
+## ADR-348 · The admin finds a variant by its barcode on the stock page: typed, or by a scanner that types it, as digits alone, or read through the phone's camera where the browser can read barcodes; the core's search by barcode, the variant with it alone shown, its stock open
+
+* **Context:**
+  * Staff counting or moving stock hold the goods: a box with a barcode on it, an EAN printed by
+    the maker or the shop's own label (INV-07). Finding it by name on a phone, among sizes and
+    colours, is slow.
+  * The core's product search takes `barcode:` and finds products with any variant of it. Many
+    shops use a scanner that types the code and presses Enter, like a keyboard.
+  * Chrome on Android, and on macOS, reads barcodes from the camera (`BarcodeDetector`); Safari
+    and Chrome on Windows and Linux do not.
+* **Decision:**
+  * **Digits alone, 6 to 14 of them**, typed in the stock page's search, as a scanner types them,
+    are a barcode: the core is asked for `barcode:"…"`, and of what it finds only the variants
+    with that barcode, in any letter case, are shown. One found is open at once, its stock at
+    each location ready to count, adjust or move. None found says the barcode.
+  * **"Scan a barcode"** is offered where the browser reads barcodes: the back camera, read four
+    times a second for EAN, UPC, Code 128, Code 39 and QR codes; the first code read lets the
+    camera go and is searched as one typed. A camera refused says to type the code instead.
+  * Each variant's barcode shows beside its SKU.
+* **Consequences:**
+  * A box in the hand is its stock in a scan or a few keys.
+  * Where the browser cannot read barcodes, a scanner or typing still works; no library is
+    bundled to read them in the page.
+  * Not yet: counting many variants by scanning one after another, saved together.
+* **Alternatives:**
+  * **A barcode library in the page (ZXing):** some hundred kilobytes for every member of staff
+    for the few phones without a reader; for when shops ask.
+  * **Searching words and barcodes together:** a name of digits alone is rare, and the search
+    would show every product whose words matched.
