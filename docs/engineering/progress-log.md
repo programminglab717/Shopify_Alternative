@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### What goods cost, from purchase orders, in the core and the admin
+### 525d04f · What goods cost, from purchase orders, in the core and the admin
 
 * **Costs from what came** ([ADR-352](../architecture/13-decision-log.md#adr-352--goods-received-on-a-purchase-order-set-what-their-variants-cost-a-lines-cost-averaged-with-what-was-on-hand-at-the-variants-cost-before-weighted-by-units-rounded-to-the-paisa-the-orders-cost-where-none-was-on-hand-or-none-was-known-in-the-same-transaction-as-the-receipt)): goods received on a purchase order set their variants' cost,
   each line's averaged with what was on hand at the cost before, weighted by units, in the same
