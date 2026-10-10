@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### The orders each location ships, in the core and the admin
+### 39596c1 · The orders each location ships, in the core and the admin
 
 * **By location** ([ADR-356](../architecture/13-decision-log.md#adr-356--the-orders-each-location-ships-a-location_id-filter-in-the-orders-search-stage-counts-by-location-and-the-admins-orders-list-by-the-location-chosen-kept-in-the-browser)): the orders search takes `location_id:loc_…`, and `orderStageCounts`
   a location. A shop with more than one location gets "Ships from" over the orders list, the list
