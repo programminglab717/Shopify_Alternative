@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### A purchase order printed for its supplier, in the core and the admin
+### 363838a · A purchase order printed for its supplier, in the core and the admin
 
 * **Printed** ([ADR-353](../architecture/13-decision-log.md#adr-353--a-purchase-order-printed-for-its-supplier-one-a4-page-from-the-cores-documents-in-english-urdu-or-both-with-the-shop-the-order-and-its-date-the-supplier-and-their-reference-where-the-goods-go-and-by-when-and-each-line-with-what-it-costs-where-the-shop-said-the-shared-document-enums-moved-to-the-api-package)): `purchaseOrderDocument` makes an order one A4 page for its supplier, in
   English, Urdu or both: the shop, the order and its date, the supplier and their reference, where
