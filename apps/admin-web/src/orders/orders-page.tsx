@@ -36,6 +36,7 @@ import { CancelPanel, refusals, TagsPanel } from './bulk';
 import type { BulkOutcome } from './bulk';
 import { EXPORTS_ORDERS } from './export-page';
 import { FreshOrdersNotice, useFreshOrders } from './fresh-orders';
+import { LocationFilter, useOrdersLocation } from './location-filter';
 import { CANCELLABLE } from './order-page';
 import { PrintPanel } from './print';
 import { StageBadge, STAGES } from './stage';
@@ -75,10 +76,12 @@ export const SAVES_ORDER_SEARCHES: readonly StaffRole[] = [
   'packer',
 ];
 
-/** The orders list's search: a stage tab and the words searched for. */
+/** The orders list's search: a stage tab, the words searched for, and where they ship from. */
 export interface OrdersSearch {
   stage?: OrderStage;
   q?: string;
+  /** A location's ID: only the orders shipping from there (ADR-356). */
+  location?: string;
 }
 
 export function validateOrdersSearch(search: Record<string, unknown>): OrdersSearch {
@@ -87,7 +90,8 @@ export function validateOrdersSearch(search: Record<string, unknown>): OrdersSea
       ? (search.stage as OrderStage)
       : undefined;
   const q = typeof search.q === 'string' && search.q.trim() ? search.q.trim() : undefined;
-  return { stage, q };
+  const location = typeof search.location === 'string' ? search.location : undefined;
+  return { stage, q, location };
 }
 
 function OrderRow({
@@ -174,7 +178,10 @@ export function OrdersPage() {
   const store = useSessionStore();
   const shop = useShop();
   const navigate = useNavigate();
-  const { stage, q } = useSearch({ from: '/$shopId/orders' });
+  const { stage, q, location: linked } = useSearch({ from: '/$shopId/orders' });
+  const { ready, locations, location, choose: keepLocation } = useOrdersLocation(linked);
+  // The words searched for, and the location chosen as the core's filter for it.
+  const query = [q, location && `location_id:${location}`].filter(Boolean).join(' ') || null;
   const [words, setWords] = useState(q ?? '');
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [outcome, setOutcome] = useState<BulkOutcome | null>(null);
@@ -190,28 +197,35 @@ export function OrdersPage() {
   const queryClient = useQueryClient();
   const [showing, setShowing] = useState(false);
 
-  const listKey = ['admin', shop.id, 'orders', stage ?? null, q ?? null];
+  const listKey = ['admin', shop.id, 'orders', stage ?? null, q ?? null, location ?? null];
   const orders = useInfiniteQuery({
     queryKey: listKey,
     queryFn: ({ pageParam }) =>
       store.graphql<OrdersData>(shop.id, OrdersQuery, {
         first: PAGE,
         after: pageParam,
-        query: q ?? null,
+        query,
         stage: stage ?? null,
+        locationId: location ?? null,
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (last) =>
       last.orders.pageInfo.hasNextPage ? last.orders.pageInfo.endCursor : undefined,
     // Orders placed since are said above the list instead, so no row moves as staff come back.
     refetchOnWindowFocus: false,
+    enabled: ready,
   });
 
   const choose = (next: OrdersSearch) => {
     setSelected(new Set());
     setOutcome(null);
     setPanel(null);
-    void navigate({ to: '/$shopId/orders', params: { shopId: shop.id }, search: next });
+    void navigate({
+      to: '/$shopId/orders',
+      params: { shopId: shop.id },
+      // The location stays as it is unless chosen anew.
+      search: 'location' in next ? next : { ...next, location },
+    });
   };
 
   const onSearch = (event: FormEvent) => {
@@ -228,7 +242,7 @@ export function OrdersPage() {
   const ids = [...selected];
 
   const fresh = useFreshOrders(
-    { stage: stage ?? null, query: q ?? null },
+    { stage: stage ?? null, query },
     orders.isSuccess ? { shown, more: orders.hasNextPage, at: orders.dataUpdatedAt } : null,
   );
 
@@ -289,7 +303,7 @@ export function OrdersPage() {
             <Link
               to="/$shopId/orders/export"
               params={{ shopId: shop.id }}
-              search={{ stage, q }}
+              search={{ stage, q: query ?? undefined }}
               className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium md:min-h-10"
             >
               <Download aria-hidden className="size-5" />
@@ -329,6 +343,14 @@ export function OrdersPage() {
         onApply={(query) => {
           setWords(query ?? '');
           choose({ stage, q: query });
+        }}
+      />
+      <LocationFilter
+        locations={locations}
+        location={location}
+        onChoose={(locationId) => {
+          keepLocation(locationId ?? '');
+          choose({ stage, q, location: locationId });
         }}
       />
       <div role="tablist" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
@@ -395,7 +417,7 @@ export function OrdersPage() {
           <EmptyState
             icon={<Inbox aria-hidden className="size-8 text-secondary" />}
             title={t('orders.none')}
-            body={q || stage ? undefined : t('orders.noneBody')}
+            body={q || stage || location ? undefined : t('orders.noneBody')}
           />
         </Card>
       ) : (

@@ -9217,7 +9217,10 @@ type Query {
   orderSettings: OrderSettings!
 
   """How many orders are at each stage."""
-  orderStageCounts: [OrderStageCount!]!
+  orderStageCounts(
+    """Only orders shipping from this location."""
+    locationId: ID
+  ): [OrderStageCount!]!
 
   """Orders, newest first."""
   orders(

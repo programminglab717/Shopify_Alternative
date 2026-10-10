@@ -61,6 +61,8 @@ export const ORDER_SEARCH_FILTERS = {
   has_transfer_receipt: ['true', 'false'],
   /** `me`, `none`, or a member of staff by their account's ID, `usr_…` (ADR-127). */
   assignee: null,
+  /** The location it ships from, by its ID, `loc_…` (ADR-356). */
+  location_id: null,
 } as const satisfies Record<string, readonly string[] | null>;
 
 export type OrderSearchKey = keyof typeof ORDER_SEARCH_FILTERS;
@@ -88,6 +90,9 @@ export function parseOrderSearch(query: string): SearchParse<OrderSearchKey> {
         error: `assignee is me, none or a member of staff's ID (usr_…), not ${filter.value}`,
       };
     }
+    if (filter.key === 'location_id' && !tryFromPublicId(filter.value, 'location')) {
+      return { ok: false, error: `location_id is a location's ID (loc_…), not ${filter.value}` };
+    }
   }
   return search;
 }
@@ -109,6 +114,8 @@ function searchFilterCondition({ key, value }: OrderSearchFilter, me: string | n
       const id = assignee === 'me' ? me : assignee;
       return id ? sql`o.assignee_id = ${id}` : sql`false`;
     }
+    case 'location_id':
+      return sql`o.location_id = ${tryFromPublicId(value, 'location')}`;
     case 'tag':
       return sql`EXISTS (SELECT 1 FROM unnest(o.tags) AS t(tag) WHERE lower(t.tag) = lower(${value}))`;
     case 'has_transfer_receipt':

@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
-import { newId } from '@hatti/ids';
+import { newId, toPublicId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -144,5 +144,27 @@ describe.skipIf(!server)('Where an order ships from (INV-10)', () => {
     expect(errorsOf(await f.orders.changeLocation(f.a, order.id, gulberg.id))).toEqual([
       ['id', 'INVALID'],
     ]);
+  });
+
+  it('lists and counts the orders each location ships', async () => {
+    const primary = await f.primary(f.a);
+    await f.stock(f.a, kurta, 5);
+    const gulberg = await place('Gulberg', [[dupatta, 5]]);
+    const fromPrimary = await f.order(f.a, [kurta]);
+    const fromGulberg = await f.order(f.a, [dupatta]);
+    unwrap(await f.orders.confirm(f.a, fromGulberg.id));
+    const at = (locationId: string) => `location_id:${toPublicId('location', locationId)}`;
+
+    const listed = async (query: string) =>
+      (await f.orders.list(f.a, { first: 5, query })).items.map((order) => order.id);
+    expect(await listed(at(gulberg.id))).toEqual([fromGulberg.id]);
+    expect(await listed(at(primary.id))).toEqual([fromPrimary.id]);
+    expect(await listed(`-${at(gulberg.id)}`)).toEqual([fromPrimary.id]);
+
+    const counts = await f.orders.stageCounts(f.a, { locationId: gulberg.id });
+    expect(counts.get('to_pack')).toBe(1);
+    expect(counts.get('needs_confirmation')).toBe(0);
+    expect((await f.orders.stageCounts(f.a)).get('needs_confirmation')).toBe(1);
+    expect((await f.orders.stageCounts(f.b, { locationId: gulberg.id })).get('to_pack')).toBe(0);
   });
 });

@@ -102,7 +102,7 @@ export const SetupChecklistQuery = /* GraphQL */ `
 
 /** A page of the shop's orders, newest first, by stage and search, with each stage's count. */
 export const OrdersQuery = /* GraphQL */ `
-  query Orders($first: Int, $after: String, $query: String, $stage: OrderStage) {
+  query Orders($first: Int, $after: String, $query: String, $stage: OrderStage, $locationId: ID) {
     orders(first: $first, after: $after, query: $query, stage: $stage) {
       nodes {
         id
@@ -134,7 +134,7 @@ export const OrdersQuery = /* GraphQL */ `
         endCursor
       }
     }
-    orderStageCounts {
+    orderStageCounts(locationId: $locationId) {
       stage
       count
     }

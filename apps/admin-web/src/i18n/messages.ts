@@ -3110,6 +3110,7 @@ const en = {
   'shipsFrom.location': 'Location',
   'shipsFrom.save': 'Move its stock there',
   'shipsFrom.hint': 'Until it is packed, its stock can be set aside at another location instead.',
+  'shipsFrom.all': 'Every location',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6195,6 +6196,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'shipsFrom.location': 'جگہ',
   'shipsFrom.save': 'اس کا اسٹاک وہاں منتقل کریں',
   'shipsFrom.hint': 'پیک ہونے تک، اس کا اسٹاک کسی اور جگہ الگ رکھا جا سکتا ہے۔',
+  'shipsFrom.all': 'ہر جگہ',
 };
 
 export const messages: Readonly<

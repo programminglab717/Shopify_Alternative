@@ -698,6 +698,24 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
       userErrors: [],
     });
 
+    // The orders each location ships, listed and counted (ADR-356).
+    const AT = `query ($query: String, $locationId: ID) {
+      orders(first: 10, query: $query) { nodes { id } }
+      orderStageCounts(locationId: $locationId) { stage count }
+    }`;
+    const atBranch = await gql(tokens.aReader, AT, {
+      query: `location_id:${gulberg}`,
+      locationId: gulberg,
+    });
+    expect(atBranch.data?.orders.nodes).toEqual([{ id }, { id: back.order.id }].reverse());
+    expect(
+      atBranch.data?.orderStageCounts.find((each: Json) => each.stage === 'NEEDS_CONFIRMATION'),
+    ).toEqual({ stage: 'NEEDS_CONFIRMATION', count: 2 });
+    const badFilter = await gql(tokens.aReader, AT, { query: 'location_id:Lahore' });
+    expect(badFilter.errors?.[0]?.message).toBe(
+      "location_id is a location's ID (loc_…), not Lahore",
+    );
+
     // Moving needs write_orders; another shop's order is not found.
     const denied = await gql(tokens.aReader, MOVE, { id, locationId: primary.id });
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');

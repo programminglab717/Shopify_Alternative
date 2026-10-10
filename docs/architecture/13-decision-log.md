@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-355 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-356 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -363,6 +363,7 @@
 | 353 | A purchase order printed for its supplier: one A4 page from the core's documents, in English, Urdu or both, with the shop, the order and its date, the supplier and their reference, where the goods go and by when, and each line with what it costs where the shop said; the shared document enums moved to the API package | Accepted |
 | 354 | What runs low is ordered from the stock page: each low variant with what of it is on order and who supplied it last, those chosen opening a new purchase order filled in with enough of each for twice the low mark, from the supplier most came from, at the cost paid last | Accepted |
 | 355 | An order ships from the first location fulfilling online orders that has all of it, the primary first, or the primary; and from another chosen on its page until it is packed, its stock committed there and let go where it was in one change | Accepted |
+| 356 | The orders each location ships: a location_id filter in the orders search, stage counts by location, and the admin's orders list by the location chosen, kept in the browser | Accepted |
 
 ---
 
@@ -14141,3 +14142,31 @@
     has the goods matters more, and staff can move it.
   * **Splitting the order among locations at once:** two parcels cost two delivery charges the
     customer did not agree to.
+
+## ADR-356 · The orders each location ships: a location_id filter in the orders search, stage counts by location, and the admin's orders list by the location chosen, kept in the browser
+
+* **Context:**
+  * Orders ship from the location that has them, or one chosen (ADR-355); a shop with a branch in
+    Karachi and a warehouse in Lahore packs in both, and each place's packers want their own
+    orders, with their own counts on the stage tabs (INV-10, ORD-01).
+  * The orders search takes Shopify's `key:value` filters (ADR-118); Shopify's own orders search
+    has `location_id`.
+* **Decision:**
+  * **`location_id:loc_…`** in the orders search, by the location's public ID, negated as any
+    filter is; anything else is refused with what it takes. Exports and saved searches take it as
+    they take the search.
+  * **`orderStageCounts(locationId)`**: the stage tabs' counts for one location.
+  * **In the admin**, a shop with more than one location gets "Ships from" over the orders list:
+    every location, or one, the list and its tabs' counts following. The choice goes in the link,
+    and is kept in the browser for the next visit, so a branch's packers open their own orders
+    each day; a location no longer there falls back to every one. The list is read once the
+    locations are known, so it is never read twice for the wrong place.
+* **Consequences:**
+  * Each place packs its own orders from the same list, and the new-orders notice counts those of
+    the place chosen.
+  * Not yet: the home's counts by location; staff tied to a location.
+* **Alternatives:**
+  * **Staff tied to a location, seeing only its orders:** a branch's staff cover for each other
+    here; a choice they make is enough until shops ask for more.
+  * **The location as a saved search:** saved searches are shared by the shop, and a packer's
+    place is theirs.

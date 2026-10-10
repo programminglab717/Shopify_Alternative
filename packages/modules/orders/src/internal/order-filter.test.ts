@@ -29,7 +29,7 @@ describe('Orders searches', () => {
       error:
         "Orders can't be filtered by stag; filters are stage, status, confirmation_status, " +
         'financial_status, fulfillment_status, payment_method, source, risk_level, tag, ' +
-        'has_transfer_receipt, assignee',
+        'has_transfer_receipt, assignee, location_id',
     });
     expect(parseOrderSearch('risk_level:extreme')).toEqual({
       ok: false,
@@ -51,6 +51,14 @@ describe('Orders searches', () => {
     });
     expect(parseOrderSearch(`assignee:${toPublicId('order', newId())}`)).toMatchObject({
       ok: false,
+    });
+    // Where it ships from, by the location's ID (ADR-356).
+    expect(parseOrderSearch(`location_id:${toPublicId('location', newId())}`)).toMatchObject({
+      ok: true,
+    });
+    expect(parseOrderSearch('location_id:Karachi')).toEqual({
+      ok: false,
+      error: "location_id is a location's ID (loc_…), not Karachi",
     });
   });
 });

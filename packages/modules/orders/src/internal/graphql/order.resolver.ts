@@ -130,8 +130,18 @@ export class OrderResolver {
 
   @Query(() => [OrderStageCount], { description: 'How many orders are at each stage.' })
   @RequireScopes('read_orders')
-  async orderStageCounts(@CurrentTenant() tenant: TenantContext): Promise<OrderStageCount[]> {
-    const counts = await this.service.stageCounts(tenant);
+  async orderStageCounts(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('locationId', {
+      type: () => ID,
+      nullable: true,
+      description: 'Only orders shipping from this location.',
+    })
+    locationId: string | null,
+  ): Promise<OrderStageCount[]> {
+    const counts = await this.service.stageCounts(tenant, {
+      locationId: locationId ? uuidOf('location', locationId) : null,
+    });
     return ORDER_STAGES.map((stage) =>
       Object.assign(new OrderStageCount(), {
         stage: stage.toUpperCase() as OrderStage,

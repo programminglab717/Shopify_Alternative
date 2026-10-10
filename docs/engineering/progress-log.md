@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, the orders each location ships, in the admin** (INV-10, ORD-01): the orders list and
-its stages filtered by the location they ship from, so that each shop's or warehouse's packers
-see their own; then section by section as the alpha's shops need them. Urdu handles wait, as
-decided.
+**Next, another location made the primary, in the admin** (INV-01): the shop's primary
+location changed in its locations' settings, the one stock is counted at and orders fall back
+to; then section by section as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### The orders each location ships, in the core and the admin
+
+* **By location** ([ADR-356](../architecture/13-decision-log.md#adr-356--the-orders-each-location-ships-a-location_id-filter-in-the-orders-search-stage-counts-by-location-and-the-admins-orders-list-by-the-location-chosen-kept-in-the-browser)): the orders search takes `location_id:loc_…`, and `orderStageCounts`
+  a location. A shop with more than one location gets "Ships from" over the orders list, the list
+  and its stage counts following the choice, which is kept in the browser for the next visit.
+* **Tried in Chromium against the core:** on the seed's shop, with #1003 moved to Karachi store,
+  choosing it showed #1003 alone, "To pack 1"; the list opened again on Karachi store; every
+  location showed all 26 again. No errors in the browser. Postgres had restarted with the machine,
+  its first queries slow from a cold disk until warm.
+* 2486 tests: the filter refused for anything but a location's ID, and the orders each
+  location ships listed and counted, in the orders module; through the Admin API; in the admin,
+  the list by location, the choice kept and dropped, and none for a shop with one location.
 
 ### d7b3e9f · Where an order ships from, in the core and the admin
 

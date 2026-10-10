@@ -915,12 +915,20 @@ export class OrderService {
     });
   }
 
-  /** How many orders are at each stage, for the tabs of the order list. */
-  async stageCounts(tenant: TenantContext): Promise<Map<OrderStageValue, number>> {
+  /**
+   * How many orders are at each stage, for the tabs of the order list; with `locationId`, of
+   * those shipping from there (ADR-356).
+   */
+  async stageCounts(
+    tenant: TenantContext,
+    options: { locationId?: string | null } = {},
+  ): Promise<Map<OrderStageValue, number>> {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<{ stage: OrderStageValue; count: number }>(sql`
         SELECT stage, count(*)::int AS count FROM orders.orders
-         WHERE shop_id = ${tenant.shopId} GROUP BY stage`);
+         WHERE shop_id = ${tenant.shopId}
+           ${options.locationId ? sql`AND location_id = ${options.locationId}` : sql``}
+         GROUP BY stage`);
       const counts = new Map<OrderStageValue, number>(ORDER_STAGES.map((stage) => [stage, 0]));
       for (const row of rows) counts.set(row.stage, row.count);
       return counts;
