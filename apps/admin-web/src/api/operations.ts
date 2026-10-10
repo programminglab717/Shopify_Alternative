@@ -899,6 +899,31 @@ export const PrimaryLocationQuery = /* GraphQL */ `
 `;
 
 /** A product added, with its options and a variant for each of their values (CAT-01). */
+/** A copy of a product, made as a draft to change (ADR-343). */
+export const ProductDuplicateMutation = /* GraphQL */ `
+  mutation ProductDuplicate(
+    $productId: ID!
+    $newTitle: String!
+    $newStatus: ProductStatus
+    $includeImages: Boolean
+  ) {
+    productDuplicate(
+      productId: $productId
+      newTitle: $newTitle
+      newStatus: $newStatus
+      includeImages: $includeImages
+    ) {
+      newProduct {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const ProductCreateMutation = /* GraphQL */ `
   mutation ProductCreate($input: ProductCreateInput!) {
     productCreate(input: $input) {

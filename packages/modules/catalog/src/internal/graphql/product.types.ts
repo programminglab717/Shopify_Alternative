@@ -813,6 +813,15 @@ export class ProductCreatePayload {
 }
 
 @ObjectType()
+export class ProductDuplicatePayload {
+  @Field(() => Product, { nullable: true, description: 'The copy.' })
+  newProduct!: Product | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
 export class ProductUpdatePayload {
   @Field(() => Product, { nullable: true })
   product!: Product | null;

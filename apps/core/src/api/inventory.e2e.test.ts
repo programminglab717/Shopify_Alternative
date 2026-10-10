@@ -451,6 +451,58 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     ]);
   });
 
+  it("duplicates a product, its variants' stock tracked as its are with none of it (ADR-343)", async () => {
+    const warehouse = (
+      await addLocation(tokens.a, { name: 'Multan warehouse', address: { city: 'Multan' } })
+    ).location;
+    const product = await stockedProduct(tokens.a, 'Kolhapuri', ['40', '41']);
+    const [size40] = product.variants.map((variant) => variant.inventoryItem.id);
+    const counted = await mutate(tokens.a, SET_QUANTITIES, {
+      input: {
+        name: 'available',
+        reason: 'cycle_count_available',
+        quantities: [{ inventoryItemId: size40, locationId: warehouse.id, quantity: 4 }],
+      },
+    });
+    expect(counted.userErrors).toEqual([]);
+
+    const DUPLICATE = `
+      mutation ($id: ID!, $title: String!, $status: ProductStatus) {
+        productDuplicate(productId: $id, newTitle: $title, newStatus: $status) {
+          newProduct {
+            id title handle status
+            variants { title sku inventoryItem { tracked inventoryLevels { available } } }
+          }
+          userErrors { field code message }
+        }
+      }`;
+    const copied = await mutate(tokens.a, DUPLICATE, {
+      id: product.id,
+      title: 'Kolhapuri - Tan',
+      status: 'DRAFT',
+    });
+    expect(copied).toEqual({
+      newProduct: {
+        id: expect.stringMatching(/^prod_/),
+        title: 'Kolhapuri - Tan',
+        handle: 'kolhapuri-tan',
+        status: 'DRAFT',
+        variants: [
+          { title: '40', sku: null, inventoryItem: { tracked: true, inventoryLevels: [] } },
+          { title: '41', sku: null, inventoryItem: { tracked: false, inventoryLevels: [] } },
+        ],
+      },
+      userErrors: [],
+    });
+    expect(copied.newProduct.id).not.toBe(product.id);
+
+    // Another shop's product is not found there.
+    expect(await mutate(tokens.b, DUPLICATE, { id: product.id, title: 'Theirs' })).toEqual({
+      newProduct: null,
+      userErrors: [{ field: ['productId'], code: 'NOT_FOUND', message: 'Product not found' }],
+    });
+  });
+
   it('says what runs low, at the threshold the shop sets (ADR-125)', async () => {
     const shopC = newId();
     await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Shop C')`, [shopC]);

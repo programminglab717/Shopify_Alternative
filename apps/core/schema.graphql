@@ -5794,6 +5794,11 @@ type Mutation {
   productDeleteMedia(mediaIds: [ID!]!, productId: ID!): ProductDeleteMediaPayload!
 
   """
+  Copies a product (ADR-343), as Shopify's productDuplicate does: titled `newTitle`, its handle made from that, with its description, vendor, type, tags and words for search engines; its options and variants with their prices, costs, weights and tax, not their SKUs or barcodes; in the manual collections it is in; and its variants tracked as its are, with none of their stock. With `includeImages`, its photos and videos too, made again from where they came. Its status is `newStatus`, else the product's own.
+  """
+  productDuplicate(includeImages: Boolean = false, newStatus: ProductStatus, newTitle: String!, productId: ID!): ProductDuplicatePayload!
+
+  """
   Renames or moves an option, and adds, renames or deletes its values. Values that variants use cannot be deleted.
   """
   productOptionUpdate(option: ProductOptionUpdateInput!, optionValuesToAdd: [String!], optionValuesToDelete: [ID!], optionValuesToUpdate: [ProductOptionValueUpdateInput!], productId: ID!): ProductPayload!
@@ -8023,6 +8028,12 @@ type ProductDeleteMediaPayload {
 
 type ProductDeletePayload {
   deletedProductId: ID
+  userErrors: [UserError!]!
+}
+
+type ProductDuplicatePayload {
+  """The copy."""
+  newProduct: Product
   userErrors: [UserError!]!
 }
 

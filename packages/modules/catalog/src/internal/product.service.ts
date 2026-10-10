@@ -4,7 +4,7 @@ import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { correctionsOf, prefixKey, searchKey, typosAllowed, type Correction } from '@hatti/pk';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { refreshMemberships } from './collection-store.js';
 import {
@@ -14,6 +14,7 @@ import {
   type ProductUpdatedPayload,
 } from './events.js';
 import { handleCandidate, movedFrom, toHandle } from './handle.js';
+import { CopiedVariantStock, copyMedia, joinManualCollections } from './product-copy.js';
 import { productSearchConditions } from './product-filter.js';
 import {
   InputChecker,
@@ -102,6 +103,17 @@ export interface UpdateProductInput {
   redirectNewHandle?: boolean | null;
 }
 
+/** What `duplicate` copies, and how (ADR-343). */
+export interface DuplicateProductInput {
+  productId: string;
+  /** The copy's title; its handle is made from it. */
+  newTitle: string;
+  /** Left out, the copy's status is the product's own, as Shopify's `productDuplicate` has it. */
+  newStatus?: ProductStatusValue | null;
+  /** Whether its photos and videos are copied too, made again from where they came. */
+  includeImages?: boolean | null;
+}
+
 export interface ListProductsOptions {
   first: number;
   /** Return products created before this one (UUID); pages run newest first. */
@@ -126,7 +138,8 @@ interface CheckedProduct {
   seo: Partial<SeoValue>;
   requestedHandle: string | null;
   options: OptionShape[];
-  variants: { fields: VariantFields; optionValues: string[] }[];
+  /** A copy's variants keep their titles; others' are made from their option values. */
+  variants: { title?: string; fields: VariantFields; optionValues: string[] }[];
 }
 
 /**
@@ -136,7 +149,11 @@ interface CheckedProduct {
  */
 @Injectable()
 export class ProductService {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    /** Copies a duplicated product's stock settings to its copy's (ADR-343). */
+    @Optional() private readonly stock?: CopiedVariantStock,
+  ) {}
 
   /**
    * What would be wrong with creating the product `input` describes, without creating it: for
@@ -153,112 +170,210 @@ export class ProductService {
   ): Promise<MutationResult<ProductRecord>> {
     const checked = this.#checkCreate(tenant, input);
     if (!checked.ok) return fail(checked.errors);
-    const { title, description, vendor, productType, tags, seo, requestedHandle, options } =
-      checked.value;
-    const variantValues = checked.value.variants;
 
     return this.db.tenant(tenant.shopId, async (tx) => {
-      const productId = newId();
-      const base = requestedHandle ?? (toHandle(title) || 'product');
-      const values = {
-        shopId: tenant.shopId,
-        id: productId,
-        title,
-        description,
-        status: input.status ?? 'draft',
-        vendor,
-        productType,
-        tags,
-        seoTitle: seo.title ?? null,
-        seoDescription: seo.description ?? null,
-        searchText: searchTextOf({ title, vendor, productType, tags }),
+      const inserted = await this.#insert(tx, tenant, checked.value, input.status ?? 'draft');
+      if (!inserted) {
+        return failOne<ProductRecord>(['input', 'handle'], 'TAKEN', 'Handle is already in use');
+      }
+      return {
+        ok: true,
+        value: await this.#created(tx, tenant, inserted.product, checked.value.variants.length),
       };
-
-      let product: ProductRow | undefined;
-      for (let attempt = 0; attempt < LIMITS.handleAttempts && !product; attempt++) {
-        const handle = requestedHandle ?? handleCandidate(base, attempt);
-        [product] = await this.insertProduct(tx, { ...values, handle });
-        if (!product && requestedHandle) {
-          return failOne<ProductRecord>(['input', 'handle'], 'TAKEN', 'Handle is already in use');
-        }
-      }
-      // Very common titles: fall back to a random suffix.
-      if (!product) {
-        const handle = `${base.slice(0, 80)}-${randomBytes(3).toString('hex')}`;
-        [product] = await this.insertProduct(tx, { ...values, handle });
-      }
-      if (!product) throw new Error('Could not allocate a product handle');
-
-      // Option and value ids, by position and lowercased name, for the variants below.
-      const valueIds = options.map(() => new Map<string, string>());
-      if (options.length > 0) {
-        const optionRows = options.map((option, index) => ({
-          shopId: tenant.shopId,
-          id: newId(),
-          productId,
-          name: option.name,
-          position: index + 1,
-        }));
-        await tx.insert(productOptions).values(optionRows);
-        await tx.insert(productOptionValues).values(
-          options.flatMap((option, index) =>
-            option.values.map((name, valueIndex) => {
-              const id = newId();
-              valueIds[index]!.set(name.toLowerCase(), id);
-              return {
-                shopId: tenant.shopId,
-                id,
-                productId,
-                optionId: optionRows[index]!.id,
-                name,
-                position: valueIndex + 1,
-              };
-            }),
-          ),
-        );
-      }
-
-      await tx.insert(variants).values(
-        variantValues.map(({ fields, optionValues }, index) => {
-          const ids = optionValues.map((name, position) =>
-            valueIds[position]!.get(name.toLowerCase()),
-          );
-          return {
-            shopId: tenant.shopId,
-            id: newId(),
-            productId,
-            title: variantTitle(optionValues),
-            sku: fields.sku ?? null,
-            barcode: fields.barcode ?? null,
-            price: fields.price ?? 0n,
-            compareAtPrice: fields.compareAtPrice ?? null,
-            cost: fields.cost ?? null,
-            weightGrams: fields.weightGrams ?? null,
-            taxable: fields.taxable ?? true,
-            taxCode: fields.taxCode ?? null,
-            position: index + 1,
-            option1ValueId: ids[0] ?? null,
-            option2ValueId: ids[1] ?? null,
-            option3ValueId: ids[2] ?? null,
-          };
-        }),
-      );
-
-      await appendEvent<ProductCreatedPayload>(tx, tenant.shopId, {
-        type: CatalogEvents.ProductCreated,
-        aggregateType: 'product',
-        aggregateId: productId,
-        payload: {
-          handle: product.handle,
-          status: product.status,
-          variantCount: variantValues.length,
-        },
-      });
-      await refreshMemberships(tx, tenant, { productIds: [productId] });
-      const record = await loadProduct(tx, tenant.shopId, productId);
-      if (!record) throw new Error('Product disappeared after insert');
-      return { ok: true, value: record };
     });
+  }
+
+  /**
+   * A copy of the product `productId` (ADR-343), as Shopify's `productDuplicate` makes one: titled
+   * `newTitle`, its handle made from that; its description, vendor, type, tags and words for
+   * search engines; its options and their values; its variants with their prices, costs, weights
+   * and tax, not their SKUs or barcodes, which name one product's stock; its photos and videos
+   * when `includeImages`, shown again from where they came; in the manual collections it is in;
+   * and its variants' stock tracked as its are, with none of it. Its status is `newStatus`, else
+   * the product's own.
+   */
+  async duplicate(
+    tenant: TenantContext,
+    input: DuplicateProductInput,
+  ): Promise<MutationResult<ProductRecord>> {
+    const check = new InputChecker();
+    const title = check.text(['newTitle'], input.newTitle, { required: true, max: LIMITS.title });
+    if (!check.ok || title === null) return fail(check.errors);
+
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const original = await loadProduct(tx, tenant.shopId, input.productId);
+      if (!original) return failOne<ProductRecord>(['productId'], 'NOT_FOUND', 'Product not found');
+      const options = [...original.options].sort((a, b) => a.position - b.position);
+      // Its handle is made from its title, so never taken.
+      const { product, variantIds } = (await this.#insert(
+        tx,
+        tenant,
+        {
+          title,
+          description: original.description,
+          vendor: original.vendor,
+          productType: original.productType,
+          tags: original.tags,
+          seo: original.seo,
+          requestedHandle: null,
+          options: options.map((option) => ({
+            name: option.name,
+            values: [...option.values]
+              .sort((a, b) => a.position - b.position)
+              .map((value) => value.name),
+          })),
+          variants: original.variants.map((variant) => ({
+            title: variant.title,
+            fields: {
+              price: variant.price,
+              compareAtPrice: variant.compareAtPrice,
+              cost: variant.cost,
+              weightGrams: variant.weightGrams,
+              taxable: variant.taxable,
+              taxCode: variant.taxCode,
+            },
+            // Each option's value, in the options' order; none where the variant has none.
+            optionValues: options.map(
+              (option) =>
+                variant.selectedOptions.find((selected) => selected.optionId === option.id)
+                  ?.value ?? '',
+            ),
+          })),
+        },
+        input.newStatus ?? original.status,
+      ))!;
+      const copies = original.variants.map((variant, index) => ({
+        from: variant.id,
+        to: variantIds[index]!,
+        productId: product.id,
+      }));
+      if (input.includeImages) await copyMedia(tx, tenant.shopId, original, product.id, copies);
+      await joinManualCollections(tx, tenant.shopId, original.id, product.id);
+      await this.stock?.copy(tx, tenant.shopId, copies);
+      return {
+        ok: true,
+        value: await this.#created(tx, tenant, product, original.variants.length),
+      };
+    });
+  }
+
+  /**
+   * Inserts a product checked or copied: its handle, numbered or made random where taken; its
+   * options and their values; and its variants, in order, whose IDs it gives back in that order.
+   * Null where the handle asked for is taken.
+   */
+  async #insert(
+    tx: Tx,
+    tenant: TenantContext,
+    checked: CheckedProduct,
+    status: ProductStatusValue,
+  ): Promise<{ product: ProductRow; variantIds: string[] } | null> {
+    const { title, description, vendor, productType, tags, seo, requestedHandle, options } =
+      checked;
+    const productId = newId();
+    const base = requestedHandle ?? (toHandle(title) || 'product');
+    const values = {
+      shopId: tenant.shopId,
+      id: productId,
+      title,
+      description,
+      status,
+      vendor,
+      productType,
+      tags,
+      seoTitle: seo.title ?? null,
+      seoDescription: seo.description ?? null,
+      searchText: searchTextOf({ title, vendor, productType, tags }),
+    };
+
+    let product: ProductRow | undefined;
+    for (let attempt = 0; attempt < LIMITS.handleAttempts && !product; attempt++) {
+      const handle = requestedHandle ?? handleCandidate(base, attempt);
+      [product] = await this.insertProduct(tx, { ...values, handle });
+      if (!product && requestedHandle) return null;
+    }
+    // Very common titles: fall back to a random suffix.
+    if (!product) {
+      const handle = `${base.slice(0, 80)}-${randomBytes(3).toString('hex')}`;
+      [product] = await this.insertProduct(tx, { ...values, handle });
+    }
+    if (!product) throw new Error('Could not allocate a product handle');
+
+    // Option and value ids, by position and lowercased name, for the variants below.
+    const valueIds = options.map(() => new Map<string, string>());
+    if (options.length > 0) {
+      const optionRows = options.map((option, index) => ({
+        shopId: tenant.shopId,
+        id: newId(),
+        productId,
+        name: option.name,
+        position: index + 1,
+      }));
+      await tx.insert(productOptions).values(optionRows);
+      await tx.insert(productOptionValues).values(
+        options.flatMap((option, index) =>
+          option.values.map((name, valueIndex) => {
+            const id = newId();
+            valueIds[index]!.set(name.toLowerCase(), id);
+            return {
+              shopId: tenant.shopId,
+              id,
+              productId,
+              optionId: optionRows[index]!.id,
+              name,
+              position: valueIndex + 1,
+            };
+          }),
+        ),
+      );
+    }
+
+    const variantIds = checked.variants.map(() => newId());
+    await tx.insert(variants).values(
+      checked.variants.map(({ title: copied, fields, optionValues }, index) => {
+        const ids = optionValues.map((name, position) =>
+          valueIds[position]!.get(name.toLowerCase()),
+        );
+        return {
+          shopId: tenant.shopId,
+          id: variantIds[index]!,
+          productId,
+          title: copied ?? variantTitle(optionValues),
+          sku: fields.sku ?? null,
+          barcode: fields.barcode ?? null,
+          price: fields.price ?? 0n,
+          compareAtPrice: fields.compareAtPrice ?? null,
+          cost: fields.cost ?? null,
+          weightGrams: fields.weightGrams ?? null,
+          taxable: fields.taxable ?? true,
+          taxCode: fields.taxCode ?? null,
+          position: index + 1,
+          option1ValueId: ids[0] ?? null,
+          option2ValueId: ids[1] ?? null,
+          option3ValueId: ids[2] ?? null,
+        };
+      }),
+    );
+    return { product, variantIds };
+  }
+
+  /** A product just written, told of and put in the smart collections whose rules it matches. */
+  async #created(
+    tx: Tx,
+    tenant: TenantContext,
+    product: ProductRow,
+    variantCount: number,
+  ): Promise<ProductRecord> {
+    await appendEvent<ProductCreatedPayload>(tx, tenant.shopId, {
+      type: CatalogEvents.ProductCreated,
+      aggregateType: 'product',
+      aggregateId: product.id,
+      payload: { handle: product.handle, status: product.status, variantCount },
+    });
+    await refreshMemberships(tx, tenant, { productIds: [product.id] });
+    const record = await loadProduct(tx, tenant.shopId, product.id);
+    if (!record) throw new Error('Product disappeared after insert');
+    return record;
   }
 
   /** The checks `create` makes before it writes anything, and what they found. */

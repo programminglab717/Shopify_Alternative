@@ -61,6 +61,7 @@ export {
 } from '../internal/videos.js';
 export { OptionService, type OptionUpdateInput } from '../internal/option.service.js';
 export { DEFAULT_VARIANT_TITLE } from '../internal/product-store.js';
+export { CopiedVariantStock, type VariantCopy } from '../internal/product-copy.js';
 export {
   ProductImportService,
   type ImportedStock,
@@ -99,6 +100,7 @@ export {
   ProductService,
   activeProductsIn,
   type CreateProductInput,
+  type DuplicateProductInput,
   type ListProductsOptions,
   type UpdateProductInput,
 } from '../internal/product.service.js';

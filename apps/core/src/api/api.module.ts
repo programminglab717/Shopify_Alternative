@@ -8,14 +8,14 @@ import {
   type ApiContext,
 } from '@hatti/api';
 import { BillingModule, type HattiBankAccount, type HattiGateway } from '@hatti/billing/public';
-import { CatalogModule } from '@hatti/catalog/public';
+import { CatalogModule, CopiedVariantStock } from '@hatti/catalog/public';
 import { CheckoutModule } from '@hatti/checkout/public';
 import { SecretBox } from '@hatti/crypto';
 import { CustomersModule } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { FilesModule } from '@hatti/files/public';
 import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
-import { InventoryModule } from '@hatti/inventory/public';
+import { InventoryCopiedVariantStock, InventoryModule } from '@hatti/inventory/public';
 import { type Couriers, LogisticsModule } from '@hatti/logistics/public';
 import { MarketingModule } from '@hatti/marketing/public';
 import { MessagingModule, type WhatsAppWebhookSettings } from '@hatti/messaging/public';
@@ -124,6 +124,8 @@ class InfrastructureModule {
         { provide: ObjectStorage, useValue: options.storage },
         // The keys staff sign-in encrypts with; theme previews' links are sealed with them too.
         { provide: SecretBox, useValue: options.identity.secretBox },
+        // A duplicated product's stock settings, which the catalog asks the inventory for (ADR-343).
+        { provide: CopiedVariantStock, useClass: InventoryCopiedVariantStock },
       ],
       exports: [
         Database,
@@ -134,6 +136,7 @@ class InfrastructureModule {
         DnsLookup,
         SecretBox,
         ObjectStorage,
+        CopiedVariantStock,
       ],
     };
   }

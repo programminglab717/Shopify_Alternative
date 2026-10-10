@@ -10,6 +10,8 @@ export {
 // The GraphQL location type and its mapper, for other modules' fields that return a location.
 export { Location } from '../internal/graphql/location.types.js';
 export { toLocation } from '../internal/graphql/mappers.js';
+// What copies a duplicated product's stock settings for the catalog (ADR-343), which the host binds.
+export { InventoryCopiedVariantStock } from '../internal/copied-stock.js';
 export { InventoryModule } from '../internal/inventory.module.js';
 export {
   LOW_STOCK_THRESHOLD,

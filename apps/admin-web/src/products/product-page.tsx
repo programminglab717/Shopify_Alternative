@@ -42,19 +42,22 @@ import {
   StatusChoice,
 } from './product-form';
 import type { DetailsState } from './product-form';
+import { DuplicateProduct } from './duplicate';
 import { ProductOptions } from './options';
 import { ProductPhotos } from './photos';
 import { StockRules } from './stock-rules';
 import { EDITS_PRODUCTS, ProductStatusBadge, ProductThumb } from './status';
 import { ProductUrduCard } from '../urdu/urdu-pages';
 
-/** A product's page's search: whether it was just added, and its stock with it. */
+/** A product's page's search: whether it was just added, and its stock with it, or copied. */
 export interface ProductSearch {
-  added?: 'ok' | 'noStock';
+  added?: 'ok' | 'noStock' | 'copy';
 }
 
 export function validateProductSearch(search: Record<string, unknown>): ProductSearch {
-  return search.added === 'ok' || search.added === 'noStock' ? { added: search.added } : {};
+  return search.added === 'ok' || search.added === 'noStock' || search.added === 'copy'
+    ? { added: search.added }
+    : {};
 }
 
 /** A variant's row as the form holds it, with what was read to tell what changed. */
@@ -474,9 +477,15 @@ function ProductEditor({
 
 /**
  * A product's page (CAT-01): its details, price, stock and status, which owners and managers
- * change and everyone else reads.
+ * change, and duplicate (ADR-343), and everyone else reads. Each product's afresh: what was said
+ * of one, such as that it was saved, is not said of its copy.
  */
 export function ProductPage() {
+  const { productId } = useParams({ from: '/$shopId/products/$productId' });
+  return <ProductView key={productId} />;
+}
+
+function ProductView() {
   const { t } = useLocale();
   const shop = useShop();
   const { productId } = useParams({ from: '/$shopId/products/$productId' });
@@ -531,7 +540,7 @@ export function ProductPage() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 pb-8">
       {back}
-      <header className="flex items-center gap-3">
+      <header className="flex flex-wrap items-center gap-3">
         <ProductThumb media={product.media} size="lg" />
         <div className="flex min-w-0 flex-col items-start gap-1">
           <h1
@@ -542,6 +551,7 @@ export function ProductPage() {
           </h1>
           <ProductStatusBadge status={product.status} />
         </div>
+        {edits && <DuplicateProduct product={product} />}
       </header>
       {saved > 0 ? (
         <Alert tone="success">{t('product.saved')}</Alert>
@@ -549,6 +559,8 @@ export function ProductPage() {
         <Alert tone="success">{t('product.added')}</Alert>
       ) : added === 'noStock' ? (
         <Alert tone="warning">{t('product.addedNoStock')}</Alert>
+      ) : added === 'copy' ? (
+        <Alert tone="success">{t('product.copied')}</Alert>
       ) : null}
       <ProductPhotos product={product} edits={edits} />
       {/* Filled in afresh after each save, and as variants or their tracking change; not as photos change. */}

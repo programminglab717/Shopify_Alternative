@@ -2956,6 +2956,16 @@ const en = {
   'orders.fresh.one': 'Show 1 new order',
   'orders.freshSaid': '{count} new orders',
   'orders.freshSaid.one': '1 new order',
+  'duplicate.open': 'Duplicate',
+  'duplicate.heading': 'Duplicate {title}',
+  'duplicate.title': 'Title of the copy',
+  'duplicate.copyOf': 'Copy of {title}',
+  'duplicate.photos': 'Copy its photos and videos too',
+  'duplicate.note':
+    'The copy has its words, options, variants and prices. It starts as a draft, hidden from your store, with no stock, and its SKUs and barcodes are left for you to give.',
+  'duplicate.submit': 'Duplicate',
+  'product.copied':
+    'Copied as a draft. Change what differs, enter its stock, and show it when it is ready.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5886,6 +5896,16 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'orders.fresh.one': '1 نیا آرڈر دیکھیں',
   'orders.freshSaid': '{count} نئے آرڈر',
   'orders.freshSaid.one': '1 نیا آرڈر',
+  'duplicate.open': 'کاپی بنائیں',
+  'duplicate.heading': '{title} کی کاپی بنائیں',
+  'duplicate.title': 'کاپی کا نام',
+  'duplicate.copyOf': '{title} کی کاپی',
+  'duplicate.photos': 'اس کی تصویریں اور ویڈیوز بھی کاپی کریں',
+  'duplicate.note':
+    'کاپی میں اس کے الفاظ، آپشنز، ویریئنٹس اور قیمتیں ہوں گی۔ یہ ڈرافٹ کے طور پر بنے گی، اسٹور پر نظر نہیں آئے گی، اس کا اسٹاک صفر ہوگا، اور SKU اور بارکوڈ آپ خود دیں گے۔',
+  'duplicate.submit': 'کاپی بنائیں',
+  'product.copied':
+    'ڈرافٹ کے طور پر کاپی بن گئی۔ جو مختلف ہے وہ بدلیں، اس کا اسٹاک لکھیں، اور تیار ہونے پر اسے دکھائیں۔',
 };
 
 export const messages: Readonly<

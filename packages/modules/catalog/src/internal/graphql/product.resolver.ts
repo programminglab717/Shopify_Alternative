@@ -30,6 +30,8 @@ import {
   ProductCreatePayload,
   ProductDeleteInput,
   ProductDeletePayload,
+  ProductDuplicatePayload,
+  ProductStatus,
   ProductUpdateInput,
   ProductUpdatePayload,
   ProductsArgs,
@@ -143,6 +145,37 @@ export class ProductResolver {
     });
     return Object.assign(new ProductCreatePayload(), {
       product: result.ok ? toProduct(result.value, tenant.currency) : null,
+      userErrors: result.ok ? [] : toUserErrors(result.errors),
+    });
+  }
+
+  @Mutation(() => ProductDuplicatePayload, {
+    description:
+      "Copies a product (ADR-343), as Shopify's productDuplicate does: titled `newTitle`, its " +
+      'handle made from that, with its description, vendor, type, tags and words for search ' +
+      'engines; its options and variants with their prices, costs, weights and tax, not their ' +
+      'SKUs or barcodes; in the manual collections it is in; and its variants tracked as its are, ' +
+      'with none of their stock. With `includeImages`, its photos and videos too, made again from ' +
+      "where they came. Its status is `newStatus`, else the product's own.",
+  })
+  @RequireScopes('write_products')
+  async productDuplicate(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('productId', { type: () => ID }) productId: string,
+    @Args('newTitle') newTitle: string,
+    @Args('newStatus', { type: () => ProductStatus, nullable: true })
+    newStatus: ProductStatus | null,
+    @Args('includeImages', { type: () => Boolean, nullable: true, defaultValue: false })
+    includeImages: boolean | null,
+  ): Promise<ProductDuplicatePayload> {
+    const result = await this.service.duplicate(tenant, {
+      productId: uuidOf('product', productId),
+      newTitle,
+      newStatus: newStatus ? toStatusValue(newStatus) : null,
+      includeImages,
+    });
+    return Object.assign(new ProductDuplicatePayload(), {
+      newProduct: result.ok ? toProduct(result.value, tenant.currency) : null,
       userErrors: result.ok ? [] : toUserErrors(result.errors),
     });
   }

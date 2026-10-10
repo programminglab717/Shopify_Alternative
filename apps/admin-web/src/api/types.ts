@@ -441,6 +441,10 @@ export interface PrimaryLocationData {
   location: LocationRef | null;
 }
 
+export interface ProductDuplicateData {
+  productDuplicate: { newProduct: { id: string } | null; userErrors: UserError[] };
+}
+
 export interface ProductCreateData {
   productCreate: {
     product: {
