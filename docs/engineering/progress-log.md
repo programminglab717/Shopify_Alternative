@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### What runs low ordered from the stock page, in the core and the admin
+### 7acba5f · What runs low ordered from the stock page, in the core and the admin
 
 * **Ordered from the low list** ([ADR-354](../architecture/13-decision-log.md#adr-354--what-runs-low-is-ordered-from-the-stock-page-each-low-variant-with-what-of-it-is-on-order-and-who-supplied-it-last-those-chosen-opening-a-new-purchase-order-filled-in-with-enough-of-each-for-twice-the-low-mark-from-the-supplier-most-came-from-at-the-cost-paid-last)): each low variant says what of it is on open purchase
   orders and who supplied it last, at what cost (migration 0169 indexes the lines by variant).
