@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### Stock counted by scanning, in the admin
+### 0d480dd · Stock counted by scanning, in the admin
 
 * **A count by scanning** ([ADR-349](../architecture/13-decision-log.md#adr-349--the-admin-counts-stock-at-a-location-by-scanning-each-barcode-scanned-or-barcode-or-sku-typed-adds-its-variant-or-one-more-of-it-the-counts-kept-in-the-page-and-saved-together-as-one-stock-count-each-against-what-was-on-hand-when-it-was-read-those-that-moved-since-are-read-again-and-said-and-nothing-is-saved-until-they-are-checked)): at a location, each barcode scanned, or barcode or SKU typed,
   adds its variant or one more of it; the counts are corrected as needed and saved together as one
