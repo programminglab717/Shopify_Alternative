@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-345 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-346 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -353,6 +353,7 @@
 | 343 | A product is duplicated as Shopify's productDuplicate does it: the copy made in one transaction with the product's words, options, variants and prices, none of its SKUs, barcodes or stock, and put in its manual collections; its photos and videos, if asked, made again by the worker from what was kept of them; the admin makes the copy a draft and opens it | Accepted |
 | 344 | Products are shown, hidden or archived, tagged, untagged and deleted many at once, as orders are: up to 250, each in its own transaction as it would be alone, one refused said at its place in the IDs while the rest are done; the products list chooses them, and puts them in a collection made by hand too | Accepted |
 | 345 | Customers are tagged and untagged many at once, as orders and products are: up to 250, each in its own transaction, one refused said at its place; their marketing consent is not, as each customer gives or withdraws their own | Accepted |
+| 346 | The admin shows a variant's whole stock history as the core keeps it: its latest changes with its stock, older ones a page at a time as asked, at every location or the one chosen, each with what was left and a link to the order it was for | Accepted |
 
 ---
 
@@ -13824,3 +13825,27 @@
   * **Consent recorded for many at once, as "staff recorded":** a ledger of consents no customer
     gave in those words, which would not stand as consent.
   * **One transaction for all:** one customer refused would refuse them all.
+
+## ADR-346 · The admin shows a variant's whole stock history as the core keeps it: its latest changes with its stock, older ones a page at a time as asked, at every location or the one chosen, each with what was left and a link to the order it was for
+
+* **Context:**
+  * The core keeps every change to a variant's stock, why, what was left and what it was for,
+    and gives them a page at a time, at every location or one (INV-03).
+  * The stock page showed a variant's latest ten. An owner asking where a count went could not
+    see past them, nor tell which order took a unit.
+  * The core names an order's changes by `hatti://orders/ord_…`.
+* **Decision:**
+  * **The latest come with the variant's stock**, as before, in one request; older ones are asked
+    for twenty at a time as staff ask, newest first.
+  * **A location to choose** where the variant is stocked at more than one: its changes alone,
+    read from the core, its name then left out of each line.
+  * **Each change** says by how much, which quantity, why, what was left of it after, and, where
+    it was an order's, links to that order.
+  * The history is read again when the shop's stock changes, as everything the admin shows is.
+* **Consequences:**
+  * An owner follows a count back as far as it goes, and to each order that took from it.
+  * Not yet: changes by staff member, or a history across every variant, by date.
+* **Alternatives:**
+  * **Every change at once:** a variant sold for a year has thousands.
+  * **The order's name on each line:** the core would join orders for every change; the link
+    opens it.

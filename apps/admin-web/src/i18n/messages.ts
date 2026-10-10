@@ -2995,6 +2995,12 @@ const en = {
   'customerBulk.tagsTitle': 'Tag {count} customers',
   'customerBulk.tagsTitle.one': 'Tag 1 customer',
   'customerBulk.tagsHint': 'A comma between each, as on a customer: wholesale, vip.',
+  'stock.changesAt': 'Where',
+  'stock.everyLocation': 'Every location',
+  'stock.noChanges': 'No changes here yet.',
+  'stock.after': '{count} after',
+  'stock.itsOrder': 'Its order',
+  'stock.olderChanges': 'Older changes',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -5964,6 +5970,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'customerBulk.tagsTitle': '{count} کسٹمرز پر ٹیگ',
   'customerBulk.tagsTitle.one': '1 کسٹمر پر ٹیگ',
   'customerBulk.tagsHint': 'ہر ایک کے بیچ کوما، جیسے کسٹمر پر: wholesale, vip۔',
+  'stock.changesAt': 'کہاں',
+  'stock.everyLocation': 'ہر لوکیشن',
+  'stock.noChanges': 'یہاں ابھی کوئی تبدیلی نہیں۔',
+  'stock.after': 'بعد میں {count}',
+  'stock.itsOrder': 'اس کا آرڈر',
+  'stock.olderChanges': 'پرانی تبدیلیاں',
 };
 
 export const messages: Readonly<

@@ -3631,6 +3631,26 @@ export const StockSearchQuery = /* GraphQL */ `
   }
 `;
 
+/** A page of a variant's stock changes: each with why, what was left and what it was for. */
+const STOCK_CHANGES = /* GraphQL */ `
+  nodes {
+    createdAt
+    delta
+    name
+    reason
+    quantityAfterChange
+    referenceDocumentUri
+    location {
+      id
+      name
+    }
+  }
+  pageInfo {
+    hasNextPage
+    endCursor
+  }
+`;
+
 /** A variant's stock at each location, its latest changes, and the primary location. */
 export const InventoryItemQuery = /* GraphQL */ `
   query InventoryItem($id: ID!) {
@@ -3654,17 +3674,19 @@ export const InventoryItemQuery = /* GraphQL */ `
         }
       }
       changes(first: 10) {
-        nodes {
-          createdAt
-          delta
-          name
-          reason
-          quantityAfterChange
-          location {
-            id
-            name
-          }
-        }
+        ${STOCK_CHANGES}
+      }
+    }
+  }
+`;
+
+/** A variant's older stock changes, a page at a time, at every location or one (INV-03). */
+export const InventoryChangesQuery = /* GraphQL */ `
+  query InventoryChanges($id: ID!, $after: String, $locationId: ID) {
+    inventoryItem(id: $id) {
+      id
+      changes(first: 20, after: $after, locationId: $locationId) {
+        ${STOCK_CHANGES}
       }
     }
   }

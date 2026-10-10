@@ -1457,17 +1457,29 @@ export interface InventoryItemData {
     id: string;
     tracked: boolean;
     inventoryLevels: StockLevel[];
-    changes: {
-      nodes: {
-        createdAt: string;
-        delta: number;
-        name: string;
-        reason: string;
-        quantityAfterChange: number;
-        location: { id: string; name: string };
-      }[];
-    };
+    changes: StockChangePage;
   } | null;
+}
+
+/** A change to a variant's stock: by how much, which quantity, why, and what it was for. */
+export interface StockChange {
+  createdAt: string;
+  delta: number;
+  name: string;
+  reason: string;
+  quantityAfterChange: number;
+  /** What it was for, as `hatti://orders/ord_…` for an order's. */
+  referenceDocumentUri: string | null;
+  location: { id: string; name: string };
+}
+
+export interface StockChangePage {
+  nodes: StockChange[];
+  pageInfo: { hasNextPage: boolean; endCursor: string | null };
+}
+
+export interface InventoryChangesData {
+  inventoryItem: { id: string; changes: StockChangePage } | null;
 }
 
 export type CollectionSortOrder =

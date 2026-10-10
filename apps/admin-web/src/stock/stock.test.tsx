@@ -20,7 +20,12 @@ function item(id: string) {
   if (id === 'inv_3') {
     return {
       location: MAIN,
-      inventoryItem: { id, tracked: false, inventoryLevels: [], changes: { nodes: [] } },
+      inventoryItem: {
+        id,
+        tracked: false,
+        inventoryLevels: [],
+        changes: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+      },
     };
   }
   return {
@@ -37,6 +42,7 @@ function item(id: string) {
             name: 'committed',
             reason: 'committed',
             quantityAfterChange: 2,
+            referenceDocumentUri: 'hatti://orders/ord_1',
             location: MAIN,
           },
           {
@@ -45,9 +51,11 @@ function item(id: string) {
             name: 'on_hand',
             reason: 'received',
             quantityAfterChange: 10,
+            referenceDocumentUri: null,
             location: MAIN,
           },
         ],
+        pageInfo: { hasNextPage: false, endCursor: null },
       },
     },
   };

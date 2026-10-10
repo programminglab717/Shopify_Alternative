@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, a variant's stock history, in the admin** (INV-03): each change to its stock at each
-location, why and by what, as the core keeps them, so an owner can see where a count went; then
-section by section as the alpha's shops need them.
+**Next, stock moved between locations, in the core and the admin** (INV-04): stock sent from a
+warehouse to a shop, taken from one location's on hand and added to the other's in one change,
+as Shopify's inventoryMoveQuantities; then section by section as the alpha's shops need them.
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +18,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
+
+### A variant's stock history, in the admin
+
+* **The whole history** ([ADR-346](../architecture/13-decision-log.md#adr-346--the-admin-shows-a-variants-whole-stock-history-as-the-core-keeps-it-its-latest-changes-with-its-stock-older-ones-a-page-at-a-time-as-asked-at-every-location-or-the-one-chosen-each-with-what-was-left-and-a-link-to-the-order-it-was-for)): a variant's latest stock changes come with its stock, older ones
+  twenty at a time as asked, at every location or the one chosen; each says what was left after
+  it and links to the order it was for.
+* **Tried in Chromium against the core:** on the seed's shop, at a phone's width, the stock of
+  "Lawn 3-Piece Suit (Unstitched)" showed its ten changes at Lahore warehouse and Karachi store,
+  eight of them for orders, each "Its order"; the choice of location offered both; the first
+  order's link opened #1008. No errors in the browser.
+* **Counts corrected:** the admin's check of its GraphQL documents against the core's schema counts
+  each document as a test; the entries for products and customers acted on many at once left
+  their six out. The admin has 563 tests, not 555.
+* 2436 tests: a variant's changes shown with what was left and their orders linked, older
+  ones as asked, those at one location chosen; and the query checked against the core's schema.
 
 ### e24847a · Customers tagged many at once, in the core and the admin
 

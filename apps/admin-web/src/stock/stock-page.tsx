@@ -19,17 +19,18 @@ import type {
 } from '../api/types';
 import type { StaffRole } from '../auth/session';
 import { errorText } from '../i18n/errors';
-import { formatCount, formatDateTime } from '../i18n/format';
+import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { messages } from '../i18n/messages';
 import type { MessageKey } from '../i18n/messages';
 import { parseStock } from '../products/product-form';
 import { useAttempt } from '../returns/parcel';
 import { SelectField } from '../settings/settings-form';
-import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
+import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { StockChanges } from './stock-changes';
 
 /** Those who change stock, as the core lets them (`write_inventory`); every role sees it. */
 export const EDITS_STOCK: readonly StaffRole[] = ['owner', 'manager'];
@@ -301,11 +302,10 @@ function Level({ itemId, level }: { itemId: string; level: StockLevel }) {
   );
 }
 
-/** A variant's stock at each location, changed by those who may, and its latest changes. */
+/** A variant's stock at each location, changed by those who may, and its history. */
 function StockItem({ itemId }: { itemId: string }) {
-  const { t, locale } = useLocale();
+  const { t } = useLocale();
   const { role } = useShop();
-  const timezone = useShopTimezone();
   const word = useWord();
   const [counting, setCounting] = useState(false);
   const query = useAdminQuery<InventoryItemData>(['inventoryItem', itemId], InventoryItemQuery, {
@@ -344,35 +344,12 @@ function StockItem({ itemId }: { itemId: string }) {
           ))}
         </ul>
       )}
-      {item.changes.nodes.length > 0 && (
-        <div className="flex flex-col gap-1 border-t border-line pt-3">
-          <h3 className="font-medium">{t('stock.changes')}</h3>
-          <ul className="flex flex-col gap-1">
-            {item.changes.nodes.map((change, index) => (
-              <li
-                key={`${change.createdAt}-${index}`}
-                className="flex flex-wrap justify-between gap-x-3 text-[length:var(--hatti-type-body-sm-size)]"
-              >
-                <span>
-                  <span className={`num font-medium ${change.delta < 0 ? 'text-danger' : ''}`}>
-                    {change.delta > 0 ? `+${formatCount(change.delta)}` : formatCount(change.delta)}
-                  </span>{' '}
-                  {word('name', change.name)} · {word('reason', change.reason)}
-                  {item.inventoryLevels.length > 1 && (
-                    <>
-                      {' · '}
-                      <span dir="auto">{change.location.name}</span>
-                    </>
-                  )}
-                </span>
-                <span className="text-secondary">
-                  {formatDateTime(change.createdAt, timezone, locale)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <StockChanges
+        itemId={item.id}
+        latest={item.changes}
+        locations={item.inventoryLevels.map((each) => each.location)}
+        word={word}
+      />
     </div>
   );
 }
