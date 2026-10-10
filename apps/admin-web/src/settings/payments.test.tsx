@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  confirmIdentity,
   fakeCore,
   LATER,
   press,
@@ -237,8 +238,7 @@ describe('Delivery and payment settings in the admin', () => {
     type('At most', '500');
     await press('Save');
 
-    await screen.findByText('Confirm it is you');
-    type('Password', 'owner-password');
+    await confirmIdentity('Password', 'owner-password');
     await press('Confirm');
     await screen.findByText('IBAN: Its check digits are wrong');
 

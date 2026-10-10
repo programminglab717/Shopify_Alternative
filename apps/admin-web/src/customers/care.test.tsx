@@ -1,7 +1,15 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
-import { fakeCore, LATER, REAUTHENTICATE, renderAdmin, signedIn, type } from '../test-support';
+import {
+  confirmIdentity,
+  fakeCore,
+  LATER,
+  REAUTHENTICATE,
+  renderAdmin,
+  signedIn,
+  type,
+} from '../test-support';
 
 const pkr = (amount: string) => ({ amount, currencyCode: 'PKR' });
 const LAST = new Date(Date.now() - 86_400_000).toISOString();
@@ -221,8 +229,7 @@ describe("Customers' care", () => {
     renderAdmin('/shop_1/customers/cus_1');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Download their data' }));
-    await screen.findByText('Confirm it is you');
-    type('Password', 'a long password');
+    await confirmIdentity('Password', 'a long password');
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
     expect(await screen.findByText('Saved as customer-cus_1.json. Send it to them.')).toBeTruthy();
 

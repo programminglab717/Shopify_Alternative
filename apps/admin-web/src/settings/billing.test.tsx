@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BillingInvoiceValue, BillingPlanValue, BillingWalletEntryValue } from '../api/types';
 import {
+  confirmIdentity,
   fakeCore,
   LATER,
   press,
@@ -170,8 +171,7 @@ describe('Plan and billing in the admin', () => {
     fireEvent.change(screen.getByLabelText('Pay'), { target: { value: 'YEARLY' } });
     expect(screen.getByText('Rs 50,000 a year')).toBeTruthy();
     await press('Choose Growth');
-    await screen.findByText('Confirm it is you');
-    type('Password', 'owner-password');
+    await confirmIdentity('Password', 'owner-password');
     await press('Confirm');
 
     await screen.findByText('HB-000123: Rs 50,000 to pay');

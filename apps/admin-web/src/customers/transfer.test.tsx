@@ -1,7 +1,14 @@
 import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
-import { fakeCore, LATER, REAUTHENTICATE, renderAdmin, signedIn, type } from '../test-support';
+import {
+  confirmIdentity,
+  fakeCore,
+  LATER,
+  REAUTHENTICATE,
+  renderAdmin,
+  signedIn,
+} from '../test-support';
 
 const CSV =
   'Phone,First Name\n03001234567,Ayesha\n03211112233,Bilal\n03331234567,Sana\nabc,Nobody\n';
@@ -118,8 +125,7 @@ describe('Customers in and out', () => {
     fireEvent.change(who, { target: { value: 'seg_1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Download the CSV' }));
 
-    await screen.findByText('Confirm it is you');
-    type('Password', 'a long password');
+    await confirmIdentity('Password', 'a long password');
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
     expect(await screen.findByText('12 customers are in the file.')).toBeTruthy();
     expect(sentOf(fake, 'CustomersExport')).toEqual([

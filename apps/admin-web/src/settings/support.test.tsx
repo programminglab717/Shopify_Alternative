@@ -1,7 +1,15 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
-import { fakeCore, LATER, REAUTHENTICATE, renderAdmin, signedIn, type } from '../test-support';
+import {
+  confirmIdentity,
+  fakeCore,
+  LATER,
+  REAUTHENTICATE,
+  renderAdmin,
+  signedIn,
+  type,
+} from '../test-support';
 
 const EARLIER = new Date(Date.now() - 3 * 86_400_000).toISOString();
 
@@ -88,8 +96,7 @@ describe("Hatti's support's access to the shop", () => {
     fireEvent.change(screen.getByLabelText('How long'), { target: { value: '240' } });
     type('What it is for', "Order #1043 won't ship");
     fireEvent.click(screen.getByRole('button', { name: 'Let support look' }));
-    await screen.findByText('Confirm it is you');
-    type('Password', 'a long password');
+    await confirmIdentity('Password', 'a long password');
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
 
     expect(

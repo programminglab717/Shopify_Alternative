@@ -1,6 +1,14 @@
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakeCore, press, REAUTHENTICATE, renderAdmin, signedIn, type } from '../test-support';
+import {
+  confirmIdentity,
+  fakeCore,
+  press,
+  REAUTHENTICATE,
+  renderAdmin,
+  signedIn,
+  type,
+} from '../test-support';
 
 const LATER = new Date(Date.now() + 7 * 86_400_000).toISOString();
 
@@ -133,8 +141,7 @@ describe('Settings in the admin', () => {
     fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'PACKER' } });
     type('Who it is for', 'Ali, for packing');
     await press('Make the invitation');
-    await screen.findByText('Confirm it is you');
-    type('Code from your authenticator app', '123456');
+    await confirmIdentity('Code from your authenticator app', '123456');
     await press('Confirm');
 
     await screen.findByText('Send them this link. It works for 7 days, once.');

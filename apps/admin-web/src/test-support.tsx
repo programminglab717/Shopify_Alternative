@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { vi } from 'vitest';
 import { browserFetch } from './api/client';
 import { SessionProvider } from './auth/context';
@@ -157,3 +157,14 @@ export const press = async (name: string) => {
 
 export const type = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
+
+/**
+ * Fills the field of the panel asking who is signed in to confirm it: the panel shows its title at
+ * once and its field once it has read the ways to confirm, so this waits for the field, and finds
+ * it in the panel alone, as a form beside it may have a field of the same name.
+ */
+export async function confirmIdentity(label: string, value: string) {
+  const title = await screen.findByRole('heading', { name: 'Confirm it is you' });
+  const field = await within(title.parentElement!).findByLabelText(label);
+  fireEvent.change(field, { target: { value } });
+}

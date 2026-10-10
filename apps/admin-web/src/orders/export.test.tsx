@@ -1,7 +1,14 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
-import { fakeCore, LATER, REAUTHENTICATE, renderAdmin, signedIn, type } from '../test-support';
+import {
+  confirmIdentity,
+  fakeCore,
+  LATER,
+  REAUTHENTICATE,
+  renderAdmin,
+  signedIn,
+} from '../test-support';
 import { queryOf } from './export-page';
 
 const MINE = {
@@ -125,8 +132,7 @@ describe('Order exports', () => {
       target: { value: '2026-10-07' },
     });
     fireEvent.click(within(now).getByRole('button', { name: 'Download' }));
-    await screen.findByText('Confirm it is you');
-    type('Password', 'a long password');
+    await confirmIdentity('Password', 'a long password');
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
 
     expect(await screen.findByText('12 rows are in the file.')).toBeTruthy();

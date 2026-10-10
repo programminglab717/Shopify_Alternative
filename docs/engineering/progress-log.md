@@ -20,6 +20,15 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
+### The admin's tests wait for the field of the panel confirming who is signed in
+
+* CI run 391 failed in the admin's support test, which nothing in that push touched: it waited
+  for the panel asking the owner to confirm who they are by its title, then looked for its
+  Password field at once. The panel shows its title at once and its field only once it has read
+  the ways to confirm, so a slow runner found no field yet. Eleven tests waited so; each now
+  waits with `confirmIdentity` for the field itself, found in the panel alone. With the ways to
+  confirm answered 60 ms late, the eleven failed as CI did before the change and pass after it.
+
 ### 6881494 · Product types and brands suggested, and a redirect changed in place, in the admin
 
 * **Types and brands** ([ADR-341](../architecture/13-decision-log.md#adr-341--a-products-type-and-brand-are-offered-from-those-the-shop-already-uses-as-they-are-typed-and-a-redirects-old-address-or-where-it-goes-is-changed-in-place)): the product form's Type and Brand fields offer the shop's own as

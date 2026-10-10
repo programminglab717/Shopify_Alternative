@@ -1,7 +1,15 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
-import { fakeCore, LATER, REAUTHENTICATE, renderAdmin, signedIn, type } from '../test-support';
+import {
+  confirmIdentity,
+  fakeCore,
+  LATER,
+  REAUTHENTICATE,
+  renderAdmin,
+  signedIn,
+  type,
+} from '../test-support';
 
 const FEED = 'https://zari.hatti.pk/feeds/products.xml';
 
@@ -141,8 +149,7 @@ describe('Meta and the catalog feed', () => {
     });
     expect(screen.getByText(/^Only the parcels customers took count as purchases/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Connect Meta' }));
-    await screen.findByText('Confirm it is you');
-    type('Password', 'a long password');
+    await confirmIdentity('Password', 'a long password');
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
     expect(await screen.findByText('Dataset ID: Pixel ID must be 15 or 16 digits')).toBeTruthy();
 
@@ -179,8 +186,7 @@ describe('Meta and the catalog feed', () => {
 
     type('Test event code', 'TEST4821');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await screen.findByText('Confirm it is you');
-    type('Password', 'a long password');
+    await confirmIdentity('Password', 'a long password');
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
     expect(
       await screen.findByText(/Test events show in Events Manager under code TEST4821\./),

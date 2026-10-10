@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  confirmIdentity,
   fakeCore,
   LATER,
   press,
@@ -86,11 +87,8 @@ describe('The shop and its online payments in settings', () => {
     type('Password', 'secret');
     fireEvent.click(screen.getByRole('checkbox', { name: /Use its test environment/ }));
     await press('Connect');
-    await screen.findByText('Confirm it is you');
-    // The panel's own password field, below the gateway's.
-    fireEvent.change(screen.getAllByLabelText('Password').at(-1)!, {
-      target: { value: 'owner-password' },
-    });
+    // The panel's own password field, not the gateway's.
+    await confirmIdentity('Password', 'owner-password');
     await press('Confirm');
 
     await screen.findByText(/JazzCash is connected\. Add this address in its dashboard/);
@@ -177,10 +175,7 @@ describe('The shop and its online payments in settings', () => {
     type('Merchant ID', ' MC-LIVE ');
     type('Password', 'live-secret');
     await press('Save the credentials');
-    await screen.findByText('Confirm it is you');
-    fireEvent.change(screen.getAllByLabelText('Password').at(-1)!, {
-      target: { value: 'owner-password' },
-    });
+    await confirmIdentity('Password', 'owner-password');
     await press('Confirm');
 
     await screen.findByText('JazzCash now takes real payments.');
