@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### Purchase orders from suppliers, in the core and the admin
+### 051036e · Purchase orders from suppliers, in the core and the admin
 
 * **Purchase orders** ([ADR-350](../architecture/13-decision-log.md#adr-350--purchase-orders-the-shops-suppliers-goods-ordered-from-one-for-a-location-numbered-po-1-onwards-each-line-a-variant-as-it-was-named-how-many-and-what-one-costs-goods-received-into-stock-as-they-come-in-one-adjustment-naming-the-order-never-more-than-is-still-to-come-received-in-full-or-closed-with-what-came-in-the-core-and-the-admin)): the shop's suppliers; goods ordered from one for a location, PO-1
   onwards, each line a variant as it was named, how many and what one costs; goods received into
