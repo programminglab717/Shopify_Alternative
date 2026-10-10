@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-10
 
-### Where an order ships from, in the core and the admin
+### d7b3e9f · Where an order ships from, in the core and the admin
 
 * **Chosen and changed** ([ADR-355](../architecture/13-decision-log.md#adr-355--an-order-ships-from-the-first-location-fulfilling-online-orders-that-has-all-of-it-the-primary-first-or-the-primary-and-from-another-chosen-on-its-page-until-it-is-packed-its-stock-committed-there-and-let-go-where-it-was-in-one-change)): an order placed with no location named ships from the first
   location fulfilling online orders that has all of it, the primary first, so an item kept only at
