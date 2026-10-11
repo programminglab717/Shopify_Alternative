@@ -6,15 +6,30 @@
 
 ## In progress
 
-**Next, the home's counts for one location, in the admin** (INV-10, ANL-01): the home's orders to
-confirm, pack and book counted for the location chosen on the orders list, so a branch sees its
-own day; then section by section as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, what runs low at one location, in the admin** (INV-01, INV-10): the stock page's low list
+for the location chosen, each variant's units for sale there, so a branch reorders its own; then
+section by section as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
+
+## 2026-10-11
+
+### The home's counts for one location, in the core and the admin
+
+* **The home by location** ([ADR-358](../architecture/13-decision-log.md#adr-358--the-admins-home-counts-what-waits-at-the-location-chosen-homelocationid-for-orders-shipping-from-it-their-parcels-and-returns-the-choice-the-orders-list-keeps)): `home(locationId)` counts the orders shipping from one
+  location, their lost parcels and claims, the returns coming back to it, and the cash still to
+  come for its parcels. The admin's home has the orders list's "Ships from", one choice kept for
+  both.
+* **Tried in Chromium against the core:** on the seed's shop, with #1003 moved to Karachi store,
+  the home for every location said 3 to confirm, 2 to review, 1 awaiting payment and 1 to pack;
+  for Karachi store, 1 order to pack, Rs 3,200, low stock still the shop's; the orders list then
+  opened on Karachi store. No errors in the browser.
+* 2491 tests: the home for one location, and for another shop none, in the orders module;
+  through the Admin API; in the admin, the home read for the kept location and for every one.
 
 ## 2026-10-10
 

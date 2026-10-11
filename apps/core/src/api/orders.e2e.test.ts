@@ -702,6 +702,7 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     const AT = `query ($query: String, $locationId: ID) {
       orders(first: 10, query: $query) { nodes { id } }
       orderStageCounts(locationId: $locationId) { stage count }
+      home(locationId: $locationId) { toConfirm { count } }
     }`;
     const atBranch = await gql(tokens.aReader, AT, {
       query: `location_id:${gulberg}`,
@@ -711,6 +712,8 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(
       atBranch.data?.orderStageCounts.find((each: Json) => each.stage === 'NEEDS_CONFIRMATION'),
     ).toEqual({ stage: 'NEEDS_CONFIRMATION', count: 2 });
+    // And the home's, at the branch alone (ADR-358).
+    expect(atBranch.data?.home.toConfirm).toEqual({ count: 2 });
     const badFilter = await gql(tokens.aReader, AT, { query: 'location_id:Lahore' });
     expect(badFilter.errors?.[0]?.message).toBe(
       "location_id is a location's ID (loc_…), not Lahore",

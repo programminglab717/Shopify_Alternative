@@ -12,6 +12,7 @@ import type { MessageKey } from '../i18n/messages';
 import { ASK_AGAIN_MS } from '../orders/fresh-orders';
 import { CLAIMS, READS_RETURNS } from '../returns/parcel';
 import type { ReturnsTab } from '../returns/parcel';
+import { LocationFilter, useOrdersLocation } from '../orders/location-filter';
 import { useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
@@ -210,10 +211,15 @@ function SetupChecklist() {
  */
 export function HomePage() {
   const { t } = useLocale();
+  // The location chosen on the orders list, or here: what waits there alone (ADR-358).
+  const { ready, locations, location, choose } = useOrdersLocation(undefined);
   // Asked again every half minute while open, as orders come and staff move them on (ADR-342).
-  const home = useAdminQuery<HomeData>(['home'], HomeQuery, undefined, {
-    refetchInterval: () => ASK_AGAIN_MS,
-  });
+  const home = useAdminQuery<HomeData>(
+    ['home', location ?? null],
+    HomeQuery,
+    { locationId: location ?? null },
+    { refetchInterval: () => ASK_AGAIN_MS, enabled: ready },
+  );
 
   if (home.isPending) return <Loading label={t('state.loading')} />;
   if (home.isError) {
@@ -243,6 +249,11 @@ export function HomePage() {
         <h2 id="home-next" className="font-semibold">
           {t('home.next')}
         </h2>
+        <LocationFilter
+          locations={locations}
+          location={location}
+          onChoose={(locationId) => choose(locationId ?? '')}
+        />
         {next.length === 0 ? (
           <Card>
             <EmptyState

@@ -29,7 +29,7 @@ import { LocationService, StockService, type LocationRecord } from '@hatti/inven
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { orderTaxOf, taxSettingsIn } from '@hatti/tax/public';
 import { Injectable, Optional } from '@nestjs/common';
-import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, sql, type SQL } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
 import { toAttributionRecord, type AttributionValue } from './attribution.js';
 import { bankTransferSettingsIn } from './bank-transfer.service.js';
@@ -941,7 +941,13 @@ export class OrderService {
    * index; the parcels the courier lost, to claim and claimed (ADR-093), over the index of
    * those; and the customer returns on their way (ADR-138), over theirs.
    */
-  async home(tenant: TenantContext): Promise<OrderHome> {
+  async home(
+    tenant: TenantContext,
+    options: { locationId?: string | null } = {},
+  ): Promise<OrderHome> {
+    // With a location, what waits there alone (ADR-358): its orders, their parcels and returns.
+    const at = (column: SQL) =>
+      options.locationId ? sql`AND ${column} = ${options.locationId}` : sql``;
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<{
         stage: OrderStageValue;
@@ -965,7 +971,7 @@ export class OrderService {
                          SELECT 1 FROM orders.transfer_receipts r
                           WHERE r.shop_id = o.shop_id AND r.order_id = o.id) AS receipted
                   FROM orders.orders o) o
-         WHERE shop_id = ${tenant.shopId}
+         WHERE shop_id = ${tenant.shopId} ${at(sql`location_id`)}
            AND stage IN ('needs_confirmation', 'needs_review', 'awaiting_payment', 'to_pack',
                          'to_book', 'partially_fulfilled', 'in_transit', 'returning',
                          'delivered')
@@ -987,7 +993,7 @@ export class OrderService {
           FROM (SELECT f.status, f.claim_status, f.claim_amount,
                        CASE WHEN f.claim_status IS NULL THEN ${parcelWorth(sql`f`)} END AS worth
                   FROM orders.fulfillments f
-                 WHERE f.shop_id = ${tenant.shopId}
+                 WHERE f.shop_id = ${tenant.shopId} ${at(sql`f.location_id`)}
                    AND (f.status = 'lost' OR f.claim_status IS NOT NULL)) f`);
       const { rows: coming } = await tx.execute<{ count: number; total: string }>(sql`
         SELECT count(*)::int AS count,
@@ -997,8 +1003,8 @@ export class OrderService {
                               WHERE rl.shop_id = rt.shop_id AND rl.return_id = rt.id)), 0)::text
                  AS total
           FROM orders.returns rt
-         WHERE rt.shop_id = ${tenant.shopId} AND rt.status = 'open'`);
-      const at = (stage: OrderStageValue): OrderTally => {
+         WHERE rt.shop_id = ${tenant.shopId} ${at(sql`rt.location_id`)} AND rt.status = 'open'`);
+      const stageAt = (stage: OrderStageValue): OrderTally => {
         const row = rows.find((each) => each.stage === stage);
         return { count: row?.count ?? 0, total: BigInt(row?.total ?? 0) };
       };
@@ -1007,16 +1013,16 @@ export class OrderService {
         ['partially_fulfilled', 'in_transit', 'delivered'].includes(row.stage),
       );
       return {
-        toConfirm: at('needs_confirmation'),
-        toReview: at('needs_review'),
-        awaitingPayment: at('awaiting_payment'),
+        toConfirm: stageAt('needs_confirmation'),
+        toReview: stageAt('needs_review'),
+        awaitingPayment: stageAt('awaiting_payment'),
         transfersToCheck: {
           count: rows.reduce((sum, row) => sum + row.receipted_count, 0),
           total: rows.reduce((sum, row) => sum + BigInt(row.receipted), 0n),
         },
-        toPack: at('to_pack'),
-        toBook: at('to_book'),
-        returning: at('returning'),
+        toPack: stageAt('to_pack'),
+        toBook: stageAt('to_book'),
+        returning: stageAt('returning'),
         returnsToReceive: { count: coming[0]!.count, total: BigInt(coming[0]!.total) },
         lostToClaim: { count: lost[0]!.unclaimed_count, total: BigInt(lost[0]!.unclaimed) },
         claimsOpen: { count: lost[0]!.open_count, total: BigInt(lost[0]!.open) },

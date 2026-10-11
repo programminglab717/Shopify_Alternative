@@ -167,4 +167,21 @@ describe.skipIf(!server)('Where an order ships from (INV-10)', () => {
     expect((await f.orders.stageCounts(f.a)).get('needs_confirmation')).toBe(1);
     expect((await f.orders.stageCounts(f.b, { locationId: gulberg.id })).get('to_pack')).toBe(0);
   });
+
+  it("counts the home's orders for one location", async () => {
+    await f.stock(f.a, kurta, 5);
+    const gulberg = await place('Gulberg', [[dupatta, 5]]);
+    await f.order(f.a, [kurta]);
+    const fromGulberg = await f.order(f.a, [dupatta]);
+    unwrap(await f.orders.confirm(f.a, fromGulberg.id));
+
+    const all = await f.orders.home(f.a);
+    expect([all.toConfirm.count, all.toPack.count]).toEqual([1, 1]);
+    const there = await f.orders.home(f.a, { locationId: gulberg.id });
+    expect([there.toConfirm.count, there.toPack.count]).toEqual([0, 1]);
+    expect(there.toPack.total).toBe(fromGulberg.total);
+    const primary = await f.orders.home(f.a, { locationId: (await f.primary(f.a)).id });
+    expect([primary.toConfirm.count, primary.toPack.count]).toEqual([1, 0]);
+    expect((await f.orders.home(f.b, { locationId: gulberg.id })).toPack.count).toBe(0);
+  });
 });

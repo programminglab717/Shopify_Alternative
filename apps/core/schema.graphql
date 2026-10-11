@@ -9066,7 +9066,12 @@ type Query {
   ): FileConnection!
 
   """What waits for the shop: the admin's home."""
-  home: Home!
+  home(
+    """
+    What waits at this location alone: the orders shipping from it, their parcels and returns. Today's figures and low stock stay the shop's.
+    """
+    locationId: ID
+  ): Home!
 
   """
   The shop's stock as Shopify's inventory CSV, of the products a search matches as the products list does, at one location or all active ones: a row for each tracked variant at each, with what is on hand, committed to orders, available and not, for a stock count in a spreadsheet that inventoryImport then takes back. As much as one import takes, 5,000 rows and 1,500,000 characters, a larger shop's in parts.

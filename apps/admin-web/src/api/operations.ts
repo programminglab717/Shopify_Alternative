@@ -27,11 +27,11 @@ const TALLY = /* GraphQL */ `
 
 /** Home's next actions and today's numbers (ANL-01): every role that reads orders. */
 export const HomeQuery = /* GraphQL */ `
-  query Home {
+  query Home($locationId: ID) {
     shop {
       timezone
     }
-    home {
+    home(locationId: $locationId) {
       toConfirm {
         ...Tally
       }

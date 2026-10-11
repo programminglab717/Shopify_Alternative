@@ -1,10 +1,13 @@
-import { CurrentTenant, Money, RequireScopes, type TenantContext } from '@hatti/api';
+import { CurrentTenant, Money, RequireScopes, badUserInput, type TenantContext } from '@hatti/api';
+import { tryFromPublicId } from '@hatti/ids';
 import { LowStockService } from '@hatti/inventory/public';
 import { money } from '@hatti/money';
 import { OrderService, TodayService, type OrderTally } from '@hatti/orders/public';
 import {
+  Args,
   Field,
   GraphQLISODateTime,
+  ID,
   Int,
   ObjectType,
   Query,
@@ -166,8 +169,20 @@ export class HomeResolver {
 
   @Query(() => Home, { description: "What waits for the shop: the admin's home." })
   @RequireScopes('read_orders')
-  async home(@CurrentTenant() tenant: TenantContext): Promise<Home> {
-    const home = await this.orders.home(tenant);
+  async home(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('locationId', {
+      type: () => ID,
+      nullable: true,
+      description:
+        'What waits at this location alone: the orders shipping from it, their parcels and ' +
+        "returns. Today's figures and low stock stay the shop's.",
+    })
+    locationId: string | null,
+  ): Promise<Home> {
+    const home = await this.orders.home(tenant, {
+      locationId: locationId ? locationUuid(locationId) : null,
+    });
     const tally = (value: OrderTally) => homeTally(value, tenant);
     return Object.assign(new Home(), {
       toConfirm: tally(home.toConfirm),
@@ -217,4 +232,11 @@ function homeTally(value: OrderTally, tenant: TenantContext): HomeTally {
     count: value.count,
     total: Money.from(money(value.total, tenant.currency)),
   });
+}
+
+/** A location's UUID from its public ID, or a BAD_USER_INPUT error. */
+function locationUuid(id: string): string {
+  const uuid = tryFromPublicId(id, 'location');
+  if (!uuid) throw badUserInput(`Invalid location id: ${id.slice(0, 64)}`);
+  return uuid;
 }

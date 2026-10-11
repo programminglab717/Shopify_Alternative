@@ -38,6 +38,37 @@ function core(locations = LOCATIONS) {
           orderStageCounts: [{ stage: 'TO_PACK', count: karachi ? 1 : 7 }],
         };
       }
+      case 'SetupChecklist':
+        return { setupChecklist: { done: 8, total: 8, steps: [] } };
+      case 'HomeStock':
+        return { home: { lowStock: { low: 0, out: 0, threshold: 5 } } };
+      case 'Home': {
+        const tally = (count: number) => ({ count, total: rupees(String(count * 2700)) });
+        const karachi = variables.locationId === 'loc_2';
+        return {
+          shop: { timezone: 'Asia/Karachi' },
+          home: {
+            toConfirm: tally(karachi ? 0 : 3),
+            toReview: tally(0),
+            awaitingPayment: tally(0),
+            transfersToCheck: tally(0),
+            toPack: tally(karachi ? 1 : 7),
+            toBook: tally(0),
+            returning: tally(0),
+            returnsToReceive: tally(0),
+            lostToClaim: tally(0),
+            claimsOpen: tally(0),
+            cashToCollect: tally(0),
+            today: {
+              since: LATER,
+              sales: tally(0),
+              salesYesterday: tally(0),
+              delivered: tally(0),
+              returnedToOrigin: tally(0),
+            },
+          },
+        };
+      }
       default:
         throw new Error(`unexpected ${operation}`);
     }
@@ -104,5 +135,20 @@ describe('The orders each location ships (INV-10)', () => {
     renderAdmin('/shop_1/orders');
     expect(await screen.findByText('#1011')).toBeTruthy();
     expect(screen.queryByLabelText('Ships from')).toBeNull();
+  });
+
+  it("counts the home's orders at the location chosen on the orders list", async () => {
+    window.localStorage.setItem('hatti.ordersLocation.shop_1', 'loc_2');
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1');
+
+    expect(await screen.findByText(/1 order to pack/i)).toBeTruthy();
+    const homes = () =>
+      fake.sent.filter((each) => each.operation === 'Home').map((each) => each.variables);
+    expect(homes()).toEqual([{ locationId: 'loc_2' }]);
+    fireEvent.change(screen.getByLabelText('Ships from'), { target: { value: '' } });
+    expect(await screen.findByText(/7 orders to pack/i)).toBeTruthy();
+    expect(homes().at(-1)).toEqual({ locationId: null });
   });
 });

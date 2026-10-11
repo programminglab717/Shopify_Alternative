@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-357 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-358 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -365,6 +365,7 @@
 | 355 | An order ships from the first location fulfilling online orders that has all of it, the primary first, or the primary; and from another chosen on its page until it is packed, its stock committed there and let go where it was in one change | Accepted |
 | 356 | The orders each location ships: a location_id filter in the orders search, stage counts by location, and the admin's orders list by the location chosen, kept in the browser | Accepted |
 | 357 | Another active location is made the shop's primary one, from the admin's location settings, the one before no longer it, both locked in one change | Accepted |
+| 358 | The admin's home counts what waits at the location chosen: home(locationId) for orders shipping from it, their parcels and returns, the choice the orders list keeps | Accepted |
 
 ---
 
@@ -14197,3 +14198,22 @@
 * **Alternatives:**
   * **The primary as the location fulfilling online orders, chosen for the shop:** shops decide
     where their stock is counted; the two are separate settings.
+
+## ADR-358 · The admin's home counts what waits at the location chosen: home(locationId) for orders shipping from it, their parcels and returns, the choice the orders list keeps
+
+* **Context:**
+  * The orders list follows the location chosen, kept in the browser (ADR-356), but the home
+    still counted the whole shop's orders to confirm, pack and book, so a branch's packers opened
+    the admin to numbers that were not theirs (INV-10, ANL-01).
+* **Decision:**
+  * **`home(locationId)`**: the orders at each stage that ship from the location, the lost
+    parcels and open claims sent from it, the returns coming back to it, and the cash still to
+    come for its parcels. Today's sales and deliveries, and low stock, stay the shop's.
+  * **In the admin**, the home has the same "Ships from" choice as the orders list, over what
+    needs the merchant, and both read and keep one choice: chosen on either, it holds on both.
+    The home is read once the locations are known, and only for a shop with more than one.
+* **Consequences:**
+  * A branch opens to its own day; the owner, on every location, to the shop's.
+* **Alternatives:**
+  * **Today's figures by location too:** sales belong to the shop; a branch's day is what waits
+    for it.
