@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### The orders to pack scanned one after another, in the admin
+### b674d07 · The orders to pack scanned one after another, in the admin
 
 * **One after another** ([ADR-374](../architecture/13-decision-log.md#adr-374--the-orders-to-pack-scanned-one-after-another-the-to-pack-list-opens-the-first-to-scan-and-each-packed-brings-up-the-next-until-none-is-left)): the To pack tab's "Pack by scanning" opens its first order
   with the scanner open; once packed, "Scan the next to pack" brings up the next at the list's
