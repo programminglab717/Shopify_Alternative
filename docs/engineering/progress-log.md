@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### Stock lost on the way, in the core and the admin
+### c77eced · Stock lost on the way, in the core and the admin
 
 * **Closed with what arrived** ([ADR-366](../architecture/13-decision-log.md#adr-366--stock-lost-on-the-way-a-transfer-is-closed-with-what-arrived-the-rest-counted-lost-and-not-put-back-where-it-left-status-closed-with-what-was-lost)): `inventoryTransferClose` closes a transfer on its way,
   what had not arrived lost rather than put back where it left; the transfer is CLOSED with its
