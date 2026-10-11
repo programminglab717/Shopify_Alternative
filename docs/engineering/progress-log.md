@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### Reordering from what sells, in the core and the admin
+### c23e4ef · Reordering from what sells, in the core and the admin
 
 * **The pace from the ledger** ([ADR-368](../architecture/13-decision-log.md#adr-368--reordering-from-what-sells-each-variant-running-low-with-what-it-sold-in-the-last-30-days-from-the-stock-ledger-and-how-long-its-stock-lasts-and-a-purchase-order-for-enough-to-last-the-days-chosen)): `LowStockItem.soldLast30Days`, units committed to
   orders in the last 30 days less those released, and `daysOfStockLeft`. The stock page's low
