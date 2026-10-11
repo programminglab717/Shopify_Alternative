@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### What goes with a parcel, printed as it is packed by scanning, in the admin
+### 2321217 · What goes with a parcel, printed as it is packed by scanning, in the admin
 
 * **Printed as packed** ([ADR-375](../architecture/13-decision-log.md#adr-375--what-goes-with-a-parcel-printed-as-it-is-packed-by-scanning-the-packing-slip-or-invoice-offered-once-the-order-is-packed-before-the-next)): once packed by scanning, the order says it is packed and
   offers its print panel, packing slip or invoice, beside the next to pack. Nothing new in the
