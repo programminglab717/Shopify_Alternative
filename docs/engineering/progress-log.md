@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### How fast a product sells, on its page, in the core and the admin
+### e409560 · How fast a product sells, on its page, in the core and the admin
 
 * **Any variant's pace** ([ADR-370](../architecture/13-decision-log.md#adr-370--how-fast-a-product-sells-on-its-page-each-variants-units-sold-in-the-last-30-days-and-how-long-what-is-for-sale-lasts-for-any-variant-and-not-only-those-running-low)): `ProductVariant.soldLast30Days` and `daysOfStockLeft`,
   through the low list's batch loader. The product page says beside each size how many sold in
