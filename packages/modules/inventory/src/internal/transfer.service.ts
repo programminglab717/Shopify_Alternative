@@ -128,6 +128,26 @@ export class TransferService {
     });
   }
 
+  /**
+   * Transfers on their way, to receive (ADR-364): those going to `locationId` where given, else
+   * every one in the shop.
+   */
+  countInTransit(tenant: TenantContext, locationId: string | null = null): Promise<number> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const [row] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(transfers)
+        .where(
+          and(
+            eq(transfers.shopId, tenant.shopId),
+            eq(transfers.status, 'in_transit'),
+            locationId ? eq(transfers.destinationId, locationId) : undefined,
+          ),
+        );
+      return row?.count ?? 0;
+    });
+  }
+
   /** For each of these variants, the units on their way to `locationId`; none are left out. */
   incomingOf(
     tenant: TenantContext,

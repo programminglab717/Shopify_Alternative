@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, transfers to receive on the home** (INV-04, ANL-01): the home for the location chosen
-says how many transfers are on their way to it, linked to them, so a branch knows what to expect
-and receive; then section by section as the alpha's shops need them. Urdu handles wait, as
-decided.
+**Next, the transfers list for one location** (INV-04): the Transfers page for the location
+chosen on the orders list, those leaving it and those coming to it, as the home counts them;
+then section by section as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### Transfers to receive on the home, in the core and the admin
+
+* **What a branch waits for** ([ADR-364](../architecture/13-decision-log.md#adr-364--the-home-counts-the-transfers-on-their-way-to-the-location-chosen-to-receive-homes-transferstoreceive-read-with-low-stock-a-tap-from-the-transfers)): `home(locationId)` counts the transfers on their way to
+  the location, or every one, as `transfersToReceive`; the admin's home shows them with low stock
+  for the location chosen, a tap from the transfers.
+* **Tried in Chromium against the core:** on the seed's shop, T-6 sent a chappal from Lahore
+  warehouse to Karachi store; Karachi's home said "1 transfer on its way", Lahore's nothing, and
+  every location's opened the transfers on a tap; T-6 was cancelled back after. No errors in the
+  browser.
+* 2512 tests, those on their way counted in the inventory module's transfer test, through
+  the Admin API, and on the admin's home by location.
 
 ### 855a9c6 · A transfer received by scanning, in the admin
 

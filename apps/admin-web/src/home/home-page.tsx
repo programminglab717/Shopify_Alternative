@@ -1,5 +1,12 @@
 import { Link } from '@tanstack/react-router';
-import { Boxes, ChevronRight, CircleCheck, Circle, PartyPopper } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  Boxes,
+  ChevronRight,
+  CircleCheck,
+  Circle,
+  PartyPopper,
+} from 'lucide-react';
 import { ApiError } from '../api/client';
 import { HomeQuery, HomeStockQuery, SetupChecklistQuery } from '../api/operations';
 import type { HomeData, HomeStockData, OrderStage, SetupChecklistData, Tally } from '../api/types';
@@ -133,13 +140,52 @@ function Stat({
   );
 }
 
-/** Variants running low or out of stock (INV-01), a tap from the stock page; nothing if none. */
-function StockRunningLow() {
+/**
+ * Variants running low or out of stock (INV-01), a tap from the stock page, and transfers on their
+ * way to the location chosen, to receive (ADR-364), a tap from them; nothing of either if none.
+ */
+function StockOnHome({ location }: { location: string | undefined }) {
+  const query = useAdminQuery<HomeStockData>(['homeStock'], HomeStockQuery, {
+    locationId: location ?? null,
+  });
+  if (!query.data) return null;
+  return (
+    <>
+      <StockRunningLow stock={query.data.home.lowStock} />
+      <TransfersToReceive count={query.data.home.transfersToReceive} />
+    </>
+  );
+}
+
+/** Transfers on their way, to receive, a tap from the transfers on the way. */
+function TransfersToReceive({ count }: { count: number }) {
   const { t } = useLocale();
   const { id: shopId } = useShop();
-  const query = useAdminQuery<HomeStockData>(['homeStock'], HomeStockQuery);
-  const stock = query.data?.home.lowStock;
-  if (!stock || stock.low + stock.out === 0) return null;
+  if (!count) return null;
+  return (
+    <Card>
+      <Link
+        to="/$shopId/transfers"
+        params={{ shopId }}
+        className="flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-canvas"
+      >
+        <ArrowLeftRight aria-hidden className="size-5 text-primary" />
+        <span className="flex flex-1 flex-col">
+          <span className="font-medium">
+            {t('home.transfersToReceive', { count: formatCount(count) })}
+          </span>
+          <span className="text-secondary">{t('home.transfersToReceiveHint')}</span>
+        </span>
+        <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />
+      </Link>
+    </Card>
+  );
+}
+
+function StockRunningLow({ stock }: { stock: HomeStockData['home']['lowStock'] }) {
+  const { t } = useLocale();
+  const { id: shopId } = useShop();
+  if (stock.low + stock.out === 0) return null;
   return (
     <Card>
       <Link
@@ -276,7 +322,7 @@ export function HomePage() {
             </ul>
           </Card>
         )}
-        <StockRunningLow />
+        <StockOnHome location={location} />
       </section>
       <section aria-labelledby="home-today" className="flex flex-col gap-2">
         <h2 id="home-today" className="font-semibold">

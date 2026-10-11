@@ -41,7 +41,13 @@ function core(locations = LOCATIONS) {
       case 'SetupChecklist':
         return { setupChecklist: { done: 8, total: 8, steps: [] } };
       case 'HomeStock':
-        return { home: { lowStock: { low: 0, out: 0, threshold: 5 } } };
+        return {
+          home: {
+            lowStock: { low: 0, out: 0, threshold: 5 },
+            // One transfer on its way to Karachi, and another to Lahore (ADR-364).
+            transfersToReceive: variables.locationId ? 1 : 2,
+          },
+        };
       case 'Home': {
         const tally = (count: number) => ({ count, total: rupees(String(count * 2700)) });
         const karachi = variables.locationId === 'loc_2';
@@ -147,8 +153,15 @@ describe('The orders each location ships (INV-10)', () => {
     const homes = () =>
       fake.sent.filter((each) => each.operation === 'Home').map((each) => each.variables);
     expect(homes()).toEqual([{ locationId: 'loc_2' }]);
+    // What is on its way to Karachi, to receive, a tap from the transfers (ADR-364).
+    const coming = await screen.findByRole('link', { name: /1 transfer on its way/ });
+    expect(coming.getAttribute('href')).toBe('/shop_1/transfers');
     fireEvent.change(screen.getByLabelText('Ships from'), { target: { value: '' } });
     expect(await screen.findByText(/7 orders to pack/i)).toBeTruthy();
     expect(homes().at(-1)).toEqual({ locationId: null });
+    expect(await screen.findByRole('link', { name: /2 transfers on their way/ })).toBeTruthy();
+    expect(
+      fake.sent.filter((each) => each.operation === 'HomeStock').map((each) => each.variables),
+    ).toEqual([{ locationId: 'loc_2' }, { locationId: null }]);
   });
 });

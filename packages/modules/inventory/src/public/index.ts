@@ -33,6 +33,8 @@ export {
   type SetQuantitiesInput,
 } from '../internal/inventory.service.js';
 export { availableForSale, sellableQuantity } from '../internal/item-store.js';
+// Transfers between locations (ADR-360), counted on the admin's home (ADR-364).
+export { TransferService } from '../internal/transfer.service.js';
 export {
   LocationService,
   type ListLocationsOptions,

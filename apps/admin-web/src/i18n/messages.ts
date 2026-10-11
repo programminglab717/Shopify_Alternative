@@ -3164,6 +3164,9 @@ const en = {
     "1 of those chosen isn't available at {from}; find it below to send from elsewhere.",
   'transfers.print': 'Print to go with the stock',
   'transfers.notOnTransfer': 'Nothing on this transfer has the barcode or SKU {code}.',
+  'home.transfersToReceive': '{count} transfers on their way',
+  'home.transfersToReceive.one': '1 transfer on its way',
+  'home.transfersToReceiveHint': 'Count and receive the stock as it arrives.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6304,6 +6307,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'چنے ہوئے میں سے 1 {from} میں دستیاب نہیں؛ کہیں اور سے بھیجنے کے لیے اسے نیچے ڈھونڈیں۔',
   'transfers.print': 'اسٹاک کے ساتھ بھیجنے کے لیے پرنٹ کریں',
   'transfers.notOnTransfer': 'اس منتقلی میں بارکوڈ یا SKU {code} کسی کا نہیں۔',
+  'home.transfersToReceive': '{count} منتقلیاں راستے میں',
+  'home.transfersToReceive.one': '1 منتقلی راستے میں',
+  'home.transfersToReceiveHint': 'اسٹاک پہنچنے پر گنیں اور موصول کریں۔',
 };
 
 export const messages: Readonly<

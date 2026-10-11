@@ -1409,7 +1409,11 @@ export interface OrderMergeSplitData {
 }
 
 export interface HomeStockData {
-  home: { lowStock: { low: number; out: number; threshold: number } };
+  home: {
+    lowStock: { low: number; out: number; threshold: number };
+    /** Transfers on their way to the location asked for, or anywhere (ADR-364). */
+    transfersToReceive: number;
+  };
 }
 
 export interface LowStockData {

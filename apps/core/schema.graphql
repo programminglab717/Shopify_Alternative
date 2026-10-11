@@ -3725,6 +3725,11 @@ type Home {
   Of those awaiting payment, the orders whose customers sent a receipt for their transfer, to check against the shop's account first: orders(stage: AWAITING_PAYMENT, hasTransferReceipt: true).
   """
   transfersToCheck: HomeTally!
+
+  """
+  Transfers of stock on their way between the shop's locations, to receive (ADR-364): those going to the location asked for, or every one; needs read_inventory.
+  """
+  transfersToReceive: Int!
 }
 
 """

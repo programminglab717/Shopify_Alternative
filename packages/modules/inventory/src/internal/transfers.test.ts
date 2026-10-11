@@ -130,6 +130,11 @@ describe.skipIf(!server)('TransferService (INV-04)', () => {
     // Listed the newest first, by status or by either end.
     const other = unwrap(await send([[small, 1]], store, warehouse));
     expect(other.number).toBe(2);
+    // On their way, to receive (ADR-364): the store's received, the warehouse's not yet.
+    expect(await f.transfers.countInTransit(f.a, warehouse.id)).toBe(1);
+    expect(await f.transfers.countInTransit(f.a, store.id)).toBe(0);
+    expect(await f.transfers.countInTransit(f.a)).toBe(1);
+    expect(await f.transfers.countInTransit(f.b)).toBe(0);
     const listed = async (options: Parameters<typeof f.transfers.list>[1]) =>
       (await f.transfers.list(f.a, options)).items.map((transfer) => transfer.number);
     expect(await listed({ first: 10 })).toEqual([2, 1]);

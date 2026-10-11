@@ -631,6 +631,16 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
         input: { lines: [{ lineId: first!.id, quantity: 6 }] },
       }),
     ).toEqual({ inventoryTransfer: { status: 'IN_TRANSIT', receivedQuantity: 6 }, userErrors: [] });
+    // On its way to the store, for its home to receive (ADR-364).
+    const homeOf = await issueToken(shopB, [...STOCK_SCOPES, 'read_orders']);
+    const TO_RECEIVE = `query ($locationId: ID) { home(locationId: $locationId) { transfersToReceive } }`;
+    const toReceive = async (locationId: string | null) =>
+      (await gql(homeOf, TO_RECEIVE, { locationId })).data?.home.transfersToReceive;
+    expect([
+      await toReceive(store.id),
+      await toReceive(warehouse.id),
+      await toReceive(null),
+    ]).toEqual([1, 0, 1]);
     const CANCEL = `
       mutation ($id: ID!) {
         inventoryTransferCancel(id: $id) {
@@ -643,6 +653,7 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       userErrors: [],
     });
     // What arrived stays at the store; the rest is back at the godown.
+    expect(await toReceive(store.id)).toBe(0);
     const levelsOf = async (id: string) =>
       (
         await gql(

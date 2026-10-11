@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-363 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-364 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -371,6 +371,7 @@
 | 361 | What runs low at a branch is sent from another location from the stock page: the chosen filled in as a purchase order is, from the location that can send the most of them, no more than it has; stock on its way, ordered or sent, says so | Accepted |
 | 362 | A transfer is printed to go with the stock: inventoryTransferDocument, both locations' addresses and each line with room to write how many arrived and both ends to sign, in English, Urdu or both, from the transfer's page | Accepted |
 | 363 | A transfer is received by scanning, as a purchase order is: each barcode or SKU typed or read is one more of its line, a code not on it said so; one counting component for both | Accepted |
+| 364 | The home counts the transfers on their way to the location chosen, to receive: home's transfersToReceive, read with low stock, a tap from the transfers | Accepted |
 
 ---
 
@@ -14364,3 +14365,23 @@
 * **Alternatives:**
   * **Receiving each code at once in the core:** a mistaken scan would be in stock before it was
     seen; counted first, it is received together, as a purchase order's goods are.
+
+## ADR-364 · The home counts the transfers on their way to the location chosen, to receive: home's transfersToReceive, read with low stock, a tap from the transfers
+
+* **Context:**
+  * A branch's home counts the orders it ships (ADR-358), but stock sent to it (ADR-360) waited
+    unseen until someone opened Transfers: cartons arrived and sat uncounted, the stock not for
+    sale (INV-04, ANL-01).
+* **Decision:**
+  * **`home(locationId) { transfersToReceive }`**: the transfers on their way to the location
+    asked for, or every one in the shop; needs `read_inventory`, as low stock does, so a role
+    without it is not refused the rest of the home.
+  * **In the admin**, the home reads it with low stock for the location chosen there and on the
+    orders list, and shows "1 transfer on its way" with a hint to count it as it arrives, a tap
+    from the transfers; nothing when none is.
+* **Consequences:**
+  * A branch opens the admin to what it is waiting for, as well as to what it must ship.
+  * Not yet: the transfers list for one location; it lists every location's.
+* **Alternatives:**
+  * **A count of units on their way:** a branch receives a carton at a time; transfers are what
+    it opens.

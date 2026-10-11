@@ -1,6 +1,6 @@
 import { CurrentTenant, Money, RequireScopes, badUserInput, type TenantContext } from '@hatti/api';
 import { tryFromPublicId } from '@hatti/ids';
-import { LowStockService } from '@hatti/inventory/public';
+import { LowStockService, TransferService } from '@hatti/inventory/public';
 import { money } from '@hatti/money';
 import { OrderService, TodayService, type OrderTally } from '@hatti/orders/public';
 import {
@@ -10,6 +10,7 @@ import {
   ID,
   Int,
   ObjectType,
+  Parent,
   Query,
   ResolveField,
   Resolver,
@@ -153,6 +154,9 @@ export class Home {
       'yet marked paid: its total is the cash still to come, not what the orders come to.',
   })
   cashToCollect!: HomeTally;
+
+  /** The location the home was asked for, if one: what its fields count. */
+  locationId!: string | null;
 }
 
 /**
@@ -165,6 +169,7 @@ export class HomeResolver {
     private readonly orders: OrderService,
     private readonly days: TodayService,
     private readonly stock: LowStockService,
+    private readonly transfers: TransferService,
   ) {}
 
   @Query(() => Home, { description: "What waits for the shop: the admin's home." })
@@ -180,9 +185,8 @@ export class HomeResolver {
     })
     locationId: string | null,
   ): Promise<Home> {
-    const home = await this.orders.home(tenant, {
-      locationId: locationId ? locationUuid(locationId) : null,
-    });
+    const location = locationId ? locationUuid(locationId) : null;
+    const home = await this.orders.home(tenant, { locationId: location });
     const tally = (value: OrderTally) => homeTally(value, tenant);
     return Object.assign(new Home(), {
       toConfirm: tally(home.toConfirm),
@@ -196,6 +200,7 @@ export class HomeResolver {
       lostToClaim: tally(home.lostToClaim),
       claimsOpen: tally(home.claimsOpen),
       cashToCollect: tally(home.cashToCollect),
+      locationId: location,
     });
   }
 
@@ -224,6 +229,19 @@ export class HomeResolver {
   @RequireScopes('read_inventory')
   async lowStock(@CurrentTenant() tenant: TenantContext): Promise<HomeStock> {
     return Object.assign(new HomeStock(), await this.stock.counts(tenant));
+  }
+
+  @ResolveField(() => Int, {
+    description:
+      "Transfers of stock on their way between the shop's locations, to receive (ADR-364): " +
+      'those going to the location asked for, or every one; needs read_inventory.',
+  })
+  @RequireScopes('read_inventory')
+  async transfersToReceive(
+    @CurrentTenant() tenant: TenantContext,
+    @Parent() home: Home,
+  ): Promise<number> {
+    return this.transfers.countInTransit(tenant, home.locationId);
   }
 }
 

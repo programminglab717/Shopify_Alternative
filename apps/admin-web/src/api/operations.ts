@@ -3599,13 +3599,14 @@ export const OrderUpdateMutation = /* GraphQL */ `
 
 /** How many variants run low or out of stock, for Home (INV-01, ADR-125). */
 export const HomeStockQuery = /* GraphQL */ `
-  query HomeStock {
-    home {
+  query HomeStock($locationId: ID) {
+    home(locationId: $locationId) {
       lowStock {
         low
         out
         threshold
       }
+      transfersToReceive
     }
   }
 `;
