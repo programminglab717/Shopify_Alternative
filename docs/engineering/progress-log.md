@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### The home's counts for one location, in the core and the admin
+### b8d22db · The home's counts for one location, in the core and the admin
 
 * **The home by location** ([ADR-358](../architecture/13-decision-log.md#adr-358--the-admins-home-counts-what-waits-at-the-location-chosen-homelocationid-for-orders-shipping-from-it-their-parcels-and-returns-the-choice-the-orders-list-keeps)): `home(locationId)` counts the orders shipping from one
   location, their lost parcels and claims, the returns coming back to it, and the cash still to
