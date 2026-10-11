@@ -2,10 +2,53 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
 import { transferOf } from '../stock/stock-changes';
+import { startFromLow } from './new-transfer-page';
 import { LATER, fakeCore, press, renderAdmin, signedIn, type } from '../test-support';
 
 const GODOWN = { id: 'loc_1', name: 'Faisalabad godown' };
 const STORE = { id: 'loc_2', name: 'Karachi store' };
+const SHOP = { id: 'loc_3', name: 'Gulberg shop' };
+
+/** A variant low at the store, with what each location has of it. */
+function lowAt(
+  variant: string,
+  title: string,
+  available: number,
+  incoming: number,
+  levels: [string, number][],
+) {
+  return {
+    variantId: variant,
+    variantTitle: title,
+    productTitle: 'Khaddar suit',
+    available,
+    incoming,
+    inventoryItem: {
+      id: variant.replace('var_', 'invi_'),
+      inventoryLevels: levels.map(([id, count]) => ({ available: count, location: { id } })),
+    },
+  };
+}
+
+const LOW_AT_STORE = {
+  inventorySettings: { lowStockThreshold: 5 },
+  inventoryLowStock: {
+    nodes: [
+      // Twice the mark less 1 there and 2 on the way: 7, of which the godown has 4.
+      lowAt('var_1', 'S', 1, 2, [
+        ['loc_1', 4],
+        ['loc_2', 1],
+        ['loc_3', 9],
+      ]),
+      lowAt('var_2', 'M', 0, 0, [
+        ['loc_1', 20],
+        ['loc_2', 0],
+      ]),
+      // None anywhere else.
+      lowAt('var_3', 'L', 2, 0, [['loc_2', 2]]),
+    ],
+  },
+};
 
 function transfer(received: [number, number], status = 'IN_TRANSIT') {
   return {
@@ -69,6 +112,31 @@ function transferCore(role: StaffRole, places = [GODOWN, STORE]) {
         };
       case 'InventoryTransfer':
         return { inventoryTransfer: variables.id === 'invt_1' ? transfer(received, status) : null };
+      case 'LowStockToSend':
+        return variables.locationId === STORE.id
+          ? LOW_AT_STORE
+          : { ...LOW_AT_STORE, inventoryLowStock: { nodes: [] } };
+      case 'LowStock':
+        return {
+          inventorySettings: { lowStockThreshold: 5 },
+          inventoryLowStock: {
+            nodes: (variables.locationId === STORE.id
+              ? LOW_AT_STORE.inventoryLowStock.nodes
+              : []
+            ).map((each) => ({
+              variantId: each.variantId,
+              variantTitle: each.variantTitle,
+              productId: 'prod_1',
+              productTitle: each.productTitle,
+              sku: null,
+              available: each.available,
+              incoming: each.incoming,
+              lastSupplier: null,
+              lastUnitCost: null,
+              inventoryItem: { id: each.inventoryItem.id },
+            })),
+          },
+        };
       case 'StockSearch':
         return {
           products: {
@@ -239,6 +307,77 @@ describe('Transfers between locations (INV-04)', () => {
     expect(screen.getByRole('link', { name: 'Add a location' }).getAttribute('href')).toBe(
       '/shop_1/settings/locations',
     );
+  });
+
+  it('sends what runs low at a branch from the location that has most of it (ADR-361)', async () => {
+    const fake = transferCore('manager', [GODOWN, STORE, SHOP]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    window.localStorage.setItem('hatti.ordersLocation.shop_1', 'loc_2');
+    renderAdmin('/shop_1/stock');
+
+    expect(await screen.findByText(/1 for sale · 2 on the way/)).toBeTruthy();
+    const send = screen.getByRole('button', { name: 'Send the chosen from another location (0)' });
+    expect(send).toHaveProperty('disabled', true);
+    await press('Choose all');
+    await press('Send the chosen from another location (3)');
+
+    expect(await screen.findByText(/Filled in from what runs low at Karachi store/)).toBeTruthy();
+    expect((screen.getByLabelText('From', { exact: true }) as HTMLSelectElement).value).toBe(
+      'loc_1',
+    );
+    expect((screen.getByLabelText('To', { exact: true }) as HTMLSelectElement).value).toBe('loc_2');
+    expect(screen.getByLabelText('How many of Khaddar suit · S')).toHaveProperty('value', '4');
+    expect(screen.getByLabelText('How many of Khaddar suit · M')).toHaveProperty('value', '10');
+    expect(screen.queryByLabelText('How many of Khaddar suit · L')).toBeNull();
+    expect(
+      screen.getByText(
+        "1 of those chosen isn't available at Faisalabad godown; find it below to send from elsewhere.",
+      ),
+    ).toBeTruthy();
+    await press('Send');
+    await waitFor(() =>
+      expect(sentOf(fake, 'InventoryTransferCreate')).toEqual([
+        {
+          input: {
+            originId: 'loc_1',
+            destinationId: 'loc_2',
+            reference: null,
+            lines: [
+              { inventoryItemId: 'invi_1', quantity: 4 },
+              { inventoryItemId: 'invi_2', quantity: 10 },
+            ],
+          },
+        },
+      ]),
+    );
+  });
+
+  it('starts from the location that can send the most, the primary on a tie', () => {
+    const places = [
+      { id: 'loc_1', isPrimary: true },
+      { id: 'loc_2', isPrimary: false },
+      { id: 'loc_3', isPrimary: false },
+    ];
+    const start = startFromLow(LOW_AT_STORE, ['var_1', 'var_2', 'var_3'], 'loc_2', places);
+    // The godown sends 4 + 10; the shop 7 of the small alone.
+    expect(start).toMatchObject({ originId: 'loc_1', missing: 1 });
+    expect(start!.lines.map((line) => [line.itemId, line.quantity])).toEqual([
+      ['invi_1', '4'],
+      ['invi_2', '10'],
+    ]);
+    // The small alone: the shop has all 7, the godown 4.
+    expect(startFromLow(LOW_AT_STORE, ['var_1'], 'loc_2', places)).toMatchObject({
+      originId: 'loc_3',
+      lines: [{ itemId: 'invi_1', quantity: '7' }],
+      missing: 0,
+    });
+    // The large: none anywhere else; the primary, with nothing to fill in.
+    expect(startFromLow(LOW_AT_STORE, ['var_3'], 'loc_2', places)).toEqual({
+      originId: 'loc_1',
+      lines: [],
+      missing: 1,
+    });
+    expect(startFromLow(LOW_AT_STORE, ['var_9'], 'loc_2', places)).toBeNull();
   });
 
   it("links a stock change to its transfer, by the ledger's reference", () => {

@@ -6390,3 +6390,33 @@ export const InventoryTransferCancelMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/**
+ * What runs low at a location, with where else each variant is available, to send it there from
+ * another of the shop's locations.
+ */
+export const LowStockToSendQuery = /* GraphQL */ `
+  query LowStockToSend($locationId: ID!) {
+    inventorySettings {
+      lowStockThreshold
+    }
+    inventoryLowStock(first: 100, locationId: $locationId) {
+      nodes {
+        variantId
+        variantTitle
+        productTitle
+        available
+        incoming
+        inventoryItem {
+          id
+          inventoryLevels {
+            available
+            location {
+              id
+            }
+          }
+        }
+      }
+    }
+  }
+`;

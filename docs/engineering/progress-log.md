@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, stock sent for what runs low at a branch** (INV-04, INV-01): from the stock page's low
-list for a location, a transfer from another of the shop's locations that has it, filled in as a
-purchase order is from what runs low; then section by section as the alpha's shops need them.
-Urdu handles wait, as decided.
+**Next, a transfer printed to go with the stock** (INV-04): a page to print or save for whoever
+carries it, the two locations and each line, in English, Urdu or both, as a purchase order is
+printed for its supplier; then section by section as the alpha's shops need them. Urdu handles
+wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### What runs low at a branch sent from another location, in the admin
+
+* **Restocking a branch** ([ADR-361](../architecture/13-decision-log.md#adr-361--what-runs-low-at-a-branch-is-sent-from-another-location-from-the-stock-page-the-chosen-filled-in-as-a-purchase-order-is-from-the-location-that-can-send-the-most-of-them-no-more-than-it-has-stock-on-its-way-ordered-or-sent-says-so)): with a location chosen, the stock page's low list sends the
+  chosen from another location: a new transfer filled in with enough of each for twice the low
+  mark, less what the branch has and has coming, from the location that can send the most of
+  them and no more than it has. Stock on its way, ordered or sent, now reads "on the way".
+* **Tried in Chromium against the core:** on the seed's shop, Karachi store's four running low,
+  all chosen, opened a transfer from Lahore warehouse: 8 of a Shalwar Qameez, the 2 chappals
+  Lahore had of the 8 wanted, and 7 of another size, the khussa Lahore has none of counted
+  apart. Sent as T-3, the list for Karachi showed each on the way; cancelled back after. No
+  errors in the browser.
+* 2509 tests: the transfer filled in from what runs low, its origin, and what it has none of;
+  in the admin, from the stock page to the transfer sent.
 
 ### d78bfe5 · Transfers between locations, in the core and the admin
 

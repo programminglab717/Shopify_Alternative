@@ -454,7 +454,7 @@ describe('Purchase orders (INV-05)', () => {
     renderAdmin('/shop_1/stock');
 
     expect(await screen.findByText(/Out of stock · last from Nishat Mills/)).toBeTruthy();
-    expect(screen.getByText(/3 for sale · 4 on order · last from Nishat Mills/)).toBeTruthy();
+    expect(screen.getByText(/3 for sale · 4 on the way · last from Nishat Mills/)).toBeTruthy();
     const order = screen.getByRole('button', { name: 'Order the chosen (0)' });
     expect(order).toHaveProperty('disabled', true);
     fireEvent.click(screen.getByRole('checkbox', { name: 'Choose Khaddar suit · S to order' }));
@@ -499,7 +499,7 @@ describe('Purchase orders (INV-05)', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Choose Khaddar suit · S to order' }));
     // Another location: its own list, nothing chosen from the one before.
     fireEvent.change(at, { target: { value: 'loc_2' } });
-    expect(await screen.findByText('1 for sale · 2 on order')).toBeTruthy();
+    expect(await screen.findByText('1 for sale · 2 on the way')).toBeTruthy();
     expect(screen.queryByText(/Out of stock/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Order the chosen (0)' })).toBeTruthy();
     expect(fake.sent.filter((each) => each.operation === 'LowStock').at(-1)?.variables).toEqual({

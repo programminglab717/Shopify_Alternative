@@ -2609,3 +2609,20 @@ export interface InventoryTransfersData {
 export interface InventoryTransferData {
   inventoryTransfer: InventoryTransfer | null;
 }
+
+export interface LowStockToSendData {
+  inventorySettings: { lowStockThreshold: number };
+  inventoryLowStock: {
+    nodes: {
+      variantId: string;
+      variantTitle: string;
+      productTitle: string;
+      available: number;
+      incoming: number;
+      inventoryItem: {
+        id: string;
+        inventoryLevels: { available: number; location: { id: string } }[];
+      };
+    }[];
+  };
+}

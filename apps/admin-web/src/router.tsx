@@ -92,7 +92,7 @@ import { StaffPage } from './settings/staff-page';
 import { MorePage, Shell } from './shell/shell';
 import { ShippingPage, validateShippingSearch } from './shipping/shipping-page';
 import { ShopsPage } from './shops/shops-page';
-import { NewTransferPage } from './transfers/new-transfer-page';
+import { NewTransferPage, validateNewTransferSearch } from './transfers/new-transfer-page';
 import { TransferPage } from './transfers/transfer-page';
 import { TransfersPage } from './transfers/transfers-page';
 import {
@@ -533,6 +533,7 @@ const transfers = createRoute({
 const newTransfer = createRoute({
   getParentRoute: () => shop,
   path: 'transfers/new',
+  validateSearch: validateNewTransferSearch,
   component: NewTransferPage,
 });
 

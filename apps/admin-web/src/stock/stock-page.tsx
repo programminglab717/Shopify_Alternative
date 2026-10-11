@@ -871,6 +871,28 @@ export function StockPage() {
                   >
                     {t('stock.orderChosen', { count: formatCount(chosen.size) })}
                   </Button>
+                  {where.location && (
+                    <Button
+                      variant="secondary"
+                      disabled={chosen.size === 0}
+                      icon={<ArrowLeftRight aria-hidden className="size-5" />}
+                      onClick={() =>
+                        void navigate({
+                          to: '/$shopId/transfers/new',
+                          params: { shopId },
+                          search: {
+                            variants: low
+                              .filter((each) => chosen.has(each.variantId))
+                              .map((each) => each.variantId)
+                              .join(','),
+                            to: where.location,
+                          },
+                        })
+                      }
+                    >
+                      {t('stock.sendChosen', { count: formatCount(chosen.size) })}
+                    </Button>
+                  )}
                   {chosen.size < low.length && (
                     <Button
                       variant="tertiary"

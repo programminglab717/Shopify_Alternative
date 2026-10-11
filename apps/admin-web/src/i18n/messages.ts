@@ -3098,7 +3098,7 @@ const en = {
   'po.atLeast': 'At least {count}.',
   'po.costHint': "What each costs on this order becomes its cost, averaged with what's on hand.",
   'po.print': 'Print for the supplier',
-  'stock.incoming': '{count} on order',
+  'stock.incoming': '{count} on the way',
   'stock.lastFrom': 'last from {name}',
   'stock.choose': 'Choose {title} to order',
   'stock.chooseAll': 'Choose all',
@@ -3154,6 +3154,13 @@ const en = {
   'stock.itsTransfer': 'Its transfer',
   'stock.reason.movement_received': 'arrived',
   'stock.reason.movement_canceled': 'sent back',
+  'stock.sendChosen': 'Send the chosen from another location ({count})',
+  'transfers.fromLow':
+    'Filled in from what runs low at {to}: enough for twice the low mark, from what {from} has.',
+  'transfers.missing':
+    "{count} of those chosen aren't available at {from}; find them below to send from elsewhere.",
+  'transfers.missing.one':
+    "1 of those chosen isn't available at {from}; find it below to send from elsewhere.",
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6227,7 +6234,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'po.costHint':
     'اس آرڈر پر ہر چیز کی قیمت اس کی لاگت بن جاتی ہے، موجود اسٹاک کے ساتھ اوسط نکال کر۔',
   'po.print': 'سپلائر کے لیے پرنٹ کریں',
-  'stock.incoming': '{count} آرڈر پر',
+  'stock.incoming': '{count} راستے میں',
   'stock.lastFrom': 'پچھلی بار {name} سے',
   'stock.choose': 'منگوانے کے لیے {title} چنیں',
   'stock.chooseAll': 'سب چنیں',
@@ -6284,6 +6291,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'stock.itsTransfer': 'اس کی منتقلی',
   'stock.reason.movement_received': 'پہنچا',
   'stock.reason.movement_canceled': 'واپس بھیجا',
+  'stock.sendChosen': 'چنے ہوئے کسی اور مقام سے بھیجیں ({count})',
+  'transfers.fromLow':
+    '{to} پر جو کم ہو رہا ہے اس سے بھرا گیا: کم کی حد کا دگنا، {from} میں جو ہے اس سے۔',
+  'transfers.missing':
+    'چنے ہوئے میں سے {count} {from} میں دستیاب نہیں؛ کہیں اور سے بھیجنے کے لیے انہیں نیچے ڈھونڈیں۔',
+  'transfers.missing.one':
+    'چنے ہوئے میں سے 1 {from} میں دستیاب نہیں؛ کہیں اور سے بھیجنے کے لیے اسے نیچے ڈھونڈیں۔',
 };
 
 export const messages: Readonly<

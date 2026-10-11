@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-360 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-361 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -368,6 +368,7 @@
 | 358 | The admin's home counts what waits at the location chosen: home(locationId) for orders shipping from it, their parcels and returns, the choice the orders list keeps | Accepted |
 | 359 | What runs low at one location: inventoryLowStock(locationId) lists what it stocked before by what is available there, with what is on order for it; the stock page's choice, kept with the orders list's, and the purchase order from it goes there | Accepted |
 | 360 | Stock sent between locations is a transfer, T-1 onwards: off on hand where it leaves, on its way until received where it goes, in parts, and what has not arrived put back if cancelled; each step one adjustment naming it; the admin sends, receives and cancels | Accepted |
+| 361 | What runs low at a branch is sent from another location from the stock page: the chosen filled in as a purchase order is, from the location that can send the most of them, no more than it has; stock on its way, ordered or sent, says so | Accepted |
 
 ---
 
@@ -14290,3 +14291,31 @@
     shelf, and an order there could take what is on a truck.
   * **A draft before sending:** the alpha's shops send what they pack the same day; a draft is
     for when they ask.
+
+## ADR-361 · What runs low at a branch is sent from another location from the stock page: the chosen filled in as a purchase order is, from the location that can send the most of them, no more than it has; stock on its way, ordered or sent, says so
+
+* **Context:**
+  * The stock page lists what runs low at the location chosen (ADR-359) and orders it from a
+    supplier (ADR-354), but a branch's first source is the shop's own warehouse: with transfers
+    (ADR-360), restocking it was a new transfer typed line by line (INV-04, INV-01).
+* **Decision:**
+  * **On the stock page**, with a location chosen, "Send the chosen from another location" opens
+    a new transfer to it with the variants chosen, as "Order the chosen" opens a purchase order.
+  * **Filled in** as a purchase order from what runs low is: of each, enough for twice the shop's
+    low mark, less what the branch has and what is on its way to it; no more than the origin has
+    available.
+  * **The origin** is the other location that can send the most of them in all, the primary on
+    a tie. A chosen variant it has none of is left out, and the page says how many, to be found
+    and sent from elsewhere. The admin reads where each is available with the list
+    (`inventoryLowStock(locationId)`'s items' levels), so the core needs nothing new.
+  * **Stock on its way**, by a purchase order or a transfer, reads "on the way" on the list,
+    where it read "on order".
+* **Consequences:**
+  * A branch restocks from the warehouse in two taps and a send; the warehouse is never asked for
+    more than it has.
+  * Changing the origin keeps the lines as filled in; the core refuses what the new one can't
+    send.
+* **Alternatives:**
+  * **Each line from the location with the most of it:** one transfer per origin, several at
+    once; one origin is one trip.
+  * **Asking the core for a suggested transfer:** the admin has all it needs from the list.

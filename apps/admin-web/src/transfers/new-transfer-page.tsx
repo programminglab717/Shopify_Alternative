@@ -1,9 +1,14 @@
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { InventoryTransferCreateMutation, LocationsQuery } from '../api/operations';
-import type { LocationsData, UserError } from '../api/types';
+import {
+  InventoryTransferCreateMutation,
+  LocationsQuery,
+  LowStockToSendQuery,
+} from '../api/operations';
+import type { LocationsData, LowStockToSendData, UserError } from '../api/types';
+import { formatCount } from '../i18n/format';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
 import { parseStock } from '../products/product-form';
@@ -14,6 +19,72 @@ import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context'
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+
+export interface NewTransferSearch {
+  /** Variants running low at `to`, chosen on the stock page, comma-separated. */
+  variants?: string;
+  /** The location they run low at, where the stock goes. */
+  to?: string;
+}
+
+export function validateNewTransferSearch(search: Record<string, unknown>): NewTransferSearch {
+  return {
+    variants: typeof search.variants === 'string' ? search.variants : undefined,
+    to: typeof search.to === 'string' ? search.to : undefined,
+  };
+}
+
+/** What a transfer starts with, when sending what runs low at a location. */
+export interface TransferStart {
+  originId: string;
+  lines: Line[];
+  /** Chosen variants the origin has none of to send. */
+  missing: number;
+}
+
+const variantTitle = (product: string, variant: string) =>
+  variant && variant !== 'Default Title' ? `${product} · ${variant}` : product;
+
+/**
+ * Sending what runs low at `to` (ADR-361): of each chosen variant, enough for twice the shop's low
+ * mark, less what it has and what is on its way, as a purchase order from what runs low is; from
+ * the other location that can send the most of it, and no more than that location has.
+ */
+export function startFromLow(
+  low: LowStockToSendData,
+  variantIds: readonly string[],
+  to: string,
+  locations: readonly { id: string; isPrimary: boolean }[],
+): TransferStart | null {
+  const threshold = low.inventorySettings.lowStockThreshold;
+  const chosen = low.inventoryLowStock.nodes.filter((each) => variantIds.includes(each.variantId));
+  if (chosen.length === 0) return null;
+  const want = (each: (typeof chosen)[number]) =>
+    Math.max(1, threshold * 2 - each.available - each.incoming);
+  const at = (each: (typeof chosen)[number], locationId: string) =>
+    Math.max(
+      0,
+      each.inventoryItem.inventoryLevels.find((level) => level.location.id === locationId)
+        ?.available ?? 0,
+    );
+  const others = locations.filter((each) => each.id !== to);
+  const sendable = (locationId: string) =>
+    chosen.reduce((sum, each) => sum + Math.min(want(each), at(each, locationId)), 0);
+  // The most it can send; a tie goes to the primary, then the first listed.
+  const origin = [...others].sort(
+    (x, y) => sendable(y.id) - sendable(x.id) || Number(y.isPrimary) - Number(x.isPrimary),
+  )[0];
+  if (!origin) return null;
+  const lines = chosen
+    .filter((each) => at(each, origin.id) > 0)
+    .map((each) => ({
+      itemId: each.inventoryItem.id,
+      title: variantTitle(each.productTitle, each.variantTitle),
+      quantity: String(Math.min(want(each), at(each, origin.id))),
+      unitCost: '',
+    }));
+  return { originId: origin.id, lines, missing: chosen.length - lines.length };
+}
 
 type Created = Record<
   'inventoryTransferCreate',
@@ -27,7 +98,17 @@ type Created = Record<
 export function NewTransferPage() {
   const { t } = useLocale();
   const { id: shopId } = useShop();
+  const { variants, to } = useSearch({ from: '/$shopId/transfers/new' });
+  const chosen = variants?.split(',').filter(Boolean) ?? [];
+  const fromLow = chosen.length > 0 && to !== undefined;
   const places = useAdminQuery<LocationsData>(['locations'], LocationsQuery);
+  // As the stock page listed them, for the location they run low at (ADR-359).
+  const low = useAdminQuery<LowStockToSendData>(
+    ['lowStockToSend'],
+    LowStockToSendQuery,
+    { locationId: to ?? null },
+    { enabled: fromLow },
+  );
   const back = (
     <Link
       to="/$shopId/transfers"
@@ -38,8 +119,11 @@ export function NewTransferPage() {
       {t('transfers.title')}
     </Link>
   );
-  if (places.isPending) return <Loading label={t('state.loading')} />;
+  if (places.isPending || (fromLow && low.isPending)) {
+    return <Loading label={t('state.loading')} />;
+  }
   if (places.isError) return <ErrorState message={errorText(places.error, t)} />;
+  if (low.isError) return <ErrorState message={errorText(low.error, t)} />;
   const locations = places.data.locations.nodes;
   if (locations.length < 2) {
     return (
@@ -60,15 +144,27 @@ export function NewTransferPage() {
       </div>
     );
   }
-  return <SendForm locations={locations} back={back} />;
+  const goesTo = locations.some((each) => each.id === to) ? to : undefined;
+  return (
+    <SendForm
+      locations={locations}
+      back={back}
+      to={goesTo}
+      start={goesTo && low.data ? startFromLow(low.data, chosen, goesTo, locations) : null}
+    />
+  );
 }
 
 function SendForm({
   locations,
   back,
+  to,
+  start,
 }: {
   locations: LocationsData['locations']['nodes'];
   back: ReactNode;
+  to: string | undefined;
+  start: TransferStart | null;
 }) {
   const { t } = useLocale();
   const { id: shopId } = useShop();
@@ -78,12 +174,14 @@ function SendForm({
   );
   const { problem, attempt } = useAttempt();
   const primary = locations.find((each) => each.isPrimary) ?? locations[0]!;
-  const [origin, setOrigin] = useState(primary.id);
+  const from = start?.originId ?? (to === primary.id ? undefined : primary.id);
+  const [origin, setOrigin] = useState(from ?? locations.find((each) => each.id !== to)!.id);
   const [destination, setDestination] = useState(
-    locations.find((each) => each.id !== primary.id)!.id,
+    to ?? locations.find((each) => each.id !== origin)!.id,
   );
   const [reference, setReference] = useState('');
-  const [lines, setLines] = useState<Line[]>([]);
+  const [lines, setLines] = useState<Line[]>(start?.lines ?? []);
+  const nameOf = (id: string) => locations.find((each) => each.id === id)?.name ?? '';
   const valid =
     origin !== destination &&
     lines.length > 0 &&
@@ -153,6 +251,22 @@ function SendForm({
       </Card>
       <Card className="flex flex-col gap-3 p-4">
         <h2 className="font-semibold">{t('po.lines')}</h2>
+        {start && (
+          <p className="text-secondary">
+            {t('transfers.fromLow', {
+              to: nameOf(destination),
+              from: nameOf(start.originId),
+            })}
+          </p>
+        )}
+        {start && start.missing > 0 && (
+          <Alert tone="warning">
+            {t('transfers.missing', {
+              count: formatCount(start.missing),
+              from: nameOf(start.originId),
+            })}
+          </Alert>
+        )}
         <FindVariants
           chosen={new Set(lines.map((line) => line.itemId))}
           onAdd={(line) => setLines((now) => [...now, line])}
