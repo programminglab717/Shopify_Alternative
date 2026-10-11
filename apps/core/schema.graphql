@@ -3996,6 +3996,20 @@ type InventoryLevel {
   updatedAt: DateTime!
 }
 
+"""What the stock at one location is worth at cost."""
+type InventoryLocationValue {
+  location: Location!
+
+  """Units on hand of tracked variants."""
+  units: Int!
+
+  """Of them, units of variants with no cost: not valued."""
+  unitsWithoutCost: Int!
+
+  """Units on hand times what one costs the shop now."""
+  value: Money!
+}
+
 input InventoryMoveQuantitiesInput {
   """Up to 250; each item and location once."""
   changes: [InventoryMoveQuantityChange!]!
@@ -4229,6 +4243,18 @@ enum InventoryTransferStatus {
 
   """Every line arrived in full."""
   RECEIVED
+}
+
+"""
+What the shop's stock is worth at cost (INV-03, ANL-03): each tracked variant's units on hand times its cost, in all and by location, the most first.
+"""
+type InventoryValue {
+  locations: [InventoryLocationValue!]!
+  units: Int!
+
+  """Units of variants with no cost: not valued."""
+  unitsWithoutCost: Int!
+  value: Money!
 }
 
 """
@@ -9289,6 +9315,9 @@ type Query {
     locationId: ID
     status: InventoryTransferStatus
   ): InventoryTransferConnection!
+
+  """What the shop's stock on hand is worth at what it costs the shop."""
+  inventoryValue: InventoryValue!
 
   """
   Taps on the links of the shop's link page over a period (CH-07, ADR-204): which of its links bring shoppers, its chat on WhatsApp among them. Robots and staff previews are left out. Kept from the storefronts every minute.

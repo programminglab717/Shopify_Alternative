@@ -1088,7 +1088,7 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       token,
       `mutation ($input: ProductCreateInput!) {
          productCreate(input: $input) {
-           product { variants { title inventoryItem { id } } } userErrors { code }
+           product { id variants { id title inventoryItem { id } } } userErrors { code }
          }
        }`,
       {
@@ -1237,6 +1237,42 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     expect(sentBack).toEqual({ inventoryTransfer: { name: 'T-1' }, userErrors: [] });
     expect(await at(store.id)).toEqual([{ variantTitle: 'S', available: 1, incoming: 0 }]);
     expect((await at(warehouse.id))[0]).toEqual({ variantTitle: 'S', available: 0, incoming: 21 });
+
+    // What the stock is worth at cost, by location: what is on its way counts nowhere (ADR-369).
+    const [smallVariant, mediumVariant] = (created.product.variants as { id: string }[]).map(
+      (variant) => variant.id,
+    );
+    const priced = await mutate(
+      token,
+      `mutation ($id: ID!, $variants: [ProductVariantsBulkUpdateInput!]!) {
+         productVariantsBulkUpdate(productId: $id, variants: $variants) { userErrors { code } }
+       }`,
+      {
+        id: created.product.id,
+        variants: [
+          { id: smallVariant, cost: '950' },
+          { id: mediumVariant, cost: '1,200' },
+        ],
+      },
+    );
+    expect(priced.userErrors).toEqual([]);
+    expect(
+      (
+        await gql(
+          token,
+          `{ inventoryValue { units unitsWithoutCost value { amount }
+               locations { location { name } units value { amount } } } }`,
+        )
+      ).data?.inventoryValue,
+    ).toEqual({
+      units: 5,
+      unitsWithoutCost: 0,
+      value: { amount: '5750.00' },
+      locations: [
+        { location: { name: 'Warehouse' }, units: 4, value: { amount: '4800.00' } },
+        { location: { name: 'Store' }, units: 1, value: { amount: '950.00' } },
+      ],
+    });
 
     const changed = await mutate(
       token,
@@ -1429,6 +1465,10 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       `mutation { inventoryAdjustQuantities(input: { name: "available", reason: "received", changes: [] }) { userErrors { code } } }`,
     );
     expect(write.errors?.[0]?.message).toContain('write_inventory');
+    // What stock is worth is its cost: products' to read too (ADR-369).
+    const worth = await gql(tokens.aProductsOnly, '{ inventoryValue { units } }');
+    expect(worth.errors?.[0]?.message).toContain('read_inventory');
+    expect((await gql(tokens.aStockReader, '{ inventoryValue { units } }')).errors).toBeUndefined();
   });
 
   it('rejects malformed ids', async () => {

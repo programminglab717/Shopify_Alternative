@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, what the stock is worth** (INV-03, ANL-03): the stock on hand valued at its cost, by
-location and in all, for the shop to see what its money sits in; then section by section as the
-alpha's shops need them. Urdu handles wait, as decided.
+**Next, how fast a product sells, on its page** (CAT-01, INV-08): each variant's units sold in
+the last 30 days and how long its stock lasts, on the product's page as on the low list, for
+any variant and not only those running low; then section by section as the alpha's shops need
+them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +18,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### What the stock is worth, in the core and the admin
+
+* **At cost, by location** ([ADR-369](../architecture/13-decision-log.md#adr-369--what-the-stock-is-worth-units-on-hand-of-tracked-variants-at-what-each-costs-now-in-all-and-by-location-for-those-who-see-the-shops-costs)): `inventoryValue` multiplies each tracked variant's units
+  on hand by what one costs now, in all and by location, counting apart those with no cost.
+  The stock page shows owners and managers "Worth at cost", with each location's share.
+* **Tried in Chromium against the core:** the seed's shop read Rs 55,049.98 for 139 units, 109
+  of them with no cost: Lahore warehouse Rs 50,949.98 for 124, Karachi store Rs 4,100 for 15.
+  In Urdu the card read لاگت پر مالیت with its units. No errors in the browser.
+* 2520 tests: the worth by location in the inventory module; through the Admin API, with
+  its scopes; in the admin, shown to an owner and not asked for by a packer.
 
 ### c23e4ef · Reordering from what sells, in the core and the admin
 

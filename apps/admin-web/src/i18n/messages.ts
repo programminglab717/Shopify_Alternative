@@ -3188,6 +3188,11 @@ const en = {
   'stock.lasts.one': 'lasts about a day',
   'po.coverDays': 'Enough for',
   'po.days': '{count} days',
+  'stock.worth': 'Worth at cost',
+  'stock.worthUnits': '{count} units on hand',
+  'stock.worthUnits.one': '1 unit on hand',
+  'stock.worthUncosted': '{count} units have no cost and are not counted',
+  'stock.worthUncosted.one': '1 unit has no cost and is not counted',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6352,6 +6357,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'stock.lasts.one': 'تقریباً ایک دن چلے گا',
   'po.coverDays': 'کتنے دن کے لیے',
   'po.days': '{count} دن',
+  'stock.worth': 'لاگت پر مالیت',
+  'stock.worthUnits': '{count} یونٹ موجود',
+  'stock.worthUnits.one': '1 یونٹ موجود',
+  'stock.worthUncosted': '{count} یونٹس کی لاگت نہیں دی گئی، وہ شامل نہیں',
+  'stock.worthUncosted.one': '1 یونٹ کی لاگت نہیں دی گئی، وہ شامل نہیں',
 };
 
 export const messages: Readonly<

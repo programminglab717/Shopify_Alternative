@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-368 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-369 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -376,6 +376,7 @@
 | 366 | Stock lost on the way: a transfer is closed with what arrived, the rest counted lost and not put back where it left; status CLOSED, with what was lost | Accepted |
 | 367 | Purchase orders, suppliers and transfers on the activity log: each step an event with who took it, linked to its page in the admin | Accepted |
 | 368 | Reordering from what sells: each variant running low with what it sold in the last 30 days from the stock ledger and how long its stock lasts, and a purchase order for enough to last the days chosen | Accepted |
+| 369 | What the stock is worth: units on hand of tracked variants at what each costs now, in all and by location, for those who see the shop's costs | Accepted |
 
 ---
 
@@ -14478,3 +14479,28 @@
     ledger already says what was committed, where and when.
   * **A stored days-of-cover setting:** one more setting before anyone has asked; the choice
     is made on the order, where it is used.
+
+## ADR-369 · What the stock is worth: units on hand of tracked variants at what each costs now, in all and by location, for those who see the shop's costs
+
+* **Context:**
+  * Goods received on purchase orders set each variant's cost (ADR-352), and true profit
+    (ANL-03) uses it, but nothing said how much of the shop's money sits in its stock, or at
+    which location (INV-03, ANL-03).
+* **Decision:**
+  * **`inventoryValue`** on the Admin API: each tracked variant's units on hand times what one
+    costs the shop now, in all and by location, the most first; units of variants with no cost
+    are counted apart and not valued. Committed units are on hand until shipped, so they
+    count; stock on its way between locations counts nowhere until received. Worked out when
+    asked; nothing is stored. It needs `read_inventory` and `read_products`, since it is the
+    products' costs.
+  * **In the admin**, owners and managers, who see profit, see "Worth at cost" on the stock
+    page: the total, the units, those with no cost, and each location's share when there is
+    more than one.
+* **Consequences:**
+  * A shop sees what it has bought and not yet sold, and where; variants with no cost say how
+    much is left out.
+  * Not yet: the worth on a date past, by product or supplier, or at what stock would sell for.
+* **Alternatives:**
+  * **Valued from purchase orders' costs line by line (FIFO):** closer to what was paid, but
+    stock counted before any purchase order has none; the variant's cost, averaged as goods
+    come in (ADR-352), is what profit uses too.

@@ -6450,3 +6450,27 @@ export const InventoryTransferCloseMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+/** What the stock on hand is worth at cost, in all and by location (ADR-369). */
+export const InventoryValueQuery = /* GraphQL */ `
+  query InventoryValue {
+    inventoryValue {
+      units
+      unitsWithoutCost
+      value {
+        amount
+      }
+      locations {
+        location {
+          id
+          name
+        }
+        units
+        unitsWithoutCost
+        value {
+          amount
+        }
+      }
+    }
+  }
+`;

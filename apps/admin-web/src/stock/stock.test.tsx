@@ -74,6 +74,18 @@ function core(role: StaffRole, places = [MAIN, SHOP]) {
         };
       case 'InventoryMove':
         return { inventoryMoveQuantities: { userErrors: [] } };
+      case 'InventoryValue':
+        return {
+          inventoryValue: {
+            units: 42,
+            unitsWithoutCost: 3,
+            value: { amount: '125000.00' },
+            locations: [
+              { location: MAIN, units: 30, unitsWithoutCost: 0, value: { amount: '100000.00' } },
+              { location: SHOP, units: 12, unitsWithoutCost: 3, value: { amount: '25000.00' } },
+            ],
+          },
+        };
       case 'LowStock':
         return {
           inventorySettings: { lowStockThreshold: 5 },
@@ -186,6 +198,17 @@ describe('Stock', () => {
     const fake = core('owner');
     vi.stubGlobal('fetch', fake.fetcher);
     renderAdmin('/shop_1/stock');
+
+    // What the stock is worth at cost, in all and at each location (ADR-369).
+    const worth = (await screen.findByRole('heading', { name: 'Worth at cost' })).parentElement!
+      .parentElement!;
+    expect(within(worth).getByText('Rs 125,000')).toBeTruthy();
+    expect(
+      within(worth).getByText('42 units on hand · 3 units have no cost and are not counted'),
+    ).toBeTruthy();
+    expect(within(worth).getByText('Rs 100,000')).toBeTruthy();
+    expect(within(worth).getByText('Gulberg shop')).toBeTruthy();
+    expect(within(worth).getByText('12 units on hand')).toBeTruthy();
 
     const low = await screen.findByRole('region', { name: 'Running low' });
     expect(within(low).getByText('Low means 5 or fewer for sale.')).toBeTruthy();
@@ -400,10 +423,14 @@ describe('Stock', () => {
   });
 
   it('shows stock to a packer without changing it, and running low on Home', async () => {
-    vi.stubGlobal('fetch', core('packer').fetcher);
+    const packer = core('packer');
+    vi.stubGlobal('fetch', packer.fetcher);
     renderAdmin('/shop_1/stock');
 
     const low = await screen.findByRole('region', { name: 'Running low' });
+    // What the stock cost is not a packer's to see.
+    expect(screen.queryByRole('heading', { name: 'Worth at cost' })).toBeNull();
+    expect(packer.sent.some((each) => each.operation === 'InventoryValue')).toBe(false);
     fireEvent.click(within(low).getByRole('button', { name: 'Show the stock of Dupatta' }));
     await within(low).findByText('On hand');
     expect(within(low).queryByRole('button', { name: 'Add or take away' })).toBeNull();

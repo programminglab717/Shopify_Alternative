@@ -2640,3 +2640,20 @@ export interface LowStockToSendData {
 export interface InventoryTransferDocumentData {
   inventoryTransferDocument: { html: string; title: string; fileName: string } | null;
 }
+
+/** What the stock on hand is worth at cost (ADR-369). */
+export interface InventoryValueData {
+  inventoryValue: {
+    units: number;
+    /** Units of variants with no cost: not in the value. */
+    unitsWithoutCost: number;
+    value: { amount: string };
+    /** The most first. */
+    locations: {
+      location: { id: string; name: string };
+      units: number;
+      unitsWithoutCost: number;
+      value: { amount: string };
+    }[];
+  };
+}

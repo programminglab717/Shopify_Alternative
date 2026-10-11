@@ -16,12 +16,14 @@ import {
   InventoryMoveMutation,
   InventorySetQuantitiesMutation,
   InventorySettingsUpdateMutation,
+  InventoryValueQuery,
   LocationsQuery,
   LowStockQuery,
   StockSearchQuery,
 } from '../api/operations';
 import type {
   InventoryItemData,
+  InventoryValueData,
   LocationsData,
   LowStockData,
   StockLevel,
@@ -30,7 +32,7 @@ import type {
 } from '../api/types';
 import type { StaffRole } from '../auth/session';
 import { errorText } from '../i18n/errors';
-import { formatCount } from '../i18n/format';
+import { formatCount, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { messages } from '../i18n/messages';
 import type { MessageKey } from '../i18n/messages';
@@ -48,6 +50,48 @@ import { StockChanges } from './stock-changes';
 
 /** Those who change stock, as the core lets them (`write_inventory`); every role sees it. */
 export const EDITS_STOCK: readonly StaffRole[] = ['owner', 'manager'];
+
+/** Those who see what the stock cost the shop, as they see its profit. */
+export const SEES_STOCK_WORTH: readonly StaffRole[] = ['owner', 'manager'];
+
+/** What the stock on hand is worth at cost, in all and at each location (ADR-369). */
+function StockWorth() {
+  const { t } = useLocale();
+  const query = useAdminQuery<InventoryValueData>(['inventoryValue'], InventoryValueQuery);
+  if (query.isPending || query.isError) return null;
+  const worth = query.data.inventoryValue;
+  if (worth.units === 0) return null;
+  return (
+    <Card className="flex flex-col gap-2 p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-semibold">{t('stock.worth')}</h2>
+        <span className="text-[length:var(--hatti-type-title-size)] font-semibold">
+          {formatMoney(worth.value.amount)}
+        </span>
+      </div>
+      <p className="text-secondary">
+        {t('stock.worthUnits', { count: formatCount(worth.units) })}
+        {worth.unitsWithoutCost > 0 &&
+          ` · ${t('stock.worthUncosted', { count: formatCount(worth.unitsWithoutCost) })}`}
+      </p>
+      {worth.locations.length > 1 && (
+        <ul className="flex flex-col divide-y divide-line">
+          {worth.locations.map((each) => (
+            <li key={each.location.id} className="flex items-baseline justify-between gap-3 py-2">
+              <span className="flex flex-col">
+                <span dir="auto">{each.location.name}</span>
+                <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                  {t('stock.worthUnits', { count: formatCount(each.units) })}
+                </span>
+              </span>
+              <span className="font-medium">{formatMoney(each.value.amount)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
 
 /** Why stock is added, and why it is taken away, as the core names them. */
 const ADDS = ['received', 'restock', 'correction', 'other'] as const;
@@ -820,6 +864,7 @@ export function StockPage() {
           )}
         </div>
       </div>
+      {SEES_STOCK_WORTH.includes(role) && <StockWorth />}
       {!where.ready || query.isPending ? (
         <Loading label={t('state.loading')} />
       ) : query.isError ? (

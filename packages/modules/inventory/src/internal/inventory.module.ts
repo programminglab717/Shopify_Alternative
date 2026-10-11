@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { InventoryChangeResolver, InventoryItemResolver } from './graphql/inventory.resolver.js';
 import { LocationResolver } from './graphql/location.resolver.js';
 import { LowStockItemResolver, LowStockResolver } from './graphql/low-stock.resolver.js';
+import { StockValueResolver } from './graphql/stock-value.resolver.js';
 import {
   LowStockReorderResolver,
   PurchaseOrderLineResolver,
@@ -17,6 +18,7 @@ import { InventoryService } from './inventory.service.js';
 import { LocationService } from './location.service.js';
 import { LowStockService } from './low-stock.service.js';
 import { PurchaseOrderService } from './purchase-order.service.js';
+import { StockValueService } from './stock-value.service.js';
 import { StockService } from './stock.service.js';
 import { TransferService } from './transfer.service.js';
 
@@ -33,6 +35,7 @@ import { TransferService } from './transfer.service.js';
     LowStockService,
     PurchaseOrderService,
     TransferService,
+    StockValueService,
     LocationResolver,
     PurchaseOrderResolver,
     PurchaseOrderLineResolver,
@@ -41,6 +44,7 @@ import { TransferService } from './transfer.service.js';
     LowStockResolver,
     LowStockItemResolver,
     LowStockReorderResolver,
+    StockValueResolver,
     InventoryItemResolver,
     InventoryChangeResolver,
     VariantInventoryResolver,
