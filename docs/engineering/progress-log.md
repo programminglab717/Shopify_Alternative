@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### Transfers between locations, in the core and the admin
+### d78bfe5 · Transfers between locations, in the core and the admin
 
 * **Transfers** ([ADR-360](../architecture/13-decision-log.md#adr-360--stock-sent-between-locations-is-a-transfer-t-1-onwards-off-on-hand-where-it-leaves-on-its-way-until-received-where-it-goes-in-parts-and-what-has-not-arrived-put-back-if-cancelled-each-step-one-adjustment-naming-it-the-admin-sends-receives-and-cancels)): stock sent from one location to another comes off on hand where it
   leaves and is on its way, T-1 onwards, until it is received where it goes, in parts; cancelled,
