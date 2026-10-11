@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-364 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-365 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -372,6 +372,7 @@
 | 362 | A transfer is printed to go with the stock: inventoryTransferDocument, both locations' addresses and each line with room to write how many arrived and both ends to sign, in English, Urdu or both, from the transfer's page | Accepted |
 | 363 | A transfer is received by scanning, as a purchase order is: each barcode or SKU typed or read is one more of its line, a code not on it said so; one counting component for both | Accepted |
 | 364 | The home counts the transfers on their way to the location chosen, to receive: home's transfersToReceive, read with low stock, a tap from the transfers | Accepted |
+| 365 | The transfers list follows the location chosen on the orders list and the home: those leaving it and those coming to it, the choice kept with theirs | Accepted |
 
 ---
 
@@ -14385,3 +14386,18 @@
 * **Alternatives:**
   * **A count of units on their way:** a branch receives a carton at a time; transfers are what
     it opens.
+
+## ADR-365 · The transfers list follows the location chosen on the orders list and the home: those leaving it and those coming to it, the choice kept with theirs
+
+* **Context:**
+  * The home counts the transfers on their way to the location chosen (ADR-364), but a tap
+    opened every location's (INV-04).
+* **Decision:**
+  * **The Transfers page** has the same location choice as the orders list, the home and the
+    stock page, one choice kept for all, labelled "Leaving or coming to": a location's list is
+    `inventoryTransfers(locationId)`, those leaving it and those coming to it; every location's
+    when none is chosen.
+* **Consequences:**
+  * A branch's transfers are its own wherever it opens them from.
+* **Alternatives:**
+  * **Coming to it alone:** a branch sends stock back too; it is its to follow.

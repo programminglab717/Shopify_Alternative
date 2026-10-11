@@ -7,6 +7,7 @@ import { errorText } from '../i18n/errors';
 import { formatCount, formatDate } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { LocationFilter, useOrdersLocation } from '../orders/location-filter';
 import { useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { EDITS_STOCK } from '../stock/stock-page';
 import { Button } from '../ui/button';
@@ -28,11 +29,13 @@ export function TransfersPage() {
   const timezone = useShopTimezone();
   const [status, setStatus] = useState<InventoryTransferStatus>('IN_TRANSIT');
   const [after, setAfter] = useState<string | null>(null);
+  // The location chosen on the orders list or the home: what leaves it and comes to it (ADR-365).
+  const where = useOrdersLocation(undefined);
   const query = useAdminQuery<InventoryTransfersData>(
     ['inventoryTransfers'],
     InventoryTransfersQuery,
-    { status, after },
-    { keepPrevious: true },
+    { status, after, locationId: where.location ?? null },
+    { keepPrevious: true, enabled: where.ready },
   );
 
   return (
@@ -60,6 +63,15 @@ export function TransfersPage() {
           </Link>
         )}
       </div>
+      <LocationFilter
+        locations={where.locations}
+        location={where.location}
+        label={t('transfers.at')}
+        onChoose={(locationId) => {
+          where.choose(locationId ?? '');
+          setAfter(null);
+        }}
+      />
       <div role="tablist" className="flex gap-2 overflow-x-auto pb-1">
         {(Object.keys(TRANSFER_STATUS_LABELS) as InventoryTransferStatus[]).map((each) => (
           <button
@@ -81,7 +93,7 @@ export function TransfersPage() {
           </button>
         ))}
       </div>
-      {query.isPending ? (
+      {!where.ready || query.isPending ? (
         <Loading label={t('state.loading')} />
       ) : query.isError ? (
         <ErrorState

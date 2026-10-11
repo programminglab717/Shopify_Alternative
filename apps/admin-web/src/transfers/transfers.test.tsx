@@ -394,6 +394,27 @@ describe('Transfers between locations (INV-04)', () => {
     );
   });
 
+  it('lists the transfers of the location chosen on the orders list (ADR-365)', async () => {
+    const fake = transferCore('packer');
+    vi.stubGlobal('fetch', fake.fetcher);
+    window.localStorage.setItem('hatti.ordersLocation.shop_1', 'loc_2');
+    renderAdmin('/shop_1/transfers');
+
+    const at = (await screen.findByLabelText('Leaving or coming to')) as HTMLSelectElement;
+    expect(at.value).toBe('loc_2');
+    await screen.findByText(/T-1 · Faisalabad godown to Karachi store/);
+    const asked = () =>
+      fake.sent
+        .filter((each) => each.operation === 'InventoryTransfers')
+        .map((each) => each.variables);
+    expect(asked()).toEqual([{ status: 'IN_TRANSIT', after: null, locationId: 'loc_2' }]);
+    fireEvent.change(at, { target: { value: '' } });
+    await waitFor(() =>
+      expect(asked().at(-1)).toEqual({ status: 'IN_TRANSIT', after: null, locationId: null }),
+    );
+    expect(window.localStorage.getItem('hatti.ordersLocation.shop_1')).toBe('');
+  });
+
   it('starts from the location that can send the most, the primary on a tie', () => {
     const places = [
       { id: 'loc_1', isPrimary: true },

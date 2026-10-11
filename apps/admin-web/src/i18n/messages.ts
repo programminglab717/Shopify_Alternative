@@ -3167,6 +3167,7 @@ const en = {
   'home.transfersToReceive': '{count} transfers on their way',
   'home.transfersToReceive.one': '1 transfer on its way',
   'home.transfersToReceiveHint': 'Count and receive the stock as it arrives.',
+  'transfers.at': 'Leaving or coming to',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6310,6 +6311,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'home.transfersToReceive': '{count} منتقلیاں راستے میں',
   'home.transfersToReceive.one': '1 منتقلی راستے میں',
   'home.transfersToReceiveHint': 'اسٹاک پہنچنے پر گنیں اور موصول کریں۔',
+  'transfers.at': 'یہاں سے یا یہاں',
 };
 
 export const messages: Readonly<

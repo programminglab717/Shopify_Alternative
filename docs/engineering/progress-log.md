@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the transfers list for one location** (INV-04): the Transfers page for the location
-chosen on the orders list, those leaving it and those coming to it, as the home counts them;
-then section by section as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, stock lost on the way** (INV-04): a transfer closed with what arrived, the rest lost on
+the road rather than put back where it left, so the warehouse's count stays true; then section
+by section as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,15 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### The transfers list for one location, in the admin
+
+* **A branch's transfers** ([ADR-365](../architecture/13-decision-log.md#adr-365--the-transfers-list-follows-the-location-chosen-on-the-orders-list-and-the-home-those-leaving-it-and-those-coming-to-it-the-choice-kept-with-theirs)): the Transfers page follows the location chosen on the orders
+  list and the home, those leaving it and coming to it, one choice kept for all.
+* **Tried in Chromium against the core:** on the seed's shop, Karachi store chosen on Transfers
+  was kept after reloading, and the list was asked for Karachi's, then for every location's once
+  that was chosen. No errors in the browser.
+* 2513 tests: in the admin, the list read for the kept location and for every one.
 
 ### 8cae709 · Transfers to receive on the home, in the core and the admin
 
