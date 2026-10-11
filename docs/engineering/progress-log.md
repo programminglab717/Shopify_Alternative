@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### A transfer printed to go with the stock, in the core and the admin
+### 8343352 · A transfer printed to go with the stock, in the core and the admin
 
 * **The transfer on paper** ([ADR-362](../architecture/13-decision-log.md#adr-362--a-transfer-is-printed-to-go-with-the-stock-inventorytransferdocument-both-locations-addresses-and-each-line-with-room-to-write-how-many-arrived-and-both-ends-to-sign-in-english-urdu-or-both-from-the-transfers-page)): `inventoryTransferDocument` is a page on A4 with both
   locations' addresses, the tracking or bilty number, each line with how many were sent and room
