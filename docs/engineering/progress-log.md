@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### Purchase orders and transfers on the activity log, in the core and the admin
+### 00ba124 · Purchase orders and transfers on the activity log, in the core and the admin
 
 * **Each step an event** ([ADR-367](../architecture/13-decision-log.md#adr-367--purchase-orders-suppliers-and-transfers-on-the-activity-log-each-step-an-event-with-who-took-it-linked-to-its-page-in-the-admin)): suppliers created and changed, purchase orders created,
   changed, received and closed, and transfers created, received, cancelled and closed append
