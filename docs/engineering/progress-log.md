@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### What was bought from each supplier, in the core and the admin
+### 2fcd252 · What was bought from each supplier, in the core and the admin
 
 * **A supplier's purchasing** ([ADR-371](../architecture/13-decision-log.md#adr-371--what-was-bought-from-each-supplier-its-purchase-orders-what-came-of-them-and-what-it-cost-and-what-is-still-to-come-on-the-suppliers-list)): `supplier(id)` and `Supplier.purchasing`, its orders,
   what came and what it cost, and what is still to come. Each supplier on the suppliers' list
