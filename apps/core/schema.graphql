@@ -4152,6 +4152,18 @@ input InventoryTransferCreateInput {
   reference: String
 }
 
+"""A transfer as one HTML page, to print or save to go with the stock."""
+type InventoryTransferDocument {
+  """A file name to save it as."""
+  fileName: String!
+
+  """A complete HTML page, set up for A4."""
+  html: String!
+
+  """For the browser tab, such as "Stock transfer T-4"."""
+  title: String!
+}
+
 type InventoryTransferEdge {
   cursor: String!
   node: InventoryTransfer!
@@ -9234,6 +9246,11 @@ type Query {
 
   """A transfer by ID."""
   inventoryTransfer(id: ID!): InventoryTransfer
+
+  """
+  A transfer as a page to print or save to go with the stock: the shop, the transfer and when it was sent, where it leaves and where it goes, each line with room to write how many arrived, and both ends to sign; in English and Urdu by default. Null if the shop has no such transfer.
+  """
+  inventoryTransferDocument(id: ID!, language: DocumentLanguage! = BILINGUAL): InventoryTransferDocument
 
   """Transfers between the shop's locations, the newest first."""
   inventoryTransfers(

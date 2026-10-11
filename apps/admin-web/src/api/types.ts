@@ -2626,3 +2626,7 @@ export interface LowStockToSendData {
     }[];
   };
 }
+
+export interface InventoryTransferDocumentData {
+  inventoryTransferDocument: { html: string; title: string; fileName: string } | null;
+}

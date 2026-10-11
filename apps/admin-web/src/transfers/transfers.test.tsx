@@ -112,6 +112,14 @@ function transferCore(role: StaffRole, places = [GODOWN, STORE]) {
         };
       case 'InventoryTransfer':
         return { inventoryTransfer: variables.id === 'invt_1' ? transfer(received, status) : null };
+      case 'InventoryTransferDocument':
+        return {
+          inventoryTransferDocument: {
+            html: `<p>T-1 to Karachi store, ${String(variables.language)}</p>`,
+            title: 'Stock transfer T-1',
+            fileName: 'transfer-1.html',
+          },
+        };
       case 'LowStockToSend':
         return variables.locationId === STORE.id
           ? LOW_AT_STORE
@@ -378,6 +386,35 @@ describe('Transfers between locations (INV-04)', () => {
       missing: 1,
     });
     expect(startFromLow(LOW_AT_STORE, ['var_9'], 'loc_2', places)).toBeNull();
+  });
+
+  it('prints a transfer to go with the stock, in the language chosen, whoever looks (ADR-362)', async () => {
+    const fake = transferCore('packer');
+    vi.stubGlobal('fetch', fake.fetcher);
+    const written: string[] = [];
+    const tab = {
+      document: {
+        open: vi.fn(),
+        write: (html: string) => written.push(html),
+        close: vi.fn(),
+        fonts: { ready: Promise.resolve() },
+      },
+      focus: vi.fn(),
+      print: vi.fn(),
+      close: vi.fn(),
+    };
+    vi.stubGlobal(
+      'open',
+      vi.fn(() => tab),
+    );
+    renderAdmin('/shop_1/transfers/invt_1');
+
+    const language = (await screen.findByLabelText('Language')) as HTMLSelectElement;
+    fireEvent.change(language, { target: { value: 'URDU' } });
+    await press('Print to go with the stock');
+    await waitFor(() => expect(written).toEqual(['<p>T-1 to Karachi store, URDU</p>']));
+    expect(tab.print).toHaveBeenCalled();
+    expect(sentOf(fake, 'InventoryTransferDocument')).toEqual([{ id: 'invt_1', language: 'URDU' }]);
   });
 
   it("links a stock change to its transfer, by the ledger's reference", () => {

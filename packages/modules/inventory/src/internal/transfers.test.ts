@@ -219,4 +219,45 @@ describe.skipIf(!server)('TransferService (INV-04)', () => {
     unwrap(await stock(small, 0, store));
     unwrap(await f.locations.deactivate(f.a, store.id));
   });
+
+  it('prints a transfer to go with the stock, in the language chosen (ADR-362)', async () => {
+    const [small, medium] = variants as [string, string];
+    const sent = unwrap(
+      await f.transfers.create(f.a, {
+        originId: warehouse.id,
+        destinationId: store.id,
+        reference: 'Bilty 4410',
+        note: 'Two cartons',
+        lines: [
+          { inventoryItemId: small, quantity: 6 },
+          { inventoryItemId: medium, quantity: 3 },
+        ],
+      }),
+    );
+    const both = (await f.transfers.document(f.a, sent.id, 'bilingual'))!;
+    expect(both).toMatchObject({ title: 'Stock transfer T-1', fileName: 'transfer-1.html' });
+    for (const shown of [
+      'Stock transfer',
+      'اسٹاک کی منتقلی',
+      'T-1',
+      'Bilty 4410',
+      'Warehouse',
+      'Karachi store',
+      'Lawn suit',
+      'Two cartons',
+      'Received by',
+    ]) {
+      expect(both.html).toContain(shown);
+    }
+    expect(both.html).not.toContain('class="banner"');
+    const urdu = (await f.transfers.document(f.a, sent.id, 'urdu'))!;
+    expect(urdu.html).toContain('اسٹاک کی منتقلی');
+    expect(urdu.html).not.toContain('>Stock transfer<');
+    // Once cancelled, it says so.
+    unwrap(await f.transfers.cancel(f.a, sent.id));
+    expect((await f.transfers.document(f.a, sent.id, 'english'))!.html).toContain(
+      '<p class="banner">Cancelled</p>',
+    );
+    expect(await f.transfers.document(f.b, sent.id, 'english')).toBeNull();
+  });
 });

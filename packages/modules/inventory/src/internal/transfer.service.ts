@@ -3,12 +3,14 @@ import {
   UserErrorsRollback,
   failOne,
   rollbackResult,
+  shopProfile,
   type FieldError,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
 import { VariantService } from '@hatti/catalog/public';
 import { Database, toDate, type Tx } from '@hatti/db';
+import type { Language } from '@hatti/documents';
 import { newId, toPublicId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, sql } from 'drizzle-orm';
@@ -17,6 +19,7 @@ import { locationFromJson, type LocationJson } from './location-store.js';
 import type { LocationRecord, Page } from './records.js';
 import { LIMITS } from './rules.js';
 import { locations, transferLines, transfers, type TransferStatusValue } from './schema.js';
+import { transferDocument } from './transfer-document.js';
 
 export interface TransferLineRecord {
   id: string;
@@ -95,6 +98,25 @@ export class TransferService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const [found] = await this.#load(tx, tenant.shopId, { ids: [id] });
       return found ?? null;
+    });
+  }
+
+  /**
+   * A transfer as a page to print or save to go with the stock (ADR-362), in `language`; null if
+   * the shop has none with `id`.
+   */
+  document(
+    tenant: TenantContext,
+    id: string,
+    language: Language,
+  ): Promise<{ html: string; title: string; fileName: string } | null> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const [transfer] = await this.#load(tx, tenant.shopId, { ids: [id] });
+      if (!transfer) return null;
+      return transferDocument(transfer, {
+        language,
+        shop: await shopProfile(tx, tenant.shopId),
+      });
     });
   }
 

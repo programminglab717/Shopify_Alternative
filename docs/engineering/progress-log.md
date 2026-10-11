@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, a transfer printed to go with the stock** (INV-04): a page to print or save for whoever
-carries it, the two locations and each line, in English, Urdu or both, as a purchase order is
-printed for its supplier; then section by section as the alpha's shops need them. Urdu handles
+**Next, a transfer received by scanning** (INV-04, INV-07): each box's barcode or SKU, typed or
+read by the phone's camera, one more of its line on the transfer's page, as goods are counted
+into a purchase order; then section by section as the alpha's shops need them. Urdu handles
 wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +18,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### A transfer printed to go with the stock, in the core and the admin
+
+* **The transfer on paper** ([ADR-362](../architecture/13-decision-log.md#adr-362--a-transfer-is-printed-to-go-with-the-stock-inventorytransferdocument-both-locations-addresses-and-each-line-with-room-to-write-how-many-arrived-and-both-ends-to-sign-in-english-urdu-or-both-from-the-transfers-page)): `inventoryTransferDocument` is a page on A4 with both
+  locations' addresses, the tracking or bilty number, each line with how many were sent and room
+  to write how many arrived, and boxes for both ends to sign, in English, Urdu or both. A
+  transfer's page in the admin prints it in the language chosen.
+* **Tried in Chromium against the core:** on the seed's shop, T-1 printed in both languages from
+  its page: Lahore warehouse's and Karachi store's addresses, Bilty 4410, the Shalwar Qameez
+  with 2 sent and 1 arrived, and "Cancelled" at the top. No errors in the browser.
+* **CI:** run 38135312918 failed on the core's typecheck, which covers its tests: the transfers
+  e2e test passed variants read back from a product as possibly missing. They are typed as found
+  now, and the core's typecheck is run with its e2e tests from here.
+* 2512 tests: the transfer printed, in each language and once cancelled, in the inventory
+  module; through the Admin API; in the admin, printed by a packer.
 
 ### 71726e6 · What runs low at a branch sent from another location, in the admin
 

@@ -6420,3 +6420,14 @@ export const LowStockToSendQuery = /* GraphQL */ `
     }
   }
 `;
+
+/** A transfer as a page to print, to go with the stock, in the language chosen. */
+export const InventoryTransferDocumentQuery = /* GraphQL */ `
+  query InventoryTransferDocument($id: ID!, $language: DocumentLanguage) {
+    inventoryTransferDocument(id: $id, language: $language) {
+      html
+      title
+      fileName
+    }
+  }
+`;

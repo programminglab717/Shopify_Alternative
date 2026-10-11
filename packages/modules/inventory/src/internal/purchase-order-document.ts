@@ -160,8 +160,10 @@ function page(order: PurchaseOrderRecord, context: PurchaseOrderDocumentContext)
   `;
 }
 
-/** A line's product, then its variant and SKU. */
-function item(line: PurchaseOrderLineRecord): Html {
+/** A line's product, then its variant and SKU; a transfer's lines are shown so too. */
+export function item(
+  line: Pick<PurchaseOrderLineRecord, 'productTitle' | 'variantTitle' | 'sku'>,
+): Html {
   const details = [
     line.variantTitle === DEFAULT_VARIANT_TITLE ? null : line.variantTitle,
     line.sku,
@@ -181,7 +183,7 @@ function phone(e164: string): string {
 }
 
 /** "Plot 5, Sundar Estate", "Lahore 54000, Punjab", "0300 1234567". */
-function locationLines(location: LocationRecord): string[] {
+export function locationLines(location: LocationRecord): string[] {
   const { address1, address2, city, zip, provinceCode } = location.address;
   const province = provinceCode ? PK_PROVINCES[provinceCode as PkProvinceCode].name : null;
   const cityLine = [[city, zip].filter(Boolean).join(' '), province].filter(Boolean).join(', ');

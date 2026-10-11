@@ -3161,6 +3161,7 @@ const en = {
     "{count} of those chosen aren't available at {from}; find them below to send from elsewhere.",
   'transfers.missing.one':
     "1 of those chosen isn't available at {from}; find it below to send from elsewhere.",
+  'transfers.print': 'Print to go with the stock',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6298,6 +6299,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'چنے ہوئے میں سے {count} {from} میں دستیاب نہیں؛ کہیں اور سے بھیجنے کے لیے انہیں نیچے ڈھونڈیں۔',
   'transfers.missing.one':
     'چنے ہوئے میں سے 1 {from} میں دستیاب نہیں؛ کہیں اور سے بھیجنے کے لیے اسے نیچے ڈھونڈیں۔',
+  'transfers.print': 'اسٹاک کے ساتھ بھیجنے کے لیے پرنٹ کریں',
 };
 
 export const messages: Readonly<

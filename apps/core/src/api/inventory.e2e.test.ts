@@ -686,6 +686,18 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
         })
       ).data,
     ).toEqual({ inventoryTransfer: null });
+    // Printed to go with the stock, in English and Urdu by default (ADR-362).
+    const DOCUMENT = `query ($id: ID!, $language: DocumentLanguage) {
+      inventoryTransferDocument(id: $id, language: $language) { html title fileName }
+    }`;
+    const printed = (await gql(tokens.b, DOCUMENT, { id: sent.id })).data
+      ?.inventoryTransferDocument;
+    expect(printed).toMatchObject({ title: 'Stock transfer T-1', fileName: 'transfer-1.html' });
+    expect(printed.html).toContain('اسٹاک کی منتقلی');
+    expect(printed.html).toContain('Bilty 4410');
+    expect((await gql(tokens.a, DOCUMENT, { id: sent.id, language: 'ENGLISH' })).data).toEqual({
+      inventoryTransferDocument: null,
+    });
     // Shop A sees none of shop B's; sending needs writing stock.
     const readOnly = await gql(tokens.aStockReader, CREATE, send(1));
     expect(readOnly.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');

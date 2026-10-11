@@ -194,3 +194,15 @@ export class InventoryTransferPayload {
   @Field(() => [UserError])
   userErrors!: UserError[];
 }
+
+@ObjectType({ description: 'A transfer as one HTML page, to print or save to go with the stock.' })
+export class InventoryTransferDocument {
+  @Field({ description: 'A complete HTML page, set up for A4.' })
+  html!: string;
+
+  @Field({ description: 'For the browser tab, such as "Stock transfer T-4".' })
+  title!: string;
+
+  @Field({ description: 'A file name to save it as.' })
+  fileName!: string;
+}

@@ -1,22 +1,33 @@
 import { Link, useParams } from '@tanstack/react-router';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Printer } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   InventoryTransferCancelMutation,
+  InventoryTransferDocumentQuery,
   InventoryTransferQuery,
   InventoryTransferReceiveMutation,
 } from '../api/operations';
-import type { InventoryTransfer, InventoryTransferData, UserError } from '../api/types';
+import type {
+  DocumentLanguage,
+  InventoryTransfer,
+  InventoryTransferData,
+  InventoryTransferDocumentData,
+  UserError,
+} from '../api/types';
+import { useSessionStore } from '../auth/context';
 import { errorText } from '../i18n/errors';
 import { formatCount, formatDate } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
+import type { MessageKey } from '../i18n/messages';
 import { parseStock } from '../products/product-form';
 import { useAttempt } from '../returns/parcel';
+import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { EDITS_STOCK } from '../stock/stock-page';
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
+import { openPrintTab } from '../ui/print';
 import { TRANSFER_STATUS_LABELS } from './transfers-page';
 
 type Mutated = Record<string, { userErrors: UserError[] }>;
@@ -133,6 +144,68 @@ function Receive({ transfer }: { transfer: InventoryTransfer }) {
         </Button>
       </form>
     </Card>
+  );
+}
+
+const LANGUAGES: readonly DocumentLanguage[] = ['BILINGUAL', 'ENGLISH', 'URDU'];
+
+/** The transfer as a page to go with the stock (ADR-362), in the language chosen, to print. */
+function PrintTransfer({ transfer }: { transfer: InventoryTransfer }) {
+  const { t } = useLocale();
+  const store = useSessionStore();
+  const shopId = useShop().id;
+  const [language, setLanguage] = useState<DocumentLanguage>('BILINGUAL');
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const print = async () => {
+    setProblem(null);
+    // Opened while the tap is still being handled, so that pop-up blockers let it through.
+    const tab = openPrintTab();
+    if (!tab) {
+      setProblem(t('shipping.popupBlocked'));
+      return;
+    }
+    setBusy(true);
+    try {
+      const { inventoryTransferDocument } = await store.graphql<InventoryTransferDocumentData>(
+        shopId,
+        InventoryTransferDocumentQuery,
+        { id: transfer.id, language },
+      );
+      if (!inventoryTransferDocument) throw new Error(t('transfers.gone'));
+      tab.show(inventoryTransferDocument.html);
+    } catch (failure) {
+      tab.close();
+      setProblem(errorText(failure, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-end gap-2">
+        <SelectField<DocumentLanguage>
+          label={t('print.language')}
+          value={language}
+          options={LANGUAGES.map((each) => ({
+            value: each,
+            label: t(`print.language.${each}` as MessageKey),
+          }))}
+          onChange={setLanguage}
+        />
+        <Button
+          variant="secondary"
+          busy={busy}
+          icon={<Printer aria-hidden className="size-5" />}
+          onClick={() => void print()}
+        >
+          {t('transfers.print')}
+        </Button>
+      </div>
+      {problem && <Alert tone="danger">{problem}</Alert>}
+    </div>
   );
 }
 
@@ -283,6 +356,7 @@ export function TransferPage() {
           ))}
         </ul>
       </Card>
+      <PrintTransfer transfer={transfer} />
       {edits && <Receive transfer={transfer} />}
       {edits && <Cancel transfer={transfer} />}
     </div>

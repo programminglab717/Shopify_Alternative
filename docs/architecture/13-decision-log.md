@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-361 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-362 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -369,6 +369,7 @@
 | 359 | What runs low at one location: inventoryLowStock(locationId) lists what it stocked before by what is available there, with what is on order for it; the stock page's choice, kept with the orders list's, and the purchase order from it goes there | Accepted |
 | 360 | Stock sent between locations is a transfer, T-1 onwards: off on hand where it leaves, on its way until received where it goes, in parts, and what has not arrived put back if cancelled; each step one adjustment naming it; the admin sends, receives and cancels | Accepted |
 | 361 | What runs low at a branch is sent from another location from the stock page: the chosen filled in as a purchase order is, from the location that can send the most of them, no more than it has; stock on its way, ordered or sent, says so | Accepted |
+| 362 | A transfer is printed to go with the stock: inventoryTransferDocument, both locations' addresses and each line with room to write how many arrived and both ends to sign, in English, Urdu or both, from the transfer's page | Accepted |
 
 ---
 
@@ -14319,3 +14320,27 @@
   * **Each line from the location with the most of it:** one transfer per origin, several at
     once; one origin is one trip.
   * **Asking the core for a suggested transfer:** the admin has all it needs from the list.
+
+## ADR-362 · A transfer is printed to go with the stock: inventoryTransferDocument, both locations' addresses and each line with room to write how many arrived and both ends to sign, in English, Urdu or both, from the transfer's page
+
+* **Context:**
+  * Stock sent between locations travels with a courier or a goods transport (ADR-360), and in
+    Pakistan a delivery is checked against paper: the driver hands it over, the store counts it
+    and signs. A purchase order is printed for its supplier (ADR-353); a transfer had nothing to
+    go with the cartons (INV-04).
+* **Decision:**
+  * **`inventoryTransferDocument(id, language)`**: one HTML page on A4, as the purchase order's
+    is, with the shop, the transfer's number, when it was sent and its tracking or bilty number;
+    where it leaves and where it goes, each with its address and number; each line with how
+    many were sent and a column for how many arrived, filled where some have; how many items in
+    all, the note, a line asking to count each item as it arrives, and boxes for the sender and
+    the receiver to sign. English, Urdu or both, both by default; received or cancelled says so
+    at the top. `read_inventory`; null for another shop's.
+  * **In the admin**, a transfer's page prints it for anyone who can see it, in the language
+    chosen, opened in a tab to print or save.
+* **Consequences:**
+  * The cartons carry their count; what the store writes on arrival is what it receives in
+    Hatti.
+* **Alternatives:**
+  * **The purchase order's page for a transfer:** a supplier is asked to send goods; a driver is
+    asked to hand them over, and both ends sign.

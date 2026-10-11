@@ -1,5 +1,6 @@
 import {
   CurrentTenant,
+  DocumentLanguage,
   Loaders,
   PageInfo,
   RequestLoaders,
@@ -12,6 +13,7 @@ import {
   pageSize,
   type TenantContext,
 } from '@hatti/api';
+import type { Language } from '@hatti/documents';
 import { toPublicId } from '@hatti/ids';
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { InventoryService } from '../inventory.service.js';
@@ -24,6 +26,7 @@ import {
   InventoryTransfer,
   InventoryTransferConnection,
   InventoryTransferCreateInput,
+  InventoryTransferDocument,
   InventoryTransferEdge,
   InventoryTransferLine,
   InventoryTransferPayload,
@@ -88,6 +91,29 @@ export class TransferResolver {
   ): Promise<InventoryTransfer | null> {
     const record = await this.service.get(tenant, uuidOf('inventoryTransfer', id));
     return record ? toTransfer(record) : null;
+  }
+
+  @Query(() => InventoryTransferDocument, {
+    nullable: true,
+    description:
+      'A transfer as a page to print or save to go with the stock: the shop, the transfer and ' +
+      'when it was sent, where it leaves and where it goes, each line with room to write how ' +
+      'many arrived, and both ends to sign; in English and Urdu by default. Null if the shop has ' +
+      'no such transfer.',
+  })
+  @RequireScopes('read_inventory')
+  async inventoryTransferDocument(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('language', { type: () => DocumentLanguage, defaultValue: DocumentLanguage.BILINGUAL })
+    language: DocumentLanguage,
+  ): Promise<InventoryTransferDocument | null> {
+    const document = await this.service.document(
+      tenant,
+      uuidOf('inventoryTransfer', id),
+      language.toLowerCase() as Language,
+    );
+    return document ? Object.assign(new InventoryTransferDocument(), document) : null;
   }
 
   @Query(() => InventoryTransferConnection, {
