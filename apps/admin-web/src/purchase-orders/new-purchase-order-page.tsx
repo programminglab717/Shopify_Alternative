@@ -25,6 +25,29 @@ export interface Line {
   title: string;
   quantity: string;
   unitCost: string;
+  /** What a line from what runs low is reckoned from, to suggest how many again. */
+  basis?: Basis;
+}
+
+/** Where a variant running low stands: what is for sale, on its way, and sold of late. */
+interface Basis {
+  available: number;
+  incoming: number;
+  /** Units sold in the last 30 days. */
+  sold: number;
+}
+
+/** The days a reorder can be made to last, at the pace a variant sold (ADR-368). */
+export const COVER_DAYS = [15, 30, 45, 60, 90] as const;
+
+/**
+ * How many to order of a variant running low (ADR-354, ADR-368): enough to last `days` at the
+ * pace it sold in the last 30, or, where none sold, for twice the shop's low mark to be for
+ * sale; less what is for sale and on its way already; at least one.
+ */
+export function suggestedQuantity(basis: Basis, threshold: number, days: number): number {
+  const wanted = basis.sold > 0 ? Math.ceil((basis.sold * days) / 30) : threshold * 2;
+  return Math.max(1, wanted - basis.available - basis.incoming);
 }
 
 type Created<K extends string, T> = Record<K, { userErrors: UserError[] } & T>;
@@ -193,15 +216,21 @@ export function FindVariants({
 /** What it starts with, when ordering what runs low. */
 interface Start {
   supplierId: string;
+  /** The shop's low mark, for variants that sold none. */
+  threshold: number;
   lines: Line[];
 }
 
 /**
- * The lines for the variants chosen from what runs low (ADR-354): of each, enough for twice the
- * shop's low mark to be for sale, units sold beyond none made up too, less what is on order
- * already; at least one, at what it cost last; from the supplier most of them came from last.
+ * The lines for the variants chosen from what runs low (ADR-354): of each, as many as
+ * suggestedQuantity says for `days`, at what it cost last; from the supplier most of them came
+ * from last.
  */
-export function startFromLow(low: LowStockData, variantIds: readonly string[]): Start {
+export function startFromLow(
+  low: LowStockData,
+  variantIds: readonly string[],
+  days: number = 30,
+): Start {
   const threshold = low.inventorySettings.lowStockThreshold;
   const chosen = low.inventoryLowStock.nodes.filter((each) => variantIds.includes(each.variantId));
   const counts = new Map<string, number>();
@@ -212,12 +241,21 @@ export function startFromLow(low: LowStockData, variantIds: readonly string[]): 
   const supplierId = [...counts].sort((x, y) => y[1] - x[1])[0]?.[0] ?? '';
   return {
     supplierId,
-    lines: chosen.map((each) => ({
-      itemId: each.inventoryItem.id,
-      title: variantTitle(each.productTitle, each.variantTitle),
-      quantity: String(Math.max(1, threshold * 2 - each.available - each.incoming)),
-      unitCost: each.lastUnitCost?.amount.replace(/\.00$/, '') ?? '',
-    })),
+    threshold,
+    lines: chosen.map((each) => {
+      const basis = {
+        available: each.available,
+        incoming: each.incoming,
+        sold: each.soldLast30Days,
+      };
+      return {
+        itemId: each.inventoryItem.id,
+        title: variantTitle(each.productTitle, each.variantTitle),
+        quantity: String(suggestedQuantity(basis, threshold, days)),
+        unitCost: each.lastUnitCost?.amount.replace(/\.00$/, '') ?? '',
+        basis,
+      };
+    }),
   };
 }
 
@@ -273,6 +311,22 @@ function OrderForm({
   const [reference, setReference] = useState('');
   const [expectedOn, setExpectedOn] = useState('');
   const [lines, setLines] = useState<Line[]>(start?.lines ?? []);
+  const [days, setDays] = useState(30);
+  const paced = lines.some((line) => (line.basis?.sold ?? 0) > 0);
+  // Lines from what runs low suggested again for the days chosen; the rest as typed (ADR-368).
+  const cover = (chosen: number) => {
+    setDays(chosen);
+    setLines((now) =>
+      now.map((line) =>
+        line.basis
+          ? {
+              ...line,
+              quantity: String(suggestedQuantity(line.basis, start?.threshold ?? 0, chosen)),
+            }
+          : line,
+      ),
+    );
+  };
 
   const suppliers = form.suppliers;
   const places = form.locations.nodes;
@@ -374,6 +428,17 @@ function OrderForm({
       <Card className="flex flex-col gap-3 p-4">
         <h2 className="font-semibold">{t('po.lines')}</h2>
         {start && start.lines.length > 0 && <p className="text-secondary">{t('po.fromLow')}</p>}
+        {paced && (
+          <SelectField
+            label={t('po.coverDays')}
+            value={String(days)}
+            options={COVER_DAYS.map((each) => ({
+              value: String(each),
+              label: t('po.days', { count: String(each) }),
+            }))}
+            onChange={(value) => cover(Number(value))}
+          />
+        )}
         <FindVariants
           chosen={new Set(lines.map((line) => line.itemId))}
           onAdd={(line) => setLines((now) => [...now, line])}

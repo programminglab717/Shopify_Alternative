@@ -4550,6 +4550,11 @@ type LowStockItem {
   available: Int!
 
   """
+  Whole days what is available lasts at the pace it sold in the last 30: none when it is out; null when it sold none.
+  """
+  daysOfStockLeft: Int
+
+  """
   Units on open purchase orders, not yet received: already on their way; listed for one location, those on their way to it, sent from its other locations too.
   """
   incoming: Int!
@@ -4567,6 +4572,11 @@ type LowStockItem {
   productId: ID!
   productTitle: String!
   sku: String
+
+  """
+  Units sold in the last 30 days (INV-08): committed to orders, less those released when orders were cancelled; listed for one location, from there alone.
+  """
+  soldLast30Days: Int!
 
   """The variant."""
   variantId: ID!

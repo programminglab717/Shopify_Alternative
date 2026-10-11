@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-367 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-368 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -375,6 +375,7 @@
 | 365 | The transfers list follows the location chosen on the orders list and the home: those leaving it and those coming to it, the choice kept with theirs | Accepted |
 | 366 | Stock lost on the way: a transfer is closed with what arrived, the rest counted lost and not put back where it left; status CLOSED, with what was lost | Accepted |
 | 367 | Purchase orders, suppliers and transfers on the activity log: each step an event with who took it, linked to its page in the admin | Accepted |
+| 368 | Reordering from what sells: each variant running low with what it sold in the last 30 days from the stock ledger and how long its stock lasts, and a purchase order for enough to last the days chosen | Accepted |
 
 ---
 
@@ -14449,3 +14450,31 @@
   * **Reading the stock ledger into the log:** it says what changed at a level, not the
     transfer or order as a whole, and has no actor for steps that move no stock (created,
     closed).
+
+## ADR-368 · Reordering from what sells: each variant running low with what it sold in the last 30 days from the stock ledger and how long its stock lasts, and a purchase order for enough to last the days chosen
+
+* **Context:**
+  * A purchase order started from what runs low (ADR-354) suggested enough for twice the shop's
+    low mark, whatever sold. A variant that sells twenty a week and one that sells one a month
+    were reordered alike (INV-08).
+* **Decision:**
+  * **What sold** is read from the stock ledger: units committed to orders in the last 30 days,
+    less commitments released when orders were cancelled or changed, never below none.
+    Shipping moves units out of committed, not in, so nothing is counted twice; at one location
+    (ADR-359), what sold from there alone. Nothing new is stored.
+  * **On the Admin API**, `LowStockItem.soldLast30Days`, and `daysOfStockLeft`: whole days what
+    is available lasts at that pace, none when it is out, null when nothing sold.
+  * **In the admin**, the stock page's low list says how many sold in 30 days and about how
+    long the rest lasts. A purchase order started from it asks "Enough for" 15 to 90 days (30
+    first) and suggests, of each, what lasts that long at its pace less what is for sale and on
+    its way, at least one; a variant that sold none keeps the low mark's rule; lines added by
+    hand are left as typed.
+* **Consequences:**
+  * Fast sellers are ordered in proportion; a variant oversold (below none for sale) has what
+    is owed made up too.
+  * Not yet: a pace over other spans, seasons, or the time a supplier takes to deliver.
+* **Alternatives:**
+  * **From the orders module's lines:** the same count, but across a module boundary; the
+    ledger already says what was committed, where and when.
+  * **A stored days-of-cover setting:** one more setting before anyone has asked; the choice
+    is made on the order, where it is used.

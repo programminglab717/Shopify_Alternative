@@ -158,14 +158,15 @@ function poCore(role: StaffRole, start: [number, number] = [0, 0], places = [GOD
           inventorySettings: { lowStockThreshold: 5 },
           inventoryLowStock: {
             // At the store, what it stocked runs low there, with what is on order for it.
+            // Online, the large sold 20 in the last 30 days: two for sale last three (ADR-368).
             nodes: (variables.locationId === STORE.id
-              ? [['var_3', 'L', 1, 2, null, null]]
+              ? [['var_3', 'L', 1, 2, null, null, 0, null]]
               : [
-                  ['var_1', 'S', -2, 0, 'Nishat Mills', '2100.00'],
-                  ['var_2', 'M', 3, 4, 'Nishat Mills', null],
-                  ['var_3', 'L', 2, 0, null, null],
+                  ['var_1', 'S', -2, 0, 'Nishat Mills', '2100.00', 0, null],
+                  ['var_2', 'M', 3, 4, 'Nishat Mills', null, 0, null],
+                  ['var_3', 'L', 2, 0, null, null, 20, 3],
                 ]
-            ).map(([id, title, available, incoming, from, cost]) => ({
+            ).map(([id, title, available, incoming, from, cost, sold, daysLeft]) => ({
               variantId: id,
               variantTitle: title,
               productId: 'prod_1',
@@ -175,6 +176,8 @@ function poCore(role: StaffRole, start: [number, number] = [0, 0], places = [GOD
               incoming,
               lastSupplier: from ? { id: 'sup_1', name: from } : null,
               lastUnitCost: cost ? pkr(cost as string) : null,
+              soldLast30Days: sold,
+              daysOfStockLeft: daysLeft,
               inventoryItem: { id: `invi_${String(id).slice(4)}` },
             })),
           },
@@ -526,6 +529,42 @@ describe('Purchase orders (INV-05)', () => {
           },
         },
       ]),
+    );
+  });
+
+  it('says how fast each sells, and orders enough to last the days chosen (ADR-368)', async () => {
+    const fake = poCore('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/stock');
+
+    expect(
+      await screen.findByText('2 for sale · 20 sold in 30 days · lasts about 3 days'),
+    ).toBeTruthy();
+    // Sold none: no pace to say how long it lasts.
+    expect(screen.getByText(/3 for sale · 4 on the way · last from Nishat Mills/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Choose Khaddar suit · L to order' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Choose Khaddar suit · M to order' }));
+    await press('Order the chosen (2)');
+
+    // Thirty days at 20 a month, less the two for sale; the medium sold none: twice the low mark.
+    const enough = (await screen.findByLabelText('Enough for')) as HTMLSelectElement;
+    expect(enough.value).toBe('30');
+    const large = screen.getByLabelText('How many of Khaddar suit · L');
+    expect(large).toHaveProperty('value', '18');
+    expect(screen.getByLabelText('How many of Khaddar suit · M')).toHaveProperty('value', '3');
+    fireEvent.change(enough, { target: { value: '60' } });
+    expect(large).toHaveProperty('value', '38');
+    expect(screen.getByLabelText('How many of Khaddar suit · M')).toHaveProperty('value', '3');
+    fireEvent.change(enough, { target: { value: '15' } });
+    expect(large).toHaveProperty('value', '8');
+    await press('Save the purchase order');
+    await waitFor(() =>
+      expect(sentOf(fake, 'PurchaseOrderCreate')[0]?.input).toMatchObject({
+        lines: [
+          { inventoryItemId: 'invi_2', quantity: 3, unitCost: null },
+          { inventoryItemId: 'invi_3', quantity: 8, unitCost: null },
+        ],
+      }),
     );
   });
 

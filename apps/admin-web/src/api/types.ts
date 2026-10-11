@@ -1430,6 +1430,10 @@ export interface LowStockData {
       incoming: number;
       lastSupplier: { id: string; name: string } | null;
       lastUnitCost: { amount: string } | null;
+      /** Units sold in the last 30 days: committed to orders, less those cancelled. */
+      soldLast30Days: number;
+      /** Whole days what is available lasts at that pace; null when none sold. */
+      daysOfStockLeft: number | null;
       inventoryItem: { id: string };
     }[];
   };

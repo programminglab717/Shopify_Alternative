@@ -1,7 +1,8 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { LowStockService } from './low-stock.service.js';
+import type { Tx } from '@hatti/db';
+import { LowStockService, daysLeft } from './low-stock.service.js';
 import { errorsOf, inventoryFixture, unwrap, type InventoryFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -150,6 +151,53 @@ describe.skipIf(!server)('Low stock', () => {
     ]);
     unwrap(await f.locations.deactivate(f.a, (await f.location(f.a, 'Closed')).id));
     expect((await lowStock.list(f.b, { first: 10, locationId: store.id })).items).toEqual([]);
+  });
+
+  it('says what each sold in the last 30 days, and how long its stock lasts (ADR-368)', async () => {
+    const warehouse = await f.location(f.a, 'Warehouse');
+    const store = await f.location(f.a, 'Store');
+    const [small, medium] = await sold('Lawn Kurta', ['S', 'M']);
+    const set = (variantId: string, quantity: number, location = warehouse) =>
+      f.inventory.setQuantities(f.a, {
+        name: 'available',
+        reason: 'cycle_count_available',
+        quantities: [{ inventoryItemId: variantId, locationId: location.id, quantity }],
+      });
+    unwrap(await set(small!, 30));
+    unwrap(await set(small!, 10, store));
+    unwrap(await set(medium!, 5));
+    const line = (variantId: string, quantity: number, location = warehouse) => ({
+      variantId,
+      locationId: location.id,
+      quantity,
+    });
+    const run = <T>(fn: (tx: Tx) => Promise<T>) => f.db.tenant(f.a.shopId, fn);
+    // Sold before the last 30 days: not counted.
+    await run((tx) => f.stock.commit(tx, f.a, [line(small!, 4)]));
+    await f.admin.query(`UPDATE inventory.movements SET created_at = now() - interval '40 days'`);
+    await run((tx) => f.stock.commit(tx, f.a, [line(small!, 6), line(medium!, 3)]));
+    await run((tx) => f.stock.commit(tx, f.a, [line(small!, 2, store)]));
+    // Shipping moves units out of committed: not sold again. A cancelled order's are not sold.
+    await run((tx) => f.stock.fulfill(tx, f.a, [line(small!, 6)]));
+    await run((tx) => f.stock.releaseCommitment(tx, f.a, [line(medium!, 1)]));
+
+    const ids = [small!, medium!];
+    expect(await lowStock.soldOf(f.a, ids, null)).toEqual(
+      new Map([
+        [small!, 8],
+        [medium!, 2],
+      ]),
+    );
+    expect(await lowStock.soldOf(f.a, ids, store.id)).toEqual(new Map([[small!, 2]]));
+    expect(await lowStock.soldOf(f.a, [], null)).toEqual(new Map());
+    expect(await lowStock.soldOf(f.b, ids, null)).toEqual(new Map());
+    // Ten for sale at eight a month last 37 days; none lasts none; no pace with none sold.
+    expect([daysLeft(10, 8), daysLeft(0, 5), daysLeft(-2, 5), daysLeft(5, 0)]).toEqual([
+      37,
+      0,
+      0,
+      null,
+    ]);
   });
 
   it('alerts once a spell when a variant falls to the threshold, and once more when it runs out (ADR-157)', async () => {

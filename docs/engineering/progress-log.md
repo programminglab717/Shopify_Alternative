@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, reordering from what sells** (INV-08): each variant running low with what it sold in
-the last 30 days and how many days its stock lasts at that pace, and a purchase order started
-for enough to last a chosen number of days; then section by section as the alpha's shops need
-them. Urdu handles wait, as decided.
+**Next, what the stock is worth** (INV-03, ANL-03): the stock on hand valued at its cost, by
+location and in all, for the shop to see what its money sits in; then section by section as the
+alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### Reordering from what sells, in the core and the admin
+
+* **The pace from the ledger** ([ADR-368](../architecture/13-decision-log.md#adr-368--reordering-from-what-sells-each-variant-running-low-with-what-it-sold-in-the-last-30-days-from-the-stock-ledger-and-how-long-its-stock-lasts-and-a-purchase-order-for-enough-to-last-the-days-chosen)): `LowStockItem.soldLast30Days`, units committed to
+  orders in the last 30 days less those released, and `daysOfStockLeft`. The stock page's low
+  list says how many sold and how long the rest lasts; a purchase order from it suggests enough
+  to last the days chosen (15 to 90) at that pace, less what is for sale and on its way.
+* **Tried in Chromium against the core:** on the seed's shop the low list read "Out of stock ·
+  12 on the way · 8 sold in 30 days" for the lawn suit and "1 for sale · 3 sold in 30 days ·
+  lasts about 10 days" for a khussa; ordering the lawn suit suggested 1 for 30 days (8 sold, 2
+  owed, 12 coming) and 6 for 60. Nothing was saved. No errors in the browser.
+* 2518 tests: what sold, by location, in the inventory module; the fields on the Admin
+  API; the pace shown and the order's quantities following the days chosen in the admin.
 
 ### 00ba124 · Purchase orders and transfers on the activity log, in the core and the admin
 

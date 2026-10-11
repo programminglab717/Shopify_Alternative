@@ -491,6 +491,8 @@ function Row({
   tracked = true,
   opened = false,
   incoming = 0,
+  sold = 0,
+  daysLeft = null,
   lastFrom = null,
   chosen,
   onChoose,
@@ -506,6 +508,10 @@ function Row({
   opened?: boolean;
   /** Units on open purchase orders, not yet received. */
   incoming?: number;
+  /** Units sold in the last 30 days (ADR-368). */
+  sold?: number;
+  /** Whole days what is for sale lasts at that pace; null when none sold. */
+  daysLeft?: number | null;
   /** The supplier it was ordered from last. */
   lastFrom?: string | null;
   /** Chosen to order, where it can be. */
@@ -543,6 +549,10 @@ function Row({
                 ? t('stock.out')
                 : t('stock.left', { count: formatCount(available) })}
             {incoming > 0 && ` · ${t('stock.incoming', { count: formatCount(incoming) })}`}
+            {sold > 0 && ` · ${t('stock.sold', { count: formatCount(sold) })}`}
+            {daysLeft !== null &&
+              daysLeft > 0 &&
+              ` · ${t('stock.lasts', { count: formatCount(daysLeft) })}`}
             {lastFrom && ` · ${t('stock.lastFrom', { name: lastFrom })}`}
             {[sku, barcode].map(
               (code) =>
@@ -844,6 +854,8 @@ export function StockPage() {
                     itemId={each.inventoryItem.id}
                     available={each.available}
                     incoming={each.incoming}
+                    sold={each.soldLast30Days}
+                    daysLeft={each.daysOfStockLeft}
                     lastFrom={each.lastSupplier?.name ?? null}
                     chosen={chosen.has(each.variantId)}
                     onChoose={edits ? (on) => choose(each.variantId, on) : undefined}

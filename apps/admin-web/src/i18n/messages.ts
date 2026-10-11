@@ -3104,7 +3104,7 @@ const en = {
   'stock.chooseAll': 'Choose all',
   'stock.orderChosen': 'Order the chosen ({count})',
   'po.fromLow':
-    'Filled in from what runs low: of each, enough to reach twice the low mark less what is on order, at what it cost last.',
+    'Filled in from what runs low: of each, enough to last the days chosen at the pace it sold in the last 30 (twice the low mark where none sold), less what is for sale and on its way, at what it cost last.',
   'shipsFrom.title': 'Ships from',
   'shipsFrom.change': 'Ship from another location',
   'shipsFrom.location': 'Location',
@@ -3182,6 +3182,12 @@ const en = {
   'activity.subject.inventory_transfer': 'Transfer',
   'activity.verb.received': 'received',
   'activity.verb.closed': 'closed',
+  'stock.sold': '{count} sold in 30 days',
+  'stock.sold.one': '1 sold in 30 days',
+  'stock.lasts': 'lasts about {count} days',
+  'stock.lasts.one': 'lasts about a day',
+  'po.coverDays': 'Enough for',
+  'po.days': '{count} days',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6261,7 +6267,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'stock.chooseAll': 'سب چنیں',
   'stock.orderChosen': 'چنے ہوئے منگوائیں ({count})',
   'po.fromLow':
-    'کم ہونے والے مال سے بھرا گیا: ہر ایک اتنا کہ کم کی حد سے دگنا ہو جائے، جو آرڈر پر ہے وہ گھٹا کر، پچھلی قیمت پر۔',
+    'کم ہونے والے مال سے بھرا گیا: ہر ایک اتنا کہ پچھلے 30 دن کی رفتار سے چنے ہوئے دن چلے (جو نہیں بکا وہ کم کی حد سے دگنا)، جو بکنے کے لیے ہے اور راستے میں ہے وہ گھٹا کر، پچھلی قیمت پر۔',
   'shipsFrom.title': 'یہاں سے جائے گا',
   'shipsFrom.change': 'کسی اور جگہ سے بھیجیں',
   'shipsFrom.location': 'جگہ',
@@ -6340,6 +6346,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'activity.subject.inventory_transfer': 'منتقلی',
   'activity.verb.received': 'وصول ہوا',
   'activity.verb.closed': 'بند کیا گیا',
+  'stock.sold': '30 دن میں {count} بکے',
+  'stock.sold.one': '30 دن میں 1 بکا',
+  'stock.lasts': 'تقریباً {count} دن چلے گا',
+  'stock.lasts.one': 'تقریباً ایک دن چلے گا',
+  'po.coverDays': 'کتنے دن کے لیے',
+  'po.days': '{count} دن',
 };
 
 export const messages: Readonly<

@@ -14,6 +14,19 @@ export const LOW_STOCK_THRESHOLD = {
   max: 10_000,
 } as const;
 
+/** How far back what a variant sold is counted, to say how fast it sells (ADR-368). */
+export const SALES_PACE_DAYS = 30;
+
+/**
+ * Whole days `available` units last when `sold` sold in the last SALES_PACE_DAYS: none when
+ * there are none; null when none sold, as there is no pace to go by.
+ */
+export function daysLeft(available: number, sold: number): number | null {
+  if (sold <= 0) return null;
+  if (available <= 0) return 0;
+  return Math.floor((available * SALES_PACE_DAYS) / sold);
+}
+
 /** A shop's inventory settings. */
 export interface InventorySettingsRecord {
   /** A variant is low on stock with this many units for sale online, or fewer (ADR-125). */
@@ -182,6 +195,36 @@ export class LowStockService {
         items: items.slice(0, options.first),
         hasNextPage: items.length > options.first,
       };
+    });
+  }
+
+  /**
+   * What each of `variantIds` sold in the last `days` days (INV-08, ADR-368), as the ledger says:
+   * units committed to orders, less commitments released when orders were cancelled or changed;
+   * never below none. At `locationId` alone where given, or at all the shop's locations. Shipping
+   * moves units out of committed, not into it, so it is not counted twice. A variant that sold
+   * none is left out.
+   */
+  async soldOf(
+    tenant: TenantContext,
+    variantIds: readonly string[],
+    locationId: string | null,
+    days = SALES_PACE_DAYS,
+  ): Promise<Map<string, number>> {
+    if (variantIds.length === 0) return new Map();
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{ variant_id: string; sold: number }>(sql`
+        SELECT m.variant_id, GREATEST(SUM(m.delta), 0)::int AS sold
+          FROM inventory.movements m
+          JOIN inventory.adjustments a ON a.shop_id = m.shop_id AND a.id = m.adjustment_id
+         WHERE m.shop_id = ${tenant.shopId}
+           AND m.variant_id = ANY(${sql.param([...new Set(variantIds)])}::uuid[])
+           AND m.quantity_name = 'committed'
+           AND a.reason IN ('committed', 'commitment_released')
+           AND m.created_at >= now() - make_interval(days => ${days})
+           ${locationId ? sql`AND m.location_id = ${locationId}` : sql``}
+         GROUP BY m.variant_id`);
+      return new Map(rows.filter((row) => row.sold > 0).map((row) => [row.variant_id, row.sold]));
     });
   }
 

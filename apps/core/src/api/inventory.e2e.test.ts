@@ -1165,7 +1165,8 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       (
         await gql(
           token,
-          '{ inventoryLowStock(first: 5) { nodes { variantTitle incoming lastSupplier { name } lastUnitCost { amount } } } }',
+          `{ inventoryLowStock(first: 5) { nodes { variantTitle incoming lastSupplier { name }
+               lastUnitCost { amount } soldLast30Days daysOfStockLeft } } }`,
         )
       ).data?.inventoryLowStock.nodes,
     ).toEqual([
@@ -1174,8 +1175,18 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
         incoming: 20,
         lastSupplier: { name: 'Gul Ahmed' },
         lastUnitCost: { amount: '950.00' },
+        // Nothing sold yet: no pace to say how long it lasts (ADR-368).
+        soldLast30Days: 0,
+        daysOfStockLeft: null,
       },
-      { variantTitle: 'M', incoming: 0, lastSupplier: null, lastUnitCost: null },
+      {
+        variantTitle: 'M',
+        incoming: 0,
+        lastSupplier: null,
+        lastUnitCost: null,
+        soldLast30Days: 0,
+        daysOfStockLeft: null,
+      },
     ]);
 
     // At one location: what it stocked before, by what it has, and what is on order for it (ADR-359).

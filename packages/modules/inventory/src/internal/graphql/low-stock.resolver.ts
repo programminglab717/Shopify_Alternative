@@ -16,6 +16,8 @@ import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '
 import { InventoryService } from '../inventory.service.js';
 import {
   LowStockService,
+  SALES_PACE_DAYS,
+  daysLeft,
   type InventorySettingsRecord,
   type LowStockCursor,
   type LowStockRecord,
@@ -103,7 +105,48 @@ export class LowStockResolver {
 
 @Resolver(() => LowStockItem)
 export class LowStockItemResolver {
-  constructor(private readonly service: InventoryService) {}
+  constructor(
+    private readonly service: InventoryService,
+    private readonly lowStock: LowStockService,
+  ) {}
+
+  #sold(tenant: TenantContext, loaders: RequestLoaders, item: LowStockItem): Promise<number> {
+    // Listed for one location, what sold from there alone (ADR-359).
+    const locationId = item.record.locationId ?? null;
+    return loaders
+      .get<string, number>(`inventory.sold:${locationId ?? 'online'}`, (ids) =>
+        this.lowStock.soldOf(tenant, ids, locationId),
+      )
+      .load(item.record.variantId)
+      .then((sold) => sold ?? 0);
+  }
+
+  @ResolveField(() => Int, {
+    description:
+      `Units sold in the last ${SALES_PACE_DAYS} days (INV-08): committed to orders, less those ` +
+      'released when orders were cancelled; listed for one location, from there alone.',
+  })
+  soldLast30Days(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() item: LowStockItem,
+  ): Promise<number> {
+    return this.#sold(tenant, loaders, item);
+  }
+
+  @ResolveField(() => Int, {
+    nullable: true,
+    description:
+      'Whole days what is available lasts at the pace it sold in the last 30: none when it is ' +
+      'out; null when it sold none.',
+  })
+  async daysOfStockLeft(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() item: LowStockItem,
+  ): Promise<number | null> {
+    return daysLeft(item.available, await this.#sold(tenant, loaders, item));
+  }
 
   @ResolveField(() => InventoryItem, { description: 'How its stock is counted, and where it is.' })
   async inventoryItem(

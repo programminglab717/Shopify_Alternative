@@ -3630,6 +3630,8 @@ export const LowStockQuery = /* GraphQL */ `
           id
           name
         }
+        soldLast30Days
+        daysOfStockLeft
         lastUnitCost {
           amount
         }
