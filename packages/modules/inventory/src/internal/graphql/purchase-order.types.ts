@@ -45,6 +45,35 @@ export class Supplier {
   createdAt!: Date;
 }
 
+@ObjectType({
+  description: 'What the shop has bought from a supplier, and still waits for (INV-05).',
+})
+export class SupplierPurchasing {
+  @Field(() => Int, { description: 'Its purchase orders, whatever their status.' })
+  purchaseOrders!: number;
+
+  @Field(() => Int, { description: 'Of them, those still open.' })
+  openPurchaseOrders!: number;
+
+  @Field(() => Int, { description: 'Units received on them.' })
+  receivedQuantity!: number;
+
+  @Field(() => Money, { description: 'What the units received cost, where a cost was given.' })
+  receivedCost!: Money;
+
+  @Field(() => Int, { description: 'Units on open purchase orders, not yet received.' })
+  awaitingQuantity!: number;
+
+  @Field(() => Money, { description: 'What those cost, where a cost was given.' })
+  awaitingCost!: Money;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When the latest purchase order was made; null if none was.',
+  })
+  lastOrderedAt!: Date | null;
+}
+
 @ObjectType({ description: 'A variant ordered from a supplier, as it was named when ordered.' })
 export class PurchaseOrderLine {
   @Field(() => ID)

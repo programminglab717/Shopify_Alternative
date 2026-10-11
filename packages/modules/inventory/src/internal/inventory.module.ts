@@ -8,6 +8,7 @@ import {
   LowStockReorderResolver,
   PurchaseOrderLineResolver,
   PurchaseOrderResolver,
+  SupplierResolver,
 } from './graphql/purchase-order.resolver.js';
 import { TransferLineResolver, TransferResolver } from './graphql/transfer.resolver.js';
 import {
@@ -39,6 +40,7 @@ import { TransferService } from './transfer.service.js';
     LocationResolver,
     PurchaseOrderResolver,
     PurchaseOrderLineResolver,
+    SupplierResolver,
     TransferResolver,
     TransferLineResolver,
     LowStockResolver,

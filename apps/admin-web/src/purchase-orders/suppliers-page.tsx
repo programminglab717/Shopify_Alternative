@@ -3,12 +3,12 @@ import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { SupplierCreateMutation, SupplierUpdateMutation, SuppliersQuery } from '../api/operations';
-import type { Supplier, SuppliersData, UserError } from '../api/types';
+import type { Supplier, SupplierPurchasing, SuppliersData, UserError } from '../api/types';
 import { errorText } from '../i18n/errors';
-import { formatPhone } from '../i18n/format';
+import { formatCount, formatDate, formatMoney, formatPhone } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { useAttempt } from '../returns/parcel';
-import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
+import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { EDITS_STOCK } from '../stock/stock-page';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
@@ -77,6 +77,38 @@ function SupplierForm({ supplier, onDone }: { supplier: Supplier | null; onDone:
 }
 
 /** The shop's suppliers (INV-05): each with its number and note, changed in place, and its orders. */
+/** What was bought from a supplier, and what is still to come of it (ADR-371). */
+function Bought({ purchasing }: { purchasing: SupplierPurchasing }) {
+  const { t, locale } = useLocale();
+  const timezone = useShopTimezone();
+  if (purchasing.purchaseOrders === 0) return null;
+  const parts = [
+    t('po.supplierOrders', { count: formatCount(purchasing.purchaseOrders) }),
+    // In money where the shop gave costs; in units alone where it gave none.
+    purchasing.receivedQuantity > 0 &&
+      (Number(purchasing.receivedCost.amount) > 0
+        ? t('po.supplierReceived', {
+            count: formatCount(purchasing.receivedQuantity),
+            amount: formatMoney(purchasing.receivedCost.amount),
+          })
+        : t('po.supplierReceivedUnits', { count: formatCount(purchasing.receivedQuantity) })),
+    purchasing.awaitingQuantity > 0 &&
+      (Number(purchasing.awaitingCost.amount) > 0
+        ? t('po.supplierAwaiting', {
+            count: formatCount(purchasing.awaitingQuantity),
+            amount: formatMoney(purchasing.awaitingCost.amount),
+          })
+        : t('po.supplierAwaitingUnits', { count: formatCount(purchasing.awaitingQuantity) })),
+    purchasing.lastOrderedAt &&
+      t('po.supplierLast', { date: formatDate(purchasing.lastOrderedAt, timezone, locale) }),
+  ].filter(Boolean);
+  return (
+    <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+      {parts.join(' · ')}
+    </span>
+  );
+}
+
 export function SuppliersPage() {
   const { t } = useLocale();
   const { id: shopId, role } = useShop();
@@ -137,6 +169,7 @@ export function SuppliersPage() {
                             {supplier.note}
                           </span>
                         )}
+                        <Bought purchasing={supplier.purchasing} />
                       </span>
                       <span className="flex flex-wrap gap-2">
                         <Link

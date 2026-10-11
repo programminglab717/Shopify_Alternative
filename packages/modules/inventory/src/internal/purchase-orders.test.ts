@@ -241,6 +241,78 @@ describe.skipIf(!server)('PurchaseOrderService (INV-05)', () => {
     ).toEqual([['id', 'NOT_FOUND']]);
   });
 
+  it('says what was bought from each supplier, what it cost, and what is still to come (ADR-371)', async () => {
+    const [small, medium] = variants as [string, string];
+    const gul = await supplier('Gul Ahmed');
+    const nishat = await supplier('Nishat Mills');
+    const never = await supplier('Never ordered from');
+    const order = (
+      supplierId: string,
+      lines: { item: string; quantity: number; cost?: string }[],
+    ) =>
+      f.purchaseOrders
+        .create(f.a, {
+          supplierId,
+          locationId: warehouse.id,
+          lines: lines.map(({ item, quantity, cost }) => ({
+            inventoryItemId: item,
+            quantity,
+            ...(cost && { unitCost: cost }),
+          })),
+        })
+        .then(unwrap);
+    // Gul Ahmed: four of ten small have come at Rs 1,000, and all five medium with no cost.
+    const open = await order(gul.id, [
+      { item: small, quantity: 10, cost: '1000' },
+      { item: medium, quantity: 5 },
+    ]);
+    unwrap(
+      await f.purchaseOrders.receive(f.a, open.id, {
+        lines: [
+          { lineId: open.lines[0]!.id, quantity: 4 },
+          { lineId: open.lines[1]!.id, quantity: 5 },
+        ],
+      }),
+    );
+    // Another closed with none come: nothing more awaited of it.
+    unwrap(
+      await f.purchaseOrders.close(
+        f.a,
+        (await order(gul.id, [{ item: small, quantity: 3, cost: '500.50' }])).id,
+      ),
+    );
+    // Nishat: all of it came.
+    const whole = await order(nishat.id, [{ item: small, quantity: 2, cost: '800' }]);
+    unwrap(
+      await f.purchaseOrders.receive(f.a, whole.id, {
+        lines: [{ lineId: whole.lines[0]!.id, quantity: 2 }],
+      }),
+    );
+
+    const bought = await f.purchaseOrders.purchasingOf(f.a, [gul.id, nishat.id, never.id]);
+    expect(bought.get(gul.id)).toEqual({
+      orders: 2,
+      open: 1,
+      receivedQuantity: 9,
+      receivedCost: 4n * 100_000n,
+      awaitingQuantity: 6,
+      awaitingCost: 6n * 100_000n,
+      lastOrderedAt: expect.any(Date),
+    });
+    expect(bought.get(nishat.id)).toMatchObject({
+      orders: 1,
+      open: 0,
+      receivedQuantity: 2,
+      receivedCost: 160_000n,
+      awaitingQuantity: 0,
+      awaitingCost: 0n,
+    });
+    expect(bought.has(never.id)).toBe(false);
+    expect((await f.purchaseOrders.supplier(f.a, gul.id))?.name).toBe('Gul Ahmed');
+    expect(await f.purchaseOrders.supplier(f.b, gul.id)).toBeNull();
+    expect((await f.purchaseOrders.purchasingOf(f.b, [gul.id])).size).toBe(0);
+  });
+
   it('closes an order with what came, the rest no longer expected', async () => {
     const order = unwrap(
       await f.purchaseOrders.create(f.a, {

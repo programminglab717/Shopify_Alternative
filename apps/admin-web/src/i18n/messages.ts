@@ -3193,6 +3193,17 @@ const en = {
   'stock.worthUnits.one': '1 unit on hand',
   'stock.worthUncosted': '{count} units have no cost and are not counted',
   'stock.worthUncosted.one': '1 unit has no cost and is not counted',
+  'po.supplierOrders': '{count} purchase orders',
+  'po.supplierOrders.one': '1 purchase order',
+  'po.supplierReceived': '{count} received for {amount}',
+  'po.supplierReceived.one': '1 received for {amount}',
+  'po.supplierAwaiting': '{count} still to come, {amount}',
+  'po.supplierAwaiting.one': '1 still to come, {amount}',
+  'po.supplierLast': 'last ordered {date}',
+  'po.supplierReceivedUnits': '{count} received',
+  'po.supplierReceivedUnits.one': '1 received',
+  'po.supplierAwaitingUnits': '{count} still to come',
+  'po.supplierAwaitingUnits.one': '1 still to come',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6362,6 +6373,17 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'stock.worthUnits.one': '1 یونٹ موجود',
   'stock.worthUncosted': '{count} یونٹس کی لاگت نہیں دی گئی، وہ شامل نہیں',
   'stock.worthUncosted.one': '1 یونٹ کی لاگت نہیں دی گئی، وہ شامل نہیں',
+  'po.supplierOrders': '{count} خریداری آرڈر',
+  'po.supplierOrders.one': '1 خریداری آرڈر',
+  'po.supplierReceived': '{count} وصول ہوئے، {amount} کے',
+  'po.supplierReceived.one': '1 وصول ہوا، {amount} کا',
+  'po.supplierAwaiting': '{count} ابھی آنے ہیں، {amount} کے',
+  'po.supplierAwaiting.one': '1 ابھی آنا ہے، {amount} کا',
+  'po.supplierLast': 'آخری آرڈر {date}',
+  'po.supplierReceivedUnits': '{count} وصول ہوئے',
+  'po.supplierReceivedUnits.one': '1 وصول ہوا',
+  'po.supplierAwaitingUnits': '{count} ابھی آنے ہیں',
+  'po.supplierAwaitingUnits.one': '1 ابھی آنا ہے',
 };
 
 export const messages: Readonly<

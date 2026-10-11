@@ -40,6 +40,24 @@ export interface SupplierRecord {
   updatedAt: Date;
 }
 
+/** What the shop has bought from a supplier, and still waits for (INV-05, ADR-371). */
+export interface SupplierPurchasingRecord {
+  /** Its purchase orders, whatever their status. */
+  orders: number;
+  /** Of them, those still open. */
+  open: number;
+  /** Units received on them. */
+  receivedQuantity: number;
+  /** What the units received cost, in minor units, where the shop gave a cost. */
+  receivedCost: bigint;
+  /** Units ordered on open purchase orders, not yet received. */
+  awaitingQuantity: number;
+  /** What those cost, in minor units, where the shop gave a cost. */
+  awaitingCost: bigint;
+  /** When the latest was made; null if it was never ordered from. */
+  lastOrderedAt: Date | null;
+}
+
 export interface SupplierInput {
   name?: string | null;
   phone?: string | null;
@@ -190,6 +208,71 @@ export class PurchaseOrderService {
         .orderBy(sql`lower(${suppliers.name})`)
         .limit(SUPPLIER_LIMIT);
       return rows.map(toSupplier);
+    });
+  }
+
+  /** One of the shop's suppliers; null if it is not the shop's. */
+  supplier(tenant: TenantContext, id: string): Promise<SupplierRecord | null> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(suppliers)
+        .where(and(eq(suppliers.shopId, tenant.shopId), eq(suppliers.id, id)));
+      return row ? toSupplier(row) : null;
+    });
+  }
+
+  /**
+   * What the shop has bought from each of these suppliers (ADR-371): its purchase orders and how
+   * many are open, what was received on them and what it cost, and what open ones still await.
+   * A line with no cost counts in units, not in money. Suppliers never ordered from are left out.
+   */
+  purchasingOf(
+    tenant: TenantContext,
+    supplierIds: readonly string[],
+  ): Promise<Map<string, SupplierPurchasingRecord>> {
+    if (supplierIds.length === 0) return Promise.resolve(new Map());
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{
+        supplier_id: string;
+        orders: number;
+        open: number;
+        received_quantity: number;
+        received_cost: string;
+        awaiting_quantity: number;
+        awaiting_cost: string;
+        last_ordered_at: string | null;
+      }>(sql`
+        SELECT o.supplier_id,
+               count(DISTINCT o.id)::int AS orders,
+               count(DISTINCT o.id) FILTER (WHERE o.status = 'open')::int AS open,
+               coalesce(sum(l.received), 0)::int AS received_quantity,
+               coalesce(sum(l.received * l.unit_cost), 0)::text AS received_cost,
+               coalesce(sum(l.quantity - l.received) FILTER (WHERE o.status = 'open'), 0)::int
+                 AS awaiting_quantity,
+               coalesce(sum((l.quantity - l.received) * l.unit_cost)
+                 FILTER (WHERE o.status = 'open'), 0)::text AS awaiting_cost,
+               max(o.created_at) AS last_ordered_at
+          FROM inventory.purchase_orders o
+          LEFT JOIN inventory.purchase_order_lines l
+            ON l.shop_id = o.shop_id AND l.purchase_order_id = o.id
+         WHERE o.shop_id = ${tenant.shopId}
+           AND o.supplier_id = ANY(${sql.param([...new Set(supplierIds)])}::uuid[])
+         GROUP BY o.supplier_id`);
+      return new Map(
+        rows.map((row) => [
+          row.supplier_id,
+          {
+            orders: row.orders,
+            open: row.open,
+            receivedQuantity: row.received_quantity,
+            receivedCost: BigInt(row.received_cost),
+            awaitingQuantity: row.awaiting_quantity,
+            awaitingCost: BigInt(row.awaiting_cost),
+            lastOrderedAt: row.last_ordered_at === null ? null : toDate(row.last_ordered_at),
+          },
+        ]),
+      );
     });
   }
 

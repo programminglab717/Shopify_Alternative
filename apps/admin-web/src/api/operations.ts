@@ -6241,6 +6241,18 @@ export const SuppliersQuery = /* GraphQL */ `
       name
       phone
       note
+      purchasing {
+        purchaseOrders
+        receivedQuantity
+        receivedCost {
+          amount
+        }
+        awaitingQuantity
+        awaitingCost {
+          amount
+        }
+        lastOrderedAt
+      }
     }
   }
 `;

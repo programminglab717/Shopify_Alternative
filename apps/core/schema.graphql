@@ -9722,6 +9722,9 @@ type Query {
     interval: SalesInterval! = DAY
   ): StorefrontSessionsReport!
 
+  """A supplier by ID."""
+  supplier(id: ID!): Supplier
+
   """The shop's suppliers, by name; at most 250."""
   suppliers: [Supplier!]!
 
@@ -10984,6 +10987,7 @@ type Supplier {
 
   """A mobile number in E.164 form."""
   phone: String
+  purchasing: SupplierPurchasing!
 }
 
 input SupplierInput {
@@ -11000,6 +11004,32 @@ input SupplierInput {
 type SupplierPayload {
   supplier: Supplier
   userErrors: [UserError!]!
+}
+
+"""
+What the shop has bought from a supplier, and still waits for (INV-05).
+"""
+type SupplierPurchasing {
+  """What those cost, where a cost was given."""
+  awaitingCost: Money!
+
+  """Units on open purchase orders, not yet received."""
+  awaitingQuantity: Int!
+
+  """When the latest purchase order was made; null if none was."""
+  lastOrderedAt: DateTime
+
+  """Of them, those still open."""
+  openPurchaseOrders: Int!
+
+  """Its purchase orders, whatever their status."""
+  purchaseOrders: Int!
+
+  """What the units received cost, where a cost was given."""
+  receivedCost: Money!
+
+  """Units received on them."""
+  receivedQuantity: Int!
 }
 
 type SupportAccessEndPayload {

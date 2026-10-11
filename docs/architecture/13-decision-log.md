@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-370 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-371 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -378,6 +378,7 @@
 | 368 | Reordering from what sells: each variant running low with what it sold in the last 30 days from the stock ledger and how long its stock lasts, and a purchase order for enough to last the days chosen | Accepted |
 | 369 | What the stock is worth: units on hand of tracked variants at what each costs now, in all and by location, for those who see the shop's costs | Accepted |
 | 370 | How fast a product sells, on its page: each variant's units sold in the last 30 days and how long what is for sale lasts, for any variant and not only those running low | Accepted |
+| 371 | What was bought from each supplier: its purchase orders, what came of them and what it cost, and what is still to come, on the suppliers' list | Accepted |
 
 ---
 
@@ -14526,3 +14527,25 @@
 * **Alternatives:**
   * **The analytics' top products:** sales in money over a period, by product; not stock's
     pace by size, nor how long it lasts.
+
+## ADR-371 · What was bought from each supplier: its purchase orders, what came of them and what it cost, and what is still to come, on the suppliers' list
+
+* **Context:**
+  * The suppliers' list (ADR-351) kept names, numbers and notes, and linked each supplier's
+    purchase orders, but said nothing of how much the shop buys from it or still waits for,
+    which is what is weighed before ordering again (INV-05).
+* **Decision:**
+  * **On the Admin API**, `supplier(id)`, and `Supplier.purchasing`: its purchase orders and
+    how many are open, the units received on them and what they cost, the units open orders
+    still await and what those cost, and when the latest was made. Worked out from the orders'
+    lines when asked, a page of suppliers asking once; lines with no cost count in units and
+    not in money; closed orders await nothing more.
+  * **In the admin**, each supplier on the suppliers' list says "2 purchase orders · 17
+    received for Rs 35,702.50 · 3 still to come, Rs 6,301.50 · last ordered" a day; in units
+    alone where no cost was given, and nothing for a supplier never ordered from.
+* **Consequences:**
+  * Who the shop buys most from, and what it is owed in goods, is read where suppliers are kept.
+  * Not yet: what was paid to a supplier, or how long its goods take to come.
+* **Alternatives:**
+  * **A page of its own for each supplier:** the list already links its orders; a line on the
+    list says the totals without another page to open.

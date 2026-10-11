@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, a supplier's page** (INV-05): each supplier's purchase orders, what came of them and
-what they cost in all, and what the shop still waits for from it; then section by section as
-the alpha's shops need them. Urdu handles wait, as decided.
+**Next, the products list by how fast they sell** (CAT-04, INV-08): each product's units sold in
+the last 30 days on the products list, and the list sorted by it, best sellers first; then
+section by section as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### What was bought from each supplier, in the core and the admin
+
+* **A supplier's purchasing** ([ADR-371](../architecture/13-decision-log.md#adr-371--what-was-bought-from-each-supplier-its-purchase-orders-what-came-of-them-and-what-it-cost-and-what-is-still-to-come-on-the-suppliers-list)): `supplier(id)` and `Supplier.purchasing`, its orders,
+  what came and what it cost, and what is still to come. Each supplier on the suppliers' list
+  says so in a line.
+* **Tried in Chromium against the core:** the seed's Nishat Mills read "2 purchase orders · 23
+  received for Rs 24,300 · 4 still to come", and Gul Ahmed "1 purchase order · 22 still to
+  come", in units where no cost was given. The first try showed "Rs 0" for those; fixed before
+  committing. No errors in the browser.
+* 2521 tests: what was bought from each supplier, and another shop's none, in the
+  inventory module; through the Admin API with the order received in part; in the admin, in
+  money, in units, and nothing for one never ordered from.
 
 ### e409560 · How fast a product sells, on its page, in the core and the admin
 

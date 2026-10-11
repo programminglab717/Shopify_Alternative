@@ -913,6 +913,32 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       fileName: 'purchase-order-1.html',
       html: expect.stringContaining('Nishat Mills'),
     });
+    // What came from the supplier and what it cost, and the three still to come (ADR-371).
+    const bought = await gql(
+      tokens.aStockReader,
+      `query ($id: ID!) {
+         supplier(id: $id) {
+           name
+           purchasing {
+             purchaseOrders openPurchaseOrders receivedQuantity receivedCost { amount }
+             awaitingQuantity awaitingCost { amount } lastOrderedAt
+           }
+         }
+       }`,
+      { id: supplier.supplier.id },
+    );
+    expect(bought.data?.supplier).toEqual({
+      name: 'Nishat Mills',
+      purchasing: {
+        purchaseOrders: 1,
+        openPurchaseOrders: 1,
+        receivedQuantity: 17,
+        receivedCost: { amount: '35702.50' },
+        awaitingQuantity: 3,
+        awaitingCost: { amount: '6301.50' },
+        lastOrderedAt: expect.stringMatching(ISO_TIME),
+      },
+    });
     const closed = await mutate(
       tokens.a,
       `mutation ($id: ID!) { purchaseOrderClose(id: $id) { purchaseOrder { status closedAt } userErrors { code } } }`,
@@ -940,10 +966,12 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     expect(forbidden.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
     const theirs = await gql(
       tokens.b,
-      `query ($id: ID!) { purchaseOrder(id: $id) { id } suppliers { id } }`,
-      { id: order.id },
+      `query ($id: ID!, $supplierId: ID!) {
+         purchaseOrder(id: $id) { id } suppliers { id } supplier(id: $supplierId) { id }
+       }`,
+      { id: order.id, supplierId: supplier.supplier.id },
     );
-    expect(theirs.data).toEqual({ purchaseOrder: null, suppliers: [] });
+    expect(theirs.data).toEqual({ purchaseOrder: null, suppliers: [], supplier: null });
   });
 
   it('changes an open purchase order: lines added, changed and removed (ADR-351)', async () => {

@@ -2575,8 +2575,20 @@ export interface Supplier {
   note: string | null;
 }
 
+/** What the shop has bought from a supplier, and still waits for (ADR-371). */
+export interface SupplierPurchasing {
+  purchaseOrders: number;
+  receivedQuantity: number;
+  /** What the units received cost, where a cost was given. */
+  receivedCost: { amount: string };
+  /** Units on open purchase orders, not yet received. */
+  awaitingQuantity: number;
+  awaitingCost: { amount: string };
+  lastOrderedAt: string | null;
+}
+
 export interface SuppliersData {
-  suppliers: Supplier[];
+  suppliers: (Supplier & { purchasing: SupplierPurchasing })[];
 }
 
 export interface PurchaseOrderDocumentData {

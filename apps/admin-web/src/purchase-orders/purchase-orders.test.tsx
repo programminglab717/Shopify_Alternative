@@ -76,8 +76,50 @@ function poCore(role: StaffRole, start: [number, number] = [0, 0], places = [GOD
       case 'Suppliers':
         return {
           suppliers: [
-            { id: 'sup_1', name: 'Nishat Mills', phone: '+923007654321', note: null },
-            { id: 'sup_9', name: 'Ajrak House', phone: null, note: 'Hala' },
+            {
+              id: 'sup_1',
+              name: 'Nishat Mills',
+              phone: '+923007654321',
+              note: null,
+              // Seventeen came, three still to come (ADR-371).
+              purchasing: {
+                purchaseOrders: 2,
+                receivedQuantity: 17,
+                receivedCost: { amount: '35702.50' },
+                awaitingQuantity: 3,
+                awaitingCost: { amount: '6301.50' },
+                lastOrderedAt: LATER,
+              },
+            },
+            {
+              id: 'sup_9',
+              name: 'Ajrak House',
+              phone: null,
+              note: 'Hala',
+              // Ordered from with no costs given: in units alone.
+              purchasing: {
+                purchaseOrders: 1,
+                receivedQuantity: 0,
+                receivedCost: { amount: '0.00' },
+                awaitingQuantity: 22,
+                awaitingCost: { amount: '0.00' },
+                lastOrderedAt: LATER,
+              },
+            },
+            {
+              id: 'sup_5',
+              name: 'Never ordered from',
+              phone: null,
+              note: null,
+              purchasing: {
+                purchaseOrders: 0,
+                receivedQuantity: 0,
+                receivedCost: { amount: '0.00' },
+                awaitingQuantity: 0,
+                awaitingCost: { amount: '0.00' },
+                lastOrderedAt: null,
+              },
+            },
           ],
         };
       case 'SupplierUpdate':
@@ -341,6 +383,14 @@ describe('Purchase orders (INV-05)', () => {
 
     expect(await screen.findByText('Nishat Mills')).toBeTruthy();
     expect(screen.getByText('Hala')).toBeTruthy();
+    // What came from each and what it cost; one never ordered from says nothing of it.
+    expect(
+      screen.getByText(
+        /^2 purchase orders · 17 received for Rs 35,702\.50 · 3 still to come, Rs 6,301\.50 · last ordered /,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText(/^1 purchase order · 22 still to come · last ordered /)).toBeTruthy();
+    expect(screen.getAllByText(/purchase orders? ·/)).toHaveLength(2);
     await press('Change Nishat Mills');
     expect((screen.getByLabelText("Supplier's name") as HTMLInputElement).value).toBe(
       'Nishat Mills',

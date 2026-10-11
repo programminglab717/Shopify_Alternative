@@ -23,6 +23,7 @@ import {
   PurchaseOrderService,
   type PurchaseOrderRecord,
   type ReorderRecord,
+  type SupplierPurchasingRecord,
   type SupplierRecord,
 } from '../purchase-order.service.js';
 import type { PurchaseOrderStatusValue } from '../schema.js';
@@ -46,6 +47,7 @@ import {
   Supplier,
   SupplierInput,
   SupplierPayload,
+  SupplierPurchasing,
 } from './purchase-order.types.js';
 
 function toSupplier(record: SupplierRecord): Supplier {
@@ -121,6 +123,16 @@ export class PurchaseOrderResolver {
   @RequireScopes('read_inventory')
   async suppliers(@CurrentTenant() tenant: TenantContext): Promise<Supplier[]> {
     return (await this.service.suppliers(tenant)).map(toSupplier);
+  }
+
+  @Query(() => Supplier, { nullable: true, description: 'A supplier by ID.' })
+  @RequireScopes('read_inventory')
+  async supplier(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<Supplier | null> {
+    const record = await this.service.supplier(tenant, uuidOf('supplier', id));
+    return record ? toSupplier(record) : null;
   }
 
   @Query(() => PurchaseOrder, { nullable: true, description: 'A purchase order by ID.' })
@@ -378,5 +390,35 @@ export class LowStockReorderResolver {
   ): Promise<Money | null> {
     const cost = (await this.#reorder(tenant, loaders, item))?.lastUnitCost ?? null;
     return cost === null ? null : Money.from(money(cost, tenant.currency));
+  }
+}
+
+/** What the shop has bought from a supplier (ADR-371), a page of suppliers asking once. */
+@Resolver(() => Supplier)
+export class SupplierResolver {
+  constructor(private readonly service: PurchaseOrderService) {}
+
+  @ResolveField(() => SupplierPurchasing)
+  @RequireScopes('read_inventory')
+  async purchasing(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() supplier: Supplier,
+  ): Promise<SupplierPurchasing> {
+    const amount = (minor: bigint) => Money.from(money(minor, tenant.currency));
+    const record = await loaders
+      .get<string, SupplierPurchasingRecord>('inventory.supplierPurchasing', (ids) =>
+        this.service.purchasingOf(tenant, ids),
+      )
+      .load(uuidOf('supplier', supplier.id));
+    return {
+      purchaseOrders: record?.orders ?? 0,
+      openPurchaseOrders: record?.open ?? 0,
+      receivedQuantity: record?.receivedQuantity ?? 0,
+      receivedCost: amount(record?.receivedCost ?? 0n),
+      awaitingQuantity: record?.awaitingQuantity ?? 0,
+      awaitingCost: amount(record?.awaitingCost ?? 0n),
+      lastOrderedAt: record?.lastOrderedAt ?? null,
+    };
   }
 }
