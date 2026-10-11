@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-369 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-370 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -377,6 +377,7 @@
 | 367 | Purchase orders, suppliers and transfers on the activity log: each step an event with who took it, linked to its page in the admin | Accepted |
 | 368 | Reordering from what sells: each variant running low with what it sold in the last 30 days from the stock ledger and how long its stock lasts, and a purchase order for enough to last the days chosen | Accepted |
 | 369 | What the stock is worth: units on hand of tracked variants at what each costs now, in all and by location, for those who see the shop's costs | Accepted |
+| 370 | How fast a product sells, on its page: each variant's units sold in the last 30 days and how long what is for sale lasts, for any variant and not only those running low | Accepted |
 
 ---
 
@@ -14504,3 +14505,24 @@
   * **Valued from purchase orders' costs line by line (FIFO):** closer to what was paid, but
     stock counted before any purchase order has none; the variant's cost, averaged as goods
     come in (ADR-352), is what profit uses too.
+
+## ADR-370 · How fast a product sells, on its page: each variant's units sold in the last 30 days and how long what is for sale lasts, for any variant and not only those running low
+
+* **Context:**
+  * What sold in the last 30 days (ADR-368) was told only of variants running low. Staff
+    deciding what to restock, mark down or stop reordering look at a product's page, where
+    nothing said how fast its sizes sell (CAT-01, INV-08).
+* **Decision:**
+  * **On the Admin API**, `ProductVariant.soldLast30Days`, at all the shop's locations, and
+    `daysOfStockLeft`: whole days what can be sold online lasts at that pace, none when out,
+    null when nothing sold or its stock is not tracked. They read through the request's batch
+    loader the low list uses, so a page of variants asks once; `read_inventory` as stock does.
+  * **In the admin**, the product page says beside each variant "6 sold in 30 days · lasts
+    about 20 days", and under a product sold as it is; a variant that sold none says nothing.
+* **Consequences:**
+  * A size that sells fast and one that does not are told apart where prices and stock are
+    changed.
+  * Not yet: the pace on the products list, sorting by it, or over other spans.
+* **Alternatives:**
+  * **The analytics' top products:** sales in money over a period, by product; not stock's
+    pace by size, nor how long it lasts.

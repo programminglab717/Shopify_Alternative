@@ -103,6 +103,25 @@ export class LowStockResolver {
   }
 }
 
+/**
+ * What a variant sold in the last 30 days (ADR-368), at `locationId` or at all the shop's
+ * locations, through the request's batch loader: a page of variants reads it with one query.
+ */
+export function loadSold(
+  loaders: RequestLoaders,
+  lowStock: LowStockService,
+  tenant: TenantContext,
+  variantId: string,
+  locationId: string | null = null,
+): Promise<number> {
+  return loaders
+    .get<string, number>(`inventory.sold:${locationId ?? 'online'}`, (ids) =>
+      lowStock.soldOf(tenant, ids, locationId),
+    )
+    .load(variantId)
+    .then((sold) => sold ?? 0);
+}
+
 @Resolver(() => LowStockItem)
 export class LowStockItemResolver {
   constructor(
@@ -112,13 +131,7 @@ export class LowStockItemResolver {
 
   #sold(tenant: TenantContext, loaders: RequestLoaders, item: LowStockItem): Promise<number> {
     // Listed for one location, what sold from there alone (ADR-359).
-    const locationId = item.record.locationId ?? null;
-    return loaders
-      .get<string, number>(`inventory.sold:${locationId ?? 'online'}`, (ids) =>
-        this.lowStock.soldOf(tenant, ids, locationId),
-      )
-      .load(item.record.variantId)
-      .then((sold) => sold ?? 0);
+    return loadSold(loaders, this.lowStock, tenant, item.record.variantId, item.record.locationId);
   }
 
   @ResolveField(() => Int, {

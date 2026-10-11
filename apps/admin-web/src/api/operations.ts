@@ -881,6 +881,8 @@ const PRODUCT = /* GraphQL */ `
         value
       }
       inventoryQuantity
+      soldLast30Days
+      daysOfStockLeft
       inventoryItem {
         id
         tracked

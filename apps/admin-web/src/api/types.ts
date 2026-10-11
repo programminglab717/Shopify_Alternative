@@ -418,6 +418,10 @@ export interface ProductVariantDetail {
   taxCode: string | null;
   selectedOptions: { name: string; value: string }[];
   inventoryQuantity: number;
+  /** Units sold in the last 30 days, at all the shop's locations (ADR-370). */
+  soldLast30Days: number;
+  /** Whole days what can be sold online lasts at that pace; null when none sold. */
+  daysOfStockLeft: number | null;
   inventoryItem: {
     id: string;
     tracked: boolean;

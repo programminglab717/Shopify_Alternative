@@ -21,6 +21,9 @@ function variant(id: string, title: string, item: Item) {
     taxCode: null,
     selectedOptions: title === 'Default Title' ? [] : [{ name: 'Size', value: title }],
     inventoryQuantity: 4,
+    // The small sold six in 30 days: its four for sale last 20 more (ADR-370).
+    soldLast30Days: id === 'var_s' ? 6 : 0,
+    daysOfStockLeft: id === 'var_s' ? 20 : null,
     inventoryItem: {
       ...item,
       inventoryLevels: item.tracked ? [{ available: 4, location: { id: LOCATION.id } }] : [],
@@ -116,6 +119,9 @@ describe("A product's stock rules", () => {
     renderAdmin('/shop_1/products/prod_1');
 
     const rules = await screen.findByRole('region', { name: 'Stock rules' });
+    // How fast each size sells, beside its name; the one that sold none says nothing.
+    expect(screen.getByText('6 sold in 30 days · lasts about 20 days')).toBeTruthy();
+    expect(screen.getAllByText(/sold in 30 days/)).toHaveLength(1);
     const keepS = within(rules).getByLabelText(/^Keep selling S when out of stock/);
     expect((keepS as HTMLInputElement).checked).toBe(false);
     fireEvent.click(keepS);

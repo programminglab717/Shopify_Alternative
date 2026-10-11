@@ -9,8 +9,10 @@ import { Product, ProductVariant } from '@hatti/catalog/public';
 import { Int, Parent, ResolveField, Resolver } from '@nestjs/graphql';
 import { InventoryService } from '../inventory.service.js';
 import { availableForSale, sellableQuantity } from '../item-store.js';
+import { LowStockService, SALES_PACE_DAYS, daysLeft } from '../low-stock.service.js';
 import type { InventoryItemRecord } from '../records.js';
 import { loadItem } from './inventory.resolver.js';
+import { loadSold } from './low-stock.resolver.js';
 import { InventoryItem } from './inventory.types.js';
 import { toInventoryItem, uuidOf } from './mappers.js';
 
@@ -19,7 +21,10 @@ import { toInventoryItem, uuidOf } from './mappers.js';
 
 @Resolver(() => ProductVariant)
 export class VariantInventoryResolver {
-  constructor(private readonly service: InventoryService) {}
+  constructor(
+    private readonly service: InventoryService,
+    private readonly lowStock: LowStockService,
+  ) {}
 
   #item(
     tenant: TenantContext,
@@ -66,6 +71,40 @@ export class VariantInventoryResolver {
     @Parent() variant: ProductVariant,
   ): Promise<boolean> {
     return availableForSale(await this.#item(tenant, loaders, variant));
+  }
+
+  @ResolveField(() => Int, {
+    description:
+      `Units sold in the last ${SALES_PACE_DAYS} days at all the shop's locations (INV-08): ` +
+      'committed to orders, less those released when orders were cancelled.',
+  })
+  @RequireScopes('read_inventory')
+  soldLast30Days(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() variant: ProductVariant,
+  ): Promise<number> {
+    return loadSold(loaders, this.lowStock, tenant, uuidOf('variant', variant.id));
+  }
+
+  @ResolveField(() => Int, {
+    nullable: true,
+    description:
+      'Whole days what can be sold online lasts at the pace it sold in the last 30: none when ' +
+      'out; null when it sold none or its stock is not tracked.',
+  })
+  @RequireScopes('read_inventory')
+  async daysOfStockLeft(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() variant: ProductVariant,
+  ): Promise<number | null> {
+    const id = uuidOf('variant', variant.id);
+    const [item, sold] = await Promise.all([
+      this.#item(tenant, loaders, variant),
+      loadSold(loaders, this.lowStock, tenant, id),
+    ]);
+    return item.tracked ? daysLeft(sellableQuantity(item), sold) : null;
   }
 }
 

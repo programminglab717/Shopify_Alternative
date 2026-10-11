@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, how fast a product sells, on its page** (CAT-01, INV-08): each variant's units sold in
-the last 30 days and how long its stock lasts, on the product's page as on the low list, for
-any variant and not only those running low; then section by section as the alpha's shops need
-them. Urdu handles wait, as decided.
+**Next, a supplier's page** (INV-05): each supplier's purchase orders, what came of them and
+what they cost in all, and what the shop still waits for from it; then section by section as
+the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +17,18 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### How fast a product sells, on its page, in the core and the admin
+
+* **Any variant's pace** ([ADR-370](../architecture/13-decision-log.md#adr-370--how-fast-a-product-sells-on-its-page-each-variants-units-sold-in-the-last-30-days-and-how-long-what-is-for-sale-lasts-for-any-variant-and-not-only-those-running-low)): `ProductVariant.soldLast30Days` and `daysOfStockLeft`,
+  through the low list's batch loader. The product page says beside each size how many sold in
+  30 days and about how long the rest lasts.
+* **Tried in Chromium against the core:** the seed's Multani Khussa said "3 sold in 30 days ·
+  lasts about 10 days" beside 37 / Gold and "1 sold in 30 days · lasts about 60 days" beside
+  38 / Gold, and nothing beside the sizes that sold none. No errors in the browser.
+* 2520 tests, as before: an order placed counted as sold, with the days left, in the Admin
+  API's orders test; the pace beside a size that sold, and none beside one that did not, in the
+  admin's stock rules test.
 
 ### 87b4d79 · What the stock is worth, in the core and the admin
 

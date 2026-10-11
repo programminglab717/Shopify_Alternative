@@ -25,6 +25,7 @@ import type {
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
+import type { Translate } from '../i18n/locale';
 import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
@@ -87,6 +88,16 @@ function rowsOf(product: ProductDetail, location: LocationRef | null): VariantRo
       stockWas,
     };
   });
+}
+
+/** How fast a variant sells, as the stock page's low list says it (ADR-370); null if it sold none. */
+function paceOf(variant: ProductVariantDetail, t: Translate): string | null {
+  if (!(variant.soldLast30Days > 0)) return null;
+  const sold = t('stock.sold', { count: formatCount(variant.soldLast30Days) });
+  const days = variant.daysOfStockLeft;
+  return days !== null && days > 0
+    ? `${sold} · ${t('stock.lasts', { count: formatCount(days) })}`
+    : sold;
 }
 
 /** Whether the product is sold as it is, its one variant Shopify's "Default Title". */
@@ -167,6 +178,7 @@ function VariantFields({
             />
           </label>
         </div>
+        {paceOf(row.variant, t) && <p className="text-secondary">{paceOf(row.variant, t)}</p>}
       </FormSection>
     );
   }
@@ -179,10 +191,18 @@ function VariantFields({
       <ul className="flex flex-col divide-y divide-line">
         {rows.map((row, index) => {
           const name = row.variant.title;
+          const pace = paceOf(row.variant, t);
           return (
             <li key={row.variant.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
-              <span className="font-medium" dir="auto">
-                {name}
+              <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <span className="font-medium" dir="auto">
+                  {name}
+                </span>
+                {pace && (
+                  <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                    {pace}
+                  </span>
+                )}
               </span>
               <div className="grid grid-cols-3 gap-2">
                 <CellInput

@@ -8590,6 +8590,11 @@ type ProductVariant {
 
   """What one unit costs the shop, for profit."""
   cost: Money
+
+  """
+  Whole days what can be sold online lasts at the pace it sold in the last 30: none when out; null when it sold none or its stock is not tracked.
+  """
+  daysOfStockLeft: Int
   id: ID!
 
   """How the variant's stock is counted, and where it is."""
@@ -8606,6 +8611,11 @@ type ProductVariant {
   price: Money!
   selectedOptions: [SelectedOption!]!
   sku: String
+
+  """
+  Units sold in the last 30 days at all the shop's locations (INV-08): committed to orders, less those released when orders were cancelled.
+  """
+  soldLast30Days: Int!
 
   """
   Shopify's tax code: one of the shop's tax categories' codes, whose rate its price's tax is at instead of the shop's; null for the shop's own.

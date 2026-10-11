@@ -228,18 +228,21 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
       createdAt: expect.stringMatching(/Z$/),
     });
 
-    // The stock is committed: size 8 has 3 left to sell.
+    // The stock is committed: size 8 has 3 left to sell. Each sold at a pace, the order its
+    // first sale: two of size 8 in 30 days, three left lasting 45 more (ADR-370).
     const stock = await gql(
       tokens.a,
-      `query ($id: ID!) { product(id: $id) { variants { inventoryQuantity } } }`,
+      `query ($id: ID!) {
+         product(id: $id) { variants { inventoryQuantity soldLast30Days daysOfStockLeft } }
+       }`,
       {
         id: (await gql(tokens.a, '{ products(first: 1) { nodes { id } } }')).data?.products.nodes[0]
           .id,
       },
     );
     expect(stock.data?.product.variants).toEqual([
-      { inventoryQuantity: 3 },
-      { inventoryQuantity: 4 },
+      { inventoryQuantity: 3, soldLast30Days: 2, daysOfStockLeft: 45 },
+      { inventoryQuantity: 4, soldLast30Days: 1, daysOfStockLeft: 120 },
     ]);
 
     const found = await gql(
