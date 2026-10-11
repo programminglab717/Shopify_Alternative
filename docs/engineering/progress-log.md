@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### What runs low at one location, in the core and the admin
+### 0658476 · What runs low at one location, in the core and the admin
 
 * **Low stock by location** ([ADR-359](../architecture/13-decision-log.md#adr-359--what-runs-low-at-one-location-inventorylowstocklocationid-lists-what-it-stocked-before-by-what-is-available-there-with-what-is-on-order-for-it-the-stock-pages-choice-kept-with-the-orders-lists-and-the-purchase-order-from-it-goes-there)): `inventoryLowStock(locationId)` lists what a location
   stocked before and now has at or under the shop's threshold, with what is on order for it. The
