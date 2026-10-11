@@ -1,4 +1,4 @@
-import { Link, useParams } from '@tanstack/react-router';
+import { Link, useParams, useSearch } from '@tanstack/react-router';
 import {
   ArrowLeft,
   Ban,
@@ -38,7 +38,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { OrderMessages } from '../settings/messages-page';
 import { Assignment, DeliveryAddress, NoteAndTags, Timeline } from './details';
 import { OrderItems } from './edit-order';
-import { PackByScan } from './pack-by-scan';
+import { NextToPack, PackByScan } from './pack-by-scan';
 import { CustomerLink, SENDS_LINKS } from './customer-link';
 import { HANDLES_MONEY, OrderMoney } from './money';
 import { OnlinePayments } from './online-payments';
@@ -89,9 +89,19 @@ const SHIPPABLE: readonly OrderStage[] = ['TO_BOOK', 'PARTIALLY_FULFILLED'];
  * nothing has shipped, ship by hand with a courier Hatti does not book with, or cancel for a
  * reason.
  */
+export interface OrderSearch {
+  /** Opened to be packed by scanning, from the orders to pack (ADR-374). */
+  scan?: boolean;
+}
+
+export function validateOrderSearch(search: Record<string, unknown>): OrderSearch {
+  return { scan: search.scan === true || search.scan === 'true' ? true : undefined };
+}
+
 function Actions({ order }: { order: OrderDetail }) {
   const { t } = useLocale();
   const { role } = useShop();
+  const { scan } = useSearch({ from: '/$shopId/orders/$orderId' });
   const confirm = useAdminMutation<OrderMutationData, { id: string }>(OrderConfirmMutation);
   const pack = useAdminMutation<OrderMutationData, { id: string }>(OrderMarkPackedMutation);
   const unpack = useAdminMutation<OrderMutationData, { id: string }>(OrderMarkUnpackedMutation);
@@ -100,18 +110,24 @@ function Actions({ order }: { order: OrderDetail }) {
   );
   const [cancelling, setCancelling] = useState(false);
   const [shipping, setShipping] = useState(false);
-  const [scanning, setScanning] = useState(false);
+  const [scanning, setScanning] = useState(scan === true);
+  const [packedByScan, setPackedByScan] = useState(false);
   const [reason, setReason] = useState<OrderCancelReason>('CUSTOMER');
   const [problem, setProblem] = useState<string | null>(null);
 
-  const run = async (action: () => Promise<OrderMutationData>) => {
+  const run = async (action: () => Promise<OrderMutationData>): Promise<boolean> => {
     setProblem(null);
     try {
       const payload = Object.values(await action())[0]!;
-      if (payload.userErrors.length > 0) setProblem(payload.userErrors[0]!.message);
-      else setCancelling(false);
+      if (payload.userErrors.length > 0) {
+        setProblem(payload.userErrors[0]!.message);
+        return false;
+      }
+      setCancelling(false);
+      return true;
     } catch (failure) {
       setProblem(errorText(failure, t));
+      return false;
     }
   };
 
@@ -121,6 +137,8 @@ function Actions({ order }: { order: OrderDetail }) {
   const canUnpack = open && order.stage === 'TO_BOOK' && order.fulfillments.length === 0;
   const canShip = open && !order.overPlanLimit && SHIPPABLE.includes(order.stage);
   const canCancel = open && CANCELLABLE.includes(order.stage);
+  // Packed by scanning: the next order to pack, to go on scanning (ADR-374).
+  if (packedByScan) return <NextToPack after={order.id} />;
   if (!canConfirm && !canPack && !canUnpack && !canShip && !canCancel) return null;
 
   return (
@@ -197,7 +215,11 @@ function Actions({ order }: { order: OrderDetail }) {
         <PackByScan
           order={order}
           packing={pack.isPending}
-          onPack={() => void run(() => pack.mutateAsync({ id: order.id }))}
+          onPack={() =>
+            void run(() => pack.mutateAsync({ id: order.id })).then((packed) => {
+              if (packed) setPackedByScan(true);
+            })
+          }
           onClose={() => setScanning(false)}
         />
       )}

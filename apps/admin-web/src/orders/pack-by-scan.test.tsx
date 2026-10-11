@@ -74,11 +74,37 @@ const BY_CODE: Record<string, { id: string; item: string }> = {
   'KURTA-L': { id: 'var_9', item: 'invi_9' },
 };
 
-function core(role: StaffRole) {
+/** An order to pack in the list. */
+const listed = (id: string, name: string) => ({
+  id,
+  name,
+  createdAt: LATER,
+  stage: 'TO_PACK',
+  paymentMethod: 'CASH_ON_DELIVERY',
+  overPlanLimit: false,
+  totalPrice: rupees('7700'),
+  customer: null,
+  shippingAddress: { name: 'Ayesha', city: 'Lahore' },
+  risk: null,
+  lineItems: [{ quantity: 3 }],
+});
+
+function core(role: StaffRole, toPack = [listed('ord_7', '#1007'), listed('ord_8', '#1008')]) {
+  let packed = false;
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'Order':
-        return order([]);
+        return order([], packed ? 'TO_BOOK' : 'TO_PACK');
+      case 'Locations':
+        return { locations: { nodes: [{ id: 'loc_1', name: 'Main location', isPrimary: true }] } };
+      case 'Orders':
+        return {
+          orders: {
+            nodes: packed ? toPack.filter((each) => each.id !== 'ord_7') : toPack,
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+          orderStageCounts: [{ stage: 'TO_PACK', count: toPack.length }],
+        };
       case 'StockCountFind': {
         const code = /"(.*)"/.exec(String(variables.query))![1]!;
         const found = BY_CODE[code];
@@ -106,6 +132,7 @@ function core(role: StaffRole) {
         };
       }
       case 'OrderMarkPacked':
+        packed = true;
         return { orderMarkPacked: { userErrors: [] } };
       default:
         throw new Error(`unexpected ${operation}`);
@@ -159,6 +186,34 @@ describe('An order packed by scanning (ADR-373)', () => {
     fireEvent.click(pack);
     await waitFor(() =>
       expect(fake.sent.filter((each) => each.operation === 'OrderMarkPacked')).toHaveLength(1),
+    );
+    // Then the next to pack, opened to scan (ADR-374).
+    const next = await screen.findByRole('link', { name: 'Scan the next to pack: #1008' });
+    expect(next.getAttribute('href')).toBe('/shop_1/orders/ord_8?scan=true');
+  });
+
+  it('works through the orders to pack from the list, opening each to scan, until none is left', async () => {
+    const fake = core('packer', [listed('ord_7', '#1007')]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders?stage=TO_PACK');
+    const start = await screen.findByRole('link', { name: 'Pack by scanning' });
+    expect(start.getAttribute('href')).toBe('/shop_1/orders/ord_7?scan=true');
+    cleanup();
+
+    // Opened to scan at once; with the last packed, none is left.
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7?scan=true');
+    const panel = (await screen.findByRole('heading', { name: 'Scan what goes in the parcel' }))
+      .parentElement!;
+    for (const code of ['LS-M', 'LS-M', '8901234']) {
+      type('Barcode or SKU', code);
+      fireEvent.submit(within(panel).getByLabelText('Barcode or SKU').closest('form')!);
+      await within(panel).findByText(code === '8901234' ? '1 of 1' : /of 2/);
+    }
+    fireEvent.click(await within(panel).findByRole('button', { name: 'Pack the order' }));
+    expect(await screen.findByText('Nothing more to pack.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Orders to pack' }).getAttribute('href')).toBe(
+      '/shop_1/orders?stage=TO_PACK',
     );
   });
 });

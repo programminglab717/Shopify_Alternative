@@ -1,11 +1,16 @@
-import { Check, PackageCheck } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { Check, PackageCheck, ScanBarcode } from 'lucide-react';
 import { useState } from 'react';
-import type { OrderDetail } from '../api/types';
+import { OrdersQuery } from '../api/operations';
+import type { OrderDetail, OrdersData } from '../api/types';
+import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
+import { useAdminQuery, useShop } from '../shell/shop-context';
 import { CountByCode } from '../stock/count-by-code';
 import { Button } from '../ui/button';
-import { Alert, Card } from '../ui/feedback';
+import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
+import { useOrdersLocation } from './location-filter';
 
 const titleOf = (line: OrderDetail['lineItems'][number]) =>
   line.variantTitle && line.variantTitle !== 'Default Title'
@@ -95,6 +100,59 @@ export function PackByScan({
           {t('pack.stop')}
         </Button>
       </div>
+    </Card>
+  );
+}
+
+/**
+ * After an order is packed by scanning, the next one to pack (ADR-374): the oldest waiting at
+ * the location the orders list shows, opened to scan; or word that none is left.
+ */
+export function NextToPack({ after }: { after: string }) {
+  const { t } = useLocale();
+  const shop = useShop();
+  const where = useOrdersLocation(undefined);
+  const query = [where.location && `location_id:${where.location}`].filter(Boolean).join(' ');
+  const next = useAdminQuery<OrdersData>(
+    ['nextToPack', after, where.location ?? null],
+    OrdersQuery,
+    {
+      first: 2,
+      after: null,
+      query: query || null,
+      stage: 'TO_PACK',
+      locationId: where.location ?? null,
+    },
+    { enabled: where.ready },
+  );
+  if (!where.ready || next.isPending) return <Loading label={t('state.loading')} />;
+  if (next.isError) return <ErrorState message={errorText(next.error, t)} />;
+  const order = next.data.orders.nodes.find((each) => each.id !== after);
+  return (
+    <Card className="flex flex-col gap-3 p-4">
+      {order ? (
+        <Link
+          to="/$shopId/orders/$orderId"
+          params={{ shopId: shop.id, orderId: order.id }}
+          search={{ scan: true }}
+          className="inline-flex min-h-12 items-center gap-2 self-start rounded-control bg-primary px-4 font-medium text-on-primary md:min-h-10"
+        >
+          <ScanBarcode aria-hidden className="size-5" />
+          {t('pack.next', { name: order.name })}
+        </Link>
+      ) : (
+        <>
+          <Alert tone="success">{t('pack.noneLeft')}</Alert>
+          <Link
+            to="/$shopId/orders"
+            params={{ shopId: shop.id }}
+            search={{ stage: 'TO_PACK' }}
+            className="self-start font-medium text-primary hover:underline"
+          >
+            {t('pack.toList')}
+          </Link>
+        </>
+      )}
     </Card>
   );
 }

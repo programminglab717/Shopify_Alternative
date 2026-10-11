@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, the orders to pack scanned one after another** (APP-04, ORD-05): from the To pack
-list, each order opened to scan in turn and the next one brought up once it is packed, so a
-packer works through the day's orders without going back to the list; then section by section
-as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, a packing slip printed as each order is packed by scanning** (ORD-06, APP-04): once
+the scanned order is packed, its slip offered to print before going on to the next, so the
+parcel leaves the table with its paper; then section by section as the alpha's shops need them.
+Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### The orders to pack scanned one after another, in the admin
+
+* **One after another** ([ADR-374](../architecture/13-decision-log.md#adr-374--the-orders-to-pack-scanned-one-after-another-the-to-pack-list-opens-the-first-to-scan-and-each-packed-brings-up-the-next-until-none-is-left)): the To pack tab's "Pack by scanning" opens its first order
+  with the scanner open; once packed, "Scan the next to pack" brings up the next at the list's
+  location, and "Nothing more to pack" ends it. Nothing new in the core.
+* **Tried in Chromium against the core:** on the seed's shop, the To pack tab linked #1003 with
+  `?scan=true`, and the order opened with its scanner up and one item still to scan. It was not
+  packed, its variant having no code, and the seed was left as it was. No errors in the browser.
+* 2523 tests: in the admin, the To pack tab's link to the first order, the next to pack
+  offered once one is packed, and none left said after the last.
 
 ### 591adcf · An order packed by scanning, in the admin
 

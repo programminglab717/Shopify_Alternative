@@ -65,7 +65,7 @@ import { NewDraftPage } from './drafts/new-draft-page';
 import { InvitationPage } from './invitation/invitation-page';
 import { HomePage } from './home/home-page';
 import { useLocale } from './i18n/locale';
-import { OrderPage } from './orders/order-page';
+import { OrderPage, validateOrderSearch } from './orders/order-page';
 import { OrdersPage, validateOrdersSearch } from './orders/orders-page';
 import { NewProductPage } from './products/new-product-page';
 import { ProductPage, validateProductSearch } from './products/product-page';
@@ -237,6 +237,7 @@ const ordersExport = createRoute({
 const order = createRoute({
   getParentRoute: () => shop,
   path: 'orders/$orderId',
+  validateSearch: validateOrderSearch,
   component: OrderPage,
 });
 

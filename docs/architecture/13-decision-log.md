@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-373 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-374 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -381,6 +381,7 @@
 | 371 | What was bought from each supplier: its purchase orders, what came of them and what it cost, and what is still to come, on the suppliers' list | Accepted |
 | 372 | How fast each product sells, on the products list: its variants' units sold in the last 30 days together, read through the same batch loader | Accepted |
 | 373 | An order packed by scanning: each item read ticks off its line, one not in the order or one too many said at once, and the order packed once all of it is there | Accepted |
+| 374 | The orders to pack scanned one after another: the To pack list opens the first to scan, and each packed brings up the next, until none is left | Accepted |
 
 ---
 
@@ -14595,3 +14596,25 @@
 * **Alternatives:**
   * **Requiring a scan to pack:** shops whose goods carry no barcode or SKU could not pack at
     all.
+
+## ADR-374 · The orders to pack scanned one after another: the To pack list opens the first to scan, and each packed brings up the next, until none is left
+
+* **Context:**
+  * An order is packed by scanning on its page (ADR-373), but a packer with forty orders went
+    back to the list after each, found the next and opened its scanner again (APP-04, ORD-05).
+* **Decision:**
+  * **In the admin**, the To pack tab offers "Pack by scanning" to those who work orders,
+    opening its first order with the scanner already open (`?scan=true` on the order's
+    address).
+  * Once an order is packed by scanning, its page offers "Scan the next to pack" with the next
+    order's name: the first still to pack at the location the orders list shows, opened to scan
+    in turn. With none left it says "Nothing more to pack" and links back to the list.
+  * Nothing new in the core: the next is the orders list's own query, at its location.
+* **Consequences:**
+  * A packer works through the day's orders at one table, phone in hand, without the list in
+    between.
+  * Not yet: the packing slip printed as each is packed, or more than one packer kept from the
+    same order.
+* **Alternatives:**
+  * **Packing many orders in one screen:** a parcel is packed one at a time; one order on the
+    screen is the one on the table.
