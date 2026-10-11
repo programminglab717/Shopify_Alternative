@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### What the stock is worth, in the core and the admin
+### 87b4d79 · What the stock is worth, in the core and the admin
 
 * **At cost, by location** ([ADR-369](../architecture/13-decision-log.md#adr-369--what-the-stock-is-worth-units-on-hand-of-tracked-variants-at-what-each-costs-now-in-all-and-by-location-for-those-who-see-the-shops-costs)): `inventoryValue` multiplies each tracked variant's units
   on hand by what one costs now, in all and by location, counting apart those with no cost.
