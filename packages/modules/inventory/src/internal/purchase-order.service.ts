@@ -10,11 +10,13 @@ import {
 } from '@hatti/api';
 import { VariantService } from '@hatti/catalog/public';
 import { Database, isUniqueViolation, toDate, type Tx } from '@hatti/db';
-import { newId, toPublicId } from '@hatti/ids';
 import type { Language } from '@hatti/documents';
+import { appendEvent } from '@hatti/events';
+import { newId, toPublicId } from '@hatti/ids';
 import type { CurrencyCode } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, sql } from 'drizzle-orm';
+import { InventoryEvents, type PurchaseOrderPayload, type SupplierPayload } from './events.js';
 import { InventoryService, levelChange } from './inventory.service.js';
 import { purchaseOrderDocument } from './purchase-order-document.js';
 import { locationFromJson, type LocationJson } from './location-store.js';
@@ -283,6 +285,12 @@ export class PurchaseOrderService {
           .insert(suppliers)
           .values({ shopId: tenant.shopId, id: newId(), name, phone, note })
           .returning();
+        await appendEvent<SupplierPayload>(tx, tenant.shopId, {
+          type: InventoryEvents.SupplierCreated,
+          aggregateType: 'supplier',
+          aggregateId: row!.id,
+          payload: { name: row!.name },
+        });
         return { ok: true, value: toSupplier(row!) };
       });
     } catch (error) {
@@ -325,6 +333,12 @@ export class PurchaseOrderService {
           .where(and(eq(suppliers.shopId, tenant.shopId), eq(suppliers.id, id)))
           .returning();
         if (!row) return failOne(['id'], 'NOT_FOUND', 'Supplier not found');
+        await appendEvent<SupplierPayload>(tx, tenant.shopId, {
+          type: InventoryEvents.SupplierUpdated,
+          aggregateType: 'supplier',
+          aggregateId: row.id,
+          payload: { name: row.name },
+        });
         return { ok: true, value: toSupplier(row) };
       });
     } catch (error) {
@@ -486,6 +500,7 @@ export class PurchaseOrderService {
         }),
       );
       const [created] = await this.#load(tx, tenant.shopId, { ids: [id] });
+      await this.#record(tx, tenant.shopId, InventoryEvents.PurchaseOrderCreated, created!, 0);
       return { ok: true, value: created! };
     });
   }
@@ -599,6 +614,13 @@ export class PurchaseOrderService {
         await this.#averageCosts(tx, tenant.shopId, targets);
         await this.#settle(tx, tenant.shopId, id);
         const [received] = await this.#load(tx, tenant.shopId, { ids: [id] });
+        await this.#record(
+          tx,
+          tenant.shopId,
+          InventoryEvents.PurchaseOrderReceived,
+          received!,
+          targets.reduce((sum, target) => sum + target.quantity, 0),
+        );
         return { ok: true, value: received! };
       }),
     );
@@ -818,6 +840,7 @@ export class PurchaseOrderService {
       }
       await this.#settle(tx, tenant.shopId, id);
       const [changed] = await this.#load(tx, tenant.shopId, { ids: [id] });
+      await this.#record(tx, tenant.shopId, InventoryEvents.PurchaseOrderUpdated, changed!, 0);
       return { ok: true, value: changed! };
     });
   }
@@ -844,6 +867,7 @@ export class PurchaseOrderService {
         })
         .where(and(eq(purchaseOrders.shopId, tenant.shopId), eq(purchaseOrders.id, id)));
       const [closed] = await this.#load(tx, tenant.shopId, { ids: [id] });
+      await this.#record(tx, tenant.shopId, InventoryEvents.PurchaseOrderClosed, closed!, 0);
       return { ok: true, value: closed! };
     });
   }
@@ -903,6 +927,28 @@ export class PurchaseOrderService {
              updated_at = now()
         FROM done
        WHERE o.shop_id = ${shopId} AND o.id = ${id}`);
+  }
+
+  /** What happened to an order, for the activity log and webhooks (ADR-367). */
+  async #record(
+    tx: Tx,
+    shopId: string,
+    type: string,
+    order: PurchaseOrderRecord,
+    received: number,
+  ): Promise<void> {
+    await appendEvent<PurchaseOrderPayload>(tx, shopId, {
+      type,
+      aggregateType: 'purchase_order',
+      aggregateId: order.id,
+      payload: {
+        number: order.number,
+        status: order.status,
+        supplierId: order.supplier.id,
+        locationId: order.location.id,
+        received,
+      },
+    });
   }
 
   /** Purchase orders with their supplier, location and lines, the newest first. */

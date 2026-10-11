@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-366 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-367 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -374,6 +374,7 @@
 | 364 | The home counts the transfers on their way to the location chosen, to receive: home's transfersToReceive, read with low stock, a tap from the transfers | Accepted |
 | 365 | The transfers list follows the location chosen on the orders list and the home: those leaving it and those coming to it, the choice kept with theirs | Accepted |
 | 366 | Stock lost on the way: a transfer is closed with what arrived, the rest counted lost and not put back where it left; status CLOSED, with what was lost | Accepted |
+| 367 | Purchase orders, suppliers and transfers on the activity log: each step an event with who took it, linked to its page in the admin | Accepted |
 
 ---
 
@@ -14423,3 +14424,28 @@
 * **Alternatives:**
   * **Cancelling, then taking the rest away at the origin as shrinkage:** two steps, and the
     origin's history would show stock back that never was.
+
+## ADR-367 · Purchase orders, suppliers and transfers on the activity log: each step an event with who took it, linked to its page in the admin
+
+* **Context:**
+  * Purchase orders (ADR-350) and transfers (ADR-360) changed stock and said so in each level's
+    history, but appended no events of their own. The shop's activity log (ADR-279) is built from
+    events, so it showed only "Stock updated", and nothing said who sent a transfer, received
+    an order or wrote off what was lost (ADM-04, INV-04, INV-05).
+* **Decision:**
+  * **Events:** a supplier created or changed (`supplier.*`); a purchase order created, changed,
+    received or closed (`purchase_order.*`); a transfer created, received, cancelled or closed
+    (`inventory_transfer.*`). Each is appended in the transaction that made the change, with
+    the actor taken as every other event's is, and a small payload: the number, status, the
+    locations or supplier, and how many were received in that step.
+  * **In the admin**, the activity log names them ("Purchase order received", "Transfer
+    closed", "Supplier created", in English and Urdu) and links each to its page: the purchase
+    order, the transfer, or the suppliers' list.
+* **Consequences:**
+  * Who sent, received, cancelled or wrote off stock is on the log beside the stock it moved,
+    and the events reach the outbox for webhooks as every other does.
+  * Not yet: webhook topics a shop's app can subscribe to by name for these.
+* **Alternatives:**
+  * **Reading the stock ledger into the log:** it says what changed at a level, not the
+    transfer or order as a whole, and has no actor for steps that move no stock (created,
+    closed).

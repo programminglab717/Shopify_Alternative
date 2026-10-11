@@ -11,9 +11,11 @@ import {
 import { VariantService } from '@hatti/catalog/public';
 import { Database, toDate, type Tx } from '@hatti/db';
 import type { Language } from '@hatti/documents';
+import { appendEvent } from '@hatti/events';
 import { newId, toPublicId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, sql } from 'drizzle-orm';
+import { InventoryEvents, type InventoryTransferPayload } from './events.js';
 import { InventoryService, levelChange } from './inventory.service.js';
 import { locationFromJson, type LocationJson } from './location-store.js';
 import type { LocationRecord, Page } from './records.js';
@@ -318,6 +320,13 @@ export class TransferService {
           }),
         );
         const [created] = await this.#load(tx, tenant.shopId, { ids: [id] });
+        await this.#record(
+          tx,
+          tenant.shopId,
+          InventoryEvents.InventoryTransferCreated,
+          created!,
+          0,
+        );
         return { ok: true, value: created! };
       }),
     );
@@ -422,6 +431,13 @@ export class TransferService {
             FROM done
            WHERE t.shop_id = ${tenant.shopId} AND t.id = ${id}`);
         const [received] = await this.#load(tx, tenant.shopId, { ids: [id] });
+        await this.#record(
+          tx,
+          tenant.shopId,
+          InventoryEvents.InventoryTransferReceived,
+          received!,
+          targets.reduce((sum, target) => sum + target.quantity, 0),
+        );
         return { ok: true, value: received! };
       }),
     );
@@ -469,6 +485,13 @@ export class TransferService {
           })
           .where(and(eq(transfers.shopId, tenant.shopId), eq(transfers.id, id)));
         const [cancelled] = await this.#load(tx, tenant.shopId, { ids: [id] });
+        await this.#record(
+          tx,
+          tenant.shopId,
+          InventoryEvents.InventoryTransferCancelled,
+          cancelled!,
+          0,
+        );
         return { ok: true, value: cancelled! };
       }),
     );
@@ -492,7 +515,30 @@ export class TransferService {
         })
         .where(and(eq(transfers.shopId, tenant.shopId), eq(transfers.id, id)));
       const [closed] = await this.#load(tx, tenant.shopId, { ids: [id] });
+      await this.#record(tx, tenant.shopId, InventoryEvents.InventoryTransferClosed, closed!, 0);
       return { ok: true, value: closed! };
+    });
+  }
+
+  /** What happened to a transfer, for the activity log and webhooks (ADR-367). */
+  async #record(
+    tx: Tx,
+    shopId: string,
+    type: string,
+    transfer: TransferRecord,
+    received: number,
+  ): Promise<void> {
+    await appendEvent<InventoryTransferPayload>(tx, shopId, {
+      type,
+      aggregateType: 'inventory_transfer',
+      aggregateId: transfer.id,
+      payload: {
+        number: transfer.number,
+        status: transfer.status,
+        originId: transfer.origin.id,
+        destinationId: transfer.destination.id,
+        received,
+      },
     });
   }
 

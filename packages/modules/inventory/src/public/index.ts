@@ -3,9 +3,12 @@ export {
   InventoryEvents,
   type InventoryItemUpdatedPayload,
   type InventoryLevelUpdatedPayload,
+  type InventoryTransferPayload,
   type LocationCreatedPayload,
   type LocationDeletedPayload,
   type LocationUpdatedPayload,
+  type PurchaseOrderPayload,
+  type SupplierPayload,
 } from '../internal/events.js';
 // The GraphQL location type and its mapper, for other modules' fields that return a location.
 export { Location } from '../internal/graphql/location.types.js';

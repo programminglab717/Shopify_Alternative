@@ -728,6 +728,25 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     expect(await levelsOf(medium)).toEqual([
       { available: 0, location: { name: 'Faisalabad godown' } },
     ]);
+    // Each step on the shop's activity log, by the token that took it (ADR-367).
+    const logOf = await issueToken(shopB, ['read_settings']);
+    const log = await gql(
+      logOf,
+      `query ($id: ID!) { activityLog(subjectId: $id) { nodes { type subjectType actor { kind } } } }`,
+      { id: lost.id },
+    );
+    expect(log.data?.activityLog.nodes).toEqual([
+      {
+        type: 'inventory_transfer.closed',
+        subjectType: 'inventory_transfer',
+        actor: { kind: 'APP' },
+      },
+      {
+        type: 'inventory_transfer.created',
+        subjectType: 'inventory_transfer',
+        actor: { kind: 'APP' },
+      },
+    ]);
     // Shop A sees none of shop B's; sending needs writing stock.
     const readOnly = await gql(tokens.aStockReader, CREATE, send(1));
     expect(readOnly.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');

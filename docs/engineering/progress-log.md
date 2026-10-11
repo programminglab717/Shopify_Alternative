@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, purchase orders and transfers on the activity log** (ADM-04, INV-04, INV-05): each
-created, received, changed, closed or cancelled recorded as an event, so the shop's activity log
-says who did it and webhooks can hear it; then section by section as the alpha's shops need
+**Next, reordering from what sells** (INV-08): each variant running low with what it sold in
+the last 30 days and how many days its stock lasts at that pace, and a purchase order started
+for enough to last a chosen number of days; then section by section as the alpha's shops need
 them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -18,6 +18,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### Purchase orders and transfers on the activity log, in the core and the admin
+
+* **Each step an event** ([ADR-367](../architecture/13-decision-log.md#adr-367--purchase-orders-suppliers-and-transfers-on-the-activity-log-each-step-an-event-with-who-took-it-linked-to-its-page-in-the-admin)): suppliers created and changed, purchase orders created,
+  changed, received and closed, and transfers created, received, cancelled and closed append
+  events in the same transaction, so the activity log says who took each step. The admin names
+  them in English and Urdu and links each to its purchase order, transfer or the suppliers.
+* **Tried in Chromium against the core:** on the seed's shop, T-9 sent a chappal from Lahore
+  warehouse to Karachi store and was cancelled; the activity log showed "Transfer created" and
+  "Transfer cancelled" by Demo Owner, and the link opened T-9. Stock was as before. No errors in
+  the browser.
+* 2516 tests, as before: the events' assertions joined the inventory module's purchase
+  order and transfer tests, the Admin API's transfer test and the admin's activity log test.
 
 ### c77eced · Stock lost on the way, in the core and the admin
 

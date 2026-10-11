@@ -55,6 +55,31 @@ describe('The activity log in the admin', () => {
                 occurredAt: LATER,
                 actor: { id: 'tok_1', kind: 'APP', role: null },
               },
+              // Stock bought and moved, each to its page (ADR-367).
+              {
+                id: 'evt_4',
+                type: 'purchase_order.received',
+                subjectType: 'purchase_order',
+                subjectId: 'po_1',
+                occurredAt: LATER,
+                actor: { id: 'usr_2', kind: 'STAFF', role: 'packer' },
+              },
+              {
+                id: 'evt_5',
+                type: 'inventory_transfer.closed',
+                subjectType: 'inventory_transfer',
+                subjectId: 'invt_1',
+                occurredAt: LATER,
+                actor: { id: 'usr_2', kind: 'STAFF', role: 'packer' },
+              },
+              {
+                id: 'evt_6',
+                type: 'supplier.created',
+                subjectType: 'supplier',
+                subjectId: 'sup_1',
+                occurredAt: LATER,
+                actor: { id: 'usr_2', kind: 'STAFF', role: 'packer' },
+              },
             ],
             pageInfo: { hasNextPage: variables.first === 50 },
           },
@@ -85,7 +110,17 @@ describe('The activity log in the admin', () => {
 
     const product = await screen.findByRole('link', { name: 'Product updated' });
     expect(product.getAttribute('href')).toBe('/shop_1/products/prod_1');
-    expect(screen.getByText('Bilal')).toBeTruthy();
+    expect(screen.getAllByText('Bilal')).toHaveLength(4);
+    const hrefOf = (name: string) => screen.getByRole('link', { name }).getAttribute('href');
+    expect([
+      hrefOf('Purchase order received'),
+      hrefOf('Transfer closed'),
+      hrefOf('Supplier created'),
+    ]).toEqual([
+      '/shop_1/purchase-orders/po_1',
+      '/shop_1/transfers/invt_1',
+      '/shop_1/purchase-orders/suppliers',
+    ]);
     // Someone no longer on the staff is named by their role; an app as an app.
     expect(screen.getByText('Delivery charges updated')).toBeTruthy();
     expect(screen.getByText('Confirmation agent')).toBeTruthy();

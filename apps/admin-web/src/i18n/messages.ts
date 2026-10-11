@@ -3177,6 +3177,11 @@ const en = {
   'transfers.closeAsk.one':
     "Close {name} with what arrived? The 1 that has not arrived is counted lost on the way, and doesn't go back to {location}.",
   'transfers.cancelAsk.one': 'Cancel {name}? The 1 that has not arrived goes back to {location}.',
+  'activity.subject.supplier': 'Supplier',
+  'activity.subject.purchase_order': 'Purchase order',
+  'activity.subject.inventory_transfer': 'Transfer',
+  'activity.verb.received': 'received',
+  'activity.verb.closed': 'closed',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6330,6 +6335,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'transfers.closeAsk.one':
     '{name} جو پہنچا اس کے ساتھ بند کریں؟ جو 1 نہیں پہنچا وہ راستے میں گم شمار ہو گا، اور {location} واپس نہیں جائے گا۔',
   'transfers.cancelAsk.one': '{name} منسوخ کریں؟ جو 1 نہیں پہنچا وہ {location} واپس چلا جائے گا۔',
+  'activity.subject.supplier': 'سپلائر',
+  'activity.subject.purchase_order': 'خریداری کا آرڈر',
+  'activity.subject.inventory_transfer': 'منتقلی',
+  'activity.verb.received': 'وصول ہوا',
+  'activity.verb.closed': 'بند کیا گیا',
 };
 
 export const messages: Readonly<

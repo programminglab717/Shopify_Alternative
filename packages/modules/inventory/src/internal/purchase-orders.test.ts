@@ -262,6 +262,44 @@ describe.skipIf(!server)('PurchaseOrderService (INV-05)', () => {
     expect((await f.purchaseOrders.list(f.a, { first: 5, status: 'closed' })).items).toHaveLength(
       1,
     );
+    // The supplier, and each step of the order, are events for the activity log (ADR-367).
+    expect(
+      (await f.outbox())
+        .filter((row) => ['supplier', 'purchase_order'].includes(row.aggregate_type))
+        .map((row) => [row.event_type, row.payload]),
+    ).toEqual([
+      ['supplier.created', { name: 'Faisalabad Textiles' }],
+      [
+        'purchase_order.created',
+        {
+          number: 1,
+          status: 'open',
+          supplierId: order.supplier.id,
+          locationId: warehouse.id,
+          received: 0,
+        },
+      ],
+      [
+        'purchase_order.received',
+        {
+          number: 1,
+          status: 'open',
+          supplierId: order.supplier.id,
+          locationId: warehouse.id,
+          received: 3,
+        },
+      ],
+      [
+        'purchase_order.closed',
+        {
+          number: 1,
+          status: 'closed',
+          supplierId: order.supplier.id,
+          locationId: warehouse.id,
+          received: 0,
+        },
+      ],
+    ]);
   });
 
   it('changes an open order, never below what came, and is received once all of it has', async () => {

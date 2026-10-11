@@ -14,6 +14,16 @@ export const InventoryEvents = {
   InventoryItemUpdated: 'inventory_item.updated',
   InventoryLevelUpdated: 'inventory_level.updated',
   InventorySettingsUpdated: 'inventory_settings.updated',
+  SupplierCreated: 'supplier.created',
+  SupplierUpdated: 'supplier.updated',
+  PurchaseOrderCreated: 'purchase_order.created',
+  PurchaseOrderUpdated: 'purchase_order.updated',
+  PurchaseOrderReceived: 'purchase_order.received',
+  PurchaseOrderClosed: 'purchase_order.closed',
+  InventoryTransferCreated: 'inventory_transfer.created',
+  InventoryTransferReceived: 'inventory_transfer.received',
+  InventoryTransferCancelled: 'inventory_transfer.cancelled',
+  InventoryTransferClosed: 'inventory_transfer.closed',
 } as const;
 
 export interface LocationCreatedPayload {
@@ -63,4 +73,37 @@ export interface InventorySettingsUpdatedPayload {
   changed: string[];
   lowStockThreshold: number;
   version: number;
+}
+
+/** The aggregate is the supplier (ADR-367). */
+export interface SupplierPayload {
+  name: string;
+}
+
+/**
+ * The aggregate is the purchase order (ADR-367): created, changed, goods received on it, or
+ * closed with what came. Each receipt's stock is its levels' `inventory_level.updated` too.
+ */
+export interface PurchaseOrderPayload {
+  /** PO-1 onwards. */
+  number: number;
+  status: 'open' | 'received' | 'closed';
+  supplierId: string;
+  locationId: string;
+  /** Units received in this change; 0 where none were. */
+  received: number;
+}
+
+/**
+ * The aggregate is the transfer (ADR-367): sent, received in part or in full, cancelled back, or
+ * closed with the rest lost on the way.
+ */
+export interface InventoryTransferPayload {
+  /** T-1 onwards. */
+  number: number;
+  status: 'in_transit' | 'received' | 'cancelled' | 'closed';
+  originId: string;
+  destinationId: string;
+  /** Units received in this change; 0 where none were. */
+  received: number;
 }

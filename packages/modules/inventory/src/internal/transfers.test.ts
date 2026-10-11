@@ -220,6 +220,46 @@ describe.skipIf(!server)('TransferService (INV-04)', () => {
     });
     expect(errorsOf(await f.transfers.cancel(f.a, sent.id))).toEqual([['id', 'INVALID']]);
     expect(errorsOf(await f.transfers.cancel(f.b, sent.id))).toEqual([['id', 'NOT_FOUND']]);
+    // Each step is an event, for the activity log and webhooks (ADR-367).
+    expect(
+      (await f.outbox())
+        .filter((row) => row.aggregate_type === 'inventory_transfer')
+        .map((row) => [row.event_type, row.aggregate_id, row.payload]),
+    ).toEqual([
+      [
+        'inventory_transfer.created',
+        sent.id,
+        {
+          number: 1,
+          status: 'in_transit',
+          originId: warehouse.id,
+          destinationId: store.id,
+          received: 0,
+        },
+      ],
+      [
+        'inventory_transfer.received',
+        sent.id,
+        {
+          number: 1,
+          status: 'in_transit',
+          originId: warehouse.id,
+          destinationId: store.id,
+          received: 2,
+        },
+      ],
+      [
+        'inventory_transfer.cancelled',
+        sent.id,
+        {
+          number: 1,
+          status: 'cancelled',
+          originId: warehouse.id,
+          destinationId: store.id,
+          received: 0,
+        },
+      ],
+    ]);
     // Nothing on its way: the store, once empty, can be taken out of use.
     unwrap(await stock(small, 0, store));
     unwrap(await f.locations.deactivate(f.a, store.id));
@@ -292,6 +332,12 @@ describe.skipIf(!server)('TransferService (INV-04)', () => {
       ),
     ).toEqual([['id', 'INVALID']]);
     expect(errorsOf(await f.transfers.close(f.b, sent.id))).toEqual([['id', 'NOT_FOUND']]);
+    expect(
+      (await f.outbox())
+        .filter((row) => row.aggregate_type === 'inventory_transfer')
+        .map((row) => row.event_type)
+        .at(-1),
+    ).toBe('inventory_transfer.closed');
     expect((await f.transfers.document(f.a, sent.id, 'english'))!.html).toContain(
       'Closed, some lost on the way',
     );

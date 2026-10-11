@@ -91,6 +91,35 @@ function SubjectLink({ id, label }: { id: string | null; label: string }) {
       </Link>
     );
   }
+  if (id && prefix === 'po') {
+    return (
+      <Link
+        to="/$shopId/purchase-orders/$purchaseOrderId"
+        params={{ shopId, purchaseOrderId: id }}
+        className="underline"
+      >
+        {label}
+      </Link>
+    );
+  }
+  if (id && prefix === 'invt') {
+    return (
+      <Link
+        to="/$shopId/transfers/$transferId"
+        params={{ shopId, transferId: id }}
+        className="underline"
+      >
+        {label}
+      </Link>
+    );
+  }
+  if (id && prefix === 'sup') {
+    return (
+      <Link to="/$shopId/purchase-orders/suppliers" params={{ shopId }} className="underline">
+        {label}
+      </Link>
+    );
+  }
   return <>{label}</>;
 }
 
