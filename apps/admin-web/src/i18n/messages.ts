@@ -3219,6 +3219,8 @@ const en = {
   'pack.noneLeft': 'Nothing more to pack.',
   'pack.toList': 'Orders to pack',
   'orders.packByScan': 'Pack by scanning',
+  'pack.packed': '{name} is packed.',
+  'pack.print': 'Print what goes with it',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6414,6 +6416,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'pack.noneLeft': 'پیک کرنے کو اور کچھ نہیں۔',
   'pack.toList': 'پیک ہونے والے آرڈر',
   'orders.packByScan': 'اسکین کر کے پیک کریں',
+  'pack.packed': '{name} پیک ہو گیا۔',
+  'pack.print': 'ساتھ جانے والا کاغذ پرنٹ کریں',
 };
 
 export const messages: Readonly<

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-374 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-375 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -382,6 +382,7 @@
 | 372 | How fast each product sells, on the products list: its variants' units sold in the last 30 days together, read through the same batch loader | Accepted |
 | 373 | An order packed by scanning: each item read ticks off its line, one not in the order or one too many said at once, and the order packed once all of it is there | Accepted |
 | 374 | The orders to pack scanned one after another: the To pack list opens the first to scan, and each packed brings up the next, until none is left | Accepted |
+| 375 | What goes with a parcel, printed as it is packed by scanning: the packing slip or invoice offered once the order is packed, before the next | Accepted |
 
 ---
 
@@ -14618,3 +14619,21 @@
 * **Alternatives:**
   * **Packing many orders in one screen:** a parcel is packed one at a time; one order on the
     screen is the one on the table.
+
+## ADR-375 · What goes with a parcel, printed as it is packed by scanning: the packing slip or invoice offered once the order is packed, before the next
+
+* **Context:**
+  * Packing by scanning went from one order to the next (ADR-374), but the packing slip that
+    goes in the parcel (ADR-028, ADR-331) was printed from the list, many at once,
+    or from the order's page before packing; a packer working order by order had none to hand
+    (ORD-06, APP-04).
+* **Decision:**
+  * **In the admin**, once an order is packed by scanning its page says "#1003 is packed." and
+    offers "Print what goes with it": the order's print panel, packing slip or invoice, paper
+    and language as last chosen, beside "Scan the next to pack". Printing is offered, not
+    forced; nothing new in the core.
+* **Consequences:**
+  * The parcel leaves the table with its slip, and the packer goes on to the next.
+* **Alternatives:**
+  * **Printing at once when packed:** a phone at the table often has no printer; the choice is
+    the packer's.

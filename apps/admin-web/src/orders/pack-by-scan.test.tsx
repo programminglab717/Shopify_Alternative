@@ -190,6 +190,10 @@ describe('An order packed by scanning (ADR-373)', () => {
     // Then the next to pack, opened to scan (ADR-374).
     const next = await screen.findByRole('link', { name: 'Scan the next to pack: #1008' });
     expect(next.getAttribute('href')).toBe('/shop_1/orders/ord_8?scan=true');
+    // What goes with the parcel, printed before it leaves the table (ADR-375).
+    expect(screen.getByText('#1007 is packed.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Print what goes with it' }));
+    expect(await screen.findByRole('heading', { name: 'Print #1007' })).toBeTruthy();
   });
 
   it('works through the orders to pack from the list, opening each to scan, until none is left', async () => {

@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, a packing slip printed as each order is packed by scanning** (ORD-06, APP-04): once
-the scanned order is packed, its slip offered to print before going on to the next, so the
-parcel leaves the table with its paper; then section by section as the alpha's shops need them.
-Urdu handles wait, as decided.
+**Next, how many orders each packer packed** (APP-04, COD-11): the orders packed today and this
+week by each member of staff, from the orders' own events, beside the confirmation agents'
+performance; then section by section as the alpha's shops need them. Urdu handles wait, as
+decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### What goes with a parcel, printed as it is packed by scanning, in the admin
+
+* **Printed as packed** ([ADR-375](../architecture/13-decision-log.md#adr-375--what-goes-with-a-parcel-printed-as-it-is-packed-by-scanning-the-packing-slip-or-invoice-offered-once-the-order-is-packed-before-the-next)): once packed by scanning, the order says it is packed and
+  offers its print panel, packing slip or invoice, beside the next to pack. Nothing new in the
+  core.
+* **Tried in Chromium against the core:** the seed's #1003 had its variant given a SKU for the
+  try, was opened from the To pack tab, scanned, and packed; the page said "#1003 is packed.",
+  the print panel opened on the packing slip, and "Nothing more to pack" followed. The order
+  was then unpacked and the SKU taken off again, leaving their events on its timeline and the
+  activity log. No errors in the browser.
+* 2523 tests, as before: the packed order said and its print panel opened, in the admin's
+  packing test.
 
 ### b674d07 · The orders to pack scanned one after another, in the admin
 

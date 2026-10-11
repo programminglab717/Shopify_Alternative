@@ -138,7 +138,7 @@ function Actions({ order }: { order: OrderDetail }) {
   const canShip = open && !order.overPlanLimit && SHIPPABLE.includes(order.stage);
   const canCancel = open && CANCELLABLE.includes(order.stage);
   // Packed by scanning: the next order to pack, to go on scanning (ADR-374).
-  if (packedByScan) return <NextToPack after={order.id} />;
+  if (packedByScan) return <NextToPack after={order.id} name={order.name} />;
   if (!canConfirm && !canPack && !canUnpack && !canShip && !canCancel) return null;
 
   return (

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { Check, PackageCheck, ScanBarcode } from 'lucide-react';
+import { Check, PackageCheck, Printer, ScanBarcode } from 'lucide-react';
 import { useState } from 'react';
 import { OrdersQuery } from '../api/operations';
 import type { OrderDetail, OrdersData } from '../api/types';
@@ -11,6 +11,7 @@ import { CountByCode } from '../stock/count-by-code';
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { useOrdersLocation } from './location-filter';
+import { PrintPanel } from './print';
 
 const titleOf = (line: OrderDetail['lineItems'][number]) =>
   line.variantTitle && line.variantTitle !== 'Default Title'
@@ -105,12 +106,14 @@ export function PackByScan({
 }
 
 /**
- * After an order is packed by scanning, the next one to pack (ADR-374): the oldest waiting at
- * the location the orders list shows, opened to scan; or word that none is left.
+ * After an order is packed by scanning, its packing slip or invoice to print (ADR-375), and the
+ * next one to pack (ADR-374): the first waiting at the location the orders list shows, opened
+ * to scan; or word that none is left.
  */
-export function NextToPack({ after }: { after: string }) {
+export function NextToPack({ after, name }: { after: string; name: string }) {
   const { t } = useLocale();
   const shop = useShop();
+  const [printing, setPrinting] = useState(false);
   const where = useOrdersLocation(undefined);
   const query = [where.location && `location_id:${where.location}`].filter(Boolean).join(' ');
   const next = useAdminQuery<OrdersData>(
@@ -130,6 +133,23 @@ export function NextToPack({ after }: { after: string }) {
   const order = next.data.orders.nodes.find((each) => each.id !== after);
   return (
     <Card className="flex flex-col gap-3 p-4">
+      <p className="font-medium">{t('pack.packed', { name })}</p>
+      {printing ? (
+        <PrintPanel
+          ids={[after]}
+          title={t('print.titleOne', { name })}
+          onDone={() => setPrinting(false)}
+        />
+      ) : (
+        <Button
+          variant="secondary"
+          className="self-start"
+          icon={<Printer aria-hidden className="size-5" />}
+          onClick={() => setPrinting(true)}
+        >
+          {t('pack.print')}
+        </Button>
+      )}
       {order ? (
         <Link
           to="/$shopId/orders/$orderId"
