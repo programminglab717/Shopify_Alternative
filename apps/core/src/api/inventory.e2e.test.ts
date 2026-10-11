@@ -973,6 +973,38 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       { variantTitle: 'M', incoming: 0, lastSupplier: null, lastUnitCost: null },
     ]);
 
+    // At one location: what it stocked before, by what it has, and what is on order for it (ADR-359).
+    await admin.query(
+      `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+       VALUES ($1, 'pro', 'monthly', now(), now() + interval '1 month')`,
+      [shopC],
+    );
+    const store = (
+      await addLocation(token, {
+        name: 'Store',
+        fulfillsOnlineOrders: false,
+        address: { city: 'Karachi' },
+      })
+    ).location;
+    const stocked = await mutate(token, SET_QUANTITIES, {
+      input: {
+        name: 'available',
+        reason: 'cycle_count_available',
+        quantities: [{ inventoryItemId: small, locationId: store.id, quantity: 2 }],
+      },
+    });
+    expect(stocked.userErrors).toEqual([]);
+    const AT = `query ($locationId: ID) {
+      inventoryLowStock(first: 5, locationId: $locationId) { nodes { variantTitle available incoming } }
+    }`;
+    const at = async (locationId: string) =>
+      (await gql(token, AT, { locationId })).data?.inventoryLowStock.nodes;
+    expect(await at(store.id)).toEqual([{ variantTitle: 'S', available: 2, incoming: 0 }]);
+    expect(await at(warehouse.id)).toEqual([
+      { variantTitle: 'S', available: 0, incoming: 20 },
+      { variantTitle: 'M', available: 4, incoming: 0 },
+    ]);
+
     const changed = await mutate(
       token,
       `mutation {

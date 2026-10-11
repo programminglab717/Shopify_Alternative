@@ -3113,6 +3113,8 @@ const en = {
   'shipsFrom.all': 'Every location',
   'locations.makePrimary': 'Make primary',
   'locations.makePrimaryOf': 'Make {name} the primary location',
+  'stock.lowAt': 'Running low at',
+  'stock.lowOnline': 'Stock for sale online',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6201,6 +6203,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'shipsFrom.all': 'ہر جگہ',
   'locations.makePrimary': 'بنیادی بنائیں',
   'locations.makePrimaryOf': '{name} کو بنیادی جگہ بنائیں',
+  'stock.lowAt': 'مقام',
+  'stock.lowOnline': 'آن لائن فروخت کا اسٹاک',
 };
 
 export const messages: Readonly<

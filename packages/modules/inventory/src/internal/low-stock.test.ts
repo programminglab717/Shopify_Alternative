@@ -109,6 +109,49 @@ describe.skipIf(!server)('Low stock', () => {
     expect(await lowStock.counts(f.b)).toEqual({ threshold: 5, low: 0, out: 0 });
   });
 
+  it('lists what runs low at one location, among what it stocked before (ADR-359)', async () => {
+    const warehouse = await f.location(f.a, 'Warehouse');
+    const store = await f.location(f.a, 'Store', { fulfillsOnlineOrders: false });
+    const [small, medium] = await sold('Lawn Kurta', ['S', 'M']);
+    const [eight] = await sold('Peshawari Chappal', ['8']);
+    const set = (variantId: string, quantity: number, location = warehouse) =>
+      f.inventory.setQuantities(f.a, {
+        name: 'available',
+        reason: 'cycle_count_available',
+        quantities: [{ inventoryItemId: variantId, locationId: location.id, quantity }],
+      });
+    unwrap(await set(small!, 40));
+    unwrap(await set(small!, 2, store));
+    unwrap(await set(medium!, 1));
+    unwrap(await set(medium!, 30, store));
+    // The chappal was never at the store: not the store's to reorder.
+    unwrap(await set(eight!, 0));
+
+    const at = async (locationId: string) =>
+      (await lowStock.list(f.a, { first: 10, locationId })).items.map((item) => [
+        item.variantTitle,
+        item.available,
+        item.locationId,
+      ]);
+    expect(await at(store.id)).toEqual([['S', 2, store.id]]);
+    expect(await at(warehouse.id)).toEqual([
+      ['8', 0, warehouse.id],
+      ['M', 1, warehouse.id],
+    ]);
+    // Online, the store's units are not for sale: the medium runs low there alone.
+    expect(
+      (await lowStock.list(f.a, { first: 10 })).items.map((item) => [
+        item.variantTitle,
+        item.locationId,
+      ]),
+    ).toEqual([
+      ['8', null],
+      ['M', null],
+    ]);
+    unwrap(await f.locations.deactivate(f.a, (await f.location(f.a, 'Closed')).id));
+    expect((await lowStock.list(f.b, { first: 10, locationId: store.id })).items).toEqual([]);
+  });
+
   it('alerts once a spell when a variant falls to the threshold, and once more when it runs out (ADR-157)', async () => {
     const warehouse = await f.location(f.a, 'Warehouse');
     const [small] = await sold('Lawn Kurta', ['S']);

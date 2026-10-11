@@ -12,7 +12,7 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { isUuid, toPublicId } from '@hatti/ids';
-import { Args, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { InventoryService } from '../inventory.service.js';
 import {
   LowStockService,
@@ -30,7 +30,7 @@ import {
   LowStockItemConnection,
   LowStockItemEdge,
 } from './low-stock.types.js';
-import { toInventoryItem } from './mappers.js';
+import { toInventoryItem, uuidOf } from './mappers.js';
 
 /** Low stock (INV-01, ADR-125): what the shop calls low, and the variants running low or out. */
 @Resolver()
@@ -71,10 +71,18 @@ export class LowStockResolver {
     @Args('first', { type: () => Int, nullable: true, description: '1 to 250; default 50.' })
     first: number | null,
     @Args('after', { type: () => String, nullable: true }) after: string | null,
+    @Args('locationId', {
+      type: () => ID,
+      nullable: true,
+      description:
+        'Those stocked at this location before, by what is available there, and on order for it.',
+    })
+    locationId: string | null,
   ): Promise<LowStockItemConnection> {
     const { items, hasNextPage } = await this.lowStock.list(tenant, {
       first: pageSize(first),
       after: lowStockCursorAfter(after),
+      locationId: locationId ? uuidOf('location', locationId) : null,
     });
     const edges = items.map((record) =>
       Object.assign(new LowStockItemEdge(), {

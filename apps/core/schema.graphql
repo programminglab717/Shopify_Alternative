@@ -4412,11 +4412,13 @@ A variant of an active product running low or out of stock, at the shop's thresh
 """
 type LowStockItem {
   """
-  Units that can be sold online, as the variant's inventoryQuantity says: none or fewer is out of stock.
+  Units that can be sold online, as the variant's inventoryQuantity says: none or fewer is out of stock. Listed for one location, the units available there.
   """
   available: Int!
 
-  """Units on open purchase orders, not yet received: already on their way."""
+  """
+  Units on open purchase orders, not yet received: already on their way; listed for one location, those on their way to it.
+  """
   incoming: Int!
 
   """How its stock is counted, and where it is."""
@@ -9095,6 +9097,11 @@ type Query {
 
     """1 to 250; default 50."""
     first: Int
+
+    """
+    Those stocked at this location before, by what is available there, and on order for it.
+    """
+    locationId: ID
   ): LowStockItemConnection!
 
   """The shop's inventory settings."""

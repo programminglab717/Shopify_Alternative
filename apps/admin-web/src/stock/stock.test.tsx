@@ -196,8 +196,10 @@ describe('Stock', () => {
     );
 
     fireEvent.click(within(low).getByRole('button', { name: 'Show the stock of Lawn suit · M' }));
-    expect(await within(low).findByText('Main warehouse')).toBeTruthy();
-    expect(within(low).getByText('On hand').nextSibling?.textContent).toBe('4');
+    expect((await within(low).findByText('On hand')).nextSibling?.textContent).toBe('4');
+    expect(within(low).getAllByText('Main warehouse', { selector: ':not(option)' })).toHaveLength(
+      1,
+    );
     expect(within(low).getByText('For orders').nextSibling?.textContent).toBe('2');
     expect(within(low).getByText(/received/)).toBeTruthy();
     expect(within(low).getByText(/an order/)).toBeTruthy();
@@ -403,7 +405,7 @@ describe('Stock', () => {
 
     const low = await screen.findByRole('region', { name: 'Running low' });
     fireEvent.click(within(low).getByRole('button', { name: 'Show the stock of Dupatta' }));
-    await within(low).findByText('Main warehouse');
+    await within(low).findByText('On hand');
     expect(within(low).queryByRole('button', { name: 'Add or take away' })).toBeNull();
     expect(within(low).queryByRole('button', { name: 'Count' })).toBeNull();
     expect(within(low).queryByRole('button', { name: 'Move' })).toBeNull();

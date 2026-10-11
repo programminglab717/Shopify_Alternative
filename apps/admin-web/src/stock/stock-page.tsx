@@ -27,6 +27,7 @@ import { useLocale } from '../i18n/locale';
 import { messages } from '../i18n/messages';
 import type { MessageKey } from '../i18n/messages';
 import { parseStock } from '../products/product-form';
+import { LocationFilter, useOrdersLocation } from '../orders/location-filter';
 import { useAttempt } from '../returns/parcel';
 import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
@@ -747,7 +748,14 @@ export function StockPage() {
   const { t } = useLocale();
   const { id: shopId, role } = useShop();
   const navigate = useNavigate();
-  const query = useAdminQuery<LowStockData>(['lowStock'], LowStockQuery);
+  // What runs low where the branch is, as its orders are (ADR-359); none chosen, for sale online.
+  const where = useOrdersLocation(undefined);
+  const query = useAdminQuery<LowStockData>(
+    ['lowStock'],
+    LowStockQuery,
+    { locationId: where.location ?? null },
+    { enabled: where.ready },
+  );
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
   const edits = EDITS_STOCK.includes(role);
   const low = query.data?.inventoryLowStock.nodes ?? [];
@@ -786,7 +794,7 @@ export function StockPage() {
           )}
         </div>
       </div>
-      {query.isPending ? (
+      {!where.ready || query.isPending ? (
         <Loading label={t('state.loading')} />
       ) : query.isError ? (
         <ErrorState
@@ -795,6 +803,16 @@ export function StockPage() {
         />
       ) : (
         <Section title={t('stock.low')}>
+          <LocationFilter
+            locations={where.locations}
+            location={where.location}
+            label={t('stock.lowAt')}
+            allLabel={t('stock.lowOnline')}
+            onChoose={(locationId) => {
+              where.choose(locationId ?? '');
+              setChosen(new Set());
+            }}
+          />
           <Threshold threshold={query.data.inventorySettings.lowStockThreshold} />
           {query.data.inventoryLowStock.nodes.length === 0 ? (
             <EmptyState title={t('stock.noneLow')} />
@@ -830,6 +848,7 @@ export function StockPage() {
                             .filter((each) => chosen.has(each.variantId))
                             .map((each) => each.variantId)
                             .join(','),
+                          location: where.location,
                         },
                       })
                     }

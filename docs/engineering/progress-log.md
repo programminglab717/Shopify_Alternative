@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, what runs low at one location, in the admin** (INV-01, INV-10): the stock page's low list
-for the location chosen, each variant's units for sale there, so a branch reorders its own; then
-section by section as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, transfers between locations in the admin** (INV-04): stock sent from one location to
+another as a transfer on its way, received at the other end, so a branch restocks from the
+warehouse as it reorders from a supplier; then section by section as the alpha's shops need
+them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +18,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### What runs low at one location, in the core and the admin
+
+* **Low stock by location** ([ADR-359](../architecture/13-decision-log.md#adr-359--what-runs-low-at-one-location-inventorylowstocklocationid-lists-what-it-stocked-before-by-what-is-available-there-with-what-is-on-order-for-it-the-stock-pages-choice-kept-with-the-orders-lists-and-the-purchase-order-from-it-goes-there)): `inventoryLowStock(locationId)` lists what a location
+  stocked before and now has at or under the shop's threshold, with what is on order for it. The
+  stock page's low list has a location choice, kept with the orders list's, and "Order the
+  chosen" starts a purchase order whose goods go there.
+* **Tried in Chromium against the core:** on the seed's shop, the list for sale online showed
+  the lawn suit and a khussa out of stock with what is on order; for Karachi store, its own
+  three, a Shalwar Qameez with 3 there among them; ordering one opened the new purchase order
+  with Karachi store chosen, and the stock page then opened on Karachi store. No errors in the
+  browser.
+* 2493 tests: what runs low at one location, and on order for it, in the inventory module;
+  through the Admin API; in the admin, the list for the location chosen and the purchase order
+  sent there.
 
 ### b8d22db · The home's counts for one location, in the core and the admin
 

@@ -319,15 +319,19 @@ export class LowStockReorderResolver {
     loaders: RequestLoaders,
     item: LowStockItem,
   ): Promise<ReorderRecord | undefined> {
+    // A list for one location counts what is on order for it alone (ADR-359).
+    const locationId = item.record.locationId ?? null;
     return loaders
-      .get<string, ReorderRecord>('inventory.reorders', (ids) =>
-        this.service.reordersOf(tenant, ids),
+      .get<string, ReorderRecord>(`inventory.reorders:${locationId ?? 'online'}`, (ids) =>
+        this.service.reordersOf(tenant, ids, locationId),
       )
       .load(item.record.variantId);
   }
 
   @ResolveField(() => Int, {
-    description: 'Units on open purchase orders, not yet received: already on their way.',
+    description:
+      'Units on open purchase orders, not yet received: already on their way; listed for one ' +
+      'location, those on their way to it.',
   })
   async incoming(
     @CurrentTenant() tenant: TenantContext,

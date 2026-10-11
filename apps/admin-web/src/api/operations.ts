@@ -3612,11 +3612,11 @@ export const HomeStockQuery = /* GraphQL */ `
 
 /** The variants running low or out, the fewest for sale first, and what the shop calls low. */
 export const LowStockQuery = /* GraphQL */ `
-  query LowStock {
+  query LowStock($locationId: ID) {
     inventorySettings {
       lowStockThreshold
     }
-    inventoryLowStock(first: 100) {
+    inventoryLowStock(first: 100, locationId: $locationId) {
       nodes {
         variantId
         variantTitle

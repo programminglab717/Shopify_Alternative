@@ -192,12 +192,14 @@ export class PurchaseOrderService {
   }
 
   /**
-   * For each of these variants: the units on open purchase orders not yet received, and the
-   * supplier and unit cost of its latest purchase order. Variants never ordered are left out.
+   * For each of these variants: the units on open purchase orders not yet received, for
+   * `locationId` alone where given (ADR-359), and the supplier and unit cost of its latest purchase
+   * order, wherever its goods went. Variants never ordered are left out.
    */
   reordersOf(
     tenant: TenantContext,
     variantIds: readonly string[],
+    locationId: string | null = null,
   ): Promise<Map<string, ReorderRecord>> {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<{
@@ -215,7 +217,9 @@ export class PurchaseOrderService {
       }>(sql`
         WITH ordered AS (
           SELECT l.variant_id, l.unit_cost, o.supplier_id, o.number,
-                 CASE WHEN o.status = 'open' THEN l.quantity - l.received ELSE 0 END AS incoming
+                 CASE WHEN o.status = 'open'
+                       ${locationId ? sql`AND o.location_id = ${locationId}` : sql``}
+                      THEN l.quantity - l.received ELSE 0 END AS incoming
             FROM inventory.purchase_order_lines l
             JOIN inventory.purchase_orders o
               ON o.shop_id = l.shop_id AND o.id = l.purchase_order_id

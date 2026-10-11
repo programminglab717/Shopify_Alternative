@@ -51,7 +51,7 @@ export class LowStockItem {
   @Field(() => Int, {
     description:
       "Units that can be sold online, as the variant's inventoryQuantity says: none or fewer is " +
-      'out of stock.',
+      'out of stock. Listed for one location, the units available there.',
   })
   available!: number;
 

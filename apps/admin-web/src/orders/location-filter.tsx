@@ -51,15 +51,22 @@ export function useOrdersLocation(fromLink: string | undefined) {
   };
 }
 
-/** Orders by where they ship from, for a shop with more than one location. */
+/**
+ * Orders by where they ship from, for a shop with more than one location; or, labelled otherwise,
+ * what else is shown for one location, "all" saying what is shown for none.
+ */
 export function LocationFilter({
   locations,
   location,
   onChoose,
+  label,
+  allLabel,
 }: {
   locations: readonly { id: string; name: string }[];
   location: string | undefined;
   onChoose: (locationId: string | undefined) => void;
+  label?: string;
+  allLabel?: string;
 }) {
   const { t } = useLocale();
   const id = useId();
@@ -67,7 +74,7 @@ export function LocationFilter({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <label htmlFor={id} className="font-medium">
-        {t('shipsFrom.title')}
+        {label ?? t('shipsFrom.title')}
       </label>
       <select
         id={id}
@@ -75,7 +82,7 @@ export function LocationFilter({
         onChange={(event) => onChoose(event.target.value || undefined)}
         className="min-h-12 rounded-control border border-line bg-surface px-3 md:min-h-10"
       >
-        <option value={ALL}>{t('shipsFrom.all')}</option>
+        <option value={ALL}>{allLabel ?? t('shipsFrom.all')}</option>
         {locations.map((each) => (
           <option key={each.id} value={each.id}>
             {each.name}

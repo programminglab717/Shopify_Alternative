@@ -5,6 +5,7 @@ import { LATER, fakeCore, press, renderAdmin, signedIn, type } from '../test-sup
 
 const pkr = (amount: string) => ({ amount, currencyCode: 'PKR' });
 const GODOWN = { id: 'loc_1', name: 'Faisalabad godown' };
+const STORE = { id: 'loc_2', name: 'Lahore store' };
 
 function order(received: [number, number], status = 'OPEN') {
   return {
@@ -50,7 +51,7 @@ function order(received: [number, number], status = 'OPEN') {
  * A fake core with one open purchase order from Nishat Mills, of which 12 small and 5 medium came
  * once received; a supplier of the shop's, and a product to order.
  */
-function poCore(role: StaffRole, start: [number, number] = [0, 0]) {
+function poCore(role: StaffRole, start: [number, number] = [0, 0], places = [GODOWN]) {
   let received: [number, number] = start;
   let status = 'OPEN';
   return fakeCore(role, (operation, variables) => {
@@ -94,7 +95,9 @@ function poCore(role: StaffRole, start: [number, number] = [0, 0]) {
       case 'PurchaseOrderForm':
         return {
           suppliers: [{ id: 'sup_1', name: 'Nishat Mills', phone: null }],
-          locations: { nodes: [{ ...GODOWN, isPrimary: true }] },
+          locations: {
+            nodes: places.map((place) => ({ ...place, isPrimary: place.id === GODOWN.id })),
+          },
         };
       case 'SupplierCreate':
         return { supplierCreate: { supplier: { id: 'sup_2', name: 'Gul Ahmed' }, userErrors: [] } };
@@ -154,11 +157,15 @@ function poCore(role: StaffRole, start: [number, number] = [0, 0]) {
         return {
           inventorySettings: { lowStockThreshold: 5 },
           inventoryLowStock: {
-            nodes: [
-              ['var_1', 'S', -2, 0, 'Nishat Mills', '2100.00'],
-              ['var_2', 'M', 3, 4, 'Nishat Mills', null],
-              ['var_3', 'L', 2, 0, null, null],
-            ].map(([id, title, available, incoming, from, cost], index) => ({
+            // At the store, what it stocked runs low there, with what is on order for it.
+            nodes: (variables.locationId === STORE.id
+              ? [['var_3', 'L', 1, 2, null, null]]
+              : [
+                  ['var_1', 'S', -2, 0, 'Nishat Mills', '2100.00'],
+                  ['var_2', 'M', 3, 4, 'Nishat Mills', null],
+                  ['var_3', 'L', 2, 0, null, null],
+                ]
+            ).map(([id, title, available, incoming, from, cost]) => ({
               variantId: id,
               variantTitle: title,
               productId: 'prod_1',
@@ -168,12 +175,20 @@ function poCore(role: StaffRole, start: [number, number] = [0, 0]) {
               incoming,
               lastSupplier: from ? { id: 'sup_1', name: from } : null,
               lastUnitCost: cost ? pkr(cost as string) : null,
-              inventoryItem: { id: `invi_${index + 1}` },
+              inventoryItem: { id: `invi_${String(id).slice(4)}` },
             })),
           },
         };
       case 'Locations':
-        return { locations: { nodes: [{ ...GODOWN, isPrimary: true, isActive: true }] } };
+        return {
+          locations: {
+            nodes: places.map((place) => ({
+              ...place,
+              isPrimary: place.id === GODOWN.id,
+              isActive: true,
+            })),
+          },
+        };
       case 'PurchaseOrderCreate':
         return { purchaseOrderCreate: { purchaseOrder: { id: 'po_1' }, userErrors: [] } };
       case 'PurchaseOrderReceive':
@@ -466,6 +481,48 @@ describe('Purchase orders (INV-05)', () => {
               { inventoryItemId: 'invi_1', quantity: 12, unitCost: '2100' },
               { inventoryItemId: 'invi_2', quantity: 3, unitCost: null },
             ],
+          },
+        },
+      ]),
+    );
+  });
+
+  it('lists what runs low at the location chosen, and orders it for there (ADR-359)', async () => {
+    const fake = poCore('manager', [0, 0], [GODOWN, STORE]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/stock');
+
+    const at = (await screen.findByLabelText('Running low at')) as HTMLSelectElement;
+    expect(at.value).toBe('');
+    expect(screen.getByRole('option', { name: 'Stock for sale online' })).toBeTruthy();
+    await screen.findByText(/Out of stock · last from Nishat Mills/);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Choose Khaddar suit · S to order' }));
+    // Another location: its own list, nothing chosen from the one before.
+    fireEvent.change(at, { target: { value: 'loc_2' } });
+    expect(await screen.findByText('1 for sale · 2 on order')).toBeTruthy();
+    expect(screen.queryByText(/Out of stock/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Order the chosen (0)' })).toBeTruthy();
+    expect(fake.sent.filter((each) => each.operation === 'LowStock').at(-1)?.variables).toEqual({
+      locationId: 'loc_2',
+    });
+    expect(window.localStorage.getItem('hatti.ordersLocation.shop_1')).toBe('loc_2');
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Choose Khaddar suit · L to order' }));
+    await press('Order the chosen (1)');
+    expect(await screen.findByText(/Filled in from what runs low/)).toBeTruthy();
+    expect((screen.getByLabelText('Goods go to') as HTMLSelectElement).value).toBe('loc_2');
+    // Enough for twice the low mark there, less what it has and what is on its way.
+    expect(screen.getByLabelText('How many of Khaddar suit · L')).toHaveProperty('value', '7');
+    await press('Save the purchase order');
+    await waitFor(() =>
+      expect(sentOf(fake, 'PurchaseOrderCreate')).toEqual([
+        {
+          input: {
+            supplierId: 'sup_1',
+            locationId: 'loc_2',
+            reference: null,
+            expectedOn: null,
+            lines: [{ inventoryItemId: 'invi_3', quantity: 7, unitCost: null }],
           },
         },
       ]),

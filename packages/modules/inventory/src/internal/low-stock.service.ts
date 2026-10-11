@@ -36,6 +36,8 @@ export interface LowStockRecord {
   sku: string | null;
   /** Units that can be sold online, as its inventoryQuantity says: none or fewer is out. */
   available: number;
+  /** The location it was counted at, when listed for one (ADR-359); null for online sales. */
+  locationId?: string | null;
 }
 
 /** A variant just fallen to the shop's threshold, or run out after running low (ADR-157). */
@@ -154,15 +156,21 @@ export class LowStockService {
     });
   }
 
-  /** The shop's variants running low or out, the fewest for sale first, then by ID. */
+  /**
+   * The shop's variants running low or out, the fewest for sale first, then by ID; with
+   * `locationId`, those stocked at that location before, by what is available there (ADR-359).
+   */
   async list(
     tenant: TenantContext,
-    options: { first: number; after?: LowStockCursor | null },
+    options: { first: number; after?: LowStockCursor | null; locationId?: string | null },
   ): Promise<Page<LowStockRecord>> {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { lowStockThreshold } = await inventorySettingsIn(tx, tenant.shopId);
       const { after } = options;
-      const items = (await this.#lowIn(tx, tenant.shopId, lowStockThreshold))
+      const low = options.locationId
+        ? await this.#lowAt(tx, tenant.shopId, lowStockThreshold, options.locationId)
+        : await this.#lowIn(tx, tenant.shopId, lowStockThreshold);
+      const items = low
         .sort((x, y) => x.available - y.available || x.variantId.localeCompare(y.variantId))
         .filter(
           (item) =>
@@ -255,6 +263,37 @@ export class LowStockService {
        GROUP BY i.variant_id
       HAVING coalesce(sum(l.available) FILTER (WHERE loc.fulfills_online_orders), 0)
                <= ${threshold}`);
+    return this.#records(tx, shopId, rows, null);
+  }
+
+  /**
+   * The shop's tracked variants stocked at an active `locationId` before, with `threshold` or
+   * fewer units available there; none if the location is not the shop's or out of use.
+   */
+  async #lowAt(
+    tx: Tx,
+    shopId: string,
+    threshold: number,
+    locationId: string,
+  ): Promise<LowStockRecord[]> {
+    const { rows } = await tx.execute<{ variant_id: string; available: number }>(sql`
+      SELECT i.variant_id, l.available
+        FROM inventory.items i
+        JOIN inventory.levels l
+          ON l.shop_id = i.shop_id AND l.variant_id = i.variant_id AND l.location_id = ${locationId}
+        JOIN inventory.locations loc
+          ON loc.shop_id = l.shop_id AND loc.id = l.location_id AND loc.is_active
+       WHERE i.shop_id = ${shopId} AND i.tracked AND l.available <= ${threshold}`);
+    return this.#records(tx, shopId, rows, locationId);
+  }
+
+  /** The rows' variants of active products, with what staff need to reorder them. */
+  async #records(
+    tx: Tx,
+    shopId: string,
+    rows: readonly { variant_id: string; available: number }[],
+    locationId: string | null,
+  ): Promise<LowStockRecord[]> {
     if (rows.length === 0) return [];
     const snapshots = await this.variants.snapshotsOf(
       tx,
@@ -272,6 +311,7 @@ export class LowStockService {
           variantTitle: snapshot.variantTitle,
           sku: snapshot.sku,
           available: row.available,
+          locationId,
         },
       ];
     });

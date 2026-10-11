@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-358 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-359 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -366,6 +366,7 @@
 | 356 | The orders each location ships: a location_id filter in the orders search, stage counts by location, and the admin's orders list by the location chosen, kept in the browser | Accepted |
 | 357 | Another active location is made the shop's primary one, from the admin's location settings, the one before no longer it, both locked in one change | Accepted |
 | 358 | The admin's home counts what waits at the location chosen: home(locationId) for orders shipping from it, their parcels and returns, the choice the orders list keeps | Accepted |
+| 359 | What runs low at one location: inventoryLowStock(locationId) lists what it stocked before by what is available there, with what is on order for it; the stock page's choice, kept with the orders list's, and the purchase order from it goes there | Accepted |
 
 ---
 
@@ -14217,3 +14218,30 @@
 * **Alternatives:**
   * **Today's figures by location too:** sales belong to the shop; a branch's day is what waits
     for it.
+
+## ADR-359 · What runs low at one location: inventoryLowStock(locationId) lists what it stocked before by what is available there, with what is on order for it; the stock page's choice, kept with the orders list's, and the purchase order from it goes there
+
+* **Context:**
+  * The stock page listed what runs low for sale online (ADR-125), and a purchase order could be
+    started from it (ADR-354), but a branch selling in person, or a warehouse among several,
+    could not see what runs low on its own shelves: the online count adds every location
+    fulfilling online orders, and leaves out a store that does not (INV-01, INV-10).
+* **Decision:**
+  * **`inventoryLowStock(locationId)`**: the variants of active products, stock tracked, with a
+    level at that active location, available there at or under the shop's threshold, the fewest
+    first. A variant never stocked there is not that location's to reorder, so it is left out;
+    the threshold stays the shop's.
+  * **`incoming`, for one location**, counts only the open purchase orders going to it; the last
+    supplier and cost stay the shop's, since a supplier sells to the shop.
+  * **In the admin**, the stock page's low list has a location choice for a shop with more than
+    one, "Stock for sale online" when none is chosen, the same choice the orders list and the
+    home keep. "Order the chosen" carries the location, and the new purchase order sends the
+    goods there, its quantities from what that location has and has coming.
+* **Consequences:**
+  * A branch sees and reorders its own; the owner, unchanged, what the shop can sell online.
+  * Low-stock alerts (ADR-157) stay the shop's, for sale online.
+* **Alternatives:**
+  * **A threshold for each location:** one mark is enough until a shop asks; a branch sells less
+    and could want a lower one, which a column on locations can add later.
+  * **Every variant of the shop at each location, stocked there or not:** a store that never
+    carried the chappals would be told to reorder them.

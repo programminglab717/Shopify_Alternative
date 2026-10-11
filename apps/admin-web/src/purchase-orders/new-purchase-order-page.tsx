@@ -32,12 +32,17 @@ type Created<K extends string, T> = Record<K, { userErrors: UserError[] } & T>;
 export interface NewPurchaseOrderSearch {
   /** Variants running low, chosen on the stock page, comma-separated. */
   variants?: string;
+  /** The location they run low at, where the goods go. */
+  location?: string;
 }
 
 export function validateNewPurchaseOrderSearch(
   search: Record<string, unknown>,
 ): NewPurchaseOrderSearch {
-  return { variants: typeof search.variants === 'string' ? search.variants : undefined };
+  return {
+    variants: typeof search.variants === 'string' ? search.variants : undefined,
+    location: typeof search.location === 'string' ? search.location : undefined,
+  };
 }
 
 const NEW_SUPPLIER = '+new';
@@ -213,22 +218,40 @@ export function startFromLow(low: LowStockData, variantIds: readonly string[]): 
 /** A new purchase order: a supplier, where the goods go, and what of them, with what each costs. */
 export function NewPurchaseOrderPage() {
   const { t } = useLocale();
-  const { variants } = useSearch({ from: '/$shopId/purchase-orders/new' });
+  const { variants, location } = useSearch({ from: '/$shopId/purchase-orders/new' });
   const chosen = variants?.split(',').filter(Boolean) ?? [];
   const form = useAdminQuery<PurchaseOrderFormData>(['purchaseOrderForm'], PurchaseOrderFormQuery);
-  const low = useAdminQuery<LowStockData>(['lowStock'], LowStockQuery, undefined, {
-    enabled: chosen.length > 0,
-  });
+  // As the stock page listed them: at the location chosen there, or for sale online (ADR-359).
+  const low = useAdminQuery<LowStockData>(
+    ['lowStock'],
+    LowStockQuery,
+    { locationId: location ?? null },
+    { enabled: chosen.length > 0 },
+  );
 
   if (form.isPending || (chosen.length > 0 && low.isPending)) {
     return <Loading label={t('state.loading')} />;
   }
   if (form.isError) return <ErrorState message={errorText(form.error, t)} />;
   if (low.isError) return <ErrorState message={errorText(low.error, t)} />;
-  return <OrderForm form={form.data} start={low.data ? startFromLow(low.data, chosen) : null} />;
+  return (
+    <OrderForm
+      form={form.data}
+      start={low.data ? startFromLow(low.data, chosen) : null}
+      locationId={location}
+    />
+  );
 }
 
-function OrderForm({ form, start }: { form: PurchaseOrderFormData; start: Start | null }) {
+function OrderForm({
+  form,
+  start,
+  locationId: goesTo,
+}: {
+  form: PurchaseOrderFormData;
+  start: Start | null;
+  locationId: string | undefined;
+}) {
   const { t } = useLocale();
   const { id: shopId } = useShop();
   const navigate = useNavigate();
@@ -238,7 +261,9 @@ function OrderForm({ form, start }: { form: PurchaseOrderFormData; start: Start 
   >(PurchaseOrderCreateMutation);
   const { problem, attempt } = useAttempt();
   const [supplier, setSupplier] = useState(start?.supplierId ?? '');
-  const [location, setLocation] = useState('');
+  const [location, setLocation] = useState(
+    goesTo && form.locations.nodes.some((each) => each.id === goesTo) ? goesTo : '',
+  );
   const [reference, setReference] = useState('');
   const [expectedOn, setExpectedOn] = useState('');
   const [lines, setLines] = useState<Line[]>(start?.lines ?? []);

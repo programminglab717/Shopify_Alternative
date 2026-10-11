@@ -470,6 +470,15 @@ describe.skipIf(!server)('PurchaseOrderService (INV-05)', () => {
       lastSupplier: { name: 'Faisalabad Textiles' },
       lastUnitCost: null,
     });
+    // For one location, what is on its way there alone (ADR-359).
+    const store = await f.location(f.a, 'Store');
+    expect((await f.purchaseOrders.reordersOf(f.a, [small!], store.id)).get(small!)).toMatchObject({
+      incoming: 0,
+      lastSupplier: { name: 'Ajrak House' },
+    });
+    expect(
+      (await f.purchaseOrders.reordersOf(f.a, [small!], warehouse.id)).get(small!)?.incoming,
+    ).toBe(12);
     unwrap(await f.purchaseOrders.close(f.a, first.id));
     unwrap(await f.purchaseOrders.close(f.a, second.id));
     reorders = await f.purchaseOrders.reordersOf(f.a, [small!, medium!]);
