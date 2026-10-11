@@ -59,6 +59,8 @@ function catalogCore(role: StaffRole) {
               {
                 ...KURTA,
                 priceRange: { minVariantPrice: pkr('3200.00'), maxVariantPrice: pkr('3200.00') },
+                // Its sizes sold nine in 30 days together (ADR-372).
+                soldLast30Days: 9,
               },
             ],
             pageInfo: { hasNextPage: false, endCursor: null },
@@ -216,7 +218,7 @@ describe('Products in the admin', () => {
     renderAdmin('/shop_1/products');
 
     await screen.findByText('13 in stock');
-    expect(screen.getByText('across 2 variants')).toBeTruthy();
+    expect(screen.getByText(/across 2 variants · 9 sold in 30 days/)).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Add product' })).toBeNull();
 
     fireEvent.click(screen.getByRole('link', { name: /Khaddar Kurta/ }));

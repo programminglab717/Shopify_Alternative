@@ -396,6 +396,8 @@ export interface ProductListItem {
   vendor: string | null;
   totalInventory: number;
   tracksInventory: boolean;
+  /** Units of its variants sold in the last 30 days (ADR-372). */
+  soldLast30Days: number;
   priceRange: { minVariantPrice: MoneyValue; maxVariantPrice: MoneyValue };
   media: ProductThumbnail[];
   variants: { id: string }[];

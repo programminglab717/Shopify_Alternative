@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-371 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-372 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -379,6 +379,7 @@
 | 369 | What the stock is worth: units on hand of tracked variants at what each costs now, in all and by location, for those who see the shop's costs | Accepted |
 | 370 | How fast a product sells, on its page: each variant's units sold in the last 30 days and how long what is for sale lasts, for any variant and not only those running low | Accepted |
 | 371 | What was bought from each supplier: its purchase orders, what came of them and what it cost, and what is still to come, on the suppliers' list | Accepted |
+| 372 | How fast each product sells, on the products list: its variants' units sold in the last 30 days together, read through the same batch loader | Accepted |
 
 ---
 
@@ -14549,3 +14550,23 @@
 * **Alternatives:**
   * **A page of its own for each supplier:** the list already links its orders; a line on the
     list says the totals without another page to open.
+
+## ADR-372 · How fast each product sells, on the products list: its variants' units sold in the last 30 days together, read through the same batch loader
+
+* **Context:**
+  * A product's page says how fast each of its sizes sells (ADR-370), but the products list,
+    where staff look over the catalogue, said only what is in stock (CAT-04, INV-08).
+* **Decision:**
+  * **On the Admin API**, `Product.soldLast30Days`: its variants' units sold in the last 30
+    days together, through the batch loader the variants use, so a page of 50 products asks
+    the ledger once; `read_inventory` as stock does.
+  * **In the admin**, each product on the list says "6 sold in 30 days" after its stock; a
+    product that sold none says nothing more.
+* **Consequences:**
+  * Products that sell and those that sit are told apart on the list, out of stock or not.
+  * Not yet: the list sorted by it. The catalog's search orders products by its own index and
+    knows nothing of sales; a sort by them waits for a search that can join the two, or for the
+    analytics' top products, which already rank what sells by money.
+* **Alternatives:**
+  * **Sorting a page by sales in the admin:** it would sort only the 50 products on the page,
+    not the shop's best sellers.

@@ -8283,6 +8283,11 @@ type Product {
   What search engines and link previews are told in place of its title and description (ADR-231).
   """
   seo: SEO!
+
+  """
+  Units of its variants sold in the last 30 days at all the shop's locations (INV-08), a page of products asking once.
+  """
+  soldLast30Days: Int!
   status: ProductStatus!
   tags: [String!]!
   title: String!

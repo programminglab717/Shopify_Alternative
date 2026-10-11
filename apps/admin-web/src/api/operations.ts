@@ -803,6 +803,7 @@ export const ProductsQuery = /* GraphQL */ `
         vendor
         totalInventory
         tracksInventory
+        soldLast30Days
         priceRange {
           minVariantPrice {
             amount

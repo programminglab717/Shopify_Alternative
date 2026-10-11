@@ -64,12 +64,21 @@ function Stock({ product }: { product: ProductListItem }) {
     ) : (
       <span className="text-danger">{t('products.outOfStock')}</span>
     );
+  // How fast it sells, its variants together (ADR-372); nothing where none sold.
+  const sold =
+    product.soldLast30Days > 0
+      ? ` · ${t('stock.sold', { count: formatCount(product.soldLast30Days) })}`
+      : '';
   return variants > 1 ? (
     <span>
       {stock} {t('products.across', { count: formatCount(variants) })}
+      {sold}
     </span>
   ) : (
-    stock
+    <span>
+      {stock}
+      {sold}
+    </span>
   );
 }
 

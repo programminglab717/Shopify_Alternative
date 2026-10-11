@@ -233,7 +233,10 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     const stock = await gql(
       tokens.a,
       `query ($id: ID!) {
-         product(id: $id) { variants { inventoryQuantity soldLast30Days daysOfStockLeft } }
+         product(id: $id) {
+           soldLast30Days
+           variants { inventoryQuantity soldLast30Days daysOfStockLeft }
+         }
        }`,
       {
         id: (await gql(tokens.a, '{ products(first: 1) { nodes { id } } }')).data?.products.nodes[0]
@@ -244,6 +247,8 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
       { inventoryQuantity: 3, soldLast30Days: 2, daysOfStockLeft: 45 },
       { inventoryQuantity: 4, soldLast30Days: 1, daysOfStockLeft: 120 },
     ]);
+    // The product's, its sizes' together (ADR-372).
+    expect(stock.data?.product.soldLast30Days).toBe(3);
 
     const found = await gql(
       tokens.aReader,

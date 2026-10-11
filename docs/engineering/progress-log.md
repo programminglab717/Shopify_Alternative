@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, the products list by how fast they sell** (CAT-04, INV-08): each product's units sold in
-the last 30 days on the products list, and the list sorted by it, best sellers first; then
-section by section as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, packing by scanning** (APP-04, ORD-05): an order to pack checked item by item with the
+phone's camera or a scanner, each code ticking off its line, a wrong item or one too many said
+at once, and the order packed when all of it is there; then section by section as the alpha's
+shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +18,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### How fast each product sells, on the products list, in the core and the admin
+
+* **A product's sales** ([ADR-372](../architecture/13-decision-log.md#adr-372--how-fast-each-product-sells-on-the-products-list-its-variants-units-sold-in-the-last-30-days-together-read-through-the-same-batch-loader)): `Product.soldLast30Days`, its sizes' together. The products
+  list says it after each product's stock. Sorting the list by it is left for a search that
+  knows sales; the reasons are in the decision.
+* **Tried in Chromium against the core:** the seed's lawn suit read "Out of stock · 8 sold in
+  30 days", the Peshawari Chappal "25 in stock across 3 variants · 6 sold in 30 days", and the
+  Multani Khussa "3 in stock across 3 variants · 4 sold in 30 days". No errors in the browser.
+* 2521 tests, as before: a product's sales as its sizes' together after an order, in the
+  Admin API's orders test; on the products list, in the admin's products test.
 
 ### 2fcd252 · What was bought from each supplier, in the core and the admin
 

@@ -110,7 +110,10 @@ export class VariantInventoryResolver {
 
 @Resolver(() => Product)
 export class ProductInventoryResolver {
-  constructor(private readonly service: InventoryService) {}
+  constructor(
+    private readonly service: InventoryService,
+    private readonly lowStock: LowStockService,
+  ) {}
 
   #items(
     tenant: TenantContext,
@@ -148,5 +151,24 @@ export class ProductInventoryResolver {
   ): Promise<boolean> {
     const items = await this.#items(tenant, loaders, product);
     return items.some((item) => item.tracked);
+  }
+
+  @ResolveField(() => Int, {
+    description:
+      `Units of its variants sold in the last ${SALES_PACE_DAYS} days at all the shop's ` +
+      'locations (INV-08), a page of products asking once.',
+  })
+  @RequireScopes('read_inventory')
+  async soldLast30Days(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() product: Product,
+  ): Promise<number> {
+    const sold = await Promise.all(
+      product.variants.map((variant) =>
+        loadSold(loaders, this.lowStock, tenant, uuidOf('variant', variant.id)),
+      ),
+    );
+    return sold.reduce((sum, each) => sum + each, 0);
   }
 }
