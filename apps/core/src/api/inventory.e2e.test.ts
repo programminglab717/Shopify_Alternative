@@ -556,7 +556,7 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     ).location;
     const [small, medium] = (
       await stockedProduct(tokens.b, 'Khaddar suit', ['S', 'M'])
-    ).variants.map((variant) => variant.inventoryItem.id);
+    ).variants.map((variant) => variant.inventoryItem.id) as [string, string];
     const counted = await mutate(tokens.b, SET_QUANTITIES, {
       input: {
         name: 'available',
