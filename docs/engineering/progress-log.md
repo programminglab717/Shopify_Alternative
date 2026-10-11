@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### An order packed by scanning, in the admin
+### 591adcf · An order packed by scanning, in the admin
 
 * **Pack by scanning** ([ADR-373](../architecture/13-decision-log.md#adr-373--an-order-packed-by-scanning-each-item-read-ticks-off-its-line-one-not-in-the-order-or-one-too-many-said-at-once-and-the-order-packed-once-all-of-it-is-there)): beside "Mark packed", each barcode or SKU read ticks off one
   of its line, through the goods-arriving scanner (ADR-363); an item not in the order, or one
