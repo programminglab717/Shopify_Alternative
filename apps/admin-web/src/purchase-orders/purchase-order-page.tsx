@@ -1,5 +1,5 @@
 import { Link, useParams } from '@tanstack/react-router';
-import { ArrowLeft, Printer, ScanBarcode, Trash2 } from 'lucide-react';
+import { ArrowLeft, Printer, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -8,14 +8,12 @@ import {
   PurchaseOrderQuery,
   PurchaseOrderReceiveMutation,
   PurchaseOrderUpdateMutation,
-  StockCountFindQuery,
 } from '../api/operations';
 import type {
   DocumentLanguage,
   PurchaseOrder,
   PurchaseOrderData,
   PurchaseOrderDocumentData,
-  StockCountFindData,
   UserError,
 } from '../api/types';
 import { useSessionStore } from '../auth/context';
@@ -27,7 +25,7 @@ import { parseStock } from '../products/product-form';
 import { useAttempt } from '../returns/parcel';
 import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context';
-import { Scanner, canScan } from '../stock/scanner';
+import { CountByCode } from '../stock/count-by-code';
 import { EDITS_STOCK } from '../stock/stock-page';
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
@@ -49,16 +47,11 @@ const titleOf = (line: PurchaseOrder['lines'][number]) =>
  */
 function Receive({ order }: { order: PurchaseOrder }) {
   const { t } = useLocale();
-  const shop = useShop();
-  const store = useSessionStore();
   const receive = useAdminMutation<Mutated, { id: string; input: Record<string, unknown> }>(
     PurchaseOrderReceiveMutation,
   );
   const { problem, attempt } = useAttempt();
   const [came, setCame] = useState<Record<string, string>>({});
-  const [code, setCode] = useState('');
-  const [scanning, setScanning] = useState(false);
-  const [said, setSaid] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const open = order.lines.filter((line) => line.received < line.quantity);
   const left = (line: PurchaseOrder['lines'][number]) => line.quantity - line.received;
@@ -69,39 +62,12 @@ function Receive({ order }: { order: PurchaseOrder }) {
     (line) => (came[line.id] ?? '').trim() && parseStock(came[line.id]!) === null,
   );
 
-  /** One more of the line whose variant has `wanted` as its barcode or SKU. */
-  const scanned = async (wanted: string) => {
-    setSaid(null);
-    const quoted = `"${wanted.replace(/["\\]/g, '')}"`;
-    let itemId: string | null = null;
-    try {
-      for (const query of [`barcode:${quoted}`, `sku:${quoted}`]) {
-        const data = await store.graphql<StockCountFindData>(shop.id, StockCountFindQuery, {
-          query,
-          locationId: order.location.id,
-        });
-        const lower = wanted.toLowerCase();
-        const variant = data.products.nodes
-          .flatMap((product) => product.variants)
-          .find(
-            (each) => each.barcode?.toLowerCase() === lower || each.sku?.toLowerCase() === lower,
-          );
-        if (variant) {
-          itemId = variant.inventoryItem.id;
-          break;
-        }
-      }
-    } catch (error) {
-      setSaid(errorText(error, t));
-      return;
-    }
+  /** One more of the line with this item, where the order has one. */
+  const oneMore = (itemId: string) => {
     const line = open.find((each) => each.inventoryItem.id === itemId);
-    if (!line) {
-      setSaid(t('po.notOnOrder', { code: wanted }));
-      return;
-    }
+    if (!line) return false;
     setCame((now) => ({ ...now, [line.id]: String((parseStock(now[line.id] ?? '') ?? 0) + 1) }));
-    setCode('');
+    return true;
   };
 
   const onSubmit = async (event: FormEvent) => {
@@ -134,27 +100,11 @@ function Receive({ order }: { order: PurchaseOrder }) {
       {order.lines.some((line) => line.unitCost) && (
         <p className="text-secondary">{t('po.costHint')}</p>
       )}
-      <div className="flex flex-wrap gap-2">
-        <form
-          className="flex min-w-0 flex-1 gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (code.trim()) void scanned(code.trim());
-          }}
-        >
-          <input
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            aria-label={t('stock.countScan.code')}
-            placeholder={t('stock.countScan.code')}
-            dir="ltr"
-            autoComplete="off"
-            className="min-h-12 min-w-0 flex-1 rounded-control border border-line bg-surface px-3 md:min-h-10"
-          />
-          <Button type="submit" variant="secondary" disabled={!code.trim()}>
-            {t('stock.countScan.add')}
-          </Button>
-        </form>
+      <CountByCode
+        locationId={order.location.id}
+        onItem={oneMore}
+        notOnList={(code) => t('po.notOnOrder', { code })}
+      >
         <Button
           variant="secondary"
           onClick={() =>
@@ -163,25 +113,7 @@ function Receive({ order }: { order: PurchaseOrder }) {
         >
           {t('po.fillAll')}
         </Button>
-      </div>
-      {canScan() &&
-        (scanning ? (
-          <Scanner
-            continuous
-            onCode={(read) => void scanned(read)}
-            onClose={() => setScanning(false)}
-          />
-        ) : (
-          <Button
-            variant="secondary"
-            className="self-start"
-            icon={<ScanBarcode aria-hidden className="size-5" />}
-            onClick={() => setScanning(true)}
-          >
-            {t('stock.scan')}
-          </Button>
-        ))}
-      {said && <Alert tone="danger">{said}</Alert>}
+      </CountByCode>
       <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-3">
         <ul className="flex flex-col divide-y divide-line">
           {open.map((line) => {

@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, a transfer received by scanning** (INV-04, INV-07): each box's barcode or SKU, typed or
-read by the phone's camera, one more of its line on the transfer's page, as goods are counted
-into a purchase order; then section by section as the alpha's shops need them. Urdu handles
-wait, as decided.
+**Next, transfers to receive on the home** (INV-04, ANL-01): the home for the location chosen
+says how many transfers are on their way to it, linked to them, so a branch knows what to expect
+and receive; then section by section as the alpha's shops need them. Urdu handles wait, as
+decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,17 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### A transfer received by scanning, in the admin
+
+* **Counting a carton** ([ADR-363](../architecture/13-decision-log.md#adr-363--a-transfer-is-received-by-scanning-as-a-purchase-order-is-each-barcode-or-sku-typed-or-read-is-one-more-of-its-line-a-code-not-on-it-said-so-one-counting-component-for-both)): a transfer's page takes a barcode or SKU, typed or read by the
+  phone's camera, as one more of its line, as a purchase order's does; a code not on it is said
+  so. One counting component now serves both pages.
+* **Tried in Chromium against the core:** on the seed's shop, T-4 sent one chappal from Lahore
+  warehouse to Karachi store; on its page "PC-10" counted it, "NOPE-1" was said not to be on it,
+  and it was received; T-5 brought it back. No errors in the browser.
+* 2512 tests: the purchase order's and the transfer's receiving each count a SKU and refuse a
+  code not on them, in the admin.
 
 ### 8343352 · A transfer printed to go with the stock, in the core and the admin
 

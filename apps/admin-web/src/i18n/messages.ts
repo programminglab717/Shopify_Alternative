@@ -3139,7 +3139,8 @@ const en = {
     'Sending takes it off what is on hand where it leaves, until it is received where it goes.',
   'transfers.send': 'Send',
   'transfers.receive': 'Stock that arrived',
-  'transfers.receiveAbout': 'Count what arrived; it goes into stock at {location}.',
+  'transfers.receiveAbout':
+    'Count what arrived, or scan each box; it goes into stock at {location}.',
   'transfers.allOnWay': 'All that is on its way',
   'transfers.onWay': '{count} on the way',
   'transfers.arrivedOfLine': 'Arrived of {title}',
@@ -3162,6 +3163,7 @@ const en = {
   'transfers.missing.one':
     "1 of those chosen isn't available at {from}; find it below to send from elsewhere.",
   'transfers.print': 'Print to go with the stock',
+  'transfers.notOnTransfer': 'Nothing on this transfer has the barcode or SKU {code}.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6276,7 +6278,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'بھیجنے سے یہ وہاں کے موجود اسٹاک سے نکل جاتا ہے جہاں سے جاتا ہے، جب تک جہاں جاتا ہے وہاں موصول نہ ہو۔',
   'transfers.send': 'بھیجیں',
   'transfers.receive': 'جو اسٹاک پہنچا',
-  'transfers.receiveAbout': 'جو پہنچا وہ گنیں؛ یہ {location} کے اسٹاک میں جائے گا۔',
+  'transfers.receiveAbout':
+    'جو پہنچا گنیں، یا ہر ڈبہ اسکین کریں؛ یہ {location} کے اسٹاک میں جائے گا۔',
   'transfers.allOnWay': 'جو کچھ راستے میں ہے',
   'transfers.onWay': '{count} راستے میں',
   'transfers.arrivedOfLine': '{title} کتنے پہنچے',
@@ -6300,6 +6303,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'transfers.missing.one':
     'چنے ہوئے میں سے 1 {from} میں دستیاب نہیں؛ کہیں اور سے بھیجنے کے لیے اسے نیچے ڈھونڈیں۔',
   'transfers.print': 'اسٹاک کے ساتھ بھیجنے کے لیے پرنٹ کریں',
+  'transfers.notOnTransfer': 'اس منتقلی میں بارکوڈ یا SKU {code} کسی کا نہیں۔',
 };
 
 export const messages: Readonly<

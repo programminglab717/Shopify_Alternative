@@ -112,6 +112,29 @@ function transferCore(role: StaffRole, places = [GODOWN, STORE]) {
         };
       case 'InventoryTransfer':
         return { inventoryTransfer: variables.id === 'invt_1' ? transfer(received, status) : null };
+      case 'StockCountFind':
+        return {
+          products: {
+            nodes:
+              variables.query === 'sku:"KS-M"'
+                ? [
+                    {
+                      id: 'prod_1',
+                      title: 'Khaddar suit',
+                      variants: [
+                        {
+                          id: 'var_2',
+                          title: 'M',
+                          sku: 'KS-M',
+                          barcode: null,
+                          inventoryItem: { id: 'invi_2', inventoryLevel: null },
+                        },
+                      ],
+                    },
+                  ]
+                : [],
+          },
+        };
       case 'InventoryTransferDocument':
         return {
           inventoryTransferDocument: {
@@ -246,7 +269,9 @@ describe('Transfers between locations (INV-04)', () => {
     expect(screen.getByText('Bilty 4410')).toBeTruthy();
     const receive = screen.getByRole('heading', { name: 'Stock that arrived' }).parentElement!;
     expect(
-      within(receive).getByText('Count what arrived; it goes into stock at Karachi store.'),
+      within(receive).getByText(
+        'Count what arrived, or scan each box; it goes into stock at Karachi store.',
+      ),
     ).toBeTruthy();
     await press('All that is on its way');
     const small = within(receive).getByLabelText('Arrived of Khaddar suit · S') as HTMLInputElement;
@@ -256,7 +281,16 @@ describe('Transfers between locations (INV-04)', () => {
     expect([small.value, medium.value]).toEqual(['6', '4']);
     fireEvent.change(medium, { target: { value: '5' } });
     expect(within(receive).getByText('That is more than is on its way.')).toBeTruthy();
-    fireEvent.change(medium, { target: { value: '1' } });
+    fireEvent.change(medium, { target: { value: '0' } });
+    // A box scanned or typed by its SKU is one more of its line (ADR-363).
+    type('Barcode or SKU', 'KS-M');
+    await press('Add');
+    await waitFor(() => expect(medium.value).toBe('1'));
+    type('Barcode or SKU', 'NOPE');
+    await press('Add');
+    expect(
+      await within(receive).findByText('Nothing on this transfer has the barcode or SKU NOPE.'),
+    ).toBeTruthy();
     await press('Receive 7 at Karachi store');
     expect(await screen.findByText('7 received into stock at Karachi store.')).toBeTruthy();
     expect(sentOf(fake, 'InventoryTransferReceive')).toEqual([

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-362 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-363 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -370,6 +370,7 @@
 | 360 | Stock sent between locations is a transfer, T-1 onwards: off on hand where it leaves, on its way until received where it goes, in parts, and what has not arrived put back if cancelled; each step one adjustment naming it; the admin sends, receives and cancels | Accepted |
 | 361 | What runs low at a branch is sent from another location from the stock page: the chosen filled in as a purchase order is, from the location that can send the most of them, no more than it has; stock on its way, ordered or sent, says so | Accepted |
 | 362 | A transfer is printed to go with the stock: inventoryTransferDocument, both locations' addresses and each line with room to write how many arrived and both ends to sign, in English, Urdu or both, from the transfer's page | Accepted |
+| 363 | A transfer is received by scanning, as a purchase order is: each barcode or SKU typed or read is one more of its line, a code not on it said so; one counting component for both | Accepted |
 
 ---
 
@@ -14344,3 +14345,22 @@
 * **Alternatives:**
   * **The purchase order's page for a transfer:** a supplier is asked to send goods; a driver is
     asked to hand them over, and both ends sign.
+
+## ADR-363 · A transfer is received by scanning, as a purchase order is: each barcode or SKU typed or read is one more of its line, a code not on it said so; one counting component for both
+
+* **Context:**
+  * Goods received on a purchase order are counted box by box, by barcode or SKU typed, read by
+    a scanner at the keyboard or by the phone's camera (ADR-350, ADR-348). A transfer arriving
+    at a branch (ADR-360) could only be counted by hand, line by line (INV-04, INV-07).
+* **Decision:**
+  * **On a transfer's page**, receiving takes a barcode or SKU, typed or read by the camera
+    where the browser can, as a purchase order's does: found among the shop's variants, it is
+    one more of its line; one the transfer doesn't have says so, and nothing changes.
+  * **One component** counts by code for both, given where the goods arrive and what to do with
+    the item found; the purchase order's page uses it as before.
+* **Consequences:**
+  * A branch counts a carton as it opens it, the count checked against what is on its way
+    before anything is received.
+* **Alternatives:**
+  * **Receiving each code at once in the core:** a mistaken scan would be in stock before it was
+    seen; counted first, it is received together, as a purchase order's goods are.

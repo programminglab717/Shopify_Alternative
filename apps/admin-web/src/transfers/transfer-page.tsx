@@ -24,6 +24,7 @@ import { parseStock } from '../products/product-form';
 import { useAttempt } from '../returns/parcel';
 import { SelectField } from '../settings/settings-form';
 import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
+import { CountByCode } from '../stock/count-by-code';
 import { EDITS_STOCK } from '../stock/stock-page';
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
@@ -55,6 +56,14 @@ function Receive({ transfer }: { transfer: InventoryTransfer }) {
   const bad = open.some(
     (line) => (came[line.id] ?? '').trim() && parseStock(came[line.id]!) === null,
   );
+
+  /** One more of the line with this item, where the transfer has one (ADR-363). */
+  const oneMore = (itemId: string) => {
+    const line = open.find((each) => each.inventoryItem.id === itemId);
+    if (!line) return false;
+    setCame((now) => ({ ...now, [line.id]: String((parseStock(now[line.id] ?? '') ?? 0) + 1) }));
+    return true;
+  };
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -90,16 +99,21 @@ function Receive({ transfer }: { transfer: InventoryTransfer }) {
       <p className="text-secondary">
         {t('transfers.receiveAbout', { location: transfer.destination.name })}
       </p>
-      <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-3">
+      <CountByCode
+        locationId={transfer.destination.id}
+        onItem={oneMore}
+        notOnList={(code) => t('transfers.notOnTransfer', { code })}
+      >
         <Button
           variant="secondary"
-          className="self-start"
           onClick={() =>
             setCame(Object.fromEntries(open.map((line) => [line.id, String(left(line))])))
           }
         >
           {t('transfers.allOnWay')}
         </Button>
+      </CountByCode>
+      <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-3">
         <ul className="flex flex-col divide-y divide-line">
           {open.map((line) => (
             <li key={line.id} className="flex flex-wrap items-end justify-between gap-3 py-2">
