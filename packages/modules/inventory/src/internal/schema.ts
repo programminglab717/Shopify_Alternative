@@ -180,7 +180,7 @@ export const purchaseOrderLines = inventorySchema.table(
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],
 );
 
-export const TRANSFER_STATUSES = ['in_transit', 'received', 'cancelled'] as const;
+export const TRANSFER_STATUSES = ['in_transit', 'received', 'cancelled', 'closed'] as const;
 export type TransferStatusValue = (typeof TRANSFER_STATUSES)[number];
 
 export const transfers = inventorySchema.table(

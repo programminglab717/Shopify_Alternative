@@ -26,6 +26,7 @@ const WORDS = {
   note: { en: 'Note', ur: 'نوٹ' },
   received: { en: 'Received', ur: 'موصول' },
   cancelled: { en: 'Cancelled', ur: 'منسوخ' },
+  closed: { en: 'Closed, some lost on the way', ur: 'بند، کچھ راستے میں گم' },
   sentBy: { en: 'Sent by', ur: 'بھیجنے والا' },
   receivedBy: { en: 'Received by', ur: 'وصول کرنے والا' },
   name: { en: 'Name', ur: 'نام' },
@@ -75,7 +76,9 @@ function page(transfer: TransferRecord, context: TransferDocumentContext): Html 
       ? WORDS.received
       : transfer.status === 'cancelled'
         ? WORDS.cancelled
-        : null;
+        : transfer.status === 'closed'
+          ? WORDS.closed
+          : null;
   return html`
     ${ended && html`<p class="banner">${t(ended)}</p>`}
     <header class="header">

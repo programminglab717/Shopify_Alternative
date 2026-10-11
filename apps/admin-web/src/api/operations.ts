@@ -6289,6 +6289,7 @@ const INVENTORY_TRANSFER = /* GraphQL */ `
   note
   totalQuantity
   receivedQuantity
+  lostQuantity
   origin {
     id
     name
@@ -6431,4 +6432,19 @@ export const InventoryTransferDocumentQuery = /* GraphQL */ `
       fileName
     }
   }
+`;
+
+/** A transfer closed with what arrived, the rest lost on the way. */
+export const InventoryTransferCloseMutation = /* GraphQL */ `
+  mutation InventoryTransferClose($id: ID!) {
+    inventoryTransferClose(id: $id) {
+      inventoryTransfer {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
 `;

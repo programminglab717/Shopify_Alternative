@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-365 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-366 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -373,6 +373,7 @@
 | 363 | A transfer is received by scanning, as a purchase order is: each barcode or SKU typed or read is one more of its line, a code not on it said so; one counting component for both | Accepted |
 | 364 | The home counts the transfers on their way to the location chosen, to receive: home's transfersToReceive, read with low stock, a tap from the transfers | Accepted |
 | 365 | The transfers list follows the location chosen on the orders list and the home: those leaving it and those coming to it, the choice kept with theirs | Accepted |
+| 366 | Stock lost on the way: a transfer is closed with what arrived, the rest counted lost and not put back where it left; status CLOSED, with what was lost | Accepted |
 
 ---
 
@@ -14401,3 +14402,24 @@
   * A branch's transfers are its own wherever it opens them from.
 * **Alternatives:**
   * **Coming to it alone:** a branch sends stock back too; it is its to follow.
+
+## ADR-366 · Stock lost on the way: a transfer is closed with what arrived, the rest counted lost and not put back where it left; status CLOSED, with what was lost
+
+* **Context:**
+  * A transfer that does not all arrive could only be cancelled (ADR-360), which puts what had
+    not arrived back on hand where it left. When cartons go missing on the road, that counted
+    stock the warehouse does not have (INV-04).
+* **Decision:**
+  * **`inventoryTransferClose`** closes a transfer on its way with what arrived: what had not is
+    lost on the way, and the transfer is CLOSED, its `lostQuantity` saying how many. Stock does
+    not change: it came off on hand where it left when it was sent. Migration 0171 adds the
+    status.
+  * **In the admin**, a transfer some of which arrived offers "The rest was lost" beside
+    cancelling, asking first; a closed transfer shows what was lost, and its printed page says it
+    was closed with some lost.
+* **Consequences:**
+  * The warehouse's count stays what is on its shelves; the loss is on the transfer, by line.
+  * Not yet: what was lost costed, or claimed from the carrier, as a courier's lost parcels are.
+* **Alternatives:**
+  * **Cancelling, then taking the rest away at the origin as shrinkage:** two steps, and the
+    origin's history would show stock back that never was.

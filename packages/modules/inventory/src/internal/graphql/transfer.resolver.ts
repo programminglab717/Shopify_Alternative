@@ -58,6 +58,10 @@ function toTransfer(record: TransferRecord): InventoryTransfer {
     ),
     totalQuantity: record.lines.reduce((sum, line) => sum + line.quantity, 0),
     receivedQuantity: record.lines.reduce((sum, line) => sum + line.received, 0),
+    lostQuantity:
+      record.status === 'closed'
+        ? record.lines.reduce((sum, line) => sum + line.quantity - line.received, 0)
+        : 0,
     closedAt: record.closedAt,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -206,6 +210,19 @@ export class TransferResolver {
     @Args('id', { type: () => ID }) id: string,
   ): Promise<InventoryTransferPayload> {
     return payload(await this.service.cancel(tenant, uuidOf('inventoryTransfer', id)));
+  }
+
+  @Mutation(() => InventoryTransferPayload, {
+    description:
+      'Closes a transfer with what arrived: what had not is lost on the way, not put back where ' +
+      'it left, and the transfer is CLOSED. Stock does not change; it left on hand when sent.',
+  })
+  @RequireScopes('write_inventory')
+  async inventoryTransferClose(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<InventoryTransferPayload> {
+    return payload(await this.service.close(tenant, uuidOf('inventoryTransfer', id)));
   }
 }
 

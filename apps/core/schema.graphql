@@ -4107,7 +4107,7 @@ type InventorySettingsUpdatePayload {
 Stock sent from one of the shop's locations to another, on its way until it is received.
 """
 type InventoryTransfer {
-  """When it was received in full or cancelled."""
+  """When it was received in full, cancelled or closed."""
   closedAt: DateTime
 
   """When it was sent."""
@@ -4117,6 +4117,9 @@ type InventoryTransfer {
   destination: Location!
   id: ID!
   lines: [InventoryTransferLine!]!
+
+  """Lost on the way: what had not arrived when it was CLOSED."""
+  lostQuantity: Int!
 
   """T-1 onwards, per shop."""
   name: String!
@@ -4217,6 +4220,9 @@ input InventoryTransferReceiveLineInput {
 enum InventoryTransferStatus {
   """What had not arrived went back where it left."""
   CANCELLED
+
+  """Closed with what arrived; the rest was lost on the way."""
+  CLOSED
 
   """Sent; some or all of it still on its way."""
   IN_TRANSIT
@@ -5683,6 +5689,11 @@ type Mutation {
   Cancels what has not arrived: it goes back on hand where it left, in one adjustment with the reason "movement_canceled", and the transfer is CANCELLED. What arrived stays.
   """
   inventoryTransferCancel(id: ID!): InventoryTransferPayload!
+
+  """
+  Closes a transfer with what arrived: what had not is lost on the way, not put back where it left, and the transfer is CLOSED. Stock does not change; it left on hand when sent.
+  """
+  inventoryTransferClose(id: ID!): InventoryTransferPayload!
 
   """
   Sends stock from one active location to another, numbered T-1 onwards: each line taken off on hand where it leaves, no more than is available there, in one adjustment with the reason "movement_created" naming the transfer. It is IN_TRANSIT until received. Needs an Idempotency-Key header.

@@ -709,6 +709,25 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     expect((await gql(tokens.a, DOCUMENT, { id: sent.id, language: 'ENGLISH' })).data).toEqual({
       inventoryTransferDocument: null,
     });
+    // Another, closed with what arrived: the rest lost on the way, not put back (ADR-366).
+    const lost = (await mutate(tokens.b, CREATE, send(2))).inventoryTransfer;
+    const closed = await mutate(
+      tokens.b,
+      `mutation ($id: ID!) {
+         inventoryTransferClose(id: $id) {
+           inventoryTransfer { name status receivedQuantity lostQuantity }
+           userErrors { code }
+         }
+       }`,
+      { id: lost.id },
+    );
+    expect(closed).toEqual({
+      inventoryTransfer: { name: 'T-2', status: 'CLOSED', receivedQuantity: 0, lostQuantity: 6 },
+      userErrors: [],
+    });
+    expect(await levelsOf(medium)).toEqual([
+      { available: 0, location: { name: 'Faisalabad godown' } },
+    ]);
     // Shop A sees none of shop B's; sending needs writing stock.
     const readOnly = await gql(tokens.aStockReader, CREATE, send(1));
     expect(readOnly.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');

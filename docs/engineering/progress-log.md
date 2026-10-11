@@ -6,9 +6,10 @@
 
 ## In progress
 
-**Next, stock lost on the way** (INV-04): a transfer closed with what arrived, the rest lost on
-the road rather than put back where it left, so the warehouse's count stays true; then section
-by section as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, purchase orders and transfers on the activity log** (ADM-04, INV-04, INV-05): each
+created, received, changed, closed or cancelled recorded as an event, so the shop's activity log
+says who did it and webhooks can hear it; then section by section as the alpha's shops need
+them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +18,19 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### Stock lost on the way, in the core and the admin
+
+* **Closed with what arrived** ([ADR-366](../architecture/13-decision-log.md#adr-366--stock-lost-on-the-way-a-transfer-is-closed-with-what-arrived-the-rest-counted-lost-and-not-put-back-where-it-left-status-closed-with-what-was-lost)): `inventoryTransferClose` closes a transfer on its way,
+  what had not arrived lost rather than put back where it left; the transfer is CLOSED with its
+  `lostQuantity`. Migration 0171 adds the status. The admin's transfer page offers "The rest was
+  lost" once some has arrived, and shows what was lost.
+* **Tried in Chromium against the core:** on the seed's shop, T-7 sent two chappals from Lahore
+  warehouse to Karachi store; one was received, and the transfer closed with the other lost:
+  Lahore kept none of the two, Karachi had the one, and the page said 1 lost. The seed was put
+  back after with T-8 and a correction at Lahore. No errors in the browser.
+* 2516 tests: a transfer closed with the rest lost, and refused once closed, in the inventory
+  module; through the Admin API; in the admin, closed after asking.
 
 ### e381f6f · The transfers list for one location, in the admin
 

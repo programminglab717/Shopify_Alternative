@@ -15,6 +15,7 @@ export enum InventoryTransferStatus {
   IN_TRANSIT = 'IN_TRANSIT',
   RECEIVED = 'RECEIVED',
   CANCELLED = 'CANCELLED',
+  CLOSED = 'CLOSED',
 }
 
 registerEnumType(InventoryTransferStatus, {
@@ -24,6 +25,7 @@ registerEnumType(InventoryTransferStatus, {
     IN_TRANSIT: { description: 'Sent; some or all of it still on its way.' },
     RECEIVED: { description: 'Every line arrived in full.' },
     CANCELLED: { description: 'What had not arrived went back where it left.' },
+    CLOSED: { description: 'Closed with what arrived; the rest was lost on the way.' },
   },
 });
 
@@ -92,9 +94,12 @@ export class InventoryTransfer {
   @Field(() => Int)
   receivedQuantity!: number;
 
+  @Field(() => Int, { description: 'Lost on the way: what had not arrived when it was CLOSED.' })
+  lostQuantity!: number;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
-    description: 'When it was received in full or cancelled.',
+    description: 'When it was received in full, cancelled or closed.',
   })
   closedAt!: Date | null;
 

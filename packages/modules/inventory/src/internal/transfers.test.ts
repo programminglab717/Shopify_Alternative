@@ -265,4 +265,35 @@ describe.skipIf(!server)('TransferService (INV-04)', () => {
     );
     expect(await f.transfers.document(f.b, sent.id, 'english')).toBeNull();
   });
+
+  it('closes a transfer with what arrived, the rest lost on the way, not put back (ADR-366)', async () => {
+    const [small] = variants as [string];
+    const sent = unwrap(await send([[small, 6]]));
+    unwrap(
+      await f.transfers.receive(f.a, sent.id, {
+        lines: [{ lineId: sent.lines[0]!.id, quantity: 4 }],
+      }),
+    );
+    const before = (await f.inventory.history(f.a, small, { first: 1 })).items[0]!.id;
+    const closed = unwrap(await f.transfers.close(f.a, sent.id));
+    expect(closed).toMatchObject({ status: 'closed', closedAt: expect.any(Date) });
+    expect(closed.lines[0]).toMatchObject({ quantity: 6, received: 4 });
+    // Nothing goes back: the warehouse keeps 4 of its 10, the store has the 4 that came.
+    expect(await levelAt(small, warehouse)).toMatchObject({ onHand: 4 });
+    expect(await levelAt(small, store)).toMatchObject({ onHand: 4 });
+    expect((await f.inventory.history(f.a, small, { first: 1 })).items[0]!.id).toBe(before);
+    expect(await f.transfers.countInTransit(f.a, store.id)).toBe(0);
+    expect(errorsOf(await f.transfers.close(f.a, sent.id))).toEqual([['id', 'INVALID']]);
+    expect(
+      errorsOf(
+        await f.transfers.receive(f.a, sent.id, {
+          lines: [{ lineId: sent.lines[0]!.id, quantity: 1 }],
+        }),
+      ),
+    ).toEqual([['id', 'INVALID']]);
+    expect(errorsOf(await f.transfers.close(f.b, sent.id))).toEqual([['id', 'NOT_FOUND']]);
+    expect((await f.transfers.document(f.a, sent.id, 'english'))!.html).toContain(
+      'Closed, some lost on the way',
+    );
+  });
 });

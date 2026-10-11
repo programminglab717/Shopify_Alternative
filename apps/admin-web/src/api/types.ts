@@ -2575,7 +2575,7 @@ export interface PurchaseOrderDocumentData {
   purchaseOrderDocument: { html: string; title: string; fileName: string } | null;
 }
 
-export type InventoryTransferStatus = 'IN_TRANSIT' | 'RECEIVED' | 'CANCELLED';
+export type InventoryTransferStatus = 'IN_TRANSIT' | 'RECEIVED' | 'CANCELLED' | 'CLOSED';
 
 export interface InventoryTransfer {
   id: string;
@@ -2585,6 +2585,8 @@ export interface InventoryTransfer {
   note: string | null;
   totalQuantity: number;
   receivedQuantity: number;
+  /** What had not arrived when it was closed (ADR-366). */
+  lostQuantity: number;
   origin: { id: string; name: string };
   destination: { id: string; name: string };
   closedAt: string | null;

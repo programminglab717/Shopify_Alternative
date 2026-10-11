@@ -474,6 +474,28 @@ export class TransferService {
     );
   }
 
+  /**
+   * Closes a transfer with what arrived (ADR-366): what had not is lost on the way, not put back
+   * where it left. It came off on hand there when it was sent, so stock does not change.
+   */
+  async close(tenant: TenantContext, id: string): Promise<MutationResult<TransferRecord>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const transfer = await this.#lockOpen(tx, tenant.shopId, id);
+      if (!transfer.ok) return transfer;
+      await tx
+        .update(transfers)
+        .set({
+          status: 'closed',
+          closedAt: sql`now()`,
+          version: sql`${transfers.version} + 1`,
+          updatedAt: sql`now()`,
+        })
+        .where(and(eq(transfers.shopId, tenant.shopId), eq(transfers.id, id)));
+      const [closed] = await this.#load(tx, tenant.shopId, { ids: [id] });
+      return { ok: true, value: closed! };
+    });
+  }
+
   /** The transfer locked, if it is still on its way. */
   async #lockOpen(
     tx: Tx,

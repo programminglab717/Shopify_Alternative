@@ -3168,6 +3168,15 @@ const en = {
   'home.transfersToReceive.one': '1 transfer on its way',
   'home.transfersToReceiveHint': 'Count and receive the stock as it arrives.',
   'transfers.at': 'Leaving or coming to',
+  'transfers.status.CLOSED': 'Closed',
+  'transfers.lost': 'Lost on the way',
+  'transfers.close': 'The rest was lost',
+  'transfers.closeAsk':
+    "Close {name} with what arrived? The {count} that have not are counted lost on the way, and don't go back to {location}.",
+  'transfers.closeConfirm': 'Close it',
+  'transfers.closeAsk.one':
+    "Close {name} with what arrived? The 1 that has not arrived is counted lost on the way, and doesn't go back to {location}.",
+  'transfers.cancelAsk.one': 'Cancel {name}? The 1 that has not arrived goes back to {location}.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6312,6 +6321,15 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'home.transfersToReceive.one': '1 منتقلی راستے میں',
   'home.transfersToReceiveHint': 'اسٹاک پہنچنے پر گنیں اور موصول کریں۔',
   'transfers.at': 'یہاں سے یا یہاں',
+  'transfers.status.CLOSED': 'بند',
+  'transfers.lost': 'راستے میں گم',
+  'transfers.close': 'باقی گم ہو گیا',
+  'transfers.closeAsk':
+    '{name} جو پہنچا اس کے ساتھ بند کریں؟ جو {count} نہیں پہنچے وہ راستے میں گم شمار ہوں گے، اور {location} واپس نہیں جائیں گے۔',
+  'transfers.closeConfirm': 'بند کریں',
+  'transfers.closeAsk.one':
+    '{name} جو پہنچا اس کے ساتھ بند کریں؟ جو 1 نہیں پہنچا وہ راستے میں گم شمار ہو گا، اور {location} واپس نہیں جائے گا۔',
+  'transfers.cancelAsk.one': '{name} منسوخ کریں؟ جو 1 نہیں پہنچا وہ {location} واپس چلا جائے گا۔',
 };
 
 export const messages: Readonly<

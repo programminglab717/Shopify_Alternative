@@ -17,6 +17,7 @@ export const TRANSFER_STATUS_LABELS: Record<InventoryTransferStatus, MessageKey>
   IN_TRANSIT: 'transfers.status.IN_TRANSIT',
   RECEIVED: 'transfers.status.RECEIVED',
   CANCELLED: 'transfers.status.CANCELLED',
+  CLOSED: 'transfers.status.CLOSED',
 };
 
 /**

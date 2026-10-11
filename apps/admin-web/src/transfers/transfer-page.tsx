@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   InventoryTransferCancelMutation,
+  InventoryTransferCloseMutation,
   InventoryTransferDocumentQuery,
   InventoryTransferQuery,
   InventoryTransferReceiveMutation,
@@ -266,6 +267,49 @@ function Cancel({ transfer }: { transfer: InventoryTransfer }) {
   );
 }
 
+/** Closed with what arrived, the rest lost on the way (ADR-366), once asked. */
+function Close({ transfer }: { transfer: InventoryTransfer }) {
+  const { t } = useLocale();
+  const close = useAdminMutation<Mutated, { id: string }>(InventoryTransferCloseMutation);
+  const { problem, attempt } = useAttempt();
+  const [asking, setAsking] = useState(false);
+  if (!asking) {
+    return (
+      <Button variant="secondary" className="self-start" onClick={() => setAsking(true)}>
+        {t('transfers.close')}
+      </Button>
+    );
+  }
+  return (
+    <Card className="flex flex-col gap-3 p-4">
+      <p>
+        {t('transfers.closeAsk', {
+          name: transfer.name,
+          count: formatCount(transfer.totalQuantity - transfer.receivedQuantity),
+          location: transfer.origin.name,
+        })}
+      </p>
+      {problem && <Alert tone="danger">{problem}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="destructive"
+          busy={close.isPending}
+          onClick={() =>
+            void attempt(
+              async () => Object.values(await close.mutateAsync({ id: transfer.id }))[0]!,
+            )
+          }
+        >
+          {t('transfers.closeConfirm')}
+        </Button>
+        <Button variant="tertiary" onClick={() => setAsking(false)}>
+          {t('transfers.cancelKeep')}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 /** A transfer: where it left and where it goes, and each line, how much of it arrived. */
 export function TransferPage() {
   const { t, locale } = useLocale();
@@ -340,6 +384,12 @@ export function TransferPage() {
               })}
             </dd>
           </div>
+          {transfer.lostQuantity > 0 && (
+            <div>
+              <dt className="text-secondary">{t('transfers.lost')}</dt>
+              <dd className="num">{formatCount(transfer.lostQuantity)}</dd>
+            </div>
+          )}
         </dl>
       </Card>
       <Card className="p-4">
@@ -372,7 +422,12 @@ export function TransferPage() {
       </Card>
       <PrintTransfer transfer={transfer} />
       {edits && <Receive transfer={transfer} />}
-      {edits && <Cancel transfer={transfer} />}
+      {edits && (
+        <div className="flex flex-wrap gap-2">
+          <Cancel transfer={transfer} />
+          {transfer.receivedQuantity > 0 && <Close transfer={transfer} />}
+        </div>
+      )}
     </div>
   );
 }

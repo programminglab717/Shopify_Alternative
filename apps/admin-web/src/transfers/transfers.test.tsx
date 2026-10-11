@@ -59,6 +59,7 @@ function transfer(received: [number, number], status = 'IN_TRANSIT') {
     note: null,
     totalQuantity: 10,
     receivedQuantity: received[0] + received[1],
+    lostQuantity: status === 'CLOSED' ? 10 - received[0] - received[1] : 0,
     origin: GODOWN,
     destination: STORE,
     closedAt: null,
@@ -78,8 +79,8 @@ function transfer(received: [number, number], status = 'IN_TRANSIT') {
   };
 }
 
-function transferCore(role: StaffRole, places = [GODOWN, STORE]) {
-  let received: [number, number] = [0, 0];
+function transferCore(role: StaffRole, places = [GODOWN, STORE], start: [number, number] = [0, 0]) {
+  let received: [number, number] = start;
   let status = 'IN_TRANSIT';
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
@@ -198,6 +199,9 @@ function transferCore(role: StaffRole, places = [GODOWN, STORE]) {
         return {
           inventoryTransferReceive: { inventoryTransfer: { id: 'invt_1', status }, userErrors: [] },
         };
+      case 'InventoryTransferClose':
+        status = 'CLOSED';
+        return { inventoryTransferClose: { inventoryTransfer: { id: 'invt_1' }, userErrors: [] } };
       case 'InventoryTransferCancel':
         status = 'CANCELLED';
         return { inventoryTransferCancel: { inventoryTransfer: { id: 'invt_1' }, userErrors: [] } };
@@ -324,6 +328,25 @@ describe('Transfers between locations (INV-04)', () => {
       expect(screen.queryByRole('heading', { name: 'Stock that arrived' })).toBeNull(),
     );
     expect(screen.getByText('Cancelled')).toBeTruthy();
+  });
+
+  it('closes a transfer with what arrived, the rest lost on the way (ADR-366)', async () => {
+    const fake = transferCore('manager', [GODOWN, STORE], [6, 0]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/transfers/invt_1');
+
+    await screen.findByRole('heading', { name: 'T-1' });
+    await press('The rest was lost');
+    expect(
+      screen.getByText(
+        "Close T-1 with what arrived? The 4 that have not are counted lost on the way, and don't go back to Faisalabad godown.",
+      ),
+    ).toBeTruthy();
+    await press('Close it');
+    await waitFor(() => expect(sentOf(fake, 'InventoryTransferClose')).toEqual([{ id: 'invt_1' }]));
+    expect(await screen.findByText('Lost on the way')).toBeTruthy();
+    expect(screen.getByText('Closed')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Cancel the transfer' })).toBeNull();
   });
 
   it('shows transfers to a packer without sending or receiving, and asks a shop of one location for another', async () => {
