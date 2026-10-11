@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### How fast each product sells, on the products list, in the core and the admin
+### d6eba7b · How fast each product sells, on the products list, in the core and the admin
 
 * **A product's sales** ([ADR-372](../architecture/13-decision-log.md#adr-372--how-fast-each-product-sells-on-the-products-list-its-variants-units-sold-in-the-last-30-days-together-read-through-the-same-batch-loader)): `Product.soldLast30Days`, its sizes' together. The products
   list says it after each product's stock. Sorting the list by it is left for a search that
