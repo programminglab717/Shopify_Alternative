@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### What runs low at a branch sent from another location, in the admin
+### 71726e6 · What runs low at a branch sent from another location, in the admin
 
 * **Restocking a branch** ([ADR-361](../architecture/13-decision-log.md#adr-361--what-runs-low-at-a-branch-is-sent-from-another-location-from-the-stock-page-the-chosen-filled-in-as-a-purchase-order-is-from-the-location-that-can-send-the-most-of-them-no-more-than-it-has-stock-on-its-way-ordered-or-sent-says-so)): with a location chosen, the stock page's low list sends the
   chosen from another location: a new transfer filled in with enough of each for twice the low
