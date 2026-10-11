@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, packing by scanning** (APP-04, ORD-05): an order to pack checked item by item with the
-phone's camera or a scanner, each code ticking off its line, a wrong item or one too many said
-at once, and the order packed when all of it is there; then section by section as the alpha's
-shops need them. Urdu handles wait, as decided.
+**Next, the orders to pack scanned one after another** (APP-04, ORD-05): from the To pack
+list, each order opened to scan in turn and the next one brought up once it is packed, so a
+packer works through the day's orders without going back to the list; then section by section
+as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,20 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### An order packed by scanning, in the admin
+
+* **Pack by scanning** ([ADR-373](../architecture/13-decision-log.md#adr-373--an-order-packed-by-scanning-each-item-read-ticks-off-its-line-one-not-in-the-order-or-one-too-many-said-at-once-and-the-order-packed-once-all-of-it-is-there)): beside "Mark packed", each barcode or SKU read ticks off one
+  of its line, through the goods-arriving scanner (ADR-363); an item not in the order, or one
+  too many, is said at once, and the order is packed once all of it is there. Nothing new in
+  the core.
+* **Tried in Chromium against the core:** on the seed's #1003, to pack, scanning PC-10 said
+  "PC-10 is not in this order", one item was still to scan and "Pack the order" stayed off; the
+  order was left to pack. The seed's one order to pack has no code on its variant, so ticking
+  off and packing was left to the admin's test rather than changing the seed. No errors in the
+  browser.
+* 2522 tests: in the admin, an order's items ticked off by barcode and SKU, an item not
+  in it and one too many said, and the order packed once all was there.
 
 ### d6eba7b · How fast each product sells, on the products list, in the core and the admin
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-372 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-373 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -380,6 +380,7 @@
 | 370 | How fast a product sells, on its page: each variant's units sold in the last 30 days and how long what is for sale lasts, for any variant and not only those running low | Accepted |
 | 371 | What was bought from each supplier: its purchase orders, what came of them and what it cost, and what is still to come, on the suppliers' list | Accepted |
 | 372 | How fast each product sells, on the products list: its variants' units sold in the last 30 days together, read through the same batch loader | Accepted |
+| 373 | An order packed by scanning: each item read ticks off its line, one not in the order or one too many said at once, and the order packed once all of it is there | Accepted |
 
 ---
 
@@ -14570,3 +14571,27 @@
 * **Alternatives:**
   * **Sorting a page by sales in the admin:** it would sort only the 50 products on the page,
     not the shop's best sellers.
+
+## ADR-373 · An order packed by scanning: each item read ticks off its line, one not in the order or one too many said at once, and the order packed once all of it is there
+
+* **Context:**
+  * A packer marked an order packed by eye. A wrong size or a missing piece was found by the
+    customer, and in cash on delivery that is a refused parcel coming back at the shop's cost
+    (APP-04, ORD-05).
+* **Decision:**
+  * **In the admin**, an order to pack offers "Pack by scanning" beside "Mark packed". Each
+    barcode or SKU read, by a scanner at the keyboard, typed, or through the phone's camera, is
+    found among the shop's variants as goods arriving are (ADR-363) and ticks off one of its
+    line. An item the order has none of is said at once ("PC-10 is not in this order"), and so
+    is one too many of a line already full. "Pack the order" is on only once every line is
+    there, and packs it as "Mark packed" does.
+  * **Nothing new in the core.** What is counted stays on the phone until the order is packed;
+    the scan reads the variant's barcode or SKU as it is now, so an order line kept without one
+    is found by its variant's.
+* **Consequences:**
+  * The wrong item is caught at the table rather than at the door. "Mark packed" stays for a
+    shop without codes on its goods.
+  * Not yet: the To pack list worked through order after order, or a record of who scanned.
+* **Alternatives:**
+  * **Requiring a scan to pack:** shops whose goods carry no barcode or SKU could not pack at
+    all.

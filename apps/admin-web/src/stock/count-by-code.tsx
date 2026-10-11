@@ -14,8 +14,8 @@ import { Scanner, canScan } from './scanner';
 /**
  * Goods counted one box at a time (ADR-363): a barcode or SKU typed, or read by a scanner at the
  * keyboard or the phone's camera, found among the shop's variants and handed to `onItem` as one
- * more of its line; a code no line has is said so. Used where goods arrive: a purchase order's
- * and a transfer's.
+ * more of its line; a code no line has is said so. Used where goods arrive, a purchase order's
+ * and a transfer's, and where an order is packed (ADR-373).
  */
 export function CountByCode({
   locationId,
@@ -25,8 +25,8 @@ export function CountByCode({
 }: {
   /** Where the goods arrive, whose stock the search reads. */
   locationId: string;
-  /** One more of the line with this item; false where no line has it. */
-  onItem: (itemId: string) => boolean;
+  /** One more of the line with this item, the variant's too; false where no line has it. */
+  onItem: (itemId: string, variantId: string) => boolean;
   /** What is said of a code no line has. */
   notOnList: (code: string) => string;
   /** Beside the code's field, such as filling in all that is to come. */
@@ -44,6 +44,7 @@ export function CountByCode({
     setSaid(null);
     const quoted = `"${wanted.replace(/["\\]/g, '')}"`;
     let itemId: string | null = null;
+    let variantId = '';
     try {
       for (const query of [`barcode:${quoted}`, `sku:${quoted}`]) {
         const data = await store.graphql<StockCountFindData>(shop.id, StockCountFindQuery, {
@@ -58,6 +59,7 @@ export function CountByCode({
           );
         if (variant) {
           itemId = variant.inventoryItem.id;
+          variantId = variant.id;
           break;
         }
       }
@@ -65,7 +67,7 @@ export function CountByCode({
       setSaid(errorText(error, t));
       return;
     }
-    if (!itemId || !onItem(itemId)) {
+    if (!itemId || !onItem(itemId, variantId)) {
       setSaid(notOnList(wanted));
       return;
     }

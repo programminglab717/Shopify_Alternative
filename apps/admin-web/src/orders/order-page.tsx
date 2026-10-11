@@ -7,6 +7,7 @@ import {
   PackageCheck,
   PackageOpen,
   Printer,
+  ScanBarcode,
   ShieldAlert,
   Truck,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { OrderMessages } from '../settings/messages-page';
 import { Assignment, DeliveryAddress, NoteAndTags, Timeline } from './details';
 import { OrderItems } from './edit-order';
+import { PackByScan } from './pack-by-scan';
 import { CustomerLink, SENDS_LINKS } from './customer-link';
 import { HANDLES_MONEY, OrderMoney } from './money';
 import { OnlinePayments } from './online-payments';
@@ -98,6 +100,7 @@ function Actions({ order }: { order: OrderDetail }) {
   );
   const [cancelling, setCancelling] = useState(false);
   const [shipping, setShipping] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [reason, setReason] = useState<OrderCancelReason>('CUSTOMER');
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -142,6 +145,19 @@ function Actions({ order }: { order: OrderDetail }) {
             {t('order.pack')}
           </Button>
         )}
+        {canPack && !scanning && (
+          <Button
+            variant="secondary"
+            icon={<ScanBarcode aria-hidden className="size-5" />}
+            onClick={() => {
+              setScanning(true);
+              setShipping(false);
+              setCancelling(false);
+            }}
+          >
+            {t('order.packByScan')}
+          </Button>
+        )}
         {canUnpack && (
           <Button
             variant="secondary"
@@ -177,6 +193,14 @@ function Actions({ order }: { order: OrderDetail }) {
           </Button>
         )}
       </div>
+      {scanning && canPack && (
+        <PackByScan
+          order={order}
+          packing={pack.isPending}
+          onPack={() => void run(() => pack.mutateAsync({ id: order.id }))}
+          onClose={() => setScanning(false)}
+        />
+      )}
       {shipping && canShip && <ShipForm order={order} onDone={() => setShipping(false)} />}
       {cancelling && (
         <Card className="flex flex-col gap-3 p-4">

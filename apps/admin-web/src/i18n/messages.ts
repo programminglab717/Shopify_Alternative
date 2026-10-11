@@ -3204,6 +3204,17 @@ const en = {
   'po.supplierReceivedUnits.one': '1 received',
   'po.supplierAwaitingUnits': '{count} still to come',
   'po.supplierAwaitingUnits.one': '1 still to come',
+  'order.packByScan': 'Pack by scanning',
+  'pack.title': 'Scan what goes in the parcel',
+  'pack.counted': '{counted} of {count}',
+  'pack.notInOrder': '{code} is not in this order',
+  'pack.tooMany': 'All {count} of {title} are already in',
+  'pack.tooMany.one': 'The one {title} is already in',
+  'pack.left': '{count} items still to scan',
+  'pack.left.one': '1 item still to scan',
+  'pack.allHere': 'Everything in the order is here.',
+  'pack.done': 'Pack the order',
+  'pack.stop': 'Stop scanning',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6384,6 +6395,17 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'po.supplierReceivedUnits.one': '1 وصول ہوا',
   'po.supplierAwaitingUnits': '{count} ابھی آنے ہیں',
   'po.supplierAwaitingUnits.one': '1 ابھی آنا ہے',
+  'order.packByScan': 'اسکین کر کے پیک کریں',
+  'pack.title': 'پارسل میں جانے والا سامان اسکین کریں',
+  'pack.counted': '{count} میں سے {counted}',
+  'pack.notInOrder': '{code} اس آرڈر میں نہیں',
+  'pack.tooMany': '{title} کے سب {count} پہلے ہی آ چکے',
+  'pack.tooMany.one': '{title} کا ایک پہلے ہی آ چکا',
+  'pack.left': '{count} چیزیں ابھی اسکین کرنی ہیں',
+  'pack.left.one': '1 چیز ابھی اسکین کرنی ہے',
+  'pack.allHere': 'آرڈر کا سارا سامان موجود ہے۔',
+  'pack.done': 'آرڈر پیک کریں',
+  'pack.stop': 'اسکین بند کریں',
 };
 
 export const messages: Readonly<
