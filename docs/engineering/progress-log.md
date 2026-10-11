@@ -19,7 +19,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### A transfer received by scanning, in the admin
+### 855a9c6 · A transfer received by scanning, in the admin
 
 * **Counting a carton** ([ADR-363](../architecture/13-decision-log.md#adr-363--a-transfer-is-received-by-scanning-as-a-purchase-order-is-each-barcode-or-sku-typed-or-read-is-one-more-of-its-line-a-code-not-on-it-said-so-one-counting-component-for-both)): a transfer's page takes a barcode or SKU, typed or read by the
   phone's camera, as one more of its line, as a purchase order's does; a code not on it is said
