@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
 
-### Transfers to receive on the home, in the core and the admin
+### 8cae709 · Transfers to receive on the home, in the core and the admin
 
 * **What a branch waits for** ([ADR-364](../architecture/13-decision-log.md#adr-364--the-home-counts-the-transfers-on-their-way-to-the-location-chosen-to-receive-homes-transferstoreceive-read-with-low-stock-a-tap-from-the-transfers)): `home(locationId)` counts the transfers on their way to
   the location, or every one, as `transfersToReceive`; the admin's home shows them with low stock
