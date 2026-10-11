@@ -51,6 +51,8 @@ export const ID_PREFIXES = {
   supplier: 'sup',
   purchaseOrder: 'po',
   purchaseOrderLine: 'poli',
+  inventoryTransfer: 'invt',
+  inventoryTransferLine: 'invtl',
   customer: 'cus',
   blocklistEntry: 'blk',
   segment: 'seg',

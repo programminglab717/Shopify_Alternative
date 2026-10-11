@@ -26,6 +26,13 @@ export function purchaseOrderOf(change: Pick<StockChange, 'referenceDocumentUri'
   );
 }
 
+/** The transfer between locations a change sent, received or put back stock for (ADR-360). */
+export function transferOf(change: Pick<StockChange, 'referenceDocumentUri'>): string | null {
+  return (
+    /^hatti:\/\/transfers\/(invt_[0-9a-z]+)$/.exec(change.referenceDocumentUri ?? '')?.[1] ?? null
+  );
+}
+
 /**
  * A variant's stock changes, newest first: the latest as its stock was read, older ones a page at a
  * time as asked, at every location or the one chosen. Each says by how much, which quantity, why,
@@ -93,6 +100,7 @@ export function StockChanges({
           {shown.map((change, index) => {
             const order = orderOf(change);
             const purchase = purchaseOrderOf(change);
+            const moved = transferOf(change);
             return (
               <li
                 key={`${change.createdAt}-${index}`}
@@ -131,6 +139,18 @@ export function StockChanges({
                         className="text-primary underline"
                       >
                         {t('stock.itsPurchaseOrder')}
+                      </Link>
+                    </>
+                  )}
+                  {moved && (
+                    <>
+                      {' · '}
+                      <Link
+                        to="/$shopId/transfers/$transferId"
+                        params={{ shopId: shop.id, transferId: moved }}
+                        className="text-primary underline"
+                      >
+                        {t('stock.itsTransfer')}
                       </Link>
                     </>
                   )}

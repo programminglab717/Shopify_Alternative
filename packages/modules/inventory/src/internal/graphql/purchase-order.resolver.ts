@@ -26,6 +26,7 @@ import {
   type SupplierRecord,
 } from '../purchase-order.service.js';
 import type { PurchaseOrderStatusValue } from '../schema.js';
+import { TransferService } from '../transfer.service.js';
 import { InventoryItem } from './inventory.types.js';
 import { loadItem } from './inventory.resolver.js';
 import { LowStockItem } from './low-stock.types.js';
@@ -312,7 +313,10 @@ export class PurchaseOrderLineResolver {
 /** What of a low variant is on order, and who supplied it last (INV-05), for reordering it. */
 @Resolver(() => LowStockItem)
 export class LowStockReorderResolver {
-  constructor(private readonly service: PurchaseOrderService) {}
+  constructor(
+    private readonly service: PurchaseOrderService,
+    private readonly transfers: TransferService,
+  ) {}
 
   #reorder(
     tenant: TenantContext,
@@ -331,14 +335,23 @@ export class LowStockReorderResolver {
   @ResolveField(() => Int, {
     description:
       'Units on open purchase orders, not yet received: already on their way; listed for one ' +
-      'location, those on their way to it.',
+      'location, those on their way to it, sent from its other locations too.',
   })
   async incoming(
     @CurrentTenant() tenant: TenantContext,
     @Loaders() loaders: RequestLoaders,
     @Parent() item: LowStockItem,
   ): Promise<number> {
-    return (await this.#reorder(tenant, loaders, item))?.incoming ?? 0;
+    const ordered = (await this.#reorder(tenant, loaders, item))?.incoming ?? 0;
+    const locationId = item.record.locationId;
+    if (!locationId) return ordered;
+    // Stock sent from another of the shop's locations is on its way to this one too (ADR-360).
+    const sent = await loaders
+      .get<string, number>(`inventory.transfersIncoming:${locationId}`, (ids) =>
+        this.transfers.incomingOf(tenant, ids, locationId),
+      )
+      .load(item.record.variantId);
+    return ordered + (sent ?? 0);
   }
 
   @ResolveField(() => Supplier, {

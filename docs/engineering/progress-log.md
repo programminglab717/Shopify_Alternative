@@ -6,10 +6,10 @@
 
 ## In progress
 
-**Next, transfers between locations in the admin** (INV-04): stock sent from one location to
-another as a transfer on its way, received at the other end, so a branch restocks from the
-warehouse as it reorders from a supplier; then section by section as the alpha's shops need
-them. Urdu handles wait, as decided.
+**Next, stock sent for what runs low at a branch** (INV-04, INV-01): from the stock page's low
+list for a location, a transfer from another of the shop's locations that has it, filled in as a
+purchase order is from what runs low; then section by section as the alpha's shops need them.
+Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -18,6 +18,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-11
+
+### Transfers between locations, in the core and the admin
+
+* **Transfers** ([ADR-360](../architecture/13-decision-log.md#adr-360--stock-sent-between-locations-is-a-transfer-t-1-onwards-off-on-hand-where-it-leaves-on-its-way-until-received-where-it-goes-in-parts-and-what-has-not-arrived-put-back-if-cancelled-each-step-one-adjustment-naming-it-the-admin-sends-receives-and-cancels)): stock sent from one location to another comes off on hand where it
+  leaves and is on its way, T-1 onwards, until it is received where it goes, in parts; cancelled,
+  what had not arrived goes back. Each step is one adjustment naming the transfer, and what is
+  on its way counts in what runs low where it goes. Migration 0170 adds the transfers and their
+  lines. The admin's stock page links to Transfers: sent, received and cancelled there.
+* **Tried in Chromium against the core:** on the seed's shop, 2 of a Shalwar Qameez sent from
+  Lahore warehouse to Karachi store with a bilty number as T-1, 1 received, the other cancelled
+  back to Lahore; the variant's history showed sent, arrived and sent back, each naming T-1. T-2
+  then brought the one at Karachi back, received in full from the list. No errors in the
+  browser.
+* 2506 tests: transfers sent, received in parts and cancelled, and what is refused, in the
+  inventory module; through the Admin API; in the admin, sent, received, cancelled, and shown to
+  a packer.
 
 ### 0658476 · What runs low at one location, in the core and the admin
 

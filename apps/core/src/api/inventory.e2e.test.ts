@@ -547,6 +547,150 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     ]);
   });
 
+  it('sends stock to another location, on its way until it is received there (ADR-360)', async () => {
+    const warehouse = (
+      await addLocation(tokens.b, { name: 'Faisalabad godown', address: { city: 'Faisalabad' } })
+    ).location;
+    const store = (
+      await addLocation(tokens.b, { name: 'Saddar store', address: { city: 'Karachi' } })
+    ).location;
+    const [small, medium] = (
+      await stockedProduct(tokens.b, 'Khaddar suit', ['S', 'M'])
+    ).variants.map((variant) => variant.inventoryItem.id);
+    const counted = await mutate(tokens.b, SET_QUANTITIES, {
+      input: {
+        name: 'available',
+        reason: 'cycle_count_available',
+        quantities: [
+          { inventoryItemId: small, locationId: warehouse.id, quantity: 10 },
+          { inventoryItemId: medium, locationId: warehouse.id, quantity: 4 },
+        ],
+      },
+    });
+    expect(counted.userErrors).toEqual([]);
+
+    const TRANSFER = `
+      id name status reference totalQuantity receivedQuantity closedAt
+      origin { name } destination { name }
+      lines { id variantTitle quantity received inventoryItem { id } }`;
+    const CREATE = `
+      mutation ($input: InventoryTransferCreateInput!) {
+        inventoryTransferCreate(input: $input) {
+          inventoryTransfer { ${TRANSFER} }
+          userErrors { field code message }
+        }
+      }`;
+    const send = (quantity: number) => ({
+      input: {
+        originId: warehouse.id,
+        destinationId: store.id,
+        reference: 'Bilty 4410',
+        lines: [
+          { inventoryItemId: small, quantity },
+          { inventoryItemId: medium, quantity: 4 },
+        ],
+      },
+    });
+    expect(await mutate(tokens.b, CREATE, send(11))).toEqual({
+      inventoryTransfer: null,
+      userErrors: [
+        {
+          field: ['input', 'lines', '0', 'quantity'],
+          code: 'INVALID',
+          message: "Only 10 available at Faisalabad godown; can't send 11",
+        },
+      ],
+    });
+    const sent = (await mutate(tokens.b, CREATE, send(6))).inventoryTransfer;
+    expect(sent).toMatchObject({
+      name: 'T-1',
+      status: 'IN_TRANSIT',
+      reference: 'Bilty 4410',
+      totalQuantity: 10,
+      receivedQuantity: 0,
+      closedAt: null,
+      origin: { name: 'Faisalabad godown' },
+      destination: { name: 'Saddar store' },
+      lines: [
+        { variantTitle: 'S', quantity: 6, received: 0, inventoryItem: { id: small } },
+        { variantTitle: 'M', quantity: 4, received: 0, inventoryItem: { id: medium } },
+      ],
+    });
+
+    const RECEIVE = `
+      mutation ($id: ID!, $input: InventoryTransferReceiveInput!) {
+        inventoryTransferReceive(id: $id, input: $input) {
+          inventoryTransfer { status receivedQuantity }
+          userErrors { field code message }
+        }
+      }`;
+    const [first, second] = sent.lines as { id: string }[];
+    expect(
+      await mutate(tokens.b, RECEIVE, {
+        id: sent.id,
+        input: { lines: [{ lineId: first!.id, quantity: 6 }] },
+      }),
+    ).toEqual({ inventoryTransfer: { status: 'IN_TRANSIT', receivedQuantity: 6 }, userErrors: [] });
+    const CANCEL = `
+      mutation ($id: ID!) {
+        inventoryTransferCancel(id: $id) {
+          inventoryTransfer { status receivedQuantity closedAt }
+          userErrors { field code message }
+        }
+      }`;
+    expect(await mutate(tokens.b, CANCEL, { id: sent.id })).toMatchObject({
+      inventoryTransfer: { status: 'CANCELLED', receivedQuantity: 6, closedAt: expect.any(String) },
+      userErrors: [],
+    });
+    // What arrived stays at the store; the rest is back at the godown.
+    const levelsOf = async (id: string) =>
+      (
+        await gql(
+          tokens.b,
+          `query ($id: ID!) {
+             inventoryItem(id: $id) { inventoryLevels { available location { name } } }
+           }`,
+          { id },
+        )
+      ).data?.inventoryItem.inventoryLevels;
+    expect(await levelsOf(small)).toEqual([
+      { available: 4, location: { name: 'Faisalabad godown' } },
+      { available: 6, location: { name: 'Saddar store' } },
+    ]);
+    expect(await levelsOf(medium)).toEqual([
+      { available: 4, location: { name: 'Faisalabad godown' } },
+    ]);
+    expect(
+      await mutate(tokens.b, RECEIVE, {
+        id: sent.id,
+        input: { lines: [{ lineId: second!.id, quantity: 1 }] },
+      }),
+    ).toEqual({
+      inventoryTransfer: null,
+      userErrors: [
+        { field: ['id'], code: 'INVALID', message: 'The transfer is cancelled already' },
+      ],
+    });
+
+    const LIST = `query ($locationId: ID) {
+      inventoryTransfers(first: 5, locationId: $locationId) { nodes { name status } }
+    }`;
+    expect((await gql(tokens.b, LIST, { locationId: store.id })).data).toEqual({
+      inventoryTransfers: { nodes: [{ name: 'T-1', status: 'CANCELLED' }] },
+    });
+    expect((await gql(tokens.a, LIST, {})).data).toEqual({ inventoryTransfers: { nodes: [] } });
+    expect(
+      (
+        await gql(tokens.a, `query ($id: ID!) { inventoryTransfer(id: $id) { id } }`, {
+          id: sent.id,
+        })
+      ).data,
+    ).toEqual({ inventoryTransfer: null });
+    // Shop A sees none of shop B's; sending needs writing stock.
+    const readOnly = await gql(tokens.aStockReader, CREATE, send(1));
+    expect(readOnly.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
   it('orders goods from a supplier and receives them into stock as they come (ADR-350)', async () => {
     const godown = (
       await addLocation(tokens.a, { name: 'Faisalabad godown', address: { city: 'Faisalabad' } })
@@ -1004,6 +1148,23 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
       { variantTitle: 'S', available: 0, incoming: 20 },
       { variantTitle: 'M', available: 4, incoming: 0 },
     ]);
+    // Stock sent from the store is on its way to the warehouse too (ADR-360).
+    const sentBack = await mutate(
+      token,
+      `mutation ($input: InventoryTransferCreateInput!) {
+         inventoryTransferCreate(input: $input) { inventoryTransfer { name } userErrors { code } }
+       }`,
+      {
+        input: {
+          originId: store.id,
+          destinationId: warehouse.id,
+          lines: [{ inventoryItemId: small, quantity: 1 }],
+        },
+      },
+    );
+    expect(sentBack).toEqual({ inventoryTransfer: { name: 'T-1' }, userErrors: [] });
+    expect(await at(store.id)).toEqual([{ variantTitle: 'S', available: 1, incoming: 0 }]);
+    expect((await at(warehouse.id))[0]).toEqual({ variantTitle: 'S', available: 0, incoming: 21 });
 
     const changed = await mutate(
       token,

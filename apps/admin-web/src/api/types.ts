@@ -2570,3 +2570,42 @@ export interface SuppliersData {
 export interface PurchaseOrderDocumentData {
   purchaseOrderDocument: { html: string; title: string; fileName: string } | null;
 }
+
+export type InventoryTransferStatus = 'IN_TRANSIT' | 'RECEIVED' | 'CANCELLED';
+
+export interface InventoryTransfer {
+  id: string;
+  name: string;
+  status: InventoryTransferStatus;
+  reference: string | null;
+  note: string | null;
+  totalQuantity: number;
+  receivedQuantity: number;
+  origin: { id: string; name: string };
+  destination: { id: string; name: string };
+  closedAt: string | null;
+  createdAt: string;
+  lines: {
+    id: string;
+    productTitle: string;
+    variantTitle: string;
+    sku: string | null;
+    quantity: number;
+    received: number;
+    inventoryItem: { id: string };
+  }[];
+}
+
+export interface InventoryTransfersData {
+  inventoryTransfers: {
+    nodes: (Pick<
+      InventoryTransfer,
+      'id' | 'name' | 'status' | 'totalQuantity' | 'receivedQuantity' | 'createdAt'
+    > & { origin: { name: string }; destination: { name: string } })[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+}
+
+export interface InventoryTransferData {
+  inventoryTransfer: InventoryTransfer | null;
+}

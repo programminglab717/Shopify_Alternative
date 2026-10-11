@@ -8,6 +8,7 @@ import {
   PurchaseOrderLineResolver,
   PurchaseOrderResolver,
 } from './graphql/purchase-order.resolver.js';
+import { TransferLineResolver, TransferResolver } from './graphql/transfer.resolver.js';
 import {
   ProductInventoryResolver,
   VariantInventoryResolver,
@@ -17,6 +18,7 @@ import { LocationService } from './location.service.js';
 import { LowStockService } from './low-stock.service.js';
 import { PurchaseOrderService } from './purchase-order.service.js';
 import { StockService } from './stock.service.js';
+import { TransferService } from './transfer.service.js';
 
 /**
  * Needs a {@link Database} provider from the host application. Adds stock fields to the
@@ -30,9 +32,12 @@ import { StockService } from './stock.service.js';
     StockService,
     LowStockService,
     PurchaseOrderService,
+    TransferService,
     LocationResolver,
     PurchaseOrderResolver,
     PurchaseOrderLineResolver,
+    TransferResolver,
+    TransferLineResolver,
     LowStockResolver,
     LowStockItemResolver,
     LowStockReorderResolver,
@@ -41,6 +46,13 @@ import { StockService } from './stock.service.js';
     VariantInventoryResolver,
     ProductInventoryResolver,
   ],
-  exports: [LocationService, InventoryService, StockService, LowStockService, PurchaseOrderService],
+  exports: [
+    LocationService,
+    InventoryService,
+    StockService,
+    LowStockService,
+    PurchaseOrderService,
+    TransferService,
+  ],
 })
 export class InventoryModule {}

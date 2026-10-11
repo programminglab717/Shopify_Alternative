@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-359 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-360 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -367,6 +367,7 @@
 | 357 | Another active location is made the shop's primary one, from the admin's location settings, the one before no longer it, both locked in one change | Accepted |
 | 358 | The admin's home counts what waits at the location chosen: home(locationId) for orders shipping from it, their parcels and returns, the choice the orders list keeps | Accepted |
 | 359 | What runs low at one location: inventoryLowStock(locationId) lists what it stocked before by what is available there, with what is on order for it; the stock page's choice, kept with the orders list's, and the purchase order from it goes there | Accepted |
+| 360 | Stock sent between locations is a transfer, T-1 onwards: off on hand where it leaves, on its way until received where it goes, in parts, and what has not arrived put back if cancelled; each step one adjustment naming it; the admin sends, receives and cancels | Accepted |
 
 ---
 
@@ -14245,3 +14246,47 @@
     and could want a lower one, which a column on locations can add later.
   * **Every variant of the shop at each location, stocked there or not:** a store that never
     carried the chappals would be told to reorder them.
+
+## ADR-360 · Stock sent between locations is a transfer, T-1 onwards: off on hand where it leaves, on its way until received where it goes, in parts, and what has not arrived put back if cancelled; each step one adjustment naming it; the admin sends, receives and cancels
+
+* **Context:**
+  * A move between locations (ADR-347) arrives the moment it leaves. That is right across a
+    city, but the alpha's shops also keep a warehouse in one city and a store in another: goods
+    sent from Lahore to Karachi spend days with a courier or a goods transport, and a store that
+    counts them on arrival finds them already in its stock (INV-04).
+  * Shopify keeps transfers apart from moves: shipped from one location, then received at the
+    other, in parts, with "incoming" stock at the destination until then.
+* **Decision:**
+  * **`inventoryTransferCreate`** sends lines, 1 to 250, each item once, from one active
+    location to another, numbered T-1 onwards per shop, with a reference such as the courier's
+    tracking number or the bilty, and a note. Each line comes off on hand where it leaves, no
+    more than is available there, in one adjustment with the reason `movement_created` naming
+    the transfer (`hatti://transfers/invt_…`). Refused as a whole otherwise, with no number
+    taken.
+  * **`inventoryTransferReceive`** adds what arrived to on hand at the destination, never more
+    than is still on its way, in one adjustment with `movement_received`. Received in full, the
+    transfer is RECEIVED.
+  * **`inventoryTransferCancel`** puts back on hand where it left what had not arrived, with
+    `movement_canceled`, and the transfer is CANCELLED; what arrived stays.
+  * **`inventoryTransfers`** lists them, the newest first, by status and by either end;
+    `inventoryTransfer` reads one. Reading needs `read_inventory`, the rest `write_inventory`;
+    sending and receiving need an Idempotency-Key header.
+  * **On its way to a location** counts in what runs low there (ADR-359): `incoming` adds the
+    transfers going to it to its purchase orders.
+  * **A location** with a transfer on its way to or from it can't be taken out of use.
+  * **In the admin**, the stock page links to Transfers: those on the way, received or
+    cancelled; "Send stock" from the primary location by default to another, products found by
+    name and how many of each; a transfer's page counts what arrived of each line, all at once
+    or typed, and cancels the rest after asking. A stock change sent, received or put back links
+    to its transfer.
+* **Consequences:**
+  * Stock on a truck is in neither location's count, as it is in neither shop; the store sees
+    it coming with what runs low there.
+  * A move that arrives at once stays for stock carried across a city.
+  * Not yet: goods lost on the way, which are cancelled back and then taken away as shrinkage;
+    a transfer started from what runs low; a transfer printed for its driver.
+* **Alternatives:**
+  * **Stock kept at the origin, reserved, until it arrives:** the origin could not count its
+    shelf, and an order there could take what is on a truck.
+  * **A draft before sending:** the alpha's shops send what they pack the same day; a draft is
+    for when they ask.

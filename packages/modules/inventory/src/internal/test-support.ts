@@ -10,6 +10,7 @@ import { LocationService } from './location.service.js';
 import { PurchaseOrderService } from './purchase-order.service.js';
 import type { LocationRecord } from './records.js';
 import { StockService } from './stock.service.js';
+import { TransferService } from './transfer.service.js';
 
 export interface OutboxRow {
   event_type: string;
@@ -31,6 +32,7 @@ export interface InventoryFixture {
   inventory: InventoryService;
   stock: StockService;
   purchaseOrders: PurchaseOrderService;
+  transfers: TransferService;
   /** A product with one variant per size, or one variant without sizes; returns variant ids. */
   variantsOf(tenant: TenantContext, title: string, sizes?: string[]): Promise<string[]>;
   /** Adds a location, failing the test on user errors. */
@@ -82,6 +84,7 @@ export async function inventoryFixture(server: string): Promise<InventoryFixture
     inventory,
     stock: new StockService(),
     purchaseOrders: new PurchaseOrderService(db, variants, inventory),
+    transfers: new TransferService(db, variants, inventory),
     async variantsOf(owner, title, sizes) {
       const result = await products.create(owner, {
         title,
@@ -102,6 +105,8 @@ export async function inventoryFixture(server: string): Promise<InventoryFixture
     async reset() {
       await admin.query(`
         DELETE FROM catalog.products;
+        DELETE FROM inventory.transfers;
+        DELETE FROM inventory.transfer_counters;
         DELETE FROM inventory.purchase_orders;
         DELETE FROM inventory.purchase_order_counters;
         DELETE FROM inventory.suppliers;

@@ -368,6 +368,19 @@ export class LocationService {
           'The location still has stock, orders or checkouts waiting on it; move or adjust its stock first',
         );
       }
+      // Stock on its way to or from it would have nowhere to arrive, or to go back to (ADR-360).
+      const { rows: moving } = await tx.execute(sql`
+        SELECT 1 FROM inventory.transfers
+         WHERE shop_id = ${tenant.shopId} AND status = 'in_transit'
+           AND (origin_id = ${id} OR destination_id = ${id})
+         LIMIT 1`);
+      if (moving.length > 0) {
+        return failOne(
+          ['locationId'],
+          'IN_USE',
+          'Stock is on its way to or from the location; receive or cancel its transfers first',
+        );
+      }
       const value = await this.#update(
         tx,
         tenant.shopId,

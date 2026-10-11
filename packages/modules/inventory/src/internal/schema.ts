@@ -179,3 +179,41 @@ export const purchaseOrderLines = inventorySchema.table(
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],
 );
+
+export const TRANSFER_STATUSES = ['in_transit', 'received', 'cancelled'] as const;
+export type TransferStatusValue = (typeof TRANSFER_STATUSES)[number];
+
+export const transfers = inventorySchema.table(
+  'transfers',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    number: integer('number').notNull(),
+    originId: uuid('origin_id').notNull(),
+    destinationId: uuid('destination_id').notNull(),
+    status: text('status', { enum: TRANSFER_STATUSES }).notNull().default('in_transit'),
+    reference: text('reference'),
+    note: text('note'),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    version: integer('version').notNull().default(1),
+    ...timestamps,
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export const transferLines = inventorySchema.table(
+  'transfer_lines',
+  {
+    shopId: uuid('shop_id').notNull(),
+    transferId: uuid('transfer_id').notNull(),
+    id: uuid('id').notNull(),
+    position: integer('position').notNull(),
+    variantId: uuid('variant_id').notNull(),
+    productTitle: text('product_title').notNull(),
+    variantTitle: text('variant_title').notNull(),
+    sku: text('sku'),
+    quantity: integer('quantity').notNull(),
+    received: integer('received').notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);

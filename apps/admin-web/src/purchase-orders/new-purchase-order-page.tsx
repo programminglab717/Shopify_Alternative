@@ -106,13 +106,19 @@ function NewSupplier({
   );
 }
 
-/** Variants found by words, each added to the order with one tap. */
+/** Variants found by words, each added to the order, or another list of goods, with one tap. */
 export function FindVariants({
   chosen,
   onAdd,
+  findLabel,
+  addLabel,
 }: {
   chosen: Set<string>;
   onAdd: (line: Line) => void;
+  /** What the search says it finds; products to order by default. */
+  findLabel?: string;
+  /** What adding a variant says; ordering it by default. */
+  addLabel?: (title: string) => string;
 }) {
   const { t } = useLocale();
   const [words, setWords] = useState('');
@@ -136,8 +142,8 @@ export function FindVariants({
               setSearched(words.trim());
             }
           }}
-          aria-label={t('po.findProducts')}
-          placeholder={t('po.findProducts')}
+          aria-label={findLabel ?? t('po.findProducts')}
+          placeholder={findLabel ?? t('po.findProducts')}
           className="min-h-12 min-w-0 flex-1 rounded-control border border-line bg-surface px-3 md:min-h-10"
         />
         <Button
@@ -162,7 +168,7 @@ export function FindVariants({
                     <span dir="auto">{title}</span>
                     <Button
                       variant="tertiary"
-                      aria-label={t('po.addLine', { title })}
+                      aria-label={addLabel ? addLabel(title) : t('po.addLine', { title })}
                       icon={<Plus aria-hidden className="size-5" />}
                       disabled={chosen.has(variant.inventoryItem.id)}
                       onClick={() =>

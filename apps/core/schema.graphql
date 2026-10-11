@@ -4099,6 +4099,116 @@ type InventorySettingsUpdatePayload {
 }
 
 """
+Stock sent from one of the shop's locations to another, on its way until it is received.
+"""
+type InventoryTransfer {
+  """When it was received in full or cancelled."""
+  closedAt: DateTime
+
+  """When it was sent."""
+  createdAt: DateTime!
+
+  """Where the stock goes."""
+  destination: Location!
+  id: ID!
+  lines: [InventoryTransferLine!]!
+
+  """T-1 onwards, per shop."""
+  name: String!
+  note: String
+  number: Int!
+
+  """Where the stock left from."""
+  origin: Location!
+  receivedQuantity: Int!
+
+  """
+  Such as the courier's tracking number, or the bilty of the goods transport.
+  """
+  reference: String
+  status: InventoryTransferStatus!
+  totalQuantity: Int!
+  updatedAt: DateTime!
+}
+
+type InventoryTransferConnection {
+  edges: [InventoryTransferEdge!]!
+  nodes: [InventoryTransfer!]!
+  pageInfo: PageInfo!
+}
+
+input InventoryTransferCreateInput {
+  """Another active location, where it goes."""
+  destinationId: ID!
+
+  """1 to 250; each item once."""
+  lines: [InventoryTransferLineInput!]!
+  note: String
+
+  """An active location, where the stock leaves from."""
+  originId: ID!
+
+  """Such as the courier's tracking number; up to 255 characters."""
+  reference: String
+}
+
+type InventoryTransferEdge {
+  cursor: String!
+  node: InventoryTransfer!
+}
+
+"""A variant sent between locations, as it was named when sent."""
+type InventoryTransferLine {
+  id: ID!
+
+  """The variant's item, as it is now."""
+  inventoryItem: InventoryItem!
+  productTitle: String!
+  quantity: Int!
+
+  """How many arrived so far."""
+  received: Int!
+  sku: String
+  variantTitle: String!
+}
+
+input InventoryTransferLineInput {
+  inventoryItemId: ID!
+
+  """1 to as many as are available where it leaves."""
+  quantity: Int!
+}
+
+type InventoryTransferPayload {
+  inventoryTransfer: InventoryTransfer
+  userErrors: [UserError!]!
+}
+
+input InventoryTransferReceiveInput {
+  """1 to 250; each line once."""
+  lines: [InventoryTransferReceiveLineInput!]!
+}
+
+input InventoryTransferReceiveLineInput {
+  lineId: ID!
+
+  """How many arrived: 1 to as many as are still on the way."""
+  quantity: Int!
+}
+
+"""Where a transfer is: stock still on its way, or not."""
+enum InventoryTransferStatus {
+  """What had not arrived went back where it left."""
+  CANCELLED
+
+  """Sent; some or all of it still on its way."""
+  IN_TRANSIT
+
+  """Every line arrived in full."""
+  RECEIVED
+}
+
+"""
 The shop's link-in-bio page, at /links on its storefront, for its Instagram and TikTok bios and its chats (ADR-161): what it says of itself, its own links, and products to buy at once.
 """
 type LinkPage {
@@ -4417,7 +4527,7 @@ type LowStockItem {
   available: Int!
 
   """
-  Units on open purchase orders, not yet received: already on their way; listed for one location, those on their way to it.
+  Units on open purchase orders, not yet received: already on their way; listed for one location, those on their way to it, sent from its other locations too.
   """
   incoming: Int!
 
@@ -5551,6 +5661,21 @@ type Mutation {
 
   """Changes what the shop calls low stock."""
   inventorySettingsUpdate(input: InventorySettingsInput!): InventorySettingsUpdatePayload!
+
+  """
+  Cancels what has not arrived: it goes back on hand where it left, in one adjustment with the reason "movement_canceled", and the transfer is CANCELLED. What arrived stays.
+  """
+  inventoryTransferCancel(id: ID!): InventoryTransferPayload!
+
+  """
+  Sends stock from one active location to another, numbered T-1 onwards: each line taken off on hand where it leaves, no more than is available there, in one adjustment with the reason "movement_created" naming the transfer. It is IN_TRANSIT until received. Needs an Idempotency-Key header.
+  """
+  inventoryTransferCreate(input: InventoryTransferCreateInput!): InventoryTransferPayload!
+
+  """
+  Stock that arrived: each line's quantity added to on hand at the destination, in one adjustment with the reason "movement_received" naming the transfer, never more than is still on the way. Received in full, the transfer is RECEIVED. Needs an Idempotency-Key header.
+  """
+  inventoryTransferReceive(id: ID!, input: InventoryTransferReceiveInput!): InventoryTransferPayload!
   locationActivate(locationId: ID!): LocationActivatePayload!
 
   """Adds a location. A shop's first location is its primary one."""
@@ -9106,6 +9231,21 @@ type Query {
 
   """The shop's inventory settings."""
   inventorySettings: InventorySettings!
+
+  """A transfer by ID."""
+  inventoryTransfer(id: ID!): InventoryTransfer
+
+  """Transfers between the shop's locations, the newest first."""
+  inventoryTransfers(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """Those leaving from or going to it."""
+    locationId: ID
+    status: InventoryTransferStatus
+  ): InventoryTransferConnection!
 
   """
   Taps on the links of the shop's link page over a period (CH-07, ADR-204): which of its links bring shoppers, its chat on WhatsApp among them. Robots and staff previews are left out. Kept from the storefronts every minute.

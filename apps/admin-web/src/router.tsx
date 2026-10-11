@@ -92,6 +92,9 @@ import { StaffPage } from './settings/staff-page';
 import { MorePage, Shell } from './shell/shell';
 import { ShippingPage, validateShippingSearch } from './shipping/shipping-page';
 import { ShopsPage } from './shops/shops-page';
+import { NewTransferPage } from './transfers/new-transfer-page';
+import { TransferPage } from './transfers/transfer-page';
+import { TransfersPage } from './transfers/transfers-page';
 import {
   ArticleUrduPage,
   BlogUrduPage,
@@ -521,6 +524,24 @@ const purchaseOrder = createRoute({
   component: PurchaseOrderPage,
 });
 
+const transfers = createRoute({
+  getParentRoute: () => shop,
+  path: 'transfers',
+  component: TransfersPage,
+});
+
+const newTransfer = createRoute({
+  getParentRoute: () => shop,
+  path: 'transfers/new',
+  component: NewTransferPage,
+});
+
+const transfer = createRoute({
+  getParentRoute: () => shop,
+  path: 'transfers/$transferId',
+  component: TransferPage,
+});
+
 const statement = createRoute({
   getParentRoute: () => shop,
   path: 'cash/$remittanceId',
@@ -726,6 +747,9 @@ export const routeTree = root.addChildren([
     suppliers,
     newPurchaseOrder,
     purchaseOrder,
+    transfers,
+    newTransfer,
+    transfer,
     account,
     onlineStore,
     newPage,

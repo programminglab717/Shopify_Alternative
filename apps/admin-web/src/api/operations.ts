@@ -6279,3 +6279,114 @@ export const PurchaseOrderDocumentQuery = /* GraphQL */ `
     }
   }
 `;
+
+const INVENTORY_TRANSFER = /* GraphQL */ `
+  id
+  name
+  status
+  reference
+  note
+  totalQuantity
+  receivedQuantity
+  origin {
+    id
+    name
+  }
+  destination {
+    id
+    name
+  }
+  closedAt
+  createdAt
+  lines {
+    id
+    productTitle
+    variantTitle
+    sku
+    quantity
+    received
+    inventoryItem {
+      id
+    }
+  }
+`;
+
+/** Transfers between the shop's locations by status, the newest first, a page at a time. */
+export const InventoryTransfersQuery = /* GraphQL */ `
+  query InventoryTransfers($status: InventoryTransferStatus, $after: String, $locationId: ID) {
+    inventoryTransfers(first: 25, status: $status, after: $after, locationId: $locationId) {
+      nodes {
+        id
+        name
+        status
+        totalQuantity
+        receivedQuantity
+        origin {
+          name
+        }
+        destination {
+          name
+        }
+        createdAt
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`;
+
+export const InventoryTransferQuery = /* GraphQL */ `
+  query InventoryTransfer($id: ID!) {
+    inventoryTransfer(id: $id) {
+      ${INVENTORY_TRANSFER}
+    }
+  }
+`;
+
+/** Stock sent from one location to another, off on hand where it leaves. */
+export const InventoryTransferCreateMutation = /* GraphQL */ `
+  mutation InventoryTransferCreate($input: InventoryTransferCreateInput!) {
+    inventoryTransferCreate(input: $input) {
+      inventoryTransfer {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Stock that arrived, on hand where it went. */
+export const InventoryTransferReceiveMutation = /* GraphQL */ `
+  mutation InventoryTransferReceive($id: ID!, $input: InventoryTransferReceiveInput!) {
+    inventoryTransferReceive(id: $id, input: $input) {
+      inventoryTransfer {
+        id
+        status
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** What had not arrived, back where it left. */
+export const InventoryTransferCancelMutation = /* GraphQL */ `
+  mutation InventoryTransferCancel($id: ID!) {
+    inventoryTransferCancel(id: $id) {
+      inventoryTransfer {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
