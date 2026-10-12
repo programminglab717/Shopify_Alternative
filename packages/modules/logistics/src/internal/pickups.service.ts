@@ -48,6 +48,8 @@ export interface CourierPickupRecord {
   /** Being asked of the courier; asked; or refused, its parcels left for the next. */
   status: PickupStatusValue;
   parcelCount: number;
+  /** Of them, those checked off as the courier's rider took them (ADR-377). */
+  handedOverCount: number;
   /** The courier's number for its load sheet; null where it gives none. */
   reference: string | null;
   /** Who took the parcels, where the courier asked. */
@@ -60,6 +62,14 @@ export interface CourierPickupRecord {
   /** When the courier took it; null until it did. */
   requestedAt: Date | null;
   createdAt: Date;
+}
+
+/** One of a pickup's parcels, and whether its rider has taken it (ADR-377). */
+export interface PickupParcelRecord {
+  booking: CourierBookingRecord;
+  /** When it was checked off as the rider took it; null while it is still to be handed over. */
+  handedOverAt: Date | null;
+  handedOverBy: { kind: 'staff' | 'app'; id: string } | null;
 }
 
 export interface CourierPickupInput {
@@ -85,6 +95,7 @@ type PickupRow = {
   courier: string;
   status: PickupStatusValue;
   parcel_count: number;
+  handed_over_count: number;
   reference: string | null;
   rider_name: string | null;
   rider_code: string | null;
@@ -99,7 +110,20 @@ type PickupRow = {
 const PICKUP_COLUMNS = sql`
   p.id, p.account_id, a.courier, p.status, p.parcel_count, p.reference, p.rider_name,
   p.rider_code, p.document_key, p.error, p.requested_by_kind, p.requested_by_id, p.requested_at,
-  p.created_at`;
+  p.created_at,
+  (SELECT count(*) FROM logistics.pickup_parcels pp
+    WHERE pp.shop_id = p.shop_id AND pp.pickup_id = p.id AND pp.handed_over_at IS NOT NULL)::int
+    AS handed_over_count`;
+
+/** Whether a pickup's parcel was handed over, from `pp`, its row in the pickup. */
+const HANDED_OVER_COLUMNS = sql`
+  pp.handed_over_at, pp.handed_over_by_kind, pp.handed_over_by_id`;
+
+type ParcelRow = BookingRow & {
+  handed_over_at: string | Date | null;
+  handed_over_by_kind: 'staff' | 'app' | null;
+  handed_over_by_id: string | null;
+};
 
 const PICKUP_FROM = sql`
   logistics.pickups p
@@ -311,6 +335,87 @@ export class CourierPickupService {
     });
   }
 
+  /**
+   * The pickup's parcels, the longest waiting first, each with whether its rider has taken it
+   * (ADR-377).
+   */
+  async parcelsOf(tenant: TenantContext, pickupId: string): Promise<PickupParcelRecord[]> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<ParcelRow>(sql`
+        SELECT ${BOOKING_COLUMNS}, ${HANDED_OVER_COLUMNS}
+          FROM ${BOOKING_FROM}
+          JOIN logistics.pickup_parcels pp
+            ON pp.shop_id = b.shop_id AND pp.booking_id = b.id AND pp.pickup_id = ${pickupId}
+         WHERE b.shop_id = ${tenant.shopId}
+         ORDER BY b.booked_at, b.id`);
+      return rows.map((row) => this.#parcelOf(row));
+    });
+  }
+
+  /**
+   * Checks off the pickup's parcel with this tracking number as its rider takes it, scanned from
+   * its label (SHP-02, APP-04, ADR-377); a parcel checked off already stays as it was, and says
+   * so. Refused for a pickup its courier has not taken, and for a parcel not in the pickup.
+   */
+  async handOver(
+    tenant: TenantContext,
+    pickupId: string,
+    trackingNumber: string,
+  ): Promise<MutationResult<{ parcel: PickupParcelRecord; already: boolean }>> {
+    const code = trackingNumber.replace(/\s+/g, '').toUpperCase();
+    if (!code || code.length > 100) {
+      return failOne(
+        ['trackingNumber'],
+        'INVALID',
+        'Scan or type the tracking number on its label',
+      );
+    }
+    const by = actorColumnsOf(tenant.actor);
+    const { shopId } = tenant;
+    return this.db.tenant(shopId, async (tx) => {
+      const pickup = await this.#pickupIn(tx, shopId, pickupId);
+      if (!pickup) return failOne(['pickupId'], 'NOT_FOUND', 'Pickup not found');
+      if (pickup.status !== 'requested') {
+        return failOne(
+          ['pickupId'],
+          'INVALID',
+          'Only a pickup its courier has taken has parcels to hand over',
+        );
+      }
+      const { rows: found } = await tx.execute<{ booking_id: string; handed_over_at: unknown }>(sql`
+        SELECT pp.booking_id, pp.handed_over_at
+          FROM logistics.pickup_parcels pp
+          JOIN logistics.bookings b ON b.shop_id = pp.shop_id AND b.id = pp.booking_id
+         WHERE pp.shop_id = ${shopId} AND pp.pickup_id = ${pickupId}
+           AND upper(regexp_replace(b.tracking_number, '[[:space:]]', '', 'g')) = ${code}
+         FOR UPDATE OF pp`);
+      const parcel = found[0];
+      if (!parcel) {
+        return failOne(
+          ['trackingNumber'],
+          'NOT_FOUND',
+          'No parcel of this pickup has that tracking number',
+        );
+      }
+      const already = parcel.handed_over_at !== null;
+      if (!already) {
+        await tx.execute(sql`
+          UPDATE logistics.pickup_parcels
+             SET handed_over_at = now(), handed_over_by_kind = ${by.actorKind},
+                 handed_over_by_id = ${by.actorId}
+           WHERE shop_id = ${shopId} AND pickup_id = ${pickupId}
+             AND booking_id = ${parcel.booking_id}`);
+      }
+      const { rows } = await tx.execute<ParcelRow>(sql`
+        SELECT ${BOOKING_COLUMNS}, ${HANDED_OVER_COLUMNS}
+          FROM ${BOOKING_FROM}
+          JOIN logistics.pickup_parcels pp
+            ON pp.shop_id = b.shop_id AND pp.booking_id = b.id AND pp.pickup_id = ${pickupId}
+         WHERE b.shop_id = ${shopId} AND b.id = ${parcel.booking_id}`);
+      return { ok: true, value: { parcel: this.#parcelOf(rows[0]!), already } };
+    });
+  }
+
   /** A URL that gives the courier's own load sheet for an hour; null where none is kept. */
   documentUrlOf(pickup: CourierPickupRecord): string | null {
     if (!pickup.documentKey || !this.storage) return null;
@@ -336,6 +441,17 @@ export class CourierPickupService {
     return rows[0] ? this.#toRecord(rows[0]) : null;
   }
 
+  #parcelOf(row: ParcelRow): PickupParcelRecord {
+    return {
+      booking: bookingRecordOf(row, this.couriers),
+      handedOverAt: row.handed_over_at === null ? null : toDate(row.handed_over_at),
+      handedOverBy:
+        row.handed_over_by_kind === null || row.handed_over_by_id === null
+          ? null
+          : { kind: row.handed_over_by_kind, id: row.handed_over_by_id },
+    };
+  }
+
   #toRecord(row: PickupRow): CourierPickupRecord {
     return {
       id: row.id,
@@ -344,6 +460,7 @@ export class CourierPickupService {
       courierName: this.couriers.of(row.courier)?.info.name ?? row.courier,
       status: row.status,
       parcelCount: row.parcel_count,
+      handedOverCount: row.handed_over_count,
       reference: row.reference,
       rider:
         row.rider_name !== null && row.rider_code !== null

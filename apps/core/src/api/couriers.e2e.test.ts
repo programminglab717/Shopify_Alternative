@@ -424,6 +424,48 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
     expect((await gql(tokens.reader, PICKUP, { input: {} })).errors?.[0]?.extensions?.code).toBe(
       'ACCESS_DENIED',
     );
+
+    // Its parcels checked off as the rider takes them, scanned from their labels (ADR-377).
+    const HAND_OVER = `mutation ($pickupId: ID!, $trackingNumber: String!) {
+      courierPickupParcelHandOver(pickupId: $pickupId, trackingNumber: $trackingNumber) {
+        parcel { booking { id } handedOverAt }
+        alreadyHandedOver
+        userErrors { field code message }
+      }
+    }`;
+    const handed = await data(tokens.orders, HAND_OVER, {
+      pickupId,
+      trackingNumber: 'ht 0000004242',
+    });
+    expect(handed).toEqual({
+      parcel: { booking: { id: booking.id }, handedOverAt: expect.any(String) },
+      alreadyHandedOver: false,
+      userErrors: [],
+    });
+    expect(
+      (await data(tokens.orders, HAND_OVER, { pickupId, trackingNumber: 'HT0000004242' }))
+        .alreadyHandedOver,
+    ).toBe(true);
+    expect(
+      (await data(tokens.orders, HAND_OVER, { pickupId, trackingNumber: 'HT0000009999' }))
+        .userErrors,
+    ).toEqual([
+      {
+        field: ['trackingNumber'],
+        code: 'NOT_FOUND',
+        message: 'No parcel of this pickup has that tracking number',
+      },
+    ]);
+    expect(
+      await data(
+        tokens.reader,
+        `{ courierPickup(id: "${pickupId}") { handedOverCount parcels { handedOverAt } } }`,
+      ),
+    ).toEqual({ handedOverCount: 1, parcels: [{ handedOverAt: handed.parcel.handedOverAt }] });
+    expect(
+      (await gql(tokens.reader, HAND_OVER, { pickupId, trackingNumber: 'HT0000004242' }))
+        .errors?.[0]?.extensions?.code,
+    ).toBe('ACCESS_DENIED');
   });
 
   it("names cities as a courier names them, for the shop's next parcels to them (SHP-03)", async () => {

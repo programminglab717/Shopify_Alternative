@@ -694,6 +694,7 @@ export interface CourierPickup {
   courierName: string;
   status: 'REQUESTING' | 'REQUESTED' | 'FAILED';
   parcelCount: number;
+  handedOverCount: number;
   reference: string | null;
   loadSheetUrl: string | null;
   error: string | null;
@@ -701,6 +702,31 @@ export interface CourierPickup {
   riderCode: string | null;
   createdAt: string;
   requestedAt: string | null;
+}
+
+export interface PickupParcel {
+  booking: { id: string; orderId: string; orderName: string; trackingNumber: string | null };
+  handedOverAt: string | null;
+}
+
+export interface CourierPickupParcelsData {
+  courierPickup: {
+    id: string;
+    parcelCount: number;
+    handedOverCount: number;
+    parcels: PickupParcel[];
+  } | null;
+}
+
+export interface CourierPickupParcelHandOverData {
+  courierPickupParcelHandOver: {
+    parcel: {
+      booking: { id: string; orderName: string; trackingNumber: string | null };
+      handedOverAt: string | null;
+    } | null;
+    alreadyHandedOver: boolean;
+    userErrors: UserError[];
+  };
 }
 
 export interface PickupsData {

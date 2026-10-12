@@ -1,12 +1,19 @@
 import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
+import type { CurrencyCode } from '@hatti/money';
 import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
-import { CourierPickupService, type CourierPickupRecord } from '../pickups.service.js';
+import {
+  CourierPickupService,
+  type CourierPickupRecord,
+  type PickupParcelRecord,
+} from '../pickups.service.js';
 import { toBooking, uuidOf } from './couriers.resolver.js';
 import {
   CourierBooking,
   CourierPickup,
   CourierPickupInput,
+  CourierPickupParcel,
+  CourierPickupParcelHandOverPayload,
   CourierPickupPayload,
   CourierPickupStatus,
 } from './couriers.types.js';
@@ -40,6 +47,31 @@ export class CourierPickupResolver {
     });
     return Object.assign(new CourierPickupPayload(), {
       courierPickup: result.ok ? this.#toPickup(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => CourierPickupParcelHandOverPayload, {
+    description:
+      "Checks off the pickup's parcel with this tracking number as the courier's rider takes it, " +
+      'scanned from its label (SHP-02, APP-04, ADR-377). A parcel checked off already stays as it ' +
+      'was and says so. Refused for a pickup its courier has not taken, and for a tracking number ' +
+      'not among its parcels.',
+  })
+  @RequireScopes('write_orders')
+  async courierPickupParcelHandOver(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('pickupId', { type: () => ID }) pickupId: string,
+    @Args('trackingNumber') trackingNumber: string,
+  ): Promise<CourierPickupParcelHandOverPayload> {
+    const result = await this.pickups.handOver(
+      tenant,
+      uuidOf('courierPickup', pickupId),
+      trackingNumber,
+    );
+    return Object.assign(new CourierPickupParcelHandOverPayload(), {
+      parcel: result.ok ? toParcel(result.value.parcel, tenant.currency) : null,
+      alreadyHandedOver: result.ok && result.value.already,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }
@@ -82,6 +114,18 @@ export class CourierPickupResolver {
     return records.map((record) => toBooking(record, tenant.currency));
   }
 
+  @ResolveField(() => [CourierPickupParcel], {
+    description:
+      'Its parcels, the longest waiting first, each with whether its rider has taken it (ADR-377).',
+  })
+  async parcels(
+    @CurrentTenant() tenant: TenantContext,
+    @Parent() pickup: CourierPickup,
+  ): Promise<CourierPickupParcel[]> {
+    const records = await this.pickups.parcelsOf(tenant, uuidOf('courierPickup', pickup.id));
+    return records.map((record) => toParcel(record, tenant.currency));
+  }
+
   #toPickup(record: CourierPickupRecord): CourierPickup {
     return Object.assign(new CourierPickup(), {
       id: toPublicId('courierPickup', record.id),
@@ -90,6 +134,7 @@ export class CourierPickupResolver {
       courierName: record.courierName,
       status: record.status.toUpperCase() as CourierPickupStatus,
       parcelCount: record.parcelCount,
+      handedOverCount: record.handedOverCount,
       reference: record.reference,
       riderName: record.rider?.name ?? null,
       riderCode: record.rider?.code ?? null,
@@ -99,4 +144,11 @@ export class CourierPickupResolver {
       createdAt: record.createdAt,
     });
   }
+}
+
+function toParcel(record: PickupParcelRecord, currency: CurrencyCode): CourierPickupParcel {
+  return Object.assign(new CourierPickupParcel(), {
+    booking: toBooking(record.booking, currency),
+    handedOverAt: record.handedOverAt,
+  });
 }

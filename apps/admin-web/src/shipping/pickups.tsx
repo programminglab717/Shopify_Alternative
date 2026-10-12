@@ -1,4 +1,4 @@
-import { ExternalLink, FileText, Truck } from 'lucide-react';
+import { ExternalLink, FileText, ScanBarcode, Truck } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -23,6 +23,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { openPrintTab } from '../ui/print';
+import { HandOver } from './hand-over';
 
 const STATUS_TONE: Record<CourierPickup['status'], string> = {
   REQUESTING: 'text-secondary',
@@ -144,6 +145,8 @@ export function Pickups() {
       data?.courierPickups.some((pickup) => pickup.status === 'REQUESTING') ? 3000 : false,
   });
   const [problem, setProblem] = useState<string | null>(null);
+  // The pickup whose parcels are being checked off as its rider takes them (ADR-377).
+  const [handing, setHanding] = useState<string | null>(null);
 
   const printLoadSheet = async (pickup: CourierPickup) => {
     setProblem(null);
@@ -211,6 +214,14 @@ export function Pickups() {
                 </div>
                 <div className="flex flex-wrap gap-x-3 text-[length:var(--hatti-type-body-sm-size)] text-secondary">
                   <span>{t('pickups.parcels', { count: formatCount(pickup.parcelCount) })}</span>
+                  {pickup.handedOverCount > 0 && (
+                    <span>
+                      {t('pickups.handedOver', {
+                        handed: formatCount(pickup.handedOverCount),
+                        count: formatCount(pickup.parcelCount),
+                      })}
+                    </span>
+                  )}
                   {pickup.reference && (
                     <span>
                       {t('pickups.reference')} <span className="num">{pickup.reference}</span>
@@ -226,6 +237,15 @@ export function Pickups() {
                 {pickup.error && <p className="text-danger">{pickup.error}</p>}
                 {pickup.status === 'REQUESTED' && (
                   <div className="mt-1 flex flex-wrap gap-2">
+                    {handing !== pickup.id && (
+                      <Button
+                        variant="secondary"
+                        icon={<ScanBarcode aria-hidden className="size-5" />}
+                        onClick={() => setHanding(pickup.id)}
+                      >
+                        {t('pickups.scan')}
+                      </Button>
+                    )}
                     <Button
                       variant="secondary"
                       icon={<FileText aria-hidden className="size-5" />}
@@ -245,6 +265,9 @@ export function Pickups() {
                       </a>
                     )}
                   </div>
+                )}
+                {pickup.status === 'REQUESTED' && handing === pickup.id && (
+                  <HandOver pickupId={pickup.id} onClose={() => setHanding(null)} />
                 )}
               </li>
             ))}

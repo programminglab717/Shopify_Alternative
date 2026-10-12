@@ -3239,6 +3239,18 @@ const en = {
   'packers.hours': '{count} hours packing',
   'packers.hours.one': '1 hour packing',
   'packers.total': 'In all: {count} orders packed, {units} items',
+  'pickups.scan': 'Check off by scanning',
+  'pickups.scanTitle': 'Check off each parcel as the rider takes it',
+  'pickups.scanHint': 'Scan the barcode on its label, or type its tracking number.',
+  'pickups.trackingNumber': 'Tracking number',
+  'pickups.checkOff': 'Check off',
+  'pickups.handed': "{order}'s parcel is handed over.",
+  'pickups.already': "{order}'s parcel was checked off already.",
+  'pickups.handedOver': '{handed} of {count} handed over',
+  'pickups.toHand': 'Still to hand over',
+  'pickups.allHanded': 'All {count} parcels are handed over.',
+  'pickups.allHanded.one': 'The parcel is handed over.',
+  'pickups.closeScan': 'Done',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6454,6 +6466,18 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'packers.hours': '{count} گھنٹے پیکنگ',
   'packers.hours.one': '1 گھنٹہ پیکنگ',
   'packers.total': 'کل: {count} آرڈر پیک ہوئے، {units} اشیاء',
+  'pickups.scan': 'اسکین کر کے نشان لگائیں',
+  'pickups.scanTitle': 'ہر پارسل رائیڈر کو دیتے وقت نشان لگائیں',
+  'pickups.scanHint': 'لیبل کا بارکوڈ اسکین کریں، یا اس کا ٹریکنگ نمبر لکھیں۔',
+  'pickups.trackingNumber': 'ٹریکنگ نمبر',
+  'pickups.checkOff': 'نشان لگائیں',
+  'pickups.handed': '{order} کا پارسل دے دیا گیا۔',
+  'pickups.already': '{order} کا پارسل پہلے ہی نشان زد ہے۔',
+  'pickups.handedOver': '{count} میں سے {handed} دے دیے گئے',
+  'pickups.toHand': 'ابھی دینے ہیں',
+  'pickups.allHanded': 'تمام {count} پارسل دے دیے گئے۔',
+  'pickups.allHanded.one': 'پارسل دے دیا گیا۔',
+  'pickups.closeScan': 'ختم',
 };
 
 export const messages: Readonly<

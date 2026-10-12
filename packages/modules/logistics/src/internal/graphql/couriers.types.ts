@@ -503,6 +503,12 @@ export class CourierPickup {
   @Field(() => Int, { description: 'The parcels it handed over.' })
   parcelCount!: number;
 
+  @Field(() => Int, {
+    description:
+      'Of them, those checked off as the rider took them, scanned from their labels (ADR-377).',
+  })
+  handedOverCount!: number;
+
   @Field(() => String, {
     nullable: true,
     description: "The courier's number for its load sheet, as Leopards gives one; null for none.",
@@ -563,6 +569,34 @@ export class CourierPickupInput {
 export class CourierPickupPayload {
   @Field(() => CourierPickup, { nullable: true })
   courierPickup!: CourierPickup | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType({
+  description:
+    "One of a pickup's parcels, and whether its rider has taken it: checked off by scanning its " +
+    'label as the rider takes it (SHP-02, APP-04, ADR-377).',
+})
+export class CourierPickupParcel {
+  @Field(() => CourierBooking)
+  booking!: CourierBooking;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When it was checked off as handed over; null while it is still to hand over.',
+  })
+  handedOverAt!: Date | null;
+}
+
+@ObjectType()
+export class CourierPickupParcelHandOverPayload {
+  @Field(() => CourierPickupParcel, { nullable: true })
+  parcel!: CourierPickupParcel | null;
+
+  @Field({ description: 'The parcel had been checked off already, and stays as it was.' })
+  alreadyHandedOver!: boolean;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

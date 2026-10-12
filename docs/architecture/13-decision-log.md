@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-376 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-377 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -384,6 +384,7 @@
 | 374 | The orders to pack scanned one after another: the To pack list opens the first to scan, and each packed brings up the next, until none is left | Accepted |
 | 375 | What goes with a parcel, printed as it is packed by scanning: the packing slip or invoice offered once the order is packed, before the next | Accepted |
 | 376 | How many orders each packer packed: the orders' own timelines, packing undone left out, for owners and managers and each packer their own | Accepted |
+| 377 | A pickup's parcels checked off by scanning as its rider takes them: each by its label's tracking number, when and by whom kept, those still on the table listed | Accepted |
 
 ---
 
@@ -14669,3 +14670,32 @@
     order packed twice would count twice.
   * **A counter kept as orders are packed:** a second record of what the timeline says, which
     unpacking would have to keep right.
+
+## ADR-377 · A pickup's parcels checked off by scanning as its rider takes them: each by its label's tracking number, when and by whom kept, those still on the table listed
+
+* **Context:**
+  * A pickup asked of a courier (ADR-253, ADR-314) names the parcels the rider should take, but
+    nothing said which the rider did take: a parcel left on the table, or taken without being on
+    the sheet, was found only when the courier's tracking said so, days later (SHP-02, APP-04).
+* **Decision:**
+  * **In the core**, each of a pickup's parcels keeps when it was handed over and by whom
+    (migration 0173). `courierPickupParcelHandOver(pickupId, trackingNumber)` checks off the
+    pickup's parcel with that tracking number, spaces and case as a scanner or a thumb gives
+    them; a parcel checked off already stays as it was and says so; a tracking number not among
+    the pickup's parcels, and a pickup its courier has not taken, are refused with why. A
+    pickup says how many of its parcels are handed over, and `parcels` lists them with when.
+    Orders' work, as asking for the pickup is (`write_orders`).
+  * **In the admin**, a pickup the courier took offers "Check off by scanning": the label read
+    with the camera or its tracking number typed, each said as handed over with its order, or
+    as checked off already, or not in the pickup; how many of how many are handed over, and the
+    ones still to hand over, until all are. The pickup's row says how many are handed over.
+* **Consequences:**
+  * The packer knows before the rider leaves which parcels went, and which are still on the
+    table, without reading the sheet line by line.
+  * Nothing is told to the courier: its own scans say what it took, and a parcel the rider
+    missed goes in the next pickup a day on, as before.
+* **Alternatives:**
+  * **Unchecking a parcel:** a parcel is checked off only when its label is in hand; a mistake
+    is rare and changes nothing the courier does. Left for when a shop asks.
+  * **A courier without pickups through its API:** its load sheet is printed for the rider
+    (ADR-150), with no pickup to check against; it waits for its own section.

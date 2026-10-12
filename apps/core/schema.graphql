@@ -2346,6 +2346,11 @@ type CourierPickup {
 
   """What the courier said, when it refused."""
   error: String
+
+  """
+  Of them, those checked off as the rider took them, scanned from their labels (ADR-377).
+  """
+  handedOverCount: Int!
   id: ID!
 
   """
@@ -2355,6 +2360,11 @@ type CourierPickup {
 
   """The parcels it handed over."""
   parcelCount: Int!
+
+  """
+  Its parcels, the longest waiting first, each with whether its rider has taken it (ADR-377).
+  """
+  parcels: [CourierPickupParcel!]!
 
   """
   The courier's number for its load sheet, as Leopards gives one; null for none.
@@ -2383,6 +2393,25 @@ input CourierPickupInput {
   The name of the rider who takes the parcels, as the courier gave it, where it asks: up to 100 characters.
   """
   riderName: String
+}
+
+"""
+One of a pickup's parcels, and whether its rider has taken it: checked off by scanning its label as the rider takes it (SHP-02, APP-04, ADR-377).
+"""
+type CourierPickupParcel {
+  booking: CourierBooking!
+
+  """
+  When it was checked off as handed over; null while it is still to hand over.
+  """
+  handedOverAt: DateTime
+}
+
+type CourierPickupParcelHandOverPayload {
+  """The parcel had been checked off already, and stays as it was."""
+  alreadyHandedOver: Boolean!
+  parcel: CourierPickupParcel
+  userErrors: [UserError!]!
 }
 
 type CourierPickupPayload {
@@ -5470,6 +5499,11 @@ type Mutation {
   Keeps the shop's own name for a city with a courier account's courier, for the next parcel to the city: one on the courier's list of cities where it has one, as its list writes it. Null forgets it. A booking that failed for its city is booked again with ordersBook.
   """
   courierCityNameSet(input: CourierCityNameInput!): CourierCityNamePayload!
+
+  """
+  Checks off the pickup's parcel with this tracking number as the courier's rider takes it, scanned from its label (SHP-02, APP-04, ADR-377). A parcel checked off already stays as it was and says so. Refused for a pickup its courier has not taken, and for a tracking number not among its parcels.
+  """
+  courierPickupParcelHandOver(pickupId: ID!, trackingNumber: String!): CourierPickupParcelHandOverPayload!
 
   """
   Hands a courier account's parcels waiting to be picked up, the default account's unless given, to its courier through the courier's API, the longest waiting first, up to 200: PostEx's load sheet for the account's pickup address, or Leopards' naming the rider who takes them. Parcels in a pickup the courier took go in the next only once they have waited a day since. Refused, with why, for a courier whose API takes no pickups, whose rider is not named, or that refuses them.

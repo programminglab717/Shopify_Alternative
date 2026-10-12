@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, the parcels handed to the courier checked off by scanning** (SHP-02, APP-04): a load
-sheet's parcels scanned as the rider takes them, those not yet scanned said; then section by
-section as the alpha's shops need them. Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the load sheet of a courier that
+takes no pickups through its API checked off by scanning too, and what comes after it. Urdu
+handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,22 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
+
+### A pickup's parcels checked off by scanning, in the core and the admin
+
+* **Handed over** ([ADR-377](../architecture/13-decision-log.md#adr-377--a-pickups-parcels-checked-off-by-scanning-as-its-rider-takes-them-each-by-its-labels-tracking-number-when-and-by-whom-kept-those-still-on-the-table-listed)): each of a pickup's parcels keeps when it was handed over and by
+  whom (migration 0173); `courierPickupParcelHandOver` checks one off by its label's tracking
+  number, a second scan saying so, and refuses one not in the pickup or a pickup the courier has
+  not taken; a pickup says how many are handed over and lists its parcels with when.
+* **In the admin:** "Check off by scanning" on a pickup the courier took: the camera or the
+  number typed, each said with its order, how many of how many, and those still to hand over.
+* **Tried in Chromium against the core:** the seed's Test courier Karachi was asked for a
+  pickup, taking #1016's parcel; its tracking number typed in lower case with a space checked it
+  off, again said it was checked off already, an unknown number was refused, and the pickup's
+  row then said 1 of 1 handed over. The pickup stays in the seed. No errors in the browser.
+* 2534 tests (4 new): the parcels checked off in the logistics module,
+  with the API's pickup test taking them through GraphQL by role; and the admin's pickups test
+  checking them off, with its two GraphQL documents checked against the schema.
 
 ### 9393d89 · How many orders each packer packed, in the core and the admin
 

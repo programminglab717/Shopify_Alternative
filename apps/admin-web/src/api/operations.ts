@@ -1665,6 +1665,7 @@ const PICKUP = /* GraphQL */ `
     courierName
     status
     parcelCount
+    handedOverCount
     reference
     loadSheetUrl
     error
@@ -1699,6 +1700,47 @@ export const PickupsQuery = /* GraphQL */ `
     }
   }
   ${PICKUP}
+`;
+
+/** A pickup's parcels, each with whether its rider has taken it (ADR-377). */
+export const CourierPickupParcelsQuery = /* GraphQL */ `
+  query CourierPickupParcels($id: ID!) {
+    courierPickup(id: $id) {
+      id
+      parcelCount
+      handedOverCount
+      parcels {
+        booking {
+          id
+          orderId
+          orderName
+          trackingNumber
+        }
+        handedOverAt
+      }
+    }
+  }
+`;
+
+/** One of a pickup's parcels checked off as its rider takes it, scanned from its label. */
+export const CourierPickupParcelHandOverMutation = /* GraphQL */ `
+  mutation CourierPickupParcelHandOver($pickupId: ID!, $trackingNumber: String!) {
+    courierPickupParcelHandOver(pickupId: $pickupId, trackingNumber: $trackingNumber) {
+      parcel {
+        booking {
+          id
+          orderName
+          trackingNumber
+        }
+        handedOverAt
+      }
+      alreadyHandedOver
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
 `;
 
 /** A courier asked to collect the parcels waiting, through its API. */

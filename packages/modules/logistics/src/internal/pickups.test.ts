@@ -184,6 +184,63 @@ describe.skipIf(!server)('Courier pickups (ADR-253)', () => {
     });
   });
 
+  it("checks off a pickup's parcels as its rider takes them, scanned from their labels (ADR-377)", async () => {
+    await connect('test', 'Test Lahore');
+    const first = await f.booked(f.a, kurta);
+    const second = await f.booked(f.a, kurta);
+    const pickup = unwrap(await f.pickups.request(f.a, {}));
+    expect(pickup.handedOverCount).toBe(0);
+    const handed = async () =>
+      (await f.pickups.parcelsOf(f.a, pickup.id)).map((parcel) => [
+        parcel.booking.trackingNumber,
+        parcel.handedOverAt !== null,
+      ]);
+    expect(await handed()).toEqual([
+      [first.trackingNumber, false],
+      [second.trackingNumber, false],
+    ]);
+
+    // Read off the label, spaces and case as a scanner or a thumb gives them.
+    const scanned = ` ${first.trackingNumber!.toLowerCase().replace(/(.{3})/, '$1 ')} `;
+    const done = unwrap(await f.pickups.handOver(f.a, pickup.id, scanned));
+    expect(done.already).toBe(false);
+    expect(done.parcel.booking.id).toBe(first.bookingId);
+    expect(done.parcel.handedOverAt).toBeInstanceOf(Date);
+    expect(done.parcel.handedOverBy).toEqual({
+      kind: 'app',
+      id: (f.a.actor as { tokenId: string }).tokenId,
+    });
+    // Scanned twice: said, and as it was.
+    const twice = unwrap(await f.pickups.handOver(f.a, pickup.id, first.trackingNumber!));
+    expect(twice.already).toBe(true);
+    expect(twice.parcel.handedOverAt).toEqual(done.parcel.handedOverAt);
+    expect(await handed()).toEqual([
+      [first.trackingNumber, true],
+      [second.trackingNumber, false],
+    ]);
+    expect((await f.pickups.get(f.a, pickup.id))!.handedOverCount).toBe(1);
+
+    // A parcel not in the pickup, a blank scan, another shop's pickup, and one refused.
+    const later = await f.booked(f.a, kurta);
+    expect(said(await f.pickups.handOver(f.a, pickup.id, later.trackingNumber!))).toEqual([
+      ['trackingNumber', 'NOT_FOUND', 'No parcel of this pickup has that tracking number'],
+    ]);
+    expect(said(await f.pickups.handOver(f.a, pickup.id, '   '))[0]?.[1]).toBe('INVALID');
+    expect(said(await f.pickups.handOver(f.b, pickup.id, second.trackingNumber!))).toEqual([
+      ['pickupId', 'NOT_FOUND', 'Pickup not found'],
+    ]);
+    f.testCourier.nextPickup = { ok: false, retry: false, message: 'Test courier: no rider today' };
+    await f.pickups.request(f.a, {});
+    const [refused] = await f.pickups.list(f.a, { first: 1 });
+    expect(refused!.status).toBe('failed');
+    expect(said(await f.pickups.handOver(f.a, refused!.id, later.trackingNumber!))).toEqual([
+      ['pickupId', 'INVALID', 'Only a pickup its courier has taken has parcels to hand over'],
+    ]);
+
+    unwrap(await f.pickups.handOver(f.a, pickup.id, second.trackingNumber!));
+    expect((await f.pickups.get(f.a, pickup.id))!.handedOverCount).toBe(2);
+  });
+
   it('asks for the rider where the courier does, and refuses a courier whose API takes none', async () => {
     expect(said(await f.pickups.request(f.a, {}))).toEqual([
       ['accountId', 'BLANK', 'Connect a courier account first'],
