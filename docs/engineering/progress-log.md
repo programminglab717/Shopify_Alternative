@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
 
-### Courier rules: which courier books an order
+### 4b0bc1f · Courier rules: which courier books an order
 
 * **In the core** ([ADR-382](../architecture/13-decision-log.md#adr-382--courier-rules-an-order-booked-without-an-account-named-goes-with-the-first-of-the-shops-rules-its-city-and-cash-to-collect-match-else-the-default-and-staff-see-which-before-they-book), SHP-06): migration 0177 keeps each shop's courier rules in their
   order, each naming cities, a range of cash to collect, or both, and an account; `courierRules`,
