@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
 
-### How many orders each packer packed, in the core and the admin
+### 9393d89 · How many orders each packer packed, in the core and the admin
 
 * **Packers' counts** ([ADR-376](../architecture/13-decision-log.md#adr-376--how-many-orders-each-packer-packed-the-orders-own-timelines-packing-undone-left-out-for-owners-and-managers-and-each-packer-their-own)): `packers(from, before, first)` counts, from the orders'
   timelines, the orders each member of staff or app marked as packed that nobody has unpacked
