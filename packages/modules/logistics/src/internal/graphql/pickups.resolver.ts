@@ -51,6 +51,30 @@ export class CourierPickupResolver {
     });
   }
 
+  @Mutation(() => CourierPickupPayload, {
+    description:
+      "Records a courier account's parcels waiting, the default account's unless given, as handed " +
+      "to its courier's rider by hand (SHP-02, ADR-378): a rider on the courier's daily round, not " +
+      'asked for, or one of a courier whose API takes no pickups. The same parcels a pickup would ' +
+      'take, up to 200, kept here as a pickup the courier was not asked for, with the rider named ' +
+      'where given, its load sheet printed and its parcels checked off as the rider takes them.',
+  })
+  @RequireScopes('write_orders')
+  async courierPickupRecordByHand(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('input') input: CourierPickupInput,
+  ): Promise<CourierPickupPayload> {
+    const result = await this.pickups.recordByHand(tenant, {
+      accountId: input.accountId ? uuidOf('courierAccount', input.accountId) : null,
+      riderName: input.riderName,
+      riderCode: input.riderCode,
+    });
+    return Object.assign(new CourierPickupPayload(), {
+      courierPickup: result.ok ? this.#toPickup(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
   @Mutation(() => CourierPickupParcelHandOverPayload, {
     description:
       "Checks off the pickup's parcel with this tracking number as the courier's rider takes it, " +
@@ -133,6 +157,7 @@ export class CourierPickupResolver {
       courier: record.courier,
       courierName: record.courierName,
       status: record.status.toUpperCase() as CourierPickupStatus,
+      byHand: record.byHand,
       parcelCount: record.parcelCount,
       handedOverCount: record.handedOverCount,
       reference: record.reference,

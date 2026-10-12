@@ -47,6 +47,8 @@ export interface CourierPickupRecord {
   courierName: string;
   /** Being asked of the courier; asked; or refused, its parcels left for the next. */
   status: PickupStatusValue;
+  /** Handed to the courier's rider by hand, kept here alone: its courier was not asked (ADR-378). */
+  byHand: boolean;
   parcelCount: number;
   /** Of them, those checked off as the courier's rider took them (ADR-377). */
   handedOverCount: number;
@@ -94,6 +96,7 @@ type PickupRow = {
   account_id: string;
   courier: string;
   status: PickupStatusValue;
+  by_hand: boolean;
   parcel_count: number;
   handed_over_count: number;
   reference: string | null;
@@ -108,7 +111,7 @@ type PickupRow = {
 };
 
 const PICKUP_COLUMNS = sql`
-  p.id, p.account_id, a.courier, p.status, p.parcel_count, p.reference, p.rider_name,
+  p.id, p.account_id, a.courier, p.status, p.by_hand, p.parcel_count, p.reference, p.rider_name,
   p.rider_code, p.document_key, p.error, p.requested_by_kind, p.requested_by_id, p.requested_at,
   p.created_at,
   (SELECT count(*) FROM logistics.pickup_parcels pp
@@ -202,20 +205,7 @@ export class CourierPickupService {
         UPDATE logistics.pickups SET status = 'failed', error = 'The courier never answered'
          WHERE shop_id = ${shopId} AND account_id = ${account.id} AND status = 'requesting'
            AND created_at < now() - ${UNANSWERED}::interval`);
-      const { rows } = await tx.execute<{ id: string; tracking_number: string }>(sql`
-        SELECT b.id, b.tracking_number FROM logistics.bookings b
-         WHERE b.shop_id = ${shopId} AND b.account_id = ${account.id}
-           AND b.status = 'booked' AND b.parcel_status = 'booked'
-           AND b.tracking_number IS NOT NULL
-           AND NOT EXISTS (
-             SELECT 1 FROM logistics.pickup_parcels pp
-               JOIN logistics.pickups p ON p.shop_id = pp.shop_id AND p.id = pp.pickup_id
-              WHERE pp.shop_id = b.shop_id AND pp.booking_id = b.id
-                AND (p.status = 'requesting'
-                     OR (p.status = 'requested'
-                         AND p.requested_at > now() - ${MISSED}::interval)))
-         ORDER BY b.booked_at, b.id
-         LIMIT ${PICKUP_LIMITS.parcels}`);
+      const rows = await waitingIn(tx, shopId, account.id);
       if (rows.length === 0) {
         return failOne(
           ['accountId'],
@@ -294,6 +284,72 @@ export class CourierPickupService {
           courier: account.courier,
           parcelCount: trackingNumbers.length,
           reference,
+          byHand: false,
+        },
+      });
+      return { ok: true, value: (await this.#pickupIn(tx, shopId, pickupId))! };
+    });
+  }
+
+  /**
+   * Records the account's parcels waiting as handed to its courier's rider by hand (SHP-02,
+   * ADR-378): a rider who came on the courier's daily round without being asked for, or one of a
+   * courier whose API takes no pickups. The same parcels a pickup would take, the longest waiting
+   * first, kept here as a pickup its courier was not asked for, so that its load sheet lists them
+   * and each is checked off as the rider takes it. The rider's name and code are kept where given.
+   */
+  async recordByHand(
+    tenant: TenantContext,
+    input: CourierPickupInput,
+  ): Promise<MutationResult<CourierPickupRecord>> {
+    const check = new InputChecker();
+    const riderName = check.text(['riderName'], input.riderName, { max: PICKUP_LIMITS.rider });
+    const riderCode = check.text(['riderCode'], input.riderCode, { max: PICKUP_LIMITS.rider });
+    if (!check.ok) return fail(check.errors);
+    const { shopId } = tenant;
+    const by = actorColumnsOf(tenant.actor);
+    return this.db.tenant(shopId, async (tx) => {
+      const { rows: accounts } = await tx.execute<{ id: string; courier: string }>(sql`
+        SELECT id, courier FROM logistics.courier_accounts
+         WHERE shop_id = ${shopId}
+           AND ${input.accountId ? sql`id = ${input.accountId}` : sql`is_default`}
+           FOR UPDATE`);
+      const account = accounts[0];
+      if (!account) {
+        return input.accountId
+          ? failOne(['accountId'], 'NOT_FOUND', 'Courier account not found')
+          : failOne(['accountId'], 'BLANK', 'Connect a courier account first');
+      }
+      const rows = await waitingIn(tx, shopId, account.id);
+      if (rows.length === 0) {
+        return failOne(
+          ['accountId'],
+          'INVALID',
+          "None of this account's parcels waits to be picked up",
+        );
+      }
+      const { rows: made } = await tx.execute<{ id: string }>(sql`
+        INSERT INTO logistics.pickups (shop_id, account_id, status, by_hand, parcel_count,
+                                       rider_name, rider_code, requested_by_kind,
+                                       requested_by_id, requested_at)
+        VALUES (${shopId}, ${account.id}, 'requested', true, ${rows.length}, ${riderName},
+                ${riderCode}, ${by.actorKind}, ${by.actorId}, now())
+        RETURNING id`);
+      const pickupId = made[0]!.id;
+      await tx.execute(sql`
+        INSERT INTO logistics.pickup_parcels (shop_id, pickup_id, booking_id)
+        SELECT ${shopId}, ${pickupId}, id
+          FROM unnest(${sql.param(rows.map((row) => row.id))}::uuid[]) AS id`);
+      await appendEvent<CourierPickupPayload>(tx, shopId, {
+        type: LogisticsEvents.CourierPickupRequested,
+        aggregateType: 'courier_pickup',
+        aggregateId: pickupId,
+        payload: {
+          accountId: account.id,
+          courier: account.courier,
+          parcelCount: rows.length,
+          reference: null,
+          byHand: true,
         },
       });
       return { ok: true, value: (await this.#pickupIn(tx, shopId, pickupId))! };
@@ -459,6 +515,7 @@ export class CourierPickupService {
       courier: row.courier,
       courierName: this.couriers.of(row.courier)?.info.name ?? row.courier,
       status: row.status,
+      byHand: row.by_hand,
       parcelCount: row.parcel_count,
       handedOverCount: row.handed_over_count,
       reference: row.reference,
@@ -473,4 +530,31 @@ export class CourierPickupService {
       createdAt: toDate(row.created_at),
     };
   }
+}
+
+/**
+ * The account's parcels waiting to be picked up, the longest waiting first, up to
+ * {@link PICKUP_LIMITS}: booked and not yet taken, in no pickup being asked for, and in none
+ * taken within the last day.
+ */
+async function waitingIn(
+  tx: Tx,
+  shopId: string,
+  accountId: string,
+): Promise<{ id: string; tracking_number: string }[]> {
+  const { rows } = await tx.execute<{ id: string; tracking_number: string }>(sql`
+    SELECT b.id, b.tracking_number FROM logistics.bookings b
+     WHERE b.shop_id = ${shopId} AND b.account_id = ${accountId}
+       AND b.status = 'booked' AND b.parcel_status = 'booked'
+       AND b.tracking_number IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM logistics.pickup_parcels pp
+           JOIN logistics.pickups p ON p.shop_id = pp.shop_id AND p.id = pp.pickup_id
+          WHERE pp.shop_id = b.shop_id AND pp.booking_id = b.id
+            AND (p.status = 'requesting'
+                 OR (p.status = 'requested'
+                     AND p.requested_at > now() - ${MISSED}::interval)))
+     ORDER BY b.booked_at, b.id
+     LIMIT ${PICKUP_LIMITS.parcels}`);
+  return rows;
 }

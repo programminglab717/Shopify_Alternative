@@ -31,6 +31,7 @@ function pickup(
     accountId,
     courierName: accountId === 'acc_2' ? 'Leopards' : 'PostEx',
     status,
+    byHand: false,
     parcelCount: 0,
     handedOverCount: 0,
     reference: null,
@@ -130,6 +131,17 @@ function core(accounts = [POSTEX, LEOPARDS, TRAX]) {
           courierAccounts: accounts,
           courierPickups: pickups,
         };
+      case 'CourierPickupRecordByHand': {
+        const input = variables.input as { accountId: string; riderName?: string };
+        const made = pickup('pk_4', input.accountId, 'REQUESTED', {
+          byHand: true,
+          parcelCount: 3,
+          riderName: input.riderName ?? null,
+          requestedAt: AGO,
+        });
+        pickups = [made, ...pickups];
+        return { courierPickupRecordByHand: { courierPickup: made, userErrors: [] } };
+      }
       case 'CourierPickupRequest': {
         const input = variables.input as { accountId: string; riderName?: string };
         if (input.accountId === 'acc_1') {
@@ -227,10 +239,11 @@ describe('Courier pickups', () => {
     vi.stubGlobal('fetch', fake.fetcher);
     renderAdmin('/shop_1/shipping?tab=pickups');
 
-    const account = (await screen.findByLabelText('Courier account')) as HTMLSelectElement;
+    const ask = (await screen.findByRole('heading', { name: 'Ask for a pickup' })).parentElement!;
+    const account = within(ask).getByLabelText('Courier account') as HTMLSelectElement;
     // A courier whose API takes no pickups is not offered.
     expect([...account.options].map((each) => each.value)).toEqual(['acc_1', 'acc_2']);
-    expect(screen.queryByLabelText(/^Rider's name/)).toBeNull();
+    expect(within(ask).queryByLabelText(/^Rider's name/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Ask PostEx for a pickup' }));
     expect(await screen.findByText('No parcels wait to be picked up')).toBeTruthy();
 
@@ -298,5 +311,35 @@ describe('Courier pickups', () => {
     expect(screen.queryByRole('list', { name: 'Still to hand over' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     await waitFor(() => expect(screen.queryByText('3 of 3 handed over')).toBeNull());
+  });
+
+  it('records the parcels waiting as handed to a rider by hand, then checks them off (ADR-378)', async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/shipping?tab=pickups');
+
+    const card = (await screen.findByRole('heading', { name: 'Hand parcels to a rider' }))
+      .parentElement!;
+    // Any courier account, those whose API takes pickups too.
+    const account = within(card).getByLabelText('Courier account') as HTMLSelectElement;
+    expect([...account.options].map((option) => option.text)).toEqual([
+      'PostEx Lahore (PostEx)',
+      'Leopards (Leopards)',
+      'Trax (Trax)',
+    ]);
+    fireEvent.change(account, { target: { value: 'acc_3' } });
+    fireEvent.change(within(card).getByLabelText("Rider's name (optional)"), {
+      target: { value: ' Imran ' },
+    });
+    fireEvent.click(within(card).getByRole('button', { name: 'Hand over the parcels waiting' }));
+
+    // Its parcels are checked off at once.
+    await screen.findByText('0 of 3 handed over');
+    expect(sentOf(fake, 'CourierPickupRecordByHand')).toEqual([
+      { input: { accountId: 'acc_3', riderName: 'Imran' } },
+    ]);
+    const list = screen.getByRole('list', { name: 'Pickups asked for' });
+    expect(within(list).getByText('Handed to a rider by hand')).toBeTruthy();
+    expect(sentOf(fake, 'CourierPickupParcels')).toEqual([{ id: 'pk_4' }]);
   });
 });

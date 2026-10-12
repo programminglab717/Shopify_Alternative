@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the load sheet of a courier that
-takes no pickups through its API checked off by scanning too, and what comes after it. Urdu
-handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: what a rider took against what the
+courier's tracking says it picked up, and what comes after it. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +16,23 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
+
+### Parcels handed to a rider by hand, in the core and the admin
+
+* **By hand** ([ADR-378](../architecture/13-decision-log.md#adr-378--parcels-handed-to-a-couriers-rider-by-hand-the-parcels-waiting-recorded-as-a-pickup-the-courier-was-not-asked-for-its-load-sheet-printed-and-its-parcels-checked-off)): `courierPickupRecordByHand` records the account's parcels waiting as a
+  pickup the courier was not asked for (migration 0174), the rider named where given, so that
+  its load sheet prints and its parcels are checked off as ADR-377 has it. Any courier account;
+  none of the couriers connected today lacks pickups through its API, and their riders come
+  unasked too.
+* **In the admin:** "Hand parcels to a rider" beside asking for a pickup, opening the check-off at
+  once; the row says it was handed by hand.
+* **Tried in Chromium against the core:** the seed's Test courier account's five parcels waiting
+  were handed to "Imran" by hand; the check-off opened with #1014, #1013, #1002, #1012 and #1008,
+  two were scanned, and three were left to hand over. The pickup stays in the seed, two of its
+  parcels checked off. No errors in the browser.
+* 2537 tests (3 new): the hand-over by hand in the logistics module, its
+  mutation through the API's pickup test by role, and the admin's pickups test recording one,
+  with its GraphQL document checked against the schema.
 
 ### b134159 · A pickup's parcels checked off by scanning, in the core and the admin
 

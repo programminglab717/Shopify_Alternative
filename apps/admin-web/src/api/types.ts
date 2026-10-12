@@ -693,6 +693,7 @@ export interface CourierPickup {
   accountId: string;
   courierName: string;
   status: 'REQUESTING' | 'REQUESTED' | 'FAILED';
+  byHand: boolean;
   parcelCount: number;
   handedOverCount: number;
   reference: string | null;
@@ -727,6 +728,10 @@ export interface CourierPickupParcelHandOverData {
     alreadyHandedOver: boolean;
     userErrors: UserError[];
   };
+}
+
+export interface CourierPickupRecordByHandData {
+  courierPickupRecordByHand: { courierPickup: CourierPickup | null; userErrors: UserError[] };
 }
 
 export interface PickupsData {

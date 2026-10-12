@@ -1,14 +1,16 @@
-import { ExternalLink, FileText, ScanBarcode, Truck } from 'lucide-react';
+import { ExternalLink, FileText, Hand, ScanBarcode, Truck } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   CourierLoadSheetQuery,
+  CourierPickupRecordByHandMutation,
   CourierPickupRequestMutation,
   PickupsQuery,
 } from '../api/operations';
 import type {
   CourierDocumentData,
   CourierPickup,
+  CourierPickupRecordByHandData,
   CourierPickupRequestData,
   PickupsData,
 } from '../api/types';
@@ -131,6 +133,103 @@ function RequestPickup({ data }: { data: PickupsData }) {
 }
 
 /**
+ * The parcels waiting recorded as handed to a courier's rider by hand (ADR-378): a rider on the
+ * courier's daily round, not asked for through its API, or one of a courier whose API takes none.
+ * The rider's name and code where the shop wants them kept; then its parcels are checked off as
+ * the rider takes them, from the pickup it makes.
+ */
+function RecordByHand({
+  data,
+  onRecorded,
+}: {
+  data: PickupsData;
+  onRecorded: (pickupId: string) => void;
+}) {
+  const { t } = useLocale();
+  const record = useAdminMutation<CourierPickupRecordByHandData, { input: object }>(
+    CourierPickupRecordByHandMutation,
+  );
+  const accounts = data.courierAccounts;
+  const [accountId, setAccountId] = useState(
+    () => (accounts.find((account) => account.isDefault) ?? accounts[0])?.id ?? '',
+  );
+  const [riderName, setRiderName] = useState('');
+  const [riderCode, setRiderCode] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  if (accounts.length === 0) return null;
+  const account = accounts.find((each) => each.id === accountId) ?? accounts[0]!;
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setProblem(null);
+    try {
+      const { courierPickupRecordByHand: result } = await record.mutateAsync({
+        input: {
+          accountId: account.id,
+          ...(riderName.trim() ? { riderName: riderName.trim() } : {}),
+          ...(riderCode.trim() ? { riderCode: riderCode.trim() } : {}),
+        },
+      });
+      const error = result.userErrors[0];
+      if (error || !result.courierPickup) setProblem(error ? problemText(error, t) : null);
+      else {
+        setRiderName('');
+        setRiderCode('');
+        onRecorded(result.courierPickup.id);
+      }
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+
+  return (
+    <Card className="p-4">
+      <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-3">
+        <h2 className="font-semibold">{t('pickups.byHand')}</h2>
+        <p className="text-secondary">{t('pickups.byHandHint')}</p>
+        {accounts.length > 1 && (
+          <SelectField
+            label={t('pickups.account')}
+            value={account.id}
+            options={accounts.map((each) => ({
+              value: each.id,
+              label: `${each.name} (${each.courierName})`,
+            }))}
+            onChange={setAccountId}
+          />
+        )}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <TextField
+            label={t('pickups.riderNameOptional')}
+            dir="auto"
+            maxLength={100}
+            value={riderName}
+            onChange={(event) => setRiderName(event.target.value)}
+          />
+          <TextField
+            label={t('pickups.riderCodeOptional')}
+            ltr
+            maxLength={100}
+            value={riderCode}
+            onChange={(event) => setRiderCode(event.target.value)}
+          />
+        </div>
+        {problem && <Alert tone="danger">{problem}</Alert>}
+        <Button
+          type="submit"
+          variant="secondary"
+          className="self-start"
+          busy={record.isPending}
+          icon={<Hand aria-hidden className="size-5" />}
+        >
+          {t('pickups.byHandSubmit')}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+/**
  * Pickups (SHP-02, ADR-253): the parcels waiting handed to their courier through its API, which
  * sends a rider; each pickup asked for, with its parcels, the courier's number or load sheet,
  * and why a courier refused. Our own load sheet of a pickup is printed for the rider to sign.
@@ -183,6 +282,7 @@ export function Pickups() {
   return (
     <div className="flex flex-col gap-4">
       <RequestPickup data={query.data} />
+      <RecordByHand data={query.data} onRecorded={setHanding} />
       {problem && <Alert tone="danger">{problem}</Alert>}
       {pickups.length === 0 ? (
         <Card>
@@ -201,7 +301,9 @@ export function Pickups() {
                     {names.get(pickup.accountId) ?? pickup.courierName}
                   </span>
                   <span className={`font-medium ${STATUS_TONE[pickup.status]}`}>
-                    {t(`pickups.status.${pickup.status}`)}
+                    {pickup.byHand
+                      ? t('pickups.status.BY_HAND')
+                      : t(`pickups.status.${pickup.status}`)}
                   </span>
                   <span className="flex-1" />
                   <span className="text-secondary">

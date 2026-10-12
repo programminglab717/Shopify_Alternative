@@ -29,6 +29,8 @@ export interface CourierPickupPayload {
   parcelCount: number;
   /** The courier's number for its load sheet, where it gives one. */
   reference: string | null;
+  /** Handed to the courier's rider by hand, the courier not asked (ADR-378). */
+  byHand: boolean;
 }
 
 export interface CodRemittanceImportedPayload {

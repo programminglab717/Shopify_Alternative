@@ -466,6 +466,28 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
       (await gql(tokens.reader, HAND_OVER, { pickupId, trackingNumber: 'HT0000004242' }))
         .errors?.[0]?.extensions?.code,
     ).toBe('ACCESS_DENIED');
+
+    // A rider who came without being asked for: the hand-over recorded by hand (ADR-378).
+    const BY_HAND = `mutation ($input: CourierPickupInput!) {
+      courierPickupRecordByHand(input: $input) {
+        courierPickup { status byHand parcelCount riderName reference }
+        userErrors { field code message }
+      }
+    }`;
+    expect(await data(tokens.orders, BY_HAND, { input: { riderName: 'Imran' } })).toEqual({
+      courierPickup: null,
+      userErrors: [
+        {
+          field: ['accountId'],
+          code: 'INVALID',
+          message: "None of this account's parcels waits to be picked up",
+        },
+      ],
+    });
+    expect((await gql(tokens.reader, BY_HAND, { input: {} })).errors?.[0]?.extensions?.code).toBe(
+      'ACCESS_DENIED',
+    );
+    expect(await data(tokens.reader, '{ courierPickups { byHand } }')).toEqual([{ byHand: false }]);
   });
 
   it("names cities as a courier names them, for the shop's next parcels to them (SHP-03)", async () => {

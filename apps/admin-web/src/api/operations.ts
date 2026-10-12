@@ -1664,6 +1664,7 @@ const PICKUP = /* GraphQL */ `
     accountId
     courierName
     status
+    byHand
     parcelCount
     handedOverCount
     reference
@@ -1740,6 +1741,22 @@ export const CourierPickupParcelHandOverMutation = /* GraphQL */ `
       }
     }
   }
+  ${USER_ERRORS}
+`;
+
+/** The parcels waiting recorded as handed to a courier's rider by hand (ADR-378). */
+export const CourierPickupRecordByHandMutation = /* GraphQL */ `
+  mutation CourierPickupRecordByHand($input: CourierPickupInput!) {
+    courierPickupRecordByHand(input: $input) {
+      courierPickup {
+        ...Pickup
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${PICKUP}
   ${USER_ERRORS}
 `;
 

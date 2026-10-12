@@ -3251,6 +3251,13 @@ const en = {
   'pickups.allHanded': 'All {count} parcels are handed over.',
   'pickups.allHanded.one': 'The parcel is handed over.',
   'pickups.closeScan': 'Done',
+  'pickups.byHand': 'Hand parcels to a rider',
+  'pickups.byHandHint':
+    'A rider came without being asked for here? Record the parcels waiting as handed over, then check each off as the rider takes it.',
+  'pickups.riderNameOptional': "Rider's name (optional)",
+  'pickups.riderCodeOptional': "Rider's code (optional)",
+  'pickups.byHandSubmit': 'Hand over the parcels waiting',
+  'pickups.status.BY_HAND': 'Handed to a rider by hand',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6478,6 +6485,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'pickups.allHanded': 'تمام {count} پارسل دے دیے گئے۔',
   'pickups.allHanded.one': 'پارسل دے دیا گیا۔',
   'pickups.closeScan': 'ختم',
+  'pickups.byHand': 'پارسل رائیڈر کو دیں',
+  'pickups.byHandHint':
+    'رائیڈر یہاں سے منگوائے بغیر آ گیا؟ انتظار والے پارسل حوالے کیے گئے درج کریں، پھر رائیڈر کے لیتے وقت ہر ایک پر نشان لگائیں۔',
+  'pickups.riderNameOptional': 'رائیڈر کا نام (اختیاری)',
+  'pickups.riderCodeOptional': 'رائیڈر کا کوڈ (اختیاری)',
+  'pickups.byHandSubmit': 'انتظار والے پارسل حوالے کریں',
+  'pickups.status.BY_HAND': 'رائیڈر کو ہاتھوں ہاتھ دیے گئے',
 };
 
 export const messages: Readonly<

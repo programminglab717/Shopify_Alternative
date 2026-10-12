@@ -500,6 +500,13 @@ export class CourierPickup {
   @Field(() => CourierPickupStatus)
   status!: CourierPickupStatus;
 
+  @Field({
+    description:
+      "Handed to the courier's rider by hand and kept here alone, the courier not asked through " +
+      'its API (ADR-378).',
+  })
+  byHand!: boolean;
+
   @Field(() => Int, { description: 'The parcels it handed over.' })
   parcelCount!: number;
 

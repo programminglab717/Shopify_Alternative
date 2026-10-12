@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-377 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-378 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -385,6 +385,7 @@
 | 375 | What goes with a parcel, printed as it is packed by scanning: the packing slip or invoice offered once the order is packed, before the next | Accepted |
 | 376 | How many orders each packer packed: the orders' own timelines, packing undone left out, for owners and managers and each packer their own | Accepted |
 | 377 | A pickup's parcels checked off by scanning as its rider takes them: each by its label's tracking number, when and by whom kept, those still on the table listed | Accepted |
+| 378 | Parcels handed to a courier's rider by hand: the parcels waiting recorded as a pickup the courier was not asked for, its load sheet printed and its parcels checked off | Accepted |
 
 ---
 
@@ -14699,3 +14700,34 @@
     is rare and changes nothing the courier does. Left for when a shop asks.
   * **A courier without pickups through its API:** its load sheet is printed for the rider
     (ADR-150), with no pickup to check against; it waits for its own section.
+
+## ADR-378 · Parcels handed to a courier's rider by hand: the parcels waiting recorded as a pickup the courier was not asked for, its load sheet printed and its parcels checked off
+
+* **Context:**
+  * Checking parcels off as the rider takes them (ADR-377) needed a pickup asked of the courier
+    through its API (ADR-253). But PostEx's and Leopards' riders also come on their daily
+    rounds without being asked for, and couriers to come, TCS and Trax among them, take no
+    pickups through an API at all; the shop then printed the account's load sheet (ADR-150)
+    with nothing to check it against (SHP-02, APP-04).
+* **Decision:**
+  * **In the core**, `courierPickupRecordByHand(input)` records the account's parcels waiting,
+    the same a pickup would take, the longest waiting first and up to 200, as a pickup kept here
+    alone: taken at once, by hand (migration 0174), the rider's name and code kept where given,
+    the courier not asked. Its parcels then count as in a pickup, so none goes in another for a
+    day, and are checked off as ADR-377 has it. Any courier account may record one; refused,
+    saying why, when no account is connected or none of its parcels waits. The pickup event says
+    whether it was by hand.
+  * **In the admin**, "Hand parcels to a rider" beside asking for a pickup: the courier account,
+    the rider's name and code if wanted, and "Hand over the parcels waiting", which opens their
+    check-off at once. The pickup's row says "Handed to a rider by hand", with its load sheet to
+    print.
+* **Consequences:**
+  * A rider who simply turns up is handled like one asked for: the sheet to sign, the parcels
+    checked off, those left on the table in sight.
+  * The courier learns of the hand-over from its rider's own scans, as before; nothing is sent to
+    it.
+* **Alternatives:**
+  * **Only for couriers without pickups through their API:** none of the couriers connected
+    today is one, and their riders come unasked as often as asked.
+  * **Checking off the account's load sheet without a pickup:** what the sheet listed would be
+    lost once the parcels moved on; a pickup keeps it.

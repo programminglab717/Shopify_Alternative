@@ -94,7 +94,13 @@ describe.skipIf(!server)('Courier pickups (ADR-253)', () => {
     ).toEqual([
       [
         pickup.id,
-        { accountId: pickup.accountId, courier: 'test', parcelCount: 2, reference: 'HTL000001' },
+        {
+          accountId: pickup.accountId,
+          courier: 'test',
+          parcelCount: 2,
+          reference: 'HTL000001',
+          byHand: false,
+        },
       ],
     ]);
 
@@ -239,6 +245,50 @@ describe.skipIf(!server)('Courier pickups (ADR-253)', () => {
 
     unwrap(await f.pickups.handOver(f.a, pickup.id, second.trackingNumber!));
     expect((await f.pickups.get(f.a, pickup.id))!.handedOverCount).toBe(2);
+  });
+
+  it('records parcels handed to a rider by hand, the courier not asked, and checks them off (ADR-378)', async () => {
+    expect(said(await f.pickups.recordByHand(f.a, {}))).toEqual([
+      ['accountId', 'BLANK', 'Connect a courier account first'],
+    ]);
+    await connect('test', 'Test Lahore');
+    expect(said(await f.pickups.recordByHand(f.a, {}))).toEqual([
+      ['accountId', 'INVALID', "None of this account's parcels waits to be picked up"],
+    ]);
+    const first = await f.booked(f.a, kurta);
+    const second = await f.booked(f.a, kurta);
+
+    const handed = unwrap(
+      await f.pickups.recordByHand(f.a, { riderName: 'Imran', riderCode: ' R-77 ' }),
+    );
+    expect(handed).toMatchObject({
+      status: 'requested',
+      byHand: true,
+      parcelCount: 2,
+      handedOverCount: 0,
+      reference: null,
+      rider: { name: 'Imran', code: 'R-77' },
+      documentKey: null,
+      error: null,
+    });
+    expect(handed.requestedAt).toBeInstanceOf(Date);
+    // The courier was not asked.
+    expect(f.testCourier.pickups).toEqual([]);
+    expect(
+      (await f.pickups.parcelsOf(f.a, handed.id)).map((parcel) => parcel.booking.trackingNumber),
+    ).toEqual([first.trackingNumber, second.trackingNumber]);
+    const event = (await f.outbox()).find((each) => each.event_type === 'courier_pickup.requested');
+    expect(event?.payload).toMatchObject({ parcelCount: 2, reference: null, byHand: true });
+
+    // Its parcels are in it, as a pickup's are: none waits for another, and each is checked off.
+    expect(said(await f.pickups.request(f.a, {}))[0]?.[2]).toBe(
+      "None of this account's parcels waits to be picked up",
+    );
+    unwrap(await f.pickups.handOver(f.a, handed.id, first.trackingNumber!));
+    expect((await f.pickups.get(f.a, handed.id))!.handedOverCount).toBe(1);
+    // A rider asked through the API is not by hand.
+    await f.booked(f.a, kurta);
+    expect(unwrap(await f.pickups.request(f.a, {})).byHand).toBe(false);
   });
 
   it('asks for the rider where the courier does, and refuses a courier whose API takes none', async () => {
