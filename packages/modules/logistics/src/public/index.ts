@@ -43,6 +43,14 @@ export {
   type ShopsCityNames,
 } from '../internal/courier-city-review.js';
 export {
+  COURIER_RULE_LIMITS,
+  CourierRuleService,
+  courierRulesIn,
+  ruleFor,
+  type CourierRuleInput,
+  type CourierRuleRecord,
+} from '../internal/courier-rules.service.js';
+export {
   CourierDocumentService,
   LABEL_PAPERS,
   LOAD_SHEET_LIMIT,

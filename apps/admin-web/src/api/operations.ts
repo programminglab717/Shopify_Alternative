@@ -1514,6 +1514,9 @@ export const ShippingQuery = /* GraphQL */ `
       courierName
       isDefault
     }
+    courierRules {
+      id
+    }
     courierBookings(first: $first, after: $after) {
       nodes {
         ...Booking
@@ -6593,6 +6596,60 @@ export const InventoryValueQuery = /* GraphQL */ `
           amount
         }
       }
+    }
+  }
+`;
+
+const COURIER_RULE = /* GraphQL */ `
+  fragment CourierRuleFields on CourierRule {
+    id
+    accountId
+    accountArchived
+    cities
+    codAtLeast {
+      amount
+      currencyCode
+    }
+    codBelow {
+      amount
+      currencyCode
+    }
+  }
+`;
+
+/** The shop's courier rules, in their order (SHP-06, ADR-382). */
+export const CourierRulesQuery = /* GraphQL */ `
+  query CourierRules {
+    courierRules {
+      ...CourierRuleFields
+    }
+  }
+  ${COURIER_RULE}
+`;
+
+/** The shop's courier rules replaced, in the order given; none for none. */
+export const CourierRulesUpdateMutation = /* GraphQL */ `
+  mutation CourierRulesUpdate($rules: [CourierRuleInput!]!) {
+    courierRulesUpdate(rules: $rules) {
+      courierRules {
+        ...CourierRuleFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${COURIER_RULE}
+  ${USER_ERRORS}
+`;
+
+/** The account each order would be booked with now without one named (ADR-382). */
+export const CourierAccountsForQuery = /* GraphQL */ `
+  query CourierAccountsFor($orderIds: [ID!]!) {
+    courierAccountsFor(orderIds: $orderIds) {
+      orderId
+      accountId
+      ruleId
     }
   }
 `;

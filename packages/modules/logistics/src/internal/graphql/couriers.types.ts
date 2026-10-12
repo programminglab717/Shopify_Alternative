@@ -308,6 +308,88 @@ export class OrderBookingRefusal {
   message!: string;
 }
 
+@ObjectType({
+  description:
+    'Which courier account books an order when staff name none (SHP-06, ADR-382): the first ' +
+    "of the shop's rules that the order's city and the cash its courier is to collect match, " +
+    "else the shop's default account.",
+})
+export class CourierRule {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => ID, { description: 'The account that books the orders it matches.' })
+  accountId!: string;
+
+  @Field({ description: 'Its account was archived since: the rule is passed over.' })
+  accountArchived!: boolean;
+
+  @Field(() => [String], {
+    description: "Cities as Pakistan's list names them; none for anywhere.",
+  })
+  cities!: string[];
+
+  @Field(() => Money, {
+    nullable: true,
+    description: 'The cash to collect is at least this; null for no least.',
+  })
+  codAtLeast!: Money | null;
+
+  @Field(() => Money, {
+    nullable: true,
+    description: 'The cash to collect is below this; null for no most.',
+  })
+  codBelow!: Money | null;
+}
+
+@ObjectType({
+  description:
+    'The account an order would be booked with now without one named (ADR-382), and the rule ' +
+    'that chose it.',
+})
+export class CourierAccountChoice {
+  @Field(() => ID)
+  orderId!: string;
+
+  @Field(() => ID, {
+    nullable: true,
+    description: 'Null where no rule is for it and the shop has no default account.',
+  })
+  accountId!: string | null;
+
+  @Field(() => ID, { nullable: true, description: "Null where it is the shop's default." })
+  ruleId!: string | null;
+}
+
+@InputType()
+export class CourierRuleInput {
+  @Field(() => ID)
+  accountId!: string;
+
+  @Field(() => [String], {
+    nullable: true,
+    description:
+      'Cities of Pakistan, as addresses name them ("Pindi" is Rawalpindi); up to 100; none for ' +
+      'anywhere.',
+  })
+  cities?: string[] | null;
+
+  @Field(() => String, { nullable: true, description: 'Decimal, e.g. "20,000"; null for none.' })
+  codAtLeast?: string | null;
+
+  @Field(() => String, { nullable: true, description: 'Decimal; null for none.' })
+  codBelow?: string | null;
+}
+
+@ObjectType()
+export class CourierRulesUpdatePayload {
+  @Field(() => [CourierRule], { nullable: true })
+  courierRules!: CourierRule[] | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
 @ObjectType()
 export class OrdersBookPayload {
   @Field(() => [CourierBooking], { description: 'The bookings made, waiting to be booked.' })

@@ -2,6 +2,7 @@ import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { FileText, PackageCheck, Printer, Truck, Wrench, X } from 'lucide-react';
 import { useState } from 'react';
 import {
+  CourierAccountsForQuery,
   CourierBookingCancelMutation,
   CourierLabelsQuery,
   CourierLoadSheetQuery,
@@ -11,6 +12,7 @@ import {
 } from '../api/operations';
 import type {
   CourierAccount,
+  CourierAccountsForData,
   CourierBooking,
   CourierBookingCancelData,
   CourierDocumentData,
@@ -64,9 +66,11 @@ interface Outcome {
 
 /**
  * Packed orders, booked with the shop's courier at a tap, all or those chosen; or shipped by
- * hand with a courier Hatti does not book with, each by its tracking number.
+ * hand with a courier Hatti does not book with, each by its tracking number. Where the shop has
+ * courier rules, they choose each order's account unless staff choose one, each order saying
+ * which (ADR-382).
  */
-function ToBook({ accounts }: { accounts: CourierAccount[] }) {
+function ToBook({ accounts, ruled }: { accounts: CourierAccount[]; ruled: boolean }) {
   const { t, locale } = useLocale();
   const shopId = useShop().id;
   const timezone = useShopTimezone();
@@ -78,9 +82,23 @@ function ToBook({ accounts }: { accounts: CourierAccount[] }) {
     OrdersBookMutation,
   );
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  // Blank books by the shop's courier rules, where it has any.
   const [accountId, setAccountId] = useState(
-    accounts.find((account) => account.isDefault)?.id ?? accounts[0]?.id ?? '',
+    ruled ? '' : (accounts.find((account) => account.isDefault)?.id ?? accounts[0]?.id ?? ''),
   );
+  const orderIds = (orders.data?.orders.nodes ?? [])
+    .filter((order) => !order.overPlanLimit)
+    .map((order) => order.id);
+  const chosen = useAdminQuery<CourierAccountsForData>(
+    ['courierAccountsFor'],
+    CourierAccountsForQuery,
+    { orderIds },
+    { enabled: ruled && orderIds.length > 0 },
+  );
+  const accountOf = new Map(
+    (chosen.data?.courierAccountsFor ?? []).map((choice) => [choice.orderId, choice.accountId]),
+  );
+  const byId = new Map(accounts.map((account) => [account.id, account]));
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   // The orders being shipped by hand, as they were chosen.
   const [byHand, setByHand] = useState<readonly OrderListItem[] | null>(null);
@@ -207,6 +225,17 @@ function ToBook({ accounts }: { accounts: CourierAccount[] }) {
                   <span className="num font-medium">
                     {formatMoney(order.totalPrice.amount, order.totalPrice.currencyCode)}
                   </span>
+                  {ruled && accountId === '' && accountOf.has(order.id) && (
+                    <span className="flex basis-full items-center gap-1 text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                      <Truck aria-hidden className="size-4" />
+                      {(() => {
+                        const account = byId.get(accountOf.get(order.id) ?? '');
+                        return account
+                          ? t('shipping.goesWith', { account: accountName(account) })
+                          : t('shipping.goesWithNone');
+                      })()}
+                    </span>
+                  )}
                 </Link>
               </li>
             ))}
@@ -215,13 +244,14 @@ function ToBook({ accounts }: { accounts: CourierAccount[] }) {
       )}
       {selected.size > 0 && !byHand && (
         <div className="fixed inset-x-0 bottom-16 z-20 flex flex-wrap items-center justify-center gap-2 px-4 md:bottom-6">
-          {accounts.length > 1 && (
+          {(accounts.length > 1 || ruled) && (
             <select
               value={accountId}
               onChange={(event) => setAccountId(event.target.value)}
               aria-label={t('shipping.account')}
               className="min-h-12 rounded-control border border-line bg-surface px-3 md:min-h-10"
             >
+              {ruled && <option value="">{t('shipping.byRules')}</option>}
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
                   {accountName(account)}
@@ -596,7 +626,10 @@ export function ShippingPage() {
           action={<Button onClick={() => void accounts.refetch()}>{t('action.retry')}</Button>}
         />
       ) : tab === 'book' ? (
-        <ToBook accounts={accounts.data.courierAccounts} />
+        <ToBook
+          accounts={accounts.data.courierAccounts}
+          ruled={(accounts.data.courierRules ?? []).length > 0}
+        />
       ) : tab === 'booked' ? (
         <Booked accounts={accounts.data.courierAccounts} />
       ) : (

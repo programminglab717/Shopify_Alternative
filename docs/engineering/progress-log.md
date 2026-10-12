@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: what comes after a parcel's
-hand-over on the order's own page. Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: what comes after courier rules,
+such as rules by weight and by the courier's own record in a city (SHP-06, SHP-08). Urdu
+handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +17,27 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
+
+### Courier rules: which courier books an order
+
+* **In the core** ([ADR-382](../architecture/13-decision-log.md#adr-382--courier-rules-an-order-booked-without-an-account-named-goes-with-the-first-of-the-shops-rules-its-city-and-cash-to-collect-match-else-the-default-and-staff-see-which-before-they-book), SHP-06): migration 0177 keeps each shop's courier rules in their
+  order, each naming cities, a range of cash to collect, or both, and an account; `courierRules`,
+  `courierRulesUpdate` and `courierAccountsFor`; `ordersBook` without an account books each order
+  with its first rule's account, else the default, refusing only an order neither is for. A
+  change is on the activity log as `courier_rules.updated`.
+* **In the admin**, the Couriers settings page edits the rules, moved up and down and saved
+  together; the Shipping page's To book tab books by the rules unless an account is chosen, and
+  says under each order which courier it goes with.
+* **Tried in Chromium against the core:** "Atlantis" was refused as rule 1's city; "lahore, Pindi"
+  was saved as Lahore and Rawalpindi for the Test courier account, not the default. With #1003
+  marked packed, the To book tab said "Goes with Test courier" under it and offered "By the shop's
+  courier rules", chosen, on a desktop and a phone's width. The rules were then taken away and
+  #1003 marked unpacked, back to be packed as it was; its timeline keeps the two steps. No errors
+  in the browser.
+* 2559 tests (13 new): the matcher, by city, alias and cash, the first
+  winning and an archived account passed over; the rules kept and refused, and booking by them,
+  in the logistics module; rules and booking through the API; the editor and the Shipping page in
+  the admin, with its three new documents checked against the schema.
 
 ### 81f0850 · A parcel's hand-over on its order's page
 

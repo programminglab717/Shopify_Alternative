@@ -787,6 +787,8 @@ export interface CourierPickupRequestData {
 export interface ShippingData {
   shop: { timezone: string };
   courierAccounts: CourierAccount[];
+  /** Only whether the shop has any (ADR-382). */
+  courierRules: { id: string }[];
   courierBookings: {
     nodes: CourierBooking[];
     pageInfo: { hasNextPage: boolean; endCursor: string | null };
@@ -2759,4 +2761,27 @@ export interface InventoryValueData {
       value: { amount: string };
     }[];
   };
+}
+
+/** Which courier account books the orders a rule matches (SHP-06, ADR-382). */
+export interface CourierRuleValue {
+  id: string;
+  accountId: string;
+  accountArchived: boolean;
+  /** Cities as Pakistan's list names them; none for anywhere. */
+  cities: string[];
+  codAtLeast: MoneyValue | null;
+  codBelow: MoneyValue | null;
+}
+
+export interface CourierRulesData {
+  courierRules: CourierRuleValue[];
+}
+
+export interface CourierRulesUpdateData {
+  courierRulesUpdate: { courierRules: CourierRuleValue[] | null; userErrors: UserError[] };
+}
+
+export interface CourierAccountsForData {
+  courierAccountsFor: { orderId: string; accountId: string | null; ruleId: string | null }[];
 }

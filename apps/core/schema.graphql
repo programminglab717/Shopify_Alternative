@@ -2084,6 +2084,18 @@ type CourierAccount {
   updatedAt: DateTime!
 }
 
+"""
+The account an order would be booked with now without one named (ADR-382), and the rule that chose it.
+"""
+type CourierAccountChoice {
+  """Null where no rule is for it and the shop has no default account."""
+  accountId: ID
+  orderId: ID!
+
+  """Null where it is the shop's default."""
+  ruleId: ID
+}
+
 input CourierAccountInput {
   """The courier, by its key, such as "postex"; connecting only."""
   courier: String
@@ -2459,6 +2471,47 @@ type CourierReceivables {
   """When the parcel whose cash has waited longest was delivered."""
   oldestDeliveredAt: DateTime!
   owed: CodCash!
+}
+
+"""
+Which courier account books an order when staff name none (SHP-06, ADR-382): the first of the shop's rules that the order's city and the cash its courier is to collect match, else the shop's default account.
+"""
+type CourierRule {
+  """Its account was archived since: the rule is passed over."""
+  accountArchived: Boolean!
+
+  """The account that books the orders it matches."""
+  accountId: ID!
+
+  """Cities as Pakistan's list names them; none for anywhere."""
+  cities: [String!]!
+
+  """The cash to collect is at least this; null for no least."""
+  codAtLeast: Money
+
+  """The cash to collect is below this; null for no most."""
+  codBelow: Money
+  id: ID!
+}
+
+input CourierRuleInput {
+  accountId: ID!
+
+  """
+  Cities of Pakistan, as addresses name them ("Pindi" is Rawalpindi); up to 100; none for anywhere.
+  """
+  cities: [String!]
+
+  """Decimal, e.g. "20,000"; null for none."""
+  codAtLeast: String
+
+  """Decimal; null for none."""
+  codBelow: String
+}
+
+type CourierRulesUpdatePayload {
+  courierRules: [CourierRule!]
+  userErrors: [UserError!]!
 }
 
 """
@@ -5546,6 +5599,11 @@ type Mutation {
   Hands a courier account's parcels waiting to be picked up, the default account's unless given, to its courier through the courier's API, the longest waiting first, up to 200: PostEx's load sheet for the account's pickup address, or Leopards' naming the rider who takes them. Parcels in a pickup the courier took go in the next only once they have waited a day since. Refused, with why, for a courier whose API takes no pickups, whose rider is not named, or that refuses them.
   """
   courierPickupRequest(input: CourierPickupInput!): CourierPickupPayload!
+
+  """
+  Replaces the shop's courier rules with these, in this order; none for none. Each names one of its live accounts, and cities, a range of cash to collect, or both: up to 50.
+  """
+  courierRulesUpdate(rules: [CourierRuleInput!]!): CourierRulesUpdatePayload!
 
   """
   Adds tags to up to 250 customers, each as customerUpdate would. Tags a customer has already, in any case, stay as they are; one with too many is refused.
@@ -9262,6 +9320,11 @@ type Query {
   The shop's courier accounts, the default first; archived ones if asked.
   """
   courierAccounts(archived: Boolean): [CourierAccount!]!
+
+  """
+  The account each of up to 250 orders would be booked with now without one named: the first courier rule it matches, else the shop's default.
+  """
+  courierAccountsFor(orderIds: [ID!]!): [CourierAccountChoice!]!
   courierBooking(id: ID!): CourierBooking
 
   """The shop's bookings with couriers, the latest first."""
@@ -9310,6 +9373,11 @@ type Query {
     """Up to 50."""
     first: Int! = 20
   ): [CourierPickup!]!
+
+  """
+  The shop's courier rules, in their order: an order booked without an account named goes with the first it matches, else with the shop's default account.
+  """
+  courierRules: [CourierRule!]!
 
   """The couriers shops book parcels with here."""
   couriers: [Courier!]!

@@ -254,6 +254,7 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
       await admin.query(`
         DELETE FROM logistics.pickups;
         DELETE FROM logistics.bookings;
+        DELETE FROM logistics.courier_rules;
         DELETE FROM logistics.courier_accounts;
         DELETE FROM logistics.courier_cities;
         DELETE FROM logistics.shop_courier_cities;

@@ -21,6 +21,7 @@ import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context'
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { CourierRules } from './courier-rules';
 import { BackToSettings } from './settings-page';
 
 /** Connecting an account with a courier: its credentials as its portal gives them, sealed. */
@@ -284,6 +285,7 @@ export function CouriersPage() {
           </ul>
         </Card>
       )}
+      {accounts.length > 0 && !connecting && <CourierRules accounts={accounts} />}
       {showForm ? (
         <ConnectForm
           couriers={couriers}

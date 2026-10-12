@@ -606,4 +606,96 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
       'Courier account not found',
     );
   });
+
+  it("chooses the account by the shop's courier rules where staff name none (ADR-382)", async () => {
+    const accounts = (await data(tokens.reader, '{ courierAccounts { id isDefault } }')) as {
+      id: string;
+      isDefault: boolean;
+    }[];
+    const fallback = accounts.find((account) => account.isDefault)!.id;
+    const dear = (
+      await data(tokens.settings, CONNECT, {
+        input: { courier: 'test', name: 'Dear', credentials: [{ key: 'key', value: 'any-5678' }] },
+      })
+    ).courierAccount.id as string;
+    const RULES = `mutation ($rules: [CourierRuleInput!]!) {
+      courierRulesUpdate(rules: $rules) {
+        courierRules { id accountId accountArchived cities codAtLeast { amount } codBelow { amount } }
+        userErrors { field code message }
+      }
+    }`;
+    const rules = [
+      { accountId: dear, cities: ['karachi'] },
+      { accountId: dear, codAtLeast: '4,000' },
+    ];
+    // Rules are settings, as accounts are: orders' apps and staff change none.
+    expect((await gql(tokens.orders, RULES, { rules })).errors?.[0].extensions.code).toBe(
+      'ACCESS_DENIED',
+    );
+    expect(
+      (await data(tokens.settings, RULES, { rules: [{ accountId: dear, cities: ['Atlantis'] }] }))
+        .userErrors,
+    ).toEqual([
+      {
+        field: ['rules', '0', 'cities', '0'],
+        code: 'INVALID',
+        message: '"Atlantis" is not a city of Pakistan we know',
+      },
+    ]);
+    const kept = await data(tokens.settings, RULES, { rules });
+    expect(kept).toEqual({
+      courierRules: [
+        {
+          id: expect.stringMatching(/^crl_/),
+          accountId: dear,
+          accountArchived: false,
+          cities: ['Karachi'],
+          codAtLeast: null,
+          codBelow: null,
+        },
+        {
+          id: expect.stringMatching(/^crl_/),
+          accountId: dear,
+          accountArchived: false,
+          cities: [],
+          codAtLeast: { amount: expect.stringMatching(/^4000(\.0+)?$/) },
+          codBelow: null,
+        },
+      ],
+      userErrors: [],
+    });
+    expect(await data(tokens.reader, '{ courierRules { id } }')).toEqual(
+      kept.courierRules.map((rule: { id: string }) => ({ id: rule.id })),
+    );
+
+    const created = await data(
+      tokens.orders,
+      `mutation {
+        productCreate(input: { title: "Lawn suit", status: ACTIVE, variants: [{ price: "5,000" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const variantId = created.product.variants[0].id as string;
+    const [dearOrder, plainOrder] = [await order(variantId), await order(variantId)];
+    const FOR = `query ($ids: [ID!]!) { courierAccountsFor(orderIds: $ids) { orderId accountId ruleId } }`;
+    expect(await data(tokens.reader, FOR, { ids: [dearOrder] })).toEqual([
+      { orderId: dearOrder, accountId: dear, ruleId: kept.courierRules[1].id },
+    ]);
+    const booked = await data(tokens.orders, BOOK, { ids: [dearOrder] });
+    expect(booked.bookings.map((booking: { accountId: string }) => booking.accountId)).toEqual([
+      dear,
+    ]);
+
+    // Above Rs 6,000 alone, the order is the default account's.
+    await data(tokens.settings, RULES, { rules: [{ accountId: dear, codAtLeast: '6,000' }] });
+    expect(await data(tokens.reader, FOR, { ids: [plainOrder] })).toEqual([
+      { orderId: plainOrder, accountId: fallback, ruleId: null },
+    ]);
+    const plain = await data(tokens.orders, BOOK, { ids: [plainOrder] });
+    expect(plain.bookings.map((booking: { accountId: string }) => booking.accountId)).toEqual([
+      fallback,
+    ]);
+    expect((await data(tokens.settings, RULES, { rules: [] })).courierRules).toEqual([]);
+  });
 });

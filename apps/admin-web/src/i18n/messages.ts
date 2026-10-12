@@ -3273,6 +3273,32 @@ const en = {
   'parcels.unseen':
     "A day after its rider took it, the courier's tracking still has it as only booked. Ask the courier, or the rider, where it is.",
   'parcels.toPickups': 'See pickups',
+  'courierRules.title': 'Which courier books an order',
+  'courierRules.hint':
+    'When orders are booked without choosing an account, each goes with the first rule it matches; the rest go with {account}, the default.',
+  'courierRules.hintNoDefault':
+    'When orders are booked without choosing an account, each goes with the first rule it matches.',
+  'courierRules.none': 'No rules: orders booked without choosing an account go with the default.',
+  'courierRules.rule': 'Rule {number}',
+  'courierRules.up': 'Move rule {number} up',
+  'courierRules.down': 'Move rule {number} down',
+  'courierRules.remove': 'Remove rule {number}',
+  'courierRules.cities': 'Cities',
+  'courierRules.citiesHint': 'Comma apart, such as Karachi, Hyderabad. Blank for anywhere.',
+  'courierRules.codAtLeast': 'Cash to collect at least (Rs)',
+  'courierRules.codBelow': 'Cash to collect below (Rs)',
+  'courierRules.bookWith': 'Book with',
+  'courierRules.archived':
+    "This rule's account was archived, so the rule is passed over. Choose another account or remove it.",
+  'courierRules.archivedAccount': 'An archived account',
+  'courierRules.add': 'Add a rule',
+  'courierRules.save': 'Save rules',
+  'courierRules.discard': 'Discard changes',
+  'courierRules.saved': 'Rules saved. Orders booked from now on follow them.',
+  'shipping.byRules': "By the shop's courier rules",
+  'shipping.goesWith': 'Goes with {account}',
+  'shipping.goesWithNone': 'No rule or default account is for it',
+  'activity.subject.courier_rules': 'Courier rules',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6522,6 +6548,32 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'parcels.unseen':
     'رائیڈر کے لینے کے ایک دن بعد بھی کوریئر کی ٹریکنگ میں یہ صرف بک ہے۔ کوریئر یا رائیڈر سے پوچھیں کہ یہ کہاں ہے۔',
   'parcels.toPickups': 'پک اپس دیکھیں',
+  'courierRules.title': 'آرڈر کون سا کوریئر بک کرے',
+  'courierRules.hint':
+    'اکاؤنٹ چنے بغیر بک کیے گئے آرڈر اس پہلے اصول کے ساتھ جاتے ہیں جس پر وہ پورے اتریں؛ باقی ڈیفالٹ {account} کے ساتھ۔',
+  'courierRules.hintNoDefault':
+    'اکاؤنٹ چنے بغیر بک کیے گئے آرڈر اس پہلے اصول کے ساتھ جاتے ہیں جس پر وہ پورے اتریں۔',
+  'courierRules.none': 'کوئی اصول نہیں: اکاؤنٹ چنے بغیر بک کیے گئے آرڈر ڈیفالٹ کے ساتھ جاتے ہیں۔',
+  'courierRules.rule': 'اصول {number}',
+  'courierRules.up': 'اصول {number} اوپر کریں',
+  'courierRules.down': 'اصول {number} نیچے کریں',
+  'courierRules.remove': 'اصول {number} ہٹائیں',
+  'courierRules.cities': 'شہر',
+  'courierRules.citiesHint': 'کاما سے الگ، جیسے کراچی، حیدرآباد۔ ہر جگہ کے لیے خالی چھوڑیں۔',
+  'courierRules.codAtLeast': 'وصول کرنے کی رقم کم از کم (روپے)',
+  'courierRules.codBelow': 'وصول کرنے کی رقم اس سے کم (روپے)',
+  'courierRules.bookWith': 'اس کے ساتھ بک کریں',
+  'courierRules.archived':
+    'اس اصول کا اکاؤنٹ آرکائیو ہو چکا ہے، اس لیے اصول چھوڑ دیا جاتا ہے۔ کوئی اور اکاؤنٹ چنیں یا اسے ہٹا دیں۔',
+  'courierRules.archivedAccount': 'آرکائیو کیا گیا اکاؤنٹ',
+  'courierRules.add': 'اصول شامل کریں',
+  'courierRules.save': 'اصول محفوظ کریں',
+  'courierRules.discard': 'تبدیلیاں چھوڑ دیں',
+  'courierRules.saved': 'اصول محفوظ ہو گئے۔ اب سے بک ہونے والے آرڈر ان پر چلیں گے۔',
+  'shipping.byRules': 'دکان کے کوریئر اصولوں کے مطابق',
+  'shipping.goesWith': '{account} کے ساتھ جائے گا',
+  'shipping.goesWithNone': 'اس کے لیے کوئی اصول یا ڈیفالٹ اکاؤنٹ نہیں',
+  'activity.subject.courier_rules': 'کوریئر اصول',
 };
 
 export const messages: Readonly<

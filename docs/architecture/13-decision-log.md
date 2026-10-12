@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-381 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-382 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -389,6 +389,7 @@
 | 379 | Parcels a rider took that the courier's tracking has not seen a day on: listed from the hand-overs against the parcels' status, with the rider and when | Accepted |
 | 380 | Parcels the courier has not seen on Home: their count among the next actions, a tap from the pickups that list them, for those who hand parcels over | Accepted |
 | 381 | A parcel's hand-over on its order's page: when, to whom and whether by hand, and whether the courier's tracking has had it since, put together in the core | Accepted |
+| 382 | Courier rules: an order booked without an account named goes with the first of the shop's rules its city and cash to collect match, else the default, and staff see which before they book | Accepted |
 
 ---
 
@@ -14822,3 +14823,44 @@
     unseen a day on, would need steps written and taken back.
   * **A field on the order:** a split order ships as parcels with bookings of their own; the
     hand-over belongs to each parcel.
+
+## ADR-382 · Courier rules: an order booked without an account named goes with the first of the shop's rules its city and cash to collect match, else the default, and staff see which before they book
+
+* **Context:**
+  * Shops in Pakistan keep accounts with more than one courier: one that delivers well in
+    Karachi, another for the rest of Sindh, a third trusted with dear parcels. Booking took the
+    shop's default account unless staff chose one for the whole batch, so a packer booking a
+    morning's orders either booked them all with one courier or picked the orders out by hand,
+    batch by batch. Smart courier allocation is MVP work by rules (SHP-06), scored on couriers'
+    records in V1.
+* **Decision:**
+  * **Rules, in the logistics module** (migration 0177, `logistics.courier_rules`): each names
+    cities as Pakistan's list names them ("Pindi" is Rawalpindi, as delivery zones read cities,
+    ADR-043), a range of the cash its courier is to collect (at least, and below, in minor
+    units), or both, and the account that books what it matches. A shop keeps up to 50, in its
+    order, replaced all at once by `courierRulesUpdate` (`write_settings`, as accounts are), read
+    by `courierRules` (`read_orders`, as accounts are). A rule must name a live account of the
+    shop's, and cities or cash; an account archived since leaves its rule passed over, and said
+    so. A change records `courier_rules.updated`, on the activity log.
+  * **Booking**: `ordersBook` without an account books each order with the account of the first
+    rule its city and cash to collect match, else the shop's default; an account named books them
+    all with it, as before. An order neither a rule nor a default is for is refused, with why,
+    while the rest are booked. Without rules nothing changes.
+  * **Seen before booking**: `courierAccountsFor` gives the account each of up to 250 orders
+    would be booked with now, and the rule that chose it, by the same rule `ordersBook` follows.
+  * **In the admin**, the Couriers settings page edits the rules: cities comma apart, the cash to
+    collect at least and below, the account, each moved up or down or taken away, saved together,
+    with what is wrong said by rule. The Shipping page's To book tab offers "By the shop's courier
+    rules", chosen unless staff choose an account, and says under each order which courier it goes
+    with.
+* **Consequences:**
+  * A morning's orders are booked at one tap, each with the courier the shop chose for its city
+    and its cash, and staff see which before they tap.
+  * Rules read the order as it is when booked: an order whose address changes after the preview
+    is booked by its new city.
+* **Alternatives:**
+  * **Rules by weight, product or the courier's record:** weight and products are SHP-07's rate
+    cards; couriers' delivery and return rates by city (SHP-08, COD-12) are V1's scoring. Cities and
+    cash are what shops choose couriers by today.
+  * **The default account per city, kept on the account:** a rule for cash, or cities and cash
+    together, would have no home; an ordered list says which wins where two match.

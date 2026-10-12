@@ -7,10 +7,11 @@ import {
 } from '@hatti/api';
 import { Database, exactTime, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
-import { orderShipmentFactsIn } from '@hatti/orders/public';
+import { orderShipmentFactsIn, type OrderShipmentFacts } from '@hatti/orders/public';
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { COURIERS } from './courier-accounts.service.js';
+import { courierRulesIn, ruleFor } from './courier-rules.service.js';
 import { Couriers, plainStatusOf, type CourierParcelStatusValue } from './couriers.js';
 import {
   LogisticsEvents,
@@ -60,9 +61,17 @@ export interface CourierBookingRecord {
   updatedAt: Date;
 }
 
+/** A courier account as booking reads it. */
+type AccountRow = {
+  id: string;
+  courier: string;
+  archived_at: string | Date | null;
+  is_default: boolean;
+};
+
 export interface BookOrdersInput {
   orderIds: readonly string[];
-  /** The shop's default account unless given. */
+  /** The account the shop's courier rules choose for each order, else its default, unless given. */
   accountId?: string | null;
 }
 
@@ -168,8 +177,9 @@ export class CourierBookingService {
   ) {}
 
   /**
-   * Asks for each order to be booked with the account, the shop's default unless given: those
-   * that cannot be shipped now, or are being booked already, are refused, each with why.
+   * Asks for each order to be booked with the account named; else with the one the first of the
+   * shop's courier rules it matches names (ADR-382), else the shop's default. Those that cannot
+   * be shipped now, or are being booked already, are refused, each with why.
    */
   async request(
     tenant: TenantContext,
@@ -184,27 +194,42 @@ export class CourierBookingService {
     if (!check.ok) return { ok: false, errors: check.errors };
 
     return this.db.tenant(tenant.shopId, async (tx): Promise<MutationResult<BookOrdersResult>> => {
-      const { rows: accounts } = await tx.execute<{
-        id: string;
-        courier: string;
-        archived_at: string | Date | null;
-      }>(sql`
-        SELECT id, courier, archived_at FROM logistics.courier_accounts
+      const { rows: accounts } = await tx.execute<AccountRow>(sql`
+        SELECT id, courier, archived_at, is_default FROM logistics.courier_accounts
          WHERE shop_id = ${tenant.shopId}
-           AND ${input.accountId ? sql`id = ${input.accountId}` : sql`is_default`}`);
-      const account = accounts[0];
-      if (!account) {
-        return input.accountId
-          ? failOne(['accountId'], 'NOT_FOUND', 'Courier account not found')
-          : failOne(['accountId'], 'BLANK', 'Connect a courier account first');
+           AND ${input.accountId ? sql`id = ${input.accountId}` : sql`TRUE`}`);
+      const named = input.accountId ? accounts[0] : accounts.find((each) => each.is_default);
+      // Without an account named, the shop's courier rules choose one for each order (ADR-382).
+      const rules = input.accountId ? [] : await courierRulesIn(tx, tenant.shopId);
+      const ruled = rules.some((rule) => !rule.accountArchived);
+      if (!ruled) {
+        if (!named) {
+          return input.accountId
+            ? failOne(['accountId'], 'NOT_FOUND', 'Courier account not found')
+            : failOne(['accountId'], 'BLANK', 'Connect a courier account first');
+        }
+        if (named.archived_at !== null) {
+          return failOne(['accountId'], 'INVALID', 'The courier account is archived');
+        }
+        if (!this.couriers.of(named.courier)) {
+          return failOne(['accountId'], 'INVALID', 'Shops no longer book with this courier here');
+        }
       }
-      if (account.archived_at !== null) {
-        return failOne(['accountId'], 'INVALID', 'The courier account is archived');
-      }
-      const courier = this.couriers.of(account.courier);
-      if (!courier) {
-        return failOne(['accountId'], 'INVALID', 'Shops no longer book with this courier here');
-      }
+      const byId = new Map(accounts.map((each) => [each.id, each]));
+      /** The account to book the order with, or why there is none. */
+      const accountFor = (facts: OrderShipmentFacts): AccountRow | string => {
+        const rule = ruled
+          ? ruleFor(rules, facts.address?.city ?? null, facts.codAmount)
+          : undefined;
+        const account = rule ? byId.get(rule.accountId) : named;
+        if (!account || account.archived_at !== null) {
+          return 'No courier rule is for this order, and the shop has no default courier account';
+        }
+        if (!this.couriers.of(account.courier)) {
+          return 'Shops no longer book with this courier here';
+        }
+        return account;
+      };
       const requestedBy = actorColumnsOf(tenant.actor);
       const booked: string[] = [];
       const refused: BookOrdersResult['refused'] = [];
@@ -227,6 +252,11 @@ export class CourierBookingService {
         }
         if (facts.refusal) {
           refused.push({ orderId, message: facts.refusal });
+          continue;
+        }
+        const account = accountFor(facts);
+        if (typeof account === 'string') {
+          refused.push({ orderId, message: account });
           continue;
         }
         const { rows } = await tx.execute<{ id: string }>(sql`
@@ -254,6 +284,38 @@ export class CourierBookingService {
         ok: true,
         value: { bookings: bookings.map((row) => this.#toRecord(row)), refused },
       };
+    });
+  }
+
+  /**
+   * The account each order would be booked with if booked now without one named (ADR-382): the
+   * one the first courier rule it matches names, else the shop's default; null where neither
+   * is, or the order is not found. For staff to see before they book.
+   */
+  async accountsFor(
+    tenant: TenantContext,
+    orderIds: readonly string[],
+  ): Promise<{ orderId: string; accountId: string | null; ruleId: string | null }[]> {
+    const ids = [...new Set(orderIds)].slice(0, BOOKING_LIMITS.orders);
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows: accounts } = await tx.execute<{ id: string; is_default: boolean }>(sql`
+        SELECT id, is_default FROM logistics.courier_accounts
+         WHERE shop_id = ${tenant.shopId} AND archived_at IS NULL`);
+      const fallback = accounts.find((each) => each.is_default)?.id ?? null;
+      const rules = await courierRulesIn(tx, tenant.shopId);
+      const choices = [];
+      for (const orderId of ids) {
+        const facts = await orderShipmentFactsIn(tx, tenant.shopId, orderId);
+        const rule = facts
+          ? ruleFor(rules, facts.address?.city ?? null, facts.codAmount)
+          : undefined;
+        choices.push({
+          orderId,
+          accountId: facts ? (rule?.accountId ?? fallback) : null,
+          ruleId: rule?.id ?? null,
+        });
+      }
+      return choices;
     });
   }
 

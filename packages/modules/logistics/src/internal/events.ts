@@ -21,7 +21,14 @@ export const LogisticsEvents = {
   ShipmentStatusChanged: 'shipment.status_changed',
   /** An account's parcels were handed to its courier through the courier's API (ADR-253). */
   CourierPickupRequested: 'courier_pickup.requested',
+  /** The shop's courier rules were replaced (SHP-06, ADR-382). */
+  CourierRulesUpdated: 'courier_rules.updated',
 } as const;
+
+export interface CourierRulesUpdatedPayload {
+  /** How many rules the shop has now. */
+  count: number;
+}
 
 export interface CourierPickupPayload {
   accountId: string;
