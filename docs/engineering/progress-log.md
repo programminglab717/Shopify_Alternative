@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the courier's word on a parcel on
-the order's own page beside its hand-over, and what comes after it. Urdu handles wait, as
-decided.
+**Next, section by section as the alpha's shops need them**: what comes after a parcel's
+hand-over on the order's own page. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +16,24 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
+
+### A parcel's hand-over on its order's page
+
+* **In the core** ([ADR-381](../architecture/13-decision-log.md#adr-381--a-parcels-hand-over-on-its-orders-page-when-to-whom-and-whether-by-hand-and-whether-the-couriers-tracking-has-had-it-since-put-together-in-the-core)): `Fulfillment.handOver` gives a parcel's last check-off in a
+  pickup, its rider and whether by hand, with `seen` and `unseen` by ADR-379's rule, put
+  together in the core from logistics through the request's loader, one query for a page's
+  parcels; migration 0176 indexes bookings by their parcels.
+* **In the admin**, the order's parcel says when and to whom it was handed over, by hand where
+  it was, and that the courier has it; a day on without it, a warning to ask, with a tap to the
+  pickups for those who hand parcels over.
+* **Tried in Chromium against the core:** order #1014 said "Handed to Imran 6 hours ago" and
+  "By hand, without asking the courier"; with #1016's check-off set back 30 hours, its parcel
+  said "Handed over yesterday" with the warning and "See pickups" to the Pickups tab, on a
+  desktop and a phone's width. Its time was then put back as it was. The bookings' new index
+  is the one the query uses. No errors in the browser.
+* 2546 tests (3 new): the parcel's hand-over with its rider, by hand
+  and seen; unseen with the tap for a packer and without it for an agent; none at all; and in
+  the API's pickup test, unseen, seen and none.
 
 ### 27b0437 · Parcels the courier has not seen, on Home
 

@@ -1,6 +1,7 @@
 import type { OrderStage as BadgeColour } from '@hatti/tokens';
+import { Link } from '@tanstack/react-router';
 import type { LucideIcon } from 'lucide-react';
-import { PackageCheck, PackageX, Pencil, Truck, Undo2 } from 'lucide-react';
+import { Hand, PackageCheck, PackageX, Pencil, Truck, Undo2 } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -17,11 +18,12 @@ import type {
   FulfillmentEventStatus,
   FulfillmentStatus,
   ParcelDetail,
+  ParcelHandOverValue,
   ParcelUserErrorsData,
   UserError,
 } from '../api/types';
 import type { StaffRole } from '../auth/session';
-import { formatCount, formatDateTime } from '../i18n/format';
+import { formatCount, formatDateTime, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { Translate } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -393,6 +395,49 @@ export function ShipForm({
   );
 }
 
+/** Those who hand parcels to couriers' riders, and see the pickups (ADR-380). */
+const SEES_PICKUPS: readonly StaffRole[] = ['owner', 'manager', 'packer'];
+
+/**
+ * A parcel's last hand-over to its courier's rider (SHP-02, SHP-04, ADR-381): when, to whom and
+ * whether by hand; then that the courier's tracking has had it since, or, a day on, that it still
+ * has not, a tap from the pickups for those who hand parcels over.
+ */
+function HandedOver({ handOver, timezone }: { handOver: ParcelHandOverValue; timezone: string }) {
+  const { t, locale } = useLocale();
+  const { id: shopId, role } = useShop();
+  const when = formatRelative(handOver.handedOverAt, timezone, locale);
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="flex items-center gap-2">
+          <Hand aria-hidden className="size-5 text-secondary" />
+          {handOver.riderName
+            ? t('pickups.handedTo', { when, rider: handOver.riderName })
+            : t('pickups.handedAt', { when })}
+        </span>
+        {handOver.byHand && <span className="text-secondary">{t('parcels.byHand')}</span>}
+        {handOver.seen && <span className="text-success">{t('pickups.courierHasIt')}</span>}
+      </p>
+      {handOver.unseen && (
+        <Alert tone="warning">
+          {t('parcels.unseen')}{' '}
+          {SEES_PICKUPS.includes(role) && (
+            <Link
+              to="/$shopId/shipping"
+              params={{ shopId }}
+              search={{ tab: 'pickups' }}
+              className="font-medium underline"
+            >
+              {t('parcels.toPickups')}
+            </Link>
+          )}
+        </Alert>
+      )}
+    </div>
+  );
+}
+
 type Open = 'step' | 'checkIn' | 'lost' | 'claim' | 'tracking' | null;
 
 function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }) {
@@ -456,6 +501,7 @@ function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }
           </li>
         ))}
       </ul>
+      {parcel.handOver && <HandedOver handOver={parcel.handOver} timezone={timezone} />}
       {steps.length > 0 && (
         <ol className="flex flex-col gap-2 border-s-2 border-line ps-3">
           {shown.map((step) => (
@@ -571,7 +617,8 @@ function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }
 
 /**
  * An order's parcels (SHP-04, ADR-160, ADR-071, ADR-072): each with its courier and tracking
- * number, its items and the latest steps of its way; moved along by those who work orders:
+ * number, its items, its hand-over to the courier's rider (ADR-381) and the latest steps of its
+ * way; moved along by those who work orders:
  * delivered, refused, a step told of a courier Hatti does not follow, lost after asking, or
  * checked back in with what is damaged written off; its tracking corrected, whatever its state.
  */

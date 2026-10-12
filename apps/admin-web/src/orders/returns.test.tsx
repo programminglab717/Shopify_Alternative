@@ -34,6 +34,7 @@ const parcel = (status: string, extra: Record<string, unknown> = {}) => ({
   ],
   events: { nodes: [] },
   claim: null,
+  handOver: null,
   ...extra,
 });
 

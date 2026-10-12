@@ -77,12 +77,14 @@ export {
   type CourierPickupPayload,
   type ShipmentStatusChangedPayload,
 } from '../internal/events.js';
+export { ParcelHandOver } from '../internal/graphql/couriers.types.js';
 export { LogisticsModule } from '../internal/logistics.module.js';
 export {
   CourierPickupService,
   PICKUP_LIMITS,
   type CourierPickupInput,
   type CourierPickupRecord,
+  type ParcelHandOverRecord,
   type PickupStatusValue,
 } from '../internal/pickups.service.js';
 export type { CodRemittanceLineRecord, CodRemittanceRecord } from '../internal/records.js';

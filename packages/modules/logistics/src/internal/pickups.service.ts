@@ -88,6 +88,24 @@ export interface UnseenParcelRecord extends PickupParcelRecord {
   handedOverAt: Date;
 }
 
+/**
+ * A parcel's last hand-over to its courier's rider, for the order's page (SHP-02, SHP-04,
+ * ADR-381): when, in which pickup and to whom, and what the courier's tracking has said since.
+ */
+export interface ParcelHandOverRecord {
+  /** The parcel the order shipped as: its fulfillment. */
+  fulfillmentId: string;
+  pickupId: string;
+  handedOverAt: Date;
+  /** Handed over by hand, its courier not asked (ADR-378). */
+  byHand: boolean;
+  rider: { name: string | null; code: string | null };
+  /** The courier's tracking has had it as more than booked since. */
+  seen: boolean;
+  /** Still only booked {@link UNSEEN_AFTER_HOURS} hours after it was handed over (ADR-379). */
+  unseen: boolean;
+}
+
 export interface CourierPickupInput {
   /** The account whose parcels go; the shop's default unless given. */
   accountId?: string | null;
@@ -536,6 +554,56 @@ export class CourierPickupService {
         ) handed
          WHERE handed_over_at <= now() - make_interval(hours => ${UNSEEN_AFTER_HOURS})`);
       return rows[0]!.count;
+    });
+  }
+
+  /**
+   * The last hand-over of each of these parcels, by their fulfillments, for orders' pages
+   * (ADR-381); parcels never booked with a courier, or never checked off as handed over, are
+   * left out.
+   */
+  async handOversOf(
+    tenant: TenantContext,
+    fulfillmentIds: readonly string[],
+  ): Promise<Map<string, ParcelHandOverRecord>> {
+    const found = new Map<string, ParcelHandOverRecord>();
+    if (fulfillmentIds.length === 0) return found;
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{
+        fulfillment_id: string;
+        pickup_id: string;
+        handed_over_at: string | Date;
+        by_hand: boolean;
+        rider_name: string | null;
+        rider_code: string | null;
+        seen: boolean;
+        unseen: boolean;
+      }>(sql`
+        SELECT DISTINCT ON (b.fulfillment_id) b.fulfillment_id, pp.pickup_id, pp.handed_over_at,
+               p.by_hand, p.rider_name, p.rider_code,
+               b.parcel_status IS NOT NULL AND b.parcel_status <> 'booked' AS seen,
+               b.status = 'booked' AND b.parcel_status = 'booked'
+                 AND pp.handed_over_at <= now() - make_interval(hours => ${UNSEEN_AFTER_HOURS})
+                 AS unseen
+          FROM logistics.bookings b
+          JOIN logistics.pickup_parcels pp ON pp.shop_id = b.shop_id AND pp.booking_id = b.id
+          JOIN logistics.pickups p ON p.shop_id = pp.shop_id AND p.id = pp.pickup_id
+         WHERE b.shop_id = ${tenant.shopId}
+           AND b.fulfillment_id = ANY(${sql.param([...fulfillmentIds])}::uuid[])
+           AND pp.handed_over_at IS NOT NULL
+         ORDER BY b.fulfillment_id, pp.handed_over_at DESC`);
+      for (const row of rows) {
+        found.set(row.fulfillment_id, {
+          fulfillmentId: row.fulfillment_id,
+          pickupId: row.pickup_id,
+          handedOverAt: toDate(row.handed_over_at),
+          byHand: row.by_hand,
+          rider: { name: row.rider_name, code: row.rider_code },
+          seen: row.seen,
+          unseen: row.unseen,
+        });
+      }
+      return found;
     });
   }
 

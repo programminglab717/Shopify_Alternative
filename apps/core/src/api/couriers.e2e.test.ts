@@ -507,6 +507,47 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
     ]);
     // And Home counts it (ADR-380).
     expect(await data(tokens.reader, '{ home { parcelsUnseen } }')).toEqual({ parcelsUnseen: 1 });
+
+    // The order's own page says so of its parcel, beside its hand-over (ADR-381).
+    const PARCEL = `query ($id: ID!) {
+      order(id: $id) {
+        fulfillments {
+          id
+          handOver { handedOverAt pickupId byHand riderName riderCode seen unseen }
+        }
+      }
+    }`;
+    const parcelOf = async () =>
+      (
+        (await data(tokens.reader, PARCEL, { id: orderId })) as {
+          fulfillments: { id: string; handOver: Record<string, unknown> | null }[];
+        }
+      ).fulfillments;
+    expect(await parcelOf()).toEqual([
+      {
+        id: shipped.fulfillment.id,
+        handOver: {
+          handedOverAt: expect.any(String),
+          pickupId,
+          byHand: false,
+          riderName: null,
+          riderCode: null,
+          seen: false,
+          unseen: true,
+        },
+      },
+    ]);
+    // Once the courier's tracking has it, it is neither.
+    await admin.query(`UPDATE logistics.bookings SET parcel_status = 'in_transit' WHERE id = $1`, [
+      fromPublicId(booking.id, 'courierBooking'),
+    ]);
+    expect((await parcelOf())[0]!.handOver).toMatchObject({ seen: true, unseen: false });
+    // A parcel never checked off has none.
+    await admin.query(
+      `UPDATE logistics.pickup_parcels
+          SET handed_over_at = NULL, handed_over_by_kind = NULL, handed_over_by_id = NULL`,
+    );
+    expect((await parcelOf())[0]!.handOver).toBeNull();
   });
 
   it("names cities as a courier names them, for the shop's next parcels to them (SHP-03)", async () => {

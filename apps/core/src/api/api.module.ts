@@ -44,6 +44,7 @@ import { SetupChecklistService } from './setup-checklist.js';
 import { SetupResolver } from './setup.resolver.js';
 import { OrderAgreementResolver } from './order-agreement.resolver.js';
 import { OrderAssignmentResolver } from './order-assignment.resolver.js';
+import { ParcelHandOverResolver } from './parcel-hand-over.resolver.js';
 import { OrderEventResolver } from './order-event.resolver.js';
 import { InventoryFileResolver } from './inventory-file.resolver.js';
 import { ProductsExportResolver } from './products-export.resolver.js';
@@ -226,6 +227,7 @@ export class ApiModule {
         SupportAccessResolver,
         OrderAgreementResolver,
         OrderAssignmentResolver,
+        ParcelHandOverResolver,
         OrderEventResolver,
         ProductsImportResolver,
         ProductsExportResolver,

@@ -138,6 +138,19 @@ export interface ParcelDetail {
     }[];
   };
   claim: { status: FulfillmentClaimStatus } | null;
+  /** Its last hand-over to its courier's rider; null while none (ADR-381). */
+  handOver: ParcelHandOverValue | null;
+}
+
+/** A parcel's last hand-over to its courier's rider, and what the courier said since (ADR-381). */
+export interface ParcelHandOverValue {
+  handedOverAt: string;
+  byHand: boolean;
+  riderName: string | null;
+  /** The courier's tracking has had it as more than booked since. */
+  seen: boolean;
+  /** Still only booked a day after it was handed over (ADR-379). */
+  unseen: boolean;
 }
 
 export type ReturnReason =

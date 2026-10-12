@@ -98,6 +98,7 @@ const parcel = (status: string, extra: Record<string, unknown> = {}) => ({
     ],
   },
   claim: null,
+  handOver: null,
   ...extra,
 });
 

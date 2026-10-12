@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-380 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-381 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -388,6 +388,7 @@
 | 378 | Parcels handed to a courier's rider by hand: the parcels waiting recorded as a pickup the courier was not asked for, its load sheet printed and its parcels checked off | Accepted |
 | 379 | Parcels a rider took that the courier's tracking has not seen a day on: listed from the hand-overs against the parcels' status, with the rider and when | Accepted |
 | 380 | Parcels the courier has not seen on Home: their count among the next actions, a tap from the pickups that list them, for those who hand parcels over | Accepted |
+| 381 | A parcel's hand-over on its order's page: when, to whom and whether by hand, and whether the courier's tracking has had it since, put together in the core | Accepted |
 
 ---
 
@@ -14783,3 +14784,41 @@
   * **Among the next actions, with an amount:** the next actions are orders by stage, each with
     its money; a parcel unseen is a question for the courier, not a step in the order's way, and
     its cash is still the courier's to collect.
+
+## ADR-381 · A parcel's hand-over on its order's page: when, to whom and whether by hand, and whether the courier's tracking has had it since, put together in the core
+
+* **Context:**
+  * A parcel's hand-over to its courier's rider (ADR-377, ADR-378), and whether the courier's
+    tracking has had it since (ADR-379), showed only in the pickups. Staff answering a customer
+    who asks where their order is open the order, not the pickups; the order's parcel showed its
+    courier, tracking number and the courier's steps, but not that it had left the shop, when,
+    or with whom.
+  * The orders module keeps the parcel (a fulfillment); logistics keeps its booking and the
+    pickups it went in. Neither reads the other's tables.
+* **Decision:**
+  * **In the core**, `Fulfillment.handOver` gives the parcel's last check-off in a pickup: when,
+    the pickup, whether by hand, the rider's name and code where named, `seen` while the
+    courier's tracking has had it as more than booked since, and `unseen` while it still has it
+    as only booked a day on, by ADR-379's rule. Null for a parcel not booked through Hatti, or
+    not checked off. It is resolved in the core, as an order's agreement is (ADR-057): logistics'
+    `handOversOf` reads the hand-overs of a page's parcels at once through the request's loader,
+    by their fulfillments, with an index on bookings' fulfillments (migration 0176) so that
+    reading them never reads the shop's every booking. It is read with the order
+    (`read_orders`).
+  * **In the admin**, a parcel on the order's page says "Handed to Imran 6 hours ago", or
+    "Handed over yesterday" where no rider was named, with "By hand, without asking the courier"
+    where it was, and "The courier has it" once its tracking does. A day on without it, a warning
+    says to ask the courier or the rider, with a tap to the pickups for owners, managers and
+    packers, who hand parcels over; other staff see the warning alone. Nothing for a parcel never
+    handed over.
+* **Consequences:**
+  * Staff answering a customer see on the order whether its parcel left the shop and whether the
+    courier has it, without opening the pickups.
+  * Only the last hand-over shows: a parcel handed over again, after a pickup it was missed in,
+    shows that one.
+* **Alternatives:**
+  * **The hand-over as a step of the parcel's way:** its steps are what its courier and staff
+    said of its delivery, kept as they were said (ADR-160); a hand-over checked off again, or
+    unseen a day on, would need steps written and taken back.
+  * **A field on the order:** a split order ships as parcels with bookings of their own; the
+    hand-over belongs to each parcel.

@@ -3476,6 +3476,11 @@ type Fulfillment {
   """
   events(after: String, first: Int, reverse: Boolean): FulfillmentEventConnection!
   fulfillmentLineItems: [FulfillmentLineItem!]!
+
+  """
+  Its last hand-over to its courier's rider, checked off in a pickup, and what the courier's tracking has said of it since; null for a parcel not booked through Hatti, or not checked off yet.
+  """
+  handOver: ParcelHandOver
   id: ID!
 
   """Where it shipped from."""
@@ -8000,6 +8005,30 @@ enum PaperSize {
 
   """An 80 mm thermal receipt roll, cut after each order."""
   THERMAL_80MM
+}
+
+"""
+A parcel's last hand-over to its courier's rider (SHP-02, SHP-04, ADR-381): when, in which pickup and to whom, and what the courier's tracking has said of it since.
+"""
+type ParcelHandOver {
+  """Handed to the rider by hand, its courier not asked (ADR-378)."""
+  byHand: Boolean!
+
+  """When it was checked off as handed over."""
+  handedOverAt: DateTime!
+  pickupId: ID!
+  riderCode: String
+
+  """The pickup's rider, where named."""
+  riderName: String
+
+  """The courier's tracking has had it as more than booked since."""
+  seen: Boolean!
+
+  """
+  The courier's tracking still has it as only booked a day after it was handed over (ADR-379): the rider may never have scanned it in, or lost it.
+  """
+  unseen: Boolean!
 }
 
 """

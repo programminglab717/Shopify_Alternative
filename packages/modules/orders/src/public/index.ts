@@ -308,7 +308,7 @@ export {
   type TrackingView,
 } from '../internal/tracking.service.js';
 export { OrdersModule } from '../internal/orders.module.js';
-export { Order, OrderAgreement, OrderEvent } from '../internal/graphql/order.types.js';
+export { Fulfillment, Order, OrderAgreement, OrderEvent } from '../internal/graphql/order.types.js';
 export { DocumentLanguage, PaperSize } from '../internal/graphql/document.types.js';
 export { SalesInterval } from '../internal/graphql/sales-report.types.js';
 export { toOrder } from '../internal/graphql/mappers.js';

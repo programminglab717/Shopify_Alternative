@@ -306,6 +306,7 @@ describe("An order's everyday edits, on its page", () => {
               fulfillmentLineItems: [],
               events: { nodes: [] },
               claim: null,
+              handOver: null,
             },
           ],
         }),

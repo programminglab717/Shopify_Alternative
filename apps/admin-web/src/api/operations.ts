@@ -328,6 +328,13 @@ export const OrderQuery = /* GraphQL */ `
         claim {
           status
         }
+        handOver {
+          handedOverAt
+          byHand
+          riderName
+          seen
+          unseen
+        }
       }
       returns {
         id

@@ -619,6 +619,38 @@ export class CourierUnseenParcel {
   riderCode!: string | null;
 }
 
+@ObjectType({
+  description:
+    "A parcel's last hand-over to its courier's rider (SHP-02, SHP-04, ADR-381): when, in which " +
+    "pickup and to whom, and what the courier's tracking has said of it since.",
+})
+export class ParcelHandOver {
+  @Field(() => GraphQLISODateTime, { description: 'When it was checked off as handed over.' })
+  handedOverAt!: Date;
+
+  @Field(() => ID)
+  pickupId!: string;
+
+  @Field({ description: 'Handed to the rider by hand, its courier not asked (ADR-378).' })
+  byHand!: boolean;
+
+  @Field(() => String, { nullable: true, description: "The pickup's rider, where named." })
+  riderName!: string | null;
+
+  @Field(() => String, { nullable: true })
+  riderCode!: string | null;
+
+  @Field({ description: "The courier's tracking has had it as more than booked since." })
+  seen!: boolean;
+
+  @Field({
+    description:
+      "The courier's tracking still has it as only booked a day after it was handed over " +
+      '(ADR-379): the rider may never have scanned it in, or lost it.',
+  })
+  unseen!: boolean;
+}
+
 @ObjectType()
 export class CourierPickupParcelHandOverPayload {
   @Field(() => CourierPickupParcel, { nullable: true })
