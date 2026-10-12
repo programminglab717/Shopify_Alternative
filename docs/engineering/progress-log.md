@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: what comes after couriers'
-performance by city, such as the cheapest or best-delivering courier as a rule (SHP-06, SHP-08).
+**Next, section by section as the alpha's shops need them**: what comes after the cheapest
+courier as a rule, such as couriers' delivery by city weighed with their price (SHP-06, SHP-08).
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -17,6 +17,26 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
+
+### The cheapest courier as a rule
+
+* **In the core** ([ADR-385](../architecture/13-decision-log.md#adr-385--a-courier-rule-may-book-with-the-cheapest-of-the-shops-accounts-by-their-rate-cards-order-by-order-and-is-passed-over-where-none-has-a-card), SHP-06): a courier rule naming no account books each order it
+  matches with the cheapest of the shop's live accounts by their rate cards, by the order's
+  city, weight and cash to collect; it is passed over where no account has a card, may be for
+  every order, and cannot be saved before an account has a card. Migration 0179 lets a rule's
+  account be none. `courierAccountsFor` says which account it chose and what it is likely to
+  cost.
+* **In the admin**, a rule's "Book with" offers "The cheapest, by rate cards", saying what it
+  does.
+* **Tried in Chromium against the core:** a rule for the cheapest added in settings was refused,
+  "Rule 1: Give a courier account a rate card first, for the cheapest to be chosen by"; with
+  cards for Test courier Karachi (from Karachi, Rs 150) and Test courier (from Lahore, Rs 120)
+  it was saved, and with #1003 to Lahore marked packed the To book tab said "Goes with Test
+  courier · about Rs 120". The rule and cards were then taken away and #1003 marked unpacked.
+  No errors in the browser.
+* 2580 tests (3 new): the cheapest chosen by city, weight and cash and
+  rules passed over without cards, and booking by it, in the logistics module; a rule for it
+  through the API in the core's courier test; and the rule in the admin's settings.
 
 ### bb034a6 · Couriers' performance by city
 

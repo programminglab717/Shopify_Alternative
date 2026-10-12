@@ -2795,7 +2795,8 @@ export interface InventoryValueData {
 /** Which courier account books the orders a rule matches (SHP-06, ADR-382). */
 export interface CourierRuleValue {
   id: string;
-  accountId: string;
+  /** Null for the cheapest of the shop's accounts by their rate cards (ADR-385). */
+  accountId: string | null;
   accountArchived: boolean;
   /** Cities as Pakistan's list names them; none for anywhere. */
   cities: string[];

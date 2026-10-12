@@ -3331,6 +3331,9 @@ const en = {
   'couriers.performance.perParcel': 'Cost per parcel',
   'couriers.performance.cities': '{courier} by city',
   'couriers.performance.estimated': 'The costs include {amount} estimated by rate cards',
+  'courierRules.cheapest': 'The cheapest, by rate cards',
+  'courierRules.cheapestHint':
+    'Each order goes with the account whose rate card costs it least to send and collect. Leave the cities and cash blank for every order.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6638,6 +6641,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'couriers.performance.perParcel': 'فی پارسل خرچ',
   'couriers.performance.cities': '{courier} شہر وار',
   'couriers.performance.estimated': 'خرچ میں {amount} ریٹ کارڈ کا اندازہ ہے',
+  'courierRules.cheapest': 'سب سے سستا، ریٹ کارڈ کے حساب سے',
+  'courierRules.cheapestHint':
+    'ہر آرڈر اس اکاؤنٹ سے جائے گا جس کے ریٹ کارڈ پر بھیجنا اور رقم وصول کرنا سب سے سستا ہو۔ ہر آرڈر کے لیے شہر اور رقم خالی چھوڑیں۔',
 };
 
 export const messages: Readonly<

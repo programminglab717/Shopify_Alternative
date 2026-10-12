@@ -45,10 +45,13 @@ export {
 export {
   COURIER_RULE_LIMITS,
   CourierRuleService,
+  accountByRules,
+  cheapestOf,
   courierRulesIn,
-  ruleFor,
   type CourierRuleInput,
   type CourierRuleRecord,
+  type RuledAccount,
+  type RuledParcel,
 } from '../internal/courier-rules.service.js';
 export {
   CourierDocumentService,

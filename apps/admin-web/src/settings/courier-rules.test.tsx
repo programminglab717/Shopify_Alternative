@@ -116,6 +116,40 @@ describe('Courier rules in settings (ADR-382)', () => {
     });
   });
 
+  it('books with the cheapest account by rate cards where a rule says so (ADR-385)', async () => {
+    const fake = core([{ ...KARACHI, accountId: null, cities: [] }]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/couriers');
+
+    const first = await screen.findByRole('listitem', { name: 'Rule 1' });
+    const bookWith = within(first).getByLabelText<HTMLSelectElement>('Book with');
+    expect(bookWith.value).toBe('');
+    expect(bookWith.selectedOptions[0]!.textContent).toBe('The cheapest, by rate cards');
+    expect(
+      within(first).getByText(
+        'Each order goes with the account whose rate card costs it least to send and collect. Leave the cities and cash blank for every order.',
+      ),
+    ).toBeTruthy();
+
+    // A rule for Karachi's orders before it, with one account; then made the cheapest's too.
+    fireEvent.click(screen.getByRole('button', { name: 'Add a rule' }));
+    const second = screen.getByRole('listitem', { name: 'Rule 2' });
+    fireEvent.change(within(second).getByLabelText('Cities'), { target: { value: 'Karachi' } });
+    fireEvent.change(within(second).getByLabelText('Book with'), { target: { value: '' } });
+    expect(within(second).getByText(/costs it least/)).toBeTruthy();
+    fireEvent.change(within(second).getByLabelText('Book with'), { target: { value: 'cra_2' } });
+    expect(within(second).queryByText(/costs it least/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Move rule 2 up' }));
+    await press('Save rules');
+    await screen.findByText('Rules saved. Orders booked from now on follow them.');
+    expect(fake.sent.find((each) => each.operation === 'CourierRulesUpdate')?.variables).toEqual({
+      rules: [
+        { accountId: 'cra_2', cities: ['Karachi'], codAtLeast: null, codBelow: null },
+        { accountId: null, cities: [], codAtLeast: null, codBelow: null },
+      ],
+    });
+  });
+
   it('warns of a rule whose account was archived, and takes rules away', async () => {
     const fake = core([{ ...KARACHI, accountId: 'cra_9', accountArchived: true }]);
     vi.stubGlobal('fetch', fake.fetcher);

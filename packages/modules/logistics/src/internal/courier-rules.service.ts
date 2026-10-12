@@ -5,6 +5,7 @@ import { findCity } from '@hatti/pk';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { LogisticsEvents, type CourierRulesUpdatedPayload } from './events.js';
+import { chargeEstimate, type RateCardRecord } from './rate-cards.service.js';
 
 /** Rules a shop keeps at most, and cities a rule names at most. */
 export const COURIER_RULE_LIMITS = { rules: 50, cities: 100 } as const;
@@ -15,7 +16,8 @@ export const COURIER_RULE_LIMITS = { rules: 50, cities: 100 } as const;
  */
 export interface CourierRuleRecord {
   id: string;
-  accountId: string;
+  /** Null for the cheapest of the shop's accounts by their rate cards (ADR-385). */
+  accountId: string | null;
   /** Cities as Pakistan's list names them; none for anywhere. */
   cities: string[];
   /** The cash to collect, in minor units: at least, and below; null for no bound. */
@@ -26,7 +28,8 @@ export interface CourierRuleRecord {
 }
 
 export interface CourierRuleInput {
-  accountId: string;
+  /** Null for the cheapest of the shop's accounts by their rate cards (ADR-385). */
+  accountId: string | null;
   /** Cities of Pakistan, as addresses name them; none or null for anywhere. */
   cities?: readonly string[] | null;
   /** Decimal, in major units; null or blank for no bound. */
@@ -36,31 +39,66 @@ export interface CourierRuleInput {
 
 type RuleRow = {
   id: string;
-  account_id: string;
+  account_id: string | null;
   cities: string[];
   cod_at_least: string | null;
   cod_below: string | null;
   archived: boolean;
 };
 
+/** What a rule is matched against, and the cheapest account priced by. */
+export interface RuledParcel {
+  city: string | null;
+  codAmount: bigint;
+  weightGrams: number | null;
+}
+
+/** The account a rule chose for an order, and the rule. */
+export interface RuledAccount {
+  rule: CourierRuleRecord;
+  accountId: string;
+}
+
 /**
- * The first of `rules` an order to `city` with `codAmount` to collect matches, passing over those
- * whose account was archived; undefined when none does. A city is matched as Pakistan's list
- * names it, so "Pindi" is Rawalpindi.
+ * The account the first of `rules` that `parcel` matches books it with (ADR-382), passing over
+ * those whose account was archived; undefined when none does. A rule for the cheapest account
+ * (ADR-385) chooses, among `cards` (live accounts' that can book, the shop's default first), the
+ * one whose card prices the parcel's way out and cash the least, the first of those equal; with
+ * none, it is passed over. A city is matched as Pakistan's list names it, so "Pindi" is
+ * Rawalpindi.
  */
-export function ruleFor(
+export function accountByRules(
   rules: readonly CourierRuleRecord[],
-  city: string | null,
-  codAmount: bigint,
-): CourierRuleRecord | undefined {
-  const name = city ? (findCity(city)?.name ?? null) : null;
-  return rules.find(
-    (rule) =>
+  parcel: RuledParcel,
+  cards: readonly RateCardRecord[],
+): RuledAccount | undefined {
+  const name = parcel.city ? (findCity(parcel.city)?.name ?? null) : null;
+  for (const rule of rules) {
+    const matches =
       !rule.accountArchived &&
       (rule.cities.length === 0 || (name !== null && rule.cities.includes(name))) &&
-      (rule.codAtLeast === null || codAmount >= rule.codAtLeast) &&
-      (rule.codBelow === null || codAmount < rule.codBelow),
-  );
+      (rule.codAtLeast === null || parcel.codAmount >= rule.codAtLeast) &&
+      (rule.codBelow === null || parcel.codAmount < rule.codBelow);
+    if (!matches) continue;
+    if (rule.accountId !== null) return { rule, accountId: rule.accountId };
+    const cheapest = cheapestOf(cards, parcel);
+    if (cheapest) return { rule, accountId: cheapest };
+  }
+  return undefined;
+}
+
+/** The account whose card prices `parcel`'s way out and cash the least; the first of equals. */
+export function cheapestOf(
+  cards: readonly RateCardRecord[],
+  parcel: RuledParcel,
+): string | undefined {
+  let best: { accountId: string; cost: bigint } | undefined;
+  for (const card of cards) {
+    const estimate = chargeEstimate(card, parcel);
+    const cost = estimate.out + estimate.codFee;
+    if (!best || cost < best.cost) best = { accountId: card.accountId, cost };
+  }
+  return best?.accountId;
 }
 
 /** The shop's rules in their order, in the caller's transaction. */
@@ -69,7 +107,7 @@ export async function courierRulesIn(tx: Tx, shopId: string): Promise<CourierRul
     SELECT r.id, r.account_id, r.cities, r.cod_at_least::text AS cod_at_least,
            r.cod_below::text AS cod_below, a.archived_at IS NOT NULL AS archived
       FROM logistics.courier_rules r
-      JOIN logistics.courier_accounts a ON a.shop_id = r.shop_id AND a.id = r.account_id
+      LEFT JOIN logistics.courier_accounts a ON a.shop_id = r.shop_id AND a.id = r.account_id
      WHERE r.shop_id = ${shopId}
      ORDER BY r.position`);
   return rows.map((row) => ({
@@ -84,7 +122,8 @@ export async function courierRulesIn(tx: Tx, shopId: string): Promise<CourierRul
 
 /**
  * The shop's courier rules (SHP-06, ADR-382): kept in their order, replaced all at once, each
- * naming cities, a range of cash to collect, or both, and the account that books what matches.
+ * naming cities, a range of cash to collect, or both, and the account that books what matches;
+ * or none, for the cheapest by rate cards (ADR-385), which may be for every order.
  */
 @Injectable()
 export class CourierRuleService {
@@ -96,8 +135,8 @@ export class CourierRuleService {
 
   /**
    * Replaces the shop's rules with `inputs`, in their order; none for none. Each names a live
-   * account of the shop's, and cities, a range of cash, or both. Records
-   * `courier_rules.updated` if anything changed.
+   * account of the shop's, and cities, a range of cash, or both; or no account, for the cheapest
+   * by rate cards once one has a card. Records `courier_rules.updated` if anything changed.
    */
   async replace(
     tenant: TenantContext,
@@ -118,9 +157,21 @@ export class CourierRuleService {
         SELECT id, archived_at IS NOT NULL AS archived FROM logistics.courier_accounts
          WHERE shop_id = ${shopId}`);
       const archived = new Map(accounts.map((account) => [account.id, account.archived]));
+      const { rows: carded } = await tx.execute<{ count: number }>(sql`
+        SELECT count(*)::int AS count FROM logistics.rate_cards c
+          JOIN logistics.courier_accounts a ON a.shop_id = c.shop_id AND a.id = c.account_id
+         WHERE c.shop_id = ${shopId} AND a.archived_at IS NULL`);
       const rules = inputs.map((input, index) => {
         const at = ['rules', String(index)];
-        if (!archived.has(input.accountId)) {
+        if (input.accountId === null) {
+          if (carded[0]!.count === 0) {
+            check.addMessage(
+              [...at, 'accountId'],
+              'INVALID',
+              'Give a courier account a rate card first, for the cheapest to be chosen by',
+            );
+          }
+        } else if (!archived.has(input.accountId)) {
           check.addMessage([...at, 'accountId'], 'NOT_FOUND', 'Courier account not found');
         } else if (archived.get(input.accountId)) {
           check.addMessage([...at, 'accountId'], 'INVALID', 'The courier account is archived');
@@ -158,7 +209,9 @@ export class CourierRuleService {
             'The cash it is below must be more than the cash it is at least',
           );
         }
-        if (named.length === 0 && !input.codAtLeast?.trim() && !input.codBelow?.trim()) {
+        // A rule for the cheapest may be for every order; one account's would be the default's.
+        const anywhere = named.length === 0 && !input.codAtLeast?.trim() && !input.codBelow?.trim();
+        if (anywhere && input.accountId !== null) {
           check.addMessage(at, 'BLANK', 'Name the cities, or the cash to collect, the rule is for');
         }
         return { accountId: input.accountId, cities, codAtLeast, codBelow };

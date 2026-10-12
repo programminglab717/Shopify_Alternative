@@ -11,8 +11,8 @@ import { orderShipmentFactsIn, type OrderShipmentFacts } from '@hatti/orders/pub
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { COURIERS } from './courier-accounts.service.js';
-import { courierRulesIn, ruleFor } from './courier-rules.service.js';
-import { carryEstimateIn, chargeEstimate, rateCardIn } from './rate-cards.service.js';
+import { accountByRules, courierRulesIn, type RuledParcel } from './courier-rules.service.js';
+import { carryEstimateIn, chargeEstimate, liveRateCardsIn } from './rate-cards.service.js';
 import { Couriers, plainStatusOf, type CourierParcelStatusValue } from './couriers.js';
 import {
   LogisticsEvents,
@@ -179,7 +179,8 @@ export class CourierBookingService {
 
   /**
    * Asks for each order to be booked with the account named; else with the one the first of the
-   * shop's courier rules it matches names (ADR-382), else the shop's default. Those that cannot
+   * shop's courier rules it matches names (ADR-382), or the cheapest by rate cards where the rule
+   * says so (ADR-385), else the shop's default. Those that cannot
    * be shipped now, or are being booked already, are refused, each with why.
    */
   async request(
@@ -217,12 +218,17 @@ export class CourierBookingService {
         }
       }
       const byId = new Map(accounts.map((each) => [each.id, each]));
+      // The cheapest is chosen among accounts that can book now (ADR-385).
+      const cards = ruled
+        ? (await liveRateCardsIn(tx, tenant.shopId)).filter((card) => {
+            const account = byId.get(card.accountId);
+            return account !== undefined && this.couriers.of(account.courier) !== undefined;
+          })
+        : [];
       /** The account to book the order with, or why there is none. */
       const accountFor = (facts: OrderShipmentFacts): AccountRow | string => {
-        const rule = ruled
-          ? ruleFor(rules, facts.address?.city ?? null, facts.codAmount)
-          : undefined;
-        const account = rule ? byId.get(rule.accountId) : named;
+        const chosen = ruled ? accountByRules(rules, parcelOf(facts), cards) : undefined;
+        const account = chosen ? byId.get(chosen.accountId) : named;
         if (!account || account.archived_at !== null) {
           return 'No courier rule is for this order, and the shop has no default courier account';
         }
@@ -290,8 +296,9 @@ export class CourierBookingService {
 
   /**
    * The account each order would be booked with if booked now without one named (ADR-382): the
-   * one the first courier rule it matches names, else the shop's default; null where neither
-   * is, or the order is not found. For staff to see before they book.
+   * one the first courier rule it matches names, or the cheapest by rate cards (ADR-385), else
+   * the shop's default; null where neither is, or the order is not found. For staff to see
+   * before they book.
    */
   async accountsFor(
     tenant: TenantContext,
@@ -307,35 +314,32 @@ export class CourierBookingService {
   > {
     const ids = [...new Set(orderIds)].slice(0, BOOKING_LIMITS.orders);
     return this.db.tenant(tenant.shopId, async (tx) => {
-      const { rows: accounts } = await tx.execute<{ id: string; is_default: boolean }>(sql`
-        SELECT id, is_default FROM logistics.courier_accounts
+      const { rows: accounts } = await tx.execute<{
+        id: string;
+        courier: string;
+        is_default: boolean;
+      }>(sql`
+        SELECT id, courier, is_default FROM logistics.courier_accounts
          WHERE shop_id = ${tenant.shopId} AND archived_at IS NULL`);
       const fallback = accounts.find((each) => each.is_default)?.id ?? null;
       const rules = await courierRulesIn(tx, tenant.shopId);
-      const cards = new Map<string, Awaited<ReturnType<typeof rateCardIn>>>();
+      const booking = new Set(
+        accounts.filter((each) => this.couriers.of(each.courier)).map((each) => each.id),
+      );
+      const all = await liveRateCardsIn(tx, tenant.shopId);
+      const cards = all.filter((card) => booking.has(card.accountId));
+      const cardOf = new Map(all.map((card) => [card.accountId, card]));
       const choices = [];
       for (const orderId of ids) {
         const facts = await orderShipmentFactsIn(tx, tenant.shopId, orderId);
-        const rule = facts
-          ? ruleFor(rules, facts.address?.city ?? null, facts.codAmount)
-          : undefined;
-        const accountId = facts ? (rule?.accountId ?? fallback) : null;
-        if (accountId && !cards.has(accountId)) {
-          cards.set(accountId, await rateCardIn(tx, tenant.shopId, accountId));
-        }
-        const card = accountId ? cards.get(accountId) : null;
-        const estimate =
-          card && facts
-            ? chargeEstimate(card, {
-                city: facts.address?.city ?? null,
-                codAmount: facts.codAmount,
-                weightGrams: facts.weightGrams,
-              })
-            : null;
+        const chosen = facts ? accountByRules(rules, parcelOf(facts), cards) : undefined;
+        const accountId = facts ? (chosen?.accountId ?? fallback) : null;
+        const card = accountId ? cardOf.get(accountId) : undefined;
+        const estimate = card && facts ? chargeEstimate(card, parcelOf(facts)) : null;
         choices.push({
           orderId,
           accountId,
-          ruleId: rule?.id ?? null,
+          ruleId: chosen?.rule.id ?? null,
           estimate: estimate ? estimate.out + estimate.codFee : null,
         });
       }
@@ -697,6 +701,15 @@ export class CourierBookingService {
 }
 
 /** A booking's row as the Admin API shows it, its courier named as `couriers` name it. */
+/** What courier rules match an order by, and rate cards price its parcel by. */
+function parcelOf(facts: OrderShipmentFacts): RuledParcel {
+  return {
+    city: facts.address?.city ?? null,
+    codAmount: facts.codAmount,
+    weightGrams: facts.weightGrams,
+  };
+}
+
 export function bookingRecordOf(row: BookingRow, couriers: Couriers): CourierBookingRecord {
   return {
     id: row.id,

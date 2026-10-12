@@ -26,7 +26,8 @@ export class CourierRuleResolver {
   @Query(() => [CourierRule], {
     description:
       "The shop's courier rules, in their order: an order booked without an account named goes " +
-      "with the first it matches, else with the shop's default account.",
+      "with the first it matches, else with the shop's default account; a rule naming none, " +
+      'with the cheapest of its accounts by their rate cards.',
   })
   @RequireScopes('read_orders')
   async courierRules(@CurrentTenant() tenant: TenantContext): Promise<CourierRule[]> {
@@ -62,7 +63,8 @@ export class CourierRuleResolver {
   @Mutation(() => CourierRulesUpdatePayload, {
     description:
       "Replaces the shop's courier rules with these, in this order; none for none. Each names " +
-      'one of its live accounts, and cities, a range of cash to collect, or both: up to 50.',
+      'one of its live accounts and cities, a range of cash to collect, or both; or no account, ' +
+      'for the cheapest by rate cards, for those or for every order: up to 50.',
   })
   @RequireScopes('write_settings')
   async courierRulesUpdate(
@@ -71,7 +73,10 @@ export class CourierRuleResolver {
   ): Promise<CourierRulesUpdatePayload> {
     const result = await this.rules.replace(
       tenant,
-      rules.map((rule) => ({ ...rule, accountId: uuidOf('courierAccount', rule.accountId) })),
+      rules.map((rule) => ({
+        ...rule,
+        accountId: rule.accountId ? uuidOf('courierAccount', rule.accountId) : null,
+      })),
     );
     return Object.assign(new CourierRulesUpdatePayload(), {
       courierRules: result.ok
@@ -87,7 +92,7 @@ function toRule(record: CourierRuleRecord, currency: CurrencyCode): CourierRule 
     value === null ? null : Money.from(money(value, currency));
   return Object.assign(new CourierRule(), {
     id: toPublicId('courierRule', record.id),
-    accountId: toPublicId('courierAccount', record.accountId),
+    accountId: record.accountId && toPublicId('courierAccount', record.accountId),
     accountArchived: record.accountArchived,
     cities: record.cities,
     codAtLeast: amount(record.codAtLeast),

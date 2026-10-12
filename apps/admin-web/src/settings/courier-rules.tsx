@@ -18,6 +18,7 @@ import { TextField } from '../ui/field';
 /** A rule as it is edited: cities as typed, comma apart, and amounts as typed. */
 interface Draft {
   key: string;
+  /** Blank for the cheapest by rate cards. */
   accountId: string;
   cities: string;
   codAtLeast: string;
@@ -35,7 +36,7 @@ function amountText(value: CourierRuleValue['codAtLeast']): string {
 function draftOf(rule: CourierRuleValue): Draft {
   return {
     key: rule.id,
-    accountId: rule.accountId,
+    accountId: rule.accountId ?? '',
     cities: rule.cities.join(', '),
     codAtLeast: amountText(rule.codAtLeast),
     codBelow: amountText(rule.codBelow),
@@ -137,7 +138,13 @@ function RuleEditor({
               {accountLabel(account)}
             </option>
           ))}
+          <option value="">{t('courierRules.cheapest')}</option>
         </select>
+        {draft.accountId === '' && (
+          <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+            {t('courierRules.cheapestHint')}
+          </p>
+        )}
       </div>
     </li>
   );
@@ -146,7 +153,8 @@ function RuleEditor({
 /**
  * The shop's courier rules (SHP-06, ADR-382): when staff book without choosing an account, an
  * order goes with the first rule its city and cash to collect match, the rest with the default
- * account. Edited all together, in their order, and saved at once.
+ * account; a rule may book with the cheapest account by rate cards (ADR-385). Edited all
+ * together, in their order, and saved at once.
  */
 export function CourierRules({ accounts }: { accounts: CourierAccountDetail[] }) {
   const { t } = useLocale();
@@ -170,7 +178,7 @@ export function CourierRules({ accounts }: { accounts: CourierAccountDetail[] })
   }
   const rules = query.data.courierRules;
   const archivedIds = new Set(
-    rules.filter((rule) => rule.accountArchived).map((rule) => rule.accountId),
+    rules.filter((rule) => rule.accountArchived).map((rule) => rule.accountId ?? ''),
   );
   const editing = drafts ?? rules.map(draftOf);
   const change = (next: Draft[]) => {
@@ -184,7 +192,7 @@ export function CourierRules({ accounts }: { accounts: CourierAccountDetail[] })
     try {
       const { courierRulesUpdate } = await save.mutateAsync({
         rules: editing.map((draft) => ({
-          accountId: draft.accountId,
+          accountId: draft.accountId || null,
           cities: draft.cities
             .split(/[,،\n]/)
             .map((city) => city.trim())

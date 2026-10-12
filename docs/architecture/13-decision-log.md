@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-384 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-385 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -392,6 +392,7 @@
 | 382 | Courier rules: an order booked without an account named goes with the first of the shop's rules its city and cash to collect match, else the default, and staff see which before they book | Accepted |
 | 383 | Couriers' rate cards: each parcel keeps what its account's card says it is likely to cost when the courier books it, and profit counts that until a statement says what it charged | Accepted |
 | 384 | Couriers' performance: how each courier's parcels shipped in a period went, everywhere and city by city, worked out from the parcels when asked | Accepted |
+| 385 | A courier rule may book with the cheapest of the shop's accounts by their rate cards, order by order, and is passed over where none has a card | Accepted |
 
 ---
 
@@ -14955,3 +14956,41 @@
     enough until then.
   * **Ranking couriers in each city for the shop:** the figures are few in most cities; the
     shop reads them and decides, until there are enough to choose by rule.
+
+## ADR-385 · A courier rule may book with the cheapest of the shop's accounts by their rate cards, order by order, and is passed over where none has a card
+
+* **Context:**
+  * Courier rules ([ADR-382](#adr-382--courier-rules-an-order-booked-without-an-account-named-goes-with-the-first-of-the-shops-rules-its-city-and-cash-to-collect-match-else-the-default-and-staff-see-which-before-they-book)) send an order to one account by its city and cash; rate cards
+    ([ADR-383](#adr-383--couriers-rate-cards-each-parcel-keeps-what-its-accounts-card-says-it-is-likely-to-cost-when-the-courier-books-it-and-profit-counts-that-until-a-statement-says-what-it-charged)) say what each account charges. A shop with two or three couriers finds one
+    cheapest within its own city and another to the rest of the country, and the cheapest
+    changes with the parcel's weight and the cash to collect. Writing a rule per city to follow
+    that is work the cards already did. SHP-06 asks for the cheapest courier as a rule.
+* **Decision:**
+  * **A rule naming no account books with the cheapest** (migration 0179: `account_id` may be
+    null): of the shop's live accounts with rate cards whose courier still books here, the one
+    whose card prices the order's way out (by its city and weight) and the cash to collect the
+    least; equal, the default account first, then the oldest. A return's charge is left out,
+    since most parcels are delivered.
+  * **Passed over without a card:** a rule for the cheapest matches as any rule does, by cities
+    and cash; where no live account has a card it is passed over for the next rule, then the
+    default account. The shop cannot save one until an account has a card.
+  * **It may be for every order**, naming neither cities nor cash; a rule for one account still
+    names one or the other, else it would stand in for the default account.
+  * **Chosen as the order is booked and before**: `courierAccountsFor` gives the account the
+    rule chose and what it is likely to cost, so the Shipping page says "Goes with Test courier ·
+    about Rs 120" as it does for any rule. `CourierRule.accountId` and `CourierRuleInput.accountId`
+    are null for the cheapest.
+  * **In the admin**, a rule's "Book with" offers "The cheapest, by rate cards" after the
+    accounts, saying what it does.
+* **Consequences:**
+  * A shop with cards on its accounts needs one rule to send each order with the cheapest, and
+    rules before it for the cities it wants a courier for whatever the price.
+  * The cheapest by card is not the best: a courier that brings back half its parcels costs more
+    than its card says. Couriers' performance by city (ADR-384) shows that; weighing it in is a
+    next step.
+* **Alternatives:**
+  * **A rule kind of its own (cheapest, fastest, best delivering):** one kind is all there is;
+    a null account says it until a second comes.
+  * **Counting what a return would cost, by each courier's return rate in the city:** the
+    rates are few in most cities and move week to week; until they are steady, the card's price
+    is what the shop can check.

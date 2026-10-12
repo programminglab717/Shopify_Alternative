@@ -318,8 +318,13 @@ export class CourierRule {
   @Field(() => ID)
   id!: string;
 
-  @Field(() => ID, { description: 'The account that books the orders it matches.' })
-  accountId!: string;
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      "The account that books the orders it matches; null for the cheapest of the shop's " +
+      'accounts by their rate cards for each order (ADR-385).',
+  })
+  accountId!: string | null;
 
   @Field({ description: 'Its account was archived since: the rule is passed over.' })
   accountArchived!: boolean;
@@ -448,8 +453,13 @@ export class CourierRateCardRemovePayload {
 
 @InputType()
 export class CourierRuleInput {
-  @Field(() => ID)
-  accountId!: string;
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      "The account that books the orders it matches; null for the cheapest of the shop's " +
+      'accounts by their rate cards for each order, the rule passed over where none has a card.',
+  })
+  accountId?: string | null;
 
   @Field(() => [String], {
     nullable: true,

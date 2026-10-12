@@ -2636,8 +2636,10 @@ type CourierRule {
   """Its account was archived since: the rule is passed over."""
   accountArchived: Boolean!
 
-  """The account that books the orders it matches."""
-  accountId: ID!
+  """
+  The account that books the orders it matches; null for the cheapest of the shop's accounts by their rate cards for each order (ADR-385).
+  """
+  accountId: ID
 
   """Cities as Pakistan's list names them; none for anywhere."""
   cities: [String!]!
@@ -2651,7 +2653,10 @@ type CourierRule {
 }
 
 input CourierRuleInput {
-  accountId: ID!
+  """
+  The account that books the orders it matches; null for the cheapest of the shop's accounts by their rate cards for each order, the rule passed over where none has a card.
+  """
+  accountId: ID
 
   """
   Cities of Pakistan, as addresses name them ("Pindi" is Rawalpindi); up to 100; none for anywhere.
@@ -5772,7 +5777,7 @@ type Mutation {
   courierRateCardSet(accountId: ID!, input: CourierRateCardInput!): CourierRateCardPayload!
 
   """
-  Replaces the shop's courier rules with these, in this order; none for none. Each names one of its live accounts, and cities, a range of cash to collect, or both: up to 50.
+  Replaces the shop's courier rules with these, in this order; none for none. Each names one of its live accounts and cities, a range of cash to collect, or both; or no account, for the cheapest by rate cards, for those or for every order: up to 50.
   """
   courierRulesUpdate(rules: [CourierRuleInput!]!): CourierRulesUpdatePayload!
 
@@ -9563,7 +9568,7 @@ type Query {
   courierRateCards: [CourierRateCard!]!
 
   """
-  The shop's courier rules, in their order: an order booked without an account named goes with the first it matches, else with the shop's default account.
+  The shop's courier rules, in their order: an order booked without an account named goes with the first it matches, else with the shop's default account; a rule naming none, with the cheapest of its accounts by their rate cards.
   """
   courierRules: [CourierRule!]!
 

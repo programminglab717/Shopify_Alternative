@@ -102,6 +102,22 @@ export async function rateCardIn(
   return rows[0] ? cardOf(rows[0]) : null;
 }
 
+/**
+ * The cards of the shop's live accounts, in the caller's transaction: the default account's
+ * first, then the oldest; for the cheapest account to be chosen among (ADR-385).
+ */
+export async function liveRateCardsIn(tx: Tx, shopId: string): Promise<RateCardRecord[]> {
+  const { rows } = await tx.execute<CardRow>(sql`
+    SELECT c.account_id, c.origin_city, c.local_first::text AS local_first,
+           c.local_each::text AS local_each, c.other_first::text AS other_first,
+           c.other_each::text AS other_each, c.cod_fee_bp, c.return_bp, c.updated_at
+      FROM logistics.rate_cards c
+      JOIN logistics.courier_accounts a ON a.shop_id = c.shop_id AND a.id = c.account_id
+     WHERE c.shop_id = ${shopId} AND a.archived_at IS NULL
+     ORDER BY a.is_default DESC, a.created_at, a.id`);
+  return rows.map(cardOf);
+}
+
 function cardOf(row: CardRow): RateCardRecord {
   return {
     accountId: row.account_id,

@@ -791,6 +791,25 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
       { courierChargesEstimate: { amount: expect.stringMatching(/^250(\.0+)?$/) } },
     ]);
 
+    // A rule naming no account books each order with the cheapest by rate cards (ADR-385).
+    const RULES = `mutation ($rules: [CourierRuleInput!]!) {
+      courierRulesUpdate(rules: $rules) { courierRules { id accountId cities } userErrors { code } }
+    }`;
+    const cheapest = await data(tokens.settings, RULES, { rules: [{ accountId: null }] });
+    expect(cheapest).toEqual({
+      courierRules: [{ id: expect.stringMatching(/^crl_/), accountId: null, cities: [] }],
+      userErrors: [],
+    });
+    const another = await order(created.product.variants[0].id as string);
+    expect(
+      await data(
+        tokens.reader,
+        `query ($ids: [ID!]!) { courierAccountsFor(orderIds: $ids) { accountId ruleId } }`,
+        { ids: [another] },
+      ),
+    ).toEqual([{ accountId, ruleId: cheapest.courierRules[0].id }]);
+    expect((await data(tokens.settings, RULES, { rules: [] })).courierRules).toEqual([]);
+
     const REMOVE = `mutation ($accountId: ID!) {
       courierRateCardRemove(accountId: $accountId) { removed userErrors { code } }
     }`;
