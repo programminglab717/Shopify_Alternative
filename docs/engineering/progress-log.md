@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
 
-### Courier rules for the best value
+### 7b2f1fc · Courier rules for the best value
 
 * **In the core** ([ADR-387](../architecture/13-decision-log.md#adr-387--a-courier-rule-may-book-with-the-best-value-the-account-cheapest-for-each-parcel-delivered-weighing-its-rate-card-with-how-often-its-courier-delivers-to-the-orders-city), SHP-06, SHP-08): a courier rule naming no account picks either the
   cheapest by rate cards or, now, the best value: the account cheapest for each parcel delivered,
