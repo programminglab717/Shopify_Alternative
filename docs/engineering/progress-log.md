@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
 
-### The owner's summary of the day before
+### e71e8fd · The owner's summary of the day before
 
 * **In the core** ([ADR-386](../architecture/13-decision-log.md#adr-386--each-morning-the-shops-alerts-number-hears-how-the-day-before-went-from-nine-by-its-clock-once-a-day-and-not-of-a-day-with-nothing-in-it), ANL-07): each morning from nine by the shop's clock, the worker
   tells the shop's alerts number on WhatsApp how the day before went: its orders and their
