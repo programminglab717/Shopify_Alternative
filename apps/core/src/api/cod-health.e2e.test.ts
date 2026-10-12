@@ -166,5 +166,44 @@ describe.skipIf(!server)('Admin GraphQL API: COD health', () => {
 
     const denied = await gql(tokens.products, COD_HEALTH, period);
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+
+    // Each courier's parcels, and city by city (SHP-08, ADR-384).
+    const PERFORMANCE = `query ($from: DateTime!, $before: DateTime!) {
+      courierPerformance(shippedFrom: $from, shippedBefore: $before) {
+        courier title shipped delivered deliveryRate returnRate daysToDeliver
+        charges { amount } chargePerParcel { amount }
+        cities { city shipped delivered deliveryRate }
+      }
+    }`;
+    const shippedPeriod = {
+      from: new Date(Date.now() - 86_400_000).toISOString(),
+      before: new Date(Date.now() + 86_400_000).toISOString(),
+    };
+    const performance = await gql(tokens.owner, PERFORMANCE, shippedPeriod);
+    expect(performance.errors).toBeUndefined();
+    expect(performance.data?.courierPerformance).toEqual([
+      {
+        courier: 'TCS',
+        title: 'TCS',
+        shipped: 1,
+        delivered: 1,
+        deliveryRate: 1,
+        returnRate: 0,
+        daysToDeliver: 0,
+        charges: { amount: expect.stringMatching(/^0(\.0+)?$/) },
+        chargePerParcel: null,
+        cities: [{ city: 'Lahore', shipped: 1, delivered: 1, deliveryRate: 1 }],
+      },
+    ]);
+    const tooLongPerformance = await gql(tokens.owner, PERFORMANCE, {
+      ...before,
+      before: '2027-06-01T00:00:00Z',
+    });
+    expect(tooLongPerformance.errors?.[0]?.message).toBe(
+      "Couriers' performance covers at most 366 days at a time",
+    );
+    expect(
+      (await gql(tokens.products, PERFORMANCE, shippedPeriod)).errors?.[0]?.extensions?.code,
+    ).toBe('ACCESS_DENIED');
   });
 });

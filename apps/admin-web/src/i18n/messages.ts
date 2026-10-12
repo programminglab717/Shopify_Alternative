@@ -3323,6 +3323,14 @@ const en = {
   'shipping.about': 'about {amount}',
   'analytics.profitEstimated': 'Includes {amount} of courier charges estimated by rate cards',
   'activity.subject.courier_rate_card': 'Rate card',
+  'couriers.performance.title': 'Couriers',
+  'couriers.performance.hint':
+    'How each courier did with the parcels shipped in these days, and in which cities.',
+  'couriers.performance.none': 'No parcels shipped in these days.',
+  'couriers.performance.days': 'Days to deliver',
+  'couriers.performance.perParcel': 'Cost per parcel',
+  'couriers.performance.cities': '{courier} by city',
+  'couriers.performance.estimated': 'The costs include {amount} estimated by rate cards',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6622,6 +6630,14 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'analytics.profitEstimated':
     'اس میں ریٹ کارڈ سے اندازہ لگائے گئے {amount} کے کوریئر چارجز شامل ہیں',
   'activity.subject.courier_rate_card': 'ریٹ کارڈ',
+  'couriers.performance.title': 'کوریئرز',
+  'couriers.performance.hint':
+    'ان دنوں بھیجے گئے پارسلوں میں ہر کوریئر کی کارکردگی، اور کن شہروں میں۔',
+  'couriers.performance.none': 'ان دنوں کوئی پارسل نہیں بھیجا گیا۔',
+  'couriers.performance.days': 'ڈیلیوری کے دن',
+  'couriers.performance.perParcel': 'فی پارسل خرچ',
+  'couriers.performance.cities': '{courier} شہر وار',
+  'couriers.performance.estimated': 'خرچ میں {amount} ریٹ کارڈ کا اندازہ ہے',
 };
 
 export const messages: Readonly<

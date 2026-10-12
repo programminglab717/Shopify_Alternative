@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: what comes after couriers' rate
-cards, such as the cheapest courier as a rule, and couriers' records by city (SHP-06, SHP-08).
+**Next, section by section as the alpha's shops need them**: what comes after couriers'
+performance by city, such as the cheapest or best-delivering courier as a rule (SHP-06, SHP-08).
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -17,6 +17,26 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
+
+### Couriers' performance by city
+
+* **In the core** ([ADR-384](../architecture/13-decision-log.md#adr-384--couriers-performance-how-each-couriers-parcels-shipped-in-a-period-went-everywhere-and-city-by-city-worked-out-from-the-parcels-when-asked), SHP-08): `courierPerformance` gives, for parcels shipped in a period,
+  each courier's parcels delivered, returned, lost and on their way, its delivery and return
+  rates, the days it took to deliver, and what its parcels cost by statements else rate cards;
+  and the same for its busiest cities beneath it. Worked out from the parcels when asked.
+* **In the admin**, analytics has a Couriers section after cash on delivery: each courier's
+  parcels, delivered %, came back % (red from 30%), days to deliver and cost per parcel, its
+  cities opened beneath it, and how much of the costs rate cards estimate.
+* **Tried in Chromium against the core:** for the last 30 days the API and the page agreed: Test
+  courier 6 parcels, 0% delivered and 100% back of the 2 finished, 4 on their way; TCS 3, 33%
+  and 67%, 0.0 days, Rs 180 a parcel; Leopards, Own rider and PostEx 1 each. Test courier
+  opened showed Karachi, Islamabad, Lahore, Peshawar and Rawalpindi beneath it, cities with
+  nothing finished showing dashes. On a phone the table scrolls within its card. Nothing was
+  changed. No errors in the browser.
+* 2577 tests (5 new): couriers' and cities' figures, names typed two
+  ways, the period's limits and other shops left out in the orders module; the API's report and
+  its scope in the core's COD health test; and the Couriers section in the admin, with its
+  document checked against the schema.
 
 ### d8cf0f6 · Couriers' rate cards, and what each parcel is likely to cost
 

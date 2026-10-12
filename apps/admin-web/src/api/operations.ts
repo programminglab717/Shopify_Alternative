@@ -3043,6 +3043,55 @@ export const CodHealthQuery = /* GraphQL */ `
   ${MONEY}
 `;
 
+const COURIER_TALLY = /* GraphQL */ `
+  fragment CourierTally on CourierPerformanceCity {
+    shipped
+    delivered
+    returned
+    lost
+    inTransit
+    deliveryRate
+    returnRate
+    daysToDeliver
+    chargePerParcel {
+      ...Money
+    }
+  }
+`;
+
+/**
+ * How each courier's parcels shipped in a period went (SHP-08), everywhere and in its busiest
+ * cities: delivered and returned, the days they took, and what each cost.
+ */
+export const CourierPerformanceQuery = /* GraphQL */ `
+  query CourierPerformance($shippedFrom: DateTime!, $shippedBefore: DateTime!) {
+    courierPerformance(shippedFrom: $shippedFrom, shippedBefore: $shippedBefore, cities: 10) {
+      courier
+      title
+      shipped
+      delivered
+      returned
+      lost
+      inTransit
+      deliveryRate
+      returnRate
+      daysToDeliver
+      chargePerParcel {
+        ...Money
+      }
+      chargesEstimated {
+        ...Money
+      }
+      cities {
+        city
+        ...CourierTally
+      }
+    }
+  }
+  ${COURIER_TALLY}
+  ${MONEY}
+`;
+
 /**
  * How each agent of the Confirmation Desk did over a period (COD-11), and the staff's names for
  * them: both for owners and managers alone.

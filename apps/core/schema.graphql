@@ -2345,6 +2345,100 @@ enum CourierParcelStatus {
 }
 
 """
+How a courier's parcels shipped in a period went (SHP-08, ADR-384), everywhere and city by city: delivered, returned and lost, the days they took, and what they cost.
+"""
+type CourierPerformance {
+  """
+  The charges of the parcels charged or estimated, each; null while none is.
+  """
+  chargePerParcel: Money
+
+  """
+  What statements charged for the parcels, else what rate cards say they are likely to cost as they stand (ADR-383).
+  """
+  charges: Money!
+
+  """Of charges, what rate cards estimate."""
+  chargesEstimated: Money!
+
+  """The most parcels first."""
+  cities: [CourierPerformanceCity!]!
+
+  """The courier as parcels were shipped with it; null for none named."""
+  courier: String
+
+  """
+  The average days from shipped to delivered, to a tenth; null while none was.
+  """
+  daysToDeliver: Float
+  delivered: Int!
+
+  """
+  Delivered of those delivered, returned or lost, from 0 to 1: how often the courier got a parcel to its customer. Null while none has arrived anywhere.
+  """
+  deliveryRate: Float
+
+  """Still on their way to the customer."""
+  inTransit: Int!
+
+  """Lost before reaching the customer."""
+  lost: Int!
+
+  """Returned of those delivered or returned, from 0 to 1: the RTO rate."""
+  returnRate: Float
+
+  """Refused or undeliverable: on their way back, or back."""
+  returned: Int!
+  shipped: Int!
+
+  """The courier, or "No courier named"."""
+  title: String!
+}
+
+"""A courier's parcels to one city (SHP-08, ADR-384)."""
+type CourierPerformanceCity {
+  """
+  The charges of the parcels charged or estimated, each; null while none is.
+  """
+  chargePerParcel: Money
+
+  """
+  What statements charged for the parcels, else what rate cards say they are likely to cost as they stand (ADR-383).
+  """
+  charges: Money!
+
+  """Of charges, what rate cards estimate."""
+  chargesEstimated: Money!
+
+  """The city as orders keep it, in the spelling most used."""
+  city: String!
+
+  """
+  The average days from shipped to delivered, to a tenth; null while none was.
+  """
+  daysToDeliver: Float
+  delivered: Int!
+
+  """
+  Delivered of those delivered, returned or lost, from 0 to 1: how often the courier got a parcel to its customer. Null while none has arrived anywhere.
+  """
+  deliveryRate: Float
+
+  """Still on their way to the customer."""
+  inTransit: Int!
+
+  """Lost before reaching the customer."""
+  lost: Int!
+
+  """Returned of those delivered or returned, from 0 to 1: the RTO rate."""
+  returnRate: Float
+
+  """Refused or undeliverable: on their way back, or back."""
+  returned: Int!
+  shipped: Int!
+}
+
+"""
 An account's parcels waiting to be picked up, handed to its courier through the courier's API (SHP-02, ADR-253): PostEx's load sheet for the account's pickup address, or Leopards' naming the rider who takes them.
 """
 type CourierPickup {
@@ -9441,6 +9535,20 @@ type Query {
     """Up to 50."""
     first: Int! = 20
   ): [CourierUnseenParcel!]!
+
+  """
+  Couriers' performance (SHP-08, ADR-384): how each courier's parcels shipped in a period went, everywhere and city by city, the most parcels first. Worked out when asked.
+  """
+  courierPerformance(
+    """Cities each courier lists, the most parcels first: up to 50."""
+    cities: Int! = 10
+
+    """…and before this: at most 366 days after shippedFrom."""
+    shippedBefore: DateTime!
+
+    """Parcels shipped at or after this…"""
+    shippedFrom: DateTime!
+  ): [CourierPerformance!]!
   courierPickup(id: ID!): CourierPickup
 
   """The shop's pickups, the latest first, of one courier account if given."""

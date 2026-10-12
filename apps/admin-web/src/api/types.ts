@@ -1294,6 +1294,29 @@ export interface CodHealthData {
   };
 }
 
+/** How a courier's parcels went, everywhere or in one city (SHP-08). */
+export interface CourierTallyValue {
+  shipped: number;
+  delivered: number;
+  returned: number;
+  lost: number;
+  inTransit: number;
+  deliveryRate: number | null;
+  returnRate: number | null;
+  daysToDeliver: number | null;
+  chargePerParcel: MoneyValue | null;
+}
+
+export interface CourierPerformanceData {
+  courierPerformance: (CourierTallyValue & {
+    /** Null for parcels without a courier named. */
+    courier: string | null;
+    title: string;
+    chargesEstimated: MoneyValue;
+    cities: (CourierTallyValue & { city: string })[];
+  })[];
+}
+
 /** An agent of the Confirmation Desk over a period: a member of staff, or an app by its token. */
 export interface ConfirmationAgentValue {
   id: string;

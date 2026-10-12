@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-383 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-384 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -391,6 +391,7 @@
 | 381 | A parcel's hand-over on its order's page: when, to whom and whether by hand, and whether the courier's tracking has had it since, put together in the core | Accepted |
 | 382 | Courier rules: an order booked without an account named goes with the first of the shop's rules its city and cash to collect match, else the default, and staff see which before they book | Accepted |
 | 383 | Couriers' rate cards: each parcel keeps what its account's card says it is likely to cost when the courier books it, and profit counts that until a statement says what it charged | Accepted |
+| 384 | Couriers' performance: how each courier's parcels shipped in a period went, everywhere and city by city, worked out from the parcels when asked | Accepted |
 
 ---
 
@@ -14916,3 +14917,41 @@
     next step if a courier's card needs it.
   * **Working the estimate out when the report is read:** the card may have changed since, and
     the parcel's weight is only known as it is booked.
+
+## ADR-384 · Couriers' performance: how each courier's parcels shipped in a period went, everywhere and city by city, worked out from the parcels when asked
+
+* **Context:**
+  * A shop in Pakistan sends parcels with two or three couriers, and which one does best differs
+    by city: one delivers in Karachi in two days and brings half of Quetta's back. COD health
+    ([ADR-060](#adr-060--cod-health-follows-a-periods-cash-on-delivery-orders-worked-out-from-them-when-asked-its-rates-of-those-that-turned-out)) gives each courier's delivery and return rates, but not where, how long
+    parcels took or what they cost. SHP-08 asks for delivery %, days to deliver and RTO % by
+    city, so the shop can choose couriers by city, which courier rules (ADR-382) then do.
+* **Decision:**
+  * **`courierPerformance`** (`read_orders`, as COD health): for parcels shipped in a period of
+    at most 366 days, each courier's parcels shipped, delivered, returned (refused or
+    undeliverable, on their way back or back), lost and still on their way; delivered of those
+    that arrived anywhere and returned of those delivered or returned; the average days from
+    shipped to delivered, to a tenth; and charges, by statements else rate cards
+    ([ADR-383](#adr-383--couriers-rate-cards-each-parcel-keeps-what-its-accounts-card-says-it-is-likely-to-cost-when-the-courier-books-it-and-profit-counts-that-until-a-statement-says-what-it-charged)), with what is estimated and each parcel's share. Beneath each, its busiest
+    cities with the same figures, ten unless asked, fifty at most.
+  * **Couriers go by the name parcels were shipped with**, however typed, as COD health's do,
+    so parcels shipped by hand count with those booked; parcels with none named are "No courier
+    named". Cities go by the order's shipping address, typed two ways counted once under the
+    spelling most used.
+  * **Worked out from the parcels when asked**, in one query grouping by courier and by courier
+    and city, nothing stored: a shop's year of parcels is tens of thousands of rows.
+  * **In the admin**, analytics has a Couriers section after cash on delivery, for the period the
+    page shows: each courier's parcels, delivered %, came back % (in red from 30%, as COD
+    health), days to deliver and cost per parcel; a courier opened shows its cities beneath it;
+    and how much of the costs rate cards estimate.
+* **Consequences:**
+  * The shop sees which courier does best in each city, and writes courier rules from it.
+  * Days to deliver count from when the parcel was made, as the courier booked it or staff
+    shipped it by hand; a parcel the courier picks up days after booking counts those days.
+* **Alternatives:**
+  * **By courier account rather than name:** parcels shipped by hand have no account, and a
+    shop's two accounts with one courier are one courier to the customer.
+  * **ClickHouse's facts** (ADR-014): with V1's analytics; Postgres answers a shop's year well
+    enough until then.
+  * **Ranking couriers in each city for the shop:** the figures are few in most cities; the
+    shop reads them and decides, until there are enough to choose by rule.

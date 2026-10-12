@@ -13,6 +13,7 @@ import { useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { ErrorState, Loading } from '../ui/feedback';
 import { CodHealth } from './cod-health';
+import { CourierPerformance } from './courier-performance';
 import { Bars, Figure } from './figures';
 import { type Days, PeriodTabs, usePeriod } from './period';
 import { LiveView, Visits } from './visits';
@@ -168,6 +169,7 @@ export function AnalyticsPage() {
       )}
       <Visits from={from} before={before} previousFrom={previousFrom} interval={interval} />
       <CodHealth from={from} before={before} />
+      <CourierPerformance from={from} before={before} />
       {SEES_AGENTS.includes(shop.role) && (
         <Link
           to="/$shopId/desk/agents"

@@ -6,6 +6,7 @@ import { AgentPerformanceService } from './agent-performance.service.js';
 import { PackerPerformanceService } from './packer-performance.service.js';
 import { BankTransferService } from './bank-transfer.service.js';
 import { CodHealthService } from './cod-health.service.js';
+import { CourierPerformanceService } from './courier-performance.service.js';
 import { CodReceivablesService } from './cod-receivables.service.js';
 import { ConfirmationDeskService } from './confirmation-desk.service.js';
 import { OrderSettingsService } from './order-settings.service.js';
@@ -18,6 +19,7 @@ import { AgentPerformanceResolver } from './graphql/agent-performance.resolver.j
 import { PackerPerformanceResolver } from './graphql/packer-performance.resolver.js';
 import { BankTransferResolver } from './graphql/bank-transfer.resolver.js';
 import { CodHealthResolver } from './graphql/cod-health.resolver.js';
+import { CourierPerformanceResolver } from './graphql/courier-performance.resolver.js';
 import { CodReceivablesResolver } from './graphql/cod-receivables.resolver.js';
 import { ConfirmationDeskResolver } from './graphql/confirmation-desk.resolver.js';
 import { OrderSettingsResolver } from './graphql/order-settings.resolver.js';
@@ -80,6 +82,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     ExportScheduleService,
     RefundService,
     CodHealthService,
+    CourierPerformanceService,
     CodReceivablesService,
     ConfirmationDeskService,
     AgentPerformanceService,
@@ -105,6 +108,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     DraftOrderResolver,
     OrderLinkResolver,
     CodHealthResolver,
+    CourierPerformanceResolver,
     CodReceivablesResolver,
     ConfirmationDeskResolver,
     AgentPerformanceResolver,
@@ -132,6 +136,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     ExportScheduleService,
     RefundService,
     CodHealthService,
+    CourierPerformanceService,
     CodReceivablesService,
     ConfirmationDeskService,
     AgentPerformanceService,

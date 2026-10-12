@@ -308,6 +308,11 @@ export {
   type TrackingView,
 } from '../internal/tracking.service.js';
 export {
+  COURIER_PERFORMANCE_LIMITS,
+  CourierPerformanceService,
+  type CourierPerformanceRow,
+} from '../internal/courier-performance.service.js';
+export {
   ESTIMATED_CHARGE,
   estimateParcelChargesIn,
   type ParcelChargeEstimate,

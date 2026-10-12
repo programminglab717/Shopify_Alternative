@@ -54,8 +54,9 @@ const none = {
   conversionRate: null,
 };
 
-/** The online store's visits, none: the page asks for them beside its sales. */
+/** The online store's visits and couriers' parcels, none: the page asks for them beside its sales. */
 const NO_VISITS: Record<string, unknown> = {
+  CourierPerformance: { courierPerformance: [] },
   StorefrontLiveView: { storefrontLiveView: { visitorsNow: 0, today: none } },
   StorefrontSessions: {
     storefrontSessions: { totals: none, periods: [] },
@@ -164,6 +165,85 @@ describe('Analytics in the admin', () => {
       expect(core.sent.filter((each) => each.operation === 'CodHealth').at(-1)?.variables.by).toBe(
         'COURIER',
       ),
+    );
+  });
+
+  it("shows how each courier did, its cities beneath it and a city's high returns in red", async () => {
+    const tally = (
+      delivered: number,
+      returned: number,
+      days: number | null,
+      each: string | null,
+    ) => ({
+      shipped: delivered + returned + 1,
+      delivered,
+      returned,
+      lost: 0,
+      inTransit: 1,
+      deliveryRate: delivered / (delivered + returned),
+      returnRate: returned / (delivered + returned),
+      daysToDeliver: days,
+      chargePerParcel: each === null ? null : rupees(each),
+    });
+    const core = fakeCore('owner', (operation) => {
+      if (operation === 'CourierPerformance') {
+        return {
+          courierPerformance: [
+            {
+              courier: 'PostEx',
+              title: 'PostEx',
+              ...tally(18, 2, 2.4, '265.5'),
+              chargesEstimated: rupees('1450'),
+              cities: [
+                { city: 'Karachi', ...tally(15, 0, 1.6, '230') },
+                { city: 'Quetta', ...tally(3, 2, 5, '410') },
+              ],
+            },
+            {
+              courier: null,
+              title: 'No courier named',
+              ...tally(4, 0, 0.5, null),
+              chargesEstimated: rupees('0'),
+              cities: [],
+            },
+          ],
+        };
+      }
+      if (operation in NO_VISITS) return NO_VISITS[operation];
+      if (operation === 'CodHealth' || operation === 'Sales') throw new Error('not this time');
+      throw new Error(`unexpected ${operation}`);
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/analytics');
+
+    const postEx = await screen.findByRole('button', { name: 'PostEx by city' });
+    const row = postEx.closest('tr')!;
+    // 21 parcels, 18 of 20 that arrived somewhere delivered, 2.4 days, Rs 265.50 each.
+    expect([...row.querySelectorAll('td')].slice(1).map((cell) => cell.textContent)).toEqual([
+      '21',
+      '90%',
+      '10%',
+      '2.4',
+      'Rs 265.50',
+    ]);
+    expect(screen.getByText('No courier named').closest('tr')!.lastElementChild?.textContent).toBe(
+      '–',
+    );
+    expect(screen.getByText('The costs include Rs 1,450 estimated by rate cards')).toBeTruthy();
+    expect(screen.queryByText('Quetta')).toBeNull();
+
+    fireEvent.click(postEx);
+    expect(postEx.getAttribute('aria-expanded')).toBe('true');
+    const quetta = screen.getByText('Quetta').closest('tr')!;
+    expect(quetta.children[3]!.textContent).toBe('40%');
+    expect(quetta.children[3]!.className).toContain('text-danger');
+    expect(screen.getByText('Karachi').closest('tr')!.children[3]!.className).not.toContain(
+      'text-danger',
+    );
+
+    const asked = core.sent.find((each) => each.operation === 'CourierPerformance')!.variables;
+    expect(Date.parse(String(asked.shippedBefore)) - Date.parse(String(asked.shippedFrom))).toBe(
+      30 * 86_400_000,
     );
   });
 
