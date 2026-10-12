@@ -30,6 +30,7 @@ import {
   CourierAccountService,
   CourierBookingService,
   CourierCityService,
+  RateCardService,
 } from '@hatti/logistics/public';
 import {
   ArticleService,
@@ -395,6 +396,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         cities: new CourierCityService(database, courierAccounts, couriers),
         couriers,
         fulfillments: new FulfillmentService(database, new StockService()),
+        rateCards: new RateCardService(database),
         logger,
       }).start(config.COURIER_BOOKINGS_INTERVAL_MS);
       closers.push(() => bookings.stop());

@@ -167,10 +167,17 @@ export class Sales {
 
   @Field(() => Money, {
     description:
-      "What couriers' statements charged for the orders' parcels, out and back, so far as " +
-      'statements have come.',
+      "What couriers' statements charged for the orders' parcels, out and back; for a parcel no " +
+      "statement has charged yet, what its courier account's rate card says it is likely to " +
+      'cost as it stands (ADR-383).',
   })
   shippingCosts!: Money;
+
+  @Field(() => Money, {
+    description:
+      'Of shippingCosts, what is estimated by rate cards, no statement having charged it.',
+  })
+  shippingCostsEstimated!: Money;
 
   @Field(() => Money, {
     description:

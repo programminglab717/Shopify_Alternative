@@ -9,8 +9,10 @@ import { Couriers, LeopardsCourier, PostExCourier } from './couriers.js';
 import { CourierRuleResolver } from './graphql/courier-rules.resolver.js';
 import { CourierResolver } from './graphql/couriers.resolver.js';
 import { CourierPickupResolver } from './graphql/pickups.resolver.js';
+import { RateCardResolver } from './graphql/rate-cards.resolver.js';
 import { CodRemittanceResolver } from './graphql/remittance.resolver.js';
 import { CourierPickupService } from './pickups.service.js';
+import { RateCardService } from './rate-cards.service.js';
 import { CodRemittanceService } from './remittance.service.js';
 
 /**
@@ -45,6 +47,8 @@ export class LogisticsModule {
         CourierResolver,
         CourierRuleResolver,
         CourierRuleService,
+        RateCardResolver,
+        RateCardService,
       ],
       exports: [
         CodRemittanceService,
@@ -54,6 +58,7 @@ export class LogisticsModule {
         CourierDocumentService,
         CourierPickupService,
         CourierRuleService,
+        RateCardService,
       ],
     };
   }

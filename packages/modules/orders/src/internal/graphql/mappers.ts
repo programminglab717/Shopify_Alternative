@@ -387,6 +387,8 @@ export function toFulfillment(
     lostAt: record.lostAt,
     courierCharges:
       record.courierCharges === null ? null : Money.from(money(record.courierCharges, currency)),
+    courierChargesEstimate:
+      record.chargeEstimate === null ? null : Money.from(money(record.chargeEstimate, currency)),
     claim: record.claim && toFulfillmentClaim(record.claim, currency),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,

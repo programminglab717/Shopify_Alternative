@@ -53,6 +53,8 @@ export class CourierRuleResolver {
         orderId: toPublicId('order', choice.orderId),
         accountId: choice.accountId && toPublicId('courierAccount', choice.accountId),
         ruleId: choice.ruleId && toPublicId('courierRule', choice.ruleId),
+        chargeEstimate:
+          choice.estimate === null ? null : Money.from(money(choice.estimate, tenant.currency)),
       }),
     );
   }

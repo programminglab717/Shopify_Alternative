@@ -23,6 +23,9 @@ export const READS_ANALYTICS: readonly StaffRole[] = ['owner', 'manager', 'marke
 const amount = (money: MoneyValue | null) => Number(money?.amount ?? 0);
 
 function Totals({ now, before }: { now: SalesTotalsValue; before: SalesTotalsValue }) {
+  const { t } = useLocale();
+  // Couriers' charges no statement has said yet, estimated by rate cards (ADR-383).
+  const estimated = amount(now.shippingCostsEstimated ?? null);
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       <Figure
@@ -48,6 +51,13 @@ function Totals({ now, before }: { now: SalesTotalsValue; before: SalesTotalsVal
         now={amount(now.profit)}
         before={amount(before.profit)}
         shown={formatMoney(now.profit.amount)}
+        note={
+          estimated > 0
+            ? t('analytics.profitEstimated', {
+                amount: formatMoney(now.shippingCostsEstimated!.amount),
+              })
+            : null
+        }
       />
     </div>
   );

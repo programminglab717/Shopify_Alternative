@@ -106,6 +106,11 @@ export interface FulfillmentRecord {
    * (COD-10, ADR-088); null while none has.
    */
   courierCharges: bigint | null;
+  /**
+   * Minor units: what its courier account's rate card says it is likely to cost as it stands
+   * (ADR-383); null where the account had no card when the courier booked it.
+   */
+  chargeEstimate: bigint | null;
   /** Its claim on the courier that lost it; null while it has none. */
   claim: ParcelClaimRecord | null;
   version: number;

@@ -79,6 +79,7 @@ export class SalesReportResolver {
         // To four places, as COD health's rates are.
         grossMargin: net > 0n ? Math.round((Number(gross) / Number(net)) * 10_000) / 10_000 : null,
         shippingCosts: amount(tally.shippingCosts),
+        shippingCostsEstimated: amount(tally.shippingCostsEstimated),
         writeOffs: amount(tally.writeOffs),
         claimsRecovered: amount(tally.claimsRecovered),
         profit: amount(profit(tally)),

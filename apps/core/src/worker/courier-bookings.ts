@@ -10,6 +10,7 @@ import {
   type CourierParcelStatusValue,
   type OpenedCourierAccount,
   type TrackedBooking,
+  RateCardService,
 } from '@hatti/logistics/public';
 import { FulfillmentService, orderShipmentFactsIn } from '@hatti/orders/public';
 import { repeat } from './repeat.js';
@@ -39,6 +40,8 @@ export interface CourierBookingsOptions {
   cities: CourierCityService;
   couriers: Couriers;
   fulfillments: FulfillmentService;
+  /** Accounts' rate cards, for what each parcel is likely to cost (ADR-383); none, no estimates. */
+  rateCards?: RateCardService;
   logger?: Logger;
 }
 
@@ -156,7 +159,7 @@ export class CourierBookings {
     account: OpenedCourierAccount | null,
     at: Date,
   ): Promise<boolean> {
-    const { bookings, cities, couriers, database, fulfillments, logger } = this.options;
+    const { bookings, cities, couriers, database, fulfillments, logger, rateCards } = this.options;
     const adapter = account && couriers.of(account.courier);
     if (!account || !adapter) {
       await bookings.markFailed(
@@ -228,6 +231,17 @@ export class CourierBookings {
           );
         }
         return false;
+      }
+      // What the parcel is likely to cost by its account's rate card, while its weight is known
+      // (ADR-383); booking goes on without it.
+      try {
+        await rateCards?.estimateBooking(shopId, booking.id, {
+          city: shipment.city,
+          codAmount: shipment.codAmount,
+          weightGrams: shipment.weightGrams,
+        });
+      } catch (error) {
+        logger?.warn({ shopId, bookingId: booking.id, err: error }, 'Parcel not estimated');
       }
     }
     const shipped = await fulfillments.fulfill({ shopId, actor: 'system' }, order.id, {

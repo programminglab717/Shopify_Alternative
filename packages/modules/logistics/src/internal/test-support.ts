@@ -18,6 +18,7 @@ import { CourierAccountService } from './courier-accounts.service.js';
 import { CourierDocumentService } from './courier-documents.service.js';
 import { Couriers, LeopardsCourier, PostExCourier, TestCourier } from './couriers.js';
 import { CourierPickupService } from './pickups.service.js';
+import { RateCardService } from './rate-cards.service.js';
 import { CodRemittanceService } from './remittance.service.js';
 
 export interface OutboxRow {
@@ -52,6 +53,8 @@ export interface LogisticsFixture {
   bookings: CourierBookingService;
   documents: CourierDocumentService;
   pickups: CourierPickupService;
+  /** Accounts' rate cards; parcels {@link booked} are estimated by them, as the worker does. */
+  rateCards: RateCardService;
   /** Where couriers' load sheets are kept, in a directory of the test's own. */
   storage: LocalStorage;
   /**
@@ -181,6 +184,7 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
     const { fulfillmentId } = unwrap(await fulfillments.fulfill(owner, placed.id, { tracking }));
     return { orderId: placed.id, number: placed.number, fulfillmentId };
   };
+  const rateCards = new RateCardService(db);
   return {
     testDb,
     db,
@@ -197,6 +201,7 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
     bookings,
     documents: new CourierDocumentService(db, couriers, locations),
     pickups: new CourierPickupService(db, couriers, accounts, storage),
+    rateCards,
     storage,
     confirmed,
     async booked(owner, variantId, options = {}) {
@@ -214,6 +219,11 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
         trackingNumber,
         facts!.codAmount,
       );
+      await rateCards.estimateBooking(owner.shopId, booking!.id, {
+        city: facts!.address?.city ?? null,
+        codAmount: facts!.codAmount,
+        weightGrams: facts!.weightGrams,
+      });
       const { fulfillmentId } = unwrap(
         await fulfillments.fulfill({ shopId: owner.shopId, actor: 'system' }, order.orderId, {
           tracking: { company: 'Test courier', number: trackingNumber },
@@ -255,6 +265,7 @@ export async function logisticsFixture(server: string): Promise<LogisticsFixture
         DELETE FROM logistics.pickups;
         DELETE FROM logistics.bookings;
         DELETE FROM logistics.courier_rules;
+        DELETE FROM logistics.rate_cards;
         DELETE FROM logistics.courier_accounts;
         DELETE FROM logistics.courier_cities;
         DELETE FROM logistics.shop_courier_cities;

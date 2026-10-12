@@ -307,6 +307,11 @@ export {
   type TrackingForm,
   type TrackingView,
 } from '../internal/tracking.service.js';
+export {
+  ESTIMATED_CHARGE,
+  estimateParcelChargesIn,
+  type ParcelChargeEstimate,
+} from '../internal/parcel-estimates.js';
 export { OrdersModule } from '../internal/orders.module.js';
 export { Fulfillment, Order, OrderAgreement, OrderEvent } from '../internal/graphql/order.types.js';
 export { DocumentLanguage, PaperSize } from '../internal/graphql/document.types.js';

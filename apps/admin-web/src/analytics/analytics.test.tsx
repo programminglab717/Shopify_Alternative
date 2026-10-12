@@ -81,7 +81,8 @@ describe('Analytics in the admin', () => {
       if (operation !== 'Sales') throw new Error(`unexpected ${operation}`);
       return {
         salesReport: {
-          totals: totals('60000', 20),
+          // Rs 1,450 of couriers' charges no statement has said yet (ADR-383).
+          totals: { ...totals('60000', 20), shippingCostsEstimated: rupees('1450') },
           previous: { totals: totals('48000', 25) },
           periods: [
             { start: '2026-10-07T19:00:00Z', sales: { orders: 0, netSales: rupees('0') } },
@@ -104,6 +105,9 @@ describe('Analytics in the admin', () => {
     renderAdmin('/shop_1/analytics');
 
     await screen.findByText('Rs 60,000');
+    expect(
+      screen.getByText('Includes Rs 1,450 of courier charges estimated by rate cards'),
+    ).toBeTruthy();
     // Net sales and profit both grew a quarter; orders fell a fifth.
     expect(screen.getAllByText('25% more')).toHaveLength(2);
     expect(screen.getByText('20% less')).toBeTruthy();

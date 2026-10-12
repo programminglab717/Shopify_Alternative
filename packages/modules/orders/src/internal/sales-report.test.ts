@@ -11,6 +11,7 @@ import {
   totalSales,
   type SalesReportInput,
 } from './sales-report.service.js';
+import { estimateParcelChargesIn } from './parcel-estimates.js';
 import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -81,6 +82,7 @@ describe.skipIf(!server)('SalesReportService', () => {
     costOfGoods: 0n,
     unitsWithoutCost: 0,
     shippingCosts: 0n,
+    shippingCostsEstimated: 0n,
     writeOffs: 0n,
     claimsRecovered: 0n,
     refunds: 0n,
@@ -366,6 +368,54 @@ describe.skipIf(!server)('SalesReportService', () => {
     expect(netSales(totals)).toBe(6_000_00n);
     expect(grossProfit(totals)).toBe(2_100_00n);
     expect(profit(totals)).toBe(-1_250_00n);
+  });
+
+  it('counts what rate cards say parcels are likely to cost until a statement charges them (ADR-383)', async () => {
+    const at = '2026-09-29T10:00:00Z';
+    const shipped = async (orderId: string) => {
+      unwrap(await f.orders.confirm(f.a, orderId));
+      const parcel = unwrap(await f.fulfillments.fulfill(f.a, orderId, {})).fulfillmentId;
+      // Rs 250 out, Rs 40 of the cash, and Rs 125 back.
+      await f.db.tenant(f.a.shopId, (tx) =>
+        estimateParcelChargesIn(tx, f.a.shopId, parcel, {
+          out: 250_00n,
+          codFee: 40_00n,
+          back: 125_00n,
+        }),
+      );
+      return parcel;
+    };
+    // Delivered: out and the cash fee.
+    const delivered = await shipped((await placedAt(at, [kurta])).id);
+    unwrap(await f.fulfillments.markDelivered(f.a, delivered));
+    // Coming back: out and back.
+    unwrap(
+      await f.fulfillments.markReturning(f.a, await shipped((await placedAt(at, [kurta])).id)),
+    );
+    // Lost: out alone.
+    unwrap(await f.fulfillments.markLost(f.a, await shipped((await placedAt(at, [kurta])).id)));
+    // On its way: out and the cash fee, as if delivered.
+    await shipped((await placedAt(at, [kurta])).id);
+    // A statement charged Rs 300: that, and not the estimate.
+    const charged = await shipped((await placedAt(at, [kurta])).id);
+    await f.admin.query('UPDATE orders.fulfillments SET courier_charges = 30000 WHERE id = $1', [
+      charged,
+    ]);
+
+    const totals = unwrap(await sales.report(f.a, days())).totals;
+    expect(totals.shippingCosts).toBe(290_00n + 375_00n + 250_00n + 290_00n + 300_00n);
+    expect(totals.shippingCostsEstimated).toBe(290_00n + 375_00n + 250_00n + 290_00n);
+    // The parcel says it as it stands.
+    const parcels = (await f.orders.get(
+      f.a,
+      (
+        await f.admin.query<{ order_id: string }>(
+          'SELECT order_id FROM orders.fulfillments WHERE id = $1',
+          [delivered],
+        )
+      ).rows[0]!.order_id,
+    ))!.fulfillments;
+    expect(parcels.map((parcel) => parcel.chargeEstimate)).toEqual([290_00n]);
   });
 
   it('divides the period into weeks from Monday, or months', async () => {

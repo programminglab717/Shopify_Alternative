@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { Archive, MapPin, Plus, Star, Truck } from 'lucide-react';
+import { Archive, MapPin, Plus, ReceiptText, Star, Truck } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -188,6 +188,14 @@ function AccountRow({ account }: { account: CourierAccountDetail }) {
         >
           <MapPin aria-hidden className="size-5" />
           {t('cities.link')}
+        </Link>
+        <Link
+          to="/$shopId/settings/couriers/$accountId/rates"
+          params={{ shopId, accountId: account.id }}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-control px-4 font-medium text-primary hover:bg-canvas md:min-h-10"
+        >
+          <ReceiptText aria-hidden className="size-5" />
+          {t('rateCard.link')}
         </Link>
         {!account.isDefault && (
           <Button

@@ -48,8 +48,13 @@ function core(rules: { id: string }[]) {
       case 'CourierAccountsFor':
         return {
           courierAccountsFor: [
-            { orderId: 'ord_1', accountId: 'acc_2', ruleId: 'crl_1' },
-            { orderId: 'ord_2', accountId: 'acc_1', ruleId: null },
+            {
+              orderId: 'ord_1',
+              accountId: 'acc_2',
+              ruleId: 'crl_1',
+              chargeEstimate: pkr('290.00'),
+            },
+            { orderId: 'ord_2', accountId: 'acc_1', ruleId: null, chargeEstimate: null },
           ],
         };
       case 'OrdersBook':
@@ -86,7 +91,10 @@ describe("Booking by the shop's courier rules (ADR-382)", () => {
     renderAdmin('/shop_1/shipping');
 
     const karachi = (await screen.findByText('#1011')).closest('li')!;
-    expect(await within(karachi).findByText('Goes with Karachi (Leopards)')).toBeTruthy();
+    // About what it will cost, where its account has a rate card (ADR-383).
+    expect(
+      await within(karachi).findByText('Goes with Karachi (Leopards) · about Rs 290'),
+    ).toBeTruthy();
     const multan = screen.getByText('#1012').closest('li')!;
     expect(within(multan).getByText('Goes with PostEx')).toBeTruthy();
 

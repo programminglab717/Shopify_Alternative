@@ -23,7 +23,15 @@ export const LogisticsEvents = {
   CourierPickupRequested: 'courier_pickup.requested',
   /** The shop's courier rules were replaced (SHP-06, ADR-382). */
   CourierRulesUpdated: 'courier_rules.updated',
+  /** A courier account's rate card was set or taken away (SHP-07, ADR-383). */
+  CourierRateCardUpdated: 'courier_rate_card.updated',
 } as const;
+
+export interface CourierRateCardPayload {
+  accountId: string;
+  /** Taken away, rather than set. */
+  removed: boolean;
+}
 
 export interface CourierRulesUpdatedPayload {
   /** How many rules the shop has now. */

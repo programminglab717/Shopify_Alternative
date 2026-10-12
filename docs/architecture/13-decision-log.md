@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-382 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-383 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -390,6 +390,7 @@
 | 380 | Parcels the courier has not seen on Home: their count among the next actions, a tap from the pickups that list them, for those who hand parcels over | Accepted |
 | 381 | A parcel's hand-over on its order's page: when, to whom and whether by hand, and whether the courier's tracking has had it since, put together in the core | Accepted |
 | 382 | Courier rules: an order booked without an account named goes with the first of the shop's rules its city and cash to collect match, else the default, and staff see which before they book | Accepted |
+| 383 | Couriers' rate cards: each parcel keeps what its account's card says it is likely to cost when the courier books it, and profit counts that until a statement says what it charged | Accepted |
 
 ---
 
@@ -14864,3 +14865,54 @@
     cash are what shops choose couriers by today.
   * **The default account per city, kept on the account:** a rule for cash, or cities and cash
     together, would have no home; an ordered list says which wins where two match.
+
+## ADR-383 · Couriers' rate cards: each parcel keeps what its account's card says it is likely to cost when the courier books it, and profit counts that until a statement says what it charged
+
+* **Context:**
+  * Profit (ANL-03, ADR-141) took off what couriers' statements charged for parcels
+    ([ADR-088](#adr-088--a-parcel-keeps-what-couriers-statements-charged-for-it-which-cod-health-adds-up-for-those-that-came-back-a-statement-with-the-lines-of-one-imported-before-is-refused)),
+    and statements come a week or two after the parcels. Until then every parcel cost nothing,
+    so the last fortnight always looked more profitable than it was, and a shop deciding
+    whether an ad paid or which courier to use read the wrong numbers. Couriers in Pakistan
+    publish rate cards: a first half kilo and each half kilo after, within the city and to other
+    cities, a share of the cash they collect, and a share again to bring a parcel back. SHP-07
+    asks for rate cards and each order's shipping cost, for profit.
+* **Decision:**
+  * **A card per courier account, in the logistics module** (migration 0178,
+    `logistics.rate_cards`): the city parcels go from, as Pakistan's list names it; the first half
+    kilo and each half kilo after, within that city and to others, in minor units; the share of
+    the cash collected and of the charge for a return, in hundredths of a percent, up to 20% and
+    200%. Set whole by `courierRateCardSet`, taken away by `courierRateCardRemove`
+    (`write_settings`, as accounts are), read by `courierRateCards` (`read_orders`); each change
+    records `courier_rate_card.updated`, on the activity log.
+  * **What a parcel is likely to cost** is worked out from the card as the courier books it,
+    while its weight is known: out, by its half kilos (a part counting whole, one of no known
+    weight counting one) within the card's city or beyond; the card's share of the cash to
+    collect; and its share of out to bring it back. The worker keeps it on the booking, and the
+    booking, as it is marked booked, carries it to the parcel through the orders module's
+    `estimateParcelChargesIn`, as statements' charges reach parcels through its functions. A
+    card changed later changes no parcel booked before.
+  * **Profit counts it as the parcel stands** until a statement charges the parcel, and then the
+    statement alone: out and the cash share while on its way or delivered, out and back once
+    coming back, out once lost. The sales report's `shippingCosts` says so, and
+    `shippingCostsEstimated` says how much of it is estimated. A parcel's
+    `courierChargesEstimate` gives its own.
+  * **Before booking**, `courierAccountsFor` gives, with each order's account, what its parcel is
+    likely to cost with it if delivered.
+  * **In the admin**, each courier account has a Rate card page under Couriers in settings; the
+    Shipping page says "Goes with PostEx · about Rs 330" under each order the rules book; an
+    order's parcel says what the courier charged, or until it says, "Likely courier charges:
+    about Rs 337.48, by the rate card"; and analytics says under profit how much of couriers'
+    charges in it is estimated.
+* **Consequences:**
+  * Profit for the last fortnight counts couriers' charges from the day parcels are booked, and
+    the shop sees how much of it is estimate; statements replace the estimates as they come.
+  * A card's mistakes show in profit until statements come; the card is the shop's own.
+* **Alternatives:**
+  * **Couriers' own rate APIs:** PostEx and Leopards quote by API for some accounts only, and
+    neither for returns; a card the shop keeps works for every courier, and for one Hatti does
+    not book with, later.
+  * **Weight slabs of the shop's own:** couriers price by the half kilo; a table of slabs is a
+    next step if a courier's card needs it.
+  * **Working the estimate out when the report is read:** the card may have changed since, and
+    the parcel's weight is only known as it is booked.

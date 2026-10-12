@@ -3299,6 +3299,30 @@ const en = {
   'shipping.goesWith': 'Goes with {account}',
   'shipping.goesWithNone': 'No rule or default account is for it',
   'activity.subject.courier_rules': 'Courier rules',
+  'rateCard.link': 'Rate card',
+  'rateCard.title': 'Rate card: {account}',
+  'rateCard.hint':
+    "What the courier charges you, so that each parcel booked with this account is costed, and profit counts it until the courier's statement says what it charged.",
+  'rateCard.originCity': 'City you ship from',
+  'rateCard.originCityHint': 'Parcels to this city are charged at the within-city rate.',
+  'rateCard.local': 'Within the city',
+  'rateCard.other': 'To other cities',
+  'rateCard.first': 'First half kilo (Rs)',
+  'rateCard.each': 'Each half kilo after (Rs)',
+  'rateCard.codFee': 'Cash handling (%)',
+  'rateCard.codFeeHint': "The courier's share of the cash it collects, such as 2.5.",
+  'rateCard.returnShare': 'Return charge (% of the charge)',
+  'rateCard.returnShareHint':
+    'What bringing a parcel back costs, as a share of sending it, such as 50.',
+  'rateCard.save': 'Save rate card',
+  'rateCard.remove': 'Remove rate card',
+  'rateCard.saved': 'Rate card saved. Parcels booked from now on are costed by it.',
+  'rateCard.removed': 'Rate card removed. Parcels booked from now on are not costed.',
+  'parcels.charged': 'The courier charged {amount}',
+  'parcels.chargeEstimate': 'Likely courier charges: about {amount}, by the rate card',
+  'shipping.about': 'about {amount}',
+  'analytics.profitEstimated': 'Includes {amount} of courier charges estimated by rate cards',
+  'activity.subject.courier_rate_card': 'Rate card',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6574,6 +6598,30 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'shipping.goesWith': '{account} کے ساتھ جائے گا',
   'shipping.goesWithNone': 'اس کے لیے کوئی اصول یا ڈیفالٹ اکاؤنٹ نہیں',
   'activity.subject.courier_rules': 'کوریئر اصول',
+  'rateCard.link': 'ریٹ کارڈ',
+  'rateCard.title': 'ریٹ کارڈ: {account}',
+  'rateCard.hint':
+    'کوریئر آپ سے کیا لیتا ہے، تاکہ اس اکاؤنٹ سے بک ہونے والے ہر پارسل کی لاگت لگے، اور منافع میں گنی جائے جب تک کوریئر کا اسٹیٹمنٹ اصل رقم نہ بتا دے۔',
+  'rateCard.originCity': 'جس شہر سے آپ بھیجتے ہیں',
+  'rateCard.originCityHint': 'اس شہر کے پارسلوں پر شہر کے اندر کا ریٹ لگتا ہے۔',
+  'rateCard.local': 'شہر کے اندر',
+  'rateCard.other': 'دوسرے شہروں کو',
+  'rateCard.first': 'پہلا آدھا کلو (روپے)',
+  'rateCard.each': 'اس کے بعد ہر آدھا کلو (روپے)',
+  'rateCard.codFee': 'نقد وصولی کی فیس (%)',
+  'rateCard.codFeeHint': 'کوریئر جو نقد وصول کرتا ہے اس میں اس کا حصہ، جیسے 2.5۔',
+  'rateCard.returnShare': 'واپسی کا چارج (چارج کا %)',
+  'rateCard.returnShareHint': 'پارسل واپس لانے کی لاگت، بھیجنے کے حصے کے طور پر، جیسے 50۔',
+  'rateCard.save': 'ریٹ کارڈ محفوظ کریں',
+  'rateCard.remove': 'ریٹ کارڈ ہٹائیں',
+  'rateCard.saved': 'ریٹ کارڈ محفوظ ہو گیا۔ اب سے بک ہونے والے پارسلوں کی لاگت اسی سے لگے گی۔',
+  'rateCard.removed': 'ریٹ کارڈ ہٹا دیا گیا۔ اب سے بک ہونے والے پارسلوں کی لاگت نہیں لگے گی۔',
+  'parcels.charged': 'کوریئر نے {amount} لیے',
+  'parcels.chargeEstimate': 'کوریئر کے متوقع چارجز: تقریباً {amount}، ریٹ کارڈ کے مطابق',
+  'shipping.about': 'تقریباً {amount}',
+  'analytics.profitEstimated':
+    'اس میں ریٹ کارڈ سے اندازہ لگائے گئے {amount} کے کوریئر چارجز شامل ہیں',
+  'activity.subject.courier_rate_card': 'ریٹ کارڈ',
 };
 
 export const messages: Readonly<

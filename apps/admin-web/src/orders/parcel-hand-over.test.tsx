@@ -7,7 +7,11 @@ const rupees = (amount: string) => ({ amount, currencyCode: 'PKR' });
 const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
 
 /** An order shipped as one parcel, handed over as `handOver` says. */
-function core(role: StaffRole, handOver: Record<string, unknown> | null) {
+function core(
+  role: StaffRole,
+  handOver: Record<string, unknown> | null,
+  charges: Record<string, unknown> = {},
+) {
   return fakeCore(role, (operation) => {
     if (operation !== 'Order') throw new Error(`unexpected ${operation}`);
     return {
@@ -66,6 +70,7 @@ function core(role: StaffRole, handOver: Record<string, unknown> | null) {
             events: { nodes: [] },
             claim: null,
             handOver,
+            ...charges,
           },
         ],
         returns: [],
@@ -127,6 +132,34 @@ describe("A parcel's hand-over to its courier, on the order's page (ADR-381)", (
     const again = await screen.findByRole('region', { name: 'Parcels' });
     expect(await within(again).findByText(/still has it as only booked/)).toBeTruthy();
     expect(within(again).queryByRole('link', { name: 'See pickups' })).toBeNull();
+  });
+
+  it('says what the courier charged, or until it says, what its rate card does (ADR-383)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      core('owner', null, {
+        courierCharges: null,
+        courierChargesEstimate: { amount: '290.00', currencyCode: 'PKR' },
+      }).fetcher,
+    );
+    renderAdmin('/shop_1/orders/ord_7');
+    const parcels = await screen.findByRole('region', { name: 'Parcels' });
+    expect(
+      await within(parcels).findByText('Likely courier charges: about Rs 290, by the rate card'),
+    ).toBeTruthy();
+    cleanup();
+
+    vi.stubGlobal(
+      'fetch',
+      core('owner', null, {
+        courierCharges: { amount: '310.00', currencyCode: 'PKR' },
+        courierChargesEstimate: { amount: '290.00', currencyCode: 'PKR' },
+      }).fetcher,
+    );
+    renderAdmin('/shop_1/orders/ord_7');
+    const charged = await screen.findByRole('region', { name: 'Parcels' });
+    expect(await within(charged).findByText('The courier charged Rs 310')).toBeTruthy();
+    expect(within(charged).queryByText(/Likely courier charges/)).toBeNull();
   });
 
   it('says nothing of a hand-over the parcel never had', async () => {

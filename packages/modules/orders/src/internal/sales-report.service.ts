@@ -9,6 +9,7 @@ import {
   visitSourceTitle,
 } from './attribution.js';
 import { ORDER_SOURCE_TITLES } from './cod-health.service.js';
+import { ESTIMATED_CHARGE } from './parcel-estimates.js';
 import type { OrderSourceValue } from './schema.js';
 
 export const SALES_REPORT_LIMITS = {
@@ -75,8 +76,14 @@ export interface SalesTally {
   costOfGoods: bigint;
   /** Units sold whose variant had no cost when they were sold. */
   unitsWithoutCost: number;
-  /** What couriers' statements charged for the orders' parcels, out and back (ADR-088). */
+  /**
+   * What couriers' statements charged for the orders' parcels, out and back (ADR-088); for a
+   * parcel no statement has charged yet, what its courier's rate card says it is likely to cost
+   * (ADR-383).
+   */
   shippingCosts: bigint;
+  /** Of {@link shippingCosts}, what is estimated by rate cards, no statement having charged it. */
+  shippingCostsEstimated: bigint;
   /**
    * What the items written off cost when sold: those of parcels that came back and were not
    * restocked, of parcels lost, and of customers' returns checked in and not restocked.
@@ -144,6 +151,7 @@ type TallyRow = {
   cost: string;
   uncosted: number;
   shipping_costs: string;
+  shipping_costs_estimated: string;
   write_offs: string;
   claims: string;
   refunds: string;
@@ -283,10 +291,14 @@ function salesWith(
            (SELECT coalesce(sum(l.quantity) FILTER (WHERE l.unit_cost IS NULL), 0)
               FROM orders.lines l
              WHERE l.shop_id = o.shop_id AND l.order_id = o.id) AS uncosted,
-           -- What couriers charged for its parcels, and paid of their claims.
-           (SELECT coalesce(sum(f.courier_charges), 0)
+           -- What couriers charged for its parcels, else what their rate cards say they are
+           -- likely to cost (ADR-383), and paid of their claims.
+           (SELECT coalesce(sum(coalesce(f.courier_charges, ${ESTIMATED_CHARGE})), 0)
               FROM orders.fulfillments f
              WHERE f.shop_id = o.shop_id AND f.order_id = o.id) AS shipping_costs,
+           (SELECT coalesce(sum(${ESTIMATED_CHARGE}) FILTER (WHERE f.courier_charges IS NULL), 0)
+              FROM orders.fulfillments f
+             WHERE f.shop_id = o.shop_id AND f.order_id = o.id) AS shipping_costs_estimated,
            (SELECT coalesce(sum(f.claim_paid), 0)
               FROM orders.fulfillments f
              WHERE f.shop_id = o.shop_id AND f.order_id = o.id) AS claims,
@@ -361,6 +373,7 @@ function salesWith(
              sum(p.cost) - coalesce(sum(r.cost), 0) AS cost,
              sum(p.uncosted)::int AS uncosted,
              sum(p.shipping_costs) AS shipping_costs,
+             sum(p.shipping_costs_estimated) AS shipping_costs_estimated,
              coalesce(sum(w.cost), 0) AS write_offs,
              sum(p.claims) AS claims,
              sum(p.refunds) AS refunds
@@ -383,6 +396,7 @@ const TALLY_COLUMNS = sql`
   coalesce(s.cost, 0)::bigint::text AS cost,
   coalesce(s.uncosted, 0) AS uncosted,
   coalesce(s.shipping_costs, 0)::bigint::text AS shipping_costs,
+  coalesce(s.shipping_costs_estimated, 0)::bigint::text AS shipping_costs_estimated,
   coalesce(s.write_offs, 0)::bigint::text AS write_offs,
   coalesce(s.claims, 0)::bigint::text AS claims,
   coalesce(s.refunds, 0)::bigint::text AS refunds`;
@@ -399,6 +413,7 @@ function tallyOfRow(row: TallyRow): SalesTally {
     costOfGoods: BigInt(row.cost),
     unitsWithoutCost: row.uncosted,
     shippingCosts: BigInt(row.shipping_costs),
+    shippingCostsEstimated: BigInt(row.shipping_costs_estimated),
     writeOffs: BigInt(row.write_offs),
     claimsRecovered: BigInt(row.claims),
     refunds: BigInt(row.refunds),
@@ -486,6 +501,7 @@ export function tallyOf(periods: readonly SalesTally[]): SalesTally {
     costOfGoods: 0n,
     unitsWithoutCost: 0,
     shippingCosts: 0n,
+    shippingCostsEstimated: 0n,
     writeOffs: 0n,
     claimsRecovered: 0n,
     refunds: 0n,
@@ -501,6 +517,7 @@ export function tallyOf(periods: readonly SalesTally[]): SalesTally {
     tally.costOfGoods += period.costOfGoods;
     tally.unitsWithoutCost += period.unitsWithoutCost;
     tally.shippingCosts += period.shippingCosts;
+    tally.shippingCostsEstimated += period.shippingCostsEstimated;
     tally.writeOffs += period.writeOffs;
     tally.claimsRecovered += period.claimsRecovered;
     tally.refunds += period.refunds;

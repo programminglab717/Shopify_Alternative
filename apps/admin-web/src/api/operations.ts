@@ -328,6 +328,14 @@ export const OrderQuery = /* GraphQL */ `
         claim {
           status
         }
+        courierCharges {
+          amount
+          currencyCode
+        }
+        courierChargesEstimate {
+          amount
+          currencyCode
+        }
         handOver {
           handedOverAt
           byHand
@@ -2876,6 +2884,9 @@ const SALES_TOTALS = /* GraphQL */ `
       ...Money
     }
     profit {
+      ...Money
+    }
+    shippingCostsEstimated {
       ...Money
     }
   }
@@ -6650,6 +6661,80 @@ export const CourierAccountsForQuery = /* GraphQL */ `
       orderId
       accountId
       ruleId
+      chargeEstimate {
+        amount
+        currencyCode
+      }
     }
   }
+`;
+
+const RATE_CARD = /* GraphQL */ `
+  fragment RateCardFields on CourierRateCard {
+    accountId
+    originCity
+    localFirst {
+      amount
+      currencyCode
+    }
+    localEach {
+      amount
+      currencyCode
+    }
+    otherFirst {
+      amount
+      currencyCode
+    }
+    otherEach {
+      amount
+      currencyCode
+    }
+    codFeePercent
+    returnPercent
+    updatedAt
+  }
+`;
+
+/** The shop's courier accounts and their rate cards (SHP-07, ADR-383). */
+export const CourierRateCardsQuery = /* GraphQL */ `
+  query CourierRateCards {
+    courierAccounts {
+      id
+      name
+      courierName
+    }
+    courierRateCards {
+      ...RateCardFields
+    }
+  }
+  ${RATE_CARD}
+`;
+
+/** A courier account's rate card set whole. */
+export const CourierRateCardSetMutation = /* GraphQL */ `
+  mutation CourierRateCardSet($accountId: ID!, $input: CourierRateCardInput!) {
+    courierRateCardSet(accountId: $accountId, input: $input) {
+      courierRateCard {
+        ...RateCardFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${RATE_CARD}
+  ${USER_ERRORS}
+`;
+
+/** A courier account's rate card taken away. */
+export const CourierRateCardRemoveMutation = /* GraphQL */ `
+  mutation CourierRateCardRemove($accountId: ID!) {
+    courierRateCardRemove(accountId: $accountId) {
+      removed
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
 `;

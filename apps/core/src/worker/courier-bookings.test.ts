@@ -12,6 +12,7 @@ import {
   CourierBookingService,
   CourierCityService,
   Couriers,
+  RateCardService,
   TRACK_EVERY_MS,
   type CourierAdapter,
   type CourierInfo,
@@ -116,6 +117,7 @@ describe.skipIf(!server)('Orders booked with couriers, and their parcels followe
       cities: cities(),
       couriers: couriers(),
       fulfillments: fulfillments(),
+      rateCards: new RateCardService(database),
     });
 
   /** A confirmed order of a kurta, paid on delivery, to Lahore unless given. */
@@ -207,6 +209,7 @@ describe.skipIf(!server)('Orders booked with couriers, and their parcels followe
   beforeEach(async () => {
     await admin.query(`
       DELETE FROM logistics.bookings;
+      DELETE FROM logistics.rate_cards;
       DELETE FROM logistics.courier_accounts;
       DELETE FROM logistics.courier_cities;
       DELETE FROM logistics.shop_courier_cities;`);
@@ -267,6 +270,42 @@ describe.skipIf(!server)('Orders booked with couriers, and their parcels followe
       'fulfillment.created',
       'courier_booking.booked',
     ]);
+  });
+
+  it("keeps what each parcel is likely to cost by its account's rate card (ADR-383)", async () => {
+    await admin.query(
+      `INSERT INTO logistics.courier_cities (courier, city, courier_city)
+       VALUES ('scripted', 'Lahore', 'LHE'), ('scripted', 'Karachi', 'KHI')`,
+    );
+    unwrap(
+      await new RateCardService(database).set(tenant, accountId, {
+        originCity: 'Lahore',
+        localFirst: '150',
+        localEach: '50',
+        otherFirst: '250',
+        otherEach: '100',
+        codFeePercent: '2',
+        returnPercent: '50',
+      }),
+    );
+    const [local, far] = [await confirmed(), await confirmed('0300 7654321', 'Karachi')];
+    await request(local.id, far.id);
+    expect(await sweeper().sweep(new Date(Date.now() + 1_000))).toEqual({ booked: 2, tracked: 0 });
+    const { rows } = await admin.query<{
+      order_id: string;
+      out: string;
+      cod: string;
+      back: string;
+    }>(
+      `SELECT order_id, charge_estimate_out AS out, charge_estimate_cod_fee AS cod,
+              charge_estimate_back AS back
+         FROM orders.fulfillments WHERE order_id = ANY($1)`,
+      [[local.id, far.id]],
+    );
+    const byOrder = new Map(rows.map((row) => [row.order_id, row]));
+    // Rs 4,000 to collect, 2% of it; within Lahore Rs 150 out, to Karachi Rs 250; half back.
+    expect(byOrder.get(local.id)).toMatchObject({ out: '15000', cod: '8000', back: '7500' });
+    expect(byOrder.get(far.id)).toMatchObject({ out: '25000', cod: '8000', back: '12500' });
   });
 
   it("books to the courier's name for the city, failing one it names none of until staff name it (ADR-233)", async () => {

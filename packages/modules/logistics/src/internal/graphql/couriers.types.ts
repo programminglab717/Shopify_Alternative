@@ -359,6 +359,91 @@ export class CourierAccountChoice {
 
   @Field(() => ID, { nullable: true, description: "Null where it is the shop's default." })
   ruleId!: string | null;
+
+  @Field(() => Money, {
+    nullable: true,
+    description:
+      'What the parcel is likely to cost with that account if delivered, by its rate card: out ' +
+      "and the courier's share of the cash (ADR-383). Null where the account has no card.",
+  })
+  chargeEstimate!: Money | null;
+}
+
+@ObjectType({
+  description:
+    'What a courier account charges (SHP-07, ADR-383): by the half kilo, within the city the ' +
+    'shop ships from and to other cities; a share of the cash it collects; and a share of the ' +
+    'charge again to bring a parcel back. Each parcel booked with the account is estimated by it.',
+})
+export class CourierRateCard {
+  @Field(() => ID)
+  accountId!: string;
+
+  @Field({ description: "The city parcels go from, as Pakistan's list names it." })
+  originCity!: string;
+
+  @Field(() => Money, { description: 'The first half kilo, within the city.' })
+  localFirst!: Money;
+
+  @Field(() => Money, { description: 'Each half kilo after, within the city.' })
+  localEach!: Money;
+
+  @Field(() => Money, { description: 'The first half kilo, to other cities.' })
+  otherFirst!: Money;
+
+  @Field(() => Money, { description: 'Each half kilo after, to other cities.' })
+  otherEach!: Money;
+
+  @Field({ description: 'Percent of the cash collected, such as 2.5.' })
+  codFeePercent!: number;
+
+  @Field({ description: 'Percent of the charge again for a parcel brought back, such as 50.' })
+  returnPercent!: number;
+
+  @Field(() => GraphQLISODateTime)
+  updatedAt!: Date;
+}
+
+@InputType()
+export class CourierRateCardInput {
+  @Field({ description: 'A city of Pakistan, as addresses name it.' })
+  originCity!: string;
+
+  @Field({ description: 'Decimal, e.g. "180".' })
+  localFirst!: string;
+
+  @Field()
+  localEach!: string;
+
+  @Field()
+  otherFirst!: string;
+
+  @Field()
+  otherEach!: string;
+
+  @Field(() => String, { nullable: true, description: 'Percent, 0 to 20, e.g. "2.5".' })
+  codFeePercent?: string | null;
+
+  @Field(() => String, { nullable: true, description: 'Percent, 0 to 200, e.g. "50".' })
+  returnPercent?: string | null;
+}
+
+@ObjectType()
+export class CourierRateCardPayload {
+  @Field(() => CourierRateCard, { nullable: true })
+  courierRateCard!: CourierRateCard | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class CourierRateCardRemovePayload {
+  @Field({ description: 'The card was taken away.' })
+  removed!: boolean;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
 }
 
 @InputType()

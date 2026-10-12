@@ -174,13 +174,23 @@ describe.skipIf(!server)("A shop's courier rules, and booking by them (ADR-382)"
         smallLahore.orderId,
       ]),
     ).toEqual([
-      { orderId: toKarachi.orderId, accountId: karachi.id, ruleId: expect.any(String) },
-      { orderId: bigLahore.orderId, accountId: dear.id, ruleId: expect.any(String) },
-      { orderId: smallLahore.orderId, accountId: main.id, ruleId: null },
+      {
+        orderId: toKarachi.orderId,
+        accountId: karachi.id,
+        ruleId: expect.any(String),
+        estimate: null,
+      },
+      {
+        orderId: bigLahore.orderId,
+        accountId: dear.id,
+        ruleId: expect.any(String),
+        estimate: null,
+      },
+      { orderId: smallLahore.orderId, accountId: main.id, ruleId: null, estimate: null },
     ]);
     const missing = newId();
     expect(await f.bookings.accountsFor(f.a, [missing])).toEqual([
-      { orderId: missing, accountId: null, ruleId: null },
+      { orderId: missing, accountId: null, ruleId: null, estimate: null },
     ]);
 
     const asked = unwrap(

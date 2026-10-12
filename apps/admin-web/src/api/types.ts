@@ -138,6 +138,10 @@ export interface ParcelDetail {
     }[];
   };
   claim: { status: FulfillmentClaimStatus } | null;
+  /** What couriers' statements charged for it; null while none has. */
+  courierCharges?: MoneyValue | null;
+  /** What its account's rate card says it is likely to cost as it stands (ADR-383). */
+  courierChargesEstimate?: MoneyValue | null;
   /** Its last hand-over to its courier's rider; null while none (ADR-381). */
   handOver: ParcelHandOverValue | null;
 }
@@ -1223,6 +1227,8 @@ export interface SalesTotalsValue {
   averageOrderValue: MoneyValue | null;
   returns: MoneyValue;
   profit: MoneyValue;
+  /** Of couriers' charges in profit, what rate cards estimate, no statement saying (ADR-383). */
+  shippingCostsEstimated?: MoneyValue;
 }
 
 export interface SalesData {
@@ -2783,5 +2789,37 @@ export interface CourierRulesUpdateData {
 }
 
 export interface CourierAccountsForData {
-  courierAccountsFor: { orderId: string; accountId: string | null; ruleId: string | null }[];
+  courierAccountsFor: {
+    orderId: string;
+    accountId: string | null;
+    ruleId: string | null;
+    /** Out and the cash fee by the account's rate card (ADR-383); null without one. */
+    chargeEstimate: MoneyValue | null;
+  }[];
+}
+
+/** What a courier account charges (SHP-07, ADR-383). */
+export interface CourierRateCardValue {
+  accountId: string;
+  originCity: string;
+  localFirst: MoneyValue;
+  localEach: MoneyValue;
+  otherFirst: MoneyValue;
+  otherEach: MoneyValue;
+  codFeePercent: number;
+  returnPercent: number;
+  updatedAt: string;
+}
+
+export interface CourierRateCardsData {
+  courierAccounts: { id: string; name: string; courierName: string }[];
+  courierRateCards: CourierRateCardValue[];
+}
+
+export interface CourierRateCardSetData {
+  courierRateCardSet: { courierRateCard: CourierRateCardValue | null; userErrors: UserError[] };
+}
+
+export interface CourierRateCardRemoveData {
+  courierRateCardRemove: { removed: boolean; userErrors: UserError[] };
 }

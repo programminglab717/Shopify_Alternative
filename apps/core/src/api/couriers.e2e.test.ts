@@ -698,4 +698,109 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
     ]);
     expect((await data(tokens.settings, RULES, { rules: [] })).courierRules).toEqual([]);
   });
+
+  it("keeps courier accounts' rate cards, and says what parcels are likely to cost (ADR-383)", async () => {
+    const accounts = (await data(tokens.reader, '{ courierAccounts { id isDefault } }')) as {
+      id: string;
+      isDefault: boolean;
+    }[];
+    const accountId = accounts.find((account) => account.isDefault)!.id;
+    const SET = `mutation ($accountId: ID!, $input: CourierRateCardInput!) {
+      courierRateCardSet(accountId: $accountId, input: $input) {
+        courierRateCard {
+          accountId originCity localFirst { amount } otherFirst { amount }
+          codFeePercent returnPercent
+        }
+        userErrors { field code message }
+      }
+    }`;
+    const input = {
+      originCity: 'Lahore',
+      localFirst: '150',
+      localEach: '50',
+      otherFirst: '250',
+      otherEach: '100',
+      codFeePercent: '2.5',
+      returnPercent: '50',
+    };
+    // Rate cards are settings, as accounts are.
+    expect((await gql(tokens.orders, SET, { accountId, input })).errors?.[0].extensions.code).toBe(
+      'ACCESS_DENIED',
+    );
+    expect(
+      (await data(tokens.settings, SET, { accountId, input: { ...input, originCity: 'Atlantis' } }))
+        .userErrors,
+    ).toEqual([
+      {
+        field: ['input', 'originCity'],
+        code: 'INVALID',
+        message: '"Atlantis" is not a city of Pakistan we know',
+      },
+    ]);
+    expect(await data(tokens.settings, SET, { accountId, input })).toEqual({
+      courierRateCard: {
+        accountId,
+        originCity: 'Lahore',
+        localFirst: { amount: expect.stringMatching(/^150(\.0+)?$/) },
+        otherFirst: { amount: expect.stringMatching(/^250(\.0+)?$/) },
+        codFeePercent: 2.5,
+        returnPercent: 50,
+      },
+      userErrors: [],
+    });
+    expect(await data(tokens.reader, '{ courierRateCards { accountId } }')).toEqual([
+      { accountId },
+    ]);
+
+    const created = await data(
+      tokens.orders,
+      `mutation {
+        productCreate(input: { title: "Chador", status: ACTIVE, variants: [{ price: "4,000" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const orderId = await order(created.product.variants[0].id as string);
+    // To Lahore, within the card's city: Rs 150 out, and 2.5% of Rs 4,000.
+    const FOR = `query ($ids: [ID!]!) { courierAccountsFor(orderIds: $ids) { chargeEstimate { amount } } }`;
+    expect(await data(tokens.reader, FOR, { ids: [orderId] })).toEqual([
+      { chargeEstimate: { amount: expect.stringMatching(/^250(\.0+)?$/) } },
+    ]);
+
+    // A parcel booked by the card says what it is likely to cost as it stands.
+    const shipped = await data(
+      tokens.orders,
+      `mutation ($id: ID!) {
+        orderFulfill(id: $id, input: { trackingInfo: { company: "Test courier", number: "HT0000009090" } }) {
+          fulfillment { id }
+        }
+      }`,
+      { id: orderId },
+    );
+    await admin.query(
+      `UPDATE orders.fulfillments
+          SET charge_estimate_out = 15000, charge_estimate_cod_fee = 10000,
+              charge_estimate_back = 7500
+        WHERE id = $1`,
+      [fromPublicId(shipped.fulfillment.id, 'fulfillment')],
+    );
+    const ESTIMATE = `query ($id: ID!) {
+      order(id: $id) { fulfillments { courierChargesEstimate { amount } } }
+    }`;
+    expect((await data(tokens.reader, ESTIMATE, { id: orderId })).fulfillments).toEqual([
+      { courierChargesEstimate: { amount: expect.stringMatching(/^250(\.0+)?$/) } },
+    ]);
+
+    const REMOVE = `mutation ($accountId: ID!) {
+      courierRateCardRemove(accountId: $accountId) { removed userErrors { code } }
+    }`;
+    expect(await data(tokens.settings, REMOVE, { accountId })).toEqual({
+      removed: true,
+      userErrors: [],
+    });
+    expect(await data(tokens.settings, REMOVE, { accountId })).toEqual({
+      removed: false,
+      userErrors: [{ code: 'NOT_FOUND' }],
+    });
+  });
 });

@@ -95,8 +95,8 @@ function ToBook({ accounts, ruled }: { accounts: CourierAccount[]; ruled: boolea
     { orderIds },
     { enabled: ruled && orderIds.length > 0 },
   );
-  const accountOf = new Map(
-    (chosen.data?.courierAccountsFor ?? []).map((choice) => [choice.orderId, choice.accountId]),
+  const choiceOf = new Map(
+    (chosen.data?.courierAccountsFor ?? []).map((choice) => [choice.orderId, choice]),
   );
   const byId = new Map(accounts.map((account) => [account.id, account]));
   const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -225,14 +225,23 @@ function ToBook({ accounts, ruled }: { accounts: CourierAccount[]; ruled: boolea
                   <span className="num font-medium">
                     {formatMoney(order.totalPrice.amount, order.totalPrice.currencyCode)}
                   </span>
-                  {ruled && accountId === '' && accountOf.has(order.id) && (
+                  {ruled && accountId === '' && choiceOf.has(order.id) && (
                     <span className="flex basis-full items-center gap-1 text-secondary text-[length:var(--hatti-type-body-sm-size)]">
                       <Truck aria-hidden className="size-4" />
                       {(() => {
-                        const account = byId.get(accountOf.get(order.id) ?? '');
-                        return account
-                          ? t('shipping.goesWith', { account: accountName(account) })
-                          : t('shipping.goesWithNone');
+                        const choice = choiceOf.get(order.id)!;
+                        const account = byId.get(choice.accountId ?? '');
+                        if (!account) return t('shipping.goesWithNone');
+                        const goes = t('shipping.goesWith', { account: accountName(account) });
+                        // About what it will cost, by the account's rate card (ADR-383).
+                        return choice.chargeEstimate
+                          ? `${goes} · ${t('shipping.about', {
+                              amount: formatMoney(
+                                choice.chargeEstimate.amount,
+                                choice.chargeEstimate.currencyCode,
+                              ),
+                            })}`
+                          : goes;
                       })()}
                     </span>
                   )}

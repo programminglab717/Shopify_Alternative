@@ -12,6 +12,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { COURIERS } from './courier-accounts.service.js';
 import { courierRulesIn, ruleFor } from './courier-rules.service.js';
+import { carryEstimateIn, chargeEstimate, rateCardIn } from './rate-cards.service.js';
 import { Couriers, plainStatusOf, type CourierParcelStatusValue } from './couriers.js';
 import {
   LogisticsEvents,
@@ -295,7 +296,15 @@ export class CourierBookingService {
   async accountsFor(
     tenant: TenantContext,
     orderIds: readonly string[],
-  ): Promise<{ orderId: string; accountId: string | null; ruleId: string | null }[]> {
+  ): Promise<
+    {
+      orderId: string;
+      accountId: string | null;
+      ruleId: string | null;
+      /** Out and the cash fee by the account's rate card (ADR-383); null without one. */
+      estimate: bigint | null;
+    }[]
+  > {
     const ids = [...new Set(orderIds)].slice(0, BOOKING_LIMITS.orders);
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows: accounts } = await tx.execute<{ id: string; is_default: boolean }>(sql`
@@ -303,16 +312,31 @@ export class CourierBookingService {
          WHERE shop_id = ${tenant.shopId} AND archived_at IS NULL`);
       const fallback = accounts.find((each) => each.is_default)?.id ?? null;
       const rules = await courierRulesIn(tx, tenant.shopId);
+      const cards = new Map<string, Awaited<ReturnType<typeof rateCardIn>>>();
       const choices = [];
       for (const orderId of ids) {
         const facts = await orderShipmentFactsIn(tx, tenant.shopId, orderId);
         const rule = facts
           ? ruleFor(rules, facts.address?.city ?? null, facts.codAmount)
           : undefined;
+        const accountId = facts ? (rule?.accountId ?? fallback) : null;
+        if (accountId && !cards.has(accountId)) {
+          cards.set(accountId, await rateCardIn(tx, tenant.shopId, accountId));
+        }
+        const card = accountId ? cards.get(accountId) : null;
+        const estimate =
+          card && facts
+            ? chargeEstimate(card, {
+                city: facts.address?.city ?? null,
+                codAmount: facts.codAmount,
+                weightGrams: facts.weightGrams,
+              })
+            : null;
         choices.push({
           orderId,
-          accountId: facts ? (rule?.accountId ?? fallback) : null,
+          accountId,
           ruleId: rule?.id ?? null,
+          estimate: estimate ? estimate.out + estimate.codFee : null,
         });
       }
       return choices;
@@ -505,6 +529,8 @@ export class CourierBookingService {
         RETURNING b.order_id, b.account_id, a.courier, b.tracking_number`);
       const row = rows[0];
       if (!row) return;
+      // What the parcel is likely to cost by its account's rate card goes with it (ADR-383).
+      await carryEstimateIn(tx, shopId, id, booked.fulfillmentId);
       await appendEvent<CourierBookingPayload>(tx, shopId, {
         type: LogisticsEvents.CourierBookingBooked,
         aggregateType: 'courier_booking',

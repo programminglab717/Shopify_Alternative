@@ -86,6 +86,13 @@ export {
   type ShipmentStatusChangedPayload,
 } from '../internal/events.js';
 export { ParcelHandOver } from '../internal/graphql/couriers.types.js';
+export {
+  RATE_CARD_LIMITS,
+  RateCardService,
+  chargeEstimate,
+  type RateCardInput,
+  type RateCardRecord,
+} from '../internal/rate-cards.service.js';
 export { LogisticsModule } from '../internal/logistics.module.js';
 export {
   CourierPickupService,

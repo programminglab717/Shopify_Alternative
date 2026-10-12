@@ -5,6 +5,7 @@ import type { CurrencyCode } from '@hatti/money';
 import { searchKey } from '@hatti/pk';
 import { and, eq, sql, type SQL } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
+import { ESTIMATED_CHARGE } from './parcel-estimates.js';
 import type {
   FulfillmentRecord,
   OrderLineRecord,
@@ -124,6 +125,7 @@ interface OrderJsonRow extends Record<string, unknown> {
     returned_at: string | null;
     lost_at: string | null;
     courier_charges: string | null;
+    charge_estimate: string | null;
     claim_status: ParcelClaimRecord['status'] | null;
     claim_amount: string | null;
     claim_paid: string | null;
@@ -288,6 +290,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       returnedAt: toDateOrNull(parcel.returned_at),
       lostAt: toDateOrNull(parcel.lost_at),
       courierCharges: parcel.courier_charges === null ? null : BigInt(parcel.courier_charges),
+      chargeEstimate: parcel.charge_estimate === null ? null : BigInt(parcel.charge_estimate),
       claim:
         parcel.claim_status === null
           ? null
@@ -409,6 +412,7 @@ export async function loadOrders(
                       'shipped_at', f.shipped_at, 'delivered_at', f.delivered_at,
                       'returning_at', f.returning_at, 'returned_at', f.returned_at,
                       'lost_at', f.lost_at, 'courier_charges', f.courier_charges::text,
+                      'charge_estimate', (${ESTIMATED_CHARGE})::text,
                       'claim_status', f.claim_status, 'claim_amount', f.claim_amount::text,
                       'claim_paid', f.claim_paid::text, 'claim_note', f.claim_note,
                       'claimed_at', f.claimed_at, 'claim_settled_at', f.claim_settled_at,

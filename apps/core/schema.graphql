@@ -2090,6 +2090,11 @@ The account an order would be booked with now without one named (ADR-382), and t
 type CourierAccountChoice {
   """Null where no rule is for it and the shop has no default account."""
   accountId: ID
+
+  """
+  What the parcel is likely to cost with that account if delivered, by its rate card: out and the courier's share of the cash (ADR-383). Null where the account has no card.
+  """
+  chargeEstimate: Money
   orderId: ID!
 
   """Null where it is the shop's default."""
@@ -2456,6 +2461,63 @@ type CourierPickupSupport {
   Whether it asks for the name and code of the rider who takes the parcels, as Leopards does: courierPickupRequest takes them.
   """
   rider: Boolean!
+}
+
+"""
+What a courier account charges (SHP-07, ADR-383): by the half kilo, within the city the shop ships from and to other cities; a share of the cash it collects; and a share of the charge again to bring a parcel back. Each parcel booked with the account is estimated by it.
+"""
+type CourierRateCard {
+  accountId: ID!
+
+  """Percent of the cash collected, such as 2.5."""
+  codFeePercent: Float!
+
+  """Each half kilo after, within the city."""
+  localEach: Money!
+
+  """The first half kilo, within the city."""
+  localFirst: Money!
+
+  """The city parcels go from, as Pakistan's list names it."""
+  originCity: String!
+
+  """Each half kilo after, to other cities."""
+  otherEach: Money!
+
+  """The first half kilo, to other cities."""
+  otherFirst: Money!
+
+  """Percent of the charge again for a parcel brought back, such as 50."""
+  returnPercent: Float!
+  updatedAt: DateTime!
+}
+
+input CourierRateCardInput {
+  """Percent, 0 to 20, e.g. "2.5"."""
+  codFeePercent: String
+  localEach: String!
+
+  """Decimal, e.g. "180"."""
+  localFirst: String!
+
+  """A city of Pakistan, as addresses name it."""
+  originCity: String!
+  otherEach: String!
+  otherFirst: String!
+
+  """Percent, 0 to 200, e.g. "50"."""
+  returnPercent: String
+}
+
+type CourierRateCardPayload {
+  courierRateCard: CourierRateCard
+  userErrors: [UserError!]!
+}
+
+type CourierRateCardRemovePayload {
+  """The card was taken away."""
+  removed: Boolean!
+  userErrors: [UserError!]!
 }
 
 """The cash on delivery one courier holds for the shop."""
@@ -3521,6 +3583,11 @@ type Fulfillment {
   What couriers' statements charged for it, both ways, as codRemittanceImport took them: for a parcel that came back, what its return cost in charges. Null while none has.
   """
   courierCharges: Money
+
+  """
+  What its courier account's rate card says it is likely to cost as it stands: out, and the courier's share of the cash while on its way or delivered; out and back once coming back; out once lost (ADR-383). Null where the account had no card when the courier booked it.
+  """
+  courierChargesEstimate: Money
   createdAt: DateTime!
   deliveredAt: DateTime
 
@@ -5599,6 +5666,16 @@ type Mutation {
   Hands a courier account's parcels waiting to be picked up, the default account's unless given, to its courier through the courier's API, the longest waiting first, up to 200: PostEx's load sheet for the account's pickup address, or Leopards' naming the rider who takes them. Parcels in a pickup the courier took go in the next only once they have waited a day since. Refused, with why, for a courier whose API takes no pickups, whose rider is not named, or that refuses them.
   """
   courierPickupRequest(input: CourierPickupInput!): CourierPickupPayload!
+
+  """
+  Takes a courier account's rate card away: its parcels are no longer estimated, those estimated keeping their estimates.
+  """
+  courierRateCardRemove(accountId: ID!): CourierRateCardRemovePayload!
+
+  """
+  Sets a courier account's rate card whole. Parcels booked with the account from then on are estimated by it; those booked before keep their estimates.
+  """
+  courierRateCardSet(accountId: ID!, input: CourierRateCardInput!): CourierRateCardPayload!
 
   """
   Replaces the shop's courier rules with these, in this order; none for none. Each names one of its live accounts, and cities, a range of cash to collect, or both: up to 50.
@@ -9374,6 +9451,9 @@ type Query {
     first: Int! = 20
   ): [CourierPickup!]!
 
+  """The shop's courier accounts' rate cards."""
+  courierRateCards: [CourierRateCard!]!
+
   """
   The shop's courier rules, in their order: an order booked without an account named goes with the first it matches, else with the shop's default account.
   """
@@ -10345,9 +10425,14 @@ type Sales {
   shipping: Money!
 
   """
-  What couriers' statements charged for the orders' parcels, out and back, so far as statements have come.
+  What couriers' statements charged for the orders' parcels, out and back; for a parcel no statement has charged yet, what its courier account's rate card says it is likely to cost as it stands (ADR-383).
   """
   shippingCosts: Money!
+
+  """
+  Of shippingCosts, what is estimated by rate cards, no statement having charged it.
+  """
+  shippingCostsEstimated: Money!
 
   """
   The sales tax the orders include, less that of the items that came back: the orders' prices include it, and the other amounts leave it out, as Shopify's reports do.

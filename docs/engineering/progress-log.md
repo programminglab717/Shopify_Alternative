@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: what comes after courier rules,
-such as rules by weight and by the courier's own record in a city (SHP-06, SHP-08). Urdu
-handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: what comes after couriers' rate
+cards, such as the cheapest courier as a rule, and couriers' records by city (SHP-06, SHP-08).
+Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,32 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
+
+### Couriers' rate cards, and what each parcel is likely to cost
+
+* **In the core** ([ADR-383](../architecture/13-decision-log.md#adr-383--couriers-rate-cards-each-parcel-keeps-what-its-accounts-card-says-it-is-likely-to-cost-when-the-courier-books-it-and-profit-counts-that-until-a-statement-says-what-it-charged), SHP-07): migration 0178 keeps a rate card per courier account, and
+  what each booking's parcel is likely to cost by it, on the booking and on the parcel. The
+  worker estimates each parcel as the courier books it; profit counts the estimate as the parcel
+  stands until a statement charges it, and the sales report says how much is estimated.
+  `courierRateCards`, `courierRateCardSet`, `courierRateCardRemove`, an order's account's estimate
+  in `courierAccountsFor`, and a parcel's `courierChargesEstimate`.
+* **In the admin**, a Rate card page for each courier account under Couriers in settings; about
+  what each order will cost on the Shipping page; on the order's parcel what the courier charged,
+  or what its card says; and under profit in analytics how much of couriers' charges is
+  estimated.
+* **Tried in Chromium against the core:** a card for the default account from Karachi was saved,
+  "karachi" kept as Karachi; with a rule sending Lahore's orders to it and #1003 marked packed,
+  the To book tab said "Goes with Test courier Karachi (Test courier) · about Rs 250", #1003
+  being paid already; with #1016's parcel estimated as the worker would, its order said "Likely
+  courier charges: about Rs 337.48, by the rate card", and analytics "Includes Rs 337.48 of
+  courier charges estimated by rate cards". The card and rule were then taken away, #1003 marked
+  unpacked and #1016's estimate cleared. No errors in the browser.
+* 2572 tests (13 new): the price by half kilos, cities, cash and returns;
+  cards kept, refused and taken away, and parcels estimated by them, in the logistics module;
+  profit with estimates as parcels stand in the orders module; the worker estimating as it books
+  and the API's cards and estimates in the core; the rate card page, the Shipping page's
+  estimate, the parcel's charge and profit's estimated part in the admin, with its three new
+  documents checked against the schema.
 
 ### 4b0bc1f · Courier rules: which courier books an order
 

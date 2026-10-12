@@ -635,6 +635,16 @@ export class Fulfillment {
   })
   courierCharges!: Money | null;
 
+  @Field(() => Money, {
+    nullable: true,
+    description:
+      "What its courier account's rate card says it is likely to cost as it stands: out, and " +
+      "the courier's share of the cash while on its way or delivered; out and back once coming " +
+      'back; out once lost (ADR-383). Null where the account had no card when the courier ' +
+      'booked it.',
+  })
+  courierChargesEstimate!: Money | null;
+
   @Field(() => FulfillmentClaim, {
     nullable: true,
     description:

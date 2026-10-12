@@ -18,11 +18,14 @@ export function Figure({
   now,
   before,
   shown,
+  note,
 }: {
   label: MessageKey;
   now: number;
   before: number;
   shown: string;
+  /** A line under the figure, such as how much of it is estimated. */
+  note?: string | null;
 }) {
   const { t } = useLocale();
   const delta = change(now, before);
@@ -43,6 +46,9 @@ export function Figure({
           )}
           {t(delta >= 0 ? 'analytics.up' : 'analytics.down', { percent: Math.abs(delta) })}
         </span>
+      )}
+      {note && (
+        <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">{note}</span>
       )}
     </Card>
   );

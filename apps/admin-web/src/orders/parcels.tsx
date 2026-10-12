@@ -23,7 +23,7 @@ import type {
   UserError,
 } from '../api/types';
 import type { StaffRole } from '../auth/session';
-import { formatCount, formatDateTime, formatRelative } from '../i18n/format';
+import { formatCount, formatDateTime, formatMoney, formatRelative } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { Translate } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
@@ -502,6 +502,25 @@ function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }
         ))}
       </ul>
       {parcel.handOver && <HandedOver handOver={parcel.handOver} timezone={timezone} />}
+      {parcel.courierCharges ? (
+        <span className="text-secondary">
+          {t('parcels.charged', {
+            amount: formatMoney(parcel.courierCharges.amount, parcel.courierCharges.currencyCode),
+          })}
+        </span>
+      ) : (
+        parcel.courierChargesEstimate && (
+          // Until the courier's statement says, what its rate card says (ADR-383).
+          <span className="text-secondary">
+            {t('parcels.chargeEstimate', {
+              amount: formatMoney(
+                parcel.courierChargesEstimate.amount,
+                parcel.courierChargesEstimate.currencyCode,
+              ),
+            })}
+          </span>
+        )
+      )}
       {steps.length > 0 && (
         <ol className="flex flex-col gap-2 border-s-2 border-line ps-3">
           {shown.map((step) => (
