@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
 
-### Parcels handed to a rider by hand, in the core and the admin
+### b1bb2d9 · Parcels handed to a rider by hand, in the core and the admin
 
 * **By hand** ([ADR-378](../architecture/13-decision-log.md#adr-378--parcels-handed-to-a-couriers-rider-by-hand-the-parcels-waiting-recorded-as-a-pickup-the-courier-was-not-asked-for-its-load-sheet-printed-and-its-parcels-checked-off)): `courierPickupRecordByHand` records the account's parcels waiting as a
   pickup the courier was not asked for (migration 0174), the rider named where given, so that
