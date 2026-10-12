@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
 
-### Parcels the courier has not seen, on Home
+### 27b0437 · Parcels the courier has not seen, on Home
 
 * **On Home** ([ADR-380](../architecture/13-decision-log.md#adr-380--parcels-the-courier-has-not-seen-on-home-their-count-among-the-next-actions-a-tap-from-the-pickups-that-list-them-for-those-who-hand-parcels-over)): Home's `parcelsUnseen` counts the parcels `courierParcelsUnseen`
   lists; the admin's Home shows the count below the next actions, a tap from the Pickups tab,
