@@ -17,7 +17,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
 
-### A parcel's hand-over on its order's page
+### 81f0850 · A parcel's hand-over on its order's page
 
 * **In the core** ([ADR-381](../architecture/13-decision-log.md#adr-381--a-parcels-hand-over-on-its-orders-page-when-to-whom-and-whether-by-hand-and-whether-the-couriers-tracking-has-had-it-since-put-together-in-the-core)): `Fulfillment.handOver` gives a parcel's last check-off in a
   pickup, its rider and whether by hand, with `seen` and `unseen` by ADR-379's rule, put
