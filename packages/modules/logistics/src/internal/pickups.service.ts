@@ -37,6 +37,12 @@ const UNANSWERED = '10 minutes';
 /** A parcel still waiting this long after the pickup it went in is handed over in the next. */
 const MISSED = '24 hours';
 
+/**
+ * A parcel handed to a rider that the courier's tracking still has as only booked this long
+ * after is one the courier has not seen (ADR-379).
+ */
+export const UNSEEN_AFTER_HOURS = 24;
+
 export type PickupStatusValue = 'requesting' | 'requested' | 'failed';
 
 /** A pickup of an account's parcels, as staff see it (ADR-253). */
@@ -72,6 +78,14 @@ export interface PickupParcelRecord {
   /** When it was checked off as the rider took it; null while it is still to be handed over. */
   handedOverAt: Date | null;
   handedOverBy: { kind: 'staff' | 'app'; id: string } | null;
+}
+
+/** A parcel handed to a rider that the courier's tracking has not seen since (ADR-379). */
+export interface UnseenParcelRecord extends PickupParcelRecord {
+  /** The pickup it was last handed over in, and that pickup's rider where named. */
+  pickupId: string;
+  rider: { name: string | null; code: string | null };
+  handedOverAt: Date;
 }
 
 export interface CourierPickupInput {
@@ -469,6 +483,41 @@ export class CourierPickupService {
             ON pp.shop_id = b.shop_id AND pp.booking_id = b.id AND pp.pickup_id = ${pickupId}
          WHERE b.shop_id = ${shopId} AND b.id = ${parcel.booking_id}`);
       return { ok: true, value: { parcel: this.#parcelOf(rows[0]!), already } };
+    });
+  }
+
+  /**
+   * Parcels handed to a rider at least {@link UNSEEN_AFTER_HOURS} hours ago that the courier's
+   * tracking still has as only booked (SHP-02, SHP-04, ADR-379): the rider may never have
+   * scanned them in, or lost them. The longest since handed over first; each by the pickup it was
+   * last handed over in.
+   */
+  async unseen(tenant: TenantContext, first: number): Promise<UnseenParcelRecord[]> {
+    const limit = Math.min(Math.max(first, 1), PICKUP_LIMITS.listed);
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<
+        ParcelRow & { pickup_id: string; rider_name: string | null; rider_code: string | null }
+      >(sql`
+        SELECT * FROM (
+          SELECT DISTINCT ON (b.id) ${BOOKING_COLUMNS}, ${HANDED_OVER_COLUMNS},
+                 pp.pickup_id, p.rider_name, p.rider_code
+            FROM ${BOOKING_FROM}
+            JOIN logistics.pickup_parcels pp ON pp.shop_id = b.shop_id AND pp.booking_id = b.id
+            JOIN logistics.pickups p ON p.shop_id = pp.shop_id AND p.id = pp.pickup_id
+           WHERE b.shop_id = ${tenant.shopId}
+             AND b.status = 'booked' AND b.parcel_status = 'booked'
+             AND pp.handed_over_at IS NOT NULL
+           ORDER BY b.id, pp.handed_over_at DESC
+        ) handed
+         WHERE handed_over_at <= now() - make_interval(hours => ${UNSEEN_AFTER_HOURS})
+         ORDER BY handed_over_at, id
+         LIMIT ${limit}`);
+      return rows.map((row) => ({
+        ...this.#parcelOf(row),
+        handedOverAt: toDate(row.handed_over_at!),
+        pickupId: row.pickup_id,
+        rider: { name: row.rider_name, code: row.rider_code },
+      }));
     });
   }
 

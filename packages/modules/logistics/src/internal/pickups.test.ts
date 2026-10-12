@@ -291,6 +291,60 @@ describe.skipIf(!server)('Courier pickups (ADR-253)', () => {
     expect(unwrap(await f.pickups.request(f.a, {})).byHand).toBe(false);
   });
 
+  it("lists parcels handed to a rider that the courier's tracking has not seen a day on (ADR-379)", async () => {
+    await connect('test', 'Test Lahore');
+    const [seen, unseen, recent, unhanded] = [
+      await f.booked(f.a, kurta),
+      await f.booked(f.a, kurta),
+      await f.booked(f.a, kurta),
+      await f.booked(f.a, kurta),
+    ];
+    const pickup = unwrap(await f.pickups.recordByHand(f.a, { riderName: 'Imran' }));
+    for (const parcel of [seen, unseen, recent]) {
+      unwrap(await f.pickups.handOver(f.a, pickup.id, parcel.trackingNumber!));
+    }
+    // Two handed over a day and more ago, one an hour ago; one never handed over.
+    const handedAt = async (bookingId: string, hours: number) =>
+      f.admin.query(
+        `UPDATE logistics.pickup_parcels SET handed_over_at = now() - make_interval(hours => $2)
+          WHERE booking_id = $1`,
+        [bookingId, hours],
+      );
+    await handedAt(seen.bookingId, 30);
+    await handedAt(unseen.bookingId, 26);
+    await handedAt(recent.bookingId, 1);
+    // The courier's tracking has the first on its way.
+    await f.admin.query(
+      `UPDATE logistics.bookings SET parcel_status = 'in_transit' WHERE id = $1`,
+      [seen.bookingId],
+    );
+
+    const listed = await f.pickups.unseen(f.a, 20);
+    expect(listed.map((each) => each.booking.id)).toEqual([unseen.bookingId]);
+    expect(listed[0]).toMatchObject({
+      pickupId: pickup.id,
+      rider: { name: 'Imran', code: null },
+    });
+    expect(listed[0]!.handedOverAt.getTime()).toBeLessThan(Date.now() - 25 * 3_600_000);
+    expect(unhanded.bookingId).not.toBe(unseen.bookingId);
+    // Another shop sees none of it.
+    expect(await f.pickups.unseen(f.b, 20)).toEqual([]);
+
+    // Handed over again in a later pickup an hour ago: not unseen until a day after that.
+    await f.admin.query(
+      `UPDATE logistics.pickups SET requested_at = now() - interval '2 days' WHERE id = $1`,
+      [pickup.id],
+    );
+    const again = unwrap(await f.pickups.recordByHand(f.a, {}));
+    unwrap(await f.pickups.handOver(f.a, again.id, unseen.trackingNumber!));
+    await f.admin.query(
+      `UPDATE logistics.pickup_parcels SET handed_over_at = now() - interval '1 hour'
+        WHERE pickup_id = $1 AND booking_id = $2`,
+      [again.id, unseen.bookingId],
+    );
+    expect(await f.pickups.unseen(f.a, 20)).toEqual([]);
+  });
+
   it('asks for the rider where the courier does, and refuses a courier whose API takes none', async () => {
     expect(said(await f.pickups.request(f.a, {}))).toEqual([
       ['accountId', 'BLANK', 'Connect a courier account first'],

@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: what a rider took against what the
-courier's tracking says it picked up, and what comes after it. Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: what the courier's tracking says of
+each parcel shown where staff already look for it, and what comes after it. Urdu handles wait,
+as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +17,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
+
+### Parcels a rider took that the courier has not seen, in the core and the admin
+
+* **Unseen** ([ADR-379](../architecture/13-decision-log.md#adr-379--parcels-a-rider-took-that-the-couriers-tracking-has-not-seen-a-day-on-listed-from-the-hand-overs-against-the-parcels-status-with-the-rider-and-when)): `courierParcelsUnseen` lists the parcels handed over a day ago and more
+  that the courier's tracking still has as only booked, with their pickup and rider; a partial
+  index finds the bookings still waiting (migration 0175).
+* **In the admin:** the Pickups tab opens with them, each order linked, and the check-off says
+  when the courier has a parcel that was not checked off.
+* **Tried in Chromium against the core:** the seed's three parcels checked off today were set
+  back 30 hours in the database; the Pickups tab said "3 parcels handed over that the courier has
+  not scanned in", #1016 handed over yesterday and #1014 and #1013 handed to Imran yesterday.
+  Their times were then put back as they were. No errors in the browser.
+* 2541 tests (4 new): the unseen parcels in the logistics module, the
+  query through the API's pickup test, and the admin's pickups tests of the list, of none, and of
+  the courier's word in the check-off, with the new GraphQL document checked against the schema.
 
 ### b1bb2d9 · Parcels handed to a rider by hand, in the core and the admin
 

@@ -45,7 +45,22 @@ function pickup(
   };
 }
 
-function core(accounts = [POSTEX, LEOPARDS, TRAX]) {
+/** A parcel handed to Imran a day and more ago that PostEx's tracking has not seen (ADR-379). */
+const UNSEEN = {
+  booking: {
+    id: 'cb_9',
+    orderId: 'ord_9',
+    orderName: '#1009',
+    trackingNumber: 'PX100299',
+    courierName: 'PostEx',
+  },
+  handedOverAt: new Date(Date.now() - 30 * 3_600_000).toISOString(),
+  pickupId: 'pk_1',
+  riderName: 'Imran',
+  riderCode: null,
+};
+
+function core(accounts = [POSTEX, LEOPARDS, TRAX], unseen: (typeof UNSEEN)[] = []) {
   let pickups = [
     pickup('pk_1', 'acc_1', 'REQUESTED', {
       parcelCount: 12,
@@ -70,11 +85,15 @@ function core(accounts = [POSTEX, LEOPARDS, TRAX]) {
       orderId: `ord_${number}`,
       orderName: parcels.get(number)!.order,
       trackingNumber: number,
+      // The courier's tracking has #1033 already, though it was not checked off.
+      parcelStatus: number === 'PX100203' ? 'IN_TRANSIT' : 'BOOKED',
     },
     handedOverAt: parcels.get(number)!.handed ? AGO : null,
   });
   return fakeCore('packer', (operation, variables) => {
     switch (operation) {
+      case 'CourierParcelsUnseen':
+        return { shop: { timezone: 'Asia/Karachi' }, courierParcelsUnseen: unseen };
       case 'CourierPickupParcels':
         return {
           courierPickup: {
@@ -284,7 +303,7 @@ describe('Courier pickups', () => {
       within(screen.getByRole('list', { name: 'Still to hand over' }))
         .getAllByRole('listitem')
         .map((item) => item.textContent);
-    expect(left()).toEqual(['#1031PX100201', '#1032PX100202', '#1033PX100203']);
+    expect(left()).toEqual(['#1031PX100201', '#1032PX100202', '#1033PX100203The courier has it']);
 
     const scan = async (code: string) => {
       type('Tracking number', code);
@@ -293,7 +312,7 @@ describe('Courier pickups', () => {
     await scan('px 100202');
     expect(await screen.findByText("#1032's parcel is handed over.")).toBeTruthy();
     await screen.findByText('1 of 3 handed over');
-    expect(left()).toEqual(['#1031PX100201', '#1033PX100203']);
+    expect(left()).toEqual(['#1031PX100201', '#1033PX100203The courier has it']);
     expect(sentOf(fake, 'CourierPickupParcelHandOver')).toEqual([
       { pickupId: 'pk_1', trackingNumber: 'px 100202' },
     ]);
@@ -341,5 +360,40 @@ describe('Courier pickups', () => {
     const list = screen.getByRole('list', { name: 'Pickups asked for' });
     expect(within(list).getByText('Handed to a rider by hand')).toBeTruthy();
     expect(sentOf(fake, 'CourierPickupParcels')).toEqual([{ id: 'pk_4' }]);
+  });
+
+  it("says which parcels a rider took that the courier's tracking has not seen a day on (ADR-379)", async () => {
+    vi.stubGlobal('fetch', core(undefined, [UNSEEN]).fetcher);
+    renderAdmin('/shop_1/shipping?tab=pickups');
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'A parcel handed over that the courier has not scanned in',
+      }),
+    ).toBeTruthy();
+    const list = screen.getByRole('list', { name: 'Handed over, not yet with the courier' });
+    const item = within(list).getByRole('listitem');
+    expect(within(item).getByRole('link', { name: '#1009' }).getAttribute('href')).toBe(
+      '/shop_1/orders/ord_9',
+    );
+    expect(within(item).getByText('PX100299')).toBeTruthy();
+    expect(within(item).getByText(/^Handed to Imran /)).toBeTruthy();
+
+    // In the check-off, a parcel the courier's tracking has, though not checked off, says so.
+    fireEvent.click(await screen.findByRole('button', { name: 'Check off by scanning' }));
+    await screen.findByText('0 of 3 handed over');
+    const left = screen.getByRole('list', { name: 'Still to hand over' });
+    const taken = within(left).getByText('#1033').closest('li')!;
+    expect(within(taken).getByText('The courier has it')).toBeTruthy();
+    expect(within(left).getAllByText('The courier has it')).toHaveLength(1);
+  });
+
+  it('shows nothing of parcels unseen while there are none', async () => {
+    vi.stubGlobal('fetch', core().fetcher);
+    renderAdmin('/shop_1/shipping?tab=pickups');
+    await screen.findByRole('list', { name: 'Pickups asked for' });
+    expect(
+      screen.queryByRole('list', { name: 'Handed over, not yet with the courier' }),
+    ).toBeNull();
   });
 });

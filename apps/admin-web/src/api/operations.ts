@@ -1716,9 +1716,32 @@ export const CourierPickupParcelsQuery = /* GraphQL */ `
           orderId
           orderName
           trackingNumber
+          parcelStatus
         }
         handedOverAt
       }
+    }
+  }
+`;
+
+/** Parcels handed to a rider that the courier's tracking has not seen a day on (ADR-379). */
+export const CourierParcelsUnseenQuery = /* GraphQL */ `
+  query CourierParcelsUnseen {
+    shop {
+      timezone
+    }
+    courierParcelsUnseen(first: 50) {
+      booking {
+        id
+        orderId
+        orderName
+        trackingNumber
+        courierName
+      }
+      handedOverAt
+      pickupId
+      riderName
+      riderCode
     }
   }
 `;

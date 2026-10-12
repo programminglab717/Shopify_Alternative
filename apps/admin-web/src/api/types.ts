@@ -706,8 +706,32 @@ export interface CourierPickup {
 }
 
 export interface PickupParcel {
-  booking: { id: string; orderId: string; orderName: string; trackingNumber: string | null };
+  booking: {
+    id: string;
+    orderId: string;
+    orderName: string;
+    trackingNumber: string | null;
+    /** What the courier's tracking says of it; BOOKED until the courier has it. */
+    parcelStatus: string | null;
+  };
   handedOverAt: string | null;
+}
+
+export interface CourierParcelsUnseenData {
+  shop: { timezone: string };
+  courierParcelsUnseen: {
+    booking: {
+      id: string;
+      orderId: string;
+      orderName: string;
+      trackingNumber: string | null;
+      courierName: string;
+    };
+    handedOverAt: string;
+    pickupId: string;
+    riderName: string | null;
+    riderCode: string | null;
+  }[];
 }
 
 export interface CourierPickupParcelsData {

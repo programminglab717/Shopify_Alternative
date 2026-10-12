@@ -1,14 +1,17 @@
-import { ExternalLink, FileText, Hand, ScanBarcode, Truck } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { AlertTriangle, ExternalLink, FileText, Hand, ScanBarcode, Truck } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   CourierLoadSheetQuery,
+  CourierParcelsUnseenQuery,
   CourierPickupRecordByHandMutation,
   CourierPickupRequestMutation,
   PickupsQuery,
 } from '../api/operations';
 import type {
   CourierDocumentData,
+  CourierParcelsUnseenData,
   CourierPickup,
   CourierPickupRecordByHandData,
   CourierPickupRequestData,
@@ -128,6 +131,59 @@ function RequestPickup({ data }: { data: PickupsData }) {
           {t('pickups.askSubmit', { courier: account.courierName })}
         </Button>
       </form>
+    </Card>
+  );
+}
+
+/**
+ * Parcels handed to a rider a day ago and more that the courier's tracking still has as only
+ * booked (ADR-379): the rider may never have scanned them in, or lost them. Each with its order,
+ * tracking number, courier, and when and to whom it was handed; nothing shown while none is.
+ */
+function Unseen() {
+  const { t, locale } = useLocale();
+  const shop = useShop();
+  const query = useAdminQuery<CourierParcelsUnseenData>(
+    ['courierParcelsUnseen'],
+    CourierParcelsUnseenQuery,
+  );
+  if (!query.data || query.data.courierParcelsUnseen.length === 0) return null;
+  const { timezone } = query.data.shop;
+  const parcels = query.data.courierParcelsUnseen;
+  return (
+    <Card className="flex flex-col gap-3 border-warning p-4">
+      <h2 className="flex items-center gap-2 font-semibold">
+        <AlertTriangle aria-hidden className="size-5 text-warning" />
+        {t('pickups.unseen', { count: parcels.length })}
+      </h2>
+      <p className="text-secondary">{t('pickups.unseenHint')}</p>
+      <ul aria-label={t('pickups.unseenList')} className="flex flex-col gap-2">
+        {parcels.map((parcel) => {
+          const when = formatRelative(parcel.handedOverAt, timezone, locale);
+          return (
+            <li key={parcel.booking.id} className="flex flex-col">
+              <span className="flex flex-wrap gap-x-3">
+                <Link
+                  to="/$shopId/orders/$orderId"
+                  params={{ shopId: shop.id, orderId: parcel.booking.orderId }}
+                  className="font-medium text-primary"
+                >
+                  {parcel.booking.orderName}
+                </Link>
+                <span dir="ltr" className="num text-secondary">
+                  {parcel.booking.trackingNumber}
+                </span>
+                <span className="text-secondary">{parcel.booking.courierName}</span>
+              </span>
+              <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                {parcel.riderName
+                  ? t('pickups.handedTo', { when, rider: parcel.riderName })
+                  : t('pickups.handedAt', { when })}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </Card>
   );
 }
@@ -281,6 +337,7 @@ export function Pickups() {
 
   return (
     <div className="flex flex-col gap-4">
+      <Unseen />
       <RequestPickup data={query.data} />
       <RecordByHand data={query.data} onRecorded={setHanding} />
       {problem && <Alert tone="danger">{problem}</Alert>}

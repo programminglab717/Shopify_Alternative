@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-378 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-379 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -386,6 +386,7 @@
 | 376 | How many orders each packer packed: the orders' own timelines, packing undone left out, for owners and managers and each packer their own | Accepted |
 | 377 | A pickup's parcels checked off by scanning as its rider takes them: each by its label's tracking number, when and by whom kept, those still on the table listed | Accepted |
 | 378 | Parcels handed to a courier's rider by hand: the parcels waiting recorded as a pickup the courier was not asked for, its load sheet printed and its parcels checked off | Accepted |
+| 379 | Parcels a rider took that the courier's tracking has not seen a day on: listed from the hand-overs against the parcels' status, with the rider and when | Accepted |
 
 ---
 
@@ -14731,3 +14732,32 @@
     today is one, and their riders come unasked as often as asked.
   * **Checking off the account's load sheet without a pickup:** what the sheet listed would be
     lost once the parcels moved on; a pickup keeps it.
+
+## ADR-379 · Parcels a rider took that the courier's tracking has not seen a day on: listed from the hand-overs against the parcels' status, with the rider and when
+
+* **Context:**
+  * Parcels are now checked off as the rider takes them (ADR-377, ADR-378), and the courier's
+    tracking says of each parcel what the courier knows of it (ADR-149). A parcel the rider took
+    but never scanned in, or lost on the way, stays "booked" in the courier's tracking; nothing
+    put the two side by side, and the shop found out when the customer called (SHP-02, SHP-04).
+* **Decision:**
+  * **In the core**, `courierParcelsUnseen(first)` lists the parcels handed over at least 24
+    hours ago, by the hand-over they were last in, that the courier's tracking still has as only
+    booked: each with its booking, when it was handed over, the pickup, and that pickup's rider.
+    The longest since handed over first. A parcel handed over again later counts from then. A
+    partial index finds the bookings still waiting (migration 0175), which pickups' claim and
+    load sheets read too.
+  * **In the admin**, the Pickups tab opens with those parcels, when there are any: how many,
+    and for each its order (linked), tracking number, courier, and when and to whom it was
+    handed, with a word to ask the courier or the rider. In a pickup's check-off, a parcel not
+    checked off that the courier's tracking already has says "The courier has it".
+* **Consequences:**
+  * A parcel gone missing between the shop and the courier shows a day after, with the rider
+    who took it, instead of when the customer asks.
+  * Nothing is sent to the courier; the shop asks it, as now.
+* **Alternatives:**
+  * **Telling staff as it happens:** a day is how long couriers' first scans take at the
+    slowest; a message before then would mostly be wrong. A message can follow once shops say
+    the list is not enough.
+  * **Checking the parcel off when the courier's tracking has it:** the check-off records what
+    the shop saw leave; the courier's word is shown beside it, not written into it.

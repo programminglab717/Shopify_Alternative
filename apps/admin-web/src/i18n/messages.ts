@@ -3258,6 +3258,14 @@ const en = {
   'pickups.riderCodeOptional': "Rider's code (optional)",
   'pickups.byHandSubmit': 'Hand over the parcels waiting',
   'pickups.status.BY_HAND': 'Handed to a rider by hand',
+  'pickups.unseen': '{count} parcels handed over that the courier has not scanned in',
+  'pickups.unseen.one': 'A parcel handed over that the courier has not scanned in',
+  'pickups.unseenHint':
+    "A day and more after its rider took them, the courier's tracking still has these as only booked. Ask the courier, or the rider, where they are.",
+  'pickups.unseenList': 'Handed over, not yet with the courier',
+  'pickups.handedTo': 'Handed to {rider} {when}',
+  'pickups.handedAt': 'Handed over {when}',
+  'pickups.courierHasIt': 'The courier has it',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6492,6 +6500,14 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'pickups.riderCodeOptional': 'رائیڈر کا کوڈ (اختیاری)',
   'pickups.byHandSubmit': 'انتظار والے پارسل حوالے کریں',
   'pickups.status.BY_HAND': 'رائیڈر کو ہاتھوں ہاتھ دیے گئے',
+  'pickups.unseen': '{count} حوالے کیے گئے پارسل جو کوریئر نے اسکین نہیں کیے',
+  'pickups.unseen.one': 'ایک حوالے کیا گیا پارسل جو کوریئر نے اسکین نہیں کیا',
+  'pickups.unseenHint':
+    'رائیڈر کے لینے کے ایک دن بعد بھی کوریئر کی ٹریکنگ میں یہ صرف بک شدہ ہیں۔ کوریئر یا رائیڈر سے پوچھیں کہ یہ کہاں ہیں۔',
+  'pickups.unseenList': 'حوالے کیے گئے، ابھی کوریئر کے پاس نہیں',
+  'pickups.handedTo': '{when} {rider} کو دیا گیا',
+  'pickups.handedAt': '{when} حوالے کیا گیا',
+  'pickups.courierHasIt': 'کوریئر کے پاس ہے',
 };
 
 export const messages: Readonly<

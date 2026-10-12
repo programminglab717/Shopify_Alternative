@@ -2461,6 +2461,23 @@ type CourierReceivables {
   owed: CodCash!
 }
 
+"""
+A parcel handed to a courier's rider that the courier's tracking still has as only booked a day on (SHP-02, SHP-04, ADR-379): the rider may never have scanned it in, or lost it.
+"""
+type CourierUnseenParcel {
+  booking: CourierBooking!
+
+  """When it was checked off as handed over."""
+  handedOverAt: DateTime!
+
+  """The pickup it was last handed over in."""
+  pickupId: ID!
+  riderCode: String
+
+  """That pickup's rider, where named."""
+  riderName: String
+}
+
 input CreateMediaInput {
   alt: String
 
@@ -9242,6 +9259,14 @@ type Query {
   A courier account's load sheet, the default account's unless given: its parcels waiting to be picked up, the longest waiting first, up to 1,000, with the cash each collects, and boxes for the shop and the rider to sign; or, given a pickup, the parcels it handed to its courier (ADR-253). On A4.
   """
   courierLoadSheet(accountId: ID, language: DocumentLanguage! = BILINGUAL, pickupId: ID): CourierDocument!
+
+  """
+  Parcels handed to a courier's rider at least 24 hours ago that the courier's tracking still has as only booked (SHP-02, SHP-04, ADR-379): the rider may never have scanned them in, or lost them. The longest since handed over first.
+  """
+  courierParcelsUnseen(
+    """Up to 50."""
+    first: Int! = 20
+  ): [CourierUnseenParcel!]!
   courierPickup(id: ID!): CourierPickup
 
   """The shop's pickups, the latest first, of one courier account if given."""

@@ -95,6 +95,10 @@ export function HandOver({ pickupId, onClose }: { pickupId: string; onClose: () 
                   <span dir="ltr" className="num text-secondary">
                     {parcel.booking.trackingNumber}
                   </span>
+                  {parcel.booking.parcelStatus && parcel.booking.parcelStatus !== 'BOOKED' && (
+                    // Taken without being checked off: the courier's tracking has it (ADR-379).
+                    <span className="text-success">{t('pickups.courierHasIt')}</span>
+                  )}
                 </li>
               ))}
             </ul>

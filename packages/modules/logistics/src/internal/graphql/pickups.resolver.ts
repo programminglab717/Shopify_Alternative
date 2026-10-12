@@ -3,6 +3,7 @@ import { toPublicId } from '@hatti/ids';
 import type { CurrencyCode } from '@hatti/money';
 import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import {
+  UNSEEN_AFTER_HOURS,
   CourierPickupService,
   type CourierPickupRecord,
   type PickupParcelRecord,
@@ -16,6 +17,7 @@ import {
   CourierPickupParcelHandOverPayload,
   CourierPickupPayload,
   CourierPickupStatus,
+  CourierUnseenParcel,
 } from './couriers.types.js';
 
 /**
@@ -115,6 +117,30 @@ export class CourierPickupResolver {
       first,
     });
     return records.map((record) => this.#toPickup(record));
+  }
+
+  @Query(() => [CourierUnseenParcel], {
+    description:
+      `Parcels handed to a courier's rider at least ${UNSEEN_AFTER_HOURS} hours ago that the ` +
+      "courier's tracking still has as only booked (SHP-02, SHP-04, ADR-379): the rider may " +
+      'never have scanned them in, or lost them. The longest since handed over first.',
+  })
+  @RequireScopes('read_orders')
+  async courierParcelsUnseen(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('first', { type: () => Int, defaultValue: 20, description: 'Up to 50.' })
+    first = 20,
+  ): Promise<CourierUnseenParcel[]> {
+    const records = await this.pickups.unseen(tenant, first);
+    return records.map((record) =>
+      Object.assign(new CourierUnseenParcel(), {
+        booking: toBooking(record.booking, tenant.currency),
+        handedOverAt: record.handedOverAt,
+        pickupId: toPublicId('courierPickup', record.pickupId),
+        riderName: record.rider.name,
+        riderCode: record.rider.code,
+      }),
+    );
   }
 
   @Query(() => CourierPickup, { nullable: true })
