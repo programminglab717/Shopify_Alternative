@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
 
-### Couriers' rate cards, and what each parcel is likely to cost
+### d8cf0f6 · Couriers' rate cards, and what each parcel is likely to cost
 
 * **In the core** ([ADR-383](../architecture/13-decision-log.md#adr-383--couriers-rate-cards-each-parcel-keeps-what-its-accounts-card-says-it-is-likely-to-cost-when-the-courier-books-it-and-profit-counts-that-until-a-statement-says-what-it-charged), SHP-07): migration 0178 keeps a rate card per courier account, and
   what each booking's parcel is likely to cost by it, on the booking and on the parcel. The
