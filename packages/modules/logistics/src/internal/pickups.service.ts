@@ -521,6 +521,24 @@ export class CourierPickupService {
     });
   }
 
+  /** How many parcels {@link unseen} lists in all, for Home (ADR-380). */
+  async unseenCount(tenant: TenantContext): Promise<number> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows } = await tx.execute<{ count: number }>(sql`
+        SELECT count(*)::int AS count FROM (
+          SELECT DISTINCT ON (b.id) pp.handed_over_at
+            FROM logistics.bookings b
+            JOIN logistics.pickup_parcels pp ON pp.shop_id = b.shop_id AND pp.booking_id = b.id
+           WHERE b.shop_id = ${tenant.shopId}
+             AND b.status = 'booked' AND b.parcel_status = 'booked'
+             AND pp.handed_over_at IS NOT NULL
+           ORDER BY b.id, pp.handed_over_at DESC
+        ) handed
+         WHERE handed_over_at <= now() - make_interval(hours => ${UNSEEN_AFTER_HOURS})`);
+      return rows[0]!.count;
+    });
+  }
+
   /** A URL that gives the courier's own load sheet for an hour; null where none is kept. */
   documentUrlOf(pickup: CourierPickupRecord): string | null {
     if (!pickup.documentKey || !this.storage) return null;

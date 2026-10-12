@@ -1,6 +1,7 @@
 import { CurrentTenant, Money, RequireScopes, badUserInput, type TenantContext } from '@hatti/api';
 import { tryFromPublicId } from '@hatti/ids';
 import { LowStockService, TransferService } from '@hatti/inventory/public';
+import { CourierPickupService } from '@hatti/logistics/public';
 import { money } from '@hatti/money';
 import { OrderService, TodayService, type OrderTally } from '@hatti/orders/public';
 import {
@@ -170,6 +171,7 @@ export class HomeResolver {
     private readonly days: TodayService,
     private readonly stock: LowStockService,
     private readonly transfers: TransferService,
+    private readonly pickups: CourierPickupService,
   ) {}
 
   @Query(() => Home, { description: "What waits for the shop: the admin's home." })
@@ -242,6 +244,16 @@ export class HomeResolver {
     @Parent() home: Home,
   ): Promise<number> {
     return this.transfers.countInTransit(tenant, home.locationId);
+  }
+
+  @ResolveField(() => Int, {
+    description:
+      "Parcels handed to a courier's rider a day ago and more that the courier's tracking still " +
+      'has as only booked (ADR-379, ADR-380): the rider may never have scanned them in, or lost ' +
+      'them; courierParcelsUnseen lists them.',
+  })
+  async parcelsUnseen(@CurrentTenant() tenant: TenantContext): Promise<number> {
+    return this.pickups.unseenCount(tenant);
   }
 }
 

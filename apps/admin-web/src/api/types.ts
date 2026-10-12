@@ -54,6 +54,8 @@ export interface HomeData {
     | 'claimsOpen',
     Tally
   > & {
+    /** Parcels handed to a rider a day ago and more that the courier has not seen (ADR-380). */
+    parcelsUnseen: number;
     today: {
       since: string;
       sales: Tally;

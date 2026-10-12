@@ -41,6 +41,7 @@ export const HomeQuery = /* GraphQL */ `
       awaitingPayment {
         ...Tally
       }
+      parcelsUnseen
       transfersToCheck {
         ...Tally
       }

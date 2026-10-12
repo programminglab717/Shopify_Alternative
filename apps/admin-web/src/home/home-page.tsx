@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import {
+  AlertTriangle,
   ArrowLeftRight,
   Boxes,
   ChevronRight,
@@ -24,7 +25,7 @@ import { useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 
-type HomeKey = Exclude<keyof HomeData['home'], 'today'>;
+type HomeKey = Exclude<keyof HomeData['home'], 'today' | 'parcelsUnseen'>;
 
 /** A page of its own that a next action opens, for the roles that use it. */
 interface Opens {
@@ -154,6 +155,38 @@ function StockOnHome({ location }: { location: string | undefined }) {
       <StockRunningLow stock={query.data.home.lowStock} />
       <TransfersToReceive count={query.data.home.transfersToReceive} />
     </>
+  );
+}
+
+/** The roles that see parcels the courier has not seen: those who hand them over (ADR-380). */
+const SEES_UNSEEN: readonly StaffRole[] = ['owner', 'manager', 'packer'];
+
+/**
+ * Parcels handed to a rider a day ago and more that the courier's tracking still has as only
+ * booked (ADR-379, ADR-380), a tap from the pickups that list them; nothing while none is.
+ */
+function ParcelsUnseen({ count }: { count: number }) {
+  const { t } = useLocale();
+  const { id: shopId, role } = useShop();
+  if (!count || !SEES_UNSEEN.includes(role)) return null;
+  return (
+    <Card>
+      <Link
+        to="/$shopId/shipping"
+        params={{ shopId }}
+        search={{ tab: 'pickups' }}
+        className="flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-canvas"
+      >
+        <AlertTriangle aria-hidden className="size-5 text-warning" />
+        <span className="flex flex-1 flex-col">
+          <span className="font-medium">
+            {t('home.parcelsUnseen', { count: formatCount(count) })}
+          </span>
+          <span className="text-secondary">{t('home.parcelsUnseenHint')}</span>
+        </span>
+        <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />
+      </Link>
+    </Card>
   );
 }
 
@@ -323,6 +356,7 @@ export function HomePage() {
           </Card>
         )}
         <StockOnHome location={location} />
+        <ParcelsUnseen count={tallies.parcelsUnseen} />
       </section>
       <section aria-labelledby="home-today" className="flex flex-col gap-2">
         <h2 id="home-today" className="font-semibold">

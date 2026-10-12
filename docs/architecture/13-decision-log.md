@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-379 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-380 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -387,6 +387,7 @@
 | 377 | A pickup's parcels checked off by scanning as its rider takes them: each by its label's tracking number, when and by whom kept, those still on the table listed | Accepted |
 | 378 | Parcels handed to a courier's rider by hand: the parcels waiting recorded as a pickup the courier was not asked for, its load sheet printed and its parcels checked off | Accepted |
 | 379 | Parcels a rider took that the courier's tracking has not seen a day on: listed from the hand-overs against the parcels' status, with the rider and when | Accepted |
+| 380 | Parcels the courier has not seen on Home: their count among the next actions, a tap from the pickups that list them, for those who hand parcels over | Accepted |
 
 ---
 
@@ -14761,3 +14762,24 @@
     the list is not enough.
   * **Checking the parcel off when the courier's tracking has it:** the check-off records what
     the shop saw leave; the courier's word is shown beside it, not written into it.
+
+## ADR-380 · Parcels the courier has not seen on Home: their count among the next actions, a tap from the pickups that list them, for those who hand parcels over
+
+* **Context:**
+  * Parcels a rider took that the courier's tracking has not seen a day on (ADR-379) showed only
+    on the Pickups tab, which staff open when a rider comes, not every day. Home is where they
+    look first (ANL-01, ADR-121), as transfers to receive are (ADR-364).
+* **Decision:**
+  * **In the core**, Home's `parcelsUnseen` counts the same parcels `courierParcelsUnseen` lists,
+    by the same rule, read with Home (`read_orders`).
+  * **In the admin**, Home shows "N parcels handed over that the courier has not scanned in"
+    below the next actions while there are any, for owners, managers and packers, who hand
+    parcels over; a tap opens the Pickups tab, which lists them. Nothing while there are none,
+    nor for other staff.
+* **Consequences:**
+  * A missing parcel is in front of the shop the morning after, without anyone opening the
+    Pickups tab.
+* **Alternatives:**
+  * **Among the next actions, with an amount:** the next actions are orders by stage, each with
+    its money; a parcel unseen is a question for the courier, not a step in the order's way, and
+    its cash is still the courier's to collect.

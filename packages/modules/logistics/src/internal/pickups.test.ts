@@ -321,6 +321,8 @@ describe.skipIf(!server)('Courier pickups (ADR-253)', () => {
 
     const listed = await f.pickups.unseen(f.a, 20);
     expect(listed.map((each) => each.booking.id)).toEqual([unseen.bookingId]);
+    expect(await f.pickups.unseenCount(f.a)).toBe(1);
+    expect(await f.pickups.unseenCount(f.b)).toBe(0);
     expect(listed[0]).toMatchObject({
       pickupId: pickup.id,
       rider: { name: 'Imran', code: null },
@@ -343,6 +345,7 @@ describe.skipIf(!server)('Courier pickups (ADR-253)', () => {
       [again.id, unseen.bookingId],
     );
     expect(await f.pickups.unseen(f.a, 20)).toEqual([]);
+    expect(await f.pickups.unseenCount(f.a)).toBe(0);
   });
 
   it('asks for the rider where the courier does, and refuses a courier whose API takes none', async () => {

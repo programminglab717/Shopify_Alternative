@@ -3744,6 +3744,11 @@ type Home {
   lowStock: HomeStock!
 
   """
+  Parcels handed to a courier's rider a day ago and more that the courier's tracking still has as only booked (ADR-379, ADR-380): the rider may never have scanned them in, or lost them; courierParcelsUnseen lists them.
+  """
+  parcelsUnseen: Int!
+
+  """
   Refused or undeliverable parcels on their way back, to check in: RETURNING.
   """
   returning: HomeTally!

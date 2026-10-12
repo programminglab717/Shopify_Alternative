@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: what the courier's tracking says of
-each parcel shown where staff already look for it, and what comes after it. Urdu handles wait,
-as decided.
+**Next, section by section as the alpha's shops need them**: the courier's word on a parcel on
+the order's own page beside its hand-over, and what comes after it. Urdu handles wait, as
+decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +17,21 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
+
+### Parcels the courier has not seen, on Home
+
+* **On Home** ([ADR-380](../architecture/13-decision-log.md#adr-380--parcels-the-courier-has-not-seen-on-home-their-count-among-the-next-actions-a-tap-from-the-pickups-that-list-them-for-those-who-hand-parcels-over)): Home's `parcelsUnseen` counts the parcels `courierParcelsUnseen`
+  lists; the admin's Home shows the count below the next actions, a tap from the Pickups tab,
+  for owners, managers and packers, and nothing while there are none.
+* **Tried in Chromium against the core:** with the seed's three checked-off parcels set back
+  30 hours, Home said "3 parcels handed over that the courier has not scanned in", and its tap
+  opened the Pickups tab with them listed. Their times were then put back as they were. The
+  container had been restarted, so Postgres and Redis were started again, and the tables Home
+  reads were read once first, so that a cold disk could not time out its first query as it did
+  this morning. No errors in the browser.
+* 2543 tests (2 new): Home's card for an owner and a packer, one parcel
+  and none, and an agent; the count beside the list in the logistics module's test and through
+  the API's pickup test.
 
 ### 9685536 · Parcels a rider took that the courier has not seen, in the core and the admin
 

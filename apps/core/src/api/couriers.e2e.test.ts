@@ -492,6 +492,7 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
     // Handed over a day ago and the courier's tracking still has it booked: said (ADR-379).
     const UNSEEN = '{ courierParcelsUnseen { booking { id } pickupId riderName handedOverAt } }';
     expect(await data(tokens.reader, UNSEEN)).toEqual([]);
+    expect(await data(tokens.reader, '{ home { parcelsUnseen } }')).toEqual({ parcelsUnseen: 0 });
     await admin.query(
       `UPDATE logistics.pickup_parcels SET handed_over_at = now() - interval '30 hours'
         WHERE handed_over_at IS NOT NULL`,
@@ -504,6 +505,8 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
         handedOverAt: expect.any(String),
       },
     ]);
+    // And Home counts it (ADR-380).
+    expect(await data(tokens.reader, '{ home { parcelsUnseen } }')).toEqual({ parcelsUnseen: 1 });
   });
 
   it("names cities as a courier names them, for the shop's next parcels to them (SHP-03)", async () => {

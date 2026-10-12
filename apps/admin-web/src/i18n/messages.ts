@@ -3266,6 +3266,9 @@ const en = {
   'pickups.handedTo': 'Handed to {rider} {when}',
   'pickups.handedAt': 'Handed over {when}',
   'pickups.courierHasIt': 'The courier has it',
+  'home.parcelsUnseen': '{count} parcels handed over that the courier has not scanned in',
+  'home.parcelsUnseen.one': 'A parcel handed over that the courier has not scanned in',
+  'home.parcelsUnseenHint': 'A day after its rider took them. See which, and ask.',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6508,6 +6511,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'pickups.handedTo': '{when} {rider} کو دیا گیا',
   'pickups.handedAt': '{when} حوالے کیا گیا',
   'pickups.courierHasIt': 'کوریئر کے پاس ہے',
+  'home.parcelsUnseen': '{count} حوالے کیے گئے پارسل جو کوریئر نے اسکین نہیں کیے',
+  'home.parcelsUnseen.one': 'ایک حوالے کیا گیا پارسل جو کوریئر نے اسکین نہیں کیا',
+  'home.parcelsUnseenHint': 'رائیڈر کے لینے کے ایک دن بعد۔ دیکھیں کون سے، اور پوچھیں۔',
 };
 
 export const messages: Readonly<
