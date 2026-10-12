@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
 
-### A pickup's parcels checked off by scanning, in the core and the admin
+### b134159 · A pickup's parcels checked off by scanning, in the core and the admin
 
 * **Handed over** ([ADR-377](../architecture/13-decision-log.md#adr-377--a-pickups-parcels-checked-off-by-scanning-as-its-rider-takes-them-each-by-its-labels-tracking-number-when-and-by-whom-kept-those-still-on-the-table-listed)): each of a pickup's parcels keeps when it was handed over and by
   whom (migration 0173); `courierPickupParcelHandOver` checks one off by its label's tracking
