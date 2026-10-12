@@ -3221,6 +3221,24 @@ const en = {
   'orders.packByScan': 'Pack by scanning',
   'pack.packed': '{name} is packed.',
   'pack.print': 'Print what goes with it',
+  'orders.packers': 'Who packed what',
+  'orders.packedByMe': 'What I packed',
+  'packers.title': 'Orders packed',
+  'packers.hint':
+    "How many orders each member of staff marked as packed, and the items in them. Orders unpacked again don't count.",
+  'packers.hintOwn':
+    "The orders you marked as packed, and the items in them. Orders unpacked again don't count.",
+  'packers.cannot': 'Only owners, managers and packers see how many orders were packed.',
+  'packers.none': 'No one marked an order as packed in these days.',
+  'packers.noneOwn': 'You marked no orders as packed in these days.',
+  'packers.today': 'Today',
+  'packers.you': 'You',
+  'packers.packed': 'Orders packed',
+  'packers.units': 'Items',
+  'packers.perHour': 'Orders an hour',
+  'packers.hours': '{count} hours packing',
+  'packers.hours.one': '1 hour packing',
+  'packers.total': 'In all: {count} orders packed, {units} items',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6418,6 +6436,24 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'orders.packByScan': 'اسکین کر کے پیک کریں',
   'pack.packed': '{name} پیک ہو گیا۔',
   'pack.print': 'ساتھ جانے والا کاغذ پرنٹ کریں',
+  'orders.packers': 'کس نے کیا پیک کیا',
+  'orders.packedByMe': 'میں نے کیا پیک کیا',
+  'packers.title': 'پیک کیے گئے آرڈر',
+  'packers.hint':
+    'ہر عملے کے رکن نے کتنے آرڈر پیک کیے، اور ان میں کتنی اشیاء تھیں۔ جو آرڈر دوبارہ ان پیک ہوئے وہ شمار نہیں ہوتے۔',
+  'packers.hintOwn':
+    'آپ کے پیک کیے ہوئے آرڈر، اور ان میں اشیاء۔ جو آرڈر دوبارہ ان پیک ہوئے وہ شمار نہیں ہوتے۔',
+  'packers.cannot': 'پیک کیے گئے آرڈر صرف مالکان، مینیجر اور پیکرز دیکھتے ہیں۔',
+  'packers.none': 'ان دنوں میں کسی نے کوئی آرڈر پیک نہیں کیا۔',
+  'packers.noneOwn': 'ان دنوں میں آپ نے کوئی آرڈر پیک نہیں کیا۔',
+  'packers.today': 'آج',
+  'packers.you': 'آپ',
+  'packers.packed': 'پیک کیے گئے آرڈر',
+  'packers.units': 'اشیاء',
+  'packers.perHour': 'فی گھنٹہ آرڈر',
+  'packers.hours': '{count} گھنٹے پیکنگ',
+  'packers.hours.one': '1 گھنٹہ پیکنگ',
+  'packers.total': 'کل: {count} آرڈر پیک ہوئے، {units} اشیاء',
 };
 
 export const messages: Readonly<

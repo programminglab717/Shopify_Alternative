@@ -20,6 +20,11 @@ export {
   type AgentPerformanceInput,
   type AgentPerformanceRow,
 } from '../internal/agent-performance.service.js';
+export {
+  PackerPerformanceService,
+  type PackerPerformanceInput,
+  type PackerPerformanceRow,
+} from '../internal/packer-performance.service.js';
 export { BROWSER_ID_LIMIT, browserIdsOf, type BrowserIdsValue } from '../internal/browser-ids.js';
 export {
   BANK_TRANSFER_LIMITS,

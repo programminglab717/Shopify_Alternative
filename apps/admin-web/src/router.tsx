@@ -67,6 +67,7 @@ import { HomePage } from './home/home-page';
 import { useLocale } from './i18n/locale';
 import { OrderPage, validateOrderSearch } from './orders/order-page';
 import { OrdersPage, validateOrdersSearch } from './orders/orders-page';
+import { PackersPage } from './orders/packers-page';
 import { NewProductPage } from './products/new-product-page';
 import { ProductPage, validateProductSearch } from './products/product-page';
 import { ProductsPage, validateProductsSearch } from './products/products-page';
@@ -225,6 +226,12 @@ const deskAgents = createRoute({
   getParentRoute: () => shop,
   path: 'desk/agents',
   component: AgentsPage,
+});
+
+const ordersPackers = createRoute({
+  getParentRoute: () => shop,
+  path: 'orders/packers',
+  component: PackersPage,
 });
 
 const ordersExport = createRoute({
@@ -724,6 +731,7 @@ export const routeTree = root.addChildren([
     home,
     orders,
     ordersExport,
+    ordersPackers,
     order,
     desk,
     deskAgents,

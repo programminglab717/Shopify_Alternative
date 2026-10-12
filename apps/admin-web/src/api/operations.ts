@@ -2943,6 +2943,23 @@ export const CodHealthQuery = /* GraphQL */ `
  * How each agent of the Confirmation Desk did over a period (COD-11), and the staff's names for
  * them: both for owners and managers alone.
  */
+export const PackersQuery = /* GraphQL */ `
+  query Packers($from: DateTime!, $before: DateTime!, $managing: Boolean!) {
+    packers(from: $from, before: $before) {
+      id
+      kind
+      packed
+      units
+      activeHours
+      packedPerHour
+    }
+    staffMembers @include(if: $managing) {
+      id
+      name
+    }
+  }
+`;
+
 export const ConfirmationAgentsQuery = /* GraphQL */ `
   query ConfirmationAgents($from: DateTime!, $before: DateTime!) {
     confirmationAgents(from: $from, before: $before) {

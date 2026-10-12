@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-375 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-376 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -383,6 +383,7 @@
 | 373 | An order packed by scanning: each item read ticks off its line, one not in the order or one too many said at once, and the order packed once all of it is there | Accepted |
 | 374 | The orders to pack scanned one after another: the To pack list opens the first to scan, and each packed brings up the next, until none is left | Accepted |
 | 375 | What goes with a parcel, printed as it is packed by scanning: the packing slip or invoice offered once the order is packed, before the next | Accepted |
+| 376 | How many orders each packer packed: the orders' own timelines, packing undone left out, for owners and managers and each packer their own | Accepted |
 
 ---
 
@@ -14637,3 +14638,34 @@
 * **Alternatives:**
   * **Printing at once when packed:** a phone at the table often has no printer; the choice is
     the packer's.
+
+## ADR-376 · How many orders each packer packed: the orders' own timelines, packing undone left out, for owners and managers and each packer their own
+
+* **Context:**
+  * Packing is the work of the shop's packers (APP-04), and orders are now packed one after
+    another by scanning (ADR-373, ADR-374). Owners asked how many each packer packed today and
+    this week, as the Confirmation Desk's agents are counted (COD-11, ADR-090, ADR-335).
+  * Each order's timeline already says who marked it as packed and when, and who unpacked it.
+* **Decision:**
+  * **In the core**, `packers(from, before, first)` works it out when asked from the orders'
+    timelines, as agents' performance does: for each member of staff or app, the orders they
+    marked as packed in the period that nobody has unpacked since (packed still, or shipped),
+    the units in them as their items stand, and the hours of the shop's day in which they
+    packed any, with orders an hour. An order unpacked and packed again is the second packer's;
+    packing undone counts for no one, though its hour still shows they were at it. Orders
+    shipped without being marked as packed have no packer and are not counted. A partial index
+    finds the packing entries by when (migration 0172). At most a year at a time.
+  * **Who sees it:** owners and managers see every packer, and apps with `read_orders`; a packer
+    sees their own count alone; other staff are refused.
+  * **In the admin**, "Who packed what" on the To pack tab (for a packer, "What I packed") opens
+    the count for today, the last 7 or the last 30 days in the shop's time zone: each packer by
+    name, former staff and apps as the agents' page shows them, with orders packed, items and
+    orders an hour, and the total for owners and managers.
+* **Consequences:**
+  * Owners see who packed what each day without a sheet of their own, and packers their own
+    day's count, from what packing already records; nothing new is stored.
+* **Alternatives:**
+  * **Counting every time an order was marked as packed:** a mistake undone would count, and an
+    order packed twice would count twice.
+  * **A counter kept as orders are packed:** a second record of what the timeline says, which
+    unpacking would have to keep right.

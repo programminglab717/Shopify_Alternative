@@ -6,16 +6,36 @@
 
 ## In progress
 
-**Next, how many orders each packer packed** (APP-04, COD-11): the orders packed today and this
-week by each member of staff, from the orders' own events, beside the confirmation agents'
-performance; then section by section as the alpha's shops need them. Urdu handles wait, as
-decided.
+**Next, the parcels handed to the courier checked off by scanning** (SHP-02, APP-04): a load
+sheet's parcels scanned as the rider takes them, those not yet scanned said; then section by
+section as the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
 delivery was tried is V1's failed-delivery rescue (COD-08).
+
+## 2026-10-12
+
+### How many orders each packer packed, in the core and the admin
+
+* **Packers' counts** ([ADR-376](../architecture/13-decision-log.md#adr-376--how-many-orders-each-packer-packed-the-orders-own-timelines-packing-undone-left-out-for-owners-and-managers-and-each-packer-their-own)): `packers(from, before, first)` counts, from the orders'
+  timelines, the orders each member of staff or app marked as packed that nobody has unpacked
+  since, the units in them, and their hours packing; a partial index finds the packing entries
+  by when (migration 0172). Owners and managers see every packer, a packer their own.
+* **In the admin:** "Who packed what" on the To pack tab ("What I packed" for a packer): today,
+  the last 7 or 30 days, each packer's orders, items and orders an hour, and the total.
+* **Tried in Chromium against the core:** the seed's #1003 was marked as packed and the page
+  opened from the To pack tab: today showed Demo Owner with 1 order, 1 item, in 1 hour; the
+  last 30 days 9 orders and 11 items, the owner's 8 and an app's 1. Unpacked again, the owner's
+  count today went to 0, the hour still shown. The order is back in To pack, its packing and
+  unpacking on its timeline. No errors in the browser. The first sign-in after the container
+  was restored timed out on the home's stage counts (5 seconds), a query that takes 0.2 ms
+  warm and did not come back: the database's first reads after the restore, not this change.
+* 2530 tests (7 new): the packers' counts and a period refused in the
+  orders module; packers through the API by role; and the admin's page for an owner, a packer
+  and other staff, with its GraphQL document checked against the schema.
 
 ## 2026-10-11
 

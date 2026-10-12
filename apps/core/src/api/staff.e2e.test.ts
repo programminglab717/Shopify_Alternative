@@ -964,6 +964,62 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       ]);
     });
 
+    it('lets owners and managers see how many orders each packer packed, and packers their own', async () => {
+      const app = await appOfShopA(['write_products', 'write_orders']);
+      const [first, second] = [
+        await orderOfShopA(app, 'PREPAID'),
+        await orderOfShopA(app, 'PREPAID'),
+      ];
+      const [bilal, hina] = [await signUp(), await signUp()];
+      await grant(bilal.userId, shopA, 'packer');
+      await grant(hina.userId, shopA, 'packer');
+      for (const [packer, orderId] of [
+        [bilal, first],
+        [hina, second],
+      ] as const) {
+        const packed = await graphql(
+          packer.accessToken,
+          shopA,
+          `mutation { orderMarkPacked(id: "${orderId}") { userErrors { code } } }`,
+        );
+        expect(packed.json().data.orderMarkPacked.userErrors).toEqual([]);
+      }
+      const from = new Date(Date.now() - 3_600_000).toISOString();
+      const before = new Date(Date.now() + 3_600_000).toISOString();
+      const packers = (token: string) =>
+        graphql(
+          token,
+          shopA,
+          `{ packers(from: "${from}", before: "${before}") { kind id packed units activeHours packedPerHour } }`,
+        );
+      const row = (userId: string) => ({
+        kind: 'STAFF',
+        id: toPublicId('user', userId),
+        packed: 1,
+        units: 1,
+        activeHours: 1,
+        packedPerHour: 1,
+      });
+
+      // A packer sees their own count alone.
+      expect((await packers(hina.accessToken)).json().data.packers).toEqual([row(hina.userId)]);
+      const manager = await signUp();
+      await grant(manager.userId, shopA, 'manager');
+      await enableTwoStep(manager.accessToken);
+      expect(
+        (await packers(manager.accessToken))
+          .json()
+          .data.packers.map((each: { id: string }) => each.id),
+      ).toEqual(expect.arrayContaining([row(bilal.userId).id, row(hina.userId).id]));
+      // Other staff see nobody's.
+      const agent = await signUp();
+      await grant(agent.userId, shopA, 'confirmation_agent');
+      expect((await packers(agent.accessToken)).json().errors[0]).toMatchObject({
+        message: 'Access denied. Only owners, managers and packers see packing counts.',
+        extensions: { code: 'ACCESS_DENIED' },
+      });
+    });
+
     it('lets owners, managers and accountants export orders, as they see them', async () => {
       const app = await appOfShopA(['write_products', 'write_orders']);
       await orderOfShopA(app, 'CASH_ON_DELIVERY');

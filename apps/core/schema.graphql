@@ -7784,6 +7784,33 @@ type OrdersExportPayload {
 }
 
 """
+How one packer did over a period (APP-04, COD-11): the orders they marked as packed, the units in them, and their hours at it.
+"""
+type Packer {
+  """The hours of the shop's day in which they marked any order as packed."""
+  activeHours: Int!
+
+  """The staff member (usr_…) or the access token (tok_…)."""
+  id: ID!
+
+  """A staff member, or an app by its access token."""
+  kind: ConfirmationAgentKind!
+
+  """
+  Orders they marked as packed that nobody has unpacked since: packed still, or shipped.
+  """
+  packed: Int!
+
+  """
+  Orders packed an active hour, to two places; null without active hours.
+  """
+  packedPerHour: Float
+
+  """The units in those orders, as their items stand now."""
+  units: Int!
+}
+
+"""
 A shop's own page, such as About us or its returns policy, which its storefront shows at /pages/{handle} once published, and its menus link to.
 """
 type Page {
@@ -9498,6 +9525,20 @@ type Query {
     riskLevel: OrderRiskLevel
     stage: OrderStage
   ): OrderConnection!
+
+  """
+  Packers' performance (APP-04, COD-11): for each member of staff or app who marked orders as packed over a period, the orders packed that nobody has unpacked since, the units in them, and their hours at it; those who packed most first. Owners and managers see every packer, and apps with read_orders; packers see themselves alone. Worked out when asked.
+  """
+  packers(
+    """Packing done before this; at most 366 days after from."""
+    before: DateTime!
+
+    """Packers at most, 1 to 250; default 50."""
+    first: Int
+
+    """Packing done at or after this."""
+    from: DateTime!
+  ): [Packer!]!
   page(id: ID!): Page
 
   """The shop's pages, oldest first."""

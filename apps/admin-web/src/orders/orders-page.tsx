@@ -8,6 +8,7 @@ import {
   EyeOff,
   FilePen,
   Inbox,
+  PackageCheck,
   Printer,
   ScanBarcode,
   Search,
@@ -39,6 +40,7 @@ import { EXPORTS_ORDERS } from './export-page';
 import { FreshOrdersNotice, useFreshOrders } from './fresh-orders';
 import { LocationFilter, useOrdersLocation } from './location-filter';
 import { CANCELLABLE } from './order-page';
+import { SEES_PACKERS, SEES_PACKING } from './packers-page';
 import { WORKS_PARCELS } from './parcels';
 import { PrintPanel } from './print';
 import { StageBadge, STAGES } from './stage';
@@ -382,17 +384,32 @@ export function OrdersPage() {
           );
         })}
       </div>
-      {stage === 'TO_PACK' && WORKS_PARCELS.includes(shop.role) && shown[0] && (
-        // The orders to pack worked through by scanning, one after another (ADR-374).
-        <Link
-          to="/$shopId/orders/$orderId"
-          params={{ shopId: shop.id, orderId: shown[0].id }}
-          search={{ scan: true }}
-          className="inline-flex min-h-12 items-center gap-2 self-start rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
-        >
-          <ScanBarcode aria-hidden className="size-5" />
-          {t('orders.packByScan')}
-        </Link>
+      {stage === 'TO_PACK' && (
+        <div className="flex flex-wrap gap-2">
+          {WORKS_PARCELS.includes(shop.role) && shown[0] && (
+            // The orders to pack worked through by scanning, one after another (ADR-374).
+            <Link
+              to="/$shopId/orders/$orderId"
+              params={{ shopId: shop.id, orderId: shown[0].id }}
+              search={{ scan: true }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
+            >
+              <ScanBarcode aria-hidden className="size-5" />
+              {t('orders.packByScan')}
+            </Link>
+          )}
+          {SEES_PACKING.includes(shop.role) && (
+            // How many orders each packer packed, or a packer their own (ADR-376).
+            <Link
+              to="/$shopId/orders/packers"
+              params={{ shopId: shop.id }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
+            >
+              <PackageCheck aria-hidden className="size-5" />
+              {t(SEES_PACKERS.includes(shop.role) ? 'orders.packers' : 'orders.packedByMe')}
+            </Link>
+          )}
+        </div>
       )}
       {outcome && (
         <Alert tone={outcome.failed.length ? 'warning' : 'success'}>

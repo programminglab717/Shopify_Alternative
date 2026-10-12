@@ -1229,6 +1229,21 @@ export interface ConfirmationAgentValue {
   delivery: CodDeliveryFigures;
 }
 
+export interface PackerValue {
+  id: string;
+  kind: 'STAFF' | 'APP';
+  packed: number;
+  units: number;
+  activeHours: number;
+  packedPerHour: number | null;
+}
+
+/** Packers' counts; the staff's names only for those who see every packer. */
+export interface PackersData {
+  packers: PackerValue[];
+  staffMembers?: { id: string; name: string }[];
+}
+
 export interface ConfirmationAgentsData {
   confirmationAgents: ConfirmationAgentValue[];
   staffMembers: { id: string; name: string }[];
