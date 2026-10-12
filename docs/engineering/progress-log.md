@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
 
-### Parcels a rider took that the courier has not seen, in the core and the admin
+### 9685536 · Parcels a rider took that the courier has not seen, in the core and the admin
 
 * **Unseen** ([ADR-379](../architecture/13-decision-log.md#adr-379--parcels-a-rider-took-that-the-couriers-tracking-has-not-seen-a-day-on-listed-from-the-hand-overs-against-the-parcels-status-with-the-rider-and-when)): `courierParcelsUnseen` lists the parcels handed over a day ago and more
   that the courier's tracking still has as only booked, with their pickup and rider; a partial
