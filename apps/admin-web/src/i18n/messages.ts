@@ -3334,6 +3334,9 @@ const en = {
   'courierRules.cheapest': 'The cheapest, by rate cards',
   'courierRules.cheapestHint':
     'Each order goes with the account whose rate card costs it least to send and collect. Leave the cities and cash blank for every order.',
+  'messages.kind.DAILY_SUMMARY': "Yesterday's summary",
+  'messages.hint.DAILY_SUMMARY':
+    "To the alerts number each morning: the day before's orders and sales, parcels delivered and turned back, and cash still to come.",
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6644,6 +6647,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'courierRules.cheapest': 'سب سے سستا، ریٹ کارڈ کے حساب سے',
   'courierRules.cheapestHint':
     'ہر آرڈر اس اکاؤنٹ سے جائے گا جس کے ریٹ کارڈ پر بھیجنا اور رقم وصول کرنا سب سے سستا ہو۔ ہر آرڈر کے لیے شہر اور رقم خالی چھوڑیں۔',
+  'messages.kind.DAILY_SUMMARY': 'کل کا خلاصہ',
+  'messages.hint.DAILY_SUMMARY':
+    'ہر صبح الرٹس نمبر پر: پچھلے دن کے آرڈرز اور سیل، ڈیلیور اور واپس ہونے والے پارسل، اور ابھی آنے والی نقدی۔',
 };
 
 export const messages: Readonly<

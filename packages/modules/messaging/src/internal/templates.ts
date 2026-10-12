@@ -30,6 +30,7 @@ export const MESSAGE_KINDS = [
   'one_time_code',
   'stock_low',
   'stock_out',
+  'daily_summary',
   'order_assigned',
   'order_mentioned',
   'order_receipt_sent',
@@ -152,6 +153,14 @@ export interface MessageVariables {
    */
   orders?: string;
   limit?: string;
+  /**
+   * For the shop's summary of the day before (ADR-386), with its `date` and its `orders`: their
+   * total sales, the parcels delivered and turned back, and the cash on delivery still to come.
+   */
+  sales?: string;
+  delivered?: string;
+  returned?: string;
+  cash?: string;
   /**
    * For an email of an order's news (ADR-198): the shop's accent colour, "#B45309", and the
    * address of its logo, where it set them; the order's first lines, one to a line, each its name
@@ -460,6 +469,15 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: '{shop}: {product} is out of stock online. Restock it in Hatti.',
       ur: '{shop}: {product} آن لائن اسٹاک میں ختم ہو گیا ہے۔ ہٹی میں اسٹاک بڑھائیں۔',
+    },
+  },
+  daily_summary: {
+    whatsapp: 'hatti_daily_summary',
+    category: 'utility',
+    parameters: ['shop', 'date', 'orders', 'sales', 'delivered', 'returned', 'cash'],
+    text: {
+      en: '{shop}, {date}: {orders} orders for {sales}; {delivered} parcels delivered and {returned} turned back. Cash on delivery still to come: {cash}. More in Hatti.',
+      ur: '{shop}، {date}: {sales} کے {orders} آرڈرز؛ {delivered} پارسل ڈیلیور ہوئے اور {returned} واپس ہوئے۔ کیش آن ڈیلیوری کی ابھی آنے والی رقم: {cash}۔ مزید ہٹی میں۔',
     },
   },
   order_assigned: {

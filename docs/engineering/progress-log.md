@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: what comes after the cheapest
-courier as a rule, such as couriers' delivery by city weighed with their price (SHP-06, SHP-08).
+**Next, section by section as the alpha's shops need them**: what comes after the owner's
+morning summary, such as couriers' delivery by city weighed with their price (SHP-06, SHP-08).
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -17,6 +17,26 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
+
+### The owner's summary of the day before
+
+* **In the core** ([ADR-386](../architecture/13-decision-log.md#adr-386--each-morning-the-shops-alerts-number-hears-how-the-day-before-went-from-nine-by-its-clock-once-a-day-and-not-of-a-day-with-nothing-in-it), ANL-07): each morning from nine by the shop's clock, the worker
+  tells the shop's alerts number on WhatsApp how the day before went: its orders and their
+  sales, parcels delivered and turned back, and cash on delivery still to come, as the home
+  works them out; once a day, not of a day with nothing in it, and not while the shop turned it
+  off. A message kind of its own, `daily_summary`, with Hatti's template in English and Urdu;
+  `yesterdayIn` in the orders module.
+* **In the admin**, Messages in settings lists "Yesterday's summary" among what the shop hears,
+  to turn off.
+* **Tried against the core:** in Chromium the summary was listed and on, and the alerts number
+  0300 1234567 saved; a sweep for 11 October in Karachi told nothing at 8 am, one summary at 10
+  am and nothing again at noon: "Hatti Demo Bazaar, Sat 10 Oct: 3 orders for Rs 0; 0 parcels
+  delivered and 3 turned back. Cash on delivery still to come: Rs 10,230. More in Hatti.", the
+  three having come back, and in Urdu the same. The message was then deleted and the number
+  cleared. No errors in the browser.
+* 2583 tests (3 new): the day before in the orders module, its words in
+  the messaging module, and the worker's sweep in the core; and the summary among the admin's
+  messages, in its test of them.
 
 ### 75d1561 · The cheapest courier as a rule
 

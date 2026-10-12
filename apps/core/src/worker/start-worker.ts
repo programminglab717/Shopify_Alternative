@@ -65,6 +65,7 @@ import { ConfirmationReminders } from './confirmation-reminders.js';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
 import { CourierBookings } from './courier-bookings.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
+import { DailySummaries } from './daily-summaries.js';
 import { DomainChecks } from './domain-checks.js';
 import { DomainNotices } from './domain-notices.js';
 import { PlanOrders } from './plan-orders.js';
@@ -291,6 +292,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => credit.stop());
+    // Each shop told each morning on WhatsApp how the day before went (ADR-386).
+    const summaries = new DailySummaries(database, new MessagesService(database), logger).start(
+      config.SWEEP_INTERVAL_MS,
+    );
+    closers.push(() => summaries.stop());
     // Carts, checkouts and browsers' proofs of a number past their time deleted (ADR-230).
     const expired = new ExpiredCheckouts(new CheckoutExpiry(database), logger).start(
       config.SWEEP_INTERVAL_MS,

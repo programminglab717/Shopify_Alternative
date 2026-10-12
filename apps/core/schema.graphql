@@ -5313,6 +5313,11 @@ enum MessageKind {
   CREDIT_LOW
 
   """
+  For the shop, at its alerts number each morning: the day before's orders and sales, parcels delivered and turned back, and cash on delivery still to come (ANL-07, ADR-386).
+  """
+  DAILY_SUMMARY
+
+  """
   For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: DNS points a domain of its own elsewhere, which is disconnected three days on unless it points back (ADR-262).
   """
   DOMAIN_UNPOINTED

@@ -301,7 +301,12 @@ export {
   type SavedSearchInput,
   type SavedSearchUpdateInput,
 } from '../internal/saved-search.service.js';
-export { TodayService, type OrderToday } from '../internal/today.service.js';
+export {
+  TodayService,
+  yesterdayIn,
+  type OrderDay,
+  type OrderToday,
+} from '../internal/today.service.js';
 export {
   OrderTrackingService,
   type TrackingForm,

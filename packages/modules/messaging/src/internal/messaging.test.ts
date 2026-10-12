@@ -155,6 +155,34 @@ describe("Messages' words", () => {
     expect(messageText('stock_out', 'ur', stock)).toContain('Lawn Kurta (S)');
   });
 
+  it('tells the shop each morning how the day before went, at its alerts number (ADR-386)', () => {
+    const day = {
+      shop: 'Zari Fashions',
+      date: 'Sun 11 Oct',
+      orders: '14',
+      sales: 'Rs 41,000',
+      delivered: '9',
+      returned: '2',
+      cash: 'Rs 86,500',
+    };
+    expect(messageText('daily_summary', 'en', day)).toBe(
+      'Zari Fashions, Sun 11 Oct: 14 orders for Rs 41,000; 9 parcels delivered and 2 turned back. ' +
+        'Cash on delivery still to come: Rs 86,500. More in Hatti.',
+    );
+    expect(templateParameters('daily_summary', day)).toEqual([
+      'Zari Fashions',
+      'Sun 11 Oct',
+      '14',
+      'Rs 41,000',
+      '9',
+      '2',
+      'Rs 86,500',
+    ]);
+    expect(messageText('daily_summary', 'ur', day)).toMatch(
+      /^Zari Fashions، Sun 11 Oct: Rs 41,000/,
+    );
+  });
+
   it('tells a customer of store credit given them, and of a credit about to expire (ADR-192)', () => {
     const credit = { shop: 'Zari Fashions', amount: 'Rs 1,000', balance: 'Rs 1,500' };
     expect(messageText('store_credit_given', 'en', credit)).toBe(

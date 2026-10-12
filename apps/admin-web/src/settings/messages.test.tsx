@@ -121,11 +121,17 @@ describe('Customer messages', () => {
     ).toBeTruthy();
     expect((screen.getByLabelText(/^Out of stock/) as HTMLInputElement).checked).toBe(false);
     expect((screen.getByLabelText(/^Order shipped/) as HTMLInputElement).checked).toBe(true);
+    // The summary of the day before, each morning (ADR-386): on unless turned off.
+    expect((screen.getByLabelText(/^Yesterday's summary/) as HTMLInputElement).checked).toBe(true);
+    expect(
+      screen.getByText(/^To the alerts number each morning: the day before's orders/),
+    ).toBeTruthy();
     expect(screen.getByText(/^Codes customers prove their number with/)).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText(/^SMS for updates/));
     fireEvent.click(screen.getByLabelText(/^Order shipped/));
     fireEvent.click(screen.getByLabelText(/^Out of stock/));
+    fireEvent.click(screen.getByLabelText(/^Yesterday's summary/));
     type('Alerts number', '12345');
     fireEvent.click(screen.getByRole('button', { name: 'Save messages' }));
     expect(await screen.findByText('Alerts number: must be a Pakistani mobile')).toBeTruthy();
@@ -136,7 +142,7 @@ describe('Customer messages', () => {
     expect(sentOf(fake, 'MessagingSettingsUpdate').at(-1)).toEqual({
       input: {
         routing: 'ECONOMY',
-        disabledNotifications: ['ORDER_SHIPPED'],
+        disabledNotifications: ['DAILY_SUMMARY', 'ORDER_SHIPPED'],
         alertsPhone: '0300 1234567',
       },
     });

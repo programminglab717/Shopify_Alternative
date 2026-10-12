@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-385 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-386 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -393,6 +393,7 @@
 | 383 | Couriers' rate cards: each parcel keeps what its account's card says it is likely to cost when the courier books it, and profit counts that until a statement says what it charged | Accepted |
 | 384 | Couriers' performance: how each courier's parcels shipped in a period went, everywhere and city by city, worked out from the parcels when asked | Accepted |
 | 385 | A courier rule may book with the cheapest of the shop's accounts by their rate cards, order by order, and is passed over where none has a card | Accepted |
+| 386 | Each morning the shop's alerts number hears how the day before went, from nine by its clock, once a day, and not of a day with nothing in it | Accepted |
 
 ---
 
@@ -14994,3 +14995,42 @@
   * **Counting what a return would cost, by each courier's return rate in the city:** the
     rates are few in most cities and move week to week; until they are steady, the card's price
     is what the shop can check.
+
+## ADR-386 · Each morning the shop's alerts number hears how the day before went, from nine by its clock, once a day, and not of a day with nothing in it
+
+* **Context:**
+  * An owner in Pakistan runs the shop from a phone and reads WhatsApp first thing; opening the
+    admin to see how yesterday went is a step most skip. ANL-07 asks for a daily summary on
+    WhatsApp: yesterday's sales, deliveries, returns and the cash still owed. The shop already
+    gives a number for Hatti's alerts ([ADR-157](#adr-157--the-shop-hears-on-whatsapp-when-a-variant-runs-low-on-stock-and-again-when-it-runs-out-at-the-number-it-gives-for-hattis-alerts-once-for-each-spell-of-low-stock-which-inventory-keeps-until-the-variant-is-stocked-above-the-threshold-again-the-worker-hears-each-levels-change-and-queues-the-alert-as-a-message-the-shops-credit-pays-for)), and the home already works out a day's figures
+    ([ADR-121](#adr-121--the-home-says-how-the-shops-day-has-gone-from-midnight-in-its-time-zone-todays-sales-as-the-sales-report-works-them-out-and-the-parcels-delivered-and-turned-back-today-at-their-worth)).
+* **Decision:**
+  * **A message kind of its own, `daily_summary`**, Hatti's utility template
+    `hatti_daily_summary` in English and Urdu: the day, its orders and their sales, parcels
+    delivered and turned back, and the cash on delivery still to come. It goes to the shop's
+    alerts number on WhatsApp, at the shop's cost as its alerts do, and the shop turns it off
+    as it does any alert; on unless it does.
+  * **Worked out as the home works out today**, for the day before by the shop's clock: the
+    orders placed that day, cancelled ones aside, with the sales report's total sales, less what
+    came back; parcels delivered and turned back that day at their worth; and the cash on
+    delivery still to come as the home has it: on cash-on-delivery orders on their way, or
+    delivered and not yet paid for. `yesterdayIn` in the orders module.
+  * **A sweep of the worker**, every few minutes as the others: shops with an alerts number and
+    the summary on are found with the system role, and each is told in its own transaction from
+    nine in the morning by its clock, with the day in its message's key so it is told once a day.
+    A day with no orders and no parcels delivered or turned back is not told: it would cost the
+    shop for nothing.
+  * **In the admin**, Messages in settings lists "Yesterday's summary" among what the shop
+    hears, saying what it carries, to turn off.
+* **Consequences:**
+  * The owner hears each morning what the home would say of yesterday, without opening it.
+  * A shop pays for one WhatsApp utility message on each day it had any orders or parcels.
+  * A worker down all morning tells the shop late that day; down past midnight, that day's
+    summary is not sent.
+* **Alternatives:**
+  * **Off unless turned on:** few shops would find it; the alerts number is given on purpose,
+    and the summary is turned off as easily as any alert.
+  * **An hour of the shop's choosing:** nine suits most shops; a setting of its own can come
+    when shops ask.
+  * **To the owner's own number rather than the alerts number:** the alerts number is where the
+    shop asked Hatti's word to go, and may be a manager's.

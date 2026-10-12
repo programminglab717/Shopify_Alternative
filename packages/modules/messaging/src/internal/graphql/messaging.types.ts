@@ -28,6 +28,7 @@ export enum MessageKind {
   ONE_TIME_CODE = 'ONE_TIME_CODE',
   STOCK_LOW = 'STOCK_LOW',
   STOCK_OUT = 'STOCK_OUT',
+  DAILY_SUMMARY = 'DAILY_SUMMARY',
   ORDER_ASSIGNED = 'ORDER_ASSIGNED',
   ORDER_MENTIONED = 'ORDER_MENTIONED',
   ORDER_RECEIPT_SENT = 'ORDER_RECEIPT_SENT',
@@ -109,6 +110,11 @@ registerEnumType(MessageKind, {
         'spell, until it is stocked above it again.',
     },
     STOCK_OUT: { description: 'For the shop: a variant ran out for sale online (INV-01).' },
+    DAILY_SUMMARY: {
+      description:
+        "For the shop, at its alerts number each morning: the day before's orders and sales, " +
+        'parcels delivered and turned back, and cash on delivery still to come (ANL-07, ADR-386).',
+    },
     ORDER_ASSIGNED: {
       description:
         'For a member of staff, at their own number: an order was given to them to see through ' +
