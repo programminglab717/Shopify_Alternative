@@ -808,6 +808,13 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
         { ids: [another] },
       ),
     ).toEqual([{ accountId, ruleId: cheapest.courierRules[0].id }]);
+    // Or the best value for each parcel delivered (ADR-387).
+    const PICKED = `mutation ($rules: [CourierRuleInput!]!) {
+      courierRulesUpdate(rules: $rules) { courierRules { accountId pick } userErrors { code } }
+    }`;
+    expect(
+      await data(tokens.settings, PICKED, { rules: [{ accountId: null, pick: 'BEST_VALUE' }] }),
+    ).toEqual({ courierRules: [{ accountId: null, pick: 'BEST_VALUE' }], userErrors: [] });
     expect((await data(tokens.settings, RULES, { rules: [] })).courierRules).toEqual([]);
 
     const REMOVE = `mutation ($accountId: ID!) {

@@ -4,7 +4,9 @@ import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   CourierRuleService,
+  DELIVERY_RATE_MIN,
   accountByRules,
+  deliveryRateFor,
   type CourierRuleRecord,
   type RuledParcel,
 } from './courier-rules.service.js';
@@ -14,6 +16,7 @@ import { errorsOf, logisticsFixture, unwrap, type LogisticsFixture } from './tes
 const rule = (fields: Partial<CourierRuleRecord>): CourierRuleRecord => ({
   id: newId(),
   accountId: 'acc',
+  pick: null,
   cities: [],
   codAtLeast: null,
   codBelow: null,
@@ -91,6 +94,48 @@ describe('The first courier rule an order matches (ADR-382)', () => {
   });
 });
 
+describe('The best value for each parcel delivered (ADR-387)', () => {
+  const rates = [
+    { courier: 'postex', city: 'quetta', delivered: 4, finished: 10 },
+    { courier: 'postex', city: 'multan', delivered: 2, finished: 3 },
+    { courier: 'postex', city: null, delivered: 18, finished: 20 },
+    { courier: 'leopards', city: null, delivered: 3, finished: 5 },
+    { courier: null, city: null, delivered: 30, finished: 40 },
+  ];
+
+  it("takes a courier's rate in the city, else everywhere, else the shop's, once there are enough", () => {
+    expect(DELIVERY_RATE_MIN).toBe(10);
+    expect(deliveryRateFor(rates, 'PostEx', ' Quetta')).toBe(0.4);
+    // Three parcels in Multan are too few: PostEx's everywhere.
+    expect(deliveryRateFor(rates, 'PostEx', 'Multan')).toBe(0.9);
+    expect(deliveryRateFor(rates, 'PostEx', null)).toBe(0.9);
+    // Five of Leopards' are too few: the shop's with every courier.
+    expect(deliveryRateFor(rates, 'Leopards', 'Quetta')).toBe(0.75);
+    expect(deliveryRateFor([], 'Leopards', 'Quetta')).toBe(1);
+  });
+
+  it('picks the account cheapest for each parcel delivered, not the cheapest to send', () => {
+    const value = rule({ accountId: null, pick: 'best_value' });
+    // PostEx's card is dearer out, but it delivers 9 in 10 to Quetta to the other's 4 in 10.
+    const cards = [
+      card('cheap', { otherFirst: 25_000n, returnBp: 5_000 }),
+      card('sure', { otherFirst: 30_000n, returnBp: 5_000 }),
+    ];
+    const delivers = (accountId: string) => (accountId === 'sure' ? 0.9 : 0.4);
+    const parcel = { city: 'Quetta', codAmount: 0n, weightGrams: null };
+    expect(accountByRules([value], parcel, cards, delivers)?.accountId).toBe('sure');
+    // The cheapest by card alone, as a rule naming no pick has it.
+    expect(
+      accountByRules([{ ...value, pick: 'cheapest' }], parcel, cards, delivers)?.accountId,
+    ).toBe('cheap');
+    // Equal rates, the cheaper card; and a courier that never delivers is never picked.
+    expect(accountByRules([value], parcel, cards, () => 0.5)?.accountId).toBe('cheap');
+    expect(
+      accountByRules([value], parcel, cards, (id) => (id === 'cheap' ? 0 : 0.1))?.accountId,
+    ).toBe('sure');
+  });
+});
+
 const server = testDatabaseServer();
 
 describe.skipIf(!server)("A shop's courier rules, and booking by them (ADR-382)", () => {
@@ -164,6 +209,7 @@ describe.skipIf(!server)("A shop's courier rules, and booking by them (ADR-382)"
       {
         id: expect.any(String),
         accountId: karachi.id,
+        pick: null,
         cities: ['Karachi', 'Hyderabad'],
         codAtLeast: null,
         codBelow: null,
@@ -172,6 +218,7 @@ describe.skipIf(!server)("A shop's courier rules, and booking by them (ADR-382)"
       {
         id: expect.any(String),
         accountId: main.id,
+        pick: null,
         cities: [],
         codAtLeast: 2_000_000n,
         codBelow: null,
@@ -323,6 +370,44 @@ describe.skipIf(!server)("A shop's courier rules, and booking by them (ADR-382)"
       ruleId: null,
       estimate: null,
     });
+  });
+
+  it("books with the best value by cards and couriers' deliveries (ADR-387)", async () => {
+    const main = unwrap(await testAccount('Main'));
+    // A PostEx account, as connecting one would check it with PostEx.
+    const { rows } = await f.admin.query<{ id: string }>(
+      `INSERT INTO logistics.courier_accounts (shop_id, courier, name, credentials, credentials_hint)
+       VALUES ($1, 'postex', 'PostEx', 'sealed', '9876') RETURNING id`,
+      [f.a.shopId],
+    );
+    const postex = rows[0]!.id;
+    const card = { originCity: 'Karachi', localEach: '50', otherEach: '100' };
+    unwrap(await f.rateCards.set(f.a, main.id, { ...card, localFirst: '150', otherFirst: '250' }));
+    unwrap(await f.rateCards.set(f.a, postex, { ...card, localFirst: '150', otherFirst: '300' }));
+    // In Lahore the test courier delivered 5 of its last 10, PostEx all 10.
+    for (let at = 0; at < 10; at += 1) {
+      const ours = await f.shipped(f.a, kurta, { company: 'Test courier', number: `TC-${at}` });
+      if (at < 5) unwrap(await f.fulfillments.markDelivered(f.a, ours.fulfillmentId));
+      else unwrap(await f.fulfillments.markReturning(f.a, ours.fulfillmentId));
+      const theirs = await f.shipped(f.a, kurta, { company: 'PostEx', number: `PX-${at}` });
+      unwrap(await f.fulfillments.markDelivered(f.a, theirs.fulfillmentId));
+    }
+
+    const kept = unwrap(await rules.replace(f.a, [{ accountId: null, pick: 'best_value' }]));
+    expect(kept).toEqual([expect.objectContaining({ accountId: null, pick: 'best_value' })]);
+    const toLahore = await f.confirmed(f.a, kurta);
+    // Rs 250 for half the parcels delivered is Rs 500 each; Rs 300 for all of them, Rs 300.
+    expect((await f.bookings.accountsFor(f.a, [toLahore.orderId]))[0]).toMatchObject({
+      accountId: postex,
+      estimate: 30_000n,
+    });
+    // The cheapest by card alone.
+    unwrap(await rules.replace(f.a, [{ accountId: null }]));
+    expect((await rules.list(f.a))[0]!.pick).toBe('cheapest');
+    expect((await f.bookings.accountsFor(f.a, [toLahore.orderId]))[0]!.accountId).toBe(main.id);
+    expect(
+      errorsOf(await rules.replace(f.a, [{ accountId: null, pick: 'fastest' as 'cheapest' }])),
+    ).toEqual([['rules.0.pick', 'INVALID']]);
   });
 
   it('refuses an order no rule is for once the shop has no default account', async () => {

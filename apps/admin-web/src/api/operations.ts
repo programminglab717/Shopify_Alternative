@@ -6664,6 +6664,7 @@ const COURIER_RULE = /* GraphQL */ `
   fragment CourierRuleFields on CourierRule {
     id
     accountId
+    pick
     accountArchived
     cities
     codAtLeast {

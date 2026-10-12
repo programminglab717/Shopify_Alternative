@@ -110,8 +110,14 @@ describe('Courier rules in settings (ADR-382)', () => {
       fake.sent.filter((each) => each.operation === 'CourierRulesUpdate').at(-1)?.variables,
     ).toEqual({
       rules: [
-        { accountId: 'cra_1', cities: [], codAtLeast: '20,000', codBelow: null },
-        { accountId: 'cra_2', cities: ['Karachi', 'Hyderabad'], codAtLeast: null, codBelow: null },
+        { accountId: 'cra_1', pick: null, cities: [], codAtLeast: '20,000', codBelow: null },
+        {
+          accountId: 'cra_2',
+          pick: null,
+          cities: ['Karachi', 'Hyderabad'],
+          codAtLeast: null,
+          codBelow: null,
+        },
       ],
     });
   });
@@ -140,14 +146,30 @@ describe('Courier rules in settings (ADR-382)', () => {
     fireEvent.change(within(second).getByLabelText('Book with'), { target: { value: 'cra_2' } });
     expect(within(second).queryByText(/costs it least/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Move rule 2 up' }));
+    // The rule for every order picks the best value for each parcel delivered (ADR-387).
+    const last = screen.getByRole('listitem', { name: 'Rule 2' });
+    fireEvent.change(within(last).getByLabelText('Book with'), {
+      target: { value: '~best-value' },
+    });
+    expect(
+      within(last).getByText(
+        /^Each order goes with the account cheapest for each parcel delivered/,
+      ),
+    ).toBeTruthy();
     await press('Save rules');
     await screen.findByText('Rules saved. Orders booked from now on follow them.');
     expect(fake.sent.find((each) => each.operation === 'CourierRulesUpdate')?.variables).toEqual({
       rules: [
-        { accountId: 'cra_2', cities: ['Karachi'], codAtLeast: null, codBelow: null },
-        { accountId: null, cities: [], codAtLeast: null, codBelow: null },
+        { accountId: 'cra_2', pick: null, cities: ['Karachi'], codAtLeast: null, codBelow: null },
+        { accountId: null, pick: 'BEST_VALUE', cities: [], codAtLeast: null, codBelow: null },
       ],
     });
+    // Kept, it reads back as the best value.
+    expect(
+      within(screen.getByRole('listitem', { name: 'Rule 2' })).getByLabelText<HTMLSelectElement>(
+        'Book with',
+      ).value,
+    ).toBe('~best-value');
   });
 
   it('warns of a rule whose account was archived, and takes rules away', async () => {

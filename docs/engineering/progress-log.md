@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: what comes after the owner's
-morning summary, such as couriers' delivery by city weighed with their price (SHP-06, SHP-08).
+**Next, section by section as the alpha's shops need them**: what comes after courier rules for
+the best value, such as a message when a delivery was tried and failed (COD-08).
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -17,6 +17,25 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
+
+### Courier rules for the best value
+
+* **In the core** ([ADR-387](../architecture/13-decision-log.md#adr-387--a-courier-rule-may-book-with-the-best-value-the-account-cheapest-for-each-parcel-delivered-weighing-its-rate-card-with-how-often-its-courier-delivers-to-the-orders-city), SHP-06, SHP-08): a courier rule naming no account picks either the
+  cheapest by rate cards or, now, the best value: the account cheapest for each parcel delivered,
+  its card's way out, cash fee and charge back weighed with how often its courier delivered to
+  the order's city in the last 90 days, else everywhere, else the shop's, once ten parcels
+  arrived. Migration 0180 keeps the rule's pick; `deliveryRatesIn` in the orders module gives the
+  rates.
+* **In the admin**, a rule's "Book with" offers "The best value, by rate cards and deliveries".
+* **Tried in Chromium against the core:** with cards for both of the seed's accounts, a rule for
+  the best value was added in settings and saved, read back as such after a reload and through
+  the API as `BEST_VALUE`; with #1003 to Lahore marked packed the To book tab said "Goes with Test
+  courier · about Rs 120", both accounts being the test courier's and so delivering alike. The
+  rule and cards were then taken away and #1003 marked unpacked. No errors in the browser.
+* 2587 tests (4 new): delivery rates in the orders module; the rate's
+  fallbacks, the best value against the cheapest, and booking by it in the logistics module; the
+  pick through the API in the core's courier test; and the rule in the admin's settings, in its
+  test of the cheapest.
 
 ### e71e8fd · The owner's summary of the day before
 

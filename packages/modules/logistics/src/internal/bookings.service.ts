@@ -7,11 +7,23 @@ import {
 } from '@hatti/api';
 import { Database, exactTime, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
-import { orderShipmentFactsIn, type OrderShipmentFacts } from '@hatti/orders/public';
+import {
+  deliveryRatesIn,
+  orderShipmentFactsIn,
+  type OrderShipmentFacts,
+} from '@hatti/orders/public';
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { COURIERS } from './courier-accounts.service.js';
-import { accountByRules, courierRulesIn, type RuledParcel } from './courier-rules.service.js';
+import {
+  accountByRules,
+  courierRulesIn,
+  DELIVERY_RATE_DAYS,
+  deliveryRateFor,
+  type CourierRuleRecord,
+  type DeliveryRateOf,
+  type RuledParcel,
+} from './courier-rules.service.js';
 import { carryEstimateIn, chargeEstimate, liveRateCardsIn } from './rate-cards.service.js';
 import { Couriers, plainStatusOf, type CourierParcelStatusValue } from './couriers.js';
 import {
@@ -225,9 +237,12 @@ export class CourierBookingService {
             return account !== undefined && this.couriers.of(account.courier) !== undefined;
           })
         : [];
+      const deliveryRateOf = await this.#deliveryRates(tx, tenant.shopId, rules, accounts);
       /** The account to book the order with, or why there is none. */
       const accountFor = (facts: OrderShipmentFacts): AccountRow | string => {
-        const chosen = ruled ? accountByRules(rules, parcelOf(facts), cards) : undefined;
+        const chosen = ruled
+          ? accountByRules(rules, parcelOf(facts), cards, deliveryRateOf)
+          : undefined;
         const account = chosen ? byId.get(chosen.accountId) : named;
         if (!account || account.archived_at !== null) {
           return 'No courier rule is for this order, and the shop has no default courier account';
@@ -329,10 +344,13 @@ export class CourierBookingService {
       const all = await liveRateCardsIn(tx, tenant.shopId);
       const cards = all.filter((card) => booking.has(card.accountId));
       const cardOf = new Map(all.map((card) => [card.accountId, card]));
+      const deliveryRateOf = await this.#deliveryRates(tx, tenant.shopId, rules, accounts);
       const choices = [];
       for (const orderId of ids) {
         const facts = await orderShipmentFactsIn(tx, tenant.shopId, orderId);
-        const chosen = facts ? accountByRules(rules, parcelOf(facts), cards) : undefined;
+        const chosen = facts
+          ? accountByRules(rules, parcelOf(facts), cards, deliveryRateOf)
+          : undefined;
         const accountId = facts ? (chosen?.accountId ?? fallback) : null;
         const card = accountId ? cardOf.get(accountId) : undefined;
         const estimate = card && facts ? chargeEstimate(card, parcelOf(facts)) : null;
@@ -345,6 +363,29 @@ export class CourierBookingService {
       }
       return choices;
     });
+  }
+
+  /**
+   * How often each account's courier delivers to a parcel's city (ADR-387), by the parcels
+   * shipped in the last {@link DELIVERY_RATE_DAYS} days under the name its courier ships them
+   * with; asked for only where a rule picks the best value.
+   */
+  async #deliveryRates(
+    tx: Tx,
+    shopId: string,
+    rules: readonly CourierRuleRecord[],
+    accounts: readonly { id: string; courier: string }[],
+  ): Promise<DeliveryRateOf> {
+    if (!rules.some((rule) => rule.pick === 'best_value')) return () => 1;
+    const since = new Date(Date.now() - DELIVERY_RATE_DAYS * 86_400_000);
+    const rates = await deliveryRatesIn(tx, shopId, since);
+    const names = new Map(
+      accounts.map((account) => [
+        account.id,
+        this.couriers.of(account.courier)?.info.name ?? account.courier,
+      ]),
+    );
+    return (accountId, parcel) => deliveryRateFor(rates, names.get(accountId) ?? null, parcel.city);
   }
 
   /** Cancels a booking while it waits; one booked is cancelled with the courier, not here. */

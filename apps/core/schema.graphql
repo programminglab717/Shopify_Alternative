@@ -2637,7 +2637,7 @@ type CourierRule {
   accountArchived: Boolean!
 
   """
-  The account that books the orders it matches; null for the cheapest of the shop's accounts by their rate cards for each order (ADR-385).
+  The account that books the orders it matches; null for one of the shop's accounts picked by their rate cards for each order, as `pick` says (ADR-385).
   """
   accountId: ID
 
@@ -2650,11 +2650,14 @@ type CourierRule {
   """The cash to collect is below this; null for no most."""
   codBelow: Money
   id: ID!
+
+  """How the account is picked where the rule names none (ADR-387)."""
+  pick: CourierRulePick
 }
 
 input CourierRuleInput {
   """
-  The account that books the orders it matches; null for the cheapest of the shop's accounts by their rate cards for each order, the rule passed over where none has a card.
+  The account that books the orders it matches; null for one of the shop's accounts picked by their rate cards for each order, as `pick` says, the rule passed over where none has a card.
   """
   accountId: ID
 
@@ -2668,6 +2671,24 @@ input CourierRuleInput {
 
   """Decimal; null for none."""
   codBelow: String
+
+  """
+  How the account is picked where none is named: the cheapest unless said.
+  """
+  pick: CourierRulePick
+}
+
+"""How a courier rule naming no account picks one of the shop's accounts."""
+enum CourierRulePick {
+  """
+  The cheapest for each parcel delivered (ADR-387): the way out, the cash fee where delivered and the charge back where not, over how often its courier delivers to the order's city.
+  """
+  BEST_VALUE
+
+  """
+  The cheapest by the accounts' rate cards: the way out and the cash fee (ADR-385).
+  """
+  CHEAPEST
 }
 
 type CourierRulesUpdatePayload {

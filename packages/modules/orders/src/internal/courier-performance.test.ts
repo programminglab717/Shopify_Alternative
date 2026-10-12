@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { CourierPerformanceService } from './courier-performance.service.js';
+import { CourierPerformanceService, deliveryRatesIn } from './courier-performance.service.js';
 import { estimateParcelChargesIn } from './parcel-estimates.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
@@ -127,6 +127,37 @@ describe.skipIf(!server)("Couriers' performance (ADR-384)", () => {
       parcelsCosted: 2,
       chargesEstimated: 30_000n,
     });
+  });
+
+  it('gives delivery rates by courier and city, by courier, and the whole (ADR-387)', async () => {
+    // PostEx: delivered twice in Karachi, refused in Lahore, and one on its way there.
+    await delivered(await shipped('PostEx', 'Karachi', 5), 1);
+    await delivered(await shipped('postex', ' karachi', 4), 1);
+    unwrap(await f.fulfillments.markReturning(f.a, await shipped('PostEx', 'Lahore', 4)));
+    await shipped('PostEx', 'Lahore', 1);
+    // Leopards: lost in Lahore; the shop's own rider, delivered; and one shipped before.
+    unwrap(await f.fulfillments.markLost(f.a, await shipped('Leopards', 'Lahore', 3)));
+    await delivered(await shipped(null, 'Lahore', 2), 0);
+    await delivered(await shipped('Leopards', 'Lahore', 40), 1);
+
+    const since = new Date(Date.now() - 30 * 86_400_000);
+    const rates = await f.db.tenant(f.a.shopId, (tx) => deliveryRatesIn(tx, f.a.shopId, since));
+    const key = (row: { courier: string | null; city: string | null }) =>
+      `${row.courier ?? '*'}/${row.city ?? '*'}`;
+    expect(
+      Object.fromEntries(rates.map((row) => [key(row), [row.delivered, row.finished]])),
+    ).toEqual({
+      'postex/karachi': [2, 2],
+      'postex/lahore': [0, 1],
+      'postex/*': [2, 3],
+      'leopards/lahore': [0, 1],
+      'leopards/*': [0, 1],
+      // The rider's parcel counts in the whole alone.
+      '*/*': [3, 5],
+    });
+    expect(await f.db.tenant(f.b.shopId, (tx) => deliveryRatesIn(tx, f.b.shopId, since))).toEqual([
+      { courier: null, city: null, delivered: 0, finished: 0 },
+    ]);
   });
 
   it('refuses a period the wrong way round or longer than a year', async () => {

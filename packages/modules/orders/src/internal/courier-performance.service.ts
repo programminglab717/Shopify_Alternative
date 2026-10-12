@@ -1,5 +1,5 @@
 import { failOne, type MutationResult, type TenantContext } from '@hatti/api';
-import { Database } from '@hatti/db';
+import { Database, type Tx } from '@hatti/db';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { ESTIMATED_CHARGE } from './parcel-estimates.js';
@@ -87,6 +87,60 @@ function tallyOf(row: Row): CourierPerformanceTally {
     parcelsCosted: row.costed,
     chargesEstimated: BigInt(row.estimated),
   };
+}
+
+/** How often parcels sent with a courier were delivered, of those that arrived anywhere. */
+export interface DeliveryRateRow {
+  /** The courier as parcels name it, lowercased and trimmed; null for the shop's whole. */
+  courier: string | null;
+  /** The city as orders have it, lowercased and trimmed; null for everywhere. */
+  city: string | null;
+  delivered: number;
+  /** Delivered, returned or lost. */
+  finished: number;
+}
+
+/**
+ * Delivery rates of the parcels shipped since `since` (ADR-387), in the caller's transaction: for
+ * each courier in each city, each courier everywhere, and the shop's whole. For courier rules
+ * that weigh a courier's price with how often it delivers.
+ */
+export async function deliveryRatesIn(
+  tx: Tx,
+  shopId: string,
+  since: Date,
+): Promise<DeliveryRateRow[]> {
+  const { rows } = await tx.execute<{
+    courier: string | null;
+    city: string | null;
+    by_courier: boolean;
+    by_city: boolean;
+    delivered: number;
+    finished: number;
+  }>(sql`
+    SELECT lower(nullif(btrim(f.tracking_company), '')) AS courier,
+           lower(btrim(o.shipping_address->>'city')) AS city,
+           GROUPING(lower(nullif(btrim(f.tracking_company), ''))) = 0 AS by_courier,
+           GROUPING(lower(btrim(o.shipping_address->>'city'))) = 0 AS by_city,
+           count(*) FILTER (WHERE f.status = 'delivered')::int AS delivered,
+           count(*) FILTER (WHERE f.status = 'delivered' OR f.returning_at IS NOT NULL
+                              OR f.status = 'returned' OR f.lost_at IS NOT NULL)::int AS finished
+      FROM orders.fulfillments f
+      JOIN orders.orders o ON o.shop_id = f.shop_id AND o.id = f.order_id
+     WHERE f.shop_id = ${shopId} AND f.shipped_at >= ${since}
+     GROUP BY GROUPING SETS (
+       (lower(nullif(btrim(f.tracking_company), '')), lower(btrim(o.shipping_address->>'city'))),
+       (lower(nullif(btrim(f.tracking_company), ''))),
+       ())`);
+  // Parcels without a courier named, or by city without a city, count in the whole alone.
+  return rows
+    .filter((row) => (!row.by_courier || row.courier) && (!row.by_city || row.city))
+    .map((row) => ({
+      courier: row.courier,
+      city: row.city,
+      delivered: row.delivered,
+      finished: row.finished,
+    }));
 }
 
 /**

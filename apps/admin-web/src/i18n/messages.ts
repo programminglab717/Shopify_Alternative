@@ -3337,6 +3337,9 @@ const en = {
   'messages.kind.DAILY_SUMMARY': "Yesterday's summary",
   'messages.hint.DAILY_SUMMARY':
     "To the alerts number each morning: the day before's orders and sales, parcels delivered and turned back, and cash still to come.",
+  'courierRules.bestValue': 'The best value, by rate cards and deliveries',
+  'courierRules.bestValueHint':
+    "Each order goes with the account cheapest for each parcel delivered: its rate card's price, weighed with how often its courier delivered to the order's city in the last 90 days. Leave the cities and cash blank for every order.",
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6650,6 +6653,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.kind.DAILY_SUMMARY': 'کل کا خلاصہ',
   'messages.hint.DAILY_SUMMARY':
     'ہر صبح الرٹس نمبر پر: پچھلے دن کے آرڈرز اور سیل، ڈیلیور اور واپس ہونے والے پارسل، اور ابھی آنے والی نقدی۔',
+  'courierRules.bestValue': 'بہترین قیمت، ریٹ کارڈ اور ڈیلیوری کے حساب سے',
+  'courierRules.bestValueHint':
+    'ہر آرڈر اس اکاؤنٹ سے جائے گا جو ہر ڈیلیور ہونے والے پارسل پر سب سے سستا ہو: اس کے ریٹ کارڈ کی قیمت، پچھلے 90 دنوں میں آرڈر کے شہر میں اس کوریئر کی ڈیلیوری کے ساتھ تولی گئی۔ ہر آرڈر کے لیے شہر اور رقم خالی چھوڑیں۔',
 };
 
 export const messages: Readonly<

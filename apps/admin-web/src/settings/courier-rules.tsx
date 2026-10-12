@@ -15,10 +15,13 @@ import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 
+/** What "Book with" holds for the best value for each parcel delivered (ADR-387). */
+const BEST_VALUE = '~best-value';
+
 /** A rule as it is edited: cities as typed, comma apart, and amounts as typed. */
 interface Draft {
   key: string;
-  /** Blank for the cheapest by rate cards. */
+  /** Blank for the cheapest by rate cards, {@link BEST_VALUE} for the best value. */
   accountId: string;
   cities: string;
   codAtLeast: string;
@@ -36,7 +39,7 @@ function amountText(value: CourierRuleValue['codAtLeast']): string {
 function draftOf(rule: CourierRuleValue): Draft {
   return {
     key: rule.id,
-    accountId: rule.accountId ?? '',
+    accountId: rule.accountId ?? (rule.pick === 'BEST_VALUE' ? BEST_VALUE : ''),
     cities: rule.cities.join(', '),
     codAtLeast: amountText(rule.codAtLeast),
     codBelow: amountText(rule.codBelow),
@@ -139,10 +142,11 @@ function RuleEditor({
             </option>
           ))}
           <option value="">{t('courierRules.cheapest')}</option>
+          <option value={BEST_VALUE}>{t('courierRules.bestValue')}</option>
         </select>
-        {draft.accountId === '' && (
+        {(draft.accountId === '' || draft.accountId === BEST_VALUE) && (
           <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-            {t('courierRules.cheapestHint')}
+            {t(draft.accountId === '' ? 'courierRules.cheapestHint' : 'courierRules.bestValueHint')}
           </p>
         )}
       </div>
@@ -192,7 +196,13 @@ export function CourierRules({ accounts }: { accounts: CourierAccountDetail[] })
     try {
       const { courierRulesUpdate } = await save.mutateAsync({
         rules: editing.map((draft) => ({
-          accountId: draft.accountId || null,
+          accountId: draft.accountId && draft.accountId !== BEST_VALUE ? draft.accountId : null,
+          pick:
+            draft.accountId === BEST_VALUE
+              ? 'BEST_VALUE'
+              : draft.accountId === ''
+                ? 'CHEAPEST'
+                : null,
           cities: draft.cities
             .split(/[,،\n]/)
             .map((city) => city.trim())

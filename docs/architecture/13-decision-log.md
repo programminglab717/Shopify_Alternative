@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-386 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-387 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -394,6 +394,7 @@
 | 384 | Couriers' performance: how each courier's parcels shipped in a period went, everywhere and city by city, worked out from the parcels when asked | Accepted |
 | 385 | A courier rule may book with the cheapest of the shop's accounts by their rate cards, order by order, and is passed over where none has a card | Accepted |
 | 386 | Each morning the shop's alerts number hears how the day before went, from nine by its clock, once a day, and not of a day with nothing in it | Accepted |
+| 387 | A courier rule may book with the best value: the account cheapest for each parcel delivered, weighing its rate card with how often its courier delivers to the order's city | Accepted |
 
 ---
 
@@ -15034,3 +15035,40 @@
     when shops ask.
   * **To the owner's own number rather than the alerts number:** the alerts number is where the
     shop asked Hatti's word to go, and may be a manager's.
+
+## ADR-387 · A courier rule may book with the best value: the account cheapest for each parcel delivered, weighing its rate card with how often its courier delivers to the order's city
+
+* **Context:**
+  * A rule for the cheapest account ([ADR-385](#adr-385--a-courier-rule-may-book-with-the-cheapest-of-the-shops-accounts-by-their-rate-cards-order-by-order-and-is-passed-over-where-none-has-a-card)) goes by the cards alone, and the cheapest courier
+    to send with is often the one that brings the most back: a parcel refused costs its way out,
+    its way back, and the sale. Couriers' performance ([ADR-384](#adr-384--couriers-performance-how-each-couriers-parcels-shipped-in-a-period-went-everywhere-and-city-by-city-worked-out-from-the-parcels-when-asked)) shows how often each courier
+    delivers in each city; SHP-06 asks for allocation that weighs it.
+* **Decision:**
+  * **A rule naming no account picks one of two ways** (migration 0180, `pick`): the cheapest, as
+    before and still the default, or the **best value**: the account whose card costs the least
+    for each parcel delivered, its way out, the cash fee where delivered and the charge back
+    where not, over how often its courier delivers: `(out + d × fee + (1 − d) × back) / d`.
+  * **How often a courier delivers** comes from the shop's own parcels shipped in the last 90
+    days, delivered of those delivered, returned or lost, under the name the courier ships them
+    with: in the order's city once ten have arrived anywhere, else everywhere once ten have, else
+    the shop's with every courier once ten have, else taken as always. `deliveryRatesIn` in the
+    orders module gives them, grouped by courier and city, by courier, and the shop's whole, and
+    is asked only where a rule picks the best value.
+  * **A courier that never delivers is never picked** while another can be. Equal, the default
+    account first, as for the cheapest.
+  * **Through the API**, `CourierRule.pick` and `CourierRuleInput.pick` (`CHEAPEST`,
+    `BEST_VALUE`); **in the admin**, a rule's "Book with" offers "The best value, by rate cards
+    and deliveries", saying how it weighs them.
+* **Consequences:**
+  * A shop sending most of its orders with one rule gets, city by city, the courier whose
+    deliveries make it cheapest, and the choice follows the couriers as they do better or worse.
+  * Two accounts with one courier share its record; a new courier with too few parcels is taken
+    at the shop's rate until it has ten, so it is neither shunned nor favoured.
+  * The sale lost when a parcel comes back is not counted; the courier's charges alone are.
+* **Alternatives:**
+  * **Counting the margin lost on a return:** it differs by product and the rule does not know
+    the order's margin when it is written; the charges are what the cards say.
+  * **A delivery rate the shop sets per courier:** it would go stale; the shop's parcels already
+    say it.
+  * **Couriers' rates across shops:** a cross-shop record is the network data of V1 (06 §11),
+    with its privacy questions; a shop's own parcels first.

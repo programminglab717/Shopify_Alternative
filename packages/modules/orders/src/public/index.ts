@@ -315,6 +315,8 @@ export {
 export {
   COURIER_PERFORMANCE_LIMITS,
   CourierPerformanceService,
+  deliveryRatesIn,
+  type DeliveryRateRow,
   type CourierPerformanceRow,
 } from '../internal/courier-performance.service.js';
 export {

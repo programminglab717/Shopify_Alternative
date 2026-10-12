@@ -10,6 +10,29 @@ import {
   registerEnumType,
 } from '@nestjs/graphql';
 
+/** How a courier rule naming no account picks one (ADR-385, ADR-387). */
+export enum CourierRulePick {
+  CHEAPEST = 'CHEAPEST',
+  BEST_VALUE = 'BEST_VALUE',
+}
+
+registerEnumType(CourierRulePick, {
+  name: 'CourierRulePick',
+  description: "How a courier rule naming no account picks one of the shop's accounts.",
+  valuesMap: {
+    CHEAPEST: {
+      description:
+        "The cheapest by the accounts' rate cards: the way out and the cash fee (ADR-385).",
+    },
+    BEST_VALUE: {
+      description:
+        'The cheapest for each parcel delivered (ADR-387): the way out, the cash fee where ' +
+        'delivered and the charge back where not, over how often its courier delivers to the ' +
+        "order's city.",
+    },
+  },
+});
+
 export enum CourierBookingStatus {
   PENDING = 'PENDING',
   BOOKED = 'BOOKED',
@@ -321,10 +344,16 @@ export class CourierRule {
   @Field(() => ID, {
     nullable: true,
     description:
-      "The account that books the orders it matches; null for the cheapest of the shop's " +
-      'accounts by their rate cards for each order (ADR-385).',
+      "The account that books the orders it matches; null for one of the shop's accounts " +
+      'picked by their rate cards for each order, as `pick` says (ADR-385).',
   })
   accountId!: string | null;
+
+  @Field(() => CourierRulePick, {
+    nullable: true,
+    description: 'How the account is picked where the rule names none (ADR-387).',
+  })
+  pick!: CourierRulePick | null;
 
   @Field({ description: 'Its account was archived since: the rule is passed over.' })
   accountArchived!: boolean;
@@ -456,10 +485,17 @@ export class CourierRuleInput {
   @Field(() => ID, {
     nullable: true,
     description:
-      "The account that books the orders it matches; null for the cheapest of the shop's " +
-      'accounts by their rate cards for each order, the rule passed over where none has a card.',
+      "The account that books the orders it matches; null for one of the shop's accounts " +
+      'picked by their rate cards for each order, as `pick` says, the rule passed over where ' +
+      'none has a card.',
   })
   accountId?: string | null;
+
+  @Field(() => CourierRulePick, {
+    nullable: true,
+    description: 'How the account is picked where none is named: the cheapest unless said.',
+  })
+  pick?: CourierRulePick | null;
 
   @Field(() => [String], {
     nullable: true,

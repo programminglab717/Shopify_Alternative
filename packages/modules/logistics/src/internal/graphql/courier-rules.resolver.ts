@@ -3,12 +3,17 @@ import { toPublicId } from '@hatti/ids';
 import { money, type CurrencyCode } from '@hatti/money';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { CourierBookingService } from '../bookings.service.js';
-import { CourierRuleService, type CourierRuleRecord } from '../courier-rules.service.js';
+import {
+  CourierRuleService,
+  type CourierRulePick as CourierRulePickValue,
+  type CourierRuleRecord,
+} from '../courier-rules.service.js';
 import { uuidOf } from './couriers.resolver.js';
 import {
   CourierAccountChoice,
   CourierRule,
   CourierRuleInput,
+  CourierRulePick,
   CourierRulesUpdatePayload,
 } from './couriers.types.js';
 
@@ -76,6 +81,7 @@ export class CourierRuleResolver {
       rules.map((rule) => ({
         ...rule,
         accountId: rule.accountId ? uuidOf('courierAccount', rule.accountId) : null,
+        pick: rule.pick ? (rule.pick.toLowerCase() as CourierRulePickValue) : null,
       })),
     );
     return Object.assign(new CourierRulesUpdatePayload(), {
@@ -93,6 +99,7 @@ function toRule(record: CourierRuleRecord, currency: CurrencyCode): CourierRule 
   return Object.assign(new CourierRule(), {
     id: toPublicId('courierRule', record.id),
     accountId: record.accountId && toPublicId('courierAccount', record.accountId),
+    pick: record.pick && (record.pick.toUpperCase() as CourierRulePick),
     accountArchived: record.accountArchived,
     cities: record.cities,
     codAtLeast: amount(record.codAtLeast),
