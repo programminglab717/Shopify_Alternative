@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
 
-### The failed-delivery rescue
+### 2647d02 · The failed-delivery rescue
 
 * **In the core** ([ADR-388](../architecture/13-decision-log.md#adr-388--a-customer-whose-delivery-failed-is-asked-on-whatsapp-whether-to-deliver-it-again-or-call-them-first-and-the-shop-sees-the-parcels-to-rescue-with-each-answer), COD-08): each time a courier's tracking says a delivery was tried and
   failed, the worker asks the customer on WhatsApp whether to deliver it again or call them
