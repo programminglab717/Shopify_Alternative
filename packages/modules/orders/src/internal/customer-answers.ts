@@ -1,6 +1,7 @@
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { Injectable } from '@nestjs/common';
+import { recordRescueIn, type RescueAnswerValue } from './delivery-rescue.service.js';
 import { OrderEvents, type OrderUpdatedPayload } from './events.js';
 import { ORDER_LINK_PATH, linkHashOf, newLinkToken } from './links.js';
 import { orderSettingsIn } from './order-settings.service.js';
@@ -115,6 +116,37 @@ export class CustomerAnswers {
         declined,
       });
       return done.ok ? 'cancelled' : 'unchanged';
+    });
+  }
+
+  /**
+   * The customer's answer `via` a channel, at `at`, after a delivery of theirs failed (COD-08,
+   * ADR-388): to deliver it again, or call them first. Kept on the order's parcels waiting after a
+   * failed try, for the shop to tell their couriers, and on its timeline. Whether any was waiting.
+   */
+  async rescue(
+    shopId: string,
+    orderId: string,
+    answer: RescueAnswerValue,
+    via: string,
+    at: Date = new Date(),
+  ): Promise<boolean> {
+    return this.db.tenant(shopId, async (tx) => {
+      const order = await lockOrder(tx, shopId, orderId);
+      if (!order) return false;
+      const parcels = await recordRescueIn(tx, shopId, order.id, answer, at);
+      if (parcels.length === 0) return false;
+      await addTimelineEntry(
+        tx,
+        shopId,
+        order.id,
+        'system',
+        'customer_request',
+        answer === 'retry'
+          ? `The customer asked ${via} to have it delivered again`
+          : `The customer asked ${via} to be called before it is delivered again`,
+      );
+      return true;
     });
   }
 

@@ -285,6 +285,113 @@ describe('Parcels coming back, in the admin', () => {
       expect(sectionsOf(role).some((item) => item.to === '/$shopId/returns')).toBe(false);
     }
   });
+  it('lists failed deliveries with what each customer answered, and Home counts them (ADR-388)', async () => {
+    const parcel = (id: string, extra: Record<string, unknown>) => ({
+      id,
+      orderId: `ord_${id}`,
+      orderName: `#10${id}`,
+      customerName: 'Ayesha Khan',
+      city: 'Karachi',
+      trackingInfo: tracking('PostEx', `PX${id}`),
+      attemptedAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+      reason: 'Customer not available',
+      attempts: 1,
+      answer: null,
+      answeredAt: null,
+      ...extra,
+    });
+    const core = fakeCore('packer', (operation) => {
+      if (operation !== 'DeliveriesToRescue') throw new Error(`unexpected ${operation}`);
+      return {
+        deliveriesToRescue: {
+          count: 4,
+          parcels: [
+            parcel('31', { answer: 'CALL', answeredAt: LATER }),
+            parcel('32', { answer: 'RETRY', answeredAt: LATER, attempts: 2, reason: null }),
+            parcel('33', { customerName: null, city: null }),
+          ],
+        },
+      };
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/returns?tab=rescue');
+
+    await screen.findByText('PostEx · PX31');
+    expect(
+      screen.getByRole('tab', { name: 'Failed deliveries' }).getAttribute('aria-selected'),
+    ).toBe('true');
+    expect(screen.getByText('Call first')).toBeTruthy();
+    expect(screen.getByText('Deliver again')).toBeTruthy();
+    expect(screen.getByText('No answer yet')).toBeTruthy();
+    expect(screen.getAllByText('Ayesha Khan · Karachi')).toHaveLength(2);
+    expect(screen.getAllByText(/^Attempts: 1 · last 2 hours ago/)).toHaveLength(2);
+    expect(screen.getAllByText('“Customer not available”')).toHaveLength(2);
+    expect(screen.getByText('Attempts: 2 · last 2 hours ago')).toBeTruthy();
+    expect(screen.getByRole('link', { name: '#1031' }).getAttribute('href')).toBe(
+      '/shop_1/orders/ord_31',
+    );
+    expect(screen.getByText('Showing 3 of 4.')).toBeTruthy();
+    expect(validateReturnsSearch({ tab: 'rescue' })).toEqual({ tab: 'rescue' });
+    cleanup();
+
+    const empty = fakeCore('owner', () => ({ deliveriesToRescue: { count: 0, parcels: [] } }));
+    vi.stubGlobal('fetch', empty.fetcher);
+    renderAdmin('/shop_1/returns?tab=rescue');
+    expect(await screen.findByText('No deliveries have failed.')).toBeTruthy();
+    cleanup();
+
+    // Home: a tap to them for those who handle parcels coming back.
+    const tally = (count: number) => ({ count, total: rupees('0') });
+    const home = (role: 'owner' | 'confirmation_agent', deliveriesToRescue: number) =>
+      fakeCore(role, (operation) => {
+        if (operation === 'SetupChecklist') {
+          return { setupChecklist: { done: 8, total: 8, steps: [] } };
+        }
+        if (operation === 'HomeStock') {
+          return { home: { lowStock: { low: 0, out: 0, threshold: 5 }, transfersToReceive: 0 } };
+        }
+        if (operation !== 'Home') throw new Error(`unexpected ${operation}`);
+        return {
+          shop: { timezone: 'Asia/Karachi' },
+          home: {
+            toConfirm: tally(0),
+            toReview: tally(0),
+            awaitingPayment: tally(0),
+            transfersToCheck: tally(0),
+            toPack: tally(0),
+            toBook: tally(0),
+            returning: tally(0),
+            returnsToReceive: tally(0),
+            cashToCollect: tally(0),
+            lostToClaim: tally(0),
+            claimsOpen: tally(0),
+            parcelsUnseen: 0,
+            deliveriesToRescue,
+            today: {
+              since: LATER,
+              sales: tally(0),
+              salesYesterday: tally(0),
+              delivered: tally(0),
+              returnedToOrigin: tally(0),
+            },
+          },
+        };
+      });
+    vi.stubGlobal('fetch', home('owner', 3).fetcher);
+    renderAdmin('/shop_1');
+    const link = await screen.findByRole('link', { name: /3 failed deliveries to rescue/ });
+    expect(link.getAttribute('href')).toBe('/shop_1/returns?tab=rescue');
+    cleanup();
+    vi.stubGlobal('fetch', home('owner', 1).fetcher);
+    renderAdmin('/shop_1');
+    expect(await screen.findByRole('link', { name: /A failed delivery to rescue/ })).toBeTruthy();
+    cleanup();
+    vi.stubGlobal('fetch', home('confirmation_agent', 3).fetcher);
+    renderAdmin('/shop_1');
+    await screen.findByText('All caught up. New orders will show here.');
+    expect(screen.queryByText(/failed deliveries/)).toBeNull();
+  });
+
   it('lists customer returns on their way, the slow in red, and receives one all back in stock', async () => {
     const fake = fakeCore('packer', (operation) => {
       if (operation === 'OpenReturns') {

@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: what comes after courier rules for
-the best value, such as a message when a delivery was tried and failed (COD-08).
+**Next, section by section as the alpha's shops need them**: what comes after the failed-delivery
+rescue, such as asking couriers to deliver again through their APIs where they offer it (COD-08).
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -17,6 +17,26 @@ with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a
 delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
+
+### The failed-delivery rescue
+
+* **In the core** ([ADR-388](../architecture/13-decision-log.md#adr-388--a-customer-whose-delivery-failed-is-asked-on-whatsapp-whether-to-deliver-it-again-or-call-them-first-and-the-shop-sees-the-parcels-to-rescue-with-each-answer), COD-08): each time a courier's tracking says a delivery was tried and
+  failed, the worker asks the customer on WhatsApp whether to deliver it again or call them
+  first (`order_delivery_failed`, which the shop may turn off). Their answer is kept on the
+  parcel (migration 0181) for the try it answers, and on the order's timeline;
+  `deliveriesToRescue` lists the parcels whose last step is a failed try, and Home counts them.
+* **In the admin**, Returns has a "Failed deliveries" tab: each parcel with its customer, its
+  tries and the courier's words, and the answer, "Deliver again", "Call first" or none yet, the
+  answered first. Home leads there; Messages in settings lists "Delivery failed".
+* **Tried in Chromium against the core:** with failed tries recorded on #1002 and #1013 and a
+  "call first" answer on #1002, Home said "2 failed deliveries to rescue" and led to the tab,
+  which listed #1002 first with "Call first" and #1013, tried twice, with "No answer yet", in
+  English and Urdu; the courier's own words, in English, are kept apart in Urdu's right-to-left
+  line. The tries and the answer were then taken away. No errors in the browser.
+* 2594 tests (7 new): the list and answers in the orders module; the
+  message's words and buttons in messaging; the worker asking and hearing the answer, and the
+  query through the API, in the core; the tab and Home's count in the admin, and its query
+  checked against the schema.
 
 ### 7b2f1fc · Courier rules for the best value
 

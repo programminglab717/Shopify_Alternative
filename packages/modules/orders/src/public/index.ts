@@ -79,6 +79,14 @@ export {
   type CustomerAnswer,
 } from '../internal/customer-answers.js';
 export {
+  DELIVERY_RESCUE_LIMITS,
+  DeliveryRescueService,
+  RESCUE_ANSWER_VALUES,
+  type DeliveriesToRescue,
+  type DeliveryToRescue,
+  type RescueAnswerValue,
+} from '../internal/delivery-rescue.service.js';
+export {
   orderNotificationFactsIn,
   type OrderNotificationFacts,
 } from '../internal/notification-facts.js';

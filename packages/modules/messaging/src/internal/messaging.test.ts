@@ -155,6 +155,38 @@ describe("Messages' words", () => {
     expect(messageText('stock_out', 'ur', stock)).toContain('Lawn Kurta (S)');
   });
 
+  it('asks a customer whose delivery failed whether to deliver it again or call them (ADR-388)', () => {
+    const failed = {
+      name: 'Ayesha',
+      shop: 'Zari Fashions',
+      order: '#1043',
+      courier: 'PostEx',
+    };
+    expect(messageText('order_delivery_failed', 'en', failed)).toBe(
+      'Assalam-o-Alaikum Ayesha! PostEx tried to deliver your order #1043 from Zari Fashions but ' +
+        'could not. Tell Zari Fashions whether to deliver it again or call you first.',
+    );
+    expect(messageText('order_delivery_failed', 'ur', failed)).toMatch(
+      /^السلام علیکم Ayesha! PostEx نے Zari Fashions سے آپ کا آرڈر #1043/,
+    );
+    expect(templateParameters('order_delivery_failed', failed)).toEqual([
+      'Ayesha',
+      'PostEx',
+      '#1043',
+      'Zari Fashions',
+    ]);
+    expect(templateButtons('order_delivery_failed', failed)).toEqual(
+      ['retry', 'call'].map((payload, index) => ({
+        type: 'button',
+        sub_type: 'quick_reply',
+        index: String(index),
+        parameters: [{ type: 'payload', payload }],
+      })),
+    );
+    // Its answers come back on WhatsApp alone: no email of it.
+    expect(EMAILED_KINDS).not.toContain('order_delivery_failed');
+  });
+
   it('tells the shop each morning how the day before went, at its alerts number (ADR-386)', () => {
     const day = {
       shop: 'Zari Fashions',

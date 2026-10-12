@@ -3340,6 +3340,22 @@ const en = {
   'courierRules.bestValue': 'The best value, by rate cards and deliveries',
   'courierRules.bestValueHint':
     "Each order goes with the account cheapest for each parcel delivered: its rate card's price, weighed with how often its courier delivered to the order's city in the last 90 days. Leave the cities and cash blank for every order.",
+  'returns.tab.rescue': 'Failed deliveries',
+  'returns.rescue.hint':
+    "Parcels the courier tried to deliver and couldn't. Each customer is asked on WhatsApp whether to deliver it again or call them first: tell the courier what they said before it sends the parcel back.",
+  'returns.rescue.none': 'No deliveries have failed.',
+  'returns.rescue.answer.RETRY': 'Deliver again',
+  'returns.rescue.answer.CALL': 'Call first',
+  'returns.rescue.answer.NONE': 'No answer yet',
+  'returns.rescue.tried': 'Attempts: {count} · last {when}',
+  'returns.rescue.more': 'Showing {shown} of {count}.',
+  'messages.kind.ORDER_DELIVERY_FAILED': 'Delivery failed',
+  'messages.hint.ORDER_DELIVERY_FAILED':
+    "When the courier couldn't deliver: asks whether to deliver it again or call them first.",
+  'home.deliveriesToRescue': '{count} failed deliveries to rescue',
+  'home.deliveriesToRescueHint':
+    "The courier couldn't deliver them: see what each customer said, and tell the courier before it sends them back.",
+  'home.deliveriesToRescue.one': 'A failed delivery to rescue',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6656,6 +6672,22 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'courierRules.bestValue': 'بہترین قیمت، ریٹ کارڈ اور ڈیلیوری کے حساب سے',
   'courierRules.bestValueHint':
     'ہر آرڈر اس اکاؤنٹ سے جائے گا جو ہر ڈیلیور ہونے والے پارسل پر سب سے سستا ہو: اس کے ریٹ کارڈ کی قیمت، پچھلے 90 دنوں میں آرڈر کے شہر میں اس کوریئر کی ڈیلیوری کے ساتھ تولی گئی۔ ہر آرڈر کے لیے شہر اور رقم خالی چھوڑیں۔',
+  'returns.tab.rescue': 'ناکام ڈیلیوریز',
+  'returns.rescue.hint':
+    'وہ پارسل جو کوریئر نے پہنچانے کی کوشش کی مگر نہ پہنچا سکا۔ ہر گاہک سے واٹس ایپ پر پوچھا جاتا ہے کہ دوبارہ ڈیلیور کیا جائے یا پہلے انہیں کال کی جائے: پارسل واپس جانے سے پہلے کوریئر کو ان کا جواب بتائیں۔',
+  'returns.rescue.none': 'کوئی ڈیلیوری ناکام نہیں ہوئی۔',
+  'returns.rescue.answer.RETRY': 'دوبارہ ڈیلیور کریں',
+  'returns.rescue.answer.CALL': 'پہلے کال کریں',
+  'returns.rescue.answer.NONE': 'ابھی جواب نہیں',
+  'returns.rescue.tried': 'کوششیں: {count} · آخری {when}',
+  'returns.rescue.more': '{count} میں سے {shown} دکھائے گئے۔',
+  'messages.kind.ORDER_DELIVERY_FAILED': 'ڈیلیوری ناکام',
+  'messages.hint.ORDER_DELIVERY_FAILED':
+    'جب کوریئر ڈیلیور نہ کر سکے: پوچھتا ہے کہ دوبارہ ڈیلیور کیا جائے یا پہلے کال کی جائے۔',
+  'home.deliveriesToRescue': '{count} ناکام ڈیلیوریز بچانے کے لیے',
+  'home.deliveriesToRescueHint':
+    'کوریئر انہیں ڈیلیور نہ کر سکا: دیکھیں ہر گاہک نے کیا کہا، اور پارسل واپس جانے سے پہلے کوریئر کو بتائیں۔',
+  'home.deliveriesToRescue.one': 'ایک ناکام ڈیلیوری بچانے کے لیے',
 };
 
 export const messages: Readonly<

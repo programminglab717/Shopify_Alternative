@@ -50,6 +50,7 @@ export {
 export {
   ALWAYS_SENT,
   CONFIRMATION_ANSWERS,
+  RESCUE_ANSWERS,
   EMAILED_KINDS,
   MESSAGE_CATEGORIES,
   MESSAGE_KINDS,
@@ -65,6 +66,7 @@ export {
   templateParameters,
   type AnyMessageKind,
   type ConfirmationAnswer,
+  type RescueAnswer,
   type MessageCategory,
   type MessageEmail,
   type MessageKind,

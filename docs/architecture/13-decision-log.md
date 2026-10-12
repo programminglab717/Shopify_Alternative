@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-387 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-388 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -395,6 +395,7 @@
 | 385 | A courier rule may book with the cheapest of the shop's accounts by their rate cards, order by order, and is passed over where none has a card | Accepted |
 | 386 | Each morning the shop's alerts number hears how the day before went, from nine by its clock, once a day, and not of a day with nothing in it | Accepted |
 | 387 | A courier rule may book with the best value: the account cheapest for each parcel delivered, weighing its rate card with how often its courier delivers to the order's city | Accepted |
+| 388 | A customer whose delivery failed is asked on WhatsApp whether to deliver it again or call them first, and the shop sees the parcels to rescue with each answer | Accepted |
 
 ---
 
@@ -15072,3 +15073,40 @@
     say it.
   * **Couriers' rates across shops:** a cross-shop record is the network data of V1 (06 §11),
     with its privacy questions; a shop's own parcels first.
+
+## ADR-388 · A customer whose delivery failed is asked on WhatsApp whether to deliver it again or call them first, and the shop sees the parcels to rescue with each answer
+
+* **Context:**
+  * A parcel whose rider could not deliver it (not home, phone off, address not found) usually
+    goes back to the shop after one or two more tries, both ways charged and the sale lost.
+    Couriers' tracking tells Hatti of each try as a step, `attempted_delivery` ([ADR-160](#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)); the
+    customer is often willing, and a word from them in time saves the parcel. COD-08 asks for a
+    WhatsApp message to the shopper, and an instruction to the courier.
+* **Decision:**
+  * **Each failed try asks the customer** (`order_delivery_failed`, a kind the shop may turn off):
+    the courier tried to deliver their order and could not; tell the shop whether to deliver it
+    again or call them first. Two quick replies, `retry` and `call`, come back as the answers to
+    confirmations do ([ADR-147](#adr-147--a-cash-on-delivery-order-waiting-for-its-customer-asks-them-on-whatsapp-to-confirm-it-with-confirm-cancel-and-change-address-buttons-and-its-link-their-answer-comes-through-the-webhook-as-an-event-and-the-worker-confirms-or-cancels-the-order-as-their-link-would)). Once per step, while the parcel is on its way; not for an erased
+    customer's order, and never by email, as its answers come back on WhatsApp alone.
+  * **The answer is kept on the parcel** (migration 0181, `rescue_answer` and
+    `rescue_answered_at`, both or neither) and on the order's timeline as asked by the customer.
+    It counts for the try it answers: a later try shows no answer until the customer gives one
+    again. An answer once the parcel moved on, delivered or coming back, changes nothing.
+  * **The shop sees the deliveries to rescue**: parcels on their way whose last step is a failed
+    try, with the customer's name and city, how many tries, the courier's words for the last, and
+    the answer, those answered first. `deliveriesToRescue` in the API (up to 100, with the whole
+    count), a "Failed deliveries" tab among Returns in the admin, and a count on Home that leads
+    there, for those who handle parcels coming back.
+  * **Telling the courier stays the shop's** for now: the answer is for staff to pass on, by the
+    courier's portal or call. Asking couriers through their APIs comes once one offers it.
+* **Consequences:**
+  * A failed delivery costs the shop one utility message, against a return's two charges.
+  * The list follows couriers' tracking: a parcel out for delivery again leaves it, and comes
+    back with its next failed try.
+  * Couriers Hatti does not follow reach it only when staff record a failed try themselves.
+* **Alternatives:**
+  * **A message with the order's page to choose a new time:** couriers in Pakistan take no
+    appointments; two answers are what staff can act on.
+  * **Answers changing the parcel's status:** the courier decides the next try; Hatti records
+    what the customer asked, not what the courier will do.
+  * **Asking only for cash-on-delivery orders:** a prepaid parcel refused is lost just the same.

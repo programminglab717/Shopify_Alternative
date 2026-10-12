@@ -548,6 +548,100 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     ).toEqual([]);
   });
 
+  it('asks the customer whose delivery failed whether to deliver again or call, and keeps their answer (ADR-388)', async () => {
+    await withoutConfirmations();
+    const order = await placeOnline();
+    unwrap(await orders().confirm(tenant, order.id));
+    const { fulfillmentId } = unwrap(
+      await fulfillments().fulfill(tenant, order.id, {
+        tracking: { company: 'PostEx', number: 'PX808', url: null },
+      }),
+    );
+    let source = 0;
+    const step = (
+      status: 'out_for_delivery' | 'attempted_delivery',
+      message: string | null = null,
+    ) =>
+      fulfillments().recordEvent({ shopId, actor: 'system' }, fulfillmentId, {
+        status,
+        message,
+        sourceKey: `rescue:${++source}`,
+      });
+    unwrap(await step('attempted_delivery', 'Customer not available'));
+    await dispatch(2);
+    const failed = (await queued()).filter((message) => message.kind === 'order_delivery_failed');
+    expect(failed).toHaveLength(1);
+    expect(failed[0]!.variables).toMatchObject({
+      name: 'Ayesha',
+      shop: 'Zari Fashions',
+      order: `#${order.number}`,
+      courier: 'PostEx',
+    });
+    // On WhatsApp with its two answers.
+    requests.splice(0);
+    await sender().sweep(soon());
+    const sent = requests.find(
+      (request) =>
+        (request.body.template as { name?: string } | undefined)?.name ===
+        'hatti_order_delivery_failed',
+    );
+    expect(sent!.body).toMatchObject({
+      to: AYESHA.slice(1),
+      template: {
+        components: [
+          {
+            type: 'body',
+            parameters: ['Ayesha', 'PostEx', `#${order.number}`, 'Zari Fashions'].map((text) => ({
+              type: 'text',
+              text,
+            })),
+          },
+          ...['retry', 'call'].map((payload, index) => ({
+            type: 'button',
+            sub_type: 'quick_reply',
+            index: String(index),
+            parameters: [{ type: 'payload', payload }],
+          })),
+        ],
+      },
+    });
+
+    // They ask to be called first: kept on the parcel, and on the timeline.
+    const [asked] = (await queued()).filter((message) => message.kind === 'order_delivery_failed');
+    expect(
+      await messages().recordReply({
+        replyTo: asked!.provider_message_id!,
+        from: asked!.recipient,
+        answer: 'call',
+        at: new Date(),
+      }),
+    ).toBe(true);
+    await dispatch();
+    const rescueOf = async () =>
+      (
+        await admin.query<{ rescue_answer: string | null }>(
+          'SELECT rescue_answer FROM orders.fulfillments WHERE id = $1',
+          [fulfillmentId],
+        )
+      ).rows[0]!.rescue_answer;
+    expect(await rescueOf()).toBe('call');
+    expect((await timeline(order.id)).at(-1)).toEqual([
+      'customer_request',
+      'The customer asked on WhatsApp to be called before it is delivered again',
+    ]);
+
+    // Tried again: asked again. Delivered: a late try tells nothing.
+    unwrap(await step('out_for_delivery'));
+    unwrap(await step('attempted_delivery'));
+    await dispatch();
+    unwrap(await fulfillments().markDelivered(tenant, fulfillmentId));
+    unwrap(await step('attempted_delivery'));
+    await dispatch();
+    expect(
+      (await queued()).filter((message) => message.kind === 'order_delivery_failed'),
+    ).toHaveLength(2);
+  });
+
   it('does as the customer answers on WhatsApp: confirms, cancels, or sends the page to change the address', async () => {
     const ayesha = await placeOnline();
     const bilal = await placeOnline({ address: { ...addressOf('Bilal'), phone: '+923217654321' } });

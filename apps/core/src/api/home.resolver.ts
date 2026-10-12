@@ -3,7 +3,12 @@ import { tryFromPublicId } from '@hatti/ids';
 import { LowStockService, TransferService } from '@hatti/inventory/public';
 import { CourierPickupService } from '@hatti/logistics/public';
 import { money } from '@hatti/money';
-import { OrderService, TodayService, type OrderTally } from '@hatti/orders/public';
+import {
+  DeliveryRescueService,
+  OrderService,
+  TodayService,
+  type OrderTally,
+} from '@hatti/orders/public';
 import {
   Args,
   Field,
@@ -172,6 +177,7 @@ export class HomeResolver {
     private readonly stock: LowStockService,
     private readonly transfers: TransferService,
     private readonly pickups: CourierPickupService,
+    private readonly rescue: DeliveryRescueService,
   ) {}
 
   @Query(() => Home, { description: "What waits for the shop: the admin's home." })
@@ -254,6 +260,15 @@ export class HomeResolver {
   })
   async parcelsUnseen(@CurrentTenant() tenant: TenantContext): Promise<number> {
     return this.pickups.unseenCount(tenant);
+  }
+
+  @ResolveField(() => Int, {
+    description:
+      'Parcels on their way whose last step is a failed delivery (COD-08, ADR-388), to rescue ' +
+      'before their couriers send them back; deliveriesToRescue lists them.',
+  })
+  async deliveriesToRescue(@CurrentTenant() tenant: TenantContext): Promise<number> {
+    return (await this.rescue.list(tenant, 0)).count;
   }
 }
 

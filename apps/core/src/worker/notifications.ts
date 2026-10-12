@@ -54,7 +54,9 @@ const ON_WHATSAPP = 'on WhatsApp';
  *
  * A cash-on-delivery order waiting for its customer asks them to confirm it instead of saying it
  * was placed (COD-01, ADR-147), its link with it; their answer confirms or cancels it, or brings
- * them its page to change its address, and an order confirmed, by them or the shop, says so.
+ * them its page to change its address, and an order confirmed, by them or the shop, says so. A
+ * delivery that failed asks whether to deliver it again or call them first (COD-08, ADR-388), and
+ * their answer is kept for the shop.
  */
 export class OrderNotifications {
   /** The events {@link handle} reads. */
@@ -131,6 +133,8 @@ export class OrderNotifications {
           event.payload as Partial<FulfillmentEventCreatedPayload>;
         if (orderId && fulfillmentId && status === 'out_for_delivery') {
           await this.#outForDelivery(event.shopId, orderId, fulfillmentId, event.aggregateId);
+        } else if (orderId && fulfillmentId && status === 'attempted_delivery') {
+          await this.#deliveryFailed(event.shopId, orderId, fulfillmentId, event.aggregateId);
         }
         return;
       }
@@ -262,6 +266,33 @@ export class OrderNotifications {
   }
 
   /**
+   * The courier tried to deliver a parcel and could not (COD-08, ADR-388): its customer asked,
+   * each time, whether to deliver it again or call them first, their answer for the shop to tell
+   * the courier. Not once it arrived, or is coming back.
+   */
+  async #deliveryFailed(
+    shopId: string,
+    orderId: string,
+    parcelId: string,
+    stepId: string,
+  ): Promise<void> {
+    await this.database.tenant(shopId, async (tx) => {
+      const order = await orderNotificationFactsIn(tx, shopId, orderId, parcelId);
+      if (!order || order.erased || !order.phone) return;
+      if (order.parcel?.status !== 'in_transit') return;
+      const variables = await this.#variables(tx, shopId, order);
+      await this.messages.queueIn(tx, shopId, {
+        kind: 'order_delivery_failed',
+        recipient: order.phone,
+        orderId,
+        customerId: order.customerId,
+        dedupeKey: `order_delivery_failed:${stepId}`,
+        variables: { ...variables, courier: variables.courier ?? 'The courier' },
+      });
+    });
+  }
+
+  /**
    * The order's page for the message `messageId` to carry (ADR-160): the link its messages carry
    * while it works, else a new one, said on the timeline to have gone with the message `about`.
    */
@@ -315,9 +346,18 @@ export class OrderNotifications {
     });
   }
 
-  /** A customer pressed a button of a message asking them to confirm their order. */
+  /**
+   * A customer pressed a button of a message asking them to confirm their order, or of one telling
+   * them a delivery failed (ADR-388).
+   */
   async #answered(event: DomainEvent): Promise<void> {
-    const { kind, orderId, answer } = event.payload as Partial<MessageRepliedPayload>;
+    const { kind, orderId, answer, at } = event.payload as Partial<MessageRepliedPayload>;
+    if (kind === 'order_delivery_failed' && orderId) {
+      if (answer === 'retry' || answer === 'call') {
+        await this.answers.rescue(event.shopId, orderId, answer, ON_WHATSAPP, answeredAt(at));
+      }
+      return;
+    }
     // Asked first, or again (ADR-175): the same answers.
     if ((kind !== 'order_confirmation' && kind !== 'order_confirmation_reminder') || !orderId) {
       return;
@@ -439,6 +479,12 @@ export function shopTime(timeZone: string, at: Date): string {
     minute: '2-digit',
     hour12: true,
   }).format(at);
+}
+
+/** When a customer answered, as WhatsApp said: now, for a time it gave that is not one. */
+function answeredAt(at: string | undefined): Date {
+  const when = at ? new Date(at) : new Date();
+  return Number.isNaN(when.getTime()) ? new Date() : when;
 }
 
 /** An order's stages before it ships, when a payment is news to its customer (ADR-171). */

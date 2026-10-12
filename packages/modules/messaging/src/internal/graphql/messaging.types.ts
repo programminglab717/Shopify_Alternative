@@ -17,6 +17,7 @@ export enum MessageKind {
   ORDER_ADDRESS = 'ORDER_ADDRESS',
   ORDER_SHIPPED = 'ORDER_SHIPPED',
   ORDER_OUT_FOR_DELIVERY = 'ORDER_OUT_FOR_DELIVERY',
+  ORDER_DELIVERY_FAILED = 'ORDER_DELIVERY_FAILED',
   ORDER_DELIVERED = 'ORDER_DELIVERED',
   ORDER_CANCELLED = 'ORDER_CANCELLED',
   ORDER_PAID = 'ORDER_PAID',
@@ -66,6 +67,11 @@ registerEnumType(MessageKind, {
       description:
         'A parcel of theirs with cash to pay went out for delivery: what to keep ready for the ' +
         "rider, and the order's page (ADR-160).",
+    },
+    ORDER_DELIVERY_FAILED: {
+      description:
+        "A courier tried to deliver a parcel of theirs and couldn't: asked whether to deliver it " +
+        'again or call them first, their answer for the shop (COD-08, ADR-388).',
     },
     ORDER_DELIVERED: { description: 'A parcel of theirs was delivered.' },
     ORDER_CANCELLED: { description: 'Their order was cancelled.' },

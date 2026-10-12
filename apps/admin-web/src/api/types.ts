@@ -56,6 +56,8 @@ export interface HomeData {
   > & {
     /** Parcels handed to a rider a day ago and more that the courier has not seen (ADR-380). */
     parcelsUnseen: number;
+    /** Parcels whose last step is a failed delivery (ADR-388). */
+    deliveriesToRescue: number;
     today: {
       since: string;
       sales: Tally;
@@ -1456,6 +1458,24 @@ export interface ReturningParcelsData {
   returningParcels: {
     nodes: (ParcelBase & { days: number; units: number })[];
     pageInfo: { hasNextPage: boolean };
+  };
+}
+
+/** What a customer answered when told their delivery failed (ADR-388). */
+export type DeliveryRescueAnswer = 'RETRY' | 'CALL';
+
+export interface DeliveriesToRescueData {
+  deliveriesToRescue: {
+    count: number;
+    parcels: (ParcelBase & {
+      customerName: string | null;
+      city: string | null;
+      attemptedAt: string;
+      reason: string | null;
+      attempts: number;
+      answer: DeliveryRescueAnswer | null;
+      answeredAt: string | null;
+    })[];
   };
 }
 

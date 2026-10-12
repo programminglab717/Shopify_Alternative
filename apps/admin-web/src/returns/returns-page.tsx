@@ -19,6 +19,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { Claims, Lost } from './claims';
 import { CustomerReturns } from './customer-returns';
+import { Rescue } from './rescue';
 import { CHECKS_IN, CLAIMS, ParcelTitle, RETURNS_TABS, SLOW_RETURN_DAYS } from './parcel';
 import type { ReturnsTab } from './parcel';
 
@@ -206,7 +207,8 @@ function ComingBack() {
 /**
  * Parcels coming back (COD-09, ADR-071, ADR-072, ADR-093): those on their way back, the longest
  * first, a slow courier's in red, checked in by the tracking number on their label or from the
- * list, or marked lost; the parcels couriers lost, and the claims on them. Packers check in;
+ * list, or marked lost; deliveries that failed, with what their customers said (ADR-388); the
+ * parcels couriers lost, and the claims on them. Packers check in;
  * owners, managers and accountants claim.
  */
 export function ReturnsPage() {
@@ -247,6 +249,8 @@ export function ReturnsPage() {
       </div>
       {showing === 'back' ? (
         <ComingBack />
+      ) : showing === 'rescue' ? (
+        <Rescue />
       ) : showing === 'customer' ? (
         <CustomerReturns />
       ) : showing === 'lost' ? (

@@ -206,4 +206,86 @@ describe.skipIf(!server)('Admin GraphQL API: COD health', () => {
       (await gql(tokens.products, PERFORMANCE, shippedPeriod)).errors?.[0]?.extensions?.code,
     ).toBe('ACCESS_DENIED');
   });
+
+  it('lists the deliveries to rescue: parcels whose last step is a failed try (ADR-388)', async () => {
+    const created = await gql(
+      tokens.owner,
+      `mutation {
+        productCreate(input: { title: "Shawl", status: ACTIVE, variants: [{ price: "1,500" }] }) {
+          product { variants { id } }
+        }
+      }`,
+    );
+    const placed = await gql(
+      tokens.owner,
+      `mutation ($variantId: ID!) {
+        orderCreate(input: {
+          lineItems: [{ variantId: $variantId, quantity: 1 }],
+          shippingAddress: { name: "Sana Malik", phone: "0333 5550001",
+                             address1: "Flat 3, Clifton", city: "khi" }
+        }) { order { id name } }
+      }`,
+      { variantId: created.data?.productCreate.product.variants[0].id },
+    );
+    const order = placed.data?.orderCreate.order;
+    await gql(
+      tokens.owner,
+      `mutation ($id: ID!) { orderConfirm(id: $id) { userErrors { code } } }`,
+      {
+        id: order.id,
+      },
+    );
+    const fulfilled = await gql(
+      tokens.owner,
+      `mutation ($id: ID!) {
+        orderFulfill(id: $id, input: { trackingInfo: { company: "Leopards", number: "LE55" } }) {
+          fulfillment { id }
+        }
+      }`,
+      { id: order.id },
+    );
+    const parcel = fulfilled.data?.orderFulfill.fulfillment.id;
+    const tried = await gql(
+      tokens.owner,
+      `mutation ($id: ID!) {
+        fulfillmentEventCreate(fulfillmentEvent: {
+          fulfillmentId: $id, status: ATTEMPTED_DELIVERY, message: "Customer not available"
+        }) { userErrors { code } }
+      }`,
+      { id: parcel },
+    );
+    expect(tried.data?.fulfillmentEventCreate.userErrors).toEqual([]);
+
+    const RESCUE = `{
+      deliveriesToRescue {
+        count
+        parcels {
+          id orderId orderName customerName city trackingInfo { company number }
+          reason attempts answer answeredAt
+        }
+      }
+    }`;
+    const rescue = await gql(tokens.owner, RESCUE);
+    expect(rescue.errors).toBeUndefined();
+    expect(rescue.data?.deliveriesToRescue).toEqual({
+      count: 1,
+      parcels: [
+        {
+          id: parcel,
+          orderId: order.id,
+          orderName: order.name,
+          customerName: 'Sana Malik',
+          city: 'Karachi',
+          trackingInfo: { company: 'Leopards', number: 'LE55' },
+          reason: 'Customer not available',
+          attempts: 1,
+          answer: null,
+          answeredAt: null,
+        },
+      ],
+    });
+    expect((await gql(tokens.products, RESCUE)).errors?.[0]?.extensions?.code).toBe(
+      'ACCESS_DENIED',
+    );
+  });
 });

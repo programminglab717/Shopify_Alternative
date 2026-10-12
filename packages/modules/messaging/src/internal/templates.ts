@@ -19,6 +19,7 @@ export const MESSAGE_KINDS = [
   'order_address',
   'order_shipped',
   'order_out_for_delivery',
+  'order_delivery_failed',
   'order_delivered',
   'order_cancelled',
   'order_paid',
@@ -84,6 +85,13 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
 /** What the buttons of a message asking a customer to confirm their order answer (COD-01). */
 export const CONFIRMATION_ANSWERS = ['confirm', 'cancel', 'address'] as const;
 export type ConfirmationAnswer = (typeof CONFIRMATION_ANSWERS)[number];
+
+/**
+ * What the buttons of a message telling a customer their delivery failed answer (COD-08,
+ * ADR-388): to have it brought again, or to be called first.
+ */
+export const RESCUE_ANSWERS = ['retry', 'call'] as const;
+export type RescueAnswer = (typeof RESCUE_ANSWERS)[number];
 
 /**
  * Meta's categories of WhatsApp templates, which it prices apart (07 §2.3): news of an order its
@@ -318,6 +326,21 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: 'Your order {order} is out for delivery',
       ur: 'آپ کا آرڈر {order} ڈیلیوری کے لیے نکل چکا ہے',
+    },
+  },
+  order_delivery_failed: {
+    whatsapp: 'hatti_order_delivery_failed',
+    category: 'utility',
+    parameters: ['name', 'courier', 'order', 'shop'],
+    // Its answers go to the shop (ADR-388).
+    buttons: RESCUE_ANSWERS.map((payload) => ({ type: 'quick_reply', payload })),
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! {courier} tried to deliver your order {order} from {shop} ' +
+        'but could not. Tell {shop} whether to deliver it again or call you first.',
+      ur:
+        'السلام علیکم {name}! {courier} نے {shop} سے آپ کا آرڈر {order} پہنچانے کی کوشش کی مگر ' +
+        'ڈیلیوری نہ ہو سکی۔ {shop} کو بتائیں کہ دوبارہ ڈیلیوری کی جائے یا پہلے آپ کو کال کی جائے۔',
     },
   },
   order_paid: {

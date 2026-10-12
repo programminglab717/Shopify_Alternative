@@ -3105,6 +3105,17 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 """
 scalar DateTime
 
+"""The parcels to rescue (COD-08, ADR-388)."""
+type DeliveriesToRescue {
+  """All of them, however many are listed."""
+  count: Int!
+
+  """
+  Those whose customers answered first, the latest answer first, for the shop to tell their couriers; then the latest tries.
+  """
+  parcels: [DeliveryToRescue!]!
+}
+
 """
 How many working days delivery takes (CHK-22): from `min` to `max`, 0 the same day.
 """
@@ -3119,6 +3130,17 @@ input DeliveryDaysInput {
 
   """The fewest working days, 0 to 30; 0 is the same day."""
   min: Int!
+}
+
+"""
+What a customer answered when told their delivery failed (COD-08, ADR-388).
+"""
+enum DeliveryRescueAnswer {
+  """To be called before it is delivered again."""
+  CALL
+
+  """To have it delivered again."""
+  RETRY
 }
 
 """
@@ -3161,6 +3183,40 @@ input DeliverySettingsUpdateInput {
 type DeliverySettingsUpdatePayload {
   deliverySettings: DeliverySettings
   userErrors: [UserError!]!
+}
+
+"""
+A parcel on its way whose last step is a failed delivery (COD-08, ADR-388): one to rescue before its courier sends it back.
+"""
+type DeliveryToRescue {
+  """
+  What the customer answered on WhatsApp since that last try; null while not.
+  """
+  answer: DeliveryRescueAnswer
+  answeredAt: DateTime
+
+  """When the courier last tried."""
+  attemptedAt: DateTime!
+
+  """How many times the courier has tried."""
+  attempts: Int!
+  city: String
+
+  """
+  As the order's address has it; null once the customer's data is erased.
+  """
+  customerName: String
+
+  """The parcel's (Fulfillment) ID."""
+  id: ID!
+  orderId: ID!
+
+  """Such as "#1001"."""
+  orderName: String!
+
+  """What the courier said of it: "Customer not available"."""
+  reason: String
+  trackingInfo: TrackingInfo!
 }
 
 """Cities with a delivery charge of their own, such as the shop's own."""
@@ -3977,6 +4033,11 @@ type Home {
   Claims on couriers they have neither paid nor refused yet, for parcels they lost or that came back damaged, and what they claim: parcelClaims(status: OPEN).
   """
   claimsOpen: HomeTally!
+
+  """
+  Parcels on their way whose last step is a failed delivery (COD-08, ADR-388), to rescue before their couriers send them back; deliveriesToRescue lists them.
+  """
+  deliveriesToRescue: Int!
 
   """
   Parcels the courier lost that the shop has not claimed from it yet, and their worth: lostParcels(claim: UNCLAIMED).
@@ -5394,6 +5455,11 @@ enum MessageKind {
 
   """A parcel of theirs was delivered."""
   ORDER_DELIVERED
+
+  """
+  A courier tried to deliver a parcel of theirs and couldn't: asked whether to deliver it again or call them first, their answer for the shop (COD-08, ADR-388).
+  """
+  ORDER_DELIVERY_FAILED
 
   """
   For a member of staff, at their own number: a comment on an order names them, as @ and their name (ORD-02, ADR-191).
@@ -9626,6 +9692,14 @@ type Query {
     """
     query: String
   ): CustomerConnection!
+
+  """
+  Parcels on their way whose last step is a failed delivery (COD-08, ADR-388), with what their customers answered on WhatsApp since: whether to deliver again or call them first.
+  """
+  deliveriesToRescue(
+    """Parcels listed at most: up to 100."""
+    first: Int! = 50
+  ): DeliveriesToRescue!
 
   """
   What the shop charges to deliver an order, which checkout adds for its city.

@@ -42,6 +42,7 @@ export const HomeQuery = /* GraphQL */ `
         ...Tally
       }
       parcelsUnseen
+      deliveriesToRescue
       transfersToCheck {
         ...Tally
       }
@@ -3342,6 +3343,34 @@ export const ReturningParcelsQuery = /* GraphQL */ `
       }
       pageInfo {
         hasNextPage
+      }
+    }
+  }
+`;
+
+/**
+ * Parcels whose courier tried to deliver them and couldn't, with what their customers answered on
+ * WhatsApp since (COD-08, ADR-388).
+ */
+export const DeliveriesToRescueQuery = /* GraphQL */ `
+  query DeliveriesToRescue {
+    deliveriesToRescue(first: 100) {
+      count
+      parcels {
+        id
+        orderId
+        orderName
+        customerName
+        city
+        trackingInfo {
+          company
+          number
+        }
+        attemptedAt
+        reason
+        attempts
+        answer
+        answeredAt
       }
     }
   }
