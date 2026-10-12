@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
 
-### The cheapest courier as a rule
+### 75d1561 · The cheapest courier as a rule
 
 * **In the core** ([ADR-385](../architecture/13-decision-log.md#adr-385--a-courier-rule-may-book-with-the-cheapest-of-the-shops-accounts-by-their-rate-cards-order-by-order-and-is-passed-over-where-none-has-a-card), SHP-06): a courier rule naming no account books each order it
   matches with the cheapest of the shop's live accounts by their rate cards, by the order's
