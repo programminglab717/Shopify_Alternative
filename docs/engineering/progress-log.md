@@ -18,7 +18,7 @@ delivery was tried is V1's failed-delivery rescue (COD-08).
 
 ## 2026-10-12
 
-### Couriers' performance by city
+### bb034a6 · Couriers' performance by city
 
 * **In the core** ([ADR-384](../architecture/13-decision-log.md#adr-384--couriers-performance-how-each-couriers-parcels-shipped-in-a-period-went-everywhere-and-city-by-city-worked-out-from-the-parcels-when-asked), SHP-08): `courierPerformance` gives, for parcels shipped in a period,
   each courier's parcels delivered, returned, lost and on their way, its delivery and return
