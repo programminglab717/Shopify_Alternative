@@ -56,6 +56,7 @@ import {
   shownProperties,
   type CheckoutDiscount,
   type CheckoutForm,
+  type CheckoutGift,
   type CheckoutPayments,
   type CheckoutProblem,
   type CheckoutShop,
@@ -82,6 +83,9 @@ const LABELS = {
   discountCode: { en: 'Discount code', ur: 'ڈسکاؤنٹ کوڈ' },
   apply: { en: 'Apply', ur: 'لاگو کریں' },
   remove: { en: 'Remove', ur: 'ہٹائیں' },
+  giftWrap: { en: 'Gift wrap', ur: 'گفٹ ریپ' },
+  addGiftWrap: { en: 'Add gift wrap', ur: 'گفٹ ریپ شامل کریں' },
+  giftMessage: { en: 'Gift message', ur: 'تحفے کا پیغام' },
   delivery: { en: 'Delivery', ur: 'ڈیلیوری' },
   free: { en: 'Free', ur: 'مفت' },
   byCity: { en: 'By city', ur: 'شہر کے مطابق' },
@@ -346,6 +350,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
         view.tax,
       ),
       discountSection(discount, problem?.kind === 'discount' ? problem : null),
+      orderable && giftWrapSection(view.gift),
       orderable &&
         html`<form method="post">
           <input type="hidden" name="shown" value="${view.shown}" />
@@ -399,6 +404,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
             errors,
             form.city,
           )}
+          ${giftMessageField(view.gift, form)}
           ${paymentSection(shop, payments, form.payment, { transferOff, onlineOff }, askedAhead, pastLimit)}
           ${view.storeCredit && storeCreditChoice(form.storeCredit === '1')} ${asked && codeField()}
           ${agreement && paragraphs(agreement, 'small muted')}
@@ -1402,6 +1408,63 @@ function problemWords(
       };
     }
   }
+}
+
+/**
+ * The shop's gift wrap (CHK-16, ADR-413): a form to add it to the cart at its price, or, added, to
+ * take it off; a form of its own, as the code's is, which places nothing.
+ */
+function giftWrapSection(gift: CheckoutGift | null): Html {
+  const wrap = gift?.wrap;
+  if (!wrap) return html``;
+  const price = amount(wrap.price);
+  return html`<section class="section">
+    <h2 class="label">${say('bilingual', LABELS.giftWrap)}</h2>
+    ${paragraphs(
+      wrap.added
+        ? {
+            en: html`Your order is gift-wrapped: ${text(wrap.title)}, ${price}.`,
+            ur: html`آپ کا آرڈر گفٹ ریپ ہوگا: ${text(wrap.title)}، ${ltr(price)}۔`,
+          }
+        : {
+            en: `Have it gift-wrapped for ${price}.`,
+            ur: html`${ltr(price)} میں اسے گفٹ ریپ کروائیں۔`,
+          },
+      '',
+    )}
+    <form method="post">
+      <input type="hidden" name="action" value="${wrap.added ? 'remove_gift_wrap' : 'gift_wrap'}" />
+      <button class="button secondary" type="submit">
+        ${say('bilingual', wrap.added ? LABELS.remove : LABELS.addGiftWrap)}
+      </button>
+    </form>
+  </section>`;
+}
+
+/** A message to go with the order as a gift, where the shop asks for one (ADR-413). */
+function giftMessageField(gift: CheckoutGift | null, form: CheckoutForm): Html {
+  if (!gift?.messages) return html``;
+  return html`<div class="field">
+    <label class="label" for="gift_message">${say('bilingual', LABELS.giftMessage)}</label>
+    <textarea
+      id="gift_message"
+      name="gift_message"
+      dir="auto"
+      rows="3"
+      maxlength="250"
+      aria-describedby="gift_message-hint"
+    >
+${form.giftMessage ?? ''}</textarea>
+    <div id="gift_message-hint">
+      ${paragraphs(
+        {
+          en: 'If you like, for the one you are sending it to: the shop puts it in the parcel.',
+          ur: 'اگر آپ چاہیں، جسے آپ یہ بھیج رہے ہیں اس کے لیے: دکان اسے پارسل میں رکھے گی۔',
+        },
+        'small muted',
+      )}
+    </div>
+  </div>`;
 }
 
 /**

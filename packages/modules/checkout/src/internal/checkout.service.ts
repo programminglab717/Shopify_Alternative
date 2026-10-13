@@ -59,7 +59,7 @@ import { NO_TAX, taxSettingsIn, type TaxRates, type TaxSettingsRecord } from '@h
 import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { keepContactIn, recoverIn } from './abandoned.service.js';
-import { CartService } from './cart.service.js';
+import { CartService, type KeptCart } from './cart.service.js';
 import {
   NO_COD_RULES,
   advanceAsksOfCustomers,
@@ -74,6 +74,7 @@ import {
 import { codRulesIn } from './cod-rules.service.js';
 import { highestDeliveryCharge, type DeliverySettingsRecord } from './delivery.js';
 import { DeliveryService } from './delivery.service.js';
+import { giftOptionsIn } from './gift-options.service.js';
 import { marketingTicked, marketingWording } from './marketing.js';
 import { checkoutMarketingIn } from './marketing.service.js';
 import {
@@ -159,6 +160,17 @@ export interface CheckoutForm {
    * or absent, for delivered to their address.
    */
   pickup?: string;
+  /** A message to go with the order as a gift, where the page asks for one (ADR-413). */
+  giftMessage?: string;
+}
+
+/**
+ * What the page offers to send a gift with (CHK-16, ADR-413): the shop's gift wrap, at its price,
+ * and whether the cart holds it already; and whether it asks for a gift message.
+ */
+export interface CheckoutGift {
+  wrap: { variantId: string; title: string; price: bigint; added: boolean } | null;
+  messages: boolean;
 }
 
 /**
@@ -219,6 +231,7 @@ export const EMPTY_FORM: CheckoutForm = {
   latitude: '',
   longitude: '',
   pickup: '',
+  giftMessage: '',
 };
 
 /** Why cash on delivery can't take an order: the law's cap (TAX-07), or the shop's rules (CHK-07). */
@@ -409,6 +422,8 @@ export type CheckoutView =
       paymentLink: { id: string; title: string } | null;
       /** Where the shopper may pick the order up instead (ADR-391): none, where nowhere offers it. */
       pickup: PickupPoint[];
+      /** Gift wrap and a gift message (ADR-413); null where the shop offers neither. */
+      gift: CheckoutGift | null;
     }
   | {
       kind: 'placed';
@@ -865,6 +880,8 @@ export class CheckoutService {
           deliveryMethod: pickupAt ? 'pickup' : 'shipping',
           locationId: pickupAt?.id ?? null,
           note: orderNoteOf(view.cart),
+          // A message to go with it as a gift, where the page asked for one (ADR-413).
+          giftMessage: view.gift?.messages ? (form.giftMessage ?? null) : null,
           tags: [],
           agreement: {
             policyVersions: view.shop.policies.map((policy) => policy.versionId),
@@ -1117,6 +1134,7 @@ export class CheckoutService {
       marketing: await checkoutMarketingIn(tx, shopId),
       paymentLink: link && { id: link.id, title: link.title },
       pickup: await this.#pickupPoints(tx, shopId),
+      gift: await this.#gift(tx, shopId, cart),
       problem:
         !codRefusal || payments.bankTransfer || payments.online
           ? null
@@ -1124,6 +1142,54 @@ export class CheckoutService {
             ? { kind: 'cod_limit' }
             : { kind: 'cod_unavailable', refusal: codRefusal },
     };
+  }
+
+  /**
+   * What the page offers to send a gift with (ADR-413): the shop's gift wrap while it is for sale
+   * and in stock, or in the cart already; and a gift message where the shop asks for one.
+   */
+  async #gift(tx: Tx, shopId: string, cart: KeptCart): Promise<CheckoutGift | null> {
+    const options = await giftOptionsIn(tx, shopId);
+    const id = options.wrapVariantId;
+    const facts = id ? (await this.carts.factsIn(tx, shopId, [id])).get(id) : undefined;
+    const added = id !== null && cart.lines.some((line) => line.variantId === id);
+    const offered =
+      facts !== undefined &&
+      facts.forSale &&
+      (added || facts.sellable === null || facts.sellable > 0);
+    if (!offered && !options.messages) return null;
+    return {
+      wrap: offered ? { variantId: id!, title: facts.title, price: facts.price, added } : null,
+      messages: options.messages,
+    };
+  }
+
+  /**
+   * Adds the shop's gift wrap to the checkout's cart, one of it, or takes it off (ADR-413): the
+   * page again, its totals with it.
+   */
+  async giftWrap(
+    token: string,
+    add: boolean,
+    options: { shopId?: string } = {},
+  ): Promise<CheckoutView> {
+    const found = await this.#resolve(token, options.shopId);
+    if (!found) return { kind: 'not_found' };
+    return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
+      const view = await this.#view(tx, found, true, EMPTY_FORM);
+      if (view.kind !== 'open' || !view.gift?.wrap) return view;
+      const wrap = view.gift.wrap.variantId;
+      const cart = await this.carts.cartIn(tx, found.shopId, view.cartId, true);
+      if (!cart) return view;
+      const others = cart.lines.filter((line) => line.variantId !== wrap);
+      await this.carts.setLinesIn(
+        tx,
+        found.shopId,
+        view.cartId,
+        add ? [{ variantId: wrap, quantity: 1, properties: {} }, ...others] : others,
+      );
+      return this.#view(tx, found, false, EMPTY_FORM);
+    });
   }
 
   /** The locations offering pickup, as checkout offers them (ADR-391). */

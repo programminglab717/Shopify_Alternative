@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-412 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-413 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -420,6 +420,7 @@
 | 410 | An order of a bundle holds its parts' lines, the bundle's price shared among them by what each costs alone, to the paisa, each keeping the bundle it was sold as; a bundle sells as many as its parts' stock makes | Accepted |
 | 411 | A bundle's storefront page lists what one set holds, each part linked while it is for sale, as Hatti's product.bundle; a part off sale leaves the set unsold; a customer's order page shows a bundle once, its parts named under it | Accepted |
 | 412 | The admin makes a product a bundle on its page, its parts found as a draft's items are, each with how many one set holds; an order's page says of each part's line which bundle it was sold in | Accepted |
+| 413 | A shop sells gift wrap as one of its own variants, which the checkout's page adds to the cart when the shopper asks, and may ask for a gift message, which the order keeps for its packing slip | Accepted |
 
 ---
 
@@ -15882,3 +15883,33 @@
 * **Alternatives:**
   * **Bundles on a page of their own**, as size charts are: a bundle is a product, sold and seen
     as one, so it is made where its product is.
+
+## ADR-413 · A shop sells gift wrap as one of its own variants, which the checkout's page adds to the cart when the shopper asks, and may ask for a gift message, which the order keeps for its packing slip
+
+* **Context:**
+  * CHK-16: gifts are a large part of Eid and wedding orders, sent to a mother or a sister in
+    another city. Shoppers ask for them to be wrapped and for a few words to go with them;
+    order notes already exist, but a note is the shop's to read, not the recipient's.
+* **Decision:**
+  * **Gift wrap is a variant of the shop's own** (`checkout.gift_options.wrap_variant_id`),
+    "Gift wrap, Rs 150", with its own price, stock and tax. The checkout's page offers it, at
+    its price, while its product is active and in stock: **a form of its own**, posted with
+    `action=gift_wrap`, puts one of it in the cart, and `remove_gift_wrap` takes it off, as
+    the discount code's forms do. It is then a line like any other: the page's totals, the
+    cash cap, advances, discounts, the order's lines, refunds and stock all count it unchanged.
+  * **A gift message**, where the shop asks for one: a box in the order's form, up to 250
+    characters, kept as `orders.orders.gift_message`, trimmed, none when blank, and on the
+    Admin API as `Order.giftMessage`; staff give one with `orderCreate`'s `giftMessage`. It is
+    the customer's words, so a customer's erasure clears it.
+  * **The settings:** `checkoutGiftOptions` and `checkoutGiftOptionsUpdate` (`read_settings`,
+    `write_settings`): the variant, the shop's own or refused, and whether messages are asked
+    for; `gift_options.updated` when they change. Neither until the shop chooses.
+* **Consequences:**
+  * A wrap whose variant is deleted, or whose product is drafted, is no longer offered; one in
+    a cart already is priced as the cart prices any line.
+  * The packing slip and the order's pages show the message next (gift options b).
+* **Alternatives:**
+  * **A fee on the order**, as cash on delivery's is: every total, tax, discount and refund
+    would need to know of it; a line needs nothing new.
+  * **A cart attribute** set by the storefront's theme: themes the shop did not write would
+    offer nothing; the checkout's page is the platform's and offers it to every shop.

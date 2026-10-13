@@ -321,7 +321,8 @@ function contactOf(body: unknown): { name: string; phone: string } {
 
 /**
  * What a POST to a checkout's page does: applies the discount code it carries
- * (`action=discount`), takes the code off (`action=remove_discount`), sends the shopper to the
+ * (`action=discount`), takes the code off (`action=remove_discount`), adds the shop's gift wrap
+ * or takes it off (`action=gift_wrap`, `remove_gift_wrap`, ADR-413), sends the shopper to the
  * shop's gateway to pay the order placed online (`action=pay`, ADR-152), or places the order.
  */
 async function posted(
@@ -335,6 +336,10 @@ async function posted(
       return checkouts.applyDiscount(token, field(body, 'discount'), options);
     case 'remove_discount':
       return checkouts.removeDiscount(token, options);
+    case 'gift_wrap':
+      return checkouts.giftWrap(token, true, options);
+    case 'remove_gift_wrap':
+      return checkouts.giftWrap(token, false, options);
     case 'pay':
       return checkouts.payOnline(token, { ...options, gateway: field(body, 'gateway') });
     default:
@@ -405,6 +410,8 @@ function formOf(body: unknown): CheckoutForm {
     longitude: field(body, 'longitude').slice(0, 20),
     // The location the shopper picks the order up at, where the page offered one (ADR-391).
     pickup: field(body, 'pickup').slice(0, 40),
+    // A message to go with it as a gift, where the page asked for one (ADR-413).
+    giftMessage: field(body, 'gift_message').slice(0, 250),
   };
 }
 

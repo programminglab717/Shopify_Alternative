@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: gift options at checkout, a gift
-note and wrapping (CHK-16); then the shop's whole store exported (ADM-10). Urdu handles wait, as
-decided.
+**Next, section by section as the alpha's shops need them**: the gift message on packing slips
+and order pages, and the admin's gift options (CHK-16); then the shop's whole store exported
+(ADM-10). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,15 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Gift wrap and gift messages at checkout
+
+* **Gift wrap** ([ADR-413](../architecture/13-decision-log.md#adr-413--a-shop-sells-gift-wrap-as-one-of-its-own-variants-which-the-checkouts-page-adds-to-the-cart-when-the-shopper-asks-and-may-ask-for-a-gift-message-which-the-order-keeps-for-its-packing-slip), CHK-16) is one of the shop's own variants: the checkout's page offers
+  it at its price and adds it to the cart, a line like any other, or takes it off.
+* **A gift message**, where the shop asks for one, goes with the order: `Order.giftMessage`,
+  given by staff too, and cleared with the customer's other data on erasure.
+* **The settings** are `checkoutGiftOptions` and `checkoutGiftOptionsUpdate`. Migration 0193.
+* 2754 tests (5 new): the checkout's and the Admin API's.
 
 ### 0bb6211 · Bundles in the admin
 

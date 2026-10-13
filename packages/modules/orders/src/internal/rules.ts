@@ -19,6 +19,8 @@ export const LIMITS = {
   name: 255,
   addressLine: 255,
   note: 5_000,
+  /** A gift message, as a card in the parcel holds it (CHK-16, ADR-413). */
+  giftMessage: 250,
   /** A comment on an order's timeline (ADR-128), as an event's message may be. */
   comment: 2_000,
   /** A refund's transfer reference. */

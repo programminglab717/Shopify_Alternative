@@ -1077,6 +1077,43 @@ type CashOnDeliverySettingsUpdatePayload {
   userErrors: [UserError!]!
 }
 
+"""What the checkout offers to send a gift with (CHK-16, ADR-413)."""
+type CheckoutGiftOptions {
+  """
+  Whether the page asks for a gift message, which the order keeps for its packing slip.
+  """
+  messages: Boolean!
+
+  """
+  The shop's own variant the checkout's page adds to the cart when a shopper asks for gift wrap, at its price; null for none, or once it is deleted.
+  """
+  wrap: CheckoutGiftWrap
+}
+
+input CheckoutGiftOptionsInput {
+  messages: Boolean!
+
+  """One of the shop's variants to sell as gift wrap; null for none."""
+  wrapVariantId: ID
+}
+
+type CheckoutGiftOptionsUpdatePayload {
+  checkoutGiftOptions: CheckoutGiftOptions
+  userErrors: [UserError!]!
+}
+
+"""The variant a shop sells as gift wrap, as the catalog has it now."""
+type CheckoutGiftWrap {
+  """Whether its product is active: checkout offers it only then."""
+  forSale: Boolean!
+
+  """What checkout adds to the order for it."""
+  price: Money!
+  productTitle: String!
+  variantId: ID!
+  variantTitle: String!
+}
+
 type CheckoutMarketingChannelsUpdatePayload {
   checkoutMarketingChannels: [MarketingChannel!]
   userErrors: [UserError!]!
@@ -5952,6 +5989,11 @@ type Mutation {
   cashOnDeliverySettingsUpdate(input: CashOnDeliverySettingsInput!): CashOnDeliverySettingsUpdatePayload!
 
   """
+  Sets the variant sold as gift wrap, null for none, and whether checkout asks for a gift message.
+  """
+  checkoutGiftOptionsUpdate(input: CheckoutGiftOptionsInput!): CheckoutGiftOptionsUpdatePayload!
+
+  """
   Sets the channels the checkout's page offers a box for the shop's news and offers on, each once; none for no boxes. A box ticked records the customer's consent on its channel as the order is placed, from CHECKOUT.
   """
   checkoutMarketingChannelsUpdate(channels: [MarketingChannel!]!): CheckoutMarketingChannelsUpdatePayload!
@@ -7473,6 +7515,11 @@ type Order {
 
   """Its parcels, oldest first."""
   fulfillments: [Fulfillment!]!
+
+  """
+  The message its customer asked to go with it as a gift, for its packing slip (CHK-16, ADR-413); null for none.
+  """
+  giftMessage: String
   id: ID!
   lineItems: [OrderLineItem!]!
 
@@ -7721,6 +7768,11 @@ input OrderCreateInput {
   """Taken off the items, as an amount."""
   discount: String
   email: String
+
+  """
+  A message to go with it as a gift, up to 250 characters (CHK-16, ADR-413).
+  """
+  giftMessage: String
 
   """Up to 100."""
   lineItems: [OrderLineItemInput!]!
@@ -9944,6 +9996,11 @@ type Query {
 
   """The shop's rules for cash on delivery at checkout."""
   cashOnDeliverySettings: CashOnDeliverySettings!
+
+  """
+  The gift wrap the checkout's page offers to add, and whether it asks for a gift message (CHK-16, ADR-413): neither until the shop chooses.
+  """
+  checkoutGiftOptions: CheckoutGiftOptions!
 
   """
   The channels the checkout's page offers a box for the shop's news and offers on, each unticked until the shopper ticks it (ADR-187): WHATSAPP until the shop chooses.

@@ -26,18 +26,19 @@ const NAMED = 5;
 /**
  * Orders' part in merging and erasing customers. A merged duplicate's orders become the customer's.
  * An erased customer's orders keep what the shop's accounts need: the items, amounts, statuses and
- * dates, and the city and province they went to; the name, number, email, street and note go, as do
- * the address and browser they were placed from and the IDs the shop's Meta pixel gave that browser
- * (ADR-144), the notes, references and receipts of their refunds (ADR-242), the comments on their
- * timelines and the receipts they sent for transfers, whose files nothing signs a URL for after;
- * and the timeline says so. The policies they agreed to stay: those are the shop's words, not the
- * customer's (ADR-057). Of the visits that brought them to the shop (ADR-139), the pages they
- * landed on and came from go, which may carry an ad's click ID or a search; where each came from
- * and its UTM parameters stay, the shop's own words for its campaigns, for its sales by campaign.
- * Timeline messages never hold contact details, so they stay as they are. Their orders' links stop
- * working, since their pages show the address. Their draft orders go: those that became their
- * orders, and open ones with one of their numbers or their email. So do the reviews they wrote on
- * their orders' pages (ADR-399), which a merge gives the customer kept, as it does their orders.
+ * dates, and the city and province they went to; the name, number, email, street, note and gift
+ * message (ADR-413) go, as do the address and browser they were placed from and the IDs the shop's
+ * Meta pixel gave that browser (ADR-144), the notes, references and receipts of their refunds
+ * (ADR-242), the comments on their timelines and the receipts they sent for transfers, whose files
+ * nothing signs a URL for after; and the timeline says so. The policies they agreed to stay: those
+ * are the shop's words, not the customer's (ADR-057). Of the visits that brought them to the shop
+ * (ADR-139), the pages they landed on and came from go, which may carry an ad's click ID or a
+ * search; where each came from and its UTM parameters stay, the shop's own words for its campaigns,
+ * for its sales by campaign. Timeline messages never hold contact details, so they stay as they
+ * are. Their orders' links stop working, since their pages show the address. Their draft orders go:
+ * those that became their orders, and open ones with one of their numbers or their email. So do the
+ * reviews they wrote on their orders' pages (ADR-399), which a merge gives the customer kept, as it
+ * does their orders.
  *
  * A customer's own export (ADR-102) gives them the same orders and drafts whole, with their
  * parcels, refunds, calls to confirm them, the receipts they sent, the visits that brought them,
@@ -86,7 +87,7 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
     await tx.execute(sql`
       WITH erased AS (
         UPDATE orders.orders
-           SET phone = NULL, email = NULL, note = '', search_text = '',
+           SET phone = NULL, email = NULL, note = '', gift_message = NULL, search_text = '',
                link_token_hash = NULL, link_expires_at = NULL,
                client_ip = NULL, client_user_agent = NULL, browser_ids = NULL,
                attribution = attribution #- '{first,landingPage}' #- '{first,referrer}'

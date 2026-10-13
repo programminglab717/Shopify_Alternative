@@ -62,12 +62,19 @@ export {
   CheckoutEvents,
   type CodSettingsUpdatedPayload,
   type DeliverySettingsUpdatedPayload,
+  type GiftOptionsUpdatedPayload,
   type MarketingOptionsUpdatedPayload,
   type PaymentLinkChangedPayload,
   type TrustBadgesUpdatedPayload,
 } from '../internal/events.js';
 export { DEFAULT_MARKETING_CHANNELS, MARKETING_FIELDS } from '../internal/marketing.js';
 export { CheckoutMarketingService, checkoutMarketingIn } from '../internal/marketing.service.js';
+export {
+  GiftOptionsService,
+  giftOptionsIn,
+  type GiftOptions,
+  type GiftWrap,
+} from '../internal/gift-options.service.js';
 export { TrustBadgeService, trustBadgesIn } from '../internal/trust-badge.service.js';
 export {
   TRUST_BADGE_KINDS,

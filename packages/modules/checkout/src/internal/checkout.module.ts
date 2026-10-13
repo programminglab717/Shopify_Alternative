@@ -20,9 +20,11 @@ import { DeliveryService } from './delivery.service.js';
 import { AbandonedCheckoutResolver } from './graphql/abandoned.resolver.js';
 import { CodRulesResolver } from './graphql/cod-rules.resolver.js';
 import { DeliveryResolver } from './graphql/delivery.resolver.js';
+import { GiftOptionsResolver } from './graphql/gift-options.resolver.js';
 import { CheckoutMarketingResolver } from './graphql/marketing.resolver.js';
 import { PaymentLinkResolver } from './graphql/payment-link.resolver.js';
 import { TrustBadgeResolver } from './graphql/trust-badge.resolver.js';
+import { GiftOptionsService } from './gift-options.service.js';
 import { CheckoutMarketingService } from './marketing.service.js';
 import { PaymentLinkService } from './payment-link.service.js';
 import { TrustBadgeService } from './trust-badge.service.js';
@@ -44,6 +46,9 @@ import { TrustBadgeService } from './trust-badge.service.js';
     TrustBadgeResolver,
     CheckoutMarketingService,
     CheckoutMarketingResolver,
+    // Gift wrap and gift messages (CHK-16, ADR-413).
+    GiftOptionsService,
+    GiftOptionsResolver,
     CheckoutService,
     // Links many customers open, each to a checkout of their own (ADR-248).
     PaymentLinkService,
@@ -69,6 +74,7 @@ import { TrustBadgeService } from './trust-badge.service.js';
     CodRulesService,
     TrustBadgeService,
     CheckoutMarketingService,
+    GiftOptionsService,
     CheckoutService,
     PaymentLinkService,
     AbandonedCheckoutService,

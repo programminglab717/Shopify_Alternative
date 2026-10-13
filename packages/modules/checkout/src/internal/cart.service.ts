@@ -15,6 +15,7 @@ import {
   variantsNamed,
   type CartAction,
   type CartContent,
+  type StoredLine,
   type VariantFacts,
 } from './cart-lines.js';
 import type { CodProduct } from './cod-rules.js';
@@ -173,6 +174,26 @@ export class CartService {
       .update(carts)
       .set({ discountCodes: codes, updatedAt: sql`now()` })
       .where(and(eq(carts.shopId, shopId), eq(carts.id, id)));
+  }
+
+  /**
+   * Keeps `lines` as what the cart holds, in the caller's transaction `tx`, as checkout's page
+   * adds or takes off its gift wrap (ADR-413); what is for sale is the cart's pricing's to say.
+   */
+  async setLinesIn(tx: Tx, shopId: string, id: string, lines: StoredLine[]): Promise<void> {
+    await tx
+      .update(carts)
+      .set({ lines, updatedAt: sql`now()` })
+      .where(and(eq(carts.shopId, shopId), eq(carts.id, id)));
+  }
+
+  /** What the catalog and inventory say of these variants now, in the caller's transaction `tx`. */
+  factsIn(
+    tx: Tx,
+    shopId: string,
+    variantIds: readonly string[],
+  ): Promise<Map<string, VariantFacts>> {
+    return this.#facts(tx, shopId, variantIds);
   }
 
   /** The cart whose secret hashes to `hash`; prepared (ADR-111) when read, not locked. */

@@ -157,6 +157,7 @@ function openView(
     marketing: [],
     paymentLink: null,
     pickup: [],
+    gift: null,
     ...changes,
   };
 }

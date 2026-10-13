@@ -299,6 +299,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM checkout.trust_badges;
         DELETE FROM checkout.marketing_options;
         DELETE FROM checkout.recovery_settings;
+        DELETE FROM checkout.gift_options;
         DELETE FROM online_store.preferences;
         DELETE FROM pricing.discount_redemptions;
         DELETE FROM pricing.discount_codes;

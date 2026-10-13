@@ -207,3 +207,15 @@ export const recoverySettings = checkoutSchema.table('recovery_settings', {
   reminderAfterMinutes: integer('reminder_after_minutes'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * What the shop offers to send a gift with (CHK-16, ADR-413): one of its variants as gift wrap,
+ * which checkout adds to the cart when asked, and whether it asks for a gift message. Shops
+ * without a row offer neither.
+ */
+export const giftOptions = checkoutSchema.table('gift_options', {
+  shopId: uuid('shop_id').primaryKey(),
+  wrapVariantId: uuid('wrap_variant_id'),
+  messages: boolean('messages').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

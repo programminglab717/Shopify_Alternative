@@ -10,6 +10,7 @@ export const CheckoutEvents = {
   PaymentLinkCreated: 'payment_link.created',
   PaymentLinkUpdated: 'payment_link.updated',
   RecoverySettingsUpdated: 'recovery_settings.updated',
+  GiftOptionsUpdated: 'gift_options.updated',
 } as const;
 
 /** The shop changed what it charges for delivery. */
@@ -43,6 +44,13 @@ export interface MarketingOptionsUpdatedPayload {
 export interface RecoverySettingsUpdatedPayload {
   /** 30, 60, 180 or 600; null for never. */
   reminderAfterMinutes: number | null;
+}
+
+/** The shop changed the gift options its checkout offers (CHK-16, ADR-413). */
+export interface GiftOptionsUpdatedPayload {
+  /** The variant sold as gift wrap; null for none. */
+  wrapVariantId: string | null;
+  messages: boolean;
 }
 
 /** Staff made a payment link (ADR-248), or changed one. */

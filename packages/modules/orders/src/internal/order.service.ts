@@ -150,6 +150,8 @@ export interface OrderCreateInput {
    */
   deliveryMethod?: DeliveryMethodValue | null;
   note?: string | null;
+  /** The message to go with it as a gift (CHK-16, ADR-413). */
+  giftMessage?: string | null;
   tags?: string[] | null;
 }
 
@@ -209,6 +211,8 @@ export interface OrderToPlace {
    */
   deliveryMethod?: DeliveryMethodValue;
   note: string;
+  /** The message to go with it as a gift, checked (CHK-16, ADR-413); none when left out. */
+  giftMessage?: string | null;
   tags: string[];
   /**
    * What its customer agreed to, when they place it themselves: through checkout (ADR-057), or by
@@ -461,6 +465,9 @@ export class OrderService {
       );
     }
     const note = check.text(['input', 'note'], input.note, { max: LIMITS.note }) ?? '';
+    const giftMessage = check.text(['input', 'giftMessage'], input.giftMessage, {
+      max: LIMITS.giftMessage,
+    });
     const tags = check.tags(['input', 'tags'], input.tags);
     if (!check.ok || !address) return { ok: false, errors: check.errors };
 
@@ -477,6 +484,7 @@ export class OrderService {
       locationId: input.locationId ?? null,
       deliveryMethod: input.deliveryMethod ?? 'shipping',
       note,
+      giftMessage,
       tags,
     };
     const placement: Placement = {
@@ -795,6 +803,7 @@ export class OrderService {
         shippingAddress: address,
         locationId: location.value.id,
         note: order.note,
+        giftMessage: giftMessageOf(order.giftMessage),
         tags: order.tags,
         searchText: searchTextOf(address, email),
         discountCodes: order.discountCodes ?? [],
@@ -2942,4 +2951,16 @@ function waitingForPayment(shopId: string) {
     sql`NOT EXISTS (SELECT 1 FROM orders.transfer_receipts r
                      WHERE r.shop_id = ${orders.shopId} AND r.order_id = ${orders.id})`,
   );
+}
+
+/**
+ * A gift message as an order keeps it (CHK-16, ADR-413): trimmed, cut to what a card holds, null
+ * when it says nothing.
+ */
+export function giftMessageOf(message: string | null | undefined): string | null {
+  const trimmed = (message ?? '').trim();
+  if (trimmed === '') return null;
+  return trimmed.length <= LIMITS.giftMessage
+    ? trimmed
+    : `${trimmed.slice(0, LIMITS.giftMessage - 1)}…`;
 }

@@ -70,6 +70,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   over_limit_at: string | null;
   location_id: string;
   note: string;
+  gift_message: string | null;
   tags: string[];
   cancel_reason: OrderRecord['cancelReason'];
   merged_into_id: string | null;
@@ -223,6 +224,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     overLimitAt: toDateOrNull(row.over_limit_at),
     locationId: row.location_id,
     note: row.note,
+    giftMessage: row.gift_message,
     tags: row.tags,
     cancelReason: row.cancel_reason,
     mergedInto: row.merged_into_id
@@ -396,7 +398,8 @@ export async function loadOrders(
            o.shipping, o.cod_fee, o.tax_rate, o.total_tax, o.shipping_tax, o.transfer_discount,
            o.online_discount, o.total, o.discount_codes, o.amount_paid,
            o.amount_refunded, o.cod_amount, o.advance_due, o.bank_account, o.customer_id,
-           o.phone, o.email, o.shipping_address, o.location_id, o.note, o.tags, o.cancel_reason,
+           o.phone, o.email, o.shipping_address, o.location_id, o.note, o.gift_message, o.tags,
+           o.cancel_reason,
            o.merged_into_id,
            (SELECT m.number FROM orders.orders m
              WHERE m.shop_id = o.shop_id AND m.id = o.merged_into_id) AS merged_into_number,

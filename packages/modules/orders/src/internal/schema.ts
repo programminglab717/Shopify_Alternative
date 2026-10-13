@@ -314,6 +314,8 @@ export const orders = ordersSchema.table(
     shippingAddress: jsonb('shipping_address').$type<StoredAddressValue>().notNull(),
     locationId: uuid('location_id').notNull(),
     note: text('note').notNull().default(''),
+    /** The message its customer asked to go with it as a gift (CHK-16, ADR-413). */
+    giftMessage: text('gift_message'),
     tags: text('tags').array().notNull().default([]),
     searchText: text('search_text').notNull().default(''),
     cancelReason: text('cancel_reason', { enum: CANCEL_REASONS }),

@@ -1301,6 +1301,14 @@ export class Order {
   @Field()
   note!: string;
 
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The message its customer asked to go with it as a gift, for its packing slip (CHK-16, ' +
+      'ADR-413); null for none.',
+  })
+  giftMessage!: string | null;
+
   @Field(() => [String])
   tags!: string[];
 
@@ -1648,6 +1656,12 @@ export class OrderCreateInput {
 
   @Field(() => String, { nullable: true })
   note?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'A message to go with it as a gift, up to 250 characters (CHK-16, ADR-413).',
+  })
+  giftMessage?: string | null;
 
   @Field(() => [String], { nullable: true })
   tags?: string[] | null;
