@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Webhooks
+### 29d1ed8 · Webhooks
 
 * **Subscriptions** ([ADR-397](../architecture/13-decision-log.md#adr-397--a-custom-app-subscribes-to-topics-of-the-shops-events-at-https-addresses-the-worker-makes-one-delivery-an-event-and-subscription-for-apps-that-may-read-what-it-names-posts-it-signed-with-the-apps-secret-to-a-public-address-alone-and-tries-again-with-backoff-for-two-days), DEV-03): a custom app subscribes to Shopify's topics, orders,
   fulfillments, products, stock levels, customers and its own uninstalling, at https addresses
