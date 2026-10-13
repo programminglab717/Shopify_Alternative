@@ -129,7 +129,8 @@ describe("The shop's own WhatsApp number (MKT-01, ADR-419)", () => {
       xfbml: false,
       autoLogAppEvents: false,
     });
-    expect(sdk.login.mock.calls[0]![1]).toMatchObject({
+    // What Embedded Signup is opened with, after the callback.
+    expect((sdk.login.mock.calls[0] as unknown[])[1]).toMatchObject({
       config_id: SIGNUP.configurationId,
       response_type: 'code',
     });
