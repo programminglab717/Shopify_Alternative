@@ -348,6 +348,8 @@ function formOf(body: unknown): CheckoutForm {
     // The pin, where the shopper added their location (ADR-259).
     latitude: field(body, 'latitude').slice(0, 20),
     longitude: field(body, 'longitude').slice(0, 20),
+    // The location the shopper picks the order up at, where the page offered one (ADR-391).
+    pickup: field(body, 'pickup').slice(0, 40),
   };
 }
 

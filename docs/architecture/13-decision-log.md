@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-390 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-391 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -398,6 +398,7 @@
 | 388 | A customer whose delivery failed is asked on WhatsApp whether to deliver it again or call them first, and the shop sees the parcels to rescue with each answer | Accepted |
 | 389 | A location lets customers pick orders up, with what to tell them; an order picked up waits ready for pickup once packed, its customer told where, is never booked with a courier, and completes when handed over at the counter | Accepted |
 | 390 | A draft order is shipped or picked up: one picked up names a location offering pickup, or the only one, has no delivery charge, and becomes an order picked up there; its link says the customer pays when they collect it | Accepted |
+| 391 | Checkout offers pickup at each location that lets customers pick up: chosen, the order has no delivery charge, the shopper's address is optional with the location's standing in, and the thank-you page says where to collect it | Accepted |
 
 ---
 
@@ -15185,3 +15186,34 @@
     the method of its own keeps couriers out, as for orders.
   * **Choosing the location only when placing:** a draft is agreed in the chat; where to collect
     is part of what the customer agreed to, so it is on the draft.
+
+## ADR-391 · Checkout offers pickup at each location that lets customers pick up: chosen, the order has no delivery charge, the shopper's address is optional with the location's standing in, and the thank-you page says where to collect it
+
+* **Context:**
+  * Shops offer pickup at their counters ([ADR-389](#adr-389--a-location-lets-customers-pick-orders-up-with-what-to-tell-them-an-order-picked-up-waits-ready-for-pickup-once-packed-its-customer-told-where-is-never-booked-with-a-courier-and-completes-when-handed-over-at-the-counter)), but shoppers ordering on the storefront
+    could only have their order delivered. Checkout is one page the core renders, working
+    without JavaScript ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)), its totals worked out as it is posted.
+* **Decision:**
+  * **The page offers delivery or pickup** where any active location lets customers pick up
+    and has its street and city: "Deliver to my address", or "Pick up from" each such location,
+    its address and what the shop says of it, with no delivery charge. Delivered is the default;
+    without such a location the page is as before.
+  * **Picked up, the shopper's address is optional**: the location's street and city stand in
+    for any they leave out, so the shop's rules by city (cash on delivery, advances) go by where
+    they collect it. Their name and number are still asked, as the order is theirs and its
+    ready message goes to the number.
+  * **Placed, it is an order picked up there**, with no delivery charge, through the orders
+    module's own placing, which checks the location again. A location that stopped offering
+    pickup after the page showed it shows the page again.
+  * **The thank-you page says where to collect it**, with what the shop says of collecting
+    there, and that the customer is told on WhatsApp when it is ready; as it is seen again too.
+* **Consequences:**
+  * What the cart may hold is still what the locations fulfilling online orders have; an order
+    picked up commits stock at its location as any order does.
+  * The page's words for paying, such as an advance before the shop "sends your order", stay
+    those of delivered orders for now.
+* **Alternatives:**
+  * **A script switching the address away:** the page works without JavaScript; the address
+    stays and is optional once picked up.
+  * **Pickup as a delivery zone with no charge:** couriers would be booked for it; the
+    location's own method keeps them out, as for orders and drafts.

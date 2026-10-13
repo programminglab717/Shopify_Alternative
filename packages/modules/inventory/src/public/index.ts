@@ -40,6 +40,7 @@ export { availableForSale, sellableQuantity } from '../internal/item-store.js';
 export { TransferService } from '../internal/transfer.service.js';
 export {
   LocationService,
+  pickupLocationsIn,
   type ListLocationsOptions,
   type LocationAddInput,
   type LocationAddressInput,

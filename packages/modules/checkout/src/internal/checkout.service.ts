@@ -12,6 +12,7 @@ import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, type Tx } from '@hatti/db';
 import { LOGO_URL_SECONDS, shopLogoOf } from '@hatti/files/public';
 import { newId } from '@hatti/ids';
+import { pickupLocationsIn, type LocationRecord } from '@hatti/inventory/public';
 import { MessagesService, type PhoneChannel } from '@hatti/messaging/public';
 import type { CurrencyCode } from '@hatti/money';
 import {
@@ -152,6 +153,52 @@ export interface CheckoutForm {
    */
   latitude?: string;
   longitude?: string;
+  /**
+   * The location the shopper picks the order up at, of those the page offered (ADR-391); blank,
+   * or absent, for delivered to their address.
+   */
+  pickup?: string;
+}
+
+/**
+ * A location the shopper may collect their order at (SHP-15, ADR-391), as the page names it: its
+ * street and city stand in for an address the shopper leaves out.
+ */
+export interface PickupPoint {
+  id: string;
+  name: string;
+  address1: string;
+  address2: string | null;
+  city: string;
+  /** What the shop tells customers of collecting there; null for nothing. */
+  instructions: string | null;
+}
+
+/** A location offering pickup as checkout names it; only those with their street and city do. */
+function pickupPointOf(location: LocationRecord): PickupPoint | null {
+  const { address1, address2, city } = location.address;
+  if (!address1 || !city) return null;
+  return {
+    id: location.id,
+    name: location.name,
+    address1,
+    address2,
+    city,
+    instructions: location.localPickup?.instructions ?? null,
+  };
+}
+
+/**
+ * The form as placing reads it: picked up, the location's street and city in place of any the
+ * shopper left out, so that the shop's rules by city go by where they collect it.
+ */
+export function formForPickup(form: CheckoutForm, at: PickupPoint | null): CheckoutForm {
+  if (!at) return form;
+  return {
+    ...form,
+    address1: form.address1.trim() || at.address1,
+    city: form.city.trim() || at.city,
+  };
 }
 
 export const EMPTY_FORM: CheckoutForm = {
@@ -170,6 +217,7 @@ export const EMPTY_FORM: CheckoutForm = {
   marketing: '',
   latitude: '',
   longitude: '',
+  pickup: '',
 };
 
 /** Why cash on delivery can't take an order: the law's cap (TAX-07), or the shop's rules (CHK-07). */
@@ -358,6 +406,8 @@ export type CheckoutView =
       marketing: readonly MarketingChannelValue[];
       /** The payment link it was opened from (ADR-248), for the order placed; null for a cart's. */
       paymentLink: { id: string; title: string } | null;
+      /** Where the shopper may pick the order up instead (ADR-391): none, where nowhere offers it. */
+      pickup: PickupPoint[];
     }
   | {
       kind: 'placed';
@@ -375,6 +425,8 @@ export type CheckoutView =
       payment: 'paid' | OnlinePaymentProblem | null;
       /** What of it store credit paid, in minor units (ADR-186). */
       storeCredit: bigint;
+      /** Where the shopper picks it up (ADR-391); null for delivered, or a location gone since. */
+      pickup: PickupPoint | null;
       /**
        * The form that takes the shopper on to the shop's gateway, once they asked to pay online
        * and its page takes one, as JazzCash's does (ADR-163).
@@ -521,7 +573,8 @@ export class CheckoutService {
       const view = await this.#view(tx, found, false, typed);
       if (view.kind !== 'open') return view;
       const check = new InputChecker();
-      const address = checkAddress(check, [], { ...form, zip: null });
+      const at = view.pickup.find((point) => point.id === form.pickup) ?? null;
+      const address = checkAddress(check, [], { ...formForPickup(form, at), zip: null });
       if (!address) return { ...view, problem: { kind: 'address', errors: check.errors } };
       const sent = await sendCodeIn(tx, this.messages, {
         shopId: found.shopId,
@@ -598,8 +651,14 @@ export class CheckoutService {
       // A way to pay the page no longer offers, or never did.
       const paymentMethod = paymentOf(form.payment, view.payments);
       if (!paymentMethod) return { ...view, problem: { kind: 'changed' } };
+      // Picked up where the page offered (ADR-391); a location that stopped offering it since
+      // shows the page again.
+      const pickupAt = form.pickup
+        ? (view.pickup.find((point) => point.id === form.pickup) ?? null)
+        : null;
+      if (form.pickup && !pickupAt) return { ...view, problem: { kind: 'changed' } };
       const check = new InputChecker();
-      const address = checkAddress(check, [], { ...form, zip: null });
+      const address = checkAddress(check, [], { ...formForPickup(form, pickupAt), zip: null });
       const email = check.email(['email'], form.email)?.toLowerCase() ?? null;
       if (!address || !check.ok) {
         return { ...view, problem: { kind: 'address', errors: check.errors } };
@@ -621,9 +680,10 @@ export class CheckoutService {
       const profile = await shopProfile(tx, found.shopId);
       const code = view.discount?.record ?? null;
       const totals = checkoutTotals(BigInt(view.cart.subtotal), view.delivery, address.city, code);
-      // Known once the city is.
-      const delivery = totals.delivery!;
+      // Known once the city is; nothing for an order picked up.
+      const delivery = pickupAt ? 0n : totals.delivery!;
       const shipping = totals.freeDelivery ? 0n : delivery;
+      const total = pickupAt ? totals.subtotal - totals.discount : totals.total!;
       // The parcels the customer with the number typed refused before, and those the shop
       // delivered to them, where the shop's rules for paying on delivery, or its advance, ask
       // (ADR-075, ADR-089, ADR-094).
@@ -668,7 +728,7 @@ export class CheckoutService {
           : undefined;
       if (paymentMethod === 'cash_on_delivery') {
         const refusal = codRefusalOf(rules, {
-          total: totals.total!,
+          total,
           city: address.city,
           refused: customer?.refused,
         });
@@ -766,7 +826,8 @@ export class CheckoutService {
           // that high, instead of holding it for review (ADR-094).
           advanceDue: asked.due,
           riskAdvance: asked.ifRisky,
-          locationId: null,
+          deliveryMethod: pickupAt ? 'pickup' : 'shipping',
+          locationId: pickupAt?.id ?? null,
           note: orderNoteOf(view.cart),
           tags: [],
           agreement: {
@@ -856,6 +917,7 @@ export class CheckoutService {
         online: null,
         payment: null,
         storeCredit,
+        pickup: pickupAt,
         ...(proof && { proof }),
       };
     });
@@ -895,6 +957,12 @@ export class CheckoutService {
         online: gateways.length > 0 ? { gateways, amount: owed } : null,
         payment: null,
         storeCredit: await storeCreditPaidIn(tx, shopId, order.id),
+        pickup:
+          order.deliveryMethod === 'pickup'
+            ? ((await this.#pickupPoints(tx, shopId)).find(
+                (point) => point.id === order.locationId,
+              ) ?? null)
+            : null,
       };
     }
     // Paused for a while (ADR-252): placing the order waits on it too, as the view is built again.
@@ -1009,6 +1077,7 @@ export class CheckoutService {
       storeCredit: await shopGivesStoreCreditIn(tx, shopId),
       marketing: await checkoutMarketingIn(tx, shopId),
       paymentLink: link && { id: link.id, title: link.title },
+      pickup: await this.#pickupPoints(tx, shopId),
       problem:
         !codRefusal || payments.bankTransfer || payments.online
           ? null
@@ -1016,6 +1085,13 @@ export class CheckoutService {
             ? { kind: 'cod_limit' }
             : { kind: 'cod_unavailable', refusal: codRefusal },
     };
+  }
+
+  /** The locations offering pickup, as checkout offers them (ADR-391). */
+  async #pickupPoints(tx: Tx, shopId: string): Promise<PickupPoint[]> {
+    return (await pickupLocationsIn(tx, shopId))
+      .map(pickupPointOf)
+      .filter((point): point is PickupPoint => point !== null);
   }
 
   /**

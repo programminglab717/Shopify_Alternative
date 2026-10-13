@@ -156,6 +156,7 @@ function openView(
     storeCredit: false,
     marketing: [],
     paymentLink: null,
+    pickup: [],
     ...changes,
   };
 }
@@ -331,6 +332,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      pickup: null,
     });
     expect(placed.html).toContain('Location pin on the map');
     expect(placed.html).not.toContain('<script');
@@ -395,6 +397,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      pickup: null,
     });
     expect(page.status).toBe(200);
     expect(page.html).toContain('Thank you!');
@@ -735,6 +738,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      pickup: null,
     });
     expect(placed.html).toMatch(/Cash on delivery fee<\/span>[\s\S]*?Rs 100/);
     expect(placed.html).toContain('You pay Rs 4,250 when it arrives.');
@@ -810,6 +814,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      pickup: null,
     });
     expect(placed.html).toMatch(
       /Discount \(EID25\)<\/span>[\s\S]*?−Rs 1,000[\s\S]*?Bank transfer discount<\/span>[\s\S]*?−Rs 150/,
@@ -912,6 +917,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      pickup: null,
     }).html;
     expect(placed).toContain(
       'Your order #1001 is placed. Pay Rs 500 in advance by bank transfer, with #1001 as the ' +
@@ -925,6 +931,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      pickup: null,
     }).html;
     expect(paid).toContain('Your order #1001 is placed. Zari will be in touch before sending it.');
     expect(paid).not.toContain('call or message');
@@ -1094,6 +1101,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      pickup: null,
     });
     expect(page.html).toContain(
       'Your order #1001 is placed. Pay Rs 4,150 by bank transfer, with #1001 as the reference: ' +
@@ -1114,6 +1122,7 @@ describe('checkoutPage', () => {
         online: null,
         payment: null,
         storeCredit: 0n,
+        pickup: null,
       }).html,
     ).not.toContain('Raast ID');
     expect(page.html).toContain('<bdi>Send the receipt to 0300 1234567 on WhatsApp.</bdi>');
@@ -1128,6 +1137,7 @@ describe('checkoutPage', () => {
         online: null,
         payment: null,
         storeCredit: 0n,
+        pickup: null,
       });
       expect(later.html).toContain('Your order #1001 is placed. Zari will be in touch');
       expect(later.html).not.toContain('PK36');
@@ -1216,6 +1226,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      pickup: null,
     }).html;
     expect(placed).toContain('href="https://zari.hatti.test/policies/shipping-policy"');
     expect(checkoutPage(openView()).html).not.toContain('<nav');
@@ -1276,6 +1287,7 @@ describe('checkoutPage', () => {
         online: null,
         payment: null,
         storeCredit: 0n,
+        pickup: null,
       }),
       checkoutPage({ kind: 'expired', shop: amber }),
       checkoutPage({ kind: 'empty', shop: amber }),
@@ -1306,6 +1318,7 @@ describe('checkoutPage', () => {
         online: null,
         payment: null,
         storeCredit: 0n,
+        pickup: null,
       }),
       checkoutPage({ kind: 'expired', shop: branded }),
       checkoutPage({ kind: 'empty', shop: branded }),
@@ -1433,6 +1446,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      pickup: null,
     }).html;
     expect(html).toContain('Discount (EID25)');
     expect(html).toContain('−Rs 1,000');
@@ -1483,6 +1497,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      pickup: null,
     }).html;
     expect(placed).toMatch(
       /Total<\/span>[\s\S]*?Rs 4,150[\s\S]*?Sales tax 18% \(included\)<\/span>[\s\S]*?Rs 610.17/,

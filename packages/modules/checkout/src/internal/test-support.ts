@@ -135,6 +135,8 @@ export interface CheckoutFixture {
   codes: DiscountCodeService;
   blocklist: BlocklistService;
   products: ProductService;
+  /** The shop's locations, some of which customers may pick orders up at (ADR-391). */
+  locations: LocationService;
   variants: VariantService;
   /** Storage in a directory of its own, at https://hatti.test/storage. */
   storage: LocalStorage;
@@ -239,6 +241,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     codes: new DiscountCodeService(db),
     blocklist,
     products,
+    locations,
     variants,
     storage,
     files: new FileService(db, storage),

@@ -61,6 +61,7 @@ import {
   type CheckoutShop,
   type CheckoutView,
   type ClosedLinkReason,
+  type PickupPoint,
 } from './checkout.service.js';
 import { deliveryDays, type DeliveryDays, type DeliverySettingsRecord } from './delivery.js';
 import { MARKETING_FIELDS, marketingTicked, marketingWords } from './marketing.js';
@@ -89,6 +90,8 @@ const LABELS = {
   codFee: { en: 'Cash on delivery fee', ur: 'کیش آن ڈیلیوری فیس' },
   advanceByTransfer: { en: 'Advance by bank transfer', ur: 'ایڈوانس بینک ٹرانسفر سے' },
   deliverTo: { en: 'Deliver to', ur: 'ترسیل کا پتہ' },
+  deliveryOrPickup: { en: 'Delivery or pickup', ur: 'ڈیلیوری یا خود وصولی' },
+  pickUpFrom: { en: 'Pick up from', ur: 'یہاں سے وصول کریں' },
   payment: { en: 'Payment', ur: 'ادائیگی' },
   note: { en: 'Your note', ur: 'آپ کا نوٹ' },
   name: { en: 'Name', ur: 'نام' },
@@ -283,7 +286,10 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const byTransfer = orderable && ways.transfer && !ways.online && payments.codRefusal !== null;
   const onlineAlone = orderable && ways.online && !ways.transfer && payments.codRefusal !== null;
   const code = discount?.record ?? null;
-  const totals = checkoutTotals(BigInt(cart.subtotal), delivery, form.city, code);
+  // Picked up where the shopper chose (ADR-391): nothing to deliver.
+  const pickupAt = view.pickup.find((point) => point.id === form.pickup) ?? null;
+  const charges = pickupAt ? NO_DELIVERY : delivery;
+  const totals = checkoutTotals(BigInt(cart.subtotal), charges, form.city, code);
   // What paying by transfer takes off the items, after the code (ADR-077), and paying online
   // (ADR-222).
   const transferOff = payments.bankTransfer
@@ -321,7 +327,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
       problem && problem.kind !== 'discount' && banner(problemWords(problem, ways)),
       cartSummary(
         cart,
-        delivery,
+        charges,
         form.city,
         code,
         {
@@ -362,6 +368,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
             },
           })}
           ${marketingChoices(shop.name, view.marketing, form.marketing)}
+          ${pickupChoices(view.pickup, pickupAt)}
           ${field('city', LABELS.city, form, errors, {
             autocomplete: 'address-level2',
             required: true,
@@ -404,6 +411,54 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
     ],
     { scripts: orderable ? [LOCATION_SCRIPT] : [] },
   );
+}
+
+/** What delivery costs an order the shopper picks up: nothing (ADR-391). */
+const NO_DELIVERY: DeliverySettingsRecord = {
+  charge: 0n,
+  freeAbove: null,
+  days: null,
+  zones: [],
+  updatedAt: null,
+};
+
+/**
+ * Delivered to the address below, unless the shopper picks the order up at one of the locations
+ * the shop offers (ADR-391): its address and what the shop says of it, with no delivery charge,
+ * and their own address then optional.
+ */
+function pickupChoices(points: readonly PickupPoint[], chosen: PickupPoint | null): Html {
+  if (points.length === 0) return html``;
+  const choice = (value: string, sentence: Sentence, checked: boolean) =>
+    html`<label class="choice">
+      <input type="radio" name="pickup" value="${value}" ${checked && html`checked`} />
+      <span
+        ><span lang="en">${sentence.en}</span><span lang="ur" dir="rtl">${sentence.ur}</span></span
+      >
+    </label>`;
+  return html`<section class="section" role="radiogroup" aria-labelledby="delivery-way">
+    <h2 class="label" id="delivery-way">${say('bilingual', LABELS.deliveryOrPickup)}</h2>
+    ${choice('', { en: 'Deliver to my address', ur: 'میرے پتے پر ڈیلیور کریں' }, chosen === null)}
+    ${points.map((point) => {
+      const where = [point.address1, point.address2, point.city].filter(Boolean).join(', ');
+      const told = point.instructions ? ` ${point.instructions}` : '';
+      return choice(
+        point.id,
+        {
+          en: `Pick up from ${point.name}, ${where}: no delivery charge.${told}`,
+          ur: html`${point.name}، ${where} سے خود وصول کریں: کوئی ڈیلیوری چارجز نہیں۔${told}`,
+        },
+        chosen?.id === point.id,
+      );
+    })}
+    ${paragraphs(
+      {
+        en: 'If you pick it up, your address is optional: we tell you on WhatsApp when it is ready.',
+        ur: 'خود وصول کرنے پر آپ کا پتہ اختیاری ہے: آرڈر تیار ہونے پر ہم آپ کو واٹس ایپ پر بتائیں گے۔',
+      },
+      'small muted',
+    )}
+  </section>`;
 }
 
 /**
@@ -860,7 +915,24 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
           ${view.storeCredit > 0n && row(LABELS.storeCredit, `−${rs(view.storeCredit)}`)}
         </table>
       </section>`,
-      to.name &&
+      view.pickup &&
+        html`<section class="section">
+          <h2 class="label">${say('bilingual', LABELS.pickUpFrom)}</h2>
+          <p>
+            ${text(view.pickup.name)}<br />${text(view.pickup.address1)}<br />
+            ${view.pickup.address2 && html`${text(view.pickup.address2)}<br />`}${text(view.pickup.city)}
+          </p>
+          ${view.pickup.instructions && html`<p>${text(view.pickup.instructions)}</p>`}
+          ${paragraphs(
+            {
+              en: 'We tell you on WhatsApp when it is ready to collect.',
+              ur: 'آرڈر وصولی کے لیے تیار ہونے پر ہم آپ کو واٹس ایپ پر بتائیں گے۔',
+            },
+            'small muted',
+          )}
+        </section>`,
+      !view.pickup &&
+        to.name &&
         html`<section class="section">
           <h2 class="label">${say('bilingual', LABELS.deliverTo)}</h2>
           <p>

@@ -225,18 +225,7 @@ export class LocationService {
    * first, then by name; in another module's tenant transaction `tx`.
    */
   async pickupLocationsIn(tx: Tx, shopId: string): Promise<LocationRecord[]> {
-    const rows = await tx
-      .select()
-      .from(locations)
-      .where(
-        and(
-          eq(locations.shopId, shopId),
-          eq(locations.isActive, true),
-          eq(locations.pickupEnabled, true),
-        ),
-      )
-      .orderBy(sql`${locations.isPrimary} DESC`, sql`lower(${locations.name})`, asc(locations.id));
-    return rows.map(toLocationRecord);
+    return pickupLocationsIn(tx, shopId);
   }
 
   /** Like {@link getMany}, in another module's tenant transaction `tx`. */
@@ -605,4 +594,23 @@ export class LocationService {
     });
     return toLocationRecord(updated!);
   }
+}
+
+/**
+ * The active locations customers may collect their orders at (SHP-15, ADR-389), the primary
+ * first, then by name, in a tenant transaction `tx`: for checkout to offer them (ADR-391).
+ */
+export async function pickupLocationsIn(tx: Tx, shopId: string): Promise<LocationRecord[]> {
+  const rows = await tx
+    .select()
+    .from(locations)
+    .where(
+      and(
+        eq(locations.shopId, shopId),
+        eq(locations.isActive, true),
+        eq(locations.pickupEnabled, true),
+      ),
+    )
+    .orderBy(sql`${locations.isPrimary} DESC`, sql`lower(${locations.name})`, asc(locations.id));
+  return rows.map(toLocationRecord);
 }

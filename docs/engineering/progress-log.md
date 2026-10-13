@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: local pickup offered at checkout,
-the customer choosing where to collect (SHP-15, its last part).
+**Next, section by section as the alpha's shops need them**: duplicate orders caught, the same
+number ordering an overlapping basket again before the first ships (CHK-11).
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -16,6 +16,21 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Pickup at checkout
+
+* **In checkout** ([ADR-391](../architecture/13-decision-log.md#adr-391--checkout-offers-pickup-at-each-location-that-lets-customers-pick-up-chosen-the-order-has-no-delivery-charge-the-shoppers-address-is-optional-with-the-locations-standing-in-and-the-thank-you-page-says-where-to-collect-it), SHP-15): where a location lets customers pick up, the page offers
+  "Deliver to my address" or "Pick up from" it, with its address and what the shop says of it,
+  and no delivery charge. Picked up, the shopper's address is optional, the location's street
+  and city standing in; the order is placed picked up there, and the thank-you page says where
+  to collect it and that WhatsApp will tell them when it is ready.
+* **Tried in Chromium against the core:** with pickup at the Karachi store, a cart's checkout
+  offered "Pick up from Karachi store, Shop 7, Tariq Road, Karachi: no delivery charge. Ready in
+  two hours; ask at the counter"; chosen with only a name and number, it placed #1027 picked up
+  there, with no delivery charge and Karachi as its city. The order, its customer, the cart and
+  the store's pickup were then taken away. No errors in the page.
+* 2612 tests (2 new): pickup offered, placed and refused once withdrawn,
+  in the checkout module.
 
 ### 8dcb355 · Drafts picked up
 
