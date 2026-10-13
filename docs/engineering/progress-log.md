@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Size charts in the admin
+### 1a221e9 · Size charts in the admin
 
 * **Products → Size charts** ([ADR-408](../architecture/13-decision-log.md#adr-408--the-admin-keeps-the-shops-size-charts-on-a-page-of-their-own-beside-its-products-each-edited-as-a-table-of-sizes-and-measurements-given-to-a-collections-products-from-its-page-and-to-a-product-from-the-products-measurements-typed-with-a-comma-or-a-point), CAT-10) lists the shop's charts; a chart is made and
   changed as a table of sizes and measurements, with a note on how to measure, and deleted.
