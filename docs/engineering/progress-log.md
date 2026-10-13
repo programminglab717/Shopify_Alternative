@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Reviews asked for on WhatsApp after delivery
+### 8e2f985 · Reviews asked for on WhatsApp after delivery
 
 * **The shop says when** ([ADR-400](../architecture/13-decision-log.md#adr-400--a-shop-may-ask-each-delivered-orders-customer-once-on-whatsapp-to-rate-what-it-brought-1-to-14-days-after-its-last-parcel-arrived-with-the-orders-page-an-order-already-rated-is-not-asked-about), MKT-05): `reviewSettingsUpdate(input: { requestAfterDays })`,
   1 to 14 days after the order's last parcel arrived, or never. The worker then asks each
