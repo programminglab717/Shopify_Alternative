@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Abandoned checkouts and their reminder
+### e99fc3c · Abandoned checkouts and their reminder
 
 * **In checkout** ([ADR-393](../architecture/13-decision-log.md#adr-393--abandoned-checkouts-the-number-a-shopper-types-is-kept-as-they-type-it-the-shop-sees-who-left-and-may-remind-them-once-on-whatsapp-after-the-delay-it-sets-with-a-link-back-to-their-items-an-order-the-number-places-then-recovers-it), CHK-12): the page keeps the name and number the shopper types, as it
   is posted or as a small script sends them to `/checkouts/<secret>/contact`, with the items in
