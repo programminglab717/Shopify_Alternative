@@ -205,6 +205,7 @@ export const OrderQuery = /* GraphQL */ `
         variantTitle
         sku
         quantity
+        preorderShipsOn
         unitPrice {
           ...Money
         }
@@ -901,6 +902,9 @@ const PRODUCT = /* GraphQL */ `
     tags
     totalInventory
     tracksInventory
+    preorder {
+      shipsOn
+    }
     options {
       id
       name
@@ -7191,6 +7195,25 @@ export const ReviewSettingsUpdateMutation = /* GraphQL */ `
       reviewSettings {
         publishFrom
         requestAfterDays
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/**
+ * Puts a product on pre-order, shipping by a day (YYYY-MM-DD), or takes it off with null
+ * (CAT-14, ADR-403).
+ */
+export const ProductPreorderSetMutation = /* GraphQL */ `
+  mutation ProductPreorderSet($productId: ID!, $shipsOn: String) {
+    productPreorderSet(productId: $productId, shipsOn: $shipsOn) {
+      preorder {
+        productId
+        shipsOn
       }
       userErrors {
         ...Problems

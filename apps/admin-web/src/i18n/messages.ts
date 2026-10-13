@@ -3541,6 +3541,23 @@ const en = {
   'activity.subject.review_settings': 'Review settings',
   'activity.verb.written': 'written',
   'activity.verb.hidden': 'hidden',
+  'preorder.title': 'Pre-order',
+  'preorder.hint':
+    'Sell it before it is in stock, telling customers the day it ships by. Each order keeps the day it was placed with.',
+  'preorder.on': 'Take pre-orders',
+  'preorder.onHint': 'It sells whatever its stock, as if every size kept selling at zero.',
+  'preorder.shipsOn': 'Ships by',
+  'preorder.shipsOnHint':
+    'From today to a year ahead. Customers see it on its page, in the cart and at checkout.',
+  'preorder.payment':
+    'To ask an advance for it, or take no cash on delivery, tag it pre-order and set that in Settings → Cash on delivery.',
+  'preorder.passed':
+    'Its day, {date}, has gone by: customers are still told it ships by then. Move the day, or stop taking pre-orders.',
+  'preorder.save': 'Save pre-order',
+  'preorder.savedOn': 'On pre-order, shipping by {date}',
+  'preorder.savedOff': 'No longer on pre-order: it sells as its stock allows',
+  'preorder.line': 'Pre-order: ships by {date}',
+  'activity.subject.product_preorder': 'Pre-order',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -7058,6 +7075,23 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'activity.subject.review_settings': 'ریویو کی ترتیبات',
   'activity.verb.written': 'لکھا گیا',
   'activity.verb.hidden': 'چھپایا گیا',
+  'preorder.title': 'پیشگی آرڈر',
+  'preorder.hint':
+    'اسٹاک آنے سے پہلے بیچیں، گاہکوں کو روانگی کا دن بتا کر۔ ہر آرڈر وہی دن رکھتا ہے جس کے ساتھ دیا گیا۔',
+  'preorder.on': 'پیشگی آرڈر لیں',
+  'preorder.onHint': 'یہ اسٹاک کچھ بھی ہو بکتا ہے، جیسے ہر سائز صفر پر بھی بکتا رہے۔',
+  'preorder.shipsOn': 'روانگی کا دن',
+  'preorder.shipsOnHint':
+    'آج سے ایک سال تک۔ گاہک اسے پراڈکٹ کے صفحے، کارٹ اور چیک آؤٹ پر دیکھتے ہیں۔',
+  'preorder.payment':
+    'اس پر ایڈوانس مانگنے یا کیش آن ڈیلیوری بند کرنے کے لیے اسے pre-order ٹیگ دیں اور ترتیبات → کیش آن ڈیلیوری میں طے کریں۔',
+  'preorder.passed':
+    'اس کا دن، {date}، گزر چکا ہے: گاہکوں کو اب بھی یہی بتایا جا رہا ہے۔ دن بدلیں، یا پیشگی آرڈر لینا بند کریں۔',
+  'preorder.save': 'پیشگی آرڈر محفوظ کریں',
+  'preorder.savedOn': 'پیشگی آرڈر پر، {date} تک روانگی',
+  'preorder.savedOff': 'اب پیشگی آرڈر پر نہیں: اسٹاک کے مطابق بکتا ہے',
+  'preorder.line': 'پیشگی آرڈر: {date} تک روانگی',
+  'activity.subject.product_preorder': 'پیشگی آرڈر',
 };
 
 export const messages: Readonly<

@@ -261,6 +261,8 @@ export interface OrderDetail {
     variantTitle: string;
     sku: string | null;
     quantity: number;
+    /** The day it ships by, sold on pre-order (ADR-403); absent where a fake core leaves it out. */
+    preorderShipsOn?: string | null;
     unitPrice: MoneyValue;
     totalPrice: MoneyValue;
   }[];
@@ -473,6 +475,8 @@ export interface ProductDetail {
   tags: string[];
   totalInventory: number;
   tracksInventory: boolean;
+  /** Its pre-order, if it is on one (ADR-403); absent where a fake core leaves it out. */
+  preorder?: { shipsOn: string } | null;
   options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
   media: ProductMedia[];
   variants: ProductVariantDetail[];
@@ -3073,4 +3077,11 @@ export interface ReviewSettingsData {
 
 export interface ReviewSettingsUpdateData {
   reviewSettingsUpdate: { reviewSettings: ReviewSettings | null; userErrors: UserError[] };
+}
+
+export interface ProductPreorderSetData {
+  productPreorderSet: {
+    preorder: { productId: string; shipsOn: string } | null;
+    userErrors: UserError[];
+  };
 }

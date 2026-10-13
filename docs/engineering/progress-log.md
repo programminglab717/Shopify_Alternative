@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the admin's pre-order setting on a
-product's page, with the day each order line ships by (CAT-14); then size charts (CAT-10). Urdu
-handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: size charts on a product's page
+(CAT-10); then bundles (CAT-11). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +15,23 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Pre-orders in the admin
+
+* **A product's page** ([ADR-405](../architecture/13-decision-log.md#adr-405--the-admin-puts-a-product-on-pre-order-from-its-page-beside-its-stock-rules-with-the-day-it-ships-by-a-month-ahead-to-begin-with-warns-when-that-day-has-gone-by-and-an-orders-page-says-of-each-line-sold-on-pre-order-the-day-it-ships-by), CAT-14) has a pre-order card after its stock rules, for the
+  owner and managers: "Take pre-orders" and the day it ships by, a month ahead to begin with,
+  saved with a button of its own. A day gone by is warned of, since customers are still told
+  it; the card points to the cash on delivery settings for an advance.
+* **An order's items** say of each line sold on pre-order the day it ships by, in English and
+  Urdu; the activity log reads "Pre-order updated".
+* **Tried in Chromium against the core, at a phone's width:** the demo shop's Peshawari
+  Chappal put on pre-order offered 12 November 2026, a month ahead, and saved 1 December
+  2026, said back; its day moved to 1 October read the warning; taken off, the core kept none.
+  An order's line sold with 1 December read "Pre-order: ships by 1 Dec 2026", and in Urdu its
+  Urdu words; the activity log read "Pre-order updated" twice. Nothing overflowed and nothing
+  errored, and the demo shop was left as it was.
+* 2705 tests (6 new): the product page's card, its warning and who
+  sees it, the order's line, and the mutation's document.
 
 ### b35ec7e · Pre-orders where shoppers see them
 

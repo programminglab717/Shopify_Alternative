@@ -46,6 +46,7 @@ import type { DetailsState } from './product-form';
 import { DuplicateProduct } from './duplicate';
 import { ProductOptions } from './options';
 import { ProductPhotos } from './photos';
+import { ProductPreorder } from './preorder';
 import { StockRules } from './stock-rules';
 import { EDITS_PRODUCTS, ProductStatusBadge, ProductThumb } from './status';
 import { ProductUrduCard } from '../urdu/urdu-pages';
@@ -595,6 +596,8 @@ function ProductView() {
       />
       {edits && <ProductOptions product={product} />}
       {edits && <StockRules product={product} />}
+      {/* Shown afresh when the core's day changes. */}
+      {edits && <ProductPreorder product={product} />}
       <ProductUrduCard product={product} />
     </div>
   );

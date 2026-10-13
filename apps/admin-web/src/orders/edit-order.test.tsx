@@ -140,6 +140,19 @@ describe("Changing an order's items and charges, on its page", () => {
     vi.unstubAllGlobals();
   });
 
+  it('says of each line sold on pre-order the day it ships by (ADR-403)', async () => {
+    const preordered = order({
+      lineItems: [
+        { ...line('li_1', 'Lawn suit', 'M', 1, '2500'), preorderShipsOn: '2026-11-30' },
+        { ...line('li_2', 'Dupatta', 'Default Title', 1, '1200'), preorderShipsOn: null },
+      ],
+    });
+    vi.stubGlobal('fetch', core('owner', preordered).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    expect(await screen.findByText('Pre-order: ships by 30 Nov 2026')).toBeTruthy();
+    expect(screen.getAllByText(/^Pre-order: ships by/)).toHaveLength(1);
+  });
+
   it('changes quantities, takes a line off and adds a variant at a price agreed on the call', async () => {
     const fake = core('confirmation_agent');
     vi.stubGlobal('fetch', fake.fetcher);

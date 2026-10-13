@@ -9,6 +9,7 @@ import type { PickedVariant } from '../drafts/new-draft-page';
 import { formatCount, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { parsePrice, priceText } from '../products/product-form';
+import { shipsOnWords } from '../products/preorder';
 import { useAttempt } from '../returns/parcel';
 import { useAdminMutation, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
@@ -408,7 +409,7 @@ function ChargesForm({ order, onDone }: { order: OrderDetail; onDone: (said: str
  * unpacked first.
  */
 export function OrderItems({ order }: { order: OrderDetail }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { role, id: shopId } = useShop();
   const [open, setOpen] = useState<'items' | 'charges' | 'merge' | 'split' | null>(null);
   const [done, setDone] = useState<Made | null>(null);
@@ -452,6 +453,11 @@ export function OrderItems({ order }: { order: OrderDetail }) {
               <span className="font-medium">{line.title}</span>
               {line.variantTitle && line.variantTitle !== 'Default Title' && (
                 <span className="text-secondary">{line.variantTitle}</span>
+              )}
+              {line.preorderShipsOn && (
+                <span className="text-warning">
+                  {t('preorder.line', { date: shipsOnWords(line.preorderShipsOn, locale) })}
+                </span>
               )}
               <span className="num text-secondary">
                 {money(line.unitPrice)} × {formatCount(line.quantity)}

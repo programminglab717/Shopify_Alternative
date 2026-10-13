@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-404 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-405 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -412,6 +412,7 @@
 | 402 | Products' reviews have a page of their own in the admin, by status, waiting first, each published or hidden by those who change products; above them, for the owner and managers, from how many stars reviews publish by themselves and how many days after delivery customers are asked | Accepted |
 | 403 | A product the shop puts on pre-order sells whatever its stock, as if its variants kept selling at zero, and promises a day it ships by, which the lines of orders placed meanwhile keep; inventory keeps it, by product | Accepted |
 | 404 | A product on pre-order says so where shoppers decide and buy: its button reads Pre-order with the day it ships by, its card a badge, its cart and checkout lines and the order's own page the day each ships by | Accepted |
+| 405 | The admin puts a product on pre-order from its page, beside its stock rules, with the day it ships by, a month ahead to begin with, warns when that day has gone by, and an order's page says of each line sold on pre-order the day it ships by | Accepted |
 
 ---
 
@@ -15630,3 +15631,33 @@
     has none of.
   * **A product metafield:** themes and apps could read one, but metafields are the shop's to
     write, and this one is the platform's.
+
+## ADR-405 · The admin puts a product on pre-order from its page, beside its stock rules, with the day it ships by, a month ahead to begin with, warns when that day has gone by, and an order's page says of each line sold on pre-order the day it ships by
+
+* **Context:**
+  * A product on pre-order ([ADR-403](#adr-403--a-product-the-shop-puts-on-pre-order-sells-whatever-its-stock-as-if-its-variants-kept-selling-at-zero-and-promises-a-day-it-ships-by-which-the-lines-of-orders-placed-meanwhile-keep-inventory-keeps-it-by-product)) and what shoppers are told of it ([ADR-404](#adr-404--a-product-on-pre-order-says-so-where-shoppers-decide-and-buy-its-button-reads-pre-order-with-the-day-it-ships-by-its-card-a-badge-its-cart-and-checkout-lines-and-the-orders-own-page-the-day-each-ships-by)) were set only
+    through the Admin API; a merchant runs the shop from the admin, on a phone.
+* **Decision:**
+  * **A card on the product's page, after its stock rules,** for those who change products
+    (the owner and managers): "Take pre-orders", and when ticked the day it ships by, a month
+    ahead to begin with, from today to a year ahead in Pakistan's days as the core counts them.
+    It is saved alone, with a button of its own, and says what it saved.
+  * **A day gone by is warned of** on the card: the core keeps it, and customers are still told
+    it, until the merchant moves it or stops taking pre-orders. The core does not end a
+    pre-order by itself: a late shipment is the merchant's to explain, not the platform's to
+    hide.
+  * **Payment is pointed to, not set here:** an advance or no cash on delivery for pre-orders
+    is the product rule a tag selects in Settings → Cash on delivery (CHK-07, CHK-10); the
+    card says so.
+  * **An order's items say of each line sold on pre-order the day it ships by,** in the
+    admin's language, so whoever packs knows to wait for it.
+  * **The activity log reads "Pre-order updated"** from the event the core already writes.
+* **Consequences:**
+  * Taking a product off pre-order leaves its orders' lines with their days: they were sold
+    with them.
+* **Alternatives:**
+  * **A pre-order setting per variant:** the core keeps it by product ([ADR-403](#adr-403--a-product-the-shop-puts-on-pre-order-sells-whatever-its-stock-as-if-its-variants-kept-selling-at-zero-and-promises-a-day-it-ships-by-which-the-lines-of-orders-placed-meanwhile-keep-inventory-keeps-it-by-product)), as shops
+    sell a design on pre-order, not a size.
+  * **Ending a pre-order on its day by itself:** a product would stop selling the moment a
+    shipment ran late, while its orders still waited; the warning leaves the choice with the
+    merchant.
