@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### The store's export notice listed with the shop's messages
+### 27b90e0 · The store's export notice listed with the shop's messages
 
 * **Fix:** the Admin API's `MessageKind` lacked `STORE_EXPORT_READY` (ADR-417), so `messages`
   failed for a shop with that notice among them. It names every kind now, and a test holds the
