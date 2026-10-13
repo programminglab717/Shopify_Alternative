@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### The whole store exported
+### 94cf8a5 · The whole store exported
 
 * **An owner asks** ([ADR-415](../architecture/13-decision-log.md#adr-415--an-owner-exports-the-whole-store-a-worker-makes-a-zip-of-each-parts-own-export-as-that-owner-which-storage-keeps-for-a-week-behind-links-that-last-an-hour), ADM-10) with `storeExportCreate`, one at a time and three a day; a
   worker makes a ZIP of the store as that owner, each part in its own export's format, with a
