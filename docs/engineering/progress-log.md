@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### The shop's WhatsApp number, connected in the admin
+### 139b596 · The shop's WhatsApp number, connected in the admin
 
 * **Settings → Your WhatsApp number** ([ADR-423](../architecture/13-decision-log.md#adr-423--the-admin-connects-the-shops-own-whatsapp-number-in-its-settings-through-metas-embedded-signup-in-facebooks-window-and-the-core-trades-the-code-it-gives), MKT-01) connects the shop's own number through
   Meta's Embedded Signup, in Facebook's own window. The core trades the one-time code it
