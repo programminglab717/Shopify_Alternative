@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Bundles in the admin
+### 0bb6211 · Bundles in the admin
 
 * **A product's page** ([ADR-412](../architecture/13-decision-log.md#adr-412--the-admin-makes-a-product-a-bundle-on-its-page-its-parts-found-as-a-drafts-items-are-each-with-how-many-one-set-holds-an-orders-page-says-of-each-parts-line-which-bundle-it-was-sold-in), CAT-11) has a Bundle card: parts found by name or SKU as a
   draft's items are, how many of each one set holds, removed by their buttons, and saved whole;
