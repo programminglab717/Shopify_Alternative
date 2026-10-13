@@ -2810,7 +2810,9 @@ Rules:
 ## Testing
 
 * **Vitest**, with real Postgres and Redis. Each test file creates and drops its own database with
-  `createTestDatabase()` from `@hatti/db/testing`.
+  `createTestDatabase()` from `@hatti/db/testing`: a copy of a template database the first test
+  migrates, named by a digest of the migrations, so that a migration added or changed makes a new
+  one and drops the old.
 * **A test of how a migration treats old data** makes its database `before` it and applies it
   alone with `migrateThrough`; its `describe` takes `{ timeout: MIGRATION_TEST_TIMEOUT }`, as
   every migration before it runs from nothing, which a busy CI runner takes more than 30 seconds

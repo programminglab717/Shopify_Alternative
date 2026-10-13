@@ -1,9 +1,9 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { copyFile, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pg from 'pg';
-import { defaultMigrationsDir, migrate, type MigrateResult } from '../migrate.js';
+import { defaultMigrationsDir, loadMigrations, migrate, type MigrateResult } from '../migrate.js';
 import { setupDatabase } from '../setup.js';
 import { withCredentials, withDatabase } from '../urls.js';
 
@@ -85,6 +85,9 @@ export async function createTestDatabase(
   const identityUrl = login('identity');
   const migrationsDir = options.before ? await migrationsBefore(options.before) : undefined;
   try {
+    // A fully migrated database is a copy of the template for the migrations there are, which
+    // one test migrates once; the logins are then set up on it as on any other.
+    if (!migrationsDir) await cloneTemplate(server, name);
     await setupDatabase({ adminUrl: server, appUrl, systemUrl, identityUrl, migrationsDir });
   } finally {
     if (migrationsDir) await rm(migrationsDir, { recursive: true, force: true });
@@ -108,6 +111,65 @@ export async function createTestDatabase(
       }
     },
   };
+}
+
+/** Serialises making and copying templates across test processes. */
+const TEMPLATE_LOCK_KEY = 7_241_703;
+
+/**
+ * Creates database `name` as a copy of the template for the current migrations, migrating the
+ * template first if no test has yet. Every migration ran in each test's own database before, one
+ * test at a time under setup's lock: with two hundred of them, a busy CI runner kept a test
+ * waiting past its hook's minute (run 38458021000). A copy takes a moment. The template is named
+ * by a digest of the migrations, so a migration added or changed makes a new one, and the old
+ * ones are dropped.
+ */
+async function cloneTemplate(server: string, name: string): Promise<void> {
+  const digest = createHash('sha256');
+  for (const migration of await loadMigrations()) {
+    digest.update(`${migration.version}:${migration.checksum}\n`);
+  }
+  const template = `hatti_template_${digest.digest('hex').slice(0, 16)}`;
+  const admin = new pg.Client({
+    connectionString: server,
+    application_name: 'hatti-test-template',
+  });
+  await admin.connect();
+  try {
+    await admin.query('SELECT pg_advisory_lock($1)', [TEMPLATE_LOCK_KEY]);
+    const { rows } = await admin.query<{ datname: string }>(
+      "SELECT datname FROM pg_database WHERE datname LIKE 'hatti\\_template\\_%'",
+    );
+    if (!rows.some((row) => row.datname === template)) {
+      // Built under another name and renamed once whole, so that a run cut short leaves none.
+      const building = `${template}_building`;
+      for (const { datname } of rows) {
+        await admin.query(
+          `DROP DATABASE IF EXISTS ${admin.escapeIdentifier(datname)} WITH (FORCE)`,
+        );
+      }
+      const login = (kind: keyof typeof TEST_LOGINS) =>
+        withCredentials(
+          withDatabase(server, building),
+          TEST_LOGINS[kind].user,
+          TEST_LOGINS[kind].password,
+        );
+      await setupDatabase({
+        adminUrl: server,
+        appUrl: login('app'),
+        systemUrl: login('system'),
+        identityUrl: login('identity'),
+      });
+      await admin.query(
+        `ALTER DATABASE ${admin.escapeIdentifier(building)} RENAME TO ${admin.escapeIdentifier(template)}`,
+      );
+    }
+    await admin.query(
+      `CREATE DATABASE ${admin.escapeIdentifier(name)} TEMPLATE ${admin.escapeIdentifier(template)}`,
+    );
+  } finally {
+    await admin.end();
+  }
 }
 
 /**
