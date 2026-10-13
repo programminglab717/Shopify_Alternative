@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### The admin's apps
+### 2fe9187 · The admin's apps
 
 * **Settings → Apps** ([ADR-396](../architecture/13-decision-log.md#adr-396--settings-lists-the-shops-custom-apps-for-owners-and-managers-each-with-what-it-may-reach-in-words-and-the-last-characters-of-its-token-and-secret-an-app-is-made-by-choosing-each-resources-access-and-its-token-and-secret-are-shown-once-to-copy), DEV-04) lists the shop's custom apps for owners and managers,
   with what each may reach in words and the last characters of its token and secret. Making or
