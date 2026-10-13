@@ -145,7 +145,10 @@ describe.skipIf(!server)('The whole store exported (ADM-10, ADR-415)', () => {
 
     expect(await outbox()).toEqual([
       ['store_export.requested', {}],
-      ['store_export.ready', { size: 22 }],
+      [
+        'store_export.ready',
+        { size: 22, expiresAt: new Date(START.getTime() + 60_000 + 7 * DAY).toISOString() },
+      ],
     ]);
     const { rows: audit } = await admin.query<{ action: string; actor_role: string }>(
       'SELECT action, actor_role FROM platform.audit_log',

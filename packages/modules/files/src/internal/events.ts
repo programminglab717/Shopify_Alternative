@@ -24,5 +24,7 @@ export interface ShopBrandUpdatePayload {
 /** A whole store's export (ADR-415): asked for, ready with its ZIP's bytes, or failed and why. */
 export interface StoreExportPayload {
   size?: number;
+  /** When storage lets a ready one go, ISO 8601. */
+  expiresAt?: string;
   error?: string;
 }

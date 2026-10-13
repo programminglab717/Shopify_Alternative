@@ -245,7 +245,7 @@ export class StoreExportService {
         type: FileEvents.StoreExportReady,
         aggregateType: 'store_export',
         aggregateId: id,
-        payload: { size: zip.length },
+        payload: { size: zip.length, expiresAt: expiresAt.toISOString() },
       });
       return true;
     });

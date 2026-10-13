@@ -439,6 +439,16 @@ describe("Messages' words", () => {
       '10 Oct, 3:00 pm',
     ]);
     expect(messageText('domain_unpointed', 'ur', unpointed)).toContain('www.zari.pk');
+    // The whole store's export, made (ADR-417).
+    const exported = { shop: 'Zari Fashions', date: '20 Oct, 3:00 pm' };
+    expect(messageText('store_export_ready', 'en', exported)).toBe(
+      "Hatti: Zari Fashions's export is ready. Download it from Settings > Export your store in " +
+        "Hatti's admin until 20 Oct, 3:00 pm. It holds your customers' data: keep it safe.",
+    );
+    expect(templateParameters('store_export_ready', exported)).toEqual([
+      'Zari Fashions',
+      '20 Oct, 3:00 pm',
+    ]);
     // The orders a month its plan allows (ADR-263).
     const counted = { shop: 'Zari Fashions', orders: '40', limit: '50', plan: 'Free' };
     expect(messageText('orders_limit_near', 'en', counted)).toBe(
@@ -461,6 +471,7 @@ describe("Messages' words", () => {
       'domain_unpointed',
       'orders_limit_near',
       'orders_limit_reached',
+      'store_export_ready',
     ]);
     expect(ALWAYS_SENT).toEqual([
       'one_time_code',
@@ -476,6 +487,7 @@ describe("Messages' words", () => {
       'domain_unpointed',
       'orders_limit_near',
       'orders_limit_reached',
+      'store_export_ready',
     ]);
   });
 
@@ -569,6 +581,7 @@ describe("Messages' words", () => {
       'domain_unpointed',
       'orders_limit_near',
       'orders_limit_reached',
+      'store_export_ready',
     ]);
     const shipped = messageEmail('order_shipped', 'en', SHIPPED.variables)!;
     expect(shipped.from).toBe('shop');

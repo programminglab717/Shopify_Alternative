@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: an email to the owner when the
-store's export is ready, and the online store's pages, blogs and collections in it (ADM-10); then
-wishlists on the storefront (OS-12). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: wishlists on the storefront
+(OS-12); then marketing's next pieces (MKT-01, MKT-04). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +15,13 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### The store's export with the online store's content, and an email when ready
+
+* **The ZIP** ([ADR-417](../architecture/13-decision-log.md#adr-417--the-stores-export-holds-the-online-stores-collections-pages-and-blogs-as-json-and-its-owner-is-emailed-when-it-is-ready), ADM-10) holds the online store's collections, pages and blogs with their
+  articles as JSON.
+* **The owner is emailed** when it is ready, in their language, and until when it downloads.
+* Still 2770 tests: the store export's and messaging's own, extended.
 
 ### fcb14da · Export your store, in the admin's settings
 

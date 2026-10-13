@@ -6,11 +6,13 @@ import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { StoreExportService } from '@hatti/files/public';
 import { fromPublicId, newId, toPublicId } from '@hatti/ids';
+import { MessagesService } from '@hatti/messaging/public';
 import { xlsxParts as unzip } from '@hatti/xlsx/testing';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { storeExportBuilder } from '../store-export.js';
 import { startTestApi, type TestApi } from '../testing/api.js';
+import { StoreExportNotices } from '../worker/store-export-notices.js';
 import { NO_LONGER_OWNER, StoreExports } from '../worker/store-exports.js';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
 
@@ -112,7 +114,15 @@ describe.skipIf(!server)('Admin GraphQL API: the whole store exported (ADM-10, A
         shop,
         hash,
         hint,
-        ['write_products', 'write_orders', 'write_customers', 'read_customers', 'read_orders'],
+        [
+          'write_products',
+          'write_orders',
+          'write_customers',
+          'read_customers',
+          'read_orders',
+          'write_online_store_pages',
+          'write_content',
+        ],
       ],
     );
     app = token;
@@ -130,7 +140,7 @@ describe.skipIf(!server)('Admin GraphQL API: the whole store exported (ADM-10, A
     const product = await data(
       app,
       `mutation ($input: ProductCreateInput!) {
-        productCreate(input: $input) { product { variants { id } } }
+        productCreate(input: $input) { product { id variants { id } } }
       }`,
       { input: { title: 'Lawn suit', status: 'ACTIVE', variants: [{ price: '4,500' }] } },
     );
@@ -157,6 +167,26 @@ describe.skipIf(!server)('Admin GraphQL API: the whole store exported (ADM-10, A
       },
     );
     expect(order.userErrors).toEqual([]);
+    // And the online store's content: a manual collection of it, a page, a blog with an article.
+    await data(
+      app,
+      'mutation ($input: CollectionCreateInput!) { collectionCreate(input: $input) { userErrors { code } } }',
+      { input: { title: 'Eid edit', products: [product.product.id] } },
+    );
+    await data(
+      app,
+      'mutation ($page: PageCreateInput!) { pageCreate(page: $page) { userErrors { code } } }',
+      { page: { title: 'About us', body: '<p>Since 1998.</p>' } },
+    );
+    const blog = await data(
+      app,
+      'mutation { blogCreate(blog: { title: "News" }) { blog { id } userErrors { code } } }',
+    );
+    await data(
+      app,
+      'mutation ($article: ArticleCreateInput!) { articleCreate(article: $article) { userErrors { code } } }',
+      { article: { blogId: blog.blog.id, title: 'Eid lawn is here', body: '<p>New prints.</p>' } },
+    );
 
     owner = await member('owner');
     expect(await data(owner.token, EXPORTS)).toEqual([]);
@@ -187,6 +217,9 @@ describe.skipIf(!server)('Admin GraphQL API: the whole store exported (ADM-10, A
       'orders.csv',
       'order-line-items.csv',
       'redirects.csv',
+      'collections.json',
+      'pages.json',
+      'blogs.json',
     ]);
     expect(files.get('README.txt')).toContain(`by ${toPublicId('user', owner.id)}`);
     expect(files.get('README.txt')).toContain('products.csv: 1 product,');
@@ -195,6 +228,63 @@ describe.skipIf(!server)('Admin GraphQL API: the whole store exported (ADM-10, A
     expect(files.get('customers.csv')).toContain('Ayesha Khan');
     expect(files.get('orders.csv')).toContain(order.order.name);
     expect(files.get('order-line-items.csv')).toContain('Lawn suit');
+    expect(JSON.parse(files.get('collections.json')!)).toEqual([
+      expect.objectContaining({ handle: 'eid-edit', rules: null, products: ['lawn-suit'] }),
+    ]);
+    expect(JSON.parse(files.get('pages.json')!)).toEqual([
+      expect.objectContaining({ handle: 'about-us', body: '<p>Since 1998.</p>' }),
+    ]);
+    expect(JSON.parse(files.get('blogs.json')!)).toEqual([
+      expect.objectContaining({
+        handle: 'news',
+        articles: [
+          expect.objectContaining({ handle: 'eid-lawn-is-here', title: 'Eid lawn is here' }),
+        ],
+      }),
+    ]);
+
+    // Its owner is told by email it is ready, in their language, and until when (ADR-417).
+    await admin.query(
+      "UPDATE identity.users SET email_verified_at = now(), language = 'ur' WHERE id = $1",
+      [owner.id],
+    );
+    const { rows: events } = await admin.query<{
+      id: string;
+      aggregate_id: string;
+      payload: Record<string, unknown>;
+    }>(
+      `SELECT id, aggregate_id, payload FROM platform.outbox_events
+        WHERE event_type = 'store_export.ready'`,
+    );
+    const notices = new StoreExportNotices(system, new MessagesService(system));
+    const event = {
+      id: events[0]!.id,
+      type: 'store_export.ready',
+      shopId: shop,
+      aggregateType: 'store_export',
+      aggregateId: events[0]!.aggregate_id,
+      payload: events[0]!.payload,
+      occurredAt: new Date().toISOString(),
+    };
+    // Heard twice, as a retried event is, it is sent once.
+    await notices.handle(event);
+    await notices.handle(event);
+    const { rows: told } = await admin.query<{
+      kind: string;
+      channel: string;
+      recipient: string;
+      language: string;
+    }>(`SELECT kind, channel, recipient, language FROM messaging.messages WHERE shop_id = $1`, [
+      shop,
+    ]);
+    expect(told).toEqual([
+      {
+        kind: 'store_export_ready',
+        channel: 'email',
+        recipient: expect.stringMatching(/^export-\w+@example\.pk$/),
+        language: 'ur',
+      },
+    ]);
     // Each part as the owner exported it: in the audit log under their name.
     const { rows: audit } = await admin.query<{ action: string; actor_id: string }>(
       `SELECT action, actor_id FROM platform.audit_log WHERE action LIKE '%export%' ORDER BY id`,

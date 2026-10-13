@@ -1,5 +1,10 @@
 import { PublicSite, type TenantContext } from '@hatti/api';
-import { ProductExportService, StockFileService, VariantService } from '@hatti/catalog/public';
+import {
+  CollectionService,
+  ProductExportService,
+  StockFileService,
+  VariantService,
+} from '@hatti/catalog/public';
 import {
   CustomerTransferService,
   SegmentFieldRegistry,
@@ -8,7 +13,12 @@ import {
 import type { Database } from '@hatti/db';
 import { toPublicId } from '@hatti/ids';
 import { InventoryService } from '@hatti/inventory/public';
-import { UrlRedirectService } from '@hatti/online-store/public';
+import {
+  ArticleService,
+  BlogService,
+  PageService,
+  UrlRedirectService,
+} from '@hatti/online-store/public';
 import { ORDER_SEGMENT_FACTS, OrderExportService } from '@hatti/orders/public';
 import { stockLevelsOf } from './api/inventory-file.resolver.js';
 import { exportStockOf } from './api/products-export.resolver.js';
@@ -46,14 +56,21 @@ export interface StoreExportSources {
   customers: CustomerTransferService;
   orders: OrderExportService;
   redirects: UrlRedirectService;
+  collections: CollectionService;
+  pages: PageService;
+  blogs: BlogService;
+  articles: ArticleService;
 }
 
+/** Records read a page at a time, as many as there are. */
+const PAGE = 250;
+
 /**
- * The whole store as files (ADM-10, ADR-415), each in the format its own export writes, so that
- * each goes back in where an import takes it: Shopify's product and inventory CSVs, the
+ * The whole store as files (ADM-10, ADR-415, ADR-417), each in the format its own export writes,
+ * so that each goes back in where an import takes it: Shopify's product and inventory CSVs, the
  * customers' CSV, the orders a row each and their line items a row each, and Shopify's redirects
- * CSV; and a README saying what each is. Made as `tenant`, an owner: each export's audit and
- * watermarks name them.
+ * CSV; the online store's collections, pages and blogs as JSON; and a README saying what each is.
+ * Made as `tenant`, an owner: each export's audit and watermarks name them.
  */
 export class StoreExportBuilder {
   constructor(private readonly sources: StoreExportSources) {}
@@ -93,6 +110,7 @@ export class StoreExportBuilder {
       await orders.export(tenant, { layout: 'line_items', format: 'csv' }, orderLimits),
     );
     const redirectFile = await redirects.export(tenant);
+    const content = await this.#content(tenant);
 
     const exporter =
       tenant.actor.kind === 'staff' ? toPublicId('user', tenant.actor.userId) : 'Hatti';
@@ -110,6 +128,10 @@ export class StoreExportBuilder {
         "their order's details beside them.",
       `redirects.csv: ${count(redirectFile.count, 'URL redirect')}, in Shopify's redirects ` +
         "CSV, which Shopify's import and Hatti's take back.",
+      `collections.json: ${count(content.collections.length, 'collection')}, with the ` +
+        "rules of automated ones and the products' handles of manual ones.",
+      `pages.json: ${count(content.pages.length, 'page')} of the online store.`,
+      `blogs.json: ${count(content.blogs.length, 'blog')}, each with its articles.`,
       '',
       "Customers' numbers and addresses are personal data: keep this file safe, and delete it " +
         'once it is no longer needed.',
@@ -123,7 +145,82 @@ export class StoreExportBuilder {
       { path: 'orders.csv', data: orderFile.file.content },
       { path: 'order-line-items.csv', data: lineFile.file.content },
       { path: 'redirects.csv', data: Buffer.from(redirectFile.csv, 'utf8') },
+      { path: 'collections.json', data: json(content.collections) },
+      { path: 'pages.json', data: json(content.pages) },
+      { path: 'blogs.json', data: json(content.blogs) },
     ];
+  }
+
+  /**
+   * The online store's content, which no CSV of Shopify's carries: its collections, pages, and
+   * blogs with their articles, as JSON under their handles, each as the Admin API names its
+   * fields.
+   */
+  async #content(tenant: TenantContext) {
+    const { collections, pages, blogs, articles } = this.sources;
+    const collected = [];
+    for (const collection of await all((after) =>
+      collections.list(tenant, { first: PAGE, after }),
+    )) {
+      const products: string[] = [];
+      if (collection.rules === null) {
+        let after: Parameters<CollectionService['products']>[2]['after'] = null;
+        for (;;) {
+          const page = await collections.products(tenant, collection.id, { first: PAGE, after });
+          if (!page) break;
+          products.push(...page.items.map((product) => product.handle));
+          if (!page.hasNextPage) break;
+          after = page.cursors.at(-1)!;
+        }
+      }
+      collected.push({
+        handle: collection.handle,
+        title: collection.title,
+        description: collection.description,
+        sortOrder: collection.sortOrder,
+        rules: collection.rules,
+        disjunctive: collection.disjunctive,
+        seo: collection.seo,
+        ...(collection.rules === null ? { products } : {}),
+      });
+    }
+    const pageList = (await all((after) => pages.list(tenant, { first: PAGE, after }))).map(
+      (page) => ({
+        handle: page.handle,
+        title: page.title,
+        body: page.body,
+        isPublished: page.isPublished,
+        publishedAt: page.publishedAt,
+        templateSuffix: page.templateSuffix,
+        seo: page.seo,
+      }),
+    );
+    const blogList = [];
+    for (const blog of await all((after) => blogs.list(tenant, { first: PAGE, after }))) {
+      const written = await all((after) =>
+        articles.list(tenant, { first: PAGE, after, blogId: blog.id }),
+      );
+      blogList.push({
+        handle: blog.handle,
+        title: blog.title,
+        commentPolicy: blog.commentPolicy,
+        templateSuffix: blog.templateSuffix,
+        seo: blog.seo,
+        articles: written.map((article) => ({
+          handle: article.handle,
+          title: article.title,
+          body: article.body,
+          summary: article.summary,
+          author: article.author,
+          tags: article.tags,
+          isPublished: article.isPublished,
+          publishedAt: article.publishedAt,
+          templateSuffix: article.templateSuffix,
+          seo: article.seo,
+        })),
+      });
+    }
+    return { collections: collected, pages: pageList, blogs: blogList };
   }
 }
 
@@ -142,6 +239,10 @@ export function storeExportBuilder(database: Database, site: PublicSite): StoreE
     ),
     orders: new OrderExportService(database),
     redirects: new UrlRedirectService(database),
+    collections: new CollectionService(database),
+    pages: new PageService(database),
+    blogs: new BlogService(database),
+    articles: new ArticleService(database),
   });
 }
 
@@ -153,6 +254,25 @@ function must<T>(
     throw new StoreExportError(`The ${part} could not be exported: ${result.errors[0]!.message}`);
   }
   return result.value;
+}
+
+/** Every record a list gives, a page at a time, each page after the last one's last. */
+async function all<T extends { id: string }>(
+  list: (after: string | null) => Promise<{ items: T[]; hasNextPage: boolean }>,
+): Promise<T[]> {
+  const records: T[] = [];
+  let after: string | null = null;
+  for (;;) {
+    const page = await list(after);
+    records.push(...page.items);
+    if (!page.hasNextPage || page.items.length === 0) return records;
+    after = page.items.at(-1)!.id;
+  }
+}
+
+/** Indented JSON, as people read it. */
+function json(value: unknown): Buffer {
+  return Buffer.from(`${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
 function count(n: number, noun: string): string {

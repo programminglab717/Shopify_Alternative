@@ -74,6 +74,7 @@ import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
 import { DailySummaries } from './daily-summaries.js';
 import { DomainChecks } from './domain-checks.js';
 import { DomainNotices } from './domain-notices.js';
+import { StoreExportNotices } from './store-export-notices.js';
 import { PlanOrders } from './plan-orders.js';
 import { ExpiredCheckouts } from './expired-checkouts.js';
 import { StoreCreditExpiry } from './store-credit-expiry.js';
@@ -113,6 +114,7 @@ export interface EventConsumers {
   staff?: StaffAlerts;
   storeCredit?: StoreCreditNotices;
   domains?: DomainNotices;
+  storeExports?: StoreExportNotices;
   planOrders?: PlanOrders;
   webhooks?: WebhookFanOut;
 }
@@ -133,6 +135,7 @@ export function eventHandlers(
     staff,
     storeCredit,
     domains,
+    storeExports,
     planOrders,
     webhooks,
   }: EventConsumers = {},
@@ -190,6 +193,11 @@ export function eventHandlers(
   }
   if (domains) {
     for (const type of DomainNotices.EVENTS) registry.on(type, (event) => domains.handle(event));
+  }
+  if (storeExports) {
+    for (const type of StoreExportNotices.EVENTS) {
+      registry.on(type, (event) => storeExports.handle(event));
+    }
   }
   if (planOrders) {
     for (const type of PlanOrders.EVENTS) registry.on(type, (event) => planOrders.handle(event));
@@ -267,6 +275,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         staff: new StaffAlerts(database, new MessagesService(database)),
         storeCredit: new StoreCreditNotices(database, new MessagesService(database)),
         domains: new DomainNotices(database, new MessagesService(database)),
+        storeExports: new StoreExportNotices(database, new MessagesService(database)),
         planOrders: new PlanOrders(database, new MessagesService(database), workerOrders(database)),
         // Apps' webhooks need their secrets opened to be sent (ADR-397).
         ...(config.ENCRYPTION_KEYS && {

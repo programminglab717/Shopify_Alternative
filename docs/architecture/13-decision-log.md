@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-416 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-417 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -424,6 +424,7 @@
 | 414 | An order's gift message is printed on its packing slip and shown on its pages, the customer's and staff's; the admin sets the gift wrap and messages on the checkout page's settings | Accepted |
 | 415 | An owner exports the whole store: a worker makes a ZIP of each part's own export as that owner, which storage keeps for a week behind links that last an hour | Accepted |
 | 416 | The admin's Settings → Export your store: the owner asks, confirming who they are, and downloads each export from the page, which asks again while one is being made | Accepted |
+| 417 | The store's export holds the online store's collections, pages and blogs as JSON, and its owner is emailed when it is ready | Accepted |
 
 ---
 
@@ -16000,3 +16001,28 @@
 * **Alternatives:**
   * **Downloading the ZIP through the admin's own request**: the signed link downloads it
     straight from storage, without the admin holding it.
+
+## ADR-417 · The store's export holds the online store's collections, pages and blogs as JSON, and its owner is emailed when it is ready
+
+* **Context:**
+  * ADR-415's ZIP held what Shopify's CSVs carry. A shop's collections, pages, blogs and
+    articles are its own work too, and no CSV of Shopify's carries them. ADR-416's page showed
+    an export ready only to an owner who came back to it.
+* **Decision:**
+  * **`collections.json`, `pages.json` and `blogs.json`** in the ZIP, read through the catalog's
+    and online store's own services a page at a time: each by its handle, with its fields as
+    the Admin API names them; a manual collection with its products' handles, in its order, an
+    automated one with its rules; each blog with its articles. JSON, as a person or a script
+    reads it, since nothing imports them whole.
+  * **An email to the owner** once it is ready, as `store_export.ready` is heard, which now
+    carries when the ZIP is let go: a notice of Hatti's own (`store_export_ready`), at Hatti's
+    cost, to the address the owner's account proved, in their language, saying until when it
+    downloads from Settings → Export your store. Email alone, never the shop's alerts number,
+    which others may read: the export is the owner's. Once per export, however often the event
+    is heard.
+* **Consequences:**
+  * Menus, themes, discounts and reviews are not in it yet; a theme has its own download in
+    Shopify, and so may Hatti's.
+* **Alternatives:**
+  * **The ZIP itself attached to the email**: it holds customers' data, and an inbox keeps it
+    for good; the link expires within the hour and needs the owner signed in to get another.

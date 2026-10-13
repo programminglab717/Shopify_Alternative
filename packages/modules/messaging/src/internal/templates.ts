@@ -46,6 +46,7 @@ export const MESSAGE_KINDS = [
   'domain_unpointed',
   'orders_limit_near',
   'orders_limit_reached',
+  'store_export_ready',
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
@@ -70,8 +71,8 @@ export type AnyMessageKind = MessageKind | PlatformMessageKind;
 /**
  * Messages a shop cannot turn off: what a shopper asked for, as a code to prove their number, and
  * Hatti's notices of the shop's bills (ADR-169), among them what Hatti found of a transfer the
- * shop said it made (ADR-254), of a domain of its own DNS points elsewhere (ADR-262), and of its
- * orders nearing its plan's limit (ADR-263).
+ * shop said it made (ADR-254), of a domain of its own DNS points elsewhere (ADR-262), of its
+ * orders nearing its plan's limit (ADR-263), and of the whole store's export made (ADR-417).
  */
 export const ALWAYS_SENT: readonly MessageKind[] = [
   'one_time_code',
@@ -87,6 +88,7 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'domain_unpointed',
   'orders_limit_near',
   'orders_limit_reached',
+  'store_export_ready',
 ];
 
 /** What the buttons of a message asking a customer to confirm their order answer (COD-01). */
@@ -719,6 +721,20 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: '{shop} has taken all {limit} orders its plan allows this month',
       ur: '{shop} نے اس مہینے اپنے پلان کے تمام {limit} آرڈر لے لیے ہیں',
+    },
+  },
+  store_export_ready: {
+    whatsapp: 'hatti_store_export_ready',
+    category: 'utility',
+    parameters: ['shop', 'date'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: {shop}'s export is ready. Download it from Settings > Export your store in Hatti's admin until {date}. It holds your customers' data: keep it safe.",
+      ur: 'ہٹی: {shop} کی ایکسپورٹ تیار ہے۔ اسے {date} تک ہٹی کے ایڈمن میں سیٹنگز > اپنی دکان ایکسپورٹ کریں سے ڈاؤن لوڈ کریں۔ اس میں آپ کے کسٹمرز کا ڈیٹا ہے: اسے محفوظ رکھیں۔',
+    },
+    subject: {
+      en: "{shop}'s export is ready to download",
+      ur: '{shop} کی ایکسپورٹ ڈاؤن لوڈ کے لیے تیار ہے',
     },
   },
 };
