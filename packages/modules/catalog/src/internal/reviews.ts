@@ -156,6 +156,39 @@ export async function reviewsOfOrderIn(
   }));
 }
 
+/** Those of `orderIds` whose customer rated anything of them. */
+export async function ordersReviewedIn(
+  tx: Tx,
+  shopId: string,
+  orderIds: readonly string[],
+): Promise<Set<string>> {
+  if (orderIds.length === 0) return new Set();
+  const { rows } = await tx.execute<{ order_id: string }>(sql`
+    SELECT DISTINCT order_id FROM catalog.product_reviews
+     WHERE shop_id = ${shopId} AND order_id = ANY(${sql.param([...orderIds])}::uuid[])`);
+  return new Set(rows.map((row) => row.order_id));
+}
+
+/** The shops that ask for reviews after delivery (ADR-400), with the system role. */
+export async function shopsRequestingReviewsIn(tx: Tx): Promise<string[]> {
+  const { rows } = await tx.execute<{ shop_id: string }>(sql`
+    SELECT shop_id FROM catalog.review_settings WHERE request_after_days IS NOT NULL`);
+  return rows.map((row) => row.shop_id);
+}
+
+/** Those of `productIds` still in the shop: a customer may rate them. */
+export async function reviewableProductsIn(
+  tx: Tx,
+  shopId: string,
+  productIds: readonly string[],
+): Promise<Set<string>> {
+  if (productIds.length === 0) return new Set();
+  const { rows } = await tx.execute<{ id: string }>(sql`
+    SELECT id FROM catalog.products
+     WHERE shop_id = ${shopId} AND id = ANY(${sql.param([...productIds])}::uuid[])`);
+  return new Set(rows.map((row) => row.id));
+}
+
 /** A customer's reviews, as their own file lists them (CUS-05). */
 export async function reviewsOfCustomerIn(
   tx: Tx,

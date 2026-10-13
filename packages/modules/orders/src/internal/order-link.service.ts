@@ -10,6 +10,7 @@ import {
 } from '@hatti/api';
 import {
   reviewAuthorName,
+  reviewableProductsIn,
   reviewsOfOrderIn,
   writeReviewsIn,
   type OrderReview,
@@ -532,10 +533,7 @@ async function reviewableIn(
   order: OrderRecord,
 ): Promise<ReviewableProduct[]> {
   const ids = [...new Set(order.lines.map((line) => line.productId))];
-  const { rows } = await tx.execute<{ id: string }>(sql`
-    SELECT id FROM catalog.products
-     WHERE shop_id = ${shopId} AND id = ANY(${sql.param(ids)}::uuid[])`);
-  const kept = new Set(rows.map((row) => row.id));
+  const kept = await reviewableProductsIn(tx, shopId, ids);
   const reviews = await reviewsOfOrderIn(tx, shopId, order.id);
   return ids
     .filter((id) => kept.has(id))

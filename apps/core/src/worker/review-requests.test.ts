@@ -159,11 +159,14 @@ describe.skipIf(!server)('Customers asked to rate their delivered orders (MKT-05
       [due]: true,
       [tooSoon]: false,
       [tooLate]: false,
-      [rated]: false,
+      // Settled without a message: no sweep picks it again.
+      [rated]: true,
     });
+
     const timeline = await admin.query<{ message: string }>(
-      `SELECT message FROM orders.order_events WHERE order_id = $1 AND kind = 'review_requested'`,
-      [due],
+      `SELECT message FROM orders.order_events
+        WHERE order_id = ANY($1) AND kind = 'review_requested'`,
+      [[due, rated]],
     );
     expect(timeline.rows).toEqual([
       { message: 'Asked the customer on WhatsApp to rate what it brought' },

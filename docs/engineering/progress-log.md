@@ -17,6 +17,16 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
+### Reviews read through the catalog's facade
+
+* **The orders module no longer reads the catalog's tables** (conventions, "Packages and
+  boundaries"): whether an order was rated, which shops ask for reviews and which products may
+  still be rated come from the catalog's `ordersReviewedIn`, `shopsRequestingReviewsIn` and
+  `reviewableProductsIn`, each in the caller's transaction.
+* **An order rated before it was asked about is settled:** the sweep marks it asked, without a
+  message or a timeline entry, so that no later sweep picks it again and it never takes a place
+  among the 200 a sweep looks at.
+
 ### f1d8ca4 · Reviews in the admin
 
 * **Products → Reviews** ([ADR-402](../architecture/13-decision-log.md#adr-402--products-reviews-have-a-page-of-their-own-in-the-admin-by-status-waiting-first-each-published-or-hidden-by-those-who-change-products-above-them-for-the-owner-and-managers-from-how-many-stars-reviews-publish-by-themselves-and-how-many-days-after-delivery-customers-are-asked), MKT-05): the shop's reviews by status, waiting first, each
