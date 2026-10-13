@@ -206,6 +206,11 @@ export const OrderQuery = /* GraphQL */ `
         sku
         quantity
         preorderShipsOn
+        bundle {
+          key
+          title
+          quantity
+        }
         unitPrice {
           ...Money
         }
@@ -908,6 +913,16 @@ const PRODUCT = /* GraphQL */ `
     sizeChart {
       id
       name
+    }
+    bundle {
+      complete
+      components {
+        productId
+        variantId
+        productTitle
+        variantTitle
+        quantity
+      }
     }
     options {
       id
@@ -7218,6 +7233,31 @@ export const ProductPreorderSetMutation = /* GraphQL */ `
       preorder {
         productId
         shipsOn
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/**
+ * Makes a product a bundle of other products' variants, a number of each, or no bundle with none
+ * (CAT-11, ADR-409).
+ */
+export const ProductBundleSetMutation = /* GraphQL */ `
+  mutation ProductBundleSet($productId: ID!, $components: [ProductBundleComponentInput!]!) {
+    productBundleSet(productId: $productId, components: $components) {
+      bundle {
+        complete
+        components {
+          productId
+          variantId
+          productTitle
+          variantTitle
+          quantity
+        }
       }
       userErrors {
         ...Problems

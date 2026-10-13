@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the admin's bundles, a product's
-bundle card and an order's parts under their bundle (CAT-11); then gift options at checkout
-(CHK-16). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: gift options at checkout, a gift
+note and wrapping (CHK-16); then the shop's whole store exported (ADM-10). Urdu handles wait, as
+decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,14 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Bundles in the admin
+
+* **A product's page** ([ADR-412](../architecture/13-decision-log.md#adr-412--the-admin-makes-a-product-a-bundle-on-its-page-its-parts-found-as-a-drafts-items-are-each-with-how-many-one-set-holds-an-orders-page-says-of-each-parts-line-which-bundle-it-was-sold-in), CAT-11) has a Bundle card: parts found by name or SKU as a
+  draft's items are, how many of each one set holds, removed by their buttons, and saved whole;
+  a part deleted is warned of, and the core's refusals are said naming the part.
+* **An order's page** says under each part's line the bundle it was sold in and how many sets.
+* CAT-11 is whole. 2749 tests (5 new): the admin's.
 
 ### b4cd244 · Bundles on the storefront and their orders' pages
 

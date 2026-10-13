@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-411 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-412 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -419,6 +419,7 @@
 | 409 | A bundle is a product of one variant made of other products' variants, a number of each, up to ten parts, one level deep; a part deleted leaves it unsold until it is given its parts again, and orders will hold its parts as their lines | Accepted |
 | 410 | An order of a bundle holds its parts' lines, the bundle's price shared among them by what each costs alone, to the paisa, each keeping the bundle it was sold as; a bundle sells as many as its parts' stock makes | Accepted |
 | 411 | A bundle's storefront page lists what one set holds, each part linked while it is for sale, as Hatti's product.bundle; a part off sale leaves the set unsold; a customer's order page shows a bundle once, its parts named under it | Accepted |
+| 412 | The admin makes a product a bundle on its page, its parts found as a draft's items are, each with how many one set holds; an order's page says of each part's line which bundle it was sold in | Accepted |
 
 ---
 
@@ -15858,3 +15859,26 @@
 * **Alternatives:**
   * **A metafield the shop fills in:** would say what the set held when it was written, not
     what an order of it takes from stock.
+
+## ADR-412 · The admin makes a product a bundle on its page, its parts found as a draft's items are, each with how many one set holds; an order's page says of each part's line which bundle it was sold in
+
+* **Context:**
+  * ADR-409 to ADR-411 keep, sell and show bundles; the shop makes them through the Admin API
+    alone so far.
+* **Decision:**
+  * **A product's page** has a Bundle card, for those who change products, on a product sold as
+    it is (one variant, no options) or one that is a bundle already: its parts listed with how
+    many one set holds, a part added by finding products by name or SKU as a draft adds items, a
+    variant added twice holding one more, and each part removed by its button. Saving sends the
+    whole list; none makes it no bundle.
+  * **Said, not hidden:** a quantity outside 1 to 99 is refused before it is sent; what the core
+    refuses, a part of options, one bundle within another, too few items, is said in the core's
+    words, naming the part; a bundle with a part deleted is warned of above its parts.
+  * **An order's page** says under each line sold as a part which bundle and how many sets,
+    "Part of Eid 3-piece suit × 2"; its prices stay the line's, for staff to see each part's share.
+  * Its changes are on the activity log as "Bundle updated".
+* **Consequences:**
+  * CAT-11 is whole but mix and match, which is a discount's.
+* **Alternatives:**
+  * **Bundles on a page of their own**, as size charts are: a bundle is a product, sold and seen
+    as one, so it is made where its product is.

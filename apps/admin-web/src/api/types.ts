@@ -263,6 +263,8 @@ export interface OrderDetail {
     quantity: number;
     /** The day it ships by, sold on pre-order (ADR-403); absent where a fake core leaves it out. */
     preorderShipsOn?: string | null;
+    /** The bundle it was sold as a part of (ADR-410); absent where a fake core leaves it out. */
+    bundle?: { key: string; title: string; quantity: number } | null;
     unitPrice: MoneyValue;
     totalPrice: MoneyValue;
   }[];
@@ -479,6 +481,8 @@ export interface ProductDetail {
   preorder?: { shipsOn: string } | null;
   /** The size chart its page shows (ADR-406); absent where a fake core leaves it out. */
   sizeChart?: { id: string; name: string } | null;
+  /** What it is made of, where it is a bundle (ADR-409); absent where a fake core leaves it out. */
+  bundle?: ProductBundle | null;
   options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
   media: ProductMedia[];
   variants: ProductVariantDetail[];
@@ -3086,6 +3090,26 @@ export interface ProductPreorderSetData {
     preorder: { productId: string; shipsOn: string } | null;
     userErrors: UserError[];
   };
+}
+
+/** A part of a bundle: a variant of another product, and how many one set holds. */
+export interface ProductBundleComponent {
+  productId: string;
+  variantId: string;
+  productTitle: string;
+  variantTitle: string;
+  quantity: number;
+}
+
+/** A product sold as a set of other products' variants (CAT-11, ADR-409). */
+export interface ProductBundle {
+  /** False once a part's variant was deleted: it is not sold until it has its parts again. */
+  complete: boolean;
+  components: ProductBundleComponent[];
+}
+
+export interface ProductBundleSetData {
+  productBundleSet: { bundle: ProductBundle | null; userErrors: UserError[] };
 }
 
 export type SizeChartUnit = 'INCHES' | 'CENTIMETERS';

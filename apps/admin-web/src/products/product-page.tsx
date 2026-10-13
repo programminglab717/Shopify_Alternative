@@ -43,6 +43,7 @@ import {
   StatusChoice,
 } from './product-form';
 import type { DetailsState } from './product-form';
+import { ProductBundleCard } from './bundle';
 import { DuplicateProduct } from './duplicate';
 import { ProductOptions } from './options';
 import { ProductPhotos } from './photos';
@@ -600,6 +601,13 @@ function ProductView() {
       {/* Shown afresh when the core's day changes. */}
       {edits && <ProductPreorder product={product} />}
       {edits && <ProductSizeChart product={product} />}
+      {/* A product of options is no bundle: its parts have them (ADR-409). */}
+      {edits && (single(product) || product.bundle) && (
+        <ProductBundleCard
+          key={product.variants.map((variant) => variant.id).join()}
+          product={product}
+        />
+      )}
       <ProductUrduCard product={product} />
     </div>
   );

@@ -153,6 +153,20 @@ describe("Changing an order's items and charges, on its page", () => {
     expect(screen.getAllByText(/^Pre-order: ships by/)).toHaveLength(1);
   });
 
+  it('says of each line sold as a part of a bundle which, and how many sets (ADR-410)', async () => {
+    const suit = { key: 'bnd_1', title: 'Eid 3-piece suit', quantity: 2 };
+    const sets = order({
+      lineItems: [
+        { ...line('li_1', 'Lawn shirt', 'M', 2, '3000'), bundle: suit },
+        { ...line('li_2', 'Cotton trouser', 'Default Title', 4, '750'), bundle: suit },
+        { ...line('li_3', 'Socks', 'Default Title', 1, '400'), bundle: null },
+      ],
+    });
+    vi.stubGlobal('fetch', core('owner', sets).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    expect(await screen.findAllByText('Part of Eid 3-piece suit × 2')).toHaveLength(2);
+  });
+
   it('changes quantities, takes a line off and adds a variant at a price agreed on the call', async () => {
     const fake = core('confirmation_agent');
     vi.stubGlobal('fetch', fake.fetcher);

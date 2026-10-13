@@ -459,6 +459,14 @@ export function OrderItems({ order }: { order: OrderDetail }) {
                   {t('preorder.line', { date: shipsOnWords(line.preorderShipsOn, locale) })}
                 </span>
               )}
+              {line.bundle && (
+                <span className="text-secondary">
+                  {t('bundle.line', {
+                    title: line.bundle.title,
+                    quantity: formatCount(line.bundle.quantity),
+                  })}
+                </span>
+              )}
               <span className="num text-secondary">
                 {money(line.unitPrice)} × {formatCount(line.quantity)}
               </span>
