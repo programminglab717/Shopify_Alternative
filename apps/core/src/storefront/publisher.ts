@@ -17,6 +17,7 @@ import {
   videoPathOf,
   type BundleRecord,
   type CollectionRecord,
+  type ProductRecord,
   type ProductReviewChangedPayload,
   type ProductUpdatedPayload,
   type ShownReviews,
@@ -100,6 +101,7 @@ import {
   allProductsDoc,
   articleDoc,
   blogDoc,
+  bundleDoc,
   collectionDoc,
   menuDoc,
   pageDoc,
@@ -189,16 +191,20 @@ export function itemsFor(event: DomainEvent): string[] {
     case CatalogEvents.ProductUpdated: {
       const { changed } = event.payload as unknown as ProductUpdatedPayload;
       if (changed.every((name) => OWN_FIELDS.has(name))) {
-        // A menu may link to it, by its handle.
-        return changed.includes('handle') ? [Items.product(id), Items.menus] : [Items.product(id)];
+        // A menu may link to it, by its handle, and the bundles it is a part of (ADR-411).
+        return changed.includes('handle')
+          ? [Items.product(id), Items.menus, Items.bundlesWith(id)]
+          : [Items.product(id)];
       }
       // Its listings may change order or drop it: smart collections it left no longer hold it.
+      // The bundles it is a part of name it, and are not sold while it is not (ADR-411).
       return [
         Items.product(id),
         Items.collectionsWith(id),
         Items.smartCollections,
         Items.allProducts,
         Items.menus,
+        Items.bundlesWith(id),
       ];
     }
     case CatalogEvents.ProductDeleted:
@@ -893,6 +899,7 @@ export class StorefrontPublisher {
       shopId,
       active.map((record) => record.id),
     );
+    let parts = new Map<string, ProductRecord>();
     if (bundles.size > 0) {
       const sellable = new Map(
         await this.services.inventory.sellableOf(
@@ -903,8 +910,23 @@ export class StorefrontPublisher {
           ),
         ),
       );
+      // A part not for sale leaves it unsold, as placing an order would refuse it.
+      parts = new Map(
+        (
+          await this.services.products.recordsOf(tx, shopId, [
+            ...new Set(
+              [...bundles.values()].flatMap((bundle) =>
+                bundle.components.map((part) => part.productId),
+              ),
+            ),
+          ])
+        ).map((record) => [record.id, record]),
+      );
       for (const bundle of bundles.values()) {
-        available.set(bundle.variantId, bundleSellable(bundle, sellable) !== 0);
+        const offSale = bundle.components.some(
+          (part) => parts.get(part.productId)?.status !== 'active',
+        );
+        available.set(bundle.variantId, !offSale && bundleSellable(bundle, sellable) !== 0);
       }
     }
     const stored = await this.#stored(shopId, 'product', ids);
@@ -953,6 +975,7 @@ export class StorefrontPublisher {
         reviews.get(record.id),
         preorders.get(record.id),
         sizeCharts.get(record.id),
+        bundleDoc(bundles.get(record.id), parts),
       ),
     );
     await writer.putProducts(docs);

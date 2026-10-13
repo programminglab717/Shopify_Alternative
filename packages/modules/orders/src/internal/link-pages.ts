@@ -36,7 +36,13 @@ import type { TrackingView } from './tracking.service.js';
 import type { FulfillmentEventRecord, FulfillmentRecord, OrderRecord } from './records.js';
 import { addressChangeable, awaitsCustomer, itemName, orderName } from './rules.js';
 import type { FulfillmentEventStatusValue, StoredAddressValue } from './schema.js';
-import { shownOfDraft, shownOfOrder, type ShownOrder, type ShownTerm } from './shown-order.js';
+import {
+  shownItems,
+  shownOfDraft,
+  shownOfOrder,
+  type ShownOrder,
+  type ShownTerm,
+} from './shown-order.js';
 import { transferDetails, transferWords } from './transfer-details.js';
 import { RECEIPT_LIMITS, RECEIPT_TYPES } from './transfer-receipt.service.js';
 
@@ -49,6 +55,7 @@ export interface LinkPage extends RenderedPage {
 const LABELS = {
   confirmTitle: { en: 'Confirm your order', ur: 'اپنا آرڈر کنفرم کریں' },
   yourOrder: { en: 'Your order', ur: 'آپ کا آرڈر' },
+  bundleHolds: { en: 'Includes:', ur: 'اس میں شامل:' },
   subtotal: { en: 'Subtotal', ur: 'ذیلی کل' },
   discount: { en: 'Discount', ur: 'رعایت' },
   transferDiscount: { en: 'Bank transfer discount', ur: 'بینک ٹرانسفر پر رعایت' },
@@ -1427,21 +1434,38 @@ function summary(shown: ShownOrder): Html {
   return html`<section class="section">
     <h2 class="label">${say('bilingual', LABELS.yourOrder)}</h2>
     <table>
-      ${shown.lines.map(
-        (line) =>
-          html`<tr>
+      ${shownItems(shown.lines).map((item) => {
+        if ('bundle' in item) {
+          const { bundle } = item;
+          // A bundle once, what it holds under it (ADR-411).
+          return html`<tr>
             <td>
-              ${ltr(`${line.quantity} ×`)} ${text(itemName(line))}
-              ${
-                line.preorderShipsOn &&
-                html`<br /><span class="small"
-                    >${say('bilingual', preorderWords(line.preorderShipsOn))}</span
-                  >`
-              }
+              ${ltr(`${bundle.quantity} ×`)} ${text(bundle.title)}
+              <br /><span class="small"
+                >${say('bilingual', LABELS.bundleHolds)}
+                ${bundle.parts.map(
+                  (part, index) =>
+                    html`${index > 0 && ', '}${ltr(`${part.quantity} ×`)} ${text(part.name)}`,
+                )}</span
+              >
             </td>
-            <td class="num">${ltr(rs(line.total))}</td>
-          </tr>`,
-      )}
+            <td class="num">${ltr(rs(bundle.total))}</td>
+          </tr>`;
+        }
+        const { line } = item;
+        return html`<tr>
+          <td>
+            ${ltr(`${line.quantity} ×`)} ${text(itemName(line))}
+            ${
+              line.preorderShipsOn &&
+              html`<br /><span class="small"
+                  >${say('bilingual', preorderWords(line.preorderShipsOn))}</span
+                >`
+            }
+          </td>
+          <td class="num">${ltr(rs(line.total))}</td>
+        </tr>`;
+      })}
     </table>
     <table>
       ${row(LABELS.subtotal, rs(shown.subtotal))}

@@ -3,8 +3,8 @@ import type { CurrencyCode } from '@hatti/money';
 import type { PolicyType } from '@hatti/online-store/public';
 import { maskPkMobile } from '@hatti/pk';
 import { taxByRate, type DraftTax } from './order-tax.js';
-import type { DraftOrderRecord, OrderRecord } from './records.js';
-import { transferOwed } from './rules.js';
+import type { DraftOrderRecord, LineBundle, OrderRecord } from './records.js';
+import { itemName, transferOwed } from './rules.js';
 import type { StoredAddressValue } from './schema.js';
 
 /**
@@ -20,6 +20,8 @@ export interface ShownOrder {
     total: bigint;
     /** The day it ships by, its product on pre-order when it was sold (ADR-403). */
     preorderShipsOn?: string | null;
+    /** The bundle it was sold as a part of (ADR-410); a draft's lines have none. */
+    bundle?: LineBundle | null;
   }[];
   /** Minor units. */
   subtotal: bigint;
@@ -161,4 +163,47 @@ export function shownDigest(shown: ShownOrder): string {
     shown.terms.map((term) => term.versionId),
   ]);
   return createHash('sha256').update(text).digest('base64url').slice(0, 22);
+}
+
+/** A row of a customer's page: a line, or a bundle with its parts' lines (ADR-411). */
+export type ShownItem =
+  | { line: ShownOrder['lines'][number] }
+  | {
+      bundle: {
+        title: string;
+        /** How many of it were ordered. */
+        quantity: number;
+        /** What its parts' lines come to. */
+        total: bigint;
+        /** Each part once, as "Lawn shirt (M)", with its units in the order. */
+        parts: { name: string; quantity: number }[];
+      };
+    };
+
+/**
+ * An order's lines as its customer's page shows them (ADR-411): each bundle once, where its first
+ * part's line is, its parts' lines its own; any other line as it is.
+ */
+export function shownItems(lines: ShownOrder['lines']): ShownItem[] {
+  const items: ShownItem[] = [];
+  const bundles = new Map<string, Extract<ShownItem, { bundle: unknown }>['bundle']>();
+  for (const line of lines) {
+    if (!line.bundle) {
+      items.push({ line });
+      continue;
+    }
+    let bundle = bundles.get(line.bundle.key);
+    if (!bundle) {
+      bundle = { title: line.bundle.title, quantity: line.bundle.quantity, total: 0n, parts: [] };
+      bundles.set(line.bundle.key, bundle);
+      items.push({ bundle });
+    }
+    bundle.total += line.total;
+    // A part's price shared to the paisa may make it two lines (ADR-410): one part, here.
+    const name = itemName(line);
+    const part = bundle.parts.find((each) => each.name === name);
+    if (part) part.quantity += line.quantity;
+    else bundle.parts.push({ name, quantity: line.quantity });
+  }
+  return items;
 }

@@ -158,6 +158,31 @@ h3 {
   margin: 0;
   font-weight: 600;
 }
+.bundle-contents {
+  margin-block-end: 1rem;
+}
+.bundle-contents__title {
+  margin: 0 0 0.375rem;
+  font-weight: 600;
+}
+.bundle-contents__parts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bundle-contents__part {
+  padding-block: 0.25rem;
+}
+.bundle-contents__quantity {
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: isolate;
+}
+.bundle-contents__variant {
+  color: var(--color-muted);
+}
+.bundle-contents__variant::before {
+  content: '· ';
+}
 .size-chart {
   border: 1px solid var(--color-border);
   border-radius: 0.5rem;

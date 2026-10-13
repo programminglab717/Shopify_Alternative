@@ -31,6 +31,9 @@
       "sold_out": "ختم ہو گیا",
       "preorder": "پیشگی آرڈر",
       "preorder_ships": "پیشگی آرڈر: {{ date }} تک روانہ ہوگا",
+      "bundle": {
+        "title": "اس سیٹ میں"
+      },
       "size_chart": {
         "title": "سائز چارٹ",
         "size": "سائز",

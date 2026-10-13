@@ -336,6 +336,18 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     // Its size chart (ADR-407), each measurement in inches and centimetres; nil when it has none.
     // Hatti's own.
     size_chart: sizeChartObject(doc),
+    // What it holds, where it is a bundle (ADR-411): each part's title, variant, how many one set
+    // has, and a link to it while it is for sale; nil for a product that is no bundle. Hatti's own.
+    bundle: doc.bundle
+      ? {
+          components: doc.bundle.components.map((part) => ({
+            title: part.title,
+            variant_title: part.variantTitle,
+            quantity: part.quantity,
+            url: part.handle === null ? null : `/products/${part.handle}`,
+          })),
+        }
+      : null,
     reviews: (doc.reviews?.latest ?? []).map((review) => ({
       id: review.id,
       author: review.author,
@@ -346,10 +358,6 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
   };
 }
 
-/**
- * Shopify's `reviews.rating` and `reviews.rating_count` metafields of a product with published
- * reviews: its average stars of 1 to 5, and how many; none for one without.
- */
 /** A measurement in a unit, to a tenth: inches from centimetres or the other way. */
 function inUnit(value: number | null, from: 'in' | 'cm', to: 'in' | 'cm'): number | null {
   if (value === null) return null;
@@ -379,6 +387,10 @@ function sizeChartObject(doc: ProductDoc): Record<string, unknown> | null {
   };
 }
 
+/**
+ * Shopify's `reviews.rating` and `reviews.rating_count` metafields of a product with published
+ * reviews: its average stars of 1 to 5, and how many; none for one without.
+ */
 function reviewMetafields(doc: ProductDoc): Record<string, Record<string, unknown>> {
   if (!doc.reviews) return {};
   return {

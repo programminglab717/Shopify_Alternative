@@ -1154,6 +1154,40 @@ describe('Storefront rendering', () => {
     expect(urdu.html).toContain('سینٹی میٹر');
   });
 
+  it('lists what a bundle holds on its page, linking the parts for sale (ADR-411)', async () => {
+    const sample = sampleStore();
+    const [first, second, ...rest] = sample.products;
+    const set = {
+      ...first!,
+      bundle: {
+        components: [
+          { title: second!.title, variantTitle: null, quantity: 1, handle: second!.handle },
+          { title: 'Silk <dupatta>', variantTitle: 'Red', quantity: 2, handle: null },
+        ],
+      },
+    };
+    const shop = new MemoryStore({ ...sample, products: [set, second!, ...rest] });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${set.handle}` }, shop.fresh());
+    const flat = page.html.replace(/\s+/g, ' ');
+    expect(flat).toContain('<p class="bundle-contents__title">In this set</p>');
+    expect(flat).toContain(
+      `<span class="bundle-contents__quantity">1 ×</span> <a href="/products/${second!.handle}" dir="auto">`,
+    );
+    // A part not for sale is named, not linked; its variant beside it.
+    expect(flat).toContain(
+      '<span class="bundle-contents__quantity">2 ×</span> <span dir="auto">Silk &lt;dupatta&gt;</span> <span class="bundle-contents__variant" dir="auto">Red</span>',
+    );
+
+    const plain = await renderer.render({ path: `/products/${second!.handle}` }, shop.fresh());
+    expect(plain.html).not.toContain('bundle-contents');
+    const urdu = await renderer.render(
+      { path: `/products/${set.handle}`, locale: 'ur' },
+      shop.fresh(),
+    );
+    expect(urdu.html).toContain('اس سیٹ میں');
+  });
+
   it('says a product on pre-order is one, and the day it ships by, on its page, card and cart line (ADR-403)', async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;

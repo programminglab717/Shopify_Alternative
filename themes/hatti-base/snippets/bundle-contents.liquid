@@ -1,0 +1,25 @@
+{%- comment -%}
+  What a bundle holds (CAT-11, ADR-411): each part, its variant where it has options, and how
+  many one set has, linked to its own page while it is for sale.
+  Accepts: bundle, the product's bundle.
+{%- endcomment -%}
+{%- if bundle -%}
+  <div class="bundle-contents">
+    <p class="bundle-contents__title">{{ 'products.product.bundle.title' | t }}</p>
+    <ul class="bundle-contents__parts" role="list">
+      {%- for part in bundle.components -%}
+        <li class="bundle-contents__part">
+          <span class="bundle-contents__quantity">{{ part.quantity }} ×</span>
+          {% if part.url -%}
+            <a href="{{ part.url }}" dir="auto">{{ part.title | escape }}</a>
+          {%- else -%}
+            <span dir="auto">{{ part.title | escape }}</span>
+          {%- endif %}
+          {%- if part.variant_title %}
+            <span class="bundle-contents__variant" dir="auto">{{ part.variant_title | escape }}</span>
+          {%- endif -%}
+        </li>
+      {%- endfor -%}
+    </ul>
+  </div>
+{%- endif -%}

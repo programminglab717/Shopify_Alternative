@@ -3,6 +3,7 @@ import type { DeliverySettingsRecord } from '@hatti/checkout/public';
 import {
   DEFAULT_VARIANT_TITLE,
   shownSizeOf,
+  type BundleRecord,
   type CollectionRecord,
   type MediaRecord,
   type OptionRecord,
@@ -31,6 +32,7 @@ import {
   type ImageDoc,
   type BlogDoc,
   type BrandDoc,
+  type BundleDoc,
   type CollectionDoc,
   type MediaDoc,
   type MenuDoc,
@@ -83,6 +85,8 @@ export function productDoc(
   preorderShipsOn?: string,
   /** The size chart it shows, if any (ADR-407). */
   sizeChart?: ShownSizeChart,
+  /** What it holds, where it is a bundle (ADR-411). */
+  bundle?: BundleDoc,
 ): ProductDoc {
   // Its images; its videos are its media beside them (ADR-258).
   const images = record.media.flatMap((media) => {
@@ -170,6 +174,30 @@ export function productDoc(
     }),
     ...(preorderShipsOn && { preorderShipsOn }),
     ...(sizeChart && { sizeChart }),
+    ...(bundle && { bundle }),
+  };
+}
+
+/**
+ * What a bundle holds (ADR-411), its parts as they are now: their products' titles, their variants'
+ * where they have options, and a link to each part for sale. None for a product that is no bundle.
+ */
+export function bundleDoc(
+  bundle: BundleRecord | undefined,
+  parts: ReadonlyMap<string, ProductRecord>,
+): BundleDoc | undefined {
+  if (!bundle) return undefined;
+  return {
+    components: bundle.components.map((component) => {
+      const part = parts.get(component.productId);
+      return {
+        title: part?.title ?? component.productTitle,
+        variantTitle:
+          component.variantTitle === DEFAULT_VARIANT_TITLE ? null : component.variantTitle,
+        quantity: component.quantity,
+        handle: part?.status === 'active' ? part.handle : null,
+      };
+    }),
   };
 }
 

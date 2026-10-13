@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: bundles on the storefront, what a
-set holds on its page and an order's parts grouped under their bundle, and the admin's bundle
-card (CAT-11); then gift options at checkout (CHK-16). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the admin's bundles, a product's
+bundle card and an order's parts under their bundle (CAT-11); then gift options at checkout
+(CHK-16). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,16 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Bundles on the storefront and their orders' pages
+
+* **A bundle's page** ([ADR-411](../architecture/13-decision-log.md#adr-411--a-bundles-storefront-page-lists-what-one-set-holds-each-part-linked-while-it-is-for-sale-as-hattis-productbundle-a-part-off-sale-leaves-the-set-unsold-a-customers-order-page-shows-a-bundle-once-its-parts-named-under-it), CAT-11) lists what one set holds, "In this set", each part linked
+  while it is for sale; themes read it as Hatti's `product.bundle`. A part renamed or taken off
+  sale rebuilds the set's page, and a part off sale leaves the set unsold.
+* **The customer's order page** shows a bundle once, how many sets and what they came to, with
+  its parts under it.
+* 2744 tests (3 new): the storefront's, the publisher's and the order
+  page's rows.
 
 ### 52a839e · Bundles sold
 

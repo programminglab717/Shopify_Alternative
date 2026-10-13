@@ -10,6 +10,7 @@ export {
   type CommentDoc,
   type CommentPolicyDoc,
   type BrandDoc,
+  type BundleDoc,
   type CollectionDoc,
   type DeliveryDaysDoc,
   type DeliveryDoc,

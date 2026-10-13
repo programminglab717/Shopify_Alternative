@@ -31,6 +31,9 @@
       "sold_out": "Sold out",
       "preorder": "Pre-order",
       "preorder_ships": "Pre-order: ships by {{ date }}",
+      "bundle": {
+        "title": "In this set"
+      },
       "size_chart": {
         "title": "Size chart",
         "size": "Size",

@@ -103,8 +103,24 @@ export interface SizeChartDoc {
   note: string | null;
 }
 
+/**
+ * What a bundle holds (CAT-11, ADR-411): each part's product and variant, and how many of it one
+ * set has; `handle` where its product is for sale, to link to.
+ */
+export interface BundleDoc {
+  components: {
+    title: string;
+    /** Null where its product has no options. */
+    variantTitle: string | null;
+    quantity: number;
+    handle: string | null;
+  }[];
+}
+
 export interface ProductDoc {
   id: string;
+  /** What it holds, where it is a bundle (ADR-411). */
+  bundle?: BundleDoc;
   /** The size chart its page shows, if any (ADR-407). */
   sizeChart?: SizeChartDoc;
   /**

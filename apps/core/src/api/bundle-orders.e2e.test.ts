@@ -176,6 +176,20 @@ describe.skipIf(!server)('Admin GraphQL API: orders of bundles (CAT-11, ADR-410)
     expect(await available(trouser.product)).toBe(6);
     expect(await available(suit.product)).toBe(0);
 
+    // Its customer's page shows the suits once, what they hold under them (ADR-411).
+    const link = await data(
+      'mutation ($id: ID!) { orderLinkCreate(id: $id) { url userErrors { code } } }',
+      { id: order.id },
+    );
+    const page = await app.inject({ method: 'GET', url: new URL(link.url).pathname });
+    const flat = page.body.replace(/\s+/g, ' ');
+    expect(flat).toContain('<bdi dir="ltr">2 ×</bdi> <bdi>Eid 3-piece suit</bdi>');
+    expect(flat).toContain(
+      'Includes:</span> <span lang="ur" dir="rtl">اس میں شامل:</span></span> <bdi dir="ltr">2 ×</bdi> <bdi>Lawn shirt</bdi>, <bdi dir="ltr">2 ×</bdi> <bdi>Chiffon dupatta</bdi>, <bdi dir="ltr">4 ×</bdi> <bdi>Cotton trouser</bdi>',
+    );
+    expect(flat).toContain('<td class="num"><bdi dir="ltr">Rs 12,000</bdi></td>');
+    expect(flat).not.toContain('Rs 3,000');
+
     // A bundle is no line to add to an order: its parts are.
     const edit = await data(
       `mutation ($id: ID!, $input: OrderEditLineItemsInput!) {

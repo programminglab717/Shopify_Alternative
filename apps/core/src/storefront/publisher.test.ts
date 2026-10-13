@@ -113,6 +113,7 @@ describe('What storefront documents an event makes stale', () => {
     expect(itemsFor(event('product.updated', { changed: ['handle'] }))).toEqual([
       'product:a1',
       'menus',
+      'bundles-with:a1',
     ]);
     expect(itemsFor(event('product.updated', { changed: ['handle', 'tags'] }))).toEqual([
       'product:a1',
@@ -120,6 +121,7 @@ describe('What storefront documents an event makes stale', () => {
       'smart-collections',
       'all-products',
       'menus',
+      'bundles-with:a1',
     ]);
     expect(itemsFor(event('product.deleted'))).toContain('every-collection');
     expect(itemsFor(event('collection.updated', { changed: ['title'] }))).toEqual([
@@ -1147,6 +1149,49 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
     expect((await store().productByHandle(set.handle))?.variants[0]?.available).toBe(false);
     for (const each of [set, trouser]) unwrap(await products.delete(tenant, each.id));
+    await deliver();
+  });
+
+  it('publishes what a bundle holds as its parts change, and no bundle for sale with a part off sale (ADR-411)', async () => {
+    const bundles = new BundleService(database);
+    const shirt = unwrap(
+      await products.create(tenant, {
+        title: 'Lawn shirt',
+        status: 'active',
+        options: [{ name: 'Size', values: ['M'] }],
+        variants: [{ optionValues: ['M'], price: '4000' }],
+      }),
+    );
+    const dupatta = unwrap(await products.create(tenant, { title: 'Dupatta', status: 'active' }));
+    const set = unwrap(await products.create(tenant, { title: 'Eid set', status: 'active' }));
+    unwrap(
+      await bundles.set(tenant, set.id, [
+        { variantId: shirt.variants[0]!.id, quantity: 1 },
+        { variantId: dupatta.variants[0]!.id, quantity: 2 },
+      ]),
+    );
+    await deliver();
+    const published = await store().productByHandle(set.handle);
+    expect(published?.bundle).toEqual({
+      components: [
+        { title: 'Lawn shirt', variantTitle: 'M', quantity: 1, handle: shirt.handle },
+        { title: 'Dupatta', variantTitle: null, quantity: 2, handle: dupatta.handle },
+      ],
+    });
+    expect((await store().productByHandle(shirt.handle))?.bundle).toBeUndefined();
+
+    // A part renamed, then taken off sale: the set names it as it is, and is not for sale.
+    unwrap(await products.update(tenant, { id: dupatta.id, title: 'Chiffon dupatta' }));
+    await deliver();
+    expect((await store().productByHandle(set.handle))?.bundle?.components[1]?.title).toBe(
+      'Chiffon dupatta',
+    );
+    unwrap(await products.update(tenant, { id: dupatta.id, status: 'archived' }));
+    await deliver();
+    const offSale = await store().productByHandle(set.handle);
+    expect(offSale?.bundle?.components[1]).toMatchObject({ handle: null });
+    expect(offSale?.variants[0]?.available).toBe(false);
+    for (const each of [set, shirt, dupatta]) unwrap(await products.delete(tenant, each.id));
     await deliver();
   });
 

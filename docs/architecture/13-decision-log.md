@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-410 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-411 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -418,6 +418,7 @@
 | 408 | The admin keeps the shop's size charts on a page of their own beside its products, each edited as a table of sizes and measurements, given to a collection's products from its page and to a product from the product's; measurements typed with a comma or a point | Accepted |
 | 409 | A bundle is a product of one variant made of other products' variants, a number of each, up to ten parts, one level deep; a part deleted leaves it unsold until it is given its parts again, and orders will hold its parts as their lines | Accepted |
 | 410 | An order of a bundle holds its parts' lines, the bundle's price shared among them by what each costs alone, to the paisa, each keeping the bundle it was sold as; a bundle sells as many as its parts' stock makes | Accepted |
+| 411 | A bundle's storefront page lists what one set holds, each part linked while it is for sale, as Hatti's product.bundle; a part off sale leaves the set unsold; a customer's order page shows a bundle once, its parts named under it | Accepted |
 
 ---
 
@@ -15828,3 +15829,32 @@
     price as a Rs 4,000 shirt, and returning one would refund the wrong amount.
   * **The remainder on the first part alone:** a multipack's single part would need a unit
     price that does not divide; a second line of the same part keeps every price exact.
+
+## ADR-411 · A bundle's storefront page lists what one set holds, each part linked while it is for sale, as Hatti's product.bundle; a part off sale leaves the set unsold; a customer's order page shows a bundle once, its parts named under it
+
+* **Context:**
+  * ADR-410 sells a bundle as its parts' lines. A shopper must see what a set holds before
+    buying it, and the order's page should read as what they bought, not as its parts' lines
+    at prices of the shop's sharing.
+* **Decision:**
+  * **The product's storefront document** carries what a bundle holds: each part's product
+    title as it is now, its variant's title where it has options, how many one set has, and
+    its handle while it is for sale. Themes read it as Hatti's `product.bundle.components`,
+    each with `title`, `variant_title`, `quantity` and `url`, nil for any other product.
+  * **Hatti Base** lists it above the product's buttons, "In this set", each part linked to
+    its page while it is for sale, in English and Urdu.
+  * **Rebuilt** when a part's product changes in what a bundle shows of it, its title, handle
+    or status, as when its stock changes (ADR-410): the publisher finds the bundles holding it.
+  * **A part off sale** (draft or archived) leaves the set unsold on the storefront, as placing
+    an order refuses it.
+  * **The customer's order page** shows each bundle once, where its first part's line is: how
+    many sets, the bundle's title and what its parts' lines come to, with "Includes:" and each
+    part's units in the order under it. A part made two lines by its shared price is one there.
+    What the page's confirmation digest covers is unchanged: the lines.
+* **Consequences:**
+  * A shop's own theme shows nothing of a bundle until it reads `product.bundle`; it sells all
+    the same.
+  * Emails, invoices and packing slips list the parts' lines: what is packed.
+* **Alternatives:**
+  * **A metafield the shop fills in:** would say what the set held when it was written, not
+    what an order of it takes from stock.
