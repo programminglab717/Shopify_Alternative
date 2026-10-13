@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### 7bb5683 · Test databases copied from a migrated template
+### 4e7d4fc · Test databases copied from a migrated template
 
 * CI timed out the hooks of two of the customers module's tests making their databases (run
   38458021000). Each test file ran every migration in a database of its own, under the setup's
