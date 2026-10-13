@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Marketing in the admin: broadcasts and templates
+### de33c54 · Marketing in the admin: broadcasts and templates
 
 * **A Marketing section** ([ADR-424](../architecture/13-decision-log.md#adr-424--marketing-in-the-admin-broadcasts-estimated-and-scheduled-and-the-shops-own-templates-written-for-meta-for-the-owner-managers-and-marketers), MKT-01) is open to the owner, managers and marketers.
 * **Broadcasts:** a broadcast is estimated as its segment is chosen, then scheduled for now
