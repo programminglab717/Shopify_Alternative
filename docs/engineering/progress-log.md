@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: product reviews on the storefront
-with their stars in its structured data, and moderated in the admin with the review request's
-setting (MKT-05); then pre-orders (CAT-14). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: product reviews in the admin,
+listed, published and hidden, with the request's and publishing's settings (MKT-05); then
+pre-orders (CAT-14). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,23 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Reviews on the storefront
+
+* **On the product's page and cards** ([ADR-401](../architecture/13-decision-log.md#adr-401--a-products-storefront-page-shows-its-published-reviews-their-average-stars-and-the-latest-ten-through-shopifys-review-metafields-and-hattis-productreviews-and-tells-search-engines-as-schemaorgs-aggregaterating), MKT-05): its published reviews' stars under its
+  title and on its cards, and the latest ten below it, each from someone who bought it from the
+  shop. Themes read them as Shopify's `reviews.rating` and `reviews.rating_count` metafields and
+  Hatti's `product.reviews`; `structured_data` gives search engines an AggregateRating.
+* **Kept current by the publisher:** a review written, published or hidden rebuilds its
+  product's document, and the edge forgets its page.
+* **Tried against the core:** two published reviews and one waiting were put on
+  the demo shop's Peshawari Chappal and the shop published again. Its page at its subdomain, at
+  a phone's width, showed 4.5 stars and "2 reviews" under its title, and the two below it, the
+  newest first, each "Bought from this shop"; the one waiting did not show. Its structured data
+  had the AggregateRating, its card on All products its stars, and its Urdu page "خریداروں کے
+  ریویوز". The reviews were then taken away, and the shop published again without them.
+* 2677 tests (4 new): a product's shown reviews, the publisher following them,
+  and Hatti Base's page, cards and structured data.
 
 ### 8e2f985 · Reviews asked for on WhatsApp after delivery
 

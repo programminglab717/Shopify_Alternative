@@ -145,10 +145,12 @@ export {
   reviewSettingsIn,
   reviewsOfCustomerIn,
   reviewsOfOrderIn,
+  shownReviewsIn,
   writeReviewsIn,
   type OrderReview,
   type ProductReviewChangedPayload,
   type ReviewInput,
   type ReviewSettingsRecord,
   type ReviewStatusValue,
+  type ShownReviews,
 } from '../internal/reviews.js';

@@ -42,7 +42,14 @@
         "sale": "Sale price"
       },
       "free_delivery_from": "Free delivery on orders of {{ amount }} or more",
-      "delivery_from": "Delivery from {{ amount }}"
+      "delivery_from": "Delivery from {{ amount }}",
+      "rating": "Rated {{ rating }} out of 5",
+      "reviews_count": {
+        "one": "{{ count }} review",
+        "other": "{{ count }} reviews"
+      },
+      "reviews": "Customer reviews",
+      "verified_buyer": "Bought from this shop"
     }
   },
   "sections": {

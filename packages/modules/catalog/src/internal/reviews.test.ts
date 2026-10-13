@@ -11,6 +11,7 @@ import {
   reviewAuthorName,
   reviewsOfCustomerIn,
   reviewsOfOrderIn,
+  shownReviewsIn,
   writeReviewsIn,
   type ReviewInput,
 } from './reviews.js';
@@ -159,6 +160,42 @@ describe.skipIf(!server)("Products' reviews (MKT-05, ADR-399)", () => {
     expect(await reviews.list(staff, { productId: lawn })).toHaveLength(1);
     const [first] = await reviews.list(staff, { first: 1 });
     expect(await reviews.list(staff, { first: 1, after: first!.id })).toEqual([all[1]]);
+  });
+
+  it("shows a product's published reviews alone, their average and the latest first (ADR-401)", async () => {
+    const lawn = await product('Lawn Suit');
+    const chiffon = await product('Chiffon Dupatta');
+    unwrap(await reviews.updateSettings(staff, { publishFrom: 3 }));
+    for (const [rating, body] of [
+      [5, 'Lovely'],
+      [4, null],
+      [2, 'Faded'],
+      [3, 'Fine'],
+    ] as const) {
+      await write(newId(), [{ productId: lawn, rating, body }]);
+    }
+    const shown = () =>
+      f.db.tenant(f.a.shopId, (tx) => shownReviewsIn(tx, f.a.shopId, [lawn, chiffon]));
+    // The two-star review waits; the rest are published. The chiffon has none.
+    const first = await shown();
+    expect([...first.keys()]).toEqual([lawn]);
+    expect(first.get(lawn)).toMatchObject({ rating: 4, count: 3 });
+    expect(first.get(lawn)!.latest.map((review) => [review.rating, review.body])).toEqual([
+      [3, 'Fine'],
+      [4, null],
+      [5, 'Lovely'],
+    ]);
+    expect(first.get(lawn)!.latest[0]).toMatchObject({
+      author: 'Ayesha K.',
+      publishedAt: expect.any(Date),
+    });
+    // Hidden, one goes; another shop sees none of them.
+    const [fine] = await reviews.list(staff, { status: 'published', first: 1 });
+    unwrap(await reviews.moderate(staff, fine!.id, 'hidden'));
+    expect((await shown()).get(lawn)).toMatchObject({ rating: 4.5, count: 2 });
+    expect(await f.db.tenant(f.b.shopId, (tx) => shownReviewsIn(tx, f.b.shopId, [lawn]))).toEqual(
+      new Map(),
+    );
   });
 
   it("goes with its customer's data: listed in their export, theirs on a merge, erased with them", async () => {

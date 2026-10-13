@@ -43,6 +43,7 @@
           <div {{ block.shopify_attributes }}>
             <h1 class="product__title" dir="auto">{{ product.title | escape }}</h1>
             {%- if product.vendor != blank -%}<p class="product__vendor" dir="auto">{{ product.vendor | escape }}</p>{%- endif -%}
+            {% render 'rating', product: product, link: true %}
           </div>
 
         {%- when 'price' -%}
@@ -145,6 +146,28 @@
     {%- endfor -%}
   </div>
 </div>
+{%- comment -%}
+  What customers who received it said (ADR-401): the latest published reviews, each with its
+  stars, its author's first name and initial, and when.
+{%- endcomment -%}
+{%- if product.reviews.size > 0 -%}
+  <section id="reviews" class="page-width reviews" aria-labelledby="reviews-heading">
+    <h2 id="reviews-heading">{{ 'products.product.reviews' | t }}</h2>
+    {% render 'rating', product: product %}
+    {%- for review in product.reviews -%}
+      <article class="review">
+        <p class="review__meta">
+          <span class="rating__stars" aria-hidden="true" style="--rating: {{ review.rating }}">★★★★★</span>
+          <span class="visually-hidden">{{ 'products.product.rating' | t: rating: review.rating }}</span>
+          <span dir="auto">{{ review.author | escape }}</span> ·
+          {{ review.created_at | time_tag: format: 'day_month_year' }}
+        </p>
+        {%- if review.content != blank -%}<div class="rte" dir="auto">{{ review.content }}</div>{%- endif -%}
+        <p class="review__verified">{{ 'products.product.verified_buyer' | t }}</p>
+      </article>
+    {%- endfor -%}
+  </section>
+{%- endif -%}
 <script type="application/json" data-variants>{{ product.variants | json }}</script>
 <script type="application/ld+json">{{ product | structured_data }}</script>
 
@@ -168,6 +191,10 @@
   .product__variants, .product__quantity { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
   .product__promises { display: grid; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
   .product__promises li::before { content: "✓ "; color: var(--color-accent); }
+  .reviews { display: grid; gap: 1rem; margin-block-end: 2rem; }
+  .reviews h2 { margin: 0; }
+  .review { display: grid; gap: 0.25rem; padding-block-end: 1rem; border-block-end: 1px solid var(--color-border); }
+  .review__meta, .review__verified { margin: 0; color: var(--color-muted); font-size: 0.875rem; }
   @media (min-width: 990px) {
     .product { grid-template-columns: minmax(0, 55fr) minmax(0, 45fr); align-items: start; }
     .product__media { grid-auto-flow: row; overflow: visible; }

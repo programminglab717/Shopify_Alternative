@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-400 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-401 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -408,6 +408,7 @@
 | 398 | Each custom app on the shop's apps page shows its webhooks, the topic in words, where it goes and how its latest delivery went, with its last ten to open; one is added for a topic the app may hear, or removed | Accepted |
 | 399 | Customers rate what their delivered order brought them on its own page, one to five stars a product with words if they like; each review waits for the shop, which publishes or hides it, unless its stars reach those the shop publishes by itself | Accepted |
 | 400 | A shop may ask each delivered order's customer once on WhatsApp to rate what it brought, 1 to 14 days after its last parcel arrived, with the order's page; an order already rated is not asked about | Accepted |
+| 401 | A product's storefront page shows its published reviews, their average stars and the latest ten, through Shopify's review metafields and Hatti's product.reviews, and tells search engines as schema.org's AggregateRating | Accepted |
 
 ---
 
@@ -15500,3 +15501,33 @@
 * **Alternatives:**
   * **Asking at delivery:** a customer who has not yet worn the suit has nothing to say of it.
   * **Asking again later:** one message is a request; two are a nag, and cost the shop twice.
+
+## ADR-401 · A product's storefront page shows its published reviews, their average stars and the latest ten, through Shopify's review metafields and Hatti's product.reviews, and tells search engines as schema.org's AggregateRating
+
+* **Context:**
+  * Reviews written by buyers ([ADR-399](#adr-399--customers-rate-what-their-delivered-order-brought-them-on-its-own-page-one-to-five-stars-a-product-with-words-if-they-like-each-review-waits-for-the-shop-which-publishes-or-hides-it-unless-its-stars-reach-those-the-shop-publishes-by-itself)) are worth something only where shoppers decide: on
+    the product's page, on its card in a collection, and in Google's results as stars.
+  * Shopify themes read a product's stars from the standard `reviews.rating` and
+    `reviews.rating_count` metafields, which review apps fill; the reviews themselves each app
+    shows its own way.
+* **Decision:**
+  * **The product's storefront document carries them:** its published reviews' average, to one
+    decimal place, how many, and the latest ten, each with its author as "Ayesha K.", its stars,
+    its words escaped as articles' comments are ([ADR-220](#adr-220--articles-take-comments-as-their-blogs-shopify-comment-policy-says-posted-from-an-articles-page-through-the-storefront-held-for-the-shops-approval-where-the-blog-moderates-them-shown-escaped-as-text-in-the-articles-document-and-approved-marked-as-spam-or-deleted-through-the-admin-api)), and when it was published. A product
+    with none carries nothing. The publisher rebuilds the product when one of its reviews is
+    written, published or hidden.
+  * **Themes read them as Shopify's:** `product.metafields.reviews.rating.value` (`rating`,
+    `scale_min`, `scale_max`) and `product.metafields.reviews.rating_count.value`, and Hatti's
+    own `product.reviews`, each with `author`, `rating`, `content` and `created_at`.
+  * **Hatti Base shows them:** stars filled as far as the average under the title, leading to
+    the reviews; the same on the product's cards; and the reviews below the product, each
+    saying it was bought from the shop, in English and Urdu.
+  * **`structured_data` tells search engines:** an AggregateRating, and the latest as Reviews,
+    so Google may show the product's stars in its results.
+* **Consequences:**
+  * Only the latest ten show; a product with more shows its average of all of them.
+  * Hidden reviews leave the page with the next build, and the edge forgets the page.
+* **Alternatives:**
+  * **Fetching reviews as the page renders:** every product page would wait on the core; the
+    document is already read for the page.
+  * **Metafields alone:** a theme could show stars but no words.

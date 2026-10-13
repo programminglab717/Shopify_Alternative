@@ -24,7 +24,14 @@ export type ReviewStatusValue = 'pending' | 'published' | 'hidden';
  * How long a review's words may be, how many a page lists, and how long after delivery a shop may
  * ask for one at most.
  */
-export const REVIEW_LIMITS = { body: 2_000, name: 100, page: 50, requestAfterDays: 14 } as const;
+export const REVIEW_LIMITS = {
+  body: 2_000,
+  name: 100,
+  page: 50,
+  requestAfterDays: 14,
+  /** How many of a product's published reviews its storefront page shows. */
+  shown: 10,
+} as const;
 
 /**
  * A customer's name as their reviews show it: their first name and their surname's initial,
@@ -193,4 +200,70 @@ export async function eraseReviewsIn(tx: Tx, shopId: string, customerId: string)
      WHERE shop_id = ${shopId} AND customer_id = ${customerId}
     RETURNING id`);
   return rows.length;
+}
+
+/** A product's published reviews, as its storefront page shows them (ADR-401). */
+export interface ShownReviews {
+  /** Their average stars, to one decimal place. */
+  rating: number;
+  count: number;
+  /** The latest published, newest first, at most {@link REVIEW_LIMITS.shown}. */
+  latest: { id: string; author: string; rating: number; body: string | null; publishedAt: Date }[];
+}
+
+/**
+ * The published reviews of each of `productIds` that has any, for its storefront page (ADR-401):
+ * their average and count, and the latest, newest first.
+ */
+export async function shownReviewsIn(
+  tx: Tx,
+  shopId: string,
+  productIds: readonly string[],
+): Promise<Map<string, ShownReviews>> {
+  const shown = new Map<string, ShownReviews>();
+  if (productIds.length === 0) return shown;
+  const { rows: totals } = await tx.execute<{
+    product_id: string;
+    rating: string | number;
+    count: number;
+  }>(sql`
+    SELECT product_id, round(avg(rating), 1) AS rating, count(*)::int AS count
+      FROM catalog.product_reviews
+     WHERE shop_id = ${shopId} AND product_id = ANY(${sql.param(productIds)}::uuid[])
+       AND status = 'published'
+     GROUP BY product_id`);
+  if (totals.length === 0) return shown;
+  const { rows: latest } = await tx.execute<{
+    id: string;
+    product_id: string;
+    author_name: string;
+    rating: number;
+    body: string | null;
+    published_at: string | Date;
+  }>(sql`
+    SELECT id, product_id, author_name, rating, body, published_at FROM (
+      SELECT r.*, row_number() OVER (PARTITION BY product_id
+                                     ORDER BY published_at DESC, id DESC) AS place
+        FROM catalog.product_reviews r
+       WHERE shop_id = ${shopId}
+         AND product_id = ANY(${sql.param(totals.map((row) => row.product_id))}::uuid[])
+         AND status = 'published') ranked
+     WHERE place <= ${REVIEW_LIMITS.shown}
+     ORDER BY product_id, place`);
+  for (const total of totals) {
+    shown.set(total.product_id, {
+      rating: Number(total.rating),
+      count: total.count,
+      latest: latest
+        .filter((row) => row.product_id === total.product_id)
+        .map((row) => ({
+          id: row.id,
+          author: row.author_name,
+          rating: row.rating,
+          body: row.body,
+          publishedAt: toDate(row.published_at),
+        })),
+    });
+  }
+  return shown;
 }

@@ -327,6 +327,33 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     created_at: doc.createdAt ?? null,
     published_at: doc.createdAt ?? null,
     updated_at: doc.updatedAt ?? doc.createdAt ?? null,
+    // Its published reviews (ADR-401): their stars as Shopify's standard review metafields hold
+    // them, which themes and apps read, and the latest of them, Hatti's own.
+    metafields: reviewMetafields(doc),
+    reviews: (doc.reviews?.latest ?? []).map((review) => ({
+      id: review.id,
+      author: review.author,
+      rating: review.rating,
+      content: review.bodyHtml ?? '',
+      created_at: review.createdAt,
+    })),
+  };
+}
+
+/**
+ * Shopify's `reviews.rating` and `reviews.rating_count` metafields of a product with published
+ * reviews: its average stars of 1 to 5, and how many; none for one without.
+ */
+function reviewMetafields(doc: ProductDoc): Record<string, Record<string, unknown>> {
+  if (!doc.reviews) return {};
+  return {
+    reviews: {
+      rating: {
+        type: 'rating',
+        value: { rating: doc.reviews.rating, scale_min: 1, scale_max: 5 },
+      },
+      rating_count: { type: 'number_integer', value: doc.reviews.count },
+    },
   };
 }
 

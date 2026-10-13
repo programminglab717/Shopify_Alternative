@@ -33,5 +33,6 @@
     </div>
     <h3 class="card__title" dir="auto">{{ product.title | escape }}</h3>
   </a>
+  {% render 'rating', product: product %}
   {% render 'price', product: product %}
 </div>

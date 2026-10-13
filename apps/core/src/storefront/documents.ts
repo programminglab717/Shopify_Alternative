@@ -7,6 +7,7 @@ import {
   type MediaRecord,
   type OptionRecord,
   type ProductRecord,
+  type ShownReviews,
 } from '@hatti/catalog/public';
 import {
   commentHtml,
@@ -75,6 +76,8 @@ export function productDoc(
    */
   translations: ReadonlyMap<string, TranslatedFields> = new Map(),
   videoAddress: VideoAddress = () => null,
+  /** Its published reviews (ADR-401), if it has any. */
+  reviews?: ShownReviews,
 ): ProductDoc {
   // Its images; its videos are its media beside them (ADR-258).
   const images = record.media.flatMap((media) => {
@@ -147,6 +150,19 @@ export function productDoc(
         options: optionsIn(record.options, translations, locale),
       }),
     ),
+    ...(reviews && {
+      reviews: {
+        rating: reviews.rating,
+        count: reviews.count,
+        latest: reviews.latest.map((review) => ({
+          id: review.id,
+          author: review.author,
+          rating: review.rating,
+          bodyHtml: review.body === null ? null : commentHtml(review.body),
+          createdAt: review.publishedAt.toISOString(),
+        })),
+      },
+    }),
   };
 }
 

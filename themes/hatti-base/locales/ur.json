@@ -42,7 +42,14 @@
         "sale": "سیل قیمت"
       },
       "free_delivery_from": "{{ amount }} یا اس سے زیادہ کے آرڈر پر مفت ڈیلیوری",
-      "delivery_from": "ڈیلیوری {{ amount }} سے"
+      "delivery_from": "ڈیلیوری {{ amount }} سے",
+      "rating": "5 میں سے {{ rating }} ستارے",
+      "reviews_count": {
+        "one": "{{ count }} ریویو",
+        "other": "{{ count }} ریویوز"
+      },
+      "reviews": "خریداروں کے ریویوز",
+      "verified_buyer": "اس دکان سے خریدا"
     }
   },
   "sections": {

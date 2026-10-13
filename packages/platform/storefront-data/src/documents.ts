@@ -129,6 +129,29 @@ export interface ProductDoc {
     ProductDoc,
     'title' | 'descriptionHtml' | 'productType' | 'options'
   >;
+  /** Its published reviews (ADR-401); absent while it has none. */
+  reviews?: ProductReviewsDoc;
+}
+
+/** A product's published reviews, as its page shows them (ADR-401). */
+export interface ProductReviewsDoc {
+  /** Their average stars, 1 to 5, to one decimal place. */
+  rating: number;
+  count: number;
+  /** The latest, newest first: ten at most. */
+  latest: ReviewDoc[];
+}
+
+/** A published review of a product, by a customer who received it (ADR-399). */
+export interface ReviewDoc {
+  id: string;
+  /** "Ayesha K." */
+  author: string;
+  rating: number;
+  /** Its words, escaped, their paragraphs and lines kept: safe to show as they are; or none. */
+  bodyHtml: string | null;
+  /** When it was published, in ISO 8601. */
+  createdAt: string;
 }
 
 export interface CollectionDoc {

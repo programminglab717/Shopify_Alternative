@@ -1,0 +1,18 @@
+{%- comment -%}
+  A product's stars from its published reviews (ADR-401), as Shopify's standard review
+  metafields hold them, and how many there are; nothing for a product without. With `link`, the
+  count leads to the reviews on its page.
+{%- endcomment -%}
+{%- assign rating = product.metafields.reviews.rating.value -%}
+{%- if rating -%}
+  {%- assign count = product.metafields.reviews.rating_count.value -%}
+  <p class="rating">
+    <span class="rating__stars" aria-hidden="true" style="--rating: {{ rating.rating }}">★★★★★</span>
+    <span class="visually-hidden">{{ 'products.product.rating' | t: rating: rating.rating }}</span>
+    {%- if link -%}
+      <a href="#reviews">{{ 'products.product.reviews_count' | t: count: count }}</a>
+    {%- else -%}
+      <span>{{ 'products.product.reviews_count' | t: count: count }}</span>
+    {%- endif -%}
+  </p>
+{%- endif -%}

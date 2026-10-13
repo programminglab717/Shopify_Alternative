@@ -336,6 +336,47 @@ function productData(value: unknown, origin: string): Record<string, unknown> | 
         ? 'https://schema.org/InStock'
         : 'https://schema.org/OutOfStock',
     })),
+    ...reviewData(product),
+  };
+}
+
+/**
+ * A product's published reviews as schema.org's AggregateRating and its latest Reviews (ADR-401),
+ * which search results show as stars; nothing for a product without.
+ */
+function reviewData(product: Record<string, unknown>): Record<string, unknown> {
+  const metafields = product.metafields as
+    | { reviews?: { rating?: { value: { rating: number } }; rating_count?: { value: number } } }
+    | undefined;
+  const rating = metafields?.reviews?.rating?.value.rating;
+  const count = metafields?.reviews?.rating_count?.value;
+  if (rating === undefined || !count) return {};
+  const reviews = (product.reviews as Record<string, unknown>[] | undefined) ?? [];
+  return {
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: rating,
+      reviewCount: count,
+      bestRating: 5,
+      worstRating: 1,
+    },
+    review: reviews.map((review) => {
+      const body = unescapeHtml(String(review.content ?? '').replace(/<[^>]*>/g, ' '))
+        .replace(/\s+/g, ' ')
+        .trim();
+      return {
+        '@type': 'Review',
+        author: { '@type': 'Person', name: review.author },
+        reviewRating: {
+          '@type': 'Rating',
+          ratingValue: review.rating,
+          bestRating: 5,
+          worstRating: 1,
+        },
+        datePublished: String(review.created_at).slice(0, 10),
+        ...(body && { reviewBody: body }),
+      };
+    }),
   };
 }
 

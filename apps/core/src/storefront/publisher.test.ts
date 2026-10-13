@@ -4,8 +4,11 @@ import { StorefrontSite, type MutationResult, type TenantContext } from '@hatti/
 import {
   CollectionService,
   MediaService,
+  ProductReviewService,
   ProductService,
   VariantService,
+  shownReviewsIn,
+  writeReviewsIn,
 } from '@hatti/catalog/public';
 import { DeliveryService } from '@hatti/checkout/public';
 import { SecretBox, checkPassword } from '@hatti/crypto';
@@ -121,6 +124,19 @@ describe('What storefront documents an event makes stale', () => {
       'every-product',
     ]);
     expect(itemsFor(event('order.created'))).toEqual([]);
+  });
+
+  it('rebuilds a product when one of its reviews is written, published or hidden (ADR-401)', () => {
+    for (const type of [
+      'product_review.written',
+      'product_review.published',
+      'product_review.hidden',
+    ]) {
+      expect(itemsFor(event(type, { productId: 'p1', rating: 5, status: 'published' }))).toEqual([
+        'product:p1',
+      ]);
+    }
+    expect(itemsFor(event('review_settings.updated'))).toEqual([]);
   });
 
   it('rebuilds the shop when its main theme changes, or another takes its place', () => {
@@ -388,6 +404,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         pages,
         blogs,
         articles,
+        reviews: { shownReviewsOf: shownReviewsIn },
         comments: new CommentService(database),
         preferences,
         delivery,
@@ -974,6 +991,68 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await imageOf('lookbook/eid-lawn')).toBeNull();
     expect(await imageOf('lookbook/sizes')).toEqual(plainImage);
     unwrap(await blogs.delete(tenant, lookbook.id));
+    await deliver();
+  });
+
+  it("publishes a product's published reviews, their average and the latest, and follows them (ADR-401)", async () => {
+    const reviews = new ProductReviewService(database);
+    const chappal = unwrap(
+      await products.create(tenant, {
+        title: 'Peshawari Chappal',
+        status: 'active',
+        variants: [{ price: '3,499' }],
+      }),
+    );
+    await deliver();
+    expect((await store().productByHandle(chappal.handle))?.reviews).toBeUndefined();
+
+    // One waits for the shop: nothing to show yet.
+    const write = (rating: number, body: string | null) =>
+      database.tenant(shopId, (tx) =>
+        writeReviewsIn(tx, shopId, { id: newId(), customerId: null, authorName: 'Ayesha K.' }, [
+          { productId: chappal.id, rating, body },
+        ]),
+      );
+    await write(4, 'Comfortable <b>soles</b>\nTrue to size');
+    expect(await deliver()).toEqual(['product_review.written']);
+    expect((await store().productByHandle(chappal.handle))?.reviews).toBeUndefined();
+
+    // Published, it shows, escaped as text; the edge forgets the product's page.
+    const [waiting] = await reviews.list(tenant, { productId: chappal.id });
+    forgotten.length = 0;
+    unwrap(await reviews.moderate(tenant, waiting!.id, 'published'));
+    await deliver();
+    expect((await store().productByHandle(chappal.handle))?.reviews).toEqual({
+      rating: 4,
+      count: 1,
+      latest: [
+        {
+          id: waiting!.id,
+          author: 'Ayesha K.',
+          rating: 4,
+          bodyHtml: '<p>Comfortable &lt;b&gt;soles&lt;/b&gt;<br>True to size</p>',
+          createdAt: expect.any(String),
+        },
+      ],
+    });
+    expect(forgotten.flat()).toContain(handleTag(shopId, 'product', chappal.handle));
+
+    // Another, published at once by its stars; then the first hidden.
+    unwrap(await reviews.updateSettings(tenant, { publishFrom: 5 }));
+    await write(5, null);
+    await deliver();
+    expect((await store().productByHandle(chappal.handle))?.reviews).toMatchObject({
+      rating: 4.5,
+      count: 2,
+      latest: [{ rating: 5, bodyHtml: null }, { rating: 4 }],
+    });
+    unwrap(await reviews.moderate(tenant, waiting!.id, 'hidden'));
+    await deliver();
+    expect((await store().productByHandle(chappal.handle))?.reviews).toMatchObject({
+      rating: 5,
+      count: 1,
+    });
+    unwrap(await products.delete(tenant, chappal.id));
     await deliver();
   });
 

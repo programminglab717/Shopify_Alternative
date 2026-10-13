@@ -1036,6 +1036,84 @@ describe('Storefront rendering', () => {
     );
   });
 
+  it("shows a product's published reviews, its stars on its page and cards, and tells search engines (ADR-401)", async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const reviewed = {
+      ...first!,
+      reviews: {
+        rating: 4.5,
+        count: 2,
+        latest: [
+          {
+            id: 'r2',
+            author: 'Bilal A.',
+            rating: 5,
+            bodyHtml: '<p>Fits &lt;well&gt;</p>',
+            createdAt: '2026-10-10T09:00:00.000Z',
+          },
+          {
+            id: 'r1',
+            author: 'Ayesha K.',
+            rating: 4,
+            bodyHtml: null,
+            createdAt: '2026-10-08T09:00:00.000Z',
+          },
+        ],
+      },
+    };
+    const shop = new MemoryStore({ ...sample, products: [reviewed, ...rest] });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${reviewed.handle}` }, shop.fresh());
+    const html = page.html;
+    // Under its title, leading to its reviews; then each, newest first, escaped as it was kept.
+    expect(html).toContain('style="--rating: 4.5"');
+    expect(html).toContain('Rated 4.5 out of 5');
+    expect(html).toContain('<a href="#reviews">2 reviews</a>');
+    expect(html).toContain('<h2 id="reviews-heading">Customer reviews</h2>');
+    expect(html.indexOf('Bilal A.')).toBeLessThan(html.indexOf('Ayesha K.'));
+    expect(html).toContain('<p>Fits &lt;well&gt;</p>');
+    expect(count(html, 'Bought from this shop')).toBe(2);
+    // Search engines get its stars, and the reviews' own.
+    const data = JSON.parse(
+      /<script type="application\/ld\+json">([^<]*Product[^<]*)<\/script>/.exec(html)![1]!,
+    );
+    expect(data.aggregateRating).toEqual({
+      '@type': 'AggregateRating',
+      ratingValue: 4.5,
+      reviewCount: 2,
+      bestRating: 5,
+      worstRating: 1,
+    });
+    expect(data.review).toEqual([
+      {
+        '@type': 'Review',
+        author: { '@type': 'Person', name: 'Bilal A.' },
+        reviewRating: { '@type': 'Rating', ratingValue: 5, bestRating: 5, worstRating: 1 },
+        datePublished: '2026-10-10',
+        reviewBody: 'Fits <well>',
+      },
+      {
+        '@type': 'Review',
+        author: { '@type': 'Person', name: 'Ayesha K.' },
+        reviewRating: { '@type': 'Rating', ratingValue: 4, bestRating: 5, worstRating: 1 },
+        datePublished: '2026-10-08',
+      },
+    ]);
+    // A collection's cards show its stars; a product with none shows none, nor its section.
+    const listing = await renderer.render({ path: '/collections/all' }, shop.fresh());
+    expect(count(listing.html, 'class="rating"')).toBe(1);
+    const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());
+    expect(plain.html).not.toContain('id="reviews"');
+    expect(plain.html).not.toContain('aggregateRating');
+    // In Urdu too.
+    const urdu = await renderer.render(
+      { path: `/products/${reviewed.handle}`, locale: 'ur' },
+      shop.fresh(),
+    );
+    expect(urdu.html).toContain('خریداروں کے ریویوز');
+  });
+
   it("gives themes an image's focal point, as Shopify's image.presentation, and keeps it in sight in image_tag (ADR-257)", async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;

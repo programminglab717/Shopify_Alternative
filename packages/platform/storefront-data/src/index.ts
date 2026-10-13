@@ -21,6 +21,8 @@ export {
   type MenuLinkDoc,
   type PageDoc,
   type ProductDoc,
+  type ProductReviewsDoc,
+  type ReviewDoc,
   type SeoDoc,
   type ShopDoc,
   type SitemapEntry,

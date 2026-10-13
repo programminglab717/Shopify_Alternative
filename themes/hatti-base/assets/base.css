@@ -363,3 +363,26 @@ input[type='number'] {
   opacity: 0.5;
   cursor: default;
 }
+
+/* A product's stars from its reviews (ADR-401): filled in the accent colour as far as its rating. */
+.rating {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+.rating__stars {
+  background: linear-gradient(
+    90deg,
+    var(--color-accent) calc(var(--rating, 0) / 5 * 100%),
+    var(--color-border) 0
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: 0.1em;
+  font-size: 1rem;
+}

@@ -3,11 +3,15 @@ import {
   CatalogEvents,
   CollectionService,
   ProductService,
+  ReviewEvents,
   VariantService,
   imagePathOf,
+  shownReviewsIn,
   videoPathOf,
   type CollectionRecord,
+  type ProductReviewChangedPayload,
   type ProductUpdatedPayload,
+  type ShownReviews,
 } from '@hatti/catalog/public';
 import { CheckoutEvents, DeliveryService } from '@hatti/checkout/public';
 import type { Database, Tx } from '@hatti/db';
@@ -193,6 +197,12 @@ export function itemsFor(event: DomainEvent): string[] {
     case InventoryEvents.InventoryItemUpdated:
     case InventoryEvents.InventoryLevelUpdated:
       return [Items.product((event.payload as { productId: string }).productId)];
+    case ReviewEvents.Written:
+    case ReviewEvents.Published:
+    case ReviewEvents.Hidden:
+      // Its product's page shows its published reviews (ADR-401): one written may be published
+      // at once, or a published one sent back to wait.
+      return [Items.product((event.payload as unknown as ProductReviewChangedPayload).productId)];
     case InventoryEvents.LocationUpdated: {
       // Whether a location sells online, or at all, changes what every product has to sell. A
       // location with stock history cannot be deleted, so deleting one changes nothing.
@@ -320,6 +330,9 @@ export function itemsFor(event: DomainEvent): string[] {
 /** The events {@link itemsFor} reads. */
 export const PUBLISHED_EVENTS = [
   ...Object.values(CatalogEvents),
+  ReviewEvents.Written,
+  ReviewEvents.Published,
+  ReviewEvents.Hidden,
   InventoryEvents.InventoryItemUpdated,
   InventoryEvents.InventoryLevelUpdated,
   InventoryEvents.LocationUpdated,
@@ -384,6 +397,14 @@ export interface PublisherServices {
   pages: PageService;
   blogs: BlogService;
   articles: ArticleService;
+  /** The published reviews products' pages show (ADR-401). */
+  reviews: {
+    shownReviewsOf(
+      tx: Tx,
+      shopId: string,
+      productIds: readonly string[],
+    ): Promise<Map<string, ShownReviews>>;
+  };
   /** The comments articles' pages show (ADR-220). */
   comments: {
     shownCommentsOf(
@@ -800,6 +821,11 @@ export class StorefrontPublisher {
         ]),
       ]),
     );
+    const reviews = await this.services.reviews.shownReviewsOf(
+      tx,
+      shopId,
+      active.map((record) => record.id),
+    );
     const docs = active.map((record) =>
       productDoc(
         record,
@@ -814,6 +840,7 @@ export class StorefrontPublisher {
           const path = videoPathOf(shopId, media, handle);
           return path && images.url(path);
         },
+        reviews.get(record.id),
       ),
     );
     await writer.putProducts(docs);
@@ -1045,6 +1072,7 @@ export function createStorefrontPublisher(
       pages: new PageService(database),
       blogs: new BlogService(database),
       articles: new ArticleService(database),
+      reviews: { shownReviewsOf: shownReviewsIn },
       comments: new CommentService(database),
       preferences: { preferencesOf: shopPreferencesOf },
       delivery: new DeliveryService(database),
