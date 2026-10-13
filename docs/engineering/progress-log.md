@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Custom apps
+### db1ec42 · Custom apps
 
 * **A new module, `@hatti/apps`** ([ADR-395](../architecture/13-decision-log.md#adr-395--a-custom-app-is-an-access-token-the-shops-owner-or-a-manager-makes-with-a-name-and-scopes-none-beyond-their-own-roles-and-a-secret-its-webhooks-will-be-signed-with-kept-sealed-for-the-app-alone-both-are-shown-once-and-can-be-replaced-and-removing-the-app-revokes-its-token-at-once), DEV-04): a custom app is an access token with a
   name and scopes. Owners and managers make one with `customAppCreate`, giving no scope their
