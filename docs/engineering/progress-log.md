@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Pre-orders where shoppers see them
+### b35ec7e · Pre-orders where shoppers see them
 
 * **On the storefront** ([ADR-404](../architecture/13-decision-log.md#adr-404--a-product-on-pre-order-says-so-where-shoppers-decide-and-buy-its-button-reads-pre-order-with-the-day-it-ships-by-its-card-a-badge-its-cart-and-checkout-lines-and-the-orders-own-page-the-day-each-ships-by), CAT-14): a product on pre-order's document carries the day it
   ships by, which themes read as `product.preorder_ships_on`. Hatti Base's button reads
