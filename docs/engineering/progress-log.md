@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Size charts in the catalog
+### 217f760 · Size charts in the catalog
 
 * **The shop's size charts** ([ADR-406](../architecture/13-decision-log.md#adr-406--the-catalog-keeps-the-shops-size-charts-tables-of-measurements-a-row-for-each-size-in-inches-or-centimetres-and-gives-each-product-one-at-most-by-its-id-or-as-a-collection-has-it-then-the-products-whose-chart-changes-are-named-in-the-event), CAT-10): a name, inches or centimetres, what is measured
   and a row for each size, with a note on how to measure; 50 a shop. Migration 0191 keeps them,
