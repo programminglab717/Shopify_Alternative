@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Local pickup
+### d809543 · Local pickup
 
 * **In the core** ([ADR-389](../architecture/13-decision-log.md#adr-389--a-location-lets-customers-pick-orders-up-with-what-to-tell-them-an-order-picked-up-waits-ready-for-pickup-once-packed-its-customer-told-where-is-never-booked-with-a-courier-and-completes-when-handed-over-at-the-counter), SHP-15): a location lets customers pick orders up, with up to 200
   characters of instructions (migration 0182), once it has its street address and city. An
