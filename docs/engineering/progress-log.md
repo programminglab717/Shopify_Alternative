@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Drafts picked up
+### 8dcb355 · Drafts picked up
 
 * **In the core** ([ADR-390](../architecture/13-decision-log.md#adr-390--a-draft-order-is-shipped-or-picked-up-one-picked-up-names-a-location-offering-pickup-or-the-only-one-has-no-delivery-charge-and-becomes-an-order-picked-up-there-its-link-says-the-customer-pays-when-they-collect-it), SHP-15): a draft order is shipped or picked up (migration 0183). One
   picked up names a location offering pickup, or the only one, and has no delivery charge, both
