@@ -496,6 +496,7 @@ describe("Messages' words", () => {
       'orders_limit_reached',
       'store_export_ready',
       'broadcast',
+      'automation',
     ]);
   });
 
@@ -508,7 +509,11 @@ describe("Messages' words", () => {
     expect(
       templateParameters('broadcast', { shop: 'Zari Fashions', template: 'eid_sale' }),
     ).toEqual([]);
-    expect(WHATSAPP_ONLY_KINDS).toEqual(['broadcast']);
+    expect(WHATSAPP_ONLY_KINDS).toEqual(['broadcast', 'automation']);
+    // An automation's the same way (ADR-425).
+    const welcome = { ...sale, template: 'welcome_offer', automation: 'welcome' };
+    expect(templateName('automation', welcome)).toBe('welcome_offer');
+    expect(templateParameters('automation', welcome)).toEqual(['Ayesha']);
     expect(
       messageCostOf({ kind: 'broadcast', channel: 'whatsapp', language: 'en', variables: sale }),
     ).toEqual({ channel: 'whatsapp', category: 'marketing', parts: 1 });

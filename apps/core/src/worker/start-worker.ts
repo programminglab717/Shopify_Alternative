@@ -8,7 +8,12 @@ import {
   VariantService,
 } from '@hatti/catalog/public';
 import { AbandonedCheckoutService, CheckoutExpiry } from '@hatti/checkout/public';
-import { SegmentFieldRegistry, SegmentService, StoreCreditService } from '@hatti/customers/public';
+import {
+  CustomerService,
+  SegmentFieldRegistry,
+  SegmentService,
+  StoreCreditService,
+} from '@hatti/customers/public';
 import type { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import {
@@ -29,6 +34,7 @@ import {
   MetaConversionsService,
 } from '@hatti/marketing/public';
 import {
+  AutomationsService,
   BroadcastsService,
   MessagesService,
   WhatsAppAccountsService,
@@ -71,6 +77,7 @@ import { workerStorage } from '../storage.js';
 import { storeExportBuilder } from '../store-export.js';
 import { BillingNotices } from './billing-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
+import { AutomationTriggers, WinBacks } from './automations.js';
 import { BroadcastQueue } from './broadcasts.js';
 import { CheckoutReminders } from './checkout-reminders.js';
 import { ReviewRequests } from './review-requests.js';
@@ -125,6 +132,7 @@ export interface EventConsumers {
   storeExports?: StoreExportNotices;
   planOrders?: PlanOrders;
   webhooks?: WebhookFanOut;
+  automations?: AutomationTriggers;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
@@ -146,6 +154,7 @@ export function eventHandlers(
     storeExports,
     planOrders,
     webhooks,
+    automations,
   }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
@@ -212,6 +221,11 @@ export function eventHandlers(
   }
   if (webhooks) {
     for (const type of WebhookFanOut.EVENTS) registry.on(type, (event) => webhooks.handle(event));
+  }
+  if (automations) {
+    for (const type of AutomationTriggers.EVENTS) {
+      registry.on(type, (event) => automations.handle(event));
+    }
   }
   return registry;
 }
@@ -288,6 +302,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         // Apps' webhooks need their secrets opened to be sent (ADR-397).
         ...(config.ENCRYPTION_KEYS && {
           webhooks: new WebhookFanOut(new WebhookService(database, config.ENCRYPTION_KEYS)),
+          // The shop's automations, sent from its own number, whose token is sealed (ADR-425).
+          automations: new AutomationTriggers(
+            workerAutomations(database, config.ENCRYPTION_KEYS),
+            new CustomerService(database),
+          ),
         }),
       }),
       concurrency: config.EVENT_CONCURRENCY,
@@ -504,6 +523,12 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         logger,
       ).start(config.SCHEDULED_INTERVAL_MS);
       closers.push(() => broadcasts.stop());
+      // Lapsed customers won back, where the shop's win-back is on (ADR-425).
+      const winBacks = new WinBacks(
+        workerAutomations(database, config.ENCRYPTION_KEYS),
+        logger,
+      ).start(config.SWEEP_INTERVAL_MS);
+      closers.push(() => winBacks.stop());
     } else {
       logger.warn(
         'ENCRYPTION_KEYS is not set: no conversions go to the ad platforms, no orders are ' +
@@ -541,14 +566,33 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
 
 /** Shops' broadcasts as the worker queues them (ADR-422): their templates on their own numbers. */
 function workerBroadcasts(database: Database, box: SecretBox): BroadcastsService {
-  const registry = new SegmentFieldRegistry();
-  registry.register(ORDER_SEGMENT_FACTS);
   return new BroadcastsService(
     database,
-    new WhatsAppTemplatesService(database, new WhatsAppAccountsService(database, box, null)),
-    new SegmentService(database, registry),
+    workerTemplates(database, box),
+    workerSegments(database),
     new MessagesService(database),
   );
+}
+
+/** Shops' automations as the worker sends them (ADR-425). */
+function workerAutomations(database: Database, box: SecretBox): AutomationsService {
+  return new AutomationsService(
+    database,
+    workerTemplates(database, box),
+    workerSegments(database),
+    new MessagesService(database),
+  );
+}
+
+function workerTemplates(database: Database, box: SecretBox): WhatsAppTemplatesService {
+  return new WhatsAppTemplatesService(database, new WhatsAppAccountsService(database, box, null));
+}
+
+/** Segments with the orders module's facts, as the API has them. */
+function workerSegments(database: Database): SegmentService {
+  const registry = new SegmentFieldRegistry();
+  registry.register(ORDER_SEGMENT_FACTS);
+  return new SegmentService(database, registry);
 }
 
 /** Cloudflare's cache, in front of storefronts and images, where it is set up; else none. */

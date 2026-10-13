@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: automations (MKT-04), the shop's
-own WhatsApp messages sent when something happens, such as a first order or a birthday. Urdu
+**Next, section by section as the alpha's shops need them**: the admin's page for automations
+under Marketing (MKT-04), then the other recipes: back in stock and the COD→prepaid nudge. Urdu
 handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -16,6 +16,17 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Automations: welcome and win-back
+
+* **Two recipes** ([ADR-425](../architecture/13-decision-log.md#adr-425--automations-send-the-shops-own-approved-template-from-its-own-number-a-welcome-once-a-customer-subscribes-and-a-win-back-some-days-after-their-last-order), MKT-04) send one of the shop's approved templates from its own
+  number, as broadcasts do.
+* **Welcome** goes once to a customer who subscribes on WhatsApp at checkout or on the
+  storefront.
+* **Win-back** goes to a subscribed customer some days after their last order: 60 by default,
+  14 to 365. It goes once each time they lapse.
+* They are set through the Admin API; their page in the admin is next.
+* 2824 tests, from 2818: three for messaging, three for the core.
 
 ### de33c54 · Marketing in the admin: broadcasts and templates
 

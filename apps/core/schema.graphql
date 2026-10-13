@@ -5389,6 +5389,55 @@ input MailingAddressInput {
   zip: String
 }
 
+"""
+One of the shop's automations (ADR-425): one of its approved WhatsApp templates, sent from its own number when something happens to a customer who agreed to hear from it there.
+"""
+type MarketingAutomation {
+  """For a win-back: how many days after the customer's last order it goes."""
+  afterDays: Int
+
+  """Whether it sends."""
+  enabled: Boolean!
+  kind: MarketingAutomationKind!
+
+  """
+  The template it sends; null when none was chosen, or the one chosen is gone.
+  """
+  template: WhatsAppTemplate
+
+  """When the shop last changed it; null for one never set."""
+  updatedAt: DateTime
+}
+
+input MarketingAutomationInput {
+  """For a win-back: 14 to 365 days after the customer's last order."""
+  afterDays: Int
+
+  """On only with a template Meta approved."""
+  enabled: Boolean
+
+  """One of the shop's templates."""
+  templateId: ID
+}
+
+"""One of the shop's automations' recipes (MKT-04, ADR-425)."""
+enum MarketingAutomationKind {
+  """
+  Once, to a customer who agrees to hear from the shop on WhatsApp at checkout or on its storefront.
+  """
+  WELCOME
+
+  """
+  To a customer who agreed to hear on WhatsApp, some days after their last order: once each time they lapse.
+  """
+  WIN_BACK
+}
+
+type MarketingAutomationUpdatePayload {
+  marketingAutomation: MarketingAutomation
+  userErrors: [UserError!]!
+}
+
 """A channel marketing goes out on. Each has its own consent."""
 enum MarketingChannel {
   EMAIL
@@ -5725,6 +5774,11 @@ type MessageEdge {
 A notification the shop's customers get about their orders, an alert the shop gets itself, at its alerts number, or one its staff get of their own work, each at their own number (ADR-191).
 """
 enum MessageKind {
+  """
+  Sent by one of the shop's automations, a welcome or a win-back, from its own WhatsApp number to a customer who agreed to hear from it there (ADR-425): never by SMS.
+  """
+  AUTOMATION
+
   """
   One of the shop's own broadcasts, from its own WhatsApp number to a customer who agreed to hear from it there (ADR-422): never by SMS.
   """
@@ -6567,6 +6621,11 @@ type Mutation {
   Makes an active location the shop's primary one, where stock is counted in the admin and orders ship from when none has all of an order; the one before stops being it.
   """
   locationMakePrimary(locationId: ID!): LocationMakePrimaryPayload!
+
+  """
+  Turns one of the shop's automations on or off, or changes its template or days: on only with a template Meta approved on the shop's number.
+  """
+  marketingAutomationUpdate(input: MarketingAutomationInput!, kind: MarketingAutomationKind!): MarketingAutomationUpdatePayload!
 
   """
   A new menu, which the storefront publishes a moment later. Its handle names it to themes.
@@ -10580,6 +10639,9 @@ type Query {
     """1 to 250; default 50."""
     first: Int
   ): LostParcelConnection!
+
+  """The shop's automations, each as set, or off where it never was."""
+  marketingAutomations: [MarketingAutomation!]!
   menu(id: ID!): Menu
 
   """

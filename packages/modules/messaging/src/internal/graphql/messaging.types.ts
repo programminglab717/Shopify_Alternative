@@ -46,6 +46,7 @@ export enum MessageKind {
   ORDERS_LIMIT_REACHED = 'ORDERS_LIMIT_REACHED',
   STORE_EXPORT_READY = 'STORE_EXPORT_READY',
   BROADCAST = 'BROADCAST',
+  AUTOMATION = 'AUTOMATION',
 }
 
 registerEnumType(MessageKind, {
@@ -212,6 +213,11 @@ registerEnumType(MessageKind, {
       description:
         "One of the shop's own broadcasts, from its own WhatsApp number to a customer who agreed " +
         'to hear from it there (ADR-422): never by SMS.',
+    },
+    AUTOMATION: {
+      description:
+        "Sent by one of the shop's automations, a welcome or a win-back, from its own WhatsApp " +
+        'number to a customer who agreed to hear from it there (ADR-425): never by SMS.',
     },
   },
 });

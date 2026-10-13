@@ -12,6 +12,7 @@ export const MessagingEvents = {
   BroadcastScheduled: 'broadcast.scheduled',
   BroadcastCancelled: 'broadcast.cancelled',
   BroadcastSent: 'broadcast.sent',
+  MarketingAutomationUpdated: 'marketing_automation.updated',
 } as const;
 
 /**
@@ -82,4 +83,15 @@ export interface BroadcastChangedPayload {
 export interface BroadcastSentPayload {
   /** The customers it was queued for. */
   recipients: number;
+}
+
+/**
+ * The shop turned one of its automations on or off, or changed it (ADR-425). The aggregate is the
+ * shop: a shop has one of each.
+ */
+export interface MarketingAutomationUpdatedPayload {
+  kind: string;
+  enabled: boolean;
+  actorKind: 'app' | 'staff';
+  actorId: string;
 }

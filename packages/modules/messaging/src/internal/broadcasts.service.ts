@@ -30,7 +30,7 @@ export const BROADCAST_AHEAD_DAYS = 30;
 export const BROADCAST_BATCH = 500;
 
 /** What a template's {{1}} says of a customer whose name the shop does not have. */
-const NO_NAME: Record<MessageLanguage, string> = { en: 'there', ur: 'دوست' };
+export const NO_NAME: Record<MessageLanguage, string> = { en: 'there', ur: 'دوست' };
 
 /** What the worker did of a broadcast in a round (ADR-422). */
 export type BroadcastRound =
@@ -44,7 +44,7 @@ export type BroadcastRound =
   | { outcome: 'none' };
 
 /** The shop as the worker acts for it: only its ID is read. */
-function workerTenant(shopId: string): TenantContext {
+export function workerTenant(shopId: string): TenantContext {
   return {
     shopId,
     currency: 'PKR',
@@ -54,7 +54,7 @@ function workerTenant(shopId: string): TenantContext {
 }
 
 /** A customer's first name, as a template's {{1}} greets them. */
-function firstName(name: string | null): string | null {
+export function firstName(name: string | null): string | null {
   return name?.trim().split(/\s+/)[0]?.slice(0, 60) || null;
 }
 

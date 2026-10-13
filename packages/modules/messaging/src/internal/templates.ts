@@ -48,6 +48,7 @@ export const MESSAGE_KINDS = [
   'orders_limit_reached',
   'store_export_ready',
   'broadcast',
+  'automation',
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
@@ -90,15 +91,19 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'orders_limit_near',
   'orders_limit_reached',
   'store_export_ready',
-  // The shop's own, which it schedules itself (ADR-421).
+  // The shop's own, which it schedules itself (ADR-421), or sets going (ADR-425).
   'broadcast',
+  'automation',
 ];
 
 /**
- * Messages WhatsApp alone carries: a broadcast is marketing its customer agreed to hear on
- * WhatsApp, from the shop's own number (ADR-422), and no SMS goes in its place.
+ * Messages WhatsApp alone carries: a broadcast or an automation is marketing its customer agreed
+ * to hear on WhatsApp, from the shop's own number (ADR-422, ADR-425), and no SMS goes in its place.
  */
-export const WHATSAPP_ONLY_KINDS: readonly MessageKind[] = ['broadcast'];
+export const WHATSAPP_ONLY_KINDS: readonly MessageKind[] = ['broadcast', 'automation'];
+
+/** Messages that send the shop's own template, named in their `template` (ADR-422, ADR-425). */
+const SHOP_TEMPLATE_KINDS: readonly AnyMessageKind[] = WHATSAPP_ONLY_KINDS;
 
 /** What the buttons of a message asking a customer to confirm their order answer (COD-01). */
 export const CONFIRMATION_ANSWERS = ['confirm', 'cancel', 'address'] as const;
@@ -207,6 +212,8 @@ export interface MessageVariables {
    * the shop's account; and, in `name`, the customer's first name where its body has {{1}}.
    */
   template?: string;
+  /** For an automation (ADR-425): which of the shop's recipes sent it, "welcome" or "win_back". */
+  automation?: string;
 }
 
 /**
@@ -747,6 +754,16 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur: '{shop} براڈکاسٹ: {template}',
     },
   },
+  // The same, sent by one of the shop's automations (ADR-425).
+  automation: {
+    whatsapp: '',
+    category: 'marketing',
+    parameters: ['name'],
+    text: {
+      en: '{shop}: {template}',
+      ur: '{shop}: {template}',
+    },
+  },
   store_export_ready: {
     whatsapp: 'hatti_store_export_ready',
     category: 'utility',
@@ -942,13 +959,13 @@ function escapeHtml(text: string): string {
 export function templateParameters(kind: AnyMessageKind, variables: MessageVariables): string[] {
   // A broadcast's template names the customer only where its body has {{1}}, which its queuing
   // says by giving a name (ADR-422).
-  if (kind === 'broadcast') return variables.name ? [variables.name] : [];
+  if (SHOP_TEMPLATE_KINDS.includes(kind)) return variables.name ? [variables.name] : [];
   return TEMPLATES[kind].parameters.map((name) => variables[name] || NONE);
 }
 
 /** The name of the WhatsApp template a message goes as: Hatti's, or the shop's own. */
 export function templateName(kind: AnyMessageKind, variables: MessageVariables): string {
-  return kind === 'broadcast' ? (variables.template ?? '') : TEMPLATES[kind].whatsapp;
+  return SHOP_TEMPLATE_KINDS.includes(kind) ? (variables.template ?? '') : TEMPLATES[kind].whatsapp;
 }
 
 /**

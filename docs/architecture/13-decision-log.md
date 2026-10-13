@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-424 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-425 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -432,6 +432,7 @@
 | 422 | The worker queues a broadcast a batch at a time and sends it from the shop's own number, both in the hours marketing may go, and never by SMS | Accepted |
 | 423 | The admin connects the shop's own WhatsApp number in its settings through Meta's Embedded Signup, in Facebook's window, and the core trades the code it gives | Accepted |
 | 424 | Marketing in the admin: broadcasts estimated and scheduled, and the shop's own templates written for Meta, for the owner, managers and marketers | Accepted |
+| 425 | Automations send the shop's own approved template from its own number: a welcome once a customer subscribes, and a win-back some days after their last order | Accepted |
 
 ---
 
@@ -16317,3 +16318,44 @@
     (automations, MKT-04), and marketers look for it by that name.
   * **Typing a template's name freely and letting Meta refuse it**: the name is a technical
     key. Showing it as Meta will take it avoids a round trip that fails.
+
+## ADR-425 · Automations send the shop's own approved template from its own number: a welcome once a customer subscribes, and a win-back some days after their last order
+
+* **Context:**
+  * MKT-04 lists recipes for V1. Abandoned checkout (ADR-393) and the review request
+    (ADR-400) exist already; welcome and win-back do not.
+  * Marketing to a customer goes from the shop's own number with its own approved templates,
+    in marketing hours and never by SMS (ADR-419 to ADR-422).
+  * A customer's WhatsApp consent changes are events (`customer.marketing_consent_updated`),
+    with where they came from. Segments know each customer's last order (ADR-024).
+* **Decision:**
+  * **`messaging.automations`** keeps one row per recipe the shop has set: whether it is on,
+    the template it sends, and for a win-back its days (14 to 365, 60 by default). A recipe
+    never set is off.
+    * It can be turned on only with a template Meta approved on the shop's current number.
+    * A change is audited and published as `marketing_automation.updated`.
+  * **The `automation` message kind** goes like a broadcast: the shop's template by name, the
+    first name as `{{1}}` where the body has it, from the shop's number, in marketing hours,
+    never by SMS, and charged as marketing. Its variables say which recipe sent it.
+  * **Welcome:** the worker hears a WhatsApp subscription made at checkout or on the
+    storefront.
+    * Not one made by staff, an app or an import, which would welcome a whole list at once.
+    * The customer must still be subscribed when the event is heard.
+    * It goes once per customer, ever: the dedupe key is the customer's.
+  * **Win-back:** every sweep, each shop with it on. It reaches the customers who agreed to hear
+    on WhatsApp and whose last order was its days ago, or up to a week more, so that a missed
+    sweep is made up. A customer sent a win-back within that time is skipped. A customer who
+    orders again and lapses again is won back again.
+  * A recipe whose template is gone or no longer approved sends nothing until the shop chooses
+    another.
+  * **API:** `marketingAutomations` (`read_marketing_events`) and `marketingAutomationUpdate`
+    (`write_marketing_events`).
+* **Consequences:**
+  * The two V1 recipes left, back in stock and the COD→prepaid nudge, need watching products
+    and an offer to pay online. They come later, as recipes of the same table.
+  * The admin's page for automations comes next.
+* **Alternatives:**
+  * **A general flow builder now** (07 §5.2): MKT-04 puts it in GROWTH. Fixed recipes cover the
+    alpha's shops.
+  * **Welcoming every subscription, whatever its source**: an import of a thousand subscribed
+    customers would send a thousand welcomes at once.

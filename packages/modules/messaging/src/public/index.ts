@@ -14,6 +14,7 @@ export {
   type WhatsAppAccountConnectedPayload,
   type WhatsAppAccountDisconnectedPayload,
   type BroadcastChangedPayload,
+  type MarketingAutomationUpdatedPayload,
   type WhatsAppTemplateChangedPayload,
   type WhatsAppTemplateStatusPayload,
 } from '../internal/events.js';
@@ -132,3 +133,13 @@ export {
   type BroadcastStatus,
 } from '../internal/broadcasts.service.js';
 export { MARKETING_HOURS, marketingHours } from '../internal/marketing-hours.js';
+export {
+  AUTOMATION_KINDS,
+  AutomationsService,
+  WIN_BACK_DAYS,
+  WIN_BACK_GRACE_DAYS,
+  type AutomationCustomer,
+  type AutomationInput,
+  type AutomationKind,
+  type AutomationRecord,
+} from '../internal/automations.service.js';
