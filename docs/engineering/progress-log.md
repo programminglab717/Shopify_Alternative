@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Gift wrap and gift messages at checkout
+### 1094353 · Gift wrap and gift messages at checkout
 
 * **Gift wrap** ([ADR-413](../architecture/13-decision-log.md#adr-413--a-shop-sells-gift-wrap-as-one-of-its-own-variants-which-the-checkouts-page-adds-to-the-cart-when-the-shopper-asks-and-may-ask-for-a-gift-message-which-the-order-keeps-for-its-packing-slip), CHK-16) is one of the shop's own variants: the checkout's page offers
   it at its price and adds it to the cart, a line like any other, or takes it off.
