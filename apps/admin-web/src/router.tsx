@@ -77,6 +77,8 @@ import { SupportAccessPage } from './settings/support-page';
 import { StoreExportPage } from './settings/export-page';
 import { AppsPage } from './settings/apps-page';
 import { WhatsAppPage } from './settings/whatsapp-page';
+import { BroadcastsPage } from './marketing/broadcasts-page';
+import { TemplatesPage } from './marketing/templates-page';
 import { TaxPage } from './settings/tax-page';
 import { MessagesPage } from './settings/messages-page';
 import { OrderPoliciesPage } from './settings/order-policies-page';
@@ -666,6 +668,18 @@ const settingsWhatsApp = createRoute({
   component: WhatsAppPage,
 });
 
+const marketing = createRoute({
+  getParentRoute: () => shop,
+  path: 'marketing',
+  component: BroadcastsPage,
+});
+
+const marketingTemplates = createRoute({
+  getParentRoute: () => shop,
+  path: 'marketing/templates',
+  component: TemplatesPage,
+});
+
 const settingsTax = createRoute({
   getParentRoute: () => shop,
   path: 'settings/tax',
@@ -863,6 +877,8 @@ export const routeTree = root.addChildren([
     settingsExport,
     settingsApps,
     settingsWhatsApp,
+    marketing,
+    marketingTemplates,
     settingsTax,
     settingsMessages,
     settingsOrders,

@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: WhatsApp broadcasts' last pages in
-the admin: the shop's templates and its broadcasts (MKT-01); then automations (MKT-04). Urdu
+**Next, section by section as the alpha's shops need them**: automations (MKT-04), the shop's
+own WhatsApp messages sent when something happens, such as a first order or a birthday. Urdu
 handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -16,6 +16,17 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Marketing in the admin: broadcasts and templates
+
+* **A Marketing section** ([ADR-424](../architecture/13-decision-log.md#adr-424--marketing-in-the-admin-broadcasts-estimated-and-scheduled-and-the-shops-own-templates-written-for-meta-for-the-owner-managers-and-marketers), MKT-01) is open to the owner, managers and marketers.
+* **Broadcasts:** a broadcast is estimated as its segment is chosen, then scheduled for now
+  or later with one of the shop's approved templates. Each shows how its messages went, and
+  can be cancelled before it is sent.
+* **Templates:** the shop's own templates are written and sent to Meta. Each shows what Meta
+  made of it, and Meta can be asked again.
+* 2818 tests, from 2802: sixteen for the admin, eight of them its new GraphQL
+  documents checked against the schema.
 
 ### 139b596 · The shop's WhatsApp number, connected in the admin
 

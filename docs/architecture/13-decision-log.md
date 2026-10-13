@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-423 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-424 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -431,6 +431,7 @@
 | 421 | A broadcast sends one of the shop's approved templates to a segment's customers who agreed to hear on WhatsApp, or to all who did, estimated before it is scheduled | Accepted |
 | 422 | The worker queues a broadcast a batch at a time and sends it from the shop's own number, both in the hours marketing may go, and never by SMS | Accepted |
 | 423 | The admin connects the shop's own WhatsApp number in its settings through Meta's Embedded Signup, in Facebook's window, and the core trades the code it gives | Accepted |
+| 424 | Marketing in the admin: broadcasts estimated and scheduled, and the shop's own templates written for Meta, for the owner, managers and marketers | Accepted |
 
 ---
 
@@ -16273,3 +16274,46 @@
     and leaves a long-lived token in the shop's hands and in the clipboard.
   * **Redirecting the whole admin to Facebook and back**: the shop would leave the admin
     mid-task. Meta's documented flow is the popup.
+
+## ADR-424 · Marketing in the admin: broadcasts estimated and scheduled, and the shop's own templates written for Meta, for the owner, managers and marketers
+
+* **Context:**
+  * Templates (ADR-420), broadcasts (ADR-421) and their sending (ADR-422) are in the API, and
+    the shop's number is connected in settings (ADR-423).
+  * Marketers hold `write_marketing_events` and `write_segments`, but not `read_settings`.
+* **Decision:**
+  * **A Marketing section** in the admin's navigation, for the owner, managers and marketers.
+  * **Its page is broadcasts:**
+    * A new broadcast has a name, one of the shop's approved templates (with its words
+      shown), a segment or everyone who agreed to hear on WhatsApp, and now or a time
+      chosen in the phone's own time.
+    * Choosing the segment shows the estimate (`broadcastEstimate`): how many it reaches
+      and about what it costs from the credit, at the price of a message. The page says
+      when no one in the segment has agreed to hear on WhatsApp.
+    * The shop's broadcasts follow, the latest first, 20 a page. Each shows its template,
+      who it goes to, its status, when it goes or was to go, its error, and how its
+      messages went: customers, sent, delivered, read and failed. A message read was
+      delivered and sent, so each count includes those further on. While scheduled or
+      sending, a broadcast can be cancelled after asking once more.
+    * Without an approved template, the page says why no broadcast can be made and links
+      to the templates. Without any template at all, it says who connects the number, or
+      links to settings for those who can.
+  * **The templates page:**
+    * A new template has a name, which the page writes as Meta takes it (small letters,
+      digits and underscores) and shows. It also has a language, words (with `{{1}}` for the
+      first name), and an optional heading, footer and link button.
+    * The shop's templates follow. Each shows what Meta made of it, with Meta's reason for
+      a rejection.
+    * *Check with Meta* asks Meta again about every template. A template can be deleted
+      after asking once more.
+  * The core's refusals are shown as it words them.
+* **Consequences:**
+  * A marketer works on broadcasts end to end, but never sees or changes the number's
+    connection.
+  * Broadcasts' counts are read when the page is opened. They do not update live as
+    messages are delivered.
+* **Alternatives:**
+  * **Broadcasts under Customers, beside segments**: marketing grows beyond broadcasts
+    (automations, MKT-04), and marketers look for it by that name.
+  * **Typing a template's name freely and letting Meta refuse it**: the name is a technical
+    key. Showing it as Meta will take it avoids a round trip that fails.

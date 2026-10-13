@@ -7,6 +7,7 @@ import {
   House,
   Link2,
   LogOut,
+  Megaphone,
   Menu,
   Package,
   ReceiptText,
@@ -27,6 +28,7 @@ import { RECONCILES_CASH } from '../cash/cash-page';
 import { OPENS_ONLINE_STORE } from '../online-store/online-store-page';
 import { READS_CUSTOMERS } from '../customers/customers-page';
 import { MANAGES_DISCOUNTS } from '../discounts/discounts-page';
+import { MARKETS } from '../marketing/broadcasts-page';
 import { MAKES_PAYMENT_LINKS } from '../payment-links/payment-links-page';
 import { READS_RETURNS } from '../returns/parcel';
 import { OPENS_SETTINGS } from '../settings/settings-page';
@@ -50,6 +52,7 @@ interface NavItem {
     | '/$shopId/shipping'
     | '/$shopId/returns'
     | '/$shopId/discounts'
+    | '/$shopId/marketing'
     | '/$shopId/payment-links'
     | '/$shopId/online-store'
     | '/$shopId/analytics'
@@ -99,6 +102,7 @@ export const NAV: readonly NavItem[] = [
     roles: READS_CUSTOMERS,
   },
   { to: '/$shopId/discounts', label: 'nav.discounts', icon: Tag, roles: MANAGES_DISCOUNTS },
+  { to: '/$shopId/marketing', label: 'nav.marketing', icon: Megaphone, roles: MARKETS },
   {
     to: '/$shopId/payment-links',
     label: 'nav.paymentLinks',

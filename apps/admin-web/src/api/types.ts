@@ -3233,3 +3233,98 @@ export interface WhatsAppAccountConnectData {
 export interface WhatsAppAccountDisconnectData {
   whatsAppAccountDisconnect: { disconnectedPhoneNumber: string | null; userErrors: UserError[] };
 }
+
+export type WhatsAppTemplateStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAUSED' | 'DISABLED';
+
+/** One of the shop's own marketing templates on its WhatsApp number (ADR-420). */
+export interface WhatsAppTemplate {
+  id: string;
+  name: string;
+  language: MessageLanguage;
+  header: string | null;
+  body: string;
+  footer: string | null;
+  buttonText: string | null;
+  buttonUrl: string | null;
+  status: WhatsAppTemplateStatus;
+  rejectedReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WhatsAppTemplateInput {
+  name: string;
+  language: MessageLanguage;
+  body: string;
+  header?: string | null;
+  footer?: string | null;
+  buttonText?: string | null;
+  buttonUrl?: string | null;
+}
+
+export interface WhatsAppTemplatesData {
+  whatsAppTemplates: WhatsAppTemplate[];
+}
+
+export interface WhatsAppTemplateCreateData {
+  whatsAppTemplateCreate: { whatsAppTemplate: WhatsAppTemplate | null; userErrors: UserError[] };
+}
+
+export interface WhatsAppTemplateDeleteData {
+  whatsAppTemplateDelete: { deletedWhatsAppTemplateId: string | null; userErrors: UserError[] };
+}
+
+export interface WhatsAppTemplatesSyncData {
+  whatsAppTemplatesSync: { whatsAppTemplates: WhatsAppTemplate[]; userErrors: UserError[] };
+}
+
+export type BroadcastStatus = 'SCHEDULED' | 'SENDING' | 'SENT' | 'CANCELLED' | 'FAILED';
+
+/** A WhatsApp broadcast (ADR-421): one approved template to a segment's subscribed customers. */
+export interface Broadcast {
+  id: string;
+  name: string;
+  templateId: string;
+  templateName: string;
+  templateLanguage: MessageLanguage;
+  templateBody: string;
+  segmentId: string | null;
+  segmentName: string | null;
+  sendAt: string;
+  status: BroadcastStatus;
+  error: string | null;
+  recipients: number;
+  counts: {
+    pending: number;
+    sent: number;
+    delivered: number;
+    read: number;
+    failed: number;
+    skipped: number;
+  };
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+}
+
+export interface BroadcastsData {
+  broadcasts: {
+    nodes: Broadcast[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+}
+
+export interface BroadcastEstimateData {
+  broadcastEstimate: { recipients: number; pricePerMessage: MoneyValue; cost: MoneyValue };
+}
+
+export interface BroadcastInput {
+  name: string;
+  templateId: string;
+  segmentId: string | null;
+  sendAt: string | null;
+}
+
+export interface BroadcastPayloadData {
+  [mutation: string]: { broadcast: Broadcast | null; userErrors: UserError[] };
+}

@@ -7494,3 +7494,165 @@ export const WhatsAppAccountDisconnectMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const WHATSAPP_TEMPLATE = /* GraphQL */ `
+  fragment WhatsAppTemplateFields on WhatsAppTemplate {
+    id
+    name
+    language
+    header
+    body
+    footer
+    buttonText
+    buttonUrl
+    status
+    rejectedReason
+    createdAt
+    updatedAt
+  }
+`;
+
+/** The marketing templates of the number the shop has connected (ADR-420), the latest first. */
+export const WhatsAppTemplatesQuery = /* GraphQL */ `
+  query WhatsAppTemplates {
+    whatsAppTemplates {
+      ...WhatsAppTemplateFields
+    }
+  }
+  ${WHATSAPP_TEMPLATE}
+`;
+
+/** A template written, sent to Meta to approve. */
+export const WhatsAppTemplateCreateMutation = /* GraphQL */ `
+  mutation WhatsAppTemplateCreate($input: WhatsAppTemplateInput!) {
+    whatsAppTemplateCreate(input: $input) {
+      whatsAppTemplate {
+        ...WhatsAppTemplateFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${WHATSAPP_TEMPLATE}
+  ${USER_ERRORS}
+`;
+
+export const WhatsAppTemplateDeleteMutation = /* GraphQL */ `
+  mutation WhatsAppTemplateDelete($id: ID!) {
+    whatsAppTemplateDelete(id: $id) {
+      deletedWhatsAppTemplateId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Meta asked again what it made of each template. */
+export const WhatsAppTemplatesSyncMutation = /* GraphQL */ `
+  mutation WhatsAppTemplatesSync {
+    whatsAppTemplatesSync {
+      whatsAppTemplates {
+        ...WhatsAppTemplateFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${WHATSAPP_TEMPLATE}
+  ${USER_ERRORS}
+`;
+
+const BROADCAST = /* GraphQL */ `
+  fragment BroadcastFields on Broadcast {
+    id
+    name
+    templateId
+    templateName
+    templateLanguage
+    templateBody
+    segmentId
+    segmentName
+    sendAt
+    status
+    error
+    recipients
+    counts {
+      pending
+      sent
+      delivered
+      read
+      failed
+      skipped
+    }
+    startedAt
+    finishedAt
+    createdAt
+  }
+`;
+
+/** The shop's broadcasts (ADR-421), the latest first, a page at a time. */
+export const BroadcastsQuery = /* GraphQL */ `
+  query Broadcasts($first: Int, $after: String) {
+    broadcasts(first: $first, after: $after) {
+      nodes {
+        ...BroadcastFields
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+  ${BROADCAST}
+`;
+
+/** Who a broadcast to a segment, or to everyone, would reach now, and what it would cost. */
+export const BroadcastEstimateQuery = /* GraphQL */ `
+  query BroadcastEstimate($segmentId: ID) {
+    broadcastEstimate(segmentId: $segmentId) {
+      recipients
+      pricePerMessage {
+        amount
+        currencyCode
+      }
+      cost {
+        amount
+        currencyCode
+      }
+    }
+  }
+`;
+
+export const BroadcastCreateMutation = /* GraphQL */ `
+  mutation BroadcastCreate($input: BroadcastInput!) {
+    broadcastCreate(input: $input) {
+      broadcast {
+        ...BroadcastFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${BROADCAST}
+  ${USER_ERRORS}
+`;
+
+export const BroadcastCancelMutation = /* GraphQL */ `
+  mutation BroadcastCancel($id: ID!) {
+    broadcastCancel(id: $id) {
+      broadcast {
+        ...BroadcastFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${BROADCAST}
+  ${USER_ERRORS}
+`;
