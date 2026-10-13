@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: marketing's next pieces: WhatsApp
-broadcasts (MKT-01), then automations (MKT-04). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: WhatsApp broadcasts' next parts:
+the shop's own marketing templates (MKT-01 b), broadcasts to opted-in segments (c) and their
+pages in the admin (d); then automations (MKT-04). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +16,14 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### A shop's own WhatsApp number, through Embedded Signup
+
+* **Shops connect their own number** ([ADR-419](../architecture/13-decision-log.md#adr-419--a-shop-connects-its-own-whatsapp-number-through-metas-embedded-signup-hatti-exchanging-the-code-subscribing-to-the-account-and-registering-the-number-its-token-sealed-for-the-shop), MKT-01), which broadcasts need. Hatti's shared
+  number sends utility templates only.
+* **The core exchanges Embedded Signup's code**, checks the number, subscribes Hatti's app to
+  the account and registers the number. The token stays sealed for the shop.
+* 2778 tests, from 2771: five for messaging, two for the core.
 
 ### 4e7d4fc · Test databases copied from a migrated template
 

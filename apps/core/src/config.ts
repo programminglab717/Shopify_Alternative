@@ -273,6 +273,20 @@ const apiSchema = z
     WHATSAPP_APP_SECRET: env.secret(16).optional(),
     WHATSAPP_VERIFY_TOKEN: env.secret(16).optional(),
     /**
+     * Embedded Signup (ADR-419), through which shops connect WhatsApp numbers of their own:
+     * Hatti's Meta app's ID, whose secret is WHATSAPP_APP_SECRET, and the ID of the Facebook
+     * Login for Business configuration it starts with. Both or neither; without them, shops
+     * cannot connect numbers of their own.
+     */
+    WHATSAPP_APP_ID: z
+      .string()
+      .regex(/^[0-9]{5,30}$/, 'Expected digits')
+      .optional(),
+    WHATSAPP_SIGNUP_CONFIG_ID: z
+      .string()
+      .regex(/^[0-9]{5,30}$/, 'Expected digits')
+      .optional(),
+    /**
      * Hatti's own Safepay account, which shops pay their plans through (ADR-154): its API key,
      * secret key and webhook secret, all three or none, and its environment. Without them, the
      * test gateway outside production, and invoices are not paid online in production. Its
@@ -300,6 +314,16 @@ const apiSchema = z
     {
       path: ['WHATSAPP_VERIFY_TOKEN'],
       message: 'Set both WHATSAPP_APP_SECRET and WHATSAPP_VERIFY_TOKEN, or neither',
+    },
+  )
+  .refine(
+    (config) =>
+      (config.WHATSAPP_APP_ID === undefined) === (config.WHATSAPP_SIGNUP_CONFIG_ID === undefined) &&
+      (config.WHATSAPP_APP_ID === undefined || config.WHATSAPP_APP_SECRET !== undefined),
+    {
+      path: ['WHATSAPP_SIGNUP_CONFIG_ID'],
+      message:
+        'Set both WHATSAPP_APP_ID and WHATSAPP_SIGNUP_CONFIG_ID, with WHATSAPP_APP_SECRET, or neither',
     },
   )
   .refine(

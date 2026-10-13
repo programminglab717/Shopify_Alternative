@@ -874,6 +874,13 @@ test number from Meta's app dashboard answers on WhatsApp) and `SMS_GATEWAY_URL`
 `WHATSAPP_APP_SECRET` and `WHATSAPP_VERIFY_TOKEN` set on the API; replying "band karo" from the
 phone then stops the shop's messages to it.
 
+A shop's own WhatsApp number (ADR-419): with `WHATSAPP_APP_ID` and `WHATSAPP_SIGNUP_CONFIG_ID` set
+on the API, beside `WHATSAPP_APP_SECRET`, `whatsAppSignup` gives what the admin starts Meta's
+Embedded Signup with, and `whatsAppAccountConnect(input: { code, businessAccountId, phoneNumberId })`
+connects what it shares: the core exchanges the code, checks the number is the account's,
+subscribes Hatti's app to the account's webhooks and registers the number. `whatsAppAccount`
+shows it; `whatsAppAccountDisconnect` lets it go.
+
 Codes at checkout (ADR-148): with the seed's token,
 `cashOnDeliverySettingsUpdate(input: { verifyFromScore: 0 })` makes checkout ask a code of every
 order paid on delivery. Place one through the storefront: the page asks for the code, which the

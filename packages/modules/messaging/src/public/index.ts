@@ -11,6 +11,8 @@ export {
   MessagingEvents,
   type MessageRepliedPayload,
   type MessagingSettingsUpdatedPayload,
+  type WhatsAppAccountConnectedPayload,
+  type WhatsAppAccountDisconnectedPayload,
 } from '../internal/events.js';
 export {
   MESSAGE_STATUSES,
@@ -85,3 +87,20 @@ export {
   type InboundMessage,
   type WhatsAppWebhook,
 } from '../internal/whatsapp-webhook.js';
+export {
+  WHATSAPP_SIGNUP,
+  WhatsAppAccountsService,
+  type WhatsAppAccountConnectInput,
+  type WhatsAppAccountRecord,
+  type WhatsAppSender,
+  type WhatsAppSignupRecord,
+} from '../internal/whatsapp-accounts.service.js';
+export {
+  WHATSAPP_QUALITIES,
+  WhatsAppBusinessClient,
+  qualityOf,
+  type GraphResult,
+  type WhatsAppNumber,
+  type WhatsAppQuality,
+  type WhatsAppSignupSettings,
+} from '../internal/whatsapp-business.js';

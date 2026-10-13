@@ -8,7 +8,7 @@ import { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import type { TestDatabase } from '@hatti/db/testing';
 import { createLogger } from '@hatti/logger';
-import type { WhatsAppWebhookSettings } from '@hatti/messaging/public';
+import type { WhatsAppSignupSettings, WhatsAppWebhookSettings } from '@hatti/messaging/public';
 import type { PaymentGateways } from '@hatti/payments/public';
 import { LocalStorage } from '@hatti/storage';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -54,6 +54,8 @@ export async function startTestApi(
   options: {
     dns?: DnsLookup;
     whatsapp?: WhatsAppWebhookSettings;
+    /** Hatti's Meta app and Embedded Signup's configuration (ADR-419); none unless given. */
+    whatsAppSignup?: WhatsAppSignupSettings;
     paymentGateways?: PaymentGateways;
     /** Hatti's own gateway account (ADR-154); the test gateway unless given, or null for none. */
     billingGateway?: HattiGateway | null;
@@ -100,6 +102,7 @@ export async function startTestApi(
     storefrontKey: TEST_STOREFRONT_KEY,
     dnsLookup: options.dns ?? new TestDns(),
     whatsapp: options.whatsapp ?? null,
+    whatsAppSignup: options.whatsAppSignup ?? null,
     couriers: couriersOf({ production: false }),
     paymentGateways: options.paymentGateways ?? paymentGatewaysOf({ production: false }),
     billingGateway:

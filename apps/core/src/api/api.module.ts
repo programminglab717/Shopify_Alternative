@@ -19,7 +19,11 @@ import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/pub
 import { InventoryCopiedVariantStock, InventoryModule } from '@hatti/inventory/public';
 import { type Couriers, LogisticsModule } from '@hatti/logistics/public';
 import { MarketingModule } from '@hatti/marketing/public';
-import { MessagingModule, type WhatsAppWebhookSettings } from '@hatti/messaging/public';
+import {
+  MessagingModule,
+  type WhatsAppSignupSettings,
+  type WhatsAppWebhookSettings,
+} from '@hatti/messaging/public';
 import { OnlineStoreModule } from '@hatti/online-store/public';
 import { OrdersModule } from '@hatti/orders/public';
 import { type PaymentGateways, PaymentsModule } from '@hatti/payments/public';
@@ -78,6 +82,11 @@ export interface ApiModuleOptions {
   storefrontDnsTarget?: string;
   /** WhatsApp's webhook (ADR-146); without it, /webhooks/whatsapp answers 404. */
   whatsapp?: WhatsAppWebhookSettings | null;
+  /**
+   * Hatti's Meta app and Embedded Signup's configuration (ADR-419); without them, shops cannot
+   * connect WhatsApp numbers of their own.
+   */
+  whatsAppSignup?: WhatsAppSignupSettings | null;
   /** Asks DNS whether shops' own domains point at the platform; the system's resolvers unless given. */
   dnsLookup?: DnsLookup;
   /** Where files are kept (ADR-079): R2 in production, a directory in development. */
@@ -213,7 +222,10 @@ export class ApiModule {
         TaxModule,
         MarketingModule,
         AppsModule,
-        MessagingModule.forRoot({ whatsapp: options.whatsapp ?? null }),
+        MessagingModule.forRoot({
+          whatsapp: options.whatsapp ?? null,
+          signup: options.whatsAppSignup ?? null,
+        }),
         PaymentsModule.forRoot({ gateways: options.paymentGateways }),
         BillingModule.forRoot({
           gateway: options.billingGateway ?? null,

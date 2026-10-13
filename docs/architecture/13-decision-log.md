@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-418 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-419 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -426,6 +426,7 @@
 | 416 | The admin's Settings → Export your store: the owner asks, confirming who they are, and downloads each export from the page, which asks again while one is being made | Accepted |
 | 417 | The store's export holds the online store's collections, pages and blogs as JSON, and its owner is emailed when it is ready | Accepted |
 | 418 | Shoppers keep a wishlist and see what they viewed lately in their own browser, and Hatti Base fetches each product's card through the section rendering API | Accepted |
+| 419 | A shop connects its own WhatsApp number through Meta's Embedded Signup, Hatti exchanging the code, subscribing to the account and registering the number, its token sealed for the shop | Accepted |
 
 ---
 
@@ -16056,3 +16057,43 @@
   * **Wishlists in the core, by a cookie's ID**: every page that shows a heart would then be
     the shopper's own and could not be cached at the edge, for something most shoppers never
     open.
+
+## ADR-419 · A shop connects its own WhatsApp number through Meta's Embedded Signup, Hatti exchanging the code, subscribing to the account and registering the number, its token sealed for the shop
+
+* **Context:**
+  * Broadcasts (MKT-01) are marketing. Meta allows marketing only from a business's own number,
+    and Hatti's shared number sends utility templates alone (07 §2.1, ADR-012). Until now
+    every message went from the shared number.
+* **Decision:**
+  * **Embedded Signup, with Hatti as the Tech Provider.** The admin starts Facebook Login for
+    Business with Hatti's app and its Embedded Signup configuration (`whatsAppSignup`), and
+    hands the core what it returns: a code, the WhatsApp Business Account the merchant shared
+    and its number (`whatsAppAccountConnect`).
+  * **The core does the rest before keeping anything:**
+    * it exchanges the code for a business token with the app's secret;
+    * it checks the number is in the shared account;
+    * it subscribes Hatti's app to the account's webhooks, so statuses and replies reach
+      `/webhooks/whatsapp`;
+    * it registers the number to send, with a six-digit PIN of Hatti's.
+
+    A step Meta refuses is the merchant's to try again, in Meta's words.
+  * **Kept in `messaging.whatsapp_accounts`, one per shop:**
+    * the account, the number, the name Meta verified and its quality rating;
+    * the token and PIN, each sealed for the shop and never shown.
+
+    A number sends for one shop at a time. Another shop connecting it is refused as `TAKEN`.
+  * **Owners, managers and apps with `write_settings`** connect it, in place of any before,
+    and disconnect it. Disconnecting forgets the token and unsubscribes Hatti's app as far as
+    Meta still allows. Both are audited and published as events.
+* **Consequences:**
+  * The worker can send from the shop's own number (`senderOf`) once the shop's own templates
+    are approved there. The order updates stay on Hatti's number until Hatti's library is
+    submitted to the shop's account.
+  * Meta's quality rating is shown as it was when the shop connected. Its webhook updates
+    come with broadcasts.
+* **Alternatives:**
+  * **The merchant pasting a system user's token**, as for the conversions API (ADR-143):
+    WhatsApp also needs the app subscribed and the number registered. Embedded Signup does all
+    of it in a few taps, from Meta's own pages.
+  * **A Business Solution Provider's hosted signup**: a markup on every message, and a second
+    party holding the shop's token.

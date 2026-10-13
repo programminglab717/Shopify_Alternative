@@ -186,6 +186,27 @@ describe('API configuration', () => {
     ).toMatchObject({ WHATSAPP_APP_SECRET: 'a'.repeat(32), WHATSAPP_VERIFY_TOKEN: 'v'.repeat(24) });
   });
 
+  it("takes Embedded Signup's app and configuration together, with the app's secret (ADR-419)", () => {
+    const webhook = { WHATSAPP_APP_SECRET: 'a'.repeat(32), WHATSAPP_VERIFY_TOKEN: 'v'.repeat(24) };
+    const message =
+      'WHATSAPP_SIGNUP_CONFIG_ID: Set both WHATSAPP_APP_ID and WHATSAPP_SIGNUP_CONFIG_ID, with ' +
+      'WHATSAPP_APP_SECRET, or neither';
+    expect(() => loadApiConfig({ ...env, ...webhook, WHATSAPP_APP_ID: '1234567890' })).toThrow(
+      message,
+    );
+    expect(() =>
+      loadApiConfig({ ...env, WHATSAPP_APP_ID: '1234567890', WHATSAPP_SIGNUP_CONFIG_ID: '98765' }),
+    ).toThrow(message);
+    expect(
+      loadApiConfig({
+        ...env,
+        ...webhook,
+        WHATSAPP_APP_ID: '1234567890',
+        WHATSAPP_SIGNUP_CONFIG_ID: '987654321',
+      }),
+    ).toMatchObject({ WHATSAPP_APP_ID: '1234567890', WHATSAPP_SIGNUP_CONFIG_ID: '987654321' });
+  });
+
   it("takes Hatti's own Safepay account whole or not at all, and the test gateway outside production (ADR-154)", () => {
     const local = loadApiConfig(env);
     expect(hattiGatewayOf(local)?.gateway.info.gateway).toBe('test');

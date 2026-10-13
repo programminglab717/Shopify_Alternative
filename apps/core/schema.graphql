@@ -7085,6 +7085,16 @@ type Mutation {
   Posts a subscription's topic to another https address, from its next on.
   """
   webhookSubscriptionUpdate(id: ID!, webhookSubscription: WebhookSubscriptionInput!): WebhookSubscriptionPayload!
+
+  """
+  Connects the shop's own WhatsApp number with what Embedded Signup gave, in place of any it had: the code is exchanged with Meta, Hatti's app hears the account's webhooks, and the number is registered to send.
+  """
+  whatsAppAccountConnect(input: WhatsAppAccountConnectInput!): WhatsAppAccountConnectPayload!
+
+  """
+  Disconnects the shop's own WhatsApp number: Hatti forgets its token and stops sending from it.
+  """
+  whatsAppAccountDisconnect: WhatsAppAccountDisconnectPayload!
 }
 
 """
@@ -10878,6 +10888,14 @@ type Query {
   The calling app's webhook subscriptions; for the owner and managers, every app's, by app and topic (DEV-03, ADR-397).
   """
   webhookSubscriptions: [WebhookSubscription!]!
+
+  """The shop's own WhatsApp number; null while it has none connected."""
+  whatsAppAccount: WhatsAppAccount
+
+  """
+  What the admin starts Meta's Embedded Signup with; null where this server has none set up.
+  """
+  whatsAppSignup: WhatsAppSignup
 }
 
 """Money given back on an order, as staff recorded it."""
@@ -12885,4 +12903,73 @@ enum WebhookSubscriptionTopic {
   PRODUCTS_CREATE
   PRODUCTS_DELETE
   PRODUCTS_UPDATE
+}
+
+"""
+The shop's own WhatsApp number (MKT-01, ADR-419), connected through Meta's Embedded Signup: broadcasts and the shop's own templates go from it.
+"""
+type WhatsAppAccount {
+  """The ID of the WhatsApp Business Account the number is in."""
+  businessAccountId: String!
+  connectedAt: DateTime!
+
+  """The number as Meta shows it: "+92 300 1234567"."""
+  displayPhoneNumber: String!
+
+  """The number's ID in WhatsApp's Cloud API."""
+  phoneNumberId: String!
+  qualityRating: WhatsAppQualityRating!
+
+  """The business name Meta approved for the number, which customers see."""
+  verifiedName: String!
+}
+
+input WhatsAppAccountConnectInput {
+  """The WhatsApp Business Account Embedded Signup shared."""
+  businessAccountId: String!
+
+  """The code Embedded Signup gave, which the core exchanges with Meta."""
+  code: String!
+
+  """The number Embedded Signup shared, in that account."""
+  phoneNumberId: String!
+}
+
+type WhatsAppAccountConnectPayload {
+  userErrors: [UserError!]!
+  whatsAppAccount: WhatsAppAccount
+}
+
+type WhatsAppAccountDisconnectPayload {
+  """
+  The number disconnected, as Meta showed it; null if none was connected.
+  """
+  disconnectedPhoneNumber: String
+  userErrors: [UserError!]!
+}
+
+"""
+How Meta rates the messages a number sends, from its customers' blocks and reports: RED ones lower what it may send in a day.
+"""
+enum WhatsAppQualityRating {
+  GREEN
+  RED
+
+  """Meta has not rated it yet, as for a number new to sending."""
+  UNKNOWN
+  YELLOW
+}
+
+"""
+What the admin starts Meta's Embedded Signup with, through Facebook's JavaScript SDK.
+"""
+type WhatsAppSignup {
+  """Hatti's Meta app."""
+  appId: String!
+
+  """The Facebook Login for Business configuration of Embedded Signup."""
+  configurationId: String!
+
+  """The Graph API version the SDK is started with: "v26.0"."""
+  graphVersion: String!
 }

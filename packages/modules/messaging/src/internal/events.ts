@@ -4,6 +4,8 @@
 export const MessagingEvents = {
   MessagingSettingsUpdated: 'messaging_settings.updated',
   MessageReplied: 'message.replied',
+  WhatsAppAccountConnected: 'whatsapp_account.connected',
+  WhatsAppAccountDisconnected: 'whatsapp_account.disconnected',
 } as const;
 
 /**
@@ -26,6 +28,23 @@ export interface MessageRepliedPayload {
 export interface MessagingSettingsUpdatedPayload {
   /** What changed: "routing", "language" or "disabled". */
   changed: string[];
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/**
+ * The shop connected its own WhatsApp number (ADR-419), in place of any it had. The aggregate is
+ * the shop.
+ */
+export interface WhatsAppAccountConnectedPayload {
+  phoneNumberId: string;
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/** The shop disconnected its own WhatsApp number (ADR-419). The aggregate is the shop. */
+export interface WhatsAppAccountDisconnectedPayload {
+  phoneNumberId: string;
   actorKind: 'app' | 'staff';
   actorId: string;
 }

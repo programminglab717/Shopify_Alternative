@@ -68,6 +68,16 @@ const app = await createApi({
     config.WHATSAPP_APP_SECRET && config.WHATSAPP_VERIFY_TOKEN
       ? { appSecret: config.WHATSAPP_APP_SECRET, verifyToken: config.WHATSAPP_VERIFY_TOKEN }
       : null,
+  whatsAppSignup:
+    config.WHATSAPP_APP_ID && config.WHATSAPP_SIGNUP_CONFIG_ID && config.WHATSAPP_APP_SECRET
+      ? {
+          appId: config.WHATSAPP_APP_ID,
+          appSecret: config.WHATSAPP_APP_SECRET,
+          configurationId: config.WHATSAPP_SIGNUP_CONFIG_ID,
+          baseUrl: config.META_GRAPH_URL,
+          version: config.META_GRAPH_VERSION,
+        }
+      : null,
   storefrontKey: config.STOREFRONT_SERVICE_KEY,
   couriers: couriersOf({ production: config.NODE_ENV === 'production' }),
   paymentGateways: paymentGatewaysOf({ production: config.NODE_ENV === 'production' }),

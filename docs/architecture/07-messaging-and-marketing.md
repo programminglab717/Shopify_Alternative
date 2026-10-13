@@ -82,6 +82,11 @@ a few excluded countries; Pakistan is not excluded). The shop owner keeps chatti
 as today, while Hatti sends automated confirmations and updates from the same, familiar number.
 Onboarding offers this by default.
 
+*Built so far* ([ADR-419](./13-decision-log.md#adr-419--a-shop-connects-its-own-whatsapp-number-through-metas-embedded-signup-hatti-exchanging-the-code-subscribing-to-the-account-and-registering-the-number-its-token-sealed-for-the-shop)): a shop connects its own
+number through Embedded Signup from Hatti's app. The core exchanges the code, checks the number
+is the shared account's, subscribes Hatti's app to the account's webhooks and registers the
+number, keeping the token sealed for the shop. Order updates still go from Hatti's number.
+
 ### 2.2 Template library
 
 Hatti ships a pre-written, policy-compliant **template library** in English, Urdu and Roman Urdu. It
