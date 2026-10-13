@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Pre-orders
+### 12ec4a7 · Pre-orders
 
 * **A product on pre-order** ([ADR-403](../architecture/13-decision-log.md#adr-403--a-product-the-shop-puts-on-pre-order-sells-whatever-its-stock-as-if-its-variants-kept-selling-at-zero-and-promises-a-day-it-ships-by-which-the-lines-of-orders-placed-meanwhile-keep-inventory-keeps-it-by-product), CAT-14) sells whatever its stock until the day it ships
   by, from today to a year ahead. `productPreorderSet` puts it on, moves its day or takes it
