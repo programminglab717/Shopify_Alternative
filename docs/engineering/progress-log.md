@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Automations: welcome and win-back
+### fa71f60 · Automations: welcome and win-back
 
 * **Two recipes** ([ADR-425](../architecture/13-decision-log.md#adr-425--automations-send-the-shops-own-approved-template-from-its-own-number-a-welcome-once-a-customer-subscribes-and-a-win-back-some-days-after-their-last-order), MKT-04) send one of the shop's approved templates from its own
   number, as broadcasts do.
