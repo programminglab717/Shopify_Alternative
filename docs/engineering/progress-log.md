@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### WhatsApp broadcasts, sent
+### a692708 · WhatsApp broadcasts, sent
 
 * **The worker queues each broadcast that is due** ([ADR-422](../architecture/13-decision-log.md#adr-422--the-worker-queues-a-broadcast-a-batch-at-a-time-and-sends-it-from-the-shops-own-number-both-in-the-hours-marketing-may-go-and-never-by-sms), MKT-01) 500 customers at a time,
   only from 10 am to 9 pm in the shop's own time. A broadcast whose template or segment has
