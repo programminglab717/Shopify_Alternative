@@ -16,6 +16,17 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
+### 7bb5683 · Test databases copied from a migrated template
+
+* CI timed out the hooks of two of the customers module's tests making their databases (run
+  38458021000). Each test file ran every migration in a database of its own, under the setup's
+  lock, one file at a time: with 195 migrations, a busy runner kept a file waiting past its
+  hook's minute.
+* `createTestDatabase()` now copies a template database, which the first test to need it
+  migrates once, named by a digest of the migrations' names and checksums. A migration added or
+  changed makes a new template and drops the old. The customers module's tests take 11 seconds
+  here. Tests of a migration's data still make theirs `before` it, from nothing.
+
 ### c43bd88 · Wishlists and recently viewed in Hatti Base
 
 * **A heart on each card and product page** ([ADR-418](../architecture/13-decision-log.md#adr-418--shoppers-keep-a-wishlist-and-see-what-they-viewed-lately-in-their-own-browser-and-hatti-base-fetches-each-products-card-through-the-section-rendering-api), OS-12) saves the product to a wishlist
