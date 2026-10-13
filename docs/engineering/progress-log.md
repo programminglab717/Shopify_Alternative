@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the store export in the admin and
-its email when ready, with the online store's pages and blogs in it (ADM-10); then wishlists on
-the storefront (OS-12). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: an email to the owner when the
+store's export is ready, and the online store's pages, blogs and collections in it (ADM-10); then
+wishlists on the storefront (OS-12). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,13 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Export your store, in the admin's settings
+
+* **Settings → Export your store** ([ADR-416](../architecture/13-decision-log.md#adr-416--the-admins-settings--export-your-store-the-owner-asks-confirming-who-they-are-and-downloads-each-export-from-the-page-which-asks-again-while-one-is-being-made), ADM-10): the owner asks for the whole store, once
+  they confirm who they are, and downloads it when ready; the page asks after it while it is
+  made. A manager is told it is the owner's.
+* 2770 tests (5 new): the admin's.
 
 ### 94cf8a5 · The whole store exported
 

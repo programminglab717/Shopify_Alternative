@@ -74,6 +74,7 @@ import { ProductPage, validateProductSearch } from './products/product-page';
 import { ProductsPage, validateProductsSearch } from './products/products-page';
 import { ActivityPage } from './settings/activity-page';
 import { SupportAccessPage } from './settings/support-page';
+import { StoreExportPage } from './settings/export-page';
 import { AppsPage } from './settings/apps-page';
 import { TaxPage } from './settings/tax-page';
 import { MessagesPage } from './settings/messages-page';
@@ -646,6 +647,12 @@ const settingsSupport = createRoute({
   component: SupportAccessPage,
 });
 
+const settingsExport = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/export',
+  component: StoreExportPage,
+});
+
 const settingsApps = createRoute({
   getParentRoute: () => shop,
   path: 'settings/apps',
@@ -846,6 +853,7 @@ export const routeTree = root.addChildren([
     settingsBilling,
     settingsActivity,
     settingsSupport,
+    settingsExport,
     settingsApps,
     settingsTax,
     settingsMessages,

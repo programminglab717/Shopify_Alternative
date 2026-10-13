@@ -7399,3 +7399,41 @@ export const ProductsSizeChartSetMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const STORE_EXPORT = /* GraphQL */ `
+  fragment StoreExport on StoreExport {
+    id
+    status
+    size
+    error
+    createdAt
+    finishedAt
+    expiresAt
+    url
+  }
+`;
+
+/** The whole store's exports (ADM-10, ADR-415): the owner's alone. */
+export const StoreExportsQuery = /* GraphQL */ `
+  query StoreExports {
+    storeExports {
+      ...StoreExport
+    }
+  }
+  ${STORE_EXPORT}
+`;
+
+export const StoreExportCreateMutation = /* GraphQL */ `
+  mutation StoreExportCreate {
+    storeExportCreate {
+      storeExport {
+        ...StoreExport
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${STORE_EXPORT}
+  ${USER_ERRORS}
+`;

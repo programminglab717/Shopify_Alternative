@@ -3179,3 +3179,25 @@ export interface SizeChartDeleteData {
 export interface ProductsSizeChartSetData {
   productsSizeChartSet: { productIds: string[]; userErrors: UserError[] };
 }
+
+/** The whole store exported (ADM-10, ADR-415). */
+export interface StoreExport {
+  id: string;
+  status: 'PENDING' | 'READY' | 'FAILED' | 'EXPIRED';
+  /** Bytes of the ZIP, once ready. */
+  size: number | null;
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+  expiresAt: string | null;
+  /** A link that downloads it for an hour, while ready. */
+  url: string | null;
+}
+
+export interface StoreExportsData {
+  storeExports: StoreExport[];
+}
+
+export interface StoreExportCreateData {
+  storeExportCreate: { storeExport: StoreExport | null; userErrors: UserError[] };
+}

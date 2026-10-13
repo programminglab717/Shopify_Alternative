@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-415 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-416 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -423,6 +423,7 @@
 | 413 | A shop sells gift wrap as one of its own variants, which the checkout's page adds to the cart when the shopper asks, and may ask for a gift message, which the order keeps for its packing slip | Accepted |
 | 414 | An order's gift message is printed on its packing slip and shown on its pages, the customer's and staff's; the admin sets the gift wrap and messages on the checkout page's settings | Accepted |
 | 415 | An owner exports the whole store: a worker makes a ZIP of each part's own export as that owner, which storage keeps for a week behind links that last an hour | Accepted |
+| 416 | The admin's Settings → Export your store: the owner asks, confirming who they are, and downloads each export from the page, which asks again while one is being made | Accepted |
 
 ---
 
@@ -15977,3 +15978,25 @@
     larger store in many parts, by hand; leaving should take one step.
   * **One JSON document of everything**: complete, but nothing takes it back; each part in the
     format its import reads goes straight into Hatti again, or into Shopify.
+
+## ADR-416 · The admin's Settings → Export your store: the owner asks, confirming who they are, and downloads each export from the page, which asks again while one is being made
+
+* **Context:**
+  * ADR-415 made the whole store's export through the Admin API alone. Owners leave, or keep a
+    backup, from the admin.
+* **Decision:**
+  * **Settings → Export your store**, among the settings owners and managers open. The owner
+    sees what the ZIP holds, that it holds customers' data to keep safe, and a button that asks
+    for one; asking confirms who they are first when they have not lately, as support access
+    does (ADR-103).
+  * **The exports asked for**, newest first: being made, ready with its size and until when it
+    downloads, with a Download link, failed and why, or no longer kept. While one is being
+    made, the page asks again every five seconds, and the button waits, so it shows ready
+    without a reload.
+  * **A manager** is told it is the owner's, and the page asks the API nothing.
+* **Consequences:**
+  * An owner who leaves the page learns it is ready only on coming back; an email when it is
+    ready comes next.
+* **Alternatives:**
+  * **Downloading the ZIP through the admin's own request**: the signed link downloads it
+    straight from storage, without the admin holding it.
