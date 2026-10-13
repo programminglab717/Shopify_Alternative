@@ -92,6 +92,7 @@ export const ID_PREFIXES = {
   conversionEvent: 'cnv',
   message: 'msg',
   whatsAppTemplate: 'wtm',
+  broadcast: 'bdc',
   accessToken: 'tok',
   webhookSubscription: 'whs',
   webhookDelivery: 'whd',

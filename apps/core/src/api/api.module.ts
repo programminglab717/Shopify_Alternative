@@ -52,6 +52,7 @@ import { OrderAssignmentResolver } from './order-assignment.resolver.js';
 import { ParcelHandOverResolver } from './parcel-hand-over.resolver.js';
 import { OrderEventResolver } from './order-event.resolver.js';
 import { InventoryFileResolver } from './inventory-file.resolver.js';
+import { BroadcastEstimateResolver } from './broadcast-estimate.resolver.js';
 import { ProductsExportResolver } from './products-export.resolver.js';
 import { ProductsImportResolver } from './products-import.resolver.js';
 import { ShopResolver } from './shop.resolver.js';
@@ -245,6 +246,7 @@ export class ApiModule {
         OrderEventResolver,
         ProductsImportResolver,
         ProductsExportResolver,
+        BroadcastEstimateResolver,
         InventoryFileResolver,
         HomeResolver,
         StorefrontSessionsResolver,

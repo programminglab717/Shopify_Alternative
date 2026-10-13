@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: WhatsApp broadcasts' next parts:
-broadcasts of an approved template to opted-in segments (MKT-01 c) and their pages in the
-admin (d); then automations (MKT-04). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: WhatsApp broadcasts' last parts:
+the worker sending them from the shop's own number in the hours marketing may go (MKT-01), and
+their pages in the admin; then automations (MKT-04). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,14 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### WhatsApp broadcasts, scheduled and estimated
+
+* **A broadcast** ([ADR-421](../architecture/13-decision-log.md#adr-421--a-broadcast-sends-one-of-the-shops-approved-templates-to-a-segments-customers-who-agreed-to-hear-on-whatsapp-or-to-all-who-did-estimated-before-it-is-scheduled), MKT-01) sends one of the shop's approved templates to a segment's
+  customers who agreed to hear on WhatsApp, or to all who did, now or within 30 days.
+* **The estimate comes first**: who it would reach, and what that costs from the shop's credit.
+  A broadcast is counted from its messages, and can be cancelled until it is sent.
+* 2788 tests, from 2784: three for messaging, one for the core.
 
 ### 480efda · A shop's own WhatsApp templates
 

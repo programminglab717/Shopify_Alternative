@@ -13,6 +13,7 @@ export {
   type MessagingSettingsUpdatedPayload,
   type WhatsAppAccountConnectedPayload,
   type WhatsAppAccountDisconnectedPayload,
+  type BroadcastChangedPayload,
   type WhatsAppTemplateChangedPayload,
   type WhatsAppTemplateStatusPayload,
 } from '../internal/events.js';
@@ -117,3 +118,13 @@ export {
   type WhatsAppTemplateRecord,
   type WhatsAppTemplateStatus,
 } from '../internal/whatsapp-templates.service.js';
+export {
+  BROADCAST_AHEAD_DAYS,
+  BROADCAST_STATUSES,
+  BroadcastsService,
+  audienceQuery,
+  type BroadcastCounts,
+  type BroadcastInput,
+  type BroadcastRecord,
+  type BroadcastStatus,
+} from '../internal/broadcasts.service.js';

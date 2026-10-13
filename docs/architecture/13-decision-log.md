@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-420 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-421 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -428,6 +428,7 @@
 | 418 | Shoppers keep a wishlist and see what they viewed lately in their own browser, and Hatti Base fetches each product's card through the section rendering API | Accepted |
 | 419 | A shop connects its own WhatsApp number through Meta's Embedded Signup, Hatti exchanging the code, subscribing to the account and registering the number, its token sealed for the shop | Accepted |
 | 420 | A shop writes its own marketing templates, sent at once to Meta for approval on its own WhatsApp account, and kept as Meta's webhook says they stand | Accepted |
+| 421 | A broadcast sends one of the shop's approved templates to a segment's customers who agreed to hear on WhatsApp, or to all who did, estimated before it is scheduled | Accepted |
 
 ---
 
@@ -16139,3 +16140,41 @@
     different words, and Meta judges each template on its own.
   * **Asking Meta on a timer alone**: the webhook says within moments, and the shop's asking
     again covers one lost.
+
+## ADR-421 · A broadcast sends one of the shop's approved templates to a segment's customers who agreed to hear on WhatsApp, or to all who did, estimated before it is scheduled
+
+* **Context:**
+  * MKT-01 asks for broadcasts to opted-in segments, with "a cost estimate before sending"
+    (07 §2.3). The shop's own number (ADR-419) and its approved templates (ADR-420) are in
+    place.
+  * Consent is kept by channel on each customer (CUS-04), and segments are queries evaluated on
+    demand (ADR-024).
+* **Decision:**
+  * **A broadcast is:**
+    * a name;
+    * one of the shop's templates Meta approved, on the account it has now;
+    * a segment, or none for everyone;
+    * a time to go, now or up to 30 days ahead.
+
+    It keeps the template's name, language and words, and the segment's name, as they were
+    chosen.
+  * **Who it reaches:** the segment's customers who agreed to hear from the shop on WhatsApp,
+    the segment's query ANDed with `whatsapp_subscription_status = subscribed`, at the time it
+    goes. Those who asked the shop to stop since are skipped as any message is (MSG-09).
+  * **The estimate** (`broadcastEstimate`): those it would reach now, and what a marketing
+    message costs from the shop's credit, Hatti's fee in it (ADR-155), times them. Messages
+    not sent are not charged, so the estimate is at most what is spent.
+  * **Its counts** come from its messages, which keep the broadcast they went in: pending,
+    sent, delivered, read, failed and skipped.
+  * **Cancelled** while scheduled or being queued: its messages not yet sent are skipped.
+    Scheduling and cancelling are audited and published as events.
+* **Consequences:**
+  * The worker queues and sends what is scheduled, which comes next (ADR-422). Until then, a
+    broadcast waits.
+  * Customers who are not subscribed are never reached, even when a segment names them. The
+    shop gathers consent at checkout and through its storefront's forms (CUS-04).
+* **Alternatives:**
+  * **The segment's members fixed when it is scheduled**: customers agree and stop between
+    scheduling and sending; the query at sending is what the customers said last.
+  * **Charging the estimate up front**: credit would be held for customers who stop or cannot
+    be reached; each message is charged as it goes, as every message is.

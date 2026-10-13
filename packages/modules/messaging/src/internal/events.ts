@@ -9,6 +9,8 @@ export const MessagingEvents = {
   WhatsAppTemplateCreated: 'whatsapp_template.created',
   WhatsAppTemplateDeleted: 'whatsapp_template.deleted',
   WhatsAppTemplateStatusChanged: 'whatsapp_template.status_changed',
+  BroadcastScheduled: 'broadcast.scheduled',
+  BroadcastCancelled: 'broadcast.cancelled',
 } as const;
 
 /**
@@ -65,4 +67,12 @@ export interface WhatsAppTemplateStatusPayload {
   status: 'pending' | 'approved' | 'rejected' | 'paused' | 'disabled';
   /** Why, where Meta says. */
   reason: string | null;
+}
+
+/** The shop scheduled a broadcast, or cancelled one (ADR-421). The aggregate is the broadcast. */
+export interface BroadcastChangedPayload {
+  /** When it goes, or was to. */
+  sendAt: string;
+  actorKind: 'app' | 'staff';
+  actorId: string;
 }

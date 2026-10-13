@@ -873,6 +873,120 @@ type BlogUpdatePayload {
 }
 
 """
+A WhatsApp broadcast (MKT-01, ADR-421): one of the shop's approved templates to the customers of a segment who agreed to hear from it on WhatsApp, from its own number.
+"""
+type Broadcast {
+  counts: BroadcastCounts!
+  createdAt: DateTime!
+  error: String
+  finishedAt: DateTime
+  id: ID!
+  name: String!
+
+  """The customers queued so far."""
+  recipients: Int!
+
+  """The segment it goes to; null for every customer who agreed to hear."""
+  segmentId: ID
+
+  """The segment's name as it was chosen."""
+  segmentName: String
+
+  """
+  When it goes: in the hours marketing may go, 10 am to 9 pm in the shop.
+  """
+  sendAt: DateTime!
+  startedAt: DateTime
+  status: BroadcastStatus!
+
+  """What it says; {{1}} is each customer's first name."""
+  templateBody: String!
+
+  """The template chosen; deleted since, the broadcast fails."""
+  templateId: ID!
+  templateLanguage: MessageLanguage!
+  templateName: String!
+}
+
+type BroadcastConnection {
+  edges: [BroadcastEdge!]!
+  nodes: [Broadcast!]!
+  pageInfo: PageInfo!
+}
+
+"""How a broadcast's messages went."""
+type BroadcastCounts {
+  delivered: Int!
+  failed: Int!
+
+  """Queued and waiting: for their turn, or the shop's credit."""
+  pending: Int!
+  read: Int!
+
+  """Taken by WhatsApp, the delivered and read among them."""
+  sent: Int!
+
+  """
+  Not sent: the customer had asked the shop to stop, or it was cancelled.
+  """
+  skipped: Int!
+}
+
+type BroadcastEdge {
+  cursor: String!
+  node: Broadcast!
+}
+
+"""
+What a broadcast would reach and cost now (MKT-01, ADR-421): "This broadcast to 4,200 customers will cost about Rs 61,000", from the shop's message credit as each is sent.
+"""
+type BroadcastEstimate {
+  cost: Money!
+
+  """A marketing message's price, Hatti's fee in it."""
+  pricePerMessage: Money!
+
+  """The customers who agreed to hear from the shop on WhatsApp."""
+  recipients: Int!
+}
+
+input BroadcastInput {
+  name: String!
+
+  """The segment it goes to; none for every customer who agreed to hear."""
+  segmentId: ID
+
+  """When it goes, up to 30 days ahead; now if not given."""
+  sendAt: DateTime
+
+  """One of the shop's approved templates."""
+  templateId: ID!
+}
+
+type BroadcastPayload {
+  broadcast: Broadcast
+  userErrors: [UserError!]!
+}
+
+"""Where a broadcast is (ADR-421)."""
+enum BroadcastStatus {
+  """Stopped by the shop; its messages not sent were not."""
+  CANCELLED
+
+  """Not sent: error says why."""
+  FAILED
+
+  """Waiting for its time, or for the hours marketing may go."""
+  SCHEDULED
+
+  """Its messages are being queued."""
+  SENDING
+
+  """Every message is queued: counts says how they went."""
+  SENT
+}
+
+"""
 The hours in which the Confirmation Desk calls customers, in the shop's time zone, as clocks: "10:00" to "21:00".
 """
 type CallingHours {
@@ -5984,6 +6098,16 @@ type Mutation {
   blogUpdate(blog: BlogUpdateInput!, id: ID!): BlogUpdatePayload!
 
   """
+  Cancels a broadcast not yet sent: one being queued stops, and its messages not yet sent are not.
+  """
+  broadcastCancel(id: ID!): BroadcastPayload!
+
+  """
+  Schedules a broadcast of one of the shop's approved templates, to a segment's customers who agreed to hear from it on WhatsApp, or to all who did: now, or up to 30 days ahead.
+  """
+  broadcastCreate(input: BroadcastInput!): BroadcastPayload!
+
+  """
   Changes the shop's rules for cash on delivery, for checkouts from now on. Those not given stay as they are.
   """
   cashOnDeliverySettingsUpdate(input: CashOnDeliverySettingsInput!): CashOnDeliverySettingsUpdatePayload!
@@ -10021,6 +10145,15 @@ type Query {
     """1 to 250; default 50."""
     first: Int
   ): BlogConnection!
+  broadcast(id: ID!): Broadcast
+
+  """
+  What a broadcast to the segment's customers who agreed to hear on WhatsApp, or to all who did, would reach and cost now.
+  """
+  broadcastEstimate(segmentId: ID): BroadcastEstimate!
+
+  """The shop's WhatsApp broadcasts, the latest first, with how each went."""
+  broadcasts(after: String, first: Int): BroadcastConnection!
 
   """The shop's rules for cash on delivery at checkout."""
   cashOnDeliverySettings: CashOnDeliverySettings!

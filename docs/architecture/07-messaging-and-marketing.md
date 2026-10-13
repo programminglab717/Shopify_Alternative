@@ -150,7 +150,8 @@ full or its advance with what is left for the rider ([ADR-171](./13-decision-log
   informational updates like "shipped"). With per-message pricing, SMS can be cheaper for one-way
   updates, while WhatsApp wins where buttons and replies matter.
 * **Pre-send estimates:** "This broadcast to 4,200 opted-in customers will cost about Rs X" before
-  sending.
+  sending. *Built* ([ADR-421](./13-decision-log.md#adr-421--a-broadcast-sends-one-of-the-shops-approved-templates-to-a-segments-customers-who-agreed-to-hear-on-whatsapp-or-to-all-who-did-estimated-before-it-is-scheduled)): `broadcastEstimate`, those a
+  broadcast would reach now times a marketing message's price from the shop's credit.
 * **Channel risk:** WhatsApp has been restricted in parts of Pakistan at times. The router tracks
   delivery rates per network and region and switches to SMS automatically.
 
