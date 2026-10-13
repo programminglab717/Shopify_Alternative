@@ -3,13 +3,19 @@ import {
   CatalogEvents,
   CollectionService,
   ProductService,
+  BundleEvents,
   ReviewEvents,
   SizeChartEvents,
+  bundleProductIdsIn,
+  bundleSellable,
+  bundlesContainingIn,
+  bundlesOfProductsIn,
   VariantService,
   imagePathOf,
   shownReviewsIn,
   shownSizeChartsIn,
   videoPathOf,
+  type BundleRecord,
   type CollectionRecord,
   type ProductReviewChangedPayload,
   type ProductUpdatedPayload,
@@ -120,6 +126,10 @@ export const Items = {
   smartCollections: 'smart-collections',
   /** The collections a product is in now. */
   collectionsWith: (productId: string) => `collections-with:${productId}`,
+  /** The bundles a product's variants are parts of, which sell from their stock (ADR-410). */
+  bundlesWith: (productId: string) => `bundles-with:${productId}`,
+  /** The shop's bundles: one may have lost a part. */
+  everyBundle: 'every-bundle',
   /**
    * The shop's settings, preferences and delivery charges, its Meta pixel, and its main theme,
    * the theme written first.
@@ -192,8 +202,15 @@ export function itemsFor(event: DomainEvent): string[] {
       ];
     }
     case CatalogEvents.ProductDeleted:
-      // Its memberships went with it, so which listings named it is not known: all are rebuilt.
-      return [Items.product(id), Items.everyCollection, Items.allProducts, Items.menus];
+      // Its memberships went with it, so which listings named it is not known: all are rebuilt,
+      // and the bundles, one of which may have lost a part (ADR-409).
+      return [
+        Items.product(id),
+        Items.everyCollection,
+        Items.allProducts,
+        Items.menus,
+        Items.everyBundle,
+      ];
     case CatalogEvents.CollectionCreated:
     case CatalogEvents.CollectionUpdated:
     case CatalogEvents.CollectionDeleted:
@@ -202,8 +219,13 @@ export function itemsFor(event: DomainEvent): string[] {
     // Its stock, or its being on pre-order, where it sells whatever its stock (ADR-403).
     case InventoryEvents.InventoryItemUpdated:
     case InventoryEvents.InventoryLevelUpdated:
-    case InventoryEvents.ProductPreorderUpdated:
-      return [Items.product((event.payload as { productId: string }).productId)];
+    case InventoryEvents.ProductPreorderUpdated: {
+      // And the bundles it is a part of, which sell as its stock allows (ADR-410).
+      const { productId } = event.payload as { productId: string };
+      return [Items.product(productId), Items.bundlesWith(productId)];
+    }
+    case BundleEvents.Updated:
+      return [Items.product(id)];
     case ReviewEvents.Written:
     case ReviewEvents.Published:
     case ReviewEvents.Hidden:
@@ -345,6 +367,7 @@ export const PUBLISHED_EVENTS = [
   ReviewEvents.Written,
   ReviewEvents.Published,
   ReviewEvents.Hidden,
+  BundleEvents.Updated,
   SizeChartEvents.Updated,
   SizeChartEvents.Deleted,
   SizeChartEvents.ProductsUpdated,
@@ -398,6 +421,7 @@ const BY_ID = new Set([
   'blog',
   'article',
   'collections-with',
+  'bundles-with',
   'articles-in',
 ]);
 
@@ -420,6 +444,16 @@ export interface PublisherServices {
       shopId: string,
       productIds: readonly string[],
     ): Promise<Map<string, ShownReviews>>;
+  };
+  /** Bundles, whose stock is their parts' (ADR-410). */
+  bundles: {
+    bundlesOfProductsIn(
+      tx: Tx,
+      shopId: string,
+      productIds: readonly string[],
+    ): Promise<Map<string, BundleRecord>>;
+    bundlesContainingIn(tx: Tx, shopId: string, productIds: readonly string[]): Promise<string[]>;
+    bundleProductIdsIn(tx: Tx, shopId: string): Promise<string[]>;
   };
   /** The size charts products' pages show (ADR-407). */
   sizeCharts: {
@@ -543,6 +577,7 @@ export class StorefrontPublisher {
     const articles = new Set<string>();
     const containing: string[] = [];
     const articlesIn: string[] = [];
+    const bundlesWith: string[] = [];
     const wanted = new Set<string>();
     for (const item of batch.items) {
       const [kind, id = ''] = splitItem(item);
@@ -555,6 +590,7 @@ export class StorefrontPublisher {
       else if (kind === 'blog') blogs.add(id);
       else if (kind === 'article') articles.add(id);
       else if (kind === 'articles-in') articlesIn.push(id);
+      else if (kind === 'bundles-with') bundlesWith.push(id);
       else containing.push(id);
     }
 
@@ -562,6 +598,16 @@ export class StorefrontPublisher {
     const changed = new Set<string>();
     await this.db.tenant(shopId, async (tx) => {
       const more = await this.#expand(tx, shopId, wanted, containing, articlesIn);
+      // The bundles whose parts' stock changed, or which may have lost a part (ADR-410).
+      if (bundlesWith.length > 0) {
+        const ids = await this.services.bundles.bundlesContainingIn(tx, shopId, bundlesWith);
+        more.push(...ids.map(Items.product));
+      }
+      if (wanted.has(Items.everyBundle)) {
+        more.push(
+          ...(await this.services.bundles.bundleProductIdsIn(tx, shopId)).map(Items.product),
+        );
+      }
       await batch.add(more);
       if (products.size > 0) await this.#products(tx, batch, [...products], changed);
       if (collections.size > 0) await this.#collections(tx, batch, [...collections], changed);
@@ -834,11 +880,33 @@ export class StorefrontPublisher {
   ): Promise<void> {
     const records = await this.services.products.recordsOf(tx, shopId, ids);
     const active = records.filter((record) => record.status === 'active');
-    const available = await this.services.inventory.availableOf(
+    const available = new Map(
+      await this.services.inventory.availableOf(
+        tx,
+        shopId,
+        active.flatMap((record) => record.variants.map((variant) => variant.id)),
+      ),
+    );
+    // A bundle is for sale while its parts' stock makes one (ADR-410).
+    const bundles = await this.services.bundles.bundlesOfProductsIn(
       tx,
       shopId,
-      active.flatMap((record) => record.variants.map((variant) => variant.id)),
+      active.map((record) => record.id),
     );
+    if (bundles.size > 0) {
+      const sellable = new Map(
+        await this.services.inventory.sellableOf(
+          tx,
+          shopId,
+          [...bundles.values()].flatMap((bundle) =>
+            bundle.components.map((part) => part.variantId),
+          ),
+        ),
+      );
+      for (const bundle of bundles.values()) {
+        available.set(bundle.variantId, bundleSellable(bundle, sellable) !== 0);
+      }
+    }
     const stored = await this.#stored(shopId, 'product', ids);
     const images = this.options.images ?? LOCAL_IMAGES;
     // Its own, and its options' and their values' (ADR-241).
@@ -1119,6 +1187,7 @@ export function createStorefrontPublisher(
       reviews: { shownReviewsOf: shownReviewsIn },
       preorders: { preordersOf: preordersIn },
       sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
+      bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
       comments: new CommentService(database),
       preferences: { preferencesOf: shopPreferencesOf },
       delivery: new DeliveryService(database),

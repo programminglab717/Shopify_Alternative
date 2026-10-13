@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
 import type { TenantContext } from '@hatti/api';
+import { BundleService } from '@hatti/catalog/public';
 import { sha256 } from '@hatti/crypto';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
@@ -153,6 +154,38 @@ describe.skipIf(!server)('CartService', () => {
       ok: false,
       error: { code: 'MAX_QUANTITY', variantId: tracked, title: 'Lawn 3-piece', max: 1 },
     });
+  });
+
+  it("holds a bundle to the sets its parts' stock makes (ADR-410)", async () => {
+    const [suit] = await f.variantsOf(f.a, 'Eid 3-piece suit', { price: '6,000' });
+    const [shirt] = await f.variantsOf(f.a, 'Lawn shirt');
+    const [trouser] = await f.variantsOf(f.a, 'Cotton trouser');
+    const [dupatta] = await f.variantsOf(f.a, 'Chiffon dupatta');
+    await f.stock(f.a, shirt!, 3);
+    await f.stock(f.a, trouser!, 5);
+    const snapshots = await f.db.tenant(f.a.shopId, (tx) =>
+      f.variants.snapshotsOf(tx, f.a.shopId, [suit!]),
+    );
+    // Its parts make two sets; the dupatta's stock is not tracked.
+    unwrap(
+      await new BundleService(f.db).set(f.a, snapshots.get(suit!)!.productId, [
+        { variantId: shirt!, quantity: 1 },
+        { variantId: trouser!, quantity: 2 },
+        { variantId: dupatta!, quantity: 1 },
+      ]),
+    );
+    const { token } = done(
+      await act(f.a, null, 'add', { items: [{ variantId: suit, quantity: 2 }] }),
+    );
+    expect(await act(f.a, token, 'add', { items: [{ variantId: suit, quantity: 1 }] })).toEqual({
+      ok: false,
+      error: { code: 'MAX_QUANTITY', variantId: suit, title: 'Eid 3-piece suit', max: 2 },
+    });
+    await f.stock(f.a, trouser!, 3);
+    const cart = await f.carts.cart(f.a.shopId, token!);
+    expect(cart!.items.map((item) => [item.quantity, item.maxQuantity, item.price])).toEqual([
+      [2, 1, 600_000],
+    ]);
   });
 
   it('makes a new cart for a secret naming none, but none that holds nothing', async () => {

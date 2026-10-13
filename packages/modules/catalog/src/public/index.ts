@@ -173,6 +173,8 @@ export {
   BundleEvents,
   BundleService,
   bundleProductIdsIn,
+  bundleSellable,
+  bundlesContainingIn,
   bundlesOfProductsIn,
   bundlesOfVariantsIn,
   type BundleComponent,

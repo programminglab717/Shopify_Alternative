@@ -4768,6 +4768,18 @@ type InventoryValue {
   value: Money!
 }
 
+"""A bundle an order's lines were sold as (ADR-410)."""
+type LineItemBundle {
+  """Shared by the lines of its parts."""
+  key: ID!
+
+  """How many of it were ordered."""
+  quantity: Int!
+
+  """The bundle's title when it was sold."""
+  title: String!
+}
+
 """
 The shop's link-in-bio page, at /links on its storefront, for its Instagram and TikTok bios and its chats (ADR-161): what it says of itself, its own links, and products to buy at once.
 """
@@ -8037,6 +8049,11 @@ enum OrderFulfillmentStatus {
 
 """A line of an order: what was sold, as it was then."""
 type OrderLineItem {
+  """
+  The bundle it was sold as a part of (CAT-11, ADR-410): the lines of its parts share its key. Null for a line sold alone.
+  """
+  bundle: LineItemBundle
+
   """Units still to ship; none once the order is closed or cancelled."""
   fulfillableQuantity: Int!
 

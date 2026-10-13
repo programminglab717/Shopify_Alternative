@@ -321,3 +321,39 @@ export class BundleService {
     });
   }
 }
+
+/**
+ * How many of a bundle can be sold: the fewest sets its parts' stock makes, each part's
+ * `sellable` (null for no limit) over how many a set holds; null when no part has a limit, and
+ * none when it is missing a part (ADR-410).
+ */
+export function bundleSellable(
+  bundle: Pick<BundleRecord, 'complete' | 'components'>,
+  sellable: ReadonlyMap<string, number | null>,
+): number | null {
+  if (!bundle.complete) return 0;
+  let fewest: number | null = null;
+  for (const part of bundle.components) {
+    const left = sellable.get(part.variantId) ?? null;
+    if (left === null) continue;
+    const sets = Math.floor(Math.max(left, 0) / part.quantity);
+    fewest = fewest === null ? sets : Math.min(fewest, sets);
+  }
+  return fewest;
+}
+
+/** The bundles holding a variant of the products among `productIds`, in the caller's `tx`. */
+export async function bundlesContainingIn(
+  tx: Tx,
+  shopId: string,
+  productIds: readonly string[],
+): Promise<string[]> {
+  if (productIds.length === 0) return [];
+  const { rows } = await tx.execute<{ product_id: string }>(sql`
+    SELECT DISTINCT c.product_id FROM catalog.bundle_components c
+      JOIN catalog.variants v ON v.shop_id = c.shop_id AND v.id = c.variant_id
+     WHERE c.shop_id = ${shopId}
+       AND v.product_id = ANY(${sql.param([...productIds])}::uuid[])
+     ORDER BY c.product_id`);
+  return rows.map((row) => row.product_id);
+}

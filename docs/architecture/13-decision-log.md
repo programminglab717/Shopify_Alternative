@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-409 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-410 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -417,6 +417,7 @@
 | 407 | A product's storefront page shows its size chart, opened under its buttons and read in inches or centimetres without a script, the unit the shop wrote it in first; themes read it as Hatti's `product.size_chart`, each measurement in both units | Accepted |
 | 408 | The admin keeps the shop's size charts on a page of their own beside its products, each edited as a table of sizes and measurements, given to a collection's products from its page and to a product from the product's; measurements typed with a comma or a point | Accepted |
 | 409 | A bundle is a product of one variant made of other products' variants, a number of each, up to ten parts, one level deep; a part deleted leaves it unsold until it is given its parts again, and orders will hold its parts as their lines | Accepted |
+| 410 | An order of a bundle holds its parts' lines, the bundle's price shared among them by what each costs alone, to the paisa, each keeping the bundle it was sold as; a bundle sells as many as its parts' stock makes | Accepted |
 
 ---
 
@@ -15789,3 +15790,41 @@
   * **Mix and match** ("any three for Rs 9,999"): a discount, not a product; with discounts.
   * **Refusing to delete a part:** every path that deletes variants would need to know of
     bundles; an incomplete bundle is safe, as it is not sold.
+
+## ADR-410 · An order of a bundle holds its parts' lines, the bundle's price shared among them by what each costs alone, to the paisa, each keeping the bundle it was sold as; a bundle sells as many as its parts' stock makes
+
+* **Context:**
+  * ADR-409 keeps bundles in the catalog; selling one must take its parts from stock, ship
+    them, and give them back if it is cancelled or returned, and every step after placing an
+    order already works on lines of variants.
+* **Decision:**
+  * **Placing an order** turns each line of a bundle's variant into its parts' lines, in the
+    same transaction, before the location is chosen and stock is committed: so committing,
+    cancelling, editing, splitting, packing and returning work on them unchanged.
+  * **The price is shared** among the parts by what each costs on its own times how many a set
+    holds, by their units where none has a price, each unit's share rounded down; what that
+    leaves is a paisa more on as many units, the dearest part's first, which may make a part
+    two lines. The lines add up to the bundle's price times the sets, to the paisa, so the
+    order's subtotal, discounts, tax and refunds are as the shopper was shown.
+  * **Each part's line keeps the bundle** it was sold as: a key its parts' lines share, the
+    bundle's title and how many sets were ordered (`orders.lines.bundle_*`, migration 0192),
+    read as `OrderLineItem.bundle`. An edit merges a part only into a line of the same bundle,
+    or of none.
+  * **Not sold:** a bundle missing a part, or with a part archived, is refused where it is
+    asked for, "\"Gift box\" is missing a part, so it can't be sold"; a part short of stock is
+    refused on the bundle's line, naming the part. Adding a bundle to an order being edited is
+    refused: its parts are added instead.
+  * **How many sell:** a bundle's sellable count is the fewest sets its parts' stock makes, a
+    part whose stock is not tracked not counting, none while it is incomplete. The cart holds a
+    bundle to it, and the storefront's documents say a bundle is for sale while it is above
+    none, rebuilt when a part's stock changes or a part is deleted.
+* **Consequences:**
+  * Sales and profit count the parts at their share of the price; the bundle's own sales are
+    its lines grouped by their key.
+  * An order edited may leave a set's parts in other numbers than its sets; the lines are what
+    is shipped and charged.
+* **Alternatives:**
+  * **Shared by each part's units alone:** a Rs 500 trouser would carry as much of a suit's
+    price as a Rs 4,000 shirt, and returning one would refund the wrong amount.
+  * **The remainder on the first part alone:** a multipack's single part would need a unit
+    price that does not divide; a second line of the same part keeps every price exact.

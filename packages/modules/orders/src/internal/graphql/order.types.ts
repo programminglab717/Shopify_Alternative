@@ -511,6 +511,18 @@ export class MailingAddress {
   formatted!: string[];
 }
 
+@ObjectType({ description: "A bundle an order's lines were sold as (ADR-410)." })
+export class LineItemBundle {
+  @Field(() => ID, { description: 'Shared by the lines of its parts.' })
+  key!: string;
+
+  @Field({ description: "The bundle's title when it was sold." })
+  title!: string;
+
+  @Field(() => Int, { description: 'How many of it were ordered.' })
+  quantity!: number;
+}
+
 @ObjectType({ description: 'A line of an order: what was sold, as it was then.' })
 export class OrderLineItem {
   @Field(() => ID)
@@ -567,6 +579,14 @@ export class OrderLineItem {
       'was sold (CAT-14); null otherwise.',
   })
   preorderShipsOn!: string | null;
+
+  @Field(() => LineItemBundle, {
+    nullable: true,
+    description:
+      'The bundle it was sold as a part of (CAT-11, ADR-410): the lines of its parts share its ' +
+      'key. Null for a line sold alone.',
+  })
+  bundle!: LineItemBundle | null;
 }
 
 @ObjectType({ description: "A parcel's courier and tracking number." })

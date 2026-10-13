@@ -529,6 +529,11 @@ export const lines = ordersSchema.table(
      * sold (CAT-14, ADR-403); null otherwise.
      */
     preorderShipsOn: date('preorder_ships_on'),
+    /** The bundle it was sold as a part of (CAT-11, ADR-410): its parts' lines share the key. */
+    bundleKey: uuid('bundle_key'),
+    bundleTitle: text('bundle_title'),
+    /** How many of the bundle were ordered. */
+    bundleQuantity: integer('bundle_quantity'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],

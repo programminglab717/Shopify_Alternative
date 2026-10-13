@@ -56,6 +56,16 @@ export interface OrderLineRecord {
    * sold (CAT-14, ADR-403); null otherwise.
    */
   preorderShipsOn: string | null;
+  /** The bundle it was sold as a part of (CAT-11, ADR-410); null when it was sold alone. */
+  bundle: LineBundle | null;
+}
+
+/** A bundle an order's lines were sold as: the lines of its parts share its key. */
+export interface LineBundle {
+  key: string;
+  title: string;
+  /** How many of it were ordered. */
+  quantity: number;
 }
 
 /**

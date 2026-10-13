@@ -11,7 +11,7 @@ import {
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
-import { VariantService } from '@hatti/catalog/public';
+import { VariantService, bundlesOfVariantsIn, type VariantSnapshot } from '@hatti/catalog/public';
 import {
   BlocklistService,
   CustomerService,
@@ -118,6 +118,7 @@ import {
   type PaymentMethodValue,
   type StoredAddressValue,
 } from './schema.js';
+import { shareBundlePrice } from './bundle-lines.js';
 
 export interface OrderLineInput {
   variantId: string;
@@ -150,6 +151,16 @@ export interface OrderCreateInput {
   deliveryMethod?: DeliveryMethodValue | null;
   note?: string | null;
   tags?: string[] | null;
+}
+
+/** A line as it is placed: a bundle's part keeps the bundle it was sold as (ADR-410). */
+interface PlacingLine {
+  variantId: string;
+  quantity: number;
+  price: bigint | null;
+  /** Where the order names it, for errors: a part's is its bundle's. */
+  field: string[];
+  bundle: { key: string; title: string; quantity: number } | null;
 }
 
 /** An order to place, checked: an orderCreate's, or a draft's items at the prices agreed. */
@@ -523,22 +534,25 @@ export class OrderService {
       );
     }
     const lineField = (index: number) => [...order.field, 'lineItems', String(index)];
-    const snapshots = await this.variants.snapshotsOf(
+    const asked = await this.variants.snapshotsOf(
       tx,
       shopId,
       order.lines.map((line) => line.variantId),
     );
+    // A bundle is sold as its parts (ADR-410).
+    const placing = await this.#parts(tx, shopId, order.lines, lineField, asked);
+    const snapshots = placing.snapshots;
     const location = await this.#location(
       tx,
       shopId,
       pickupAt?.ok ? pickupAt.value : order.locationId,
       [...order.field, 'locationId'],
-      order.lines,
+      placing.lines,
     );
     const errors: FieldError[] = [];
     if (!location.ok) errors.push(location.error);
     order.lines.forEach((line, index) => {
-      const snapshot = snapshots.get(line.variantId);
+      const snapshot = asked.get(line.variantId);
       if (!snapshot) {
         errors.push({
           field: [...lineField(index), 'variantId'],
@@ -553,12 +567,13 @@ export class OrderService {
         });
       }
     });
+    errors.push(...placing.errors);
     if (errors.length > 0 || !location.ok) return { ok: false, errors };
 
-    const priced = order.lines.map((line, index) => {
+    const priced = placing.lines.map((line, index) => {
       const snapshot = snapshots.get(line.variantId)!;
       const unitPrice = line.price ?? snapshot.price;
-      return { ...line, field: lineField(index), snapshot, unitPrice, position: index + 1 };
+      return { ...line, snapshot, unitPrice, position: index + 1 };
     });
     const subtotal = priced.reduce((sum, line) => sum + line.unitPrice * BigInt(line.quantity), 0n);
     if (discount > subtotal) {
@@ -818,6 +833,9 @@ export class OrderService {
         taxRate: tax.lines[index]!.rate,
         tax: tax.lines[index]!.tax,
         preorderShipsOn: preorders.get(line.snapshot.productId) ?? null,
+        bundleKey: line.bundle?.key ?? null,
+        bundleTitle: line.bundle?.title ?? null,
+        bundleQuantity: line.bundle?.quantity ?? null,
       })),
     );
     await addTimelineEntry(
@@ -2697,6 +2715,84 @@ export class OrderService {
       ...order.field,
       'locationId',
     ]);
+  }
+
+  /**
+   * The lines an order's become: each bundle's, its parts', its price shared among them by
+   * what each costs alone, and the bundle kept on them (ADR-410); any other as it is. A bundle
+   * missing a part, or with one archived, is not sold. The snapshots of all their variants.
+   */
+  async #parts(
+    tx: Tx,
+    shopId: string,
+    asked: readonly OrderToPlace['lines'][number][],
+    lineField: (index: number) => string[],
+    snapshots: Map<string, VariantSnapshot>,
+  ): Promise<{
+    lines: PlacingLine[];
+    snapshots: Map<string, VariantSnapshot>;
+    errors: FieldError[];
+  }> {
+    const bundles = await bundlesOfVariantsIn(
+      tx,
+      shopId,
+      asked.map((line) => line.variantId),
+    );
+    if (bundles.size === 0) {
+      return {
+        lines: asked.map((line, index) => ({ ...line, field: lineField(index), bundle: null })),
+        snapshots,
+        errors: [],
+      };
+    }
+    const parts = await this.variants.snapshotsOf(
+      tx,
+      shopId,
+      [...bundles.values()].flatMap((bundle) => bundle.components.map((part) => part.variantId)),
+    );
+    const lines: PlacingLine[] = [];
+    const errors: FieldError[] = [];
+    asked.forEach((line, index) => {
+      const field = lineField(index);
+      const bundle = bundles.get(line.variantId);
+      const own = snapshots.get(line.variantId);
+      if (!bundle || !own) {
+        lines.push({ ...line, field, bundle: null });
+        return;
+      }
+      const missing = bundle.components.find((part) => {
+        const snapshot = parts.get(part.variantId);
+        return !snapshot || snapshot.productStatus === 'archived';
+      });
+      if (!bundle.complete || missing) {
+        errors.push({
+          field: [...field, 'variantId'],
+          code: 'INVALID',
+          message: `"${own.productTitle}" is missing a part, so it can't be sold`,
+        });
+        return;
+      }
+      const sold = { key: newId(), title: own.productTitle, quantity: line.quantity };
+      const shared = shareBundlePrice(
+        line.price ?? own.price,
+        line.quantity,
+        bundle.components.map((part) => ({
+          variantId: part.variantId,
+          quantity: part.quantity,
+          price: parts.get(part.variantId)!.price,
+        })),
+      );
+      for (const part of shared) {
+        lines.push({
+          variantId: part.variantId,
+          quantity: part.quantity,
+          price: part.unitPrice,
+          field,
+          bundle: sold,
+        });
+      }
+    });
+    return { lines, snapshots: new Map([...snapshots, ...parts]), errors };
   }
 
   /**

@@ -6,7 +6,7 @@ import {
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
-import { VariantService, type VariantSnapshot } from '@hatti/catalog/public';
+import { VariantService, bundlesOfVariantsIn, type VariantSnapshot } from '@hatti/catalog/public';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
@@ -96,6 +96,10 @@ interface EditedLine {
   createdAt: Date | null;
   /** The day it ships by: a kept line's as it was sold, an added one's product's now (ADR-403). */
   preorderShipsOn: string | null;
+  /** The bundle a kept line was sold as a part of, as its row has it; none for one added. */
+  bundleKey?: string | null;
+  bundleTitle?: string | null;
+  bundleQuantity?: number | null;
   /** Where the edit names it, for errors; null for a kept line the edit leaves as it is. */
   field: string[] | null;
 }
@@ -219,6 +223,12 @@ export class OrderEditService {
         });
       }
       const onOrder = new Set(current.map((line) => line.variantId));
+      // A bundle added is its parts added, which the edit names itself (ADR-410).
+      const bundles = await bundlesOfVariantsIn(
+        tx,
+        shopId,
+        additions.map((line) => line.variantId),
+      );
       const preorders = await preordersIn(
         tx,
         shopId,
@@ -234,6 +244,12 @@ export class OrderEditService {
             field,
             code: 'INVALID',
             message: `"${snapshot.productTitle}" is archived, so it can't be sold`,
+          });
+        } else if (bundles.has(line.variantId)) {
+          errors.push({
+            field,
+            code: 'INVALID',
+            message: `"${snapshot.productTitle}" is a bundle: add its parts instead`,
           });
         } else if (onOrder.has(line.variantId)) {
           errors.push({
@@ -495,7 +511,9 @@ export class OrderEditService {
               each.variantId === line.variantId &&
               each.unitPrice === line.unitPrice &&
               each.unitCost === line.unitCost &&
-              each.taxable === line.taxable,
+              each.taxable === line.taxable &&
+              // A bundle's parts stay its own (ADR-410).
+              (each.bundleKey ?? null) === (line.bundleKey ?? null),
           );
           if (same) same.quantity += line.quantity;
           else {
@@ -1192,6 +1210,9 @@ function lineValues(
     taxRate: tax.lines[index]!.rate,
     tax: tax.lines[index]!.tax,
     preorderShipsOn: line.preorderShipsOn,
+    bundleKey: line.bundleKey ?? null,
+    bundleTitle: line.bundleTitle ?? null,
+    bundleQuantity: line.bundleQuantity ?? null,
     ...(line.createdAt && { createdAt: line.createdAt }),
   }));
 }

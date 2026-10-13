@@ -5,8 +5,12 @@ import {
   CollectionService,
   MediaService,
   ProductReviewService,
+  BundleService,
   ProductService,
   SizeChartService,
+  bundleProductIdsIn,
+  bundlesContainingIn,
+  bundlesOfProductsIn,
   VariantService,
   shownReviewsIn,
   shownSizeChartsIn,
@@ -126,11 +130,19 @@ describe('What storefront documents an event makes stale', () => {
   });
 
   it("rebuilds a product when its stock changes, and all of them when a location's selling does", () => {
-    expect(itemsFor(event('inventory_level.updated', { productId: 'p1' }))).toEqual(['product:p1']);
+    // And the bundles it is a part of, which sell from its stock (ADR-410).
+    expect(itemsFor(event('inventory_level.updated', { productId: 'p1' }))).toEqual([
+      'product:p1',
+      'bundles-with:p1',
+    ]);
     // On pre-order or off it, its variants sell whatever their stock, or as it allows (ADR-403).
     expect(itemsFor(event('product_preorder.updated', { productId: 'p1', shipsOn: null }))).toEqual(
-      ['product:p1'],
+      ['product:p1', 'bundles-with:p1'],
     );
+    expect(itemsFor(event('product_bundle.updated', { variantIds: ['v1'] }))).toEqual([
+      'product:a1',
+    ]);
+    expect(itemsFor(event('product.deleted'))).toContain('every-bundle');
     expect(itemsFor(event('location.updated', { changed: ['name'] }))).toEqual([]);
     // A size chart changed or given: the products whose pages show it (ADR-407).
     expect(itemsFor(event('size_chart.updated', { productIds: ['p1', 'p2'] }))).toEqual([
@@ -428,6 +440,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         reviews: { shownReviewsOf: shownReviewsIn },
         preorders: { preordersOf: preordersIn },
         sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
+        bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
         comments: new CommentService(database),
         preferences,
         delivery,
@@ -1076,6 +1089,64 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       count: 1,
     });
     unwrap(await products.delete(tenant, chappal.id));
+    await deliver();
+  });
+
+  it("publishes a bundle as for sale while its parts' stock makes one, as that stock changes (ADR-410)", async () => {
+    const bundles = new BundleService(database);
+    const primary = (await database.tenant(shopId, (tx) => locations.primaryOf(tx, shopId))).id;
+    const stocked = async (title: string, quantity: number) => {
+      const product = unwrap(await products.create(tenant, { title, status: 'active' }));
+      unwrap(
+        await inventory.setQuantities(tenant, {
+          name: 'on_hand',
+          reason: 'received',
+          quantities: [{ inventoryItemId: product.variants[0]!.id, locationId: primary, quantity }],
+        }),
+      );
+      return product;
+    };
+    const shirt = await stocked('Lawn shirt', 3);
+    const trouser = await stocked('Cotton trouser', 3);
+    const set = unwrap(await products.create(tenant, { title: 'Eid set', status: 'active' }));
+    unwrap(
+      await bundles.set(tenant, set.id, [
+        { variantId: shirt.variants[0]!.id, quantity: 1 },
+        { variantId: trouser.variants[0]!.id, quantity: 2 },
+      ]),
+    );
+    await deliver();
+    expect((await store().productByHandle(set.handle))?.variants[0]?.available).toBe(true);
+
+    // Two trousers a set: one left makes none.
+    unwrap(
+      await inventory.setQuantities(tenant, {
+        name: 'on_hand',
+        reason: 'correction',
+        quantities: [
+          { inventoryItemId: trouser.variants[0]!.id, locationId: primary, quantity: 1 },
+        ],
+      }),
+    );
+    await deliver();
+    expect((await store().productByHandle(set.handle))?.variants[0]?.available).toBe(false);
+
+    // A part deleted leaves it unsold.
+    unwrap(
+      await inventory.setQuantities(tenant, {
+        name: 'on_hand',
+        reason: 'received',
+        quantities: [
+          { inventoryItemId: trouser.variants[0]!.id, locationId: primary, quantity: 9 },
+        ],
+      }),
+    );
+    await deliver();
+    expect((await store().productByHandle(set.handle))?.variants[0]?.available).toBe(true);
+    unwrap(await products.delete(tenant, shirt.id));
+    await deliver();
+    expect((await store().productByHandle(set.handle))?.variants[0]?.available).toBe(false);
+    for (const each of [set, trouser]) unwrap(await products.delete(tenant, each.id));
     await deliver();
   });
 

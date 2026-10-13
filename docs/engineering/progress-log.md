@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: bundles sold: their stock from their
-parts', and orders holding the parts (CAT-11); then the storefront's and admin's bundles. Urdu
-handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: bundles on the storefront, what a
+set holds on its page and an order's parts grouped under their bundle, and the admin's bundle
+card (CAT-11); then gift options at checkout (CHK-16). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,18 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Bundles sold
+
+* **An order of a bundle** ([ADR-410](../architecture/13-decision-log.md#adr-410--an-order-of-a-bundle-holds-its-parts-lines-the-bundles-price-shared-among-them-by-what-each-costs-alone-to-the-paisa-each-keeping-the-bundle-it-was-sold-as-a-bundle-sells-as-many-as-its-parts-stock-makes), CAT-11) holds its parts' lines, the set's price shared
+  among them by what each costs alone, exact to the paisa, each line keeping the bundle it was
+  sold as, read as `OrderLineItem.bundle`. Stock, cancelling, editing and returns work on
+  those lines unchanged.
+* **Not sold:** a bundle missing a part, or a part short of stock, named on the bundle's line;
+  an edit adds a bundle's parts, not the bundle.
+* **How many sell:** the fewest sets its parts' stock makes, in the cart and on the storefront.
+* 2741 tests (7 new): the price shared, the cart's, the publisher's
+  and the Admin API's.
 
 ### b494755 · Bundles in the catalog
 

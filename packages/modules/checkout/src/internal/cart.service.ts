@@ -1,4 +1,4 @@
-import { VariantService } from '@hatti/catalog/public';
+import { VariantService, bundleSellable, bundlesOfVariantsIn } from '@hatti/catalog/public';
 import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, runPrepared, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
@@ -194,7 +194,13 @@ export class CartService {
     variantIds: readonly string[],
   ): Promise<Map<string, VariantFacts>> {
     const snapshots = await this.variants.snapshotsOf(tx, shopId, [...new Set(variantIds)]);
-    const sellable = await this.inventory.sellableOf(tx, shopId, [...snapshots.keys()]);
+    // A bundle sells as many as its parts' stock makes (ADR-410).
+    const bundles = await bundlesOfVariantsIn(tx, shopId, [...snapshots.keys()]);
+    const sellable = await this.inventory.sellableOf(tx, shopId, [
+      ...snapshots.keys(),
+      ...[...bundles.values()].flatMap((bundle) => bundle.components.map((part) => part.variantId)),
+    ]);
+    for (const [id, bundle] of bundles) sellable.set(id, bundleSellable(bundle, sellable));
     const preorders = await preordersIn(
       tx,
       shopId,
