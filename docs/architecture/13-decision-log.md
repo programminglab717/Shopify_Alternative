@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-417 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-418 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -425,6 +425,7 @@
 | 415 | An owner exports the whole store: a worker makes a ZIP of each part's own export as that owner, which storage keeps for a week behind links that last an hour | Accepted |
 | 416 | The admin's Settings → Export your store: the owner asks, confirming who they are, and downloads each export from the page, which asks again while one is being made | Accepted |
 | 417 | The store's export holds the online store's collections, pages and blogs as JSON, and its owner is emailed when it is ready | Accepted |
+| 418 | Shoppers keep a wishlist and see what they viewed lately in their own browser, and Hatti Base fetches each product's card through the section rendering API | Accepted |
 
 ---
 
@@ -16026,3 +16027,32 @@
 * **Alternatives:**
   * **The ZIP itself attached to the email**: it holds customers' data, and an inbox keeps it
     for good; the link expires within the hour and needs the owner signed in to get another.
+
+## ADR-418 · Shoppers keep a wishlist and see what they viewed lately in their own browser, and Hatti Base fetches each product's card through the section rendering API
+
+* **Context:**
+  * OS-12 asks for a wishlist and recently viewed products. Storefront pages are the same for
+    every shopper and cached at the edge (ADR-047), and shoppers have no accounts, so nothing
+    on the page can be the shopper's own.
+* **Decision:**
+  * **Kept in the shopper's browser**, in `localStorage`: the handles of the products they
+    saved, newest first, 50 at most, and of the last 12 they looked at. Nothing goes to the
+    core, and a shopper on another phone starts again.
+  * **A heart on every card and on the product's page** (Hatti Base's `wishlist-button`
+    snippet), hidden until the header's script shows it, pressed for a saved product. Its
+    label names the product, in the shopper's language.
+  * **The wishlist's page** is a page of the shop's own with the `wishlist` template, and
+    **recently viewed** is a section on the product template. Both get each card from the
+    section rendering API: `/products/<handle>?section_id=product-card`, a section that renders
+    the theme's own card for the product. The card is cached like any page, and looks the same
+    as it does in a collection. A product no longer for sale returns no card, and drops out
+    of the list.
+  * **The header links to the wishlist** with its count, behind a setting of the header's, so
+    a shop that has not made the page shows no link.
+* **Consequences:**
+  * A wishlist does not follow the shopper to another device, and the shop cannot see it or
+    send reminders from it. Both wait for customer accounts.
+* **Alternatives:**
+  * **Wishlists in the core, by a cookie's ID**: every page that shows a heart would then be
+    the shopper's own and could not be cached at the edge, for something most shoppers never
+    open.

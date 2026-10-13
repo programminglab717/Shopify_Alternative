@@ -1,0 +1,55 @@
+{%- comment -%}
+  The shopper's wishlist (OS-12, ADR-418), on a page of the shop's own whose template is
+  page.wishlist: the products their hearts kept in this browser, each card asked for as the
+  theme renders it, newest first. A product gone from the shop leaves the list.
+{%- endcomment -%}
+<div class="page-width section-spacing">
+  <h1 dir="auto">{{ page.title | escape }}</h1>
+  {%- if page.content != blank -%}<div class="rte">{{ page.content }}</div>{%- endif -%}
+  <hatti-wishlist>
+    <ul class="grid" role="list" data-cards></ul>
+    <p data-empty hidden>{{ 'sections.wishlist.empty' | t }}</p>
+  </hatti-wishlist>
+  <noscript><p>{{ 'sections.wishlist.no_script' | t }}</p></noscript>
+</div>
+
+{% javascript %}
+  class HattiWishlistPage extends HTMLElement {
+    connectedCallback() {
+      this.cards = this.querySelector('[data-cards]');
+      this.empty = this.querySelector('[data-empty]');
+      this.show();
+      // A heart taken off here takes its card away.
+      document.addEventListener('hatti:wishlist', () => this.prune());
+    }
+
+    async show() {
+      const lists = window.HattiWishlist;
+      const handles = lists?.handles() ?? [];
+      const cards = await Promise.all(handles.map((handle) => lists.card(handle)));
+      cards.forEach((card, index) => {
+        if (!card) return lists.remove(handles[index]);
+        const item = document.createElement('li');
+        item.dataset.handle = handles[index];
+        item.append(card);
+        this.cards.append(item);
+      });
+      this.prune();
+    }
+
+    prune() {
+      const kept = new Set(window.HattiWishlist?.handles() ?? []);
+      for (const item of this.cards.querySelectorAll('li')) {
+        if (!kept.has(item.dataset.handle)) item.remove();
+      }
+      this.empty.hidden = this.cards.childElementCount > 0;
+    }
+  }
+  if (!customElements.get('hatti-wishlist')) {
+    customElements.define('hatti-wishlist', HattiWishlistPage);
+  }
+{% endjavascript %}
+
+{% schema %}
+{ "name": "t:sections.main-wishlist.name" }
+{% endschema %}

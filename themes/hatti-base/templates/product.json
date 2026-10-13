@@ -14,7 +14,11 @@
     "related": {
       "type": "featured-collection",
       "settings": { "title": "You may also like", "collection": "eid-lawn", "products_to_show": 4 }
+    },
+    "recently_viewed": {
+      "type": "recently-viewed",
+      "settings": { "title": "Recently viewed", "products_to_show": 4 }
     }
   },
-  "order": ["main", "related"]
+  "order": ["main", "related", "recently_viewed"]
 }

@@ -1,4 +1,4 @@
-<header class="header">
+<header class="header" data-root="{{ routes.root_url }}">
   <div class="page-width header__inner">
     <a href="{{ routes.root_url }}" class="header__logo">
       {%- if shop.brand.logo -%}
@@ -43,6 +43,16 @@
       {%- else -%}
         <a href="/ur{{ request.path }}" lang="ur" hreflang="ur">{{ 'general.language' | t }}</a>
       {%- endif -%}
+      {%- if section.settings.wishlist -%}
+        {%- if routes.root_url == '/' -%}
+          {%- assign wishlist_url = '/pages/wishlist' -%}
+        {%- else -%}
+          {%- assign wishlist_url = routes.root_url | append: '/pages/wishlist' -%}
+        {%- endif -%}
+        <a href="{{ wishlist_url }}" class="header__wishlist">
+          {{- 'general.wishlist' | t }} <span class="count" data-wishlist-count hidden></span>
+        </a>
+      {%- endif -%}
       <a href="{{ routes.cart_url }}" class="header__cart" data-cart-link>
         {{- 'general.cart' | t }} <span class="count" data-cart-count>{{ cart.item_count }}</span>
       </a>
@@ -59,7 +69,7 @@
   .header__menu { display: flex; gap: 1.25rem; margin: 0; padding: 0; list-style: none; white-space: nowrap; }
   .header__menu a { color: inherit; text-decoration: none; }
   .header__tools { display: flex; gap: 1rem; margin-inline-start: auto; }
-  .header__cart .count { display: inline-block; min-inline-size: 1.5em; border-radius: 1em; background: var(--color-accent); color: #fff; text-align: center; }
+  .header__cart .count, .header__wishlist .count { display: inline-block; min-inline-size: 1.5em; border-radius: 1em; background: var(--color-accent); color: #fff; text-align: center; }
   @media (min-width: 750px) { .header__nav { order: 0; inline-size: auto; } }
   .header__search > summary { cursor: pointer; list-style: none; text-decoration: underline; }
   .header__search > summary::-webkit-details-marker { display: none; }
@@ -76,6 +86,77 @@
 {% endstylesheet %}
 
 {% javascript %}
+  // The shopper's wishlist (OS-12, ADR-418): products' handles, newest first, kept in this
+  // browser alone, since pages are the same for every shopper. The hearts on cards and product
+  // pages add and remove them; the wishlist page and recently viewed read it through
+  // window.HattiWishlist. Storage that cannot be read or written keeps nothing.
+  const lists = (window.HattiWishlist = {
+    read(key) {
+      try {
+        const kept = JSON.parse(localStorage.getItem(key) ?? '[]');
+        return Array.isArray(kept) ? kept.filter((handle) => typeof handle === 'string') : [];
+      } catch {
+        return [];
+      }
+    },
+    write(key, handles) {
+      try {
+        localStorage.setItem(key, JSON.stringify(handles));
+      } catch {
+        // Private browsing, or storage full: the list is not kept.
+      }
+    },
+    handles() {
+      return this.read('hatti:wishlist');
+    },
+    toggle(handle) {
+      const handles = this.handles().filter((each) => each !== handle);
+      const adding = handles.length === this.handles().length;
+      this.write('hatti:wishlist', (adding ? [handle, ...handles] : handles).slice(0, 50));
+      document.dispatchEvent(new CustomEvent('hatti:wishlist'));
+      return adding;
+    },
+    remove(handle) {
+      if (this.handles().includes(handle)) this.toggle(handle);
+    },
+    /** Products viewed, newest first: at most 12. */
+    viewed(handle) {
+      const handles = this.read('hatti:viewed').filter((each) => each !== handle);
+      if (handle) this.write('hatti:viewed', [handle, ...handles].slice(0, 12));
+      return handles;
+    },
+    /** A product's card, as the theme renders it, for its handle; null once it is gone. */
+    async card(handle) {
+      // The root is "/", or "/ur" for the Urdu pages.
+      const root = (document.querySelector('[data-root]')?.dataset.root ?? '/').replace(/\/$/, '');
+      const url = `${root}/products/${encodeURIComponent(handle)}?section_id=product-card`;
+      const response = await fetch(url).catch(() => null);
+      if (!response?.ok) return null;
+      const html = new DOMParser().parseFromString(await response.text(), 'text/html');
+      return html.querySelector('.card');
+    },
+  });
+  const showWishlist = () => {
+    const handles = new Set(lists.handles());
+    for (const button of document.querySelectorAll('[data-wishlist]')) {
+      button.hidden = false;
+      button.setAttribute('aria-pressed', String(handles.has(button.dataset.wishlist)));
+    }
+    for (const count of document.querySelectorAll('[data-wishlist-count]')) {
+      count.textContent = String(handles.size);
+      count.hidden = handles.size === 0;
+    }
+  };
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest?.('[data-wishlist]');
+    if (!button) return;
+    lists.toggle(button.dataset.wishlist);
+  });
+  document.addEventListener('hatti:wishlist', showWishlist);
+  // Cards added later, as recently viewed and the wishlist page add them.
+  new MutationObserver(showWishlist).observe(document.body, { childList: true, subtree: true });
+  showWishlist();
+
   // Pages are the same for every shopper, so the cart's count comes from its cookie.
   const count = /(?:^|;\s*)cart_count=(\d+)/.exec(document.cookie);
   if (count) {
@@ -180,6 +261,13 @@
       "id": "menu",
       "label": "t:sections.header.settings.menu.label",
       "default": "main-menu"
+    },
+    {
+      "type": "checkbox",
+      "id": "wishlist",
+      "label": "t:sections.header.settings.wishlist.label",
+      "info": "t:sections.header.settings.wishlist.info",
+      "default": false
     }
   ]
 }

@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: wishlists on the storefront
-(OS-12); then marketing's next pieces (MKT-01, MKT-04). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: marketing's next pieces: WhatsApp
+broadcasts (MKT-01), then automations (MKT-04). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +15,14 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Wishlists and recently viewed in Hatti Base
+
+* **A heart on each card and product page** ([ADR-418](../architecture/13-decision-log.md#adr-418--shoppers-keep-a-wishlist-and-see-what-they-viewed-lately-in-their-own-browser-and-hatti-base-fetches-each-products-card-through-the-section-rendering-api), OS-12) saves the product to a wishlist
+  kept in the shopper's browser. The wishlist's page and recently viewed fetch each card
+  through the section rendering API.
+* **The header links to the wishlist**, with its count, once the shop turns it on.
+* 2771 tests, from 2770: one more for the storefront.
 
 ### bddce1e · The store's export with the online store's content, and an email when ready
 

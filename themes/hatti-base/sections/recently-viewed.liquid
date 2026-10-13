@@ -1,0 +1,61 @@
+{%- comment -%}
+  Products the shopper looked at before this one (OS-12, ADR-418), newest first, as this browser
+  remembers them: at most as many as the section's setting says, each card as the theme renders
+  it. Hidden until there is one, and on pages without a product.
+{%- endcomment -%}
+<hatti-recently-viewed
+  class="page-width section-spacing"
+  data-product="{{ product.handle }}"
+  data-limit="{{ section.settings.products_to_show }}"
+  hidden
+>
+  {%- if section.settings.title != blank -%}
+    <h2 dir="auto">{{ section.settings.title | escape }}</h2>
+  {%- endif -%}
+  <ul class="grid" role="list" data-cards></ul>
+</hatti-recently-viewed>
+
+{% javascript %}
+  class HattiRecentlyViewed extends HTMLElement {
+    async connectedCallback() {
+      const lists = window.HattiWishlist;
+      if (!lists) return;
+      const viewed = lists.viewed(this.dataset.product || null);
+      const limit = Number(this.dataset.limit) || 4;
+      const cards = await Promise.all(viewed.slice(0, limit).map((handle) => lists.card(handle)));
+      const list = this.querySelector('[data-cards]');
+      for (const card of cards.filter(Boolean)) {
+        const item = document.createElement('li');
+        item.append(card);
+        list.append(item);
+      }
+      this.hidden = list.childElementCount === 0;
+    }
+  }
+  if (!customElements.get('hatti-recently-viewed')) {
+    customElements.define('hatti-recently-viewed', HattiRecentlyViewed);
+  }
+{% endjavascript %}
+
+{% schema %}
+{
+  "name": "t:sections.recently-viewed.name",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "t:sections.recently-viewed.settings.title.label",
+      "default": "Recently viewed"
+    },
+    {
+      "type": "range",
+      "id": "products_to_show",
+      "label": "t:sections.recently-viewed.settings.products_to_show.label",
+      "min": 2,
+      "max": 8,
+      "step": 1,
+      "default": 4
+    }
+  ]
+}
+{% endschema %}

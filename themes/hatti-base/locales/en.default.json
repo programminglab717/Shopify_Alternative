@@ -20,7 +20,8 @@
         "other": "Delivered within {{ count }} working days"
       },
       "range": "Delivered in {{ min }} to {{ max }} working days"
-    }
+    },
+    "wishlist": "Wishlist"
   },
   "accessibility": {
     "skip_to_content": "Skip to content"
@@ -63,6 +64,9 @@
       },
       "reviews": "Customer reviews",
       "verified_buyer": "Bought from this shop"
+    },
+    "wishlist": {
+      "save": "Save {{ title }} to your wishlist"
     }
   },
   "sections": {
@@ -170,6 +174,10 @@
       "submit": "Sign up",
       "success": "Thank you! We'll send you our news and offers on WhatsApp.",
       "error": "Enter a Pakistani mobile number, like 0300 1234567."
+    },
+    "wishlist": {
+      "empty": "Nothing saved yet. Tap the heart on a product to keep it here.",
+      "no_script": "Your wishlist is kept in this browser, and needs JavaScript to show."
     }
   },
   "footer": {

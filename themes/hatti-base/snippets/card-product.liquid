@@ -1,6 +1,7 @@
 {%- comment -%}
   A product in a grid: its image, title and price, with a badge for a sale or when it is sold
-  out. The first two cards load their images at once; the rest when they come into view.
+  out, and a heart for the shopper's wishlist. The first two cards load their images at once;
+  the rest when they come into view.
 {%- endcomment -%}
 {%- liquid
   if position > 2
@@ -35,6 +36,7 @@
     </div>
     <h3 class="card__title" dir="auto">{{ product.title | escape }}</h3>
   </a>
+  {% render 'wishlist-button', product: product %}
   {% render 'rating', product: product %}
   {% render 'price', product: product %}
 </div>

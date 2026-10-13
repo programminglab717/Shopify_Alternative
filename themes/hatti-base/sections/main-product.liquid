@@ -41,7 +41,10 @@
       {%- case block.type -%}
         {%- when 'title' -%}
           <div {{ block.shopify_attributes }}>
-            <h1 class="product__title" dir="auto">{{ product.title | escape }}</h1>
+            <div class="product__heading">
+              <h1 class="product__title" dir="auto">{{ product.title | escape }}</h1>
+              {% render 'wishlist-button', product: product %}
+            </div>
             {%- if product.vendor != blank -%}<p class="product__vendor" dir="auto">{{ product.vendor | escape }}</p>{%- endif -%}
             {% render 'rating', product: product, link: true %}
           </div>
@@ -188,6 +191,7 @@
   .product__embed { aspect-ratio: var(--ratio, 16 / 9); }
   .product__embed iframe { inline-size: 100%; block-size: 100%; border: 0; }
   .product__title { margin: 0; font-size: 1.75rem; }
+  .product__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
   .product__vendor { color: var(--color-muted); }
   .product__form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-block: 1rem; }
   .product__option { display: flex; flex-wrap: wrap; gap: 0.5rem; min-inline-size: 0; border: 0; margin: 0; padding: 0; }

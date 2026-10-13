@@ -1544,6 +1544,59 @@ describe('Storefront rendering', () => {
     expect([fallback.status, fallback.html.includes('class="more"')]).toEqual([200, false]);
   });
 
+  it('gives each card a heart for the wishlist, renders a card alone, and the wishlist and recently viewed (ADR-418)', async () => {
+    const documents = sampleStore();
+    const wishlist = {
+      id: 'pg-wishlist',
+      handle: 'wishlist',
+      title: 'Wishlist',
+      bodyHtml: '',
+      templateSuffix: 'wishlist',
+      publishedAt: '2026-09-01T09:00:00.000Z',
+    };
+    const shop = new MemoryStore({ ...documents, pages: [...documents.pages!, wishlist] });
+    const header = JSON.parse(files['sections/header-group.json']!) as SectionList;
+    const theme = loadTheme({
+      ...files,
+      'sections/header-group.json': JSON.stringify({
+        ...header,
+        sections: {
+          ...header.sections,
+          header: { ...header.sections.header, settings: { wishlist: true } },
+        },
+      }),
+    });
+    const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+    const { handle, title } = documents.products[0]!;
+
+    // A product's page: its heart, hidden until the script shows it, and recently viewed after it.
+    const product = await renderer.render({ path: `/products/${handle}` }, shop.fresh());
+    expect(product.html).toMatch(
+      new RegExp(`class="wishlist-button"\\s+data-wishlist="${handle}"`),
+    );
+    expect(product.html).toContain(`aria-label="Save ${title} to your wishlist"`);
+    expect(product.html).toMatch(new RegExp(`<hatti-recently-viewed[^>]*data-product="${handle}"`));
+    expect(product.html).toContain('<a href="/pages/wishlist" class="header__wishlist">');
+
+    // A card alone, as the wishlist asks for it, in the shopper's language.
+    const cards = await renderer.sections(
+      { path: `/products/${handle}`, locale: 'ur' },
+      shop.fresh(),
+      ['product-card'],
+    );
+    const card = cards.get('product-card')!;
+    expect(card).toContain('<div class="card">');
+    expect(card).toContain(`data-wishlist="${handle}"`);
+    expect(card).toContain('اپنی پسندیدہ فہرست میں رکھیں');
+
+    // The wishlist's own page, empty until the script fills it.
+    const page = await renderer.render({ path: '/pages/wishlist' }, shop.fresh());
+    expect(page.html).toContain('<hatti-wishlist>');
+    expect(page.html).toContain('Nothing saved yet. Tap the heart on a product to keep it here.');
+    const urdu = await renderer.render({ path: '/pages/wishlist', locale: 'ur' }, shop.fresh());
+    expect(urdu.html).toContain('<a href="/ur/pages/wishlist" class="header__wishlist">');
+  });
+
   it('leaves out a section that goes over a limit or fails, and renders the rest', async () => {
     const extra = {
       'sections/loop.liquid':

@@ -11,7 +11,16 @@
       }
     },
     "footer": { "name": "Footer", "settings": { "menu": { "label": "Menu" } } },
-    "header": { "name": "Header", "settings": { "menu": { "label": "Menu" } } },
+    "header": {
+      "name": "Header",
+      "settings": {
+        "menu": { "label": "Menu" },
+        "wishlist": {
+          "label": "Link to the wishlist",
+          "info": "Shows the shopper's wishlist at /pages/wishlist: add a page with that handle and the wishlist template."
+        }
+      }
+    },
     "image-banner": {
       "name": "Image banner",
       "settings": { "image": { "label": "Image" } },
@@ -53,6 +62,15 @@
     },
     "newsletter": { "name": "Newsletter", "settings": { "heading": { "label": "Heading" } } },
     "predictive-search": { "name": "Predictive search" },
+    "product-card": { "name": "Product card" },
+    "main-wishlist": { "name": "Wishlist" },
+    "recently-viewed": {
+      "name": "Recently viewed",
+      "settings": {
+        "title": { "label": "Heading" },
+        "products_to_show": { "label": "Products to show" }
+      }
+    },
     "whatsapp-cta": {
       "name": "WhatsApp",
       "settings": {

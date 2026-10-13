@@ -1,0 +1,10 @@
+{%- comment -%}
+  One product's card alone, for the wishlist and recently viewed to ask for through Shopify's
+  section rendering API (OS-12, ADR-418): /products/{handle}?section_id=product-card. It is in
+  no template: pages never show it.
+{%- endcomment -%}
+{% render 'card-product', product: product, position: 3 %}
+
+{% schema %}
+{ "name": "t:sections.product-card.name" }
+{% endschema %}
