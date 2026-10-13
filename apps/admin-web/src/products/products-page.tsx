@@ -8,6 +8,7 @@ import {
   PackageOpen,
   Plus,
   Search,
+  Ruler,
   Star,
   Tags,
   ToggleRight,
@@ -222,6 +223,14 @@ export function ProductsPage() {
           >
             <Star aria-hidden className="size-5" />
             {t('reviews.title')}
+          </Link>
+          <Link
+            to="/$shopId/products/size-charts"
+            params={{ shopId: shop.id }}
+            className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
+          >
+            <Ruler aria-hidden className="size-5" />
+            {t('sizeCharts.title')}
           </Link>
           {edits && (
             <Link

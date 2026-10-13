@@ -76,6 +76,16 @@ describe.skipIf(!server)('Size charts (CAT-10, ADR-406)', () => {
   });
 
   it('refuses a chart whose parts do not agree, and a name the shop has', async () => {
+    const refused = await charts.create(f.a, {
+      ...KURTAS,
+      columns: ['Chest', 'chest'],
+      rows: [{ size: 'S', values: [36, 1000] }],
+    });
+    // Sentences of their own where the field's last part is an index.
+    expect(refused.ok ? [] : refused.errors.map((error) => error.message)).toEqual([
+      'chest is measured already',
+      'A measurement must be more than 0 and at most 999',
+    ]);
     expect(
       errorsOf(
         await charts.create(f.a, {

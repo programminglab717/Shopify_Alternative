@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-407 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-408 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -415,6 +415,7 @@
 | 405 | The admin puts a product on pre-order from its page, beside its stock rules, with the day it ships by, a month ahead to begin with, warns when that day has gone by, and an order's page says of each line sold on pre-order the day it ships by | Accepted |
 | 406 | The catalog keeps the shop's size charts, tables of measurements a row for each size, in inches or centimetres, and gives each product one at most, by its ID or as a collection has it then; the products whose chart changes are named in the event | Accepted |
 | 407 | A product's storefront page shows its size chart, opened under its buttons and read in inches or centimetres without a script, the unit the shop wrote it in first; themes read it as Hatti's `product.size_chart`, each measurement in both units | Accepted |
+| 408 | The admin keeps the shop's size charts on a page of their own beside its products, each edited as a table of sizes and measurements, given to a collection's products from its page and to a product from the product's; measurements typed with a comma or a point | Accepted |
 
 ---
 
@@ -15725,3 +15726,31 @@
     table; the disclosure is the browser's own.
   * **Converting in Liquid:** themes would each repeat the arithmetic and its rounding; the
     object gives both units.
+
+## ADR-408 · The admin keeps the shop's size charts on a page of their own beside its products, each edited as a table of sizes and measurements, given to a collection's products from its page and to a product from the product's; measurements typed with a comma or a point
+
+* **Context:**
+  * Size charts are kept by the catalog ([ADR-406](#adr-406--the-catalog-keeps-the-shops-size-charts-tables-of-measurements-a-row-for-each-size-in-inches-or-centimetres-and-gives-each-product-one-at-most-by-its-id-or-as-a-collection-has-it-then-the-products-whose-chart-changes-are-named-in-the-event)) and shown on products' pages ([ADR-407](#adr-407--a-products-storefront-page-shows-its-size-chart-opened-under-its-buttons-and-read-in-inches-or-centimetres-without-a-script-the-unit-the-shop-wrote-it-in-first-themes-read-it-as-hattis-productsize_chart-each-measurement-in-both-units)); a
+    merchant makes them on a phone, often from a tailor's paper chart.
+* **Decision:**
+  * **Products → Size charts** lists the shop's charts by name, each with its sizes, what it
+    measures, its unit and how many products show it, for everyone who reads products; those who
+    change products (the owner and managers) add, change and delete them.
+  * **A chart is edited as a table:** a box for each measurement's name across the top, a row
+    for each size, and a box for each measurement, empty where there is none; sizes and
+    measurements added and taken away in place, up to the core's 30 and 8. A measurement may be
+    typed with a decimal comma; one that is not a number is said before anything is sent. The
+    core's refusals are said of the size and measurement they are about, in the admin's language.
+  * **Given from either side:** a chart's page gives it to the products a collection has now; a
+    product's page, after its pre-order card, chooses its chart or none.
+  * **The core's sentences:** errors of a chart's columns and measurements, whose fields end in
+    an index, are whole sentences of their own, as an app reading the API sees them.
+  * **The activity log** reads "Size chart created" and "Products' size chart updated".
+* **Consequences:**
+  * A collection's products given a chart keep it when they leave the collection; the chart's
+    page says how many show it.
+* **Alternatives:**
+  * **Charts under Settings:** they are the catalog's, chosen product by product; they sit beside
+    collections and reviews.
+  * **A chart pasted as text or a spreadsheet:** a later step if shops ask; typing a dozen sizes
+    on a phone is quick enough.

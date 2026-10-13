@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the admin's size charts, made and
-given to products from their pages (CAT-10); then bundles (CAT-11). Urdu handles wait, as
-decided.
+**Next, section by section as the alpha's shops need them**: bundles and multipacks (CAT-11);
+then gift options at checkout (CHK-16). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +15,24 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Size charts in the admin
+
+* **Products → Size charts** ([ADR-408](../architecture/13-decision-log.md#adr-408--the-admin-keeps-the-shops-size-charts-on-a-page-of-their-own-beside-its-products-each-edited-as-a-table-of-sizes-and-measurements-given-to-a-collections-products-from-its-page-and-to-a-product-from-the-products-measurements-typed-with-a-comma-or-a-point), CAT-10) lists the shop's charts; a chart is made and
+  changed as a table of sizes and measurements, with a note on how to measure, and deleted.
+  Its page gives it to a collection's products; a product's page chooses its chart.
+* **The core's refusals** of a chart's columns and measurements are whole sentences now, and
+  the admin says each of the size and measurement it is about, in English or Urdu.
+* **Tried in Chromium against the core, at a phone's width:** from the products page, the demo
+  shop's first chart, Chappals, in inches, three sizes of foot length and width, a width typed
+  "3,7"; a foot length of 0 was refused as "Size 9, Foot length: must be more than 0 and at
+  most 999", and once corrected the chart was kept as typed. Given to the Chappals collection,
+  its one product showed it; on the Peshawari Chappal's page it was cleared and chosen again.
+  The list read "7, 8, 9 · Foot length, Width, in Inches, Shown on 1 product", the activity log
+  "Size chart created" and "Products' size chart updated", and the chart's page in Urdu its
+  Urdu words. Deleted, nothing was left. Nothing overflowed and nothing errored, and the demo
+  shop was left as it was.
+* 2728 tests (12 new): the admin's size charts and their documents.
 
 ### 5ec4012 · Size charts on the storefront
 

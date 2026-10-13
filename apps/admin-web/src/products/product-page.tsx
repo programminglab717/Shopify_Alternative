@@ -47,6 +47,7 @@ import { DuplicateProduct } from './duplicate';
 import { ProductOptions } from './options';
 import { ProductPhotos } from './photos';
 import { ProductPreorder } from './preorder';
+import { ProductSizeChart } from './size-charts';
 import { StockRules } from './stock-rules';
 import { EDITS_PRODUCTS, ProductStatusBadge, ProductThumb } from './status';
 import { ProductUrduCard } from '../urdu/urdu-pages';
@@ -598,6 +599,7 @@ function ProductView() {
       {edits && <StockRules product={product} />}
       {/* Shown afresh when the core's day changes. */}
       {edits && <ProductPreorder product={product} />}
+      {edits && <ProductSizeChart product={product} />}
       <ProductUrduCard product={product} />
     </div>
   );

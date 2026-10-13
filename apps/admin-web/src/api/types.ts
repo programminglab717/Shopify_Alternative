@@ -477,6 +477,8 @@ export interface ProductDetail {
   tracksInventory: boolean;
   /** Its pre-order, if it is on one (ADR-403); absent where a fake core leaves it out. */
   preorder?: { shipsOn: string } | null;
+  /** The size chart its page shows (ADR-406); absent where a fake core leaves it out. */
+  sizeChart?: { id: string; name: string } | null;
   options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
   media: ProductMedia[];
   variants: ProductVariantDetail[];
@@ -3084,4 +3086,49 @@ export interface ProductPreorderSetData {
     preorder: { productId: string; shipsOn: string } | null;
     userErrors: UserError[];
   };
+}
+
+export type SizeChartUnit = 'INCHES' | 'CENTIMETERS';
+
+/** A table of measurements, a row for each size (CAT-10, ADR-406). */
+export interface SizeChart {
+  id: string;
+  name: string;
+  unit: SizeChartUnit;
+  columns: string[];
+  rows: { size: string; values: (number | null)[] }[];
+  note: string | null;
+  productsCount: number;
+}
+
+export interface SizeChartInput {
+  name: string;
+  unit: SizeChartUnit;
+  columns: string[];
+  rows: { size: string; values: (number | null)[] }[];
+  note: string | null;
+}
+
+export interface SizeChartsData {
+  sizeCharts: SizeChart[];
+}
+
+export interface SizeChartData {
+  sizeChart: SizeChart | null;
+}
+
+export interface SizeChartCreateData {
+  sizeChartCreate: { sizeChart: SizeChart | null; userErrors: UserError[] };
+}
+
+export interface SizeChartUpdateData {
+  sizeChartUpdate: { sizeChart: SizeChart | null; userErrors: UserError[] };
+}
+
+export interface SizeChartDeleteData {
+  sizeChartDelete: { deletedSizeChartId: string | null; userErrors: UserError[] };
+}
+
+export interface ProductsSizeChartSetData {
+  productsSizeChartSet: { productIds: string[]; userErrors: UserError[] };
 }

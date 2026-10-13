@@ -133,20 +133,24 @@ function checkChart(
     if (given.length > SIZE_CHART_LIMITS.columns) {
       check.add(['columns'], 'TOO_MANY', `may measure ${SIZE_CHART_LIMITS.columns} things at most`);
     }
-    columns = given.map(
-      (column, index) =>
-        check.text(['columns', String(index)], column, {
-          required: true,
-          max: SIZE_CHART_LIMITS.column,
-        }) ?? '',
-    );
+    // Its own sentences: the field's last part is an index, no name to begin one with.
     const seen = new Set<string>();
-    columns.forEach((column, index) => {
-      const key = column.toLowerCase();
-      if (column && seen.has(key)) {
-        check.add(['columns', String(index)], 'TAKEN', 'is measured already');
+    columns = given.map((given, index) => {
+      const field = ['columns', String(index)];
+      const column = given.trim();
+      if (column === '') {
+        check.addMessage(field, 'BLANK', "What is measured can't be blank");
+      } else if (column.length > SIZE_CHART_LIMITS.column) {
+        check.addMessage(
+          field,
+          'TOO_LONG',
+          `What is measured is too long (maximum is ${SIZE_CHART_LIMITS.column} characters)`,
+        );
+      } else if (seen.has(column.toLowerCase())) {
+        check.addMessage(field, 'TAKEN', `${column} is measured already`);
       }
-      seen.add(key);
+      seen.add(column.toLowerCase());
+      return column;
     });
   }
 
@@ -182,10 +186,10 @@ function checkChart(
         if (value === null) return null;
         const kept = measurement(value);
         if (kept === null) {
-          check.add(
+          check.addMessage(
             ['rows', String(index), 'values', String(at)],
             'INVALID',
-            `must be more than 0 and at most ${SIZE_CHART_LIMITS.value}`,
+            `A measurement must be more than 0 and at most ${SIZE_CHART_LIMITS.value}`,
           );
         }
         return kept;

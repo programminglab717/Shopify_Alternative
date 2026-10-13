@@ -905,6 +905,10 @@ const PRODUCT = /* GraphQL */ `
     preorder {
       shipsOn
     }
+    sizeChart {
+      id
+      name
+    }
     options {
       id
       name
@@ -7215,6 +7219,102 @@ export const ProductPreorderSetMutation = /* GraphQL */ `
         productId
         shipsOn
       }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+const SIZE_CHART = /* GraphQL */ `
+  fragment SizeChartFields on SizeChart {
+    id
+    name
+    unit
+    columns
+    rows {
+      size
+      values
+    }
+    note
+    productsCount
+  }
+`;
+
+/** The shop's size charts, by name (CAT-10, ADR-406). */
+export const SizeChartsQuery = /* GraphQL */ `
+  query SizeCharts {
+    sizeCharts {
+      ...SizeChartFields
+    }
+  }
+  ${SIZE_CHART}
+`;
+
+export const SizeChartQuery = /* GraphQL */ `
+  query SizeChart($id: ID!) {
+    sizeChart(id: $id) {
+      ...SizeChartFields
+    }
+  }
+  ${SIZE_CHART}
+`;
+
+export const SizeChartCreateMutation = /* GraphQL */ `
+  mutation SizeChartCreate($input: SizeChartInput!) {
+    sizeChartCreate(input: $input) {
+      sizeChart {
+        ...SizeChartFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SIZE_CHART}
+  ${USER_ERRORS}
+`;
+
+export const SizeChartUpdateMutation = /* GraphQL */ `
+  mutation SizeChartUpdate($id: ID!, $input: SizeChartInput!) {
+    sizeChartUpdate(id: $id, input: $input) {
+      sizeChart {
+        ...SizeChartFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SIZE_CHART}
+  ${USER_ERRORS}
+`;
+
+export const SizeChartDeleteMutation = /* GraphQL */ `
+  mutation SizeChartDelete($id: ID!) {
+    sizeChartDelete(id: $id) {
+      deletedSizeChartId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/**
+ * Gives products a size chart in place of any they had, or takes theirs away with a null chart:
+ * those named, and those a collection has now.
+ */
+export const ProductsSizeChartSetMutation = /* GraphQL */ `
+  mutation ProductsSizeChartSet($sizeChartId: ID, $productIds: [ID!], $collectionId: ID) {
+    productsSizeChartSet(
+      sizeChartId: $sizeChartId
+      productIds: $productIds
+      collectionId: $collectionId
+    ) {
+      productIds
       userErrors {
         ...Problems
       }
