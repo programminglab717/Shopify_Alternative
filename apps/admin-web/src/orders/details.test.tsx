@@ -293,6 +293,21 @@ describe("An order's everyday edits, on its page", () => {
     );
   });
 
+  it("shows the gift message the customer wrote, above the order's note (ADR-414)", async () => {
+    vi.stubGlobal('fetch', core('packer', order({ giftMessage: 'Eid Mubarak, Ammi!' })).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    const notes = await screen.findByRole('region', { name: 'Note and tags' });
+    expect(within(notes).getByText('Gift message')).toBeTruthy();
+    expect(within(notes).getByText('Eid Mubarak, Ammi!')).toBeTruthy();
+    cleanup();
+
+    vi.stubGlobal('fetch', core('packer').fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    const plain = await screen.findByRole('region', { name: 'Note and tags' });
+    expect(within(plain).queryByText('Gift message')).toBeNull();
+  });
+
   it('leaves the address as it is once a parcel shipped, and edits to those who work orders', async () => {
     vi.stubGlobal(
       'fetch',

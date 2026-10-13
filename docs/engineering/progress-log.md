@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the gift message on packing slips
-and order pages, and the admin's gift options (CHK-16); then the shop's whole store exported
-(ADM-10). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the shop's whole store exported
+(ADM-10); then wishlists on the storefront (OS-12). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +15,14 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Gift messages on packing slips and order pages, and the admin's gift options
+
+* **The packing slip** ([ADR-414](../architecture/13-decision-log.md#adr-414--an-orders-gift-message-is-printed-on-its-packing-slip-and-shown-on-its-pages-the-customers-and-staffs-the-admin-sets-the-gift-wrap-and-messages-on-the-checkout-pages-settings), CHK-16) prints an order's gift message in a box of its own;
+  the thank-you page and the order's link page say it back to the customer.
+* **The admin** shows it above the order's note, and sets the gift wrap and messages in
+  Settings → Checkout page.
+* 2758 tests (4 new): the packing slip's and the admin's.
 
 ### 1094353 · Gift wrap and gift messages at checkout
 

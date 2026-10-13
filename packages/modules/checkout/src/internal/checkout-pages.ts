@@ -922,6 +922,14 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
             itemRow(line.quantity, itemName(line.title, line.variantTitle), rs(line.total)),
           )}
         </table>
+        ${
+          // The words to go with it as a gift (ADR-413), as the shopper wrote them.
+          order.giftMessage &&
+          html`<p class="small">
+            ${say('bilingual', LABELS.giftMessage)}:
+            <span dir="auto">${text(order.giftMessage)}</span>
+          </p>`
+        }
         <table>
           ${row(LABELS.subtotal, rs(order.subtotal))}
           ${

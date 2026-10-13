@@ -229,6 +229,29 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     expect(page).not.toContain('0300');
   });
 
+  it('prints the gift message on the packing slip, escaped, and none once its customer is erased (ADR-413)', async () => {
+    const order = await f.order(f.a, [kurta], { giftMessage: '  Eid Mubarak <3 Ammi  ' });
+    expect(order.giftMessage).toBe('Eid Mubarak <3 Ammi');
+    const slip = async (language: 'english' | 'urdu') =>
+      unwrap(
+        await f.documents.render(f.a, [order.id], {
+          kind: 'packing_slip',
+          paper: 'a4',
+          language,
+        }),
+      ).html;
+    const english = await slip('english');
+    expect(english).toContain('Gift message');
+    expect(english).toContain('Eid Mubarak &lt;3 Ammi');
+    expect(await slip('urdu')).toContain('تحفے کا پیغام');
+
+    unwrap(await f.orders.cancel(f.a, order.id, { reason: 'customer' }));
+    unwrap(await f.customerData.erase(f.a, order.customerId));
+    const erased = await slip('english');
+    expect(erased).not.toContain('Gift message');
+    expect(erased).not.toContain('Ammi');
+  });
+
   it('prints up to 250 orders at a time', async () => {
     const request = { kind: 'invoice', paper: 'a4', language: 'english' } as const;
     expect(errorsOf(await f.documents.render(f.a, [], request))).toEqual([['ids', 'BLANK']]);

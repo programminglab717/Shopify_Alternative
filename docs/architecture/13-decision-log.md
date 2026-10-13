@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-413 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-414 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -421,6 +421,7 @@
 | 411 | A bundle's storefront page lists what one set holds, each part linked while it is for sale, as Hatti's product.bundle; a part off sale leaves the set unsold; a customer's order page shows a bundle once, its parts named under it | Accepted |
 | 412 | The admin makes a product a bundle on its page, its parts found as a draft's items are, each with how many one set holds; an order's page says of each part's line which bundle it was sold in | Accepted |
 | 413 | A shop sells gift wrap as one of its own variants, which the checkout's page adds to the cart when the shopper asks, and may ask for a gift message, which the order keeps for its packing slip | Accepted |
+| 414 | An order's gift message is printed on its packing slip and shown on its pages, the customer's and staff's; the admin sets the gift wrap and messages on the checkout page's settings | Accepted |
 
 ---
 
@@ -15913,3 +15914,27 @@
     would need to know of it; a line needs nothing new.
   * **A cart attribute** set by the storefront's theme: themes the shop did not write would
     offer nothing; the checkout's page is the platform's and offers it to every shop.
+
+## ADR-414 · An order's gift message is printed on its packing slip and shown on its pages, the customer's and staff's; the admin sets the gift wrap and messages on the checkout page's settings
+
+* **Context:**
+  * ADR-413 kept a gift message with the order, for the parcel's recipient. It is of no use
+    until it reaches the parcel, and the shop could set the gift options only through the API.
+* **Decision:**
+  * **The packing slip** prints the message in a box of its own under the items, in large
+    type, in the slip's language's label, `dir="auto"` so an Urdu message reads right to
+    left. The invoice does not: it is the buyer's, and the gift is for someone else.
+  * **The customer's pages** say it back: the checkout's thank-you page and the order's link
+    page, after the items, so the customer sees what will be written.
+  * **The admin**: the order's page shows it above the order's note, marked with a gift, to
+    whoever packs; Settings → Checkout page has a Gifts section: the gift wrap chosen from
+    the shop's products as a draft's items are, removed, warned of while its product is not
+    for sale, and the box for asking a gift message. It saves with the page's other settings,
+    sending only what changed.
+  * A customer's erasure clears the message, so none is printed after it.
+* **Consequences:**
+  * Packers see the message twice, on the slip and the order's page; the slip is what goes in
+    the parcel.
+* **Alternatives:**
+  * **A card printed apart**: one more sheet for every gift order, on printers that take A4
+    and labels; a box on the slip that already goes in the parcel needs no new paper.

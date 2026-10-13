@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
 import { fakeCore, renderAdmin, signedIn, type } from '../test-support';
@@ -7,6 +7,16 @@ function core(role: StaffRole, whatsappNumber: string | null) {
   let badges: unknown[] = [{ kind: 'CASH_ON_DELIVERY', days: null }];
   let channels = ['WHATSAPP'];
   let reminderAfterMinutes: number | null = null;
+  let gifts: { wrap: unknown; messages: boolean } = {
+    wrap: {
+      variantId: 'var_9',
+      productTitle: 'Gift wrap',
+      variantTitle: 'Default Title',
+      price: { amount: '150.00', currencyCode: 'PKR' },
+      forSale: false,
+    },
+    messages: false,
+  };
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'CheckoutPage':
@@ -15,7 +25,42 @@ function core(role: StaffRole, whatsappNumber: string | null) {
           checkoutMarketingChannels: channels,
           onlineStorePreferences: { whatsappNumber },
           checkoutRecoverySettings: { reminderAfterMinutes },
+          checkoutGiftOptions: gifts,
         };
+      case 'DraftVariants':
+        return {
+          products: {
+            nodes: [
+              {
+                id: 'prod_2',
+                title: 'Gift box',
+                variants: [
+                  {
+                    id: 'var_5',
+                    title: 'Red',
+                    availableForSale: true,
+                    inventoryQuantity: 40,
+                    price: { amount: '250.00', currencyCode: 'PKR' },
+                  },
+                ],
+              },
+            ],
+          },
+        };
+      case 'CheckoutGiftOptionsUpdate': {
+        const input = variables.input as { wrapVariantId: string | null; messages: boolean };
+        gifts = {
+          wrap: input.wrapVariantId && {
+            variantId: input.wrapVariantId,
+            productTitle: 'Gift box',
+            variantTitle: 'Default Title',
+            price: { amount: '250.00', currencyCode: 'PKR' },
+            forSale: true,
+          },
+          messages: input.messages,
+        };
+        return { checkoutGiftOptionsUpdate: { checkoutGiftOptions: gifts, userErrors: [] } };
+      }
       case 'CheckoutRecoverySettingsUpdate':
         reminderAfterMinutes = variables.reminderAfterMinutes as number | null;
         return {
@@ -106,6 +151,38 @@ describe('The checkout page', () => {
       expect(sentOf(fake, 'CheckoutTrustBadgesUpdate')).toEqual([{ badges: [] }]),
     );
     expect(sentOf(fake, 'CheckoutMarketingChannelsUpdate')).toEqual([]);
+  });
+
+  it('sells another gift wrap, or none, and asks for a gift message (ADR-414)', async () => {
+    const fake = core('manager', null);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/checkout');
+
+    const gifts = await screen.findByRole('region', { name: 'Gifts' });
+    expect(within(gifts).getByText('Gift wrap')).toBeTruthy();
+    expect(within(gifts).getByText(/^Not for sale/)).toBeTruthy();
+    fireEvent.click(within(gifts).getByRole('button', { name: 'Choose another' }));
+    type('Find products by name or SKU', 'gift');
+    fireEvent.click(within(gifts).getByRole('button', { name: 'Find' }));
+    fireEvent.click(await within(gifts).findByRole('button', { name: 'Add Gift box' }));
+    expect(within(gifts).getByText('Gift box')).toBeTruthy();
+    fireEvent.click(within(gifts).getByLabelText(/Ask for a gift message/));
+    fireEvent.click(screen.getByRole('button', { name: 'Save checkout page' }));
+    expect(await screen.findByText('Saved. The checkout shows it in a moment.')).toBeTruthy();
+    expect(sentOf(fake, 'CheckoutGiftOptionsUpdate')).toEqual([
+      { input: { wrapVariantId: 'var_5', messages: true } },
+    ]);
+    expect(sentOf(fake, 'CheckoutTrustBadgesUpdate')).toEqual([]);
+
+    fireEvent.click(within(gifts).getByRole('button', { name: 'No gift wrap' }));
+    expect(within(gifts).getByRole('button', { name: 'Choose gift wrap' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save checkout page' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'CheckoutGiftOptionsUpdate')).toEqual([
+        { input: { wrapVariantId: 'var_5', messages: true } },
+        { input: { wrapVariantId: null, messages: true } },
+      ]),
+    );
   });
 
   it('reminds shoppers who leave after the delay chosen, or never (ADR-393)', async () => {

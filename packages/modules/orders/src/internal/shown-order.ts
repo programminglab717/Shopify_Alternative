@@ -23,6 +23,8 @@ export interface ShownOrder {
     /** The bundle it was sold as a part of (ADR-410); a draft's lines have none. */
     bundle?: LineBundle | null;
   }[];
+  /** The message to go with it as a gift (ADR-413); a draft has none. */
+  giftMessage?: string | null;
   /** Minor units. */
   subtotal: bigint;
   discount: bigint;
@@ -112,6 +114,7 @@ export function shownOfOrder(order: OrderRecord, terms: readonly ShownTerm[] = [
   return {
     currency: order.currency,
     lines: order.lines,
+    giftMessage: order.giftMessage,
     subtotal: order.subtotal,
     discount: order.discount,
     transferDiscount: order.transferDiscount,

@@ -189,6 +189,7 @@ export const OrderQuery = /* GraphQL */ `
       cancelReason
       overPlanLimit
       note
+      giftMessage
       tags
       phone
       email
@@ -5743,6 +5744,38 @@ export const CustomerErasureRequestsQuery = /* GraphQL */ `
 `;
 
 /** What the checkout's page shows under its button, and the boxes it offers for marketing. */
+const GIFT_OPTIONS = /* GraphQL */ `
+  fragment GiftOptions on CheckoutGiftOptions {
+    wrap {
+      variantId
+      productTitle
+      variantTitle
+      price {
+        ...Money
+      }
+      forSale
+    }
+    messages
+  }
+  ${MONEY}
+`;
+
+/** The variant sold as gift wrap, null for none, and whether checkout asks for a gift message. */
+export const CheckoutGiftOptionsUpdateMutation = /* GraphQL */ `
+  mutation CheckoutGiftOptionsUpdate($input: CheckoutGiftOptionsInput!) {
+    checkoutGiftOptionsUpdate(input: $input) {
+      checkoutGiftOptions {
+        ...GiftOptions
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${GIFT_OPTIONS}
+  ${USER_ERRORS}
+`;
+
 export const CheckoutPageQuery = /* GraphQL */ `
   query CheckoutPage {
     checkoutTrustBadges {
@@ -5756,7 +5789,11 @@ export const CheckoutPageQuery = /* GraphQL */ `
     checkoutRecoverySettings {
       reminderAfterMinutes
     }
+    checkoutGiftOptions {
+      ...GiftOptions
+    }
   }
+  ${GIFT_OPTIONS}
 `;
 
 /** How long after a shopper leaves checkout they are reminded on WhatsApp; null for never. */

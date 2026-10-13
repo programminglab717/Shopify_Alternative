@@ -69,6 +69,7 @@ const WORDS = {
   refunded: { en: 'Refunded', ur: 'واپس کی گئی رقم' },
   balanceDue: { en: 'Balance due', ur: 'بقایا رقم' },
   thanks: { en: 'Thank you for your order!', ur: 'آپ کے آرڈر کا شکریہ!' },
+  giftMessage: { en: 'Gift message', ur: 'تحفے کا پیغام' },
   cancelled: { en: 'Cancelled', ur: 'منسوخ' },
   doNotShip: { en: 'Cancelled: do not ship', ur: 'منسوخ: مت بھیجیں' },
   doNotPack: { en: 'Not confirmed: do not pack yet', ur: 'تصدیق باقی ہے: ابھی پیک نہ کریں' },
@@ -124,6 +125,14 @@ export function packingSlip(order: OrderRecord, context: DocumentContext): Html 
       </tbody>
     </table>
     <p class="strong">${t(WORDS.units)}: ${ltr(String(units))}</p>
+    ${
+      // The customer's words to go with it as a gift (ADR-413), to copy onto a card or cut out.
+      order.giftMessage &&
+      html`<section class="box gift">
+        <p class="label">${t(WORDS.giftMessage)}</p>
+        <p class="big" dir="auto">${text(order.giftMessage)}</p>
+      </section>`
+    }
     <p class="footer">${t(WORDS.thanks)}</p>
   `;
 }

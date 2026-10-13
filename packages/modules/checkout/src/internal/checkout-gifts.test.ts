@@ -105,6 +105,8 @@ describe.skipIf(!server)('Gift wrap and gift messages at checkout (CHK-16, ADR-4
     });
     if (placed.kind !== 'placed') throw new Error(`Expected it placed, got ${placed.kind}`);
     expect(placed.order.giftMessage).toBe('Eid Mubarak, Ammi!');
+    // The thank-you page says it back.
+    expect(checkoutPage(placed).html).toContain('Eid Mubarak, Ammi!');
     expect(placed.order.lines.map((line) => [line.title, line.total])).toEqual([
       ['Gift wrap', 150_00n],
       ['Kurta', 2_000_00n],

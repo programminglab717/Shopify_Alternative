@@ -56,6 +56,7 @@ const LABELS = {
   confirmTitle: { en: 'Confirm your order', ur: 'اپنا آرڈر کنفرم کریں' },
   yourOrder: { en: 'Your order', ur: 'آپ کا آرڈر' },
   bundleHolds: { en: 'Includes:', ur: 'اس میں شامل:' },
+  giftMessage: { en: 'Gift message', ur: 'تحفے کا پیغام' },
   subtotal: { en: 'Subtotal', ur: 'ذیلی کل' },
   discount: { en: 'Discount', ur: 'رعایت' },
   transferDiscount: { en: 'Bank transfer discount', ur: 'بینک ٹرانسفر پر رعایت' },
@@ -1467,6 +1468,13 @@ function summary(shown: ShownOrder): Html {
         </tr>`;
       })}
     </table>
+    ${
+      // The words to go with it as a gift (ADR-413), as the customer wrote them.
+      shown.giftMessage &&
+      html`<p class="small">
+        ${say('bilingual', LABELS.giftMessage)}: <span dir="auto">${text(shown.giftMessage)}</span>
+      </p>`
+    }
     <table>
       ${row(LABELS.subtotal, rs(shown.subtotal))}
       ${

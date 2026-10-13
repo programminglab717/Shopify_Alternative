@@ -1,24 +1,30 @@
-import { ArrowDown, ArrowUp, BadgeCheck, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, BadgeCheck, Gift, Plus, Save, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  CheckoutGiftOptionsUpdateMutation,
   CheckoutMarketingChannelsUpdateMutation,
   CheckoutPageQuery,
   CheckoutRecoverySettingsUpdateMutation,
   CheckoutTrustBadgesUpdateMutation,
 } from '../api/operations';
 import type {
+  CheckoutGiftOptionsUpdateData,
   CheckoutMarketingChannelsUpdateData,
   CheckoutPageData,
   CheckoutRecoverySettingsUpdateData,
   CheckoutTrustBadgeKind,
   CheckoutTrustBadgesUpdateData,
   MarketingChannel,
+  MoneyValue,
 } from '../api/types';
 import { CHANNELS } from '../customers/care';
+import { ProductPicker } from '../drafts/new-draft-page';
 import { errorText } from '../i18n/errors';
+import { formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
+import { partTitle } from '../products/bundle';
 import { FormSection, problemText } from '../products/product-form';
 import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
 import { Button } from '../ui/button';
@@ -86,6 +92,24 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
   const [delay, setDelay] = useState<ReminderDelay>(delayWas);
   const [rows, setRows] = useState<BadgeRow[]>(keyed);
   const [channels, setChannels] = useState<MarketingChannel[]>(data.checkoutMarketingChannels);
+  const updateGift = useAdminMutation<
+    CheckoutGiftOptionsUpdateData,
+    { input: { wrapVariantId: string | null; messages: boolean } }
+  >(CheckoutGiftOptionsUpdateMutation);
+  // Gift wrap and gift messages (CHK-16, ADR-413).
+  const giftWas = data.checkoutGiftOptions ?? { wrap: null, messages: false };
+  const [wrap, setWrap] = useState<{ variantId: string; title: string; price: MoneyValue } | null>(
+    giftWas.wrap && {
+      variantId: giftWas.wrap.variantId,
+      title: partTitle(giftWas.wrap),
+      price: giftWas.wrap.price,
+    },
+  );
+  const [messages, setMessages] = useState(giftWas.messages);
+  const [picking, setPicking] = useState(false);
+  const giftChanged =
+    (wrap?.variantId ?? null) !== (giftWas.wrap?.variantId ?? null) ||
+    messages !== giftWas.messages;
   const [problems, setProblems] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const hasWhatsapp = Boolean(data.onlineStorePreferences.whatsappNumber);
@@ -102,7 +126,7 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
     JSON.stringify(channelsNow) !==
     JSON.stringify(CHANNELS.filter((channel) => data.checkoutMarketingChannels.includes(channel)));
   const delayChanged = delay !== delayWas;
-  const changed = badgesChanged || channelsChanged || delayChanged;
+  const changed = badgesChanged || channelsChanged || delayChanged || giftChanged;
 
   const move = (index: number, by: -1 | 1) =>
     setRows((all) => {
@@ -155,6 +179,15 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
           setProblems(
             checkoutRecoverySettingsUpdate.userErrors.map((error) => problemText(error, t)),
           );
+          return;
+        }
+      }
+      if (giftChanged) {
+        const { checkoutGiftOptionsUpdate } = await updateGift.mutateAsync({
+          input: { wrapVariantId: wrap?.variantId ?? null, messages },
+        });
+        if (checkoutGiftOptionsUpdate.userErrors.length > 0) {
+          setProblems(checkoutGiftOptionsUpdate.userErrors.map((error) => problemText(error, t)));
           return;
         }
       }
@@ -306,12 +339,62 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
         />
       </FormSection>
 
+      <FormSection title={t('checkoutPage.gifts')} hint={t('checkoutPage.giftsHint')}>
+        {wrap ? (
+          <div className="flex items-center gap-3 rounded-control border border-line px-3 py-2">
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span dir="auto">{wrap.title}</span>
+              <span className="num text-secondary">{formatMoney(wrap.price.amount)}</span>
+              {giftWas.wrap?.variantId === wrap.variantId && !giftWas.wrap.forSale && (
+                <span className="text-warning">{t('checkoutPage.wrapOffSale')}</span>
+              )}
+            </span>
+            <Button
+              variant="tertiary"
+              icon={<Trash2 aria-hidden className="size-5" />}
+              aria-label={t('checkoutPage.removeWrap')}
+              onClick={() => setWrap(null)}
+            />
+          </div>
+        ) : (
+          <p className="text-secondary">{t('checkoutPage.noGiftWrap')}</p>
+        )}
+        {picking ? (
+          <ProductPicker
+            onAdd={(picked) => {
+              setWrap({ variantId: picked.variantId, title: picked.title, price: picked.price });
+              setPicking(false);
+            }}
+          />
+        ) : (
+          <Button
+            variant="secondary"
+            className="self-start"
+            icon={<Gift aria-hidden className="size-5" />}
+            onClick={() => setPicking(true)}
+          >
+            {t(wrap ? 'checkoutPage.changeWrap' : 'checkoutPage.chooseWrap')}
+          </Button>
+        )}
+        <CheckField
+          label={t('checkoutPage.giftMessages')}
+          hint={t('checkoutPage.giftMessagesHint')}
+          checked={messages}
+          onChange={setMessages}
+        />
+      </FormSection>
+
       <Problems problems={problems} />
       {saved && !changed && <Alert tone="success">{t('checkoutPage.saved')}</Alert>}
       <Button
         type="submit"
         className="self-start"
-        busy={updateBadges.isPending || updateChannels.isPending || updateRecovery.isPending}
+        busy={
+          updateBadges.isPending ||
+          updateChannels.isPending ||
+          updateRecovery.isPending ||
+          updateGift.isPending
+        }
         disabled={!changed}
         icon={<Save aria-hidden className="size-5" />}
       >

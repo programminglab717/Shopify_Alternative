@@ -249,6 +249,8 @@ export interface OrderDetail {
   cancelReason: OrderCancelReason | null;
   overPlanLimit: boolean;
   note: string;
+  /** The words to go with it as a gift (ADR-413); absent where a fake core leaves it out. */
+  giftMessage?: string | null;
   tags: string[];
   phone: string | null;
   email: string | null;
@@ -2498,6 +2500,27 @@ export interface CheckoutPageData {
   checkoutMarketingChannels: MarketingChannel[];
   onlineStorePreferences: { whatsappNumber: string | null };
   checkoutRecoverySettings: { reminderAfterMinutes: number | null };
+  /** Gift wrap and messages (ADR-413); absent where a fake core leaves it out. */
+  checkoutGiftOptions?: CheckoutGiftOptions;
+}
+
+/** What checkout offers to send a gift with (CHK-16, ADR-413). */
+export interface CheckoutGiftOptions {
+  wrap: {
+    variantId: string;
+    productTitle: string;
+    variantTitle: string;
+    price: MoneyValue;
+    forSale: boolean;
+  } | null;
+  messages: boolean;
+}
+
+export interface CheckoutGiftOptionsUpdateData {
+  checkoutGiftOptionsUpdate: {
+    checkoutGiftOptions: CheckoutGiftOptions | null;
+    userErrors: UserError[];
+  };
 }
 
 export interface CheckoutRecoverySettingsUpdateData {

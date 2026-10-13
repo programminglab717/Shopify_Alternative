@@ -1,3 +1,4 @@
+import { Gift } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -290,6 +291,17 @@ export function NoteAndTags({ order }: { order: OrderDetail }) {
 
   return (
     <div className="flex flex-col gap-2">
+      {order.giftMessage && (
+        <div className="rounded-control border border-line px-3 py-2">
+          <p className="flex items-center gap-2 font-medium">
+            <Gift aria-hidden className="size-4 text-secondary" />
+            {t('details.giftMessage')}
+          </p>
+          <p className="whitespace-pre-line" dir="auto">
+            {order.giftMessage}
+          </p>
+        </div>
+      )}
       {order.note ? (
         <p className="whitespace-pre-line" dir="auto">
           {order.note}

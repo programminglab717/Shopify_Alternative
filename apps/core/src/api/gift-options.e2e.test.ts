@@ -167,6 +167,17 @@ describe.skipIf(!server)('Admin GraphQL API and checkout: gift options (CHK-16, 
       { giftMessage: 'Eid Mubarak!', lineItems: [{ title: 'Gift wrap' }, { title: 'Kurta' }] },
     ]);
 
+    // The customer's page for the order says it too (ADR-413).
+    const [{ id }] = (await data(tokens.orders, '{ orders(first: 1) { nodes { id } } }')).nodes;
+    const link = await data(
+      tokens.all,
+      'mutation ($id: ID!) { orderLinkCreate(id: $id) { url userErrors { code } } }',
+      { id },
+    );
+    const page = await app.inject({ method: 'GET', url: new URL(link.url).pathname });
+    expect(page.body).toContain('Gift message');
+    expect(page.body).toContain('Eid Mubarak!');
+
     // Staff take one with a message too, of at most 250 characters.
     const order = (giftMessage: string) =>
       data(
