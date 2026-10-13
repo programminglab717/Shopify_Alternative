@@ -440,7 +440,15 @@ function HandedOver({ handOver, timezone }: { handOver: ParcelHandOverValue; tim
 
 type Open = 'step' | 'checkIn' | 'lost' | 'claim' | 'tracking' | null;
 
-function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }) {
+function Parcel({
+  parcel,
+  timezone,
+  pickup,
+}: {
+  parcel: ParcelDetail;
+  timezone: string;
+  pickup: boolean;
+}) {
   const { t, locale } = useLocale();
   const { role } = useShop();
   const [open, setOpen] = useState<Open>(null);
@@ -482,7 +490,7 @@ function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }
               {tracking || t('parcels.noTracking')}
             </a>
           ) : (
-            tracking || t('parcels.noTracking')
+            tracking || t(pickup ? 'parcels.atCounter' : 'parcels.noTracking')
           )}
         </span>
         <Badge
@@ -621,13 +629,15 @@ function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }
               {t('returns.lost.it')}
             </Button>
           )}
-          <Button
-            variant="tertiary"
-            icon={<Pencil aria-hidden className="size-5" />}
-            onClick={() => setOpen('tracking')}
-          >
-            {t('parcels.tracking.edit')}
-          </Button>
+          {!pickup && (
+            <Button
+              variant="tertiary"
+              icon={<Pencil aria-hidden className="size-5" />}
+              onClick={() => setOpen('tracking')}
+            >
+              {t('parcels.tracking.edit')}
+            </Button>
+          )}
         </div>
       )}
     </li>
@@ -640,12 +650,21 @@ function Parcel({ parcel, timezone }: { parcel: ParcelDetail; timezone: string }
  * way; moved along by those who work orders:
  * delivered, refused, a step told of a courier Hatti does not follow, lost after asking, or
  * checked back in with what is damaged written off; its tracking corrected, whatever its state.
+ * What a customer picked up (ADR-389) was handed over at the counter: no tracking to correct.
  */
-export function Parcels({ parcels, timezone }: { parcels: ParcelDetail[]; timezone: string }) {
+export function Parcels({
+  parcels,
+  timezone,
+  pickup = false,
+}: {
+  parcels: ParcelDetail[];
+  timezone: string;
+  pickup?: boolean;
+}) {
   return (
     <ul className="flex flex-col divide-y divide-line">
       {parcels.map((parcel) => (
-        <Parcel key={parcel.id} parcel={parcel} timezone={timezone} />
+        <Parcel key={parcel.id} parcel={parcel} timezone={timezone} pickup={pickup} />
       ))}
     </ul>
   );

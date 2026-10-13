@@ -53,6 +53,7 @@ const TABS: readonly (OrderStage | null)[] = [
   'AWAITING_PAYMENT',
   'TO_PACK',
   'TO_BOOK',
+  'READY_FOR_PICKUP',
   'IN_TRANSIT',
   'DELIVERED',
   'RETURNING',

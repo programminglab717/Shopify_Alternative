@@ -302,6 +302,7 @@ describe.skipIf(!server)('OrderService', () => {
       transfersToCheck: none,
       toPack: none,
       toBook: none,
+      readyForPickup: none,
       returning: none,
       returnsToReceive: none,
       lostToClaim: none,
@@ -346,6 +347,7 @@ describe.skipIf(!server)('OrderService', () => {
       transfersToCheck: none,
       toPack: { count: 1, total: 2_000_00n },
       toBook: { count: 1, total: 2_000_00n },
+      readyForPickup: none,
       returning: { count: 1, total: 2_000_00n },
       // So are customer returns (returns.test.ts), and lost parcels (fulfillments.test.ts).
       returnsToReceive: none,

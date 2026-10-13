@@ -18,6 +18,7 @@ import {
   type FulfillmentCreatedPayload,
   type FulfillmentEventCreatedPayload,
   type FulfillmentUpdatedPayload,
+  type OrderPaidPayload,
 } from './events.js';
 import {
   EVENT_WORDS,
@@ -36,7 +37,7 @@ import {
 import { CLAIM_LIMITS, claimedParcel, parcelWorth, writtenOffWorth } from './parcel-claims.js';
 import type { FulfillmentEventRecord, OrderRecord, Page, ParcelClaimRecord } from './records.js';
 import { OVER_LIMIT_MESSAGE } from './plan-orders.js';
-import { LIMITS, orderName } from './rules.js';
+import { LIMITS, PICKUP_NOT_SHIPPED, orderName } from './rules.js';
 import {
   FULFILLMENT_EVENT_STATUSES,
   fulfillmentEvents,
@@ -300,6 +301,26 @@ function items(count: number): string {
   return count === 1 ? '1 item' : `${count} items`;
 }
 
+/**
+ * Why an open order's items cannot leave the shop yet, shipped or handed over: not confirmed, or
+ * waiting for its money; null if they can.
+ */
+function handOverRefusal(order: OrderRow): string | null {
+  if (order.confirmationStatus !== 'confirmed' && order.confirmationStatus !== 'not_required') {
+    return order.deliveryMethod === 'pickup'
+      ? 'Confirm the order with the customer before handing it over'
+      : 'Confirm the order with the customer before shipping it';
+  }
+  if (order.stage === 'awaiting_payment') {
+    return order.paymentMethod === 'bank_transfer'
+      ? 'Mark the order paid once its bank transfer is in'
+      : order.paymentMethod === 'online'
+        ? 'The order waits for its payment online'
+        : 'Record the advance it asks for once it is in';
+  }
+  return null;
+}
+
 /** The courier, as the parcel names it: "TCS", or "the courier". */
 function courierOf(parcel: { trackingCompany: string | null }): string {
   return parcel.trackingCompany ?? 'the courier';
@@ -365,20 +386,10 @@ export class FulfillmentService {
       if (order.status !== 'open') {
         return failOne(['id'], 'INVALID', `A ${order.status} order can't be shipped`);
       }
-      if (order.confirmationStatus !== 'confirmed' && order.confirmationStatus !== 'not_required') {
-        return failOne(['id'], 'INVALID', 'Confirm the order with the customer before shipping it');
-      }
-      if (order.stage === 'awaiting_payment') {
-        return failOne(
-          ['id'],
-          'INVALID',
-          order.paymentMethod === 'bank_transfer'
-            ? 'Mark the order paid once its bank transfer is in'
-            : order.paymentMethod === 'online'
-              ? 'The order waits for its payment online'
-              : 'Record the advance it asks for once it is in',
-        );
-      }
+      // Handed over at the counter instead (ADR-389).
+      if (order.deliveryMethod === 'pickup') return failOne(['id'], 'INVALID', PICKUP_NOT_SHIPPED);
+      const unready = handOverRefusal(order);
+      if (unready) return failOne(['id'], 'INVALID', unready);
       const orderLines = await tx
         .select({
           id: lines.id,
@@ -485,6 +496,134 @@ export class FulfillmentService {
       return {
         ok: true,
         value: { order: (await loadOrder(tx, tenant.shopId, order.id))!, fulfillmentId },
+      };
+    });
+  }
+
+  /**
+   * The customer collected their pickup order (SHP-15, ADR-389): what is left of it goes as one
+   * parcel, delivered there and then with no courier, and what it still owed, cash paid at the
+   * counter, is received, so the order is complete. Packed or not: ready for pickup is the shop's
+   * word to the customer, not a step it must take.
+   */
+  async pickUp(tenant: ParcelCaller, orderId: string): Promise<MutationResult<ParcelResult>> {
+    return this.db.tenant(tenant.shopId, async (tx): Promise<MutationResult<ParcelResult>> => {
+      const { shopId } = tenant;
+      const order = await lockOrder(tx, shopId, orderId);
+      if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
+      if (order.overLimitAt) return failOne(['id'], 'INVALID', OVER_LIMIT_MESSAGE);
+      if (order.status !== 'open') {
+        return failOne(['id'], 'INVALID', `A ${order.status} order can't be picked up`);
+      }
+      if (order.deliveryMethod !== 'pickup') {
+        return failOne(['id'], 'INVALID', 'The order is sent to its customer, not picked up');
+      }
+      const unready = handOverRefusal(order);
+      if (unready) return failOne(['id'], 'INVALID', unready);
+      const left = (
+        await tx
+          .select({
+            id: lines.id,
+            variantId: lines.variantId,
+            quantity: lines.quantity,
+            fulfilledQuantity: lines.fulfilledQuantity,
+          })
+          .from(lines)
+          .where(and(eq(lines.shopId, shopId), eq(lines.orderId, order.id)))
+      )
+        .filter((line) => line.quantity > line.fulfilledQuantity)
+        .map((line) => ({ line, quantity: line.quantity - line.fulfilledQuantity }));
+      if (left.length === 0) {
+        return failOne(['id'], 'INVALID', 'Everything on this order was handed over');
+      }
+      const handed = await this.stock.fulfill(
+        tx,
+        tenant,
+        left.map(({ line, quantity }) => ({
+          variantId: line.variantId,
+          locationId: order.locationId,
+          quantity,
+        })),
+        { referenceDocumentUri: orderReference(order.id) },
+      );
+      if (!handed.ok) throw new Error('Handing stock over cannot fall short');
+      const fulfillmentId = newId();
+      await tx.insert(fulfillments).values({
+        shopId,
+        id: fulfillmentId,
+        orderId: order.id,
+        locationId: order.locationId,
+        status: 'delivered',
+        deliveredAt: sql`now()`,
+      });
+      await tx
+        .insert(fulfillmentLines)
+        .values(
+          left.map(({ line, quantity }) => ({ shopId, fulfillmentId, lineId: line.id, quantity })),
+        );
+      await tx.execute(sql`
+        UPDATE orders.lines l
+           SET fulfilled_quantity = l.quantity
+         WHERE l.shop_id = ${shopId} AND l.order_id = ${order.id}`);
+      // Cash at the counter: what it still owed is in.
+      const owed = order.total - order.amountPaid;
+      const updated = await updateOrder(
+        tx,
+        shopId,
+        order,
+        owed > 0n
+          ? {
+              financialStatus: order.amountRefunded > 0n ? 'partially_refunded' : 'paid',
+              amountPaid: order.total,
+            }
+          : {},
+        owed > 0n ? ['paidAt'] : [],
+      );
+      const units = left.reduce((sum, { quantity }) => sum + quantity, 0);
+      await addTimelineEntry(
+        tx,
+        shopId,
+        order.id,
+        tenant.actor,
+        'fulfilled',
+        `Picked up by the customer: ${items(units)}`,
+      );
+      await appendEvent<FulfillmentCreatedPayload>(tx, shopId, {
+        type: OrderEvents.FulfillmentCreated,
+        aggregateType: 'fulfillment',
+        aggregateId: fulfillmentId,
+        payload: {
+          orderId: order.id,
+          status: 'delivered',
+          trackingCompany: null,
+          trackingNumber: null,
+          orderStage: updated.stage,
+          orderVersion: updated.version,
+        },
+      });
+      if (owed > 0n) {
+        await addTimelineEntry(
+          tx,
+          shopId,
+          order.id,
+          tenant.actor,
+          'paid',
+          `${formatMoney(money(owed, order.currency as CurrencyCode))} received at the counter`,
+        );
+        await appendEvent<OrderPaidPayload>(tx, shopId, {
+          type: OrderEvents.OrderPaid,
+          aggregateType: 'order',
+          aggregateId: order.id,
+          payload: {
+            amountPaid: order.total.toString(),
+            stage: updated.stage,
+            version: updated.version,
+          },
+        });
+      }
+      return {
+        ok: true,
+        value: { order: (await loadOrder(tx, shopId, order.id))!, fulfillmentId },
       };
     });
   }

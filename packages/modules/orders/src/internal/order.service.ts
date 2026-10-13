@@ -105,6 +105,7 @@ import {
   type AddressValue,
   type CancelReasonValue,
   type ConfirmationStatusValue,
+  type DeliveryMethodValue,
   type FinancialStatusValue,
   type OrderRow,
   type OrderSourceValue,
@@ -137,6 +138,11 @@ export interface OrderCreateInput {
   discount?: string | null;
   /** Where it ships from, and where its stock is committed; chosen (ADR-355) if left out. */
   locationId?: string | null;
+  /**
+   * Shipped unless given; or collected at `locationId`, which must offer pickup (SHP-15,
+   * ADR-389), or the one location that does when left out.
+   */
+  deliveryMethod?: DeliveryMethodValue | null;
   note?: string | null;
   tags?: string[] | null;
 }
@@ -181,6 +187,11 @@ export interface OrderToPlace {
   onlineDiscount?: bigint;
   /** Where it ships from; chosen (ADR-355) if null. */
   locationId: string | null;
+  /**
+   * Shipped, as unless given; or collected at its location, which must offer pickup (ADR-389),
+   * with no delivery charge.
+   */
+  deliveryMethod?: DeliveryMethodValue;
   note: string;
   tags: string[];
   /**
@@ -404,6 +415,7 @@ export class OrderService {
       advance,
       advanceDue,
       locationId: input.locationId ?? null,
+      deliveryMethod: input.deliveryMethod ?? 'shipping',
       note,
       tags,
     };
@@ -450,6 +462,17 @@ export class OrderService {
         'The shop takes no payments online: connect a payment gateway account first',
       );
     }
+    const deliveryMethod = order.deliveryMethod ?? 'shipping';
+    const pickupAt =
+      deliveryMethod === 'pickup' ? await this.#pickupLocation(tx, shopId, order) : null;
+    if (pickupAt && !pickupAt.ok) return { ok: false, errors: [pickupAt.error] };
+    if (deliveryMethod === 'pickup' && shipping > 0n) {
+      return failOne(
+        [...order.field, 'shippingPrice'],
+        'INVALID',
+        'An order the customer picks up has no delivery charge',
+      );
+    }
     const lineField = (index: number) => [...order.field, 'lineItems', String(index)];
     const snapshots = await this.variants.snapshotsOf(
       tx,
@@ -459,7 +482,7 @@ export class OrderService {
     const location = await this.#location(
       tx,
       shopId,
-      order.locationId,
+      pickupAt?.ok ? pickupAt.value : order.locationId,
       [...order.field, 'locationId'],
       order.lines,
     );
@@ -667,8 +690,16 @@ export class OrderService {
         planMonth: planMonth?.month ?? null,
         overLimitAt: planOrder?.overLimit ? sql`now()` : null,
         ...statuses,
-        stage: stageOf({ ...statuses, paymentMethod, amountPaid, total, advanceDue }),
+        stage: stageOf({
+          ...statuses,
+          paymentMethod,
+          deliveryMethod,
+          amountPaid,
+          total,
+          advanceDue,
+        }),
         paymentMethod,
+        deliveryMethod,
         currency,
         subtotal,
         discount,
@@ -973,8 +1004,8 @@ export class OrderService {
                   FROM orders.orders o) o
          WHERE shop_id = ${tenant.shopId} ${at(sql`location_id`)}
            AND stage IN ('needs_confirmation', 'needs_review', 'awaiting_payment', 'to_pack',
-                         'to_book', 'partially_fulfilled', 'in_transit', 'returning',
-                         'delivered')
+                         'to_book', 'ready_for_pickup', 'partially_fulfilled', 'in_transit',
+                         'returning', 'delivered')
          GROUP BY stage`);
       // Parcels the courier lost that are not claimed yet, at their worth; and the claims still
       // open, for those and for parcels that came back damaged (ADR-098).
@@ -1022,6 +1053,7 @@ export class OrderService {
         },
         toPack: stageAt('to_pack'),
         toBook: stageAt('to_book'),
+        readyForPickup: stageAt('ready_for_pickup'),
         returning: stageAt('returning'),
         returnsToReceive: { count: coming[0]!.count, total: BigInt(coming[0]!.total) },
         lostToClaim: { count: lost[0]!.unclaimed_count, total: BigInt(lost[0]!.unclaimed) },
@@ -1869,7 +1901,9 @@ export class OrderService {
         order.id,
         tenant.actor,
         'packed',
-        'Marked as packed',
+        order.deliveryMethod === 'pickup'
+          ? 'Marked as packed, ready for the customer to pick up'
+          : 'Marked as packed',
       );
       await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
         type: OrderEvents.OrderUpdated,
@@ -2061,6 +2095,10 @@ export class OrderService {
       if (order.locationId === locationId) return { ok: true, value: order };
       const location = await this.#location(tx, shopId, locationId, ['locationId'], []);
       if (!location.ok) return { ok: false, errors: [location.error] };
+      // Collected where the customer was told to come: only somewhere that offers it (ADR-389).
+      if (order.deliveryMethod === 'pickup' && !location.value.localPickup) {
+        return failOne(['locationId'], 'INVALID', noPickupAt(location.value.name));
+      }
       const orderLines = await tx
         .select({ variantId: lines.variantId, quantity: lines.quantity, title: lines.title })
         .from(lines)
@@ -2514,6 +2552,45 @@ export class OrderService {
   }
 
   /**
+   * Where a pickup order is collected (ADR-389): the location named, which must offer pickup; or,
+   * with none named, the one location that does.
+   */
+  async #pickupLocation(
+    tx: Tx,
+    shopId: string,
+    order: OrderToPlace,
+  ): Promise<{ ok: true; value: string } | { ok: false; error: FieldError }> {
+    const field = [...order.field, 'locationId'];
+    const offering = await this.locations.pickupLocationsIn(tx, shopId);
+    if (order.locationId) {
+      if (offering.some((location) => location.id === order.locationId)) {
+        return { ok: true, value: order.locationId };
+      }
+      const named = (await this.locations.locationsOf(tx, shopId, [order.locationId])).get(
+        order.locationId,
+      );
+      return {
+        ok: false,
+        error: named
+          ? { field, code: 'INVALID', message: noPickupAt(named.name) }
+          : { field, code: 'NOT_FOUND', message: 'Location not found' },
+      };
+    }
+    if (offering.length === 1) return { ok: true, value: offering[0]!.id };
+    return {
+      ok: false,
+      error: {
+        field,
+        code: 'BLANK',
+        message:
+          offering.length === 0
+            ? 'No location offers pickup: let customers pick up at one in its settings'
+            : 'Choose where the customer picks the order up',
+      },
+    };
+  }
+
+  /**
    * The location named, which must be active; or, with none named, the first fulfilling online
    * orders that has all of `lines` for sale, the primary otherwise (INV-10, ADR-355).
    */
@@ -2555,6 +2632,11 @@ function agreementColumns(
     clientIp: agreement.ip && isIP(agreement.ip) !== 0 ? agreement.ip : null,
     clientUserAgent: agreement.userAgent?.replace(/\p{Cc}/gu, '').slice(0, 512) || null,
   };
+}
+
+/** Why a pickup order cannot be collected at a location (ADR-389). */
+function noPickupAt(name: string): string {
+  return `Customers can't pick up at ${name}: let them in the location's settings`;
 }
 
 /** Why an order cannot be packed, or null if it can. */

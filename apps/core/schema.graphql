@@ -4055,6 +4055,11 @@ type Home {
   parcelsUnseen: Int!
 
   """
+  Packed, for their customers to collect (SHP-15, ADR-389): READY_FOR_PICKUP.
+  """
+  readyForPickup: HomeTally!
+
+  """
   Refused or undeliverable parcels on their way back, to check in: RETURNING.
   """
   returning: HomeTally!
@@ -4737,6 +4742,12 @@ type LinkTaps {
   url: String!
 }
 
+input LocalPickupSettingsInput {
+  """Up to 200 characters."""
+  instructions: String
+  locationId: ID!
+}
+
 """
 How a field's words are written, so an editor knows how to take its translation.
 """
@@ -4768,6 +4779,11 @@ type Location {
 
   """The first location; it cannot be deactivated or deleted."""
   isPrimary: Boolean!
+
+  """
+  Customers may collect their orders here (SHP-15, ADR-389), as Shopify's localPickupSettingsV2 says; null where they may not.
+  """
+  localPickupSettings: LocationLocalPickupSettings
   name: String!
   updatedAt: DateTime!
 
@@ -4866,6 +4882,19 @@ input LocationEditInput {
 type LocationEditPayload {
   location: Location
   userErrors: [UserError!]!
+}
+
+type LocationLocalPickupPayload {
+  location: Location
+  userErrors: [UserError!]!
+}
+
+"""How customers collect their orders at a location (ADR-389)."""
+type LocationLocalPickupSettings {
+  """
+  What it tells customers of picking up: "Ready in two hours; ask at the counter".
+  """
+  instructions: String
 }
 
 type LocationMakePrimaryPayload {
@@ -5483,6 +5512,11 @@ enum MessageKind {
 
   """Their order was placed: its total."""
   ORDER_PLACED
+
+  """
+  An order they collect is packed and waits for them: where, and what the location tells customers of picking up there (SHP-15, ADR-389).
+  """
+  ORDER_READY_FOR_PICKUP
 
   """
   For staff, at their own numbers: a customer sent the receipt of their transfer for an order still waiting for it; told to whom the order is given, else to the owners and managers (PAY-02, ADR-247).
@@ -6152,6 +6186,16 @@ type Mutation {
   locationEdit(id: ID!, input: LocationEditInput!): LocationEditPayload!
 
   """
+  Stops customers choosing to collect their orders at a location (ADR-389); orders placed for pickup there stay so.
+  """
+  locationLocalPickupDisable(locationId: ID!): LocationLocalPickupPayload!
+
+  """
+  Lets customers collect their orders at an active location with its street and city (SHP-15, ADR-389), as Shopify's locationLocalPickupEnable; given again, its instructions change.
+  """
+  locationLocalPickupEnable(localPickupSettings: LocalPickupSettingsInput!): LocationLocalPickupPayload!
+
+  """
   Makes an active location the shop's primary one, where stock is counted in the admin and orders ship from when none has all of an order; the one before stops being it.
   """
   locationMakePrimary(locationId: ID!): LocationMakePrimaryPayload!
@@ -6333,6 +6377,11 @@ type Mutation {
   Marks a confirmed or paid order as packed, moving it from TO_PACK to TO_BOOK. Shipping does not need it; it is for shops that pack and book in separate steps.
   """
   orderMarkPacked(id: ID!): OrderMarkPackedPayload!
+
+  """
+  The customer collected their pickup order (SHP-15, ADR-389): what is left of it is handed over as one parcel, delivered at once with no courier, and what it still owed is received as cash at the counter, so it is complete.
+  """
+  orderMarkPickedUp(id: ID!): OrderMarkPickedUpPayload!
 
   """Takes back a packed mark while nothing has shipped: back to TO_PACK."""
   orderMarkUnpacked(id: ID!): OrderMarkUnpackedPayload!
@@ -7161,6 +7210,7 @@ type Order {
   The customer's link, where they follow the order and act on it while they may; null without one. orderLinkCreate makes one.
   """
   customerLink: OrderCustomerLink
+  deliveryMethod: OrderDeliveryMethod!
 
   """The discount codes it was placed with, as the shop wrote them."""
   discountCodes: [String!]!
@@ -7410,6 +7460,11 @@ input OrderCreateInput {
   """
   advancePaid: String
 
+  """
+  Default SHIPPING. PICKUP: collected at locationId, which must offer local pickup, or at the one location that does when left out; with no shippingPrice.
+  """
+  deliveryMethod: OrderDeliveryMethod
+
   """Taken off the items, as an amount."""
   discount: String
   email: String
@@ -7448,6 +7503,17 @@ type OrderCustomerLink {
   When it stops working: at the time it was made to expire, or 30 days after the order is closed or cancelled, whichever comes first. Null while the order is open, for a link made to last.
   """
   expiresAt: DateTime
+}
+
+"""How an order reaches its customer (SHP-15, ADR-389)."""
+enum OrderDeliveryMethod {
+  """
+  Collected by the customer at its location, which offers pickup: no delivery charge, READY_FOR_PICKUP once packed, and complete once picked up.
+  """
+  PICKUP
+
+  """Sent to the address, by a courier or the shop."""
+  SHIPPING
 }
 
 """Packing slips or invoices, as one HTML page to print or save."""
@@ -7806,6 +7872,13 @@ type OrderMarkPackedPayload {
   userErrors: [UserError!]!
 }
 
+type OrderMarkPickedUpPayload {
+  """What was handed over, as a parcel delivered at the counter."""
+  fulfillment: Fulfillment
+  order: Order
+  userErrors: [UserError!]!
+}
+
 type OrderMarkUnpackedPayload {
   order: Order
   userErrors: [UserError!]!
@@ -8118,6 +8191,11 @@ enum OrderStage {
 
   """Some items shipped, some still to ship."""
   PARTIALLY_FULFILLED
+
+  """
+  Packed, for its customer to collect at its location (SHP-15, ADR-389); orderMarkPickedUp hands it over.
+  """
+  READY_FOR_PICKUP
 
   """Came back and was checked in."""
   RETURNED

@@ -133,6 +133,12 @@ function core(role: StaffRole, answer = order()) {
         return ok('orderCommentDelete');
       case 'OrderUpdate':
         return ok('orderUpdate');
+      case 'OrderMarkPacked':
+        return ok('orderMarkPacked');
+      case 'OrderMarkPickedUp':
+        return ok('orderMarkPickedUp');
+      case 'OrderMarkUnpacked':
+        return ok('orderMarkUnpacked');
       case 'Messages':
         return {
           messages: {
@@ -377,5 +383,39 @@ describe("An order's everyday edits, on its page", () => {
     renderAdmin('/shop_1/orders/ord_7');
     const read = await screen.findByRole('region', { name: 'Ships from' });
     expect(within(read).queryByRole('button')).toBeNull();
+  });
+
+  it('marks an order the customer collects ready for pickup, then picked up, never shipped (ADR-389)', async () => {
+    const toPack = core('packer', order({ deliveryMethod: 'PICKUP' }));
+    vi.stubGlobal('fetch', toPack.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark ready for pickup' }));
+    await waitFor(() => expect(sentOf(toPack, 'OrderMarkPacked')).toEqual({ id: 'ord_7' }));
+    // Picked up at its location, which can still change before it is packed.
+    const at = screen.getByRole('region', { name: 'Picked up at' });
+    expect(within(at).getByText('Main location')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Mark as shipped' })).toBeNull();
+    cleanup();
+
+    const ready = core('packer', order({ deliveryMethod: 'PICKUP', stage: 'READY_FOR_PICKUP' }));
+    vi.stubGlobal('fetch', ready.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    expect(await screen.findByText('Ready for pickup')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Unpack' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Mark as shipped' })).toBeNull();
+    // Its cash is taken at the counter, not the door.
+    expect(screen.getByText('To collect at the counter')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Picked up' }));
+    await waitFor(() => expect(sentOf(ready, 'OrderMarkPickedUp')).toEqual({ id: 'ord_7' }));
+    cleanup();
+
+    // A marketer only reads it.
+    vi.stubGlobal(
+      'fetch',
+      core('marketer', order({ deliveryMethod: 'PICKUP', stage: 'READY_FOR_PICKUP' })).fetcher,
+    );
+    renderAdmin('/shop_1/orders/ord_7');
+    await screen.findByRole('region', { name: 'Picked up at' });
+    expect(screen.queryByRole('button', { name: 'Picked up' })).toBeNull();
   });
 });

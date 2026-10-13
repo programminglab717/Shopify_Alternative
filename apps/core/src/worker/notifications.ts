@@ -34,6 +34,7 @@ import {
   type OrderCreatedPayload,
   type OrderPaidPayload,
   type OrderPaymentRemindedPayload,
+  type OrderUpdatedPayload,
   type OrderNotificationFacts,
 } from '@hatti/orders/public';
 import { LOGOS_PATH } from '../api/logos.js';
@@ -56,13 +57,15 @@ const ON_WHATSAPP = 'on WhatsApp';
  * was placed (COD-01, ADR-147), its link with it; their answer confirms or cancels it, or brings
  * them its page to change its address, and an order confirmed, by them or the shop, says so. A
  * delivery that failed asks whether to deliver it again or call them first (COD-08, ADR-388), and
- * their answer is kept for the shop.
+ * their answer is kept for the shop. An order its customer collects says where once it is ready
+ * (ADR-389).
  */
 export class OrderNotifications {
   /** The events {@link handle} reads. */
   static readonly EVENTS: readonly string[] = [
     OrderEvents.OrderCreated,
     OrderEvents.OrderConfirmed,
+    OrderEvents.OrderUpdated,
     OrderEvents.OrderCancelled,
     OrderEvents.OrderPaid,
     OrderEvents.OrderPaymentReminded,
@@ -91,6 +94,13 @@ export class OrderNotifications {
       case OrderEvents.OrderConfirmed:
         await this.#queue(event.shopId, 'order_confirmed', event.aggregateId);
         return;
+      case OrderEvents.OrderUpdated: {
+        const { changed, stage } = event.payload as Partial<OrderUpdatedPayload>;
+        if (changed?.includes('packed') && stage === 'ready_for_pickup') {
+          await this.#readyForPickup(event.shopId, event.aggregateId);
+        }
+        return;
+      }
       case OrderEvents.OrderCancelled: {
         const { reason } = event.payload as Partial<OrderCancelledPayload>;
         if (reason !== 'merged') {
@@ -262,6 +272,32 @@ export class OrderNotifications {
         },
       });
       if (id) await this.#carryPage(tx, shopId, orderId, id, 'that it is out for delivery');
+    });
+  }
+
+  /**
+   * An order its customer collects is packed and waits for them (SHP-15, ADR-389): where to come,
+   * and what the location tells customers of picking up there. Once; not once it was picked up.
+   */
+  async #readyForPickup(shopId: string, orderId: string): Promise<void> {
+    await this.database.tenant(shopId, async (tx) => {
+      const order = await orderNotificationFactsIn(tx, shopId, orderId);
+      if (!order || order.erased || !order.phone || !order.pickup) return;
+      if (order.stage !== 'ready_for_pickup') return;
+      const { name, address, instructions } = order.pickup;
+      await this.messages.queueIn(tx, shopId, {
+        kind: 'order_ready_for_pickup',
+        recipient: order.phone,
+        email: order.email,
+        orderId,
+        customerId: order.customerId,
+        dedupeKey: `order_ready_for_pickup:${orderId}`,
+        variables: {
+          ...(await this.#variables(tx, shopId, order)),
+          location: name,
+          address: instructions ? `${address || name} (${instructions})` : address || name,
+        },
+      });
     });
   }
 

@@ -444,6 +444,14 @@ export class OrderEditService {
         if (merged.paymentMethod !== into.paymentMethod) {
           return failOne(['intoId'], 'INVALID', 'Only orders paid the same way merge');
         }
+        // One parcel, sent or collected (ADR-389).
+        if (merged.deliveryMethod !== into.deliveryMethod) {
+          return failOne(
+            ['intoId'],
+            'INVALID',
+            'Only orders both sent, or both picked up by the customer, merge',
+          );
+        }
         if (merged.amountPaid > 0n || merged.advanceDue > 0n) {
           return failOne(
             ['id'],
@@ -767,6 +775,7 @@ export class OrderEditService {
             stage: stageOf({
               ...statuses,
               paymentMethod: order.paymentMethod,
+              deliveryMethod: order.deliveryMethod,
               amountPaid: 0n,
               total,
               advanceDue: 0n,

@@ -155,6 +155,32 @@ describe("Messages' words", () => {
     expect(messageText('stock_out', 'ur', stock)).toContain('Lawn Kurta (S)');
   });
 
+  it('tells a customer their order is ready to pick up, and where (ADR-389)', () => {
+    const ready = {
+      name: 'Ayesha',
+      shop: 'Zari Fashions',
+      order: '#1043',
+      location: 'Liberty Market shop',
+      address: 'Shop 4, Liberty Market, Lahore (ask at the counter)',
+    };
+    expect(messageText('order_ready_for_pickup', 'en', ready)).toBe(
+      'Assalam-o-Alaikum Ayesha! Your order #1043 from Zari Fashions is ready for you to pick up ' +
+        'at Liberty Market shop: Shop 4, Liberty Market, Lahore (ask at the counter).',
+    );
+    expect(messageText('order_ready_for_pickup', 'ur', ready)).toMatch(
+      /^السلام علیکم Ayesha! Zari Fashions سے آپ کا آرڈر #1043 وصولی کے لیے تیار ہے/,
+    );
+    expect(templateParameters('order_ready_for_pickup', ready)).toEqual([
+      'Ayesha',
+      '#1043',
+      'Zari Fashions',
+      'Liberty Market shop',
+      'Shop 4, Liberty Market, Lahore (ask at the counter)',
+    ]);
+    // News of the order: by email too.
+    expect(EMAILED_KINDS).toContain('order_ready_for_pickup');
+  });
+
   it('asks a customer whose delivery failed whether to deliver it again or call them (ADR-388)', () => {
     const failed = {
       name: 'Ayesha',
@@ -524,6 +550,7 @@ describe("Messages' words", () => {
       'order_confirmed',
       'order_shipped',
       'order_out_for_delivery',
+      'order_ready_for_pickup',
       'order_delivered',
       'order_cancelled',
       'order_paid',

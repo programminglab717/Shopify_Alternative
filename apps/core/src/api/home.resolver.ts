@@ -129,6 +129,11 @@ export class Home {
   toBook!: HomeTally;
 
   @Field(() => HomeTally, {
+    description: 'Packed, for their customers to collect (SHP-15, ADR-389): READY_FOR_PICKUP.',
+  })
+  readyForPickup!: HomeTally;
+
+  @Field(() => HomeTally, {
     description: 'Refused or undeliverable parcels on their way back, to check in: RETURNING.',
   })
   returning!: HomeTally;
@@ -203,6 +208,7 @@ export class HomeResolver {
       transfersToCheck: tally(home.transfersToCheck),
       toPack: tally(home.toPack),
       toBook: tally(home.toBook),
+      readyForPickup: tally(home.readyForPickup),
       returning: tally(home.returning),
       returnsToReceive: tally(home.returnsToReceive),
       lostToClaim: tally(home.lostToClaim),

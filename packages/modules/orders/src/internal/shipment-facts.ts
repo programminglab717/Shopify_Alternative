@@ -2,10 +2,11 @@ import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
 import { toDate, type Tx } from '@hatti/db';
 import { sql } from 'drizzle-orm';
 import { OVER_LIMIT_MESSAGE } from './plan-orders.js';
-import { orderName } from './rules.js';
+import { PICKUP_NOT_SHIPPED, orderName } from './rules.js';
 import type {
   AddressValue,
   ConfirmationStatusValue,
+  DeliveryMethodValue,
   OrderStageValue,
   OrderStatusValue,
   ParcelStatusValue,
@@ -46,6 +47,7 @@ type ShipmentRow = {
   stage: OrderStageValue;
   confirmation_status: ConfirmationStatusValue;
   payment_method: string;
+  delivery_method: DeliveryMethodValue;
   shipping_address: StoredAddressValue;
   customer_erased_at: string | Date | null;
   over_limit_at: string | Date | null;
@@ -63,7 +65,7 @@ export async function orderShipmentFactsIn(
 ): Promise<OrderShipmentFacts | null> {
   const { rows } = await tx.execute<ShipmentRow>(sql`
     SELECT o.id, o.number, o.status, o.stage, o.confirmation_status, o.payment_method,
-           o.shipping_address, o.customer_erased_at, o.over_limit_at, o.currency,
+           o.delivery_method, o.shipping_address, o.customer_erased_at, o.over_limit_at, o.currency,
            CASE WHEN o.status = 'open' AND o.payment_method = 'cash_on_delivery'
                 THEN greatest(o.total - o.amount_paid, 0) ELSE 0 END::text AS cod_amount,
            coalesce((
@@ -112,6 +114,7 @@ export async function orderShipmentFactsIn(
 function refusalOf(row: ShipmentRow): string | null {
   if (row.status !== 'open') return `A ${row.status} order can't be shipped`;
   if (row.over_limit_at !== null) return OVER_LIMIT_MESSAGE;
+  if (row.delivery_method === 'pickup') return PICKUP_NOT_SHIPPED;
   if (row.customer_erased_at !== null) {
     return "The customer's details on this order were erased at their request";
   }

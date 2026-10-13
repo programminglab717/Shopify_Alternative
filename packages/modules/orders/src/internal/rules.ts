@@ -3,6 +3,7 @@ import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
 import { formatMoney, money } from '@hatti/money';
 import type {
   ConfirmationStatusValue,
+  DeliveryMethodValue,
   CustomerCancellationValue,
   FulfillmentStatusValue,
   OrderStageValue,
@@ -145,6 +146,8 @@ export interface StageInputs {
   status: OrderStatusValue;
   confirmationStatus: ConfirmationStatusValue;
   paymentMethod: PaymentMethodValue;
+  /** Collected at its location rather than shipped (ADR-389): packed, it waits there. */
+  deliveryMethod: DeliveryMethodValue;
   /** Received so far; refunds since do not change it. */
   amountPaid: bigint;
   total: bigint;
@@ -203,7 +206,10 @@ export function stageOf(order: StageInputs, parcels: ParcelSummary = NO_PARCELS)
   }
   if (order.confirmationStatus === 'needs_review') return 'needs_review';
   if (parcels.shipped === 0 && awaitsTransfer(order)) return 'awaiting_payment';
-  if (parcels.shipped === 0) return order.packedAt ? 'to_book' : 'to_pack';
+  if (parcels.shipped === 0) {
+    if (!order.packedAt) return 'to_pack';
+    return order.deliveryMethod === 'pickup' ? 'ready_for_pickup' : 'to_book';
+  }
   if (parcels.shipped < parcels.units) return 'partially_fulfilled';
   if (parcels.returning > 0) return 'returning';
   if (parcels.inTransit > 0) return 'in_transit';
@@ -312,6 +318,10 @@ export function cancellableByCustomer(
   }
   return window === 'until_packed' && order.paymentMethod === 'cash_on_delivery' && untouched;
 }
+
+/** Why an order its customer collects is not sent with a courier (ADR-389). */
+export const PICKUP_NOT_SHIPPED =
+  'The customer picks this order up: hand it over at the counter and mark it picked up';
 
 /** Stages at which an order is done, so it closes. */
 export function isFinalStage(stage: OrderStageValue): boolean {

@@ -215,6 +215,7 @@ describe('Orders as they come, in the admin', () => {
               transfersToCheck: tally(0),
               toPack: tally(0),
               toBook: tally(0),
+              readyForPickup: tally(0),
               returning: tally(0),
               returnsToReceive: tally(0),
               cashToCollect: tally(0),

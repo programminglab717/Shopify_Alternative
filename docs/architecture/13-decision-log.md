@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-388 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-389 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -396,6 +396,7 @@
 | 386 | Each morning the shop's alerts number hears how the day before went, from nine by its clock, once a day, and not of a day with nothing in it | Accepted |
 | 387 | A courier rule may book with the best value: the account cheapest for each parcel delivered, weighing its rate card with how often its courier delivers to the order's city | Accepted |
 | 388 | A customer whose delivery failed is asked on WhatsApp whether to deliver it again or call them first, and the shop sees the parcels to rescue with each answer | Accepted |
+| 389 | A location lets customers pick orders up, with what to tell them; an order picked up waits ready for pickup once packed, its customer told where, is never booked with a courier, and completes when handed over at the counter | Accepted |
 
 ---
 
@@ -15110,3 +15111,44 @@
   * **Answers changing the parcel's status:** the courier decides the next try; Hatti records
     what the customer asked, not what the courier will do.
   * **Asking only for cash-on-delivery orders:** a prepaid parcel refused is lost just the same.
+
+## ADR-389 · A location lets customers pick orders up, with what to tell them; an order picked up waits ready for pickup once packed, its customer told where, is never booked with a courier, and completes when handed over at the counter
+
+* **Context:**
+  * Shops with a counter, a boutique or a warehouse in town, let nearby customers collect
+    their orders: no courier's charge, no failed delivery, cash taken by hand. SHP-15 asks for
+    store pickup with a message when the order is ready. Orders so far all went by courier or
+    by hand to the customer's door, from the location they ship from ([ADR-355](#adr-355--an-order-ships-from-the-first-location-fulfilling-online-orders-that-has-all-of-it-the-primary-first-or-the-primary-and-from-another-chosen-on-its-page-until-it-is-packed-its-stock-committed-there-and-let-go-where-it-was-in-one-change)).
+* **Decision:**
+  * **A location offers pickup** when the shop lets it (migration 0182, `pickup_enabled` and
+    up to 200 characters of `pickup_instructions`, such as the counter's hours), as Shopify's
+    `locationLocalPickupEnable` and `locationLocalPickupDisable` do. Only an active location
+    with its street address and city may, so customers can find it ([ADR-312](#adr-312--the-admin-lists-the-shops-locations-in-settings-those-out-of-use-too-and-adds-one-with-its-address-and-the-number-couriers-call-for-pickups-changes-it-and-whether-it-fulfils-online-orders-takes-it-out-of-use-and-puts-it-back-and-deletes-one-that-never-held-stock-the-primary-one-stays)); its address is
+    not cleared while it does.
+  * **An order is shipped or picked up** (`deliveryMethod`, `SHIPPING` by default). One
+    picked up is collected at its location, which must offer pickup: the one named, or the
+    only one that does. It has no delivery charge. It moves to another location only where
+    pickup is offered, and merges only with another picked up.
+  * **Packed, it waits at a stage of its own, `READY_FOR_PICKUP`**, in place of to book, on
+    Home and in its own tab. The customer is told on WhatsApp, and by email when they gave one,
+    that it is ready and where: the location's name, address and instructions
+    (`order_ready_for_pickup`, which the shop may turn off); their order's page says so too.
+  * **It is never booked or shipped**: a courier booking or a shipment by hand is refused with
+    why. **"Picked up"** (`orderMarkPickedUp`) hands it over in one step: its stock leaves the
+    location, a parcel with no courier is recorded as delivered, and what it still owed is
+    taken at the counter, so the order completes. Returns, refunds and the timeline work as for
+    any delivered parcel.
+  * In the admin, a location's settings let customers pick up there; an order picked up says
+    where, "Mark ready for pickup" packs it, and "Picked up" hands it over.
+* **Consequences:**
+  * Pickup orders come through the API for now; checkout and draft orders offering pickup come
+    next, with the customer choosing where.
+  * A parcel picked up has no courier and no tracking: no courier owes its cash, which is
+    taken as it is handed over.
+* **Alternatives:**
+  * **Pickup as a zero-charge delivery rate:** the order would still wait to be booked and
+    could be given to a courier by mistake; a method of its own keeps couriers out.
+  * **Cash at the counter recorded by hand:** handing over and taking the money happen
+    together; one step keeps the order from completing unpaid.
+  * **Pickup points apart from locations:** a shop's counter is where its stock is; a location
+    keeps stock, address and orders in one place.

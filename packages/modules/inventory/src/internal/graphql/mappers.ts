@@ -18,7 +18,13 @@ import {
   InventoryLevel,
   InventoryPolicy,
 } from './inventory.types.js';
-import { Location, LocationAddress, LocationConnection, LocationEdge } from './location.types.js';
+import {
+  Location,
+  LocationAddress,
+  LocationConnection,
+  LocationEdge,
+  LocationLocalPickupSettings,
+} from './location.types.js';
 
 /** The UUID behind a public ID of the given kind, or a BAD_USER_INPUT error. */
 export function uuidOf(kind: IdKind, id: string): string {
@@ -56,6 +62,11 @@ export function toLocation(record: LocationRecord): Location {
     isActive: record.isActive,
     isPrimary: record.isPrimary,
     fulfillsOnlineOrders: record.fulfillsOnlineOrders,
+    localPickupSettings:
+      record.localPickup &&
+      Object.assign(new LocationLocalPickupSettings(), {
+        instructions: record.localPickup.instructions,
+      }),
     deactivatedAt: record.deactivatedAt,
     version: record.version,
     createdAt: record.createdAt,

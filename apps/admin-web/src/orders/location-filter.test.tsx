@@ -60,6 +60,7 @@ function core(locations = LOCATIONS) {
             transfersToCheck: tally(0),
             toPack: tally(karachi ? 1 : 7),
             toBook: tally(0),
+            readyForPickup: tally(0),
             returning: tally(0),
             returnsToReceive: tally(0),
             lostToClaim: tally(0),

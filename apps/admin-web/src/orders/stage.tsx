@@ -9,6 +9,7 @@ import {
   RotateCcw,
   SearchX,
   ShieldAlert,
+  Store,
   Truck,
   Undo2,
 } from 'lucide-react';
@@ -35,6 +36,7 @@ export const STAGES: Readonly<
   AWAITING_PAYMENT: { badge: 'needsConfirmation', icon: Clock, label: 'stage.AWAITING_PAYMENT' },
   TO_PACK: { badge: 'confirmed', icon: Package, label: 'stage.TO_PACK' },
   TO_BOOK: { badge: 'packed', icon: PackageCheck, label: 'stage.TO_BOOK' },
+  READY_FOR_PICKUP: { badge: 'packed', icon: Store, label: 'stage.READY_FOR_PICKUP' },
   PARTIALLY_FULFILLED: { badge: 'inTransit', icon: Truck, label: 'stage.PARTIALLY_FULFILLED' },
   IN_TRANSIT: { badge: 'inTransit', icon: Truck, label: 'stage.IN_TRANSIT' },
   DELIVERED: { badge: 'delivered', icon: CircleCheck, label: 'stage.DELIVERED' },

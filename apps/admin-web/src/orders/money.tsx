@@ -56,6 +56,7 @@ const UNSHIPPED: readonly OrderStage[] = [
   'AWAITING_PAYMENT',
   'TO_PACK',
   'TO_BOOK',
+  'READY_FOR_PICKUP',
 ];
 
 const RECEIPT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];

@@ -42,6 +42,24 @@ export class LocationAddress {
   formatted!: string[];
 }
 
+@ObjectType({ description: 'How customers collect their orders at a location (ADR-389).' })
+export class LocationLocalPickupSettings {
+  @Field(() => String, {
+    nullable: true,
+    description: 'What it tells customers of picking up: "Ready in two hours; ask at the counter".',
+  })
+  instructions!: string | null;
+}
+
+@InputType()
+export class LocalPickupSettingsInput {
+  @Field(() => ID)
+  locationId!: string;
+
+  @Field(() => String, { nullable: true, description: 'Up to 200 characters.' })
+  instructions?: string | null;
+}
+
 @ObjectType({ description: 'A place where stock is kept, such as a warehouse or a shop.' })
 export class Location {
   @Field(() => ID)
@@ -61,6 +79,14 @@ export class Location {
 
   @Field({ description: 'Whether online orders can be sent from here, so its stock sells online.' })
   fulfillsOnlineOrders!: boolean;
+
+  @Field(() => LocationLocalPickupSettings, {
+    nullable: true,
+    description:
+      "Customers may collect their orders here (SHP-15, ADR-389), as Shopify's " +
+      'localPickupSettingsV2 says; null where they may not.',
+  })
+  localPickupSettings!: LocationLocalPickupSettings | null;
 
   @Field(() => GraphQLISODateTime, { nullable: true })
   deactivatedAt!: Date | null;
@@ -175,6 +201,15 @@ export class LocationAddPayload {
 
 @ObjectType()
 export class LocationEditPayload {
+  @Field(() => Location, { nullable: true })
+  location!: Location | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class LocationLocalPickupPayload {
   @Field(() => Location, { nullable: true })
   location!: Location | null;
 

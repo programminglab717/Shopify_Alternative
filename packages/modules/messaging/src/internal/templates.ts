@@ -20,6 +20,7 @@ export const MESSAGE_KINDS = [
   'order_shipped',
   'order_out_for_delivery',
   'order_delivery_failed',
+  'order_ready_for_pickup',
   'order_delivered',
   'order_cancelled',
   'order_paid',
@@ -161,6 +162,12 @@ export interface MessageVariables {
    */
   orders?: string;
   limit?: string;
+  /**
+   * For an order its customer collects (ADR-389): the location's name, and its street and city
+   * with what it tells customers of picking up there.
+   */
+  location?: string;
+  address?: string;
   /**
    * For the shop's summary of the day before (ADR-386), with its `date` and its `orders`: their
    * total sales, the parcels delivered and turned back, and the cash on delivery still to come.
@@ -341,6 +348,23 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur:
         'السلام علیکم {name}! {courier} نے {shop} سے آپ کا آرڈر {order} پہنچانے کی کوشش کی مگر ' +
         'ڈیلیوری نہ ہو سکی۔ {shop} کو بتائیں کہ دوبارہ ڈیلیوری کی جائے یا پہلے آپ کو کال کی جائے۔',
+    },
+  },
+  order_ready_for_pickup: {
+    whatsapp: 'hatti_order_ready_for_pickup',
+    category: 'utility',
+    parameters: ['name', 'order', 'shop', 'location', 'address'],
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! Your order {order} from {shop} is ready for you to pick up at ' +
+        '{location}: {address}.',
+      ur:
+        'السلام علیکم {name}! {shop} سے آپ کا آرڈر {order} وصولی کے لیے تیار ہے۔ اسے {location} سے ' +
+        'وصول کریں: {address}۔',
+    },
+    subject: {
+      en: 'Your order {order} is ready for pickup',
+      ur: 'آپ کا آرڈر {order} وصولی کے لیے تیار ہے',
     },
   },
   order_paid: {

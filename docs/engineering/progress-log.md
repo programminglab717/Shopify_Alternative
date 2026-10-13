@@ -6,15 +6,40 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: what comes after the failed-delivery
-rescue, such as asking couriers to deliver again through their APIs where they offer it (COD-08).
+**Next, section by section as the alpha's shops need them**: local pickup offered at checkout and
+on draft orders, the customer choosing where to collect (SHP-15, its second part).
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
-with merchants' accounts; TikTok's and Google's conversions (MKT-10) are V1's; a message when a
-delivery was tried is V1's failed-delivery rescue (COD-08).
+with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
+
+## 2026-10-13
+
+### Local pickup
+
+* **In the core** ([ADR-389](../architecture/13-decision-log.md#adr-389--a-location-lets-customers-pick-orders-up-with-what-to-tell-them-an-order-picked-up-waits-ready-for-pickup-once-packed-its-customer-told-where-is-never-booked-with-a-courier-and-completes-when-handed-over-at-the-counter), SHP-15): a location lets customers pick orders up, with up to 200
+  characters of instructions (migration 0182), once it has its street address and city. An
+  order is shipped or picked up (`deliveryMethod`); one picked up is collected at a location
+  that offers it, with no delivery charge. Packed, it waits as `READY_FOR_PICKUP` rather than
+  to book, and the worker tells the customer it is ready and where
+  (`order_ready_for_pickup`). Courier bookings and shipping by hand refuse it;
+  `orderMarkPickedUp` hands it over, its stock leaving the location, a parcel with no courier
+  delivered and what it owed taken at the counter, so it completes.
+* **In the admin**, a location's settings let customers pick up there with what to tell them;
+  an order picked up says where, "Mark ready for pickup" packs it, "Picked up" hands it over,
+  and Home and the orders list count those ready. Its cash reads as taken at the counter, and
+  what was picked up as handed over there, with no tracking to change.
+* **Tried in Chromium against the core:** pickup let at the Karachi store with its hours; a
+  pickup order there placed, confirmed and marked ready for pickup, a courier booking refused
+  with why, Home saying "1 order ready for pickup"; "Picked up" completed it, paid, with the
+  store's stock one less. The order, its stock and the store's pickup were then taken away. No
+  errors in the browser.
+* 2606 tests (12 new): pickup locations and orders in the orders
+  module; the message in messaging; the worker telling the customer, and pickup through the
+  API, in the core; the location's settings, the order's page and the parcel in the admin, and
+  its queries checked against the schema.
 
 ## 2026-10-12
 

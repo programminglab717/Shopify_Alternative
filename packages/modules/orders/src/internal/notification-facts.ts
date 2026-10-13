@@ -4,7 +4,9 @@ import { awaitsCustomer, transferOwed } from './rules.js';
 import type {
   CancelReasonValue,
   ConfirmationStatusValue,
+  DeliveryMethodValue,
   FulfillmentStatusValue,
+  OrderStageValue,
   OrderSourceValue,
   OrderStatusValue,
   ParcelStatusValue,
@@ -48,6 +50,12 @@ export interface OrderNotificationFacts {
   cancelReason: CancelReasonValue | null;
   /** Whether it is a cash-on-delivery order waiting for its customer to confirm it. */
   awaitsCustomer: boolean;
+  stage: OrderStageValue;
+  /**
+   * Where its customer collects it, for an order they pick up (SHP-15, ADR-389): its location's
+   * name, its street and city on one line, and what it tells customers of picking up there.
+   */
+  pickup: { name: string; address: string; instructions: string | null } | null;
   /** The parcel asked about, when one was. */
   parcel: {
     status: ParcelStatusValue;
@@ -89,6 +97,11 @@ export async function orderNotificationFactsIn(
     cancel_reason: CancelReasonValue | null;
     status: OrderStatusValue;
     payment_method: PaymentMethodValue;
+    stage: OrderStageValue;
+    delivery_method: DeliveryMethodValue;
+    location_name: string;
+    location_address: string;
+    pickup_instructions: string | null;
     confirmation_status: ConfirmationStatusValue;
     fulfillment_status: FulfillmentStatusValue;
     tracking_company: string | null;
@@ -102,7 +115,10 @@ export async function orderNotificationFactsIn(
            o.customer_id,
            o.customer_erased_at IS NOT NULL AS erased, o.phone, o.email,
            o.shipping_address ->> 'name' AS name, o.cancel_reason, o.status, o.payment_method,
-           o.confirmation_status, o.fulfillment_status,
+           o.confirmation_status, o.fulfillment_status, o.stage, o.delivery_method,
+           loc.name AS location_name,
+           concat_ws(', ', loc.address1, loc.address2, loc.city) AS location_address,
+           loc.pickup_instructions,
            f.tracking_company, f.tracking_number, f.tracking_url, f.status AS parcel_status,
            coalesce((SELECT jsonb_agg(jsonb_build_object('title', l.title,
                                                          'variantTitle', l.variant_title,
@@ -115,6 +131,7 @@ export async function orderNotificationFactsIn(
            (SELECT count(*)::int FROM orders.lines
              WHERE shop_id = o.shop_id AND order_id = o.id) AS line_count
       FROM orders.orders o
+      JOIN inventory.locations loc ON loc.shop_id = o.shop_id AND loc.id = o.location_id
       LEFT JOIN orders.fulfillments f
         ON f.shop_id = o.shop_id AND f.order_id = o.id AND f.id = ${parcelId ?? null}::uuid
      WHERE o.shop_id = ${shopId} AND o.id = ${orderId}`);
@@ -149,6 +166,15 @@ export async function orderNotificationFactsIn(
       confirmationStatus: row.confirmation_status,
       fulfillmentStatus: row.fulfillment_status,
     }),
+    stage: row.stage,
+    pickup:
+      row.delivery_method === 'pickup'
+        ? {
+            name: row.location_name,
+            address: row.location_address,
+            instructions: row.pickup_instructions,
+          }
+        : null,
     parcel: row.parcel_status
       ? {
           status: row.parcel_status,

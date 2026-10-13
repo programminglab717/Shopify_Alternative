@@ -242,6 +242,26 @@ describe("An order's parcels, on its page", () => {
     );
   });
 
+  it('shows what a customer picked up as handed over at the counter, with no tracking to change (ADR-389)', async () => {
+    const pickedUp = parcel('DELIVERED', {
+      deliveredAt: LATER,
+      trackingInfo: { company: null, number: null, url: null },
+      events: { nodes: [] },
+    });
+    const data = order([pickedUp], 'COMPLETED');
+    const fake = fakeCore('packer', (operation) =>
+      operation === 'Order'
+        ? { ...data, order: { ...data.order, deliveryMethod: 'PICKUP' } }
+        : undefined,
+    );
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    const parcels = await screen.findByRole('region', { name: 'Parcels' });
+    expect(within(parcels).getByText('Handed over at the counter')).toBeTruthy();
+    expect(within(parcels).queryByRole('button', { name: 'Change tracking' })).toBeNull();
+  });
+
   it("corrects a delivered parcel's tracking, its link https and its refusal named", async () => {
     const fake = core('packer', [parcel('DELIVERED', { deliveredAt: LATER })]);
     vi.stubGlobal('fetch', fake.fetcher);

@@ -36,6 +36,7 @@ import {
   toOrderConnection,
   toOrderEventConnection,
   toPaymentMethodValue,
+  toDeliveryMethodValue,
   toRiskLevelValue,
   toStageValue,
   uuidOf,
@@ -236,6 +237,7 @@ export class OrderResolver {
     const result = await this.service.create(tenant, {
       ...input,
       paymentMethod: input.paymentMethod ? toPaymentMethodValue(input.paymentMethod) : null,
+      deliveryMethod: input.deliveryMethod ? toDeliveryMethodValue(input.deliveryMethod) : null,
       locationId: input.locationId ? uuidOf('location', input.locationId) : null,
       lineItems: input.lineItems.map((line) => ({
         ...line,

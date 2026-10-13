@@ -73,6 +73,7 @@ export function ShipsFrom({ order }: { order: OrderDetail }) {
     order.status === 'OPEN' &&
     !order.overPlanLimit &&
     order.stage !== 'TO_BOOK' &&
+    order.stage !== 'READY_FOR_PICKUP' &&
     order.fulfillments.length === 0;
 
   return (

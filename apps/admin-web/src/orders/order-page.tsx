@@ -4,6 +4,7 @@ import {
   Ban,
   Check,
   EyeOff,
+  HandPlatter,
   PackageCheck,
   PackageOpen,
   Printer,
@@ -17,6 +18,7 @@ import {
   OrderCancelMutation,
   OrderConfirmMutation,
   OrderMarkPackedMutation,
+  OrderMarkPickedUpMutation,
   OrderMarkUnpackedMutation,
   OrderQuery,
 } from '../api/operations';
@@ -56,6 +58,7 @@ export const CANCELLABLE: readonly OrderStage[] = [
   'AWAITING_PAYMENT',
   'TO_PACK',
   'TO_BOOK',
+  'READY_FOR_PICKUP',
 ];
 /** The reasons staff cancel for; MERGED is the merge's own. */
 export const REASONS: readonly OrderCancelReason[] = [
@@ -105,6 +108,7 @@ function Actions({ order }: { order: OrderDetail }) {
   const confirm = useAdminMutation<OrderMutationData, { id: string }>(OrderConfirmMutation);
   const pack = useAdminMutation<OrderMutationData, { id: string }>(OrderMarkPackedMutation);
   const unpack = useAdminMutation<OrderMutationData, { id: string }>(OrderMarkUnpackedMutation);
+  const pickUp = useAdminMutation<OrderMutationData, { id: string }>(OrderMarkPickedUpMutation);
   const cancel = useAdminMutation<OrderMutationData, { id: string; reason: OrderCancelReason }>(
     OrderCancelMutation,
   );
@@ -134,12 +138,22 @@ function Actions({ order }: { order: OrderDetail }) {
   const open = order.status === 'OPEN' && WORKS_PARCELS.includes(role);
   const canConfirm = open && !order.overPlanLimit && CONFIRMABLE.includes(order.stage);
   const canPack = open && !order.overPlanLimit && order.stage === 'TO_PACK';
-  const canUnpack = open && order.stage === 'TO_BOOK' && order.fulfillments.length === 0;
-  const canShip = open && !order.overPlanLimit && SHIPPABLE.includes(order.stage);
+  // Collected at the counter instead of sent (ADR-389).
+  const pickup = order.deliveryMethod === 'PICKUP';
+  const canUnpack =
+    open &&
+    (order.stage === 'TO_BOOK' || order.stage === 'READY_FOR_PICKUP') &&
+    order.fulfillments.length === 0;
+  const canShip = open && !order.overPlanLimit && !pickup && SHIPPABLE.includes(order.stage);
+  const canPickUp =
+    open &&
+    !order.overPlanLimit &&
+    pickup &&
+    (order.stage === 'TO_PACK' || order.stage === 'READY_FOR_PICKUP');
   const canCancel = open && CANCELLABLE.includes(order.stage);
   // Packed by scanning: the next order to pack, to go on scanning (ADR-374).
   if (packedByScan) return <NextToPack after={order.id} name={order.name} />;
-  if (!canConfirm && !canPack && !canUnpack && !canShip && !canCancel) return null;
+  if (!canConfirm && !canPack && !canUnpack && !canShip && !canPickUp && !canCancel) return null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -160,7 +174,17 @@ function Actions({ order }: { order: OrderDetail }) {
             busy={pack.isPending}
             onClick={() => void run(() => pack.mutateAsync({ id: order.id }))}
           >
-            {t('order.pack')}
+            {t(pickup ? 'order.packForPickup' : 'order.pack')}
+          </Button>
+        )}
+        {canPickUp && (
+          <Button
+            variant={order.stage === 'READY_FOR_PICKUP' ? 'primary' : 'secondary'}
+            icon={<HandPlatter aria-hidden className="size-5" />}
+            busy={pickUp.isPending}
+            onClick={() => void run(() => pickUp.mutateAsync({ id: order.id }))}
+          >
+            {t('order.pickedUp')}
           </Button>
         )}
         {canPack && !scanning && (
@@ -384,7 +408,11 @@ export function OrderPage() {
           )}
           {order.fulfillments.length > 0 && (
             <Section title={t('parcels.title')}>
-              <Parcels parcels={order.fulfillments} timezone={timezone} />
+              <Parcels
+                parcels={order.fulfillments}
+                timezone={timezone}
+                pickup={order.deliveryMethod === 'PICKUP'}
+              />
             </Section>
           )}
           {(order.returns.length > 0 ||
@@ -444,7 +472,9 @@ export function OrderPage() {
           <Section title={t('order.address')}>
             <DeliveryAddress order={order} />
           </Section>
-          <Section title={t('shipsFrom.title')}>
+          <Section
+            title={t(order.deliveryMethod === 'PICKUP' ? 'shipsFrom.pickup' : 'shipsFrom.title')}
+          >
             <ShipsFrom order={order} />
           </Section>
           <Section title={t('details.noteAndTags')}>

@@ -77,6 +77,7 @@ const LABELS = {
   sendReceipt: { en: 'Send receipt', ur: 'رسید بھیجیں' },
   onItsWayTitle: { en: 'On its way', ur: 'آرڈر راستے میں ہے' },
   outForDeliveryTitle: { en: 'Out for delivery', ur: 'آرڈر ڈیلیوری کے لیے نکل چکا ہے' },
+  readyForPickupTitle: { en: 'Ready for pickup', ur: 'آرڈر وصولی کے لیے تیار ہے' },
   deliveredTitle: { en: 'Delivered', ur: 'آرڈر پہنچ گیا' },
   notDeliveredTitle: { en: 'Not delivered', ur: 'آرڈر ڈیلیور نہیں ہوا' },
   cancelledTitle: { en: 'Order cancelled', ur: 'آرڈر منسوخ ہو گیا' },
@@ -805,6 +806,22 @@ function statusPage(
       );
     case 'to_pack':
     case 'to_book':
+      // Collected rather than sent (ADR-389): no address for it to go to.
+      if (order.deliveryMethod === 'pickup') {
+        return show(
+          LABELS.confirmedTitle,
+          {
+            en:
+              `Thank you! Your order ${name} is confirmed. ${shop.name} will tell you when it is ` +
+              'ready for you to pick up.',
+            ur: html`شکریہ! آپ کا آرڈر ${ltr(name)} کنفرم ہو گیا ہے۔ وصولی کے لیے تیار ہونے پر دکان
+            آپ کو بتائے گی۔`,
+          },
+          true,
+          summary(shown),
+          cancellable && cancelLink(),
+        );
+      }
       return show(
         LABELS.confirmedTitle,
         {
@@ -816,6 +833,24 @@ function statusPage(
         summary(shown),
         address(shown, { changeable }),
         cancellable && cancelLink(),
+      );
+    case 'ready_for_pickup':
+      return show(
+        LABELS.readyForPickupTitle,
+        {
+          en: `Your order ${name} is ready. Collect it from ${shop.name}, as they told you.`,
+          ur: html`آپ کا آرڈر ${ltr(name)} تیار ہے۔ دکان کے بتائے ہوئے پتے سے وصول کریں۔`,
+        },
+        true,
+        shown.due > 0n &&
+          paragraphs(
+            {
+              en: `You pay ${amount(shown.due, shown.currency)} when you collect it.`,
+              ur: html`وصولی پر ${ltr(amount(shown.due, shown.currency))} ادا کریں۔`,
+            },
+            'center strong',
+          ),
+        summary(shown),
       );
     case 'partially_fulfilled':
     case 'in_transit':
@@ -1008,7 +1043,9 @@ export function trackingPage(view: TrackingView): LinkPage {
               ? LABELS.awaitingPaymentTitle
               : order.stage === 'to_pack' || order.stage === 'to_book'
                 ? LABELS.confirmedTitle
-                : LABELS.placedTitle;
+                : order.stage === 'ready_for_pickup'
+                  ? LABELS.readyForPickupTitle
+                  : LABELS.placedTitle;
   return page(200, `${title.en} · ${shop.name}`, shop, [
     shopName(shop),
     heading(title),

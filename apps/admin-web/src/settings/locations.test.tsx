@@ -14,6 +14,7 @@ function location(id: string, name: string, extra: object = {}) {
     isPrimary: false,
     isActive: true,
     fulfillsOnlineOrders: true,
+    localPickupSettings: null as { instructions: string | null } | null,
     address: {
       address1: null,
       address2: null,
@@ -103,6 +104,41 @@ function core(role: StaffRole) {
         return ok(
           'locationMakePrimary',
           locations.find((each) => each.id === variables.locationId) ?? null,
+        );
+      case 'LocationLocalPickupEnable': {
+        const settings = variables.settings as { locationId: string; instructions: string | null };
+        if (settings.locationId === 'loc_2') {
+          return {
+            locationLocalPickupEnable: {
+              location: null,
+              userErrors: [
+                {
+                  field: ['localPickupSettings', 'locationId'],
+                  code: 'INVALID',
+                  message:
+                    'Give the location its street address and city, for customers to find it',
+                },
+              ],
+            },
+          };
+        }
+        locations = locations.map((each) =>
+          each.id === settings.locationId
+            ? { ...each, localPickupSettings: { instructions: settings.instructions } }
+            : each,
+        );
+        return ok(
+          'locationLocalPickupEnable',
+          locations.find((each) => each.id === settings.locationId)!,
+        );
+      }
+      case 'LocationLocalPickupDisable':
+        locations = locations.map((each) =>
+          each.id === variables.locationId ? { ...each, localPickupSettings: null } : each,
+        );
+        return ok(
+          'locationLocalPickupDisable',
+          locations.find((each) => each.id === variables.locationId)!,
         );
       case 'LocationDelete':
         locations = locations.filter((each) => each.id !== variables.locationId);
@@ -207,5 +243,36 @@ describe("The shop's locations", () => {
     ).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Delete Lahore warehouse' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Delete Karachi shop' })).toBeNull();
+  });
+
+  it('lets customers pick up at a location with its address, changes what it says, and stops it (ADR-389)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/locations');
+
+    const [warehouse, shop] = await screen.findAllByRole('listitem');
+    fireEvent.click(within(warehouse!).getByRole('button', { name: 'Let customers pick up here' }));
+    typeIn(warehouse!, 'Pickup instructions', '  Ask at the counter  ');
+    fireEvent.click(within(warehouse!).getByRole('button', { name: 'Start pickup' }));
+    expect(await within(warehouse!).findByText('Customers can pick up orders here')).toBeTruthy();
+    expect(within(warehouse!).getByText(/Ask at the counter/)).toBeTruthy();
+    expect(sentOf(fake, 'LocationLocalPickupEnable')).toEqual([
+      { settings: { locationId: 'loc_1', instructions: 'Ask at the counter' } },
+    ]);
+
+    // A location without its address says why.
+    fireEvent.click(within(shop!).getByRole('button', { name: 'Let customers pick up here' }));
+    fireEvent.click(within(shop!).getByRole('button', { name: 'Start pickup' }));
+    expect(
+      await within(shop!).findByText(
+        'Give the location its street address and city, for customers to find it',
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(within(warehouse!).getByRole('button', { name: 'Stop pickup here' }));
+    await waitFor(() =>
+      expect(within(warehouse!).queryByText('Customers can pick up orders here')).toBeNull(),
+    );
+    expect(sentOf(fake, 'LocationLocalPickupDisable')).toEqual([{ locationId: 'loc_1' }]);
   });
 });

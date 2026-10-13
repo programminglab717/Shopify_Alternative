@@ -45,6 +45,7 @@ const NEXT: readonly { key: HomeKey; stage?: OrderStage; opens?: Opens }[] = [
   { key: 'transfersToCheck' },
   { key: 'toPack', stage: 'TO_PACK' },
   { key: 'toBook', stage: 'TO_BOOK' },
+  { key: 'readyForPickup', stage: 'READY_FOR_PICKUP' },
   { key: 'returning', stage: 'RETURNING' },
   {
     key: 'returnsToReceive',

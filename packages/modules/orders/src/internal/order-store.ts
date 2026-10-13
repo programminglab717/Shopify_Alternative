@@ -43,6 +43,7 @@ interface OrderJsonRow extends Record<string, unknown> {
   fulfillment_status: OrderRecord['fulfillmentStatus'];
   stage: OrderRecord['stage'];
   payment_method: OrderRecord['paymentMethod'];
+  delivery_method: OrderRecord['deliveryMethod'];
   currency: string;
   // int8 arrives as text, so no amount loses precision.
   subtotal: string;
@@ -185,6 +186,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     fulfillmentStatus: row.fulfillment_status,
     stage: row.stage,
     paymentMethod: row.payment_method,
+    deliveryMethod: row.delivery_method,
     currency: row.currency as CurrencyCode,
     subtotal: BigInt(row.subtotal),
     discount: BigInt(row.discount),
@@ -371,7 +373,8 @@ export async function loadOrders(
 ): Promise<OrderRecord[]> {
   const query = sql`
     SELECT o.id, o.number, o.source, o.status, o.confirmation_status, o.financial_status,
-           o.fulfillment_status, o.stage, o.payment_method, o.currency, o.subtotal, o.discount,
+           o.fulfillment_status, o.stage, o.payment_method, o.delivery_method, o.currency,
+           o.subtotal, o.discount,
            o.shipping, o.cod_fee, o.tax_rate, o.total_tax, o.shipping_tax, o.transfer_discount,
            o.online_discount, o.total, o.discount_codes, o.amount_paid,
            o.amount_refunded, o.cod_amount, o.advance_due, o.bank_account, o.customer_id,

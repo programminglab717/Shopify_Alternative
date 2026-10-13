@@ -60,6 +60,7 @@ export const ORDER_STAGES = [
   'awaiting_payment',
   'to_pack',
   'to_book',
+  'ready_for_pickup',
   'partially_fulfilled',
   'in_transit',
   'returning',
@@ -117,6 +118,10 @@ export type DraftOrderStatusValue = (typeof DRAFT_ORDER_STATUSES)[number];
  * customer makes after placing it, which staff mark paid once the money is in (ADR-074).
  */
 export const PAYMENT_METHODS = ['cash_on_delivery', 'prepaid', 'bank_transfer', 'online'] as const;
+
+/** How an order reaches its customer: shipped, or collected at its location (SHP-15, ADR-389). */
+export const DELIVERY_METHODS = ['shipping', 'pickup'] as const;
+export type DeliveryMethodValue = (typeof DELIVERY_METHODS)[number];
 export type PaymentMethodValue = (typeof PAYMENT_METHODS)[number];
 
 export const CANCEL_REASONS = [
@@ -277,6 +282,9 @@ export const orders = ordersSchema.table(
       .default('unfulfilled'),
     stage: text('stage', { enum: ORDER_STAGES }).notNull(),
     paymentMethod: text('payment_method', { enum: PAYMENT_METHODS }).notNull(),
+    deliveryMethod: text('delivery_method', { enum: DELIVERY_METHODS })
+      .notNull()
+      .default('shipping'),
     currency: text('currency').notNull(),
     subtotal: money('subtotal').notNull(),
     discount: money('discount').notNull(),

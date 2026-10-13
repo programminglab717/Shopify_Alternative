@@ -52,6 +52,9 @@ export const HomeQuery = /* GraphQL */ `
       toBook {
         ...Tally
       }
+      readyForPickup {
+        ...Tally
+      }
       returning {
         ...Tally
       }
@@ -180,6 +183,7 @@ export const OrderQuery = /* GraphQL */ `
       stage
       status
       paymentMethod
+      deliveryMethod
       financialStatus
       confirmationStatus
       cancelReason
@@ -442,6 +446,22 @@ export const OrderConfirmMutation = /* GraphQL */ `
 `;
 
 /** An order packed: it waits to be booked with a courier. */
+/** The customer collected their pickup order: handed over, and paid at the counter (ADR-389). */
+export const OrderMarkPickedUpMutation = /* GraphQL */ `
+  mutation OrderMarkPickedUp($id: ID!) {
+    orderMarkPickedUp(id: $id) {
+      order {
+        id
+        stage
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const OrderMarkPackedMutation = /* GraphQL */ `
   mutation OrderMarkPacked($id: ID!) {
     orderMarkPacked(id: $id) {
@@ -5808,6 +5828,9 @@ const SHOP_LOCATION = /* GraphQL */ `
     isPrimary
     isActive
     fulfillsOnlineOrders
+    localPickupSettings {
+      instructions
+    }
     address {
       address1
       address2
@@ -5884,6 +5907,38 @@ export const LocationDeactivateMutation = /* GraphQL */ `
 export const LocationMakePrimaryMutation = /* GraphQL */ `
   mutation LocationMakePrimary($locationId: ID!) {
     locationMakePrimary(locationId: $locationId) {
+      location {
+        ...ShopLocationParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SHOP_LOCATION}
+  ${USER_ERRORS}
+`;
+
+/** Customers let to pick up their orders at a location, with what it tells them (ADR-389). */
+export const LocationLocalPickupEnableMutation = /* GraphQL */ `
+  mutation LocationLocalPickupEnable($settings: LocalPickupSettingsInput!) {
+    locationLocalPickupEnable(localPickupSettings: $settings) {
+      location {
+        ...ShopLocationParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SHOP_LOCATION}
+  ${USER_ERRORS}
+`;
+
+/** Pickup at a location stopped (ADR-389). */
+export const LocationLocalPickupDisableMutation = /* GraphQL */ `
+  mutation LocationLocalPickupDisable($locationId: ID!) {
+    locationLocalPickupDisable(locationId: $locationId) {
       location {
         ...ShopLocationParts
       }

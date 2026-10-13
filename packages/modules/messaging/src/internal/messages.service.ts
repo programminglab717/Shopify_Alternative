@@ -129,6 +129,7 @@ const INFORMATIONAL: ReadonlySet<MessageKind> = new Set([
   'order_confirmed',
   'order_shipped',
   'order_out_for_delivery',
+  'order_ready_for_pickup',
   'order_delivered',
   'order_cancelled',
   'order_paid',

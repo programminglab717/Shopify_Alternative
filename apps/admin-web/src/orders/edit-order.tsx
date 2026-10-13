@@ -417,7 +417,7 @@ export function OrderItems({ order }: { order: OrderDetail }) {
   const packed =
     works &&
     order.status === 'OPEN' &&
-    order.stage === 'TO_BOOK' &&
+    (order.stage === 'TO_BOOK' || order.stage === 'READY_FOR_PICKUP') &&
     order.fulfillments.length === 0;
   const finish = (said: string) => {
     setOpen(null);
@@ -475,7 +475,13 @@ export function OrderItems({ order }: { order: OrderDetail }) {
           <Row label={t('order.paid')} value={money(order.amountPaid)} />
         )}
         {cents(order.codAmount.amount) > 0 && (
-          <Row label={t('order.toCollect')} value={money(order.codAmount)} strong />
+          <Row
+            label={t(
+              order.deliveryMethod === 'PICKUP' ? 'order.toCollectAtCounter' : 'order.toCollect',
+            )}
+            value={money(order.codAmount)}
+            strong
+          />
         )}
       </dl>
       {done && (

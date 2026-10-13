@@ -54,6 +54,7 @@ import {
   FulfillmentEventInput,
   FulfillmentEventStatus,
   FulfillmentMarkDeliveredPayload,
+  OrderMarkPickedUpPayload,
   FulfillmentMarkLostPayload,
   FulfillmentMarkReturningPayload,
   FulfillmentReceiveReturnPayload,
@@ -259,6 +260,21 @@ export class FulfillmentResolver {
       trackingInfo,
     );
     return payload(FulfillmentTrackingInfoUpdatePayload, result, tenant);
+  }
+
+  @Mutation(() => OrderMarkPickedUpPayload, {
+    description:
+      'The customer collected their pickup order (SHP-15, ADR-389): what is left of it is ' +
+      'handed over as one parcel, delivered at once with no courier, and what it still owed is ' +
+      'received as cash at the counter, so it is complete.',
+  })
+  @RequireScopes('write_orders')
+  async orderMarkPickedUp(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<OrderMarkPickedUpPayload> {
+    const result = await this.service.pickUp(tenant, uuidOf('order', id));
+    return payload(OrderMarkPickedUpPayload, result, tenant);
   }
 
   @Mutation(() => FulfillmentMarkDeliveredPayload, {

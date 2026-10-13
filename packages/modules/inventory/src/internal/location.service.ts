@@ -118,6 +118,13 @@ function checkAddress(
 
 const NAME_TAKEN = 'A location with this name already exists';
 
+/** Why customers can't collect orders at a location as its address stands, or null. */
+function pickupRefusal(location: { address1: string | null; city: string | null }): string | null {
+  return location.address1 && location.city
+    ? null
+    : 'Give the location its street address and city, for customers to find it';
+}
+
 /**
  * Where stock is kept. A shop always has a primary location once it has any, and the first is
  * created, as "Main location", the first time something needs one. Deactivating a location takes
@@ -211,6 +218,25 @@ export class LocationService {
        LIMIT 1`);
     const found = rows[0] && (await this.locationsOf(tx, shopId, [rows[0].id])).get(rows[0].id);
     return found ?? this.primaryOf(tx, shopId);
+  }
+
+  /**
+   * The active locations customers may collect their orders at (SHP-15, ADR-389), the primary
+   * first, then by name; in another module's tenant transaction `tx`.
+   */
+  async pickupLocationsIn(tx: Tx, shopId: string): Promise<LocationRecord[]> {
+    const rows = await tx
+      .select()
+      .from(locations)
+      .where(
+        and(
+          eq(locations.shopId, shopId),
+          eq(locations.isActive, true),
+          eq(locations.pickupEnabled, true),
+        ),
+      )
+      .orderBy(sql`${locations.isPrimary} DESC`, sql`lower(${locations.name})`, asc(locations.id));
+    return rows.map(toLocationRecord);
   }
 
   /** Like {@link getMany}, in another module's tenant transaction `tx`. */
@@ -316,6 +342,8 @@ export class LocationService {
         if (input.fulfillsOnlineOrders !== undefined && input.fulfillsOnlineOrders !== null) {
           next.fulfillsOnlineOrders = input.fulfillsOnlineOrders;
         }
+        const refusal = row.pickupEnabled ? pickupRefusal({ ...row, ...next }) : null;
+        if (refusal) return failOne(['input', 'address'], 'INVALID', refusal);
         const changed = (Object.keys(next) as (keyof LocationRow)[]).filter(
           (key) => next[key] !== row[key],
         );
@@ -338,6 +366,73 @@ export class LocationService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Lets customers collect their orders at the location (SHP-15, ADR-389), telling them
+   * `instructions`, "Ready in two hours; ask at the counter", as Shopify's
+   * `locationLocalPickupEnable`; given again, its instructions change. The location must be in
+   * use and have its street and city, for customers to find it.
+   */
+  async enableLocalPickup(
+    tenant: TenantContext,
+    id: string,
+    input: { instructions?: string | null },
+  ): Promise<MutationResult<LocationRecord>> {
+    const check = new InputChecker();
+    const instructions =
+      check.text(['localPickupSettings', 'instructions'], input.instructions, {
+        max: LIMITS.pickupInstructions,
+      }) ?? null;
+    if (!check.ok) return { ok: false, errors: check.errors };
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const row = await this.#lock(tx, tenant.shopId, id);
+      if (!row)
+        return failOne(['localPickupSettings', 'locationId'], 'NOT_FOUND', 'Location not found');
+      if (!row.isActive) {
+        return failOne(
+          ['localPickupSettings', 'locationId'],
+          'INVALID',
+          'Activate the location before customers pick up from it',
+        );
+      }
+      const refusal = pickupRefusal(row);
+      if (refusal) return failOne(['localPickupSettings', 'locationId'], 'INVALID', refusal);
+      if (row.pickupEnabled && row.pickupInstructions === instructions) {
+        return { ok: true, value: toLocationRecord(row) };
+      }
+      const value = await this.#update(
+        tx,
+        tenant.shopId,
+        row,
+        { pickupEnabled: true, pickupInstructions: instructions },
+        ['localPickup'],
+      );
+      return { ok: true, value };
+    });
+  }
+
+  /**
+   * Stops customers choosing to collect their orders at the location (ADR-389), as Shopify's
+   * `locationLocalPickupDisable`; orders placed for pickup there stay so.
+   */
+  async disableLocalPickup(
+    tenant: TenantContext,
+    id: string,
+  ): Promise<MutationResult<LocationRecord>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const row = await this.#lock(tx, tenant.shopId, id);
+      if (!row) return failOne(['locationId'], 'NOT_FOUND', 'Location not found');
+      if (!row.pickupEnabled) return { ok: true, value: toLocationRecord(row) };
+      const value = await this.#update(
+        tx,
+        tenant.shopId,
+        row,
+        { pickupEnabled: false, pickupInstructions: null },
+        ['localPickup'],
+      );
+      return { ok: true, value };
+    });
   }
 
   /** Takes a location out of use. It must hold no stock, and not be the primary location. */

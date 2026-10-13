@@ -3356,6 +3356,26 @@ const en = {
   'home.deliveriesToRescueHint':
     "The courier couldn't deliver them: see what each customer said, and tell the courier before it sends them back.",
   'home.deliveriesToRescue.one': 'A failed delivery to rescue',
+  'stage.READY_FOR_PICKUP': 'Ready for pickup',
+  'home.readyForPickup': '{count} orders ready for pickup',
+  'home.readyForPickup.one': '1 order ready for pickup',
+  'order.packForPickup': 'Mark ready for pickup',
+  'order.pickedUp': 'Picked up',
+  'shipsFrom.pickup': 'Picked up at',
+  'locations.pickupOn': 'Customers can pick up orders here',
+  'locations.pickupLet': 'Let customers pick up here',
+  'locations.pickupChange': 'Change pickup instructions',
+  'locations.pickupStop': 'Stop pickup here',
+  'locations.pickupStart': 'Start pickup',
+  'locations.pickupSave': 'Save instructions',
+  'locations.pickupInstructions': 'Pickup instructions',
+  'locations.pickupInstructionsHint':
+    'What customers are told when their order is ready, like "Ready in two hours; ask at the counter". Up to 200 characters.',
+  'messages.kind.ORDER_READY_FOR_PICKUP': 'Ready for pickup',
+  'messages.hint.ORDER_READY_FOR_PICKUP':
+    "When an order the customer collects is packed: where to come, and the location's instructions.",
+  'order.toCollectAtCounter': 'To collect at the counter',
+  'parcels.atCounter': 'Handed over at the counter',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6688,6 +6708,26 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'home.deliveriesToRescueHint':
     'کوریئر انہیں ڈیلیور نہ کر سکا: دیکھیں ہر گاہک نے کیا کہا، اور پارسل واپس جانے سے پہلے کوریئر کو بتائیں۔',
   'home.deliveriesToRescue.one': 'ایک ناکام ڈیلیوری بچانے کے لیے',
+  'stage.READY_FOR_PICKUP': 'وصولی کے لیے تیار',
+  'home.readyForPickup': '{count} آرڈر وصولی کے لیے تیار',
+  'home.readyForPickup.one': '1 آرڈر وصولی کے لیے تیار',
+  'order.packForPickup': 'وصولی کے لیے تیار کریں',
+  'order.pickedUp': 'گاہک نے وصول کر لیا',
+  'shipsFrom.pickup': 'وصولی کی جگہ',
+  'locations.pickupOn': 'گاہک یہاں سے آرڈر وصول کر سکتے ہیں',
+  'locations.pickupLet': 'گاہکوں کو یہاں سے وصولی کی اجازت دیں',
+  'locations.pickupChange': 'وصولی کی ہدایات بدلیں',
+  'locations.pickupStop': 'یہاں وصولی بند کریں',
+  'locations.pickupStart': 'وصولی شروع کریں',
+  'locations.pickupSave': 'ہدایات محفوظ کریں',
+  'locations.pickupInstructions': 'وصولی کی ہدایات',
+  'locations.pickupInstructionsHint':
+    'آرڈر تیار ہونے پر گاہکوں کو یہ بتایا جاتا ہے، جیسے "دو گھنٹے میں تیار؛ کاؤنٹر پر پوچھیں"۔ زیادہ سے زیادہ 200 حروف۔',
+  'messages.kind.ORDER_READY_FOR_PICKUP': 'وصولی کے لیے تیار',
+  'messages.hint.ORDER_READY_FOR_PICKUP':
+    'جب گاہک کا خود وصول کرنے والا آرڈر پیک ہو جائے: کہاں آنا ہے، اور جگہ کی ہدایات۔',
+  'order.toCollectAtCounter': 'کاؤنٹر پر وصول کرنا ہے',
+  'parcels.atCounter': 'کاؤنٹر پر حوالے کیا گیا',
 };
 
 export const messages: Readonly<

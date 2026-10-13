@@ -45,6 +45,9 @@ export const locations = inventorySchema.table(
     isPrimary: boolean('is_primary').notNull().default(false),
     isActive: boolean('is_active').notNull().default(true),
     fulfillsOnlineOrders: boolean('fulfills_online_orders').notNull().default(true),
+    /** Whether customers may collect their orders here (SHP-15, ADR-389), and what it tells them. */
+    pickupEnabled: boolean('pickup_enabled').notNull().default(false),
+    pickupInstructions: text('pickup_instructions'),
     deactivatedAt: timestamp('deactivated_at', { withTimezone: true }),
     version: integer('version').notNull().default(1),
     ...timestamps,

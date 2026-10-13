@@ -16,6 +16,7 @@ export type OrderStage =
   | 'AWAITING_PAYMENT'
   | 'TO_PACK'
   | 'TO_BOOK'
+  | 'READY_FOR_PICKUP'
   | 'PARTIALLY_FULFILLED'
   | 'IN_TRANSIT'
   | 'DELIVERED'
@@ -26,6 +27,9 @@ export type OrderStage =
   | 'CANCELLED';
 
 export type OrderPaymentMethod = 'CASH_ON_DELIVERY' | 'PREPAID' | 'BANK_TRANSFER' | 'ONLINE';
+
+/** Sent, or collected at its location (SHP-15, ADR-389). */
+export type OrderDeliveryMethod = 'SHIPPING' | 'PICKUP';
 
 export type OrderCancelReason =
   'CUSTOMER' | 'FRAUD' | 'INVENTORY' | 'MERGED' | 'NO_RESPONSE' | 'OTHER' | 'UNPAID';
@@ -47,6 +51,7 @@ export interface HomeData {
     | 'transfersToCheck'
     | 'toPack'
     | 'toBook'
+    | 'readyForPickup'
     | 'returning'
     | 'returnsToReceive'
     | 'cashToCollect'
@@ -238,6 +243,7 @@ export interface OrderDetail {
   stage: OrderStage;
   status: 'OPEN' | 'CLOSED' | 'CANCELLED';
   paymentMethod: OrderPaymentMethod;
+  deliveryMethod: OrderDeliveryMethod;
   financialStatus: string;
   confirmationStatus: string;
   cancelReason: OrderCancelReason | null;
@@ -2550,6 +2556,8 @@ export interface ShopLocation {
   isPrimary: boolean;
   isActive: boolean;
   fulfillsOnlineOrders: boolean;
+  /** Customers may collect their orders here (ADR-389); null where they may not. */
+  localPickupSettings: { instructions: string | null } | null;
   address: {
     address1: string | null;
     address2: string | null;
@@ -2572,6 +2580,8 @@ export interface LocationPayloadData {
   locationDeactivate?: { location: ShopLocation | null; userErrors: UserError[] };
   locationActivate?: { location: ShopLocation | null; userErrors: UserError[] };
   locationMakePrimary?: { location: ShopLocation | null; userErrors: UserError[] };
+  locationLocalPickupEnable?: { location: ShopLocation | null; userErrors: UserError[] };
+  locationLocalPickupDisable?: { location: ShopLocation | null; userErrors: UserError[] };
 }
 
 export interface SavedSearch {

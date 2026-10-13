@@ -7,6 +7,8 @@ export const LIMITS = {
   quantity: 100_000_000,
   name: 255,
   addressLine: 255,
+  /** What a location tells customers of picking up there (ADR-389). */
+  pickupInstructions: 200,
   uri: 2_048,
 } as const;
 

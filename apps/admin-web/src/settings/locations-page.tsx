@@ -1,4 +1,4 @@
-import { Pencil, Plus, Power, PowerOff, Save, Star, Trash2, Warehouse } from 'lucide-react';
+import { Pencil, Plus, Power, PowerOff, Save, Star, Store, Trash2, Warehouse } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -7,6 +7,8 @@ import {
   LocationDeactivateMutation,
   LocationDeleteMutation,
   LocationEditMutation,
+  LocationLocalPickupDisableMutation,
+  LocationLocalPickupEnableMutation,
   LocationMakePrimaryMutation,
   ShopLocationsQuery,
 } from '../api/operations';
@@ -175,6 +177,117 @@ function LocationForm({
 }
 
 /** One location: what it is, and changed, taken out of use, put back or deleted. */
+/**
+ * Whether customers may collect their orders at the location (SHP-15, ADR-389), and what it tells
+ * them of it: let them, change what it says, or stop it. For locations in use alone.
+ */
+function LocalPickup({ location }: { location: ShopLocation }) {
+  const { t } = useLocale();
+  const enable = useAdminMutation<
+    LocationPayloadData,
+    { settings: { locationId: string; instructions: string | null } }
+  >(LocationLocalPickupEnableMutation);
+  const disable = useAdminMutation<LocationPayloadData, { locationId: string }>(
+    LocationLocalPickupDisableMutation,
+  );
+  const settings = location.localPickupSettings;
+  const [editing, setEditing] = useState(false);
+  const [instructions, setInstructions] = useState(settings?.instructions ?? '');
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const run = async (call: () => Promise<UserError[]>) => {
+    setProblem(null);
+    try {
+      const error = (await call())[0];
+      if (error) {
+        setProblem(problemText(error, t));
+        return;
+      }
+      setEditing(false);
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    }
+  };
+  const save = (event: FormEvent) => {
+    event.preventDefault();
+    void run(
+      async () =>
+        (
+          await enable.mutateAsync({
+            settings: { locationId: location.id, instructions: instructions.trim() || null },
+          })
+        ).locationLocalPickupEnable!.userErrors,
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      {settings && (
+        <span className="flex items-center gap-1 text-[length:var(--hatti-type-body-sm-size)]">
+          <Store aria-hidden className="size-4 text-success" />
+          <span>
+            {t('locations.pickupOn')}
+            {settings.instructions && (
+              <span className="text-secondary" dir="auto">
+                {' · '}
+                {settings.instructions}
+              </span>
+            )}
+          </span>
+        </span>
+      )}
+      {editing ? (
+        <form onSubmit={save} className="flex flex-col gap-2">
+          <TextField
+            label={t('locations.pickupInstructions')}
+            hint={t('locations.pickupInstructionsHint')}
+            value={instructions}
+            maxLength={200}
+            onChange={(event) => setInstructions(event.target.value)}
+          />
+          <span className="flex flex-wrap gap-2">
+            <Button type="submit" busy={enable.isPending}>
+              {t(settings ? 'locations.pickupSave' : 'locations.pickupStart')}
+            </Button>
+            <Button variant="tertiary" onClick={() => setEditing(false)}>
+              {t('locations.keep')}
+            </Button>
+          </span>
+        </form>
+      ) : (
+        <span className="flex flex-wrap gap-2">
+          <Button
+            variant="tertiary"
+            icon={<Store aria-hidden className="size-5" />}
+            onClick={() => {
+              setInstructions(settings?.instructions ?? '');
+              setEditing(true);
+            }}
+          >
+            {t(settings ? 'locations.pickupChange' : 'locations.pickupLet')}
+          </Button>
+          {settings && (
+            <Button
+              variant="tertiary"
+              busy={disable.isPending}
+              onClick={() =>
+                void run(
+                  async () =>
+                    (await disable.mutateAsync({ locationId: location.id }))
+                      .locationLocalPickupDisable!.userErrors,
+                )
+              }
+            >
+              {t('locations.pickupStop')}
+            </Button>
+          )}
+        </span>
+      )}
+      {problem && <Alert tone="danger">{problem}</Alert>}
+    </div>
+  );
+}
+
 function LocationRow({ location }: { location: ShopLocation }) {
   const { t } = useLocale();
   const edit = useAdminMutation<LocationPayloadData, { id: string; input: object }>(
@@ -232,6 +345,7 @@ function LocationRow({ location }: { location: ShopLocation }) {
       <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
         {t(location.fulfillsOnlineOrders ? 'locations.fulfilsYes' : 'locations.fulfilsNo')}
       </span>
+      {location.isActive && !editing && <LocalPickup location={location} />}
       {editing ? (
         <LocationForm
           initial={draftOf(location)}

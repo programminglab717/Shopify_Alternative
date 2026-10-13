@@ -735,6 +735,102 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     ]);
   });
 
+  it('lets customers pick orders up at a location, ready once packed and complete when picked up (ADR-389)', async () => {
+    const [khussa] = await stockedVariants(tokens.a, 'Khussa', ['7'], 3);
+    const primary = (await gql(tokens.a, '{ location { id } }')).data?.location.id as string;
+    const ENABLE = `mutation ($settings: LocalPickupSettingsInput!) {
+      locationLocalPickupEnable(localPickupSettings: $settings) {
+        location { localPickupSettings { instructions } } userErrors { field code message }
+      }
+    }`;
+    const settings = { locationId: primary, instructions: 'Ask at the counter' };
+    // Not without its street and city.
+    expect((await mutate(tokens.a, ENABLE, { settings })).userErrors).toMatchObject([
+      { field: ['localPickupSettings', 'locationId'], code: 'INVALID' },
+    ]);
+    await mutate(
+      tokens.a,
+      `mutation ($id: ID!) {
+         locationEdit(id: $id, input: { address: { address1: "Shop 4, Liberty Market", city: "lhr" } }) {
+           userErrors { code }
+         }
+       }`,
+      { id: primary },
+    );
+    expect(await mutate(tokens.a, ENABLE, { settings })).toEqual({
+      location: { localPickupSettings: { instructions: 'Ask at the counter' } },
+      userErrors: [],
+    });
+
+    const created = await mutate(
+      tokens.a,
+      `mutation ($input: OrderCreateInput!) {
+         orderCreate(input: $input) {
+           order { id deliveryMethod stage location { id } } userErrors { field code message }
+         }
+       }`,
+      {
+        input: {
+          lineItems: [{ variantId: khussa, quantity: 1 }],
+          shippingAddress: ADDRESS,
+          deliveryMethod: 'PICKUP',
+        },
+      },
+    );
+    expect(created.order).toMatchObject({
+      deliveryMethod: 'PICKUP',
+      stage: 'NEEDS_CONFIRMATION',
+      location: { id: primary },
+    });
+    const id = created.order.id as string;
+    await mutate(
+      tokens.a,
+      `mutation ($id: ID!) { orderConfirm(id: $id) { userErrors { code } } }`,
+      {
+        id,
+      },
+    );
+    const packed = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) { orderMarkPacked(id: $id) { order { stage } userErrors { code } } }`,
+      { id },
+    );
+    expect(packed.order.stage).toBe('READY_FOR_PICKUP');
+    expect(
+      (await gql(tokens.aReader, '{ home { readyForPickup { count } } }')).data?.home.readyForPickup
+        .count,
+    ).toBe(1);
+
+    const PICKED_UP = `mutation ($id: ID!) {
+      orderMarkPickedUp(id: $id) {
+        fulfillment { status trackingInfo { company } }
+        order { stage financialStatus }
+        userErrors { field code message }
+      }
+    }`;
+    expect((await gql(tokens.aReader, PICKED_UP, { id })).errors?.[0]?.extensions?.code).toBe(
+      'ACCESS_DENIED',
+    );
+    expect(await mutate(tokens.a, PICKED_UP, { id })).toEqual({
+      fulfillment: { status: 'DELIVERED', trackingInfo: { company: null } },
+      order: { stage: 'COMPLETED', financialStatus: 'PAID' },
+      userErrors: [],
+    });
+    expect((await mutate(tokens.a, PICKED_UP, { id })).userErrors).toMatchObject([
+      { field: ['id'], code: 'INVALID' },
+    ]);
+    const disabled = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) {
+         locationLocalPickupDisable(locationId: $id) {
+           location { localPickupSettings { instructions } } userErrors { code }
+         }
+       }`,
+      { id: primary },
+    );
+    expect(disabled.location.localPickupSettings).toBeNull();
+  });
+
   it('splits an order in two, the items sent apart an order of their own (ADR-135)', async () => {
     const [size] = await stockedVariants(tokens.a, 'Multani Khussa', ['8'], 4);
     const created = await mutate(tokens.a, ORDER_CREATE, {

@@ -17,6 +17,7 @@ import type {
   ParcelClaimStatusValue,
   ParcelStatusValue,
   PaymentMethodValue,
+  DeliveryMethodValue,
   RefundMethodValue,
   ReturnReasonValue,
   ReturnStatusValue,
@@ -251,6 +252,8 @@ export interface OrderRecord {
   fulfillmentStatus: FulfillmentStatusValue;
   stage: OrderStageValue;
   paymentMethod: PaymentMethodValue;
+  /** Shipped, or collected at its location (SHP-15, ADR-389). */
+  deliveryMethod: DeliveryMethodValue;
   currency: CurrencyCode;
   /** Minor units. total = subtotal − discount + shipping + codFee. */
   subtotal: bigint;
@@ -452,6 +455,8 @@ export interface OrderHome {
   toPack: OrderTally;
   /** Packed, for a courier to take. */
   toBook: OrderTally;
+  /** Packed, for their customers to collect (ADR-389). */
+  readyForPickup: OrderTally;
   /** Parcels on their way back, to check in. */
   returning: OrderTally;
   /**

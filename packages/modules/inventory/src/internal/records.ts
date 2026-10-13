@@ -12,6 +12,10 @@ export interface LocationAddressRecord {
   phone: string | null;
 }
 
+export interface LocalPickupRecord {
+  instructions: string | null;
+}
+
 export interface LocationRecord {
   id: string;
   name: string;
@@ -19,6 +23,11 @@ export interface LocationRecord {
   isPrimary: boolean;
   isActive: boolean;
   fulfillsOnlineOrders: boolean;
+  /**
+   * Customers may collect their orders here (SHP-15, ADR-389), with what it tells them of it,
+   * "Ready in two hours; ask at the counter"; null where they may not.
+   */
+  localPickup: LocalPickupRecord | null;
   deactivatedAt: Date | null;
   version: number;
   createdAt: Date;

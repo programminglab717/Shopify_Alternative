@@ -36,6 +36,7 @@ import type {
   DraftOrderStatusValue,
   OrderStageValue,
   PaymentMethodValue,
+  DeliveryMethodValue,
   RefundMethodValue,
   RiskLevelValue,
   StoredAddressValue,
@@ -72,6 +73,7 @@ import {
   OrderLineItem,
   OrderMergedInto,
   OrderPaymentMethod,
+  OrderDeliveryMethod,
   OrderRisk,
   OrderRiskLevel,
   OrderRiskReason,
@@ -130,6 +132,10 @@ export function toStageValue(stage: OrderStage): OrderStageValue {
 
 export function toPaymentMethodValue(method: OrderPaymentMethod): PaymentMethodValue {
   return method.toLowerCase() as PaymentMethodValue;
+}
+
+export function toDeliveryMethodValue(method: OrderDeliveryMethod): DeliveryMethodValue {
+  return method.toLowerCase() as DeliveryMethodValue;
 }
 
 export function toCancelReasonValue(reason: OrderCancelReason): CancelReasonValue {
@@ -227,6 +233,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
     financialStatus: upper<OrderFinancialStatus>(record.financialStatus),
     fulfillmentStatus: upper<OrderFulfillmentStatus>(record.fulfillmentStatus),
     paymentMethod: upper<OrderPaymentMethod>(record.paymentMethod),
+    deliveryMethod: upper<OrderDeliveryMethod>(record.deliveryMethod),
     source: upper<OrderSource>(record.source),
     phone: hidden ? null : hidePhone ? maskPhone(record.phone) : record.phone,
     email: hidden ? null : record.email,

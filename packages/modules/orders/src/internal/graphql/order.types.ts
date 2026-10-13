@@ -20,6 +20,7 @@ export enum OrderStage {
   AWAITING_PAYMENT = 'AWAITING_PAYMENT',
   TO_PACK = 'TO_PACK',
   TO_BOOK = 'TO_BOOK',
+  READY_FOR_PICKUP = 'READY_FOR_PICKUP',
   PARTIALLY_FULFILLED = 'PARTIALLY_FULFILLED',
   IN_TRANSIT = 'IN_TRANSIT',
   RETURNING = 'RETURNING',
@@ -42,6 +43,11 @@ registerEnumType(OrderStage, {
     },
     TO_PACK: { description: 'Confirmed or paid; to pick and pack.' },
     TO_BOOK: { description: 'Packed; to book with a courier and hand over.' },
+    READY_FOR_PICKUP: {
+      description:
+        'Packed, for its customer to collect at its location (SHP-15, ADR-389); ' +
+        'orderMarkPickedUp hands it over.',
+    },
     PARTIALLY_FULFILLED: { description: 'Some items shipped, some still to ship.' },
     IN_TRANSIT: { description: 'Everything shipped; on its way.' },
     RETURNING: { description: 'Refused or undeliverable; on its way back.' },
@@ -182,6 +188,24 @@ export class Refund {
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
 }
+
+export enum OrderDeliveryMethod {
+  SHIPPING = 'SHIPPING',
+  PICKUP = 'PICKUP',
+}
+
+registerEnumType(OrderDeliveryMethod, {
+  name: 'OrderDeliveryMethod',
+  description: 'How an order reaches its customer (SHP-15, ADR-389).',
+  valuesMap: {
+    SHIPPING: { description: 'Sent to the address, by a courier or the shop.' },
+    PICKUP: {
+      description:
+        'Collected by the customer at its location, which offers pickup: no delivery charge, ' +
+        'READY_FOR_PICKUP once packed, and complete once picked up.',
+    },
+  },
+});
 
 export enum OrderPaymentMethod {
   CASH_ON_DELIVERY = 'CASH_ON_DELIVERY',
@@ -1105,6 +1129,9 @@ export class Order {
   @Field(() => OrderPaymentMethod)
   paymentMethod!: OrderPaymentMethod;
 
+  @Field(() => OrderDeliveryMethod)
+  deliveryMethod!: OrderDeliveryMethod;
+
   @Field(() => OrderSource)
   source!: OrderSource;
 
@@ -1527,6 +1554,14 @@ export class OrderCreateInput {
       "ONLINE one too, for its customer to pay through the shop's payment gateway from its link.",
   })
   paymentMethod?: OrderPaymentMethod | null;
+
+  @Field(() => OrderDeliveryMethod, {
+    nullable: true,
+    description:
+      'Default SHIPPING. PICKUP: collected at locationId, which must offer local pickup, or at ' +
+      'the one location that does when left out; with no shippingPrice.',
+  })
+  deliveryMethod?: OrderDeliveryMethod | null;
 
   @Field(() => String, {
     nullable: true,
@@ -2081,6 +2116,21 @@ export class OrderFulfillPayload {
 @ObjectType()
 export class FulfillmentTrackingInfoUpdatePayload {
   @Field(() => Fulfillment, { nullable: true })
+  fulfillment!: Fulfillment | null;
+
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class OrderMarkPickedUpPayload {
+  @Field(() => Fulfillment, {
+    nullable: true,
+    description: 'What was handed over, as a parcel delivered at the counter.',
+  })
   fulfillment!: Fulfillment | null;
 
   @Field(() => Order, { nullable: true })

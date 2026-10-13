@@ -548,6 +548,41 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     ).toEqual([]);
   });
 
+  it('tells the customer where to collect an order picked up once it is ready, and not before (ADR-389)', async () => {
+    await withoutConfirmations();
+    await admin.query(
+      `UPDATE inventory.locations
+          SET address1 = 'Shop 4, Liberty Market', city = 'Lahore', pickup_enabled = true,
+              pickup_instructions = 'Ask at the counter'
+        WHERE shop_id = $1 AND is_primary`,
+      [shopId],
+    );
+    const order = await placeOnline({ deliveryMethod: 'pickup', shipping: 0n });
+    unwrap(await orders().confirm(tenant, order.id));
+    await dispatch(2);
+    expect((await queued()).filter((message) => message.kind === 'order_ready_for_pickup')).toEqual(
+      [],
+    );
+    unwrap(await orders().markPacked(tenant, order.id));
+    await dispatch(2);
+    const ready = (await queued()).filter((message) => message.kind === 'order_ready_for_pickup');
+    expect(ready).toHaveLength(1);
+    expect(ready[0]!.variables).toMatchObject({
+      name: 'Ayesha',
+      shop: 'Zari Fashions',
+      order: `#${order.number}`,
+      location: expect.any(String),
+      address: 'Shop 4, Liberty Market, Lahore (Ask at the counter)',
+    });
+    // Unpacked and packed again: told once.
+    unwrap(await orders().markUnpacked(tenant, order.id));
+    unwrap(await orders().markPacked(tenant, order.id));
+    await dispatch();
+    expect(
+      (await queued()).filter((message) => message.kind === 'order_ready_for_pickup'),
+    ).toHaveLength(1);
+  });
+
   it('asks the customer whose delivery failed whether to deliver again or call, and keeps their answer (ADR-388)', async () => {
     await withoutConfirmations();
     const order = await placeOnline();

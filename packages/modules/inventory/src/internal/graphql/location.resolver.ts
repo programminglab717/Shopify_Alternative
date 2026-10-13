@@ -19,6 +19,8 @@ import {
   LocationDeletePayload,
   LocationEditInput,
   LocationEditPayload,
+  LocationLocalPickupPayload,
+  LocalPickupSettingsInput,
   LocationMakePrimaryPayload,
   LocationsArgs,
 } from './location.types.js';
@@ -102,6 +104,45 @@ export class LocationResolver {
   ): Promise<LocationDeactivatePayload> {
     const result = await this.service.deactivate(tenant, uuidOf('location', locationId));
     return Object.assign(new LocationDeactivatePayload(), {
+      location: result.ok ? toLocation(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => LocationLocalPickupPayload, {
+    description:
+      'Lets customers collect their orders at an active location with its street and city ' +
+      "(SHP-15, ADR-389), as Shopify's locationLocalPickupEnable; given again, its instructions " +
+      'change.',
+  })
+  @RequireScopes('write_locations')
+  async locationLocalPickupEnable(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('localPickupSettings') settings: LocalPickupSettingsInput,
+  ): Promise<LocationLocalPickupPayload> {
+    const result = await this.service.enableLocalPickup(
+      tenant,
+      uuidOf('location', settings.locationId),
+      { instructions: settings.instructions },
+    );
+    return Object.assign(new LocationLocalPickupPayload(), {
+      location: result.ok ? toLocation(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => LocationLocalPickupPayload, {
+    description:
+      'Stops customers choosing to collect their orders at a location (ADR-389); orders placed ' +
+      'for pickup there stay so.',
+  })
+  @RequireScopes('write_locations')
+  async locationLocalPickupDisable(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('locationId', { type: () => ID }) locationId: string,
+  ): Promise<LocationLocalPickupPayload> {
+    const result = await this.service.disableLocalPickup(tenant, uuidOf('location', locationId));
+    return Object.assign(new LocationLocalPickupPayload(), {
       location: result.ok ? toLocation(result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
