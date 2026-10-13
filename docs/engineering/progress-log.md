@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Reviews in the admin
+### f1d8ca4 · Reviews in the admin
 
 * **Products → Reviews** ([ADR-402](../architecture/13-decision-log.md#adr-402--products-reviews-have-a-page-of-their-own-in-the-admin-by-status-waiting-first-each-published-or-hidden-by-those-who-change-products-above-them-for-the-owner-and-managers-from-how-many-stars-reviews-publish-by-themselves-and-how-many-days-after-delivery-customers-are-asked), MKT-05): the shop's reviews by status, waiting first, each
   with its product, stars, author, words and order, published or hidden by the owner and
