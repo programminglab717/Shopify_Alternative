@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Bundles in the catalog
+### b494755 · Bundles in the catalog
 
 * **A bundle** ([ADR-409](../architecture/13-decision-log.md#adr-409--a-bundle-is-a-product-of-one-variant-made-of-other-products-variants-a-number-of-each-up-to-ten-parts-one-level-deep-a-part-deleted-leaves-it-unsold-until-it-is-given-its-parts-again-and-orders-will-hold-its-parts-as-their-lines), CAT-11) is a product of one variant made of other products' variants,
   a number of each: a lawn suit's three pieces, or a multipack of three of one. Migration 0192
