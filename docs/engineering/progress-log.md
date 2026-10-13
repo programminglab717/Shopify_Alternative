@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### A shop's own WhatsApp templates
+### 480efda · A shop's own WhatsApp templates
 
 * **Shops write their own marketing templates** ([ADR-420](../architecture/13-decision-log.md#adr-420--a-shop-writes-its-own-marketing-templates-sent-at-once-to-meta-for-approval-on-its-own-whatsapp-account-and-kept-as-metas-webhook-says-they-stand), MKT-01). Each is sent at once to Meta
   for approval on the shop's own account, and Meta's verdict comes back through its webhook or
