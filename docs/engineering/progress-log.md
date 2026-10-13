@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Wishlists and recently viewed in Hatti Base
+### c43bd88 · Wishlists and recently viewed in Hatti Base
 
 * **A heart on each card and product page** ([ADR-418](../architecture/13-decision-log.md#adr-418--shoppers-keep-a-wishlist-and-see-what-they-viewed-lately-in-their-own-browser-and-hatti-base-fetches-each-products-card-through-the-section-rendering-api), OS-12) saves the product to a wishlist
   kept in the shopper's browser. The wishlist's page and recently viewed fetch each card
