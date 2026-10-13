@@ -1,0 +1,19 @@
+/**
+ * Events the apps module publishes. Payloads are thin: fetch current state through the API.
+ */
+export const AppEvents = {
+  Created: 'app.created',
+  Updated: 'app.updated',
+  TokenRotated: 'app.token_rotated',
+  SecretRotated: 'app.secret_rotated',
+  Deleted: 'app.deleted',
+} as const;
+
+/** A custom app made, changed, given a new token or secret, or removed. */
+export interface AppChangedPayload {
+  name: string;
+  /** Its scopes now; none once it is removed. */
+  scopes: string[];
+  /** What changed, for an update: "name" or "scopes". */
+  changed?: string[];
+}

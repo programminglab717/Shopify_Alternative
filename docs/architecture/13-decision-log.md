@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-394 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-395 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -402,6 +402,7 @@
 | 392 | An order may repeat another: placed for a customer with an open order not shipped yet, from the three days before, with an item in common, it names that order, and staff merge it in, cancel it as a repeat, or keep both | Accepted |
 | 393 | Abandoned checkouts: the number a shopper types is kept as they type it, the shop sees who left, and may remind them once on WhatsApp, after the delay it sets, with a link back to their items; an order the number places then recovers it | Accepted |
 | 394 | The admin lists the checkouts shoppers left under Orders, for those who work orders and marketers, with a chat on WhatsApp for a whole number not yet ordered, and the reminder's delay is set with the checkout page's settings | Accepted |
+| 395 | A custom app is an access token the shop's owner or a manager makes, with a name and scopes none beyond their own role's, and a secret its webhooks will be signed with, kept sealed for the app alone; both are shown once and can be replaced, and removing the app revokes its token at once | Accepted |
 
 ---
 
@@ -15320,3 +15321,36 @@
 * **Alternatives:**
   * **A tab of the orders list:** abandoned checkouts are not orders and have none of their
     actions, so they have a page of their own, linked from it.
+
+## ADR-395 · A custom app is an access token the shop's owner or a manager makes, with a name and scopes none beyond their own role's, and a secret its webhooks will be signed with, kept sealed for the app alone; both are shown once and can be replaced, and removing the app revokes its token at once
+
+* **Context:**
+  * The Admin API has taken access tokens with scopes since its first slice, but only the seed
+    made them. Shops here connect sheets, accounting and warehouse tools through developers they
+    hire, as Shopify's custom apps let merchants do (DEV-04).
+  * Webhooks (DEV-03) need a secret to sign with that the app's developer knows and Hatti can
+    read: a token is kept only as its SHA-256.
+* **Decision:**
+  * **A custom app is an access token**, as `apps.access_tokens` already keeps them, with a name
+    and its scopes; a new module, `@hatti/apps`, makes and lists them.
+  * **Owners and managers alone make and change them** (`customAppCreate`, `customAppUpdate`),
+    signed in as themselves: apps manage no apps, themselves included. The scopes given are ones
+    the maker's own role has, each once, in the API's order. A shop keeps up to 20.
+  * **The token and a webhook secret are shown once**, in the payload that makes them. The
+    secret is sealed with the platform's SecretBox for that shop and app, as Meta's token is
+    ([ADR-143](#adr-143--orders-placed-through-checkout-go-to-metas-conversions-api-from-the-worker-as-they-are-placed-confirmed-and-delivered-the-shop-choosing-which-is-purchase-each-moment-waits-in-postgres-until-meta-takes-it-or-its-seven-days-are-up)), and opened only for signing.
+  * **Either can be replaced** (`customAppTokenRotate`, `customAppSecretRotate`): the old token
+    stops working at once. **Removing** an app (`customAppDelete`) revokes its token.
+  * Making, changing and replacing need the member to have proved who they are lately
+    ([ADR-103](#adr-103--sensitive-actions-need-staff-to-have-proved-who-they-are-in-the-last-15-minutes-by-signing-in-or-confirming-with-the-strongest-factor-their-account-has-apps-are-not-asked)); removing does not, as it only takes access away.
+  * Each change is an event on the activity log ([ADR-256](#adr-256--what-the-shops-staff-and-apps-change-goes-on-its-activity-log-each-event-a-request-of-the-admin-api-records-written-in-the-same-statement-as-the-outboxs-by-whom-and-to-what-never-what-it-recorded-in-a-table-of-its-own-kept-as-long-as-the-audit-log)) and in the audit log, with the
+    token's and secret's last four characters, never either.
+* **Consequences:**
+  * A token made before apps had a secret is listed with none until one is made for it.
+  * An app's scopes change from its next request; what it did before stays on the activity log
+    by its token.
+* **Alternatives:**
+  * **A table of apps apart from their tokens:** a custom app has one token, as Shopify's do;
+    OAuth apps installed from a store, with tokens of their own per shop, come later.
+  * **Showing the secret again on request:** Shopify does; once is enough here, as a new one can
+    be made, and a leaked admin session reveals nothing.

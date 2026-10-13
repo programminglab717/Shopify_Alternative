@@ -107,6 +107,12 @@ flowchart LR
 | **Unlisted app** | Partners | Install link | Agency tools for their clients |
 | **Custom app** | Merchant or their developer | Created in the shop's admin, single-shop token | Warehouse system sync |
 
+*Built so far* ([ADR-395](./13-decision-log.md#adr-395--a-custom-app-is-an-access-token-the-shops-owner-or-a-manager-makes-with-a-name-and-scopes-none-beyond-their-own-roles-and-a-secret-its-webhooks-will-be-signed-with-kept-sealed-for-the-app-alone-both-are-shown-once-and-can-be-replaced-and-removing-the-app-revokes-its-token-at-once)): custom apps, each an
+access token with a name and scopes that the shop's owner or a manager makes through
+`customAppCreate`, none beyond their own role's, and a secret its webhooks will be signed with,
+both shown once and replaced with `customAppTokenRotate` and `customAppSecretRotate`;
+`customAppDelete` revokes the token.
+
 ### 3.2 Install and auth (OAuth 2.0)
 
 ```mermaid

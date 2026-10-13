@@ -7,6 +7,7 @@ import {
   SystemDnsLookup,
   type ApiContext,
 } from '@hatti/api';
+import { AppsModule } from '@hatti/apps/public';
 import { BillingModule, type HattiBankAccount, type HattiGateway } from '@hatti/billing/public';
 import { CatalogModule, CopiedVariantStock } from '@hatti/catalog/public';
 import { CheckoutModule } from '@hatti/checkout/public';
@@ -211,6 +212,7 @@ export class ApiModule {
         FilesModule,
         TaxModule,
         MarketingModule,
+        AppsModule,
         MessagingModule.forRoot({ whatsapp: options.whatsapp ?? null }),
         PaymentsModule.forRoot({ gateways: options.paymentGateways }),
         BillingModule.forRoot({

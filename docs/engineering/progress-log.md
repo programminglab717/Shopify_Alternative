@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: webhooks for apps (DEV-03), a
-shop's subscriptions to its events delivered signed, retried and logged; then product reviews
-(MKT-05). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the admin's page of custom apps
+under Settings (DEV-04); then webhooks for apps (DEV-03), each app's subscriptions to the shop's
+events delivered signed with its secret, retried and logged. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,19 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Custom apps
+
+* **A new module, `@hatti/apps`** ([ADR-395](../architecture/13-decision-log.md#adr-395--a-custom-app-is-an-access-token-the-shops-owner-or-a-manager-makes-with-a-name-and-scopes-none-beyond-their-own-roles-and-a-secret-its-webhooks-will-be-signed-with-kept-sealed-for-the-app-alone-both-are-shown-once-and-can-be-replaced-and-removing-the-app-revokes-its-token-at-once), DEV-04): a custom app is an access token with a
+  name and scopes. Owners and managers make one with `customAppCreate`, giving no scope their
+  own role lacks, and are shown its token and the secret its webhooks will be signed with once.
+  The secret is kept sealed for that app alone.
+* `customAppUpdate` renames an app or changes its scopes; `customAppTokenRotate` and
+  `customAppSecretRotate` replace its token or secret; `customAppDelete` revokes its token. Apps
+  manage none. Each change is on the activity and audit logs, never a token or secret.
+* Migration 0186 gives tokens the secret, its hint, who made them and when they changed.
+* 2642 tests (6 new): made, refused, changed, replaced and removed, in the
+  apps module; through the API in the core.
 
 ### 9d7eea5 · Abandoned checkouts in the admin
 
