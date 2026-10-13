@@ -74,6 +74,7 @@ import { ProductPage, validateProductSearch } from './products/product-page';
 import { ProductsPage, validateProductsSearch } from './products/products-page';
 import { ActivityPage } from './settings/activity-page';
 import { SupportAccessPage } from './settings/support-page';
+import { AppsPage } from './settings/apps-page';
 import { TaxPage } from './settings/tax-page';
 import { MessagesPage } from './settings/messages-page';
 import { OrderPoliciesPage } from './settings/order-policies-page';
@@ -625,6 +626,12 @@ const settingsSupport = createRoute({
   component: SupportAccessPage,
 });
 
+const settingsApps = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/apps',
+  component: AppsPage,
+});
+
 const settingsTax = createRoute({
   getParentRoute: () => shop,
   path: 'settings/tax',
@@ -816,6 +823,7 @@ export const routeTree = root.addChildren([
     settingsBilling,
     settingsActivity,
     settingsSupport,
+    settingsApps,
     settingsTax,
     settingsMessages,
     settingsOrders,

@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import {
   BadgeCheck,
   Banknote,
+  Blocks,
   ChevronRight,
   CreditCard,
   Globe,
@@ -49,6 +50,7 @@ interface Section {
     | '/$shopId/settings/billing'
     | '/$shopId/settings/activity'
     | '/$shopId/settings/support'
+    | '/$shopId/settings/apps'
     | '/$shopId/settings/tax'
     | '/$shopId/settings/messages'
     | '/$shopId/settings/orders'
@@ -142,6 +144,12 @@ const SECTIONS: readonly Section[] = [
     icon: UserCog,
   },
   {
+    to: '/$shopId/settings/apps',
+    label: 'settings.apps',
+    hint: 'settings.appsHint',
+    icon: Blocks,
+  },
+  {
     to: '/$shopId/settings/billing',
     label: 'settings.billing',
     hint: 'settings.billingHint',
@@ -161,7 +169,7 @@ const SECTIONS: readonly Section[] = [
   },
 ];
 
-/** Settings (docs/design/02 §4), as far as they are built: the shop, its domains, order policies, locations, delivery and payments, the checkout page, sales tax, customer messages, couriers, staff, billing, activity and support access. */
+/** Settings (docs/design/02 §4), as far as they are built: the shop, its domains, order policies, locations, delivery and payments, the checkout page, sales tax, customer messages, couriers, staff, apps, billing, activity and support access. */
 export function SettingsPage() {
   const { t } = useLocale();
   const shopId = useShop().id;

@@ -2919,3 +2919,55 @@ export interface CourierRateCardSetData {
 export interface CourierRateCardRemoveData {
   courierRateCardRemove: { removed: boolean; userErrors: UserError[] };
 }
+
+/** One of the shop's custom apps (DEV-04, ADR-395): never its token or secret. */
+export interface CustomApp {
+  id: string;
+  name: string;
+  scopes: string[];
+  tokenHint: string;
+  secretHint: string | null;
+  createdAt: string;
+}
+
+export interface CustomAppsData {
+  customApps: CustomApp[];
+}
+
+export interface CustomAppInput {
+  name?: string | null;
+  scopes?: string[] | null;
+}
+
+export interface CustomAppCreateData {
+  customAppCreate: {
+    customApp: CustomApp | null;
+    accessToken: string | null;
+    webhookSecret: string | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface CustomAppUpdateData {
+  customAppUpdate: { customApp: CustomApp | null; userErrors: UserError[] };
+}
+
+export interface CustomAppTokenRotateData {
+  customAppTokenRotate: {
+    customApp: CustomApp | null;
+    accessToken: string | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface CustomAppSecretRotateData {
+  customAppSecretRotate: {
+    customApp: CustomApp | null;
+    webhookSecret: string | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface CustomAppDeleteData {
+  customAppDelete: { deletedCustomAppId: string | null; userErrors: UserError[] };
+}

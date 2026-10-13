@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-395 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-396 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -403,6 +403,7 @@
 | 393 | Abandoned checkouts: the number a shopper types is kept as they type it, the shop sees who left, and may remind them once on WhatsApp, after the delay it sets, with a link back to their items; an order the number places then recovers it | Accepted |
 | 394 | The admin lists the checkouts shoppers left under Orders, for those who work orders and marketers, with a chat on WhatsApp for a whole number not yet ordered, and the reminder's delay is set with the checkout page's settings | Accepted |
 | 395 | A custom app is an access token the shop's owner or a manager makes, with a name and scopes none beyond their own role's, and a secret its webhooks will be signed with, kept sealed for the app alone; both are shown once and can be replaced, and removing the app revokes its token at once | Accepted |
+| 396 | Settings lists the shop's custom apps for owners and managers, each with what it may reach in words and the last characters of its token and secret; an app is made by choosing each resource's access, and its token and secret are shown once, to copy | Accepted |
 
 ---
 
@@ -15354,3 +15355,27 @@
     OAuth apps installed from a store, with tokens of their own per shop, come later.
   * **Showing the secret again on request:** Shopify does; once is enough here, as a new one can
     be made, and a leaked admin session reveals nothing.
+
+## ADR-396 · Settings lists the shop's custom apps for owners and managers, each with what it may reach in words and the last characters of its token and secret; an app is made by choosing each resource's access, and its token and secret are shown once, to copy
+
+* **Context:**
+  * The core makes custom apps ([ADR-395](#adr-395--a-custom-app-is-an-access-token-the-shops-owner-or-a-manager-makes-with-a-name-and-scopes-none-beyond-their-own-roles-and-a-secret-its-webhooks-will-be-signed-with-kept-sealed-for-the-app-alone-both-are-shown-once-and-can-be-replaced-and-removing-the-app-revokes-its-token-at-once)); a shop's owner needs to make one for the developer
+    connecting their sheet or accounting system, from their phone.
+* **Decision:**
+  * **Settings → Apps**, for owners and managers, lists the shop's apps: each with what it may
+    reach in words ("Orders: Read and write"), or "Everything the API offers", when it was
+    made, and the last four characters of its token and its signing secret, or that it has none
+    yet.
+  * **Making or changing an app chooses each resource's access**, "No access", "Read" or "Read
+    and write", rather than the API's scopes by name; the core refuses any the member's role
+    lacks.
+  * **What is made is shown once**, with a button to copy each, until "I've copied it". A new
+    token or secret is shown the same way. Removing asks once more, saying the token stops
+    working at once.
+  * Making, changing and replacing ask the member to confirm who they are when they have not
+    lately.
+* **Consequences:**
+  * The activity log names apps' changes, a new token or secret among them.
+* **Alternatives:**
+  * **A checkbox for each scope:** forty boxes on a phone, with read and write apart where
+    write already reads.

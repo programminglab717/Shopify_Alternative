@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the admin's page of custom apps
-under Settings (DEV-04); then webhooks for apps (DEV-03), each app's subscriptions to the shop's
-events delivered signed with its secret, retried and logged. Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: webhooks for apps (DEV-03), each
+app's subscriptions to the shop's events delivered signed with its secret, retried and logged;
+then product reviews (MKT-05). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,19 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### The admin's apps
+
+* **Settings → Apps** ([ADR-396](../architecture/13-decision-log.md#adr-396--settings-lists-the-shops-custom-apps-for-owners-and-managers-each-with-what-it-may-reach-in-words-and-the-last-characters-of-its-token-and-secret-an-app-is-made-by-choosing-each-resources-access-and-its-token-and-secret-are-shown-once-to-copy), DEV-04) lists the shop's custom apps for owners and managers,
+  with what each may reach in words and the last characters of its token and secret. Making or
+  changing one chooses "No access", "Read" or "Read and write" for each resource; the token and
+  secret are shown once to copy, as is a new one.
+* **Tried in Chromium against the core:** the owner made "Accounting sync" with Locations to
+  read and Orders to read and write. Its token, used straight away, read the shop's location;
+  once the app was removed, the same token was refused (401). The activity log had the app made
+  and removed. The app and its log rows were then taken away.
+* 2650 tests (8 new): the list, making, changing, a new token and secret, and
+  removing, in the admin; its documents checked against the schema.
 
 ### db1ec42 · Custom apps
 

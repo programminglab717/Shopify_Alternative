@@ -6948,3 +6948,99 @@ export const CourierRateCardRemoveMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const CUSTOM_APP = /* GraphQL */ `
+  fragment CustomAppFields on CustomApp {
+    id
+    name
+    scopes
+    tokenHint
+    secretHint
+    createdAt
+  }
+`;
+
+export const CustomAppsQuery = /* GraphQL */ `
+  query CustomApps {
+    customApps {
+      ...CustomAppFields
+    }
+  }
+  ${CUSTOM_APP}
+`;
+
+export const CustomAppCreateMutation = /* GraphQL */ `
+  mutation CustomAppCreate($input: CustomAppInput!) {
+    customAppCreate(input: $input) {
+      customApp {
+        ...CustomAppFields
+      }
+      accessToken
+      webhookSecret
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CUSTOM_APP}
+  ${USER_ERRORS}
+`;
+
+export const CustomAppUpdateMutation = /* GraphQL */ `
+  mutation CustomAppUpdate($id: ID!, $input: CustomAppInput!) {
+    customAppUpdate(id: $id, input: $input) {
+      customApp {
+        ...CustomAppFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CUSTOM_APP}
+  ${USER_ERRORS}
+`;
+
+export const CustomAppTokenRotateMutation = /* GraphQL */ `
+  mutation CustomAppTokenRotate($id: ID!) {
+    customAppTokenRotate(id: $id) {
+      customApp {
+        ...CustomAppFields
+      }
+      accessToken
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CUSTOM_APP}
+  ${USER_ERRORS}
+`;
+
+export const CustomAppSecretRotateMutation = /* GraphQL */ `
+  mutation CustomAppSecretRotate($id: ID!) {
+    customAppSecretRotate(id: $id) {
+      customApp {
+        ...CustomAppFields
+      }
+      webhookSecret
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CUSTOM_APP}
+  ${USER_ERRORS}
+`;
+
+export const CustomAppDeleteMutation = /* GraphQL */ `
+  mutation CustomAppDelete($id: ID!) {
+    customAppDelete(id: $id) {
+      deletedCustomAppId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
