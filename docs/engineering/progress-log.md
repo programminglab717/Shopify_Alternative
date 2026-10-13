@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### The store's export with the online store's content, and an email when ready
+### bddce1e · The store's export with the online store's content, and an email when ready
 
 * **The ZIP** ([ADR-417](../architecture/13-decision-log.md#adr-417--the-stores-export-holds-the-online-stores-collections-pages-and-blogs-as-json-and-its-owner-is-emailed-when-it-is-ready), ADM-10) holds the online store's collections, pages and blogs with their
   articles as JSON.
