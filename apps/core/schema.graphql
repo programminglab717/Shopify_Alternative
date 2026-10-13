@@ -6991,6 +6991,11 @@ type Mutation {
   """
   storeCreditAccountDebit(debitInput: StoreCreditAccountDebitInput!, id: ID!): StoreCreditAccountDebitPayload!
 
+  """
+  Asks for the whole store, exported: a worker makes the ZIP as the owner asking, ready in a few minutes, which storeExports then links for a week. One at a time, at most 3 a day. The owner’s alone, who must have proved who they are in the last few minutes.
+  """
+  storeExportCreate: StoreExportCreatePayload!
+
   """Adds a supplier, named uniquely in the shop."""
   supplierCreate(input: SupplierInput!): SupplierPayload!
 
@@ -10760,6 +10765,11 @@ type Query {
   storeCreditAccount(id: ID!): StoreCreditAccount
 
   """
+  The shop's latest 10 exports of the whole store, newest first. The owner's alone.
+  """
+  storeExports: [StoreExport!]!
+
+  """
   Who is on the online store now, and today's sessions so far, from the storefronts' counts as they stand (ANL-02).
   """
   storefrontLiveView: StorefrontLiveView!
@@ -12099,6 +12109,43 @@ enum StoreCreditSystemEvent {
 
   """An order's refund, given as store credit."""
   ORDER_REFUND
+}
+
+"""
+The whole store exported (ADM-10, ADR-415): a ZIP of its products and stock, customers, orders and their line items, and redirects, each as its own export writes it.
+"""
+type StoreExport {
+  createdAt: DateTime!
+
+  """Why it failed."""
+  error: String
+
+  """When storage lets the ZIP go."""
+  expiresAt: DateTime
+  finishedAt: DateTime
+  id: ID!
+
+  """Bytes of the ZIP, once ready."""
+  size: Float
+  status: StoreExportStatus!
+
+  """A link that downloads the ZIP, for 60 minutes, once ready."""
+  url: String
+}
+
+type StoreExportCreatePayload {
+  storeExport: StoreExport
+  userErrors: [UserError!]!
+}
+
+"""
+PENDING while a worker makes it, READY to download for a week, FAILED, or EXPIRED once storage let it go.
+"""
+enum StoreExportStatus {
+  EXPIRED
+  FAILED
+  PENDING
+  READY
 }
 
 """

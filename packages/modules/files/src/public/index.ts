@@ -17,6 +17,7 @@ export {
   type FileCreatedPayload,
   type FileDeletedPayload,
   type ShopBrandUpdatePayload,
+  type StoreExportPayload,
 } from '../internal/events.js';
 export {
   FILE_LIMITS,
@@ -32,3 +33,11 @@ export { FilesModule } from '../internal/files.module.js';
 export { toShopBrand } from '../internal/graphql/brand.resolver.js';
 export { ShopBrand } from '../internal/graphql/file.types.js';
 export type { FileRecord, StagedUpload } from '../internal/records.js';
+export { STORE_EXPORT_STATUSES, type StoreExportStatusValue } from '../internal/schema.js';
+export {
+  STORE_EXPORT_LIMITS,
+  STORE_EXPORT_URL_SECONDS,
+  StoreExportService,
+  type StoreExportRecord,
+  type StoreExportTask,
+} from '../internal/store-export.service.js';

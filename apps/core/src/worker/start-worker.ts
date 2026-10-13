@@ -18,6 +18,7 @@ import {
   createEventWorker,
   createRedis,
 } from '@hatti/events';
+import { StoreExportService } from '@hatti/files/public';
 import { ImageFetcher } from '@hatti/images';
 import { LowStockService, StockService } from '@hatti/inventory/public';
 import type { Logger } from '@hatti/logger';
@@ -60,6 +61,7 @@ import {
   type StorefrontPublisher,
 } from '../storefront/publisher.js';
 import { workerStorage } from '../storage.js';
+import { storeExportBuilder } from '../store-export.js';
 import { BillingNotices } from './billing-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
 import { CheckoutReminders } from './checkout-reminders.js';
@@ -86,6 +88,7 @@ import { ProductImages } from './product-images.js';
 import { RiskRescoring } from './risk-rescoring.js';
 import { ScheduledContent, scheduledKinds } from './scheduled-content.js';
 import { ScheduledExports } from './scheduled-exports.js';
+import { StoreExports } from './store-exports.js';
 import { StaffAlerts } from './staff-alerts.js';
 import { StorefrontSessions } from './storefront-sessions.js';
 import { StorefrontSweep } from './storefront-sweep.js';
@@ -419,6 +422,13 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     } else {
       logger.warn('SES is not set up: scheduled exports wait until it is');
     }
+    // The whole store, exported as its owners ask (ADR-415).
+    const storeExports = new StoreExports(
+      new StoreExportService(database, workerStorage(config)),
+      storeExportBuilder(database, new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000')),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => storeExports.stop());
     const renewals = new BillingRenewals(
       new BillingService(database, new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000')),
       logger,

@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the shop's whole store exported
-(ADM-10); then wishlists on the storefront (OS-12). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the store export in the admin and
+its email when ready, with the online store's pages and blogs in it (ADM-10); then wishlists on
+the storefront (OS-12). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +16,15 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### The whole store exported
+
+* **An owner asks** ([ADR-415](../architecture/13-decision-log.md#adr-415--an-owner-exports-the-whole-store-a-worker-makes-a-zip-of-each-parts-own-export-as-that-owner-which-storage-keeps-for-a-week-behind-links-that-last-an-hour), ADM-10) with `storeExportCreate`, one at a time and three a day; a
+  worker makes a ZIP of the store as that owner, each part in its own export's format, with a
+  README.
+* **`storeExports`** links each for an hour while storage keeps it, a week. Migration 0194.
+* `@hatti/xlsx` writes ZIPs of several files, `zipFiles`, for it.
+* 2765 tests (7 new): the ZIP's, the files module's and the Admin API's.
 
 ### d598b35 · Gift messages on packing slips and order pages, and the admin's gift options
 

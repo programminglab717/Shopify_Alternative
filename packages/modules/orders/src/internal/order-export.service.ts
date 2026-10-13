@@ -78,15 +78,18 @@ export class OrderExportService {
   constructor(private readonly db: Database) {}
 
   /**
-   * Orders as CSV or an Excel workbook, oldest first, filtered as the order list is: up to
-   * {@link EXPORT_LIMITS} orders, one row each or one row per line item. Customers' numbers show
-   * as the caller sees them, masked for most staff; every row carries a watermark naming who
-   * exported it and when. Each export goes into the audit log and the outbox.
+   * Orders as CSV or an Excel workbook, oldest first, filtered as the order list is: up to {@link
+   * EXPORT_LIMITS} orders unless `limits` say otherwise, as for the whole store's export (ADR-415),
+   * one row each or one row per line item. Customers' numbers show as the caller sees them, masked
+   * for most staff; every row carries a watermark naming who exported it and when. Each export goes
+   * into the audit log and the outbox.
    */
   async export(
     tenant: TenantContext,
     input: OrderExportInput,
+    limits: { orders?: number; lines?: number } = {},
   ): Promise<MutationResult<OrderExportResult>> {
+    const most = { ...EXPORT_LIMITS, ...limits };
     if (input.placedFrom && input.placedBefore && input.placedFrom >= input.placedBefore) {
       return failOne(['placedBefore'], 'INVALID', 'Placed before must be later than placed from');
     }
@@ -104,21 +107,21 @@ export class OrderExportService {
             FROM orders.orders o
            WHERE o.shop_id = ${tenant.shopId} AND ${where}`);
       const { orders: orderCount, lines: lineCount } = counted[0]!;
-      if (orderCount > EXPORT_LIMITS.orders) {
+      if (orderCount > most.orders) {
         return failOne(
           ['query'],
           'TOO_MANY',
           `${orderCount.toLocaleString('en')} orders match; export at most ` +
-            `${EXPORT_LIMITS.orders.toLocaleString('en')} at a time. Narrow it down, such as ` +
+            `${most.orders.toLocaleString('en')} at a time. Narrow it down, such as ` +
             'by the dates they were placed.',
         );
       }
-      if (input.layout === 'line_items' && lineCount > EXPORT_LIMITS.lines) {
+      if (input.layout === 'line_items' && lineCount > most.lines) {
         return failOne(
           ['query'],
           'TOO_MANY',
           `The orders that match have ${lineCount.toLocaleString('en')} line items; export at ` +
-            `most ${EXPORT_LIMITS.lines.toLocaleString('en')} at a time. Narrow it down, such ` +
+            `most ${most.lines.toLocaleString('en')} at a time. Narrow it down, such ` +
             'as by the dates they were placed.',
         );
       }

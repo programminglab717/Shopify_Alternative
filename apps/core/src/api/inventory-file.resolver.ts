@@ -147,7 +147,7 @@ export class InventoryFileResolver {
       if (!location?.isActive) throw badUserInput('Location not found, or not active');
     }
     const result = await this.files.export(tenant, search, (variantIds) =>
-      this.#levels(tenant, variantIds, only),
+      stockLevelsOf(this.inventory, tenant, variantIds, only),
     );
     if (!result.ok) throw badUserInput(result.errors[0]!.message);
     return Object.assign(new InventoryExport(), {
@@ -295,28 +295,34 @@ export class InventoryFileResolver {
    * Each tracked variant's levels at active locations, or `only` that one: on hand, committed,
    * available, and not available though on hand, held for checkouts or kept back.
    */
-  async #levels(
-    tenant: TenantContext,
-    variantIds: string[],
-    only: string | null,
-  ): Promise<Map<string, StockLevel[]>> {
-    const items = await this.inventory.itemsOf(tenant, variantIds);
-    const levels = new Map<string, StockLevel[]>();
-    for (const [variantId, item] of items) {
-      if (!item.tracked) continue;
-      levels.set(
-        variantId,
-        item.levels
-          .filter((level) => only === null || level.location.id === only)
-          .map((level) => ({
-            location: level.location.name,
-            onHand: level.onHand,
-            committed: level.committed,
-            available: level.available,
-            unavailable: level.reserved + level.safetyStock,
-          })),
-      );
-    }
-    return levels;
+}
+
+/**
+ * Each tracked variant's stock at each location, or at `only`, as Shopify's inventory CSV gives
+ * it: also the whole store's export's (ADR-415).
+ */
+export async function stockLevelsOf(
+  inventory: InventoryService,
+  tenant: TenantContext,
+  variantIds: string[],
+  only: string | null = null,
+): Promise<Map<string, StockLevel[]>> {
+  const items = await inventory.itemsOf(tenant, variantIds);
+  const levels = new Map<string, StockLevel[]>();
+  for (const [variantId, item] of items) {
+    if (!item.tracked) continue;
+    levels.set(
+      variantId,
+      item.levels
+        .filter((level) => only === null || level.location.id === only)
+        .map((level) => ({
+          location: level.location.name,
+          onHand: level.onHand,
+          committed: level.committed,
+          available: level.available,
+          unavailable: level.reserved + level.safetyStock,
+        })),
+    );
   }
+  return levels;
 }

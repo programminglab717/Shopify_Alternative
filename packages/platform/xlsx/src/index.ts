@@ -294,6 +294,21 @@ function escapeXml(text: string): string {
 const DOS_DATE = (1 << 5) | 1;
 const DOS_TIME = 0;
 
+/** The most {@link zipFiles} writes, without ZIP64: 65,535 files, of 4 GiB in all. */
+export const ZIP_LIMITS = { files: 0xffff, bytes: 0xffffffff } as const;
+
+/**
+ * A ZIP of `files`, each deflated, as a workbook is written: for exports of several files, such
+ * as a whole store's (ADR-415). Throws past {@link ZIP_LIMITS}, which a ZIP without ZIP64 cannot
+ * say.
+ */
+export function zipFiles(files: readonly { path: string; data: Buffer }[]): Buffer {
+  if (files.length > ZIP_LIMITS.files) throw new RangeError('Too many files for one ZIP');
+  const written = zip(files);
+  if (written.length > ZIP_LIMITS.bytes) throw new RangeError('Too large for one ZIP');
+  return written;
+}
+
 /** A ZIP of `files`, each deflated (PKWARE's APPNOTE, without ZIP64: a workbook is far smaller). */
 function zip(files: readonly { path: string; data: Buffer }[]): Buffer {
   const entries: Buffer[] = [];

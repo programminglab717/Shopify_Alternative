@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-414 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-415 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -422,6 +422,7 @@
 | 412 | The admin makes a product a bundle on its page, its parts found as a draft's items are, each with how many one set holds; an order's page says of each part's line which bundle it was sold in | Accepted |
 | 413 | A shop sells gift wrap as one of its own variants, which the checkout's page adds to the cart when the shopper asks, and may ask for a gift message, which the order keeps for its packing slip | Accepted |
 | 414 | An order's gift message is printed on its packing slip and shown on its pages, the customer's and staff's; the admin sets the gift wrap and messages on the checkout page's settings | Accepted |
+| 415 | An owner exports the whole store: a worker makes a ZIP of each part's own export as that owner, which storage keeps for a week behind links that last an hour | Accepted |
 
 ---
 
@@ -15938,3 +15939,41 @@
 * **Alternatives:**
   * **A card printed apart**: one more sheet for every gift order, on printers that take A4
     and labels; a box on the slip that already goes in the parcel needs no new paper.
+
+## ADR-415 · An owner exports the whole store: a worker makes a ZIP of each part's own export as that owner, which storage keeps for a week behind links that last an hour
+
+* **Context:**
+  * ADM-10: a shop can leave Hatti with everything it keeps, without asking. Each part has an
+    export of its own already, products, stock, customers, orders and redirects, but each for one
+    download within a request, capped at what an import takes back: 5,000 product rows, 10,000
+    customers, 10,000 orders. A whole store is more than any one of them, and more than a
+    request should hold open.
+* **Decision:**
+  * **Asked for, then made in the background.** `storeExportCreate` keeps a request
+    (`files.store_exports`, migration 0194): the owner's alone, who must have proved who they
+    are in the last few minutes, one at a time and three a day, recorded in the audit log. A
+    worker sweep takes each, held for half an hour so that no other worker makes it too, and
+    tries one three times before it fails.
+  * **As the owner who asked.** The worker makes it as that owner, while they still are one:
+    each part's audit entry and watermark names them, as when they export it themselves. One
+    asked for by someone no longer the owner fails, and says why.
+  * **Each part in its own export's format**, past that export's limits for one download, so
+    that each goes back in where an import takes it: `products.csv` and `inventory.csv` in
+    Shopify's CSVs, `customers.csv` as Customers > Export writes it, `orders.csv` and
+    `order-line-items.csv`, `redirects.csv` in Shopify's; and a `README.txt` saying what each is,
+    and that customers' data is to be kept safe. A part that cannot be exported fails the
+    export with its reason.
+  * **A ZIP**, written by the zip writer `@hatti/xlsx` already had for workbooks, now exported
+    as `zipFiles`: no new dependency. Without ZIP64 it holds 4 GiB, far past any shop's.
+  * **Kept a week**, under `shops/{shopId}/exports/{id}.zip`; `storeExports` gives each a link
+    that downloads it for an hour. A week on, storage lets it go and the export says it expired.
+* **Consequences:**
+  * The worker holds a store in memory while it makes the ZIP. A shop far larger than the
+    alpha's would want each part streamed to storage instead.
+  * Not yet in it: the online store's pages, blogs and themes, collections, discounts and
+    reviews; nor the admin's page, nor an email when it is ready (the next parts).
+* **Alternatives:**
+  * **The parts' exports, one by one, in the admin**: each capped for one download, and a
+    larger store in many parts, by hand; leaving should take one step.
+  * **One JSON document of everything**: complete, but nothing takes it back; each part in the
+    format its import reads goes straight into Hatti again, or into Shopify.

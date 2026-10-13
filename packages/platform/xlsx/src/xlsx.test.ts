@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columnName, toXlsx, type XlsxSheet } from './index.js';
+import { ZIP_LIMITS, columnName, toXlsx, zipFiles, type XlsxSheet } from './index.js';
 import { xlsxParts as unzip, xlsxRows } from './testing/index.js';
 
 const ORDERS: XlsxSheet = {
@@ -146,5 +146,27 @@ describe('Excel workbooks', () => {
     );
     expect(named("Ayesha's & Co")).toContain(`'Ayesha''s &amp; Co'!$A$1:$A$1`);
     expect(() => toXlsx({ name: 'None', columns: [], rows: [] })).toThrow(RangeError);
+  });
+});
+
+describe('ZIPs of several files', () => {
+  it('keeps each file whole under its path, and refuses more than a ZIP can say (ADR-415)', () => {
+    const files = [
+      { path: 'README.txt', data: Buffer.from('A store, exported.\n') },
+      {
+        path: 'products.csv',
+        data: Buffer.from('Handle,Title\nlawn-suit,Lawn suit\n'.repeat(500)),
+      },
+      { path: 'empty.csv', data: Buffer.alloc(0) },
+    ];
+    const zip = zipFiles(files);
+    expect([...unzip(zip)]).toEqual(files.map((file) => [file.path, file.data.toString('utf8')]));
+    // Deflated: the repeated rows take far less room than they would as they are.
+    expect(zip.length).toBeLessThan(files[1]!.data.length / 4);
+    const many = Array.from({ length: ZIP_LIMITS.files + 1 }, (_, index) => ({
+      path: `${index}.txt`,
+      data: Buffer.alloc(0),
+    }));
+    expect(() => zipFiles(many)).toThrow('Too many files for one ZIP');
   });
 });

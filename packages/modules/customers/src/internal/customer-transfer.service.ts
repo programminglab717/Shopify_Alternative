@@ -617,15 +617,18 @@ export class CustomerTransferService {
   }
 
   /**
-   * Customers as CSV, oldest first: every customer, a saved segment's members, or a query's.
-   * Columns: the profile with the customer's other numbers, consent per channel, every labelled segment field, such as orders and
-   * amount spent, and a watermark on each row naming who exported it and when. Each export is
-   * recorded as a `customer_export.created` event.
+   * Customers as CSV, oldest first: every customer, a saved segment's members, or a query's, up to
+   * {@link TRANSFER_LIMITS} unless `limits` say otherwise, as for the whole store's export
+   * (ADR-415). Columns: the profile with the customer's other numbers, consent per channel, every
+   * labelled segment field, such as orders and amount spent, and a watermark on each row naming who
+   * exported it and when. Each export is recorded as a `customer_export.created` event.
    */
   async export(
     tenant: TenantContext,
     filter: CustomerExportFilter,
+    limits: { rows?: number } = {},
   ): Promise<MutationResult<{ csv: string; rowCount: number }>> {
+    const mostRows = limits.rows ?? TRANSFER_LIMITS.exportRows;
     if (filter.query && filter.segmentId) {
       return failOne(['query'], 'INVALID', 'Give a segment or a query, not both');
     }
@@ -665,12 +668,12 @@ export class CustomerTransferService {
         SELECT count(*)::int AS count FROM customers.customers c ${joins}
          WHERE c.shop_id = ${tenant.shopId} AND ${where}`);
         const total = counted[0]!.count;
-        if (total > TRANSFER_LIMITS.exportRows) {
+        if (total > mostRows) {
           return failOne(
             filterField,
             'TOO_MANY',
             `${total.toLocaleString('en')} customers match; export at most ` +
-              `${TRANSFER_LIMITS.exportRows.toLocaleString('en')} at a time. Narrow it down with a ` +
+              `${mostRows.toLocaleString('en')} at a time. Narrow it down with a ` +
               'segment.',
           );
         }

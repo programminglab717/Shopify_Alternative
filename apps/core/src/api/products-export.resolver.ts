@@ -67,7 +67,7 @@ export class ProductsExportResolver {
     const parsed = parseProductSearch(search);
     if (!parsed.ok) throw badUserInput(parsed.error);
     const stock = hasScope(tenant, 'read_inventory')
-      ? (variantIds: string[]) => this.#stock(tenant, variantIds)
+      ? (variantIds: string[]) => exportStockOf(this.inventory, tenant, variantIds)
       : null;
     const result = await this.exports.export(tenant, search, stock);
     if (!result.ok) throw badUserInput(result.errors[0]!.message);
@@ -77,21 +77,25 @@ export class ProductsExportResolver {
       rowCount: result.value.rows,
     });
   }
+}
 
-  /** Each tracked variant's stock: what is for sale online, and whether it sells on at zero. */
-  async #stock(
-    tenant: TenantContext,
-    variantIds: string[],
-  ): Promise<Map<string, ShopifyVariantStock>> {
-    const items = await this.inventory.itemsOf(tenant, variantIds);
-    const stock = new Map<string, ShopifyVariantStock>();
-    for (const [variantId, item] of items) {
-      if (!item.tracked) continue;
-      stock.set(variantId, {
-        quantity: sellableQuantity(item),
-        continueSelling: item.inventoryPolicy === 'continue',
-      });
-    }
-    return stock;
+/**
+ * Each tracked variant's stock, as Shopify's product CSV gives it: what is for sale online, and
+ * whether it sells on at zero. Also the whole store's export's (ADR-415).
+ */
+export async function exportStockOf(
+  inventory: InventoryService,
+  tenant: TenantContext,
+  variantIds: string[],
+): Promise<Map<string, ShopifyVariantStock>> {
+  const items = await inventory.itemsOf(tenant, variantIds);
+  const stock = new Map<string, ShopifyVariantStock>();
+  for (const [variantId, item] of items) {
+    if (!item.tracked) continue;
+    stock.set(variantId, {
+      quantity: sellableQuantity(item),
+      continueSelling: item.inventoryPolicy === 'continue',
+    });
   }
+  return stock;
 }
