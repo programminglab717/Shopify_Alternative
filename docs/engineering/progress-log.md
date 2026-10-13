@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Orders that repeat another
+### cc7464b · Orders that repeat another
 
 * **In the orders module** ([ADR-392](../architecture/13-decision-log.md#adr-392--an-order-may-repeat-another-placed-for-a-customer-with-an-open-order-not-shipped-yet-from-the-three-days-before-with-an-item-in-common-it-names-that-order-and-staff-merge-it-in-cancel-it-as-a-repeat-or-keep-both), CHK-11): an order placed for a customer who has an open order
   not shipped yet, from the three days before, with an item in common, names that order and
