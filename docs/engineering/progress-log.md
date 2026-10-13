@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Export your store, in the admin's settings
+### fcb14da · Export your store, in the admin's settings
 
 * **Settings → Export your store** ([ADR-416](../architecture/13-decision-log.md#adr-416--the-admins-settings--export-your-store-the-owner-asks-confirming-who-they-are-and-downloads-each-export-from-the-page-which-asks-again-while-one-is-being-made), ADM-10): the owner asks for the whole store, once
   they confirm who they are, and downloads it when ready; the page asks after it while it is
