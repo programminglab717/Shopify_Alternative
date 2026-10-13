@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Bundles sold
+### 52a839e · Bundles sold
 
 * **An order of a bundle** ([ADR-410](../architecture/13-decision-log.md#adr-410--an-order-of-a-bundle-holds-its-parts-lines-the-bundles-price-shared-among-them-by-what-each-costs-alone-to-the-paisa-each-keeping-the-bundle-it-was-sold-as-a-bundle-sells-as-many-as-its-parts-stock-makes), CAT-11) holds its parts' lines, the set's price shared
   among them by what each costs alone, exact to the paisa, each line keeping the bundle it was
