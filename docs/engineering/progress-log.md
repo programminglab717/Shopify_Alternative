@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: bundles and multipacks (CAT-11);
-then gift options at checkout (CHK-16). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: bundles sold: their stock from their
+parts', and orders holding the parts (CAT-11); then the storefront's and admin's bundles. Urdu
+handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +16,16 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Bundles in the catalog
+
+* **A bundle** ([ADR-409](../architecture/13-decision-log.md#adr-409--a-bundle-is-a-product-of-one-variant-made-of-other-products-variants-a-number-of-each-up-to-ten-parts-one-level-deep-a-part-deleted-leaves-it-unsold-until-it-is-given-its-parts-again-and-orders-will-hold-its-parts-as-their-lines), CAT-11) is a product of one variant made of other products' variants,
+  a number of each: a lawn suit's three pieces, or a multipack of three of one. Migration 0192
+  keeps them, and readies orders' lines to keep the bundle they were sold as.
+* **Kept one level deep:** no options for a bundle, no bundle within one; a part deleted leaves
+  it incomplete, not sold, until it is given its parts again.
+* **The Admin API** reads it as `Product.bundle` and sets it with `productBundleSet`.
+* 2734 tests (6 new): the catalog's bundles and the Admin API's.
 
 ### 1a221e9 · Size charts in the admin
 

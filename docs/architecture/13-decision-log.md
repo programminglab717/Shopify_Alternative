@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-408 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-409 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -416,6 +416,7 @@
 | 406 | The catalog keeps the shop's size charts, tables of measurements a row for each size, in inches or centimetres, and gives each product one at most, by its ID or as a collection has it then; the products whose chart changes are named in the event | Accepted |
 | 407 | A product's storefront page shows its size chart, opened under its buttons and read in inches or centimetres without a script, the unit the shop wrote it in first; themes read it as Hatti's `product.size_chart`, each measurement in both units | Accepted |
 | 408 | The admin keeps the shop's size charts on a page of their own beside its products, each edited as a table of sizes and measurements, given to a collection's products from its page and to a product from the product's; measurements typed with a comma or a point | Accepted |
+| 409 | A bundle is a product of one variant made of other products' variants, a number of each, up to ten parts, one level deep; a part deleted leaves it unsold until it is given its parts again, and orders will hold its parts as their lines | Accepted |
 
 ---
 
@@ -15754,3 +15755,37 @@
     collections and reviews.
   * **A chart pasted as text or a spreadsheet:** a later step if shops ask; typing a dozen sizes
     on a phone is quick enough.
+
+## ADR-409 · A bundle is a product of one variant made of other products' variants, a number of each, up to ten parts, one level deep; a part deleted leaves it unsold until it is given its parts again, and orders will hold its parts as their lines
+
+* **Context:**
+  * CAT-11: shops sell sets, a lawn suit's shirt, dupatta and trouser, or Eid "3 for" deals, and
+    multipacks, three of one; on Shopify bundles are an app's, or Cart Transform's. The stock is
+    the parts', and a parcel holds the parts: a set sold must take them from stock, and its
+    return put them back.
+* **Decision:**
+  * **A bundle is a product** (`catalog.bundles`), so it has its page, price, photos and
+    collections as any other; it has **one variant**, whose price is the set's. A bundle takes
+    no options or variants of its own: its parts have them.
+  * **Its parts** (`catalog.bundle_components`) are other products' variants, 1 to 10 of them,
+    each 1 to 99 of, holding two items at least: two variants, or two of one, a multipack. A
+    bundle holds no bundle, and a part's product is no bundle: one level deep.
+  * **A part deleted** goes with its variant; the bundle keeps how many parts it was given, so
+    with one missing it is **incomplete** and not sold until the shop gives it its parts again.
+    Deleting a variant or product is never refused for a bundle's sake.
+  * **The Admin API:** `Product.bundle` (batched) and `productBundleSet(productId, components)`,
+    with `read_products` and `write_products`; no parts, no bundle. `product_bundle.updated`
+    names the parts' variants before and after, and is on the activity log.
+  * **Selling it, next:** a bundle's stock is the fewest sets its parts' stock makes; placing
+    an order turns each bundle line into its parts' lines, its price shared among them by their
+    own prices, each keeping the bundle it was sold as (`orders.lines.bundle_*`, in this
+    migration). Every step after, committing, cancelling, editing, packing, returning, works on
+    those lines as on any other.
+* **Consequences:**
+  * Sales and stock reports count the parts; the bundle's own sales are its lines' grouping.
+* **Alternatives:**
+  * **A line with components** (Shopify's): every stock call site would expand the bundle line
+    again; lines of their own keep one way of committing and restocking.
+  * **Mix and match** ("any three for Rs 9,999"): a discount, not a product; with discounts.
+  * **Refusing to delete a part:** every path that deletes variants would need to know of
+    bundles; an incomplete bundle is safe, as it is not sold.

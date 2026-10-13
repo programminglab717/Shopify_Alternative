@@ -21,6 +21,7 @@ import {
   type VariantFields,
   type VariantFieldsInput,
 } from './variant-input.js';
+import { BUNDLE_HAS_ONE_VARIANT, isBundleIn } from './bundles.js';
 
 export interface VariantCreateInput extends VariantFieldsInput {
   /** One of the product's media, shown for this variant. */
@@ -206,6 +207,9 @@ export class VariantService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const product = await loadForUpdate(tx, tenant.shopId, productId);
       if (!product) return failOne(['productId'], 'NOT_FOUND', 'Product not found');
+      if (await isBundleIn(tx, tenant.shopId, productId)) {
+        return failOne(['productId'], 'INVALID', BUNDLE_HAS_ONE_VARIANT);
+      }
       if (product.options.length === 0) {
         return failOne(
           ['variants'],

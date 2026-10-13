@@ -27,6 +27,7 @@ import {
   combinations,
   type OptionInput,
 } from './variant-input.js';
+import { BUNDLE_HAS_ONE_VARIANT, isBundleIn } from './bundles.js';
 
 /** What to do with variants when options are added, like Shopify's variant strategies. */
 export type NewOptionVariants = 'leave_as_is' | 'create';
@@ -102,6 +103,9 @@ export class OptionService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const product = await loadForUpdate(tx, tenant.shopId, productId);
       if (!product) return failOne(['productId'], 'NOT_FOUND', 'Product not found');
+      if (await isBundleIn(tx, tenant.shopId, productId)) {
+        return failOne(['productId'], 'INVALID', BUNDLE_HAS_ONE_VARIANT);
+      }
       const check = new InputChecker();
       if (inputs.length === 0) check.add(['options'], 'BLANK', 'must include at least one');
       const shapes = checkOptionInputs(

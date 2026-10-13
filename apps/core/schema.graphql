@@ -6711,6 +6711,11 @@ type Mutation {
   Shows, hides or archives up to 250 products (CAT-04), each as productUpdate would; one refused leaves the rest done.
   """
   productBulkUpdateStatus(ids: [ID!]!, status: ProductStatus!): ProductBulkPayload!
+
+  """
+  Makes a product of one variant a bundle of other products’ variants, a number of each, in place of any parts it had; no parts, and it is a bundle no longer.
+  """
+  productBundleSet(components: [ProductBundleComponentInput!]!, productId: ID!): ProductBundleSetPayload!
   productCreate(input: ProductCreateInput!): ProductCreatePayload!
 
   """Adds images by URL, after the existing ones."""
@@ -9040,6 +9045,11 @@ enum PaymentSessionStatus {
 
 """A product in the shop catalog."""
 type Product {
+  """
+  What it is made of, when it is a bundle; null when it is not (ADR-409).
+  """
+  bundle: ProductBundle
+
   """The collections it is in, by id."""
   collections(
     """Cursor from a previous page."""
@@ -9112,6 +9122,43 @@ type ProductBulkPayload {
   products: [Product!]!
 
   """Why products were refused, each at its place in `ids`: ["ids", "3"]."""
+  userErrors: [UserError!]!
+}
+
+"""
+A product sold as a set of other products’ variants (CAT-11, ADR-409): its one variant is what is ordered, its parts are what orders hold and what stock sells from.
+"""
+type ProductBundle {
+  """
+  False once a part’s variant was deleted: the bundle is not sold until it is given its parts again.
+  """
+  complete: Boolean!
+
+  """In the order the shop gave them."""
+  components: [ProductBundleComponent!]!
+  productId: ID!
+}
+
+"""A part of a bundle: a variant of another product, and how many."""
+type ProductBundleComponent {
+  productId: ID!
+  productTitle: String!
+
+  """How many of it one bundle holds, 1 to 99."""
+  quantity: Int!
+  variantId: ID!
+  variantTitle: String!
+}
+
+input ProductBundleComponentInput {
+  """1 to 99."""
+  quantity: Int!
+  variantId: ID!
+}
+
+type ProductBundleSetPayload {
+  """Null once it is no bundle."""
+  bundle: ProductBundle
   userErrors: [UserError!]!
 }
 

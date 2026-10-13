@@ -168,3 +168,15 @@ export {
   type SizeChartRow,
   type SizeChartUnitValue,
 } from '../internal/size-charts.js';
+export {
+  BUNDLE_LIMITS,
+  BundleEvents,
+  BundleService,
+  bundleProductIdsIn,
+  bundlesOfProductsIn,
+  bundlesOfVariantsIn,
+  type BundleComponent,
+  type BundleComponentInput,
+  type BundleRecord,
+  type ProductBundleUpdatedPayload,
+} from '../internal/bundles.js';
