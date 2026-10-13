@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Bundles on the storefront and their orders' pages
+### b4cd244 · Bundles on the storefront and their orders' pages
 
 * **A bundle's page** ([ADR-411](../architecture/13-decision-log.md#adr-411--a-bundles-storefront-page-lists-what-one-set-holds-each-part-linked-while-it-is-for-sale-as-hattis-productbundle-a-part-off-sale-leaves-the-set-unsold-a-customers-order-page-shows-a-bundle-once-its-parts-named-under-it), CAT-11) lists what one set holds, "In this set", each part linked
   while it is for sale; themes read it as Hatti's `product.bundle`. A part renamed or taken off
