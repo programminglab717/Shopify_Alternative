@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Gift messages on packing slips and order pages, and the admin's gift options
+### d598b35 · Gift messages on packing slips and order pages, and the admin's gift options
 
 * **The packing slip** ([ADR-414](../architecture/13-decision-log.md#adr-414--an-orders-gift-message-is-printed-on-its-packing-slip-and-shown-on-its-pages-the-customers-and-staffs-the-admin-sets-the-gift-wrap-and-messages-on-the-checkout-pages-settings), CHK-16) prints an order's gift message in a box of its own;
   the thank-you page and the order's link page say it back to the customer.
