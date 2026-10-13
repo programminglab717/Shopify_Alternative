@@ -17,6 +17,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
+### The store's export notice listed with the shop's messages
+
+* **Fix:** the Admin API's `MessageKind` lacked `STORE_EXPORT_READY` (ADR-417), so `messages`
+  failed for a shop with that notice among them. It names every kind now, and a test holds the
+  list to the messaging module's kinds.
+* 2789 tests, from 2788: one for messaging.
+
 ### a4a31a6 · WhatsApp broadcasts, scheduled and estimated
 
 * **A broadcast** ([ADR-421](../architecture/13-decision-log.md#adr-421--a-broadcast-sends-one-of-the-shops-approved-templates-to-a-segments-customers-who-agreed-to-hear-on-whatsapp-or-to-all-who-did-estimated-before-it-is-scheduled), MKT-01) sends one of the shop's approved templates to a segment's

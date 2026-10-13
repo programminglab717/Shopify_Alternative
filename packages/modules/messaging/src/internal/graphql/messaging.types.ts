@@ -44,6 +44,7 @@ export enum MessageKind {
   DOMAIN_UNPOINTED = 'DOMAIN_UNPOINTED',
   ORDERS_LIMIT_NEAR = 'ORDERS_LIMIT_NEAR',
   ORDERS_LIMIT_REACHED = 'ORDERS_LIMIT_REACHED',
+  STORE_EXPORT_READY = 'STORE_EXPORT_READY',
 }
 
 registerEnumType(MessageKind, {
@@ -200,6 +201,11 @@ registerEnumType(MessageKind, {
         "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
         'it has placed all the orders its plan allows this month; those past them come in with ' +
         'their customers hidden (ADR-263).',
+    },
+    STORE_EXPORT_READY: {
+      description:
+        "For the shop's owner, from Hatti and paid by Hatti, by email: the whole store's export " +
+        'they asked for is ready to download, and until when (ADR-417).',
     },
   },
 });

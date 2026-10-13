@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chargedFor, messageCostOf, smsParts } from './charges.js';
 import { emailStatusOf } from './email-events.js';
+import { MessageKind } from './graphql/messaging.types.js';
 import {
   LogProvider,
   SmsGatewayProvider,
@@ -40,6 +41,10 @@ const SHIPPED: OutgoingMessage = {
 };
 
 describe("Messages' words", () => {
+  it('names every kind of message in the Admin API, as messages lists them', () => {
+    expect(Object.values(MessageKind)).toEqual(MESSAGE_KINDS.map((kind) => kind.toUpperCase()));
+  });
+
   it("fills in an SMS, its order's page after it, in English and Urdu", () => {
     expect(messageText('order_shipped', 'en', SHIPPED.variables)).toBe(
       'Your order #1043 from Zari Fashions is on its way with PostEx. Tracking number: ' +
