@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Size charts on the storefront
+### 5ec4012 · Size charts on the storefront
 
 * **A product's page** ([ADR-407](../architecture/13-decision-log.md#adr-407--a-products-storefront-page-shows-its-size-chart-opened-under-its-buttons-and-read-in-inches-or-centimetres-without-a-script-the-unit-the-shop-wrote-it-in-first-themes-read-it-as-hattis-productsize_chart-each-measurement-in-both-units), CAT-10) shows its size chart under its buttons, closed until
   tapped, in the unit the shop wrote it in, with a switch to the other that needs no script.
