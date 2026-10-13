@@ -60,6 +60,7 @@ const RESOURCES = [
   { name: 'legal_policies', write: true },
   { name: 'domains', write: true },
   { name: 'pixels', write: true },
+  { name: 'marketing_events', write: true },
   { name: 'settings', write: true },
 ] as const;
 type Resource = (typeof RESOURCES)[number]['name'];

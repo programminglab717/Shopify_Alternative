@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: WhatsApp broadcasts' pages in the
-admin: the shop's own number connected, its templates and its broadcasts (MKT-01); then
-automations (MKT-04). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: WhatsApp broadcasts' last pages in
+the admin: the shop's templates and its broadcasts (MKT-01); then automations (MKT-04). Urdu
+handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,16 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### The shop's WhatsApp number, connected in the admin
+
+* **Settings → Your WhatsApp number** ([ADR-423](../architecture/13-decision-log.md#adr-423--the-admin-connects-the-shops-own-whatsapp-number-in-its-settings-through-metas-embedded-signup-in-facebooks-window-and-the-core-trades-the-code-it-gives), MKT-01) connects the shop's own number through
+  Meta's Embedded Signup, in Facebook's own window. The core trades the one-time code it
+  gives.
+* **Once connected**, the page shows the number, its name and Meta's quality rating, and it
+  can be disconnected. Apps can be given access to broadcasts in Settings → Apps.
+* 2802 tests, from 2795: seven for the admin, three of them its new GraphQL
+  documents checked against the schema.
 
 ### a692708 · WhatsApp broadcasts, sent
 

@@ -7437,3 +7437,60 @@ export const StoreExportCreateMutation = /* GraphQL */ `
   ${STORE_EXPORT}
   ${USER_ERRORS}
 `;
+
+const WHATSAPP_ACCOUNT = /* GraphQL */ `
+  fragment WhatsAppAccountFields on WhatsAppAccount {
+    businessAccountId
+    phoneNumberId
+    displayPhoneNumber
+    verifiedName
+    qualityRating
+    connectedAt
+  }
+`;
+
+/**
+ * The shop's own WhatsApp number (ADR-419), and what Meta's Embedded Signup starts with where
+ * this server is set up for it.
+ */
+export const WhatsAppAccountQuery = /* GraphQL */ `
+  query WhatsAppAccount {
+    whatsAppAccount {
+      ...WhatsAppAccountFields
+    }
+    whatsAppSignup {
+      appId
+      configurationId
+      graphVersion
+    }
+  }
+  ${WHATSAPP_ACCOUNT}
+`;
+
+/** The number the shop chose in Meta's Embedded Signup, connected with the code it gave. */
+export const WhatsAppAccountConnectMutation = /* GraphQL */ `
+  mutation WhatsAppAccountConnect($input: WhatsAppAccountConnectInput!) {
+    whatsAppAccountConnect(input: $input) {
+      whatsAppAccount {
+        ...WhatsAppAccountFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${WHATSAPP_ACCOUNT}
+  ${USER_ERRORS}
+`;
+
+export const WhatsAppAccountDisconnectMutation = /* GraphQL */ `
+  mutation WhatsAppAccountDisconnect {
+    whatsAppAccountDisconnect {
+      disconnectedPhoneNumber
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

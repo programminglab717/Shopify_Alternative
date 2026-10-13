@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-422 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-423 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -430,6 +430,7 @@
 | 420 | A shop writes its own marketing templates, sent at once to Meta for approval on its own WhatsApp account, and kept as Meta's webhook says they stand | Accepted |
 | 421 | A broadcast sends one of the shop's approved templates to a segment's customers who agreed to hear on WhatsApp, or to all who did, estimated before it is scheduled | Accepted |
 | 422 | The worker queues a broadcast a batch at a time and sends it from the shop's own number, both in the hours marketing may go, and never by SMS | Accepted |
+| 423 | The admin connects the shop's own WhatsApp number in its settings through Meta's Embedded Signup, in Facebook's window, and the core trades the code it gives | Accepted |
 
 ---
 
@@ -16232,3 +16233,43 @@
   * **SMS for broadcasts WhatsApp cannot deliver**: consent was given for WhatsApp alone
     (CUS-04), and SMS marketing has its own rules (PTA). It may be revisited as its own
     channel.
+
+## ADR-423 · The admin connects the shop's own WhatsApp number in its settings through Meta's Embedded Signup, in Facebook's window, and the core trades the code it gives
+
+* **Context:**
+  * The core connects a shop's own number from the code Embedded Signup gives and the number
+    chosen (ADR-419). Nothing in the admin starts it yet.
+  * Embedded Signup runs in Facebook's own window, opened by Facebook's JavaScript SDK
+    (`FB.login` with the configuration's ID). It gives the code to the login's callback, and
+    posts the WhatsApp Business account and number chosen to the opener as a
+    `WA_EMBEDDED_SIGNUP` message.
+* **Decision:**
+  * **Settings → Your WhatsApp number**, for the owner and managers, who hold `write_settings`.
+  * **Without a number**, the page explains the three steps and offers *Connect with
+    Facebook*:
+    * Facebook's SDK is loaded from Facebook only then, and started with the app ID and Graph
+      version the core gives (`whatsAppSignup`).
+    * The admin listens only to messages from Facebook's origins
+      (`https://www.facebook.com`, `https://web.facebook.com`).
+    * Once it has both the code and the number, it sends `whatsAppAccountConnect`. The core
+      checks the number belongs to the account the code reaches.
+    * If Facebook closes before a number is chosen, the page says nothing was connected.
+    * The core's reasons for refusing a number are shown as it gives them.
+  * **With a number**, the page shows its verified name, its number, when it was connected,
+    and Meta's quality rating as a badge in words. It can be disconnected after asking once
+    more.
+  * **Where the server has no Embedded Signup configuration**, the page says so, and nothing
+    is loaded from Facebook.
+  * Apps may be given access to broadcasts and templates (`marketing_events`, ADR-420) in
+    Settings → Apps, like any other resource.
+* **Consequences:**
+  * The shop's number is connected without leaving the admin, and without Hatti ever seeing
+    a Facebook password or a long-lived token in the browser. Only the one-time code passes
+    through.
+  * Marketers, who send broadcasts, cannot connect or disconnect the number. Their pages
+    (next) say who can.
+* **Alternatives:**
+  * **Asking the shop to paste its account ID, number ID and a token**: this is error-prone
+    and leaves a long-lived token in the shop's hands and in the clipboard.
+  * **Redirecting the whole admin to Facebook and back**: the shop would leave the admin
+    mid-task. Meta's documented flow is the popup.

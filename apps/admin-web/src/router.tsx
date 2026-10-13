@@ -76,6 +76,7 @@ import { ActivityPage } from './settings/activity-page';
 import { SupportAccessPage } from './settings/support-page';
 import { StoreExportPage } from './settings/export-page';
 import { AppsPage } from './settings/apps-page';
+import { WhatsAppPage } from './settings/whatsapp-page';
 import { TaxPage } from './settings/tax-page';
 import { MessagesPage } from './settings/messages-page';
 import { OrderPoliciesPage } from './settings/order-policies-page';
@@ -659,6 +660,12 @@ const settingsApps = createRoute({
   component: AppsPage,
 });
 
+const settingsWhatsApp = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/whatsapp',
+  component: WhatsAppPage,
+});
+
 const settingsTax = createRoute({
   getParentRoute: () => shop,
   path: 'settings/tax',
@@ -855,6 +862,7 @@ export const routeTree = root.addChildren([
     settingsSupport,
     settingsExport,
     settingsApps,
+    settingsWhatsApp,
     settingsTax,
     settingsMessages,
     settingsOrders,

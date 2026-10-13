@@ -3201,3 +3201,35 @@ export interface StoreExportsData {
 export interface StoreExportCreateData {
   storeExportCreate: { storeExport: StoreExport | null; userErrors: UserError[] };
 }
+
+export type WhatsAppQualityRating = 'GREEN' | 'YELLOW' | 'RED' | 'UNKNOWN';
+
+/** The shop's own WhatsApp Business number (ADR-419). */
+export interface WhatsAppAccount {
+  businessAccountId: string;
+  phoneNumberId: string;
+  displayPhoneNumber: string;
+  verifiedName: string;
+  qualityRating: WhatsAppQualityRating;
+  connectedAt: string;
+}
+
+/** What Meta's Embedded Signup starts with: Hatti's app, its configuration and Graph's version. */
+export interface WhatsAppSignup {
+  appId: string;
+  configurationId: string;
+  graphVersion: string;
+}
+
+export interface WhatsAppAccountData {
+  whatsAppAccount: WhatsAppAccount | null;
+  whatsAppSignup: WhatsAppSignup | null;
+}
+
+export interface WhatsAppAccountConnectData {
+  whatsAppAccountConnect: { whatsAppAccount: WhatsAppAccount | null; userErrors: UserError[] };
+}
+
+export interface WhatsAppAccountDisconnectData {
+  whatsAppAccountDisconnect: { disconnectedPhoneNumber: string | null; userErrors: UserError[] };
+}

@@ -12,6 +12,7 @@ import {
   LifeBuoy,
   ListChecks,
   MapPin,
+  MessageCircle,
   MessageSquareText,
   Percent,
   Receipt,
@@ -48,6 +49,7 @@ interface Section {
     | '/$shopId/settings/delivery'
     | '/$shopId/settings/cash-on-delivery'
     | '/$shopId/settings/bank-transfer'
+    | '/$shopId/settings/whatsapp'
     | '/$shopId/settings/billing'
     | '/$shopId/settings/activity'
     | '/$shopId/settings/support'
@@ -132,6 +134,12 @@ const SECTIONS: readonly Section[] = [
     label: 'settings.messages',
     hint: 'settings.messagesHint',
     icon: MessageSquareText,
+  },
+  {
+    to: '/$shopId/settings/whatsapp',
+    label: 'settings.whatsapp',
+    hint: 'settings.whatsappHint',
+    icon: MessageCircle,
   },
   {
     to: '/$shopId/settings/couriers',

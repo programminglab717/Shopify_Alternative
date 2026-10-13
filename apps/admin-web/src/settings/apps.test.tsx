@@ -41,6 +41,7 @@ const OLD = {
     'write_legal_policies',
     'write_domains',
     'write_pixels',
+    'write_marketing_events',
     'write_settings',
   ],
   tokenHint: 'efgh',
