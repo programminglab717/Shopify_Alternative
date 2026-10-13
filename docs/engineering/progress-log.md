@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: product reviews (MKT-05), asked
-for on WhatsApp after delivery and shown on the storefront; then pre-orders (CAT-14). Urdu
-handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: product reviews asked for on
+WhatsApp after delivery, shown on the storefront and moderated in the admin (MKT-05); then
+pre-orders (CAT-14). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,24 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Products' reviews, written on a delivered order's page
+
+* **On the order's page** ([ADR-399](../architecture/13-decision-log.md#adr-399--customers-rate-what-their-delivered-order-brought-them-on-its-own-page-one-to-five-stars-a-product-with-words-if-they-like-each-review-waits-for-the-shop-which-publishes-or-hides-it-unless-its-stars-reach-those-the-shop-publishes-by-itself), MKT-05): once it is delivered, the customer rates each
+  product it brought, one to five stars, with words if they like, and may change them later.
+  Their name shows as "Ayesha K.".
+* **Kept by the catalog** (migration 0188): one review an order and product, waiting for the
+  shop unless its stars reach those the shop publishes by itself (`reviewSettingsUpdate`). The
+  shop publishes or hides each through `productReviews`, `productReviewPublish` and
+  `productReviewHide`. A customer's reviews are in their own file, move in a merge and go in an
+  erasure.
+* **Tried in Chromium against the core:** a completed order's page offered its
+  Peshawari Chappal to rate; four stars filled the first four in the shop's amber, and with
+  words it was sent, thanked for and shown back to change. The API listed it waiting, under
+  "Usman A.", and published it; the shop set reviews of four stars to publish by themselves.
+  The review, the setting and the order's link were then taken away.
+* 2671 tests (7 new): reviews written, judged by their stars, moderated and
+  listed; the order page's form; customers' data; the Admin API's end to end.
 
 ### 29ab362 · Apps' webhooks in the admin
 

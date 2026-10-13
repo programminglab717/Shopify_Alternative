@@ -1,3 +1,4 @@
+import { eraseReviewsIn, mergeReviewsIn, reviewsOfCustomerIn } from '@hatti/catalog/public';
 import {
   CustomerDataRegistry,
   type CustomerDataHandler,
@@ -35,11 +36,12 @@ const NAMED = 5;
  * and its UTM parameters stay, the shop's own words for its campaigns, for its sales by campaign.
  * Timeline messages never hold contact details, so they stay as they are. Their orders' links stop
  * working, since their pages show the address. Their draft orders go: those that became their
- * orders, and open ones with one of their numbers or their email.
+ * orders, and open ones with one of their numbers or their email. So do the reviews they wrote on
+ * their orders' pages (ADR-399), which a merge gives the customer kept, as it does their orders.
  *
  * A customer's own export (ADR-102) gives them the same orders and drafts whole, with their
- * parcels, refunds, calls to confirm them, the receipts they sent, the visits that brought them and
- * their browser's IDs. Risk scores and the timeline, its comments too, stay out: the shop's
+ * parcels, refunds, calls to confirm them, the receipts they sent, the visits that brought them,
+ * their browser's IDs and the reviews they wrote. Risk scores and the timeline, its comments too, stay out: the shop's
  * defences against fraud, and its record of its own work.
  */
 export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
@@ -65,11 +67,14 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
       UPDATE orders.orders
          SET customer_id = ${intoId}, version = version + 1, updated_at = now()
        WHERE shop_id = ${shopId} AND customer_id = ${fromId}`);
+    await mergeReviewsIn(tx, shopId, fromId, intoId);
   },
 
   async erase(tx, shopId, customer, actor) {
     const customerId = customer.id;
     const { actorKind, actorId } = actorColumns(actor);
+    // The reviews they wrote on their orders' pages (ADR-399) carry their name, and are their words.
+    await eraseReviewsIn(tx, shopId, customerId);
     // Drafts name no customer, and a completed one holds its order's address: they go first.
     await tx.execute(sql`
       DELETE FROM orders.draft_orders d
@@ -196,6 +201,7 @@ export const ORDER_CUSTOMER_DATA: CustomerDataHandler = {
         ),
       ),
       draftOrders: drafts.map(exportedDraft),
+      productReviews: await reviewsOfCustomerIn(tx, shopId, customer.id),
     };
   },
 };

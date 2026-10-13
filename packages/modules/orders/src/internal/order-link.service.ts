@@ -8,6 +8,13 @@ import {
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
+import {
+  reviewAuthorName,
+  reviewsOfOrderIn,
+  writeReviewsIn,
+  type OrderReview,
+  type ReviewInput,
+} from '@hatti/catalog/public';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { ObjectStorage } from '@hatti/storage';
@@ -85,6 +92,19 @@ export interface OrderLink {
   expiresAt: Date | null;
 }
 
+/**
+ * A product of a delivered order, which its customer may rate on its page (ADR-399): its name as
+ * sold, and what they said of it, if they did.
+ */
+export interface ReviewableProduct {
+  productId: string;
+  title: string;
+  review: OrderReview | null;
+}
+
+/** What the customer posted of the products they rate, by product: stars, and words. */
+export type ReviewForm = ReadonlyMap<string, { rating: string; body: string }>;
+
 /** What an order's link shows the customer. */
 export type OrderLinkView =
   | { kind: 'not_found' }
@@ -111,6 +131,8 @@ export type OrderLinkView =
       onlinePayment: { gateways: OnlineGateway[]; amount: bigint } | null;
       /** Its parcels' steps on their way (ADR-160), by parcel. */
       steps: ParcelSteps;
+      /** Once it is delivered, its products to rate (ADR-399); empty before. */
+      reviewable: ReviewableProduct[];
       problem: LinkProblem | null;
       /**
        * The form that takes the customer on to the shop's gateway, once they asked to pay online
@@ -302,6 +324,36 @@ export class OrderLinkService {
   }
 
   /**
+   * The customer rates the products of their delivered order (MKT-05, ADR-399): one to five stars
+   * each, with words if they like, under their first name and their surname's initial. Those
+   * left unrated are passed over; any they rated before, changed.
+   */
+  async review(token: string, form: ReviewForm): Promise<OrderLinkView> {
+    return this.#act(token, async (tx, shopId, order) => {
+      const record = (await loadOrder(tx, shopId, order.id))!;
+      if (!reviewable(record)) return { kind: 'too_late', action: 'review' };
+      const reviews: ReviewInput[] = [];
+      for (const productId of new Set(record.lines.map((line) => line.productId))) {
+        const posted = form.get(productId);
+        if (!posted || !/^[1-5]$/.test(posted.rating)) continue;
+        reviews.push({ productId, rating: Number(posted.rating), body: posted.body });
+      }
+      if (reviews.length === 0) return { kind: 'review', reason: 'none' };
+      await writeReviewsIn(
+        tx,
+        shopId,
+        {
+          id: record.id,
+          customerId: record.customerId,
+          authorName: reviewAuthorName(record.shippingAddress.name),
+        },
+        reviews,
+      );
+      return null;
+    });
+  }
+
+  /**
    * The customer sends the receipt of their transfer through the link, while the order waits for
    * it: a photo, a screenshot or a PDF, which the shop sees with the order (ADR-080).
    */
@@ -462,9 +514,36 @@ export class OrderLinkService {
         shopId,
         record.fulfillments.map((parcel) => parcel.id),
       ),
+      reviewable: reviewable(record) ? await reviewableIn(tx, shopId, record) : [],
       problem,
     };
   }
+}
+
+/** Whether the order's customer may rate what they bought: once it was delivered to them. */
+function reviewable(order: OrderRecord): boolean {
+  return order.stage === 'delivered' || order.stage === 'completed';
+}
+
+/** The order's products still in the shop, each once, as sold, with what was said of them. */
+async function reviewableIn(
+  tx: Tx,
+  shopId: string,
+  order: OrderRecord,
+): Promise<ReviewableProduct[]> {
+  const ids = [...new Set(order.lines.map((line) => line.productId))];
+  const { rows } = await tx.execute<{ id: string }>(sql`
+    SELECT id FROM catalog.products
+     WHERE shop_id = ${shopId} AND id = ANY(${sql.param(ids)}::uuid[])`);
+  const kept = new Set(rows.map((row) => row.id));
+  const reviews = await reviewsOfOrderIn(tx, shopId, order.id);
+  return ids
+    .filter((id) => kept.has(id))
+    .map((productId) => ({
+      productId,
+      title: order.lines.find((line) => line.productId === productId)!.title,
+      review: reviews.find((review) => review.productId === productId) ?? null,
+    }));
 }
 
 /**

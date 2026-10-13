@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-398 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-399 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -406,6 +406,7 @@
 | 396 | Settings lists the shop's custom apps for owners and managers, each with what it may reach in words and the last characters of its token and secret; an app is made by choosing each resource's access, and its token and secret are shown once, to copy | Accepted |
 | 397 | A custom app subscribes to topics of the shop's events at https addresses; the worker makes one delivery an event and subscription for apps that may read what it names, posts it signed with the app's secret to a public address alone, and tries again with backoff for two days | Accepted |
 | 398 | Each custom app on the shop's apps page shows its webhooks, the topic in words, where it goes and how its latest delivery went, with its last ten to open; one is added for a topic the app may hear, or removed | Accepted |
+| 399 | Customers rate what their delivered order brought them on its own page, one to five stars a product with words if they like; each review waits for the shop, which publishes or hides it, unless its stars reach those the shop publishes by itself | Accepted |
 
 ---
 
@@ -15438,3 +15439,35 @@
   * The activity log calls a subscription's changes a webhook's.
 * **Alternatives:**
   * **A page of its own for webhooks:** they are each app's, so they sit with the app.
+
+## ADR-399 · Customers rate what their delivered order brought them on its own page, one to five stars a product with words if they like; each review waits for the shop, which publishes or hides it, unless its stars reach those the shop publishes by itself
+
+* **Context:**
+  * Shoppers in Pakistan buy from shops they don't know on the word of others who did, and a
+    review from someone who never received the parcel is worth nothing: MKT-05 wants reviews
+    from verified buyers, asked for on WhatsApp after delivery.
+  * Customers have no accounts, but each order has its own page behind a link the shop already
+    sends ([ADR-115](#adr-115--an-order-staff-or-an-app-placed-keeps-what-its-customer-agreed-to-in-confirming-it-through-its-link-the-page-names-the-shops-policies-and-the-order-keeps-their-versions-where-it-was-confirmed-from-and-when)), which knows the order, its items and that it was delivered.
+* **Decision:**
+  * **Written on the order's page once it is delivered:** each product it brought, once, with
+    five stars to choose and a box for words, up to 2,000 characters. The page has no scripts,
+    so the stars are radio buttons drawn as stars. What the customer said before is filled in,
+    to change; one review an order and product, so a customer who bought a product twice
+    reviews it twice.
+  * **Kept by the catalog** (`catalog.product_reviews`), which the orders module already
+    depends on: the product, the order, the customer, their name as "Ayesha K." from the
+    order's address, the stars, the words, and pending, published or hidden.
+  * **Waiting for the shop, unless** the shop chose to publish reviews of 3, 4 or 5 stars or
+    more by themselves (`reviewSettingsUpdate(publishFrom)`); a changed review is judged again.
+    The shop publishes or hides each through the Admin API (`productReviews`,
+    `productReviewPublish`, `productReviewHide`), with `read_products` and `write_products`.
+  * **Theirs, as their orders are:** a customer's reviews are in their own file ([ADR-102](#adr-102--a-customers-own-data-is-one-json-file-of-everything-the-shop-keeps-of-them-which-each-module-with-their-data-adds-to-the-blocklist-and-risk-scores-stay-out)),
+    move with a merge, and go when they are erased.
+* **Consequences:**
+  * Products deleted since are not offered to rate; a deleted product takes its reviews with it.
+  * The storefront does not show them yet, nor does WhatsApp ask for them: the next slices.
+* **Alternatives:**
+  * **A review form on the storefront's product page:** anyone could write one; verified
+    buyers would need accounts the shop's customers don't have.
+  * **Publishing every review at once:** a shop's first one-star review from a rider's delay
+    would sit on its product page before the shop saw it.

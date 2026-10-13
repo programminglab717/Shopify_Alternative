@@ -6737,6 +6737,12 @@ type Mutation {
 
   """Moves media, one move after another."""
   productReorderMedia(moves: [MoveInput!]!, productId: ID!): ProductPayload!
+
+  """Keeps a review off the storefront. It can be published again."""
+  productReviewHide(id: ID!): ProductReviewPayload!
+
+  """Shows a review on its product's storefront page."""
+  productReviewPublish(id: ID!): ProductReviewPayload!
   productUpdate(input: ProductUpdateInput!): ProductUpdatePayload!
   productUpdateMedia(media: [UpdateMediaInput!]!, productId: ID!): ProductPayload!
 
@@ -6797,6 +6803,11 @@ type Mutation {
   Checks a return in as it arrives: `restock` says how many of each line go back in stock where it came back to; the rest are written off. Everything is restocked if left out.
   """
   returnReceive(id: ID!, restock: [ReturnRestockInput!]): ReturnReceivePayload!
+
+  """
+  Sets from how many stars, 3, 4 or 5, reviews publish by themselves; null, none: each waits for the shop. Reviews written before keep their status.
+  """
+  reviewSettingsUpdate(publishFrom: Int): ReviewSettingsPayload!
 
   """
   Keeps a search of one of the shop's lists by name, for all its staff: up to 100 of each list. Needs the scope that changes the list: write_orders, or write_products.
@@ -9263,6 +9274,44 @@ type ProductPriceRange {
   minVariantPrice: Money!
 }
 
+"""
+A customer's stars, and words if they gave any, for a product of an order delivered to them (MKT-05, ADR-399): one an order and product, written on their order's page.
+"""
+type ProductReview {
+  """As the storefront shows it: "Ayesha K.", or "A customer"."""
+  authorName: String!
+  body: String
+  createdAt: DateTime!
+  id: ID!
+
+  """The order it was written on."""
+  orderId: ID!
+  productId: ID!
+  productTitle: String!
+  publishedAt: DateTime
+
+  """1 to 5."""
+  rating: Int!
+  status: ProductReviewStatus!
+
+  """When the customer last changed it."""
+  updatedAt: DateTime!
+}
+
+type ProductReviewPayload {
+  productReview: ProductReview
+  userErrors: [UserError!]!
+}
+
+"""
+PENDING until the shop publishes it, or at once when its stars reach those the shop publishes by itself; HIDDEN when the shop keeps it off its storefront. A customer changing what they said sends it back to PENDING, unless its stars publish it.
+"""
+enum ProductReviewStatus {
+  HIDDEN
+  PENDING
+  PUBLISHED
+}
+
 """What a product sold in a sales report."""
 type ProductSales {
   """
@@ -10366,6 +10415,11 @@ type Query {
   productByHandle(handle: String!): Product
 
   """
+  The shop's products' reviews, the latest first: those of a status or a product if given; `first` of them (50 unless given, 250 at most), older than the review `after` names.
+  """
+  productReviews(after: ID, first: Int, productId: ID, status: ProductReviewStatus): [ProductReview!]!
+
+  """
   The shop's saved searches of its products, oldest first, as their tabs were added.
   """
   productSavedSearches(
@@ -10447,6 +10501,7 @@ type Query {
     """1 to 250; default 50."""
     first: Int
   ): ReturningParcelConnection!
+  reviewSettings: ReviewSettings!
 
   """
   Sales analytics (ANL-02): what a period's orders came to, day by day, week by week or month by month in the shop's time zone, the products that sold most, and by channel, or by where their last visits came from or their campaigns. Worked out from the orders when asked.
@@ -10875,6 +10930,19 @@ type ReturningParcelConnection {
 type ReturningParcelEdge {
   cursor: String!
   node: ReturningParcel!
+}
+
+"""How the shop's reviews are published (ADR-399)."""
+type ReviewSettings {
+  """
+  Reviews of this many stars or more, 3, 4 or 5, publish by themselves; the rest wait for the shop. Null: every review waits.
+  """
+  publishFrom: Int
+}
+
+type ReviewSettingsPayload {
+  reviewSettings: ReviewSettings
+  userErrors: [UserError!]!
 }
 
 """

@@ -6,6 +6,7 @@ import type { AttributionValue } from './attribution.js';
 import type { BrowserIdsValue } from './browser-ids.js';
 import { ConfirmationDeskService } from './confirmation-desk.service.js';
 import { toOrder } from './graphql/mappers.js';
+import type { OrderRecord } from './records.js';
 import { ADDRESS, errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -60,6 +61,21 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
     return unwrap(await f.fulfillments.fulfill(f.a, order.id, {})).fulfillmentId;
   }
 
+  /** A review the customer of `order` wrote on its page (ADR-399). */
+  const reviewed = (order: OrderRecord, body: string) =>
+    f.admin.query(
+      `INSERT INTO catalog.product_reviews
+              (shop_id, product_id, order_id, customer_id, author_name, rating, body)
+       VALUES ($1, $2, $3, $4, 'Ayesha K.', 5, $5)`,
+      [f.a.shopId, order.lines[0]!.productId, order.id, order.customerId, body],
+    );
+  const reviewers = async () =>
+    (
+      await f.admin.query<{ customer_id: string; body: string }>(
+        'SELECT customer_id, body FROM catalog.product_reviews ORDER BY body',
+      )
+    ).rows;
+
   it("moves a duplicate's orders to the customer, so their history counts together", async () => {
     const refused = await f.order(f.a, [kurta]);
     const parcel = await ship(refused.id);
@@ -68,7 +84,10 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
     const other = await f.order(f.a, [kurta], { shippingAddress: SECOND_SIM });
     expect(other.customerId).not.toBe(refused.customerId);
 
+    await reviewed(other, 'Fits well');
     unwrap(await f.customerData.merge(f.a, refused.customerId, other.customerId));
+    // Their reviews too (ADR-399).
+    expect(await reviewers()).toEqual([{ customer_id: refused.customerId, body: 'Fits well' }]);
     const moved = (await f.orders.get(f.a, other.id))!;
     expect(moved).toMatchObject({ customerId: refused.customerId, version: other.version + 1 });
     const stats = await f.orders.customerStats(f.a, [refused.customerId]);
@@ -132,6 +151,9 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
       shippingAddress: { ...ADDRESS, name: 'Bilal Ahmed', phone: '0345 7654321' },
     });
     unwrap(await f.comments.create(f.a, bilals.id, 'Bilal pays exact change'));
+    // Her reviews carry her name, and are her words; Bilal's are his (ADR-399).
+    await reviewed(completed, 'Lovely colour');
+    await reviewed(bilals, 'Fast delivery');
     // Another shop's customer with the same number is someone else's to erase.
     const [shawl] = (await f.variantsOf(f.b, 'Shawl')) as [string];
     await f.stock(f.b, shawl, 5);
@@ -150,6 +172,7 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
     });
     unwrap(await f.orders.cancel(f.a, open.id, { reason: 'customer' }));
     unwrap(await f.customerData.erase(f.a, completed.customerId));
+    expect(await reviewers()).toEqual([{ customer_id: bilals.customerId, body: 'Fast delivery' }]);
     const { rows: calls } = await f.admin.query<{ outcome: string; note: string }>(
       'SELECT outcome, note FROM orders.confirmation_calls WHERE order_id = $1',
       [open.id],
@@ -310,6 +333,8 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
 
     // Comments on her orders are the shop's record of its work, as the timeline is.
     unwrap(await f.comments.create(f.a, delivered.id, 'She takes calls after 5pm'));
+    // What she said of what she bought is hers (ADR-399).
+    await reviewed(delivered, 'Lovely colour');
 
     const file = JSON.parse(
       unwrap(await f.customerData.export(f.a, delivered.customerId)).json,
@@ -479,6 +504,9 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
         note: '',
         tags: [],
       },
+    ]);
+    expect(file.productReviews).toEqual([
+      { product: 'Kurta', rating: 5, body: 'Lovely colour', at },
     ]);
     // Addresses read in the order they are written, whatever order Postgres keeps their keys in.
     const [first] = file.orders as { shippingAddress: object }[];

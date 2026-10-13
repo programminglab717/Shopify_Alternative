@@ -31,7 +31,7 @@ import {
   payOnlineForm,
 } from './online-payment-page.js';
 import type { OnlineGateway } from './online-payments.js';
-import type { OrderLinkView } from './order-link.service.js';
+import type { OrderLinkView, ReviewableProduct } from './order-link.service.js';
 import type { TrackingView } from './tracking.service.js';
 import type { FulfillmentEventRecord, FulfillmentRecord, OrderRecord } from './records.js';
 import { addressChangeable, awaitsCustomer, itemName, orderName } from './rules.js';
@@ -105,6 +105,9 @@ const LABELS = {
   trackAnother: { en: 'Track another order', ur: 'کوئی اور آرڈر ٹریک کریں' },
   reference: { en: 'Order or tracking number', ur: 'آرڈر یا ٹریکنگ نمبر' },
   findOrder: { en: 'Find my order', ur: 'میرا آرڈر تلاش کریں' },
+  reviewTitle: { en: 'Rate what you bought', ur: 'اپنی خریداری کو ریٹ کریں' },
+  reviewWords: { en: 'Your words (optional)', ur: 'آپ کی رائے (اختیاری)' },
+  sendReview: { en: 'Send my rating', ur: 'ریٹنگ بھیجیں' },
 } satisfies Record<string, Words>;
 
 /** A parcel's steps, as its page names them (ADR-160): shipped, then each its courier told of. */
@@ -138,6 +141,8 @@ export interface LinkPageOptions {
   sent?: boolean;
   /** They came back from paying online, and the shop's gateway said it is in (ADR-151). */
   paid?: boolean;
+  /** Their rating of what the order brought them was taken just now (ADR-399). */
+  reviewed?: boolean;
 }
 
 /**
@@ -223,6 +228,8 @@ export function orderLinkPage(view: OrderLinkView, options: LinkPageOptions = {}
           receipts: view.receipts,
           onlinePayment: view.onlinePayment,
           steps: view.steps,
+          reviewable: view.reviewable,
+          reviewed: Boolean(options.reviewed) && !problem,
         });
       }
       return confirmPage({
@@ -730,6 +737,10 @@ function statusPage(
     onlinePayment?: { gateways: OnlineGateway[]; amount: bigint } | null;
     /** Its parcels' steps on their way (ADR-160). */
     steps?: ParcelSteps;
+    /** Once delivered, its products to rate (ADR-399). */
+    reviewable?: readonly ReviewableProduct[];
+    /** Their rating was taken just now. */
+    reviewed?: boolean;
   },
 ): LinkPage {
   const {
@@ -742,6 +753,8 @@ function statusPage(
     receipts = 0,
     onlinePayment = null,
     steps = NO_STEPS,
+    reviewable = [],
+    reviewed = false,
   } = options;
   const name = orderName(order.number);
   const shown = shownOfOrder(order);
@@ -758,7 +771,7 @@ function statusPage(
     page(
       !problem || (problem.kind === 'payment' && problem.reason !== 'unavailable')
         ? 200
-        : problem.kind === 'receipt'
+        : problem.kind === 'receipt' || problem.kind === 'review'
           ? 422
           : problem.kind === 'payment'
             ? 503
@@ -771,6 +784,7 @@ function statusPage(
         saved && savedNotice(),
         sent && receiptNotice(shop),
         paid && onlinePaidNotice(shop.name),
+        reviewed && reviewedNotice(shop),
         mark && html`<div class="mark" aria-hidden="true">✓</div>`,
         heading(title),
         paragraphs(sentence, 'center'),
@@ -896,6 +910,7 @@ function statusPage(
           ur: html`آپ کا آرڈر ${ltr(name)} پہنچ گیا ہے۔ خریداری کا شکریہ!`,
         },
         true,
+        reviewForm(reviewable),
         parcels(order, steps, shop.timezone),
       );
     case 'returning':
@@ -1195,6 +1210,74 @@ function receiptForm(receipts: number): Html {
   </section>`;
 }
 
+/** Stars as the page reads them out: "4 stars", "4 ستارے". */
+function starWords(count: number): Words {
+  return count === 1
+    ? { en: '1 star', ur: '1 ستارہ' }
+    : { en: `${count} stars`, ur: `${count} ستارے` };
+}
+
+/**
+ * Where the customer rates what their delivered order brought them (MKT-05, ADR-399): each
+ * product once, one to five stars, with words if they like; what they said before filled in, to
+ * change. Without scripts, as the page has none: five radio buttons a product, drawn as stars,
+ * those up to the one chosen filled.
+ */
+function reviewForm(products: readonly ReviewableProduct[]): Html | false {
+  if (products.length === 0) return false;
+  return html`<section class="section">
+    <h2 class="label">${say('bilingual', LABELS.reviewTitle)}</h2>
+    ${paragraphs(
+      {
+        en: 'Tell other customers how it was. Your first name shows with your rating.',
+        ur: 'دوسرے خریداروں کو بتائیں کہ چیز کیسی تھی۔ آپ کی ریٹنگ کے ساتھ آپ کا پہلا نام دکھایا جائے گا۔',
+      },
+      'small',
+    )}
+    <form method="post">
+      <input type="hidden" name="action" value="review" />
+      ${products.map(
+        ({ productId, title, review }, index) =>
+          html`<fieldset class="field">
+            <legend class="label">${text(title)}</legend>
+            <div class="stars" dir="ltr">
+              ${[1, 2, 3, 4, 5].map((stars) => {
+                const words = starWords(stars);
+                return html`<label>
+                  <input
+                    type="radio"
+                    name="rating_${productId}"
+                    value="${String(stars)}"
+                    aria-label="${words.en} · ${words.ur}"
+                    ${review?.rating === stars && html`checked`}
+                  />★
+                </label>`;
+              })}
+            </div>
+            <label class="label" for="body-${String(index)}"
+              >${say('bilingual', LABELS.reviewWords)}</label
+            >
+            <textarea id="body-${String(index)}" name="body_${productId}" maxlength="2000" rows="3">
+${review?.body ?? ''}</textarea>
+          </fieldset>`,
+      )}
+      <button class="button stack" type="submit">${say('bilingual', LABELS.sendReview)}</button>
+    </form>
+  </section>`;
+}
+
+function reviewedNotice(shop: LinkShop): Html {
+  return html`<div class="banner done" role="status">
+    ${paragraphs(
+      {
+        en: `Thank you for your rating! It helps ${shop.name} and its other customers.`,
+        ur: 'ریٹنگ کا شکریہ! اس سے دکان اور دوسرے خریداروں کو مدد ملتی ہے۔',
+      },
+      '',
+    )}
+  </div>`;
+}
+
 function receiptNotice(shop: LinkShop): Html {
   return html`<div class="banner done" role="status">
     ${paragraphs(
@@ -1253,11 +1336,16 @@ function problemWords(problem: LinkProblem, shown: ShownOrder): Sentence {
       };
     case 'payment':
       return onlinePaymentProblemWords(problem.reason, shown.transfer > 0n);
+    case 'review':
+      return {
+        en: 'Choose the stars for at least one product, then send.',
+        ur: 'کم از کم ایک چیز کے لیے ستارے چنیں، پھر بھیجیں۔',
+      };
   }
 }
 
 /** Why the customer can no longer do `action` here, and whom to ask instead. */
-function tooLateWords(action: 'cancel' | 'address' | 'receipt' | 'pay'): Sentence {
+function tooLateWords(action: 'cancel' | 'address' | 'receipt' | 'pay' | 'review'): Sentence {
   switch (action) {
     case 'cancel':
       return {
@@ -1278,6 +1366,11 @@ function tooLateWords(action: 'cancel' | 'address' | 'receipt' | 'pay'): Sentenc
       return {
         en: 'This order no longer waits for a payment online. Ask the shop in your chat.',
         ur: 'یہ آرڈر اب آن لائن ادائیگی کا انتظار نہیں کر رہا۔ اپنی چیٹ میں دکان سے پوچھیں۔',
+      };
+    case 'review':
+      return {
+        en: 'You can rate what you bought once your order is delivered.',
+        ur: 'آرڈر پہنچنے کے بعد آپ اپنی خریداری کو ریٹ کر سکتے ہیں۔',
       };
   }
 }

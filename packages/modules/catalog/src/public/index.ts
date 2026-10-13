@@ -129,3 +129,24 @@ export {
   type VariantSnapshot,
   type VariantUpdateInput,
 } from '../internal/variant.service.js';
+export {
+  PUBLISH_FROM,
+  ProductReviewService,
+  type ProductReviewRecord,
+  type ReviewQuery,
+} from '../internal/review.service.js';
+export {
+  REVIEW_LIMITS,
+  ReviewEvents,
+  eraseReviewsIn,
+  mergeReviewsIn,
+  publishFromIn,
+  reviewAuthorName,
+  reviewsOfCustomerIn,
+  reviewsOfOrderIn,
+  writeReviewsIn,
+  type OrderReview,
+  type ProductReviewChangedPayload,
+  type ReviewInput,
+  type ReviewStatusValue,
+} from '../internal/reviews.js';

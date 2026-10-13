@@ -613,6 +613,65 @@ describe.skipIf(!server)('Order links', () => {
     expect(deliveredAt).toBeLessThan(outAt!);
   });
 
+  it('takes the stars the customer gives what their delivered order brought them (ADR-399)', async () => {
+    const order = await f.order(f.a, [kurta, size8]);
+    const token = await linkFor(order.id);
+    const [kurtaProduct, chappal] = order.lines.map((line) => line.productId) as [string, string];
+    const form = (rated: Record<string, [string, string]>) =>
+      new Map(Object.entries(rated).map(([id, [rating, body]]) => [id, { rating, body }]));
+
+    // Not yet: nothing to rate until it arrives.
+    expect((await shownOn(token)).reviewable).toEqual([]);
+    expect(orderLinkPage(await f.links.viewLink(token)).html).not.toContain('rating_');
+    expect(problemOf(await f.links.review(token, form({ [kurtaProduct]: ['5', ''] })))).toEqual({
+      kind: 'too_late',
+      action: 'review',
+    });
+
+    unwrap(await f.orders.confirm(f.a, order.id));
+    const { fulfillmentId } = unwrap(await f.fulfillments.fulfill(f.a, order.id, {}));
+    unwrap(await f.fulfillments.markDelivered(f.a, fulfillmentId));
+    expect((await shownOn(token)).reviewable).toEqual([
+      { productId: kurtaProduct, title: 'Kurta', review: null },
+      { productId: chappal, title: 'Peshawari Chappal', review: null },
+    ]);
+    const page = orderLinkPage(await f.links.viewLink(token)).html;
+    expect(page).toContain('Rate what you bought');
+    expect(page).toMatch(
+      new RegExp(`name="rating_${chappal}"\\s+value="5"\\s+aria-label="5 stars · 5 ستارے"`),
+    );
+
+    // No stars at all: the page again, saying so.
+    const none = await f.links.review(token, form({ [kurtaProduct]: ['', 'Nice'] }));
+    expect(problemOf(none)).toEqual({ kind: 'review', reason: 'none' });
+    expect(orderLinkPage(none).status).toBe(422);
+
+    // One product rated, with words; another product's stars, not of this order, passed over.
+    const done = await f.links.review(
+      token,
+      form({ [kurtaProduct]: ['4', 'Good stitching'], [newId()]: ['5', ''] }),
+    );
+    expect(problemOf(done)).toBeNull();
+    const shown = await shownOn(token);
+    expect(shown.reviewable[0]!.review).toEqual({
+      productId: kurtaProduct,
+      rating: 4,
+      body: 'Good stitching',
+      status: 'pending',
+    });
+    const { rows } = await f.admin.query(
+      'SELECT author_name, customer_id, order_id FROM catalog.product_reviews',
+    );
+    expect(rows).toEqual([
+      { author_name: 'Ayesha K.', customer_id: order.customerId, order_id: order.id },
+    ]);
+    // Shown back, to change: their stars checked, their words in the box.
+    const again = orderLinkPage(shown, { reviewed: true }).html;
+    expect(again).toContain('Thank you for your rating!');
+    expect(again).toMatch(new RegExp(`name="rating_${kurtaProduct}"\\s+value="4"[^>]*checked`));
+    expect(again).toContain('Good stitching</textarea>');
+  });
+
   it('keeps a link working until 30 days after its order ends, however long it takes', async () => {
     const DAY = 86_400_000;
     const order = await f.order(f.a, [kurta]);

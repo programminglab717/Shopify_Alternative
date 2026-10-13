@@ -92,9 +92,12 @@ export type LinkProblem =
   | { kind: 'refused' }
   /**
    * The order moved on, so the customer can no longer cancel it (once confirmed or shipped),
-   * change its address (once packed or shipped) or send a receipt for it (once paid) here.
+   * change its address (once packed or shipped) or send a receipt for it (once paid) here; or
+   * not far enough for them to rate what it brought them (until it is delivered).
    */
-  | { kind: 'too_late'; action: 'cancel' | 'address' | 'receipt' | 'pay' }
+  | { kind: 'too_late'; action: 'cancel' | 'address' | 'receipt' | 'pay' | 'review' }
+  /** A review form posted with no stars given (ADR-399). */
+  | { kind: 'review'; reason: 'none' }
   /**
    * Paying online (ADR-151) did not start, as the shop's gateway could not be reached or refused
    * it; the customer came back before the gateway said the payment is in; or what they paid was a

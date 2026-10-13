@@ -16,7 +16,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { DraftOrderService } from './draft-order.service.js';
 import { draftLinkPage, orderLinkPage, trackingPage, type LinkPage } from './link-pages.js';
 import { DRAFT_LINK_PATH, ORDER_LINK_PATH, type AddressForm, type LinkClient } from './links.js';
-import { OrderLinkService, type OrderLinkView } from './order-link.service.js';
+import { OrderLinkService, type OrderLinkView, type ReviewForm } from './order-link.service.js';
 import { OrderTrackingService } from './tracking.service.js';
 import type { ReceiptUpload } from './transfer-receipt.service.js';
 
@@ -114,8 +114,9 @@ export class DraftLinkController {
  * whether they mean to cancel it, and with `?address` shows its address to correct. POST confirms
  * (`action=confirm`, from the address and browser the request comes from, ADR-115) or cancels
  * (`action=cancel`) a cash-on-delivery order that waits for them, saves a corrected address
- * (`action=address`), or takes the receipt of a transfer (`action=receipt`, a form with the file,
- * ADR-080). As for drafts, only a POST changes anything.
+ * (`action=address`), takes the receipt of a transfer (`action=receipt`, a form with the file,
+ * ADR-080), or, once it is delivered, the customer's stars for its products (`action=review`,
+ * `rating_<product>` and `body_<product>`, ADR-399). As for drafts, only a POST changes anything.
  */
 @Controller(ORDER_LINK_PATH)
 export class OrderLinkController {
@@ -129,6 +130,7 @@ export class OrderLinkController {
     @Query('saved') saved: string | undefined,
     @Query('sent') sent: string | undefined,
     @Query('paid') paid: string | undefined,
+    @Query('reviewed') reviewed: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const view = await this.links.viewLink(token);
@@ -140,6 +142,7 @@ export class OrderLinkController {
         saved: saved !== undefined,
         sent: sent !== undefined,
         paid: paid !== undefined,
+        reviewed: reviewed !== undefined,
       }),
     );
   }
@@ -203,6 +206,9 @@ export class OrderLinkController {
       case 'receipt':
         view = await this.links.sendReceipt(token, receiptOf(body));
         break;
+      case 'review':
+        view = await this.links.review(token, reviewForm(body));
+        break;
       case 'pay': {
         // To the gateway the customer chose (ADR-219), linked or by its form (ADR-163), or the
         // page again with why not.
@@ -219,10 +225,8 @@ export class OrderLinkController {
         return;
     }
     if (view.kind === 'order' && !view.problem) {
-      return seeOther(
-        reply,
-        action === 'address' ? `${token}?saved` : action === 'receipt' ? `${token}?sent` : token,
-      );
+      const done = { address: 'saved', receipt: 'sent', review: 'reviewed' }[action as string];
+      return seeOther(reply, done ? `${token}?${done}` : token);
     }
     await send(reply, orderLinkPage(view, { form: action === 'address' ? action : undefined }));
   }
@@ -315,6 +319,18 @@ function addressForm(body: unknown): AddressForm {
     latitude: field(body, 'latitude'),
     longitude: field(body, 'longitude'),
   };
+}
+
+/** The stars and words the form carried, by product: `rating_<id>` and `body_<id>`. */
+function reviewForm(body: unknown): ReviewForm {
+  const form = new Map<string, { rating: string; body: string }>();
+  for (const [name, rating] of Object.entries(fieldsOf(body))) {
+    const productId = /^rating_(.+)$/.exec(name)?.[1];
+    if (productId && UUID.test(productId)) {
+      form.set(productId, { rating, body: field(body, `body_${productId}`) });
+    }
+  }
+  return form;
 }
 
 /** The receipt the form carried: its bytes, too many of them, or none. */

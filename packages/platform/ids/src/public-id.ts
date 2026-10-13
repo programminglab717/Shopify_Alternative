@@ -26,6 +26,7 @@ const DECODE_TABLE: ReadonlyMap<string, number> = (() => {
 export const ID_PREFIXES = {
   shop: 'shop',
   product: 'prod',
+  productReview: 'rvw',
   productOption: 'opt',
   productOptionValue: 'optv',
   media: 'med',

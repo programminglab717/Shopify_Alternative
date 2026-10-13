@@ -46,9 +46,10 @@ export interface RenderedPage {
 // (Urdu under English), section, label, text (a block of paragraphs), num (with wrap, for text
 // that may be long), total, due, banner (with done), mark, button (with danger; on a link too),
 // field (a form's label and box), choice (a radio button's label, the button and a span for
-// each language inside), error, badges (a list of what a shop promises, a tick before each),
-// center, muted, small, strong and select-all (a value tapped to copy, such as an IBAN). Urdu
-// paragraphs are <p lang="ur" dir="rtl">. A box with something wrong has aria-invalid="true".
+// each language inside), stars (a row of five radio buttons' labels, each a star), error,
+// badges (a list of what a shop promises, a tick before each), center, muted, small, strong and
+// select-all (a value tapped to copy, such as an IBAN). Urdu paragraphs are
+// <p lang="ur" dir="rtl">. A box with something wrong has aria-invalid="true".
 const STYLES = `
 *, *::before, *::after { box-sizing: border-box; }
 /* What a script shows once it runs, such as a button, stays hidden until it does. */
@@ -158,7 +159,7 @@ a { color: var(--link, #0F766E); text-underline-offset: 2px; }
 a:focus-visible { outline: 3px solid var(--link, #0F766E); outline-offset: 2px; }
 .field { margin-top: 14px; }
 .field .label { display: block; }
-input, select {
+input, select, textarea {
   display: block;
   width: 100%;
   min-height: 44px;
@@ -169,7 +170,9 @@ input, select {
   color: inherit;
   font: inherit;
 }
-input:focus-visible, select:focus-visible { outline: 3px solid var(--link, #0F766E); outline-offset: 1px; }
+textarea { min-height: 88px; resize: vertical; }
+fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--link, #0F766E); outline-offset: 1px; }
 [aria-invalid="true"] { border: 2px solid #B91C1C; }
 .choice {
   display: flex;
@@ -193,6 +196,23 @@ input:focus-visible, select:focus-visible { outline: 3px solid var(--link, #0F76
 .choice:has(input:checked) { border: 2px solid var(--link, #0F766E); padding: 9px 11px; }
 .choice span[lang] { display: block; }
 .choice span[lang="ur"] { text-align: right; }
+/* Stars to rate with (ADR-399): those up to the one checked filled, each a radio button's label. */
+.stars { display: flex; gap: 6px; margin-top: 4px; }
+.stars label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  color: #94A3B8;
+  font-size: 1.4em;
+  cursor: pointer;
+}
+.stars input { position: absolute; width: 1px; height: 1px; min-height: 0; opacity: 0; }
+.stars label:has(input:checked), .stars label:has(~ label input:checked) { color: #B45309; }
+.stars label:has(input:focus-visible) { outline: 3px solid var(--link, #0F766E); outline-offset: 1px; }
 .error { margin-top: 4px; color: #B91C1C; font-size: 0.9em; font-weight: 600; }
 /* What a shop promises, under a button: a tick before each, its Urdu to the right as choices'. */
 .badges { margin: 0 0 12px; padding: 0; list-style: none; font-size: 0.9em; }
@@ -214,8 +234,10 @@ input:focus-visible, select:focus-visible { outline: 3px solid var(--link, #0F76
   .button.danger { background: #F87171; color: #0B1220; }
   .button.secondary { border-color: #2DD4BF; background: transparent; color: #2DD4BF; }
   a { color: #2DD4BF; }
-  input, select { border-color: #94A3B8; background: #0B1220; }
-  input:focus-visible, select:focus-visible { outline-color: #2DD4BF; }
+  input, select, textarea { border-color: #94A3B8; background: #0B1220; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible { outline-color: #2DD4BF; }
+  .stars label { border-color: #334155; color: #475569; }
+  .stars label:has(input:checked), .stars label:has(~ label input:checked) { color: #FBBF24; }
   [aria-invalid="true"] { border-color: #F87171; }
   .choice { border-color: #334155; }
   .choice input { accent-color: #2DD4BF; }
