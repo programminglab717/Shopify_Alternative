@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Reviews read through the catalog's facade
+### 4a4e47b · Reviews read through the catalog's facade
 
 * **The orders module no longer reads the catalog's tables** (conventions, "Packages and
   boundaries"): whether an order was rated, which shops ask for reviews and which products may
