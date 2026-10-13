@@ -2971,3 +2971,61 @@ export interface CustomAppSecretRotateData {
 export interface CustomAppDeleteData {
   customAppDelete: { deletedCustomAppId: string | null; userErrors: UserError[] };
 }
+
+export type WebhookTopic =
+  | 'ORDERS_CREATE'
+  | 'ORDERS_UPDATED'
+  | 'ORDERS_CANCELLED'
+  | 'ORDERS_PAID'
+  | 'FULFILLMENTS_CREATE'
+  | 'FULFILLMENTS_UPDATE'
+  | 'PRODUCTS_CREATE'
+  | 'PRODUCTS_UPDATE'
+  | 'PRODUCTS_DELETE'
+  | 'INVENTORY_LEVELS_UPDATE'
+  | 'CUSTOMERS_CREATE'
+  | 'CUSTOMERS_UPDATE'
+  | 'APP_UNINSTALLED';
+
+/** One event's post to an app (ADR-397). */
+export interface WebhookDelivery {
+  id: string;
+  status: 'PENDING' | 'DELIVERED' | 'FAILED';
+  attempts: number;
+  responseStatus: number | null;
+  error: string | null;
+  createdAt: string;
+  lastAttemptAt: string | null;
+  nextAttemptAt: string | null;
+}
+
+export interface WebhookSubscription {
+  id: string;
+  topic: WebhookTopic;
+  callbackUrl: string;
+  appId: string;
+  createdAt: string;
+  lastDelivery: WebhookDelivery | null;
+}
+
+export interface WebhookSubscriptionsData {
+  webhookSubscriptions: WebhookSubscription[];
+}
+
+export interface WebhookDeliveriesData {
+  webhookDeliveries: WebhookDelivery[];
+}
+
+export interface WebhookSubscriptionCreateData {
+  webhookSubscriptionCreate: {
+    webhookSubscription: { id: string } | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface WebhookSubscriptionDeleteData {
+  webhookSubscriptionDelete: {
+    deletedWebhookSubscriptionId: string | null;
+    userErrors: UserError[];
+  };
+}

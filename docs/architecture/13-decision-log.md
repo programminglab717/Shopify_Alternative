@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-397 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-398 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -405,6 +405,7 @@
 | 395 | A custom app is an access token the shop's owner or a manager makes, with a name and scopes none beyond their own role's, and a secret its webhooks will be signed with, kept sealed for the app alone; both are shown once and can be replaced, and removing the app revokes its token at once | Accepted |
 | 396 | Settings lists the shop's custom apps for owners and managers, each with what it may reach in words and the last characters of its token and secret; an app is made by choosing each resource's access, and its token and secret are shown once, to copy | Accepted |
 | 397 | A custom app subscribes to topics of the shop's events at https addresses; the worker makes one delivery an event and subscription for apps that may read what it names, posts it signed with the app's secret to a public address alone, and tries again with backoff for two days | Accepted |
+| 398 | Each custom app on the shop's apps page shows its webhooks, the topic in words, where it goes and how its latest delivery went, with its last ten to open; one is added for a topic the app may hear, or removed | Accepted |
 
 ---
 
@@ -15417,3 +15418,23 @@
     the worker and grows stale when deliveries are retried; the ID and the API's current answer
     cannot disagree.
   * **A queue per app:** the deliveries table is the queue, and the log the admin will show.
+
+## ADR-398 · Each custom app on the shop's apps page shows its webhooks, the topic in words, where it goes and how its latest delivery went, with its last ten to open; one is added for a topic the app may hear, or removed
+
+* **Context:**
+  * Apps' webhooks are made and posted by the core ([ADR-397](#adr-397--a-custom-app-subscribes-to-topics-of-the-shops-events-at-https-addresses-the-worker-makes-one-delivery-an-event-and-subscription-for-apps-that-may-read-what-it-names-posts-it-signed-with-the-apps-secret-to-a-public-address-alone-and-tries-again-with-backoff-for-two-days)); a shop whose sheet stops
+    filling needs to see whether Hatti sent, and what the app answered, without a developer.
+* **Decision:**
+  * **Under each app on Settings → Apps** ([ADR-396](#adr-396--settings-lists-the-shops-custom-apps-for-owners-and-managers-each-with-what-it-may-reach-in-words-and-the-last-characters-of-its-token-and-secret-an-app-is-made-by-choosing-each-resources-access-and-its-token-and-secret-are-shown-once-to-copy)), its webhooks: the topic in words ("An
+    order is placed"), the address, and its latest delivery: delivered and when, trying again
+    and when, with why it failed, given up, or nothing sent yet. "Recent deliveries" opens the
+    last ten, each with its tries.
+  * **The core gives each subscription its latest delivery** (`lastDelivery`) and a
+    subscription's deliveries of the last 30 days (`webhookDeliveries`), to the app itself or
+    the owner and managers.
+  * **Adding one offers only the topics the app may hear**, from its scopes, at an https
+    address; removing one is a tap.
+* **Consequences:**
+  * The activity log calls a subscription's changes a webhook's.
+* **Alternatives:**
+  * **A page of its own for webhooks:** they are each app's, so they sit with the app.

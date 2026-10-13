@@ -7,9 +7,15 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
-import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { WebhookService, type WebhookSubscriptionRecord } from '../webhooks.service.js';
+import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
+  WebhookService,
+  type WebhookDeliveryRecord,
+  type WebhookSubscriptionRecord,
+} from '../webhooks.service.js';
+import {
+  WebhookDelivery,
+  WebhookDeliveryStatus,
   WebhookSubscription,
   WebhookSubscriptionDeletePayload,
   WebhookSubscriptionInput,
@@ -50,6 +56,22 @@ export class WebhookResolver {
     @CurrentTenant() tenant: TenantContext,
   ): Promise<WebhookSubscription[]> {
     return (await this.service.list(tenant, ownApp(tenant))).map(toSubscription);
+  }
+
+  @Query(() => [WebhookDelivery], {
+    description:
+      "A webhook subscription's deliveries of the last 30 days, the latest first, `first` of " +
+      'them (20 unless given, 100 at most).',
+  })
+  async webhookDeliveries(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('subscriptionId', { type: () => ID }) subscriptionId: string,
+    @Args('first', { type: () => Int, nullable: true }) first?: number | null,
+  ): Promise<WebhookDelivery[]> {
+    const own = ownApp(tenant);
+    const id = tryFromPublicId(subscriptionId, 'webhookSubscription');
+    const records = id ? await this.service.deliveries(tenant, id, own, first ?? 20) : null;
+    return (records ?? []).map(toDelivery);
   }
 
   @Mutation(() => WebhookSubscriptionPayload, {
@@ -136,5 +158,14 @@ export function toSubscription(record: WebhookSubscriptionRecord): WebhookSubscr
     appName: record.appName,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+    lastDelivery: record.lastDelivery && toDelivery(record.lastDelivery),
+  });
+}
+
+function toDelivery(record: WebhookDeliveryRecord): WebhookDelivery {
+  return Object.assign(new WebhookDelivery(), {
+    ...record,
+    id: toPublicId('webhookDelivery', record.id),
+    status: record.status.toUpperCase() as WebhookDeliveryStatus,
   });
 }

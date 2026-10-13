@@ -49,8 +49,8 @@ describe('The activity log in the admin', () => {
               },
               {
                 id: 'evt_3',
-                type: 'webhook_subscription.created',
-                subjectType: 'webhook_subscription',
+                type: 'gift_registry.created',
+                subjectType: 'gift_registry',
                 subjectId: null,
                 occurredAt: LATER,
                 actor: { id: 'tok_1', kind: 'APP', role: null },
@@ -124,7 +124,7 @@ describe('The activity log in the admin', () => {
     // Someone no longer on the staff is named by their role; an app as an app.
     expect(screen.getByText('Delivery charges updated')).toBeTruthy();
     expect(screen.getByText('Confirmation agent')).toBeTruthy();
-    expect(screen.getByText('webhook subscription created')).toBeTruthy();
+    expect(screen.getByText('gift registry created')).toBeTruthy();
     expect(screen.getByText('An app')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Show older' }));

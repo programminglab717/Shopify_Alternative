@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: each app's webhooks in the admin,
-its subscriptions and their recent deliveries (DEV-03); then product reviews (MKT-05). Urdu
+**Next, section by section as the alpha's shops need them**: product reviews (MKT-05), asked
+for on WhatsApp after delivery and shown on the storefront; then pre-orders (CAT-14). Urdu
 handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -16,6 +16,20 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Apps' webhooks in the admin
+
+* **On Settings → Apps** ([ADR-398](../architecture/13-decision-log.md#adr-398--each-custom-app-on-the-shops-apps-page-shows-its-webhooks-the-topic-in-words-where-it-goes-and-how-its-latest-delivery-went-with-its-last-ten-to-open-one-is-added-for-a-topic-the-app-may-hear-or-removed), DEV-03): each app lists its webhooks, the topic in words,
+  the address, and how the latest delivery went, with its last ten to open. A webhook is added
+  for a topic the app may hear, or removed. The core gives each subscription its
+  `lastDelivery`, and `webhookDeliveries` lists one's deliveries.
+* **Tried in Chromium against the core:** the owner made "Orders sheet" reading orders; its
+  topics offered orders' and its own removal alone. A webhook for new orders was added; the
+  latest new order, fanned out and answered 500, showed "Trying again" with why; answered 200
+  on the next try, it showed "Delivered", and its recent deliveries "Tries: 2". The app, its
+  webhook and logs were then taken away.
+* 2664 tests (5 new): the app's webhooks and deliveries in the admin, and the
+  new documents checked against the schema.
 
 ### 29d1ed8 · Webhooks
 

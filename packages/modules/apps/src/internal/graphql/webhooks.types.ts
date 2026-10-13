@@ -4,6 +4,7 @@ import {
   GraphQLISODateTime,
   ID,
   InputType,
+  Int,
   ObjectType,
   registerEnumType,
 } from '@nestjs/graphql';
@@ -47,6 +48,46 @@ export function topicOf(value: WebhookSubscriptionTopic): string {
     : `${first}/${rest.join('_')}`;
 }
 
+export enum WebhookDeliveryStatus {
+  PENDING = 'PENDING',
+  DELIVERED = 'DELIVERED',
+  FAILED = 'FAILED',
+}
+
+registerEnumType(WebhookDeliveryStatus, {
+  name: 'WebhookDeliveryStatus',
+  description:
+    'PENDING until the app answers 2xx, then DELIVERED; FAILED once two days of tries have ' +
+    'passed, or its app was removed.',
+});
+
+@ObjectType({ description: "One event's post to an app, and how its tries went (ADR-397)." })
+export class WebhookDelivery {
+  @Field(() => ID, { description: 'As its X-Hatti-Webhook-Id header says.' })
+  id!: string;
+
+  @Field(() => WebhookDeliveryStatus)
+  status!: WebhookDeliveryStatus;
+
+  @Field(() => Int)
+  attempts!: number;
+
+  @Field(() => Int, { nullable: true, description: "The app's HTTP status at the last try." })
+  responseStatus!: number | null;
+
+  @Field(() => String, { nullable: true, description: 'Why the last try failed.' })
+  error!: string | null;
+
+  @Field(() => GraphQLISODateTime)
+  createdAt!: Date;
+
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  lastAttemptAt!: Date | null;
+
+  @Field(() => GraphQLISODateTime, { nullable: true, description: 'While pending.' })
+  nextAttemptAt!: Date | null;
+}
+
 @ObjectType({
   description:
     "An app's subscription to a topic (DEV-03, ADR-397): each event of it is posted to its " +
@@ -75,6 +116,9 @@ export class WebhookSubscription {
 
   @Field(() => GraphQLISODateTime)
   updatedAt!: Date;
+
+  @Field(() => WebhookDelivery, { nullable: true, description: 'Its latest delivery.' })
+  lastDelivery!: WebhookDelivery | null;
 }
 
 @InputType()

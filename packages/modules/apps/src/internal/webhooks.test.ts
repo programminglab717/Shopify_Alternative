@@ -363,6 +363,18 @@ describe.skipIf(!server)('Webhooks: subscriptions and deliveries (DEV-03, ADR-39
       failed: 1,
     });
     expect((await deliveries()).map((each) => each.status)).toEqual(['delivered', 'failed']);
+
+    // The subscription's deliveries, the latest first, and its latest on it.
+    const [subscription] = await webhooks.list(sheet.tenant, sheet.id);
+    const listed = await webhooks.deliveries(sheet.tenant, subscription!.id, sheet.id);
+    expect(listed!.map((each) => [each.status, each.attempts, each.responseStatus])).toEqual([
+      ['failed', 2, 503],
+      ['delivered', 2, 200],
+    ]);
+    expect(subscription!.lastDelivery).toMatchObject({ status: 'failed', nextAttemptAt: null });
+    // Another app sees none of them.
+    const other = await app(['read_orders']);
+    expect(await webhooks.deliveries(other.tenant, subscription!.id, other.id)).toBeNull();
   });
 
   it("tells an app it was removed, and posts nothing more of the shop's to it", async () => {

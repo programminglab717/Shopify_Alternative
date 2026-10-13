@@ -7044,3 +7044,75 @@ export const CustomAppDeleteMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const WEBHOOK_DELIVERY = /* GraphQL */ `
+  fragment WebhookDeliveryFields on WebhookDelivery {
+    id
+    status
+    attempts
+    responseStatus
+    error
+    createdAt
+    lastAttemptAt
+    nextAttemptAt
+  }
+`;
+
+export const WebhookSubscriptionsQuery = /* GraphQL */ `
+  query WebhookSubscriptions {
+    webhookSubscriptions {
+      id
+      topic
+      callbackUrl
+      appId
+      createdAt
+      lastDelivery {
+        ...WebhookDeliveryFields
+      }
+    }
+  }
+  ${WEBHOOK_DELIVERY}
+`;
+
+export const WebhookDeliveriesQuery = /* GraphQL */ `
+  query WebhookDeliveries($subscriptionId: ID!, $first: Int) {
+    webhookDeliveries(subscriptionId: $subscriptionId, first: $first) {
+      ...WebhookDeliveryFields
+    }
+  }
+  ${WEBHOOK_DELIVERY}
+`;
+
+export const WebhookSubscriptionCreateMutation = /* GraphQL */ `
+  mutation WebhookSubscriptionCreate(
+    $topic: WebhookSubscriptionTopic!
+    $callbackUrl: String!
+    $appId: ID
+  ) {
+    webhookSubscriptionCreate(
+      topic: $topic
+      webhookSubscription: { callbackUrl: $callbackUrl }
+      appId: $appId
+    ) {
+      webhookSubscription {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+export const WebhookSubscriptionDeleteMutation = /* GraphQL */ `
+  mutation WebhookSubscriptionDelete($id: ID!) {
+    webhookSubscriptionDelete(id: $id) {
+      deletedWebhookSubscriptionId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

@@ -35,6 +35,47 @@ export interface WebhookSubscriptionRecord {
   uri: string;
   createdAt: Date;
   updatedAt: Date;
+  /** Its latest delivery, if it has had one. */
+  lastDelivery: WebhookDeliveryRecord | null;
+}
+
+/** One of a subscription's deliveries: how its tries went. */
+export interface WebhookDeliveryRecord {
+  id: string;
+  /** "pending" until delivered, or given up on as "failed". */
+  status: 'pending' | 'delivered' | 'failed';
+  attempts: number;
+  /** The app's HTTP status at the last try, if it answered. */
+  responseStatus: number | null;
+  error: string | null;
+  createdAt: Date;
+  lastAttemptAt: Date | null;
+  /** When it is tried next, while pending. */
+  nextAttemptAt: Date | null;
+}
+
+type DeliveryRow = {
+  id: string;
+  status: WebhookDeliveryRecord['status'];
+  attempts: number;
+  response_status: number | null;
+  error: string | null;
+  created_at: string | Date;
+  last_attempt_at: string | Date | null;
+  next_attempt_at: string | Date;
+};
+
+function toDelivery(row: DeliveryRow): WebhookDeliveryRecord {
+  return {
+    id: row.id,
+    status: row.status,
+    attempts: row.attempts,
+    responseStatus: row.response_status,
+    error: row.error,
+    createdAt: toDate(row.created_at),
+    lastAttemptAt: row.last_attempt_at === null ? null : toDate(row.last_attempt_at),
+    nextAttemptAt: row.status === 'pending' ? toDate(row.next_attempt_at) : null,
+  };
 }
 
 /** What a sweep did. */
@@ -54,6 +95,7 @@ type SubscriptionRow = {
   uri: string;
   created_at: string | Date;
   updated_at: string | Date;
+  last_delivery: DeliveryRow | null;
 };
 
 function toRecord(row: SubscriptionRow): WebhookSubscriptionRecord {
@@ -65,8 +107,14 @@ function toRecord(row: SubscriptionRow): WebhookSubscriptionRecord {
     uri: row.uri,
     createdAt: toDate(row.created_at),
     updatedAt: toDate(row.updated_at),
+    lastDelivery: row.last_delivery && toDelivery(row.last_delivery),
   };
 }
+
+const DELIVERY_COLUMNS = sql.raw(
+  'd.id, d.status, d.attempts, d.response_status, d.error, d.created_at, d.last_attempt_at, ' +
+    'd.next_attempt_at',
+);
 
 async function subscriptionsIn(
   tx: Tx,
@@ -74,7 +122,11 @@ async function subscriptionsIn(
   where: { id?: string; appId?: string | null },
 ): Promise<SubscriptionRow[]> {
   const { rows } = await tx.execute<SubscriptionRow>(sql`
-    SELECT s.id, s.app_id, t.name AS app_name, s.topic, s.uri, s.created_at, s.updated_at
+    SELECT s.id, s.app_id, t.name AS app_name, s.topic, s.uri, s.created_at, s.updated_at,
+           (SELECT row_to_json(last) FROM (
+              SELECT ${DELIVERY_COLUMNS} FROM apps.webhook_deliveries d
+               WHERE d.shop_id = s.shop_id AND d.subscription_id = s.id
+               ORDER BY d.created_at DESC, d.id DESC LIMIT 1) last) AS last_delivery
       FROM apps.webhook_subscriptions s
       JOIN apps.access_tokens t ON t.shop_id = s.shop_id AND t.id = s.app_id
      WHERE s.shop_id = ${shopId} AND t.revoked_at IS NULL
@@ -230,6 +282,28 @@ export class WebhookService {
       const record = toRecord(current);
       await this.#record(tx, tenant, WebhookEvents.SubscriptionDeleted, record);
       return { ok: true, value: record };
+    });
+  }
+
+  /**
+   * A subscription's deliveries, the latest first, `first` of them; null for a subscription the
+   * caller cannot see.
+   */
+  async deliveries(
+    tenant: TenantContext,
+    id: string,
+    appId: string | null,
+    first = 20,
+  ): Promise<WebhookDeliveryRecord[] | null> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const [subscription] = await subscriptionsIn(tx, tenant.shopId, { id, appId });
+      if (!subscription) return null;
+      const { rows } = await tx.execute<DeliveryRow>(sql`
+        SELECT ${DELIVERY_COLUMNS} FROM apps.webhook_deliveries d
+         WHERE d.shop_id = ${tenant.shopId} AND d.subscription_id = ${id}
+         ORDER BY d.created_at DESC, d.id DESC
+         LIMIT ${Math.min(Math.max(first, 1), 100)}`);
+      return rows.map(toDelivery);
     });
   }
 

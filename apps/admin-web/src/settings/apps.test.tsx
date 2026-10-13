@@ -48,9 +48,42 @@ const OLD = {
   createdAt: LATER,
 };
 
+const EARLIER = new Date(Date.now() - 3_600_000).toISOString();
+
+const DELIVERED = {
+  id: 'whd_1',
+  status: 'DELIVERED',
+  attempts: 1,
+  responseStatus: 200,
+  error: null,
+  createdAt: EARLIER,
+  lastAttemptAt: EARLIER,
+  nextAttemptAt: null,
+};
+
+const RETRYING = {
+  ...DELIVERED,
+  id: 'whd_2',
+  status: 'PENDING',
+  attempts: 2,
+  responseStatus: 500,
+  error: 'It answered 500',
+  nextAttemptAt: LATER,
+};
+
 function core() {
   let confirmed = false;
   let apps: Record<string, unknown>[] = [SHEET, OLD];
+  let subscriptions: Record<string, unknown>[] = [
+    {
+      id: 'whs_1',
+      topic: 'ORDERS_CREATE',
+      callbackUrl: 'https://sheets.example.pk/hooks/orders',
+      appId: 'tok_1',
+      createdAt: EARLIER,
+      lastDelivery: RETRYING,
+    },
+  ];
   return fakeCore(
     'owner',
     (operation, variables) => {
@@ -97,6 +130,33 @@ function core() {
             customAppSecretRotate: {
               customApp: apps.find((app) => app.id === variables.id),
               webhookSecret: 'hws_newSecret2222',
+              userErrors: [],
+            },
+          };
+        case 'WebhookSubscriptions':
+          return { webhookSubscriptions: subscriptions };
+        case 'WebhookDeliveries':
+          return { webhookDeliveries: [RETRYING, DELIVERED] };
+        case 'WebhookSubscriptionCreate':
+          subscriptions = [
+            ...subscriptions,
+            {
+              id: 'whs_2',
+              topic: variables.topic,
+              callbackUrl: variables.callbackUrl,
+              appId: variables.appId,
+              createdAt: LATER,
+              lastDelivery: null,
+            },
+          ];
+          return {
+            webhookSubscriptionCreate: { webhookSubscription: { id: 'whs_2' }, userErrors: [] },
+          };
+        case 'WebhookSubscriptionDelete':
+          subscriptions = subscriptions.filter((each) => each.id !== variables.id);
+          return {
+            webhookSubscriptionDelete: {
+              deletedWebhookSubscriptionId: variables.id,
               userErrors: [],
             },
           };
@@ -202,5 +262,63 @@ describe('Custom apps in settings (DEV-04, ADR-395)', () => {
     fireEvent.click(within(sheet()).getByRole('button', { name: 'Remove it' }));
     await waitFor(() => expect(screen.queryByText('Orders sheet')).toBeNull());
     expect(sentOf(fake, 'CustomAppDelete')).toEqual([{ id: 'tok_1' }]);
+  });
+
+  it("shows each app's webhooks and how they went, and adds and removes them", async () => {
+    const fake = core();
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/apps');
+
+    const hooks = await screen.findByRole('region', { name: "Orders sheet's webhooks" });
+    expect(within(hooks).getByText('An order is placed')).toBeTruthy();
+    expect(within(hooks).getByText('https://sheets.example.pk/hooks/orders')).toBeTruthy();
+    expect(within(hooks).getByText(/^Trying again .*: It answered 500$/)).toBeTruthy();
+    fireEvent.click(within(hooks).getByRole('button', { name: 'Recent deliveries' }));
+    expect(await within(hooks).findByText(/^Delivered /)).toBeTruthy();
+    expect(within(hooks).getByText('Tries: 2')).toBeTruthy();
+    expect(
+      fake.sent.filter((each) => each.operation === 'WebhookDeliveries').at(-1)!.variables,
+    ).toEqual({ subscriptionId: 'whs_1', first: 10 });
+
+    // Topics of what the app may read alone: orders and products, and its own removal.
+    fireEvent.click(within(hooks).getByRole('button', { name: 'Add a webhook' }));
+    const when = within(hooks).getByLabelText('When') as HTMLSelectElement;
+    expect([...when.options].map((option) => option.text)).toEqual([
+      'An order is placed',
+      'An order changes',
+      'An order is cancelled',
+      'An order is paid',
+      'A parcel is sent',
+      'A parcel moves on',
+      'A product is added',
+      'A product changes',
+      'A product is deleted',
+      'This app is removed',
+    ]);
+    fireEvent.change(when, { target: { value: 'ORDERS_PAID' } });
+    fireEvent.change(within(hooks).getByLabelText('Send it to'), {
+      target: { value: 'https://sheets.example.pk/hooks/paid' },
+    });
+    fireEvent.click(within(hooks).getByRole('button', { name: 'Add it' }));
+    expect(await within(hooks).findByText('Nothing sent yet')).toBeTruthy();
+    expect(within(hooks).getByText('https://sheets.example.pk/hooks/paid')).toBeTruthy();
+    expect(
+      fake.sent.filter((each) => each.operation === 'WebhookSubscriptionCreate')[0]!.variables,
+    ).toEqual({
+      topic: 'ORDERS_PAID',
+      callbackUrl: 'https://sheets.example.pk/hooks/paid',
+      appId: 'tok_1',
+    });
+
+    fireEvent.click(
+      within(hooks).getByRole('button', { name: 'Remove the webhook for An order is placed' }),
+    );
+    await waitFor(() => expect(within(hooks).queryByText('An order is placed')).toBeNull());
+    // The development token has none.
+    expect(
+      within(screen.getByRole('region', { name: "Development token's webhooks" })).getByText(
+        /^It is sent nothing yet\./,
+      ),
+    ).toBeTruthy();
   });
 });

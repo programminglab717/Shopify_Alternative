@@ -32,6 +32,7 @@ export {
 } from '../internal/webhooks.js';
 export {
   WebhookService,
+  type WebhookDeliveryRecord,
   type WebhookSubscriptionRecord,
   type WebhookSweep,
 } from '../internal/webhooks.service.js';

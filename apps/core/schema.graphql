@@ -10623,6 +10623,11 @@ type Query {
   urlRedirectsExport: UrlRedirectsExport!
 
   """
+  A webhook subscription's deliveries of the last 30 days, the latest first, `first` of them (20 unless given, 100 at most).
+  """
+  webhookDeliveries(first: Int, subscriptionId: ID!): [WebhookDelivery!]!
+
+  """
   The calling app's webhook subscriptions; for the owner and managers, every app's, by app and topic (DEV-03, ADR-397).
   """
   webhookSubscriptions: [WebhookSubscription!]!
@@ -12414,6 +12419,35 @@ type VideoSource {
   width: Int!
 }
 
+"""One event's post to an app, and how its tries went (ADR-397)."""
+type WebhookDelivery {
+  attempts: Int!
+  createdAt: DateTime!
+
+  """Why the last try failed."""
+  error: String
+
+  """As its X-Hatti-Webhook-Id header says."""
+  id: ID!
+  lastAttemptAt: DateTime
+
+  """While pending."""
+  nextAttemptAt: DateTime
+
+  """The app's HTTP status at the last try."""
+  responseStatus: Int
+  status: WebhookDeliveryStatus!
+}
+
+"""
+PENDING until the app answers 2xx, then DELIVERED; FAILED once two days of tries have passed, or its app was removed.
+"""
+enum WebhookDeliveryStatus {
+  DELIVERED
+  FAILED
+  PENDING
+}
+
 """
 An app's subscription to a topic (DEV-03, ADR-397): each event of it is posted to its address as JSON, signed in X-Hatti-Hmac-Sha256 with the HMAC-SHA256 of the body by the app's secret, in base64; tried again for two days until the app answers 2xx within five seconds. The body names the resource by its ID, to fetch through the Admin API.
 """
@@ -12426,6 +12460,9 @@ type WebhookSubscription {
   callbackUrl: String!
   createdAt: DateTime!
   id: ID!
+
+  """Its latest delivery."""
+  lastDelivery: WebhookDelivery
   topic: WebhookSubscriptionTopic!
   updatedAt: DateTime!
 }

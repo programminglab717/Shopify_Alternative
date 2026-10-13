@@ -8,6 +8,7 @@ import {
   CustomAppTokenRotateMutation,
   CustomAppUpdateMutation,
   CustomAppsQuery,
+  WebhookSubscriptionsQuery,
 } from '../api/operations';
 import type {
   CustomApp,
@@ -19,6 +20,7 @@ import type {
   CustomAppUpdateData,
   CustomAppsData,
   UserError,
+  WebhookSubscriptionsData,
 } from '../api/types';
 import { useRecentAuthentication } from '../auth/confirm-identity';
 import { errorText } from '../i18n/errors';
@@ -32,6 +34,7 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { FormSection } from '../products/product-form';
 import { SelectField } from './settings-form';
+import { AppWebhooks } from './app-webhooks';
 import { BackToSettings } from './settings-page';
 
 /**
@@ -251,6 +254,10 @@ export function AppsPage() {
   const { t, locale } = useLocale();
   const timezone = useShopTimezone();
   const query = useAdminQuery<CustomAppsData>(['customApps'], CustomAppsQuery);
+  const webhooks = useAdminQuery<WebhookSubscriptionsData>(
+    ['webhookSubscriptions'],
+    WebhookSubscriptionsQuery,
+  );
   const rotateToken = useAdminMutation<CustomAppTokenRotateData, { id: string }>(
     CustomAppTokenRotateMutation,
   );
@@ -417,6 +424,14 @@ export function AppsPage() {
                       </>
                     )}
                   </div>
+                  {webhooks.data && (
+                    <AppWebhooks
+                      app={app}
+                      subscriptions={webhooks.data.webhookSubscriptions.filter(
+                        (subscription) => subscription.appId === app.id,
+                      )}
+                    />
+                  )}
                 </li>
               ))}
             </ul>

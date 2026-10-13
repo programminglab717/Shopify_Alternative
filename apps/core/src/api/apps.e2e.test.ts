@@ -196,6 +196,17 @@ describe.skipIf(!server)(
         userErrors: [],
       });
       expect(subscribed.webhookSubscription.id).toMatch(/^whs_/);
+      // Nothing posted yet.
+      expect(
+        await data(
+          app,
+          `query ($id: ID!) { webhookDeliveries(subscriptionId: $id) { id status } }`,
+          { id: subscribed.webhookSubscription.id },
+        ),
+      ).toEqual([]);
+      expect(
+        (await data(app, '{ webhookSubscriptions { lastDelivery { status } } }'))[0].lastDelivery,
+      ).toBeNull();
       // Products it cannot read; a plain http address.
       expect(
         (
