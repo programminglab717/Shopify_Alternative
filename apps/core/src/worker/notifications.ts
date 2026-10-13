@@ -7,6 +7,7 @@ import {
   MessagesService,
   MessagingEvents,
   SECRET_KINDS,
+  WHATSAPP_ONLY_KINDS,
   chargedFor,
   messageCostOf,
   settingsIn,
@@ -549,6 +550,13 @@ export function messageRetryDelayMs(attempts: number): number {
   return Math.min(2 ** Math.max(0, attempts - 1) * 60_000, 60 * 60_000);
 }
 
+/** Whether a shop's broadcasts may go this round, and the number they go from (ADR-422). */
+interface Marketing {
+  open: boolean;
+  nextOpen: Date;
+  provider: MessageProvider | null;
+}
+
 export interface MessagesSenderOptions {
   messages: MessagesService;
   /** How each channel sends; a channel without one fails its messages, as not set up. */
@@ -558,8 +566,19 @@ export interface MessagesSenderOptions {
    * Without it, messages go unpaid for.
    */
   charges?: MessageCharges;
+  /**
+   * Each shop's own WhatsApp number (ADR-419), which its broadcasts go from (ADR-422): none for a
+   * shop that has not connected one. Without it, broadcasts fail, as not set up.
+   */
+  shopNumbers?: (shopId: string) => Promise<MessageProvider | null>;
   logger?: Logger;
 }
+
+/** Why a broadcast failed: the shop's own number is not there to send it. */
+const NO_SHOP_NUMBER = "The shop's own WhatsApp number is not connected";
+
+/** Why a broadcast's message waits: marketing reaches customers by day alone (07 §1). */
+const OUTSIDE_MARKETING_HOURS = 'Waiting for marketing hours';
 
 /** Why a message failed with no provider for its channel. */
 const NOT_SET_UP: Record<MessageChannel, string> = {
@@ -581,7 +600,8 @@ const NO_CREDIT = {
  * took and did not deliver within 15 minutes. Each is paid for from the shop's credit as it goes
  * (ADR-155): what the credit cannot pay for waits as long, but a code, which works for minutes, is
  * not sent at all. Hatti's own notices to the shop about its bills cost it nothing (ADR-169), nor
- * do its customers' emails (ADR-181).
+ * do its customers' emails (ADR-181). A broadcast's messages go from the shop's own number, in
+ * marketing hours alone, and never by SMS (ADR-422).
  */
 export class MessagesSender {
   constructor(private readonly options: MessagesSenderOptions) {}
@@ -614,6 +634,7 @@ export class MessagesSender {
         .map((message) => message.recipient);
       stopped.set(channel, await messages.optedOut(shopId, channel, recipients));
     }
+    const marketing = await this.#marketing(shopId, claimed, at);
     // What the shop's credit has left to pay for, as the round spends it.
     const { charges } = this.options;
     let credit = charges ? await charges.balanceOf(shopId) : null;
@@ -626,12 +647,15 @@ export class MessagesSender {
       // are emails (ADR-181).
       const paid = charges !== undefined && chargedFor(message);
       const price = paid ? charges.priceOf(messageCostOf(message)) : 0n;
-      const outcome = await this.#attempt(
-        message,
-        stopped,
-        at,
-        !paid || credit === null || credit >= price,
-      );
+      const outcome = WHATSAPP_ONLY_KINDS.includes(message.kind)
+        ? await this.#marketingAttempt(message, marketing, stopped, at, credit, price)
+        : await this.#attempt(
+            message,
+            this.options.providers[message.channel],
+            stopped,
+            at,
+            !paid || credit === null || credit >= price,
+          );
       // Recorded at once: WhatsApp's webhook tells of a message within seconds of its sending.
       await messages.settle(shopId, [outcome], at);
       if (outcome.status === 'sent') {
@@ -642,11 +666,62 @@ export class MessagesSender {
     return sent;
   }
 
+  /**
+   * What a round with broadcasts needs for them (ADR-422): whether marketing may go now in the
+   * shop's time, and the shop's own number. Nothing asked for a round without one.
+   */
+  async #marketing(
+    shopId: string,
+    claimed: readonly ClaimedMessage[],
+    at: Date,
+  ): Promise<Marketing | null> {
+    if (!claimed.some((message) => WHATSAPP_ONLY_KINDS.includes(message.kind))) return null;
+    const { messages, shopNumbers } = this.options;
+    const hours = await messages.marketingHoursOf(shopId, at);
+    return {
+      ...hours,
+      provider: hours.open && shopNumbers ? await shopNumbers(shopId) : null,
+    };
+  }
+
+  /**
+   * A broadcast's message (ADR-422): it waits for marketing hours, goes from the shop's own number
+   * or fails, and never goes by SMS. Each is paid for, as any marketing message is.
+   */
+  async #marketingAttempt(
+    message: ClaimedMessage,
+    marketing: Marketing | null,
+    stopped: ReadonlyMap<MessageChannel, ReadonlySet<string>>,
+    at: Date,
+    credit: bigint | null,
+    price: bigint,
+  ): Promise<MessageOutcome> {
+    if (marketing && !marketing.open && !stopped.get(message.channel)?.has(message.recipient)) {
+      return {
+        id: message.id,
+        status: 'pending',
+        error: OUTSIDE_MARKETING_HOURS,
+        nextAttemptAt: marketing.nextOpen,
+      };
+    }
+    const outcome = await this.#attempt(
+      message,
+      marketing?.provider ?? undefined,
+      stopped,
+      at,
+      credit === null || credit >= price,
+      NO_SHOP_NUMBER,
+    );
+    return outcome.status === 'failed' ? { ...outcome, replace: false } : outcome;
+  }
+
   async #attempt(
     message: ClaimedMessage,
+    provider: MessageProvider | undefined,
     stopped: ReadonlyMap<MessageChannel, ReadonlySet<string>>,
     at: Date,
     paidFor: boolean,
+    notSetUp: string = NOT_SET_UP[message.channel],
   ): Promise<MessageOutcome> {
     const { providers } = this.options;
     const { id } = message;
@@ -657,14 +732,8 @@ export class MessagesSender {
     if (at.getTime() - message.createdAt.getTime() > GIVE_UP_MS) {
       return { id, status: 'failed', error: 'Not sent within a day', replace: false };
     }
-    const provider = providers[message.channel];
     if (!provider) {
-      return {
-        id,
-        status: 'failed',
-        error: NOT_SET_UP[message.channel],
-        replace: replaceable,
-      };
+      return { id, status: 'failed', error: notSetUp, replace: replaceable };
     }
     if (!paidFor) {
       return SECRET_KINDS.includes(message.kind)

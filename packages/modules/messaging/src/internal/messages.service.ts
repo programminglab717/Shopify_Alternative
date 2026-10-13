@@ -1,10 +1,11 @@
-import type { TenantContext } from '@hatti/api';
+import { shopProfile, type TenantContext } from '@hatti/api';
 import { Database, exactTime, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { MessageCharges, chargedFor, messageCostOf } from './charges.js';
 import { emailStatusOf } from './email-events.js';
+import { marketingHours } from './marketing-hours.js';
 import { MessagingEvents, type MessageRepliedPayload } from './events.js';
 import { SES_EMAIL, WHATSAPP_CLOUD, type MessageChannel } from './providers.js';
 import { settingsIn } from './settings.service.js';
@@ -12,6 +13,7 @@ import {
   ALWAYS_SENT,
   EMAILED_KINDS,
   SECRET_KINDS,
+  WHATSAPP_ONLY_KINDS,
   type MessageKind,
   type MessageLanguage,
   type MessageVariables,
@@ -55,6 +57,8 @@ export interface MessageToQueue {
    * (ADR-194); the shop's otherwise.
    */
   language?: MessageLanguage | null;
+  /** The broadcast it goes in (ADR-422), for the broadcast's counts. */
+  broadcastId?: string | null;
 }
 
 /** A message the sender took to send. */
@@ -184,10 +188,10 @@ export class MessagesService {
     const { rows } = await tx.execute<{ id: string }>(sql`
       INSERT INTO messaging.messages
              (shop_id, kind, channel, recipient, language, variables, order_id, customer_id,
-              dedupe_key)
+              dedupe_key, broadcast_id)
       VALUES (${shopId}, ${message.kind}, ${channel}, ${message.recipient}, ${language},
               ${JSON.stringify(message.variables)}::jsonb, ${message.orderId ?? null},
-              ${message.customerId ?? null}, ${message.dedupeKey})
+              ${message.customerId ?? null}, ${message.dedupeKey}, ${message.broadcastId ?? null})
           ON CONFLICT (shop_id, dedupe_key) DO NOTHING
       RETURNING id`);
     const id = rows[0]?.id ?? null;
@@ -204,6 +208,12 @@ export class MessagesService {
             ON CONFLICT (shop_id, dedupe_key) DO NOTHING`);
     }
     return id;
+  }
+
+  /** Whether marketing may reach the shop's customers at `at`, and when it may next (ADR-422). */
+  async marketingHoursOf(shopId: string, at: Date): Promise<{ open: boolean; nextOpen: Date }> {
+    const { timezone } = await this.db.tenant(shopId, (tx) => shopProfile(tx, shopId));
+    return marketingHours(timezone, at);
   }
 
   /** {@link queueIn} in a transaction of its own. */
@@ -396,7 +406,7 @@ export class MessagesService {
           FROM messaging.messages m
          WHERE m.status = 'sent' AND m.channel = 'whatsapp' AND m.provider = ${WHATSAPP_CLOUD}
            AND m.sent_at <= ${before} AND m.sent_at > ${since}
-           AND m.kind <> ALL(${sql.param([...SECRET_KINDS])}::text[])
+           AND m.kind <> ALL(${sql.param([...SECRET_KINDS, ...WHATSAPP_ONLY_KINDS])}::text[])
            AND NOT EXISTS (SELECT 1 FROM messaging.messages r
                             WHERE r.shop_id = m.shop_id AND r.replaces = m.id)
          ORDER BY m.sent_at
@@ -628,6 +638,7 @@ async function replaceWithSms(tx: Tx, shopId: string, id: string): Promise<void>
            dedupe_key || ':sms', id
       FROM messaging.messages
      WHERE shop_id = ${shopId} AND id = ${id} AND channel = 'whatsapp'
+       AND kind <> ALL(${sql.param([...WHATSAPP_ONLY_KINDS])}::text[])
        AND (kind <> ALL(${sql.param([...SECRET_KINDS])}::text[])
             OR (variables ->> 'code') IS NOT NULL)
         ON CONFLICT (shop_id, dedupe_key) DO NOTHING`);

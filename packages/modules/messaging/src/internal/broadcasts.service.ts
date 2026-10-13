@@ -2,6 +2,7 @@ import {
   InputChecker,
   actorColumnsOf,
   failOne,
+  shopProfile,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
@@ -10,7 +11,12 @@ import { Database, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
-import { MessagingEvents, type BroadcastChangedPayload } from './events.js';
+import {
+  MessagingEvents,
+  type BroadcastChangedPayload,
+  type BroadcastSentPayload,
+} from './events.js';
+import { MessagesService } from './messages.service.js';
 import type { MessageLanguage } from './templates.js';
 import { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
 
@@ -19,6 +25,38 @@ export type BroadcastStatus = (typeof BROADCAST_STATUSES)[number];
 
 /** How far ahead a broadcast may be set to go. */
 export const BROADCAST_AHEAD_DAYS = 30;
+
+/** The customers a round of the worker queues of one broadcast (ADR-422). */
+export const BROADCAST_BATCH = 500;
+
+/** What a template's {{1}} says of a customer whose name the shop does not have. */
+const NO_NAME: Record<MessageLanguage, string> = { en: 'there', ur: 'دوست' };
+
+/** What the worker did of a broadcast in a round (ADR-422). */
+export type BroadcastRound =
+  /** Its messages queued for so many more customers, and whether it has more to queue. */
+  | { outcome: 'queued'; queued: number; done: boolean }
+  /** Outside the hours marketing may go: it waits until then. */
+  | { outcome: 'waiting'; until: Date }
+  /** It cannot go: its template or segment is gone, or the shop's number. */
+  | { outcome: 'failed'; error: string }
+  /** Sent, cancelled or failed already, by another round or the shop. */
+  | { outcome: 'none' };
+
+/** The shop as the worker acts for it: only its ID is read. */
+function workerTenant(shopId: string): TenantContext {
+  return {
+    shopId,
+    currency: 'PKR',
+    actor: { kind: 'app', tokenId: '00000000-0000-0000-0000-000000000000' },
+    scopes: new Set(),
+  };
+}
+
+/** A customer's first name, as a template's {{1}} greets them. */
+function firstName(name: string | null): string | null {
+  return name?.trim().split(/\s+/)[0]?.slice(0, 60) || null;
+}
 
 /** Who a broadcast reaches of a segment: those who agreed to hear from the shop on WhatsApp. */
 const CONSENTED = 'whatsapp_subscription_status = subscribed';
@@ -74,6 +112,7 @@ export interface BroadcastInput {
 
 type BroadcastRow = {
   id: string;
+  after_customer: string | null;
   name: string;
   template_id: string;
   template_name: string;
@@ -90,7 +129,7 @@ type BroadcastRow = {
   created_at: string | Date;
 };
 
-const COLUMNS = sql`id, name, template_id, template_name, template_language, template_body,
+const COLUMNS = sql`id, after_customer, name, template_id, template_name, template_language, template_body,
                     segment_id, segment_name, send_at, status, error, recipients, started_at,
                     finished_at, created_at`;
 
@@ -116,7 +155,133 @@ export class BroadcastsService {
     private readonly db: Database,
     private readonly templates: WhatsAppTemplatesService,
     private readonly segments: SegmentService,
+    private readonly messages: MessagesService,
   ) {}
+
+  /** The broadcasts due at `at`, whichever shop's, the longest due first: the worker's to queue. */
+  async due(at: Date, limit = 50): Promise<{ shopId: string; id: string }[]> {
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string; id: string }>(sql`
+        SELECT shop_id, id FROM messaging.broadcasts
+         WHERE status IN ('scheduled', 'sending') AND send_at <= ${at.toISOString()}
+         ORDER BY send_at, id
+         LIMIT ${limit}`),
+    );
+    return rows.map((row) => ({ shopId: row.shop_id, id: row.id }));
+  }
+
+  /**
+   * Queues a broadcast's next customers (ADR-422), at most `batch`, from where it got to: in the
+   * hours marketing may go, while its template is approved on the shop's number and its segment
+   * is there. Each customer's message is queued once, however often a round is repeated.
+   */
+  async queueNext(
+    shopId: string,
+    id: string,
+    at: Date,
+    batch: number = BROADCAST_BATCH,
+  ): Promise<BroadcastRound> {
+    const row = await this.db.tenant(shopId, (tx) => broadcastIn(tx, shopId, id));
+    if (!row || !['scheduled', 'sending'].includes(row.status)) return { outcome: 'none' };
+    const hours = await this.messages.marketingHoursOf(shopId, at);
+    if (!hours.open) return { outcome: 'waiting', until: hours.nextOpen };
+
+    const tenant = workerTenant(shopId);
+    const template = (await this.templates.list(tenant)).find(
+      (each) => each.id === row.template_id,
+    );
+    if (!template) {
+      return this.#fail(shopId, id, "Its template is gone from the shop's own WhatsApp number");
+    }
+    if (template.status !== 'approved') {
+      return this.#fail(
+        shopId,
+        id,
+        `Meta no longer approves its template: it is ${template.status}`,
+      );
+    }
+    let query: string | null = null;
+    if (row.segment_id) {
+      const segment = await this.segments.get(tenant, row.segment_id);
+      if (!segment) return this.#fail(shopId, id, 'Its segment was deleted');
+      query = segment.query;
+    }
+    let page;
+    try {
+      page = await this.segments.members(tenant, audienceQuery(query), {
+        first: batch,
+        after: row.after_customer,
+      });
+    } catch (error) {
+      if (!(error instanceof SegmentQueryError)) throw error;
+      return this.#fail(shopId, id, `Its segment's query no longer works: ${error.message}`);
+    }
+
+    const named = template.body.includes('{{1}}');
+    return this.db.tenant(shopId, async (tx) => {
+      const { rows } = await tx.execute<BroadcastRow>(sql`
+        SELECT ${COLUMNS} FROM messaging.broadcasts
+         WHERE shop_id = ${shopId} AND id = ${id} FOR UPDATE`);
+      const current = rows[0];
+      // Another round, or the shop, moved it on meanwhile.
+      if (
+        !current ||
+        !['scheduled', 'sending'].includes(current.status) ||
+        current.after_customer !== row.after_customer
+      ) {
+        return { outcome: 'none' } as const;
+      }
+      const { name: shop } = await shopProfile(tx, shopId);
+      let queued = 0;
+      for (const customer of page.items) {
+        const queuedId = await this.messages.queueIn(tx, shopId, {
+          kind: 'broadcast',
+          recipient: customer.phone,
+          customerId: customer.id,
+          variables: {
+            shop,
+            template: current.template_name,
+            ...(named && {
+              name: firstName(customer.name) ?? NO_NAME[current.template_language],
+            }),
+          },
+          dedupeKey: `broadcast:${id}:${customer.id}`,
+          channel: 'whatsapp',
+          language: current.template_language,
+          broadcastId: id,
+        });
+        if (queuedId) queued++;
+      }
+      const done = !page.hasNextPage;
+      const last = page.items.at(-1)?.id ?? current.after_customer;
+      await tx.execute(sql`
+        UPDATE messaging.broadcasts
+           SET recipients = recipients + ${queued}, after_customer = ${last},
+               status = ${done ? 'sent' : 'sending'},
+               started_at = coalesce(started_at, now()),
+               finished_at = ${done ? sql`now()` : sql`NULL`}, updated_at = now()
+         WHERE shop_id = ${shopId} AND id = ${id}`);
+      if (done) {
+        await appendEvent<BroadcastSentPayload>(tx, shopId, {
+          type: MessagingEvents.BroadcastSent,
+          aggregateType: 'broadcast',
+          aggregateId: id,
+          payload: { recipients: current.recipients + queued },
+        });
+      }
+      return { outcome: 'queued', queued, done } as const;
+    });
+  }
+
+  async #fail(shopId: string, id: string, error: string): Promise<BroadcastRound> {
+    await this.db.tenant(shopId, (tx) =>
+      tx.execute(sql`
+        UPDATE messaging.broadcasts
+           SET status = 'failed', error = ${error}, finished_at = now(), updated_at = now()
+         WHERE shop_id = ${shopId} AND id = ${id} AND status IN ('scheduled', 'sending')`),
+    );
+    return { outcome: 'failed', error };
+  }
 
   /**
    * How many customers a broadcast to the segment, or to all, would reach now: those who agreed

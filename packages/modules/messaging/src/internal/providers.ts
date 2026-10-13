@@ -2,8 +2,8 @@ import {
   messageEmail,
   messageText,
   templateButtons,
+  templateName,
   templateParameters,
-  TEMPLATES,
   type AnyMessageKind,
   type MessageLanguage,
   type MessageVariables,
@@ -89,7 +89,6 @@ export class WhatsAppCloudProvider implements MessageProvider {
   async send(message: OutgoingMessage): Promise<SendResult> {
     const { baseUrl, version, phoneNumberId, accessToken, timeoutMs } = this.options;
     const url = `${baseUrl.replace(/\/+$/, '')}/${version}/${phoneNumberId}/messages`;
-    const template = TEMPLATES[message.kind];
     let response: Response;
     try {
       const parameters = templateParameters(message.kind, message.variables);
@@ -105,7 +104,7 @@ export class WhatsAppCloudProvider implements MessageProvider {
           to: message.recipient.slice(1),
           type: 'template',
           template: {
-            name: template.whatsapp,
+            name: templateName(message.kind, message.variables),
             language: { code: message.language },
             components: [
               // A template with no variables, as word of a number removed, takes no body's.

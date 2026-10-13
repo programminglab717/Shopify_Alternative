@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: WhatsApp broadcasts' last parts:
-the worker sending them from the shop's own number in the hours marketing may go (MKT-01), and
-their pages in the admin; then automations (MKT-04). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: WhatsApp broadcasts' pages in the
+admin: the shop's own number connected, its templates and its broadcasts (MKT-01); then
+automations (MKT-04). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,15 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### WhatsApp broadcasts, sent
+
+* **The worker queues each broadcast that is due** ([ADR-422](../architecture/13-decision-log.md#adr-422--the-worker-queues-a-broadcast-a-batch-at-a-time-and-sends-it-from-the-shops-own-number-both-in-the-hours-marketing-may-go-and-never-by-sms), MKT-01) 500 customers at a time,
+  only from 10 am to 9 pm in the shop's own time. A broadcast whose template or segment has
+  gone fails, saying why.
+* **Its messages go from the shop's own number**, with its own template and each customer's
+  first name. They wait for the morning at night, and they never go by SMS.
+* 2795 tests, from 2789: four for messaging, two for the core.
 
 ### 27b90e0 · The store's export notice listed with the shop's messages
 

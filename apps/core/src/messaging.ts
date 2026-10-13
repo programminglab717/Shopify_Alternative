@@ -13,6 +13,7 @@ import {
   type MessageProvider,
   type OutgoingMessage,
   type SendResult,
+  type WhatsAppAccountsService,
 } from '@hatti/messaging/public';
 import type { MessageSendingConfig } from './config.js';
 import { SesMessageEmails } from './emails.js';
@@ -62,6 +63,28 @@ export function messageProvidersOf(
     providers.email = log('email');
   }
   return providers;
+}
+
+/**
+ * Each shop's own WhatsApp number (ADR-419) as its broadcasts go from it (ADR-422), with the token
+ * its connection keeps: none for a shop that has not connected one.
+ */
+export function shopNumbersOf(
+  accounts: Pick<WhatsAppAccountsService, 'senderOf'>,
+  config: Pick<MessageSendingConfig, 'META_GRAPH_URL' | 'META_GRAPH_VERSION'>,
+): (shopId: string) => Promise<MessageProvider | null> {
+  return async (shopId) => {
+    const sender = await accounts.senderOf(shopId);
+    return (
+      sender &&
+      new WhatsAppCloudProvider({
+        baseUrl: config.META_GRAPH_URL,
+        version: config.META_GRAPH_VERSION,
+        phoneNumberId: sender.phoneNumberId,
+        accessToken: sender.accessToken,
+      })
+    );
+  };
 }
 
 /**

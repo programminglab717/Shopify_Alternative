@@ -63,11 +63,13 @@ export {
   PLATFORM_MESSAGE_KINDS,
   SECRET_KINDS,
   TEMPLATES,
+  WHATSAPP_ONLY_KINDS,
   asksToStop,
   messageEmail,
   messageText,
   paidByShop,
   templateButtons,
+  templateName,
   templateParameters,
   type AnyMessageKind,
   type ConfirmationAnswer,
@@ -124,7 +126,9 @@ export {
   BroadcastsService,
   audienceQuery,
   type BroadcastCounts,
+  type BroadcastRound,
   type BroadcastInput,
   type BroadcastRecord,
   type BroadcastStatus,
 } from '../internal/broadcasts.service.js';
+export { MARKETING_HOURS, marketingHours } from '../internal/marketing-hours.js';

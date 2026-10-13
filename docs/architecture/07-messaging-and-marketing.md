@@ -35,7 +35,8 @@ flowchart LR
 1. **Is this message allowed?** Transactional messages go out on the legitimate-interest basis
    of the order. Marketing messages require an explicit opt-in per channel.
 2. **Quiet hours.** No marketing between 21:00 and 10:00 and no calls between 22:00 and 09:00
-   (shop timezone). Transactional OTPs are exempt.
+   (shop timezone). Transactional OTPs are exempt. *Built for broadcasts*
+   ([ADR-422](./13-decision-log.md#adr-422--the-worker-queues-a-broadcast-a-batch-at-a-time-and-sends-it-from-the-shops-own-number-both-in-the-hours-marketing-may-go-and-never-by-sms)): queued and sent from 10:00 to 21:00 alone.
 3. **Channel preference and health.** Use WhatsApp unless it is failing for this shopper or
    degraded nationally (for example during a regional block), then fall back to SMS.
 4. **Cost.** Use the cheapest channel that achieves the purpose, following the shop's messaging
@@ -62,7 +63,7 @@ cash-on-delivery order waiting for its customer asks them to confirm it instead,
 replies; their answer comes back through the webhook as `message.replied`, and the worker acts on
 it ([ADR-147](./13-decision-log.md#adr-147--a-cash-on-delivery-order-waiting-for-its-customer-asks-them-on-whatsapp-to-confirm-it-with-confirm-cancel-and-change-address-buttons-and-its-link-their-answer-comes-through-the-webhook-as-an-event-and-the-worker-confirms-or-cancels-the-order-as-their-link-would)). Checkout's codes go the same way, as
 `one_time_code`, which no shop can turn off and whose code is dropped once it is sent
-([ADR-148](./13-decision-log.md#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)). Not yet: quiet hours and consent for marketing, channel health, a second
+([ADR-148](./13-decision-log.md#adr-148--checkout-asks-a-shopper-paying-on-delivery-for-a-code-sent-to-the-number-they-typed-on-whatsapp-or-by-sms-where-the-shops-risk-rules-score-the-order-at-its-mark-a-digest-of-the-code-alone-is-kept-and-the-order-keeps-when-its-number-was-proved)). Not yet: channel health, a second
 aggregator, email, push and IVR.
 
 ---

@@ -5726,6 +5726,11 @@ A notification the shop's customers get about their orders, an alert the shop ge
 """
 enum MessageKind {
   """
+  One of the shop's own broadcasts, from its own WhatsApp number to a customer who agreed to hear from it there (ADR-422): never by SMS.
+  """
+  BROADCAST
+
+  """
   A shopper who typed their number at checkout and left without ordering, reminded once with a link back to the items (CHK-12, ADR-393): sent as the shop's checkout recovery setting says, which turns it on and off, not here.
   """
   CHECKOUT_REMINDER

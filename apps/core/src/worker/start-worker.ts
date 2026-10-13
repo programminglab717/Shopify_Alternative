@@ -8,7 +8,8 @@ import {
   VariantService,
 } from '@hatti/catalog/public';
 import { AbandonedCheckoutService, CheckoutExpiry } from '@hatti/checkout/public';
-import { StoreCreditService } from '@hatti/customers/public';
+import { SegmentFieldRegistry, SegmentService, StoreCreditService } from '@hatti/customers/public';
+import type { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import {
   BullMqEventPublisher,
@@ -27,7 +28,12 @@ import {
   MetaConversionsClient,
   MetaConversionsService,
 } from '@hatti/marketing/public';
-import { MessagesService } from '@hatti/messaging/public';
+import {
+  BroadcastsService,
+  MessagesService,
+  WhatsAppAccountsService,
+  WhatsAppTemplatesService,
+} from '@hatti/messaging/public';
 import {
   CourierAccountService,
   CourierBookingService,
@@ -45,6 +51,7 @@ import {
   CustomerAnswers,
   ExportScheduleService,
   FulfillmentService,
+  ORDER_SEGMENT_FACTS,
   OrderExportService,
 } from '@hatti/orders/public';
 import { GatewayAccountService, OnlinePaymentService } from '@hatti/payments/public';
@@ -52,7 +59,7 @@ import { StorefrontActivity } from '@hatti/storefront-data';
 import type { WorkerConfig } from '../config.js';
 import { couriersOf } from '../couriers.js';
 import { exportEmailsOf } from '../emails.js';
-import { messageProvidersOf } from '../messaging.js';
+import { messageProvidersOf, shopNumbersOf } from '../messaging.js';
 import { paymentGatewaysOf } from '../payments.js';
 import { CloudflareCache, NO_EDGE_CACHE, type EdgeCache } from '../storefront/edge-cache.js';
 import {
@@ -64,6 +71,7 @@ import { workerStorage } from '../storage.js';
 import { storeExportBuilder } from '../store-export.js';
 import { BillingNotices } from './billing-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
+import { BroadcastQueue } from './broadcasts.js';
 import { CheckoutReminders } from './checkout-reminders.js';
 import { ReviewRequests } from './review-requests.js';
 import { WebhookDeliveries, WebhookFanOut } from './webhooks.js';
@@ -490,10 +498,16 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         logger,
       ).start(config.SWEEP_INTERVAL_MS);
       closers.push(() => inquiries.stop());
+      // Shops' broadcasts queued once their time comes, in marketing hours (ADR-422).
+      const broadcasts = new BroadcastQueue(
+        workerBroadcasts(database, config.ENCRYPTION_KEYS),
+        logger,
+      ).start(config.SCHEDULED_INTERVAL_MS);
+      closers.push(() => broadcasts.stop());
     } else {
       logger.warn(
         'ENCRYPTION_KEYS is not set: no conversions go to the ad platforms, no orders are ' +
-          'booked with couriers, and no payments are asked after',
+          'booked with couriers, no payments are asked after, and no broadcasts are sent',
       );
     }
     // Each message is paid for from its shop's credit as it goes (ADR-155).
@@ -502,6 +516,13 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       messages: new MessagesService(database, wallet),
       providers: messageProvidersOf(config, logger),
       charges: wallet,
+      // Broadcasts go from each shop's own number (ADR-422), whose token is sealed.
+      ...(config.ENCRYPTION_KEYS && {
+        shopNumbers: shopNumbersOf(
+          new WhatsAppAccountsService(database, config.ENCRYPTION_KEYS, null),
+          config,
+        ),
+      }),
       logger,
     }).start(config.MESSAGES_INTERVAL_MS);
     closers.push(() => messages.stop());
@@ -516,6 +537,18 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       await database.close();
     },
   };
+}
+
+/** Shops' broadcasts as the worker queues them (ADR-422): their templates on their own numbers. */
+function workerBroadcasts(database: Database, box: SecretBox): BroadcastsService {
+  const registry = new SegmentFieldRegistry();
+  registry.register(ORDER_SEGMENT_FACTS);
+  return new BroadcastsService(
+    database,
+    new WhatsAppTemplatesService(database, new WhatsAppAccountsService(database, box, null)),
+    new SegmentService(database, registry),
+    new MessagesService(database),
+  );
 }
 
 /** Cloudflare's cache, in front of storefronts and images, where it is set up; else none. */

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-421 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-422 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -429,6 +429,7 @@
 | 419 | A shop connects its own WhatsApp number through Meta's Embedded Signup, Hatti exchanging the code, subscribing to the account and registering the number, its token sealed for the shop | Accepted |
 | 420 | A shop writes its own marketing templates, sent at once to Meta for approval on its own WhatsApp account, and kept as Meta's webhook says they stand | Accepted |
 | 421 | A broadcast sends one of the shop's approved templates to a segment's customers who agreed to hear on WhatsApp, or to all who did, estimated before it is scheduled | Accepted |
+| 422 | The worker queues a broadcast a batch at a time and sends it from the shop's own number, both in the hours marketing may go, and never by SMS | Accepted |
 
 ---
 
@@ -16178,3 +16179,56 @@
     scheduling and sending; the query at sending is what the customers said last.
   * **Charging the estimate up front**: credit would be held for customers who stop or cannot
     be reached; each message is charged as it goes, as every message is.
+
+## ADR-422 · The worker queues a broadcast a batch at a time and sends it from the shop's own number, both in the hours marketing may go, and never by SMS
+
+* **Context:**
+  * Broadcasts are scheduled (ADR-421), and the shop's own number (ADR-419) and templates
+    (ADR-420) are in place. Nothing sends them yet.
+  * 07 §1 allows no marketing between 21:00 and 10:00 in the shop's time zone.
+  * Hatti's shared number sends utility templates only. A shop's marketing template exists only
+    on its own WhatsApp account.
+  * A segment can hold tens of thousands of customers. A message is queued once per key, and
+    the sender takes 50 of a shop's messages a round (ADR-146).
+* **Decision:**
+  * **Queuing.** A sweep, every `SCHEDULED_INTERVAL_MS`, finds the broadcasts due. It queues
+    each one round by round, in batches of 500, until all are queued:
+    * Each round re-reads the template from the shop's current account. A template that is
+      gone or no longer approved fails the broadcast, saying why. So does a deleted segment,
+      or a query that no longer works.
+    * Each round takes the next page of the audience (ADR-421), after the last customer
+      queued, and queues one `broadcast` message per customer, keyed by the broadcast and the
+      customer.
+    * Each round runs in one transaction that locks the broadcast and moves its place forward.
+      Two workers cannot queue the same page.
+    * The last page marks the broadcast sent, with its recipients, and publishes
+      `broadcast.sent`.
+  * **Its message** is the template's name and language as the broadcast kept them. Its one
+    parameter, for a template with `{{1}}`, is the customer's first name, or "there" /
+    "دوست" without one.
+  * **Sending.** Outside marketing hours, a broadcast waits for 10 am, both when queuing and
+    when sending. The sender asks for the shop's own number once per round that has
+    broadcasts, and builds WhatsApp's Cloud provider with that number's ID and the token kept
+    sealed for it.
+    * A shop without a number has its broadcast messages fail: "The shop's own WhatsApp number
+      is not connected".
+    * Broadcasts never go by SMS. They are not replaced when refused, not when the webhook says
+      they failed, and not when they are undelivered after 15 minutes. They are charged as
+      marketing messages from the shop's credit.
+  * Without `ENCRYPTION_KEYS`, the worker cannot open the tokens, so it neither queues nor
+    sends broadcasts, and says so when it starts.
+* **Consequences:**
+  * A broadcast's messages wait in the queue at the sender's pace. They are not all sent at
+    once, and they are not sent past a day (ADR-146).
+  * A broadcast whose template Meta pauses while it is being queued stops there, failed. The
+    messages already queued still go.
+  * The admin's pages for the shop's number, templates and broadcasts come next.
+* **Alternatives:**
+  * **Queuing every member when the broadcast is created**: the query would be evaluated before
+    customers could say stop, and one huge transaction would hold the queue. Pages with a
+    stored place resume after a crash.
+  * **Sending broadcasts from Hatti's shared number**: Meta does not allow it, and a shop's
+    template exists only on its own account.
+  * **SMS for broadcasts WhatsApp cannot deliver**: consent was given for WhatsApp alone
+    (CUS-04), and SMS marketing has its own rules (PTA). It may be revisited as its own
+    channel.

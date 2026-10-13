@@ -11,6 +11,7 @@ export const MessagingEvents = {
   WhatsAppTemplateStatusChanged: 'whatsapp_template.status_changed',
   BroadcastScheduled: 'broadcast.scheduled',
   BroadcastCancelled: 'broadcast.cancelled',
+  BroadcastSent: 'broadcast.sent',
 } as const;
 
 /**
@@ -75,4 +76,10 @@ export interface BroadcastChangedPayload {
   sendAt: string;
   actorKind: 'app' | 'staff';
   actorId: string;
+}
+
+/** Every message of a broadcast is queued (ADR-422). The aggregate is the broadcast. */
+export interface BroadcastSentPayload {
+  /** The customers it was queued for. */
+  recipients: number;
 }

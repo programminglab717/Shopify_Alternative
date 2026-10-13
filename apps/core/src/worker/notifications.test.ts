@@ -1083,6 +1083,99 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     expect(await wallet.balanceOf(shopId)).toBe(38n);
   });
 
+  it("sends a broadcast from the shop's own number in marketing hours, and never by SMS (ADR-422)", async () => {
+    // 10 pm in Karachi, then 10 the next morning.
+    const night = new Date('2026-10-13T17:00:00.000Z');
+    const morning = new Date('2026-10-14T05:00:00.000Z');
+    const broadcast = (recipient: string, name: string) =>
+      messages().queue(shopId, {
+        kind: 'broadcast',
+        recipient,
+        channel: 'whatsapp',
+        language: 'en',
+        dedupeKey: `broadcast:${newId()}:${recipient}`,
+        variables: { shop: 'Zari Fashions', template: 'eid_sale', name },
+      });
+    const asOf = (at: Date) =>
+      admin.query(
+        `UPDATE messaging.messages SET created_at = $1, next_attempt_at = $1
+          WHERE shop_id = $2 AND status = 'pending'`,
+        [at, shopId],
+      );
+    await broadcast(AYESHA, 'Ayesha');
+    await broadcast('+923217654321', 'Bilal');
+    await asOf(new Date(night.getTime() - 60_000));
+    const asked: string[] = [];
+    const shopNumber = new WhatsAppCloudProvider({
+      baseUrl: providerUrl,
+      version: 'v26.0',
+      phoneNumberId: '106540352242922',
+      accessToken: 'EAAQ-shop-token',
+    });
+    const sending = (number: MessageProvider | null) =>
+      new MessagesSender({
+        messages: messages(),
+        providers: { whatsapp: whatsapp(), sms: sms() },
+        shopNumbers: async (shop) => {
+          asked.push(shop);
+          return number;
+        },
+      });
+
+    // At night they wait for the morning, and the shop's number is not asked for.
+    expect(await sending(shopNumber).sweep(night)).toBe(0);
+    expect(requests).toEqual([]);
+    expect(asked).toEqual([]);
+    const { rows: waiting } = await admin.query<{ next_attempt_at: Date; error: string }>(
+      `SELECT next_attempt_at, error FROM messaging.messages WHERE shop_id = $1 ORDER BY id`,
+      [shopId],
+    );
+    expect(waiting).toEqual([
+      { next_attempt_at: morning, error: 'Waiting for marketing hours' },
+      { next_attempt_at: morning, error: 'Waiting for marketing hours' },
+    ]);
+
+    // In the morning, from the shop's own number with its own template; one refused for good.
+    answers.whatsapp.push(
+      { status: 200, body: { messages: [{ id: 'wamid.SHOP' }] } },
+      { status: 400, body: { error: { code: 131026, message: 'Message undeliverable' } } },
+    );
+    expect(await sending(shopNumber).sweep(morning)).toBe(1);
+    expect(asked).toEqual([shopId]);
+    expect(requests.map((request) => request.url)).toEqual([
+      '/v26.0/106540352242922/messages',
+      '/v26.0/106540352242922/messages',
+    ]);
+    expect(requests[0]!.body).toMatchObject({
+      to: AYESHA.slice(1),
+      template: {
+        name: 'eid_sale',
+        language: { code: 'en' },
+        components: [{ type: 'body', parameters: [{ type: 'text', text: 'Ayesha' }] }],
+      },
+    });
+    // Not delivered within 15 minutes, nor refused: no SMS in place of either.
+    requests.splice(0);
+    expect(await sending(shopNumber).sweep(new Date(morning.getTime() + 20 * 60_000))).toBe(0);
+    expect(
+      (await queued()).map((message) => [message.channel, message.status, message.error]),
+    ).toEqual([
+      ['whatsapp', 'sent', null],
+      ['whatsapp', 'failed', 'WhatsApp 131026: Message undeliverable'],
+    ]);
+
+    // A shop whose number is gone: its broadcast fails, by no other number.
+    await broadcast('+923335550001', 'Sana');
+    await asOf(morning);
+    expect(await sending(null).sweep(morning)).toBe(0);
+    expect(requests).toEqual([]);
+    expect((await queued()).map((message) => [message.status, message.error]).at(-1)).toEqual([
+      'failed',
+      "The shop's own WhatsApp number is not connected",
+    ]);
+    expect((await queued()).filter((message) => message.channel === 'sms')).toEqual([]);
+  });
+
   it("emails an order's news to the address its customer gave too, at no cost to the shop (ADR-181)", async () => {
     const order = await placeOnline({ email: 'Ayesha@Example.pk' });
     // None given: nothing more.

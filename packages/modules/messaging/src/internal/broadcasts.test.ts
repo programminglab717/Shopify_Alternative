@@ -9,6 +9,8 @@ import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BroadcastsService, audienceQuery } from './broadcasts.service.js';
+import { marketingHours } from './marketing-hours.js';
+import { MessagesService } from './messages.service.js';
 import { FakeGraph, NUMBER, WABA } from './test-support.js';
 import { WhatsAppAccountsService } from './whatsapp-accounts.service.js';
 import { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
@@ -84,7 +86,7 @@ describe.skipIf(!server)('WhatsApp broadcasts (MKT-01, ADR-421)', () => {
     });
     templates = new WhatsAppTemplatesService(db, accounts);
     segments = new SegmentService(db, new SegmentFieldRegistry());
-    broadcasts = new BroadcastsService(db, templates, segments);
+    broadcasts = new BroadcastsService(db, templates, segments, new MessagesService(db));
 
     unwrap(
       await accounts.connect(a, {
@@ -246,5 +248,126 @@ describe.skipIf(!server)('WhatsApp broadcasts (MKT-01, ADR-421)', () => {
       'broadcast.scheduled',
       'broadcast.cancelled',
     ]);
+  });
+
+  it("opens marketing from 10 am to 9 pm in the shop's time zone", () => {
+    const karachi = (iso: string) => marketingHours('Asia/Karachi', new Date(iso));
+    expect(karachi('2026-10-13T04:30:00.000Z')).toEqual({
+      open: false,
+      nextOpen: new Date('2026-10-13T05:00:00.000Z'),
+    });
+    expect(karachi('2026-10-13T08:00:00.000Z').open).toBe(true);
+    expect(karachi('2026-10-13T15:59:59.000Z').open).toBe(true);
+    expect(karachi('2026-10-13T17:15:30.000Z')).toEqual({
+      open: false,
+      nextOpen: new Date('2026-10-14T05:00:00.000Z'),
+    });
+  });
+
+  it('queues a broadcast a batch at a time in marketing hours, once to each customer (ADR-422)', async () => {
+    const night = new Date('2026-10-13T17:00:00.000Z');
+    const sale = unwrap(await broadcasts.create(a, { name: 'Queued', templateId: approved }, NOW));
+    expect((await broadcasts.due(NOW)).map((each) => each.id)).toContain(sale.id);
+    expect(await broadcasts.due(new Date(NOW.getTime() - 3_600_000))).not.toContainEqual({
+      shopId: a.shopId,
+      id: sale.id,
+    });
+    // At 10 pm in Karachi it waits for the morning.
+    expect(await broadcasts.queueNext(a.shopId, sale.id, night)).toEqual({
+      outcome: 'waiting',
+      until: new Date('2026-10-14T05:00:00.000Z'),
+    });
+
+    expect(await broadcasts.queueNext(a.shopId, sale.id, NOW, 1)).toEqual({
+      outcome: 'queued',
+      queued: 1,
+      done: false,
+    });
+    expect(await broadcasts.get(a, sale.id)).toMatchObject({
+      status: 'sending',
+      recipients: 1,
+      startedAt: expect.any(Date),
+    });
+    // The last page: it is sent.
+    expect(await broadcasts.queueNext(a.shopId, sale.id, NOW, 1)).toEqual({
+      outcome: 'queued',
+      queued: 1,
+      done: true,
+    });
+    expect(await broadcasts.get(a, sale.id)).toMatchObject({
+      status: 'sent',
+      recipients: 2,
+      finishedAt: expect.any(Date),
+      counts: { pending: 2 },
+    });
+    expect(await broadcasts.queueNext(a.shopId, sale.id, NOW)).toEqual({ outcome: 'none' });
+
+    const { rows } = await admin.query<{
+      kind: string;
+      channel: string;
+      recipient: string;
+      language: string;
+      variables: Record<string, string>;
+    }>(
+      `SELECT kind, channel, recipient, language, variables FROM messaging.messages
+        WHERE broadcast_id = $1 ORDER BY recipient`,
+      [sale.id],
+    );
+    expect(rows).toEqual(
+      ['+923001110001', '+923001110002'].map((recipient) => ({
+        kind: 'broadcast',
+        channel: 'whatsapp',
+        recipient,
+        language: 'en',
+        variables: { shop: 'A', template: 'eid_sale', name: 'Ayesha' },
+      })),
+    );
+    const sent = await admin.query<{ payload: { recipients: number } }>(
+      "SELECT payload FROM platform.outbox_events WHERE event_type = 'broadcast.sent' AND aggregate_id = $1",
+      [sale.id],
+    );
+    expect(sent.rows.map((row) => row.payload.recipients)).toEqual([2]);
+  });
+
+  it('fails a broadcast whose segment or template has gone, or Meta no longer approves', async () => {
+    const segment = unwrap(
+      await segments.create(a, { name: 'Gone soon', query: "customer_tags CONTAINS 'vip'" }),
+    );
+    const toSegment = unwrap(
+      await broadcasts.create(
+        a,
+        { name: 'To a segment', templateId: approved, segmentId: segment.id },
+        NOW,
+      ),
+    );
+    await admin.query('DELETE FROM customers.segments WHERE id = $1', [segment.id]);
+    expect(await broadcasts.queueNext(a.shopId, toSegment.id, NOW)).toEqual({
+      outcome: 'failed',
+      error: 'Its segment was deleted',
+    });
+    expect(await broadcasts.get(a, toSegment.id)).toMatchObject({
+      status: 'failed',
+      error: 'Its segment was deleted',
+    });
+
+    const paused = unwrap(
+      await broadcasts.create(a, { name: 'Paused', templateId: approved }, NOW),
+    );
+    await admin.query("UPDATE messaging.whatsapp_templates SET status = 'paused' WHERE id = $1", [
+      approved,
+    ]);
+    expect(await broadcasts.queueNext(a.shopId, paused.id, NOW)).toEqual({
+      outcome: 'failed',
+      error: 'Meta no longer approves its template: it is paused',
+    });
+    await admin.query('DELETE FROM messaging.whatsapp_templates WHERE id = $1', [approved]);
+    const gone = await admin.query<{ id: string }>(
+      "SELECT id FROM messaging.broadcasts WHERE shop_id = $1 AND status = 'scheduled' ORDER BY id DESC LIMIT 1",
+      [a.shopId],
+    );
+    expect(await broadcasts.queueNext(a.shopId, gone.rows[0]!.id, NOW)).toEqual({
+      outcome: 'failed',
+      error: "Its template is gone from the shop's own WhatsApp number",
+    });
   });
 });

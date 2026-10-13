@@ -47,6 +47,7 @@ export const MESSAGE_KINDS = [
   'orders_limit_near',
   'orders_limit_reached',
   'store_export_ready',
+  'broadcast',
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
@@ -89,7 +90,15 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'orders_limit_near',
   'orders_limit_reached',
   'store_export_ready',
+  // The shop's own, which it schedules itself (ADR-421).
+  'broadcast',
 ];
+
+/**
+ * Messages WhatsApp alone carries: a broadcast is marketing its customer agreed to hear on
+ * WhatsApp, from the shop's own number (ADR-422), and no SMS goes in its place.
+ */
+export const WHATSAPP_ONLY_KINDS: readonly MessageKind[] = ['broadcast'];
 
 /** What the buttons of a message asking a customer to confirm their order answer (COD-01). */
 export const CONFIRMATION_ANSWERS = ['confirm', 'cancel', 'address'] as const;
@@ -193,6 +202,11 @@ export interface MessageVariables {
   logo?: string;
   items?: string;
   more?: string;
+  /**
+   * For a broadcast (ADR-422): the name of the shop's own template it sends, approved by Meta on
+   * the shop's account; and, in `name`, the customer's first name where its body has {{1}}.
+   */
+  template?: string;
 }
 
 /**
@@ -723,6 +737,16 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur: '{shop} نے اس مہینے اپنے پلان کے تمام {limit} آرڈر لے لیے ہیں',
     },
   },
+  // The shop's own template, by the name in `template` (ADR-422): the words are Meta's to hold.
+  broadcast: {
+    whatsapp: '',
+    category: 'marketing',
+    parameters: ['name'],
+    text: {
+      en: '{shop} broadcast: {template}',
+      ur: '{shop} براڈکاسٹ: {template}',
+    },
+  },
   store_export_ready: {
     whatsapp: 'hatti_store_export_ready',
     category: 'utility',
@@ -916,7 +940,15 @@ function escapeHtml(text: string): string {
 
 /** A WhatsApp template's body variables, in its order. */
 export function templateParameters(kind: AnyMessageKind, variables: MessageVariables): string[] {
+  // A broadcast's template names the customer only where its body has {{1}}, which its queuing
+  // says by giving a name (ADR-422).
+  if (kind === 'broadcast') return variables.name ? [variables.name] : [];
   return TEMPLATES[kind].parameters.map((name) => variables[name] || NONE);
+}
+
+/** The name of the WhatsApp template a message goes as: Hatti's, or the shop's own. */
+export function templateName(kind: AnyMessageKind, variables: MessageVariables): string {
+  return kind === 'broadcast' ? (variables.template ?? '') : TEMPLATES[kind].whatsapp;
 }
 
 /**

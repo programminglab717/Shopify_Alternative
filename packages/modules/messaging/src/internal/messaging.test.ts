@@ -19,7 +19,9 @@ import {
   messageEmail,
   messageText,
   paidByShop,
+  WHATSAPP_ONLY_KINDS,
   templateButtons,
+  templateName,
   templateParameters,
 } from './templates.js';
 import { parseWhatsAppWebhook, signatureValid } from './whatsapp-webhook.js';
@@ -493,7 +495,23 @@ describe("Messages' words", () => {
       'orders_limit_near',
       'orders_limit_reached',
       'store_export_ready',
+      'broadcast',
     ]);
+  });
+
+  it("sends a broadcast as the shop's own template, the customer's first name its {{1}} (ADR-422)", () => {
+    const sale = { shop: 'Zari Fashions', template: 'eid_sale', name: 'Ayesha' };
+    expect(templateName('broadcast', sale)).toBe('eid_sale');
+    expect(templateName('order_shipped', sale)).toBe('hatti_order_shipped');
+    expect(templateParameters('broadcast', sale)).toEqual(['Ayesha']);
+    // A template without {{1}} is sent no parameters: Meta refuses any it does not ask for.
+    expect(
+      templateParameters('broadcast', { shop: 'Zari Fashions', template: 'eid_sale' }),
+    ).toEqual([]);
+    expect(WHATSAPP_ONLY_KINDS).toEqual(['broadcast']);
+    expect(
+      messageCostOf({ kind: 'broadcast', channel: 'whatsapp', language: 'en', variables: sale }),
+    ).toEqual({ channel: 'whatsapp', category: 'marketing', parts: 1 });
   });
 
   it('tells a number another took the place of which number signs in now (ADR-173)', () => {

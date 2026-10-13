@@ -435,7 +435,7 @@ const workerSchema = z
     SWEEP_INTERVAL_MS: z.coerce.number().int().min(1_000).default(600_000),
     /**
      * How often articles and pages published at a time ahead are shown once it comes (ADR-215,
-     * ADR-217).
+     * ADR-217), and shops' broadcasts queued once theirs does (ADR-422).
      */
     SCHEDULED_INTERVAL_MS: z.coerce.number().int().min(1_000).default(60_000),
     /** How often apps' webhooks due are posted (ADR-397). */
