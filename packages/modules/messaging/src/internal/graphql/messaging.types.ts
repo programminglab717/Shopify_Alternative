@@ -28,6 +28,7 @@ export enum MessageKind {
   STORE_CREDIT_GIVEN = 'STORE_CREDIT_GIVEN',
   STORE_CREDIT_EXPIRING = 'STORE_CREDIT_EXPIRING',
   CHECKOUT_REMINDER = 'CHECKOUT_REMINDER',
+  REVIEW_REQUEST = 'REVIEW_REQUEST',
   ONE_TIME_CODE = 'ONE_TIME_CODE',
   STOCK_LOW = 'STOCK_LOW',
   STOCK_OUT = 'STOCK_OUT',
@@ -117,6 +118,12 @@ registerEnumType(MessageKind, {
         'A shopper who typed their number at checkout and left without ordering, reminded once ' +
         "with a link back to the items (CHK-12, ADR-393): sent as the shop's checkout recovery " +
         'setting says, which turns it on and off, not here.',
+    },
+    REVIEW_REQUEST: {
+      description:
+        "A delivered order's customer asked once to rate what it brought, with its page's link " +
+        "(MKT-05, ADR-400): sent as many days after delivery as the shop's review settings say, " +
+        'which turn it on and off, not here.',
     },
     ONE_TIME_CODE: {
       description:

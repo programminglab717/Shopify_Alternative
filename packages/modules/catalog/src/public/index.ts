@@ -142,11 +142,13 @@ export {
   mergeReviewsIn,
   publishFromIn,
   reviewAuthorName,
+  reviewSettingsIn,
   reviewsOfCustomerIn,
   reviewsOfOrderIn,
   writeReviewsIn,
   type OrderReview,
   type ProductReviewChangedPayload,
   type ReviewInput,
+  type ReviewSettingsRecord,
   type ReviewStatusValue,
 } from '../internal/reviews.js';

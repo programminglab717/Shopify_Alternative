@@ -12,8 +12,9 @@ import { sql } from 'drizzle-orm';
 import {
   REVIEW_LIMITS,
   ReviewEvents,
-  publishFromIn,
+  reviewSettingsIn,
   type ProductReviewChangedPayload,
+  type ReviewSettingsRecord,
   type ReviewStatusValue,
 } from './reviews.js';
 
@@ -81,8 +82,8 @@ export const PUBLISH_FROM = [3, 4, 5] as const;
 /**
  * The shop's products' reviews (MKT-05, ADR-399), as its staff and apps moderate them: the
  * latest first, those waiting, published or hidden, or one product's; each published or hidden;
- * and from how many stars reviews publish by themselves. Customers write them on their delivered
- * orders' pages ({@link writeReviewsIn}).
+ * from how many stars reviews publish by themselves, and when the shop asks for them (ADR-400).
+ * Customers write them on their delivered orders' pages ({@link writeReviewsIn}).
  */
 @Injectable()
 export class ProductReviewService {
@@ -141,48 +142,73 @@ export class ProductReviewService {
     });
   }
 
-  /** From how many stars reviews publish by themselves; null when every one waits. */
-  async settings(tenant: TenantContext): Promise<{ publishFrom: number | null }> {
-    return {
-      publishFrom: await this.db.tenant(tenant.shopId, (tx) => publishFromIn(tx, tenant.shopId)),
-    };
+  /** How the shop takes reviews: from how many stars they publish, and when it asks for them. */
+  async settings(tenant: TenantContext): Promise<ReviewSettingsRecord> {
+    return this.db.tenant(tenant.shopId, (tx) => reviewSettingsIn(tx, tenant.shopId));
   }
 
-  /** Sets from how many stars, 3, 4 or 5, reviews publish by themselves, or none. */
+  /**
+   * Sets from how many stars, 3, 4 or 5, reviews publish by themselves, or none; and how many days
+   * after delivery, 1 to 30, the shop asks for them on WhatsApp, or never. What is not given stays.
+   */
   async updateSettings(
     tenant: TenantContext,
-    input: { publishFrom: number | null },
-  ): Promise<MutationResult<{ publishFrom: number | null }>> {
+    input: Partial<ReviewSettingsRecord>,
+  ): Promise<MutationResult<ReviewSettingsRecord>> {
     const check = new InputChecker();
+    const { publishFrom, requestAfterDays } = input;
     if (
-      input.publishFrom !== null &&
-      !(PUBLISH_FROM as readonly number[]).includes(input.publishFrom)
+      publishFrom !== undefined &&
+      publishFrom !== null &&
+      !(PUBLISH_FROM as readonly number[]).includes(publishFrom)
     ) {
       check.add(['publishFrom'], 'INVALID', 'must be 3, 4 or 5 stars, or none');
     }
+    if (
+      requestAfterDays !== undefined &&
+      requestAfterDays !== null &&
+      !(
+        Number.isInteger(requestAfterDays) &&
+        requestAfterDays >= 1 &&
+        requestAfterDays <= REVIEW_LIMITS.requestAfterDays
+      )
+    ) {
+      check.add(['requestAfterDays'], 'INVALID', 'must be 1 to 14 days, or none');
+    }
     if (!check.ok) return { ok: false, errors: check.errors };
     return this.db.tenant(tenant.shopId, async (tx) => {
-      const before = await publishFromIn(tx, tenant.shopId);
-      if (before === input.publishFrom) return { ok: true, value: { publishFrom: before } };
+      const before = await reviewSettingsIn(tx, tenant.shopId);
+      const after: ReviewSettingsRecord = {
+        publishFrom: publishFrom === undefined ? before.publishFrom : publishFrom,
+        requestAfterDays:
+          requestAfterDays === undefined ? before.requestAfterDays : requestAfterDays,
+      };
+      if (
+        after.publishFrom === before.publishFrom &&
+        after.requestAfterDays === before.requestAfterDays
+      ) {
+        return { ok: true, value: before };
+      }
       await tx.execute(sql`
-        INSERT INTO catalog.review_settings (shop_id, publish_from)
-        VALUES (${tenant.shopId}, ${input.publishFrom})
+        INSERT INTO catalog.review_settings (shop_id, publish_from, request_after_days)
+        VALUES (${tenant.shopId}, ${after.publishFrom}, ${after.requestAfterDays})
         ON CONFLICT (shop_id) DO UPDATE
-              SET publish_from = excluded.publish_from, updated_at = now()`);
+              SET publish_from = excluded.publish_from,
+                  request_after_days = excluded.request_after_days, updated_at = now()`);
       await appendEvent(tx, tenant.shopId, {
         type: ReviewEvents.SettingsUpdated,
         aggregateType: 'review_settings',
         aggregateId: tenant.shopId,
-        payload: { publishFrom: input.publishFrom },
+        payload: { ...after },
       });
       await recordAudit(tx, tenant.shopId, {
         action: ReviewEvents.SettingsUpdated,
         subjectType: 'shop',
         subjectId: tenant.shopId,
         ...actorColumnsOf(tenant.actor),
-        details: { publishFrom: input.publishFrom, before },
+        details: { ...after, before },
       });
-      return { ok: true, value: { publishFrom: input.publishFrom } };
+      return { ok: true, value: after };
     });
   }
 }

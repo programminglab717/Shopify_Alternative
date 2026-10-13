@@ -15,6 +15,7 @@ import {
   ProductReviewPayload,
   ProductReviewStatus,
   ReviewSettings,
+  ReviewSettingsInput,
   ReviewSettingsPayload,
 } from './reviews.types.js';
 
@@ -98,15 +99,18 @@ export class ProductReviewResolver {
 
   @Mutation(() => ReviewSettingsPayload, {
     description:
-      'Sets from how many stars, 3, 4 or 5, reviews publish by themselves; null, none: each ' +
-      'waits for the shop. Reviews written before keep their status.',
+      'Sets from how many stars, 3, 4 or 5, reviews publish by themselves, and how many days ' +
+      'after delivery customers are asked for them. Reviews written before keep their status.',
   })
   @RequireScopes('write_settings')
   async reviewSettingsUpdate(
     @CurrentTenant() tenant: TenantContext,
-    @Args('publishFrom', { type: () => Int, nullable: true }) publishFrom?: number | null,
+    @Args('input') input: ReviewSettingsInput,
   ): Promise<ReviewSettingsPayload> {
-    const result = await this.service.updateSettings(tenant, { publishFrom: publishFrom ?? null });
+    const result = await this.service.updateSettings(tenant, {
+      ...('publishFrom' in input && { publishFrom: input.publishFrom ?? null }),
+      ...('requestAfterDays' in input && { requestAfterDays: input.requestAfterDays ?? null }),
+    });
     return Object.assign(new ReviewSettingsPayload(), {
       reviewSettings: result.ok ? Object.assign(new ReviewSettings(), result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),

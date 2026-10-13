@@ -20,8 +20,11 @@ export interface ProductReviewChangedPayload {
 
 export type ReviewStatusValue = 'pending' | 'published' | 'hidden';
 
-/** How long a review's words may be, and how many a page lists. */
-export const REVIEW_LIMITS = { body: 2_000, name: 100, page: 50 } as const;
+/**
+ * How long a review's words may be, how many a page lists, and how long after delivery a shop may
+ * ask for one at most.
+ */
+export const REVIEW_LIMITS = { body: 2_000, name: 100, page: 50, requestAfterDays: 14 } as const;
 
 /**
  * A customer's name as their reviews show it: their first name and their surname's initial,
@@ -49,11 +52,31 @@ export interface OrderReview {
   status: ReviewStatusValue;
 }
 
+/** How the shop takes reviews (ADR-399, ADR-400). */
+export interface ReviewSettingsRecord {
+  /** The stars it publishes by itself, and more; null: every review waits for it. */
+  publishFrom: number | null;
+  /** How many days after delivery it asks for a review on WhatsApp; null: it does not. */
+  requestAfterDays: number | null;
+}
+
+/** The shop's review settings, in the caller's transaction `tx`. */
+export async function reviewSettingsIn(tx: Tx, shopId: string): Promise<ReviewSettingsRecord> {
+  const { rows } = await tx.execute<{
+    publish_from: number | null;
+    request_after_days: number | null;
+  }>(sql`
+    SELECT publish_from, request_after_days FROM catalog.review_settings
+     WHERE shop_id = ${shopId}`);
+  return {
+    publishFrom: rows[0]?.publish_from ?? null,
+    requestAfterDays: rows[0]?.request_after_days ?? null,
+  };
+}
+
 /** The stars the shop publishes by itself, if any (null: every review waits for it). */
 export async function publishFromIn(tx: Tx, shopId: string): Promise<number | null> {
-  const { rows } = await tx.execute<{ publish_from: number | null }>(sql`
-    SELECT publish_from FROM catalog.review_settings WHERE shop_id = ${shopId}`);
-  return rows[0]?.publish_from ?? null;
+  return (await reviewSettingsIn(tx, shopId)).publishFrom;
 }
 
 /**

@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: product reviews asked for on
-WhatsApp after delivery, shown on the storefront and moderated in the admin (MKT-05); then
-pre-orders (CAT-14). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: product reviews on the storefront
+with their stars in its structured data, and moderated in the admin with the review request's
+setting (MKT-05); then pre-orders (CAT-14). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,20 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Reviews asked for on WhatsApp after delivery
+
+* **The shop says when** ([ADR-400](../architecture/13-decision-log.md#adr-400--a-shop-may-ask-each-delivered-orders-customer-once-on-whatsapp-to-rate-what-it-brought-1-to-14-days-after-its-last-parcel-arrived-with-the-orders-page-an-order-already-rated-is-not-asked-about), MKT-05): `reviewSettingsUpdate(input: { requestAfterDays })`,
+  1 to 14 days after the order's last parcel arrived, or never. The worker then asks each
+  delivered order's customer once, a `review_request` with a button to the order's page, where
+  they rate what it brought (migration 0189). Orders already rated are not asked about.
+* **Tried against the core:** the demo shop set reviews to be asked for four days
+  after delivery; one sweep queued a `review_request` for #1006, delivered five days before,
+  with "Usman", the order, the shop and a new link to its page, which opened on its rating form;
+  the order's timeline said so, and a second sweep asked no one. The message, the setting and
+  the link were then taken away.
+* 2673 tests (2 new): the sweep's days and once each, the link for an
+  order ended once delivered, the settings through the API.
 
 ### 39c5955 · Products' reviews, written on a delivered order's page
 

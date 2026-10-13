@@ -87,6 +87,13 @@ export {
   type RescueAnswerValue,
 } from '../internal/delivery-rescue.service.js';
 export {
+  REVIEW_REQUEST_LIMITS,
+  markReviewRequestedIn,
+  reviewRequestsDueIn,
+  shopsAskingForReviewsIn,
+  type ReviewRequestDue,
+} from '../internal/review-requests.js';
+export {
   orderNotificationFactsIn,
   type OrderNotificationFacts,
 } from '../internal/notification-facts.js';

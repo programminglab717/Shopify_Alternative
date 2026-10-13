@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-399 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-400 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -407,6 +407,7 @@
 | 397 | A custom app subscribes to topics of the shop's events at https addresses; the worker makes one delivery an event and subscription for apps that may read what it names, posts it signed with the app's secret to a public address alone, and tries again with backoff for two days | Accepted |
 | 398 | Each custom app on the shop's apps page shows its webhooks, the topic in words, where it goes and how its latest delivery went, with its last ten to open; one is added for a topic the app may hear, or removed | Accepted |
 | 399 | Customers rate what their delivered order brought them on its own page, one to five stars a product with words if they like; each review waits for the shop, which publishes or hides it, unless its stars reach those the shop publishes by itself | Accepted |
+| 400 | A shop may ask each delivered order's customer once on WhatsApp to rate what it brought, 1 to 14 days after its last parcel arrived, with the order's page; an order already rated is not asked about | Accepted |
 
 ---
 
@@ -15471,3 +15472,31 @@
     buyers would need accounts the shop's customers don't have.
   * **Publishing every review at once:** a shop's first one-star review from a rider's delay
     would sit on its product page before the shop saw it.
+
+## ADR-400 · A shop may ask each delivered order's customer once on WhatsApp to rate what it brought, 1 to 14 days after its last parcel arrived, with the order's page; an order already rated is not asked about
+
+* **Context:**
+  * Customers rate what they bought on their delivered order's page ([ADR-399](#adr-399--customers-rate-what-their-delivered-order-brought-them-on-its-own-page-one-to-five-stars-a-product-with-words-if-they-like-each-review-waits-for-the-shop-which-publishes-or-hides-it-unless-its-stars-reach-those-the-shop-publishes-by-itself)), but few go back
+    to it unasked; MKT-05 asks for reviews on WhatsApp after delivery.
+* **Decision:**
+  * **The shop says how many days after delivery**, 1 to 14, or never
+    (`reviewSettingsUpdate(input: { requestAfterDays })`), the default. Fourteen at most, so
+    the order's page, whose link lasts 30 days past the order's end, is still there to open.
+  * **The worker asks once an order**, a `review_request` on WhatsApp with the customer's first
+    name, the order and the shop, and a button to the order's page: the link its messages
+    carried while it works ([ADR-160](#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)), a new one otherwise, now also for an order closed once
+    delivered. Orders whose last parcel arrived up to three days past the day are still asked,
+    so a sweep missed is made up; older ones are not.
+  * **Not asked:** an order already rated on its page, its customer erased, or a shop that does
+    not ask. Each order asked says so on its timeline.
+  * **Utility, not marketing:** the message is about the order its customer received, as its
+    delivery's news is; Meta prices it so unless it judges the template otherwise. Turned on and
+    off by the reviews' setting, not the list of customers' messages, as the checkout reminder is
+    ([ADR-393](#adr-393--abandoned-checkouts-the-number-a-shopper-types-is-kept-as-they-type-it-the-shop-sees-who-left-and-may-remind-them-once-on-whatsapp-after-the-delay-it-sets-with-a-link-back-to-their-items-an-order-the-number-places-then-recovers-it)).
+* **Consequences:**
+  * A shop that starts asking asks about orders delivered within its days and the three before,
+    not its history.
+  * The admin has no setting for it yet: the next slice.
+* **Alternatives:**
+  * **Asking at delivery:** a customer who has not yet worn the suit has nothing to say of it.
+  * **Asking again later:** one message is a request; two are a nag, and cost the shop twice.

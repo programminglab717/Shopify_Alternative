@@ -63,6 +63,7 @@ import { workerStorage } from '../storage.js';
 import { BillingNotices } from './billing-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
 import { CheckoutReminders } from './checkout-reminders.js';
+import { ReviewRequests } from './review-requests.js';
 import { WebhookDeliveries, WebhookFanOut } from './webhooks.js';
 import { ConfirmationReminders } from './confirmation-reminders.js';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
@@ -327,6 +328,14 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => checkoutReminders.stop());
+    // Customers of delivered orders asked once to rate them, as their shop says (ADR-400).
+    const reviewRequests = new ReviewRequests(
+      database,
+      new MessagesService(database),
+      new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => reviewRequests.stop());
     // Apps' webhooks posted, signed with each app's secret, and tried again for two days (ADR-397).
     if (config.ENCRYPTION_KEYS) {
       const webhookDeliveries = new WebhookDeliveries(

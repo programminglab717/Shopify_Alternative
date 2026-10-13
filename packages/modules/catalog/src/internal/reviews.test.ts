@@ -113,11 +113,22 @@ describe.skipIf(!server)("Products' reviews (MKT-05, ADR-399)", () => {
     const chiffon = await product('Chiffon Dupatta');
     expect(unwrap(await reviews.updateSettings(staff, { publishFrom: 4 }))).toEqual({
       publishFrom: 4,
+      requestAfterDays: null,
     });
     expect(errorsOf(await reviews.updateSettings(staff, { publishFrom: 2 }))).toEqual([
       ['publishFrom', 'INVALID'],
     ]);
-    expect(await reviews.settings(staff)).toEqual({ publishFrom: 4 });
+    // Asking for reviews after delivery (ADR-400): 1 to 14 days, the stars left as they were.
+    for (const days of [0, 15, 2.5]) {
+      expect(errorsOf(await reviews.updateSettings(staff, { requestAfterDays: days }))).toEqual([
+        ['requestAfterDays', 'INVALID'],
+      ]);
+    }
+    expect(unwrap(await reviews.updateSettings(staff, { requestAfterDays: 3 }))).toEqual({
+      publishFrom: 4,
+      requestAfterDays: 3,
+    });
+    expect(await reviews.settings(staff)).toEqual({ publishFrom: 4, requestAfterDays: 3 });
 
     const orderId = newId();
     await write(orderId, [

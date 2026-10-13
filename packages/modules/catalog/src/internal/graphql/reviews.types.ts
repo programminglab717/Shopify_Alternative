@@ -1,5 +1,13 @@
 import { UserError } from '@hatti/api';
-import { Field, GraphQLISODateTime, ID, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
+import {
+  Field,
+  GraphQLISODateTime,
+  ID,
+  InputType,
+  Int,
+  ObjectType,
+  registerEnumType,
+} from '@nestjs/graphql';
 
 export enum ProductReviewStatus {
   PENDING = 'PENDING',
@@ -73,6 +81,23 @@ export class ReviewSettings {
       'the shop. Null: every review waits.',
   })
   publishFrom!: number | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'How many days after an order is delivered, 1 to 14, its customer is asked on WhatsApp to ' +
+      "rate what it brought, with its page's link (ADR-400). Null: they are not asked.",
+  })
+  requestAfterDays!: number | null;
+}
+
+@InputType({ description: 'What is left out stays as it is; null turns it off.' })
+export class ReviewSettingsInput {
+  @Field(() => Int, { nullable: true, description: '3, 4 or 5, or null.' })
+  publishFrom?: number | null;
+
+  @Field(() => Int, { nullable: true, description: '1 to 14, or null.' })
+  requestAfterDays?: number | null;
 }
 
 @ObjectType()

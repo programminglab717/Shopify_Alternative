@@ -32,7 +32,9 @@ export type AnswerOutcome =
  * public site, "/o/…". The secret of one of `known`, the links its messages carried before, while
  * it is still the order's and works, so the customer's messages keep one link (ADR-160); a new one
  * otherwise, which replaces the order's previous link, as `orderLinkCreate` does. Null for an order
- * that cannot have one: gone, not open, or its customer erased.
+ * that cannot have one: gone, not open, or its customer erased. With `ended`, an order closed
+ * once delivered has one too, to rate what it brought (ADR-400): its link lasts 30 days past its
+ * end.
  */
 export async function messageLinkIn(
   tx: Tx,
@@ -40,9 +42,11 @@ export async function messageLinkIn(
   orderId: string,
   via: string,
   known: readonly string[] = [],
+  options: { ended?: boolean } = {},
 ): Promise<string | null> {
   const order = await lockOrder(tx, shopId, orderId);
-  if (!order || order.status !== 'open' || order.phone === null) return null;
+  if (!order || order.phone === null) return null;
+  if (order.status !== 'open' && !(options.ended && order.status === 'closed')) return null;
   const expiresAt = orderLinkExpiry(order);
   const current = order.linkTokenHash;
   if (current && (!expiresAt || expiresAt > new Date())) {

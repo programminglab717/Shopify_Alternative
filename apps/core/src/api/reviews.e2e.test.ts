@@ -215,28 +215,52 @@ describe.skipIf(!server)("Admin GraphQL API: products' reviews (MKT-05, ADR-399)
     expect(denied.errors?.[0].extensions.code).toBe('ACCESS_DENIED');
   });
 
-  it('publishes reviews of as many stars as the shop says by themselves', async () => {
-    expect(await data(tokens.all, '{ reviewSettings { publishFrom } }')).toEqual({
+  it('publishes reviews of as many stars as the shop says by themselves, and asks for them', async () => {
+    expect(await data(tokens.all, '{ reviewSettings { publishFrom requestAfterDays } }')).toEqual({
       publishFrom: null,
+      requestAfterDays: null,
     });
     const set = await data(
       tokens.all,
       `mutation {
-        reviewSettingsUpdate(publishFrom: 4) { reviewSettings { publishFrom } userErrors { code } }
+        reviewSettingsUpdate(input: { publishFrom: 4 }) {
+          reviewSettings { publishFrom requestAfterDays } userErrors { code }
+        }
       }`,
     );
-    expect(set).toEqual({ reviewSettings: { publishFrom: 4 }, userErrors: [] });
+    expect(set).toEqual({
+      reviewSettings: { publishFrom: 4, requestAfterDays: null },
+      userErrors: [],
+    });
+    // And customers asked for them a week after delivery (ADR-400); the stars stay as they were.
+    const asking = await data(
+      tokens.all,
+      `mutation {
+        reviewSettingsUpdate(input: { requestAfterDays: 7 }) {
+          reviewSettings { publishFrom requestAfterDays } userErrors { code }
+        }
+      }`,
+    );
+    expect(asking.reviewSettings).toEqual({ publishFrom: 4, requestAfterDays: 7 });
     const refused = await data(
       tokens.all,
       `mutation {
-        reviewSettingsUpdate(publishFrom: 1) { reviewSettings { publishFrom } userErrors { field code } }
+        reviewSettingsUpdate(input: { publishFrom: 1, requestAfterDays: 20 }) {
+          reviewSettings { publishFrom } userErrors { field code }
+        }
       }`,
     );
-    expect(refused.userErrors).toEqual([{ field: ['publishFrom'], code: 'INVALID' }]);
+    expect(refused.userErrors).toEqual([
+      { field: ['publishFrom'], code: 'INVALID' },
+      { field: ['requestAfterDays'], code: 'INVALID' },
+    ]);
     const { rows } = await admin.query(
       `SELECT event_type FROM platform.activity_log WHERE shop_id = $1 AND event_type LIKE 'review%'`,
       [shop],
     );
-    expect(rows).toEqual([{ event_type: 'review_settings.updated' }]);
+    expect(rows).toEqual([
+      { event_type: 'review_settings.updated' },
+      { event_type: 'review_settings.updated' },
+    ]);
   });
 });

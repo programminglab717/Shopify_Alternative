@@ -466,6 +466,8 @@ describe("Messages' words", () => {
       'one_time_code',
       // Checkout's own setting turns it on and off (ADR-393).
       'checkout_reminder',
+      // And the reviews' own, this (ADR-400).
+      'review_request',
       'invoice_due',
       'plan_ended',
       'credit_low',

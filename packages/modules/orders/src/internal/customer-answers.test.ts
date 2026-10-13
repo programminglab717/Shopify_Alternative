@@ -69,6 +69,24 @@ describe.skipIf(!server)("Customers' answers to the shop's messages", () => {
     expect(await linkIn(f.a.shopId, order.id)).toBeNull();
   });
 
+  it('makes one for an order ended once delivered only when asked to, to rate it (ADR-400)', async () => {
+    const order = await f.order(f.a, [kurta]);
+    unwrap(await f.orders.confirm(f.a, order.id));
+    const { fulfillmentId } = unwrap(await f.fulfillments.fulfill(f.a, order.id, {}));
+    unwrap(await f.fulfillments.markDelivered(f.a, fulfillmentId));
+    await f.admin.query(
+      "UPDATE orders.orders SET status = 'closed', closed_at = now() WHERE id = $1",
+      [order.id],
+    );
+    expect(await linkIn(f.a.shopId, order.id)).toBeNull();
+    const path = await f.db.tenant(f.a.shopId, (tx) =>
+      messageLinkIn(tx, f.a.shopId, order.id, 'with the message', [], { ended: true }),
+    );
+    expect(path).toMatch(/^\/o\/[\w-]{22}$/);
+    const view = await f.links.viewLink(path!.slice('/o/'.length));
+    expect(view.kind === 'order' && view.reviewable.length).toBe(1);
+  });
+
   it('confirms or cancels as the customer answers, as their link would, once', async () => {
     const confirmed = await f.order(f.a, [kurta]);
     const cancelled = await f.order(f.a, [kurta]);

@@ -30,6 +30,7 @@ export const MESSAGE_KINDS = [
   'store_credit_given',
   'store_credit_expiring',
   'checkout_reminder',
+  'review_request',
   'one_time_code',
   'stock_low',
   'stock_out',
@@ -76,6 +77,8 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'one_time_code',
   // Turned on and off with checkout's own setting, which says when (ADR-393).
   'checkout_reminder',
+  // Turned on and off with the reviews' own setting, which says when (ADR-400).
+  'review_request',
   'invoice_due',
   'plan_ended',
   'credit_low',
@@ -517,6 +520,22 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur:
         'السلام علیکم {name}! آپ نے {shop} پر اپنی ٹوکری میں کچھ چیزیں چھوڑ دی تھیں۔ وہ ابھی ' +
         'آپ کی منتظر ہیں، اپنا آرڈر یہاں مکمل کریں:',
+    },
+  },
+  review_request: {
+    whatsapp: 'hatti_review_request',
+    // About the order its customer received, as its delivery's news is (ADR-400).
+    category: 'utility',
+    parameters: ['name', 'order', 'shop'],
+    // The order's page, where they rate what it brought.
+    buttons: [{ type: 'url' }],
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! How was your order {order} from {shop}? Rate what you ' +
+        'bought in a minute; it helps other customers choose:',
+      ur:
+        'السلام علیکم {name}! {shop} سے آپ کا آرڈر {order} کیسا رہا؟ ایک منٹ میں اپنی خریداری ' +
+        'کو ریٹ کریں، اس سے دوسرے خریداروں کو انتخاب میں مدد ملتی ہے:',
     },
   },
   stock_low: {
