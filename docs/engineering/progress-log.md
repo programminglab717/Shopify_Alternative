@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### A shop's own WhatsApp number, through Embedded Signup
+### 284f94c · A shop's own WhatsApp number, through Embedded Signup
 
 * **Shops connect their own number** ([ADR-419](../architecture/13-decision-log.md#adr-419--a-shop-connects-its-own-whatsapp-number-through-metas-embedded-signup-hatti-exchanging-the-code-subscribing-to-the-account-and-registering-the-number-its-token-sealed-for-the-shop), MKT-01), which broadcasts need. Hatti's shared
   number sends utility templates only.
