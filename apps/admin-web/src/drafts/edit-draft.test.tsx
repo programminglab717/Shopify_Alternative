@@ -45,6 +45,8 @@ const DRAFT: DraftOrderDetail = {
   totalDiscounts: rupees('0.00'),
   totalPrice: rupees('6950.00'),
   codAmount: rupees('6950.00'),
+  deliveryMethod: 'SHIPPING',
+  location: null,
   order: null,
 };
 
@@ -60,6 +62,8 @@ function core(draft: DraftOrderDetail, refusal: UserError[] = []) {
             userErrors: refusal,
           },
         };
+      case 'Locations':
+        return { locations: { nodes: [] } };
       default:
         throw new Error(`unexpected ${operation}`);
     }

@@ -3376,6 +3376,12 @@ const en = {
     "When an order the customer collects is packed: where to come, and the location's instructions.",
   'order.toCollectAtCounter': 'To collect at the counter',
   'parcels.atCounter': 'Handed over at the counter',
+  'drafts.deliveryMethod': 'Delivery',
+  'drafts.ship': 'Delivered to the customer',
+  'drafts.pickupAt': 'Picked up at {location}',
+  'drafts.pickupOnly': 'Picked up by the customer',
+  'drafts.atTheCounter': 'To collect at the counter',
+  'shipsFrom.changePickup': 'Pick up at another location',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6728,6 +6734,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'جب گاہک کا خود وصول کرنے والا آرڈر پیک ہو جائے: کہاں آنا ہے، اور جگہ کی ہدایات۔',
   'order.toCollectAtCounter': 'کاؤنٹر پر وصول کرنا ہے',
   'parcels.atCounter': 'کاؤنٹر پر حوالے کیا گیا',
+  'drafts.deliveryMethod': 'ترسیل',
+  'drafts.ship': 'گاہک کو بھیجا جائے',
+  'drafts.pickupAt': 'گاہک {location} سے خود وصول کرے',
+  'drafts.pickupOnly': 'گاہک خود وصول کرے',
+  'drafts.atTheCounter': 'کاؤنٹر پر وصول کرنا ہے',
+  'shipsFrom.changePickup': 'کسی اور جگہ سے وصول کروائیں',
 };
 
 export const messages: Readonly<

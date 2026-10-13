@@ -1170,6 +1170,9 @@ export interface DraftOrderDetail {
   totalDiscounts: MoneyValue;
   totalPrice: MoneyValue;
   codAmount: MoneyValue;
+  deliveryMethod: OrderDeliveryMethod;
+  /** Where it ships from, or is picked up; null for one chosen when it is placed. */
+  location: { id: string; name: string } | null;
   order: { id: string; name: string } | null;
 }
 
@@ -2528,7 +2531,15 @@ export interface ProductsImportData {
 }
 
 export interface LocationsData {
-  locations: { nodes: { id: string; name: string; isPrimary: boolean }[] };
+  locations: {
+    nodes: {
+      id: string;
+      name: string;
+      isPrimary: boolean;
+      /** Set where customers may pick orders up (ADR-389). */
+      localPickupSettings?: { instructions: string | null } | null;
+    }[];
+  };
 }
 
 export interface InventoryExportData {

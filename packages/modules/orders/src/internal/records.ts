@@ -399,6 +399,11 @@ export interface DraftOrderRecord {
   shippingAddress: AddressValue | null;
   /** Where the order will ship from; one chosen when it is placed (ADR-355), if null. */
   locationId: string | null;
+  /**
+   * Shipped, or picked up at its location, or the only one offering pickup if none is named
+   * (ADR-390).
+   */
+  deliveryMethod: DeliveryMethodValue;
   note: string;
   tags: string[];
   /** The order it became, once completed. */

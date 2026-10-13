@@ -42,6 +42,8 @@ export interface ShownOrder {
   /** To pay online: what an order paid online still waits for (ADR-152); a draft's, nothing. */
   online: bigint;
   cashOnDelivery: boolean;
+  /** Collected by the customer at a location rather than delivered (ADR-389, ADR-390). */
+  pickup: boolean;
   /** Null for a draft without one yet. */
   address: StoredAddressValue | null;
   /**
@@ -83,6 +85,7 @@ export function shownOfDraft(
     transfer: draft.paymentMethod === 'bank_transfer' ? draft.total : draft.advanceDue,
     online: 0n,
     cashOnDelivery: draft.paymentMethod === 'cash_on_delivery',
+    pickup: draft.deliveryMethod === 'pickup',
     address: draft.shippingAddress,
     terms: [...terms],
   };
@@ -113,6 +116,7 @@ export function shownOfOrder(order: OrderRecord, terms: readonly ShownTerm[] = [
     transfer,
     online,
     cashOnDelivery,
+    pickup: order.deliveryMethod === 'pickup',
     address: order.shippingAddress,
     terms: [...terms],
   };
@@ -134,6 +138,7 @@ export function shownDigest(shown: ShownOrder): string {
     ),
     shown.taxes.map((tax) => [tax.rate, `${tax.tax}`]),
     shown.cashOnDelivery,
+    shown.pickup,
     address && [
       address.name,
       address.phone && maskPkMobile(address.phone),

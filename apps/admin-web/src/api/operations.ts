@@ -2725,6 +2725,11 @@ export const DraftOrderQuery = /* GraphQL */ `
       codAmount {
         ...Money
       }
+      deliveryMethod
+      location {
+        id
+        name
+      }
       order {
         id
         name
@@ -5783,6 +5788,9 @@ export const LocationsQuery = /* GraphQL */ `
         id
         name
         isPrimary
+        localPickupSettings {
+          instructions
+        }
       }
     }
   }

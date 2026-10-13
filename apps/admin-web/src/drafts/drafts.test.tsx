@@ -52,6 +52,8 @@ const DRAFT: DraftOrderDetail = {
   totalDiscounts: rupees('0.00'),
   totalPrice: rupees('6650.00'),
   codAmount: rupees('6650.00'),
+  deliveryMethod: 'SHIPPING',
+  location: null,
   order: null,
 };
 
@@ -66,6 +68,76 @@ describe('Draft orders in the admin', () => {
     vi.unstubAllGlobals();
   });
 
+  it('takes a draft the customer picks up, with no delivery charge, and says where (ADR-390)', async () => {
+    const picked: DraftOrderDetail = {
+      ...DRAFT,
+      totalShippingPrice: rupees('0.00'),
+      totalPrice: rupees('6400.00'),
+      codAmount: rupees('5400.00'),
+      deliveryMethod: 'PICKUP',
+      location: { id: 'loc_2', name: 'Liberty store' },
+    };
+    const core = fakeCore('confirmation_agent', (operation) => {
+      switch (operation) {
+        case 'Locations':
+          return {
+            locations: {
+              nodes: [
+                { id: 'loc_1', name: 'Warehouse', isPrimary: true, localPickupSettings: null },
+                {
+                  id: 'loc_2',
+                  name: 'Liberty store',
+                  isPrimary: false,
+                  localPickupSettings: { instructions: null },
+                },
+              ],
+            },
+          };
+        case 'DraftVariants':
+          return { products: { nodes: [LAWN] } };
+        case 'DraftOrderCreate':
+          return { draftOrderCreate: { draftOrder: { id: 'dft_1' }, userErrors: [] } };
+        case 'DraftOrder':
+          return { draftOrder: picked };
+        default:
+          throw new Error(`unexpected ${operation}`);
+      }
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    const { router } = renderAdmin('/shop_1/drafts/new');
+
+    const delivery = (await screen.findByLabelText('Delivery')) as HTMLSelectElement;
+    // Only the locations offering pickup are among the choices.
+    expect([...delivery.options].map((option) => option.text)).toEqual([
+      'Delivered to the customer',
+      'Picked up at Liberty store',
+    ]);
+    type('Find products by name or SKU', 'lawn');
+    await press('Find');
+    await screen.findByText('Lawn suit · Small');
+    await press('Add Lawn suit · Small');
+    type('Delivery charge', '250');
+    fireEvent.change(delivery, { target: { value: 'loc_2' } });
+    // Nothing to deliver: no charge for it.
+    expect(screen.queryByLabelText('Delivery charge')).toBeNull();
+    await press('Make the draft');
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/shop_1/drafts/dft_1'));
+    expect(core.sent.find((each) => each.operation === 'DraftOrderCreate')?.variables).toEqual({
+      input: {
+        lineItems: [{ variantId: 'var_s', quantity: 1 }],
+        source: 'WHATSAPP',
+        paymentMethod: 'CASH_ON_DELIVERY',
+        deliveryMethod: 'PICKUP',
+        locationId: 'loc_2',
+      },
+    });
+    const at = await screen.findByRole('region', { name: 'Picked up at' });
+    expect(at.textContent).toContain('Liberty store');
+    expect(screen.getByText('To collect at the counter')).toBeTruthy();
+    expect(screen.queryByText('Delivery charge')).toBeNull();
+  });
+
   it('takes an order from a chat as a draft, at the price agreed', async () => {
     const core = fakeCore('confirmation_agent', (operation) => {
       switch (operation) {
@@ -75,6 +147,8 @@ describe('Draft orders in the admin', () => {
           return { draftOrderCreate: { draftOrder: { id: 'dft_1' }, userErrors: [] } };
         case 'DraftOrder':
           return { draftOrder: DRAFT };
+        case 'Locations':
+          return { locations: { nodes: [] } };
         default:
           throw new Error(`unexpected ${operation}`);
       }
@@ -138,6 +212,8 @@ describe('Draft orders in the admin', () => {
               ],
             },
           };
+        case 'Locations':
+          return { locations: { nodes: [] } };
         default:
           throw new Error(`unexpected ${operation}`);
       }
@@ -184,6 +260,8 @@ describe('Draft orders in the admin', () => {
           return { draftOrder: DRAFT };
         case 'DraftOrderDelete':
           return { draftOrderDelete: { deletedId: 'dft_1', userErrors: [] } };
+        case 'Locations':
+          return { locations: { nodes: [] } };
         default:
           throw new Error(`unexpected ${operation}`);
       }

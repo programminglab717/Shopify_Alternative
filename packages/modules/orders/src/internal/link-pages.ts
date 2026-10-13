@@ -59,9 +59,11 @@ const LABELS = {
   advance: { en: 'Paid in advance', ur: 'پیشگی ادائیگی' },
   paid: { en: 'Paid', ur: 'ادا شدہ' },
   payOnDelivery: { en: 'Pay on delivery', ur: 'ڈیلیوری پر ادائیگی' },
+  payOnCollection: { en: 'Pay when you collect it', ur: 'وصول کرتے وقت ادائیگی' },
   payByTransfer: { en: 'Pay by bank transfer', ur: 'بینک ٹرانسفر سے ادائیگی' },
   advanceByTransfer: { en: 'Advance by bank transfer', ur: 'ایڈوانس بینک ٹرانسفر سے' },
   shipTo: { en: 'Deliver to', ur: 'ترسیل کا پتہ' },
+  collectedBy: { en: 'Collected by', ur: 'وصول کرنے والا' },
   courier: { en: 'Courier', ur: 'کوریئر' },
   track: { en: 'Track', ur: 'ٹریک کریں' },
   confirm: { en: 'Confirm order', ur: 'آرڈر کنفرم کریں' },
@@ -1343,7 +1345,7 @@ function summary(shown: ShownOrder): Html {
         row(LABELS.transferDiscount, `-${rs(shown.transferDiscount)}`)
       }
       ${shown.onlineDiscount > 0n && row(LABELS.onlineDiscount, `-${rs(shown.onlineDiscount)}`)}
-      ${row(LABELS.shipping, rs(shown.shipping))}
+      ${!shown.pickup && row(LABELS.shipping, rs(shown.shipping))}
       ${shown.codFee > 0n && row(LABELS.codFee, rs(shown.codFee))}
       ${row(LABELS.total, rs(shown.total), 'total')}
       ${shown.taxes.map((tax) => row(taxIncludedWords(tax.rate), rs(tax.tax)))}
@@ -1352,7 +1354,11 @@ function summary(shown: ShownOrder): Html {
           ? [
               shown.paid > 0n && row(LABELS.advance, `-${rs(shown.paid)}`),
               shown.transfer > 0n && row(LABELS.advanceByTransfer, `-${rs(shown.transfer)}`),
-              row(LABELS.payOnDelivery, rs(shown.due), 'due'),
+              row(
+                shown.pickup ? LABELS.payOnCollection : LABELS.payOnDelivery,
+                rs(shown.due),
+                'due',
+              ),
             ]
           : shown.transfer > 0n
             ? row(LABELS.payByTransfer, rs(shown.transfer), 'due')
@@ -1379,7 +1385,7 @@ function address(shown: ShownOrder, options: { changeable?: boolean } = {}): Htm
   ].filter((line): line is Html => Boolean(line));
   const pin = pinLine(to.location);
   return html`<section class="section">
-    <h2 class="label">${say('bilingual', LABELS.shipTo)}</h2>
+    <h2 class="label">${say('bilingual', shown.pickup ? LABELS.collectedBy : LABELS.shipTo)}</h2>
     <p>${lines.map((line, index) => html`${index > 0 && html`<br />`}${line}`)}</p>
     ${pin && html`<p>${pin}</p>`}
     ${

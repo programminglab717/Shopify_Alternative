@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: local pickup offered at checkout and
-on draft orders, the customer choosing where to collect (SHP-15, its second part).
+**Next, section by section as the alpha's shops need them**: local pickup offered at checkout,
+the customer choosing where to collect (SHP-15, its last part).
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -16,6 +16,24 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Drafts picked up
+
+* **In the core** ([ADR-390](../architecture/13-decision-log.md#adr-390--a-draft-order-is-shipped-or-picked-up-one-picked-up-names-a-location-offering-pickup-or-the-only-one-has-no-delivery-charge-and-becomes-an-order-picked-up-there-its-link-says-the-customer-pays-when-they-collect-it), SHP-15): a draft order is shipped or picked up (migration 0183). One
+  picked up names a location offering pickup, or the only one, and has no delivery charge, both
+  checked as it is saved; placed by staff or by its customer, it becomes an order picked up
+  there. Its link leaves out the delivery charge and says the customer pays when they collect
+  it, as an order picked up's page does.
+* **In the admin**, the draft form's "Delivery" offers each location customers may pick up at;
+  picked up, the delivery charge goes. The draft's page says where it is picked up and what is
+  collected at the counter, and an order picked up moves only to another location offering it.
+* **Tried in Chromium against the core:** with pickup at the Karachi store, a new draft offered
+  "Delivered to the customer" or "Picked up at Karachi store"; picked up, its charge field went,
+  and the draft said "Picked up at Karachi store". Placed, it became #1027, picked up there with
+  no delivery charge, its page saying "To collect at the counter". The draft, the order and the
+  store's pickup were then taken away. No errors in the browser.
+* 2610 tests (4 new): drafts picked up and their link in the orders
+  module; through the API in the core; the draft form and page in the admin.
 
 ### d809543 · Local pickup
 

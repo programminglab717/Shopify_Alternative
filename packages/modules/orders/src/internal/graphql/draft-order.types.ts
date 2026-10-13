@@ -13,6 +13,7 @@ import type { DraftOrderRecord } from '../records.js';
 import {
   MailingAddress,
   MailingAddressInput,
+  OrderDeliveryMethod,
   OrderLineItemInput,
   OrderPaymentMethod,
   OrderSource,
@@ -138,6 +139,13 @@ export class DraftOrder {
     description: 'What the courier will collect at the door: what the advance leaves.',
   })
   codAmount!: Money;
+
+  @Field(() => OrderDeliveryMethod, {
+    description:
+      'SHIPPING, or PICKUP: its order collected at its location, or the only one offering ' +
+      'local pickup when none is named, with no delivery charge.',
+  })
+  deliveryMethod!: OrderDeliveryMethod;
 
   @Field()
   note!: string;
@@ -278,6 +286,14 @@ export class DraftOrderInput {
       'Where the order will ship from; one chosen when it is placed, as orderCreate does, if none.',
   })
   locationId?: string | null;
+
+  @Field(() => OrderDeliveryMethod, {
+    nullable: true,
+    description:
+      'Default SHIPPING. PICKUP: collected at locationId, which must offer local pickup, or at ' +
+      'the one location that does when left out; with no shippingPrice.',
+  })
+  deliveryMethod?: OrderDeliveryMethod | null;
 
   @Field(() => String, { nullable: true })
   note?: string | null;

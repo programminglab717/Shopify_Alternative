@@ -45,6 +45,7 @@ import {
   toDraftStatusValue,
   toOrder,
   toPaymentMethodValue,
+  toDeliveryMethodValue,
   uuidOf,
 } from './mappers.js';
 import { Order } from './order.types.js';
@@ -75,6 +76,9 @@ function fields(input: DraftOrderInput): DraftOrderFields {
       ? toPaymentMethodValue(input.paymentMethod)
       : input.paymentMethod,
     locationId: input.locationId ? uuidOf('location', input.locationId) : input.locationId,
+    deliveryMethod: input.deliveryMethod
+      ? toDeliveryMethodValue(input.deliveryMethod)
+      : input.deliveryMethod,
   };
 }
 

@@ -11,7 +11,7 @@ import { useAdminMutation, useAdminQuery, useShop } from '../shell/shop-context'
 import { Button } from '../ui/button';
 import { EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TAKES_DRAFTS } from './drafts-page';
-import { DraftForm } from './new-draft-page';
+import { ANY_PICKUP, DraftForm } from './new-draft-page';
 import type { DraftValues } from './new-draft-page';
 
 const SOURCES: readonly string[] = ['WHATSAPP', 'INSTAGRAM', 'FACEBOOK', 'MANUAL'];
@@ -36,6 +36,7 @@ export function valuesOf(draft: DraftOrderDetail): DraftValues {
     source: (SOURCES.includes(draft.source) ? draft.source : 'MANUAL') as DraftSource,
     payment: draft.paymentMethod,
     delivery: amountText(draft.totalShippingPrice.amount),
+    pickupAt: draft.deliveryMethod === 'PICKUP' ? (draft.location?.id ?? ANY_PICKUP) : '',
     discount: amountText(draft.totalDiscounts.amount),
     note: draft.note,
     address: address && {

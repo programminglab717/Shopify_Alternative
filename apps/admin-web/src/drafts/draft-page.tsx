@@ -218,9 +218,13 @@ export function DraftPage() {
       </Card>
     );
   }
+  const pickup = draft.deliveryMethod === 'PICKUP';
   const totals: [MessageKey, string][] = [
     ['drafts.subtotal', draft.subtotalPrice.amount],
-    ['drafts.delivery', draft.totalShippingPrice.amount],
+    // Picked up: nothing to deliver (ADR-390).
+    ...(pickup
+      ? []
+      : [['drafts.delivery', draft.totalShippingPrice.amount] as [MessageKey, string]]),
     ...(Number(draft.totalDiscounts.amount) > 0
       ? [['drafts.discount', `-${draft.totalDiscounts.amount}`] as [MessageKey, string]]
       : []),
@@ -304,12 +308,17 @@ export function DraftPage() {
           {draft.paymentMethod === 'CASH_ON_DELIVERY' &&
             draft.codAmount.amount !== draft.totalPrice.amount && (
               <div className="flex justify-between text-secondary">
-                <dt>{t('drafts.atTheDoor')}</dt>
+                <dt>{t(pickup ? 'drafts.atTheCounter' : 'drafts.atTheDoor')}</dt>
                 <dd className="num">{formatMoney(draft.codAmount.amount)}</dd>
               </div>
             )}
         </dl>
       </Card>
+      {pickup && (
+        <FormSection title={t('shipsFrom.pickup')}>
+          <p dir="auto">{draft.location?.name ?? t('drafts.pickupOnly')}</p>
+        </FormSection>
+      )}
       <FormSection title={t('drafts.address')}>
         {draft.shippingAddress ? (
           <address className="not-italic" dir="auto">

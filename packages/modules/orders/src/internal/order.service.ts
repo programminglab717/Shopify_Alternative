@@ -2560,34 +2560,10 @@ export class OrderService {
     shopId: string,
     order: OrderToPlace,
   ): Promise<{ ok: true; value: string } | { ok: false; error: FieldError }> {
-    const field = [...order.field, 'locationId'];
-    const offering = await this.locations.pickupLocationsIn(tx, shopId);
-    if (order.locationId) {
-      if (offering.some((location) => location.id === order.locationId)) {
-        return { ok: true, value: order.locationId };
-      }
-      const named = (await this.locations.locationsOf(tx, shopId, [order.locationId])).get(
-        order.locationId,
-      );
-      return {
-        ok: false,
-        error: named
-          ? { field, code: 'INVALID', message: noPickupAt(named.name) }
-          : { field, code: 'NOT_FOUND', message: 'Location not found' },
-      };
-    }
-    if (offering.length === 1) return { ok: true, value: offering[0]!.id };
-    return {
-      ok: false,
-      error: {
-        field,
-        code: 'BLANK',
-        message:
-          offering.length === 0
-            ? 'No location offers pickup: let customers pick up at one in its settings'
-            : 'Choose where the customer picks the order up',
-      },
-    };
+    return pickupLocationIn(tx, this.locations, shopId, order.locationId, [
+      ...order.field,
+      'locationId',
+    ]);
   }
 
   /**
@@ -2635,6 +2611,44 @@ function agreementColumns(
 }
 
 /** Why a pickup order cannot be collected at a location (ADR-389). */
+/**
+ * Where an order or draft the customer picks up is collected (ADR-389, ADR-390): the location
+ * named, which must offer pickup; or, with none named, the only one that does.
+ */
+export async function pickupLocationIn(
+  tx: Tx,
+  locations: LocationService,
+  shopId: string,
+  locationId: string | null | undefined,
+  field: string[],
+): Promise<{ ok: true; value: string } | { ok: false; error: FieldError }> {
+  const offering = await locations.pickupLocationsIn(tx, shopId);
+  if (locationId) {
+    if (offering.some((location) => location.id === locationId)) {
+      return { ok: true, value: locationId };
+    }
+    const named = (await locations.locationsOf(tx, shopId, [locationId])).get(locationId);
+    return {
+      ok: false,
+      error: named
+        ? { field, code: 'INVALID', message: noPickupAt(named.name) }
+        : { field, code: 'NOT_FOUND', message: 'Location not found' },
+    };
+  }
+  if (offering.length === 1) return { ok: true, value: offering[0]!.id };
+  return {
+    ok: false,
+    error: {
+      field,
+      code: 'BLANK',
+      message:
+        offering.length === 0
+          ? 'No location offers pickup: let customers pick up at one in its settings'
+          : 'Choose where the customer picks the order up',
+    },
+  };
+}
+
 function noPickupAt(name: string): string {
   return `Customers can't pick up at ${name}: let them in the location's settings`;
 }

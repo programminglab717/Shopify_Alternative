@@ -59,6 +59,7 @@ import {
   type OrderAgreementInput,
   type OrderLineInput,
   type Placement,
+  pickupLocationIn,
 } from './order.service.js';
 import type { DraftOrderRecord, OrderRecord, Page } from './records.js';
 import { LIMITS, LINK_DAYS_AFTER_END, advanceRefusal, codLimitError, draftName } from './rules.js';
@@ -70,6 +71,7 @@ import {
   type DraftOrderRow,
   type DraftOrderSourceValue,
   type DraftOrderStatusValue,
+  type DeliveryMethodValue,
   type PaymentMethodValue,
 } from './schema.js';
 import { shownDigest, shownOfDraft, shownOfOrder, type ShownTerm } from './shown-order.js';
@@ -105,6 +107,11 @@ export interface DraftOrderInput {
   discount?: string | null;
   /** Where the order will ship from; chosen when it is placed (ADR-355), if left out. */
   locationId?: string | null;
+  /**
+   * Shipped unless given. Picked up: at `locationId`, which must offer pickup, or the only
+   * location that does; with no delivery charge (ADR-390).
+   */
+  deliveryMethod?: DeliveryMethodValue | null;
   note?: string | null;
   tags?: string[] | null;
 }
@@ -178,6 +185,7 @@ interface CheckedDraft {
   shipping?: bigint;
   discount?: bigint;
   locationId?: string | null;
+  deliveryMethod?: DeliveryMethodValue;
   note?: string;
   tags?: string[];
 }
@@ -672,6 +680,7 @@ export class DraftOrderService {
         advance: draft.advancePaid,
         advanceDue: draft.advanceDue,
         locationId: draft.locationId,
+        deliveryMethod: draft.deliveryMethod,
         note: draft.note,
         tags: draft.tags,
         agreement,
@@ -779,9 +788,25 @@ export class DraftOrderService {
       shipping: checked.shipping ?? current?.shipping ?? 0n,
       discount: checked.discount ?? current?.discount ?? 0n,
       locationId: pick(checked.locationId, current?.locationId ?? null),
+      deliveryMethod: checked.deliveryMethod ?? current?.deliveryMethod ?? 'shipping',
       note: checked.note ?? current?.note ?? '',
       tags: checked.tags ?? current?.tags ?? [],
     };
+    // Picked up: at a location that offers it, with nothing to deliver (ADR-390).
+    if (next.deliveryMethod === 'pickup') {
+      if (next.shipping > 0n) {
+        return failOne(
+          ['input', 'shippingPrice'],
+          'INVALID',
+          'A draft the customer picks up has no delivery charge',
+        );
+      }
+      const at = await pickupLocationIn(tx, this.locations, shopId, next.locationId, [
+        'input',
+        'locationId',
+      ]);
+      if (!at.ok) return { ok: false, errors: [at.error] };
+    }
     const subtotal = next.lines.reduce(
       (sum, line) => sum + BigInt(line.unitPrice) * BigInt(line.quantity),
       0n,
@@ -909,6 +934,7 @@ const CHANGES = [
   ['shippingPrice', 'shipping'],
   ['discount', 'discount'],
   ['location', 'locationId'],
+  ['deliveryMethod', 'deliveryMethod'],
   ['note', 'note'],
   ['tags', 'tags'],
 ] as const;
@@ -980,6 +1006,7 @@ function checkDraft(
   checked.shipping = amount('shippingPrice');
   checked.discount = amount('discount');
   if (input.locationId !== undefined) checked.locationId = input.locationId || null;
+  if (input.deliveryMethod) checked.deliveryMethod = input.deliveryMethod;
   if (input.note !== undefined) {
     checked.note = check.text(['input', 'note'], input.note, { max: LIMITS.note }) ?? '';
   }
@@ -1126,6 +1153,7 @@ export function toDraftRecord(row: DraftOrderRow): DraftOrderRecord {
     email: row.email,
     shippingAddress: row.shippingAddress,
     locationId: row.locationId,
+    deliveryMethod: row.deliveryMethod,
     note: row.note,
     tags: row.tags,
     orderId: row.orderId,

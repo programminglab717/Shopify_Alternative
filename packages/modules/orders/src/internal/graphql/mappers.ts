@@ -574,6 +574,7 @@ export function toDraftOrder(record: DraftOrderRecord, tenant: TenantContext): D
     advancePaid: amount(record.advancePaid),
     advanceDue: amount(record.advanceDue),
     codAmount: amount(record.codAmount),
+    deliveryMethod: upper<OrderDeliveryMethod>(record.deliveryMethod),
     note: record.note,
     tags: record.tags,
     linkExpiresAt: record.linkExpiresAt,

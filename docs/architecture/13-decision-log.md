@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-389 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-390 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -397,6 +397,7 @@
 | 387 | A courier rule may book with the best value: the account cheapest for each parcel delivered, weighing its rate card with how often its courier delivers to the order's city | Accepted |
 | 388 | A customer whose delivery failed is asked on WhatsApp whether to deliver it again or call them first, and the shop sees the parcels to rescue with each answer | Accepted |
 | 389 | A location lets customers pick orders up, with what to tell them; an order picked up waits ready for pickup once packed, its customer told where, is never booked with a courier, and completes when handed over at the counter | Accepted |
+| 390 | A draft order is shipped or picked up: one picked up names a location offering pickup, or the only one, has no delivery charge, and becomes an order picked up there; its link says the customer pays when they collect it | Accepted |
 
 ---
 
@@ -15152,3 +15153,35 @@
     together; one step keeps the order from completing unpaid.
   * **Pickup points apart from locations:** a shop's counter is where its stock is; a location
     keeps stock, address and orders in one place.
+
+## ADR-390 · A draft order is shipped or picked up: one picked up names a location offering pickup, or the only one, has no delivery charge, and becomes an order picked up there; its link says the customer pays when they collect it
+
+* **Context:**
+  * Most orders a shop's staff take come from chats, as draft orders that the customer confirms
+    through a link or staff place ([ADR-114](#adr-114--a-draft-its-customer-confirms-through-its-link-keeps-what-they-agreed-to-as-checkouts-orders-do-the-page-names-the-shops-policies-above-its-button-and-the-order-keeps-their-versions-and-where-it-was-confirmed-from)). Local pickup came to orders made through the API
+    ([ADR-389](#adr-389--a-location-lets-customers-pick-orders-up-with-what-to-tell-them-an-order-picked-up-waits-ready-for-pickup-once-packed-its-customer-told-where-is-never-booked-with-a-courier-and-completes-when-handed-over-at-the-counter)), so a customer who said in the chat "I'll collect it" still had to be sent a
+    courier's order, or one made by hand outside the admin.
+* **Decision:**
+  * **A draft is shipped or picked up** (migration 0183, `delivery_method` on drafts;
+    `deliveryMethod` on `DraftOrderInput` and `DraftOrder`), as orders are. One picked up names
+    a location offering pickup, or is collected at the only one that does; it has no delivery
+    charge. Both are checked as the draft is saved, so staff learn then, not when placing it.
+  * **Placing it, by staff or by the customer through its link,** makes an order picked up
+    there, which goes on as any pickup order: ready for pickup once packed, the customer told
+    where, and picked up at the counter.
+  * **Its link** leaves out the delivery charge and says the customer pays when they collect
+    it; it names them as the one collecting rather than an address to deliver to. An order's
+    page picked up says the same.
+  * **In the admin**, the draft form offers "Delivery" where a location offers pickup: delivered
+    to the customer, or picked up at each such location, the delivery charge gone once picked
+    up. The draft's page says where it is picked up and what is collected at the counter. An
+    order picked up moves only to another location offering pickup.
+* **Consequences:**
+  * A draft picked up still keeps the customer's name, number and address, as a draft sent does:
+    the number is how they are told it is ready.
+  * Checkout offering pickup to shoppers comes next.
+* **Alternatives:**
+  * **A zero delivery charge and a note:** the order would wait to be booked with a courier;
+    the method of its own keeps couriers out, as for orders.
+  * **Choosing the location only when placing:** a draft is agreed in the chat; where to collect
+    is part of what the customer agreed to, so it is on the draft.

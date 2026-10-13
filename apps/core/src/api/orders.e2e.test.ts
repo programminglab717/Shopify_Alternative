@@ -831,6 +831,60 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(disabled.location.localPickupSettings).toBeNull();
   });
 
+  it('takes a draft the customer picks up, with no delivery charge, completed as an order picked up (ADR-390)', async () => {
+    const [khussa] = await stockedVariants(tokens.a, 'Khussa', ['8'], 3);
+    const primary = (await gql(tokens.a, '{ location { id } }')).data?.location.id as string;
+    const DRAFT = `mutation ($input: DraftOrderInput!) {
+      draftOrderCreate(input: $input) {
+        draftOrder { id deliveryMethod totalShippingPrice { amount } } userErrors { field code }
+      }
+    }`;
+    const input = {
+      lineItems: [{ variantId: khussa, quantity: 1 }],
+      shippingAddress: ADDRESS,
+      deliveryMethod: 'PICKUP',
+    };
+    // No location offers pickup yet.
+    expect((await mutate(tokens.a, DRAFT, { input })).userErrors).toEqual([
+      { field: ['input', 'locationId'], code: 'BLANK' },
+    ]);
+    await mutate(
+      tokens.a,
+      `mutation ($id: ID!) {
+         locationEdit(id: $id, input: { address: { address1: "Shop 4, Liberty Market", city: "lhr" } }) {
+           userErrors { code }
+         }
+       }`,
+      { id: primary },
+    );
+    await mutate(
+      tokens.a,
+      `mutation ($settings: LocalPickupSettingsInput!) {
+         locationLocalPickupEnable(localPickupSettings: $settings) { userErrors { code } }
+       }`,
+      { settings: { locationId: primary, instructions: null } },
+    );
+    expect(
+      (await mutate(tokens.a, DRAFT, { input: { ...input, shippingPrice: '150' } })).userErrors,
+    ).toEqual([{ field: ['input', 'shippingPrice'], code: 'INVALID' }]);
+    const made = await mutate(tokens.a, DRAFT, { input });
+    expect(made.draftOrder).toMatchObject({
+      deliveryMethod: 'PICKUP',
+      totalShippingPrice: { amount: '0.00' },
+    });
+
+    const done = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) {
+         draftOrderComplete(id: $id) {
+           draftOrder { order { deliveryMethod location { id } } } userErrors { code }
+         }
+       }`,
+      { id: made.draftOrder.id },
+    );
+    expect(done.draftOrder.order).toEqual({ deliveryMethod: 'PICKUP', location: { id: primary } });
+  });
+
   it('splits an order in two, the items sent apart an order of their own (ADR-135)', async () => {
     const [size] = await stockedVariants(tokens.a, 'Multani Khussa', ['8'], 4);
     const created = await mutate(tokens.a, ORDER_CREATE, {

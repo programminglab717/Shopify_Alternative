@@ -727,6 +727,10 @@ export const draftOrders = ordersSchema.table(
     shippingAddress: jsonb('shipping_address').$type<AddressValue>(),
     /** Null: one chosen when it is placed (ADR-355). */
     locationId: uuid('location_id'),
+    /** Shipped, or picked up at a location that offers it, as its order will be (ADR-390). */
+    deliveryMethod: text('delivery_method', { enum: DELIVERY_METHODS })
+      .notNull()
+      .default('shipping'),
     note: text('note').notNull().default(''),
     tags: text('tags').array().notNull().default([]),
     /** Its customer's name, city and email, folded, as a search of the drafts matches them. */

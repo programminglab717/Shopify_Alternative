@@ -23,7 +23,11 @@ function MoveForm({ order, onDone }: { order: OrderDetail; onDone: () => void })
 
   if (places.isPending) return <Loading label={t('state.loading')} />;
   if (places.isError) return <Alert tone="danger">{errorText(places.error, t)}</Alert>;
-  const others = places.data.locations.nodes.filter((each) => each.id !== order.location.id);
+  // An order picked up moves only where customers may pick up too (ADR-389).
+  const pickup = order.deliveryMethod === 'PICKUP';
+  const others = places.data.locations.nodes.filter(
+    (each) => each.id !== order.location.id && (!pickup || each.localPickupSettings),
+  );
   const locationId = chosen || others[0]?.id || '';
 
   const onMove = async () => {
@@ -86,7 +90,7 @@ export function ShipsFrom({ order }: { order: OrderDetail }) {
       ) : (
         movable && (
           <Button variant="secondary" className="self-start" onClick={() => setMoving(true)}>
-            {t('shipsFrom.change')}
+            {t(order.deliveryMethod === 'PICKUP' ? 'shipsFrom.changePickup' : 'shipsFrom.change')}
           </Button>
         )
       )}

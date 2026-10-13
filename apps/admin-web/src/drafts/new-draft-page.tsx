@@ -2,8 +2,14 @@ import { useNavigate } from '@tanstack/react-router';
 import { Minus, Plus, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { DraftOrderCreateMutation, DraftVariantsQuery } from '../api/operations';
-import type { DraftSource, DraftVariantsData, MoneyValue, UserError } from '../api/types';
+import { DraftOrderCreateMutation, DraftVariantsQuery, LocationsQuery } from '../api/operations';
+import type {
+  DraftSource,
+  DraftVariantsData,
+  LocationsData,
+  MoneyValue,
+  UserError,
+} from '../api/types';
 import { errorText } from '../i18n/errors';
 import { formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
@@ -28,6 +34,7 @@ const SOURCES: readonly DraftSource[] = ['WHATSAPP', 'INSTAGRAM', 'FACEBOOK', 'M
 const LABELS: Partial<Record<string, MessageKey>> = {
   lineItems: 'drafts.items.title',
   shippingPrice: 'drafts.delivery',
+  locationId: 'drafts.deliveryMethod',
   discount: 'drafts.discount',
   shippingAddress: 'drafts.address',
   phone: 'drafts.phone',
@@ -139,10 +146,18 @@ export interface DraftValues {
   source: DraftSource;
   payment: string;
   delivery: string;
+  /**
+   * Where the customer picks it up (ADR-390): a location's ID, ANY_PICKUP for the only one
+   * offering it, or empty for delivered.
+   */
+  pickupAt: string;
   discount: string;
   note: string;
   address: DraftAddress | null;
 }
+
+/** A draft picked up at the one location offering pickup, as none is named. */
+export const ANY_PICKUP = 'pickup';
 
 const NO_ADDRESS: DraftAddress = { name: '', phone: '', city: '', address1: '', rest: {} };
 
@@ -151,6 +166,7 @@ const FIRST: DraftValues = {
   source: 'WHATSAPP',
   payment: 'CASH_ON_DELIVERY',
   delivery: '',
+  pickupAt: '',
   discount: '',
   note: '',
   address: null,
@@ -161,8 +177,9 @@ const shown = (address: DraftAddress) =>
 
 /**
  * A draft order's form (ORD-03): what the customer picked in the chat or on the call, at the
- * prices agreed; where the conversation was, how they pay, the delivery charge and anything off;
- * their address where staff have it, or else the link asks them for it. Changing a draft sends
+ * prices agreed; where the conversation was, how they pay, the delivery charge and anything off,
+ * or the location the customer picks it up at, where the shop offers pickup (ADR-390); their
+ * address where staff have it, or else the link asks them for it. Changing a draft sends
  * every line at its price and every charge, so a field emptied is cleared, and its address only
  * if it changed, its area and pin kept.
  */
@@ -185,6 +202,22 @@ export function DraftForm({
   const [source, setSource] = useState<DraftSource>(initial.source);
   const [payment, setPayment] = useState(initial.payment);
   const [delivery, setDelivery] = useState(initial.delivery);
+  const [pickupAt, setPickupAt] = useState(initial.pickupAt);
+  const places = useAdminQuery<LocationsData>(['locations'], LocationsQuery);
+  const offering = (places.data?.locations.nodes ?? []).filter(
+    (place) => place.localPickupSettings,
+  );
+  const ways = [
+    { value: '', label: t('drafts.ship') },
+    ...offering.map((place) => ({
+      value: place.id,
+      label: t('drafts.pickupAt', { location: place.name }),
+    })),
+  ];
+  // Picked up where the form has no name for: at the only location offering it.
+  if (pickupAt && !ways.some((way) => way.value === pickupAt)) {
+    ways.push({ value: pickupAt, label: t('drafts.pickupOnly') });
+  }
   const [discount, setDiscount] = useState(initial.discount);
   const [note, setNote] = useState(initial.note);
   const [hasAddress, setHasAddress] = useState(initial.address !== null);
@@ -246,14 +279,21 @@ export function DraftForm({
         }),
         source,
         paymentMethod: payment,
+        ...(pickupAt
+          ? {
+              deliveryMethod: 'PICKUP',
+              ...(pickupAt !== ANY_PICKUP && { locationId: pickupAt }),
+            }
+          : // Sent again once it was picked up.
+            initial.pickupAt && { deliveryMethod: 'SHIPPING' }),
         ...(editing
           ? {
-              shippingPrice: delivery.trim() || '0',
+              shippingPrice: (!pickupAt && delivery.trim()) || '0',
               discount: discount.trim() || '0',
               note: note.trim(),
             }
           : {
-              ...(delivery.trim() && { shippingPrice: delivery.trim() }),
+              ...(!pickupAt && delivery.trim() && { shippingPrice: delivery.trim() }),
               ...(discount.trim() && { discount: discount.trim() }),
               ...(note.trim() && { note: note.trim() }),
             }),
@@ -348,15 +388,25 @@ export function DraftForm({
             onChange={setPayment}
           />
         </Pair>
-        <Pair>
-          <TextField
-            label={t('drafts.delivery')}
-            hint={t('drafts.deliveryHint')}
-            inputMode="decimal"
-            ltr
-            value={delivery}
-            onChange={(event) => setDelivery(event.target.value)}
+        {ways.length > 1 && (
+          <SelectField
+            label={t('drafts.deliveryMethod')}
+            value={pickupAt}
+            options={ways}
+            onChange={setPickupAt}
           />
+        )}
+        <Pair>
+          {!pickupAt && (
+            <TextField
+              label={t('drafts.delivery')}
+              hint={t('drafts.deliveryHint')}
+              inputMode="decimal"
+              ltr
+              value={delivery}
+              onChange={(event) => setDelivery(event.target.value)}
+            />
+          )}
           <TextField
             label={t('drafts.discount')}
             hint={t('drafts.discountHint')}
