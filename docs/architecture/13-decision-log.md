@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-405 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-406 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -413,6 +413,7 @@
 | 403 | A product the shop puts on pre-order sells whatever its stock, as if its variants kept selling at zero, and promises a day it ships by, which the lines of orders placed meanwhile keep; inventory keeps it, by product | Accepted |
 | 404 | A product on pre-order says so where shoppers decide and buy: its button reads Pre-order with the day it ships by, its card a badge, its cart and checkout lines and the order's own page the day each ships by | Accepted |
 | 405 | The admin puts a product on pre-order from its page, beside its stock rules, with the day it ships by, a month ahead to begin with, warns when that day has gone by, and an order's page says of each line sold on pre-order the day it ships by | Accepted |
+| 406 | The catalog keeps the shop's size charts, tables of measurements a row for each size, in inches or centimetres, and gives each product one at most, by its ID or as a collection has it then; the products whose chart changes are named in the event | Accepted |
 
 ---
 
@@ -15661,3 +15662,38 @@
   * **Ending a pre-order on its day by itself:** a product would stop selling the moment a
     shipment ran late, while its orders still waited; the warning leaves the choice with the
     merchant.
+
+## ADR-406 · The catalog keeps the shop's size charts, tables of measurements a row for each size, in inches or centimetres, and gives each product one at most, by its ID or as a collection has it then; the products whose chart changes are named in the event
+
+* **Context:**
+  * CAT-10: shoppers of clothes and shoes ask what a size measures; on Shopify a size-chart app
+    answers, per product or collection, with a toggle between units. Eastern wear is measured
+    in inches (design principles §6), and many shops sell by the chest and length of a kurta.
+* **Decision:**
+  * **A chart is the shop's** (`catalog.size_charts`): a name unique in the shop, the unit it is
+    written in (inches or centimetres), what is measured (1 to 8 columns), a row for each size
+    (1 to 30) with a measurement for each column or none, and a note on how to measure. A shop
+    keeps 50 at most. Measurements are numbers, more than 0 and at most 999, to a hundredth, so
+    the storefront can show them in the other unit.
+  * **A product shows one chart at most** (`catalog.product_size_charts`), given by its ID, up
+    to 250 at once, or to the products a collection has when it is given: `productsSizeChartSet`,
+    with a null chart taking theirs away. A product added to the collection later is given none
+    until the shop gives it one; a product duplicated keeps its original's.
+  * **The Admin API** reads them as products are (`sizeCharts`, `sizeChart`, `Product.sizeChart`,
+    batched) and changes them with `write_products`: `sizeChartCreate`, `sizeChartUpdate` (new
+    columns take their rows again), `sizeChartDelete`. Errors are user errors, by field.
+  * **Events name the products whose pages change:** `size_chart.updated` and
+    `size_chart.deleted` the products showing it, `product_size_chart.updated` those given or
+    losing one. The storefront's publisher rebuilds them from these alone; `size_chart.created`
+    names none. Each is on the activity log.
+* **Consequences:**
+  * A chart changed for many products names them all in one event: at most the shop's catalog.
+  * Column and size names are the shop's words, not translated yet.
+* **Alternatives:**
+  * **A chart given to a collection, followed as its products change:** every change of a
+    collection's members, smart ones included, would rebuild the products it gained and lost,
+    which its events do not name; giving the collection's products at once covers how shops
+    use it.
+  * **A chart as a page or a product's description:** an image or text cannot be read in the
+    other unit, nor kept the same across products.
+  * **A metafield:** Shopify's size-chart apps keep one, but its shape is each app's own.

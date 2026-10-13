@@ -5,6 +5,7 @@ import { ProductMediaResolver } from './graphql/media.resolver.js';
 import { ProductPartsResolver } from './graphql/product-parts.resolver.js';
 import { ProductResolver } from './graphql/product.resolver.js';
 import { ProductReviewResolver } from './graphql/reviews.resolver.js';
+import { SizeChartResolver } from './graphql/size-chart.resolver.js';
 import { MediaService } from './media.service.js';
 import { OptionService } from './option.service.js';
 import { ProductExportService } from './product-export.service.js';
@@ -13,6 +14,7 @@ import { ProductImportService } from './product-import.service.js';
 import { ProductService } from './product.service.js';
 import { ProductReviewService } from './review.service.js';
 import { StorefrontSearchController } from './search.controller.js';
+import { SizeChartService } from './size-charts.js';
 import { VariantService } from './variant.service.js';
 
 /**
@@ -30,11 +32,13 @@ import { VariantService } from './variant.service.js';
     ProductExportService,
     StockFileService,
     ProductReviewService,
+    SizeChartService,
     ProductResolver,
     ProductPartsResolver,
     ProductMediaResolver,
     CollectionResolver,
     ProductReviewResolver,
+    SizeChartResolver,
   ],
   controllers: [StorefrontSearchController],
   exports: [
@@ -47,6 +51,7 @@ import { VariantService } from './variant.service.js';
     ProductExportService,
     StockFileService,
     ProductReviewService,
+    SizeChartService,
   ],
 })
 export class CatalogModule {}

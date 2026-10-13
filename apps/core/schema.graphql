@@ -6781,6 +6781,11 @@ type Mutation {
     overwrite: Boolean
   ): ProductsImportPayload!
 
+  """
+  Gives products a size chart in place of any they had, or takes theirs away with a null `sizeChartId`: up to 250 by their IDs, and those a collection has now. Products added to the collection later are given none.
+  """
+  productsSizeChartSet(collectionId: ID, productIds: [ID!], sizeChartId: ID): ProductsSizeChartSetPayload!
+
   """Closes an open order with what came; the rest is no longer expected."""
   purchaseOrderClose(id: ID!): PurchaseOrderPayload!
 
@@ -6860,6 +6865,13 @@ type Mutation {
   Sets one of the shop's policies, or takes it away with a blank body; the storefront shows it a moment later.
   """
   shopPolicyUpdate(shopPolicy: ShopPolicyInput!): ShopPolicyUpdatePayload!
+  sizeChartCreate(input: SizeChartInput!): SizeChartPayload!
+
+  """Deletes a chart; the products that showed it show none."""
+  sizeChartDelete(id: ID!): SizeChartDeletePayload!
+
+  """Changes a chart; the products showing it show it changed."""
+  sizeChartUpdate(id: ID!, input: SizeChartInput!): SizeChartPayload!
 
   """
   Invites someone to work in the shop in `role`, by a link the inviter sends them, good for 7 days and accepted once; with `email`, Hatti emails it there too, 20 a day for a shop at most (ADR-167). The owner invites any role but its own; managers, those below them. Staff confirm who they are first when they signed in over 15 minutes ago.
@@ -9059,6 +9071,9 @@ type Product {
   """
   seo: SEO!
 
+  """The size chart its page shows, if any (ADR-406)."""
+  sizeChart: SizeChart
+
   """
   Units of its variants sold in the last 30 days at all the shop's locations (INV-08), a page of products asking once.
   """
@@ -9596,6 +9611,12 @@ type ProductsImportPayload {
 
   """Variants made: of new products, and new to those updated."""
   variants: Int!
+}
+
+type ProductsSizeChartSetPayload {
+  """The products whose chart changed."""
+  productIds: [ID!]!
+  userErrors: [UserError!]!
 }
 
 """
@@ -10599,6 +10620,10 @@ type Query {
     locale: String! = "en"
     type: ShopPolicyType!
   ): ShopPolicyDraft!
+  sizeChart(id: ID!): SizeChart
+
+  """The shop's size charts, by name; 50 at most."""
+  sizeCharts: [SizeChart!]!
 
   """
   Invitations neither accepted, taken back nor expired, the newest first. Staff need to be the owner or a manager.
@@ -11608,6 +11633,81 @@ type ShopPolicyVersion {
   """As Shopify titles it: "Refund policy"."""
   title: String!
   type: ShopPolicyType!
+}
+
+"""
+A table of measurements, a row for each size (CAT-10, ADR-406), which the products it is given to show on their pages.
+"""
+type SizeChart {
+  """What is measured, in order: "Chest", "Length"."""
+  columns: [String!]!
+  createdAt: DateTime!
+  id: ID!
+
+  """The shop's own name for it, unique in the shop: "Women's kurtas"."""
+  name: String!
+
+  """How to measure, or what else to know."""
+  note: String
+
+  """How many products show it."""
+  productsCount: Int!
+  rows: [SizeChartRow!]!
+  unit: SizeChartUnit!
+  updatedAt: DateTime!
+}
+
+type SizeChartDeletePayload {
+  deletedSizeChartId: ID
+  userErrors: [UserError!]!
+}
+
+"""
+What a chart is made of. Creating one takes its name, unit, columns and rows; an update leaves what it omits as it is, but takes the rows again with new columns.
+"""
+input SizeChartInput {
+  """1 to 8, each 1 to 40 characters."""
+  columns: [String!]
+
+  """1 to 100 characters."""
+  name: String
+
+  """Up to 1,000 characters; null for none."""
+  note: String
+
+  """1 to 30 sizes."""
+  rows: [SizeChartRowInput!]
+  unit: SizeChartUnit
+}
+
+type SizeChartPayload {
+  sizeChart: SizeChart
+  userErrors: [UserError!]!
+}
+
+"""A size and its measurements, in the order of its chart's columns."""
+type SizeChartRow {
+  """"S", "38", "Free size"."""
+  size: String!
+
+  """One for each of the chart's columns; null where none is given."""
+  values: [Float]!
+}
+
+input SizeChartRowInput {
+  """1 to 20 characters, unique in the chart."""
+  size: String!
+
+  """One for each column, more than 0 and at most 999, or null."""
+  values: [Float]!
+}
+
+"""
+The unit a chart's measurements are written in; shoppers may read them in either.
+"""
+enum SizeChartUnit {
+  CENTIMETERS
+  INCHES
 }
 
 """

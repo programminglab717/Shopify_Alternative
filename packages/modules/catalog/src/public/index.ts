@@ -157,3 +157,14 @@ export {
   type ReviewStatusValue,
   type ShownReviews,
 } from '../internal/reviews.js';
+export {
+  SIZE_CHART_LIMITS,
+  SizeChartEvents,
+  SizeChartService,
+  shownSizeChartsIn,
+  type ShownSizeChart,
+  type SizeChartChangedPayload,
+  type SizeChartRecord,
+  type SizeChartRow,
+  type SizeChartUnitValue,
+} from '../internal/size-charts.js';

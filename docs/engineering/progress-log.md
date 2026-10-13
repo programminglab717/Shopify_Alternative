@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: size charts on a product's page
-(CAT-10); then bundles (CAT-11). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: size charts on the storefront, read
+in inches or centimetres (CAT-10); then the admin's size charts. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +15,18 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Size charts in the catalog
+
+* **The shop's size charts** ([ADR-406](../architecture/13-decision-log.md#adr-406--the-catalog-keeps-the-shops-size-charts-tables-of-measurements-a-row-for-each-size-in-inches-or-centimetres-and-gives-each-product-one-at-most-by-its-id-or-as-a-collection-has-it-then-the-products-whose-chart-changes-are-named-in-the-event), CAT-10): a name, inches or centimetres, what is measured
+  and a row for each size, with a note on how to measure; 50 a shop. Migration 0191 keeps them,
+  and the chart each product shows.
+* **Given to products** by their IDs, 250 at once, or to those a collection has then, and taken
+  away; a duplicated product keeps its original's.
+* **The Admin API** reads them as products are, `Product.sizeChart` among them, and changes
+  them with `write_products`; their events name the products whose pages change, for the
+  storefront's publisher next.
+* 2714 tests (9 new): the catalog's charts and the Admin API's.
 
 ### 1d6cc92 · Pre-orders in the admin
 

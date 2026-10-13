@@ -15,6 +15,7 @@ import {
 } from './events.js';
 import { handleCandidate, movedFrom, toHandle } from './handle.js';
 import { CopiedVariantStock, copyMedia, joinManualCollections } from './product-copy.js';
+import { copySizeChartIn } from './size-charts.js';
 import { productSearchConditions } from './product-filter.js';
 import {
   InputChecker,
@@ -273,6 +274,7 @@ export class ProductService {
       }));
       if (input.includeImages) await copyMedia(tx, tenant.shopId, original, product.id, copies);
       await joinManualCollections(tx, tenant.shopId, original.id, product.id);
+      await copySizeChartIn(tx, tenant.shopId, original.id, product.id);
       await this.stock?.copy(tx, tenant.shopId, copies);
       return {
         ok: true,
