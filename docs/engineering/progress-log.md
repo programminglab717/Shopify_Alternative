@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Apps' webhooks in the admin
+### 29ab362 · Apps' webhooks in the admin
 
 * **On Settings → Apps** ([ADR-398](../architecture/13-decision-log.md#adr-398--each-custom-app-on-the-shops-apps-page-shows-its-webhooks-the-topic-in-words-where-it-goes-and-how-its-latest-delivery-went-with-its-last-ten-to-open-one-is-added-for-a-topic-the-app-may-hear-or-removed), DEV-03): each app lists its webhooks, the topic in words,
   the address, and how the latest delivery went, with its last ten to open. A webhook is added
