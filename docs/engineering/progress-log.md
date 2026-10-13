@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Abandoned checkouts in the admin
+### 9d7eea5 · Abandoned checkouts in the admin
 
 * **Under Orders** ([ADR-394](../architecture/13-decision-log.md#adr-394--the-admin-lists-the-checkouts-shoppers-left-under-orders-for-those-who-work-orders-and-marketers-with-a-chat-on-whatsapp-for-a-whole-number-not-yet-ordered-and-the-reminders-delay-is-set-with-the-checkout-pages-settings), CHK-12): "Abandoned checkouts" lists who left, latest first, with
   their number as the role sees it, the items, the subtotal, and whether they were reminded or
