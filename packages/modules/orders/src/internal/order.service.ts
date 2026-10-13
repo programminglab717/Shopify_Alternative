@@ -1224,6 +1224,24 @@ export class OrderService {
   }
 
   /**
+   * The latest order the number placed in the shop since `since`, by any way, in the caller's
+   * transaction `tx`: for checkout not to remind a shopper who ordered meanwhile (ADR-393).
+   */
+  async latestOrderFromIn(
+    tx: Tx,
+    shopId: string,
+    phone: string,
+    since: Date,
+  ): Promise<{ id: string; number: number } | null> {
+    const { rows } = await tx.execute<{ id: string; number: number }>(sql`
+      SELECT id, number FROM orders.orders
+       WHERE shop_id = ${shopId} AND phone = ${phone} AND created_at >= ${since.toISOString()}::timestamptz
+       ORDER BY created_at DESC
+       LIMIT 1`);
+    return rows[0] ?? null;
+  }
+
+  /**
    * The different addresses each customer's orders went to, most recently used first: at most
    * `limit` per customer.
    */

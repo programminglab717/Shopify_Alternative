@@ -23,6 +23,7 @@ export type CoreBackend = Pick<
   | 'openPaymentLink'
   | 'trackingPage'
   | 'checkoutPage'
+  | 'checkoutContact'
   | 'search'
   | 'searchContent'
   | 'themePreview'

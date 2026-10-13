@@ -81,6 +81,7 @@ export const ID_PREFIXES = {
   paymentSession: 'psn',
   paymentRefund: 'prf',
   paymentLink: 'plnk',
+  abandonedCheckout: 'ack',
   billingInvoice: 'binv',
   billingWalletEntry: 'bwe',
   billingTransfer: 'btr',

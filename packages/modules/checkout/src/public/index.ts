@@ -6,6 +6,21 @@ export {
   type CartAction,
   type StoredLine,
 } from '../internal/cart-lines.js';
+export {
+  ABANDONED,
+  REMINDER_DELAYS,
+  REMINDER_LINK_PATH,
+  permalinkOf,
+  type ContactLineValue,
+} from '../internal/abandoned.js';
+export {
+  AbandonedCheckoutService,
+  keepContactIn,
+  recoverIn,
+  recoverySettingsIn,
+  type AbandonedCheckoutRecord,
+  type RecoverySettingsRecord,
+} from '../internal/abandoned.service.js';
 export { CartService, type CartResult } from '../internal/cart.service.js';
 export { CheckoutModule } from '../internal/checkout.module.js';
 export { CHECKOUT_CUSTOMER_DATA, CheckoutCustomerData } from '../internal/customer-data.js';

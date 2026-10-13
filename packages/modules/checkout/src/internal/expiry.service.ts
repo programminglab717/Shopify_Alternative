@@ -8,6 +8,14 @@ const EXPIRING = {
   proofs: sql`checkout.number_proofs`,
 } as const satisfies Record<string, SQL>;
 
+/**
+ * What else must have passed: a checkout with a number is kept for its shop past its page's day,
+ * as an abandoned checkout (ADR-393).
+ */
+const KEPT: Partial<Record<keyof typeof EXPIRING, (at: string) => SQL>> = {
+  checkouts: (at) => sql`AND (kept_until IS NULL OR kept_until <= ${at})`,
+};
+
 /** How many of each kind a sweep deleted. */
 export type ExpiredCounts = Record<keyof typeof EXPIRING, number>;
 
@@ -39,10 +47,11 @@ export class CheckoutExpiry {
     const deleted: ExpiredCounts = { checkouts: 0, carts: 0, proofs: 0 };
     for (const kind of Object.keys(EXPIRING) as (keyof typeof EXPIRING)[]) {
       const table = EXPIRING[kind];
+      const kept = KEPT[kind]?.(at.toISOString()) ?? sql``;
       const { rows } = await this.db.system((tx) =>
         tx.execute<{ shop_id: string; id: string }>(sql`
           SELECT shop_id, id FROM ${table}
-           WHERE expires_at <= ${at.toISOString()}
+           WHERE expires_at <= ${at.toISOString()} ${kept}
            ORDER BY expires_at
            LIMIT ${limit}`),
       );
@@ -58,7 +67,7 @@ export class CheckoutExpiry {
             tx.execute(sql`
               DELETE FROM ${table}
                WHERE shop_id = ${shopId} AND id = ANY(${sql.param(ids)}::uuid[])
-                 AND expires_at <= ${at.toISOString()}
+                 AND expires_at <= ${at.toISOString()} ${kept}
               RETURNING id`),
           );
           deleted[kind] += gone.length;

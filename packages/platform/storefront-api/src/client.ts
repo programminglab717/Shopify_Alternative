@@ -196,6 +196,22 @@ export class StorefrontApiClient {
     return (await response.json()) as CheckoutPageResponse;
   }
 
+  /**
+   * The name and number a shopper typed on the checkout `checkoutToken` names, as its page's
+   * script sends them (ADR-393): kept for the shop, nothing answered.
+   */
+  async checkoutContact(
+    shopId: string,
+    checkoutToken: string,
+    contact: { name: string; phone: string },
+  ): Promise<void> {
+    const path = `${checkoutsPath(shopId, encodeURIComponent(checkoutToken))}/contact`;
+    const response = await this.#request('POST', path, null, contact);
+    if (response.status !== 204) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+  }
+
   /** The shop's active products with every word of `terms`, best first, by their IDs. */
   async search(shopId: string, terms: string, options: SearchOptions = {}): Promise<string[]> {
     const query = searchQuery(terms, options);

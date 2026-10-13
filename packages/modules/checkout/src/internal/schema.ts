@@ -17,6 +17,7 @@ import {
 import type { MarketingChannelValue } from '@hatti/customers/public';
 import type { AttributionValue } from '@hatti/orders/public';
 import type { StoredLine } from './cart-lines.js';
+import type { ContactLineValue } from './abandoned.js';
 import type { CodAdvanceValue } from './cod-rules.js';
 import type { PaymentLinkItemValue } from './payment-links.js';
 import type { TrustBadgeValue } from './trust-badges.js';
@@ -70,6 +71,19 @@ export const checkouts = checkoutSchema.table(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    /** The name and number the shopper typed, and when, for the shop to remind them (CHK-12). */
+    contactName: text('contact_name'),
+    contactPhone: text('contact_phone'),
+    contactAt: timestamp('contact_at', { withTimezone: true }),
+    /** The items, and their subtotal, as the cart held them then. */
+    contactLines: jsonb('contact_lines').$type<ContactLineValue[]>(),
+    contactSubtotal: bigint('contact_subtotal', { mode: 'bigint' }),
+    /** Kept past `expiresAt` until then, as an abandoned checkout with a number is. */
+    keptUntil: timestamp('kept_until', { withTimezone: true }),
+    remindedAt: timestamp('reminded_at', { withTimezone: true }),
+    reminderTokenHash: bytea('reminder_token_hash'),
+    /** The order the same number placed after the reminder (ADR-393). */
+    recoveredOrderId: uuid('recovered_order_id'),
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],
 );
@@ -184,5 +198,12 @@ export const trustBadges = checkoutSchema.table('trust_badges', {
 export const marketingOptions = checkoutSchema.table('marketing_options', {
   shopId: uuid('shop_id').primaryKey(),
   channels: text('channels').array().$type<MarketingChannelValue[]>().notNull().default([]),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Whether, and how long after a shopper leaves checkout, the shop reminds them (CHK-12). */
+export const recoverySettings = checkoutSchema.table('recovery_settings', {
+  shopId: uuid('shop_id').primaryKey(),
+  reminderAfterMinutes: integer('reminder_after_minutes'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

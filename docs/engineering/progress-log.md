@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: abandoned checkouts recovered, a
-reminder on WhatsApp to a shopper who gave their number and left without ordering (CHK-12).
+**Next, section by section as the alpha's shops need them**: abandoned checkouts in the admin,
+their list under orders and the reminder's setting (CHK-12); then webhooks for apps (DEV-03).
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -16,6 +16,26 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Abandoned checkouts and their reminder
+
+* **In checkout** ([ADR-393](../architecture/13-decision-log.md#adr-393--abandoned-checkouts-the-number-a-shopper-types-is-kept-as-they-type-it-the-shop-sees-who-left-and-may-remind-them-once-on-whatsapp-after-the-delay-it-sets-with-a-link-back-to-their-items-an-order-the-number-places-then-recovers-it), CHK-12): the page keeps the name and number the shopper types, as it
+  is posted or as a small script sends them to `/checkouts/<secret>/contact`, with the items in
+  the cart then. `abandonedCheckouts` lists those who left, kept 30 days.
+* **The reminder**: a shop that sets a delay (`checkoutRecoverySettingsUpdate`: 30, 60, 180 or
+  600 minutes) has the worker remind each shopper once on WhatsApp (`checkout_reminder`, a
+  marketing template), with a button to `/r/<secret>`, which opens the shop's storefront at a
+  cart of their items. An order from the same number recovers the checkout; one placed before
+  the reminder was due stops it.
+* **Tried in Chromium against the core:** on a checkout of two Lawn suits, typing a name and
+  number and moving on to the city kept them, with the items and Rs 6,400, before anything was
+  posted. With the shop's reminder set to 30 minutes, the sweep reminded nobody ten minutes on,
+  and once at thirty-one; the reminder's link answered 302 to the storefront's
+  `/cart/<variant>:2`, and an unknown link 404. The checkout, cart, setting and message were
+  then taken away. The page's one console error was a font the sandbox's proxy refused.
+* 2629 tests (6 new): kept, reminded, recovered, kept past the page and
+  erased, in the checkout module; through the API and the link in the core; the relay in the
+  storefront.
 
 ### cc7464b · Orders that repeat another
 

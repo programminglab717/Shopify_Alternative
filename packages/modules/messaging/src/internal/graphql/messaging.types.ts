@@ -27,6 +27,7 @@ export enum MessageKind {
   ORDER_CONFIRMATION_REMINDER = 'ORDER_CONFIRMATION_REMINDER',
   STORE_CREDIT_GIVEN = 'STORE_CREDIT_GIVEN',
   STORE_CREDIT_EXPIRING = 'STORE_CREDIT_EXPIRING',
+  CHECKOUT_REMINDER = 'CHECKOUT_REMINDER',
   ONE_TIME_CODE = 'ONE_TIME_CODE',
   STOCK_LOW = 'STOCK_LOW',
   STOCK_OUT = 'STOCK_OUT',
@@ -110,6 +111,12 @@ registerEnumType(MessageKind, {
       description:
         'A store credit of theirs with something left expires within the week: how much, and ' +
         'when (ADR-192). Once a credit.',
+    },
+    CHECKOUT_REMINDER: {
+      description:
+        'A shopper who typed their number at checkout and left without ordering, reminded once ' +
+        "with a link back to the items (CHK-12, ADR-393): sent as the shop's checkout recovery " +
+        'setting says, which turns it on and off, not here.',
     },
     ONE_TIME_CODE: {
       description:

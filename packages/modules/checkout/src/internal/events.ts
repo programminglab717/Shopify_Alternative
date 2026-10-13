@@ -9,6 +9,7 @@ export const CheckoutEvents = {
   MarketingOptionsUpdated: 'marketing_options.updated',
   PaymentLinkCreated: 'payment_link.created',
   PaymentLinkUpdated: 'payment_link.updated',
+  RecoverySettingsUpdated: 'recovery_settings.updated',
 } as const;
 
 /** The shop changed what it charges for delivery. */
@@ -36,6 +37,12 @@ export interface TrustBadgesUpdatedPayload {
 export interface MarketingOptionsUpdatedPayload {
   /** The channels now, in the page's order: "whatsapp", "email". */
   channels: string[];
+}
+
+/** The shop changed whether, and how long after they leave, it reminds shoppers (ADR-393). */
+export interface RecoverySettingsUpdatedPayload {
+  /** 30, 60, 180 or 600; null for never. */
+  reminderAfterMinutes: number | null;
 }
 
 /** Staff made a payment link (ADR-248), or changed one. */

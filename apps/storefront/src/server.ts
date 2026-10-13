@@ -1459,6 +1459,34 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   app.route({ method: ['GET', 'POST'], url: '/checkouts/:token', handler: checkoutPage });
 
   /**
+   * The name and number a shopper typed on a checkout's page, as its script sends them once the
+   * number is whole (ADR-393), passed to the core for the shop's abandoned checkouts: 204 for
+   * whatever came of it. From the shop's own pages only, and as often as cart changes.
+   */
+  app.post('/checkouts/:token/contact', async (request, reply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    reply.header('cache-control', 'no-store');
+    if (!core || request.headers['sec-fetch-site'] === 'cross-site') {
+      return reply.code(204).send();
+    }
+    if (limiter && !(await limiter.hit(CART_CHANGES, request.ip)).allowed) {
+      return tooMany(reply);
+    }
+    const { token } = request.params as { token: string };
+    const form = textFields(paramsOf(request));
+    try {
+      await core.checkoutContact(found.shopId, token, {
+        name: (form.name ?? '').slice(0, 200),
+        phone: (form.phone ?? '').slice(0, 40),
+      });
+    } catch (error) {
+      if (!unreachable(request, error)) throw error;
+    }
+    return reply.code(204).send();
+  });
+
+  /**
    * A payment link (ADR-248), `/pay/{token}`, which a shop shares once, on WhatsApp, Instagram or
    * anywhere: each shopper who opens it gets a checkout of their own with the link's items, kept
    * apart from their own cart, as a cart permalink's is; or the core's page saying why not, such

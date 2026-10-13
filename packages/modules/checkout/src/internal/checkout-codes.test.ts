@@ -166,6 +166,10 @@ describe.skipIf(!server)('Codes that prove the number at checkout', () => {
           sparesCodesUntil: new Date(proved[0]! + 30 * 86_400_000),
         },
       ],
+      // And the checkouts they left with the number typed, as those asking for a code (ADR-393).
+      checkoutsLeft: expect.arrayContaining([
+        expect.objectContaining({ number: '+923001234567', remindedAt: null }),
+      ]) as unknown,
     });
     await f.admin.query(
       `UPDATE checkout.number_proofs

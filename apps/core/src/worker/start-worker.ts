@@ -6,7 +6,7 @@ import {
   ProductService,
   VariantService,
 } from '@hatti/catalog/public';
-import { CheckoutExpiry } from '@hatti/checkout/public';
+import { AbandonedCheckoutService, CheckoutExpiry } from '@hatti/checkout/public';
 import { StoreCreditService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import {
@@ -61,6 +61,7 @@ import {
 import { workerStorage } from '../storage.js';
 import { BillingNotices } from './billing-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
+import { CheckoutReminders } from './checkout-reminders.js';
 import { ConfirmationReminders } from './confirmation-reminders.js';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
 import { CourierBookings } from './courier-bookings.js';
@@ -302,6 +303,19 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => expired.stop());
+    // Shoppers who typed their number at checkout and left reminded once, as their shop says
+    // (ADR-393).
+    const checkoutReminders = new CheckoutReminders(
+      new AbandonedCheckoutService(
+        database,
+        new MessagesService(database),
+        workerOrders(database),
+        new StorefrontSite(config.STOREFRONT_URL ?? 'http://localhost:4100'),
+        new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
+      ),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => checkoutReminders.stop());
     // Shops' verified domains asked about again, and those DNS points elsewhere disconnected three
     // days on (ADR-262).
     const domainChecks = new DomainChecks(

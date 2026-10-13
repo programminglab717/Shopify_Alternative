@@ -29,6 +29,11 @@ export interface PageOptions {
    * the phone is for a delivery address (ADR-259).
    */
   scripts?: readonly string[];
+  /**
+   * Whether its scripts may send requests back to the site that served it, as checkout's sends
+   * the number a shopper typed (ADR-393); no other site either way.
+   */
+  connectsHome?: boolean;
 }
 
 /** A page and the Content-Security-Policy header to send with it. */
@@ -231,10 +236,12 @@ function contentSecurityPolicy(
   images: readonly string[] = [],
   formTargets: readonly string[] = [],
   scripts: readonly string[] = [],
+  connectsHome = false,
 ): string {
   return [
     "default-src 'none'",
     scripts.length > 0 && `script-src ${scripts.map(hashOf).join(' ')}`,
+    scripts.length > 0 && connectsHome && "connect-src 'self'",
     `style-src ${styles.map(hashOf).join(' ')} https://fonts.googleapis.com`,
     'font-src https://fonts.gstatic.com',
     images.length > 0 && `img-src ${images.join(' ')}`,
@@ -367,6 +374,7 @@ export function renderPage(options: PageOptions): RenderedPage {
             images,
             formTargets,
             scripts,
+            options.connectsHome === true,
           ),
   };
 }

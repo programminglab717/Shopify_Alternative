@@ -1,4 +1,56 @@
 """
+A checkout its shopper left after typing their number, kept 30 days (CHK-12, ADR-393): as Shopify's abandoned checkouts, with the number in place of an email.
+"""
+type AbandonedCheckout {
+  """When they last typed their number."""
+  abandonedAt: DateTime!
+
+  """When the shopper started it."""
+  createdAt: DateTime!
+  id: ID!
+  lineItems: [AbandonedCheckoutLineItem!]!
+
+  """The name they typed, if any."""
+  name: String
+
+  """
+  The number they typed, in E.164; masked like "0300 ••••567" for roles that see customers' numbers masked.
+  """
+  phone: String!
+
+  """The order the same number placed since, after the reminder or not."""
+  recoveredOrder: AbandonedCheckoutOrder
+
+  """When they were reminded on WhatsApp; null while they were not."""
+  remindedAt: DateTime
+
+  """What the items came to then."""
+  subtotalPrice: Money!
+}
+
+"""An item as the cart held it when the shopper typed their number."""
+type AbandonedCheckoutLineItem {
+  quantity: Int!
+
+  """The product's title then."""
+  title: String!
+
+  """The variant. It may have been deleted since."""
+  variantId: ID!
+
+  """The variant's title then, such as "Red / M" or "Default Title"."""
+  variantTitle: String!
+}
+
+"""The order that recovered an abandoned checkout."""
+type AbandonedCheckoutOrder {
+  id: ID!
+
+  """Its number as staff say it, such as #1001."""
+  name: String!
+}
+
+"""
 A change the shop's staff or apps made (ADM-04, ADR-256): the event it recorded, by whom and to what; never what it recorded.
 """
 type ActivityEntry {
@@ -1027,6 +1079,19 @@ type CashOnDeliverySettingsUpdatePayload {
 
 type CheckoutMarketingChannelsUpdatePayload {
   checkoutMarketingChannels: [MarketingChannel!]
+  userErrors: [UserError!]!
+}
+
+"""
+Whether, and how long after they leave, the shop reminds shoppers who typed their number at checkout, once, on WhatsApp, with a link back to their items (ADR-393).
+"""
+type CheckoutRecoverySettings {
+  """30, 60, 180 or 600 minutes; null for never, as until the shop chooses."""
+  reminderAfterMinutes: Int
+}
+
+type CheckoutRecoverySettingsUpdatePayload {
+  checkoutRecoverySettings: CheckoutRecoverySettings
   userErrors: [UserError!]!
 }
 
@@ -5429,6 +5494,11 @@ A notification the shop's customers get about their orders, an alert the shop ge
 """
 enum MessageKind {
   """
+  A shopper who typed their number at checkout and left without ordering, reminded once with a link back to the items (CHK-12, ADR-393): sent as the shop's checkout recovery setting says, which turns it on and off, not here.
+  """
+  CHECKOUT_REMINDER
+
+  """
   For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: its message credit fell below Rs 100 (ADR-169, ADR-195).
   """
   CREDIT_LOW
@@ -5799,6 +5869,11 @@ type Mutation {
   Sets the channels the checkout's page offers a box for the shop's news and offers on, each once; none for no boxes. A box ticked records the customer's consent on its channel as the order is placed, from CHECKOUT.
   """
   checkoutMarketingChannelsUpdate(channels: [MarketingChannel!]!): CheckoutMarketingChannelsUpdatePayload!
+
+  """
+  Sets how long after a shopper leaves checkout, having typed their number, they are reminded once on WhatsApp, of 30, 60, 180 or 600 minutes; null for never. Each reminder is a marketing message, charged to the shop as its messages are.
+  """
+  checkoutRecoverySettingsUpdate(reminderAfterMinutes: Int): CheckoutRecoverySettingsUpdatePayload!
 
   """
   Replaces the badges the checkout's page shows, in the order given: up to 4, each once. WHATSAPP needs the shop's WhatsApp number, from the online store's preferences.
@@ -9495,6 +9570,11 @@ input PurchaseOrderUpdateInput {
 
 type Query {
   """
+  Checkouts shoppers left after typing their number, the latest first, `first` at a time after the one `after` names; kept 30 days (CHK-12, ADR-393).
+  """
+  abandonedCheckouts(after: ID, first: Int): [AbandonedCheckout!]!
+
+  """
   What the shop's staff and apps changed, the latest first: each change as the event it recorded, by whom and to what. What needs accounting for, with more about it, is on auditLog. Owners and managers, and apps with read_settings.
   """
   activityLog(
@@ -9596,6 +9676,11 @@ type Query {
   The channels the checkout's page offers a box for the shop's news and offers on, each unticked until the shopper ticks it (ADR-187): WHATSAPP until the shop chooses.
   """
   checkoutMarketingChannels: [MarketingChannel!]!
+
+  """
+  Whether, and how long after they leave, the shop reminds shoppers (ADR-393).
+  """
+  checkoutRecoverySettings: CheckoutRecoverySettings!
 
   """The badges the shop chose for its checkout's page, in their order."""
   checkoutTrustBadges: [CheckoutTrustBadge!]!

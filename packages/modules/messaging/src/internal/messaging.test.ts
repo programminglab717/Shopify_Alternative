@@ -464,6 +464,8 @@ describe("Messages' words", () => {
     ]);
     expect(ALWAYS_SENT).toEqual([
       'one_time_code',
+      // Checkout's own setting turns it on and off (ADR-393).
+      'checkout_reminder',
       'invoice_due',
       'plan_ended',
       'credit_low',

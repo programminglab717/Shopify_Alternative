@@ -4,10 +4,12 @@ import { InventoryModule } from '@hatti/inventory/public';
 import { MessagesService } from '@hatti/messaging/public';
 import { OrdersModule } from '@hatti/orders/public';
 import { Module } from '@nestjs/common';
+import { AbandonedCheckoutService } from './abandoned.service.js';
 import { CartController } from './cart.controller.js';
 import { CartService } from './cart.service.js';
 import {
   CheckoutController,
+  ReminderLinkController,
   StorefrontCheckoutController,
   StorefrontPaymentLinkController,
 } from './checkout.controller.js';
@@ -15,6 +17,7 @@ import { CheckoutService } from './checkout.service.js';
 import { CodRulesService } from './cod-rules.service.js';
 import { CheckoutCustomerData } from './customer-data.js';
 import { DeliveryService } from './delivery.service.js';
+import { AbandonedCheckoutResolver } from './graphql/abandoned.resolver.js';
 import { CodRulesResolver } from './graphql/cod-rules.resolver.js';
 import { DeliveryResolver } from './graphql/delivery.resolver.js';
 import { CheckoutMarketingResolver } from './graphql/marketing.resolver.js';
@@ -45,6 +48,9 @@ import { TrustBadgeService } from './trust-badge.service.js';
     // Links many customers open, each to a checkout of their own (ADR-248).
     PaymentLinkService,
     PaymentLinkResolver,
+    // Checkouts shoppers left, and their reminders (ADR-393).
+    AbandonedCheckoutService,
+    AbandonedCheckoutResolver,
     // Sends the codes that prove shoppers' numbers (CHK-09).
     MessagesService,
     // Browsers' proofs of numbers in customers' erasure and exports (ADR-199).
@@ -55,6 +61,7 @@ import { TrustBadgeService } from './trust-badge.service.js';
     StorefrontCheckoutController,
     StorefrontPaymentLinkController,
     CheckoutController,
+    ReminderLinkController,
   ],
   exports: [
     CartService,
@@ -64,6 +71,7 @@ import { TrustBadgeService } from './trust-badge.service.js';
     CheckoutMarketingService,
     CheckoutService,
     PaymentLinkService,
+    AbandonedCheckoutService,
   ],
 })
 export class CheckoutModule {}

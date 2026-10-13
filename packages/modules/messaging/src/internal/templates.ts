@@ -29,6 +29,7 @@ export const MESSAGE_KINDS = [
   'order_confirmation_reminder',
   'store_credit_given',
   'store_credit_expiring',
+  'checkout_reminder',
   'one_time_code',
   'stock_low',
   'stock_out',
@@ -73,6 +74,8 @@ export type AnyMessageKind = MessageKind | PlatformMessageKind;
  */
 export const ALWAYS_SENT: readonly MessageKind[] = [
   'one_time_code',
+  // Turned on and off with checkout's own setting, which says when (ADR-393).
+  'checkout_reminder',
   'invoice_due',
   'plan_ended',
   'credit_low',
@@ -498,6 +501,22 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: '{shop}: {amount} of your store credit expires on {date}. Spend it on an order before then, ordering with this number.',
       ur: '{shop}: آپ کے اسٹور کریڈٹ میں سے {amount} کی میعاد {date} کو ختم ہو جائے گی۔ اس سے پہلے اسے کسی آرڈر پر استعمال کریں، اسی نمبر سے آرڈر کر کے۔',
+    },
+  },
+  checkout_reminder: {
+    whatsapp: 'hatti_checkout_reminder',
+    // Meta counts a nudge to buy as marketing, priced apart (ADR-393).
+    category: 'marketing',
+    parameters: ['name', 'shop'],
+    // Back to the items left in the cart.
+    buttons: [{ type: 'url' }],
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! You left items in your cart at {shop}. They are still ' +
+        'waiting for you: finish your order here:',
+      ur:
+        'السلام علیکم {name}! آپ نے {shop} پر اپنی ٹوکری میں کچھ چیزیں چھوڑ دی تھیں۔ وہ ابھی ' +
+        'آپ کی منتظر ہیں، اپنا آرڈر یہاں مکمل کریں:',
     },
   },
   stock_low: {

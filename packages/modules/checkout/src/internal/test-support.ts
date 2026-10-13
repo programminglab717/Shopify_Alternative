@@ -11,6 +11,7 @@ import { BrandService, FileService } from '@hatti/files/public';
 import { newId } from '@hatti/ids';
 import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
 import { MessagesService } from '@hatti/messaging/public';
+import { AbandonedCheckoutService } from './abandoned.service.js';
 import {
   BankTransferService,
   FulfillmentService,
@@ -122,6 +123,8 @@ export interface CheckoutFixture {
   /** The channels the checkout's page offers boxes for the shop's news and offers on. */
   marketing: CheckoutMarketingService;
   checkouts: CheckoutService;
+  /** Checkouts shoppers left after typing their number, and their reminders (ADR-393). */
+  abandoned: AbandonedCheckoutService;
   /** What the worker's sweep deletes once past its time (ADR-230). */
   expiry: CheckoutExpiry;
   orders: OrderService;
@@ -233,6 +236,13 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
       payments,
       new PublicSite('https://hatti.test'),
     ),
+    abandoned: new AbandonedCheckoutService(
+      db,
+      new MessagesService(db),
+      orders,
+      storefronts,
+      new PublicSite('https://hatti.test'),
+    ),
     expiry: new CheckoutExpiry(db),
     orders,
     payments,
@@ -288,6 +298,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM checkout.cod_settings;
         DELETE FROM checkout.trust_badges;
         DELETE FROM checkout.marketing_options;
+        DELETE FROM checkout.recovery_settings;
         DELETE FROM online_store.preferences;
         DELETE FROM pricing.discount_redemptions;
         DELETE FROM pricing.discount_codes;

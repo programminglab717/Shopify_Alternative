@@ -356,6 +356,17 @@ class FakeCore {
     return this.page;
   }
 
+  /** The names and numbers shoppers typed at checkout, as the page's script sent them. */
+  readonly contacts: { token: string; name: string; phone: string }[] = [];
+
+  async checkoutContact(
+    _shopId: string,
+    token: string,
+    contact: { name: string; phone: string },
+  ): Promise<void> {
+    this.contacts.push({ token, ...contact });
+  }
+
   /** The searches asked for, and what they find. */
   readonly searches: { shopId: string; terms: string; options: SearchOptions }[] = [];
   found: string[] | Error = [];
@@ -1239,6 +1250,29 @@ describe('Carts', () => {
       });
     }
     await app.close();
+  });
+
+  it('passes the name and number a shopper typed at checkout to the core, from the shop alone (ADR-393)', async () => {
+    const app = server();
+    const sent = await app.inject({
+      method: 'POST',
+      url: '/checkouts/c-secret/contact',
+      headers: { ...FORM, 'sec-fetch-site': 'same-origin' },
+      payload: form({ name: 'Ayesha Khan', phone: '0300 1234567', other: 'x' }),
+    });
+    expect([sent.statusCode, sent.headers['cache-control']]).toEqual([204, 'no-store']);
+    expect(core.contacts).toEqual([
+      { token: 'c-secret', name: 'Ayesha Khan', phone: '0300 1234567' },
+    ]);
+    // From another site: nothing passed on.
+    const elsewhere = await app.inject({
+      method: 'POST',
+      url: '/checkouts/c-secret/contact',
+      headers: { ...FORM, 'sec-fetch-site': 'cross-site' },
+      payload: form({ name: 'Someone', phone: '0300 7654321' }),
+    });
+    expect(elsewhere.statusCode).toBe(204);
+    expect(core.contacts).toHaveLength(1);
   });
 
   it("shows a checkout's page on the shop's address, and forgets the count once its order is placed", async () => {

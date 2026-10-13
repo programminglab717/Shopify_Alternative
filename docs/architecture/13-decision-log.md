@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-392 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-393 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -400,6 +400,7 @@
 | 390 | A draft order is shipped or picked up: one picked up names a location offering pickup, or the only one, has no delivery charge, and becomes an order picked up there; its link says the customer pays when they collect it | Accepted |
 | 391 | Checkout offers pickup at each location that lets customers pick up: chosen, the order has no delivery charge, the shopper's address is optional with the location's standing in, and the thank-you page says where to collect it | Accepted |
 | 392 | An order may repeat another: placed for a customer with an open order not shipped yet, from the three days before, with an item in common, it names that order, and staff merge it in, cancel it as a repeat, or keep both | Accepted |
+| 393 | Abandoned checkouts: the number a shopper types is kept as they type it, the shop sees who left, and may remind them once on WhatsApp, after the delay it sets, with a link back to their items; an order the number places then recovers it | Accepted |
 
 ---
 
@@ -15253,3 +15254,44 @@
     turned away.
   * **Matching the whole basket:** a customer adding an item would not be caught; any item in
     common is enough for a hint staff can dismiss.
+
+## ADR-393 · Abandoned checkouts: the number a shopper types is kept as they type it, the shop sees who left, and may remind them once on WhatsApp, after the delay it sets, with a link back to their items; an order the number places then recovers it
+
+* **Context:**
+  * Most shoppers who start a checkout leave without ordering. Shopify keeps their email and
+    reminds them; in Pakistan the number is what shoppers give, and WhatsApp is where they
+    answer. The checkout kept nothing the shopper typed until the order had it ([ADR-044](#adr-044--checkout-is-one-page-the-core-renders-and-storefronts-serve-on-the-shops-address-placing-a-cash-on-delivery-order-as-the-page-showed-it)).
+  * Hatti's WhatsApp templates are shared by every shop, and a URL button can vary only the last
+    part of its address ([ADR-147](#adr-147--a-cash-on-delivery-order-waiting-for-its-customer-asks-them-on-whatsapp-to-confirm-it-with-confirm-cancel-and-change-address-buttons-and-its-link-their-answer-comes-through-the-webhook-as-an-event-and-the-worker-confirms-or-cancels-the-order-as-their-link-would)).
+* **Decision:**
+  * **The checkout keeps the name and number** the shopper types, with the cart's items and
+    their subtotal then: as the page is posted without placing the order, and as a small script
+    on the page sends them once the number is whole, to `/checkouts/<secret>/contact` on the
+    page's own site. The page's policy lets its scripts connect to that site alone
+    (`connect-src 'self'`); the page works without the script, as with the pin's
+    ([ADR-259](#adr-259--a-delivery-address-may-carry-a-pin-where-the-customers-phone-is-at-the-address-checkouts-and-customers-links-address-forms-add-it-by-the-pages-first-script-allowed-by-its-hash-it-is-kept-in-pakistan-and-near-the-city-typed-as-shopifys-latitude-and-longitude)). The storefront relays it to the core, from the shop's own pages only.
+  * **The shop sees who left**: `abandonedCheckouts` lists them, the latest first, with the
+    number masked for roles that see numbers masked; a checkout with a number is kept 30 days
+    past its page's day.
+  * **The shop may remind them once**, 30, 60, 180 or 600 minutes after they left
+    (`checkoutRecoverySettingsUpdate`); never until it chooses. The worker's sweep queues one
+    `checkout_reminder` message, which Meta counts as marketing, charged to the shop as its
+    messages are, for shoppers who left within the last day and have ordered nothing since.
+    Its button opens `/r/<secret>` on the core's address, which sends them on to their shop's
+    storefront at a cart permalink of their items.
+  * **An order recovers it**: one the same number places through checkout within 7 days, or by
+    any way before the reminder is due, which then is not sent.
+  * **Erasing a customer** takes what they typed from the checkouts they left; their file lists
+    them.
+* **Consequences:**
+  * A shopper who types their number and leaves gets at most one message from the shop, and only
+    where it chose to send them; the shop can't turn the kind off in its notifications, as
+    checkout's setting is its switch.
+  * The reminder's link names the items, not the discount code or the address typed: the cart
+    permalink starts a new checkout.
+* **Alternatives:**
+  * **A two-step checkout, the number first:** the page stays one form, as shoppers on slow
+    phones finish it faster; the script keeps the number as it is typed.
+  * **Keeping the checkout's own secret for the link:** only its SHA-256 is kept, so a reminder
+    has a secret of its own.
+  * **Reminding on by default:** each reminder costs the shop a marketing message, so it chooses.

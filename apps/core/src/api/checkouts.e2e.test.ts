@@ -1,7 +1,11 @@
 import 'reflect-metadata';
-import { generateAccessToken } from '@hatti/api';
+import { PublicSite, StorefrontSite, generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import { AbandonedCheckoutService } from '@hatti/checkout/public';
+import { Database } from '@hatti/db';
 import { fromPublicId, newId } from '@hatti/ids';
+import { MessagesService } from '@hatti/messaging/public';
+import { OrderService } from '@hatti/orders/public';
 import {
   StorefrontApiClient,
   cartPath,
@@ -305,6 +309,107 @@ describe.skipIf(!server)('Checkouts', () => {
       ok: true,
       path: expect.stringMatching(/^\/checkouts\//),
     });
+  });
+
+  it('keeps the number a shopper typed and left, reminds them once, and sends the link back to the items (ADR-393)', async () => {
+    const path = await checkout();
+    const secret = path.split('/').at(-1)!;
+    // As the page's script sends it, on the core's address and through the storefront's.
+    const typed = await post(`${path}/contact`, { name: 'Ayesha Khan', phone: '0300 1234567' });
+    expect(typed.statusCode).toBe(204);
+    const relayed = await app.inject({
+      method: 'POST',
+      url: `${checkoutsPath(shopA, secret)}/contact`,
+      headers: asStorefront,
+      payload: { name: 'Ayesha', phone: '0300 1234567' },
+    });
+    expect(relayed.statusCode).toBe(204);
+    // Its page's policy lets its script send it to the page's own site alone.
+    const page = await app.inject({ method: 'GET', url: path });
+    expect(page.headers['content-security-policy']).toContain("connect-src 'self'");
+
+    const gql = (token: string, query: string, variables: Record<string, unknown> = {}) =>
+      app.inject({
+        method: 'POST',
+        url: ADMIN_GRAPHQL_PATH,
+        headers: { 'x-hatti-access-token': token },
+        payload: { query, variables },
+      });
+    const LIST = `{
+      abandonedCheckouts {
+        id name phone lineItems { title quantity } subtotalPrice { formatted }
+        remindedAt recoveredOrder { name }
+      }
+    }`;
+    expect((await gql(adminToken, LIST)).json().data.abandonedCheckouts).toEqual([
+      {
+        id: expect.stringMatching(/^ack_/),
+        name: 'Ayesha',
+        phone: '+923001234567',
+        lineItems: [{ title: 'Kurta', quantity: 2 }],
+        subtotalPrice: { formatted: 'Rs 4,000' },
+        remindedAt: null,
+        recoveredOrder: null,
+      },
+    ]);
+
+    // The shop turns reminders on, an hour after.
+    const { token: settings, hash, hint } = generateAccessToken();
+    await admin.query(
+      `INSERT INTO apps.access_tokens (shop_id, name, token_hash, token_hint, scopes)
+       VALUES ($1, 'settings', $2, $3, $4)`,
+      [shopA, hash, hint, ['write_settings']],
+    );
+    const UPDATE = `mutation ($minutes: Int) {
+      checkoutRecoverySettingsUpdate(reminderAfterMinutes: $minutes) {
+        checkoutRecoverySettings { reminderAfterMinutes } userErrors { field code }
+      }
+    }`;
+    expect((await gql(settings, UPDATE, { minutes: 45 })).json().data).toEqual({
+      checkoutRecoverySettingsUpdate: {
+        checkoutRecoverySettings: null,
+        userErrors: [{ field: ['input', 'reminderAfterMinutes'], code: 'INVALID' }],
+      },
+    });
+    expect((await gql(settings, UPDATE, { minutes: 60 })).json().data).toEqual({
+      checkoutRecoverySettingsUpdate: {
+        checkoutRecoverySettings: { reminderAfterMinutes: 60 },
+        userErrors: [],
+      },
+    });
+    expect((await gql(adminToken, UPDATE, { minutes: null })).json().errors[0].message).toContain(
+      'write_settings',
+    );
+
+    // The worker's sweep, an hour and more on: one reminder, its link to the items.
+    // With the system role, which finds the shops with shoppers to remind, as the worker has.
+    const database = new Database({
+      appUrl: testDb.appUrl,
+      systemUrl: testDb.systemUrl,
+      applicationName: 'checkout-reminders-test',
+    });
+    const abandoned = new AbandonedCheckoutService(
+      database,
+      new MessagesService(database),
+      app.get(OrderService),
+      app.get(StorefrontSite),
+      app.get(PublicSite),
+    );
+    expect(await abandoned.remindDue(new Date(Date.now() + 61 * 60_000))).toBe(1);
+    await database.close();
+    const { rows } = await admin.query<{ url: string; handle: string }>(
+      `SELECT m.variables ->> 'url' AS url, s.handle
+         FROM messaging.messages m JOIN control.shops s ON s.id = m.shop_id
+        WHERE m.kind = 'checkout_reminder'`,
+    );
+    const link = new URL(rows[0]!.url);
+    const opened = await app.inject({ method: 'GET', url: link.pathname });
+    expect(opened.statusCode).toBe(302);
+    expect(opened.headers.location).toMatch(
+      new RegExp(`^https?://${rows[0]!.handle}\\.[^/]+/cart/${kurta}:2$`),
+    );
+    expect((await app.inject({ method: 'GET', url: '/r/' + 'x'.repeat(22) })).statusCode).toBe(404);
+    await admin.query(`DELETE FROM checkout.recovery_settings; DELETE FROM messaging.messages`);
   });
 
   it('keeps what the shopper agreed to with the order, which the Admin API shows as it was', async () => {

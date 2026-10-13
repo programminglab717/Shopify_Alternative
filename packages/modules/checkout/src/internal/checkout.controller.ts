@@ -32,6 +32,8 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { REMINDER_LINK_PATH } from './abandoned.js';
+import { AbandonedCheckoutService } from './abandoned.service.js';
 import { checkoutPage } from './checkout-pages.js';
 import { MARKETING_FIELDS } from './marketing.js';
 import { PaymentLinkService } from './payment-link.service.js';
@@ -120,6 +122,17 @@ export class CheckoutController {
     await send(reply, token, responseOf(view, false));
   }
 
+  /**
+   * The name and number the shopper typed, as the page's script sends them once the number is
+   * whole (ADR-393): kept on the checkout, nothing shown. 204 whatever came of it.
+   */
+  @Post(':token/contact')
+  @HttpCode(204)
+  @Header('cache-control', 'no-store')
+  async contact(@Param('token') token: string, @Body() body: unknown): Promise<void> {
+    await this.checkouts.keepContact(token, contactOf(body));
+  }
+
   @Post(':token')
   async place(
     @Param('token') token: string,
@@ -192,6 +205,19 @@ export class StorefrontCheckoutController {
     return responseOf(await this.checkouts.view(token, shopId), false);
   }
 
+  /** The name and number the shopper typed, as on the core's own address (ADR-393). */
+  @Post(':token/contact')
+  @HttpCode(204)
+  @Header('cache-control', 'no-store')
+  async contact(
+    @Param('shopId') shopId: string,
+    @Param('token') token: string,
+    @Body() body: unknown,
+  ): Promise<void> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    await this.checkouts.keepContact(token, contactOf(body), shopId);
+  }
+
   @Post(':token')
   @HttpCode(200)
   @Header('cache-control', 'no-store')
@@ -262,6 +288,35 @@ export class StorefrontPaymentLinkController {
       html: page.html,
     };
   }
+}
+
+/**
+ * Where a reminder's link takes the shopper who left a checkout (ADR-393): /r/<secret> on the
+ * core's own address, as WhatsApp's buttons need one address for every shop, sends them on to
+ * their shop's storefront, at a cart of the items they left; 404 for a link it knows not.
+ */
+@Controller(REMINDER_LINK_PATH)
+export class ReminderLinkController {
+  constructor(private readonly abandoned: AbandonedCheckoutService) {}
+
+  @Get(':token')
+  async open(@Param('token') token: string, @Res() reply: FastifyReply): Promise<void> {
+    const target = await this.abandoned.reminderTarget(token);
+    if (!target) {
+      await reply
+        .code(404)
+        .headers(PRIVATE_PAGE_HEADERS)
+        .header('content-type', 'text/plain; charset=utf-8')
+        .send('This link is not known, or has expired.');
+      return;
+    }
+    await reply.code(302).headers(PRIVATE_PAGE_HEADERS).header('location', target).send();
+  }
+}
+
+/** The name and number a contact's body carries; blank for those it lacks. */
+function contactOf(body: unknown): { name: string; phone: string } {
+  return { name: field(body, 'name').slice(0, 200), phone: field(body, 'phone').slice(0, 40) };
 }
 
 /**

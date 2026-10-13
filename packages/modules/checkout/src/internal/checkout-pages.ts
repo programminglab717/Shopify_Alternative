@@ -409,9 +409,37 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
       link(`${shop.storefront}/cart`, LABELS.backToCart),
       policyLinks(shop),
     ],
-    { scripts: orderable ? [LOCATION_SCRIPT] : [] },
+    orderable ? { scripts: [LOCATION_SCRIPT, CONTACT_SCRIPT], connectsHome: true } : {},
   );
 }
+
+/**
+ * Sends the name and number the shopper typed back to the page's address, /contact after it,
+ * once the number has its digits (ADR-393): the shop sees who left without ordering and may remind
+ * them. The same text on every page, which their policy allows by its hash, with requests to the
+ * page's own site alone; without it, the page keeps them as it is posted.
+ */
+export const CONTACT_SCRIPT = `(function () {
+  var phone = document.querySelector('input[name="phone"]');
+  var name = document.querySelector('input[name="name"]');
+  if (!phone || !window.fetch || !window.URLSearchParams) return;
+  var sent = '';
+  function send() {
+    var digits = phone.value.replace(/\\D/g, '');
+    var key = digits + '|' + (name ? name.value : '');
+    if (digits.length < 10 || key === sent) return;
+    sent = key;
+    fetch(location.pathname.replace(/\\/$/, '') + '/contact', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ name: name ? name.value : '', phone: phone.value }).toString(),
+      credentials: 'same-origin',
+      keepalive: true
+    }).catch(function () {});
+  }
+  phone.addEventListener('change', send);
+  if (name) name.addEventListener('change', send);
+})();`;
 
 /** What delivery costs an order the shopper picks up: nothing (ADR-391). */
 const NO_DELIVERY: DeliverySettingsRecord = {
@@ -1621,7 +1649,11 @@ function page(
   title: string,
   shop: CheckoutShop | null,
   body: HtmlValue[],
-  options: { formTargets?: readonly string[]; scripts?: readonly string[] } = {},
+  options: {
+    formTargets?: readonly string[];
+    scripts?: readonly string[];
+    connectsHome?: boolean;
+  } = {},
 ): CheckoutPage {
   return {
     status,
@@ -1632,6 +1664,7 @@ function page(
       images: shop?.logo ? [shop.logo] : [],
       formTargets: options.formTargets ?? [],
       scripts: options.scripts ?? [],
+      connectsHome: options.connectsHome ?? false,
     }),
   };
 }

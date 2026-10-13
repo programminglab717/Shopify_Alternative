@@ -58,6 +58,7 @@ import type { CartJson } from '@hatti/storefront-api';
 import { NO_TAX, taxSettingsIn, type TaxRates, type TaxSettingsRecord } from '@hatti/tax/public';
 import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
+import { keepContactIn, recoverIn } from './abandoned.service.js';
 import { CartService } from './cart.service.js';
 import {
   NO_COD_RULES,
@@ -517,9 +518,44 @@ export class CheckoutService {
     form: CheckoutForm,
     options: { shopId?: string; client?: CheckoutClient } = {},
   ): Promise<CheckoutView> {
-    const { shopId, client } = options;
-    const found = await this.#resolve(token, shopId);
+    const found = await this.#resolve(token, options.shopId);
     if (!found) return { kind: 'not_found' };
+    const view = await this.#placeOrShow(found, shown, form, options.client);
+    // Not placed: the name and number typed are kept, for the shop to see who left and, as it
+    // chooses, remind them (ADR-393).
+    if (view.kind === 'open' && form.phone.trim() !== '') {
+      await this.db.tenant(found.shopId, (tx) =>
+        keepContactIn(tx, found.shopId, found.checkoutId, form, view.cart),
+      );
+    }
+    return view;
+  }
+
+  /**
+   * Keeps the name and number the shopper typed on the checkout's page, as its script sends them
+   * once a number is whole (ADR-393), with the cart's items: nothing placed or shown. Whether it
+   * kept them: not for a checkout placed, gone or expired, or a number that is no mobile.
+   */
+  async keepContact(
+    token: string,
+    typed: { name: string; phone: string },
+    shopId?: string,
+  ): Promise<boolean> {
+    const found = await this.#resolve(token, shopId);
+    if (!found) return false;
+    return this.db.tenant(found.shopId, async (tx) => {
+      const view = await this.#view(tx, found, false, EMPTY_FORM);
+      if (view.kind !== 'open') return false;
+      return keepContactIn(tx, found.shopId, found.checkoutId, typed, view.cart);
+    });
+  }
+
+  async #placeOrShow(
+    found: { shopId: string; checkoutId: string },
+    shown: string,
+    form: CheckoutForm,
+    client: CheckoutClient | undefined,
+  ): Promise<CheckoutView> {
     // A new code asked for: sent, and nothing placed.
     if (form.resend === 'whatsapp' || form.resend === 'sms') {
       return this.#sendCode(found, form, form.resend, client);
@@ -901,6 +937,9 @@ export class CheckoutService {
         .update(checkouts)
         .set({ orderId: placed.value.id, completedAt: sql`now()` })
         .where(and(eq(checkouts.shopId, found.shopId), eq(checkouts.id, found.checkoutId)));
+      // Checkouts the number left lately are recovered by it, this one if it was reminded first
+      // (ADR-393).
+      await recoverIn(tx, found.shopId, address.phone, placed.value.id, found.checkoutId);
       await this.carts.emptyIn(tx, found.shopId, view.cartId);
       const order =
         storeCredit > 0n

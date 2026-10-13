@@ -95,9 +95,12 @@ export class MessagingSettingsService {
         break;
       }
       if ((ALWAYS_SENT as readonly string[]).includes(kind)) {
-        const why = paidByShop(kind as MessageKind)
-          ? 'shoppers ask for it'
-          : 'it tells the shop of its bills with Hatti';
+        const why =
+          kind === 'checkout_reminder'
+            ? "checkout's recovery setting turns it on and off"
+            : paidByShop(kind as MessageKind)
+              ? 'shoppers ask for it'
+              : 'it tells the shop of its bills with Hatti';
         check.add(['input', 'disabled'], 'INVALID', `can't turn off "${kind}": ${why}`);
         break;
       }
