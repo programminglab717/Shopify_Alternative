@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Products' reviews, written on a delivered order's page
+### 39c5955 · Products' reviews, written on a delivered order's page
 
 * **On the order's page** ([ADR-399](../architecture/13-decision-log.md#adr-399--customers-rate-what-their-delivered-order-brought-them-on-its-own-page-one-to-five-stars-a-product-with-words-if-they-like-each-review-waits-for-the-shop-which-publishes-or-hides-it-unless-its-stars-reach-those-the-shop-publishes-by-itself), MKT-05): once it is delivered, the customer rates each
   product it brought, one to five stars, with words if they like, and may change them later.
