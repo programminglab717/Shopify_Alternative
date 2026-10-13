@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Pre-orders in the admin
+### 1d6cc92 · Pre-orders in the admin
 
 * **A product's page** ([ADR-405](../architecture/13-decision-log.md#adr-405--the-admin-puts-a-product-on-pre-order-from-its-page-beside-its-stock-rules-with-the-day-it-ships-by-a-month-ahead-to-begin-with-warns-when-that-day-has-gone-by-and-an-orders-page-says-of-each-line-sold-on-pre-order-the-day-it-ships-by), CAT-14) has a pre-order card after its stock rules, for the
   owner and managers: "Take pre-orders" and the day it ships by, a month ahead to begin with,
