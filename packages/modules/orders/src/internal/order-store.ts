@@ -114,6 +114,7 @@ interface OrderJsonRow extends Record<string, unknown> {
     taxable: boolean;
     tax_rate: number | null;
     tax: string;
+    preorder_ships_on: string | null;
   }[];
   fulfillments: {
     id: string;
@@ -283,6 +284,7 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
       taxable: line.taxable,
       taxRate: line.tax_rate,
       tax: BigInt(line.tax),
+      preorderShipsOn: line.preorder_ships_on,
     })),
     fulfillments: row.fulfillments.map((parcel): FulfillmentRecord => ({
       id: parcel.id,
@@ -415,7 +417,8 @@ export async function loadOrders(
                       'unit_price', l.unit_price::text, 'total', l.total::text,
                       'weight_grams', l.weight_grams,
                       'fulfilled_quantity', l.fulfilled_quantity, 'taxable', l.taxable,
-                      'tax_rate', l.tax_rate, 'tax', l.tax::text) ORDER BY l.position)
+                      'tax_rate', l.tax_rate, 'tax', l.tax::text,
+                      'preorder_ships_on', l.preorder_ships_on) ORDER BY l.position)
                FROM orders.lines l
               WHERE l.shop_id = o.shop_id AND l.order_id = o.id), '[]') AS lines,
            coalesce((

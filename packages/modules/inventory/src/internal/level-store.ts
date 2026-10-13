@@ -82,9 +82,14 @@ export async function lockLevels(
   const { rows } = await tx.execute<LockedLevelRow>(sql`
     SELECT l.id, l.variant_id, l.location_id, l.on_hand, l.committed, l.reserved,
            l.safety_stock, l.available, l.version,
-           i.product_id, i.tracked, i.inventory_policy, loc.is_active AS location_active
+           i.product_id, i.tracked,
+           -- On pre-order, it sells on at zero whatever its own policy (ADR-403).
+           CASE WHEN p.product_id IS NULL THEN i.inventory_policy ELSE 'continue' END
+             AS inventory_policy,
+           loc.is_active AS location_active
       FROM inventory.levels l
       JOIN inventory.items i ON i.shop_id = l.shop_id AND i.variant_id = l.variant_id
+      LEFT JOIN inventory.preorders p ON p.shop_id = i.shop_id AND p.product_id = i.product_id
       JOIN inventory.locations loc ON loc.shop_id = l.shop_id AND loc.id = l.location_id
      WHERE l.shop_id = ${shopId}
        AND (l.variant_id, l.location_id) IN (

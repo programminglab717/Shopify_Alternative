@@ -1,7 +1,7 @@
 import type { Actor } from '@hatti/api';
 import type { Tx } from '@hatti/db';
 import { Injectable } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import {
   levelKey,
   lockLevels,
@@ -11,7 +11,7 @@ import {
 } from './level-store.js';
 import type { AdjustmentGroupRecord } from './records.js';
 import { LIMITS, STOCK_REASONS } from './rules.js';
-import { items, type InventoryPolicyValue } from './schema.js';
+import type { InventoryPolicyValue } from './schema.js';
 
 /** Units of one variant at one location, e.g. an order line. */
 export interface StockLine {
@@ -294,23 +294,23 @@ export class StockService {
     );
   }
 
-  /** The policy of each tracked item among `variantIds`. */
+  /**
+   * The policy of each tracked item among `variantIds`: `continue` for those whose product is on
+   * pre-order (ADR-403), whatever their own.
+   */
   async #trackedPolicies(
     tx: Tx,
     shopId: string,
     variantIds: readonly string[],
   ): Promise<Map<string, InventoryPolicyValue>> {
     if (variantIds.length === 0) return new Map();
-    const rows = await tx
-      .select({ variantId: items.variantId, policy: items.inventoryPolicy })
-      .from(items)
-      .where(
-        and(
-          eq(items.shopId, shopId),
-          eq(items.tracked, true),
-          inArray(items.variantId, [...new Set(variantIds)]),
-        ),
-      );
-    return new Map(rows.map((row) => [row.variantId, row.policy]));
+    const { rows } = await tx.execute<{ variant_id: string; policy: InventoryPolicyValue }>(sql`
+      SELECT i.variant_id,
+             CASE WHEN p.product_id IS NULL THEN i.inventory_policy ELSE 'continue' END AS policy
+        FROM inventory.items i
+        LEFT JOIN inventory.preorders p ON p.shop_id = i.shop_id AND p.product_id = i.product_id
+       WHERE i.shop_id = ${shopId} AND i.tracked
+         AND i.variant_id = ANY(${sql.param([...new Set(variantIds)])}::uuid[])`);
+    return new Map(rows.map((row) => [row.variant_id, row.policy]));
   }
 }

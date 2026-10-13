@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: pre-orders (CAT-14), products sold
-before they are in stock, with when they ship; then size charts (CAT-10). Urdu handles wait, as
-decided.
+**Next, section by section as the alpha's shops need them**: pre-orders on the storefront, the
+cart, the checkout and the order's page, saying when they ship (CAT-14); then the admin's
+pre-order setting. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,22 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Pre-orders
+
+* **A product on pre-order** ([ADR-403](../architecture/13-decision-log.md#adr-403--a-product-the-shop-puts-on-pre-order-sells-whatever-its-stock-as-if-its-variants-kept-selling-at-zero-and-promises-a-day-it-ships-by-which-the-lines-of-orders-placed-meanwhile-keep-inventory-keeps-it-by-product), CAT-14) sells whatever its stock until the day it ships
+  by, from today to a year ahead. `productPreorderSet` puts it on, moves its day or takes it
+  off; `Product.preorder` reads it. The inventory module keeps it, by product, and every check
+  of whether a variant may sell reads it beside the variant's own policy, which it leaves as it
+  was.
+* **Each order line keeps the day its product promised** when it was sold
+  (`OrderLineItem.preorderShipsOn`), through checkout, the Admin API, drafts and edits.
+* **The storefront rebuilds the product** on `product_preorder.updated`.
+* **The orders module's own reads of reviews** went through the catalog's facade the commit
+  before; this one adds the second foreign key across modules, a pre-order going with its
+  product, in the conventions.
+* 2695 tests (6 new): pre-orders in inventory, and through the Admin
+  API with orders' lines.
 
 ### 4a4e47b · Reviews read through the catalog's facade
 

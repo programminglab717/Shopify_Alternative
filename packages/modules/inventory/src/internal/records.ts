@@ -59,6 +59,11 @@ export interface InventoryItemRecord {
   variantId: string;
   tracked: boolean;
   inventoryPolicy: InventoryPolicyValue;
+  /**
+   * Its product is on pre-order (CAT-14, ADR-403): it sells whatever its stock, as if it kept
+   * selling at zero, whatever its own policy says.
+   */
+  preorder: boolean;
   /** Levels at active locations, primary first, then by name. */
   levels: InventoryLevelRecord[];
 }

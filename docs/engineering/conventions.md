@@ -32,8 +32,9 @@
   * A module may add fields to GraphQL types another module exports: the catalog exports
     `Product` and `ProductVariant`, and inventory adds their stock fields; customers export
     `Customer`, and orders add a customer's orders and what they add up to.
-  * The one foreign key across modules is `inventory.items → catalog.variants`: stock belongs to
-    its variant and is deleted with it. Translations go with what they translate the same way, by
+  * Two foreign keys cross modules: `inventory.items → catalog.variants`, stock belonging to its
+    variant and deleted with it, and `inventory.preorders → catalog.products`, a pre-order
+    going with its product ([ADR-403](../architecture/13-decision-log.md#adr-403--a-product-the-shop-puts-on-pre-order-sells-whatever-its-stock-as-if-its-variants-kept-selling-at-zero-and-promises-a-day-it-ships-by-which-the-lines-of-orders-placed-meanwhile-keep-inventory-keeps-it-by-product)). Translations go with what they translate the same way, by
     the online store's triggers on the catalog's tables, since one column names ten kinds
     ([ADR-261](../architecture/13-decision-log.md#adr-261--a-translation-is-deleted-with-what-it-translates-whichever-way-that-goes-by-triggers-on-the-tables-of-what-may-be-translated-as-a-foreign-key-would-if-one-column-could-name-ten-kinds-a-menus-items-as-the-menu-goes-or-an-update-drops-them)).
   * A module can offer an extension point that others register with at start-up, as the
@@ -355,7 +356,9 @@ Stock follows Shopify's model too. How changes are written is decided in
   online orders.
 * **Tracking starts with the first stock.** A variant whose stock was never recorded has no item
   row: it is not tracked, and always sells. Setting or adjusting its stock creates the item,
-  tracked, and records `inventory_item.updated`. `inventoryPolicy: CONTINUE` keeps selling at
+  tracked, and records `inventory_item.updated`. A product on pre-order sells whatever its
+  stock, each place that decides selling reading it beside the item's own policy ([ADR-403](../architecture/13-decision-log.md#adr-403--a-product-the-shop-puts-on-pre-order-sells-whatever-its-stock-as-if-its-variants-kept-selling-at-zero-and-promises-a-day-it-ships-by-which-the-lines-of-orders-placed-meanwhile-keep-inventory-keeps-it-by-product)).
+  `inventoryPolicy: CONTINUE` keeps selling at
   zero, and available goes negative.
 * **Merchants and apps** set quantities after a stock count (`inventorySetQuantities`) or adjust
   them (`inventoryAdjustQuantities`), with a reason from a fixed list such as `received` or

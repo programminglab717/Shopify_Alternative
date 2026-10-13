@@ -221,6 +221,7 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
       fulfillableQuantity: record.status === 'open' ? line.quantity - line.fulfilledQuantity : 0,
       taxable: line.taxable,
       taxLines: line.taxRate === null ? [] : [toTaxLine(line.taxRate, line.tax, currency)],
+      preorderShipsOn: line.preorderShipsOn,
     }),
   );
   const lineItemsById = new Map(record.lines.map((line, index) => [line.id, lineItems[index]!]));

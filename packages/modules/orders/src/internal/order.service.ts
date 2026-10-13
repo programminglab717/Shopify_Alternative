@@ -25,7 +25,12 @@ import {
 import { Database, executePrepared, literalLimit, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent, appendEvents, recordAudit } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { LocationService, StockService, type LocationRecord } from '@hatti/inventory/public';
+import {
+  LocationService,
+  StockService,
+  preordersIn,
+  type LocationRecord,
+} from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { orderTaxOf, taxSettingsIn } from '@hatti/tax/public';
 import { Injectable, Optional } from '@nestjs/common';
@@ -787,6 +792,12 @@ export class OrderService {
         phoneVerifiedAt: order.phoneVerifiedAt ?? null,
       })
       .returning();
+    // Lines of products on pre-order keep the day they ship by, as it is now (ADR-403).
+    const preorders = await preordersIn(
+      tx,
+      shopId,
+      priced.map((line) => line.snapshot.productId),
+    );
     await tx.insert(lines).values(
       priced.map((line, index) => ({
         shopId,
@@ -806,6 +817,7 @@ export class OrderService {
         taxable: line.snapshot.taxable,
         taxRate: tax.lines[index]!.rate,
         tax: tax.lines[index]!.tax,
+        preorderShipsOn: preorders.get(line.snapshot.productId) ?? null,
       })),
     );
     await addTimelineEntry(

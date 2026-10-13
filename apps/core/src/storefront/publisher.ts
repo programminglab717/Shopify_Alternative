@@ -194,8 +194,10 @@ export function itemsFor(event: DomainEvent): string[] {
     case CatalogEvents.CollectionDeleted:
       // A collection may take or give back the handle "all".
       return [Items.collection(id), Items.allProducts, Items.menus];
+    // Its stock, or its being on pre-order, where it sells whatever its stock (ADR-403).
     case InventoryEvents.InventoryItemUpdated:
     case InventoryEvents.InventoryLevelUpdated:
+    case InventoryEvents.ProductPreorderUpdated:
       return [Items.product((event.payload as { productId: string }).productId)];
     case ReviewEvents.Written:
     case ReviewEvents.Published:
@@ -335,6 +337,7 @@ export const PUBLISHED_EVENTS = [
   ReviewEvents.Hidden,
   InventoryEvents.InventoryItemUpdated,
   InventoryEvents.InventoryLevelUpdated,
+  InventoryEvents.ProductPreorderUpdated,
   InventoryEvents.LocationUpdated,
   OnlineStoreEvents.ThemeUpdated,
   OnlineStoreEvents.ThemePublished,

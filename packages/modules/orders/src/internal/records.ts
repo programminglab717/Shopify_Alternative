@@ -51,6 +51,11 @@ export interface OrderLineRecord {
   taxRate: number | null;
   /** What of its total, after its share of the order's discount, was tax. */
   tax: bigint;
+  /**
+   * The day it was promised to ship by, YYYY-MM-DD, its product being on pre-order when it was
+   * sold (CAT-14, ADR-403); null otherwise.
+   */
+  preorderShipsOn: string | null;
 }
 
 /**

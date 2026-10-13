@@ -13,7 +13,13 @@ import { appendEvent, appendEvents } from '@hatti/events';
 import { Injectable } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { InventoryEvents, type InventoryItemUpdatedPayload } from './events.js';
-import { availableForSale, loadItems, sellableQuantity, untrackedItem } from './item-store.js';
+import {
+  availableForSale,
+  loadItems,
+  sellableQuantity,
+  sellsWithoutLimit,
+  untrackedItem,
+} from './item-store.js';
 import {
   ensureItems,
   ensureLevels,
@@ -257,8 +263,8 @@ export class InventoryService {
 
   /**
    * How many of each of `variantIds` can be sold online now, in the caller's transaction `tx`:
-   * for carts, kept outside inventory. Null for no limit, when stock is not tracked or the variant
-   * sells on at zero.
+   * for carts, kept outside inventory. Null for no limit, when stock is not tracked, the variant
+   * sells on at zero or its product is on pre-order.
    */
   async sellableOf(
     tx: Tx,
@@ -269,8 +275,7 @@ export class InventoryService {
     return new Map(
       variantIds.map((id) => {
         const item = loaded.get(id) ?? untrackedItem(id);
-        const unlimited = !item.tracked || item.inventoryPolicy === 'continue';
-        return [id, unlimited ? null : Math.max(0, sellableQuantity(item))];
+        return [id, sellsWithoutLimit(item) ? null : Math.max(0, sellableQuantity(item))];
       }),
     );
   }

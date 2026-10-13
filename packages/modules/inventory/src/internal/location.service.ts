@@ -210,10 +210,13 @@ export class LocationService {
                              ${sql.param([...wanted.values()])}::int[]) AS want(variant_id, quantity)
                  JOIN inventory.items i
                    ON i.shop_id = loc.shop_id AND i.variant_id = want.variant_id AND i.tracked
+                -- What is on pre-order sells wherever (ADR-403): it rules no location out.
+                 LEFT JOIN inventory.preorders p
+                   ON p.shop_id = i.shop_id AND p.product_id = i.product_id
                  LEFT JOIN inventory.levels l
                    ON l.shop_id = loc.shop_id AND l.location_id = loc.id
                   AND l.variant_id = want.variant_id
-                WHERE coalesce(l.available, 0) < want.quantity)
+                WHERE p.product_id IS NULL AND coalesce(l.available, 0) < want.quantity)
        ORDER BY loc.is_primary DESC, lower(loc.name), loc.id
        LIMIT 1`);
     const found = rows[0] && (await this.locationsOf(tx, shopId, [rows[0].id])).get(rows[0].id);

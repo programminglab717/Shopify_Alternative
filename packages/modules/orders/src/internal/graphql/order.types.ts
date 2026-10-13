@@ -559,6 +559,14 @@ export class OrderLineItem {
       'it was not taxed.',
   })
   taxLines!: TaxLine[];
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The day it was promised to ship by, YYYY-MM-DD, its product being on pre-order when it ' +
+      'was sold (CAT-14); null otherwise.',
+  })
+  preorderShipsOn!: string | null;
 }
 
 @ObjectType({ description: "A parcel's courier and tracking number." })

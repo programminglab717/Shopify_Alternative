@@ -6,7 +6,7 @@ import type { InventoryPolicyValue } from './schema.js';
 
 /** The item of a variant whose stock was never recorded: not tracked, stocked nowhere. */
 export function untrackedItem(variantId: string): InventoryItemRecord {
-  return { variantId, tracked: false, inventoryPolicy: 'deny', levels: [] };
+  return { variantId, tracked: false, inventoryPolicy: 'deny', preorder: false, levels: [] };
 }
 
 /** Units that can be sold online: available at active locations that fulfil online orders. */
@@ -16,15 +16,21 @@ export function sellableQuantity(item: InventoryItemRecord): number {
     .reduce((sum, level) => sum + level.available, 0);
 }
 
+/** Whether the variant sells without limit: not tracked, kept selling at zero, or on pre-order. */
+export function sellsWithoutLimit(item: InventoryItemRecord): boolean {
+  return !item.tracked || item.inventoryPolicy === 'continue' || item.preorder;
+}
+
 /** Whether stock allows selling the variant online. */
 export function availableForSale(item: InventoryItemRecord): boolean {
-  return !item.tracked || item.inventoryPolicy === 'continue' || sellableQuantity(item) > 0;
+  return sellsWithoutLimit(item) || sellableQuantity(item) > 0;
 }
 
 interface ItemLevelRow extends Record<string, unknown> {
   variant_id: string;
   tracked: boolean;
   inventory_policy: InventoryPolicyValue;
+  preorder: boolean;
   level_id: string | null;
   on_hand: number;
   committed: number;
@@ -50,10 +56,11 @@ export async function loadItems(
   const { rows } = await executePrepared<ItemLevelRow>(
     tx,
     sql`
-    SELECT i.variant_id, i.tracked, i.inventory_policy,
+    SELECT i.variant_id, i.tracked, i.inventory_policy, p.product_id IS NOT NULL AS preorder,
            l.id AS level_id, l.on_hand, l.committed, l.reserved, l.safety_stock, l.available,
            l.updated_at AS level_updated_at, to_jsonb(loc) AS location
       FROM inventory.items i
+      LEFT JOIN inventory.preorders p ON p.shop_id = i.shop_id AND p.product_id = i.product_id
       LEFT JOIN (inventory.levels l
                  JOIN inventory.locations loc
                    ON loc.shop_id = l.shop_id AND loc.id = l.location_id AND loc.is_active)
@@ -69,6 +76,7 @@ export async function loadItems(
         variantId: row.variant_id,
         tracked: row.tracked,
         inventoryPolicy: row.inventory_policy,
+        preorder: row.preorder,
         levels: [],
       };
       items.set(row.variant_id, item);

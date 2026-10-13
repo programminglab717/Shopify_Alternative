@@ -6740,6 +6740,11 @@ type Mutation {
   """Deletes options, unless variants would then have the same options."""
   productOptionsDelete(options: [ID!]!, productId: ID!): ProductOptionsDeletePayload!
 
+  """
+  Puts a product on pre-order, shipping by a day from today to a year ahead, or takes it off with a null day. On pre-order it sells whatever its stock.
+  """
+  productPreorderSet(productId: ID!, shipsOn: String): ProductPreorderSetPayload!
+
   """Moves media, one move after another."""
   productReorderMedia(moves: [MoveInput!]!, productId: ID!): ProductPayload!
 
@@ -8021,6 +8026,11 @@ type OrderLineItem {
   """Units shipped so far."""
   fulfilledQuantity: Int!
   id: ID!
+
+  """
+  The day it was promised to ship by, YYYY-MM-DD, its product being on pre-order when it was sold (CAT-14); null otherwise.
+  """
+  preorderShipsOn: String
   productId: ID!
   quantity: Int!
   sku: String
@@ -9036,6 +9046,11 @@ type Product {
   """Images, in order."""
   media: [ProductMedia!]!
   options: [ProductOption!]!
+
+  """
+  Whether it is on pre-order, and the day it ships by; null when it is not.
+  """
+  preorder: ProductPreorder
   priceRange: ProductPriceRange!
   productType: String
 
@@ -9271,6 +9286,22 @@ type ProductOptionsDeletePayload {
 
 type ProductPayload {
   product: Product
+  userErrors: [UserError!]!
+}
+
+"""
+A product on pre-order (CAT-14): it sells whatever its stock, and orders placed now keep the day it ships by.
+"""
+type ProductPreorder {
+  productId: ID!
+
+  """The day the shop promises to send what is ordered now, YYYY-MM-DD."""
+  shipsOn: String!
+}
+
+type ProductPreorderSetPayload {
+  """Null once the product is off pre-order, or when there were errors."""
+  preorder: ProductPreorder
   userErrors: [UserError!]!
 }
 

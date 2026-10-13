@@ -7,6 +7,7 @@ export {
   type LocationCreatedPayload,
   type LocationDeletedPayload,
   type LocationUpdatedPayload,
+  type ProductPreorderUpdatedPayload,
   type PurchaseOrderPayload,
   type SupplierPayload,
 } from '../internal/events.js';
@@ -36,6 +37,15 @@ export {
   type SetQuantitiesInput,
 } from '../internal/inventory.service.js';
 export { availableForSale, sellableQuantity } from '../internal/item-store.js';
+// Pre-orders (CAT-14, ADR-403): the day each product on pre-order ships by, for orders' lines and
+// the storefront's documents.
+export {
+  PREORDER_LIMITS,
+  PreorderService,
+  pakistanDay,
+  preordersIn,
+  type PreorderRecord,
+} from '../internal/preorders.js';
 // Transfers between locations (ADR-360), counted on the admin's home (ADR-364).
 export { TransferService } from '../internal/transfer.service.js';
 export {

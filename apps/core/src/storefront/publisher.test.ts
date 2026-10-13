@@ -119,6 +119,10 @@ describe('What storefront documents an event makes stale', () => {
 
   it("rebuilds a product when its stock changes, and all of them when a location's selling does", () => {
     expect(itemsFor(event('inventory_level.updated', { productId: 'p1' }))).toEqual(['product:p1']);
+    // On pre-order or off it, its variants sell whatever their stock, or as it allows (ADR-403).
+    expect(itemsFor(event('product_preorder.updated', { productId: 'p1', shipsOn: null }))).toEqual(
+      ['product:p1'],
+    );
     expect(itemsFor(event('location.updated', { changed: ['name'] }))).toEqual([]);
     expect(itemsFor(event('location.updated', { changed: ['isActive'] }))).toEqual([
       'every-product',

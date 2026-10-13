@@ -24,7 +24,17 @@ export const InventoryEvents = {
   InventoryTransferReceived: 'inventory_transfer.received',
   InventoryTransferCancelled: 'inventory_transfer.cancelled',
   InventoryTransferClosed: 'inventory_transfer.closed',
+  /** A product put on pre-order, its day changed, or taken off (ADR-403). */
+  ProductPreorderUpdated: 'product_preorder.updated',
 } as const;
+
+/** The aggregate is the product. */
+export interface ProductPreorderUpdatedPayload {
+  productId: string;
+  /** The day it ships by now, YYYY-MM-DD; null once it is off pre-order. */
+  shipsOn: string | null;
+  before: string | null;
+}
 
 export interface LocationCreatedPayload {
   name: string;

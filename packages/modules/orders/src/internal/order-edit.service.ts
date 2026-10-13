@@ -10,7 +10,12 @@ import { VariantService, type VariantSnapshot } from '@hatti/catalog/public';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { LocationService, StockService, type StockLine } from '@hatti/inventory/public';
+import {
+  LocationService,
+  StockService,
+  preordersIn,
+  type StockLine,
+} from '@hatti/inventory/public';
 import { allocate, exponentOf, formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { orderTaxOf, taxSettingsIn } from '@hatti/tax/public';
 import { Injectable } from '@nestjs/common';
@@ -89,6 +94,8 @@ interface EditedLine {
   taxCode: string | null;
   /** A kept line's; null for a line added, which is new. */
   createdAt: Date | null;
+  /** The day it ships by: a kept line's as it was sold, an added one's product's now (ADR-403). */
+  preorderShipsOn: string | null;
   /** Where the edit names it, for errors; null for a kept line the edit leaves as it is. */
   field: string[] | null;
 }
@@ -212,6 +219,11 @@ export class OrderEditService {
         });
       }
       const onOrder = new Set(current.map((line) => line.variantId));
+      const preorders = await preordersIn(
+        tx,
+        shopId,
+        [...snapshots.values()].map((snapshot) => snapshot.productId),
+      );
       for (const line of additions) {
         const snapshot = snapshots.get(line.variantId);
         const field = [...line.field, 'variantId'];
@@ -246,6 +258,7 @@ export class OrderEditService {
             taxable: snapshot.taxable,
             taxCode: snapshot.taxCode,
             createdAt: null,
+            preorderShipsOn: preorders.get(snapshot.productId) ?? null,
             field: line.field,
           });
         }
@@ -1178,6 +1191,7 @@ function lineValues(
     taxable: line.taxable,
     taxRate: tax.lines[index]!.rate,
     tax: tax.lines[index]!.tax,
+    preorderShipsOn: line.preorderShipsOn,
     ...(line.createdAt && { createdAt: line.createdAt }),
   }));
 }

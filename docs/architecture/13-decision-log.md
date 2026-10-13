@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-402 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-403 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -410,6 +410,7 @@
 | 400 | A shop may ask each delivered order's customer once on WhatsApp to rate what it brought, 1 to 14 days after its last parcel arrived, with the order's page; an order already rated is not asked about | Accepted |
 | 401 | A product's storefront page shows its published reviews, their average stars and the latest ten, through Shopify's review metafields and Hatti's product.reviews, and tells search engines as schema.org's AggregateRating | Accepted |
 | 402 | Products' reviews have a page of their own in the admin, by status, waiting first, each published or hidden by those who change products; above them, for the owner and managers, from how many stars reviews publish by themselves and how many days after delivery customers are asked | Accepted |
+| 403 | A product the shop puts on pre-order sells whatever its stock, as if its variants kept selling at zero, and promises a day it ships by, which the lines of orders placed meanwhile keep; inventory keeps it, by product | Accepted |
 
 ---
 
@@ -15559,3 +15560,43 @@
     products, so they have a list of their own; a product's own may come later.
   * **The settings under Settings:** they are only reviews', and those who answer reviews are
     the ones who set them.
+
+## ADR-403 · A product the shop puts on pre-order sells whatever its stock, as if its variants kept selling at zero, and promises a day it ships by, which the lines of orders placed meanwhile keep; inventory keeps it, by product
+
+* **Context:**
+  * Pakistani shops sell Eid collections, restocks and imports before the goods arrive, and
+    tell customers when they ship (CAT-14). Selling at zero already exists per variant
+    (`inventoryPolicy: CONTINUE`), but says nothing of when, and turning it on and off for every
+    size is work and easily forgotten.
+  * Payment for such products already has its rules: shops tag them "pre-order" and ask an
+    advance for them, or take no cash on delivery ([ADR-224](#adr-224--a-shops-advance-may-be-asked-only-of-orders-holding-a-product-it-tags-checkout-knows-the-carts-products-before-anything-is-typed-names-the-product-beside-cash-on-delivery-and-asks-a-cart-holding-none-for-nothing)).
+* **Decision:**
+  * **A product is on pre-order or not, with the day it ships by**, from today to a year ahead
+    in Pakistan's day (UTC+5). `productPreorderSet(productId, shipsOn)` sets it, a null day takes
+    it off, for those who may change products; `Product.preorder` reads it.
+  * **The inventory module keeps it** (`inventory.preorders`, by product): stock is how many
+    can be sold, and a pre-order changes that. Every place that asks whether a variant may sell
+    reads it beside the variant's own policy: carts' limits, the storefront's availability,
+    committing and reserving stock ([ADR-022](#adr-022--stock-changes-lock-levels-in-one-order-check-then-write)), and choosing an order's location, which a
+    pre-order rules out nowhere. The variant's own policy is left as it was, so taking the
+    product off pre-order brings back what the shop had.
+  * **The day goes with its product**, by a foreign key: the second across modules, as stock
+    goes with its variant.
+  * **Each order line keeps the day its product promised when it was sold**
+    (`OrderLineItem.preorderShipsOn`): placed through checkout, the Admin API or a draft, or
+    added in an edit. The day moved later, lines sold before keep theirs.
+  * **`product_preorder.updated`** tells of each change, with the day before and after; the
+    storefront rebuilds the product.
+* **Consequences:**
+  * Available goes below zero on pre-order as it does for a variant that keeps selling; what
+    arrives fills what was sold.
+  * How the storefront, cart, checkout and order pages say "Pre-order, ships by" comes next,
+    and the admin's setting after.
+* **Alternatives:**
+  * **A column on the catalog's products:** the catalog does not depend on inventory, and the
+    checks that decide selling are all inventory's; a column there would mean reading another
+    module's table from them.
+  * **Setting each variant to keep selling:** loses what the shop had set, and says nothing of
+    when it ships.
+  * **Ending it by itself once the day passes:** a late shipment would stop selling with no one
+    told; the admin warns of a day gone by instead.

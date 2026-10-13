@@ -524,6 +524,11 @@ export const lines = ordersSchema.table(
     taxRate: integer('tax_rate'),
     /** What of its total, after its share of the order's discount, was tax. */
     tax: money('tax').notNull().default(0n),
+    /**
+     * The day it was promised to ship by, YYYY-MM-DD, when its product was on pre-order as it was
+     * sold (CAT-14, ADR-403); null otherwise.
+     */
+    preorderShipsOn: date('preorder_ships_on'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.shopId, table.id] })],
