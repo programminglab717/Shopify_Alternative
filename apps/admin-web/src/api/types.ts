@@ -3029,3 +3029,48 @@ export interface WebhookSubscriptionDeleteData {
     userErrors: UserError[];
   };
 }
+
+export type ProductReviewStatus = 'PENDING' | 'PUBLISHED' | 'HIDDEN';
+
+/** A customer's stars and words for a product of an order delivered to them (ADR-399). */
+export interface ProductReview {
+  id: string;
+  productId: string;
+  productTitle: string;
+  orderId: string;
+  /** "Ayesha K.", as the storefront shows it. */
+  authorName: string;
+  rating: number;
+  body: string | null;
+  status: ProductReviewStatus;
+  createdAt: string;
+  updatedAt: string;
+  publishedAt: string | null;
+}
+
+export interface ProductReviewsData {
+  productReviews: ProductReview[];
+}
+
+export interface ProductReviewPublishData {
+  productReviewPublish: { productReview: ProductReview | null; userErrors: UserError[] };
+}
+
+export interface ProductReviewHideData {
+  productReviewHide: { productReview: ProductReview | null; userErrors: UserError[] };
+}
+
+export interface ReviewSettings {
+  /** 3, 4 or 5: reviews of as many stars publish by themselves; null, each waits. */
+  publishFrom: number | null;
+  /** 1 to 14 days after delivery customers are asked on WhatsApp; null, never. */
+  requestAfterDays: number | null;
+}
+
+export interface ReviewSettingsData {
+  reviewSettings: ReviewSettings;
+}
+
+export interface ReviewSettingsUpdateData {
+  reviewSettingsUpdate: { reviewSettings: ReviewSettings | null; userErrors: UserError[] };
+}

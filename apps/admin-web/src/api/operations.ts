@@ -7116,3 +7116,86 @@ export const WebhookSubscriptionDeleteMutation = /* GraphQL */ `
   }
   ${USER_ERRORS}
 `;
+
+const PRODUCT_REVIEW = /* GraphQL */ `
+  fragment ProductReviewFields on ProductReview {
+    id
+    productId
+    productTitle
+    orderId
+    authorName
+    rating
+    body
+    status
+    createdAt
+    updatedAt
+    publishedAt
+  }
+`;
+
+/** The shop's products' reviews (MKT-05, ADR-399), the latest first: of a status, a page at a time. */
+export const ProductReviewsQuery = /* GraphQL */ `
+  query ProductReviews($first: Int, $after: ID, $status: ProductReviewStatus) {
+    productReviews(first: $first, after: $after, status: $status) {
+      ...ProductReviewFields
+    }
+  }
+  ${PRODUCT_REVIEW}
+`;
+
+/** Shows a review on its product's storefront page. */
+export const ProductReviewPublishMutation = /* GraphQL */ `
+  mutation ProductReviewPublish($id: ID!) {
+    productReviewPublish(id: $id) {
+      productReview {
+        ...ProductReviewFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${PRODUCT_REVIEW}
+  ${USER_ERRORS}
+`;
+
+/** Keeps a review off the storefront. */
+export const ProductReviewHideMutation = /* GraphQL */ `
+  mutation ProductReviewHide($id: ID!) {
+    productReviewHide(id: $id) {
+      productReview {
+        ...ProductReviewFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${PRODUCT_REVIEW}
+  ${USER_ERRORS}
+`;
+
+/** From how many stars reviews publish by themselves, and when customers are asked (ADR-400). */
+export const ReviewSettingsQuery = /* GraphQL */ `
+  query ReviewSettings {
+    reviewSettings {
+      publishFrom
+      requestAfterDays
+    }
+  }
+`;
+
+export const ReviewSettingsUpdateMutation = /* GraphQL */ `
+  mutation ReviewSettingsUpdate($input: ReviewSettingsInput!) {
+    reviewSettingsUpdate(input: $input) {
+      reviewSettings {
+        publishFrom
+        requestAfterDays
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;

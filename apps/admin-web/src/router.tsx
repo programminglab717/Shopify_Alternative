@@ -82,6 +82,7 @@ import { CheckoutPage } from './settings/checkout-page';
 import { DomainsPage } from './settings/domains-page';
 import { LocationsPage } from './settings/locations-page';
 import { ProductFilesPage } from './products/files-page';
+import { ReviewsPage } from './products/reviews-page';
 import { BankTransferPage } from './settings/bank-transfer-page';
 import { BillingPage } from './settings/billing-page';
 import { CashOnDeliveryPage } from './settings/cash-on-delivery-page';
@@ -268,6 +269,12 @@ const productFiles = createRoute({
   getParentRoute: () => shop,
   path: 'products/files',
   component: ProductFilesPage,
+});
+
+const productReviews = createRoute({
+  getParentRoute: () => shop,
+  path: 'products/reviews',
+  component: ReviewsPage,
 });
 
 const product = createRoute({
@@ -759,6 +766,7 @@ export const routeTree = root.addChildren([
     products,
     newProduct,
     productFiles,
+    productReviews,
     product,
     productUrdu,
     customers,

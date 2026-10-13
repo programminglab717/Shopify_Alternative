@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-401 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-402 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -409,6 +409,7 @@
 | 399 | Customers rate what their delivered order brought them on its own page, one to five stars a product with words if they like; each review waits for the shop, which publishes or hides it, unless its stars reach those the shop publishes by itself | Accepted |
 | 400 | A shop may ask each delivered order's customer once on WhatsApp to rate what it brought, 1 to 14 days after its last parcel arrived, with the order's page; an order already rated is not asked about | Accepted |
 | 401 | A product's storefront page shows its published reviews, their average stars and the latest ten, through Shopify's review metafields and Hatti's product.reviews, and tells search engines as schema.org's AggregateRating | Accepted |
+| 402 | Products' reviews have a page of their own in the admin, by status, waiting first, each published or hidden by those who change products; above them, for the owner and managers, from how many stars reviews publish by themselves and how many days after delivery customers are asked | Accepted |
 
 ---
 
@@ -15531,3 +15532,30 @@
   * **Fetching reviews as the page renders:** every product page would wait on the core; the
     document is already read for the page.
   * **Metafields alone:** a theme could show stars but no words.
+
+## ADR-402 · Products' reviews have a page of their own in the admin, by status, waiting first, each published or hidden by those who change products; above them, for the owner and managers, from how many stars reviews publish by themselves and how many days after delivery customers are asked
+
+* **Context:**
+  * Reviews wait for the shop unless their stars reach those it publishes by itself
+    ([ADR-399](#adr-399--customers-rate-what-their-delivered-order-brought-them-on-its-own-page-one-to-five-stars-a-product-with-words-if-they-like-each-review-waits-for-the-shop-which-publishes-or-hides-it-unless-its-stars-reach-those-the-shop-publishes-by-itself)), and it may ask for them on WhatsApp after delivery ([ADR-400](#adr-400--a-shop-may-ask-each-delivered-orders-customer-once-on-whatsapp-to-rate-what-it-brought-1-to-14-days-after-its-last-parcel-arrived-with-the-orders-page-an-order-already-rated-is-not-asked-about)); published, they
+    show on the storefront ([ADR-401](#adr-401--a-products-storefront-page-shows-its-published-reviews-their-average-stars-and-the-latest-ten-through-shopifys-review-metafields-and-hattis-productreviews-and-tells-search-engines-as-schemaorgs-aggregaterating)). Until now only the Admin API could do any of it.
+* **Decision:**
+  * **Products → Reviews:** a page linked from the products list, with a tab for each status,
+    waiting first, fifty a page, the latest first. Each review shows its product, linked, its
+    stars read out as "4 of 5 stars", its author, its words or "Stars alone, no words", when
+    it was written and a link to its order.
+  * **Those who change products publish and hide them**, owners and managers; a published
+    review can be hidden and a hidden one published again. Others only read them.
+  * **"How reviews come in", for the owner and managers:** publish by themselves none, or
+    those of 3, 4 or 5 stars and more; and ask for a review on WhatsApp never, or 1, 2, 3, 5,
+    7, 10 or 14 days after delivery. Saved together through `reviewSettingsUpdate`.
+  * **The review request is not on the messages settings' list**, like the checkout's
+    reminder: it is turned on and off here, where its delay is.
+* **Consequences:**
+  * The activity log words reviews' events: "Review published", "Review hidden", "Review
+    written", "Review settings updated".
+* **Alternatives:**
+  * **Reviews on each product's page:** the shop moderates them as they come, across
+    products, so they have a list of their own; a product's own may come later.
+  * **The settings under Settings:** they are only reviews', and those who answer reviews are
+    the ones who set them.

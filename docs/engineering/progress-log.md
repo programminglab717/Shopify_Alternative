@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: product reviews in the admin,
-listed, published and hidden, with the request's and publishing's settings (MKT-05); then
-pre-orders (CAT-14). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: pre-orders (CAT-14), products sold
+before they are in stock, with when they ship; then size charts (CAT-10). Urdu handles wait, as
+decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,23 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Reviews in the admin
+
+* **Products → Reviews** ([ADR-402](../architecture/13-decision-log.md#adr-402--products-reviews-have-a-page-of-their-own-in-the-admin-by-status-waiting-first-each-published-or-hidden-by-those-who-change-products-above-them-for-the-owner-and-managers-from-how-many-stars-reviews-publish-by-themselves-and-how-many-days-after-delivery-customers-are-asked), MKT-05): the shop's reviews by status, waiting first, each
+  with its product, stars, author, words and order, published or hidden by the owner and
+  managers. Above them, for the owner and managers, from how many stars reviews publish by
+  themselves and how many days after delivery customers are asked on WhatsApp. The review
+  request leaves the messages settings' list, as it is set here.
+* **Tried in Chromium against the core, at a phone's width:** two waiting reviews of a
+  delivered order, one of five stars with words and one of two without, were listed from the
+  products page's link. The five-star one was published, left the waiting tab and showed under
+  Published; hidden, it moved to Hidden. Publishing from 4 stars and asking 3 days after
+  delivery were saved and read back after a reload; the activity log said "Review published",
+  "Review hidden" and "Review settings updated"; the page read right to left in Urdu. Nothing
+  overflowed and nothing errored; the reviews, settings and their events were then taken away.
+* 2689 tests (12 new): the reviews page and its settings, and the new
+  documents checked against the schema.
 
 ### 5f6b5b2 · Reviews on the storefront
 
