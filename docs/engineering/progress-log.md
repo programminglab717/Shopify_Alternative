@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Pickup at checkout
+### 7d2572e · Pickup at checkout
 
 * **In checkout** ([ADR-391](../architecture/13-decision-log.md#adr-391--checkout-offers-pickup-at-each-location-that-lets-customers-pick-up-chosen-the-order-has-no-delivery-charge-the-shoppers-address-is-optional-with-the-locations-standing-in-and-the-thank-you-page-says-where-to-collect-it), SHP-15): where a location lets customers pick up, the page offers
   "Deliver to my address" or "Pick up from" it, with its address and what the shop says of it,
