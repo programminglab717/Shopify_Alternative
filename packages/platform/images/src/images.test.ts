@@ -4,7 +4,7 @@ import { crc32, deflateSync } from 'node:zlib';
 import sharp, { type Sharp } from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { MAX_IMAGE_SIDE, cleanImage, cropImage } from './clean.js';
-import { ImageFetcher, isPublicAddress } from './fetch.js';
+import { ImageFetcher } from './fetch.js';
 import { sniffImage } from './formats.js';
 import { IMAGE_WIDTHS, formatFor, imageVariant, widthFor } from './variants.js';
 import { MAX_VIDEO_BYTES, cleanVideo } from './videos.js';
@@ -322,34 +322,6 @@ describe('videos', () => {
 });
 
 describe('fetching images', () => {
-  it('reaches public addresses alone', () => {
-    for (const address of ['8.8.8.8', '1.1.1.1', '2606:4700:4700::1111', '::ffff:8.8.8.8']) {
-      expect(isPublicAddress(address), address).toBe(true);
-    }
-    for (const address of [
-      '127.0.0.1',
-      '10.1.2.3',
-      '172.20.0.1',
-      '192.168.1.10',
-      '169.254.169.254',
-      '100.64.0.1',
-      '0.0.0.0',
-      '224.0.0.1',
-      '::1',
-      '::',
-      'fd00::1',
-      'fe80::1',
-      '::ffff:127.0.0.1',
-      '::ffff:a9fe:a9fe',
-      '::127.0.0.1',
-      '64:ff9b::a00:1',
-      '2002:a00:1::',
-      'not-an-address',
-    ]) {
-      expect(isPublicAddress(address), address).toBe(false);
-    }
-  });
-
   it('refuses private hosts, plain http and passwords before it connects', async () => {
     const fetcher = new ImageFetcher({
       resolve: async () => [{ address: '10.0.0.7', family: 4 }],

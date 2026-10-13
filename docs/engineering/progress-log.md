@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: webhooks for apps (DEV-03), each
-app's subscriptions to the shop's events delivered signed with its secret, retried and logged;
-then product reviews (MKT-05). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: each app's webhooks in the admin,
+its subscriptions and their recent deliveries (DEV-03); then product reviews (MKT-05). Urdu
+handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,24 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Webhooks
+
+* **Subscriptions** ([ADR-397](../architecture/13-decision-log.md#adr-397--a-custom-app-subscribes-to-topics-of-the-shops-events-at-https-addresses-the-worker-makes-one-delivery-an-event-and-subscription-for-apps-that-may-read-what-it-names-posts-it-signed-with-the-apps-secret-to-a-public-address-alone-and-tries-again-with-backoff-for-two-days), DEV-03): a custom app subscribes to Shopify's topics, orders,
+  fulfillments, products, stock levels, customers and its own uninstalling, at https addresses
+  (`webhookSubscriptionCreate`), or the owner or a manager subscribes it. Each topic needs the
+  app to read what it names.
+* **Deliveries**: the worker makes one for each subscription an event's topics have, and a sweep
+  every ten seconds posts those due, signed with the app's secret in `X-Hatti-Hmac-Sha256`, to
+  public addresses alone, five seconds to answer; failures are tried again with backoff for two
+  days. Migration 0187 keeps subscriptions and deliveries, and checking an address is public
+  moved into `@hatti/api` for the image fetcher and webhooks alike.
+* **Tried against the core:** the owner made an app reading orders; its token subscribed it to
+  `ORDERS_UPDATED`, and was refused products. The latest order update in the outbox, fanned out
+  as the worker does, was posted to a server on this machine and delivered (200), its signature
+  matching the app's secret. The app, subscription and logs were then taken away.
+* 2659 tests (9 new): topics, bodies, signing, subscriptions, deliveries, retries
+  and refusals in the apps module; through the API and the worker in the core.
 
 ### 2fe9187 · The admin's apps
 

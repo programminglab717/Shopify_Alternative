@@ -44,6 +44,7 @@ export {
 } from './plan-allowance.js';
 export { PublicSite, StorefrontSite } from './public-site.js';
 export { DnsLookup, SystemDnsLookup } from './dns.js';
+export { isPublicAddress } from './public-address.js';
 export {
   MAX_PAGE_SIZE,
   decodeCursor,

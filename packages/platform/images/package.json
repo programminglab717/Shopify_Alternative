@@ -19,6 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hatti/api": "workspace:*",
     "sharp": "catalog:"
   },
   "devDependencies": {

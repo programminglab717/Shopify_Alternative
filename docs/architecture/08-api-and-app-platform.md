@@ -94,6 +94,13 @@ flowchart LR
 * **High-volume delivery** (Scale phase): partners can consume a dedicated event stream instead of
   HTTPS.
 
+*Built so far* ([ADR-397](./13-decision-log.md#adr-397--a-custom-app-subscribes-to-topics-of-the-shops-events-at-https-addresses-the-worker-makes-one-delivery-an-event-and-subscription-for-apps-that-may-read-what-it-names-posts-it-signed-with-the-apps-secret-to-a-public-address-alone-and-tries-again-with-backoff-for-two-days)): custom apps' subscriptions,
+made by the app or by the owner or a manager for it, to `orders/create`, `orders/updated`,
+`orders/cancelled`, `orders/paid`, `fulfillments/create` and `/update`, `products/create`,
+`/update` and `/delete`, `inventory_levels/update`, `customers/create` and `/update`, and
+`app/uninstalled`; the body names the resource by its ID, signed in `X-Hatti-Hmac-Sha256`; tried
+for two days with backoff. Filters, and turning off a subscription that keeps failing, come later.
+
 ---
 
 ## 3. App platform

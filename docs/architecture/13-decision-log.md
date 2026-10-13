@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-396 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-397 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -404,6 +404,7 @@
 | 394 | The admin lists the checkouts shoppers left under Orders, for those who work orders and marketers, with a chat on WhatsApp for a whole number not yet ordered, and the reminder's delay is set with the checkout page's settings | Accepted |
 | 395 | A custom app is an access token the shop's owner or a manager makes, with a name and scopes none beyond their own role's, and a secret its webhooks will be signed with, kept sealed for the app alone; both are shown once and can be replaced, and removing the app revokes its token at once | Accepted |
 | 396 | Settings lists the shop's custom apps for owners and managers, each with what it may reach in words and the last characters of its token and secret; an app is made by choosing each resource's access, and its token and secret are shown once, to copy | Accepted |
+| 397 | A custom app subscribes to topics of the shop's events at https addresses; the worker makes one delivery an event and subscription for apps that may read what it names, posts it signed with the app's secret to a public address alone, and tries again with backoff for two days | Accepted |
 
 ---
 
@@ -15379,3 +15380,40 @@
 * **Alternatives:**
   * **A checkbox for each scope:** forty boxes on a phone, with read and write apart where
     write already reads.
+
+## ADR-397 · A custom app subscribes to topics of the shop's events at https addresses; the worker makes one delivery an event and subscription for apps that may read what it names, posts it signed with the app's secret to a public address alone, and tries again with backoff for two days
+
+* **Context:**
+  * Apps the shop makes ([ADR-395](#adr-395--a-custom-app-is-an-access-token-the-shops-owner-or-a-manager-makes-with-a-name-and-scopes-none-beyond-their-own-roles-and-a-secret-its-webhooks-will-be-signed-with-kept-sealed-for-the-app-alone-both-are-shown-once-and-can-be-replaced-and-removing-the-app-revokes-its-token-at-once)) need to hear of orders, products, stock and customers as
+    they change, rather than asking the API again and again (DEV-03; 08 §2).
+  * The shop's events already go through the outbox to the worker, at least once each.
+* **Decision:**
+  * **Topics are Shopify's names**: `orders/create`, `orders/updated` (every change to an
+    order), `orders/cancelled`, `orders/paid`, `fulfillments/create` and `/update`,
+    `products/create`, `/update` and `/delete`, `inventory_levels/update`, `customers/create`
+    and `/update`, and `app/uninstalled`. Each but the last needs the app to read what it names.
+  * **An app subscribes itself** (`webhookSubscriptionCreate`, `Update`, `Delete`,
+    `webhookSubscriptions`), or the owner or a manager subscribes it, naming the app; up to 50
+    each, at https addresses on the public internet.
+  * **The worker makes a delivery** for each subscription to a topic an event makes, once an
+    event and subscription however often the event comes, for apps that may read it then. An
+    app removed is told on `app/uninstalled`, and nothing else.
+  * **The body names the resource by its ID**, with the topic, the event, when it happened and
+    the shop, for the app to fetch through the API; headers say the topic, shop, event and
+    delivery, and `X-Hatti-Hmac-Sha256` is the body's HMAC-SHA256 with the app's secret, in
+    base64, as Shopify's is.
+  * **A sweep posts what is due** every ten seconds, as images are fetched ([ADR-158](#adr-158--hatti-keeps-products-images-itself-the-worker-reads-each-from-the-shops-upload-or-fetches-it-from-its-url-never-reaching-a-private-network-checks-it-and-keeps-a-clean-copy-without-its-metadata-at-most-4096-pixels-a-side-the-api-serves-it-at-nine-widths-in-avif-webp-or-its-own-format-each-made-the-first-time-it-is-asked-for-and-kept-and-an-image-goes-from-storage-and-the-edge-with-its-media)): to
+    addresses every one of whose IPs is public, connecting to those checked, following no
+    redirect, five seconds to answer. Any 2xx is delivered; anything else is tried again after
+    a minute, then twice as long each time up to six hours, until two days have passed.
+    Outcomes are kept 30 days.
+* **Consequences:**
+  * An app gets an event at least once and may get them out of order; the event's ID tells a
+    repeat.
+  * A subscription failing for days is not turned off yet; the shop's admin will show it.
+  * Development may post to plain http and private addresses with `WEBHOOK_PRIVATE_ADDRESSES`.
+* **Alternatives:**
+  * **The whole resource in the body, as Shopify sends:** it would need each module's shape in
+    the worker and grows stale when deliveries are retried; the ID and the API's current answer
+    cannot disagree.
+  * **A queue per app:** the deliveries table is the queue, and the log the admin will show.

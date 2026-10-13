@@ -414,6 +414,13 @@ const workerSchema = z
      * ADR-217).
      */
     SCHEDULED_INTERVAL_MS: z.coerce.number().int().min(1_000).default(60_000),
+    /** How often apps' webhooks due are posted (ADR-397). */
+    WEBHOOK_INTERVAL_MS: z.coerce.number().int().min(1_000).default(10_000),
+    /**
+     * For development alone: lets webhooks go to plain http and private addresses, such as a
+     * server on this machine. Never set it in production.
+     */
+    WEBHOOK_PRIVATE_ADDRESSES: env.flag().default(false),
     EVENT_CONCURRENCY: z.coerce.number().int().min(1).max(100).default(10),
     /**
      * Cloudflare, the edge in front of storefronts (ADR-007): the zone storefront pages are kept in,

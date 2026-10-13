@@ -14,7 +14,6 @@ export {
 } from './clean.js';
 export {
   ImageFetcher,
-  isPublicAddress,
   type FetchFailure,
   type FetchResult,
   type ImageFetcherOptions,

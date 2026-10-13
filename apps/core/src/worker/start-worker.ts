@@ -1,4 +1,5 @@
 import { PublicSite, StorefrontSite, SystemDnsLookup } from '@hatti/api';
+import { HttpWebhookSender, WebhookService } from '@hatti/apps/public';
 import { BillingService, MessageWallet } from '@hatti/billing/public';
 import {
   CollectionService,
@@ -62,6 +63,7 @@ import { workerStorage } from '../storage.js';
 import { BillingNotices } from './billing-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
 import { CheckoutReminders } from './checkout-reminders.js';
+import { WebhookDeliveries, WebhookFanOut } from './webhooks.js';
 import { ConfirmationReminders } from './confirmation-reminders.js';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
 import { CourierBookings } from './courier-bookings.js';
@@ -108,6 +110,7 @@ export interface EventConsumers {
   storeCredit?: StoreCreditNotices;
   domains?: DomainNotices;
   planOrders?: PlanOrders;
+  webhooks?: WebhookFanOut;
 }
 
 /** Event consumers. Modules add theirs here as they gain them (search indexing, webhooks, …). */
@@ -127,6 +130,7 @@ export function eventHandlers(
     storeCredit,
     domains,
     planOrders,
+    webhooks,
   }: EventConsumers = {},
 ): EventHandlerRegistry {
   const registry = new EventHandlerRegistry().on('*', async (event) => {
@@ -185,6 +189,9 @@ export function eventHandlers(
   }
   if (planOrders) {
     for (const type of PlanOrders.EVENTS) registry.on(type, (event) => planOrders.handle(event));
+  }
+  if (webhooks) {
+    for (const type of WebhookFanOut.EVENTS) registry.on(type, (event) => webhooks.handle(event));
   }
   return registry;
 }
@@ -257,6 +264,10 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         storeCredit: new StoreCreditNotices(database, new MessagesService(database)),
         domains: new DomainNotices(database, new MessagesService(database)),
         planOrders: new PlanOrders(database, new MessagesService(database), workerOrders(database)),
+        // Apps' webhooks need their secrets opened to be sent (ADR-397).
+        ...(config.ENCRYPTION_KEYS && {
+          webhooks: new WebhookFanOut(new WebhookService(database, config.ENCRYPTION_KEYS)),
+        }),
       }),
       concurrency: config.EVENT_CONCURRENCY,
       logger,
@@ -316,6 +327,21 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => checkoutReminders.stop());
+    // Apps' webhooks posted, signed with each app's secret, and tried again for two days (ADR-397).
+    if (config.ENCRYPTION_KEYS) {
+      const webhookDeliveries = new WebhookDeliveries(
+        new WebhookService(database, config.ENCRYPTION_KEYS),
+        new HttpWebhookSender(
+          config.WEBHOOK_PRIVATE_ADDRESSES
+            ? { protocols: ['http:', 'https:'], allowAddress: () => true }
+            : {},
+        ),
+        logger,
+      ).start(config.WEBHOOK_INTERVAL_MS);
+      closers.push(() => webhookDeliveries.stop());
+    } else {
+      logger.warn('ENCRYPTION_KEYS is not set: no webhooks are sent to apps');
+    }
     // Shops' verified domains asked about again, and those DNS points elsewhere disconnected three
     // days on (ADR-262).
     const domainChecks = new DomainChecks(

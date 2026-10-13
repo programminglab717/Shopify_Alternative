@@ -17,3 +17,17 @@ export interface AppChangedPayload {
   /** What changed, for an update: "name" or "scopes". */
   changed?: string[];
 }
+
+/** Events of apps' webhook subscriptions. */
+export const WebhookEvents = {
+  SubscriptionCreated: 'webhook_subscription.created',
+  SubscriptionUpdated: 'webhook_subscription.updated',
+  SubscriptionDeleted: 'webhook_subscription.deleted',
+} as const;
+
+/** A webhook subscription made, sent elsewhere, or ended. */
+export interface WebhookSubscriptionChangedPayload {
+  appId: string;
+  topic: string;
+  uri: string;
+}

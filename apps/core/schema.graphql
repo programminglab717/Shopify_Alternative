@@ -6975,6 +6975,19 @@ type Mutation {
     csv: String!
     dryRun: Boolean
   ): UrlRedirectsImportPayload!
+
+  """
+  Subscribes an app to a topic at an https address: the calling app, or for the owner and managers the app `appId` names. The app must be able to read what the topic tells of.
+  """
+  webhookSubscriptionCreate(appId: ID, topic: WebhookSubscriptionTopic!, webhookSubscription: WebhookSubscriptionInput!): WebhookSubscriptionPayload!
+
+  """Ends a webhook subscription: what it has not yet posted, it does not."""
+  webhookSubscriptionDelete(id: ID!): WebhookSubscriptionDeletePayload!
+
+  """
+  Posts a subscription's topic to another https address, from its next on.
+  """
+  webhookSubscriptionUpdate(id: ID!, webhookSubscription: WebhookSubscriptionInput!): WebhookSubscriptionPayload!
 }
 
 """
@@ -10608,6 +10621,11 @@ type Query {
   The shop's redirects as a file, as Shopify exports them, which either takes back.
   """
   urlRedirectsExport: UrlRedirectsExport!
+
+  """
+  The calling app's webhook subscriptions; for the owner and managers, every app's, by app and topic (DEV-03, ADR-397).
+  """
+  webhookSubscriptions: [WebhookSubscription!]!
 }
 
 """Money given back on an order, as staff recorded it."""
@@ -12394,4 +12412,54 @@ type VideoSource {
 
   """In pixels, as shown."""
   width: Int!
+}
+
+"""
+An app's subscription to a topic (DEV-03, ADR-397): each event of it is posted to its address as JSON, signed in X-Hatti-Hmac-Sha256 with the HMAC-SHA256 of the body by the app's secret, in base64; tried again for two days until the app answers 2xx within five seconds. The body names the resource by its ID, to fetch through the Admin API.
+"""
+type WebhookSubscription {
+  """The app it is for."""
+  appId: ID!
+  appName: String!
+
+  """Where it is posted: an https address."""
+  callbackUrl: String!
+  createdAt: DateTime!
+  id: ID!
+  topic: WebhookSubscriptionTopic!
+  updatedAt: DateTime!
+}
+
+type WebhookSubscriptionDeletePayload {
+  deletedWebhookSubscriptionId: ID
+  userErrors: [UserError!]!
+}
+
+input WebhookSubscriptionInput {
+  """An https address on the public internet, up to 2,000 characters."""
+  callbackUrl: String!
+}
+
+type WebhookSubscriptionPayload {
+  userErrors: [UserError!]!
+  webhookSubscription: WebhookSubscription
+}
+
+"""
+What an app is told of (DEV-03, ADR-397): ORDERS_CREATE is "orders/create", as its X-Hatti-Topic header says. Orders, fulfillments and refunds need read_orders; products read_products; stock levels read_inventory; customers read_customers. APP_UNINSTALLED tells an app it was removed.
+"""
+enum WebhookSubscriptionTopic {
+  APP_UNINSTALLED
+  CUSTOMERS_CREATE
+  CUSTOMERS_UPDATE
+  FULFILLMENTS_CREATE
+  FULFILLMENTS_UPDATE
+  INVENTORY_LEVELS_UPDATE
+  ORDERS_CANCELLED
+  ORDERS_CREATE
+  ORDERS_PAID
+  ORDERS_UPDATED
+  PRODUCTS_CREATE
+  PRODUCTS_DELETE
+  PRODUCTS_UPDATE
 }

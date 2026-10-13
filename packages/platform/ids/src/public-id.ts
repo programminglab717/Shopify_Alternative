@@ -89,6 +89,8 @@ export const ID_PREFIXES = {
   conversionEvent: 'cnv',
   message: 'msg',
   accessToken: 'tok',
+  webhookSubscription: 'whs',
+  webhookDelivery: 'whd',
   event: 'evt',
   auditEntry: 'aud',
   user: 'usr',
