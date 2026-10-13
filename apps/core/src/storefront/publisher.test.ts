@@ -6,8 +6,10 @@ import {
   MediaService,
   ProductReviewService,
   ProductService,
+  SizeChartService,
   VariantService,
   shownReviewsIn,
+  shownSizeChartsIn,
   writeReviewsIn,
 } from '@hatti/catalog/public';
 import { DeliveryService } from '@hatti/checkout/public';
@@ -130,6 +132,15 @@ describe('What storefront documents an event makes stale', () => {
       ['product:p1'],
     );
     expect(itemsFor(event('location.updated', { changed: ['name'] }))).toEqual([]);
+    // A size chart changed or given: the products whose pages show it (ADR-407).
+    expect(itemsFor(event('size_chart.updated', { productIds: ['p1', 'p2'] }))).toEqual([
+      'product:p1',
+      'product:p2',
+    ]);
+    expect(itemsFor(event('product_size_chart.updated', { productIds: ['p3'] }))).toEqual([
+      'product:p3',
+    ]);
+    expect(itemsFor(event('size_chart.deleted', { productIds: [] }))).toEqual([]);
     expect(itemsFor(event('location.updated', { changed: ['isActive'] }))).toEqual([
       'every-product',
     ]);
@@ -416,6 +427,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         articles,
         reviews: { shownReviewsOf: shownReviewsIn },
         preorders: { preordersOf: preordersIn },
+        sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
         comments: new CommentService(database),
         preferences,
         delivery,
@@ -1064,6 +1076,41 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       count: 1,
     });
     unwrap(await products.delete(tenant, chappal.id));
+    await deliver();
+  });
+
+  it('publishes the size chart a product shows, as it changes, and none once it is gone (ADR-407)', async () => {
+    const charts = new SizeChartService(database);
+    const kurta = unwrap(await products.create(tenant, { title: 'Lawn Kurta', status: 'active' }));
+    await deliver();
+    expect((await store().productByHandle(kurta.handle))?.sizeChart).toBeUndefined();
+
+    const chart = unwrap(
+      await charts.create(tenant, {
+        name: 'Kurtas',
+        unit: 'in',
+        columns: ['Chest', 'Length'],
+        rows: [{ size: 'M', values: [40, null] }],
+        note: 'Measure a kurta that fits.',
+      }),
+    );
+    unwrap(await charts.setForProducts(tenant, chart.id, { productIds: [kurta.id] }));
+    expect(await deliver()).toEqual(['size_chart.created', 'product_size_chart.updated']);
+    expect((await store().productByHandle(kurta.handle))?.sizeChart).toEqual({
+      name: 'Kurtas',
+      unit: 'in',
+      columns: ['Chest', 'Length'],
+      rows: [{ size: 'M', values: [40, null] }],
+      note: 'Measure a kurta that fits.',
+    });
+
+    unwrap(await charts.update(tenant, chart.id, { unit: 'cm' }));
+    await deliver();
+    expect((await store().productByHandle(kurta.handle))?.sizeChart?.unit).toBe('cm');
+    unwrap(await charts.delete(tenant, chart.id));
+    expect(await deliver()).toEqual(['size_chart.deleted']);
+    expect((await store().productByHandle(kurta.handle))?.sizeChart).toBeUndefined();
+    unwrap(await products.delete(tenant, kurta.id));
     await deliver();
   });
 

@@ -333,6 +333,9 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     // The day it ships by while it is on pre-order (ADR-403), YYYY-MM-DD for the date filter;
     // nil when it is not. Hatti's own.
     preorder_ships_on: doc.preorderShipsOn ?? null,
+    // Its size chart (ADR-407), each measurement in inches and centimetres; nil when it has none.
+    // Hatti's own.
+    size_chart: sizeChartObject(doc),
     reviews: (doc.reviews?.latest ?? []).map((review) => ({
       id: review.id,
       author: review.author,
@@ -347,6 +350,35 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
  * Shopify's `reviews.rating` and `reviews.rating_count` metafields of a product with published
  * reviews: its average stars of 1 to 5, and how many; none for one without.
  */
+/** A measurement in a unit, to a tenth: inches from centimetres or the other way. */
+function inUnit(value: number | null, from: 'in' | 'cm', to: 'in' | 'cm'): number | null {
+  if (value === null) return null;
+  if (from === to) return value;
+  const converted = from === 'in' ? value * 2.54 : value / 2.54;
+  return Math.round(converted * 10) / 10;
+}
+
+/**
+ * A product's size chart (CAT-10, ADR-407): its name, the unit it was written in, what is
+ * measured, and a row for each size with its measurements as written and in both units.
+ */
+function sizeChartObject(doc: ProductDoc): Record<string, unknown> | null {
+  const chart = doc.sizeChart;
+  if (!chart) return null;
+  return {
+    name: chart.name,
+    unit: chart.unit,
+    columns: chart.columns,
+    rows: chart.rows.map((row) => ({
+      size: row.size,
+      values: row.values,
+      inches: row.values.map((value) => inUnit(value, chart.unit, 'in')),
+      centimetres: row.values.map((value) => inUnit(value, chart.unit, 'cm')),
+    })),
+    note: chart.note,
+  };
+}
+
 function reviewMetafields(doc: ProductDoc): Record<string, Record<string, unknown>> {
   if (!doc.reviews) return {};
   return {

@@ -1,0 +1,75 @@
+{%- comment -%}
+  A product's size chart (CAT-10, ADR-407): opened from under its buttons, read in inches or
+  centimetres without a script, the unit the shop wrote it in chosen first.
+  Accepts: chart, the product's size_chart; id, unique on the page.
+{%- endcomment -%}
+{%- if chart -%}
+  <details class="size-chart">
+    <summary class="size-chart__summary">{{ 'products.product.size_chart.title' | t }}</summary>
+    <div class="size-chart__body">
+      <p class="size-chart__name" dir="auto">{{ chart.name | escape }}</p>
+      <input
+        type="radio"
+        class="size-chart__unit"
+        name="size-chart-unit-{{ id }}"
+        id="size-chart-in-{{ id }}"
+        value="in"
+        {% if chart.unit == 'in' %}checked{% endif %}
+      >
+      <label class="size-chart__unit-label" for="size-chart-in-{{ id }}">
+        {{- 'products.product.size_chart.inches' | t -}}
+      </label>
+      <input
+        type="radio"
+        class="size-chart__unit"
+        name="size-chart-unit-{{ id }}"
+        id="size-chart-cm-{{ id }}"
+        value="cm"
+        {% if chart.unit == 'cm' %}checked{% endif %}
+      >
+      <label class="size-chart__unit-label" for="size-chart-cm-{{ id }}">
+        {{- 'products.product.size_chart.centimetres' | t -}}
+      </label>
+      {%- assign units = 'in,cm' | split: ',' -%}
+      {%- for unit in units -%}
+        <div class="size-chart__table size-chart__table--{{ unit }}">
+          <table>
+            <caption class="visually-hidden">
+              {%- if unit == 'in' -%}
+                {{ 'products.product.size_chart.caption_inches' | t: name: chart.name }}
+              {%- else -%}
+                {{ 'products.product.size_chart.caption_centimetres' | t: name: chart.name }}
+              {%- endif -%}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">{{ 'products.product.size_chart.size' | t }}</th>
+                {%- for column in chart.columns -%}
+                  <th scope="col" dir="auto">{{ column | escape }}</th>
+                {%- endfor -%}
+              </tr>
+            </thead>
+            <tbody>
+              {%- for row in chart.rows -%}
+                {%- if unit == 'in' -%}
+                  {%- assign values = row.inches -%}
+                {%- else -%}
+                  {%- assign values = row.centimetres -%}
+                {%- endif -%}
+                <tr>
+                  <th scope="row" dir="auto">{{ row.size | escape }}</th>
+                  {%- for value in values -%}
+                    <td>{% if value == nil %}–{% else %}{{ value }}{% endif %}</td>
+                  {%- endfor -%}
+                </tr>
+              {%- endfor -%}
+            </tbody>
+          </table>
+        </div>
+      {%- endfor -%}
+      {%- if chart.note != blank -%}
+        <p class="size-chart__note" dir="auto">{{ chart.note | escape }}</p>
+      {%- endif -%}
+    </div>
+  </details>
+{%- endif -%}

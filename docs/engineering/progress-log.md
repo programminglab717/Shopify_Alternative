@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: size charts on the storefront, read
-in inches or centimetres (CAT-10); then the admin's size charts. Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the admin's size charts, made and
+given to products from their pages (CAT-10); then bundles (CAT-11). Urdu handles wait, as
+decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +16,20 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Size charts on the storefront
+
+* **A product's page** ([ADR-407](../architecture/13-decision-log.md#adr-407--a-products-storefront-page-shows-its-size-chart-opened-under-its-buttons-and-read-in-inches-or-centimetres-without-a-script-the-unit-the-shop-wrote-it-in-first-themes-read-it-as-hattis-productsize_chart-each-measurement-in-both-units), CAT-10) shows its size chart under its buttons, closed until
+  tapped, in the unit the shop wrote it in, with a switch to the other that needs no script.
+  Themes read it as `product.size_chart`, each measurement in inches and centimetres.
+* **The publisher** rebuilds the products a chart's events name: changed, given, taken away or
+  deleted.
+* **Tried in Chromium against the storefront, at a phone's width:** the demo shop's Peshawari
+  Chappal given a chart of foot length and width in inches showed "Size chart" closed; opened,
+  10.75 inches read as such, and in centimetres 27.3, a missing width "–"; the arrow key went
+  back to inches. In Urdu its words were Urdu and the table ran right to left. Another product
+  showed none. Nothing overflowed and nothing errored, and the demo shop was left as it was.
+* 2716 tests (2 new): Hatti Base's chart, and the publisher's.
 
 ### 217f760 · Size charts in the catalog
 

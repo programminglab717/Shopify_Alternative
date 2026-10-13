@@ -4,14 +4,18 @@ import {
   CollectionService,
   ProductService,
   ReviewEvents,
+  SizeChartEvents,
   VariantService,
   imagePathOf,
   shownReviewsIn,
+  shownSizeChartsIn,
   videoPathOf,
   type CollectionRecord,
   type ProductReviewChangedPayload,
   type ProductUpdatedPayload,
   type ShownReviews,
+  type ShownSizeChart,
+  type SizeChartChangedPayload,
 } from '@hatti/catalog/public';
 import { CheckoutEvents, DeliveryService } from '@hatti/checkout/public';
 import type { Database, Tx } from '@hatti/db';
@@ -206,6 +210,11 @@ export function itemsFor(event: DomainEvent): string[] {
       // Its product's page shows its published reviews (ADR-401): one written may be published
       // at once, or a published one sent back to wait.
       return [Items.product((event.payload as unknown as ProductReviewChangedPayload).productId)];
+    case SizeChartEvents.Updated:
+    case SizeChartEvents.Deleted:
+    case SizeChartEvents.ProductsUpdated:
+      // The products whose pages show another chart now, or none (ADR-407).
+      return (event.payload as unknown as SizeChartChangedPayload).productIds.map(Items.product);
     case InventoryEvents.LocationUpdated: {
       // Whether a location sells online, or at all, changes what every product has to sell. A
       // location with stock history cannot be deleted, so deleting one changes nothing.
@@ -336,6 +345,9 @@ export const PUBLISHED_EVENTS = [
   ReviewEvents.Written,
   ReviewEvents.Published,
   ReviewEvents.Hidden,
+  SizeChartEvents.Updated,
+  SizeChartEvents.Deleted,
+  SizeChartEvents.ProductsUpdated,
   InventoryEvents.InventoryItemUpdated,
   InventoryEvents.InventoryLevelUpdated,
   InventoryEvents.ProductPreorderUpdated,
@@ -408,6 +420,14 @@ export interface PublisherServices {
       shopId: string,
       productIds: readonly string[],
     ): Promise<Map<string, ShownReviews>>;
+  };
+  /** The size charts products' pages show (ADR-407). */
+  sizeCharts: {
+    shownSizeChartsOf(
+      tx: Tx,
+      shopId: string,
+      productIds: readonly string[],
+    ): Promise<Map<string, ShownSizeChart>>;
   };
   /** The products on pre-order, and the day each ships by (ADR-403). */
   preorders: {
@@ -843,6 +863,11 @@ export class StorefrontPublisher {
       shopId,
       active.map((record) => record.id),
     );
+    const sizeCharts = await this.services.sizeCharts.shownSizeChartsOf(
+      tx,
+      shopId,
+      active.map((record) => record.id),
+    );
     const docs = active.map((record) =>
       productDoc(
         record,
@@ -859,6 +884,7 @@ export class StorefrontPublisher {
         },
         reviews.get(record.id),
         preorders.get(record.id),
+        sizeCharts.get(record.id),
       ),
     );
     await writer.putProducts(docs);
@@ -1092,6 +1118,7 @@ export function createStorefrontPublisher(
       articles: new ArticleService(database),
       reviews: { shownReviewsOf: shownReviewsIn },
       preorders: { preordersOf: preordersIn },
+      sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
       comments: new CommentService(database),
       preferences: { preferencesOf: shopPreferencesOf },
       delivery: new DeliveryService(database),

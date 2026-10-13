@@ -91,8 +91,22 @@ export interface VariantDoc {
   image: number | null;
 }
 
+/**
+ * A product's size chart (CAT-10, ADR-407): measurements a row for each size, in the unit the shop
+ * wrote them in, `values` a measurement for each column or null.
+ */
+export interface SizeChartDoc {
+  name: string;
+  unit: 'in' | 'cm';
+  columns: string[];
+  rows: { size: string; values: (number | null)[] }[];
+  note: string | null;
+}
+
 export interface ProductDoc {
   id: string;
+  /** The size chart its page shows, if any (ADR-407). */
+  sizeChart?: SizeChartDoc;
   /**
    * The day it ships by, YYYY-MM-DD, while it is on pre-order (CAT-14, ADR-403): it sells
    * whatever its stock. Absent when it is not.

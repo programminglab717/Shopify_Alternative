@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-406 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-407 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -414,6 +414,7 @@
 | 404 | A product on pre-order says so where shoppers decide and buy: its button reads Pre-order with the day it ships by, its card a badge, its cart and checkout lines and the order's own page the day each ships by | Accepted |
 | 405 | The admin puts a product on pre-order from its page, beside its stock rules, with the day it ships by, a month ahead to begin with, warns when that day has gone by, and an order's page says of each line sold on pre-order the day it ships by | Accepted |
 | 406 | The catalog keeps the shop's size charts, tables of measurements a row for each size, in inches or centimetres, and gives each product one at most, by its ID or as a collection has it then; the products whose chart changes are named in the event | Accepted |
+| 407 | A product's storefront page shows its size chart, opened under its buttons and read in inches or centimetres without a script, the unit the shop wrote it in first; themes read it as Hatti's `product.size_chart`, each measurement in both units | Accepted |
 
 ---
 
@@ -15697,3 +15698,30 @@
   * **A chart as a page or a product's description:** an image or text cannot be read in the
     other unit, nor kept the same across products.
   * **A metafield:** Shopify's size-chart apps keep one, but its shape is each app's own.
+
+## ADR-407 · A product's storefront page shows its size chart, opened under its buttons and read in inches or centimetres without a script, the unit the shop wrote it in first; themes read it as Hatti's `product.size_chart`, each measurement in both units
+
+* **Context:**
+  * The catalog keeps the shop's size charts and the one each product shows ([ADR-406](#adr-406--the-catalog-keeps-the-shops-size-charts-tables-of-measurements-a-row-for-each-size-in-inches-or-centimetres-and-gives-each-product-one-at-most-by-its-id-or-as-a-collection-has-it-then-the-products-whose-chart-changes-are-named-in-the-event)); shoppers
+    decide on the product's page, many on a phone, and some measure in centimetres though the
+    shop wrote inches.
+* **Decision:**
+  * **The product's storefront document carries its chart** (`sizeChart`): name, unit, columns,
+    rows and note, as the catalog keeps them, rebuilt when the chart changes, is given or taken
+    away, or is deleted, from the products its events name.
+  * **Themes read it as Hatti's `product.size_chart`**: `name`, `unit` (`in` or `cm`),
+    `columns`, `note`, and `rows`, each with its `size`, its `values` as written, and the same
+    in `inches` and `centimetres`, worked out to a tenth; nil when the product has none. Shopify
+    has no field for it.
+  * **Hatti Base** shows "Size chart" under the product's buttons, a disclosure closed until
+    tapped; inside, the chart in the unit the shop wrote it in, and a switch to the other, two
+    radio buttons a stylesheet follows, so it works without a script and by keyboard. A size
+    with no measurement reads "–"; the table scrolls on its own on a narrow screen. Its words
+    are in English and Urdu; the shop's column and size names as written.
+* **Consequences:**
+  * A theme of a shop's own shows no chart until it reads the field.
+* **Alternatives:**
+  * **A dialog opened by a script:** it would need a script on every product page for one
+    table; the disclosure is the browser's own.
+  * **Converting in Liquid:** themes would each repeat the arithmetic and its rounding; the
+    object gives both units.

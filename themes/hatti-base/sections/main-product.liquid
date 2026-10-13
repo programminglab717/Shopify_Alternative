@@ -104,6 +104,7 @@
               <p class="product__preorder">{{ 'products.product.preorder_ships' | t: date: ships_on }}</p>
             {%- endif -%}
           {%- endform -%}
+          {% render 'size-chart', chart: product.size_chart, id: product.id %}
           {%- if settings.whatsapp_orders and shop.whatsapp -%}
             {%- assign message = 'general.whatsapp.order_message' | t: product: product.title, variant: current.title -%}
             <a class="button button--secondary" href="{{ shop.whatsapp | whatsapp_url: message }}">

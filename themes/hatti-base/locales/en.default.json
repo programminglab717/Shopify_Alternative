@@ -31,6 +31,14 @@
       "sold_out": "Sold out",
       "preorder": "Pre-order",
       "preorder_ships": "Pre-order: ships by {{ date }}",
+      "size_chart": {
+        "title": "Size chart",
+        "size": "Size",
+        "inches": "Inches",
+        "centimetres": "cm",
+        "caption_inches": "{{ name }}, in inches",
+        "caption_centimetres": "{{ name }}, in centimetres"
+      },
       "on_sale": "Sale",
       "quantity": "Quantity",
       "choose": "Choose {{ option }}",

@@ -8,6 +8,7 @@ import {
   type OptionRecord,
   type ProductRecord,
   type ShownReviews,
+  type ShownSizeChart,
 } from '@hatti/catalog/public';
 import {
   commentHtml,
@@ -80,6 +81,8 @@ export function productDoc(
   reviews?: ShownReviews,
   /** The day it ships by, while it is on pre-order (ADR-403). */
   preorderShipsOn?: string,
+  /** The size chart it shows, if any (ADR-407). */
+  sizeChart?: ShownSizeChart,
 ): ProductDoc {
   // Its images; its videos are its media beside them (ADR-258).
   const images = record.media.flatMap((media) => {
@@ -166,6 +169,7 @@ export function productDoc(
       },
     }),
     ...(preorderShipsOn && { preorderShipsOn }),
+    ...(sizeChart && { sizeChart }),
   };
 }
 

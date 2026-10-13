@@ -31,6 +31,14 @@
       "sold_out": "ختم ہو گیا",
       "preorder": "پیشگی آرڈر",
       "preorder_ships": "پیشگی آرڈر: {{ date }} تک روانہ ہوگا",
+      "size_chart": {
+        "title": "سائز چارٹ",
+        "size": "سائز",
+        "inches": "انچ",
+        "centimetres": "سینٹی میٹر",
+        "caption_inches": "{{ name }}، انچ میں",
+        "caption_centimetres": "{{ name }}، سینٹی میٹر میں"
+      },
       "on_sale": "سیل",
       "quantity": "تعداد",
       "choose": "{{ option }} منتخب کریں",

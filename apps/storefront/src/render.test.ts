@@ -1114,6 +1114,46 @@ describe('Storefront rendering', () => {
     expect(urdu.html).toContain('خریداروں کے ریویوز');
   });
 
+  it("shows a product's size chart, to read in inches or centimetres (ADR-407)", async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const measured = {
+      ...first!,
+      sizeChart: {
+        name: 'Kurtas <women>',
+        unit: 'in' as const,
+        columns: ['Chest', 'Length'],
+        rows: [
+          { size: 'S', values: [36, 42] },
+          { size: 'M', values: [38.5, null] },
+        ],
+        note: 'Measure a kurta that fits.',
+      },
+    };
+    const shop = new MemoryStore({ ...sample, products: [measured, ...rest] });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${measured.handle}` }, shop.fresh());
+    const flat = page.html.replace(/\s+/g, ' ');
+    expect(flat).toContain('<summary class="size-chart__summary">Size chart</summary>');
+    expect(flat).toContain('<p class="size-chart__name" dir="auto">Kurtas &lt;women&gt;</p>');
+    // Inches first, as the shop wrote it; centimetres worked out to a tenth.
+    expect(flat).toMatch(/id="size-chart-in-[^"]+" value="in" checked/);
+    expect(flat).not.toMatch(/id="size-chart-cm-[^"]+" value="cm" checked/);
+    expect(flat).toContain('<th scope="row" dir="auto">S</th><td>36</td><td>42</td>');
+    expect(flat).toContain('<th scope="row" dir="auto">S</th><td>91.4</td><td>106.7</td>');
+    expect(flat).toContain('<th scope="row" dir="auto">M</th><td>97.8</td><td>–</td>');
+    expect(flat).toContain('Measure a kurta that fits.');
+
+    const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());
+    expect(plain.html).not.toContain('size-chart');
+    const urdu = await renderer.render(
+      { path: `/products/${measured.handle}`, locale: 'ur' },
+      shop.fresh(),
+    );
+    expect(urdu.html).toContain('سائز چارٹ');
+    expect(urdu.html).toContain('سینٹی میٹر');
+  });
+
   it('says a product on pre-order is one, and the day it ships by, on its page, card and cart line (ADR-403)', async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;
