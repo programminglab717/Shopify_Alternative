@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-13
 
-### Reviews on the storefront
+### 5f6b5b2 · Reviews on the storefront
 
 * **On the product's page and cards** ([ADR-401](../architecture/13-decision-log.md#adr-401--a-products-storefront-page-shows-its-published-reviews-their-average-stars-and-the-latest-ten-through-shopifys-review-metafields-and-hattis-productreviews-and-tells-search-engines-as-schemaorgs-aggregaterating), MKT-05): its published reviews' stars under its
   title and on its cards, and the latest ten below it, each from someone who bought it from the
