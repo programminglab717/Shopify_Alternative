@@ -7,8 +7,8 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: WhatsApp broadcasts' next parts:
-the shop's own marketing templates (MKT-01 b), broadcasts to opted-in segments (c) and their
-pages in the admin (d); then automations (MKT-04). Urdu handles wait, as decided.
+broadcasts of an approved template to opted-in segments (MKT-01 c) and their pages in the
+admin (d); then automations (MKT-04). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,15 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### A shop's own WhatsApp templates
+
+* **Shops write their own marketing templates** ([ADR-420](../architecture/13-decision-log.md#adr-420--a-shop-writes-its-own-marketing-templates-sent-at-once-to-meta-for-approval-on-its-own-whatsapp-account-and-kept-as-metas-webhook-says-they-stand), MKT-01). Each is sent at once to Meta
+  for approval on the shop's own account, and Meta's verdict comes back through its webhook or
+  when the shop asks again.
+* **New scopes for marketing**: `read_marketing_events` and `write_marketing_events`, held by
+  owners, managers and marketers.
+* 2784 tests, from 2778: five for messaging, one for the core.
 
 ### 284f94c · A shop's own WhatsApp number, through Embedded Signup
 

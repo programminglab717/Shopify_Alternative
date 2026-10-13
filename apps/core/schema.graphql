@@ -7095,6 +7095,19 @@ type Mutation {
   Disconnects the shop's own WhatsApp number: Hatti forgets its token and stops sending from it.
   """
   whatsAppAccountDisconnect: WhatsAppAccountDisconnectPayload!
+
+  """
+  Writes a marketing template and sends it to Meta for approval on the shop's own WhatsApp Business Account; it is kept once Meta has it.
+  """
+  whatsAppTemplateCreate(input: WhatsAppTemplateInput!): WhatsAppTemplateCreatePayload!
+
+  """Deletes one of the shop's templates, from Meta too."""
+  whatsAppTemplateDelete(id: ID!): WhatsAppTemplateDeletePayload!
+
+  """
+  Asks Meta how the shop's templates stand, as its webhook says of them as it decides.
+  """
+  whatsAppTemplatesSync: WhatsAppTemplatesSyncPayload!
 }
 
 """
@@ -10896,6 +10909,11 @@ type Query {
   What the admin starts Meta's Embedded Signup with; null where this server has none set up.
   """
   whatsAppSignup: WhatsAppSignup
+
+  """
+  The shop's own WhatsApp templates on the number it has connected, the latest first; none without one.
+  """
+  whatsAppTemplates: [WhatsAppTemplate!]!
 }
 
 """Money given back on an order, as staff recorded it."""
@@ -12972,4 +12990,80 @@ type WhatsAppSignup {
 
   """The Graph API version the SDK is started with: "v26.0"."""
   graphVersion: String!
+}
+
+"""
+A marketing template the shop wrote for its own WhatsApp number (MKT-01, ADR-420), sent to Meta for approval: what broadcasts send.
+"""
+type WhatsAppTemplate {
+  """Its words; {{1}}, if anywhere, is the customer's first name."""
+  body: String!
+
+  """A button's words, opening buttonUrl."""
+  buttonText: String
+  buttonUrl: String
+  createdAt: DateTime!
+
+  """A line below the body, in grey."""
+  footer: String
+
+  """A line above the body, in bold."""
+  header: String
+  id: ID!
+  language: MessageLanguage!
+
+  """Meta's name for it: lowercase letters, digits and underscores."""
+  name: String!
+
+  """Why Meta rejected, paused or disabled it, in its words, where it says."""
+  rejectedReason: String
+  status: WhatsAppTemplateStatus!
+  updatedAt: DateTime!
+}
+
+type WhatsAppTemplateCreatePayload {
+  userErrors: [UserError!]!
+  whatsAppTemplate: WhatsAppTemplate
+}
+
+type WhatsAppTemplateDeletePayload {
+  deletedWhatsAppTemplateId: ID
+  userErrors: [UserError!]!
+}
+
+input WhatsAppTemplateInput {
+  body: String!
+  buttonText: String
+
+  """An https:// address."""
+  buttonUrl: String
+  footer: String
+  header: String
+  language: MessageLanguage!
+
+  """Lowercase letters, digits and underscores: "eid_sale"."""
+  name: String!
+}
+
+"""How Meta stands on one of the shop's templates (ADR-420)."""
+enum WhatsAppTemplateStatus {
+  """It can be sent."""
+  APPROVED
+
+  """Meta stopped it for good, or it is being deleted."""
+  DISABLED
+
+  """Meta stopped it for a while, for customers' blocks and reports."""
+  PAUSED
+
+  """Meta is reviewing it, within a day as a rule."""
+  PENDING
+
+  """Meta refused it: rejectedReason says why, where Meta does."""
+  REJECTED
+}
+
+type WhatsAppTemplatesSyncPayload {
+  userErrors: [UserError!]!
+  whatsAppTemplates: [WhatsAppTemplate!]!
 }

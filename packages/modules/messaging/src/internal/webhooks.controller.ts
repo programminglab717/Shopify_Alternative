@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { MessagesService } from './messages.service.js';
+import { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
 import { asksToStop } from './templates.js';
 import { parseWhatsAppWebhook, signatureValid } from './whatsapp-webhook.js';
 
@@ -45,6 +46,7 @@ export class WhatsAppWebhookController {
   constructor(
     @Inject(WHATSAPP_WEBHOOK) private readonly settings: WhatsAppWebhookSettings | null,
     private readonly messages: MessagesService,
+    private readonly templates: WhatsAppTemplatesService,
   ) {}
 
   /** Meta's check, as the webhook is set up: the token it was given, and a challenge to echo. */
@@ -72,8 +74,10 @@ export class WhatsAppWebhookController {
     if (!request.rawBody || !signatureValid(request.rawBody, signature, this.settings.appSecret)) {
       throw new UnauthorizedException('The request is not signed with the app secret');
     }
-    const { statuses, inbound } = parseWhatsAppWebhook(request.body);
+    const { statuses, inbound, templates } = parseWhatsAppWebhook(request.body);
     const { unmatched } = await this.messages.recordStatuses(statuses);
+    // What Meta decided of shops' own templates (ADR-420).
+    await this.templates.recordStatuses(templates);
     for (const message of inbound) {
       if (message.text && asksToStop(message.text)) {
         await this.messages.optOut('whatsapp', message.from, message.text, message.replyTo);
@@ -91,7 +95,7 @@ export class WhatsAppWebhookController {
     if (unmatched.some((status) => now - status.at.getTime() < EARLY_MS)) {
       throw new ServiceUnavailableException('A message is not known yet: send it again');
     }
-    return { received: statuses.length + inbound.length };
+    return { received: statuses.length + inbound.length + templates.length };
   }
 }
 

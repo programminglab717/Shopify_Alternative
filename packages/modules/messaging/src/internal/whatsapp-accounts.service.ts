@@ -50,6 +50,7 @@ export interface WhatsAppSignupRecord {
 
 /** The shop's number as the worker sends from it, its token opened. */
 export interface WhatsAppSender {
+  businessAccountId: string;
   phoneNumberId: string;
   accessToken: string;
 }
@@ -89,6 +90,11 @@ export class WhatsAppAccountsService {
     @Inject(WHATSAPP_SIGNUP) private readonly signupSettings: WhatsAppSignupSettings | null,
   ) {
     this.#client = signupSettings && new WhatsAppBusinessClient(signupSettings);
+  }
+
+  /** Meta's Graph API as Hatti's app asks it; null where this server has none set up. */
+  get graph(): WhatsAppBusinessClient | null {
+    return this.#client;
   }
 
   /** What the admin starts Embedded Signup with; null where this server has none set up. */
@@ -262,6 +268,7 @@ export class WhatsAppAccountsService {
     const row = await this.db.tenant(shopId, (tx) => accountIn(tx, shopId));
     return (
       row && {
+        businessAccountId: row.business_account_id,
         phoneNumberId: row.phone_number_id,
         accessToken: this.box
           .decrypt(row.access_token, sealedFor(shopId, 'token'))

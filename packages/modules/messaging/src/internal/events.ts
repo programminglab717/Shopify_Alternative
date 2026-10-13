@@ -6,6 +6,9 @@ export const MessagingEvents = {
   MessageReplied: 'message.replied',
   WhatsAppAccountConnected: 'whatsapp_account.connected',
   WhatsAppAccountDisconnected: 'whatsapp_account.disconnected',
+  WhatsAppTemplateCreated: 'whatsapp_template.created',
+  WhatsAppTemplateDeleted: 'whatsapp_template.deleted',
+  WhatsAppTemplateStatusChanged: 'whatsapp_template.status_changed',
 } as const;
 
 /**
@@ -47,4 +50,19 @@ export interface WhatsAppAccountDisconnectedPayload {
   phoneNumberId: string;
   actorKind: 'app' | 'staff';
   actorId: string;
+}
+
+/** The shop wrote one of its own templates, or deleted one (ADR-420). The aggregate is it. */
+export interface WhatsAppTemplateChangedPayload {
+  name: string;
+  language: 'en' | 'ur';
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/** Meta approved, rejected, paused or disabled one of the shop's templates (ADR-420). */
+export interface WhatsAppTemplateStatusPayload {
+  status: 'pending' | 'approved' | 'rejected' | 'paused' | 'disabled';
+  /** Why, where Meta says. */
+  reason: string | null;
 }

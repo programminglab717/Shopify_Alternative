@@ -856,9 +856,35 @@ describe("WhatsApp's webhook", () => {
           at: new Date(1790940240_000),
         },
       ],
+      templates: [],
     });
-    expect(parseWhatsAppWebhook(null)).toEqual({ statuses: [], inbound: [] });
-    expect(parseWhatsAppWebhook({ entry: 'x' })).toEqual({ statuses: [], inbound: [] });
+    const none = { statuses: [], inbound: [], templates: [] };
+    expect(parseWhatsAppWebhook(null)).toEqual(none);
+    expect(parseWhatsAppWebhook({ entry: 'x' })).toEqual(none);
+  });
+
+  it("reads Meta's word of a shop's templates (ADR-420)", () => {
+    const update = (value: unknown) => ({
+      entry: [
+        { id: '102290129340398', changes: [{ field: 'message_template_status_update', value }] },
+      ],
+    });
+    expect(
+      parseWhatsAppWebhook(
+        update({
+          event: 'REJECTED',
+          message_template_id: 594425479261596,
+          message_template_name: 'eid_sale',
+          message_template_language: 'en',
+          reason: 'INVALID_FORMAT',
+        }),
+      ).templates,
+    ).toEqual([{ metaTemplateId: '594425479261596', event: 'REJECTED', reason: 'INVALID_FORMAT' }]);
+    expect(
+      parseWhatsAppWebhook(update({ event: 'APPROVED', message_template_id: '77', reason: 'NONE' }))
+        .templates,
+    ).toEqual([{ metaTemplateId: '77', event: 'APPROVED', reason: null }]);
+    expect(parseWhatsAppWebhook(update({ event: 'APPROVED' })).templates).toEqual([]);
   });
 
   it("takes only bodies signed with the app's secret", () => {

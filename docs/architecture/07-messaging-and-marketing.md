@@ -111,6 +111,10 @@ is auto-submitted for approval to each connected WABA:
 \* Meta decides the category based on content. The library is written to keep order-related
 messages in the cheaper utility category.
 
+*Built so far* ([ADR-420](./13-decision-log.md#adr-420--a-shop-writes-its-own-marketing-templates-sent-at-once-to-meta-for-approval-on-its-own-whatsapp-account-and-kept-as-metas-webhook-says-they-stand)): a shop's own marketing templates,
+written in the admin and sent at once to Meta on its own account. Each keeps Meta's verdict,
+from its webhook or when the shop asks again.
+
 *Built so far* ([ADR-160](./13-decision-log.md#adr-160--each-parcels-way-is-kept-step-by-step-as-shopifys-fulfillmentevent-its-couriers-changes-recorded-once-from-the-workers-tracking-and-staffs-for-couriers-hatti-does-not-follow-the-orders-page-shows-them-the-latest-first-in-english-and-urdu-the-shipped-message-links-that-page-and-a-parcel-out-for-delivery-with-cash-to-collect-tells-its-customer-what-to-keep-ready)): shipped, with a button to the order's page, where the parcel's way
 shows; and out for delivery, with what to keep ready for the rider and the same button, each time
 a parcel with cash to collect goes out. A payment while the order waits to ship is told too, in

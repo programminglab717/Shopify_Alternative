@@ -40,6 +40,8 @@ export const ACCESS_SCOPES = [
   'write_files',
   'read_pixels',
   'write_pixels',
+  'read_marketing_events',
+  'write_marketing_events',
   'read_store_credit_accounts',
   'read_store_credit_account_transactions',
   'write_store_credit_account_transactions',
@@ -80,8 +82,8 @@ const VIEW_CATALOG: readonly AccessScope[] = ['read_products', 'read_inventory',
  * build them. Shop settings and policies, such as when risky orders wait for review, the online
  * store's themes, menus and domains, and its legal policies: owner and manager only. Its pages
  * and blogs, which are content (ADR-176), and its content's Urdu (ADR-238), discount codes, which
- * are marketing, the files they upload, and the ad platforms its orders go to (ADR-143):
- * marketers too. Store credit (ADR-184):
+ * are marketing, the files they upload, the ad platforms its orders go to (ADR-143), and the
+ * shop's own WhatsApp templates and broadcasts (ADR-420): marketers too. Store credit (ADR-184):
  * owners and managers credit and debit it; accountants see it all, and confirmation agents what
  * a customer has.
  */
@@ -102,6 +104,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_discounts',
     'write_files',
     'write_pixels',
+    'write_marketing_events',
     'read_store_credit_accounts',
     'write_store_credit_account_transactions',
   ],
@@ -121,6 +124,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_discounts',
     'write_files',
     'write_pixels',
+    'write_marketing_events',
     'read_store_credit_accounts',
     'write_store_credit_account_transactions',
   ],
@@ -142,6 +146,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_discounts',
     'write_files',
     'write_pixels',
+    'write_marketing_events',
   ],
   accountant: [
     ...VIEW_CATALOG,

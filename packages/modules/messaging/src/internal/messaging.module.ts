@@ -5,8 +5,10 @@ import { MessagingResolver } from './graphql/messaging.resolver.js';
 import { MessagesService } from './messages.service.js';
 import { MessagingSettingsService } from './settings.service.js';
 import { WhatsAppAccountResolver } from './graphql/whatsapp-account.resolver.js';
+import { WhatsAppTemplateResolver } from './graphql/whatsapp-template.resolver.js';
 import { WHATSAPP_SIGNUP, WhatsAppAccountsService } from './whatsapp-accounts.service.js';
 import type { WhatsAppSignupSettings } from './whatsapp-business.js';
+import { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
 import {
   WHATSAPP_WEBHOOK,
   WhatsAppWebhookController,
@@ -37,8 +39,15 @@ export class MessagingModule {
         MessagingCustomerData,
         WhatsAppAccountsService,
         WhatsAppAccountResolver,
+        WhatsAppTemplatesService,
+        WhatsAppTemplateResolver,
       ],
-      exports: [MessagesService, MessagingSettingsService, WhatsAppAccountsService],
+      exports: [
+        MessagesService,
+        MessagingSettingsService,
+        WhatsAppAccountsService,
+        WhatsAppTemplatesService,
+      ],
     };
   }
 }

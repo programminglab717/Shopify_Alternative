@@ -1754,6 +1754,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'write_discounts',
         'write_files',
         'write_pixels',
+        'write_marketing_events',
         'read_store_credit_accounts',
         'write_store_credit_account_transactions',
       ]);

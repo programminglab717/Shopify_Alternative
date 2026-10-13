@@ -18,9 +18,20 @@ export interface InboundMessage {
   at: Date;
 }
 
+/** Meta's word of a shop's template (ADR-420): approved, rejected, paused or disabled. */
+export interface TemplateStatusUpdate {
+  /** Meta's ID for the template. */
+  metaTemplateId: string;
+  /** As Meta names it: "APPROVED". */
+  event: string;
+  /** Why Meta rejected, paused or disabled it, where it says. */
+  reason: string | null;
+}
+
 export interface WhatsAppWebhook {
   statuses: StatusUpdate[];
   inbound: InboundMessage[];
+  templates: TemplateStatusUpdate[];
 }
 
 /** Whether the request's body is the one Meta signed with the app's secret. */
@@ -41,10 +52,24 @@ const STATUSES = new Set(['sent', 'delivered', 'read', 'failed']);
 export function parseWhatsAppWebhook(body: unknown): WhatsAppWebhook {
   const statuses: StatusUpdate[] = [];
   const inbound: InboundMessage[] = [];
+  const templates: TemplateStatusUpdate[] = [];
   for (const entry of arrayOf(field(body, 'entry'))) {
     for (const change of arrayOf(field(entry, 'changes'))) {
-      if (field(change, 'field') !== 'messages') continue;
       const value = field(change, 'value');
+      if (field(change, 'field') === 'message_template_status_update') {
+        const id = field(value, 'message_template_id');
+        const event = field(value, 'event');
+        const reason = field(value, 'reason');
+        if ((typeof id === 'string' || typeof id === 'number') && typeof event === 'string') {
+          templates.push({
+            metaTemplateId: String(id).slice(0, 30),
+            event: event.slice(0, 50),
+            reason: typeof reason === 'string' && reason !== 'NONE' ? reason.slice(0, 500) : null,
+          });
+        }
+        continue;
+      }
+      if (field(change, 'field') !== 'messages') continue;
       for (const status of arrayOf(field(value, 'statuses'))) {
         const id = field(status, 'id');
         const kind = field(status, 'status');
@@ -82,7 +107,7 @@ export function parseWhatsAppWebhook(body: unknown): WhatsAppWebhook {
       }
     }
   }
-  return { statuses, inbound };
+  return { statuses, inbound, templates };
 }
 
 function field(value: unknown, name: string): unknown {

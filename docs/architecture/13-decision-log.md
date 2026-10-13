@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-419 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-420 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -427,6 +427,7 @@
 | 417 | The store's export holds the online store's collections, pages and blogs as JSON, and its owner is emailed when it is ready | Accepted |
 | 418 | Shoppers keep a wishlist and see what they viewed lately in their own browser, and Hatti Base fetches each product's card through the section rendering API | Accepted |
 | 419 | A shop connects its own WhatsApp number through Meta's Embedded Signup, Hatti exchanging the code, subscribing to the account and registering the number, its token sealed for the shop | Accepted |
+| 420 | A shop writes its own marketing templates, sent at once to Meta for approval on its own WhatsApp account, and kept as Meta's webhook says they stand | Accepted |
 
 ---
 
@@ -16097,3 +16098,44 @@
     of it in a few taps, from Meta's own pages.
   * **A Business Solution Provider's hosted signup**: a markup on every message, and a second
     party holding the shop's token.
+
+## ADR-420 · A shop writes its own marketing templates, sent at once to Meta for approval on its own WhatsApp account, and kept as Meta's webhook says they stand
+
+* **Context:**
+  * Broadcasts send templates Meta approved in advance, in the marketing category, from the
+    shop's own number (ADR-419). Hatti's library of templates (07 §2.2) is for order updates
+    and is fixed; a sale or a new drop is the shop's own words.
+* **Decision:**
+  * **The shop writes them:**
+    * a name in Meta's form (lowercase letters, digits and underscores) and English or Urdu;
+    * a body of up to 1,024 characters, which may name the customer with `{{1}}`, their first
+      name, and has no other variable;
+    * a header and footer line if it likes;
+    * a button with an https:// link if it likes.
+
+    Hatti checks what Meta would refuse before asking.
+  * **Sent at once** to Meta's API on the shop's WhatsApp Business Account, in the marketing
+    category, with an example name for `{{1}}`. The template is kept only once Meta has it,
+    with Meta's ID for it. What Meta refuses is the shop's to read, in Meta's words.
+  * **Kept as Meta says it stands:**
+    * pending, approved, rejected with Meta's reason, paused, or disabled;
+    * from Meta's webhook, whose `message_template_status_update` names the template by Meta's
+      ID, found across shops by a narrow function as messages are (ADR-146);
+    * or when the shop asks again (`whatsAppTemplatesSync`).
+
+    Each change is an event.
+  * **A shop's templates are those of the account it has now.** Deleting one deletes it from
+    Meta too while the shop still has that account. Meta refusing leaves it as it was; one
+    Meta no longer has goes. At most 100 per account.
+  * **New scopes, Shopify's names:** `read_marketing_events` and `write_marketing_events`,
+    which owners, managers and marketers hold, for templates and broadcasts.
+* **Consequences:**
+  * Broadcasts can choose among a shop's approved templates. The admin's pages for them come
+    with broadcasts.
+  * Only text headers, and one link button. Images, product cards and quick replies wait for a
+    shop to ask.
+* **Alternatives:**
+  * **Hatti's own marketing library on every shop's account**: shops sell different things in
+    different words, and Meta judges each template on its own.
+  * **Asking Meta on a timer alone**: the webhook says within moments, and the shop's asking
+    again covers one lost.

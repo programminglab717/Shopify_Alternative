@@ -32,8 +32,46 @@ export interface WhatsAppNumber {
 export const WHATSAPP_QUALITIES = ['green', 'yellow', 'red', 'unknown'] as const;
 export type WhatsAppQuality = (typeof WHATSAPP_QUALITIES)[number];
 
+/** A shop's template as Meta is asked to approve it (ADR-420). */
+export interface TemplateSubmission {
+  name: string;
+  language: 'en' | 'ur';
+  header: string | null;
+  /** {{1}}, if anywhere, is the customer's first name. */
+  body: string;
+  footer: string | null;
+  button: { text: string; url: string } | null;
+}
+
+/** An example of {{1}} that Meta asks for with a body that has it. */
+const EXAMPLE_NAME = 'Ayesha';
+
+/** The template's components, as Meta's API takes them. */
+export function templateComponents(template: TemplateSubmission): object[] {
+  return [
+    ...(template.header ? [{ type: 'HEADER', format: 'TEXT', text: template.header }] : []),
+    {
+      type: 'BODY',
+      text: template.body,
+      ...(template.body.includes('{{1}}') ? { example: { body_text: [[EXAMPLE_NAME]] } } : {}),
+    },
+    ...(template.footer ? [{ type: 'FOOTER', text: template.footer }] : []),
+    ...(template.button
+      ? [
+          {
+            type: 'BUTTONS',
+            buttons: [{ type: 'URL', text: template.button.text, url: template.button.url }],
+          },
+        ]
+      : []),
+  ];
+}
+
 /** What Meta said of a request: what was asked for, or why not. */
-export type GraphResult<T> = { ok: true; value: T } | { ok: false; error: string };
+export type GraphResult<T> =
+  | { ok: true; value: T }
+  /** notFound: Meta has no such thing, as one deleted there already. */
+  | { ok: false; error: string; notFound?: boolean };
 
 /** Asks Meta's Graph API for what connecting a shop's own number takes. */
 export class WhatsAppBusinessClient {
@@ -107,6 +145,73 @@ export class WhatsAppBusinessClient {
     );
   }
 
+  /**
+   * Sends a template to Meta for approval on the account, in the marketing category: Meta's ID
+   * for it and how it stands, as a status Meta names ("PENDING").
+   */
+  async createTemplate(
+    token: string,
+    businessAccountId: string,
+    template: TemplateSubmission,
+  ): Promise<GraphResult<{ id: string; status: string }>> {
+    const result = await this.#request<{ id?: unknown; status?: unknown }>(
+      'POST',
+      `${businessAccountId}/message_templates`,
+      {
+        name: template.name,
+        language: template.language,
+        category: 'MARKETING',
+        components: templateComponents(template),
+      },
+      token,
+    );
+    if (!result.ok) return result;
+    const { id, status } = result.value;
+    return typeof id === 'string' && /^[0-9]{1,30}$/.test(id)
+      ? { ok: true, value: { id, status: typeof status === 'string' ? status : 'PENDING' } }
+      : { ok: false, error: 'Meta gave no ID for the template' };
+  }
+
+  /** Deletes a template from the account, by its name and Meta's ID for it. */
+  async deleteTemplate(
+    token: string,
+    businessAccountId: string,
+    name: string,
+    id: string,
+  ): Promise<GraphResult<true>> {
+    const query = new URLSearchParams({ name, hsm_id: id });
+    return this.#done(
+      this.#request('DELETE', `${businessAccountId}/message_templates?${query}`, null, token),
+    );
+  }
+
+  /** How the account's templates stand, a hundred at most, as Meta says. */
+  async templatesOf(
+    token: string,
+    businessAccountId: string,
+  ): Promise<GraphResult<{ id: string; status: string; rejectedReason: string | null }[]>> {
+    const fields = 'id,name,language,status,rejected_reason';
+    const result = await this.#request<{ data?: unknown }>(
+      'GET',
+      `${businessAccountId}/message_templates?fields=${fields}&limit=100`,
+      null,
+      token,
+    );
+    if (!result.ok) return result;
+    const templates = [];
+    for (const each of Array.isArray(result.value.data) ? result.value.data : []) {
+      const row = each as Record<string, unknown>;
+      if (typeof row.id !== 'string' || typeof row.status !== 'string') continue;
+      const reason = row.rejected_reason;
+      templates.push({
+        id: row.id,
+        status: row.status,
+        rejectedReason: typeof reason === 'string' && reason !== 'NONE' ? reason : null,
+      });
+    }
+    return { ok: true, value: templates };
+  }
+
   async #done(request: Promise<GraphResult<unknown>>): Promise<GraphResult<true>> {
     const result = await request;
     return result.ok ? { ok: true, value: true } : result;
@@ -142,6 +247,7 @@ export class WhatsAppBusinessClient {
     return {
       ok: false,
       error: `Meta ${error?.code ?? response.status}: ${said}`.slice(0, 500),
+      notFound: response.status === 404,
     };
   }
 }

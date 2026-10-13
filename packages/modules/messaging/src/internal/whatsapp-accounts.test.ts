@@ -1,7 +1,5 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import type { MutationResult, TenantContext } from '@hatti/api';
 import { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
@@ -9,14 +7,11 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { FakeGraph, NUMBER, TOKEN, WABA } from './test-support.js';
 import { WhatsAppAccountsService } from './whatsapp-accounts.service.js';
 import { qualityOf, type WhatsAppSignupSettings } from './whatsapp-business.js';
 
 const server = testDatabaseServer();
-
-const TOKEN = 'EAAQbusinessToken'.padEnd(80, 'x');
-const WABA = '102290129340398';
-const NUMBER = '106540352242922';
 
 function unwrap<T>(result: MutationResult<T>): T {
   if (!result.ok) throw new Error(`Expected success, got ${JSON.stringify(result.errors)}`);
@@ -33,77 +28,6 @@ function tenant(shopId: string): TenantContext {
 }
 
 /** Meta's Graph API as connecting a number asks it, each request kept. */
-class FakeGraph {
-  readonly requests: { method: string; path: string; auth: string | null; body: unknown }[] = [];
-  /** The codes Meta takes. */
-  codes = new Set(['good-code']);
-  registerError: string | null = null;
-  readonly #server: Server;
-
-  constructor() {
-    this.#server = createServer((request, response) => {
-      let raw = '';
-      request.on('data', (chunk: Buffer) => (raw += chunk.toString()));
-      request.on('end', () => {
-        const url = new URL(request.url!, 'http://graph');
-        const path = url.pathname.replace(/^\/v26\.0\//, '');
-        this.requests.push({
-          method: request.method!,
-          path,
-          auth: request.headers.authorization ?? null,
-          body: raw ? JSON.parse(raw) : null,
-        });
-        const send = (status: number, body: unknown) => {
-          response.writeHead(status, { 'content-type': 'application/json' });
-          response.end(JSON.stringify(body));
-        };
-        if (path === 'oauth/access_token') {
-          const ok =
-            url.searchParams.get('client_id') === '1234567890' &&
-            url.searchParams.get('client_secret') === 'app-secret' &&
-            this.codes.has(url.searchParams.get('code') ?? '');
-          return ok
-            ? send(200, { access_token: TOKEN, token_type: 'bearer' })
-            : send(400, {
-                error: { message: 'This authorization code has been used.', code: 100 },
-              });
-        }
-        if (request.headers.authorization !== `Bearer ${TOKEN}`) {
-          return send(401, { error: { message: 'Invalid OAuth access token', code: 190 } });
-        }
-        if (path === `${WABA}/phone_numbers`) {
-          return send(200, {
-            data: [
-              {
-                id: NUMBER,
-                display_phone_number: '+92 300 1234567',
-                verified_name: 'Zari Fashions',
-                quality_rating: 'GREEN',
-              },
-            ],
-          });
-        }
-        if (path === `${WABA}/subscribed_apps`) return send(200, { success: true });
-        if (path === `${NUMBER}/register`) {
-          return this.registerError
-            ? send(400, { error: { message: this.registerError, code: 133005 } })
-            : send(200, { success: true });
-        }
-        send(404, { error: { message: 'Unknown path', code: 803 } });
-      });
-    });
-  }
-
-  async start(): Promise<string> {
-    await new Promise<void>((resolve) => this.#server.listen(0, '127.0.0.1', resolve));
-    return `http://127.0.0.1:${(this.#server.address() as AddressInfo).port}`;
-  }
-
-  async stop(): Promise<void> {
-    await new Promise<void>((resolve) => this.#server.close(() => resolve()));
-  }
-}
-
 describe.skipIf(!server)("A shop's own WhatsApp number (MKT-01, ADR-419)", () => {
   let testDb: TestDatabase;
   let db: Database;
@@ -196,6 +120,7 @@ describe.skipIf(!server)("A shop's own WhatsApp number (MKT-01, ADR-419)", () =>
     expect(rows[0]!.pin).not.toBe(pin);
     // The worker opens it to send, for that shop alone.
     expect(await accounts.senderOf(a.shopId)).toEqual({
+      businessAccountId: WABA,
       phoneNumberId: NUMBER,
       accessToken: TOKEN,
     });

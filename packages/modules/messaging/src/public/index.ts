@@ -13,6 +13,8 @@ export {
   type MessagingSettingsUpdatedPayload,
   type WhatsAppAccountConnectedPayload,
   type WhatsAppAccountDisconnectedPayload,
+  type WhatsAppTemplateChangedPayload,
+  type WhatsAppTemplateStatusPayload,
 } from '../internal/events.js';
 export {
   MESSAGE_STATUSES,
@@ -85,6 +87,7 @@ export {
   parseWhatsAppWebhook,
   signatureValid,
   type InboundMessage,
+  type TemplateStatusUpdate,
   type WhatsAppWebhook,
 } from '../internal/whatsapp-webhook.js';
 export {
@@ -99,8 +102,18 @@ export {
   WHATSAPP_QUALITIES,
   WhatsAppBusinessClient,
   qualityOf,
+  templateComponents,
+  type TemplateSubmission,
   type GraphResult,
   type WhatsAppNumber,
   type WhatsAppQuality,
   type WhatsAppSignupSettings,
 } from '../internal/whatsapp-business.js';
+export {
+  WHATSAPP_TEMPLATE_LIMITS,
+  WHATSAPP_TEMPLATE_STATUSES,
+  WhatsAppTemplatesService,
+  type WhatsAppTemplateInput,
+  type WhatsAppTemplateRecord,
+  type WhatsAppTemplateStatus,
+} from '../internal/whatsapp-templates.service.js';
