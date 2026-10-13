@@ -222,6 +222,14 @@ describe('checkoutPage', () => {
     expect(typed.html).not.toContain('working day');
   });
 
+  it('says which items are on pre-order, and the day they ship by (ADR-403)', () => {
+    const cart = { ...CART, items: [{ ...CART.items[0]!, preorderShipsOn: '2026-11-30' }] };
+    const page = checkoutPage(openView({ cart }));
+    expect(page.html).toContain('Pre-order: ships by 30 November 2026');
+    expect(page.html).toContain('پیشگی آرڈر: 30 November 2026 تک روانہ ہوگا');
+    expect(checkoutPage(openView()).html).not.toContain('Pre-order');
+  });
+
   it('says how many working days delivery takes to the city, or wherever it goes (ADR-235)', () => {
     const delivery: DeliverySettingsRecord = {
       ...DELIVERY,

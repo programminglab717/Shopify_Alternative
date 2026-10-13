@@ -232,6 +232,11 @@ export interface CartLineJson {
    * after it was added; null while all of it can be bought.
    */
   maxQuantity: number | null;
+  /**
+   * The day it ships by, YYYY-MM-DD, its product being on pre-order (ADR-403); absent when it is
+   * not.
+   */
+  preorderShipsOn?: string;
 }
 
 export interface CartJson {

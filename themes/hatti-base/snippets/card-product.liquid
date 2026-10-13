@@ -27,6 +27,8 @@
       {%- endif -%}
       {%- if product.available == false -%}
         <span class="badge">{{ 'products.product.sold_out' | t }}</span>
+      {%- elsif product.preorder_ships_on -%}
+        <span class="badge badge--preorder">{{ 'products.product.preorder' | t }}</span>
       {%- elsif product.compare_at_price > product.price -%}
         <span class="badge badge--sale">{{ 'products.product.on_sale' | t }}</span>
       {%- endif -%}

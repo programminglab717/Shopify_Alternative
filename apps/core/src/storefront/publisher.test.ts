@@ -17,7 +17,13 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import type { DomainEvent } from '@hatti/events';
 import { BrandService, FileService, readyImagesIn, shopLogoOf } from '@hatti/files/public';
 import { newId } from '@hatti/ids';
-import { InventoryService, LocationService } from '@hatti/inventory/public';
+import {
+  InventoryService,
+  LocationService,
+  PreorderService,
+  pakistanDay,
+  preordersIn,
+} from '@hatti/inventory/public';
 import { MetaConversionsService, metaPixelIdIn } from '@hatti/marketing/public';
 import {
   ArticleService,
@@ -409,6 +415,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         blogs,
         articles,
         reviews: { shownReviewsOf: shownReviewsIn },
+        preorders: { preordersOf: preordersIn },
         comments: new CommentService(database),
         preferences,
         delivery,
@@ -1057,6 +1064,42 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
       count: 1,
     });
     unwrap(await products.delete(tenant, chappal.id));
+    await deliver();
+  });
+
+  it('publishes the day a product on pre-order ships by, and its variants as sold whatever their stock (ADR-403)', async () => {
+    const preorders = new PreorderService(database, products);
+    const kurta = unwrap(
+      await products.create(tenant, {
+        title: 'Eid Kurta',
+        status: 'active',
+        variants: [{ price: '4,999' }],
+      }),
+    );
+    const [variant] = kurta.variants;
+    const primary = (await database.tenant(shopId, (tx) => locations.primaryOf(tx, shopId))).id;
+    unwrap(
+      await inventory.setQuantities(tenant, {
+        name: 'on_hand',
+        reason: 'received',
+        quantities: [{ inventoryItemId: variant!.id, locationId: primary, quantity: 0 }],
+      }),
+    );
+    await deliver();
+    let doc = await store().productByHandle(kurta.handle);
+    expect([doc?.preorderShipsOn, doc?.variants[0]?.available]).toEqual([undefined, false]);
+
+    const day = pakistanDay(new Date(), 30);
+    unwrap(await preorders.set(tenant, kurta.id, day));
+    expect(await deliver()).toEqual(['product_preorder.updated']);
+    doc = await store().productByHandle(kurta.handle);
+    expect([doc?.preorderShipsOn, doc?.variants[0]?.available]).toEqual([day, true]);
+
+    unwrap(await preorders.set(tenant, kurta.id, null));
+    await deliver();
+    doc = await store().productByHandle(kurta.handle);
+    expect([doc?.preorderShipsOn, doc?.variants[0]?.available]).toEqual([undefined, false]);
+    unwrap(await products.delete(tenant, kurta.id));
     await deliver();
   });
 

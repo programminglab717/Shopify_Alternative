@@ -60,6 +60,8 @@ export interface VariantFacts {
   forSale: boolean;
   /** How many can be sold online now; null for no limit. */
   sellable: number | null;
+  /** The day it ships by, its product being on pre-order (ADR-403); absent when it is not. */
+  preorderShipsOn?: string;
 }
 
 /** What a storefront asked of a cart, checked. */
@@ -349,6 +351,7 @@ export function cartJson(cart: CartContent, facts: ReadonlyMap<string, VariantFa
       taxable: variant.taxable,
       taxCode: variant.taxCode,
       maxQuantity: short ? Math.max(0, variant.sellable! - (all - line.quantity)) : null,
+      ...(variant.preorderShipsOn && { preorderShipsOn: variant.preorderShipsOn }),
     };
   });
   return {

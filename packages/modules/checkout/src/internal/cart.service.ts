@@ -2,7 +2,7 @@ import { VariantService } from '@hatti/catalog/public';
 import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, runPrepared, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
-import { InventoryService } from '@hatti/inventory/public';
+import { InventoryService, preordersIn } from '@hatti/inventory/public';
 import { discountCodeIn, discountFor } from '@hatti/pricing/public';
 import type { CartDiscountJson, CartError, CartJson } from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
@@ -195,6 +195,11 @@ export class CartService {
   ): Promise<Map<string, VariantFacts>> {
     const snapshots = await this.variants.snapshotsOf(tx, shopId, [...new Set(variantIds)]);
     const sellable = await this.inventory.sellableOf(tx, shopId, [...snapshots.keys()]);
+    const preorders = await preordersIn(
+      tx,
+      shopId,
+      [...snapshots.values()].map((snapshot) => snapshot.productId),
+    );
     return new Map(
       [...snapshots].map(([id, snapshot]) => [
         id,
@@ -209,6 +214,7 @@ export class CartService {
           taxCode: snapshot.taxCode,
           forSale: snapshot.productStatus === 'active',
           sellable: sellable.get(id) ?? null,
+          preorderShipsOn: preorders.get(snapshot.productId),
         },
       ]),
     );

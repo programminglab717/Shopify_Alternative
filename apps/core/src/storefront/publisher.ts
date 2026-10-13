@@ -27,6 +27,7 @@ import {
 import {
   InventoryEvents,
   InventoryService,
+  preordersIn,
   type LocationUpdatedPayload,
 } from '@hatti/inventory/public';
 import { ShopEvents } from '@hatti/identity/public';
@@ -407,6 +408,14 @@ export interface PublisherServices {
       shopId: string,
       productIds: readonly string[],
     ): Promise<Map<string, ShownReviews>>;
+  };
+  /** The products on pre-order, and the day each ships by (ADR-403). */
+  preorders: {
+    preordersOf(
+      tx: Tx,
+      shopId: string,
+      productIds: readonly string[],
+    ): Promise<Map<string, string>>;
   };
   /** The comments articles' pages show (ADR-220). */
   comments: {
@@ -829,6 +838,11 @@ export class StorefrontPublisher {
       shopId,
       active.map((record) => record.id),
     );
+    const preorders = await this.services.preorders.preordersOf(
+      tx,
+      shopId,
+      active.map((record) => record.id),
+    );
     const docs = active.map((record) =>
       productDoc(
         record,
@@ -844,6 +858,7 @@ export class StorefrontPublisher {
           return path && images.url(path);
         },
         reviews.get(record.id),
+        preorders.get(record.id),
       ),
     );
     await writer.putProducts(docs);
@@ -1076,6 +1091,7 @@ export function createStorefrontPublisher(
       blogs: new BlogService(database),
       articles: new ArticleService(database),
       reviews: { shownReviewsOf: shownReviewsIn },
+      preorders: { preordersOf: preordersIn },
       comments: new CommentService(database),
       preferences: { preferencesOf: shopPreferencesOf },
       delivery: new DeliveryService(database),

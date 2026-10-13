@@ -29,6 +29,8 @@
     "product": {
       "add_to_cart": "کارٹ میں ڈالیں",
       "sold_out": "ختم ہو گیا",
+      "preorder": "پیشگی آرڈر",
+      "preorder_ships": "پیشگی آرڈر: {{ date }} تک روانہ ہوگا",
       "on_sale": "سیل",
       "quantity": "تعداد",
       "choose": "{{ option }} منتخب کریں",

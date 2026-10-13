@@ -13,7 +13,14 @@ import type { StoredAddressValue } from './schema.js';
  */
 export interface ShownOrder {
   currency: CurrencyCode;
-  lines: { title: string; variantTitle: string; quantity: number; total: bigint }[];
+  lines: {
+    title: string;
+    variantTitle: string;
+    quantity: number;
+    total: bigint;
+    /** The day it ships by, its product on pre-order when it was sold (ADR-403). */
+    preorderShipsOn?: string | null;
+  }[];
   /** Minor units. */
   subtotal: bigint;
   discount: bigint;

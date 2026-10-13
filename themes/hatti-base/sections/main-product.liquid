@@ -91,12 +91,18 @@
             </label>
             <p class="product__error" role="alert" data-cart-error hidden></p>
             <button type="submit" name="add" class="button" {% unless current.available %}disabled{% endunless %}>
-              {%- if current.available -%}
+              {%- if current.available and product.preorder_ships_on -%}
+                {{ 'products.product.preorder' | t }}
+              {%- elsif current.available -%}
                 {{ 'products.product.add_to_cart' | t }}
               {%- else -%}
                 {{ 'products.product.sold_out' | t }}
               {%- endif -%}
             </button>
+            {%- if product.preorder_ships_on -%}
+              {%- assign ships_on = product.preorder_ships_on | date: format: 'day_month_year' -%}
+              <p class="product__preorder">{{ 'products.product.preorder_ships' | t: date: ships_on }}</p>
+            {%- endif -%}
           {%- endform -%}
           {%- if settings.whatsapp_orders and shop.whatsapp -%}
             {%- assign message = 'general.whatsapp.order_message' | t: product: product.title, variant: current.title -%}

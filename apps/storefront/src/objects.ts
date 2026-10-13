@@ -330,6 +330,9 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     // Its published reviews (ADR-401): their stars as Shopify's standard review metafields hold
     // them, which themes and apps read, and the latest of them, Hatti's own.
     metafields: reviewMetafields(doc),
+    // The day it ships by while it is on pre-order (ADR-403), YYYY-MM-DD for the date filter;
+    // nil when it is not. Hatti's own.
+    preorder_ships_on: doc.preorderShipsOn ?? null,
     reviews: (doc.reviews?.latest ?? []).map((review) => ({
       id: review.id,
       author: review.author,

@@ -159,6 +159,22 @@ describe.skipIf(!server)('Admin GraphQL API: pre-orders (CAT-14, ADR-403)', () =
       { title: 'Eid kurta', quantity: 3, preorderShipsOn: day },
     ]);
 
+    // The customer's order page says so, in English and Urdu.
+    const link = await data(
+      tokens.all,
+      'mutation ($id: ID!) { orderLinkCreate(id: $id) { url userErrors { code } } }',
+      { id: order.id },
+    );
+    const page = await app.inject({ method: 'GET', url: new URL(link.url).pathname });
+    const words = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'UTC',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date(`${day}T00:00:00Z`));
+    expect(page.body).toContain(`Pre-order: ships by ${words}`);
+    expect(page.body).toContain(`پیشگی آرڈر: ${words} تک روانہ ہوگا`);
+
     // Its day moved on, the line sold keeps the day it was sold with; a dupatta added has none.
     await data(tokens.all, SET, { productId: kurta, shipsOn: later });
     const edited = await data(

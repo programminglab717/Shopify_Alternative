@@ -1033,6 +1033,7 @@ function cartSummary(
           itemName(item.title, item.variantTitle),
           amount(BigInt(item.linePrice)),
           shownProperties(item.properties),
+          item.preorderShipsOn ? say('bilingual', preorderWords(item.preorderShipsOn)) : undefined,
         ),
       )}
     </table>
@@ -1516,6 +1517,17 @@ function momentOf(at: Date): string {
   }).format(at);
 }
 
+/** A line on pre-order (ADR-403): the day it ships by, YYYY-MM-DD, in words. */
+function preorderWords(shipsOn: string): { en: string; ur: string } {
+  const day = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${shipsOn}T00:00:00Z`));
+  return { en: `Pre-order: ships by ${day}`, ur: `پیشگی آرڈر: ${day} تک روانہ ہوگا` };
+}
+
 /** "5 October 2026", in Pakistan's time. */
 function dayOf(at: Date): string {
   return new Intl.DateTimeFormat('en-GB', {
@@ -1760,6 +1772,8 @@ function itemRow(
   name: string,
   total: string,
   properties: readonly [string, string][] = [],
+  /** What else the customer should know of it, as its pre-order's day (ADR-403). */
+  note?: Html,
 ): Html {
   return html`<tr>
     <td>
@@ -1767,6 +1781,7 @@ function itemRow(
       ${properties.map(
         ([key, value]) => html`<br /><span class="small muted">${text(`${key}: ${value}`)}</span>`,
       )}
+      ${note && html`<br /><span class="small">${note}</span>`}
     </td>
     <td class="num">${ltr(total)}</td>
   </tr>`;

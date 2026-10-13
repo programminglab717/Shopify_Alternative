@@ -1405,6 +1405,17 @@ function amount(value: bigint, currency: CurrencyCode): string {
   return formatMoney(money(value, currency));
 }
 
+/** A line sold on pre-order (ADR-403): the day it ships by, YYYY-MM-DD, in words. */
+function preorderWords(shipsOn: string): Words {
+  const day = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${shipsOn}T00:00:00Z`));
+  return { en: `Pre-order: ships by ${day}`, ur: `پیشگی آرڈر: ${day} تک روانہ ہوگا` };
+}
+
 /** The items and what they come to, down to what is paid at the door or by transfer. */
 function summary(shown: ShownOrder): Html {
   const row = (label: Words, value: string, className = '') =>
@@ -1419,7 +1430,15 @@ function summary(shown: ShownOrder): Html {
       ${shown.lines.map(
         (line) =>
           html`<tr>
-            <td>${ltr(`${line.quantity} ×`)} ${text(itemName(line))}</td>
+            <td>
+              ${ltr(`${line.quantity} ×`)} ${text(itemName(line))}
+              ${
+                line.preorderShipsOn &&
+                html`<br /><span class="small"
+                    >${say('bilingual', preorderWords(line.preorderShipsOn))}</span
+                  >`
+              }
+            </td>
             <td class="num">${ltr(rs(line.total))}</td>
           </tr>`,
       )}

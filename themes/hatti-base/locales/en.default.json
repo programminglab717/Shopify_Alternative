@@ -29,6 +29,8 @@
     "product": {
       "add_to_cart": "Add to cart",
       "sold_out": "Sold out",
+      "preorder": "Pre-order",
+      "preorder_ships": "Pre-order: ships by {{ date }}",
       "on_sale": "Sale",
       "quantity": "Quantity",
       "choose": "Choose {{ option }}",

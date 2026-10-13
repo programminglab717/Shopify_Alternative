@@ -24,6 +24,10 @@
         <p class="cart-item__detail" dir="auto">{{ property.first | escape }}: {{ property.last | escape }}</p>
       {%- endif -%}
     {%- endfor -%}
+    {%- if item.product.preorder_ships_on -%}
+      {%- assign ships_on = item.product.preorder_ships_on | date: format: 'day_month_year' -%}
+      <p class="cart-item__detail">{{ 'products.product.preorder_ships' | t: date: ships_on }}</p>
+    {%- endif -%}
     <p class="cart-item__price">{{ item.final_price | money }}</p>
     {%- if item.max_quantity != nil -%}
       <p class="cart-item__warning" role="status">

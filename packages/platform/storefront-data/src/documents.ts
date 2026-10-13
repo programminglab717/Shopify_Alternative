@@ -93,6 +93,11 @@ export interface VariantDoc {
 
 export interface ProductDoc {
   id: string;
+  /**
+   * The day it ships by, YYYY-MM-DD, while it is on pre-order (CAT-14, ADR-403): it sells
+   * whatever its stock. Absent when it is not.
+   */
+  preorderShipsOn?: string;
   handle: string;
   title: string;
   /** Safe to show as it is: made from the product's text, escaped. */

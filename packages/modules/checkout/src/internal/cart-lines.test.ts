@@ -132,6 +132,16 @@ describe('cart lines', () => {
     ]);
   });
 
+  it('gives a line on pre-order the day it ships by, and others none (ADR-403)', () => {
+    const facts = new Map(FACTS).set(
+      SHAWL,
+      variant('Shawl', 3_000_00, { preorderShipsOn: '2026-11-30' }),
+    );
+    const json = cartJson({ ...EMPTY_CART, lines: [line(SHAWL, 1), line(LAWN, 1)] }, facts);
+    expect(json.items.map((item) => item.preorderShipsOn)).toEqual(['2026-11-30', undefined]);
+    expect('preorderShipsOn' in json.items[1]!).toBe(false);
+  });
+
   it('refuses more than can be sold, or than a line or a cart can hold', () => {
     const cart = { ...EMPTY_CART, lines: [line(LAWN, 4)] };
     // Across the variant's lines: 4 in the cart and 2 more make 6 of the 5 left.

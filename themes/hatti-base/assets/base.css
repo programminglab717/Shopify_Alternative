@@ -150,6 +150,14 @@ h3 {
   background: #b91c1c;
   color: #fff;
 }
+.badge--preorder {
+  background: var(--color-accent, #1d4ed8);
+  color: #fff;
+}
+.product__preorder {
+  margin: 0;
+  font-weight: 600;
+}
 .price {
   display: flex;
   flex-wrap: wrap;

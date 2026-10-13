@@ -1114,6 +1114,76 @@ describe('Storefront rendering', () => {
     expect(urdu.html).toContain('خریداروں کے ریویوز');
   });
 
+  it('says a product on pre-order is one, and the day it ships by, on its page, card and cart line (ADR-403)', async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const variant = first!.variants[0]!;
+    const preordered = {
+      ...first!,
+      preorderShipsOn: '2026-11-30',
+      // Out of stock, but on pre-order it sells.
+      variants: first!.variants.map((each) => ({ ...each, available: true })),
+    };
+    const shop = new MemoryStore({ ...sample, products: [preordered, ...rest] });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${preordered.handle}` }, shop.fresh());
+    expect(page.html).toMatch(
+      /<button type="submit" name="add" class="button"\s*>Pre-order<\/button>/,
+    );
+    expect(page.html).toContain(
+      '<p class="product__preorder">Pre-order: ships by 30 November 2026</p>',
+    );
+    const listing = await renderer.render({ path: '/collections/all' }, shop.fresh());
+    expect(count(listing.html, '<span class="badge badge--preorder">Pre-order</span>')).toBe(1);
+    const cart = await renderer.render(
+      {
+        path: '/cart',
+        cart: {
+          note: '',
+          attributes: {},
+          items: [
+            {
+              key: `${variant.id}:0123456789abcdef0123456789abcdef`,
+              variantId: variant.id,
+              productId: preordered.id,
+              quantity: 1,
+              properties: {},
+              price: variant.price,
+              linePrice: variant.price,
+              title: preordered.title,
+              variantTitle: variant.title,
+              sku: null,
+              grams: 0,
+              taxable: true,
+              taxCode: null,
+              maxQuantity: null,
+              preorderShipsOn: '2026-11-30',
+            },
+          ],
+          itemCount: 1,
+          subtotal: variant.price,
+          totalWeightGrams: 0,
+          discount: null,
+          totalDiscount: 0,
+        },
+      },
+      shop.fresh(),
+    );
+    expect(cart.html).toContain(
+      '<p class="cart-item__detail">Pre-order: ships by 30 November 2026</p>',
+    );
+    // A product not on pre-order says nothing of it.
+    const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());
+    expect(plain.html).not.toContain('class="product__preorder"');
+    expect(plain.html).not.toMatch(/name="add" class="button"\s*>Pre-order/);
+    // In Urdu too.
+    const urdu = await renderer.render(
+      { path: `/products/${preordered.handle}`, locale: 'ur' },
+      shop.fresh(),
+    );
+    expect(urdu.html).toContain('پیشگی آرڈر');
+  });
+
   it("gives themes an image's focal point, as Shopify's image.presentation, and keeps it in sight in image_tag (ADR-257)", async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;

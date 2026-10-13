@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-403 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-404 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -411,6 +411,7 @@
 | 401 | A product's storefront page shows its published reviews, their average stars and the latest ten, through Shopify's review metafields and Hatti's product.reviews, and tells search engines as schema.org's AggregateRating | Accepted |
 | 402 | Products' reviews have a page of their own in the admin, by status, waiting first, each published or hidden by those who change products; above them, for the owner and managers, from how many stars reviews publish by themselves and how many days after delivery customers are asked | Accepted |
 | 403 | A product the shop puts on pre-order sells whatever its stock, as if its variants kept selling at zero, and promises a day it ships by, which the lines of orders placed meanwhile keep; inventory keeps it, by product | Accepted |
+| 404 | A product on pre-order says so where shoppers decide and buy: its button reads Pre-order with the day it ships by, its card a badge, its cart and checkout lines and the order's own page the day each ships by | Accepted |
 
 ---
 
@@ -15600,3 +15601,32 @@
     when it ships.
   * **Ending it by itself once the day passes:** a late shipment would stop selling with no one
     told; the admin warns of a day gone by instead.
+
+## ADR-404 · A product on pre-order says so where shoppers decide and buy: its button reads Pre-order with the day it ships by, its card a badge, its cart and checkout lines and the order's own page the day each ships by
+
+* **Context:**
+  * A product on pre-order sells past its stock and promises a day it ships by ([ADR-403](#adr-403--a-product-the-shop-puts-on-pre-order-sells-whatever-its-stock-as-if-its-variants-kept-selling-at-zero-and-promises-a-day-it-ships-by-which-the-lines-of-orders-placed-meanwhile-keep-inventory-keeps-it-by-product)); a
+    shopper who is not told may think it ships tomorrow, and a cash-on-delivery customer refuses
+    a parcel they did not expect to wait for.
+* **Decision:**
+  * **The product's storefront document carries the day** (`preorderShipsOn`), rebuilt as it
+    changes; themes read it as Hatti's own `product.preorder_ships_on`, a date for the `date`
+    filter, nil when it is not on pre-order. Shopify has no field for it: pre-order apps keep
+    their own.
+  * **Hatti Base:** the product's button reads "Pre-order" and says "Pre-order: ships by" the
+    day under it; a card shows a "Pre-order" badge; a cart line says the day, from the
+    product's own. In English and Urdu.
+  * **The cart's lines carry the day** from the core, as each is priced, so the checkout page,
+    rendered by the core, says it beside the item in both languages.
+  * **The order's own page** says, of each line sold on pre-order, the day it was sold with.
+  * **The confirmation's digest leaves it out:** it is shown, but a line's day never changes
+    once sold.
+* **Consequences:**
+  * A theme of a shop's own says nothing of pre-orders until it reads the field; Theme Check
+    does not ask it to.
+* **Alternatives:**
+  * **Shopify's selling plans:** a subscription-shaped model, too heavy for one day a product
+    ships by; themes test `variant.selling_plan_allocations` for apps' pre-orders, which Hatti
+    has none of.
+  * **A product metafield:** themes and apps could read one, but metafields are the shop's to
+    write, and this one is the platform's.

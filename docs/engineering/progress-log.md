@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: pre-orders on the storefront, the
-cart, the checkout and the order's page, saying when they ship (CAT-14); then the admin's
-pre-order setting. Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the admin's pre-order setting on a
+product's page, with the day each order line ships by (CAT-14); then size charts (CAT-10). Urdu
+handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,23 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Pre-orders where shoppers see them
+
+* **On the storefront** ([ADR-404](../architecture/13-decision-log.md#adr-404--a-product-on-pre-order-says-so-where-shoppers-decide-and-buy-its-button-reads-pre-order-with-the-day-it-ships-by-its-card-a-badge-its-cart-and-checkout-lines-and-the-orders-own-page-the-day-each-ships-by), CAT-14): a product on pre-order's document carries the day it
+  ships by, which themes read as `product.preorder_ships_on`. Hatti Base's button reads
+  "Pre-order" with the day under it, its card a badge, its cart line the day, in English and
+  Urdu.
+* **The checkout page and the order's own page** say the day beside each line on pre-order, in
+  both languages: the cart's lines carry it from the core.
+* **Tried in Chromium against the core and the storefront, at a phone's width:** the demo
+  shop's Peshawari Chappal put on pre-order, shipping in 30 days, read "Pre-order" with "ships
+  by 12 November 2026", the badge on its card in all products; in the cart, its line said the
+  day, and so did the checkout page in both languages; in Urdu, the day read in Urdu.
+  Nothing overflowed and nothing errored. Off pre-order again, the button read "Add to cart"
+  with no note, and the cart, checkout and pre-order were taken away.
+* 2699 tests (4 new): the theme's pre-order, the cart's and checkout
+  page's, the published document, and the order's page through the Admin API.
 
 ### 12ec4a7 · Pre-orders
 
