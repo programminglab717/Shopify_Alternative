@@ -272,6 +272,7 @@ export enum OrderCancelReason {
   OTHER = 'OTHER',
   MERGED = 'MERGED',
   UNPAID = 'UNPAID',
+  DUPLICATE = 'DUPLICATE',
 }
 
 registerEnumType(OrderCancelReason, {
@@ -290,6 +291,10 @@ registerEnumType(OrderCancelReason, {
     UNPAID: {
       description:
         'Not paid, by transfer, online or its advance, in the days the shop allows (ADR-168).',
+    },
+    DUPLICATE: {
+      description:
+        'It repeats another order of its customer, placed twice by mistake (CHK-11, ADR-392).',
     },
   },
 });
@@ -1091,6 +1096,19 @@ export class OrderMergedInto {
   name!: string;
 }
 
+@ObjectType({
+  description:
+    'An earlier order the same customer placed days before with items in common, not shipped ' +
+    'yet: the newer may repeat it by mistake (CHK-11, ADR-392).',
+})
+export class OrderRepeatOf {
+  @Field(() => ID)
+  id!: string;
+
+  @Field({ description: 'Its number as staff say it, such as #1001.' })
+  name!: string;
+}
+
 @ObjectType({ description: 'The order another was split from (ADR-135).' })
 export class OrderSplitFrom {
   @Field(() => ID)
@@ -1266,6 +1284,14 @@ export class Order {
     description: 'The order it was merged into, as its customer placed one order, not two.',
   })
   mergedInto!: OrderMergedInto | null;
+
+  @Field(() => OrderRepeatOf, {
+    nullable: true,
+    description:
+      'The earlier order this may repeat, while both are open and the earlier is not shipped: ' +
+      'staff merge this into it, cancel this as DUPLICATE, or keep both with orderRepeatKeep.',
+  })
+  repeatOf!: OrderRepeatOf | null;
 
   @Field(() => OrderSplitFrom, {
     nullable: true,
@@ -1637,6 +1663,15 @@ export class OrderUpdatePayload {
 
 @ObjectType()
 export class OrderConfirmPayload {
+  @Field(() => Order, { nullable: true })
+  order!: Order | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class OrderRepeatKeepPayload {
   @Field(() => Order, { nullable: true })
   order!: Order | null;
 

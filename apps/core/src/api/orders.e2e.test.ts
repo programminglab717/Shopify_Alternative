@@ -623,6 +623,58 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(reader.errors?.[0]?.message).toContain('write_orders');
   });
 
+  it('flags an order that repeats another, kept apart or cancelled as a repeat (CHK-11, ADR-392)', async () => {
+    const [size] = await stockedVariants(tokens.a, 'Chiffon Dupatta', ['Free'], 5);
+    const PLACE = `
+      mutation ($input: OrderCreateInput!) {
+        orderCreate(input: $input) {
+          order { id name repeatOf { id name } }
+          userErrors { code }
+        }
+      }`;
+    const place = async () =>
+      (
+        await mutate(tokens.a, PLACE, {
+          input: {
+            lineItems: [{ variantId: size, quantity: 1 }],
+            shippingAddress: { ...ADDRESS, phone: '0345-9998887' },
+          },
+        })
+      ).order as { id: string; name: string; repeatOf: { id: string; name: string } | null };
+    const first = await place();
+    expect(first.repeatOf).toBeNull();
+    const second = await place();
+    expect(second.repeatOf).toEqual({ id: first.id, name: first.name });
+
+    const KEEP = `
+      mutation ($id: ID!) {
+        orderRepeatKeep(id: $id) { order { id repeatOf { id } } userErrors { code } }
+      }`;
+    expect(await mutate(tokens.a, KEEP, { id: second.id })).toEqual({
+      order: { id: second.id, repeatOf: null },
+      userErrors: [],
+    });
+    const reader = await gql(tokens.aReader, KEEP, { id: second.id });
+    expect(reader.errors?.[0]?.message).toContain('write_orders');
+
+    const third = await place();
+    expect(third.repeatOf?.id).toBe(second.id);
+    const cancelled = await mutate(
+      tokens.a,
+      `mutation ($id: ID!) {
+         orderCancel(id: $id, reason: DUPLICATE) {
+           order { stage cancelReason repeatOf { id } } userErrors { code }
+         }
+       }`,
+      { id: third.id },
+    );
+    // Cancelled, it repeats nothing open.
+    expect(cancelled).toEqual({
+      order: { stage: 'CANCELLED', cancelReason: 'DUPLICATE', repeatOf: null },
+      userErrors: [],
+    });
+  });
+
   it('ships an order from a location that has its goods, and from another before it is packed (ADR-355)', async () => {
     const made = await mutate(
       tokens.a,

@@ -32,7 +32,7 @@ export type OrderPaymentMethod = 'CASH_ON_DELIVERY' | 'PREPAID' | 'BANK_TRANSFER
 export type OrderDeliveryMethod = 'SHIPPING' | 'PICKUP';
 
 export type OrderCancelReason =
-  'CUSTOMER' | 'FRAUD' | 'INVENTORY' | 'MERGED' | 'NO_RESPONSE' | 'OTHER' | 'UNPAID';
+  'CUSTOMER' | 'DUPLICATE' | 'FRAUD' | 'INVENTORY' | 'MERGED' | 'NO_RESPONSE' | 'OTHER' | 'UNPAID';
 
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -299,6 +299,8 @@ export interface OrderDetail {
   assignee: { id: string; name: string } | null;
   /** The order it was merged into, cancelled as MERGED (ADR-132). */
   mergedInto: { id: string; name: string } | null;
+  /** The earlier order of its customer's it may repeat, not shipped yet (CHK-11, ADR-392). */
+  repeatOf: { id: string; name: string } | null;
   /** The order its items were sent apart from (ADR-135). */
   splitFrom: { id: string; name: string } | null;
   fulfillments: ParcelDetail[];

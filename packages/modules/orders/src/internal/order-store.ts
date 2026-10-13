@@ -74,6 +74,9 @@ interface OrderJsonRow extends Record<string, unknown> {
   cancel_reason: OrderRecord['cancelReason'];
   merged_into_id: string | null;
   merged_into_number: number | null;
+  repeat_of_id: string | null;
+  repeat_of_number: number | null;
+  repeat_of_pending: boolean | null;
   split_from_id: string | null;
   split_from_number: number | null;
   risk_score: number | null;
@@ -220,6 +223,13 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     cancelReason: row.cancel_reason,
     mergedInto: row.merged_into_id
       ? { orderId: row.merged_into_id, number: row.merged_into_number! }
+      : null,
+    repeatOf: row.repeat_of_id
+      ? {
+          orderId: row.repeat_of_id,
+          number: row.repeat_of_number!,
+          pending: row.repeat_of_pending ?? false,
+        }
       : null,
     splitFrom: row.split_from_id
       ? { orderId: row.split_from_id, number: row.split_from_number! }
@@ -382,6 +392,12 @@ export async function loadOrders(
            o.merged_into_id,
            (SELECT m.number FROM orders.orders m
              WHERE m.shop_id = o.shop_id AND m.id = o.merged_into_id) AS merged_into_number,
+           o.repeat_of_id,
+           (SELECT rp.number FROM orders.orders rp
+             WHERE rp.shop_id = o.shop_id AND rp.id = o.repeat_of_id) AS repeat_of_number,
+           (SELECT rp.status = 'open' AND rp.fulfillment_status = 'unfulfilled'
+              FROM orders.orders rp
+             WHERE rp.shop_id = o.shop_id AND rp.id = o.repeat_of_id) AS repeat_of_pending,
            o.split_from_id,
            (SELECT s.number FROM orders.orders s
              WHERE s.shop_id = o.shop_id AND s.id = o.split_from_id) AS split_from_number,

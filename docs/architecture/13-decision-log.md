@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-391 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-392 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -399,6 +399,7 @@
 | 389 | A location lets customers pick orders up, with what to tell them; an order picked up waits ready for pickup once packed, its customer told where, is never booked with a courier, and completes when handed over at the counter | Accepted |
 | 390 | A draft order is shipped or picked up: one picked up names a location offering pickup, or the only one, has no delivery charge, and becomes an order picked up there; its link says the customer pays when they collect it | Accepted |
 | 391 | Checkout offers pickup at each location that lets customers pick up: chosen, the order has no delivery charge, the shopper's address is optional with the location's standing in, and the thank-you page says where to collect it | Accepted |
+| 392 | An order may repeat another: placed for a customer with an open order not shipped yet, from the three days before, with an item in common, it names that order, and staff merge it in, cancel it as a repeat, or keep both | Accepted |
 
 ---
 
@@ -15217,3 +15218,38 @@
     stays and is optional once picked up.
   * **Pickup as a delivery zone with no charge:** couriers would be booked for it; the
     location's own method keeps them out, as for orders and drafts.
+
+## ADR-392 · An order may repeat another: placed for a customer with an open order not shipped yet, from the three days before, with an item in common, it names that order, and staff merge it in, cancel it as a repeat, or keep both
+
+* **Context:**
+  * Shoppers in Pakistan often place the same order twice: the page seemed stuck, they were
+    not sure it went through, or they ordered again on WhatsApp after the storefront. Shops
+    then pack and ship both, and the second comes back refused, with its return charges.
+  * Merging an order into another of its customer's exists ([ADR-132](#adr-132--an-order-its-customer-placed-twice-is-merged-into-the-other-while-both-wait-to-be-packed-the-other-takes-its-items-and-discount-and-keeps-its-own-delivery-charge-as-one-parcel-the-order-merged-is-cancelled-as-merged-naming-it-and-counts-for-nothing-in-its-customers-history)), but staff have to notice
+    the repeat first.
+* **Decision:**
+  * **An order is flagged as it is placed**, through every channel, when the same customer
+    has an open order, not shipped yet, placed within the last three days (`REPEAT_DAYS`),
+    with any variant in common. The most recent such order is named; the order keeps it
+    (`repeat_of_id`).
+  * **Its timeline says so**: "May repeat #1002, which the same number placed 20 minutes before
+    with items in common and is not shipped yet: merge it in, cancel it as a repeat, or keep
+    both".
+  * **The API shows `Order.repeatOf`** while both are open and the earlier one is not shipped;
+    once either ends, nothing is shown. Staff then:
+    * merge it into the earlier order with `orderMerge`, as before;
+    * cancel it as `DUPLICATE`, a new cancel reason; or
+    * keep both with `orderRepeatKeep`, which clears the flag and says so on its timeline.
+  * **The admin's order page shows a banner** linking the earlier order. Those who work orders
+    get the three choices, with the merge offered only where merging is allowed (nothing paid).
+    Merged, the earlier order's page opens. `DUPLICATE` is also among the cancel reasons staff
+    pick from.
+* **Consequences:**
+  * The order is not held: a repeat is often a customer adding to what they wanted, so staff
+    decide. Risk scoring already counts other recent orders from the number (COD-06).
+  * The check is one indexed query per order with a known customer.
+* **Alternatives:**
+  * **Refusing the second order at checkout:** a customer ordering twice on purpose would be
+    turned away.
+  * **Matching the whole basket:** a customer adding an item would not be caught; any item in
+    common is enough for a hint staff can dismiss.

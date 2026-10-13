@@ -88,6 +88,13 @@ describe.skipIf(!server)('COD risk', () => {
         'Held for review: risk 0.60 (high). Refused a delivery from this shop; ' +
           'Another order from this number in the last 6 hours: #1002',
       ],
+      // The order not shipped yet, with the same kurta, it may repeat (ADR-392).
+      [
+        'repeat',
+        'system',
+        'May repeat #1002, which the same number placed a minute before with items in common ' +
+          'and is not shipped yet: merge it in, cancel it as a repeat, or keep both',
+      ],
       ['created', 'app', 'Order #1003 placed through the API: Rs 2,000, cash on delivery'],
     ]);
     const created = (await f.outbox()).filter((event) => event.event_type === 'order.created');

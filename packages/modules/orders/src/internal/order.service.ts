@@ -301,7 +301,51 @@ const CANCEL_REASON_TEXT: Record<CancelReasonValue, string> = {
   other: 'other reasons',
   merged: 'it was merged into another order',
   unpaid: 'it was not paid',
+  duplicate: 'it repeats another order of its customer',
 };
+
+/**
+ * How many days back an order of the same customer, not shipped yet, may be the one a new order
+ * repeats (CHK-11, ADR-392).
+ */
+export const REPEAT_DAYS = 3;
+
+/**
+ * The latest order of `customerId` placed in the last {@link REPEAT_DAYS} days, open and with
+ * nothing shipped, that has any of `variantIds`: the one a new order may repeat; null for none.
+ */
+async function repeatedOrderIn(
+  tx: Tx,
+  shopId: string,
+  customerId: string,
+  variantIds: readonly string[],
+): Promise<{ id: string; number: number; createdAt: Date } | null> {
+  if (variantIds.length === 0) return null;
+  const { rows } = await tx.execute<{ id: string; number: number; created_at: string | Date }>(sql`
+    SELECT o.id, o.number, o.created_at
+      FROM orders.orders o
+     WHERE o.shop_id = ${shopId} AND o.customer_id = ${customerId}
+       AND o.status = 'open' AND o.fulfillment_status = 'unfulfilled'
+       AND o.created_at > now() - make_interval(days => ${REPEAT_DAYS})
+       AND EXISTS (
+             SELECT 1 FROM orders.lines l
+              WHERE l.shop_id = o.shop_id AND l.order_id = o.id
+                AND l.variant_id = ANY(${sql.param([...variantIds])}::uuid[]))
+     ORDER BY o.created_at DESC
+     LIMIT 1`);
+  const [row] = rows;
+  return row ? { id: row.id, number: row.number, createdAt: new Date(row.created_at) } : null;
+}
+
+/** How long ago `at` was, as a timeline says it: "20 minutes before", "2 days before". */
+function sinceText(at: Date): string {
+  const minutes = Math.max(1, Math.round((Date.now() - at.getTime()) / 60_000));
+  if (minutes < 60) return minutes === 1 ? 'a minute before' : `${minutes} minutes before`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return hours === 1 ? 'an hour before' : `${hours} hours before`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? 'a day before' : `${days} days before`;
+}
 
 /** Why orderCancel and orderBulkCancel take no `merged`: merging moves an order's items too. */
 const MERGED_ONLY_BY_MERGING =
@@ -622,6 +666,14 @@ export class OrderService {
       email,
     });
     const blocked = await this.blocklist.entryOf(tx, shopId, address.phone);
+    // An order of the same customer not shipped yet, placed in the days before with items in
+    // common: this one may repeat it, for staff to merge, cancel or keep (CHK-11, ADR-392).
+    const repeatOf = await repeatedOrderIn(
+      tx,
+      shopId,
+      customerId,
+      priced.map((line) => line.variantId),
+    );
     // An advance paid by transfer is the customer's say-so, as paying is: nothing to score.
     const scored =
       paymentMethod === 'cash_on_delivery' && askedAhead === 0n
@@ -717,6 +769,7 @@ export class OrderService {
         bankAccount,
         ...riskColumns(risk),
         customerId,
+        repeatOfId: repeatOf?.id ?? null,
         phone: address.phone,
         email,
         shippingAddress: address,
@@ -789,6 +842,18 @@ export class OrderService {
           },
         });
       }
+    }
+    if (repeatOf) {
+      await addTimelineEntry(
+        tx,
+        shopId,
+        orderId,
+        'system',
+        'repeat',
+        `May repeat ${orderName(repeatOf.number)}, which the same number placed ` +
+          `${sinceText(repeatOf.createdAt)} with items in common and is not shipped yet: ` +
+          'merge it in, cancel it as a repeat, or keep both',
+      );
     }
     if (blocked) {
       await addTimelineEntry(tx, shopId, orderId, 'system', 'held', heldMessage(blocked));
@@ -1396,6 +1461,44 @@ export class OrderService {
       payload: { changed, stage: updated.stage, version: updated.version },
     });
     return { ok: true, value: updated };
+  }
+
+  /**
+   * Keeps an order apart from the order it may repeat (CHK-11, ADR-392): it is not a repeat, as
+   * when the customer wanted both. Keeping one that repeats nothing changes nothing.
+   */
+  async keepRepeat(tenant: TenantContext, id: string): Promise<MutationResult<OrderRecord>> {
+    return this.#change(
+      tenant,
+      id,
+      ['id'],
+      async (tx, order) => {
+        if (!order.repeatOfId) return { ok: true, value: order };
+        const [earlier] = await tx
+          .select({ number: orders.number })
+          .from(orders)
+          .where(and(eq(orders.shopId, tenant.shopId), eq(orders.id, order.repeatOfId)));
+        const updated = await updateOrder(tx, tenant.shopId, order, { repeatOfId: null });
+        await addTimelineEntry(
+          tx,
+          tenant.shopId,
+          order.id,
+          tenant.actor,
+          'repeat_kept',
+          earlier
+            ? `Kept apart from ${orderName(earlier.number)}: not a repeat`
+            : 'Kept: not a repeat',
+        );
+        await appendEvent<OrderUpdatedPayload>(tx, tenant.shopId, {
+          type: OrderEvents.OrderUpdated,
+          aggregateType: 'order',
+          aggregateId: order.id,
+          payload: { changed: ['repeat'], stage: updated.stage, version: updated.version },
+        });
+        return { ok: true, value: updated };
+      },
+      { overLimit: 'allow' },
+    );
   }
 
   /**

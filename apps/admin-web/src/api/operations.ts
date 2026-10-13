@@ -297,6 +297,10 @@ export const OrderQuery = /* GraphQL */ `
         id
         name
       }
+      repeatOf {
+        id
+        name
+      }
       splitFrom {
         id
         name
@@ -614,6 +618,21 @@ export const OrderSplitMutation = /* GraphQL */ `
 `;
 
 /** An order cancelled, for a reason; its stock let go. */
+export const OrderRepeatKeepMutation = /* GraphQL */ `
+  mutation OrderRepeatKeep($id: ID!) {
+    orderRepeatKeep(id: $id) {
+      order {
+        id
+        stage
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const OrderCancelMutation = /* GraphQL */ `
   mutation OrderCancel($id: ID!, $reason: OrderCancelReason!) {
     orderCancel(id: $id, reason: $reason) {

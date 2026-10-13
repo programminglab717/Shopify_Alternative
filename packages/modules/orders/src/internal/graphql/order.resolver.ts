@@ -46,6 +46,7 @@ import {
   Order,
   OrderBulkPayload,
   OrderCancelPayload,
+  OrderRepeatKeepPayload,
   OrderCancelReason,
   OrderConfirmPayload,
   OrderConnection,
@@ -288,6 +289,20 @@ export class OrderResolver {
       staffNote,
     });
     return payload(OrderCancelPayload, result, tenant);
+  }
+
+  @Mutation(() => OrderRepeatKeepPayload, {
+    description:
+      'Keeps an order flagged as repeating an earlier one apart from it, as staff found it is ' +
+      'not a repeat: `repeatOf` clears, and the timeline says so (CHK-11, ADR-392).',
+  })
+  @RequireScopes('write_orders')
+  async orderRepeatKeep(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<OrderRepeatKeepPayload> {
+    const result = await this.service.keepRepeat(tenant, uuidOf('order', id));
+    return payload(OrderRepeatKeepPayload, result, tenant);
   }
 
   @Mutation(() => OrderPhoneRevealPayload, {

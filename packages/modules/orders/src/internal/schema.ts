@@ -134,6 +134,8 @@ export const CANCEL_REASONS = [
   'merged',
   /** Not paid in the days its shop allows (ADR-168). */
   'unpaid',
+  /** A repeat of an order its customer placed already (CHK-11, ADR-392). */
+  'duplicate',
 ] as const;
 export type CancelReasonValue = (typeof CANCEL_REASONS)[number];
 
@@ -317,6 +319,11 @@ export const orders = ordersSchema.table(
     cancelReason: text('cancel_reason', { enum: CANCEL_REASONS }),
     /** The order it was merged into, cancelled as `merged` (ADR-132). */
     mergedIntoId: uuid('merged_into_id'),
+    /**
+     * The order its customer placed shortly before with items in common, not shipped then, which
+     * it may repeat (CHK-11, ADR-392); null once staff keep both.
+     */
+    repeatOfId: uuid('repeat_of_id'),
     /**
      * The order it was split from (ADR-135), the first one when a part is split again: it and
      * its parts are scored as the one order their customer placed.

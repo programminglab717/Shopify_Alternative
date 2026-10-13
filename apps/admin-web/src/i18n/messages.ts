@@ -3382,6 +3382,12 @@ const en = {
   'drafts.pickupOnly': 'Picked up by the customer',
   'drafts.atTheCounter': 'To collect at the counter',
   'shipsFrom.changePickup': 'Pick up at another location',
+  'order.reason.DUPLICATE': 'Repeats another order of the customer',
+  'repeat.body':
+    'This may repeat an order the same customer placed in the last few days, not shipped yet:',
+  'repeat.merge': 'Merge into {name}',
+  'repeat.cancel': 'Cancel as a repeat',
+  'repeat.keep': 'Keep both',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6740,6 +6746,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'drafts.pickupOnly': 'گاہک خود وصول کرے',
   'drafts.atTheCounter': 'کاؤنٹر پر وصول کرنا ہے',
   'shipsFrom.changePickup': 'کسی اور جگہ سے وصول کروائیں',
+  'order.reason.DUPLICATE': 'کسٹمر کے دوسرے آرڈر کا دہرایا ہوا',
+  'repeat.body': 'یہ شاید اسی کسٹمر کا پچھلے چند دنوں کا آرڈر دہراتا ہے، جو ابھی بھیجا نہیں گیا:',
+  'repeat.merge': '{name} میں شامل کریں',
+  'repeat.cancel': 'دہرایا ہوا سمجھ کر کینسل کریں',
+  'repeat.keep': 'دونوں رکھیں',
 };
 
 export const messages: Readonly<

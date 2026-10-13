@@ -54,6 +54,7 @@ function order(extra: Record<string, unknown> = {}) {
       risk: null,
       assignee: null,
       mergedInto: null,
+      repeatOf: null,
       splitFrom: null,
       amountRefunded: rupees('0'),
       advanceDue: rupees('0'),
@@ -103,6 +104,10 @@ function core(role: StaffRole, answer = order(), others = [other('ord_3', '#1003
         };
       case 'OrderMerge':
         return { orderMerge: { order: { id: 'ord_3', name: '#1003' }, userErrors: [] } };
+      case 'OrderCancel':
+        return { orderCancel: { order: { id: 'ord_7', stage: 'CANCELLED' }, userErrors: [] } };
+      case 'OrderRepeatKeep':
+        return { orderRepeatKeep: { order: { id: 'ord_7', stage: 'TO_PACK' }, userErrors: [] } };
       case 'OrderSplit':
         return { orderSplit: { splitOrder: { id: 'ord_17', name: '#1017' }, userErrors: [] } };
       default:
@@ -223,5 +228,74 @@ describe('Merging and splitting an order, on its page', () => {
     expect(splittable({ ...waiting, paymentMethod: 'BANK_TRANSFER' })).toBe(false);
     expect(splittable({ ...waiting, amountPaid: rupees('500') })).toBe(false);
     expect(splittable({ ...waiting, lineItems: [line('li_1', 'Lawn suit', 'M', 1)] })).toBe(false);
+  });
+});
+
+describe('An order that may repeat another (CHK-11, ADR-392)', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    signedIn();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  const repeating = () => order({ repeatOf: { id: 'ord_3', name: '#1003' } });
+  const banner = async () =>
+    (await screen.findByText(/may repeat an order the same customer placed/)).closest(
+      '[role="status"]',
+    ) as HTMLElement;
+
+  it('is merged into the earlier order, whose page opens', async () => {
+    const fake = core('confirmation_agent', repeating());
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    const shown = await banner();
+    expect(within(shown).getByRole('link', { name: '#1003' })).toBeTruthy();
+    fireEvent.click(within(shown).getByRole('button', { name: 'Merge into #1003' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'OrderMerge')).toEqual({ id: 'ord_7', intoId: 'ord_3' }),
+    );
+    await waitFor(() => expect(sentOf(fake, 'Order')).toEqual({ id: 'ord_3' }));
+  });
+
+  it('is cancelled as a repeat, or kept with the other', async () => {
+    const fake = core('manager', repeating());
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    const shown = await banner();
+    fireEvent.click(within(shown).getByRole('button', { name: 'Cancel as a repeat' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'OrderCancel')).toEqual({ id: 'ord_7', reason: 'DUPLICATE' }),
+    );
+    fireEvent.click(within(shown).getByRole('button', { name: 'Keep both' }));
+    await waitFor(() => expect(sentOf(fake, 'OrderRepeatKeep')).toEqual({ id: 'ord_7' }));
+  });
+
+  it('offers nothing to those who do not work orders, and no merge once something is paid', async () => {
+    vi.stubGlobal('fetch', core('marketer', repeating()).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    const shown = await banner();
+    expect(within(shown).queryByRole('button')).toBeNull();
+    cleanup();
+
+    const paid = repeating();
+    paid.order.amountPaid = rupees('500');
+    vi.stubGlobal('fetch', core('owner', paid).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    const again = await banner();
+    expect(within(again).queryByRole('button', { name: 'Merge into #1003' })).toBeNull();
+    expect(within(again).getByRole('button', { name: 'Cancel as a repeat' })).toBeTruthy();
+  });
+
+  it('shows nothing for an order that repeats none', async () => {
+    vi.stubGlobal('fetch', core('owner').fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    await screen.findByRole('region', { name: 'Items' });
+    expect(screen.queryByText(/may repeat an order/)).toBeNull();
   });
 });

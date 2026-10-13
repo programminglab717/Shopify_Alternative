@@ -46,6 +46,7 @@ import { HANDLES_MONEY, OrderMoney } from './money';
 import { OnlinePayments } from './online-payments';
 import { Parcels, ShipForm, WORKS_PARCELS } from './parcels';
 import { PrintPanel } from './print';
+import { RepeatBanner } from './repeat';
 import { OrderReturns } from './returns';
 import { ShipsFrom } from './ships-from';
 import { StageBadge } from './stage';
@@ -67,6 +68,7 @@ export const REASONS: readonly OrderCancelReason[] = [
   'FRAUD',
   'INVENTORY',
   'UNPAID',
+  'DUPLICATE',
   'OTHER',
 ];
 
@@ -382,6 +384,7 @@ export function OrderPage() {
         )}
       </header>
       {order.overPlanLimit && <Alert tone="warning">{t('order.overLimit')}</Alert>}
+      <RepeatBanner order={order} />
       {printing && (
         <PrintPanel
           ids={[order.id]}

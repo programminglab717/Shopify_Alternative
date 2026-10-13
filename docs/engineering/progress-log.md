@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: duplicate orders caught, the same
-number ordering an overlapping basket again before the first ships (CHK-11).
+**Next, section by section as the alpha's shops need them**: abandoned checkouts recovered, a
+reminder on WhatsApp to a shopper who gave their number and left without ordering (CHK-12).
 Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -16,6 +16,24 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Orders that repeat another
+
+* **In the orders module** ([ADR-392](../architecture/13-decision-log.md#adr-392--an-order-may-repeat-another-placed-for-a-customer-with-an-open-order-not-shipped-yet-from-the-three-days-before-with-an-item-in-common-it-names-that-order-and-staff-merge-it-in-cancel-it-as-a-repeat-or-keep-both), CHK-11): an order placed for a customer who has an open order
+  not shipped yet, from the three days before, with an item in common, names that order and
+  says so on its timeline. `Order.repeatOf` shows it while both are open; staff merge it in
+  (`orderMerge`), cancel it as `DUPLICATE`, or keep both (`orderRepeatKeep`).
+* **In the admin**: the order page shows a banner linking the earlier order, with "Merge into
+  #1002", "Cancel as a repeat" and "Keep both" for those who work orders. `DUPLICATE` is among
+  the cancel reasons too.
+* **Tried in Chromium against the core:** two orders of a Shalwar Qameez for the same number
+  placed #1027 and #1028, which named #1027; its page showed "This may repeat an order the same
+  customer placed in the last few days, not shipped yet: #1027" with the three choices. "Keep
+  both" cleared it, the timeline saying "Kept apart from #1027: not a repeat"; a third order
+  then named #1028, and "Cancel as a repeat" cancelled it as a duplicate. The orders, their
+  stock and the customer were then taken away. No errors in the page.
+* 2623 tests (10 new, and the admin's count, one short before, put right): repeats flagged, not flagged, kept, cancelled and
+  merged in the orders module; through the API in the core; the banner in the admin.
 
 ### 7d2572e · Pickup at checkout
 

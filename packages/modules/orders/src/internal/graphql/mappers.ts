@@ -72,6 +72,7 @@ import {
   OrderFulfillmentStatus,
   OrderLineItem,
   OrderMergedInto,
+  OrderRepeatOf,
   OrderPaymentMethod,
   OrderDeliveryMethod,
   OrderRisk,
@@ -276,6 +277,13 @@ export function toOrder(record: OrderRecord, tenant: TenantContext): Order {
           name: orderName(record.mergedInto.number),
         })
       : null,
+    repeatOf:
+      record.repeatOf && record.status === 'open' && record.repeatOf.pending
+        ? Object.assign(new OrderRepeatOf(), {
+            id: toPublicId('order', record.repeatOf.orderId),
+            name: orderName(record.repeatOf.number),
+          })
+        : null,
     splitFrom: record.splitFrom
       ? Object.assign(new OrderSplitFrom(), {
           id: toPublicId('order', record.splitFrom.orderId),

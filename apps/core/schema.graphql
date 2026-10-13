@@ -6427,6 +6427,11 @@ type Mutation {
   orderRefund(id: ID!, input: OrderRefundInput!): OrderRefundPayload!
 
   """
+  Keeps an order flagged as repeating an earlier one apart from it, as staff found it is not a repeat: `repeatOf` clears, and the timeline says so (CHK-11, ADR-392).
+  """
+  orderRepeatKeep(id: ID!): OrderRepeatKeepPayload!
+
+  """
   Changes when risky cash-on-delivery orders wait for review, for orders placed or re-addressed from now on.
   """
   orderRiskSettingsUpdate(input: OrderRiskSettingsInput!): OrderRiskSettingsUpdatePayload!
@@ -7278,6 +7283,11 @@ type Order {
 
   """Its refunds, oldest first."""
   refunds: [Refund!]!
+
+  """
+  The earlier order this may repeat, while both are open and the earlier is not shipped: staff merge this into it, cancel this as DUPLICATE, or keep both with orderRepeatKeep.
+  """
+  repeatOf: OrderRepeatOf
   returnStatus: OrderReturnStatus!
 
   """Its customer's returns, the first first (ADR-136)."""
@@ -7394,6 +7404,11 @@ type OrderCancelPayload {
 enum OrderCancelReason {
   """The customer cancelled."""
   CUSTOMER
+
+  """
+  It repeats another order of its customer, placed twice by mistake (CHK-11, ADR-392).
+  """
+  DUPLICATE
 
   """A fake or fraudulent order."""
   FRAUD
@@ -7970,6 +7985,21 @@ type OrderRefundPayload {
   order: Order
   refund: Refund
   userErrors: [UserError!]!
+}
+
+type OrderRepeatKeepPayload {
+  order: Order
+  userErrors: [UserError!]!
+}
+
+"""
+An earlier order the same customer placed days before with items in common, not shipped yet: the newer may repeat it by mistake (CHK-11, ADR-392).
+"""
+type OrderRepeatOf {
+  id: ID!
+
+  """Its number as staff say it, such as #1001."""
+  name: String!
 }
 
 """Whether an order's customer sent anything back."""
