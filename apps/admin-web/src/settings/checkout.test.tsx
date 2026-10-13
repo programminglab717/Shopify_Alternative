@@ -6,6 +6,7 @@ import { fakeCore, renderAdmin, signedIn, type } from '../test-support';
 function core(role: StaffRole, whatsappNumber: string | null) {
   let badges: unknown[] = [{ kind: 'CASH_ON_DELIVERY', days: null }];
   let channels = ['WHATSAPP'];
+  let reminderAfterMinutes: number | null = null;
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'CheckoutPage':
@@ -13,6 +14,15 @@ function core(role: StaffRole, whatsappNumber: string | null) {
           checkoutTrustBadges: badges,
           checkoutMarketingChannels: channels,
           onlineStorePreferences: { whatsappNumber },
+          checkoutRecoverySettings: { reminderAfterMinutes },
+        };
+      case 'CheckoutRecoverySettingsUpdate':
+        reminderAfterMinutes = variables.reminderAfterMinutes as number | null;
+        return {
+          checkoutRecoverySettingsUpdate: {
+            checkoutRecoverySettings: { reminderAfterMinutes },
+            userErrors: [],
+          },
         };
       case 'CheckoutTrustBadgesUpdate':
         badges = (variables.badges as { kind: string; days?: number }[]).map((badge) => ({
@@ -96,5 +106,30 @@ describe('The checkout page', () => {
       expect(sentOf(fake, 'CheckoutTrustBadgesUpdate')).toEqual([{ badges: [] }]),
     );
     expect(sentOf(fake, 'CheckoutMarketingChannelsUpdate')).toEqual([]);
+  });
+
+  it('reminds shoppers who leave after the delay chosen, or never (ADR-393)', async () => {
+    const fake = core('manager', null);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/checkout');
+
+    const when = await screen.findByLabelText('Remind them');
+    expect((when as HTMLSelectElement).value).toBe('');
+    expect(screen.getByText(/paid from your message credit/)).toBeTruthy();
+    fireEvent.change(when, { target: { value: '60' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save checkout page' }));
+    expect(await screen.findByText('Saved. The checkout shows it in a moment.')).toBeTruthy();
+    expect(sentOf(fake, 'CheckoutRecoverySettingsUpdate')).toEqual([{ reminderAfterMinutes: 60 }]);
+    // Only what changed is sent.
+    expect(sentOf(fake, 'CheckoutTrustBadgesUpdate')).toEqual([]);
+
+    fireEvent.change(screen.getByLabelText('Remind them'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save checkout page' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'CheckoutRecoverySettingsUpdate')).toEqual([
+        { reminderAfterMinutes: 60 },
+        { reminderAfterMinutes: null },
+      ]),
+    );
   });
 });

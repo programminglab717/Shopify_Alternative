@@ -3388,6 +3388,32 @@ const en = {
   'repeat.merge': 'Merge into {name}',
   'repeat.cancel': 'Cancel as a repeat',
   'repeat.keep': 'Keep both',
+  'abandoned.title': 'Abandoned checkouts',
+  'abandoned.noName': 'No name given',
+  'abandoned.left': 'Left {date}',
+  'abandoned.recovered': 'Ordered: {name}',
+  'abandoned.reminded': 'Reminded {date}',
+  'abandoned.notReminded': 'Not reminded',
+  'abandoned.chat': 'Message on WhatsApp',
+  'abandoned.remindersOff':
+    'Shoppers who type their number at checkout and leave are listed here. They are not reminded.',
+  'abandoned.remindersOn':
+    'Shoppers who type their number at checkout and leave are listed here, and reminded once on WhatsApp {after} after.',
+  'abandoned.change': 'Change',
+  'abandoned.none': 'Nobody has left a checkout after typing their number yet.',
+  'abandoned.noMore': 'No more.',
+  'abandoned.newer': 'Newer',
+  'abandoned.older': 'Older',
+  'checkoutPage.reminder': 'Remind shoppers who leave',
+  'checkoutPage.reminderHint':
+    'A shopper who types their number and leaves without ordering gets one WhatsApp message with a link back to their items. Each is a marketing message, paid from your message credit.',
+  'checkoutPage.reminderAfter': 'Remind them',
+  'checkoutPage.reminderNever': 'Never',
+  'checkoutPage.reminder.30': '30 minutes',
+  'checkoutPage.reminder.60': '1 hour',
+  'checkoutPage.reminder.180': '3 hours',
+  'checkoutPage.reminder.600': '10 hours',
+  'messages.kind.CHECKOUT_REMINDER': 'Reminder of a checkout left',
 } as const;
 
 /** A message's key; `….one` keys are the singular forms `translate` picks for a count of one. */
@@ -6751,6 +6777,32 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'repeat.merge': '{name} میں شامل کریں',
   'repeat.cancel': 'دہرایا ہوا سمجھ کر کینسل کریں',
   'repeat.keep': 'دونوں رکھیں',
+  'abandoned.title': 'چھوڑے گئے چیک آؤٹ',
+  'abandoned.noName': 'نام نہیں دیا',
+  'abandoned.left': '{date} کو چھوڑا',
+  'abandoned.recovered': 'آرڈر ہو گیا: {name}',
+  'abandoned.reminded': '{date} کو یاد دلایا',
+  'abandoned.notReminded': 'یاد نہیں دلایا',
+  'abandoned.chat': 'واٹس ایپ پر پیغام',
+  'abandoned.remindersOff':
+    'جو خریدار چیک آؤٹ پر اپنا نمبر لکھ کر چلے جاتے ہیں وہ یہاں نظر آتے ہیں۔ انہیں یاد نہیں دلایا جاتا۔',
+  'abandoned.remindersOn':
+    'جو خریدار چیک آؤٹ پر اپنا نمبر لکھ کر چلے جاتے ہیں وہ یہاں نظر آتے ہیں، اور {after} بعد انہیں ایک بار واٹس ایپ پر یاد دلایا جاتا ہے۔',
+  'abandoned.change': 'بدلیں',
+  'abandoned.none': 'ابھی تک کسی نے نمبر لکھ کر چیک آؤٹ نہیں چھوڑا۔',
+  'abandoned.noMore': 'اور نہیں۔',
+  'abandoned.newer': 'نئے',
+  'abandoned.older': 'پرانے',
+  'checkoutPage.reminder': 'چیک آؤٹ چھوڑنے والوں کو یاد دہانی',
+  'checkoutPage.reminderHint':
+    'جو خریدار اپنا نمبر لکھ کر آرڈر کیے بغیر چلا جائے اسے واٹس ایپ پر ایک پیغام ملتا ہے جس میں اس کی چیزوں کا لنک ہوتا ہے۔ ہر پیغام مارکیٹنگ پیغام ہے جو آپ کے میسج کریڈٹ سے ادا ہوتا ہے۔',
+  'checkoutPage.reminderAfter': 'یاد دہانی کب بھیجیں',
+  'checkoutPage.reminderNever': 'کبھی نہیں',
+  'checkoutPage.reminder.30': '30 منٹ',
+  'checkoutPage.reminder.60': '1 گھنٹہ',
+  'checkoutPage.reminder.180': '3 گھنٹے',
+  'checkoutPage.reminder.600': '10 گھنٹے',
+  'messages.kind.CHECKOUT_REMINDER': 'چھوڑے گئے چیک آؤٹ کی یاد دہانی',
 };
 
 export const messages: Readonly<

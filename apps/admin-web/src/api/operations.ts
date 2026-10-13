@@ -5730,6 +5730,55 @@ export const CheckoutPageQuery = /* GraphQL */ `
     onlineStorePreferences {
       whatsappNumber
     }
+    checkoutRecoverySettings {
+      reminderAfterMinutes
+    }
+  }
+`;
+
+/** How long after a shopper leaves checkout they are reminded on WhatsApp; null for never. */
+export const CheckoutRecoverySettingsUpdateMutation = /* GraphQL */ `
+  mutation CheckoutRecoverySettingsUpdate($reminderAfterMinutes: Int) {
+    checkoutRecoverySettingsUpdate(reminderAfterMinutes: $reminderAfterMinutes) {
+      checkoutRecoverySettings {
+        reminderAfterMinutes
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Checkouts shoppers left after typing their number (CHK-12), the latest first. */
+export const AbandonedCheckoutsQuery = /* GraphQL */ `
+  query AbandonedCheckouts($first: Int, $after: ID) {
+    abandonedCheckouts(first: $first, after: $after) {
+      id
+      createdAt
+      abandonedAt
+      name
+      phone
+      lineItems {
+        variantId
+        title
+        variantTitle
+        quantity
+      }
+      subtotalPrice {
+        amount
+        currencyCode
+      }
+      remindedAt
+      recoveredOrder {
+        id
+        name
+      }
+    }
+    checkoutRecoverySettings {
+      reminderAfterMinutes
+    }
   }
 `;
 

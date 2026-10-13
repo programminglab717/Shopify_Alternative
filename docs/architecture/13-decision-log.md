@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-393 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-394 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -401,6 +401,7 @@
 | 391 | Checkout offers pickup at each location that lets customers pick up: chosen, the order has no delivery charge, the shopper's address is optional with the location's standing in, and the thank-you page says where to collect it | Accepted |
 | 392 | An order may repeat another: placed for a customer with an open order not shipped yet, from the three days before, with an item in common, it names that order, and staff merge it in, cancel it as a repeat, or keep both | Accepted |
 | 393 | Abandoned checkouts: the number a shopper types is kept as they type it, the shop sees who left, and may remind them once on WhatsApp, after the delay it sets, with a link back to their items; an order the number places then recovers it | Accepted |
+| 394 | The admin lists the checkouts shoppers left under Orders, for those who work orders and marketers, with a chat on WhatsApp for a whole number not yet ordered, and the reminder's delay is set with the checkout page's settings | Accepted |
 
 ---
 
@@ -15295,3 +15296,27 @@
   * **Keeping the checkout's own secret for the link:** only its SHA-256 is kept, so a reminder
     has a secret of its own.
   * **Reminding on by default:** each reminder costs the shop a marketing message, so it chooses.
+
+## ADR-394 · The admin lists the checkouts shoppers left under Orders, for those who work orders and marketers, with a chat on WhatsApp for a whole number not yet ordered, and the reminder's delay is set with the checkout page's settings
+
+* **Context:**
+  * The core keeps the checkouts shoppers leave with their number and reminds them once if the
+    shop chooses a delay ([ADR-393](#adr-393--abandoned-checkouts-the-number-a-shopper-types-is-kept-as-they-type-it-the-shop-sees-who-left-and-may-remind-them-once-on-whatsapp-after-the-delay-it-sets-with-a-link-back-to-their-items-an-order-the-number-places-then-recovers-it)); the admin showed neither.
+* **Decision:**
+  * **Orders links to "Abandoned checkouts"** for owners, managers, confirmation agents and
+    marketers: the latest first, fifty a page, each with the name or "No name given", the
+    number as the role sees it, the items and their subtotal, when they left, and whether they
+    were reminded, not reminded, or ordered since, the order a link.
+  * **A whole number not yet ordered offers "Message on WhatsApp"**, a `wa.me` link, so a
+    shop that keeps reminders off can still write to them itself; a masked number offers none.
+  * **The page says whether reminders are on** and after how long; owners and managers, who open
+    Settings, get a link to change it.
+  * **Settings → Checkout chooses the delay**, "Don't remind them" or one of the four, beside
+    the page's other settings, and says each reminder is a marketing message charged as others.
+  * **How customers are told** lists the reminder among the messages the shop can't turn off
+    there, as checkout's setting is its switch.
+* **Consequences:**
+  * A packer or rider sees no abandoned checkouts; an agent sees them as they see numbers.
+* **Alternatives:**
+  * **A tab of the orders list:** abandoned checkouts are not orders and have none of their
+    actions, so they have a page of their own, linked from it.

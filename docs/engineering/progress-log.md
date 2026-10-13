@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: abandoned checkouts in the admin,
-their list under orders and the reminder's setting (CHK-12); then webhooks for apps (DEV-03).
-Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: webhooks for apps (DEV-03), a
+shop's subscriptions to its events delivered signed, retried and logged; then product reviews
+(MKT-05). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,20 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-13
+
+### Abandoned checkouts in the admin
+
+* **Under Orders** ([ADR-394](../architecture/13-decision-log.md#adr-394--the-admin-lists-the-checkouts-shoppers-left-under-orders-for-those-who-work-orders-and-marketers-with-a-chat-on-whatsapp-for-a-whole-number-not-yet-ordered-and-the-reminders-delay-is-set-with-the-checkout-pages-settings), CHK-12): "Abandoned checkouts" lists who left, latest first, with
+  their number as the role sees it, the items, the subtotal, and whether they were reminded or
+  have ordered since; a whole number not yet ordered can be messaged on WhatsApp from there.
+* **Settings → Checkout** chooses the reminder's delay, or none; the list says which, with a
+  link to change it for owners and managers.
+* **Tried in Chromium against the core:** with the reminder set to 30 minutes on the checkout
+  page's settings, a shopper who typed their name and number and left was listed, after the
+  sweep, with their number, Rs 6,400, "Reminded" with its time, and a link to message them on
+  WhatsApp. The setting, checkout and message were then taken away.
+* 2636 tests (7 new): the list for each role, its pages, empty; the
+  setting; the new documents checked against the schema.
 
 ### e99fc3c · Abandoned checkouts and their reminder
 

@@ -12,6 +12,7 @@ import {
   Printer,
   ScanBarcode,
   Search,
+  ShoppingCart,
   ShieldAlert,
   Tags,
 } from 'lucide-react';
@@ -20,6 +21,7 @@ import type { FormEvent } from 'react';
 import { useSessionStore } from '../auth/context';
 import type { StaffRole } from '../auth/session';
 import { TAKES_DRAFTS } from '../drafts/drafts-page';
+import { SEES_ABANDONED } from './abandoned-page';
 import {
   OrderBulkConfirmMutation,
   OrderBulkMarkPackedMutation,
@@ -323,6 +325,16 @@ export function OrdersPage() {
             >
               <FilePen aria-hidden className="size-5" />
               {t('drafts.title')}
+            </Link>
+          )}
+          {SEES_ABANDONED.includes(shop.role) && (
+            <Link
+              to="/$shopId/abandoned-checkouts"
+              params={{ shopId: shop.id }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium md:min-h-10"
+            >
+              <ShoppingCart aria-hidden className="size-5" />
+              {t('abandoned.title')}
             </Link>
           )}
         </span>

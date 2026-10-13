@@ -58,6 +58,7 @@ import { CollectionsPage, NewCollectionPage } from './collections/collections-pa
 import { DiscountsPage } from './discounts/discounts-page';
 import { OrdersExportPage } from './orders/export-page';
 import { PaymentLinksPage } from './payment-links/payment-links-page';
+import { AbandonedPage } from './orders/abandoned-page';
 import { DraftPage } from './drafts/draft-page';
 import { DraftsPage } from './drafts/drafts-page';
 import { EditDraftPage } from './drafts/edit-draft-page';
@@ -299,6 +300,12 @@ const drafts = createRoute({
   getParentRoute: () => shop,
   path: 'drafts',
   component: DraftsPage,
+});
+
+const abandoned = createRoute({
+  getParentRoute: () => shop,
+  path: 'abandoned-checkouts',
+  component: AbandonedPage,
 });
 
 const newDraft = createRoute({
@@ -751,6 +758,7 @@ export const routeTree = root.addChildren([
     customer,
     shipping,
     drafts,
+    abandoned,
     newDraft,
     draft,
     draftEdit,

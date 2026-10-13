@@ -2487,6 +2487,33 @@ export interface CheckoutPageData {
   checkoutTrustBadges: CheckoutTrustBadge[];
   checkoutMarketingChannels: MarketingChannel[];
   onlineStorePreferences: { whatsappNumber: string | null };
+  checkoutRecoverySettings: { reminderAfterMinutes: number | null };
+}
+
+export interface CheckoutRecoverySettingsUpdateData {
+  checkoutRecoverySettingsUpdate: {
+    checkoutRecoverySettings: { reminderAfterMinutes: number | null } | null;
+    userErrors: UserError[];
+  };
+}
+
+/** A checkout its shopper left after typing their number (CHK-12, ADR-393). */
+export interface AbandonedCheckout {
+  id: string;
+  createdAt: string;
+  abandonedAt: string;
+  name: string | null;
+  /** In E.164, or masked for roles that see numbers masked. */
+  phone: string;
+  lineItems: { variantId: string; title: string; variantTitle: string; quantity: number }[];
+  subtotalPrice: MoneyValue;
+  remindedAt: string | null;
+  recoveredOrder: { id: string; name: string } | null;
+}
+
+export interface AbandonedCheckoutsData {
+  abandonedCheckouts: AbandonedCheckout[];
+  checkoutRecoverySettings: { reminderAfterMinutes: number | null };
 }
 
 export interface CheckoutTrustBadgesUpdateData {

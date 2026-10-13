@@ -4,11 +4,13 @@ import type { FormEvent } from 'react';
 import {
   CheckoutMarketingChannelsUpdateMutation,
   CheckoutPageQuery,
+  CheckoutRecoverySettingsUpdateMutation,
   CheckoutTrustBadgesUpdateMutation,
 } from '../api/operations';
 import type {
   CheckoutMarketingChannelsUpdateData,
   CheckoutPageData,
+  CheckoutRecoverySettingsUpdateData,
   CheckoutTrustBadgeKind,
   CheckoutTrustBadgesUpdateData,
   MarketingChannel,
@@ -40,6 +42,10 @@ const WITH_DAYS: ReadonlySet<CheckoutTrustBadgeKind> = new Set(['EXCHANGE', 'RET
 /** The most badges the checkout shows. */
 const MOST = 4;
 
+/** How long after a shopper leaves the shop may remind them, in minutes (ADR-393); '' for never. */
+export const REMINDER_DELAYS = ['', '30', '60', '180', '600'] as const;
+type ReminderDelay = (typeof REMINDER_DELAYS)[number];
+
 interface BadgeRow {
   key: number;
   kind: CheckoutTrustBadgeKind;
@@ -70,6 +76,14 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
     CheckoutMarketingChannelsUpdateData,
     { channels: MarketingChannel[] }
   >(CheckoutMarketingChannelsUpdateMutation);
+  const updateRecovery = useAdminMutation<
+    CheckoutRecoverySettingsUpdateData,
+    { reminderAfterMinutes: number | null }
+  >(CheckoutRecoverySettingsUpdateMutation);
+  const delayWas = String(
+    data.checkoutRecoverySettings.reminderAfterMinutes ?? '',
+  ) as ReminderDelay;
+  const [delay, setDelay] = useState<ReminderDelay>(delayWas);
   const [rows, setRows] = useState<BadgeRow[]>(keyed);
   const [channels, setChannels] = useState<MarketingChannel[]>(data.checkoutMarketingChannels);
   const [problems, setProblems] = useState<string[]>([]);
@@ -87,7 +101,8 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
   const channelsChanged =
     JSON.stringify(channelsNow) !==
     JSON.stringify(CHANNELS.filter((channel) => data.checkoutMarketingChannels.includes(channel)));
-  const changed = badgesChanged || channelsChanged;
+  const delayChanged = delay !== delayWas;
+  const changed = badgesChanged || channelsChanged || delayChanged;
 
   const move = (index: number, by: -1 | 1) =>
     setRows((all) => {
@@ -128,6 +143,17 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
         if (checkoutMarketingChannelsUpdate.userErrors.length > 0) {
           setProblems(
             checkoutMarketingChannelsUpdate.userErrors.map((error) => problemText(error, t)),
+          );
+          return;
+        }
+      }
+      if (delayChanged) {
+        const { checkoutRecoverySettingsUpdate } = await updateRecovery.mutateAsync({
+          reminderAfterMinutes: delay === '' ? null : Number(delay),
+        });
+        if (checkoutRecoverySettingsUpdate.userErrors.length > 0) {
+          setProblems(
+            checkoutRecoverySettingsUpdate.userErrors.map((error) => problemText(error, t)),
           );
           return;
         }
@@ -264,12 +290,28 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
         ))}
       </FormSection>
 
+      <FormSection title={t('checkoutPage.reminder')} hint={t('checkoutPage.reminderHint')}>
+        <SelectField<ReminderDelay>
+          label={t('checkoutPage.reminderAfter')}
+          value={delay}
+          options={REMINDER_DELAYS.map((value) => ({
+            value,
+            label: t(
+              value === ''
+                ? 'checkoutPage.reminderNever'
+                : (`checkoutPage.reminder.${value}` as MessageKey),
+            ),
+          }))}
+          onChange={setDelay}
+        />
+      </FormSection>
+
       <Problems problems={problems} />
       {saved && !changed && <Alert tone="success">{t('checkoutPage.saved')}</Alert>}
       <Button
         type="submit"
         className="self-start"
-        busy={updateBadges.isPending || updateChannels.isPending}
+        busy={updateBadges.isPending || updateChannels.isPending || updateRecovery.isPending}
         disabled={!changed}
         icon={<Save aria-hidden className="size-5" />}
       >
@@ -282,7 +324,8 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
 /**
  * The checkout's page (CHK-14, CUS-04, ADR-187): the badges under its button that reassure a
  * shopper paying on delivery, up to four in the shop's order, with the days for exchanges and
- * returns; and the boxes it offers for the shop's news and offers, each unticked until ticked.
+ * returns; the boxes it offers for the shop's news and offers, each unticked until ticked; and
+ * how long after a shopper leaves it they are reminded on WhatsApp, if at all (CHK-12, ADR-393).
  */
 export function CheckoutPage() {
   const { t } = useLocale();
