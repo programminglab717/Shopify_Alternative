@@ -101,7 +101,7 @@ import {
   type HandledKind,
   type ShopDoc,
 } from '@hatti/storefront-data';
-import { TrustEvents } from '@hatti/trust/public';
+import { TrustEvents, verifiedLevelIn } from '@hatti/trust/public';
 import type { Redis } from 'ioredis';
 import { articleImagePathOf } from '../api/article-images.js';
 import { logoPathOf } from '../api/logos.js';
@@ -386,6 +386,9 @@ export function itemsFor(event: DomainEvent): string[] {
     case TrustEvents.StoreRestored:
       // Its document says whether Hatti took it down (ADR-461).
       return [Items.shop];
+    case TrustEvents.VerificationChanged:
+      // And what Hatti verified of it (ADR-465).
+      return [Items.shop];
     default:
       return [];
   }
@@ -443,6 +446,7 @@ export const PUBLISHED_EVENTS = [
   ShopEvents.ShopOpened,
   TrustEvents.StoreSuspended,
   TrustEvents.StoreRestored,
+  TrustEvents.VerificationChanged,
 ];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -839,6 +843,7 @@ export class StorefrontPublisher {
       sharingImage,
       translations.get(shopId),
       await automationOnIn(tx, shopId, 'back_in_stock'),
+      await verifiedLevelIn(tx, shopId),
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];

@@ -1617,12 +1617,18 @@ importers:
       '@hatti/events':
         specifier: workspace:*
         version: link:../../platform/events
+      '@hatti/files':
+        specifier: workspace:*
+        version: link:../files
       '@hatti/ids':
         specifier: workspace:*
         version: link:../../platform/ids
       '@hatti/pk':
         specifier: workspace:*
         version: link:../../platform/pk
+      '@hatti/storage':
+        specifier: workspace:*
+        version: link:../../platform/storage
       '@hatti/storefront-api':
         specifier: workspace:*
         version: link:../../platform/storefront-api
@@ -1636,6 +1642,9 @@ importers:
       '@nestjs/core':
         specifier: 'catalog:'
         version: 12.1.0(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/graphql':
+        specifier: 'catalog:'
+        version: 14.0.2(@fastify/websocket@11.3.1)(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(graphql@16.14.2)(reflect-metadata@0.2.2)(typescript@6.0.3)
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.0
@@ -1645,6 +1654,9 @@ importers:
       fastify:
         specifier: 'catalog:'
         version: 5.12.5
+      graphql:
+        specifier: 'catalog:'
+        version: 16.14.2
       pg:
         specifier: 'catalog:'
         version: 8.23.0

@@ -69,6 +69,7 @@ export const ID_PREFIXES = {
   savedSearch: 'svs',
   exportSchedule: 'exs',
   storeExport: 'sxp',
+  verification: 'vrf',
   lineItem: 'li',
   orderEvent: 'oev',
   orderComment: 'ocm',

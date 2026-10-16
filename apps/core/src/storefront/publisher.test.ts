@@ -69,12 +69,13 @@ import {
   type MenuLinkDoc,
   type ShopDoc,
 } from '@hatti/storefront-data';
+import { TrustEvents } from '@hatti/trust/public';
 import { Redis } from 'ioredis';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TestDns } from '../testing/api.js';
 import { StorefrontSweep } from '../worker/storefront-sweep.js';
-import { itemsFor, StorefrontPublisher } from './publisher.js';
+import { Items, itemsFor, StorefrontPublisher } from './publisher.js';
 
 const server = testDatabaseServer();
 const redisUrl = process.env.REDIS_URL;
@@ -765,6 +766,39 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await publisher.publishAll(shopId);
     expect(await publisher.directory.find('zari-fashions')).toBe(shopId);
     expect((await store().shop()).suspended).toBeUndefined();
+  });
+
+  it('says in its document what Hatti verified of the shop, and stops when it is taken back (ADR-465)', async () => {
+    const verify = (level: string) =>
+      admin.query(
+        `INSERT INTO trust.verifications
+           (shop_id, level, name, cnic_last4, ntn, status, asked_by, decided_at, decided_by)
+         VALUES ($1, $2, 'Sana Ahmed', $3, $4, 'approved', $5, now(), 'Ayesha')`,
+        [
+          shopId,
+          level,
+          level === 'identity' ? '5671' : null,
+          level === 'business' ? '1234567-8' : null,
+          newId(),
+        ],
+      );
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).verified).toBeUndefined();
+    await verify('identity');
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).verified).toBe('identity');
+    await verify('business');
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).verified).toBe('business');
+    // A business's stands on its owner's: taken back, neither is shown.
+    await admin.query(
+      `UPDATE trust.verifications SET status = 'revoked', answer = 'Not theirs'
+        WHERE shop_id = $1 AND level = 'identity'`,
+      [shopId],
+    );
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).verified).toBeUndefined();
+    expect(itemsFor({ type: TrustEvents.VerificationChanged } as never)).toEqual([Items.shop]);
   });
 
   it('publishes a shop again when its documents are of an older shape', async () => {

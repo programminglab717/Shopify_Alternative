@@ -533,6 +533,8 @@ export function shopDoc(
   translations?: TranslatedFields,
   /** Whether its back in stock automation is on (ADR-429). */
   backInStock = false,
+  /** What Hatti verified of it (ADR-465); null for none. */
+  verified: 'identity' | 'business' | null = null,
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -576,6 +578,8 @@ export function shopDoc(
     }),
     // Taken down by Hatti (ADR-461), left out while it is not, likewise.
     ...(profile.status === 'suspended' && { suspended: true as const }),
+    // Verified by Hatti (ADR-465), left out while it is not, likewise.
+    ...(verified && { verified }),
     robotsRules: preferences.robotsTxtRules,
     policies: [...policies],
     // Left out without one, so a shop without one keeps its document as it was.

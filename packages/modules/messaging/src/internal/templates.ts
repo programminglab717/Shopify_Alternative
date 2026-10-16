@@ -55,6 +55,9 @@ export const MESSAGE_KINDS = [
   'store_suspended',
   'store_appeal_refused',
   'store_restored',
+  'shop_verified',
+  'shop_verification_refused',
+  'shop_verification_revoked',
   'broadcast',
   'automation',
   'sms_broadcast',
@@ -84,7 +87,8 @@ export type AnyMessageKind = MessageKind | PlatformMessageKind;
  * Hatti's notices of the shop's bills (ADR-169), among them what Hatti found of a transfer the
  * shop said it made (ADR-254), of a domain of its own DNS points elsewhere (ADR-262), of its
  * orders nearing its plan's limit (ADR-263), of the whole store's export made (ADR-417), and of
- * its store taken down, its appeal refused and its store restored (ADR-461, ADR-462).
+ * its store taken down, its appeal refused and its store restored (ADR-461, ADR-462), and of its
+ * verification by Hatti approved, refused or taken back (ADR-465).
  */
 export const ALWAYS_SENT: readonly MessageKind[] = [
   'one_time_code',
@@ -114,6 +118,10 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'store_suspended',
   'store_appeal_refused',
   'store_restored',
+  // Its verification by Hatti (ADR-465).
+  'shop_verified',
+  'shop_verification_refused',
+  'shop_verification_revoked',
   // The shop's own, which it schedules itself (ADR-421, ADR-458), or sets going (ADR-425).
   'broadcast',
   'automation',
@@ -945,6 +953,48 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: '{shop} is open again',
       ur: '{shop} دوبارہ کھل گئی ہے',
+    },
+  },
+  shop_verified: {
+    whatsapp: 'hatti_shop_verified',
+    category: 'utility',
+    parameters: ['shop'],
+    hattiPays: true,
+    text: {
+      en: 'Hatti: we have verified {shop}. Its storefront now shows shoppers it is verified by Hatti.',
+      ur: 'ہٹی: ہم نے {shop} کی تصدیق کر دی ہے۔ اب اس کا اسٹور فرنٹ خریداروں کو دکھاتا ہے کہ اس کی تصدیق ہٹی نے کی ہے۔',
+    },
+    subject: {
+      en: 'Hatti has verified {shop}',
+      ur: 'ہٹی نے {shop} کی تصدیق کر دی ہے',
+    },
+  },
+  shop_verification_refused: {
+    whatsapp: 'hatti_shop_verification_refused',
+    category: 'utility',
+    parameters: ['shop', 'note'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: we could not verify {shop}: {note}. You can ask again from Settings > Verification in Hatti's admin.",
+      ur: 'ہٹی: ہم {shop} کی تصدیق نہیں کر سکے: {note}۔ آپ ہٹی کے ایڈمن میں سیٹنگز > تصدیق سے دوبارہ درخواست دے سکتے ہیں۔',
+    },
+    subject: {
+      en: 'Hatti could not verify {shop}',
+      ur: 'ہٹی {shop} کی تصدیق نہیں کر سکا',
+    },
+  },
+  shop_verification_revoked: {
+    whatsapp: 'hatti_shop_verification_revoked',
+    category: 'utility',
+    parameters: ['shop', 'note'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: we have taken back {shop}'s verification: {note}. Its storefront no longer shows it as verified.",
+      ur: 'ہٹی: ہم نے {shop} کی تصدیق واپس لے لی ہے: {note}۔ اب اس کا اسٹور فرنٹ اسے تصدیق شدہ نہیں دکھاتا۔',
+    },
+    subject: {
+      en: "Hatti has taken back {shop}'s verification",
+      ur: 'ہٹی نے {shop} کی تصدیق واپس لے لی ہے',
     },
   },
 };

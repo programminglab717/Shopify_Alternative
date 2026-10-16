@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-464 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-465 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -472,6 +472,7 @@
 | 462 | The owner of a store taken down appeals through a link of its own in the notice: its page says why, takes their side, and shows Hatti's answer; refused with why, or upheld by restoring the store | Accepted |
 | 463 | AI drafts a resource's Urdu through one gateway whose model and key come from the host's configuration; drafts are never kept, the shop checks and saves them as translations, and each ask is logged with its tokens, a hundred a day | Accepted |
 | 464 | The admin's Urdu pages draft a thing's empty boxes with AI in one tap, each marked as AI's until the shop saves it; options, values and links are left to the shop | Accepted |
+| 465 | Hatti verifies a shop's owner by their CNIC, then its business by its NTN, from photos its owner sends; Hatti's people decide, the photos are deleted once they do, and the storefront's document says what is verified | Accepted |
 
 ---
 
@@ -17682,3 +17683,38 @@
     does, and a page of fields would be a row of buttons.
   * **Drafting every box, those with Urdu too:** the shop's own Urdu would be overwritten by a
     machine's.
+
+## ADR-465 · Hatti verifies a shop's owner by their CNIC, then its business by its NTN, from photos its owner sends; Hatti's people decide, the photos are deleted once they do, and the storefront's document says what is verified
+
+* **Context:**
+  * ONB-11 asks for verification tiers and a badge. T0 is a phone or email proved, which every
+    owner already has. T1 is a CNIC, through a KYC partner. T2 is an NTN or the business. OS-11's
+    verified badge waits on it (ADR-454).
+  * No KYC partner is contracted yet. A CNIC is among the most sensitive things Hatti could keep,
+    and a shopper never needs it, only Hatti's word.
+* **Decision:**
+  * **Two levels, in order.** The owner asks for `identity` with the name on their CNIC, its
+    number and photos of both sides. Once that stands, they ask for `business` with its
+    registered name and NTN (`1234567-8`, or a sole proprietor's CNIC) and its certificate. One
+    to three photos or PDFs a request, staged as uploads and copied under the shop's own
+    `verifications/` prefix. One request waits at a time. The owner alone asks, having proved
+    who they are lately. Owners and managers see the shop's level and its requests.
+  * **Hatti's people decide**, with `trust-reports verifications`, which links each document for
+    an hour, then `verify`, `refuse-verification` with why, or `unverify` a shop's level with
+    why. Taking back the owner's takes the business's with it, since it stands on it. The shop
+    is told each time on WhatsApp at its alerts number, at Hatti's cost.
+  * **Once decided, the documents are deleted** from storage, and the CNIC is kept only as its
+    last four digits. What waits is the only full copy Hatti has, for as long as it waits.
+  * **The storefront's document says `verified`**: `identity`, or `business` while both stand,
+    published again on each change. What it shows is the next step (OS-11).
+* **Consequences:**
+  * A KYC partner can later decide `identity` in place of a person, through the same request
+    and the same decision.
+  * Hatti cannot find one CNIC across shops: it keeps four digits. A partner's check is where
+    that belongs.
+* **Alternatives:**
+  * **Keeping the CNIC and its photos, sealed:** a store of national ID cards to guard for every
+    shop, when only the decision is needed afterwards.
+  * **A badge from the phone number alone:** every shop has one. It would tell shoppers nothing.
+  * **Uploads through a form of its own:** staged uploads already check size and type, and leave
+    nothing a shop can reach.

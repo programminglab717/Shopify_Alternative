@@ -480,6 +480,19 @@ describe("Messages' words", () => {
       'Zari Fashions',
       'advances taken for orders never sent',
     ]);
+    // Its verification by Hatti (ADR-465).
+    const verified = { shop: 'Zari Fashions', note: 'the CNIC photo is blurred' };
+    expect(messageText('shop_verified', 'en', verified)).toBe(
+      'Hatti: we have verified Zari Fashions. Its storefront now shows shoppers it is verified by Hatti.',
+    );
+    expect(messageText('shop_verification_refused', 'en', verified)).toBe(
+      'Hatti: we could not verify Zari Fashions: the CNIC photo is blurred. You can ask again ' +
+        "from Settings > Verification in Hatti's admin.",
+    );
+    expect(templateParameters('shop_verification_revoked', verified)).toEqual([
+      'Zari Fashions',
+      'the CNIC photo is blurred',
+    ]);
     // The orders a month its plan allows (ADR-263).
     const counted = { shop: 'Zari Fashions', orders: '40', limit: '50', plan: 'Free' };
     expect(messageText('orders_limit_near', 'en', counted)).toBe(
@@ -506,6 +519,9 @@ describe("Messages' words", () => {
       'store_suspended',
       'store_appeal_refused',
       'store_restored',
+      'shop_verified',
+      'shop_verification_refused',
+      'shop_verification_revoked',
     ]);
     expect(ALWAYS_SENT).toEqual([
       'one_time_code',
@@ -534,6 +550,9 @@ describe("Messages' words", () => {
       'store_suspended',
       'store_appeal_refused',
       'store_restored',
+      'shop_verified',
+      'shop_verification_refused',
+      'shop_verification_revoked',
       'broadcast',
       'automation',
       // The shop's SMS campaign, which its customer can stop by its link (ADR-458).
@@ -671,6 +690,9 @@ describe("Messages' words", () => {
       'store_suspended',
       'store_appeal_refused',
       'store_restored',
+      'shop_verified',
+      'shop_verification_refused',
+      'shop_verification_revoked',
     ]);
     const shipped = messageEmail('order_shipped', 'en', SHIPPED.variables)!;
     expect(shipped.from).toBe('shop');

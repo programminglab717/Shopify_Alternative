@@ -15,6 +15,8 @@ import { REPORT_REASONS, type ReportReason } from './reports.service.js';
 export const TrustEvents = {
   StoreSuspended: 'trust.store_suspended',
   StoreRestored: 'trust.store_restored',
+  // The shop's verification by Hatti approved or taken back (ADR-465).
+  VerificationChanged: 'trust.verification_changed',
 } as const;
 
 export interface TakedownPayload {

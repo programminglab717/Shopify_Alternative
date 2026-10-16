@@ -53,6 +53,9 @@ export enum MessageKind {
   STORE_SUSPENDED = 'STORE_SUSPENDED',
   STORE_APPEAL_REFUSED = 'STORE_APPEAL_REFUSED',
   STORE_RESTORED = 'STORE_RESTORED',
+  SHOP_VERIFIED = 'SHOP_VERIFIED',
+  SHOP_VERIFICATION_REFUSED = 'SHOP_VERIFICATION_REFUSED',
+  SHOP_VERIFICATION_REVOKED = 'SHOP_VERIFICATION_REVOKED',
   BROADCAST = 'BROADCAST',
   AUTOMATION = 'AUTOMATION',
   SMS_BROADCAST = 'SMS_BROADCAST',
@@ -260,6 +263,21 @@ registerEnumType(MessageKind, {
       description:
         "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
         'its store is open again, and why (ADR-461).',
+    },
+    SHOP_VERIFIED: {
+      description:
+        'For the shop, from Hatti and paid by Hatti, at its alerts number: Hatti has verified it ' +
+        '(ADR-465).',
+    },
+    SHOP_VERIFICATION_REFUSED: {
+      description:
+        'For the shop, from Hatti and paid by Hatti, at its alerts number: Hatti could not verify ' +
+        'it, and why (ADR-465).',
+    },
+    SHOP_VERIFICATION_REVOKED: {
+      description:
+        'For the shop, from Hatti and paid by Hatti, at its alerts number: Hatti has taken its ' +
+        'verification back, and why (ADR-465).',
     },
     BROADCAST: {
       description:

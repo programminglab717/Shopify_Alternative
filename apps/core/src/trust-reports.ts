@@ -7,13 +7,18 @@ import {
   REPORT_REASONS,
   ReportsService,
   TakedownsService,
+  VerificationsService,
   type AppealRecord,
   type ReportRecord,
   type TakedownRecord,
+  type VerificationLevel,
+  type VerificationReview,
 } from '@hatti/trust/public';
 import { parseArgs } from 'node:util';
 import { loadTrustReportsConfig } from './config.js';
+import { createStorage } from './storage.js';
 import { refuseAppeal, restoreStore, takeDown } from './takedowns.js';
+import { approveVerification, refuseVerification, revokeVerification } from './verifications.js';
 
 // Shoppers' reports of stores (TNS-01, ADR-460), for Hatti's people: those open, the soonest due
 // first, overdue marked; each dismissed, or upheld with what was done. Every report is due a
@@ -36,6 +41,15 @@ import { refuseAppeal, restoreStore, takeDown } from './takedowns.js';
 //
 //   pnpm --filter @hatti/core trust-reports appeals [--all]
 //   pnpm --filter @hatti/core trust-reports refuse apl_… --by Ayesha --note "Tracking shows none delivered"
+//
+// Shops' owners ask Hatti to verify them (ONB-11, ADR-465): their CNIC, then their business's
+// NTN, each with photos of the documents, which the list links for an hour. Approving or refusing
+// deletes the photos; the shop is told either way, and when a verification is taken back:
+//
+//   pnpm --filter @hatti/core trust-reports verifications [--all]
+//   pnpm --filter @hatti/core trust-reports verify vrf_… --by Ayesha [--note "…"]
+//   pnpm --filter @hatti/core trust-reports refuse-verification vrf_… --by Ayesha --note "The photo is blurred"
+//   pnpm --filter @hatti/core trust-reports unverify zari --level identity --by Ayesha --note "…"
 
 const USAGE =
   'Usage: trust-reports list [--all]\n' +
@@ -45,7 +59,11 @@ const USAGE =
   `       trust-reports suspend <shop> --reason <${REPORT_REASONS.join('|')}> --by <who> --note <why, as the owner is told>\n` +
   '       trust-reports restore <shop> --by <who> --note <why, as the owner is told>\n' +
   '       trust-reports appeals [--all]\n' +
-  '       trust-reports refuse <appeal> --by <who> --note <why, as the owner is told>';
+  '       trust-reports refuse <appeal> --by <who> --note <why, as the owner is told>\n' +
+  '       trust-reports verifications [--all]\n' +
+  '       trust-reports verify <verification> --by <who> [--note <note>]\n' +
+  '       trust-reports refuse-verification <verification> --by <who> --note <why, as the owner is told>\n' +
+  '       trust-reports unverify <shop> --level <identity|business> --by <who> --note <why, as the owner is told>';
 
 function usage(problem?: string): never {
   if (problem) console.error(problem);
@@ -57,6 +75,10 @@ type Command =
   | { command: 'list'; all: boolean }
   | { command: 'takedowns'; all: boolean }
   | { command: 'appeals'; all: boolean }
+  | { command: 'verifications'; all: boolean }
+  | { command: 'verify'; id: string; verification: string; by: string; note: string }
+  | { command: 'refuse-verification'; id: string; verification: string; by: string; note: string }
+  | { command: 'unverify'; shop: string; level: VerificationLevel; by: string; note: string }
   | { command: 'refuse'; id: string; appeal: string; by: string; note: string }
   | { command: 'dismiss' | 'uphold'; id: string; report: string; by: string; note: string }
   | { command: 'suspend'; shop: string; reason: string; by: string; note: string }
@@ -79,8 +101,61 @@ const reports = new ReportsService(database);
 const takedowns = new TakedownsService(database);
 const messages = new MessagesService(database);
 const appeals = new AppealsService(database);
+const verifications = new VerificationsService(
+  database,
+  createStorage(config, config.PUBLIC_URL ?? 'http://localhost:3000'),
+);
 try {
-  if (parsed.command === 'takedowns') {
+  if (parsed.command === 'verifications') {
+    const found = await verifications.list({ all: parsed.all });
+    if (found.length === 0) {
+      console.log(parsed.all ? 'No verification asked for yet.' : 'No verification is waiting.');
+    }
+    for (const review of found) console.log(verificationLine(review));
+  } else if (
+    parsed.command === 'verify' ||
+    parsed.command === 'refuse-verification' ||
+    parsed.command === 'unverify'
+  ) {
+    const done =
+      parsed.command === 'verify'
+        ? await approveVerification(database, verifications, messages, parsed.verification, {
+            by: parsed.by,
+            note: parsed.note,
+          })
+        : parsed.command === 'refuse-verification'
+          ? await refuseVerification(database, verifications, messages, parsed.verification, {
+              by: parsed.by,
+              answer: parsed.note,
+            })
+          : await revokeVerification(database, verifications, messages, parsed.shop, parsed.level, {
+              by: parsed.by,
+              answer: parsed.note,
+            });
+    if (typeof done === 'string') {
+      console.error(
+        {
+          not_found:
+            parsed.command === 'unverify'
+              ? `No shop ${parsed.shop}: name it by its handle.`
+              : 'No such verification: see the list.',
+          decided: 'It was decided already.',
+          needs_identity: "Its owner isn't verified: verify the owner first.",
+          not_verified: `${parsed.command === 'unverify' ? parsed.shop : 'It'} is not verified at that level.`,
+        }[done],
+      );
+      process.exitCode = 1;
+    } else {
+      const [first] = Array.isArray(done) ? done : [done];
+      console.log(
+        `${first!.shopName} (${first!.shopHandle}): ${
+          Array.isArray(done)
+            ? `${done.map((each) => each.level).join(' and ')} taken back`
+            : `${done.level} ${done.status}`
+        }; its documents are deleted and the shop is told.`,
+      );
+    }
+  } else if (parsed.command === 'takedowns') {
     const found = await takedowns.list({ all: parsed.all });
     if (found.length === 0)
       console.log(parsed.all ? 'No store taken down yet.' : 'No store is down.');
@@ -190,6 +265,23 @@ function appealLine(appeal: AppealRecord): string {
   ].join('\t');
 }
 
+/** A verification on one line, tab-separated, with links to its documents while it waits. */
+function verificationLine(review: VerificationReview): string {
+  return [
+    toPublicId('verification', review.id),
+    review.status === 'waiting' ? 'WAITING' : review.status,
+    `since ${review.createdAt.toISOString()}`,
+    `${review.shopName} (${review.shopHandle})`,
+    review.level,
+    review.name,
+    review.level === 'identity'
+      ? `CNIC ${review.cnic ?? `…${review.cnicLast4}`}`
+      : `NTN ${review.ntn}`,
+    ...verifications.documentLinks(review),
+    review.answer ? `${review.status} by ${review.decidedBy}: ${review.answer}` : '',
+  ].join('\t');
+}
+
 /** A takedown on one line, tab-separated: those of stores still down say so first. */
 function takedownLine(takedown: TakedownRecord): string {
   return [
@@ -213,11 +305,17 @@ function parseCommand(args: string[]): Command {
       by: { type: 'string' },
       note: { type: 'string' },
       reason: { type: 'string' },
+      level: { type: 'string' },
     },
   });
   const [command, id, ...rest] = positionals;
   if (rest.length > 0) throw new Error(`Unexpected: ${rest.join(' ')}`);
-  if (command === 'list' || command === 'takedowns' || command === 'appeals') {
+  if (
+    command === 'list' ||
+    command === 'takedowns' ||
+    command === 'appeals' ||
+    command === 'verifications'
+  ) {
     if (id) throw new Error(`Unexpected: ${id}`);
     return { command, all: values.all ?? false };
   }
@@ -226,24 +324,43 @@ function parseCommand(args: string[]): Command {
     command !== 'uphold' &&
     command !== 'suspend' &&
     command !== 'restore' &&
-    command !== 'refuse'
+    command !== 'refuse' &&
+    command !== 'verify' &&
+    command !== 'refuse-verification' &&
+    command !== 'unverify'
   ) {
     throw new Error('Say what to do');
   }
   if (!id) {
     throw new Error(
-      command === 'suspend' || command === 'restore'
+      command === 'suspend' || command === 'restore' || command === 'unverify'
         ? 'Name the shop, by its handle'
-        : command === 'refuse'
-          ? 'Name the appeal, as the list of appeals shows it'
-          : 'Name the report, as the list shows it',
+        : command === 'verify' || command === 'refuse-verification'
+          ? 'Name the verification, as the list of verifications shows it'
+          : command === 'refuse'
+            ? 'Name the appeal, as the list of appeals shows it'
+            : 'Name the report, as the list shows it',
     );
   }
   const by = values.by?.trim();
   if (!by) throw new Error("Say who among Hatti's people decided it, with --by");
+  if (command === 'verify') {
+    const verification = tryFromPublicId(id, 'verification') ?? id;
+    return { command, id, verification, by, note: values.note?.trim() ?? '' };
+  }
   const note = values.note?.trim();
   if (!note) throw new Error('Say why, or what was done, with --note');
   if (command === 'restore') return { command, shop: id, by, note };
+  if (command === 'refuse-verification') {
+    return { command, id, verification: tryFromPublicId(id, 'verification') ?? id, by, note };
+  }
+  if (command === 'unverify') {
+    const level = values.level?.trim();
+    if (level !== 'identity' && level !== 'business') {
+      throw new Error('Say what to take back, with --level: identity or business');
+    }
+    return { command, shop: id, level, by, note };
+  }
   if (command === 'refuse') {
     return { command, id, appeal: tryFromPublicId(id, 'storeAppeal') ?? id, by, note };
   }

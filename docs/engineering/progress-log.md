@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### Shops verified by Hatti
+
+* **Hatti verifies a shop's owner by their CNIC, then its business by its NTN, from photos its
+  owner sends; Hatti's people decide, the photos are deleted once they do, and the storefront's
+  document says what is verified** ([ADR-465](../architecture/13-decision-log.md#adr-465--hatti-verifies-a-shops-owner-by-their-cnic-then-its-business-by-its-ntn-from-photos-its-owner-sends-hattis-people-decide-the-photos-are-deleted-once-they-do-and-the-storefronts-document-says-what-is-verified), ONB-11). The admin's page and the storefront's
+  badge come next.
+* 2952 tests, from 2948: the trust module's two verification tests, the core's
+  API test and its publisher's, with the messaging test covering the three new notices.
+
 ### 00500bd · AI drafts on the admin's Urdu pages
 
 * **One tap drafts a thing's empty Urdu boxes with AI, each marked as AI's until the shop saves

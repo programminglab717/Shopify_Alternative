@@ -441,6 +441,12 @@ export interface ShopDoc {
    */
   suspended?: true;
   /**
+   * What Hatti verified of it and stands by (ONB-11, ADR-465): `identity`, who runs it, by their
+   * CNIC; or `business`, its NTN too. Its storefront shows a shop verified as such (OS-11). Absent
+   * for none, as in documents written before shops could be verified.
+   */
+  verified?: 'identity' | 'business';
+  /**
    * Rules it adds to its robots.txt (ADR-055), one a line, as the online store checked them.
    * Absent or empty for none, as in documents written before shops had them.
    */

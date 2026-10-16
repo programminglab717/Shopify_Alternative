@@ -555,18 +555,22 @@ const billingTransfersSchema = z.object({
 });
 
 /**
- * Hatti's people decide on shoppers' reports of stores (ADR-460), with the system login, which
- * reads every shop's.
+ * Hatti's people decide on shoppers' reports of stores (ADR-460) and shops' verifications (ADR-465),
+ * with the system login, which reads every shop's.
  */
-const trustReportsSchema = z.object({
-  DATABASE_URL: env.postgresUrl(),
-  DATABASE_SYSTEM_URL: env.postgresUrl(),
-  /**
-   * The core's public address, where a takedown's link to appeal by goes (ADR-462): needed to
-   * take a store down.
-   */
-  PUBLIC_URL: env.httpUrl().optional(),
-});
+const trustReportsSchema = z
+  .object({
+    DATABASE_URL: env.postgresUrl(),
+    DATABASE_SYSTEM_URL: env.postgresUrl(),
+    /**
+     * The core's public address, where a takedown's link to appeal by goes (ADR-462): needed to
+     * take a store down. Local storage's links to verifications' documents go there too.
+     */
+    PUBLIC_URL: env.httpUrl().optional(),
+    // Where verifications' documents are kept, as the API keeps them (ADR-465).
+    ...storage,
+  })
+  .refine(storageComplete, STORAGE_COMPLETE);
 
 /**
  * Hatti's people review couriers' names for cities across shops, and keep Hatti's own (ADR-260),

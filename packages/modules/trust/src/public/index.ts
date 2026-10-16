@@ -31,6 +31,24 @@ export {
   type AppealStatus,
   type AppealView,
 } from '../internal/appeals.service.js';
+export {
+  VERIFICATION_DOCUMENT_TYPES,
+  VERIFICATION_LIMITS,
+  VERIFICATION_URL_SECONDS,
+  VerificationsService,
+  cnicDigits,
+  ntnOf,
+  verifiedLevelIn,
+  type ShopVerificationRecord,
+  type VerificationChangedPayload,
+  type VerificationDecisionProblem,
+  type VerificationDocument,
+  type VerificationInput,
+  type VerificationLevel,
+  type VerificationRecord,
+  type VerificationReview,
+  type VerificationStatus,
+} from '../internal/verifications.service.js';
 export { appealPage } from '../internal/appeal-page.js';
 export { AppealController } from '../internal/appeal.controller.js';
 export { ReportsController } from '../internal/reports.controller.js';
