@@ -18,7 +18,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### An offer after the checkout reminder
+### cf0db38 · An offer after the checkout reminder
 
 * **A second message** ([ADR-426](../architecture/13-decision-log.md#adr-426--shoppers-reminded-of-a-checkout-who-still-have-not-ordered-are-offered-one-of-the-shops-own-discount-codes-some-hours-after-its-link-applying-the-code-to-their-items), CHK-12) goes to shoppers reminded of a checkout who still have
   not ordered: one of the shop's own discount codes, 12, 24 or 48 hours after the reminder.
