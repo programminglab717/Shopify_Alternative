@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### A shop's own SMS sender
+### 380a8ee · A shop's own SMS sender
 
 * **A shop asks for its customers' SMS to come from a name of its own, which Hatti's people
   approve once operators register it for a verified shop; what Hatti tells the shop itself
