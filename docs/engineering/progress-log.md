@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### The verified badge
+### 7482260 · The verified badge
 
 * **Hatti Base says beside a product's promises, and in its footer, that Hatti verified the shop:
   its seller's identity, or a registered business** ([ADR-466](../architecture/13-decision-log.md#adr-466--hatti-base-says-beside-a-products-promises-and-in-its-footer-that-hatti-verified-the-shop-its-sellers-identity-or-a-registered-business), ONB-11, OS-11).
