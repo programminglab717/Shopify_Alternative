@@ -1,6 +1,8 @@
 import { shopProfile, type TenantContext } from '@hatti/api';
 import { Database, exactTime, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
+import { isUuid } from '@hatti/ids';
+import { maskPkMobile } from '@hatti/pk';
 import { Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { MessageCharges, chargedFor, messageCostOf } from './charges.js';
@@ -9,6 +11,7 @@ import { marketingHours } from './marketing-hours.js';
 import { MessagingEvents, type MessageRepliedPayload } from './events.js';
 import { SES_EMAIL, WHATSAPP_CLOUD, type MessageChannel } from './providers.js';
 import { settingsIn } from './settings.service.js';
+import type { StopLinkView } from './stop-links.js';
 import {
   ALWAYS_SENT,
   EMAILED_KINDS,
@@ -508,18 +511,42 @@ export class MessagesService {
     }
     if (!shopId) return null;
     const shop = shopId;
-    await this.db.tenant(shop, async (tx) => {
-      await tx.execute(sql`
-        INSERT INTO messaging.opt_outs (shop_id, channel, recipient, said)
-        VALUES (${shop}, ${channel}, ${recipient}, ${said.slice(0, 100)})
-            ON CONFLICT DO NOTHING`);
-      await tx.execute(sql`
-        UPDATE messaging.messages
-           SET status = 'skipped', error = 'Not sent: the customer asked the shop to stop'
-         WHERE shop_id = ${shop} AND channel = ${channel} AND recipient = ${recipient}
-           AND status = 'pending'`);
-    });
+    await this.db.tenant(shop, (tx) => optOutIn(tx, shop, channel, recipient, said));
     return shop;
+  }
+
+  /**
+   * What an SMS campaign's stop link says (ADR-458): whose messages, to which number, masked, and
+   * whether the number has stopped them. Null for a link to no such message.
+   */
+  async stopLink(messageId: string): Promise<StopLinkView | null> {
+    const found = await this.#stopLinked(messageId);
+    if (!found) return null;
+    return this.db.tenant(found, (tx) => stopLinkIn(tx, found, messageId));
+  }
+
+  /** Stops the shop's SMS to the number its stop link's message went to (ADR-458), once. */
+  async stopByLink(messageId: string): Promise<StopLinkView | null> {
+    const found = await this.#stopLinked(messageId);
+    if (!found) return null;
+    return this.db.tenant(found, async (tx) => {
+      const view = await stopLinkIn(tx, found, messageId);
+      if (!view) return null;
+      const { rows } = await tx.execute<{ channel: MessageChannel; recipient: string }>(sql`
+        SELECT channel, recipient FROM messaging.messages
+         WHERE shop_id = ${found} AND id = ${messageId}`);
+      await optOutIn(tx, found, rows[0]!.channel, rows[0]!.recipient, 'stop link');
+      return { ...view, stopped: true };
+    });
+  }
+
+  /** The shop an SMS campaign's message is of, across shops (ADR-458). */
+  async #stopLinked(messageId: string): Promise<string | null> {
+    if (!isUuid(messageId)) return null;
+    const { rows } = await this.db.app.execute<{ shop_id: string }>(
+      sql`SELECT shop_id FROM messaging.resolve_stop_link(${messageId}::uuid)`,
+    );
+    return rows[0]?.shop_id ?? null;
   }
 
   /**
@@ -662,5 +689,51 @@ function toRecord(row: MessageRow): MessageRecord {
     readAt: toDateOrNull(row.read_at),
     createdAt: toDate(row.created_at),
     createdAtExactly: row.created_at_exactly,
+  };
+}
+
+/**
+ * The number asked the shop to stop on `channel` (MSG-09): kept, and what was still to go to it
+ * there goes no more.
+ */
+async function optOutIn(
+  tx: Tx,
+  shopId: string,
+  channel: MessageChannel,
+  recipient: string,
+  said: string,
+): Promise<void> {
+  await tx.execute(sql`
+    INSERT INTO messaging.opt_outs (shop_id, channel, recipient, said)
+    VALUES (${shopId}, ${channel}, ${recipient}, ${said.slice(0, 100)})
+        ON CONFLICT DO NOTHING`);
+  await tx.execute(sql`
+    UPDATE messaging.messages
+       SET status = 'skipped', error = 'Not sent: the customer asked the shop to stop'
+     WHERE shop_id = ${shopId} AND channel = ${channel} AND recipient = ${recipient}
+       AND status = 'pending'`);
+}
+
+/** An SMS campaign's message's stop link, as its page shows it (ADR-458). */
+async function stopLinkIn(tx: Tx, shopId: string, id: string): Promise<StopLinkView | null> {
+  const { rows } = await tx.execute<{
+    recipient: string;
+    language: MessageLanguage;
+    shop: string | null;
+    stopped: boolean;
+  }>(sql`
+    SELECT m.recipient, m.language, m.variables->>'shop' AS shop,
+           EXISTS (SELECT 1 FROM messaging.opt_outs o
+                    WHERE o.shop_id = m.shop_id AND o.channel = m.channel
+                      AND o.recipient = m.recipient) AS stopped
+      FROM messaging.messages m
+     WHERE m.shop_id = ${shopId} AND m.id = ${id} AND m.kind = 'sms_broadcast'`);
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    shop: row.shop ?? (await shopProfile(tx, shopId)).name,
+    phone: maskPkMobile(row.recipient),
+    language: row.language,
+    stopped: row.stopped,
   };
 }

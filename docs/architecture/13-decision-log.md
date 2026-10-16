@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-457 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-458 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -465,6 +465,7 @@
 | 455 | Inventory reports are worked out from the stock ledger when asked: sell-through over 7, 30 or 90 days, how long ago the stock on hand last sold with its cost, and what ran out and for how long | Accepted |
 | 456 | The admin's Analytics page shows the stock over its period: sell-through, how long ago the stock on hand last sold, what ran out, and the variants listed three ways | Accepted |
 | 457 | Hatti Base's sign-up pop-up asks for a shopper's number on WhatsApp through Shopify's customer form, after some seconds or as they leave, stays away once closed or signed up, and gives the shop's code to those who sign up | Accepted |
+| 458 | A broadcast goes by SMS too: the shop's own words from Hatti's shared sender, to those who agreed to hear by SMS, in marketing hours, each message ending on a link to a page that stops the shop's SMS to the number | Accepted |
 
 ---
 
@@ -17430,3 +17431,45 @@
   * **A form of the platform's outside the theme:** shops could not place or word it, and
     themes would not see it in the editor.
   * **On by default:** a pop-up the shop has not chosen interrupts every new shopper.
+
+## ADR-458 · A broadcast goes by SMS too: the shop's own words from Hatti's shared sender, to those who agreed to hear by SMS, in marketing hours, each message ending on a link to a page that stops the shop's SMS to the number
+
+* **Context:**
+  * MKT-02 asks for SMS campaigns from a shared or branded sender.
+  * Broadcasts go on WhatsApp alone, from the shop's own number with its own templates
+    (ADR-421, ADR-422). Customers' consent is kept by channel, SMS among them (CUS-04).
+  * Hatti sends SMS through its own gateway, from one shared sender, charged to the shop's
+    credit by the parts each message goes in (ADR-155).
+  * SMS brings no reply back to Hatti, so a customer cannot answer "STOP" as on WhatsApp
+    (MSG-09).
+* **Decision:**
+  * **A broadcast has a channel** (migration 0211): WhatsApp, with one of the shop's
+    templates, as before; or SMS, with the shop's own words, up to 320 characters, and the
+    language of what Hatti adds to them. The rest is the same: a name, a segment or none, a
+    time up to 30 days ahead, cancelled while it is not yet sent.
+  * **Who an SMS campaign reaches:** the segment's customers who agreed to hear from the shop
+    by SMS (`sms_subscription_status = subscribed`), at the time it goes.
+  * **Each message says** "Zari: {the shop's words} To stop: https://hatti.pk/s/…", in
+    English or Urdu. The link is the message's own ID, 22 characters.
+  * **The link's page** (`/s/<token>` on the core's own address) names the shop and the number,
+    masked, and asks first. A phone's link preview stops nothing. The customer's tap stops the
+    shop's SMS to the number: kept as WhatsApp's "STOP" is, and what is still to go to it there
+    goes no more. A link to no SMS campaign's message is not known.
+  * **Sending:** the worker queues an SMS campaign as it queues a broadcast. Its messages go by
+    Hatti's SMS gateway, in the hours marketing may go, and nothing goes in their place. Each is
+    charged from the shop's credit as a marketing message of its parts.
+  * **The estimate** says the parts each message goes in, its words, the shop's name and the
+    link counted, and prices them.
+* **Consequences:**
+  * A shop reaches customers who agreed to SMS but not WhatsApp, at a price per part it sees
+    first.
+  * Not yet: the admin's page for SMS campaigns; a branded sender, which a shop registers with
+    the networks (PTA's masking).
+  * PTA's own do-not-call register still applies; the networks enforce it.
+* **Alternatives:**
+  * **A reply of "STOP" by SMS:** the shared sender cannot receive replies; a short code that
+    could is not Hatti's yet.
+  * **A link that stops at once:** a phone that previews links would stop the customer's SMS
+    for them.
+  * **SMS campaigns kept apart from broadcasts:** their scheduling, queuing, counting and
+    cancelling would be written twice.

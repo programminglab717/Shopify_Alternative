@@ -14,6 +14,7 @@ import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { BroadcastsService, type BroadcastRecord } from '../broadcasts.service.js';
 import {
   Broadcast,
+  BroadcastChannel,
   BroadcastConnection,
   BroadcastCounts,
   BroadcastEdge,
@@ -29,7 +30,8 @@ export class BroadcastResolver {
   constructor(private readonly service: BroadcastsService) {}
 
   @Query(() => BroadcastConnection, {
-    description: "The shop's WhatsApp broadcasts, the latest first, with how each went.",
+    description:
+      "The shop's broadcasts, on WhatsApp and by SMS, the latest first, with how each went.",
   })
   @RequireScopes('read_marketing_events')
   async broadcasts(
@@ -76,15 +78,19 @@ export class BroadcastResolver {
   @Mutation(() => BroadcastPayload, {
     description:
       "Schedules a broadcast of one of the shop's approved templates, to a segment's customers " +
-      'who agreed to hear from it on WhatsApp, or to all who did: now, or up to 30 days ahead.',
+      'who agreed to hear from it on WhatsApp, or to all who did; or of its own words by SMS, to ' +
+      'those who agreed to hear by SMS: now, or up to 30 days ahead.',
   })
   @RequireScopes('write_marketing_events')
   async broadcastCreate(
     @CurrentTenant() tenant: TenantContext,
     @Args('input') input: BroadcastInput,
   ): Promise<BroadcastPayload> {
-    const templateId = tryFromPublicId(input.templateId, 'whatsAppTemplate');
-    if (!templateId) throw badUserInput(`Invalid template id: ${input.templateId.slice(0, 64)}`);
+    let templateId: string | null = null;
+    if (input.templateId) {
+      templateId = tryFromPublicId(input.templateId, 'whatsAppTemplate');
+      if (!templateId) throw badUserInput(`Invalid template id: ${input.templateId.slice(0, 64)}`);
+    }
     let segmentId: string | null = null;
     if (input.segmentId) {
       segmentId = tryFromPublicId(input.segmentId, 'segment');
@@ -92,7 +98,10 @@ export class BroadcastResolver {
     }
     const result = await this.service.create(tenant, {
       name: input.name,
+      channel: input.channel === BroadcastChannel.SMS ? 'sms' : 'whatsapp',
       templateId,
+      text: input.text ?? null,
+      language: input.language ? (input.language.toLowerCase() as 'en' | 'ur') : null,
       segmentId,
       sendAt: input.sendAt ?? null,
     });
@@ -130,7 +139,8 @@ export function toBroadcast(record: BroadcastRecord): Broadcast {
   return Object.assign(new Broadcast(), {
     ...record,
     id: toPublicId('broadcast', record.id),
-    templateId: toPublicId('whatsAppTemplate', record.templateId),
+    channel: record.channel.toUpperCase() as BroadcastChannel,
+    templateId: record.templateId && toPublicId('whatsAppTemplate', record.templateId),
     templateLanguage: record.templateLanguage.toUpperCase() as MessageLanguage,
     segmentId: record.segmentId && toPublicId('segment', record.segmentId),
     status: record.status.toUpperCase() as BroadcastStatus,

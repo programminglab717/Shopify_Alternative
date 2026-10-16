@@ -52,6 +52,7 @@ export enum MessageKind {
   STORE_EXPORT_READY = 'STORE_EXPORT_READY',
   BROADCAST = 'BROADCAST',
   AUTOMATION = 'AUTOMATION',
+  SMS_BROADCAST = 'SMS_BROADCAST',
 }
 
 registerEnumType(MessageKind, {
@@ -251,6 +252,11 @@ registerEnumType(MessageKind, {
       description:
         "Sent by one of the shop's automations, a welcome or a win-back, from its own WhatsApp " +
         'number to a customer who agreed to hear from it there (ADR-425): never by SMS.',
+    },
+    SMS_BROADCAST: {
+      description:
+        "One of the shop's SMS campaigns, its own words from Hatti's shared sender to a customer " +
+        'who agreed to hear from it by SMS, with a link to stop (ADR-458).',
     },
   },
 });

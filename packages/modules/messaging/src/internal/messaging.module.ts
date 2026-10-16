@@ -8,6 +8,7 @@ import { AutomationResolver } from './graphql/automation.resolver.js';
 import { BroadcastResolver } from './graphql/broadcast.resolver.js';
 import { MessagingResolver } from './graphql/messaging.resolver.js';
 import { MessagesService } from './messages.service.js';
+import { StopLinkController } from './stop.controller.js';
 import { MessagingSettingsService } from './settings.service.js';
 import { WhatsAppAccountResolver } from './graphql/whatsapp-account.resolver.js';
 import { WhatsAppTemplateResolver } from './graphql/whatsapp-template.resolver.js';
@@ -34,7 +35,7 @@ export class MessagingModule {
     return {
       module: MessagingModule,
       imports: [CustomersModule],
-      controllers: [WhatsAppWebhookController],
+      controllers: [WhatsAppWebhookController, StopLinkController],
       providers: [
         { provide: WHATSAPP_WEBHOOK, useValue: options.whatsapp },
         { provide: WHATSAPP_SIGNUP, useValue: options.signup ?? null },

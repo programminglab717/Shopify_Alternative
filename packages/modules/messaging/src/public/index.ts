@@ -64,6 +64,7 @@ export {
   PLATFORM_MESSAGE_KINDS,
   SECRET_KINDS,
   TEMPLATES,
+  MARKETING_KINDS,
   WHATSAPP_ONLY_KINDS,
   asksToStop,
   messageEmail,
@@ -123,9 +124,12 @@ export {
 } from '../internal/whatsapp-templates.service.js';
 export {
   BROADCAST_AHEAD_DAYS,
+  BROADCAST_CHANNELS,
   BROADCAST_STATUSES,
   BroadcastsService,
+  SMS_BROADCAST_MAX,
   audienceQuery,
+  type BroadcastChannel,
   type BroadcastCounts,
   type BroadcastRound,
   type BroadcastInput,
@@ -156,3 +160,13 @@ export {
   type StockWatchOutcome,
   type StockWatchRecord,
 } from '../internal/stock-watches.service.js';
+export {
+  STOP_LINK_PATH,
+  messageIdOf,
+  stopLinkPage,
+  stopToken,
+  type StopLinkView,
+} from '../internal/stop-links.js';
+export { StopLinkController } from '../internal/stop.controller.js';
+export { BroadcastChannel as BroadcastChannelEnum } from '../internal/graphql/broadcast.types.js';
+export { MessageLanguage as MessageLanguageEnum } from '../internal/graphql/messaging.types.js';

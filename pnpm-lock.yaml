@@ -1176,6 +1176,9 @@ importers:
       '@hatti/db':
         specifier: workspace:*
         version: link:../../platform/db
+      '@hatti/documents':
+        specifier: workspace:*
+        version: link:../../platform/documents
       '@hatti/events':
         specifier: workspace:*
         version: link:../../platform/events

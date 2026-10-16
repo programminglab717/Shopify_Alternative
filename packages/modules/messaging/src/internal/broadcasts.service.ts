@@ -1,5 +1,6 @@
 import {
   InputChecker,
+  PublicSite,
   actorColumnsOf,
   failOne,
   shopProfile,
@@ -9,7 +10,7 @@ import {
 import { SegmentQueryError, SegmentService } from '@hatti/customers/public';
 import { Database, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import {
   MessagingEvents,
@@ -17,11 +18,20 @@ import {
   type BroadcastSentPayload,
 } from './events.js';
 import { MessagesService } from './messages.service.js';
-import type { MessageLanguage } from './templates.js';
+import { smsParts } from './charges.js';
+import { STOP_LINK_PATH, stopToken } from './stop-links.js';
+import { MESSAGE_LANGUAGES, messageText, type MessageLanguage } from './templates.js';
 import { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
 
 export const BROADCAST_STATUSES = ['scheduled', 'sending', 'sent', 'cancelled', 'failed'] as const;
 export type BroadcastStatus = (typeof BROADCAST_STATUSES)[number];
+
+/** How a broadcast goes: from the shop's own WhatsApp number, or Hatti's SMS sender (ADR-458). */
+export const BROADCAST_CHANNELS = ['whatsapp', 'sms'] as const;
+export type BroadcastChannel = (typeof BROADCAST_CHANNELS)[number];
+
+/** The most an SMS campaign's own words may be: two parts' worth, with what Hatti adds. */
+export const SMS_BROADCAST_MAX = 320;
 
 /** How far ahead a broadcast may be set to go. */
 export const BROADCAST_AHEAD_DAYS = 30;
@@ -58,12 +68,14 @@ export function firstName(name: string | null): string | null {
   return name?.trim().split(/\s+/)[0]?.slice(0, 60) || null;
 }
 
-/** Who a broadcast reaches of a segment: those who agreed to hear from the shop on WhatsApp. */
-const CONSENTED = 'whatsapp_subscription_status = subscribed';
-
-/** The customers a broadcast reaches, in the segment query language (ADR-024). */
-export function audienceQuery(segmentQuery: string | null): string {
-  return segmentQuery ? `(${segmentQuery}) AND ${CONSENTED}` : CONSENTED;
+/** The customers a broadcast reaches, in the segment query language (ADR-024): of the segment, or
+ * all, those who agreed to hear from the shop on its channel. */
+export function audienceQuery(
+  segmentQuery: string | null,
+  channel: BroadcastChannel = 'whatsapp',
+): string {
+  const consented = `${channel}_subscription_status = subscribed`;
+  return segmentQuery ? `(${segmentQuery}) AND ${consented}` : consented;
 }
 
 /** How a broadcast's messages went, by their statuses. */
@@ -79,14 +91,19 @@ export interface BroadcastCounts {
   skipped: number;
 }
 
-/** A broadcast, as the Admin API shows it (ADR-421). */
+/** A broadcast, as the Admin API shows it (ADR-421, ADR-458). */
 export interface BroadcastRecord {
   id: string;
   name: string;
-  templateId: string;
-  templateName: string;
+  channel: BroadcastChannel;
+  /** A WhatsApp broadcast's template; none for SMS. */
+  templateId: string | null;
+  templateName: string | null;
+  /** The template's language; an SMS campaign's, for what Hatti adds to its words. */
   templateLanguage: MessageLanguage;
-  templateBody: string;
+  templateBody: string | null;
+  /** An SMS campaign's own words; none for WhatsApp. */
+  text: string | null;
   segmentId: string | null;
   segmentName: string | null;
   sendAt: Date;
@@ -102,8 +119,13 @@ export interface BroadcastRecord {
 
 export interface BroadcastInput {
   name: string;
-  /** One of the shop's approved templates. */
-  templateId: string;
+  /** WhatsApp unless said. */
+  channel?: BroadcastChannel;
+  /** For WhatsApp: one of the shop's approved templates. */
+  templateId?: string | null;
+  /** For SMS: the shop's own words, and the language of what Hatti adds to them. */
+  text?: string | null;
+  language?: MessageLanguage | null;
   /** None: every customer who agreed to hear from the shop on WhatsApp. */
   segmentId?: string | null;
   /** When it goes; now if not given. */
@@ -114,10 +136,12 @@ type BroadcastRow = {
   id: string;
   after_customer: string | null;
   name: string;
-  template_id: string;
-  template_name: string;
+  channel: BroadcastChannel;
+  template_id: string | null;
+  template_name: string | null;
   template_language: MessageLanguage;
-  template_body: string;
+  template_body: string | null;
+  text: string | null;
   segment_id: string | null;
   segment_name: string | null;
   send_at: string | Date;
@@ -129,9 +153,9 @@ type BroadcastRow = {
   created_at: string | Date;
 };
 
-const COLUMNS = sql`id, after_customer, name, template_id, template_name, template_language, template_body,
-                    segment_id, segment_name, send_at, status, error, recipients, started_at,
-                    finished_at, created_at`;
+const COLUMNS = sql`id, after_customer, name, channel, template_id, template_name, template_language,
+                    template_body, text, segment_id, segment_name, send_at, status, error,
+                    recipients, started_at, finished_at, created_at`;
 
 const NO_COUNTS: BroadcastCounts = {
   pending: 0,
@@ -145,7 +169,9 @@ const NO_COUNTS: BroadcastCounts = {
 /**
  * A shop's WhatsApp broadcasts (MKT-01, ADR-421): one of its own approved templates (ADR-420) to
  * the customers of a segment who agreed to hear from it on WhatsApp, or to all who did, from its
- * own number (ADR-419), now or at a time up to 30 days ahead. The worker queues them in the hours
+ * own number (ADR-419), now or at a time up to 30 days ahead. Or its SMS campaigns (MKT-02,
+ * ADR-458): its own words, from Hatti's shared sender, to those who agreed to hear by SMS, each
+ * with a link to stop. The worker queues them in the hours
  * marketing may go (ADR-422). Until then, and while it queues, a broadcast can be cancelled.
  * Scheduled and cancelled broadcasts are audited, and each is an event.
  */
@@ -156,6 +182,8 @@ export class BroadcastsService {
     private readonly templates: WhatsAppTemplatesService,
     private readonly segments: SegmentService,
     private readonly messages: MessagesService,
+    /** Where SMS campaigns' links to stop are: the core's own address (ADR-458). */
+    @Optional() private readonly site?: PublicSite,
   ) {}
 
   /** The broadcasts due at `at`, whichever shop's, the longest due first: the worker's to queue. */
@@ -187,18 +215,24 @@ export class BroadcastsService {
     if (!hours.open) return { outcome: 'waiting', until: hours.nextOpen };
 
     const tenant = workerTenant(shopId);
-    const template = (await this.templates.list(tenant)).find(
-      (each) => each.id === row.template_id,
-    );
-    if (!template) {
-      return this.#fail(shopId, id, "Its template is gone from the shop's own WhatsApp number");
-    }
-    if (template.status !== 'approved') {
-      return this.#fail(
-        shopId,
-        id,
-        `Meta no longer approves its template: it is ${template.status}`,
+    let named = false;
+    if (row.channel === 'sms') {
+      if (!this.site) return this.#fail(shopId, id, 'SMS campaigns are not set up here');
+    } else {
+      const template = (await this.templates.list(tenant)).find(
+        (each) => each.id === row.template_id,
       );
+      if (!template) {
+        return this.#fail(shopId, id, "Its template is gone from the shop's own WhatsApp number");
+      }
+      if (template.status !== 'approved') {
+        return this.#fail(
+          shopId,
+          id,
+          `Meta no longer approves its template: it is ${template.status}`,
+        );
+      }
+      named = template.body.includes('{{1}}');
     }
     let query: string | null = null;
     if (row.segment_id) {
@@ -208,7 +242,7 @@ export class BroadcastsService {
     }
     let page;
     try {
-      page = await this.segments.members(tenant, audienceQuery(query), {
+      page = await this.segments.members(tenant, audienceQuery(query, row.channel), {
         first: batch,
         after: row.after_customer,
       });
@@ -217,7 +251,6 @@ export class BroadcastsService {
       return this.#fail(shopId, id, `Its segment's query no longer works: ${error.message}`);
     }
 
-    const named = template.body.includes('{{1}}');
     return this.db.tenant(shopId, async (tx) => {
       const { rows } = await tx.execute<BroadcastRow>(sql`
         SELECT ${COLUMNS} FROM messaging.broadcasts
@@ -234,22 +267,25 @@ export class BroadcastsService {
       const { name: shop } = await shopProfile(tx, shopId);
       let queued = 0;
       for (const customer of page.items) {
-        const queuedId = await this.messages.queueIn(tx, shopId, {
-          kind: 'broadcast',
-          recipient: customer.phone,
-          customerId: customer.id,
-          variables: {
-            shop,
-            template: current.template_name,
-            ...(named && {
-              name: firstName(customer.name) ?? NO_NAME[current.template_language],
-            }),
-          },
-          dedupeKey: `broadcast:${id}:${customer.id}`,
-          channel: 'whatsapp',
-          language: current.template_language,
-          broadcastId: id,
-        });
+        const queuedId =
+          current.channel === 'sms'
+            ? await this.#queueSms(tx, shopId, id, current, shop, customer)
+            : await this.messages.queueIn(tx, shopId, {
+                kind: 'broadcast',
+                recipient: customer.phone,
+                customerId: customer.id,
+                variables: {
+                  shop,
+                  template: current.template_name!,
+                  ...(named && {
+                    name: firstName(customer.name) ?? NO_NAME[current.template_language],
+                  }),
+                },
+                dedupeKey: `broadcast:${id}:${customer.id}`,
+                channel: 'whatsapp',
+                language: current.template_language,
+                broadcastId: id,
+              });
         if (queuedId) queued++;
       }
       const done = !page.hasNextPage;
@@ -273,6 +309,38 @@ export class BroadcastsService {
     });
   }
 
+  /**
+   * An SMS campaign's message to a customer (ADR-458): the shop's words from Hatti's sender, its
+   * link to stop made from the message's own ID once it is queued.
+   */
+  async #queueSms(
+    tx: Tx,
+    shopId: string,
+    id: string,
+    row: BroadcastRow,
+    shop: string,
+    customer: { id: string; phone: string },
+  ): Promise<string | null> {
+    const queued = await this.messages.queueIn(tx, shopId, {
+      kind: 'sms_broadcast',
+      recipient: customer.phone,
+      customerId: customer.id,
+      variables: { shop, text: row.text! },
+      dedupeKey: `broadcast:${id}:${customer.id}`,
+      channel: 'sms',
+      language: row.template_language,
+      broadcastId: id,
+    });
+    if (queued) {
+      const url = this.site!.url(`/${STOP_LINK_PATH}/${stopToken(queued)}`);
+      await tx.execute(sql`
+        UPDATE messaging.messages
+           SET variables = variables || jsonb_build_object('url', ${url}::text)
+         WHERE shop_id = ${shopId} AND id = ${queued}`);
+    }
+    return queued;
+  }
+
   async #fail(shopId: string, id: string, error: string): Promise<BroadcastRound> {
     await this.db.tenant(shopId, (tx) =>
       tx.execute(sql`
@@ -285,11 +353,12 @@ export class BroadcastsService {
 
   /**
    * How many customers a broadcast to the segment, or to all, would reach now: those who agreed
-   * to hear from the shop on WhatsApp.
+   * to hear from the shop on its channel.
    */
   async recipientsOf(
     tenant: TenantContext,
     segmentId: string | null,
+    channel: BroadcastChannel = 'whatsapp',
   ): Promise<MutationResult<number>> {
     let query: string | null = null;
     if (segmentId) {
@@ -298,7 +367,7 @@ export class BroadcastsService {
       query = segment.query;
     }
     try {
-      return { ok: true, value: await this.segments.count(tenant, audienceQuery(query)) };
+      return { ok: true, value: await this.segments.count(tenant, audienceQuery(query, channel)) };
     } catch (error) {
       if (!(error instanceof SegmentQueryError)) throw error;
       return failOne(
@@ -307,6 +376,23 @@ export class BroadcastsService {
         `The segment's query no longer works: ${error.message}`,
       );
     }
+  }
+
+  /**
+   * The parts each of an SMS campaign's messages goes in (ADR-458), as gateways charge for them:
+   * its words with the shop's name before them and the link to stop after.
+   */
+  async smsPartsOf(
+    tenant: TenantContext,
+    text: string,
+    language: MessageLanguage = 'en',
+  ): Promise<number> {
+    const { name: shop } = await this.db.tenant(tenant.shopId, (tx) =>
+      shopProfile(tx, tenant.shopId),
+    );
+    const site = this.site ?? new PublicSite('https://hatti.pk');
+    const url = site.url(`/${STOP_LINK_PATH}/${stopToken('00000000-0000-0000-0000-000000000000')}`);
+    return smsParts(messageText('sms_broadcast', language, { shop, text: text.trim(), url }));
   }
 
   /** Schedules a broadcast: checked as it will be sent, the template's words kept with it. */
@@ -327,16 +413,40 @@ export class BroadcastsService {
         `can't be more than ${BROADCAST_AHEAD_DAYS} days ahead`,
       );
     }
+    const channel = input.channel ?? 'whatsapp';
+    let text: string | null = null;
+    let language: MessageLanguage = 'en';
+    if (channel === 'sms') {
+      text = check.text(['input', 'text'], input.text, { max: SMS_BROADCAST_MAX, required: true });
+      if (input.templateId) check.add(['input', 'templateId'], 'INVALID', 'is for WhatsApp alone');
+      if (input.language && !MESSAGE_LANGUAGES.includes(input.language)) {
+        check.add(['input', 'language'], 'INVALID', 'must be en or ur');
+      }
+      language = input.language ?? 'en';
+    } else if (input.text) {
+      check.add(['input', 'text'], 'INVALID', 'is for SMS alone');
+    }
     if (!check.ok || !name) return { ok: false, errors: check.errors };
 
-    const template = (await this.templates.list(tenant)).find(
-      (each) => each.id === input.templateId,
-    );
-    if (!template) {
-      return failOne(['input', 'templateId'], 'NOT_FOUND', "No such template on the shop's number");
-    }
-    if (template.status !== 'approved') {
-      return failOne(['input', 'templateId'], 'INVALID', "Meta hasn't approved this template");
+    let template: { id: string; name: string; language: MessageLanguage; body: string } | null =
+      null;
+    if (channel === 'whatsapp') {
+      const found = (await this.templates.list(tenant)).find(
+        (each) => each.id === input.templateId,
+      );
+      if (!found) {
+        return failOne(
+          ['input', 'templateId'],
+          'NOT_FOUND',
+          "No such template on the shop's number",
+        );
+      }
+      if (found.status !== 'approved') {
+        return failOne(['input', 'templateId'], 'INVALID', "Meta hasn't approved this template");
+      }
+      template = found;
+    } else if (!this.site) {
+      return failOne(['input', 'channel'], 'INVALID', 'SMS campaigns are not set up here');
     }
     let segment: { id: string; name: string } | null = null;
     if (input.segmentId) {
@@ -348,11 +458,12 @@ export class BroadcastsService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<BroadcastRow>(sql`
         INSERT INTO messaging.broadcasts
-               (shop_id, name, template_id, template_name, template_language, template_body,
-                segment_id, segment_name, send_at)
-        VALUES (${tenant.shopId}, ${name}, ${template.id}, ${template.name}, ${template.language},
-                ${template.body}, ${segment?.id ?? null}, ${segment?.name ?? null},
-                ${sendAt.toISOString()})
+               (shop_id, name, channel, template_id, template_name, template_language,
+                template_body, text, segment_id, segment_name, send_at)
+        VALUES (${tenant.shopId}, ${name}, ${channel}, ${template?.id ?? null},
+                ${template?.name ?? null}, ${template?.language ?? language},
+                ${template?.body ?? null}, ${text}, ${segment?.id ?? null},
+                ${segment?.name ?? null}, ${sendAt.toISOString()})
         RETURNING ${COLUMNS}`);
       const row = rows[0]!;
       await this.#changed(tx, tenant, row, MessagingEvents.BroadcastScheduled);
@@ -448,6 +559,7 @@ export class BroadcastsService {
       ...actor,
       details: {
         name: row.name,
+        channel: row.channel,
         template: row.template_name,
         language: row.template_language,
         segment: row.segment_name,
@@ -493,10 +605,12 @@ function toRecord(row: BroadcastRow, counts: BroadcastCounts): BroadcastRecord {
   return {
     id: row.id,
     name: row.name,
+    channel: row.channel,
     templateId: row.template_id,
     templateName: row.template_name,
     templateLanguage: row.template_language,
     templateBody: row.template_body,
+    text: row.text,
     segmentId: row.segment_id,
     segmentName: row.segment_name,
     sendAt: toDate(row.send_at),

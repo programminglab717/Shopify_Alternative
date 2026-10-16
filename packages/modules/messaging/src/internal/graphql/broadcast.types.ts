@@ -31,12 +31,30 @@ registerEnumType(BroadcastStatus, {
   },
 });
 
+export enum BroadcastChannel {
+  WHATSAPP = 'WHATSAPP',
+  SMS = 'SMS',
+}
+
+registerEnumType(BroadcastChannel, {
+  name: 'BroadcastChannel',
+  description: 'How a broadcast goes (ADR-458).',
+  valuesMap: {
+    WHATSAPP: { description: "One of the shop's approved templates, from its own number." },
+    SMS: {
+      description: "The shop's own words, from Hatti's shared SMS sender, with a link to stop.",
+    },
+  },
+});
+
 @ObjectType({ description: "How a broadcast's messages went." })
 export class BroadcastCounts {
   @Field(() => Int, { description: "Queued and waiting: for their turn, or the shop's credit." })
   pending!: number;
 
-  @Field(() => Int, { description: 'Taken by WhatsApp, the delivered and read among them.' })
+  @Field(() => Int, {
+    description: 'Taken by WhatsApp or the SMS gateway, the delivered and read among them.',
+  })
   sent!: number;
 
   @Field(() => Int)
@@ -56,8 +74,9 @@ export class BroadcastCounts {
 
 @ObjectType({
   description:
-    "A WhatsApp broadcast (MKT-01, ADR-421): one of the shop's approved templates to the " +
-    'customers of a segment who agreed to hear from it on WhatsApp, from its own number.',
+    "A broadcast (MKT-01, ADR-421): one of the shop's approved templates to the customers of a " +
+    'segment who agreed to hear from it on WhatsApp, from its own number; or its own words by ' +
+    "SMS to those who agreed to hear by SMS, from Hatti's shared sender (MKT-02, ADR-458).",
 })
 export class Broadcast {
   @Field(() => ID)
@@ -66,17 +85,36 @@ export class Broadcast {
   @Field()
   name!: string;
 
-  @Field(() => ID, { description: 'The template chosen; deleted since, the broadcast fails.' })
-  templateId!: string;
+  @Field(() => BroadcastChannel)
+  channel!: BroadcastChannel;
 
-  @Field()
-  templateName!: string;
+  @Field(() => ID, {
+    nullable: true,
+    description: 'The template chosen, for WhatsApp; deleted since, the broadcast fails.',
+  })
+  templateId!: string | null;
 
-  @Field(() => MessageLanguage)
+  @Field(() => String, { nullable: true })
+  templateName!: string | null;
+
+  @Field(() => MessageLanguage, {
+    description: "The template's language; for SMS, that of the words Hatti adds to the shop's.",
+  })
   templateLanguage!: MessageLanguage;
 
-  @Field({ description: "What it says; {{1}} is each customer's first name." })
-  templateBody!: string;
+  @Field(() => String, {
+    nullable: true,
+    description: "What a WhatsApp broadcast says; {{1}} is each customer's first name.",
+  })
+  templateBody!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'What an SMS campaign says, after the shop\'s name and before a link to stop: "Zari: ' +
+      '{text} To stop: https://hatti.pk/s/…".',
+  })
+  text!: string | null;
 
   @Field(() => ID, {
     nullable: true,
@@ -149,8 +187,27 @@ export class BroadcastInput {
   @Field()
   name!: string;
 
-  @Field(() => ID, { description: "One of the shop's approved templates." })
-  templateId!: string;
+  @Field(() => BroadcastChannel, { nullable: true, description: 'WhatsApp unless said.' })
+  channel?: BroadcastChannel | null;
+
+  @Field(() => ID, {
+    nullable: true,
+    description: "For WhatsApp: one of the shop's approved templates.",
+  })
+  templateId?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "For SMS: the shop's own words, up to 320 characters.",
+  })
+  text?: string | null;
+
+  @Field(() => MessageLanguage, {
+    nullable: true,
+    description:
+      "For SMS: the language of the words Hatti adds to the shop's; English unless said.",
+  })
+  language?: MessageLanguage | null;
 
   @Field(() => ID, {
     nullable: true,

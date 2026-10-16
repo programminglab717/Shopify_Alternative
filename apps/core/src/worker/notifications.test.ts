@@ -1176,6 +1176,53 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     expect((await queued()).filter((message) => message.channel === 'sms')).toEqual([]);
   });
 
+  it("sends an SMS campaign's messages by SMS in marketing hours, its link to stop at the end (ADR-458)", async () => {
+    const night = new Date('2026-10-13T17:00:00.000Z');
+    const morning = new Date('2026-10-14T05:00:00.000Z');
+    await messages().queue(shopId, {
+      kind: 'sms_broadcast',
+      recipient: AYESHA,
+      channel: 'sms',
+      language: 'en',
+      dedupeKey: `broadcast:${newId()}:${AYESHA}`,
+      variables: {
+        shop: 'Zari Fashions',
+        text: 'Eid lawn is 20% off this week.',
+        url: 'https://hatti.pk/s/AZnL4mUqdy6Jc3B0n5qX2w',
+      },
+    });
+    await admin.query(
+      `UPDATE messaging.messages SET created_at = $1, next_attempt_at = $1 WHERE shop_id = $2`,
+      [new Date(night.getTime() - 60_000), shopId],
+    );
+    const sending = () =>
+      new MessagesSender({
+        messages: messages(),
+        providers: { whatsapp: whatsapp(), sms: sms() },
+        // An SMS campaign asks for no number of the shop's own.
+        shopNumbers: () => Promise.reject(new Error('not asked for SMS')),
+      });
+
+    // At night it waits for the morning.
+    expect(await sending().sweep(night)).toBe(0);
+    expect(requests).toEqual([]);
+    expect((await queued()).map((message) => message.error)).toEqual([
+      'Waiting for marketing hours',
+    ]);
+    // In the morning, by Hatti's SMS gateway, the shop's name first and the link last.
+    expect(await sending().sweep(morning)).toBe(1);
+    expect(requests.map((request) => request.url)).toEqual(['/sms']);
+    expect(requests[0]!.body).toMatchObject({
+      to: AYESHA,
+      text:
+        'Zari Fashions: Eid lawn is 20% off this week. To stop: ' +
+        'https://hatti.pk/s/AZnL4mUqdy6Jc3B0n5qX2w',
+    });
+    expect((await queued()).map((message) => [message.channel, message.status])).toEqual([
+      ['sms', 'sent'],
+    ]);
+  });
+
   it("emails an order's news to the address its customer gave too, at no cost to the shop (ADR-181)", async () => {
     const order = await placeOnline({ email: 'Ayesha@Example.pk' });
     // None given: nothing more.

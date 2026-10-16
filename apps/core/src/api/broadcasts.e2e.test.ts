@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
+import { stopToken } from '@hatti/messaging/public';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -205,5 +206,76 @@ describe.skipIf(!server)('Admin GraphQL API: WhatsApp broadcasts (MKT-01, ADR-42
         })
       ).status,
     ).toBe('CANCELLED');
+  });
+
+  it("schedules an SMS campaign of the shop's words, estimated by its parts, and its link stops it (ADR-458)", async () => {
+    await admin.query(
+      `UPDATE customers.customers SET sms_consent = 'subscribed'
+        WHERE shop_id = $1 AND phone = '+923001110003'`,
+      [shop],
+    );
+    const estimate = await data(
+      tokens.reader,
+      `query ($channel: BroadcastChannel, $text: String) {
+        broadcastEstimate(channel: $channel, text: $text) { recipients partsPerMessage }
+      }`,
+      { channel: 'SMS', text: 'Eid lawn is 20% off this week.' },
+    );
+    expect(estimate).toEqual({ recipients: 1, partsPerMessage: 1 });
+    const created = await data(
+      tokens.owner,
+      `mutation ($input: BroadcastInput!) {
+        broadcastCreate(input: $input) {
+          broadcast { channel text templateId templateName templateLanguage status }
+          userErrors { field message }
+        }
+      }`,
+      { input: { name: 'Eid by SMS', channel: 'SMS', text: 'Eid lawn is 20% off this week.' } },
+    );
+    expect(created).toEqual({
+      broadcast: {
+        channel: 'SMS',
+        text: 'Eid lawn is 20% off this week.',
+        templateId: null,
+        templateName: null,
+        templateLanguage: 'EN',
+        status: 'SCHEDULED',
+      },
+      userErrors: [],
+    });
+    const refused = await data(
+      tokens.owner,
+      `mutation ($input: BroadcastInput!) {
+        broadcastCreate(input: $input) { broadcast { id } userErrors { field message } }
+      }`,
+      { input: { name: 'No words', channel: 'SMS' } },
+    );
+    expect(refused.userErrors).toEqual([
+      { field: ['input', 'text'], message: "Text can't be blank" },
+    ]);
+
+    // Its message's link to stop: a page that asks, then stops the shop's SMS to the number.
+    const { rows } = await admin.query<{ id: string }>(
+      `INSERT INTO messaging.messages (shop_id, kind, channel, recipient, language, variables,
+                                       dedupe_key)
+       VALUES ($1, 'sms_broadcast', 'sms', '+923001110003', 'en',
+               '{"shop": "Zari", "text": "Eid lawn is 20% off."}', 'broadcast:e2e')
+       RETURNING id`,
+      [shop],
+    );
+    const link = `/s/${stopToken(rows[0]!.id)}`;
+    const asked = await app.inject({ method: 'GET', url: link });
+    expect(asked.statusCode).toBe(200);
+    expect(asked.headers['cache-control']).toBe('no-store');
+    expect(asked.body).toContain('Stop Zari sending offers by SMS to 0300 ••••003?');
+    const stopped = await app.inject({ method: 'POST', url: link });
+    expect(stopped.statusCode).toBe(200);
+    expect(stopped.body).toContain('Zari will send no more offers by SMS to 0300 ••••003.');
+    const optOuts = await admin.query(
+      `SELECT channel, recipient FROM messaging.opt_outs WHERE shop_id = $1`,
+      [shop],
+    );
+    expect(optOuts.rows).toEqual([{ channel: 'sms', recipient: '+923001110003' }]);
+    expect((await app.inject({ method: 'GET', url: '/s/not-a-link' })).statusCode).toBe(404);
   });
 });

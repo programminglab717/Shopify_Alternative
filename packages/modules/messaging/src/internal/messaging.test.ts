@@ -506,6 +506,8 @@ describe("Messages' words", () => {
       'store_export_ready',
       'broadcast',
       'automation',
+      // The shop's SMS campaign, which its customer can stop by its link (ADR-458).
+      'sms_broadcast',
     ]);
   });
 

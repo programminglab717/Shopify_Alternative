@@ -879,9 +879,10 @@ type BlogUpdatePayload {
 }
 
 """
-A WhatsApp broadcast (MKT-01, ADR-421): one of the shop's approved templates to the customers of a segment who agreed to hear from it on WhatsApp, from its own number.
+A broadcast (MKT-01, ADR-421): one of the shop's approved templates to the customers of a segment who agreed to hear from it on WhatsApp, from its own number; or its own words by SMS to those who agreed to hear by SMS, from Hatti's shared sender (MKT-02, ADR-458).
 """
 type Broadcast {
+  channel: BroadcastChannel!
   counts: BroadcastCounts!
   createdAt: DateTime!
   error: String
@@ -905,13 +906,33 @@ type Broadcast {
   startedAt: DateTime
   status: BroadcastStatus!
 
-  """What it says; {{1}} is each customer's first name."""
-  templateBody: String!
+  """What a WhatsApp broadcast says; {{1}} is each customer's first name."""
+  templateBody: String
 
-  """The template chosen; deleted since, the broadcast fails."""
-  templateId: ID!
+  """The template chosen, for WhatsApp; deleted since, the broadcast fails."""
+  templateId: ID
+
+  """
+  The template's language; for SMS, that of the words Hatti adds to the shop's.
+  """
   templateLanguage: MessageLanguage!
-  templateName: String!
+  templateName: String
+
+  """
+  What an SMS campaign says, after the shop's name and before a link to stop: "Zari: {text} To stop: https://hatti.pk/s/…".
+  """
+  text: String
+}
+
+"""How a broadcast goes (ADR-458)."""
+enum BroadcastChannel {
+  """
+  The shop's own words, from Hatti's shared SMS sender, with a link to stop.
+  """
+  SMS
+
+  """One of the shop's approved templates, from its own number."""
+  WHATSAPP
 }
 
 type BroadcastConnection {
@@ -929,7 +950,9 @@ type BroadcastCounts {
   pending: Int!
   read: Int!
 
-  """Taken by WhatsApp, the delivered and read among them."""
+  """
+  Taken by WhatsApp or the SMS gateway, the delivered and read among them.
+  """
   sent: Int!
 
   """
@@ -949,14 +972,26 @@ What a broadcast would reach and cost now (MKT-01, ADR-421): "This broadcast to 
 type BroadcastEstimate {
   cost: Money!
 
+  """
+  The parts each SMS goes in, as its words, the shop's name and the link to stop need; one on WhatsApp.
+  """
+  partsPerMessage: Int!
+
   """A marketing message's price, Hatti's fee in it."""
   pricePerMessage: Money!
 
-  """The customers who agreed to hear from the shop on WhatsApp."""
+  """The customers who agreed to hear from the shop on WhatsApp, or by SMS."""
   recipients: Int!
 }
 
 input BroadcastInput {
+  """WhatsApp unless said."""
+  channel: BroadcastChannel
+
+  """
+  For SMS: the language of the words Hatti adds to the shop's; English unless said.
+  """
+  language: MessageLanguage
   name: String!
 
   """The segment it goes to; none for every customer who agreed to hear."""
@@ -965,8 +1000,11 @@ input BroadcastInput {
   """When it goes, up to 30 days ahead; now if not given."""
   sendAt: DateTime
 
-  """One of the shop's approved templates."""
-  templateId: ID!
+  """For WhatsApp: one of the shop's approved templates."""
+  templateId: ID
+
+  """For SMS: the shop's own words, up to 320 characters."""
+  text: String
 }
 
 type BroadcastPayload {
@@ -6227,6 +6265,11 @@ enum MessageKind {
   REVIEW_REQUEST
 
   """
+  One of the shop's SMS campaigns, its own words from Hatti's shared sender to a customer who agreed to hear from it by SMS, with a link to stop (ADR-458).
+  """
+  SMS_BROADCAST
+
+  """
   For the shop: a variant fell to its low-stock threshold for sale online (INV-01), once a spell, until it is stocked above it again.
   """
   STOCK_LOW
@@ -6489,7 +6532,7 @@ type Mutation {
   broadcastCancel(id: ID!): BroadcastPayload!
 
   """
-  Schedules a broadcast of one of the shop's approved templates, to a segment's customers who agreed to hear from it on WhatsApp, or to all who did: now, or up to 30 days ahead.
+  Schedules a broadcast of one of the shop's approved templates, to a segment's customers who agreed to hear from it on WhatsApp, or to all who did; or of its own words by SMS, to those who agreed to hear by SMS: now, or up to 30 days ahead.
   """
   broadcastCreate(input: BroadcastInput!): BroadcastPayload!
 
@@ -10683,11 +10726,13 @@ type Query {
   broadcast(id: ID!): Broadcast
 
   """
-  What a broadcast to the segment's customers who agreed to hear on WhatsApp, or to all who did, would reach and cost now.
+  What a broadcast to the segment's customers who agreed to hear on WhatsApp, or to all who did, would reach and cost now; or an SMS campaign of these words, to those who agreed to hear by SMS (ADR-458).
   """
-  broadcastEstimate(segmentId: ID): BroadcastEstimate!
+  broadcastEstimate(channel: BroadcastChannel, language: MessageLanguage, segmentId: ID, text: String): BroadcastEstimate!
 
-  """The shop's WhatsApp broadcasts, the latest first, with how each went."""
+  """
+  The shop's broadcasts, on WhatsApp and by SMS, the latest first, with how each went.
+  """
   broadcasts(after: String, first: Int): BroadcastConnection!
 
   """The shop's rules for cash on delivery at checkout."""

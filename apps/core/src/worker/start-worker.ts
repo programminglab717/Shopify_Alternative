@@ -583,9 +583,14 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         logger,
       ).start(config.SWEEP_INTERVAL_MS);
       closers.push(() => inquiries.stop());
-      // Shops' broadcasts queued once their time comes, in marketing hours (ADR-422).
+      // Shops' broadcasts queued once their time comes, in marketing hours (ADR-422), and their SMS
+      // campaigns with them (ADR-458).
       const broadcasts = new BroadcastQueue(
-        workerBroadcasts(database, config.ENCRYPTION_KEYS),
+        workerBroadcasts(
+          database,
+          config.ENCRYPTION_KEYS,
+          new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
+        ),
         logger,
       ).start(config.SCHEDULED_INTERVAL_MS);
       closers.push(() => broadcasts.stop());
@@ -630,13 +635,17 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
   };
 }
 
-/** Shops' broadcasts as the worker queues them (ADR-422): their templates on their own numbers. */
-function workerBroadcasts(database: Database, box: SecretBox): BroadcastsService {
+/**
+ * Shops' broadcasts as the worker queues them (ADR-422): their templates on their own numbers; and
+ * their SMS campaigns, each message's link to stop on the core's own address (ADR-458).
+ */
+function workerBroadcasts(database: Database, box: SecretBox, site: PublicSite): BroadcastsService {
   return new BroadcastsService(
     database,
     workerTemplates(database, box),
     workerSegments(database),
     new MessagesService(database),
+    site,
   );
 }
 

@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
-import type { MutationResult, TenantContext } from '@hatti/api';
+import { PublicSite, type MutationResult, type TenantContext } from '@hatti/api';
 import { SecretBox } from '@hatti/crypto';
 import { SegmentFieldRegistry, SegmentService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
@@ -11,6 +11,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BroadcastsService, audienceQuery } from './broadcasts.service.js';
 import { marketingHours } from './marketing-hours.js';
 import { MessagesService } from './messages.service.js';
+import { messageIdOf, stopLinkPage, stopToken } from './stop-links.js';
+import { messageText } from './templates.js';
 import { FakeGraph, NUMBER, WABA } from './test-support.js';
 import { WhatsAppAccountsService } from './whatsapp-accounts.service.js';
 import { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
@@ -369,5 +371,110 @@ describe.skipIf(!server)('WhatsApp broadcasts (MKT-01, ADR-421)', () => {
       outcome: 'failed',
       error: "Its template is gone from the shop's own WhatsApp number",
     });
+  });
+
+  it("sends an SMS campaign of the shop's words to those who agreed to hear by SMS, each with a link to stop (ADR-458)", async () => {
+    const sms = new BroadcastsService(
+      db,
+      templates,
+      segments,
+      new MessagesService(db),
+      new PublicSite('https://hatti.pk'),
+    );
+    const words = 'Eid lawn is 20% off this week.';
+    // Without the core's address for its links, none is taken.
+    const unset = await broadcasts.create(a, { name: 'SMS', channel: 'sms', text: words }, NOW);
+    expect(unset.ok || unset.errors[0]!.message).toBe('SMS campaigns are not set up here');
+    const wrong = await sms.create(
+      a,
+      { name: 'SMS', channel: 'sms', text: 'x'.repeat(321), templateId: approved },
+      NOW,
+    );
+    expect(wrong.ok || wrong.errors.map((error) => [error.field.at(-1), error.code])).toEqual([
+      ['text', 'TOO_LONG'],
+      ['templateId', 'INVALID'],
+    ]);
+    expect((await sms.create(a, { name: 'SMS', channel: 'sms', text: ' ' }, NOW)).ok).toBe(false);
+
+    await admin.query(
+      `UPDATE customers.customers SET sms_consent = 'subscribed'
+        WHERE shop_id = $1 AND phone IN ('+923001110002', '+923001110004')`,
+      [a.shopId],
+    );
+    expect(audienceQuery(null, 'sms')).toBe('sms_subscription_status = subscribed');
+    expect(unwrap(await sms.recipientsOf(a, null, 'sms'))).toBe(2);
+    expect(unwrap(await sms.recipientsOf(a, vip, 'sms'))).toBe(1);
+    // Its words, the shop's name before them and the link after: one part.
+    expect(await sms.smsPartsOf(a, words)).toBe(1);
+    expect(await sms.smsPartsOf(a, 'x'.repeat(320))).toBe(3);
+
+    const campaign = unwrap(
+      await sms.create(a, { name: 'Eid by SMS', channel: 'sms', text: words, segmentId: vip }, NOW),
+    );
+    expect(campaign).toMatchObject({
+      channel: 'sms',
+      text: words,
+      templateId: null,
+      templateBody: null,
+      templateLanguage: 'en',
+      segmentName: 'VIPs',
+    });
+    expect(await sms.queueNext(a.shopId, campaign.id, NOW)).toEqual({
+      outcome: 'queued',
+      queued: 1,
+      done: true,
+    });
+    const { rows } = await admin.query<{
+      id: string;
+      kind: string;
+      channel: string;
+      recipient: string;
+      variables: Record<string, string>;
+    }>(
+      `SELECT id, kind, channel, recipient, variables FROM messaging.messages
+        WHERE broadcast_id = $1`,
+      [campaign.id],
+    );
+    const [message] = rows;
+    const token = stopToken(message!.id);
+    expect(rows).toEqual([
+      {
+        id: message!.id,
+        kind: 'sms_broadcast',
+        channel: 'sms',
+        recipient: '+923001110004',
+        variables: { shop: 'A', text: words, url: `https://hatti.pk/s/${token}` },
+      },
+    ]);
+    expect(token).toMatch(/^[\w-]{22}$/);
+    expect(messageIdOf(token)).toBe(message!.id);
+    expect(messageIdOf('not-a-token')).toBeNull();
+    expect(messageText('sms_broadcast', 'en', message!.variables as never)).toBe(
+      `A: ${words} To stop: https://hatti.pk/s/${token}`,
+    );
+
+    // The link asks first, then stops the shop's SMS to the number, what is still to go with it.
+    const messages = new MessagesService(db);
+    const view = await messages.stopLink(message!.id);
+    expect(view).toEqual({ shop: 'A', phone: '0300 ••••004', language: 'en', stopped: false });
+    expect(stopLinkPage(view).html).toContain('Stop A sending offers by SMS to 0300 ••••004?');
+    expect(stopLinkPage(view).html).toContain('<form method="post"');
+    expect(await messages.stopByLink(message!.id)).toMatchObject({ stopped: true });
+    expect(await messages.stopLink(message!.id)).toMatchObject({ stopped: true });
+    expect(stopLinkPage({ ...view!, stopped: true }).html).toContain(
+      'A will send no more offers by SMS to 0300 ••••004.',
+    );
+    const after = await admin.query<{ status: string }>(
+      'SELECT status FROM messaging.messages WHERE id = $1',
+      [message!.id],
+    );
+    expect(after.rows).toEqual([{ status: 'skipped' }]);
+    expect(await messages.optedOut(a.shopId, 'sms', ['+923001110004'])).toEqual(
+      new Set(['+923001110004']),
+    );
+    expect(await messages.optedOut(a.shopId, 'whatsapp', ['+923001110004'])).toEqual(new Set());
+    // A link to no SMS campaign's message is not known.
+    expect(await messages.stopLink(newId())).toBeNull();
+    expect(stopLinkPage(null).status).toBe(404);
   });
 });

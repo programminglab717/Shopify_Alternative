@@ -5,6 +5,7 @@ import { shopLogoOf } from '@hatti/files/public';
 import type { Logger } from '@hatti/logger';
 import {
   MessagesService,
+  MARKETING_KINDS,
   MessagingEvents,
   SECRET_KINDS,
   WHATSAPP_ONLY_KINDS,
@@ -601,7 +602,8 @@ const NO_CREDIT = {
  * (ADR-155): what the credit cannot pay for waits as long, but a code, which works for minutes, is
  * not sent at all. Hatti's own notices to the shop about its bills cost it nothing (ADR-169), nor
  * do its customers' emails (ADR-181). A broadcast's messages go from the shop's own number, in
- * marketing hours alone, and never by SMS (ADR-422).
+ * marketing hours alone, and never by SMS (ADR-422); an SMS campaign's by SMS, in those hours
+ * too, and never by WhatsApp (ADR-458).
  */
 export class MessagesSender {
   constructor(private readonly options: MessagesSenderOptions) {}
@@ -647,7 +649,7 @@ export class MessagesSender {
       // are emails (ADR-181).
       const paid = charges !== undefined && chargedFor(message);
       const price = paid ? charges.priceOf(messageCostOf(message)) : 0n;
-      const outcome = WHATSAPP_ONLY_KINDS.includes(message.kind)
+      const outcome = MARKETING_KINDS.includes(message.kind)
         ? await this.#marketingAttempt(message, marketing, stopped, at, credit, price)
         : await this.#attempt(
             message,
@@ -668,25 +670,28 @@ export class MessagesSender {
 
   /**
    * What a round with broadcasts needs for them (ADR-422): whether marketing may go now in the
-   * shop's time, and the shop's own number. Nothing asked for a round without one.
+   * shop's time, and the shop's own number for those on WhatsApp. Nothing asked for a round
+   * without one.
    */
   async #marketing(
     shopId: string,
     claimed: readonly ClaimedMessage[],
     at: Date,
   ): Promise<Marketing | null> {
-    if (!claimed.some((message) => WHATSAPP_ONLY_KINDS.includes(message.kind))) return null;
+    if (!claimed.some((message) => MARKETING_KINDS.includes(message.kind))) return null;
     const { messages, shopNumbers } = this.options;
     const hours = await messages.marketingHoursOf(shopId, at);
+    const own = claimed.some((message) => WHATSAPP_ONLY_KINDS.includes(message.kind));
     return {
       ...hours,
-      provider: hours.open && shopNumbers ? await shopNumbers(shopId) : null,
+      provider: hours.open && own && shopNumbers ? await shopNumbers(shopId) : null,
     };
   }
 
   /**
    * A broadcast's message (ADR-422): it waits for marketing hours, goes from the shop's own number
-   * or fails, and never goes by SMS. Each is paid for, as any marketing message is.
+   * or fails, and never goes by SMS; an SMS campaign's goes by Hatti's SMS gateway (ADR-458).
+   * Nothing goes in their place. Each is paid for, as any marketing message is.
    */
   async #marketingAttempt(
     message: ClaimedMessage,
@@ -704,13 +709,14 @@ export class MessagesSender {
         nextAttemptAt: marketing.nextOpen,
       };
     }
+    const own = WHATSAPP_ONLY_KINDS.includes(message.kind);
     const outcome = await this.#attempt(
       message,
-      marketing?.provider ?? undefined,
+      own ? (marketing?.provider ?? undefined) : this.options.providers[message.channel],
       stopped,
       at,
       credit === null || credit >= price,
-      NO_SHOP_NUMBER,
+      own ? NO_SHOP_NUMBER : NOT_SET_UP[message.channel],
     );
     return outcome.status === 'failed' ? { ...outcome, replace: false } : outcome;
   }

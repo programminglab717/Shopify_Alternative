@@ -54,6 +54,7 @@ export const MESSAGE_KINDS = [
   'store_export_ready',
   'broadcast',
   'automation',
+  'sms_broadcast',
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
@@ -105,9 +106,10 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'orders_limit_near',
   'orders_limit_reached',
   'store_export_ready',
-  // The shop's own, which it schedules itself (ADR-421), or sets going (ADR-425).
+  // The shop's own, which it schedules itself (ADR-421, ADR-458), or sets going (ADR-425).
   'broadcast',
   'automation',
+  'sms_broadcast',
 ];
 
 /**
@@ -115,6 +117,12 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
  * to hear on WhatsApp, from the shop's own number (ADR-422, ADR-425), and no SMS goes in its place.
  */
 export const WHATSAPP_ONLY_KINDS: readonly MessageKind[] = ['broadcast', 'automation'];
+
+/**
+ * Marketing a customer agreed to hear (CUS-04): it goes in the hours marketing may go alone, and
+ * nothing goes in its place when it cannot (ADR-422, ADR-458).
+ */
+export const MARKETING_KINDS: readonly MessageKind[] = [...WHATSAPP_ONLY_KINDS, 'sms_broadcast'];
 
 /** Messages that send the shop's own template, named in their `template` (ADR-422, ADR-425). */
 const SHOP_TEMPLATE_KINDS: readonly AnyMessageKind[] = WHATSAPP_ONLY_KINDS;
@@ -233,6 +241,8 @@ export interface MessageVariables {
   template?: string;
   /** For an automation (ADR-425): which of the shop's recipes sent it, "welcome" or "win_back". */
   automation?: string;
+  /** For an SMS campaign (ADR-458): the shop's own words, and in `url` the link to stop. */
+  text?: string;
   /**
    * For the offer to a shopper who left a checkout (ADR-426): the shop's discount code, "EID10",
    * and what it takes off their items, "10%" or "Rs 500".
@@ -859,6 +869,16 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: '{shop}: {template}',
       ur: '{shop}: {template}',
+    },
+  },
+  // The shop's SMS campaign (ADR-458): its words, then the link to stop, which the text ends on.
+  sms_broadcast: {
+    whatsapp: '',
+    category: 'marketing',
+    parameters: [],
+    text: {
+      en: '{shop}: {text} To stop:',
+      ur: '{shop}: {text} روکنے کے لیے:',
     },
   },
   store_export_ready: {
