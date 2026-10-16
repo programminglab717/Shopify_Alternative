@@ -679,6 +679,15 @@ describe('Carts', () => {
     expect(answer.sections['cart-drawer']).toContain(
       'value="2" min="0" inputmode="numeric" data-line="1"',
     );
+    // What goes with it, asked for as on the cart page, two at most (ADR-440).
+    expect(answer.sections['cart-drawer']).toMatch(
+      new RegExp(
+        `<hatti-cart-upsells[^>]*data-urls="/recommendations/products\\?section_id=cart-upsells&intent=complementary&product_id=${lawn.id}&limit=2"[^>]*data-limit="2"`,
+      ),
+    );
+    expect(answer.sections['cart-drawer']).toContain(
+      '<h2 dir="auto">Goes well with your order</h2>',
+    );
     expect(answer.sections['header-group__header']).toContain('class="header"');
     expect(answer.sections.nothing).toBeNull();
 
@@ -697,6 +706,7 @@ describe('Carts', () => {
     });
     expect(changed.json()).toMatchObject({ item_count: 0 });
     expect(changed.json().sections['cart-drawer']).toContain('آپ کا کارٹ خالی ہے۔');
+    expect(changed.json().sections['cart-drawer']).not.toContain('<hatti-cart-upsells');
 
     // A page's sections, with the cart its cookie names, and never kept.
     core.kept.set('secret-4', cartOf(3));
@@ -788,6 +798,13 @@ describe('Carts', () => {
     expect((await get('/assets/v1/base.css')).headers['cache-control']).toBe(
       'public, max-age=31536000, immutable',
     );
+    // A theme's script, as the cart's cross-sells use (ADR-440).
+    const script = await get('/assets/v1/cart-upsells.js');
+    expect([script.statusCode, script.headers['content-type']]).toEqual([
+      200,
+      'application/javascript; charset=utf-8',
+    ]);
+    expect(script.body).toContain("customElements.define('hatti-cart-upsells'");
     expect((await get('/', 'nobody.localhost')).headers['cache-control']).toBe('no-store');
     await app.close();
   });

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-439 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-440 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -447,6 +447,7 @@
 | 437 | The cart's cross-sells: the products paired with what it holds, asked for as complementary recommendations and shown together on Hatti Base's cart page | Accepted |
 | 438 | The offer after the purchase: a cash-on-delivery order's page offers a product the shop pairs with what it holds, at the shop's percentage off, added with a tap and paid at the door until it is packed | Accepted |
 | 439 | The offer after the purchase in the admin: turned on in the order settings, with its percentage off | Accepted |
+| 440 | The cart drawer's cross-sells: the cart page's, in the drawer, from one snippet and a theme script both load | Accepted |
 
 ---
 
@@ -16818,3 +16819,27 @@
 * **Alternatives:**
   * **A section under Marketing:** the offer changes orders, with their totals and stock, as the
     order settings do.
+
+## ADR-440 · The cart drawer's cross-sells: the cart page's, in the drawer, from one snippet and a theme script both load
+
+* **Context:**
+  * ADR-437 shows what goes with the cart on Hatti Base's cart page. Shops that keep the cart in
+    a drawer (CHK-22) never saw it.
+  * A page loads only its own sections' scripts (`{% javascript %}`). The drawer comes empty on
+    cached pages and is filled with the cart's section after an add, so the cross-sells' element
+    would not be defined there.
+* **Decision:**
+  * **The element moves to a theme script,** `assets/cart-upsells.js`. Its markup moves to a
+    snippet, `cart-upsells`, given the cart, a limit and a heading.
+    * The cart page's section and the drawer each render the snippet.
+    * Each loads the script once with the page. The script is wrapped in a block, so loading it
+      twice harms nothing.
+  * **The drawer shows two at most,** under "Goes well with your order" in the shopper's
+    language, below the cart's totals. It is left out of an empty cart.
+  * The element is the same: it asks for the complementary products of the cart's first three
+    products, without the cart's own or any twice, and stays hidden until there is one.
+* **Consequences:**
+  * Each time the drawer is rendered again after a change, it asks again, so what it shows follows
+    the cart.
+* **Alternatives:**
+  * **Copying the element into the drawer's own script:** two copies to keep in step.

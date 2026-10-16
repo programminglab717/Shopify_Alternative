@@ -1,0 +1,32 @@
+{%- comment -%}
+  The cart's cross-sells (MKT-09, ADR-437, ADR-440): an element that asks for the complementary
+  products of the cart's first three products and shows them under `title`, at most `limit`, once
+  there is one. The page loads cart-upsells.js, which defines it.
+{%- endcomment -%}
+{%- liquid
+  assign in_cart = ''
+  assign urls = ''
+  assign asked = 0
+  for item in cart.items
+    assign id = item.product_id | append: ''
+    unless in_cart contains id
+      assign in_cart = in_cart | append: id | append: ' '
+      if asked < 3
+        assign asked = asked | plus: 1
+        assign urls = urls | append: routes.product_recommendations_url | append: '?section_id=cart-upsells&intent=complementary&product_id=' | append: id | append: '&limit=' | append: limit | append: ' '
+      endif
+    endunless
+  endfor
+-%}
+<hatti-cart-upsells
+  class="page-width section-spacing"
+  data-urls="{{ urls | strip }}"
+  data-in-cart="{{ in_cart | strip }}"
+  data-limit="{{ limit }}"
+  hidden
+>
+  {%- if title != blank -%}
+    <h2 dir="auto">{{ title | escape }}</h2>
+  {%- endif -%}
+  <ul class="grid" role="list"></ul>
+</hatti-cart-upsells>

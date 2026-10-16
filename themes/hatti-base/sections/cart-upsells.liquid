@@ -16,69 +16,10 @@
     </ul>
   {%- endif -%}
 {%- elsif cart.item_count > 0 -%}
-  {%- liquid
-    assign in_cart = ''
-    assign urls = ''
-    assign asked = 0
-    for item in cart.items
-      assign id = item.product_id | append: ''
-      unless in_cart contains id
-        assign in_cart = in_cart | append: id | append: ' '
-        if asked < 3
-          assign asked = asked | plus: 1
-          assign urls = urls | append: routes.product_recommendations_url | append: '?section_id=cart-upsells&intent=complementary&product_id=' | append: id | append: '&limit=' | append: section.settings.products_to_show | append: ' '
-        endif
-      endunless
-    endfor
-  -%}
-  <hatti-cart-upsells
-    class="page-width section-spacing"
-    data-urls="{{ urls | strip }}"
-    data-in-cart="{{ in_cart | strip }}"
-    data-limit="{{ section.settings.products_to_show }}"
-    hidden
-  >
-    {%- if section.settings.title != blank -%}
-      <h2 dir="auto">{{ section.settings.title | escape }}</h2>
-    {%- endif -%}
-    <ul class="grid" role="list"></ul>
-  </hatti-cart-upsells>
+  {%- render 'cart-upsells', cart: cart, limit: section.settings.products_to_show, title: section.settings.title -%}
 {%- endif -%}
 
-{% javascript %}
-  class HattiCartUpsells extends HTMLElement {
-    async connectedCallback() {
-      const urls = (this.dataset.urls || '').split(' ').filter(Boolean);
-      const held = new Set((this.dataset.inCart || '').split(' ').filter(Boolean));
-      const limit = Number(this.dataset.limit) || 4;
-      const pages = await Promise.all(
-        urls.map(async (url) => {
-          try {
-            const response = await fetch(url);
-            return response.ok ? await response.text() : '';
-          } catch {
-            return '';
-          }
-        }),
-      );
-      const list = this.querySelector('ul');
-      const shown = new Set(held);
-      for (const html of pages) {
-        const page = new DOMParser().parseFromString(html, 'text/html');
-        for (const item of page.querySelectorAll('li[data-product-id]')) {
-          const id = item.getAttribute('data-product-id');
-          if (!id || shown.has(id) || list.childElementCount >= limit) continue;
-          shown.add(id);
-          list.append(document.importNode(item, true));
-        }
-      }
-      if (list.childElementCount > 0) this.hidden = false;
-    }
-  }
-  if (!customElements.get('hatti-cart-upsells')) {
-    customElements.define('hatti-cart-upsells', HattiCartUpsells);
-  }
-{% endjavascript %}
+<script src="{{ 'cart-upsells.js' | asset_url }}" defer></script>
 
 {% schema %}
 {

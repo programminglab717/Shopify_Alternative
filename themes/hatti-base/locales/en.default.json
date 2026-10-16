@@ -119,7 +119,8 @@
     },
     "cart_drawer": {
       "close": "Close",
-      "view": "View cart"
+      "view": "View cart",
+      "upsells": "Goes well with your order"
     },
     "search": {
       "title": "Search",

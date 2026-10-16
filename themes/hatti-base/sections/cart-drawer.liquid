@@ -35,10 +35,14 @@
               <a class="button button--secondary" href="{{ routes.cart_url }}">{{ 'sections.cart_drawer.view' | t }}</a>
             </div>
           {%- endform -%}
+          {%- comment -%} What goes with the cart, as on the cart page (ADR-440). {%- endcomment -%}
+          {%- assign upsells_title = 'sections.cart_drawer.upsells' | t -%}
+          {%- render 'cart-upsells', cart: cart, limit: 2, title: upsells_title -%}
         {%- endif -%}
       </div>
     </dialog>
   </cart-drawer>
+  <script src="{{ 'cart-upsells.js' | asset_url }}" defer></script>
 {%- endif -%}
 
 {% stylesheet %}

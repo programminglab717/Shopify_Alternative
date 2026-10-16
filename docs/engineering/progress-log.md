@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the cart drawer's cross-sells
-(MKT-09), then what is left of MKT-09 and the feature catalog's V1 rows. Urdu handles wait, as
-decided.
+**Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows still
+open, taken in the order the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +15,12 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### The cart drawer's cross-sells
+
+* **Hatti Base's cart drawer shows what goes with the cart** ([ADR-440](../architecture/13-decision-log.md#adr-440--the-cart-drawers-cross-sells-the-cart-pages-in-the-drawer-from-one-snippet-and-a-theme-script-both-load), MKT-09), as its cart page
+  does, from one snippet and a theme script both load.
+* 2864 tests, as before: the storefront's drawer and asset tests check it.
 
 ### 83a752f · The offer after the purchase in the admin
 
