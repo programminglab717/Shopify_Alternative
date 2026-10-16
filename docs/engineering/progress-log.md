@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### A returning shopper's address filled in
+### f09be4a · A returning shopper's address filled in
 
 * **A shopper who ordered before fills in checkout's address from their last order, once a
   code shows the number is theirs** ([ADR-447](../architecture/13-decision-log.md#adr-447--a-returning-shopper-fills-in-checkouts-address-from-their-last-order-once-a-code-sent-to-their-number-or-their-browsers-proof-of-it-shows-the-number-is-theirs), CHK-03). A browser that proved the number lately
