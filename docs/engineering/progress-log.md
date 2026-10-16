@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### The cart drawer's cross-sells
+### 52b861a · The cart drawer's cross-sells
 
 * **Hatti Base's cart drawer shows what goes with the cart** ([ADR-440](../architecture/13-decision-log.md#adr-440--the-cart-drawers-cross-sells-the-cart-pages-in-the-drawer-from-one-snippet-and-a-theme-script-both-load), MKT-09), as its cart page
   does, from one snippet and a theme script both load.
