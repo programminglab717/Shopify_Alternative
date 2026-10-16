@@ -143,6 +143,7 @@ describe('The activity log in the admin', () => {
   it('reads an event with no subject or verb the admin knows as it is named', () => {
     expect(describeEvent('order.confirmed', english)).toBe('Order confirmed');
     expect(describeEvent('support.looked', english)).toBe("Hatti's support looked");
-    expect(describeEvent('gift_card.issued', english)).toBe('gift card issued');
+    expect(describeEvent('pos_session.opened', english)).toBe('pos session opened');
+    expect(describeEvent('gift_card.deactivated', english)).toBe('Gift card deactivated');
   });
 });

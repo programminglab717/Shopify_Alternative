@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-449 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-450 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -457,6 +457,7 @@
 | 447 | A returning shopper fills in checkout's address from their last order, once a code sent to their number, or their browser's proof of it, shows the number is theirs | Accepted |
 | 448 | Gift cards are codes the shop keeps only a digest of, worth a balance kept on the card with a ledger of every change, issued, changed and deactivated through Shopify's giftCard mutations | Accepted |
 | 449 | A shopper applies a gift card on checkout's page by its code, and it pays what it can of the order as it is placed; a cancelled order gives it back | Accepted |
+| 450 | The admin's gift cards page under Products issues cards, showing each code once to copy, finds them by the code's end, and adds to, takes from or deactivates them | Accepted |
 
 ---
 
@@ -17170,3 +17171,35 @@
     Spending it as the order is placed holds nothing until then.
   * **Letting the shopper choose how much of the card to spend:** another field on a phone, for
     a choice almost nobody makes.
+
+## ADR-450 · The admin's gift cards page under Products issues cards, showing each code once to copy, finds them by the code's end, and adds to, takes from or deactivates them
+
+* **Context:**
+  * Gift cards are kept and issued through the Admin API (ADR-448) and spent at checkout
+    (ADR-449). Shops need a page to issue them and to answer customers who ask what a card has
+    left.
+  * The code is given once, by `giftCardCreate`.
+* **Decision:**
+  * **Products → Gift cards** (`products/gift-cards`), linked from the products list for those
+    who may read cards: owners, managers, accountants and confirmation agents.
+  * **Issuing**, for owners and managers: a value, the shop's own code or one made for it, the
+    last day it can be used, and a note.
+    * The code issued is shown once, large, with "Copy code" and the words "Give this code to
+      the customer now: it is not shown again."
+    * The core's refusals, such as a code another card has, are said under the form.
+  * **The list**, newest first: each card by its code's end ("•••• NPQR"), what it has left of
+    what it was issued for, when it was issued and its last day, its note, and whether it is
+    active, used up, expired or deactivated.
+    * Found by the code's last 4 characters, as staff read them off a card or a customer reads
+      them out.
+  * **Changes**, for owners and managers: "Add to it" and "Take from it", each with an amount
+    and a reason; and "Deactivate", which asks once more, since it can't be undone.
+  * The activity log names gift cards in English and Urdu, as it names other things.
+* **Consequences:**
+  * A shop can issue and manage cards with no app of its own.
+  * Not yet: a card's ledger on the page, cards given to a customer on their page, and cards
+    sold as products and sent on WhatsApp.
+* **Alternatives:**
+  * **Showing the code again later:** the shop keeps none to show (ADR-448).
+  * **Gift cards under Customers:** Shopify keeps them under Products, where shops look for
+    them.

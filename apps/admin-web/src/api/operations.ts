@@ -7399,7 +7399,7 @@ const SIZE_CHART = /* GraphQL */ `
   }
 `;
 
-/** The shop's size charts, by name (CAT-10, ADR-406). */
+/** A sale set ahead (CAT-17, ADR-443). */
 const PRICE_SALE = /* GraphQL */ `
   fragment PriceSaleFields on PriceSale {
     id
@@ -7844,5 +7844,96 @@ export const BroadcastCancelMutation = /* GraphQL */ `
     }
   }
   ${BROADCAST}
+  ${USER_ERRORS}
+`;
+
+/** A gift card as the admin lists it: its code's end, never the code (CAT-12, ADR-448). */
+const GIFT_CARD = /* GraphQL */ `
+  fragment GiftCardFields on GiftCard {
+    id
+    lastCharacters
+    initialValue {
+      amount
+    }
+    balance {
+      amount
+    }
+    expiresOn
+    expired
+    enabled
+    note
+    createdAt
+  }
+`;
+
+export const GiftCardsQuery = /* GraphQL */ `
+  query GiftCards($query: String) {
+    giftCards(first: 50, query: $query) {
+      nodes {
+        ...GiftCardFields
+      }
+    }
+  }
+  ${GIFT_CARD}
+`;
+
+export const GiftCardCreateMutation = /* GraphQL */ `
+  mutation GiftCardCreate($input: GiftCardCreateInput!) {
+    giftCardCreate(input: $input) {
+      giftCard {
+        ...GiftCardFields
+      }
+      giftCardCode
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${GIFT_CARD}
+  ${USER_ERRORS}
+`;
+
+export const GiftCardCreditMutation = /* GraphQL */ `
+  mutation GiftCardCredit($id: ID!, $input: GiftCardCreditInput!) {
+    giftCardCredit(id: $id, creditInput: $input) {
+      giftCard {
+        ...GiftCardFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${GIFT_CARD}
+  ${USER_ERRORS}
+`;
+
+export const GiftCardDebitMutation = /* GraphQL */ `
+  mutation GiftCardDebit($id: ID!, $input: GiftCardDebitInput!) {
+    giftCardDebit(id: $id, debitInput: $input) {
+      giftCard {
+        ...GiftCardFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${GIFT_CARD}
+  ${USER_ERRORS}
+`;
+
+export const GiftCardDeactivateMutation = /* GraphQL */ `
+  mutation GiftCardDeactivate($id: ID!) {
+    giftCardDeactivate(id: $id) {
+      giftCard {
+        ...GiftCardFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${GIFT_CARD}
   ${USER_ERRORS}
 `;

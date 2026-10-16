@@ -3436,3 +3436,40 @@ export interface BroadcastInput {
 export interface BroadcastPayloadData {
   [mutation: string]: { broadcast: Broadcast | null; userErrors: UserError[] };
 }
+
+/** A gift card as the admin lists it (CAT-12, ADR-448). */
+export interface GiftCard {
+  id: string;
+  lastCharacters: string;
+  initialValue: { amount: string };
+  balance: { amount: string };
+  /** YYYY-MM-DD in the shop's time zone; null for never. */
+  expiresOn: string | null;
+  expired: boolean;
+  enabled: boolean;
+  note: string;
+  createdAt: string;
+}
+
+export interface GiftCardsData {
+  giftCards: { nodes: GiftCard[] };
+}
+
+export interface GiftCardCreateInput {
+  initialValue: string;
+  code?: string;
+  expiresOn?: string;
+  note?: string;
+}
+
+export interface GiftCardCreateData {
+  giftCardCreate: {
+    giftCard: GiftCard | null;
+    giftCardCode: string | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface GiftCardPayloadData {
+  [mutation: string]: { giftCard: GiftCard | null; userErrors: UserError[] };
+}

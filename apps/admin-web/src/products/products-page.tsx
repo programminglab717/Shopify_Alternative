@@ -4,6 +4,7 @@ import {
   ChevronRight,
   FileSpreadsheet,
   FolderOpen,
+  Gift,
   FolderPlus,
   PackageOpen,
   Plus,
@@ -29,6 +30,7 @@ import { useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { CollectionPanel, DeletePanel, ProductTagsPanel, StatusPanel } from './bulk';
+import { READS_GIFT_CARDS } from './gift-cards-page';
 import {
   EDITS_PRODUCTS,
   PRODUCT_STATUSES,
@@ -233,6 +235,16 @@ export function ProductsPage() {
             <Tag aria-hidden className="size-5" />
             {t('sales.title')}
           </Link>
+          {READS_GIFT_CARDS.includes(shop.role) && (
+            <Link
+              to="/$shopId/products/gift-cards"
+              params={{ shopId: shop.id }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
+            >
+              <Gift aria-hidden className="size-5" />
+              {t('giftCards.title')}
+            </Link>
+          )}
           <Link
             to="/$shopId/products/size-charts"
             params={{ shopId: shop.id }}
