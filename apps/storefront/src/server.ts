@@ -1776,7 +1776,12 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       const lock = await lockOf(request, found);
       reply.header('cache-control', 'private, no-store');
       if (!found.preview && (!lock || lock.passed)) return await reply.redirect(home, 302);
-      const page: PageRequest = { path: '/password', locale: urdu ? 'ur' : 'en' };
+      const page: PageRequest = {
+        path: '/password',
+        // How a form on it went, as its sign-up's says (ADR-446).
+        query: Object.fromEntries(new URL(request.url, 'http://storefront').searchParams),
+        locale: urdu ? 'ur' : 'en',
+      };
       if (request.method === 'POST' && lock) {
         if (limiter && !(await limiter.hit(PASSWORD_TRIES, request.ip)).allowed) {
           return await reply

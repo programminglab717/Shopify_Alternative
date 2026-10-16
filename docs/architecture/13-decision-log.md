@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-445 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-446 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -453,6 +453,7 @@
 | 443 | A sale set ahead cuts its products' prices by a percentage at its start, the old price shown struck through, and puts them back at its end unless changed by hand meanwhile | Accepted |
 | 444 | The admin's sales page under Products: sales set ahead with products found by name, listed with their state, cancelled ahead or ended early | Accepted |
 | 445 | A product's page counts down to its running sale's end, and says how many are left only where 5 or fewer are, as Shopify's inventory_quantity | Accepted |
+| 446 | A closed shop's password page takes a waitlist: shoppers sign up tagged waitlist, and each is told once on WhatsApp from Hatti's number when the shop opens | Accepted |
 
 ---
 
@@ -17001,3 +17002,38 @@
   * **The full stock in the documents:** themes could show counts in the hundreds, which no shop in
     the alpha wants public.
   * **A countdown the shop sets by hand, per product:** it could disagree with the real prices.
+
+## ADR-446 · A closed shop's password page takes a waitlist: shoppers sign up tagged waitlist, and each is told once on WhatsApp from Hatti's number when the shop opens
+
+* **Context:**
+  * ONB-14 asks for a pre-launch waitlist: phone sign-ups on the password page, and word to
+    each of them at launch. Shops in the alpha announce a launch on Instagram days before it.
+  * A closed shop's storefront already takes Shopify's customer form (ADR-054, ADR-189), but
+    Hatti Base's password page never asked for one.
+  * Taking the password away is `online_store_preferences.updated` with `passwordEnabled`
+    among what changed.
+* **Decision:**
+  * **Hatti Base's password page has a "Notify me" form:** Shopify's customer form, tagged
+    `waitlist`, with the words "Tell me on WhatsApp when {{shop}} opens, and send me its news
+    and offers" as the consent. It signs the shopper up as the newsletter does.
+    * The page shows how the form went, as the newsletter section does. The password page now
+      reads its query, which it did not before.
+  * **When the shop opens, the worker tells its waitlist:** every customer tagged `waitlist` who
+    still agrees to hear from the shop on WhatsApp.
+    * The message is Hatti's own `hatti_store_open` template (Meta's marketing category), from
+      Hatti's number, naming the shop and linking to its storefront.
+    * It is the `store_open` message kind. The shop can't turn it off, since the shopper asked
+      for it, and it is charged to the shop's credit like other marketing.
+    * Each customer is told once, ever (`store_open:<customer>`). Closing and opening again tells
+      nobody twice.
+    * The customers are read 200 at a time.
+* **Consequences:**
+  * The waitlist is a segment the shop can see, and broadcast to, like any other:
+    `customer_tags CONTAINS 'waitlist'`.
+  * A shop without message credit queues the messages until it has some, as other messages
+    wait.
+* **Alternatives:**
+  * **The shop's own template from its own number:** most shops connect their number after
+    they open, not before.
+  * **A separate waitlist table:** the customer, consent and tag records already hold all it
+    needs, with consent kept as the law asks.

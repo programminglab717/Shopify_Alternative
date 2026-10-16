@@ -152,7 +152,10 @@
       "intro": "Enter the password to go in",
       "label": "Password",
       "enter": "Enter",
-      "wrong": "That password is not right. Try again."
+      "wrong": "That password is not right. Try again.",
+      "waitlist_consent": "Tell me on WhatsApp when {{ shop }} opens, and send me its news and offers",
+      "waitlist_submit": "Notify me",
+      "waitlist_success": "Thank you! We'll message you on WhatsApp when we open."
     },
     "blog": {
       "all": "All articles",

@@ -34,6 +34,7 @@ export const MESSAGE_KINDS = [
   'review_request',
   'back_in_stock',
   'cod_prepaid',
+  'store_open',
   'one_time_code',
   'stock_low',
   'stock_out',
@@ -90,6 +91,8 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'back_in_stock',
   // Sent while the shop's automation is on (ADR-432).
   'cod_prepaid',
+  // Asked for by the shopper, on the closed shop's page (ADR-446).
+  'store_open',
   'invoice_due',
   'plan_ended',
   'credit_low',
@@ -610,6 +613,18 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur:
         '{shop}: {product} دوبارہ اسٹاک میں آ گیا ہے، جیسا کہ آپ نے پوچھا تھا۔ دوبارہ ختم ہونے سے ' +
         'پہلے یہاں آرڈر کریں:',
+    },
+  },
+  store_open: {
+    whatsapp: 'hatti_store_open',
+    // A nudge to buy, though the shopper asked for it (ADR-446).
+    category: 'marketing',
+    parameters: ['shop'],
+    // The shop's storefront.
+    buttons: [{ type: 'url' }],
+    text: {
+      en: '{shop} is open now, as you asked to hear. Have a look and order here:',
+      ur: '{shop} اب کھل گئی ہے، جیسا کہ آپ نے پوچھا تھا۔ یہاں دیکھیں اور آرڈر کریں:',
     },
   },
   cod_prepaid: {

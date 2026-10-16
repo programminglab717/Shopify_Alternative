@@ -100,6 +100,7 @@ import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
 import { BackInStockAlerts } from './back-in-stock.js';
+import { StoreOpenNotices } from './store-open.js';
 import { CodPrepaidOffers } from './cod-prepaid-offers.js';
 import { ParcelSteps } from './parcel-steps.js';
 import { PaymentInquiries } from './payment-inquiries.js';
@@ -129,6 +130,7 @@ export interface EventConsumers {
   notifications?: OrderNotifications;
   lowStock?: LowStockAlerts;
   backInStock?: BackInStockAlerts;
+  storeOpen?: StoreOpenNotices;
   codPrepaid?: CodPrepaidOffers;
   parcelSteps?: ParcelSteps;
   billing?: BillingNotices;
@@ -153,6 +155,7 @@ export function eventHandlers(
     notifications,
     lowStock,
     backInStock,
+    storeOpen,
     codPrepaid,
     parcelSteps,
     billing,
@@ -206,6 +209,13 @@ export function eventHandlers(
     for (const type of BackInStockAlerts.EVENTS) {
       registry.on(type, async (event) => {
         await backInStock.handle(event);
+      });
+    }
+  }
+  if (storeOpen) {
+    for (const type of StoreOpenNotices.EVENTS) {
+      registry.on(type, async (event) => {
+        await storeOpen.handle(event);
       });
     }
   }
@@ -320,6 +330,12 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           new InventoryService(database, new VariantService(database)),
           new VariantService(database),
           new ProductService(database),
+          new StorefrontSite(config.STOREFRONT_URL ?? 'http://localhost:4100'),
+        ),
+        storeOpen: new StoreOpenNotices(
+          database,
+          workerSegments(database),
+          new MessagesService(database),
           new StorefrontSite(config.STOREFRONT_URL ?? 'http://localhost:4100'),
         ),
         parcelSteps: new ParcelSteps(new FulfillmentService(database, new StockService()), logger),

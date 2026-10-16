@@ -490,6 +490,8 @@ describe("Messages' words", () => {
       // And their automations, these (ADR-429, ADR-432).
       'back_in_stock',
       'cod_prepaid',
+      // Asked for by the shopper, on the closed shop's page (ADR-446).
+      'store_open',
       'invoice_due',
       'plan_ended',
       'credit_low',

@@ -3289,6 +3289,32 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
       '/password?customer_posted=true',
     ]);
     expect(core.signUps.map((signedUp) => signedUp.shopId)).toEqual([closed]);
+
+    // Hatti Base's password page asks to be told when the shop opens (ADR-446).
+    const page = await app.inject({
+      method: 'GET',
+      url: '/password',
+      headers: { host: 'shut.localhost' },
+    });
+    expect(page.body).toContain('<input type="hidden" name="contact[tags]" value="waitlist">');
+    expect(page.body).toContain(
+      '<label for="waitlist-phone">Tell me on WhatsApp when Zari Fashions opens, and send me its news and offers</label>',
+    );
+    const waitlisted = await app.inject({
+      method: 'POST',
+      url: '/contact',
+      headers: { host: 'shut.localhost', 'content-type': 'application/x-www-form-urlencoded' },
+      payload:
+        'form_type=customer&contact%5Btags%5D=waitlist&contact%5Bphone%5D=0301-7654321&return_to=%2Fpassword%23waitlist',
+    });
+    expect(waitlisted.statusCode).toBe(303);
+    expect(core.signUps.at(-1)).toMatchObject({ shopId: closed, request: { tags: 'waitlist' } });
+    const back = await app.inject({
+      method: 'GET',
+      url: waitlisted.headers.location as string,
+      headers: { host: 'shut.localhost' },
+    });
+    expect(back.body).toContain('Thank you! We&#39;ll message you on WhatsApp when we open.');
     await app.close();
   });
 

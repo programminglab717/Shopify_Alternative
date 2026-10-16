@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### The pre-launch waitlist
+
+* **A closed shop's password page takes a waitlist, and each shopper on it hears on WhatsApp
+  once the shop opens** ([ADR-446](../architecture/13-decision-log.md#adr-446--a-closed-shops-password-page-takes-a-waitlist-shoppers-sign-up-tagged-waitlist-and-each-is-told-once-on-whatsapp-from-hattis-number-when-the-shop-opens), ONB-14).
+* 2887 tests, from 2886: the core's one; the storefront's closed-shop test takes
+  the waitlist's form too.
+
 ### cd32dd0 · A sale's countdown and honest low stock
 
 * **Hatti Base's product page counts down to the end of the sale a product is in, and says "Only
