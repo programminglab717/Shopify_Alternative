@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Inventory reports
+### beb4ce8 · Inventory reports
 
 * **Sell-through, how long ago stock last sold, and stock-outs, from the stock ledger, over 7, 30
   or 90 days** ([ADR-455](../architecture/13-decision-log.md#adr-455--inventory-reports-are-worked-out-from-the-stock-ledger-when-asked-sell-through-over-7-30-or-90-days-how-long-ago-the-stock-on-hand-last-sold-with-its-cost-and-what-ran-out-and-for-how-long), ANL-05).
