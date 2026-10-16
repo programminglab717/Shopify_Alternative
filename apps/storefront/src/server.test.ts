@@ -768,7 +768,6 @@ describe('Carts', () => {
     expect(tagsOf(await get(`/ur/products/${lawn.handle}`))).toEqual([
       'hatti:sample',
       `hatti:sample:product:${lawn.handle}`,
-      'hatti:sample:collection:eid-lawn',
     ]);
     // A handle nothing has yet: forgotten once something takes it, or a redirect from its path.
     const missing = await get('/pages/size-guide');
@@ -2662,6 +2661,44 @@ describe('Carts', () => {
     core.signedUp = new StorefrontApiError(502, 'Bad gateway');
     expect((await post(signUp)).statusCode).toBe(503);
     expect(core.signUps).toHaveLength(4);
+    await app.close();
+  });
+
+  it('renders the section of related products a product page asks for, kept briefly at the edge (ADR-434)', async () => {
+    const sample = sampleStore();
+    const [first, second, ...rest] = sample.products;
+    const app = server({
+      sample: new MemoryStore({
+        ...sample,
+        products: [{ ...first!, related: [second!.id] }, second!, ...rest],
+      }),
+    });
+    const get = (url: string) => app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
+    const asked = await get(
+      `/recommendations/products?section_id=related&product_id=${first!.id}&limit=4`,
+    );
+    expect([asked.statusCode, asked.headers['cache-control']]).toEqual([
+      200,
+      'public, max-age=0, s-maxage=60',
+    ]);
+    expect(asked.body).toMatch(/^<div id="hatti-section-related"/);
+    expect(asked.body).toContain(`href="/products/${second!.handle}"`);
+    const urdu = await get(
+      `/ur/recommendations/products?section_id=related&product_id=${first!.id}`,
+    );
+    expect([urdu.statusCode, urdu.body.includes(`href="/products/${second!.handle}"`)]).toEqual([
+      200,
+      true,
+    ]);
+    // Without a product or a section to render, or for a product the shop has not.
+    for (const url of [
+      '/recommendations/products?section_id=related',
+      `/recommendations/products?product_id=${first!.id}`,
+      '/recommendations/products?section_id=related&product_id=p-gone',
+      `/recommendations/products?section_id=nothing&product_id=${first!.id}`,
+    ]) {
+      expect((await get(url)).statusCode).toBe(404);
+    }
     await app.close();
   });
 

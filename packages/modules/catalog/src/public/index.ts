@@ -182,3 +182,4 @@ export {
   type BundleRecord,
   type ProductBundleUpdatedPayload,
 } from '../internal/bundles.js';
+export { RELATED_PRODUCTS, relatedProductsIn } from '../internal/related-products.js';

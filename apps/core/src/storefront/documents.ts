@@ -87,6 +87,8 @@ export function productDoc(
   sizeChart?: ShownSizeChart,
   /** What it holds, where it is a bundle (ADR-411). */
   bundle?: BundleDoc,
+  /** The products related to it, the most related first (ADR-434). */
+  related?: readonly string[],
 ): ProductDoc {
   // Its images; its videos are its media beside them (ADR-258).
   const images = record.media.flatMap((media) => {
@@ -175,6 +177,7 @@ export function productDoc(
     ...(preorderShipsOn && { preorderShipsOn }),
     ...(sizeChart && { sizeChart }),
     ...(bundle && { bundle }),
+    ...(related && related.length > 0 && { related: [...related] }),
   };
 }
 

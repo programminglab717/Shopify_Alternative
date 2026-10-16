@@ -166,6 +166,11 @@ export interface ProductDoc {
   >;
   /** Its published reviews (ADR-401); absent while it has none. */
   reviews?: ProductReviewsDoc;
+  /**
+   * The products related to it (MKT-09, ADR-434), by ID, the most related first, as when it was
+   * last built: those gone or sold out since are left out where they are shown. Absent for none.
+   */
+  related?: string[];
 }
 
 /** A product's published reviews, as its page shows them (ADR-401). */

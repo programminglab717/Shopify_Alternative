@@ -12,8 +12,8 @@
       "block_order": ["title", "price", "buy", "delivery", "description"]
     },
     "related": {
-      "type": "featured-collection",
-      "settings": { "title": "You may also like", "collection": "eid-lawn", "products_to_show": 4 }
+      "type": "related-products",
+      "settings": { "title": "You may also like", "products_to_show": 4 }
     },
     "recently_viewed": {
       "type": "recently-viewed",

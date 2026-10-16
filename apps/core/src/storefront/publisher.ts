@@ -10,6 +10,7 @@ import {
   bundleSellable,
   bundlesContainingIn,
   bundlesOfProductsIn,
+  relatedProductsIn,
   VariantService,
   imagePathOf,
   shownReviewsIn,
@@ -480,6 +481,14 @@ export interface PublisherServices {
       shopId: string,
       productIds: readonly string[],
     ): Promise<Map<string, ShownSizeChart>>;
+  };
+  /** The products related to each, for its page (MKT-09, ADR-434). */
+  related: {
+    relatedProductsOf(
+      tx: Tx,
+      shopId: string,
+      productIds: readonly string[],
+    ): Promise<Map<string, string[]>>;
   };
   /** The products on pre-order, and the day each ships by (ADR-403). */
   preorders: {
@@ -971,6 +980,11 @@ export class StorefrontPublisher {
       shopId,
       active.map((record) => record.id),
     );
+    const related = await this.services.related.relatedProductsOf(
+      tx,
+      shopId,
+      active.map((record) => record.id),
+    );
     const docs = active.map((record) =>
       productDoc(
         record,
@@ -989,6 +1003,7 @@ export class StorefrontPublisher {
         preorders.get(record.id),
         sizeCharts.get(record.id),
         bundleDoc(bundles.get(record.id), parts),
+        related.get(record.id),
       ),
     );
     await writer.putProducts(docs);
@@ -1222,6 +1237,7 @@ export function createStorefrontPublisher(
       articles: new ArticleService(database),
       reviews: { shownReviewsOf: shownReviewsIn },
       preorders: { preordersOf: preordersIn },
+      related: { relatedProductsOf: relatedProductsIn },
       sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
       bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
       comments: new CommentService(database),

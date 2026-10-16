@@ -1,0 +1,72 @@
+{%- comment -%}
+  Products related to the one on the page (MKT-09, ADR-434), as Shopify's product
+  recommendations: once the section nears the screen, the page asks for it again at
+  routes.product_recommendations_url, rendered with the products related to this one, and shows
+  them. Until then, and where there are none, it shows nothing.
+{%- endcomment -%}
+<hatti-related-products
+  class="page-width section-spacing"
+  data-url="{{ routes.product_recommendations_url }}?section_id={{ section.id }}&product_id={{ product.id }}&limit={{ section.settings.products_to_show }}"
+>
+  {%- if recommendations.performed? and recommendations.products_count > 0 -%}
+    {%- if section.settings.title != blank -%}
+      <h2 dir="auto">{{ section.settings.title | escape }}</h2>
+    {%- endif -%}
+    <ul class="grid" role="list">
+      {%- for product in recommendations.products -%}
+        <li class="grid__item">{% render 'card-product', product: product, position: forloop.index %}</li>
+      {%- endfor -%}
+    </ul>
+  {%- endif -%}
+</hatti-related-products>
+
+{% javascript %}
+  class HattiRelatedProducts extends HTMLElement {
+    connectedCallback() {
+      // Rendered with them already, as the request for them is.
+      if (this.childElementCount > 0 || !this.dataset.url) return;
+      const load = async () => {
+        const response = await fetch(this.dataset.url);
+        if (!response.ok) return;
+        const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const shown = page.querySelector('hatti-related-products');
+        if (shown && shown.childElementCount > 0) this.innerHTML = shown.innerHTML;
+      };
+      const watching = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((entry) => entry.isIntersecting)) return;
+          watching.disconnect();
+          void load();
+        },
+        { rootMargin: '0px 0px 400px 0px' },
+      );
+      watching.observe(this);
+    }
+  }
+  if (!customElements.get('hatti-related-products')) {
+    customElements.define('hatti-related-products', HattiRelatedProducts);
+  }
+{% endjavascript %}
+
+{% schema %}
+{
+  "name": "t:sections.related-products.name",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "t:sections.related-products.settings.title.label",
+      "default": "You may also like"
+    },
+    {
+      "type": "range",
+      "id": "products_to_show",
+      "label": "t:sections.related-products.settings.products_to_show.label",
+      "min": 2,
+      "max": 10,
+      "step": 1,
+      "default": 4
+    }
+  ]
+}
+{% endschema %}

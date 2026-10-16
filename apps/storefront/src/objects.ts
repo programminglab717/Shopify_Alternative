@@ -538,6 +538,27 @@ export function predictiveSearchObject(
 }
 
 /**
+ * Shopify's `recommendations`, for a product recommendations section (MKT-09, ADR-434): whether
+ * they were asked for, of which kind, and the products, the most related first. Empty on any other
+ * page, as Shopify's is.
+ */
+export function recommendationsObject(
+  found: { intent: string; productIds: readonly string[] } | null,
+  ctx: ObjectContext,
+): Record<string, unknown> {
+  let products: ItemRef[] | null = null;
+  return {
+    'performed?': found !== null,
+    performed: found !== null,
+    intent: found?.intent ?? null,
+    products_count: found?.productIds.length ?? 0,
+    get products(): ItemRef[] {
+      return (products ??= lazyProducts(found?.productIds ?? [], ctx));
+    },
+  };
+}
+
+/**
  * A shop's page (ADR-045), as Shopify's `page`: its content was cleaned when it was saved, so
  * themes print it as it is, as they do Shopify's.
  */

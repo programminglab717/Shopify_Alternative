@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-433 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-434 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -441,6 +441,7 @@
 | 431 | Back in stock on the storefront: Hatti's back_in_stock form on a sold-out variant's page, sent on to the core and back to the page | Accepted |
 | 432 | COD to prepaid: a confirmed cash-on-delivery order's customer offered store credit for paying the rest online before it is packed, given once it is paid in full | Accepted |
 | 433 | COD to prepaid on the automations page: on and off, with the store credit it offers, sent from Hatti's number with no template to choose | Accepted |
+| 434 | Related products: worked out as each product's document is built, and served as Shopify's product recommendations for Hatti Base's product page to ask for | Accepted |
 
 ---
 
@@ -16633,3 +16634,44 @@
   * **The credit in Settings → Checkout, with the discount for paying online:** that discount is
     taken at checkout (ADR-222). This offer goes after an order is placed, as the other recipes
     do, and the shop turns it on where it turns them on.
+
+## ADR-434 · Related products: worked out as each product's document is built, and served as Shopify's product recommendations for Hatti Base's product page to ask for
+
+* **Context:**
+  * MKT-09 asks for upsells and cross-sells on the product page, in the cart and after
+    purchase. Shopify themes show related products by asking
+    `/recommendations/products?product_id=&section_id=&limit=` for a section, rendered with
+    `recommendations`, as Dawn's related-products section does.
+  * Hatti Base's product page showed a fixed collection, Eid lawn, as "You may also like",
+    whatever the product.
+  * A storefront reads documents from Valkey (ADR-033) and cannot query the catalog.
+* **Decision:**
+  * **The catalog works out a product's related products** (`relatedProductsIn`): the shop's
+    other products for sale, those sharing more of its collections first, then those of its
+    type, then its vendor's, the newest first among equals. At most 10.
+    * Each list is weighed from a bounded set of candidates: 200 from each collection it is in,
+      100 of its type and 100 of its vendor's. A shop's full rebuild stays cheap.
+    * Migration 0202 indexes the shop's products for sale by type and by vendor.
+  * **The publisher keeps the list in the product's document** (`related`), as it is built.
+    It is as fresh as the product's last change. Products gone or sold out since are left out
+    where the list is shown.
+  * **The storefront serves Shopify's product recommendations:** `/recommendations/products`
+    (and under `/ur`).
+    * It renders the section asked for as the product's own page renders it, with
+      `recommendations`: `performed?`, `intent`, `products_count` and `products`.
+    * The products shown are those related, still published and with something for sale, up to
+      the limit asked (at most 10).
+    * Complementary ones are asked for as Shopify's are, and none are found yet.
+    * The answer is kept a minute at the edge, as search's are. `routes.product_recommendations_url`
+      names the address.
+  * **Hatti Base's `related-products` section** takes the fixed collection's place on the product
+    page. Once it nears the screen, it asks for itself again and shows what comes. Its heading
+    and count are the shop's to set.
+* **Consequences:**
+  * The product page reads two fewer things before it renders: the related products come after.
+  * A shop's own pairings (complementary products), and the cart's, come next.
+* **Alternatives:**
+  * **Working them out on the storefront from collections' documents:** it would read a
+    collection or more on every product page.
+  * **Recommendations from what customers bought together:** too few orders per shop at first.
+    It can feed the same list later.

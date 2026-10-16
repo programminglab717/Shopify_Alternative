@@ -11,6 +11,7 @@ import {
   bundleProductIdsIn,
   bundlesContainingIn,
   bundlesOfProductsIn,
+  relatedProductsIn,
   VariantService,
   shownReviewsIn,
   shownSizeChartsIn,
@@ -448,6 +449,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         articles,
         reviews: { shownReviewsOf: shownReviewsIn },
         preorders: { preordersOf: preordersIn },
+        related: { relatedProductsOf: relatedProductsIn },
         sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
         bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
         comments: new CommentService(database),
@@ -1234,6 +1236,29 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await deliver()).toEqual(['size_chart.deleted']);
     expect((await store().productByHandle(kurta.handle))?.sizeChart).toBeUndefined();
     unwrap(await products.delete(tenant, kurta.id));
+    await deliver();
+  });
+
+  it('publishes the products related to each, those of its type first, as products change (ADR-434)', async () => {
+    const lawn = unwrap(
+      await products.create(tenant, { title: 'Lawn suit', status: 'active', productType: 'Lawn' }),
+    );
+    await deliver();
+    expect((await store().productByHandle(lawn.handle))?.related).toBeUndefined();
+    const printed = unwrap(
+      await products.create(tenant, {
+        title: 'Printed lawn',
+        status: 'active',
+        productType: 'Lawn',
+      }),
+    );
+    await deliver();
+    // Each is built as it changes: the new one names the first.
+    expect((await store().productByHandle(printed.handle))?.related).toEqual([lawn.id]);
+    unwrap(await products.update(tenant, { id: lawn.id, title: 'Lawn 3-piece suit' }));
+    await deliver();
+    expect((await store().productByHandle(lawn.handle))?.related).toEqual([printed.id]);
+    for (const id of [lawn.id, printed.id]) unwrap(await products.delete(tenant, id));
     await deliver();
   });
 

@@ -582,8 +582,8 @@ describe('Storefront rendering', () => {
     // The shop, the collection, two menus, and 24 products in chunks of 12.
     expect((await render({ path: '/collections/eid-lawn' })).roundTrips).toBe(6);
     expect((await render({ path: '/collections/eid-lawn' }, { chunkSize: 24 })).roundTrips).toBe(5);
-    // The product, and the related collection's first chunk.
-    expect((await render({ path: '/products/bridal-lehenga-heavy' })).roundTrips).toBe(6);
+    // The shop, the product and two menus: its related products come once the page asks for them.
+    expect((await render({ path: '/products/bridal-lehenga-heavy' })).roundTrips).toBe(4);
   });
 
   it('renders a product with its options, variants and a form that needs no JavaScript', async () => {
@@ -1919,12 +1919,12 @@ describe('Storefront rendering', () => {
     const ready = await renderer.prepare({ path: '/products/bridal-lehenga-heavy' }, data);
     expect(ready).toMatchObject({ status: 200, domain: 'www.zari.pk' });
     expect(ready.named).toContainEqual({ kind: 'product', handle: 'bridal-lehenga-heavy' });
-    // The shop and the product: the header's menu and the recommendations wait for the render.
+    // The shop and the product: the header's menus wait for the render.
     expect(data.roundTrips).toBe(2);
     let html = '';
     for await (const chunk of ready.stream().body) html += chunk;
     expect(html).toMatch(/<\/html>\s*$/);
-    expect(data.roundTrips).toBe(6);
+    expect(data.roundTrips).toBe(4);
   });
 
   it('marks sections and blocks for the theme editor in its frame, with its script, and nothing elsewhere', async () => {
@@ -2321,6 +2321,71 @@ describe('Storefront rendering', () => {
     const wrong = (await render({ path: '/', query: { customer_error: 'phone' } })).html;
     expect(wrong).toContain('Enter a Pakistani mobile number, like 0300 1234567.');
     expect(wrong).toMatch(/name="contact\[phone\]"[^>]*aria-invalid="true"/);
+  });
+
+  it('asks for related products as Shopify themes do, and renders them, those for sale, when asked (ADR-434)', async () => {
+    const sample = sampleStore();
+    const [first, second, third, fourth, ...rest] = sample.products as [
+      ProductDoc,
+      ProductDoc,
+      ProductDoc,
+      ProductDoc,
+      ...ProductDoc[],
+    ];
+    const soldOut = {
+      ...third,
+      variants: third.variants.map((each) => ({ ...each, available: false })),
+    };
+    const shop = new MemoryStore({
+      ...sample,
+      // A product gone since it was built is left out, as one sold out.
+      products: [
+        { ...first, related: [second.id, 'p-gone', soldOut.id, fourth.id] },
+        second,
+        soldOut,
+        fourth,
+        ...rest,
+      ],
+    });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const path = `/products/${first.handle}`;
+    const page = (await renderer.render({ path }, shop.fresh())).html;
+    // The page asks for them: the section is empty until then.
+    const url =
+      /<hatti-related-products\s+class="page-width section-spacing"\s+data-url="([^"]+)"\s*>\s*<\/hatti-related-products>/.exec(
+        page,
+      )?.[1];
+    expect(url?.replace(/&amp;/g, '&')).toBe(
+      `/recommendations/products?section_id=related&product_id=${first.id}&limit=4`,
+    );
+    expect(page).not.toContain('You may also like');
+    const asked = async (
+      limit: number,
+      locale?: string,
+      intent: 'related' | 'complementary' = 'related',
+    ) =>
+      (
+        await renderer.sections(
+          {
+            path,
+            ...(locale && { locale }),
+            recommendations: { productId: first.id, intent, limit },
+          },
+          shop.fresh(),
+          ['related'],
+        )
+      ).get('related')!;
+    const links = (html: string) =>
+      [...html.matchAll(/href="\/products\/([\w-]+)" class="card__link"/g)].map(
+        (match) => match[1],
+      );
+    const shown = await asked(4);
+    expect(shown).toContain('<h2 dir="auto">You may also like</h2>');
+    expect(links(shown)).toEqual([second.handle, fourth.handle]);
+    expect(links(await asked(1))).toEqual([second.handle]);
+    expect(links(await asked(4, 'ur'))).toEqual([second.handle, fourth.handle]);
+    // Complementary products Hatti does not work out yet: none, and nothing shown.
+    expect(await asked(4, undefined, 'complementary')).not.toContain('You may also like');
   });
 
   it("asks for a number on a sold-out variant's page while the shop sends back in stock messages (ADR-431)", async () => {

@@ -39,6 +39,7 @@ import {
   handleize,
   ImageDrop,
   predictiveSearchObject,
+  recommendationsObject,
   productObject,
   resolveSettings,
   searchObject,
@@ -93,6 +94,15 @@ export interface PageRequest {
     /** The shop's pages and articles found, when asked for (ADR-212). */
     pageIds?: readonly string[];
     articleIds?: readonly string[];
+  } | null;
+  /**
+   * Products recommended beside one (MKT-09, ADR-434), as Shopify's product recommendations:
+   * the product's ID, what kind are asked for, and how many at most.
+   */
+  recommendations?: {
+    productId: string;
+    intent: 'related' | 'complementary';
+    limit: number;
   } | null;
   /**
    * A theme shown through a preview link (ADR-049) rather than the shop's main theme: a bar on
@@ -237,6 +247,7 @@ function routesFor(prefix: string): Record<string, string> {
     all_products_collection_url: `${prefix}/collections/all`,
     search_url: `${prefix}/search`,
     predictive_search_url: `${prefix}/search/suggest`,
+    product_recommendations_url: `${prefix}/recommendations/products`,
     account_url: `${prefix}/account`,
   };
 }
@@ -515,7 +526,8 @@ export class PageRenderer {
     const found = route(request.path);
     const cart = request.cart ?? null;
     const suggest = request.suggest ?? null;
-    const [{ shopDoc, theme }, shown, cartDocs, suggested] = await Promise.all([
+    const asked = request.recommendations ?? null;
+    const [{ shopDoc, theme }, shown, cartDocs, suggested, recommended] = await Promise.all([
       data.shop().then(async (shopDoc) => ({
         shopDoc,
         theme: themeFor ? await themeFor(shopDoc) : this.theme,
@@ -525,6 +537,7 @@ export class PageRenderer {
       suggest
         ? data.products(suggest.productIds).then((docs) => suggestedProducts(docs, suggest.params))
         : [],
+      asked ? recommendedProducts(data, asked) : [],
     ]);
     const name = shown ? found.name : '404';
     const resource = shown ?? {};
@@ -600,6 +613,10 @@ export class PageRenderer {
           pageIds: suggest.pageIds ?? [],
           articleIds: suggest.articleIds ?? [],
         },
+        ctx,
+      ),
+      recommendations: recommendationsObject(
+        asked && { intent: asked.intent, productIds: recommended },
         ctx,
       ),
       // Hatti's: why a change to the cart was refused.
@@ -1115,4 +1132,24 @@ function pageTitle(
   if (name === 'cart') return words('sections.cart.title') ?? 'Your cart';
   if (name === 'search') return words('sections.search.title') ?? 'Search';
   return name === '404' ? 'Page not found' : String(shop.name);
+}
+
+/**
+ * The products recommended beside the one `asked` names (ADR-434): those related to it, as its
+ * document names them, still published and with something for sale, at most as many as asked;
+ * none of a kind Hatti does not work out, as complementary ones.
+ */
+async function recommendedProducts(
+  data: RequestData,
+  asked: NonNullable<PageRequest['recommendations']>,
+): Promise<string[]> {
+  if (asked.intent !== 'related') return [];
+  const [product] = await data.products([asked.productId]);
+  const related = product?.related ?? [];
+  if (related.length === 0) return [];
+  const docs = await data.products(related);
+  return docs
+    .filter((doc) => doc !== null && doc.variants.some((variant) => variant.available))
+    .slice(0, asked.limit)
+    .map((doc) => doc!.id);
 }

@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: MKT-09's upsells, related products
-on Hatti Base's product page and cart, then the one-tap offer on a cash-on-delivery order's page
-until it is packed (05 §8). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: MKT-09's next upsells, the products
+a shop pairs with one, shown on its page and in the cart, then the one-tap offer on a
+cash-on-delivery order's page until it is packed (05 §8). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,16 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### Related products
+
+* **Each product's related products** ([ADR-434](../architecture/13-decision-log.md#adr-434--related-products-worked-out-as-each-products-document-is-built-and-served-as-shopifys-product-recommendations-for-hatti-bases-product-page-to-ask-for), MKT-09) are worked out as its storefront
+  document is built: those sharing more of its collections, then its type's, then its
+  vendor's.
+* **The storefront serves Shopify's product recommendations,** and Hatti Base's product page
+  asks for them in place of its fixed collection.
+* 2852 tests, from 2847: two for the catalog, two for the storefront, one for the
+  core.
 
 ### 91d9d47 · COD to prepaid in the admin
 

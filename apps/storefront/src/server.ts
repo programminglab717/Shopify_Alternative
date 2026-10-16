@@ -226,6 +226,12 @@ const PREVIEW_TOKEN = /^[\w.-]{16,512}$/;
 /** A section's ID, as themes may name one (the themes package's rule). */
 const SECTION_ID = /^[A-Za-z0-9_-]{1,100}$/;
 
+/** A product's ID, as its document names it: Shopify's numeric IDs, or Hatti's UUIDs. */
+const PRODUCT_ID = /^[A-Za-z0-9-]{1,64}$/;
+
+/** The most products recommended beside one, as Shopify's (ADR-434). */
+const RECOMMENDATIONS_LIMIT = 10;
+
 /** A file's public ID, as a theme names a picture of the shop's (ADR-326). */
 const FILE_ID = /^file_[0-9a-hjkmnp-tv-z]{26}$/;
 
@@ -1703,6 +1709,57 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   for (const path of ['/search/suggest', '/search/suggest.json']) {
     app.get(path, suggest);
     app.get(`/ur${path}`, suggest);
+  }
+
+  /**
+   * Product recommendations (MKT-09, ADR-434), as Shopify's:
+   * `/recommendations/products?product_id=&section_id=&limit=&intent=` renders that section of the
+   * theme's with `recommendations`, the products related to the one named, for a script to show
+   * on its page. Complementary products are asked for as Shopify's are, and none are found yet.
+   */
+  const recommendations = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    const url = new URL(request.url, 'http://storefront');
+    const sectionId = url.searchParams.get('section_id') ?? '';
+    const productId = url.searchParams.get('product_id') ?? '';
+    if (!SECTION_ID.test(sectionId) || !PRODUCT_ID.test(productId)) {
+      return notFound(
+        reply,
+        'Ask for a product and the section to render: ?product_id=&section_id=',
+      );
+    }
+    const limit = Number(url.searchParams.get('limit') ?? RECOMMENDATIONS_LIMIT);
+    try {
+      // Rendered as the product's own page renders it, with the settings its template gives it.
+      const [product] = await found.store.products([productId]);
+      if (!product) return notFound(reply, 'The shop has no such product.');
+      const page: PageRequest = {
+        path: `/products/${product.handle}`,
+        query: Object.fromEntries(url.searchParams),
+        locale: url.pathname.startsWith('/ur/') ? 'ur' : 'en',
+        recommendations: {
+          productId,
+          intent: url.searchParams.get('intent') === 'complementary' ? 'complementary' : 'related',
+          limit:
+            Number.isInteger(limit) && limit >= 1
+              ? Math.min(limit, RECOMMENDATIONS_LIMIT)
+              : RECOMMENDATIONS_LIMIT,
+        },
+      };
+      const rendered = await renderer.sections(page, found.store, [sectionId], themeFor(found));
+      const html = rendered.get(sectionId);
+      if (!html) return notFound(reply, 'The theme has no such section.');
+      if (found.preview) previewed(reply);
+      else reply.header('cache-control', SEARCH_CACHE).header('cache-tag', shopTag(found.shopId));
+      return await reply.type('text/html; charset=utf-8').send(html);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      throw error;
+    }
+  };
+  for (const path of ['/recommendations/products', '/ur/recommendations/products']) {
+    app.get(path, recommendations);
   }
 
   /**
