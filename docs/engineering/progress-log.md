@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### Inventory reports
+
+* **Sell-through, how long ago stock last sold, and stock-outs, from the stock ledger, over 7, 30
+  or 90 days** ([ADR-455](../architecture/13-decision-log.md#adr-455--inventory-reports-are-worked-out-from-the-stock-ledger-when-asked-sell-through-over-7-30-or-90-days-how-long-ago-the-stock-on-hand-last-sold-with-its-cost-and-what-ran-out-and-for-how-long), ANL-05).
+* 2924 tests, from 2923: the inventory module's one, and the API's checks in its
+  stock test.
+
 ### 8cd7cfa · Trust on the product page
 
 * **A product's page says what delivery costs and takes to each of the shop's cities, and links

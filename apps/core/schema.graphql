@@ -4682,6 +4682,28 @@ type InventoryAdjustmentGroup {
   referenceDocumentUri: String
 }
 
+"""Stock on hand last sold within some days, or never sold."""
+type InventoryAgeing {
+  bucket: InventoryAgeingBucket!
+  units: Int!
+
+  """Units of variants with no cost: not valued."""
+  unitsWithoutCost: Int!
+
+  """Units times what one costs the shop, of those with a cost."""
+  value: Money!
+  variants: Int!
+}
+
+"""How long ago stock on hand last sold: in days, or never."""
+enum InventoryAgeingBucket {
+  DAYS_0_30
+  DAYS_31_60
+  DAYS_61_90
+  NEVER
+  OVER_90
+}
+
 """One quantity changed by an adjustment."""
 type InventoryChange {
   """Available at the location after the adjustment."""
@@ -4901,6 +4923,77 @@ input InventoryQuantityInput {
 
   """The new quantity, 0 or more."""
   quantity: Int!
+}
+
+"""
+Inventory reports (ANL-05): of the shop's tracked variants, what sold of what there was to sell over a period, how long ago the stock on hand last sold, and what ran out.
+"""
+type InventoryReport {
+  ageing: [InventoryAgeing!]!
+  days: Int!
+  onHand: Int!
+
+  """Variants with none available now."""
+  outNow: Int!
+
+  """Variants that ran out, or were out, in the period."""
+  ranOut: Int!
+  rows: [InventoryReportRow!]!
+  sellThrough: Float
+  since: DateTime!
+  sold: Int!
+}
+
+"""One variant in an inventory report."""
+type InventoryReportRow {
+  available: Int!
+
+  """What one costs the shop; null for none."""
+  cost: Money
+
+  """
+  Days it had none for sale in the period, to one decimal, at the location it was out longest.
+  """
+  daysOut: Float!
+  daysSinceSale: Int
+
+  """Null when it never sold."""
+  lastSoldAt: DateTime
+
+  """At all the shop’s locations, now."""
+  onHand: Int!
+  productId: ID!
+  productTitle: String!
+
+  """
+  Of sold and available now, the share sold, in percent; null with neither.
+  """
+  sellThrough: Float
+  sku: String
+
+  """Units sold in the period, less those released."""
+  sold: Int!
+
+  """How many times it ran out there in the period."""
+  stockouts: Int!
+  variantId: ID!
+  variantTitle: String!
+}
+
+"""
+Which of an inventory report's variants it lists, and in what order (ANL-05).
+"""
+enum InventoryReportSortKey {
+  """Those that sold, the most sold of what they had first."""
+  SELL_THROUGH
+
+  """
+  Those with stock on hand, what never sold first, then what sold longest ago.
+  """
+  SLOWEST
+
+  """Those that ran out or were out, the longest out first."""
+  STOCKOUTS
 }
 
 input InventorySetQuantitiesInput {
@@ -10953,6 +11046,18 @@ type Query {
     """
     locationId: ID
   ): LowStockItemConnection!
+
+  """
+  Sell-through, how long ago stock last sold, and stock-outs, over the last 7, 30 or 90 days.
+  """
+  inventoryReport(
+    """7, 30 or 90."""
+    days: Int! = 30
+
+    """1 to 250."""
+    first: Int! = 50
+    sortKey: InventoryReportSortKey! = SELL_THROUGH
+  ): InventoryReport!
 
   """The shop's inventory settings."""
   inventorySettings: InventorySettings!

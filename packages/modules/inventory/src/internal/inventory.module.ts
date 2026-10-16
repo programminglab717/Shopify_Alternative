@@ -5,6 +5,8 @@ import { ProductPreorderResolver } from './graphql/preorder.resolver.js';
 import { LocationResolver } from './graphql/location.resolver.js';
 import { LowStockItemResolver, LowStockResolver } from './graphql/low-stock.resolver.js';
 import { StockValueResolver } from './graphql/stock-value.resolver.js';
+import { InventoryReportResolver } from './graphql/inventory-report.resolver.js';
+import { InventoryReportService } from './inventory-report.service.js';
 import {
   LowStockReorderResolver,
   PurchaseOrderLineResolver,
@@ -39,6 +41,7 @@ import { TransferService } from './transfer.service.js';
     PurchaseOrderService,
     TransferService,
     StockValueService,
+    InventoryReportService,
     PreorderService,
     ProductPreorderResolver,
     LocationResolver,
@@ -51,6 +54,7 @@ import { TransferService } from './transfer.service.js';
     LowStockItemResolver,
     LowStockReorderResolver,
     StockValueResolver,
+    InventoryReportResolver,
     InventoryItemResolver,
     InventoryChangeResolver,
     VariantInventoryResolver,

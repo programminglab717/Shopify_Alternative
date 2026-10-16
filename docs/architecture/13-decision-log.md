@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-454 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-455 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -462,6 +462,7 @@
 | 452 | A product's page in the admin sells it as a gift card with one box, saved at once, and themes read Shopify's product.gift_card? and a cart line's gift_card | Accepted |
 | 453 | Loyalty is cashback: a recipe of the shop's automations gives back a share of each delivered, paid order's goods in store credit, once, lasting the days it sets, which checkout spends | Accepted |
 | 454 | A product's page in Hatti Base says what delivery costs and takes to each of the shop's cities, and links its returns, as trust elements | Accepted |
+| 455 | Inventory reports are worked out from the stock ledger when asked: sell-through over 7, 30 or 90 days, how long ago the stock on hand last sold with its cost, and what ran out and for how long | Accepted |
 
 ---
 
@@ -17340,3 +17341,33 @@
   * **A city picker that works out one city's charge:** a script, for what a short list says to
     everyone at once.
   * **The policy's text on the page:** long; a line and a link is what shoppers read.
+
+## ADR-455 · Inventory reports are worked out from the stock ledger when asked: sell-through over 7, 30 or 90 days, how long ago the stock on hand last sold with its cost, and what ran out and for how long
+
+* **Context:**
+  * ANL-05 asks for inventory reports: sell-through, ageing and stock-outs. Hatti can already
+    tell what each variant sold in 30 days (ADR-368) and what the stock is worth (ADR-369).
+  * The stock ledger keeps every movement, with what was available after it at its location
+    (migration 0005), which is all these reports need.
+* **Decision:**
+  * `inventoryReport(days, sortKey, first)`, for those who read stock and products, over the
+    last 7, 30 or 90 days, for the shop's tracked variants of products not archived. It is
+    worked out when asked, from the ledger, as the stock's worth is.
+  * **Sell-through:** units sold in the period, committed to orders less those released (as
+    ADR-368 counts them), of those sold and those available now, in percent. Available, not on
+    hand: units sold but not shipped are on hand still.
+  * **Ageing:** stock on hand by how long ago it last sold, within 30 days, 31 to 60, 61 to 90,
+    more, or never, with its units and its value at cost, as the stock's worth counts it.
+  * **Stock-outs:** for each variant, the days in the period it had none available, and how
+    many times it ran out, at the location where it was out longest.
+  * The variants are listed, up to 250, by one of three: the best sell-through first, of those
+    that sold; the slowest, of those with stock, what never sold first; or the longest out, of
+    those that ran out.
+* **Consequences:**
+  * A shop sees what to reorder, what to discount and what it ran out of, from one query.
+  * Not yet: the admin's page for it, reports by product rather than variant, and a CSV.
+* **Alternatives:**
+  * **Daily snapshots of stock:** a table to keep and a job to fill it, for what the ledger
+    already holds.
+  * **Out of stock at all locations together:** most shops have one location; for the rest, the
+    worst location says what shoppers there met.

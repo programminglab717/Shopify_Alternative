@@ -1301,6 +1301,32 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
         { location: { name: 'Store' }, units: 1, value: { amount: '950.00' } },
       ],
     });
+    // Inventory reports (ANL-05, ADR-455): nothing sold yet, so all of it never sold.
+    const report = await gql(
+      token,
+      `{ inventoryReport(days: 30, sortKey: SLOWEST, first: 5) {
+           days sold onHand sellThrough
+           ageing { bucket units value { amount } }
+           rows { variantTitle onHand sold daysSinceSale cost { amount } }
+         } }`,
+    );
+    expect(report.data?.inventoryReport).toMatchObject({
+      days: 30,
+      sold: 0,
+      onHand: 5,
+      sellThrough: 0,
+      rows: [
+        { variantTitle: 'M', onHand: 4, sold: 0, daysSinceSale: null, cost: { amount: '1200.00' } },
+        { variantTitle: 'S', onHand: 1, sold: 0, daysSinceSale: null, cost: { amount: '950.00' } },
+      ],
+    });
+    expect(report.data?.inventoryReport.ageing.at(-1)).toEqual({
+      bucket: 'NEVER',
+      units: 5,
+      value: { amount: '5750.00' },
+    });
+    const badDays = await gql(token, '{ inventoryReport(days: 12) { sold } }');
+    expect(badDays.errors?.[0]?.message).toBe('days must be 7, 30 or 90');
 
     const changed = await mutate(
       token,
@@ -1497,6 +1523,8 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     const worth = await gql(tokens.aProductsOnly, '{ inventoryValue { units } }');
     expect(worth.errors?.[0]?.message).toContain('read_inventory');
     expect((await gql(tokens.aStockReader, '{ inventoryValue { units } }')).errors).toBeUndefined();
+    const reportDenied = await gql(tokens.aProductsOnly, '{ inventoryReport { sold } }');
+    expect(reportDenied.errors?.[0]?.message).toContain('read_inventory');
   });
 
   it('rejects malformed ids', async () => {
