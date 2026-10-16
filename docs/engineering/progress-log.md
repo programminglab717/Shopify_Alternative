@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Prohibited-items screening
+### 377dc3b · Prohibited-items screening
 
 * **A product whose words name goods Hatti does not allow selling stays a draft: never on sale
   until its words change or Hatti's people clear them** ([ADR-473](../architecture/13-decision-log.md#adr-473--a-product-whose-words-name-goods-hatti-does-not-allow-selling-stays-a-draft-never-on-sale-until-its-words-change-or-hattis-people-clear-them), TNS-03).
