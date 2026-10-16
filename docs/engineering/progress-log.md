@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Stores taken down
+### 55c1aff · Stores taken down
 
 * **Hatti's people take a store down when its reports are upheld, and restore it** ([ADR-461](../architecture/13-decision-log.md#adr-461--hattis-people-take-a-store-down-when-its-reports-are-upheld-the-shop-suspended-its-storefront-answering-with-hattis-page-saying-so-its-checkout-and-admin-closed-its-owner-told-why-and-restored-the-same-way),
   TNS-01). The shop is suspended. Its storefront answers with Hatti's page saying so, and its
