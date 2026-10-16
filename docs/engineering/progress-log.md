@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### A sale's countdown and honest low stock
+### cd32dd0 · A sale's countdown and honest low stock
 
 * **Hatti Base's product page counts down to the end of the sale a product is in, and says "Only
   3 left" only where 5 or fewer are** ([ADR-445](../architecture/13-decision-log.md#adr-445--a-products-page-counts-down-to-its-running-sales-end-and-says-how-many-are-left-only-where-5-or-fewer-are-as-shopifys-inventory_quantity), MKT-14). Both are real: the sale's own end, and
