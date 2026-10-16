@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Related products
+### 534807b · Related products
 
 * **Each product's related products** ([ADR-434](../architecture/13-decision-log.md#adr-434--related-products-worked-out-as-each-products-document-is-built-and-served-as-shopifys-product-recommendations-for-hatti-bases-product-page-to-ask-for), MKT-09) are worked out as its storefront
   document is built: those sharing more of its collections, then its type's, then its
