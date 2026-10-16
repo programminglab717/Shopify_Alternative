@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### AI drafts of translations
+### 19b670f · AI drafts of translations
 
 * **AI drafts a resource's Urdu through one gateway whose model and key come from the host's
   configuration; drafts are never kept, the shop checks and saves them** ([ADR-463](../architecture/13-decision-log.md#adr-463--ai-drafts-a-resources-urdu-through-one-gateway-whose-model-and-key-come-from-the-hosts-configuration-drafts-are-never-kept-the-shop-checks-and-saves-them-as-translations-and-each-ask-is-logged-with-its-tokens-a-hundred-a-day), CAT-07, the
