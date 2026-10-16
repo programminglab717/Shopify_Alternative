@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-432 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-433 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -440,6 +440,7 @@
 | 430 | Back in stock on the automations page: turned on and off alone, sent from Hatti's number with no template to choose | Accepted |
 | 431 | Back in stock on the storefront: Hatti's back_in_stock form on a sold-out variant's page, sent on to the core and back to the page | Accepted |
 | 432 | COD to prepaid: a confirmed cash-on-delivery order's customer offered store credit for paying the rest online before it is packed, given once it is paid in full | Accepted |
+| 433 | COD to prepaid on the automations page: on and off, with the store credit it offers, sent from Hatti's number with no template to choose | Accepted |
 
 ---
 
@@ -16607,3 +16608,28 @@
   * **The offer at checkout or on the thank-you page:** paying online at checkout already takes
     the shop's discount for it (ADR-222). This reaches those who chose cash on delivery, once
     they meant it.
+
+## ADR-433 · COD to prepaid on the automations page: on and off, with the store credit it offers, sent from Hatti's number with no template to choose
+
+* **Context:**
+  * COD to prepaid (ADR-432) is a recipe of the shop's automations with a setting of its own:
+    the store credit it offers, Rs 10 to Rs 10,000. It sends Hatti's own template, as back in
+    stock does, whose card has no template to choose (ADR-430).
+* **Decision:**
+  * **COD to prepaid gets its card** on Marketing's automations page, with the other recipes:
+    what it does, the credit it offers in rupees, and its switch.
+    * It has no template to choose. The card says it goes from Hatti's number with the order's
+      page, only while the shop takes payments online, and that the credit is given once the
+      order is paid in full.
+    * The credit is checked before it is sent: Rs 10 to Rs 10,000. Saving sends whether it is on
+      and the credit; the core's refusals are shown as they come.
+  * **Messages' list** names its messages, and its settings page counts the kind among those
+    always sent, which the shop cannot turn off there.
+  * Its words are in English and Urdu.
+* **Consequences:**
+  * MKT-04's recipes are all in: abandoned checkout, welcome, review request, win-back, back in
+    stock and COD to prepaid. Its flow builder waits for GROWTH.
+* **Alternatives:**
+  * **The credit in Settings → Checkout, with the discount for paying online:** that discount is
+    taken at checkout (ADR-222). This offer goes after an order is placed, as the other recipes
+    do, and the shop turns it on where it turns them on.

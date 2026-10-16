@@ -82,6 +82,14 @@ function core(role: StaffRole, options: { templates?: unknown[]; broadcasts?: un
     { kind: 'WELCOME', enabled: false, template: null, afterDays: null, updatedAt: null },
     { kind: 'WIN_BACK', enabled: false, template: null, afterDays: 60, updatedAt: null },
     { kind: 'BACK_IN_STOCK', enabled: false, template: null, afterDays: null, updatedAt: null },
+    {
+      kind: 'COD_PREPAID',
+      enabled: false,
+      template: null,
+      afterDays: null,
+      creditAmount: { amount: '100.00', currencyCode: 'PKR' },
+      updatedAt: null,
+    },
   ];
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
@@ -155,11 +163,13 @@ function core(role: StaffRole, options: { templates?: unknown[]; broadcasts?: un
           enabled: boolean;
           templateId: string | null;
           afterDays?: number;
+          creditAmount?: string;
         };
         const chosen = (templates as { id: string; status: string }[]).find(
           (each) => each.id === input.templateId,
         );
-        if (input.enabled && variables.kind !== 'BACK_IN_STOCK' && chosen?.status !== 'APPROVED') {
+        const hatti = variables.kind === 'BACK_IN_STOCK' || variables.kind === 'COD_PREPAID';
+        if (input.enabled && !hatti && chosen?.status !== 'APPROVED') {
           return {
             marketingAutomationUpdate: {
               marketingAutomation: null,
@@ -180,6 +190,9 @@ function core(role: StaffRole, options: { templates?: unknown[]; broadcasts?: un
                 enabled: input.enabled,
                 template: chosen ?? null,
                 afterDays: input.afterDays ?? each.afterDays,
+                ...(input.creditAmount && {
+                  creditAmount: { amount: `${input.creditAmount}.00`, currencyCode: 'PKR' },
+                }),
                 updatedAt: LATER,
               }
             : each,
@@ -514,5 +527,42 @@ describe('Marketing: automations (MKT-04, ADR-428)', () => {
         ),
       ).toBeTruthy(),
     );
+  });
+
+  it('turns COD to prepaid on with the store credit it offers, checked first (ADR-433)', async () => {
+    const fake = core('marketer', { templates: [] });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/marketing/automations');
+
+    const heading = { name: 'COD to prepaid' };
+    const form = (await screen.findByRole('heading', heading)).closest('form')!;
+    expect(within(form).queryByLabelText('Template')).toBeNull();
+    expect(within(form).getByText(/the order's page, which takes the payment/)).toBeTruthy();
+    const credit = within(form).getByLabelText('Store credit offered (Rs)') as HTMLInputElement;
+    expect(credit.value).toBe('100');
+    // Past what it may offer: said before anything is sent.
+    fireEvent.change(credit, { target: { value: '20000' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    expect(
+      await within(form).findByText('Offer between Rs 10 and Rs 10,000 of store credit.'),
+    ).toBeTruthy();
+    expect(fake.sent.some((each) => each.operation === 'MarketingAutomationUpdate')).toBe(false);
+
+    fireEvent.change(credit, { target: { value: '250' } });
+    fireEvent.click(within(form).getByLabelText('Send it'));
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(
+        fake.sent.find((each) => each.operation === 'MarketingAutomationUpdate')?.variables,
+      ).toEqual({ kind: 'COD_PREPAID', input: { enabled: true, creditAmount: '250' } }),
+    );
+    // Saved, the card comes again as the core keeps it.
+    await waitFor(() => {
+      const again = screen.getByRole('heading', heading).closest('form')!;
+      expect(within(again).getByText('On')).toBeTruthy();
+      expect(
+        (within(again).getByLabelText('Store credit offered (Rs)') as HTMLInputElement).value,
+      ).toBe('250');
+    });
   });
 });

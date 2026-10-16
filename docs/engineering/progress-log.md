@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: COD to prepaid's card on the admin's
-automations page, with the credit it offers, which finishes MKT-04's recipes. Urdu handles wait,
-as decided.
+**Next, section by section as the alpha's shops need them**: MKT-09's upsells, related products
+on Hatti Base's product page and cart, then the one-tap offer on a cash-on-delivery order's page
+until it is packed (05 §8). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,13 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### COD to prepaid in the admin
+
+* **COD to prepaid has its card** on Marketing's automations page ([ADR-433](../architecture/13-decision-log.md#adr-433--cod-to-prepaid-on-the-automations-page-on-and-off-with-the-store-credit-it-offers-sent-from-hattis-number-with-no-template-to-choose), MKT-04): the shop
+  turns it on and off and sets the store credit it offers, with no template to choose.
+* Messages' list and settings name its messages. MKT-04's recipes are all in.
+* 2847 tests, from 2846: one for the admin.
 
 ### fba1101 · COD to prepaid
 

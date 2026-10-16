@@ -22,8 +22,20 @@ import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { BackToMarketing, NoNumberHint } from './templates-page';
 
-/** Recipes that send Hatti's own template from its number, choosing none of the shop's (ADR-429). */
-const FROM_HATTI: readonly MarketingAutomationKind[] = ['BACK_IN_STOCK'];
+/**
+ * Recipes that send Hatti's own template from its number, choosing none of the shop's (ADR-429,
+ * ADR-432).
+ */
+const FROM_HATTI: readonly MarketingAutomationKind[] = ['BACK_IN_STOCK', 'COD_PREPAID'];
+
+/** The store credit COD to prepaid may offer, in rupees (ADR-432), and as the page says them. */
+const CREDIT_RUPEES = { min: 10, max: 10_000 } as const;
+const CREDIT_WORDS = { min: '10', max: '10,000' } as const;
+
+/** An amount as the core gives it, "100.00", as a merchant types it, "100". */
+function rupeesOf(amount: string | undefined): string {
+  return amount?.replace(/\.00$/, '') ?? '';
+}
 
 /** The days a win-back may wait after the customer's last order (ADR-425). */
 const WIN_BACK_DAYS = { min: 14, max: 365 } as const;
@@ -49,14 +61,21 @@ function Recipe({
     MarketingAutomationUpdateData,
     {
       kind: MarketingAutomationKind;
-      input: { enabled: boolean; templateId?: string | null; afterDays?: number | null };
+      input: {
+        enabled: boolean;
+        templateId?: string | null;
+        afterDays?: number | null;
+        creditAmount?: string;
+      };
     }
   >(MarketingAutomationUpdateMutation);
   const winBack = automation.kind === 'WIN_BACK';
+  const prepaid = automation.kind === 'COD_PREPAID';
   const hatti = FROM_HATTI.includes(automation.kind);
   const [enabled, setEnabled] = useState(automation.enabled);
   const [templateId, setTemplateId] = useState(automation.template?.id ?? '');
   const [days, setDays] = useState(String(automation.afterDays ?? ''));
+  const [credit, setCredit] = useState(rupeesOf(automation.creditAmount?.amount));
   const [problem, setProblem] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   // The approved templates, and the one chosen whatever Meta made of it since.
@@ -66,7 +85,8 @@ function Recipe({
   const changed =
     enabled !== automation.enabled ||
     templateId !== (automation.template?.id ?? '') ||
-    (winBack && days.trim() !== String(automation.afterDays ?? ''));
+    (winBack && days.trim() !== String(automation.afterDays ?? '')) ||
+    (prepaid && credit.trim() !== rupeesOf(automation.creditAmount?.amount));
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -86,6 +106,18 @@ function Recipe({
         return;
       }
     }
+    if (prepaid) {
+      const rupees = Number(credit.trim());
+      if (
+        credit.trim() === '' ||
+        !Number.isFinite(rupees) ||
+        rupees < CREDIT_RUPEES.min ||
+        rupees > CREDIT_RUPEES.max
+      ) {
+        setProblem(t('automations.badCredit', CREDIT_WORDS));
+        return;
+      }
+    }
     try {
       const { marketingAutomationUpdate } = await update.mutateAsync({
         kind: automation.kind,
@@ -93,6 +125,7 @@ function Recipe({
           enabled,
           ...(!hatti && { templateId: templateId || null }),
           ...(winBack && { afterDays }),
+          ...(prepaid && { creditAmount: credit.trim() }),
         },
       });
       const error = marketingAutomationUpdate.userErrors[0];
@@ -124,7 +157,7 @@ function Recipe({
         </div>
         {hatti ? (
           <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-            {t('automations.fromHatti')}
+            {t(prepaid ? 'automations.codPrepaidFromHatti' : 'automations.fromHatti')}
           </p>
         ) : (
           <SelectField<string>
@@ -150,6 +183,16 @@ function Recipe({
             onChange={(event) => setDays(event.target.value)}
           />
         )}
+        {prepaid && (
+          <TextField
+            label={t('automations.credit')}
+            hint={t('automations.creditHint', CREDIT_WORDS)}
+            inputMode="decimal"
+            ltr
+            value={credit}
+            onChange={(event) => setCredit(event.target.value)}
+          />
+        )}
         <CheckField label={t('automations.on')} checked={enabled} onChange={setEnabled} />
         {problem && <Alert tone="danger">{problem}</Alert>}
         {saved && !changed && <Alert tone="success">{t('automations.saved')}</Alert>}
@@ -170,8 +213,10 @@ function Recipe({
 /**
  * Marketing's automations (MKT-04, ADR-428): a welcome to a customer who agrees to hear from the
  * shop on WhatsApp, and a win-back some days after a customer's last order, each sending one of
- * the shop's approved templates from its own number once turned on; and back in stock, which
- * tells shoppers who asked when a sold-out variant sells again, from Hatti's number (ADR-430).
+ * the shop's approved templates from its own number once turned on; back in stock, which tells
+ * shoppers who asked when a sold-out variant sells again, from Hatti's number (ADR-430); and COD
+ * to prepaid, which offers the store credit the shop sets for paying a confirmed cash-on-delivery
+ * order online, from Hatti's number too (ADR-433).
  */
 export function AutomationsPage() {
   const { t } = useLocale();

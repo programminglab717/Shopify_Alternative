@@ -7566,6 +7566,10 @@ const MARKETING_AUTOMATION = /* GraphQL */ `
     kind
     enabled
     afterDays
+    creditAmount {
+      amount
+      currencyCode
+    }
     updatedAt
     template {
       id

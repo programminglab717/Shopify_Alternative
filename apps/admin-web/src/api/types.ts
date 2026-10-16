@@ -3271,7 +3271,7 @@ export interface WhatsAppTemplate {
 }
 
 /** One of the shop's automations' recipes (MKT-04, ADR-425). */
-export type MarketingAutomationKind = 'WELCOME' | 'WIN_BACK' | 'BACK_IN_STOCK';
+export type MarketingAutomationKind = 'WELCOME' | 'WIN_BACK' | 'BACK_IN_STOCK' | 'COD_PREPAID';
 
 /** A template as an automation names it. */
 export type AutomationTemplate = Pick<WhatsAppTemplate, 'id' | 'name' | 'language' | 'status'>;
@@ -3281,6 +3281,8 @@ export interface MarketingAutomation {
   enabled: boolean;
   /** For a win-back: how many days after the customer's last order. */
   afterDays: number | null;
+  /** For COD to prepaid: the store credit it offers (ADR-432). */
+  creditAmount: MoneyValue | null;
   updatedAt: string | null;
   template: AutomationTemplate | null;
 }

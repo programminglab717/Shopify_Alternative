@@ -3606,6 +3606,14 @@ const en = {
     "Once, to a shopper who asked on a sold-out product's page to hear when it is back.",
   'automations.fromHatti':
     "Sent from Hatti's WhatsApp number, naming the product with a link to it, so it needs no template of yours. While it is on, sold-out product pages offer the form.",
+  'automations.COD_PREPAID': 'COD to prepaid',
+  'automations.COD_PREPAID.hint':
+    'Once a cash-on-delivery order is confirmed: store credit offered for paying the rest online before it is packed.',
+  'automations.codPrepaidFromHatti':
+    "Sent from Hatti's WhatsApp number with the order's page, which takes the payment, so it needs no template of yours. It goes only while you take payments online, and the credit is given once the order is paid in full.",
+  'automations.credit': 'Store credit offered (Rs)',
+  'automations.creditHint': 'From Rs {min} to Rs {max}, given for their next order.',
+  'automations.badCredit': 'Offer between Rs {min} and Rs {max} of store credit.',
   'automations.isOn': 'On',
   'automations.isOff': 'Off',
   'automations.on': 'Send it',
@@ -3713,6 +3721,7 @@ const en = {
   'messages.kind.BROADCAST': 'Broadcast',
   'messages.kind.AUTOMATION': 'Automation',
   'messages.kind.BACK_IN_STOCK': 'Back in stock',
+  'messages.kind.COD_PREPAID': 'COD to prepaid',
   'activity.subject.product_review': 'Review',
   'activity.subject.review_settings': 'Review settings',
   'activity.verb.written': 'written',
@@ -7392,6 +7401,14 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'ایک بار، اس خریدار کو جس نے ختم شدہ پروڈکٹ کے صفحے پر پوچھا کہ یہ دوبارہ کب آئے گی۔',
   'automations.fromHatti':
     'ہٹی کے واٹس ایپ نمبر سے، پروڈکٹ کے نام اور لنک کے ساتھ جاتا ہے، اس لیے آپ کے کسی ٹیمپلیٹ کی ضرورت نہیں۔ جب یہ آن ہو تو ختم شدہ پروڈکٹس کے صفحات پر فارم نظر آتا ہے۔',
+  'automations.COD_PREPAID': 'کیش آن ڈیلیوری سے پیشگی ادائیگی',
+  'automations.COD_PREPAID.hint':
+    'کیش آن ڈیلیوری آرڈر کنفرم ہونے پر: پیک ہونے سے پہلے باقی رقم آن لائن ادا کرنے پر اسٹور کریڈٹ کی پیشکش۔',
+  'automations.codPrepaidFromHatti':
+    'ہٹی کے واٹس ایپ نمبر سے آرڈر کے صفحے کے ساتھ جاتا ہے، جہاں ادائیگی ہوتی ہے، اس لیے آپ کے کسی ٹیمپلیٹ کی ضرورت نہیں۔ یہ صرف تب جاتا ہے جب آپ آن لائن ادائیگیاں لیتے ہوں، اور پوری رقم ادا ہونے پر کریڈٹ دیا جاتا ہے۔',
+  'automations.credit': 'پیش کردہ اسٹور کریڈٹ (روپے)',
+  'automations.creditHint': '{min} سے {max} روپے تک، اگلے آرڈر کے لیے۔',
+  'automations.badCredit': '{min} سے {max} روپے تک کا اسٹور کریڈٹ پیش کریں۔',
   'automations.isOn': 'آن',
   'automations.isOff': 'آف',
   'automations.on': 'بھیجیں',
@@ -7502,6 +7519,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.kind.BROADCAST': 'براڈکاسٹ',
   'messages.kind.AUTOMATION': 'خودکار پیغام',
   'messages.kind.BACK_IN_STOCK': 'دوبارہ اسٹاک میں',
+  'messages.kind.COD_PREPAID': 'کیش آن ڈیلیوری سے پیشگی ادائیگی',
   'activity.subject.product_review': 'ریویو',
   'activity.subject.review_settings': 'ریویو کی ترتیبات',
   'activity.verb.written': 'لکھا گیا',
