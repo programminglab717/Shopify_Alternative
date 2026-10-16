@@ -36,7 +36,9 @@ export type FieldErrorCode =
   /** Less store credit than a debit asks for (ADR-184), as Shopify's code says. */
   | 'INSUFFICIENT_FUNDS'
   /** More store credit than an account may hold (ADR-184), as Shopify's code says. */
-  | 'CREDIT_LIMIT_EXCEEDED';
+  | 'CREDIT_LIMIT_EXCEEDED'
+  /** What Hatti's Acceptable Use Policy forbids selling (ADR-473): it may stay a draft. */
+  | 'PROHIBITED';
 
 export interface FieldError {
   /** Path to the input field at fault, e.g. ["input", "title"]. */

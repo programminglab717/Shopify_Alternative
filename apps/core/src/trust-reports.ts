@@ -1,4 +1,5 @@
 import { PublicSite } from '@hatti/api';
+import { ProductService } from '@hatti/catalog/public';
 import { Database } from '@hatti/db';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import { MessagesService, SmsSendersService, type SmsSenderReview } from '@hatti/messaging/public';
@@ -60,6 +61,11 @@ import { approveVerification, refuseVerification, revokeVerification } from './v
 //   pnpm --filter @hatti/core trust-reports approve-sender snd_… --by Ayesha [--note "…"]
 //   pnpm --filter @hatti/core trust-reports refuse-sender snd_… --by Ayesha --note "Jazz refused it"
 //   pnpm --filter @hatti/core trust-reports revoke-sender zari --by Ayesha --note "…"
+//
+// A product whose words name goods Hatti does not allow selling stays a draft (TNS-03, ADR-473);
+// one found by mistake is cleared for its words as they are, and may then go on sale:
+//
+//   pnpm --filter @hatti/core trust-reports clear-listing prod_… --by Ayesha
 
 const USAGE =
   'Usage: trust-reports list [--all]\n' +
@@ -77,7 +83,8 @@ const USAGE =
   '       trust-reports senders [--all]\n' +
   '       trust-reports approve-sender <request> --by <who> [--note <note>]\n' +
   '       trust-reports refuse-sender <request> --by <who> --note <why, as the shop is told>\n' +
-  '       trust-reports revoke-sender <shop> --by <who> --note <why, as the shop is told>';
+  '       trust-reports revoke-sender <shop> --by <who> --note <why, as the shop is told>\n' +
+  '       trust-reports clear-listing <product> --by <who>';
 
 function usage(problem?: string): never {
   if (problem) console.error(problem);
@@ -94,6 +101,7 @@ type Command =
   | { command: 'approve-sender'; id: string; request: string; by: string; note: string }
   | { command: 'refuse-sender'; id: string; request: string; by: string; note: string }
   | { command: 'revoke-sender'; shop: string; by: string; note: string }
+  | { command: 'clear-listing'; id: string; product: string; by: string }
   | { command: 'verify'; id: string; verification: string; by: string; note: string }
   | { command: 'refuse-verification'; id: string; verification: string; by: string; note: string }
   | { command: 'unverify'; shop: string; level: VerificationLevel; by: string; note: string }
@@ -125,7 +133,19 @@ const verifications = new VerificationsService(
 );
 const senders = new SmsSendersService(database);
 try {
-  if (parsed.command === 'senders') {
+  if (parsed.command === 'clear-listing') {
+    const cleared = await new ProductService(database).clearScreening(parsed.product);
+    if (!cleared) {
+      console.error(`No product ${parsed.id}: name it by its ID, as the shop's admin shows it.`);
+      process.exitCode = 1;
+    } else {
+      console.log(
+        `${cleared.title} cleared by ${parsed.by}` +
+          (cleared.found.length > 0 ? ` (it named ${cleared.found.join(', ')})` : '') +
+          '; it may go on sale until its words change.',
+      );
+    }
+  } else if (parsed.command === 'senders') {
     const found = await senders.list({ all: parsed.all });
     if (found.length === 0) {
       console.log(parsed.all ? 'No sender name asked for yet.' : 'No sender name is waiting.');
@@ -407,7 +427,8 @@ function parseCommand(args: string[]): Command {
     command !== 'unverify' &&
     command !== 'approve-sender' &&
     command !== 'refuse-sender' &&
-    command !== 'revoke-sender'
+    command !== 'revoke-sender' &&
+    command !== 'clear-listing'
   ) {
     throw new Error('Say what to do');
   }
@@ -418,17 +439,22 @@ function parseCommand(args: string[]): Command {
         command === 'unverify' ||
         command === 'revoke-sender'
         ? 'Name the shop, by its handle'
-        : command === 'approve-sender' || command === 'refuse-sender'
-          ? 'Name the request, as the list of senders shows it'
-          : command === 'verify' || command === 'refuse-verification'
-            ? 'Name the verification, as the list of verifications shows it'
-            : command === 'refuse'
-              ? 'Name the appeal, as the list of appeals shows it'
-              : 'Name the report, as the list shows it',
+        : command === 'clear-listing'
+          ? "Name the product, by its ID as the shop's admin shows it"
+          : command === 'approve-sender' || command === 'refuse-sender'
+            ? 'Name the request, as the list of senders shows it'
+            : command === 'verify' || command === 'refuse-verification'
+              ? 'Name the verification, as the list of verifications shows it'
+              : command === 'refuse'
+                ? 'Name the appeal, as the list of appeals shows it'
+                : 'Name the report, as the list shows it',
     );
   }
   const by = values.by?.trim();
   if (!by) throw new Error("Say who among Hatti's people decided it, with --by");
+  if (command === 'clear-listing') {
+    return { command, id, product: tryFromPublicId(id, 'product') ?? id, by };
+  }
   if (command === 'verify') {
     const verification = tryFromPublicId(id, 'verification') ?? id;
     return { command, id, verification, by, note: values.note?.trim() ?? '' };

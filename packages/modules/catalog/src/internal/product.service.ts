@@ -8,7 +8,7 @@ import {
 } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
-import { newId } from '@hatti/ids';
+import { isUuid, newId } from '@hatti/ids';
 import { correctionsOf, prefixKey, searchKey, typosAllowed, type Correction } from '@hatti/pk';
 import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, inArray, isNotNull, lte, ne, sql } from 'drizzle-orm';
@@ -23,6 +23,7 @@ import { handleCandidate, movedFrom, toHandle } from './handle.js';
 import { CopiedVariantStock, copyMedia, joinManualCollections } from './product-copy.js';
 import { copySizeChartIn } from './size-charts.js';
 import { productSearchConditions } from './product-filter.js';
+import { screen, screeningDigest, screeningMessage, type ScreenedWords } from './prohibited.js';
 import {
   InputChecker,
   LIMITS,
@@ -244,6 +245,11 @@ export class ProductService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const original = await loadProduct(tx, tenant.shopId, input.productId);
       if (!original) return failOne<ProductRecord>(['productId'], 'NOT_FOUND', 'Product not found');
+      // A copy on sale is screened as a new product is (ADR-473): a clearance stays with the one.
+      if ((input.newStatus ?? original.status) === 'active') {
+        const prohibited = prohibitedError(original);
+        if (prohibited) return fail<ProductRecord>([prohibited]);
+      }
       const options = [...original.options].sort((a, b) => a.position - b.position);
       // Its handle is made from its title, so never taken.
       const { product, variantIds } = (await this.#insert(
@@ -500,6 +506,11 @@ export class ProductService {
       return { fields, optionValues: optionValues ?? [] };
     });
     if (!check.ok || title === null) return { ok: false, errors: check.errors };
+    // On sale from the start: screened for what Hatti does not allow (ADR-473).
+    if (input.status === 'active') {
+      const prohibited = prohibitedError({ title, description, productType, vendor, tags });
+      if (prohibited) return { ok: false, errors: [prohibited] };
+    }
     return {
       ok: true,
       value: {
@@ -587,6 +598,12 @@ export class ProductService {
           (key) => JSON.stringify(changes[key]) !== JSON.stringify(current[key]),
         );
         if (changed.length > 0) {
+          // On sale, as it is or as it becomes: screened for what Hatti does not allow (ADR-473).
+          const next = { ...current, ...changes };
+          if (next.status === 'active' && changed.some((key) => SCREENED.includes(key))) {
+            const prohibited = prohibitedError(next, next.screeningCleared);
+            if (prohibited) return fail<ProductRecord>([prohibited]);
+          }
           if (changed.includes('handle') && changes.handle) {
             const [taken] = await tx
               .select({ id: products.id })
@@ -607,7 +624,6 @@ export class ProductService {
             }
           }
 
-          const next = { ...current, ...changes };
           const [updated] = await tx
             .update(products)
             .set({
@@ -731,14 +747,39 @@ export class ProductService {
     for (const id of ids) {
       const done = await this.#change({ shopId, currency }, id, ['id'], (current) => {
         if (!current.publishAt || current.publishAt.getTime() > Date.now()) return null;
-        // One archived since keeps its status; its time goes either way.
-        return current.status === 'draft'
+        // One archived since keeps its status, as one naming what Hatti does not allow stays a
+        // draft (ADR-473); its time goes either way.
+        return current.status === 'draft' && !prohibitedError(current, current.screeningCleared)
           ? { status: 'active', publishAt: null }
           : { publishAt: null };
       });
       if (done.ok && done.value.status === 'active') published += 1;
     }
     return published;
+  }
+
+  /**
+   * Clears a product its screening found by mistake (TNS-03, ADR-473), for its words as they are,
+   * by Hatti's people: it may go on sale until its words change. What screening found in it, and
+   * whose it is; null for no such product.
+   */
+  async clearScreening(
+    productId: string,
+  ): Promise<{ shopId: string; title: string; found: string[] } | null> {
+    if (!isUuid(productId)) return null;
+    return this.db.system(async (tx) => {
+      const [row] = await tx.select().from(products).where(eq(products.id, productId));
+      if (!row) return null;
+      await tx
+        .update(products)
+        .set({ screeningCleared: screeningDigest(row) })
+        .where(and(eq(products.shopId, row.shopId), eq(products.id, row.id)));
+      return {
+        shopId: row.shopId,
+        title: row.title,
+        found: screen(row).flatMap((finding) => finding.words),
+      };
+    });
   }
 
   /** Shows, hides or archives many products at once (CAT-04); see {@link update}. */
@@ -1093,4 +1134,26 @@ export async function activeProductsIn(tx: Tx, shopId: string): Promise<number> 
     SELECT count(*)::int AS count FROM catalog.products
      WHERE shop_id = ${shopId} AND status = 'active'`);
   return rows[0]?.count ?? 0;
+}
+
+/** What screening looks at, of a product's columns: a change to one screens it again. */
+const SCREENED: readonly string[] = [
+  'status',
+  'title',
+  'description',
+  'productType',
+  'vendor',
+  'tags',
+];
+
+/**
+ * Why a product with these words may not be on sale (TNS-03, ADR-473), or null: none named, or
+ * Hatti's people cleared these very words, whose digest `cleared` is.
+ */
+function prohibitedError(words: ScreenedWords, cleared?: string | null): FieldError | null {
+  if (cleared && cleared === screeningDigest(words)) return null;
+  const findings = screen(words);
+  return findings.length === 0
+    ? null
+    : { field: ['input', 'status'], code: 'PROHIBITED', message: screeningMessage(findings) };
 }

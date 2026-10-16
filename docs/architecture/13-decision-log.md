@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-472 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-473 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -480,6 +480,7 @@
 | 470 | The admin's Customer messages page shows the name the shop's SMS go from, the request waiting, which may be withdrawn, and why the last was refused or taken back, and takes owners' and managers' requests | Accepted |
 | 471 | A product's title, description and search engine words are drafted with AI from what the shop says of it, in English, Urdu or Roman Urdu, never kept, a hundred a day | Accepted |
 | 472 | The admin's product form writes a product's title and description with AI in the language chosen, from what the form says, for the shop to check before it saves | Accepted |
+| 473 | A product whose words name goods Hatti does not allow selling stays a draft: never on sale until its words change or Hatti's people clear them | Accepted |
 
 ---
 
@@ -17906,3 +17907,31 @@
 * **Alternatives:**
   * **Filling only empty boxes, as the Urdu pages do (ADR-464):** a seller writing copy wants
     their few words rewritten, not left as they are.
+
+## ADR-473 · A product whose words name goods Hatti does not allow selling stays a draft: never on sale until its words change or Hatti's people clear them
+
+* **Context:**
+  * Hatti's Acceptable Use Policy forbids goods Pakistani law does (11 §6): weapons, drugs,
+    alcohol, prescription medicines, counterfeit copies of other brands, protected wildlife and
+    gambling. TNS-03 asks for them to be caught as they are listed, not only once reported
+    (ADR-460).
+  * Words catch most such listings, but not all, and some innocent ones ("ivory" is a colour,
+    "silencer" a car part); a mistaken refusal must not end a shop's sale for good.
+* **Decision:**
+  * **The catalog keeps Hatti's list** of words, in English, Roman Urdu and Urdu, for each kind
+    of goods. A product's title, description, type, vendor and tags are screened as whole words:
+    "gunmetal" names no gun. Words too often innocent are left out or kept only in phrases.
+  * **Screening runs whenever a product would be on sale:** created, copied or imported as
+    active, put on sale by hand or many at once, or its words changed while on sale. One that
+    names prohibited goods is refused with `PROHIBITED`, saying what was found and that it may
+    stay a draft. A draft whose time to go on sale comes stays a draft, its time gone.
+  * **Hatti's people clear a product found by mistake** with `trust-reports clear-listing`: the
+    digest of its words is kept, and it may go on sale until those words change.
+* **Consequences:**
+  * Drafts hold anything; nothing named on the list reaches a storefront without a person.
+  * The list is code, changed and reviewed as code is.
+* **Alternatives:**
+  * **Holding a matched product for review instead of refusing it:** a queue for Hatti's people
+    for every match, most of them a seller who should simply change a word.
+  * **Screening images too:** as the catalog notes, V1 matches words; images wait for a model
+    that can tell a toy from a pistol.

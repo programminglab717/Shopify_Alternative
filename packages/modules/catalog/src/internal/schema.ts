@@ -77,6 +77,11 @@ export const products = catalogSchema.table(
     publishAt: timestamp('publish_at', { withTimezone: true }),
     /** Sold as a gift card, as Shopify's `isGiftCard` (CAT-12, ADR-451). */
     giftCard: boolean('gift_card').notNull().default(false),
+    /**
+     * The digest of its words as Hatti's people cleared them of prohibited-items screening
+     * (TNS-03, ADR-473); null where they have not.
+     */
+    screeningCleared: text('screening_cleared'),
     version: integer('version').notNull().default(1),
     ...timestamps,
   },
