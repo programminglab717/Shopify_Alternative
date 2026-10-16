@@ -1910,6 +1910,24 @@ export interface ShopVerificationSubmitData {
   };
 }
 
+export type CopyLanguage = 'ENGLISH' | 'URDU' | 'ROMAN_URDU';
+
+export interface ProductCopyDraftingData {
+  productCopyDrafting: { available: boolean; usedToday: number; limitPerDay: number };
+}
+
+export interface ProductCopyDraftData {
+  productCopyDraft: {
+    draft: {
+      title: string;
+      descriptionHtml: string;
+      seoTitle: string;
+      seoDescription: string;
+    } | null;
+    userErrors: UserError[];
+  };
+}
+
 export interface TranslationDraftingData {
   translationDrafting: { available: boolean; usedToday: number; limitPerDay: number };
 }

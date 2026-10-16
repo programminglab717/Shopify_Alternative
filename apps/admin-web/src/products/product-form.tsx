@@ -8,6 +8,7 @@ import type { MessageKey } from '../i18n/messages';
 import { useAdminQuery } from '../shell/shop-context';
 import { Card } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { CopyDraft } from './copy-draft';
 import { PRODUCT_STATUSES } from './status';
 
 /** A product's own details as the form holds them; tags as the merchant types them. */
@@ -149,9 +150,14 @@ export function TextArea({
 export function DetailsFields({
   details,
   onChange,
+  productId,
+  options,
 }: {
   details: DetailsState;
   onChange: (details: DetailsState) => void;
+  /** The product, once there is one, and its options, for writing its copy with AI. */
+  productId?: string;
+  options?: { name: string; values: string[] }[];
 }) {
   const { t } = useLocale();
   return (
@@ -170,6 +176,7 @@ export function DetailsFields({
         value={details.description}
         onChange={(description) => onChange({ ...details, description })}
       />
+      <CopyDraft details={details} onChange={onChange} productId={productId} options={options} />
     </FormSection>
   );
 }

@@ -438,7 +438,15 @@ function ProductEditor({
       <fieldset disabled={!edits} className="contents">
         <div className="grid gap-4 md:grid-cols-[2fr_1fr] md:items-start">
           <div className="flex flex-col gap-4">
-            <DetailsFields details={details} onChange={setDetails} />
+            <DetailsFields
+              details={details}
+              onChange={setDetails}
+              productId={product.id}
+              options={product.options.map((option) => ({
+                name: option.name,
+                values: option.optionValues.map((value) => value.name),
+              }))}
+            />
             <VariantFields
               product={product}
               rows={rows}

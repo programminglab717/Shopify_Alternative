@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-471 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-472 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -479,6 +479,7 @@
 | 469 | A shop asks for its customers' SMS to come from a name of its own, which Hatti's people approve once operators register it for a verified shop; what Hatti tells the shop itself still comes from Hatti's | Accepted |
 | 470 | The admin's Customer messages page shows the name the shop's SMS go from, the request waiting, which may be withdrawn, and why the last was refused or taken back, and takes owners' and managers' requests | Accepted |
 | 471 | A product's title, description and search engine words are drafted with AI from what the shop says of it, in English, Urdu or Roman Urdu, never kept, a hundred a day | Accepted |
+| 472 | The admin's product form writes a product's title and description with AI in the language chosen, from what the form says, for the shop to check before it saves | Accepted |
 
 ---
 
@@ -17882,3 +17883,26 @@
     read.
   * **One quota for every AI feature:** translations and copy are asked for at different times
     of a product's life; each keeps its own hundred until AI costs say otherwise.
+
+## ADR-472 · The admin's product form writes a product's title and description with AI in the language chosen, from what the form says, for the shop to check before it saves
+
+* **Context:**
+  * The Admin API drafts a product's copy with AI (ADR-471). Sellers add products from their
+    phones, often with a title and a line or two; the admin's form is where copy is written.
+* **Decision:**
+  * **Under the description**, on adding a product and on its page: a choice of English, Urdu
+    or Roman Urdu, and "Write with AI", shown only where this Hatti drafts with AI.
+  * It sends what the form says: the title, the description as it stands, the type, brand and
+    tags, and on a product's page its options and values. It is not offered until there is a
+    title or a description to write from, and says how many of the day's drafts are left.
+  * **The draft fills the title and description**, its paragraphs apart and its lists as
+    bullets, since the form's description is plain text; a note asks the shop to check every
+    word, the fabric and sizes above all, before it saves. Nothing is saved until it does.
+  * The search engine words stay with the API, as the form has no search engine fields yet.
+  * In English and Urdu.
+* **Consequences:**
+  * The shop's own words go in the description first and come back rewritten; what it does not
+    like it changes before saving, or writes again.
+* **Alternatives:**
+  * **Filling only empty boxes, as the Urdu pages do (ADR-464):** a seller writing copy wants
+    their few words rewritten, not left as they are.

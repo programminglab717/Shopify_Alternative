@@ -115,7 +115,8 @@ export function fakeCore(
     }
     // A list's saved searches, asked by every orders and products page, and the product types
     // and vendors a product's form suggests: none unless answered. AI drafts of Urdu, which the
-    // Urdu pages ask after: not set up unless answered.
+    // Urdu pages ask after, and of products' copy, which their forms ask after: not set up unless
+    // answered.
     const data = /SavedSearches$/.test(operation)
       ? orElse(() => answer(operation, variables), { savedSearches: { nodes: [] } })
       : operation === 'ProductSuggestions'
@@ -124,7 +125,11 @@ export function fakeCore(
           ? orElse(() => answer(operation, variables), {
               translationDrafting: { available: false, usedToday: 0, limitPerDay: 100 },
             })
-          : answer(operation, variables);
+          : operation === 'ProductCopyDrafting'
+            ? orElse(() => answer(operation, variables), {
+                productCopyDrafting: { available: false, usedToday: 0, limitPerDay: 100 },
+              })
+            : answer(operation, variables);
     if (data instanceof GraphQLErrors) return json({ data: null, errors: data.errors });
     return json({ data });
   });

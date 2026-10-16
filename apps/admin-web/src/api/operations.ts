@@ -4546,6 +4546,35 @@ export const ShopVerificationSubmitMutation = /* GraphQL */ `
 `;
 
 /** Whether AI drafts the shop's Urdu here, and how many of the day's it asked for (CAT-07). */
+/** Whether this Hatti writes products' copy with AI, and how many of the day's drafts are used. */
+export const ProductCopyDraftingQuery = /* GraphQL */ `
+  query ProductCopyDrafting {
+    productCopyDrafting {
+      available
+      usedToday
+      limitPerDay
+    }
+  }
+`;
+
+/** A product's title and description written with AI from what its form says (CAT-20). */
+export const ProductCopyDraftMutation = /* GraphQL */ `
+  mutation ProductCopyDraft($input: ProductCopyDraftInput!) {
+    productCopyDraft(input: $input) {
+      draft {
+        title
+        descriptionHtml
+        seoTitle
+        seoDescription
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const TranslationDraftingQuery = /* GraphQL */ `
   query TranslationDrafting {
     translationDrafting {
