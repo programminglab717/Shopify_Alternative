@@ -29,6 +29,7 @@ export const MESSAGE_KINDS = [
   'order_confirmation_reminder',
   'store_credit_given',
   'store_credit_expiring',
+  'gift_card',
   'checkout_reminder',
   'checkout_offer',
   'review_request',
@@ -93,6 +94,8 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'cod_prepaid',
   // Asked for by the shopper, on the closed shop's page (ADR-446).
   'store_open',
+  // What the customer bought: the gift card's code, which no one else has (ADR-451).
+  'gift_card',
   'invoice_due',
   'plan_ended',
   'credit_low',
@@ -549,6 +552,18 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: '{shop}: {amount} of your store credit expires on {date}. Spend it on an order before then, ordering with this number.',
       ur: '{shop}: آپ کے اسٹور کریڈٹ میں سے {amount} کی میعاد {date} کو ختم ہو جائے گی۔ اس سے پہلے اسے کسی آرڈر پر استعمال کریں، اسی نمبر سے آرڈر کر کے۔',
+    },
+  },
+  gift_card: {
+    whatsapp: 'hatti_gift_card',
+    category: 'utility',
+    parameters: ['shop', 'amount', 'code'],
+    // The code is the card: kept nowhere once sent (ADR-451). No button copies it: WhatsApp's
+    // takes 15 characters, and a card's code has 16.
+    secret: true,
+    text: {
+      en: '{shop}: here is the gift card you bought, worth {amount}. Its code is {code}. Spend it at checkout, or give it to someone. Keep it safe: whoever has the code can spend it.',
+      ur: '{shop}: یہ آپ کا خریدا ہوا گفٹ کارڈ ہے، {amount} کا۔ اس کا کوڈ {code} ہے۔ اسے چیک آؤٹ پر استعمال کریں، یا کسی کو تحفے میں دیں۔ اسے سنبھال کر رکھیں: جس کے پاس کوڈ ہو وہ اسے خرچ کر سکتا ہے۔',
     },
   },
   checkout_reminder: {

@@ -27,6 +27,7 @@ export enum MessageKind {
   ORDER_CONFIRMATION_REMINDER = 'ORDER_CONFIRMATION_REMINDER',
   STORE_CREDIT_GIVEN = 'STORE_CREDIT_GIVEN',
   STORE_CREDIT_EXPIRING = 'STORE_CREDIT_EXPIRING',
+  GIFT_CARD = 'GIFT_CARD',
   CHECKOUT_REMINDER = 'CHECKOUT_REMINDER',
   CHECKOUT_OFFER = 'CHECKOUT_OFFER',
   REVIEW_REQUEST = 'REVIEW_REQUEST',
@@ -119,6 +120,11 @@ registerEnumType(MessageKind, {
       description:
         'A store credit of theirs with something left expires within the week: how much, and ' +
         'when (ADR-192). Once a credit.',
+    },
+    GIFT_CARD: {
+      description:
+        'A gift card they bought, once its order is paid: what it is worth and its code, which ' +
+        'is not kept once sent (CAT-12, ADR-451); the shop cannot turn it off.',
     },
     CHECKOUT_REMINDER: {
       description:

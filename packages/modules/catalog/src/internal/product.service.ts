@@ -89,6 +89,8 @@ export interface CreateProductInput {
    * way priced at zero until updated.
    */
   variants?: VariantFieldsInput[] | null;
+  /** Sold as a gift card, as Shopify's `giftCard` (CAT-12, ADR-451). False unless given. */
+  giftCard?: boolean | null;
 }
 
 /** Omitted (undefined) fields stay as they are; null clears optional fields. */
@@ -108,6 +110,8 @@ export interface UpdateProductInput {
    * `redirectNewHandle` does. The online store writes the redirect on the event (ADR-053).
    */
   redirectNewHandle?: boolean | null;
+  /** Sold as a gift card (ADR-451). */
+  giftCard?: boolean | null;
 }
 
 /** What `duplicate` copies, and how (ADR-343). */
@@ -144,6 +148,7 @@ interface CheckedProduct {
   tags: string[];
   seo: Partial<SeoValue>;
   requestedHandle: string | null;
+  giftCard: boolean;
   options: OptionShape[];
   /** A copy's variants keep their titles; others' are made from their option values. */
   variants: { title?: string; fields: VariantFields; optionValues: string[] }[];
@@ -163,6 +168,7 @@ type ProductChanges = Partial<
     | 'seoTitle'
     | 'seoDescription'
     | 'publishAt'
+    | 'giftCard'
   >
 >;
 
@@ -251,6 +257,7 @@ export class ProductService {
           tags: original.tags,
           seo: original.seo,
           requestedHandle: null,
+          giftCard: original.giftCard,
           options: options.map((option) => ({
             name: option.name,
             values: [...option.values]
@@ -304,8 +311,17 @@ export class ProductService {
     checked: CheckedProduct,
     status: ProductStatusValue,
   ): Promise<{ product: ProductRow; variantIds: string[] } | null> {
-    const { title, description, vendor, productType, tags, seo, requestedHandle, options } =
-      checked;
+    const {
+      title,
+      description,
+      vendor,
+      productType,
+      tags,
+      seo,
+      requestedHandle,
+      options,
+      giftCard,
+    } = checked;
     const productId = newId();
     const base = requestedHandle ?? (toHandle(title) || 'product');
     const values = {
@@ -319,6 +335,7 @@ export class ProductService {
       tags,
       seoTitle: seo.title ?? null,
       seoDescription: seo.description ?? null,
+      giftCard,
       searchText: searchTextOf({ title, vendor, productType, tags }),
     };
 
@@ -493,6 +510,7 @@ export class ProductService {
         tags,
         seo,
         requestedHandle,
+        giftCard: input.giftCard === true,
         options,
         variants: variantValues,
       },
@@ -540,6 +558,7 @@ export class ProductService {
     const seo = checkSeo(check, ['input', 'seo'], input.seo);
     if (seo.title !== undefined) changes.seoTitle = seo.title;
     if (seo.description !== undefined) changes.seoDescription = seo.description;
+    if (input.giftCard !== undefined && input.giftCard !== null) changes.giftCard = input.giftCard;
     if (!check.ok) return fail(check.errors);
 
     return this.#change(tenant, input.id, ['input', 'id'], () => changes, input.redirectNewHandle);

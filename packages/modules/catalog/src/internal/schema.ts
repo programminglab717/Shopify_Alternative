@@ -75,6 +75,8 @@ export const products = catalogSchema.table(
     translatedText: text('translated_text').notNull().default(''),
     /** When a draft goes on sale by itself (CAT-17, ADR-441); null for no time set. */
     publishAt: timestamp('publish_at', { withTimezone: true }),
+    /** Sold as a gift card, as Shopify's `isGiftCard` (CAT-12, ADR-451). */
+    giftCard: boolean('gift_card').notNull().default(false),
     version: integer('version').notNull().default(1),
     ...timestamps,
   },

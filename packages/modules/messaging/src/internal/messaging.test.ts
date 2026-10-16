@@ -15,6 +15,7 @@ import {
   ALWAYS_SENT,
   EMAILED_KINDS,
   MESSAGE_KINDS,
+  SECRET_KINDS,
   asksToStop,
   messageEmail,
   messageText,
@@ -492,6 +493,8 @@ describe("Messages' words", () => {
       'cod_prepaid',
       // Asked for by the shopper, on the closed shop's page (ADR-446).
       'store_open',
+      // What the customer bought: the card's code (ADR-451).
+      'gift_card',
       'invoice_due',
       'plan_ended',
       'credit_low',
@@ -557,6 +560,23 @@ describe("Messages' words", () => {
     expect(messageText('sign_in_alert', 'ur', { ...alert, device: 'Windows پر Chrome' })).toContain(
       '5 Oct, 3:04 pm کو Windows پر Chrome سے',
     );
+  });
+
+  it("carries a gift card's code in its words, as a secret (ADR-451)", () => {
+    const card = { shop: 'Zari Fashions', amount: 'Rs 5,000', code: 'ABCD EFGH JKLM NPQR' };
+    expect(messageText('gift_card', 'en', card)).toBe(
+      'Zari Fashions: here is the gift card you bought, worth Rs 5,000. Its code is ' +
+        'ABCD EFGH JKLM NPQR. Spend it at checkout, or give it to someone. Keep it safe: whoever ' +
+        'has the code can spend it.',
+    );
+    expect(templateParameters('gift_card', card)).toEqual([
+      'Zari Fashions',
+      'Rs 5,000',
+      'ABCD EFGH JKLM NPQR',
+    ]);
+    expect(templateButtons('gift_card', card)).toEqual([]);
+    expect(SECRET_KINDS).toEqual(['gift_card', 'one_time_code']);
+    expect(messageEmail('gift_card', 'en', card)).toBeNull();
   });
 
   it('carries a code in its words and in the button that copies it', () => {

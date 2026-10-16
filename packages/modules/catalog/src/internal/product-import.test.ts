@@ -170,8 +170,11 @@ describe("Shopify's product CSV", () => {
     const file = readShopifyProducts(FILE);
     if (!file.ok) throw new Error(file.message);
     expect(file.rows).toBe(7);
-    const [lawn, mug] = file.products;
-    expect(file.products).toHaveLength(2);
+    const [lawn, mug, gift] = file.products;
+    expect(file.products).toHaveLength(3);
+    // A gift card is sold as one (ADR-451).
+    expect(gift!.input).toMatchObject({ title: 'Gift Card', handle: 'gift', giftCard: true });
+    expect(lawn!.input.giftCard).toBeUndefined();
     expect(lawn).toEqual({
       handle: 'lawn-3-piece',
       row: 2,
@@ -251,11 +254,6 @@ describe("Shopify's product CSV", () => {
         message: 'http://example.com/lawn-3.jpg is not an https address; the image is left out',
       },
       {
-        row: 7,
-        column: 'Gift Card',
-        message: 'Gift cards are not imported: Hatti does not sell them yet',
-      },
-      {
         row: 8,
         column: 'Title',
         message: "Title is blank: a product's first row gives its title",
@@ -321,16 +319,15 @@ describe.skipIf(!server)('ProductImportService', () => {
     const result = unwrap(await imports.import(f.a, FILE));
     expect(result).toMatchObject({
       rows: 7,
-      created: 2,
-      variants: 4,
+      created: 3,
+      variants: 5,
       images: 3,
       skipped: 0,
-      rowErrorCount: 3,
+      rowErrorCount: 2,
       dryRun: false,
     });
     expect(result.rowErrors.map((error) => [error.row, error.column])).toEqual([
       [5, 'Image Src'],
-      [7, 'Gift Card'],
       [8, 'Title'],
     ]);
     const list = await f.products.list(f.a, { first: 10 });
@@ -381,13 +378,13 @@ describe.skipIf(!server)('ProductImportService', () => {
     ]);
 
     // The same file again changes nothing: the shop has those handles.
-    expect(unwrap(await imports.import(f.a, FILE))).toMatchObject({ created: 0, skipped: 2 });
-    expect((await f.products.list(f.a, { first: 10 })).items).toHaveLength(2);
+    expect(unwrap(await imports.import(f.a, FILE))).toMatchObject({ created: 0, skipped: 3 });
+    expect((await f.products.list(f.a, { first: 10 })).items).toHaveLength(3);
   });
 
   it('counts what a dry run would do, and does nothing', async () => {
     const result = unwrap(await imports.import(f.b, FILE, { dryRun: true }));
-    expect(result).toMatchObject({ created: 2, variants: 4, images: 3, dryRun: true, stock: [] });
+    expect(result).toMatchObject({ created: 3, variants: 5, images: 3, dryRun: true, stock: [] });
     expect((await f.products.list(f.b, { first: 10 })).items).toEqual([]);
     expect(await f.outbox()).toEqual([]);
   });

@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### Gift cards sold as products
+
+* **A product can be sold as a gift card: once its order is paid in full, a card is issued for
+  each unit at its price, given to the buyer, and its code sent on WhatsApp, kept nowhere once
+  sent** ([ADR-451](../architecture/13-decision-log.md#adr-451--a-product-can-be-sold-as-a-gift-card-once-its-order-is-paid-in-full-the-worker-issues-a-card-for-each-unit-at-its-price-given-to-the-buyer-and-sends-each-code-on-whatsapp-kept-nowhere-once-sent), CAT-12).
+* 2914 tests, from 2910: the worker's two, the API's one, and the message's
+  words.
+
 ### a4e009c · The admin's gift cards
 
 * **Products → Gift cards issues cards, shows each code once to copy, finds cards by the code's

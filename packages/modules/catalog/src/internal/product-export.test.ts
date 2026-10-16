@@ -70,6 +70,7 @@ function mugRecord(): ProductRecord {
     productType: null,
     tags: [],
     seo: { title: null, description: null },
+    giftCard: false,
     version: 1,
     createdAt: new Date(),
     updatedAt: new Date(),

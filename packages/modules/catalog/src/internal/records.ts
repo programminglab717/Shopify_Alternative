@@ -133,6 +133,8 @@ export interface ProductRecord {
   tags: string[];
   /** What search engines are told in place of its title and description (ADR-231). */
   seo: SeoValue;
+  /** Sold as a gift card: each unit paid for issues one (CAT-12, ADR-451). */
+  giftCard: boolean;
   version: number;
   createdAt: Date;
   updatedAt: Date;

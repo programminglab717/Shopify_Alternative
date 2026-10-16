@@ -154,6 +154,7 @@ export function toProduct(record: ProductRecord, currency: CurrencyCode): Produc
     description: record.description,
     vendor: record.vendor,
     productType: record.productType,
+    isGiftCard: record.giftCard,
     tags: record.tags,
     seo: Object.assign(new SEO(), record.seo),
     options: record.options.map((option) =>

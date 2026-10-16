@@ -188,10 +188,6 @@ export function readShopifyProducts(csv: string): ShopifyFileResult {
       say(first.row, 'title', "Title is blank: a product's first row gives its title");
       continue;
     }
-    if (main('giftCard').toLowerCase() === 'true') {
-      say(first.row, 'giftCard', 'Gift cards are not imported: Hatti does not sell them yet');
-      continue;
-    }
 
     // Shopify writes Title / Default Title for a product without options.
     const names = OPTION_COLUMNS.map(([name]) => main(name));
@@ -250,6 +246,8 @@ export function readShopifyProducts(csv: string): ShopifyFileResult {
       input: {
         title: main('title'),
         handle,
+        // Sold as a gift card: a card issued for each one paid for (ADR-451).
+        ...(main('giftCard').toLowerCase() === 'true' && { giftCard: true }),
         description: htmlToText(main('body')),
         ...(main('vendor') !== '' && { vendor: main('vendor') }),
         ...(main('type') !== '' && { productType: main('type') }),
@@ -358,7 +356,7 @@ export function writeShopifyProducts(
           Type: product.productType ?? '',
           Tags: product.tags.join(', '),
           Published: product.status === 'active' ? 'TRUE' : 'FALSE',
-          'Gift Card': 'FALSE',
+          'Gift Card': product.giftCard ? 'TRUE' : 'FALSE',
           'SEO Title': product.seo.title ?? '',
           'SEO Description': product.seo.description ?? '',
           Status: product.status,

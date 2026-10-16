@@ -96,6 +96,7 @@ import { PlanOrders } from './plan-orders.js';
 import { ExpiredCheckouts } from './expired-checkouts.js';
 import { StoreCreditExpiry } from './store-credit-expiry.js';
 import { StoreCreditNotices } from './store-credit-notices.js';
+import { GiftCardSales } from './gift-card-sales.js';
 import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
@@ -136,6 +137,7 @@ export interface EventConsumers {
   billing?: BillingNotices;
   staff?: StaffAlerts;
   storeCredit?: StoreCreditNotices;
+  giftCards?: GiftCardSales;
   domains?: DomainNotices;
   storeExports?: StoreExportNotices;
   planOrders?: PlanOrders;
@@ -161,6 +163,7 @@ export function eventHandlers(
     billing,
     staff,
     storeCredit,
+    giftCards,
     domains,
     storeExports,
     planOrders,
@@ -239,6 +242,9 @@ export function eventHandlers(
     for (const type of StoreCreditNotices.EVENTS) {
       registry.on(type, (event) => storeCredit.handle(event));
     }
+  }
+  if (giftCards) {
+    for (const type of GiftCardSales.EVENTS) registry.on(type, (event) => giftCards.handle(event));
   }
   if (domains) {
     for (const type of DomainNotices.EVENTS) registry.on(type, (event) => domains.handle(event));
@@ -342,6 +348,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         billing: new BillingNotices(database, new MessagesService(database)),
         staff: new StaffAlerts(database, new MessagesService(database)),
         storeCredit: new StoreCreditNotices(database, new MessagesService(database)),
+        giftCards: new GiftCardSales(database, new MessagesService(database)),
         domains: new DomainNotices(database, new MessagesService(database)),
         storeExports: new StoreExportNotices(database, new MessagesService(database)),
         planOrders: new PlanOrders(database, new MessagesService(database), workerOrders(database)),

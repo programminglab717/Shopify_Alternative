@@ -425,6 +425,13 @@ export class Product {
   @Field(() => String, { nullable: true })
   productType!: string | null;
 
+  @Field({
+    description:
+      'Sold as a gift card (CAT-12, ADR-451): each unit of it in an order paid in full issues a ' +
+      'card worth what it sold for, sent to the buyer on WhatsApp.',
+  })
+  isGiftCard!: boolean;
+
   @Field(() => [String])
   tags!: string[];
 
@@ -635,6 +642,12 @@ export class ProductCreateInput {
       'options, priced at zero.',
   })
   variants?: ProductVariantInput[] | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description: "Sold as a gift card, as Shopify's giftCard (ADR-451). False unless given.",
+  })
+  giftCard?: boolean | null;
 }
 
 @InputType()
@@ -676,6 +689,9 @@ export class ProductUpdateInput {
       'redirect is made, as on Shopify. False unless given.',
   })
   redirectNewHandle?: boolean | null;
+
+  @Field(() => Boolean, { nullable: true, description: 'Sold as a gift card (ADR-451).' })
+  giftCard?: boolean | null;
 }
 
 @InputType()

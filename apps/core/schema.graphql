@@ -6005,6 +6005,11 @@ enum MessageKind {
   DOMAIN_UNPOINTED
 
   """
+  A gift card they bought, once its order is paid: what it is worth and its code, which is not kept once sent (CAT-12, ADR-451); the shop cannot turn it off.
+  """
+  GIFT_CARD
+
+  """
   For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: its plan's next period is invoiced and waits for payment (ADR-169, ADR-195).
   """
   INVOICE_DUE
@@ -9678,6 +9683,11 @@ type Product {
   handle: String!
   id: ID!
 
+  """
+  Sold as a gift card (CAT-12, ADR-451): each unit of it in an order paid in full issues a card worth what it sold for, sent to the buyer on WhatsApp.
+  """
+  isGiftCard: Boolean!
+
   """Images, in order."""
   media: [ProductMedia!]!
   options: [ProductOption!]!
@@ -9796,6 +9806,11 @@ type ProductConnection {
 
 input ProductCreateInput {
   description: String
+
+  """
+  Sold as a gift card, as Shopify's giftCard (ADR-451). False unless given.
+  """
+  giftCard: Boolean
 
   """Generated from the title if omitted."""
   handle: String
@@ -10071,6 +10086,9 @@ enum ProductStatus {
 
 input ProductUpdateInput {
   description: String
+
+  """Sold as a gift card (ADR-451)."""
+  giftCard: Boolean
   handle: String
   id: ID!
 

@@ -82,7 +82,7 @@ describe.skipIf(!server)('Admin GraphQL API: gift cards (CAT-12, PAY-13, ADR-448
       `INSERT INTO control.shops (id, name) VALUES ($1, 'Shop A'), ($2, 'Shop B')`,
       [shopA, shopB],
     );
-    tokens.a = await issueToken(shopA, ['write_gift_cards', 'write_customers']);
+    tokens.a = await issueToken(shopA, ['write_gift_cards', 'write_customers', 'write_products']);
     tokens.reader = await issueToken(shopA, ['read_gift_cards']);
     tokens.b = await issueToken(shopB, ['write_gift_cards', 'read_customers']);
     api = await startTestApi(testDb);
@@ -213,5 +213,32 @@ describe.skipIf(!server)('Admin GraphQL API: gift cards (CAT-12, PAY-13, ADR-448
     expect(again.userErrors).toEqual([
       { field: ['input', 'code'], code: 'TAKEN', message: 'Another gift card has this code' },
     ]);
+  });
+
+  it("sells a product as a gift card, as Shopify's isGiftCard says (ADR-451)", async () => {
+    const created = await call(
+      tokens.a,
+      `mutation ($input: ProductCreateInput!) {
+        productCreate(input: $input) { product { id isGiftCard } userErrors { message } }
+      }`,
+      { input: { title: 'Eid gift card', giftCard: true } },
+    );
+    expect(created).toEqual({
+      product: { id: expect.any(String), isGiftCard: true },
+      userErrors: [],
+    });
+    const updated = await call(
+      tokens.a,
+      `mutation ($input: ProductUpdateInput!) {
+        productUpdate(input: $input) { product { isGiftCard } userErrors { message } }
+      }`,
+      { input: { id: created.product.id, giftCard: false } },
+    );
+    expect(updated).toEqual({ product: { isGiftCard: false }, userErrors: [] });
+    const plain = await call(
+      tokens.a,
+      `mutation { productCreate(input: { title: "Kurta" }) { product { isGiftCard } } }`,
+    );
+    expect(plain.product.isGiftCard).toBe(false);
   });
 });

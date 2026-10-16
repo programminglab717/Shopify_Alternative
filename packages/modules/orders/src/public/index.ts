@@ -98,6 +98,7 @@ export {
   orderNotificationFactsIn,
   type OrderNotificationFacts,
 } from '../internal/notification-facts.js';
+export { orderGiftCardFactsIn, type OrderGiftCardFacts } from '../internal/gift-card-facts.js';
 export { mentionsIn, staffAlertFactsIn, type StaffAlertFacts } from '../internal/staff-alerts.js';
 export { ORDER_SEGMENT_FACTS, customerFactsQuery } from '../internal/customer-facts.js';
 export {

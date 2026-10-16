@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-450 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-451 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -458,6 +458,7 @@
 | 448 | Gift cards are codes the shop keeps only a digest of, worth a balance kept on the card with a ledger of every change, issued, changed and deactivated through Shopify's giftCard mutations | Accepted |
 | 449 | A shopper applies a gift card on checkout's page by its code, and it pays what it can of the order as it is placed; a cancelled order gives it back | Accepted |
 | 450 | The admin's gift cards page under Products issues cards, showing each code once to copy, finds them by the code's end, and adds to, takes from or deactivates them | Accepted |
+| 451 | A product can be sold as a gift card: once its order is paid in full, the worker issues a card for each unit at its price, given to the buyer, and sends each code on WhatsApp, kept nowhere once sent | Accepted |
 
 ---
 
@@ -17203,3 +17204,47 @@
   * **Showing the code again later:** the shop keeps none to show (ADR-448).
   * **Gift cards under Customers:** Shopify keeps them under Products, where shops look for
     them.
+
+## ADR-451 · A product can be sold as a gift card: once its order is paid in full, the worker issues a card for each unit at its price, given to the buyer, and sends each code on WhatsApp, kept nowhere once sent
+
+* **Context:**
+  * Shops issue gift cards by hand (ADR-448, ADR-450). Shoppers want to buy them, as they can
+    on Shopify, where a gift card is a product and its card is issued when the order is paid.
+  * A card is its code: whoever has it can spend it, and the shop keeps only a digest
+    (ADR-448). So the code must reach the buyer, and nothing should keep it after.
+* **Decision:**
+  * **The product.** A product is a gift card or not: Shopify's `isGiftCard` on `Product`, set
+    by `giftCard` on `productCreate` and `productUpdate`, kept by the catalog (migration 0209)
+    and copied when the product is duplicated. Each variant's price is what its card is worth.
+    * Shopify's product CSV reads and writes it as **Gift Card**: TRUE is imported as a gift
+      card, where it was refused before.
+  * **Issuing.** The worker hears `order.paid` (`GiftCardSales`). Once the order is paid in
+    full and not cancelled, it issues a card for each unit of each line of a gift card product:
+    * worth the unit's price, before the order's discount, as Shopify's card is worth its
+      variant;
+    * given to the order's customer, with the note "Order #N", and its ledger's first line by
+      the system, for the order;
+    * once: each card keeps its order, line and unit (0209), unique, so an order's payment heard
+      again, or a second payment, issues nothing more.
+  * **Sending.** Each card's code goes to the order's number in a new message, `gift_card`
+    (`hatti_gift_card`, utility): the shop, what it is worth, and the code in groups of four.
+    * It is secret, as a checkout's code is (ADR-148): the code is dropped from the message once
+      it is sent, or failed for good, and no SMS takes its place after.
+    * The shop cannot turn it off: it carries what the customer bought.
+    * No button copies it: WhatsApp's copy button takes 15 characters, and a code has 16.
+* **Consequences:**
+  * A shop sells gift cards as it sells anything else, by cash on delivery too, issued when the
+    cash comes in.
+  * A buyer whose message never arrives has no code; the shop deactivates that card and issues
+    another by hand (ADR-450).
+  * A gift card order refunded keeps its cards: the shop deactivates them, as Shopify's staff
+    do.
+  * Not yet: a gift card product needing no delivery, the toggle on the admin's product page,
+    the storefront's `product.gift_card?`, a message to someone else the buyer names, and the
+    order's timeline naming the cards issued.
+* **Alternatives:**
+  * **Issuing when the order is placed:** a cash-on-delivery order may never be paid, and the
+    card would be spent before it was.
+  * **Showing the code on the thank-you page:** the order is paid later for cash on delivery,
+    and a page reloaded or shared would show it again.
+  * **Keeping the code to send it again:** whoever reads the database could spend every card.

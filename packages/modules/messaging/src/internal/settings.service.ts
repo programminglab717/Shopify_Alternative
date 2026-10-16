@@ -104,9 +104,11 @@ export class MessagingSettingsService {
                 ? 'its automation turns it on and off'
                 : kind === 'store_open'
                   ? 'shoppers asked to hear when the shop opens'
-                  : paidByShop(kind as MessageKind)
-                    ? 'shoppers ask for it'
-                    : 'it tells the shop of its bills with Hatti';
+                  : kind === 'gift_card'
+                    ? 'it carries the gift card the customer bought'
+                    : paidByShop(kind as MessageKind)
+                      ? 'shoppers ask for it'
+                      : 'it tells the shop of its bills with Hatti';
         check.add(['input', 'disabled'], 'INVALID', `can't turn off "${kind}": ${why}`);
         break;
       }

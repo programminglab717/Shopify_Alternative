@@ -107,6 +107,7 @@ export {
   giftCardPaymentsIn,
   giftCardRefusalOf,
   giftCardsPaidIn,
+  issueSoldGiftCardsIn,
   newGiftCardCode,
   normalizeGiftCardCode,
   revertOrderGiftCardsIn,
@@ -120,6 +121,7 @@ export {
   type GiftCardRefusal,
   type GiftCardTransactionRecord,
   type GiftCardUpdateInput,
+  type SoldGiftCard,
 } from '../internal/gift-cards.service.js';
 export {
   BLOCK_REASONS,

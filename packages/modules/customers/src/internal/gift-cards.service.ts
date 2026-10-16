@@ -624,6 +624,71 @@ export async function revertOrderGiftCardsIn(
   return given;
 }
 
+/** A card issued for a unit of a gift card product sold (CAT-12, ADR-451), its code this once. */
+export interface SoldGiftCard {
+  id: string;
+  code: string;
+  /** Which unit of its order line it is, from 1. */
+  unit: number;
+}
+
+/**
+ * Issues the cards an order line of a gift card product sold (CAT-12, ADR-451), in the caller's
+ * transaction: one for each of its `units`, worth `value`, given to the order's customer, as the
+ * system. A unit with its card issued already is passed over, so the line's cards are issued
+ * once however often this is asked; those issued now are given back with their codes, the only
+ * time anyone sees them. Its ledger keeps who: the system, for the order.
+ */
+export async function issueSoldGiftCardsIn(
+  tx: Tx,
+  shopId: string,
+  sale: {
+    orderId: string;
+    lineItemId: string;
+    units: number;
+    value: bigint;
+    currency: string;
+    customerId: string | null;
+    note: string;
+  },
+): Promise<SoldGiftCard[]> {
+  const issued: SoldGiftCard[] = [];
+  for (let unit = 1; unit <= sale.units; unit += 1) {
+    // A code that happens to be taken is made again; a unit issued already is left.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const id = newId();
+      const code = newGiftCardCode();
+      const { rows } = await tx.execute<{ id: string }>(sql`
+        INSERT INTO customers.gift_cards
+               (shop_id, id, code_hash, last_characters, currency, initial_value, balance,
+                customer_id, note, order_id, line_item_id, line_unit)
+        VALUES (${shopId}, ${id}, ${giftCardDigest(code)}, ${code.slice(-4)}, ${sale.currency},
+                ${sale.value}, ${sale.value}, ${sale.customerId}, ${sale.note}, ${sale.orderId},
+                ${sale.lineItemId}, ${unit})
+        ON CONFLICT DO NOTHING
+        RETURNING id`);
+      if (rows.length > 0) {
+        await addTransaction(tx, shopId, 'system', {
+          giftCardId: id,
+          kind: 'issue',
+          amount: sale.value,
+          balanceAfter: sale.value,
+          orderId: sale.orderId,
+          sourceId: null,
+          note: '',
+        });
+        issued.push({ id, code, unit });
+        break;
+      }
+      const { rows: had } = await tx.execute(sql`
+        SELECT 1 FROM customers.gift_cards
+         WHERE shop_id = ${shopId} AND line_item_id = ${sale.lineItemId} AND line_unit = ${unit}`);
+      if (had.length > 0) break;
+    }
+  }
+  return issued;
+}
+
 /**
  * The cards given to a customer, in the caller's transaction: what their own file says
  * (ADR-448). The code is not in it: the shop keeps none.
