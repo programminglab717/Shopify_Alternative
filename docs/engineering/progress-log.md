@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Complementary products in the admin
+### 2069abe · Complementary products in the admin
 
 * **A "Pairs well with" card on the product's page** ([ADR-436](../architecture/13-decision-log.md#adr-436--complementary-products-in-the-admin-a-card-on-the-products-page-the-products-found-by-name-and-put-in-order), MKT-09) finds products by name,
   puts them in order and saves them as the products it pairs with.
