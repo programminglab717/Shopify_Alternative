@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Sales set ahead
+### 6ebcd27 · Sales set ahead
 
 * **A sale set ahead cuts its products' prices by a percentage when it starts and puts them back
   when it ends** ([ADR-443](../architecture/13-decision-log.md#adr-443--a-sale-set-ahead-cuts-its-products-prices-by-a-percentage-at-its-start-the-old-price-shown-struck-through-and-puts-them-back-at-its-end-unless-changed-by-hand-meanwhile), CAT-17). The old price is shown struck through, as shoppers expect for
