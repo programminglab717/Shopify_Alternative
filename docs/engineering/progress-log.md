@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: CAT-17's price changes at a time
-ahead, for sales; then the feature catalog's V1 rows still open, in the order the alpha's shops
-need them. Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the admin's sales page for the sales
+set ahead; then the feature catalog's V1 rows still open, in the order the alpha's shops need
+them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,13 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### Sales set ahead
+
+* **A sale set ahead cuts its products' prices by a percentage when it starts and puts them back
+  when it ends** ([ADR-443](../architecture/13-decision-log.md#adr-443--a-sale-set-ahead-cuts-its-products-prices-by-a-percentage-at-its-start-the-old-price-shown-struck-through-and-puts-them-back-at-its-end-unless-changed-by-hand-meanwhile), CAT-17). The old price is shown struck through, as shoppers expect for
+  Eid and 11.11, and nobody has to change prices at midnight.
+* 2878 tests, from 2872: the catalog's four and the core's two.
 
 ### c2fff38 · A draft's time to go on sale, in the admin
 

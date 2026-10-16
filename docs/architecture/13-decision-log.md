@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-442 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-443 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -450,6 +450,7 @@
 | 440 | The cart drawer's cross-sells: the cart page's, in the drawer, from one snippet and a theme script both load | Accepted |
 | 441 | A draft is put on sale by itself at a time ahead, a minute to a year off, by the worker's sweep of scheduled content; set on sale or archived by hand, it loses its time | Accepted |
 | 442 | The admin sets a draft's time to go on sale on its page, typed in the phone's own time and said back in the shop's | Accepted |
+| 443 | A sale set ahead cuts its products' prices by a percentage at its start, the old price shown struck through, and puts them back at its end unless changed by hand meanwhile | Accepted |
 
 ---
 
@@ -16898,3 +16899,44 @@
 * **Alternatives:**
   * **A time typed in the shop's zone:** the same for owners in Pakistan, but unlike how
     articles take theirs.
+
+## ADR-443 · A sale set ahead cuts its products' prices by a percentage at its start, the old price shown struck through, and puts them back at its end unless changed by hand meanwhile
+
+* **Context:**
+  * CAT-17's other half is price changes at a time ahead. Shops in the alpha run sales for Eid,
+    11.11 and Black Friday, set days before, and today change each price by hand twice: at
+    midnight when the sale starts, and again when it ends.
+  * Discount codes (CHK-06) take money off at checkout. A sale shows its price on the product's
+    page, with the old one struck through, which is what shoppers on Instagram expect.
+  * ADR-441's sweep of scheduled content already runs every minute.
+* **Decision:**
+  * **A sale is a name, a percentage off (1 to 90), a start, an end and up to 250 products**
+    (`catalog.price_sales`, migration 0206).
+    * It starts from now to a year ahead and lasts 90 days at most. A start a minute from now
+      at most starts it at once.
+    * A product is in one sale at a time: two sales with a product in common may not share any
+      days. The products are locked while this is checked.
+  * **When it starts,** each variant of its products is cut by the percentage, down to a whole
+    rupee (as ADR-438's offer is). Its price before is shown as the compare-at price; a higher
+    compare-at price is kept. A variant too cheap to cut by a whole rupee is left as it is.
+    * The prices before and the sale price are kept per variant (`price_sale_variants`).
+  * **When it ends,** each variant's price and compare-at price come back. A variant whose price
+    was changed by hand during the sale keeps the shop's price.
+  * **Each change is a `product.updated` of its variants,** as a price set by hand is. The
+    storefront, feeds and smart collections follow it.
+  * **The worker's sweep takes sales as a fourth kind.** Each sweep ends the sales due to end
+    before it starts those due to start, each in its own transaction, so a product can go from
+    one sale straight into the next.
+  * **The Admin API:** `priceSales`, `priceSale(id)`, `priceSaleCreate`, and `priceSaleCancel`,
+    which cancels a sale not yet started or ends one running now. All take the scopes products
+    take.
+* **Consequences:**
+  * A variant added to a product during its sale sells at its own price.
+  * Ended and cancelled sales are kept, with what each variant cost before.
+  * A sale can't yet be changed once set. Cancelling it and setting another does the same.
+  * The admin's page for sales comes next.
+* **Alternatives:**
+  * **Prices worked out when read, from the sales running:** every place that reads a price
+    (storefront documents, cart, checkout, feeds, orders) would have to know about sales.
+  * **Fixed new prices per variant, as a file:** more work for the shop, for the same percentage
+    on every product in the alpha's sales.

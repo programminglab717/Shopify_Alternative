@@ -4,6 +4,7 @@ import { BillingService, MessageWallet } from '@hatti/billing/public';
 import {
   CollectionService,
   MediaProcessing,
+  PriceSaleService,
   ProductService,
   VariantService,
 } from '@hatti/catalog/public';
@@ -445,6 +446,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         new ArticleService(database),
         new PageService(database),
         new ProductService(database),
+        new PriceSaleService(database),
       ),
       logger,
     ).start(config.SCHEDULED_INTERVAL_MS);

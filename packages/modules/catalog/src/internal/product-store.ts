@@ -239,7 +239,7 @@ export function searchTextOf(fields: {
  */
 export async function productChanged(
   tx: Tx,
-  tenant: TenantContext,
+  tenant: Pick<TenantContext, 'shopId' | 'currency'>,
   productId: string,
   changed: string[],
 ): Promise<void> {

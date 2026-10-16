@@ -28,6 +28,7 @@ export const ID_PREFIXES = {
   product: 'prod',
   productReview: 'rvw',
   sizeChart: 'szc',
+  priceSale: 'sale',
   productOption: 'opt',
   productOptionValue: 'optv',
   media: 'med',

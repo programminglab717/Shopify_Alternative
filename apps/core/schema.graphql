@@ -6987,6 +6987,16 @@ type Mutation {
   paymentRefundSettle(id: ID!, input: PaymentRefundSettleInput!): PaymentRefundSettlePayload!
 
   """
+  Cancels a sale not yet started, or ends one running now, its prices put back as at its end.
+  """
+  priceSaleCancel(id: ID!): PriceSalePayload!
+
+  """
+  Sets a sale ahead. One starting now, or a minute from now at most, starts at once; others within a minute of their time.
+  """
+  priceSaleCreate(input: PriceSaleCreateInput!): PriceSalePayload!
+
+  """
   Adds tags to up to 250 products (CAT-04). Tags a product has already, in any case, stay as they are; one with too many is refused.
   """
   productBulkAddTags(ids: [ID!]!, tags: [String!]!): ProductBulkPayload!
@@ -9396,6 +9406,68 @@ enum PaymentSessionStatus {
   PAID
 }
 
+"""
+A percentage off the shop's chosen products from a time to a time (CAT-17, ADR-443): when it starts, each variant's price is cut to a whole unit and its old price shown as the compare-at price; when it ends, both come back, unless the price was changed by hand meanwhile.
+"""
+type PriceSale {
+  createdAt: DateTime!
+
+  """When it ended: at its time, or cancelled while it ran."""
+  endedAt: DateTime
+  endsAt: DateTime!
+  id: ID!
+
+  """The shop's own name for it: "Eid sale"."""
+  name: String!
+
+  """1 to 90."""
+  percentOff: Int!
+
+  """Its products still kept, by title."""
+  products: [Product!]!
+
+  """How many of its products are still kept."""
+  productsCount: Int!
+  startsAt: DateTime!
+  status: PriceSaleStatus!
+}
+
+input PriceSaleCreateInput {
+  """After it starts, 90 days at most."""
+  endsAt: DateTime!
+
+  """1 to 100 characters."""
+  name: String!
+
+  """1 to 90."""
+  percentOff: Int!
+
+  """
+  1 to 250 of the shop's products, none in another sale for any of these days.
+  """
+  productIds: [ID!]!
+
+  """
+  From now to a year ahead; now, or a minute from now at most, starts it at once.
+  """
+  startsAt: DateTime!
+}
+
+type PriceSalePayload {
+  priceSale: PriceSale
+  userErrors: [UserError!]!
+}
+
+"""
+Set ahead, running with its prices cut, ended with them put back, or cancelled before it started.
+"""
+enum PriceSaleStatus {
+  CANCELLED
+  ENDED
+  RUNNING
+  SCHEDULED
+}
+
 """A product in the shop catalog."""
 type Product {
   """
@@ -10899,6 +10971,10 @@ type Query {
   The payments an order's customer started online from its page, the latest first: which are paid, how Hatti heard, and what of each was paid on the order.
   """
   paymentSessions(orderId: ID!): [PaymentSession!]!
+  priceSale(id: ID!): PriceSale
+
+  """The shop's sales, those starting latest first; the newest hundred."""
+  priceSales: [PriceSale!]!
 
   """A product by ID, or null if not found."""
   product(id: ID!): Product

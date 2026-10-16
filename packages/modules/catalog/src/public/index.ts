@@ -189,3 +189,13 @@ export {
   ComplementService,
   complementsIn,
 } from '../internal/complements.js';
+export {
+  PRICE_SALE_LIMITS,
+  PriceSaleEvents,
+  PriceSaleService,
+  salePrice,
+  type PriceSaleInput,
+  type PriceSaleRecord,
+  type PriceSaleState,
+  type PriceSaleUpdatedPayload,
+} from '../internal/price-sales.js';
