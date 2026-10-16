@@ -34,6 +34,8 @@ import {
   type CommentResult,
   type SignUpRequest,
   type SignUpResult,
+  type StockWatchRequest,
+  type StockWatchResult,
   type StorefrontVisit,
   type ThemeImage,
   type ThemePreviewResponse,
@@ -427,6 +429,16 @@ class FakeCore {
     this.signUps.push({ shopId, request });
     if (this.signedUp instanceof Error) throw this.signedUp;
     return this.signedUp;
+  }
+
+  /** The wishes to hear a variant is back sent on, and how the core answers them (ADR-431). */
+  readonly stockWatches: { shopId: string; request: StockWatchRequest }[] = [];
+  watched: StockWatchResult | Error = { ok: true, created: true };
+
+  async watchStock(shopId: string, request: StockWatchRequest): Promise<StockWatchResult> {
+    this.stockWatches.push({ shopId, request });
+    if (this.watched instanceof Error) throw this.watched;
+    return this.watched;
   }
 
   /** The comments sent on, and how the core answers them (ADR-220). */
@@ -2650,6 +2662,55 @@ describe('Carts', () => {
     core.signedUp = new StorefrontApiError(502, 'Bad gateway');
     expect((await post(signUp)).statusCode).toBe(503);
     expect(core.signUps).toHaveLength(4);
+    await app.close();
+  });
+
+  it('sends a wish to hear a variant is back on to the core, then back to its page (ADR-431)', async () => {
+    const app = server();
+    const post = (
+      fields: Record<string, string>,
+      headers: Record<string, string> = {},
+      url = '/back-in-stock',
+    ) =>
+      app.inject({ method: 'POST', url, headers: { ...FORM, ...headers }, payload: form(fields) });
+    const wish = {
+      form_type: 'back_in_stock',
+      'contact[variant_id]': 'v-lawn-m',
+      'contact[phone]': '0300-1234567',
+      return_to: '/products/lawn?variant=v-lawn-m#back-in-stock',
+    };
+    const taken = await post(wish);
+    expect([taken.statusCode, taken.headers.location, taken.headers['cache-control']]).toEqual([
+      303,
+      '/products/lawn?variant=v-lawn-m&back_in_stock_posted=true#back-in-stock',
+      'private, no-store',
+    ]);
+    // In Urdu, it is asked in Urdu; what was wrong goes back by field.
+    core.watched = {
+      ok: false,
+      errors: [{ field: 'phone', message: 'Enter a Pakistani mobile number' }],
+    };
+    const wrong = await post(
+      {
+        ...wish,
+        'contact[phone]': '123',
+        return_to: '/ur/products/lawn?back_in_stock_posted=true',
+      },
+      {},
+      '/ur/back-in-stock',
+    );
+    expect(wrong.headers.location).toBe('/ur/products/lawn?back_in_stock_error=phone');
+    expect(core.stockWatches.map((watched) => watched.request)).toEqual([
+      { variantId: 'v-lawn-m', phone: '0300-1234567', language: 'en' },
+      { variantId: 'v-lawn-m', phone: '123', language: 'ur' },
+    ]);
+
+    // Only Hatti's form, and from the shop itself.
+    expect((await post({ ...wish, form_type: 'customer' })).statusCode).toBe(404);
+    expect((await post(wish, { 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403);
+    core.watched = new StorefrontApiError(502, 'Bad gateway');
+    expect((await post(wish)).statusCode).toBe(503);
+    expect(core.stockWatches).toHaveLength(3);
     await app.close();
   });
 

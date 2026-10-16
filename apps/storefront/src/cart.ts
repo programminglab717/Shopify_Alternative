@@ -30,6 +30,7 @@ export type CoreBackend = Pick<
   | 'themeImage'
   | 'signUp'
   | 'postComment'
+  | 'watchStock'
 >;
 
 /** The secret naming the shopper's cart, which scripts cannot read. */

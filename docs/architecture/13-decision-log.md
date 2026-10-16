@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-430 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-431 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -438,6 +438,7 @@
 | 428 | Automations in the admin: a page under Marketing with the welcome and the win-back, each turned on with an approved template, the win-back's days set there | Accepted |
 | 429 | Back in stock: a shopper who finds a variant sold out leaves their number, and is told once on WhatsApp from Hatti's number when it sells online again, while the shop's automation is on | Accepted |
 | 430 | Back in stock on the automations page: turned on and off alone, sent from Hatti's number with no template to choose | Accepted |
+| 431 | Back in stock on the storefront: Hatti's back_in_stock form on a sold-out variant's page, sent on to the core and back to the page | Accepted |
 
 ---
 
@@ -16531,3 +16532,35 @@
 * **Alternatives:**
   * **A setting of its own, outside the automations:** the shop looks for its recipes in one
     place, and the core already keeps it among them.
+
+## ADR-431 · Back in stock on the storefront: Hatti's back_in_stock form on a sold-out variant's page, sent on to the core and back to the page
+
+* **Context:**
+  * The core keeps a shopper's wish to hear a sold-out variant is back, through the storefront
+    API (ADR-429). The shop's document says while the shop's automation is on.
+  * Shopify has no form for this; its themes leave it to apps. The storefront already takes
+    Shopify's customer form for sign-ups and the comment form for articles, and sends each back
+    to its page saying how it went (ADR-189, ADR-220).
+* **Decision:**
+  * **A form of Hatti's own,** `{% form 'back_in_stock' %}`, posts to `/back-in-stock`, or
+    `/ur/back-in-stock` on Urdu pages. It sends `contact[variant_id]` and `contact[phone]`.
+  * **The storefront sends the wish on** to the core, in the page's language. Then it goes back
+    to the page the form was on, its `return_to` or the page the browser came from.
+    * `back_in_stock_posted=true` says the wish was taken, for `form.posted_successfully?`.
+    * `back_in_stock_error` names the fields that were wrong, for `form.errors`.
+    * As for sign-ups, it takes ten a minute from one address, and none from another site.
+  * **Themes see `shop.back_in_stock`,** true while the shop's automation is on.
+  * **Hatti Base** asks for the shopper's number below the product form while the variant
+    chosen is sold out and the automation is on.
+    * Picking another variant shows the form, or hides it, as that variant sells or not, and it
+      then asks for that variant.
+    * It says the shopper is told once, on WhatsApp. Its words are in English and Urdu.
+* **Consequences:**
+  * Back in stock works end to end: a shop turns it on in the admin, shoppers ask on its sold-out
+    pages, and the worker tells them when the variant is back.
+  * A product on pre-order is never sold out, so its page never asks.
+* **Alternatives:**
+  * **A script posting to an endpoint of the storefront's:** the form works without JavaScript,
+    as the theme's other forms do.
+  * **Shopify's customer form with a tag naming the variant:** that keeps marketing consent,
+    which a shopper asking about one item has not given.

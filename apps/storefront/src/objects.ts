@@ -781,6 +781,8 @@ export function shopObject(
     description: doc.seo?.description ?? null,
     // What the password page tells shoppers while the shop is closed (ADR-054), as safe HTML.
     password_message: doc.password?.message ?? '',
+    // Whether the shop tells shoppers when a sold-out variant is back (ADR-429), for its form.
+    back_in_stock: doc.backInStock === true,
     brand: brandObject(doc),
     ...policiesObject(doc, language),
   };

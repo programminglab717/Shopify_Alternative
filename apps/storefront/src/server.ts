@@ -159,6 +159,12 @@ const PASSWORD_TRIES = { name: 'password-tries', limit: 10, windowMs: 60_000 };
 const SIGN_UPS = { name: 'sign-ups', limit: 10, windowMs: 60_000 };
 
 /**
+ * Wishes an address may leave a minute to hear a sold-out variant is back (ADR-431): a shopper
+ * asks for one or two, and a script many.
+ */
+const STOCK_WATCHES = { name: 'stock-watches', limit: 10, windowMs: 60_000 };
+
+/**
  * Comments an address may post a minute on shops' articles (ADR-220): a reader writes a few, and
  * a script many.
  */
@@ -1806,6 +1812,64 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
   };
   for (const path of ['/contact', '/ur/contact']) app.post(path, contact);
+
+  /**
+   * Hatti's back_in_stock form, which Hatti Base shows on a sold-out variant's page (ADR-431):
+   * the shopper's mobile number and the variant, sent on to the core, which keeps the wish while
+   * the shop's automation is on. Then back to the page the form was on: `back_in_stock_posted=true`
+   * says it was taken, for `form.posted_successfully?`, or `back_in_stock_error` names the fields
+   * that were wrong, for `form.errors`.
+   */
+  const backInStock = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    reply.header('cache-control', 'private, no-store');
+    const params = paramsOf(request);
+    if (params.form_type !== 'back_in_stock') return notFound(reply, 'This page takes no form.');
+    if (request.headers['sec-fetch-site'] === 'cross-site') {
+      return reply
+        .code(403)
+        .type('text/plain; charset=utf-8')
+        .send('Back in stock messages are asked for from the shop itself.\n');
+    }
+    if (limiter && !(await limiter.hit(STOCK_WATCHES, request.ip)).allowed) {
+      return reply
+        .code(429)
+        .type('text/plain; charset=utf-8')
+        .send('Too many requests. Please wait a minute.\n');
+    }
+    try {
+      if (!core) throw new StorefrontApiError(503, 'This storefront keeps no wishes');
+      const fields = recordOf(params.contact);
+      const text = (name: string) => (typeof fields[name] === 'string' ? fields[name] : '');
+      const urdu = request.url.startsWith('/ur/');
+      const result = await core.watchStock(found.shopId, {
+        variantId: text('variant_id'),
+        phone: text('phone'),
+        language: urdu ? 'ur' : 'en',
+      });
+      const back = new URL(
+        returnTo(params) ?? refererPath(request) ?? (urdu ? '/ur' : '/'),
+        'http://storefront.invalid',
+      );
+      back.searchParams.delete('back_in_stock_posted');
+      back.searchParams.delete('back_in_stock_error');
+      if (result.ok) back.searchParams.set('back_in_stock_posted', 'true');
+      else {
+        const wrong = new Set(result.errors.map((error) => error.field));
+        back.searchParams.set('back_in_stock_error', [...wrong].join(','));
+      }
+      return await reply.redirect(`${back.pathname}${back.search}${back.hash}`, 303);
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return reply
+        .code(503)
+        .type('text/plain; charset=utf-8')
+        .send('The shop cannot be reached just now. Please try again in a minute.\n');
+    }
+  };
+  for (const path of ['/back-in-stock', '/ur/back-in-stock']) app.post(path, backInStock);
 
   /**
    * Shopify's new_comment form, which themes' article pages post (ADR-220): the shopper's comment,

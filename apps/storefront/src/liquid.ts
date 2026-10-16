@@ -826,6 +826,15 @@ const FORM_ACTIONS: Record<string, string> = {
   customer: 'root_url:/contact',
   customer_login: '/account/login',
   storefront_password: 'root_url:/password',
+  // Hatti's own, for a sold-out variant's page (ADR-431).
+  back_in_stock: 'root_url:/back-in-stock',
+};
+
+/** The forms that come back to their page saying how they went, by the query's prefix. */
+const POSTED_PREFIXES: Record<string, string> = {
+  customer: 'customer',
+  new_comment: 'comment',
+  back_in_stock: 'back_in_stock',
 };
 
 /** A form's action, as {@link FORM_ACTIONS} names it, in the page's language. */
@@ -893,9 +902,9 @@ class FormTag extends Tag {
       `<form ${attributes}><input type="hidden" name="form_type" value="${attribute(type)}">`,
     );
     const state = pageState(ctx);
-    // A sign-up, or a comment, comes back to its page saying how it went (ADR-189, ADR-220): the
-    // fields it got wrong, or that it was taken.
-    const prefix = type === 'customer' ? 'customer' : type === 'new_comment' ? 'comment' : null;
+    // A sign-up, a comment, or a wish to hear a variant is back, comes back to its page saying how
+    // it went (ADR-189, ADR-220, ADR-431): the fields it got wrong, or that it was taken.
+    const prefix = Object.hasOwn(POSTED_PREFIXES, type) ? POSTED_PREFIXES[type]! : null;
     const posted = prefix === null ? {} : state.query;
     const errors =
       state.formErrors[type] ??

@@ -30,6 +30,14 @@
     "product": {
       "add_to_cart": "Add to cart",
       "sold_out": "Sold out",
+      "back_in_stock": {
+        "label": "Tell me on WhatsApp when it's back",
+        "phone": "Mobile number",
+        "submit": "Notify me",
+        "success": "Thank you! We'll message you on WhatsApp once when it's back.",
+        "phone_error": "Enter a Pakistani mobile number, like 0300 1234567.",
+        "error": "We couldn't take your number just now."
+      },
       "preorder": "Pre-order",
       "preorder_ships": "Pre-order: ships by {{ date }}",
       "bundle": {

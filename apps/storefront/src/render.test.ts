@@ -2323,6 +2323,63 @@ describe('Storefront rendering', () => {
     expect(wrong).toMatch(/name="contact\[phone\]"[^>]*aria-invalid="true"/);
   });
 
+  it("asks for a number on a sold-out variant's page while the shop sends back in stock messages (ADR-431)", async () => {
+    const sample = sampleStore();
+    const [first, second, ...rest] = sample.products as [ProductDoc, ProductDoc, ...ProductDoc[]];
+    const soldOut = { ...first, variants: first.variants.map((v) => ({ ...v, available: false })) };
+    const variant = soldOut.variants[0]!;
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = async (request: PageRequest, backInStock = true) =>
+      (
+        await renderer.render(
+          request,
+          new MemoryStore({
+            ...sample,
+            shop: { ...sample.shop, ...(backInStock && { backInStock: true as const }) },
+            products: [soldOut, second, ...rest],
+          }).fresh(),
+        )
+      ).html;
+    const path = `/products/${soldOut.handle}`;
+
+    // While the shop's automation is off, no form.
+    expect(await page({ path }, false)).not.toContain('back_in_stock');
+    const html = await page({ path });
+    expect(html).toContain(
+      '<form method="post" action="/back-in-stock" accept-charset="UTF-8" id="back-in-stock" ' +
+        'class="back-in-stock__form"><input type="hidden" name="form_type" value="back_in_stock">',
+    );
+    expect(html).toContain(
+      `<input type="hidden" name="contact[variant_id]" value="${variant.id}">`,
+    );
+    expect(html).toContain(
+      `<input type="hidden" name="return_to" value="${path}?variant=${variant.id}#back-in-stock">`,
+    );
+    expect(html).toContain('Tell me on WhatsApp when it&#39;s back');
+    expect(html).not.toMatch(/data-back-in-stock\s+hidden/);
+    // A variant for sale: the form waits, hidden, for a sold-out one to be picked.
+    expect(await page({ path: `/products/${second.handle}` })).toMatch(
+      /data-back-in-stock\s+hidden/,
+    );
+
+    const urdu = await page({ path, locale: 'ur' });
+    expect(urdu).toContain('action="/ur/back-in-stock"');
+    expect(urdu).toContain(`value="/ur${path}?variant=${variant.id}#back-in-stock"`);
+    expect(urdu).toContain('دوبارہ دستیاب ہونے پر مجھے واٹس ایپ پر بتائیں');
+
+    // Back from the post, saying how it went.
+    const taken = await page({ path, query: { back_in_stock_posted: 'true' } });
+    expect(taken).toContain(
+      'Thank you! We&#39;ll message you on WhatsApp once when it&#39;s back.',
+    );
+    expect(taken).not.toContain('name="contact[phone]"');
+    const wrong = await page({ path, query: { back_in_stock_error: 'phone' } });
+    expect(wrong).toContain('Enter a Pakistani mobile number, like 0300 1234567.');
+    expect(wrong).toMatch(/name="contact\[phone\]"[^>]*aria-invalid="true"/);
+    const off = await page({ path, query: { back_in_stock_error: 'base' } });
+    expect(off).toContain('We couldn&#39;t take your number just now.');
+  });
+
   it("shows what the cart's discount code takes off, free delivery by code, or a code that does not apply", async () => {
     const kurta = (price: number): CartJson['items'][number] => ({
       key: 'kurta:0123456789abcdef0123456789abcdef',
