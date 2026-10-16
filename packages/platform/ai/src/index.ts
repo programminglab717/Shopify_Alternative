@@ -14,3 +14,13 @@ export {
   type DraftedField,
   type TranslationDraftRequest,
 } from './translate.js';
+export {
+  PRODUCT_COPY_LIMITS,
+  draftProductCopy,
+  factsText,
+  plainDescriptionHtml,
+  type CopyLanguage,
+  type ProductCopy,
+  type ProductCopyRequest,
+  type ProductFacts,
+} from './product-copy.js';

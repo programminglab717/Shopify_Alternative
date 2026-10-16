@@ -23,6 +23,8 @@ import { ProductReviewService } from './review.service.js';
 import { StorefrontSearchController } from './search.controller.js';
 import { SizeChartService } from './size-charts.js';
 import { VariantService } from './variant.service.js';
+import { CopyDraftService } from './copy-drafts.service.js';
+import { CopyDraftResolver } from './graphql/copy-draft.resolver.js';
 
 /**
  * Needs a {@link Database} provider from the host application, which also checks the storefront
@@ -53,6 +55,8 @@ import { VariantService } from './variant.service.js';
     ComplementResolver,
     ProductScheduleResolver,
     PriceSaleResolver,
+    CopyDraftService,
+    CopyDraftResolver,
   ],
   controllers: [StorefrontSearchController],
   exports: [

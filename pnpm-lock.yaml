@@ -592,6 +592,9 @@ importers:
 
   packages/modules/catalog:
     dependencies:
+      '@hatti/ai':
+        specifier: workspace:*
+        version: link:../../platform/ai
       '@hatti/api':
         specifier: workspace:*
         version: link:../../platform/api

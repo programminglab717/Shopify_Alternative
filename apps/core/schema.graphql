@@ -2300,6 +2300,15 @@ enum ConversionStatus {
   SKIPPED
 }
 
+"""
+The language AI copy is written in: English, Urdu in its own script, or Roman Urdu, Urdu in Latin letters as shoppers write it on WhatsApp.
+"""
+enum CopyLanguage {
+  ENGLISH
+  ROMAN_URDU
+  URDU
+}
+
 """A courier shops book parcels with (SHP-01)."""
 type Courier {
   """Its key, such as "postex"."""
@@ -7411,6 +7420,11 @@ type Mutation {
   Pairs a product with other products of the shop, in their order, in place of those it had, at most 10; none, and it pairs with none.
   """
   productComplementsSet(complementIds: [ID!]!, productId: ID!): ProductComplementsSetPayload!
+
+  """
+  An AI draft of a product's title, description and search engine title and description, from what the shop says of it, in the language asked for (CAT-20, ADR-471). It says nothing the shop did not; nothing is kept: the shop checks it in its form and saves it. 100 a day per shop.
+  """
+  productCopyDraft(input: ProductCopyDraftInput!): ProductCopyDraftPayload!
   productCreate(input: ProductCreateInput!): ProductCreatePayload!
 
   """Adds images by URL, after the existing ones."""
@@ -10038,6 +10052,64 @@ type ProductConnection {
   pageInfo: PageInfo!
 }
 
+"""
+A draft of a product’s copy, never kept: the shop checks it and saves it.
+"""
+type ProductCopyDraft {
+  """Paragraphs and lists alone: p, ul, ol, li, strong, em and br."""
+  descriptionHtml: String!
+
+  """The description search engines show, at most 320 characters."""
+  seoDescription: String!
+
+  """The title search engines show, at most 70 characters."""
+  seoTitle: String!
+  title: String!
+}
+
+"""What the shop says of a product, for the AI to write its copy from."""
+input ProductCopyDraftInput {
+  """Its description as it stands, which the draft may build on."""
+  description: String
+  language: CopyLanguage!
+
+  """
+  The shop’s own words of it: fabric, pieces, measurements, care, what is in the box.
+  """
+  notes: String
+  options: [ProductCopyOptionInput!]
+
+  """The product it is for; none for a product still being added."""
+  productId: ID
+  productType: String
+  tags: [String!]
+  title: String
+  vendor: String
+}
+
+type ProductCopyDraftPayload {
+  """The draft; null on errors."""
+  draft: ProductCopyDraft
+  userErrors: [UserError!]!
+}
+
+type ProductCopyDrafting {
+  """Whether this Hatti writes products’ copy with AI at all."""
+  available: Boolean!
+
+  """Drafts a shop may ask for in 24 hours."""
+  limitPerDay: Int!
+
+  """Drafts the shop asked for in the last 24 hours."""
+  usedToday: Int!
+}
+
+"""One of a product’s options and its values, as its form has them."""
+input ProductCopyOptionInput {
+  name: String!
+  values: [String!]!
+}
+
 input ProductCreateInput {
   description: String
 
@@ -11446,6 +11518,11 @@ type Query {
 
   """A product by handle, or null."""
   productByHandle(handle: String!): Product
+
+  """
+  Whether the shop may ask for AI drafts of products’ copy (CAT-20), and how many it asked for in the last 24 hours.
+  """
+  productCopyDrafting: ProductCopyDrafting!
 
   """
   The shop's products' reviews, the latest first: those of a status or a product if given; `first` of them (50 unless given, 250 at most), older than the review `after` names.

@@ -19,6 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hatti/ai": "workspace:*",
     "@hatti/api": "workspace:*",
     "@hatti/csv": "workspace:*",
     "@hatti/db": "workspace:*",

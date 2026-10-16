@@ -201,3 +201,10 @@ export {
   type PriceSaleState,
   type PriceSaleUpdatedPayload,
 } from '../internal/price-sales.js';
+export {
+  COPY_DRAFT_LIMITS,
+  COPY_LANGUAGES,
+  CopyDraftService,
+  type CopyDraftInput,
+  type CopyDraftingRecord,
+} from '../internal/copy-drafts.service.js';

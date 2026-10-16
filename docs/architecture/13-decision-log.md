@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-470 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-471 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -478,6 +478,7 @@
 | 468 | A shop says how many days buyers have to return an order, and whether for an exchange or their money: on each product page, and to search engines as its return policy | Accepted |
 | 469 | A shop asks for its customers' SMS to come from a name of its own, which Hatti's people approve once operators register it for a verified shop; what Hatti tells the shop itself still comes from Hatti's | Accepted |
 | 470 | The admin's Customer messages page shows the name the shop's SMS go from, the request waiting, which may be withdrawn, and why the last was refused or taken back, and takes owners' and managers' requests | Accepted |
+| 471 | A product's title, description and search engine words are drafted with AI from what the shop says of it, in English, Urdu or Roman Urdu, never kept, a hundred a day | Accepted |
 
 ---
 
@@ -17852,3 +17853,32 @@
 * **Alternatives:**
   * **A page of its own in Settings:** the name belongs with how customers are told, where the
     shop already chooses WhatsApp or SMS.
+
+## ADR-471 · A product's title, description and search engine words are drafted with AI from what the shop says of it, in English, Urdu or Roman Urdu, never kept, a hundred a day
+
+* **Context:**
+  * CAT-20 asks for products' copy written with AI in English, Urdu and Roman Urdu. The AI
+    gateway takes the model and key from configuration and checks every answer (ADR-463).
+  * A seller knows the fabric, the pieces and the measurements; a model invents them when asked
+    to fill a description in, which a buyer would hold the shop to.
+* **Decision:**
+  * **`@hatti/ai`'s product copy route** writes the title, the description and the search
+    engine title and description from the shop's facts alone: its title, type, brand, tags,
+    options, its own words and the description as it stands. The prompt forbids fabrics, sizes,
+    prices, guarantees and claims the shop did not make, and keeps the shop's words between tags
+    as data. The description keeps p, ul, ol, li, strong, em and br without attributes; the
+    search engine title is cut to 70 characters and its description to 320, at a word's end.
+  * **`productCopyDraft(input)`** returns the draft and keeps nothing; the shop checks it in the
+    product's form and saves it as any product is saved. `write_products`.
+    `productCopyDrafting` says whether this Hatti drafts at all and how many of the day's hundred
+    the shop asked for.
+  * **`catalog.copy_drafts`** logs each ask: the product, once there is one, the language, what
+    came of it and its tokens. Without a gateway configured, drafts are unavailable.
+* **Consequences:**
+  * A short note gives short copy; the shop writes the rest.
+  * What AI costs each shop is known from the log, as for translations.
+* **Alternatives:**
+  * **Saving the draft straight onto the product:** the shop would publish words it did not
+    read.
+  * **One quota for every AI feature:** translations and copy are asked for at different times
+    of a product's life; each keeps its own hundred until AI costs say otherwise.

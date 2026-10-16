@@ -120,4 +120,61 @@ describe.skipIf(!server)('Admin GraphQL API: AI drafts of translations (CAT-07)'
     const denied = await gql(tokens.reader, draft, { id: productId });
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
+
+  it("drafts a product's copy in Roman Urdu from what the shop says (CAT-20, ADR-471)", async () => {
+    expect(
+      (await gql(tokens.writer, '{ productCopyDrafting { available usedToday limitPerDay } }'))
+        .data,
+    ).toEqual({ productCopyDrafting: { available: true, usedToday: 0, limitPerDay: 100 } });
+    answers.push({
+      content: [
+        {
+          type: 'tool_use',
+          name: 'give_product_copy',
+          input: {
+            title: 'Printed lawn ka 3-piece suit',
+            description_html: '<p>Garmiyon ke liye lawn.</p><ul><li>Shirt: 3m</li></ul>',
+            seo_title: 'Printed lawn 3-piece suit | Zari',
+            seo_description: 'Zari ka printed lawn suit, chiffon dupatta ke saath.',
+          },
+        },
+      ],
+      stop_reason: 'tool_use',
+      usage: { input_tokens: 380, output_tokens: 160 },
+    });
+    const draft = `mutation ($input: ProductCopyDraftInput!) {
+      productCopyDraft(input: $input) {
+        draft { title descriptionHtml seoTitle seoDescription } userErrors { field code }
+      }
+    }`;
+    const drafted = await gql(tokens.writer, draft, {
+      input: {
+        language: 'ROMAN_URDU',
+        title: 'Lawn suit',
+        options: [{ name: 'Colour', values: ['Mint'] }],
+        notes: 'Shirt 3m, chiffon dupatta',
+      },
+    });
+    expect(drafted.data!.productCopyDraft).toEqual({
+      draft: {
+        title: 'Printed lawn ka 3-piece suit',
+        descriptionHtml: '<p>Garmiyon ke liye lawn.</p><ul><li>Shirt: 3m</li></ul>',
+        seoTitle: 'Printed lawn 3-piece suit | Zari',
+        seoDescription: 'Zari ka printed lawn suit, chiffon dupatta ke saath.',
+      },
+      userErrors: [],
+    });
+    // A product that is not the shop's is refused before the AI is asked.
+    const stranger = await gql(tokens.writer, draft, {
+      input: { language: 'ENGLISH', title: 'Kurta', productId: 'gid://shopify/Product/nope' },
+    });
+    expect(stranger.data!.productCopyDraft.userErrors).toEqual([
+      { field: ['input', 'productId'], code: 'NOT_FOUND' },
+    ]);
+    // Asking needs write_products.
+    expect(
+      (await gql(tokens.reader, draft, { input: { language: 'ENGLISH', title: 'Kurta' } }))
+        .errors?.[0]?.extensions?.code,
+    ).toBe('ACCESS_DENIED');
+  });
 });
