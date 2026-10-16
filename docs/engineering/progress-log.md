@@ -7,8 +7,8 @@
 ## In progress
 
 **Next, section by section as the alpha's shops need them**: CAT-17's price changes at a time
-ahead, for sales, and the publish time on the admin's product page; then the feature catalog's
-V1 rows still open, in the order the alpha's shops need them. Urdu handles wait, as decided.
+ahead, for sales; then the feature catalog's V1 rows still open, in the order the alpha's shops
+need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,12 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### A draft's time to go on sale, in the admin
+
+* **A draft's page in the admin sets the time it goes on sale** ([ADR-442](../architecture/13-decision-log.md#adr-442--the-admin-sets-a-drafts-time-to-go-on-sale-on-its-page-typed-in-the-phones-own-time-and-said-back-in-the-shops), CAT-17), in the phone's
+  own time, said back in the shop's.
+* 2872 tests, from 2869: the admin's two, and one the admin's count had missed.
 
 ### cca0063 · Drafts put on sale at a time ahead
 

@@ -490,6 +490,8 @@ export interface ProductDetail {
    * out.
    */
   complementaryProducts?: { id: string; title: string }[];
+  /** When the draft goes on sale by itself (ADR-441); absent where a fake core leaves it out. */
+  publishAt?: string | null;
   options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
   media: ProductMedia[];
   variants: ProductVariantDetail[];
@@ -3161,6 +3163,13 @@ export interface ProductBundle {
 
 export interface ProductBundleSetData {
   productBundleSet: { bundle: ProductBundle | null; userErrors: UserError[] };
+}
+
+export interface ProductSchedulePublishData {
+  productSchedulePublish: {
+    product: { id: string; status: string; publishAt: string | null } | null;
+    userErrors: UserError[];
+  };
 }
 
 export interface ProductComplementsSetData {

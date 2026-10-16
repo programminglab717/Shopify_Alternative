@@ -3750,6 +3750,17 @@ const en = {
   'preorder.savedOn': 'On pre-order, shipping by {date}',
   'preorder.savedOff': 'No longer on pre-order: it sells as its stock allows',
   'preorder.line': 'Pre-order: ships by {date}',
+  'schedule.title': 'Put on sale later',
+  'schedule.hint':
+    'For a drop that goes live at a set time, such as midnight before Eid. It stays a draft until then, and goes on sale within a minute of it.',
+  'schedule.on': 'Put it on sale at a set time',
+  'schedule.onHint': 'Put on sale or archived by hand before then, it loses its time.',
+  'schedule.at': 'Goes on sale at',
+  'schedule.atHint': "In your phone's time, from a minute to a year ahead.",
+  'schedule.set': 'It goes on sale {date}.',
+  'schedule.save': 'Save time',
+  'schedule.savedOn': 'Saved: it goes on sale {date}',
+  'schedule.savedOff': 'No time set: it stays a draft until you put it on sale',
   'bundle.title': 'Bundle',
   'bundle.hint':
     "Sell it as a set of your other products, such as a 3-piece suit, or as a multipack of one. Its price is the set's; it sells as many as its parts' stock makes, and orders take its parts.",
@@ -7570,6 +7581,18 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'preorder.savedOn': 'پیشگی آرڈر پر، {date} تک روانگی',
   'preorder.savedOff': 'اب پیشگی آرڈر پر نہیں: اسٹاک کے مطابق بکتا ہے',
   'preorder.line': 'پیشگی آرڈر: {date} تک روانگی',
+  'schedule.title': 'بعد میں فروخت پر لگائیں',
+  'schedule.hint':
+    'کسی مقررہ وقت پر لانچ کے لیے، جیسے عید سے پہلے آدھی رات۔ تب تک یہ ڈرافٹ رہتا ہے، اور اس وقت کے ایک منٹ کے اندر فروخت پر لگ جاتا ہے۔',
+  'schedule.on': 'اسے مقررہ وقت پر فروخت پر لگائیں',
+  'schedule.onHint':
+    'اس سے پہلے ہاتھ سے فروخت پر لگایا یا آرکائیو کیا تو اس کا وقت ختم ہو جاتا ہے۔',
+  'schedule.at': 'فروخت پر لگنے کا وقت',
+  'schedule.atHint': 'آپ کے فون کے وقت میں، ایک منٹ سے ایک سال آگے تک۔',
+  'schedule.set': 'یہ {date} کو فروخت پر لگے گا۔',
+  'schedule.save': 'وقت محفوظ کریں',
+  'schedule.savedOn': 'محفوظ: یہ {date} کو فروخت پر لگے گا',
+  'schedule.savedOff': 'کوئی وقت نہیں: یہ تب تک ڈرافٹ رہے گا جب تک آپ اسے فروخت پر نہ لگائیں',
   'bundle.title': 'بنڈل',
   'bundle.hint':
     'اسے اپنی دوسری مصنوعات کے سیٹ کے طور پر بیچیں، جیسے تین پیس سوٹ، یا ایک ہی چیز کا ملٹی پیک۔ اس کی قیمت سیٹ کی ہے؛ یہ اتنے بکتا ہے جتنے سیٹ اس کے حصوں کا اسٹاک بناتا ہے، اور آرڈر اس کے حصے لیتے ہیں۔',

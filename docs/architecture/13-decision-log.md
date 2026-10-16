@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-441 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-442 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -449,6 +449,7 @@
 | 439 | The offer after the purchase in the admin: turned on in the order settings, with its percentage off | Accepted |
 | 440 | The cart drawer's cross-sells: the cart page's, in the drawer, from one snippet and a theme script both load | Accepted |
 | 441 | A draft is put on sale by itself at a time ahead, a minute to a year off, by the worker's sweep of scheduled content; set on sale or archived by hand, it loses its time | Accepted |
+| 442 | The admin sets a draft's time to go on sale on its page, typed in the phone's own time and said back in the shop's | Accepted |
 
 ---
 
@@ -16875,3 +16876,25 @@
     step with the product when it is edited, archived or deleted.
   * **Keeping the time on an active product to take it off sale later:** no shop in the alpha
     asked for it. A sale ending is the price change's work.
+
+## ADR-442 · The admin sets a draft's time to go on sale on its page, typed in the phone's own time and said back in the shop's
+
+* **Context:**
+  * ADR-441 lets a draft go on sale by itself at a time ahead, through the Admin API alone.
+  * An article's time ahead (ADR-215) is typed in a `datetime-local` field in the phone's own
+    time. Owners in the alpha are in Pakistan, as their shops are.
+* **Decision:**
+  * **A draft's page has a "Put on sale later" card** for owners and managers. A box turns the
+    time on, and a field takes it in the phone's own time, as an article's does.
+    * The time set is said back in the shop's time zone, under the field and once saved.
+    * Turning the box off and saving takes the time away. The core's refusals (too soon, more
+      than a year ahead) are shown as they come.
+  * **Only a draft has the card.** A product on sale or archived has none, as it has no time to
+    go on sale (ADR-441).
+  * The field is compared to the minute, as it shows the time, so a time kept to the second is
+    not counted as a change.
+* **Consequences:**
+  * Once the product is set on sale, by the worker or by hand, the card is gone from its page.
+* **Alternatives:**
+  * **A time typed in the shop's zone:** the same for owners in Pakistan, but unlike how
+    articles take theirs.

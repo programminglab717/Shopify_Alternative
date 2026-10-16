@@ -45,6 +45,7 @@ import {
 import type { DetailsState } from './product-form';
 import { ProductBundleCard } from './bundle';
 import { ProductPairingsCard } from './pairings';
+import { ProductSchedule } from './schedule';
 import { DuplicateProduct } from './duplicate';
 import { ProductOptions } from './options';
 import { ProductPhotos } from './photos';
@@ -597,6 +598,8 @@ function ProductView() {
         edits={edits}
         onSaved={() => setSaved((count) => count + 1)}
       />
+      {/* Only a draft is put on sale at a time ahead (ADR-441). */}
+      {edits && product.status === 'DRAFT' && <ProductSchedule product={product} />}
       {edits && <ProductOptions product={product} />}
       {edits && <StockRules product={product} />}
       {/* Shown afresh when the core's day changes. */}

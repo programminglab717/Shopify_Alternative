@@ -929,6 +929,7 @@ const PRODUCT = /* GraphQL */ `
       id
       title
     }
+    publishAt
     options {
       id
       name
@@ -7352,6 +7353,22 @@ export const ProductBundleSetMutation = /* GraphQL */ `
  * Pairs a product with others, in order, in place of those it had; none, and it pairs with none
  * (MKT-09, ADR-435).
  */
+export const ProductSchedulePublishMutation = /* GraphQL */ `
+  mutation ProductSchedulePublish($productId: ID!, $publishAt: DateTime) {
+    productSchedulePublish(productId: $productId, publishAt: $publishAt) {
+      product {
+        id
+        status
+        publishAt
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 export const ProductComplementsSetMutation = /* GraphQL */ `
   mutation ProductComplementsSet($productId: ID!, $complementIds: [ID!]!) {
     productComplementsSet(productId: $productId, complementIds: $complementIds) {
