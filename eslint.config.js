@@ -38,6 +38,11 @@ export default defineConfig(
     },
   },
   {
+    // Themes' scripts run in shoppers' browsers, as classic scripts.
+    files: ['themes/**/assets/*.js'],
+    languageOptions: { sourceType: 'script', globals: { ...globals.browser } },
+  },
+  {
     // CLI entry points may print to the console.
     files: [
       '**/src/cli/**/*.ts',
