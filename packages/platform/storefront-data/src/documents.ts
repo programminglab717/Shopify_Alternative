@@ -89,6 +89,11 @@ export interface VariantDoc {
   options: string[];
   /** Its image, by position in the product's images. */
   image: number | null;
+  /**
+   * How many are left to sell, where 5 or fewer are (MKT-14, ADR-445): for honest "only 3 left"
+   * words. Absent where more are, where stock is not counted, or where it sells on at zero.
+   */
+  left?: number;
 }
 
 /**
@@ -128,6 +133,11 @@ export interface ProductDoc {
    * whatever its stock. Absent when it is not.
    */
   preorderShipsOn?: string;
+  /**
+   * When the sale it is in now ends, as ISO 8601 (MKT-14, ADR-445): for its page's countdown.
+   * Absent when it is in none.
+   */
+  saleEndsAt?: string;
   handle: string;
   title: string;
   /** Safe to show as it is: made from the product's text, escaped. */

@@ -107,6 +107,24 @@ export function salePrice(price: bigint, percent: number, currency: CurrencyCode
   return cut - (cut % unit);
 }
 
+/**
+ * When the sale each of `productIds` is in now ends (MKT-14, ADR-445), in the caller's
+ * transaction: for its storefront page's countdown. A product in none has none in the map.
+ */
+export async function runningSalesIn(
+  tx: Tx,
+  shopId: string,
+  productIds: readonly string[],
+): Promise<Map<string, Date>> {
+  if (productIds.length === 0) return new Map();
+  const { rows } = await tx.execute<{ product_id: string; ends_at: string | Date }>(sql`
+    SELECT sp.product_id, s.ends_at FROM catalog.price_sale_products sp
+      JOIN catalog.price_sales s ON s.shop_id = sp.shop_id AND s.id = sp.sale_id
+     WHERE sp.shop_id = ${shopId} AND s.state = 'running'
+       AND sp.product_id = ANY(${sql.param([...productIds])}::uuid[])`);
+  return new Map(rows.map((row) => [row.product_id, toDate(row.ends_at)]));
+}
+
 type Shop = Pick<TenantContext, 'shopId' | 'currency'>;
 
 /**

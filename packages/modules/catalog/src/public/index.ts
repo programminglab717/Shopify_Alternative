@@ -193,6 +193,7 @@ export {
   PRICE_SALE_LIMITS,
   PriceSaleEvents,
   PriceSaleService,
+  runningSalesIn,
   salePrice,
   type PriceSaleInput,
   type PriceSaleRecord,

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-444 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-445 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -452,6 +452,7 @@
 | 442 | The admin sets a draft's time to go on sale on its page, typed in the phone's own time and said back in the shop's | Accepted |
 | 443 | A sale set ahead cuts its products' prices by a percentage at its start, the old price shown struck through, and puts them back at its end unless changed by hand meanwhile | Accepted |
 | 444 | The admin's sales page under Products: sales set ahead with products found by name, listed with their state, cancelled ahead or ended early | Accepted |
+| 445 | A product's page counts down to its running sale's end, and says how many are left only where 5 or fewer are, as Shopify's inventory_quantity | Accepted |
 
 ---
 
@@ -16969,3 +16970,34 @@
 * **Alternatives:**
   * **Under Marketing:** a sale changes prices, which staff who market without changing products
     may not do.
+
+## ADR-445 · A product's page counts down to its running sale's end, and says how many are left only where 5 or fewer are, as Shopify's inventory_quantity
+
+* **Context:**
+  * MKT-14 asks for urgency and social proof: countdowns, and honest stock indicators with no fake
+    scarcity. Apps that do this on Shopify often show made-up counts or timers that restart.
+  * Sales set ahead (ADR-443) now have a real end. The storefront's documents know whether each
+    variant sells, but not how many are left.
+* **Decision:**
+  * **A product's document holds when the sale it is in now ends** (`saleEndsAt`). A sale's start
+    and end are already `product.updated`, so the document follows.
+    * Liquid sees it as `product.sale_ends_at`, Hatti's own, nil when the product is in no sale.
+  * **Each variant's document holds how many are left, only where 5 or fewer can be sold**
+    (`left`). Stock's events already rebuild the document as it sells.
+    * Liquid sees it as Shopify's `variant.inventory_quantity`, with `inventory_management` set to
+      `shopify`. Both are nil otherwise.
+    * A theme can't learn a shop's stock past 5, so the words are never a guess, and competitors
+      can't read stock levels off the page.
+  * **Hatti Base's product page:**
+    * Under the price, "Sale ends in 2d 04:12:09", counted by the second where JavaScript runs.
+      Without JavaScript it says "Sale ends 12 November 2026". It hides once the time comes.
+    * Under the buy button, "Only 3 left" for the variant chosen, following the choice.
+    * Both in English and Urdu.
+* **Consequences:**
+  * Pages are cached. The countdown runs in the browser, and the publisher's rebuild at the sale's
+    end purges the page.
+  * Collection cards say neither; a later section may add them.
+* **Alternatives:**
+  * **The full stock in the documents:** themes could show counts in the hundreds, which no shop in
+    the alpha wants public.
+  * **A countdown the shop sets by hand, per product:** it could disagree with the real prices.

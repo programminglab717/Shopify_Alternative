@@ -7,12 +7,14 @@ import {
   ProductReviewService,
   BundleService,
   ComplementService,
+  PriceSaleService,
   ProductService,
   SizeChartService,
   bundleProductIdsIn,
   bundlesContainingIn,
   bundlesOfProductsIn,
   complementsIn,
+  runningSalesIn,
   relatedProductsIn,
   VariantService,
   shownReviewsIn,
@@ -453,6 +455,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         articles,
         reviews: { shownReviewsOf: shownReviewsIn },
         preorders: { preordersOf: preordersIn },
+        sales: { runningSalesOf: runningSalesIn },
         related: { relatedProductsOf: relatedProductsIn, complementsOf: complementsIn },
         sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
         bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
@@ -1324,6 +1327,55 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
   });
 
+  it("publishes when a product's running sale ends, and how many are left where few are (ADR-445)", async () => {
+    const sales = new PriceSaleService(database);
+    const kurta = unwrap(
+      await products.create(tenant, {
+        title: 'Sale Kurta',
+        status: 'active',
+        variants: [{ price: '4,000' }],
+      }),
+    );
+    const [variant] = kurta.variants;
+    const primary = (await database.tenant(shopId, (tx) => locations.primaryOf(tx, shopId))).id;
+    const stock = (quantity: number) =>
+      inventory.setQuantities(tenant, {
+        name: 'on_hand',
+        reason: 'received',
+        quantities: [{ inventoryItemId: variant!.id, locationId: primary, quantity }],
+      });
+    unwrap(await stock(3));
+    await deliver();
+    let doc = await store().productByHandle(kurta.handle);
+    expect([doc?.saleEndsAt, doc?.variants[0]?.left]).toEqual([undefined, 3]);
+
+    const sale = unwrap(
+      await sales.create(tenant, {
+        name: 'Eid sale',
+        percentOff: 25,
+        startsAt: new Date(),
+        endsAt: new Date(Date.now() + 2 * 86_400_000),
+        productIds: [kurta.id],
+      }),
+    );
+    await deliver();
+    doc = await store().productByHandle(kurta.handle);
+    expect(doc?.saleEndsAt).toBe(sale.endsAt.toISOString());
+    expect([doc?.variants[0]?.price, doc?.variants[0]?.compareAtPrice]).toEqual([300_000, 400_000]);
+
+    // Plenty left: not said.
+    unwrap(await stock(10));
+    await deliver();
+    expect((await store().productByHandle(kurta.handle))?.variants[0]?.left).toBeUndefined();
+
+    unwrap(await sales.cancel(tenant, sale.id));
+    await deliver();
+    doc = await store().productByHandle(kurta.handle);
+    expect([doc?.saleEndsAt, doc?.variants[0]?.price]).toEqual([undefined, 400_000]);
+    unwrap(await products.delete(tenant, kurta.id));
+    await deliver();
+  });
+
   it("publishes an article's comments as its blog's policy says, and follows them (ADR-220)", async () => {
     const comments = new CommentService(database);
     const diary = unwrap(await blogs.create(tenant, { title: 'Diary' }));
@@ -2094,11 +2146,12 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
           quantities: [{ inventoryItemId: chunri.variants[0]!.id, locationId: primary, quantity }],
         }),
       );
-    await stock(5);
+    await stock(6);
     expect(await forget()).toContain(tag('product', 'chunri-dupatta'));
 
-    // More of it in stock changes nothing a page shows: nothing is forgotten.
-    await stock(6);
+    // More of it in stock, past the few a page says are left (ADR-445), changes nothing a page
+    // shows: nothing is forgotten.
+    await stock(7);
     expect(await forget()).toEqual([]);
     // Sold out: its page, and the listings that show its card.
     await stock(0);

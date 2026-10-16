@@ -50,6 +50,9 @@ import {
 /** `/collections/all`, every active product, newest first, unless a collection has the handle. */
 export const ALL_PRODUCTS = 'all';
 
+/** The most left of a variant its page says it has, honestly (MKT-14, ADR-445); more are not said. */
+export const LOW_STOCK_SHOWN = 5;
+
 /** Where a ready image is served (ADR-158), by its media and its product's handle. */
 export type ImageAddress = (media: MediaRecord, handle: string) => string | null;
 
@@ -91,6 +94,10 @@ export function productDoc(
   related?: readonly string[],
   /** The products the shop pairs with it, in its order (ADR-435). */
   complements?: readonly string[],
+  /** When the sale it is in now ends (ADR-445), if it is in one. */
+  saleEndsAt?: Date,
+  /** How many of each variant are left to sell, where 5 or fewer are (ADR-445). */
+  left: ReadonlyMap<string, number> = new Map(),
 ): ProductDoc {
   // Its images; its videos are its media beside them (ADR-258).
   const images = record.media.flatMap((media) => {
@@ -136,6 +143,7 @@ export function productDoc(
           )
         : [DEFAULT_VARIANT_TITLE],
       image: variant.mediaId === null ? null : (imageAt.get(variant.mediaId) ?? null),
+      ...(left.has(variant.id) && { left: left.get(variant.id) }),
     })),
     images: images.map(({ media, src }) => {
       // As shown: cropped where it is (ADR-257).
@@ -177,6 +185,7 @@ export function productDoc(
       },
     }),
     ...(preorderShipsOn && { preorderShipsOn }),
+    ...(saleEndsAt && { saleEndsAt: saleEndsAt.toISOString() }),
     ...(sizeChart && { sizeChart }),
     ...(bundle && { bundle }),
     ...(related && related.length > 0 && { related: [...related] }),

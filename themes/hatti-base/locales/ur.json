@@ -71,7 +71,11 @@
         "other": "{{ count }} ریویوز"
       },
       "reviews": "خریداروں کے ریویوز",
-      "verified_buyer": "اس دکان سے خریدا"
+      "verified_buyer": "اس دکان سے خریدا",
+      "sale_ends_on": "سیل {{ date }} کو ختم",
+      "sale_ends_in": "سیل ختم ہونے میں {{ time }}",
+      "sale_days": "{{ count }} دن",
+      "low_stock": "صرف {{ count }} باقی"
     },
     "wishlist": {
       "save": "{{ title }} اپنی پسندیدہ فہرست میں رکھیں"

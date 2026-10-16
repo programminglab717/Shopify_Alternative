@@ -12,6 +12,7 @@ import {
   bundlesContainingIn,
   bundlesOfProductsIn,
   complementsIn,
+  runningSalesIn,
   relatedProductsIn,
   VariantService,
   imagePathOf,
@@ -106,6 +107,7 @@ import { logoPathOf } from '../api/logos.js';
 import { sharingImagePathOf } from '../api/sharing-images.js';
 import {
   ALL_PRODUCTS,
+  LOW_STOCK_SHOWN,
   allProductsDoc,
   articleDoc,
   blogDoc,
@@ -501,6 +503,14 @@ export interface PublisherServices {
       shopId: string,
       productIds: readonly string[],
     ): Promise<Map<string, string[]>>;
+  };
+  /** When the sale each product is in now ends (ADR-445). */
+  sales: {
+    runningSalesOf(
+      tx: Tx,
+      shopId: string,
+      productIds: readonly string[],
+    ): Promise<Map<string, Date>>;
   };
   /** The products on pre-order, and the day each ships by (ADR-403). */
   preorders: {
@@ -1002,6 +1012,21 @@ export class StorefrontPublisher {
       shopId,
       active.map((record) => record.id),
     );
+    const sales = await this.services.sales.runningSalesOf(
+      tx,
+      shopId,
+      active.map((record) => record.id),
+    );
+    // How many are left, said where few are (ADR-445): the stock's events rebuild it as it sells.
+    const left = new Map<string, number>();
+    const sellable = await this.services.inventory.sellableOf(
+      tx,
+      shopId,
+      active.flatMap((record) => record.variants.map((variant) => variant.id)),
+    );
+    for (const [variantId, count] of sellable) {
+      if (count !== null && count > 0 && count <= LOW_STOCK_SHOWN) left.set(variantId, count);
+    }
     const docs = active.map((record) =>
       productDoc(
         record,
@@ -1022,6 +1047,8 @@ export class StorefrontPublisher {
         bundleDoc(bundles.get(record.id), parts),
         related.get(record.id),
         complements.get(record.id),
+        sales.get(record.id),
+        left,
       ),
     );
     await writer.putProducts(docs);
@@ -1255,6 +1282,7 @@ export function createStorefrontPublisher(
       articles: new ArticleService(database),
       reviews: { shownReviewsOf: shownReviewsIn },
       preorders: { preordersOf: preordersIn },
+      sales: { runningSalesOf: runningSalesIn },
       related: { relatedProductsOf: relatedProductsIn, complementsOf: complementsIn },
       sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
       bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },

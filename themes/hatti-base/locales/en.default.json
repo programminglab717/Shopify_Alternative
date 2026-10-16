@@ -71,7 +71,11 @@
         "other": "{{ count }} reviews"
       },
       "reviews": "Customer reviews",
-      "verified_buyer": "Bought from this shop"
+      "verified_buyer": "Bought from this shop",
+      "sale_ends_on": "Sale ends {{ date }}",
+      "sale_ends_in": "Sale ends in {{ time }}",
+      "sale_days": "{{ count }}d",
+      "low_stock": "Only {{ count }} left"
     },
     "wishlist": {
       "save": "Save {{ title }} to your wishlist"

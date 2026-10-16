@@ -333,6 +333,9 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     // The day it ships by while it is on pre-order (ADR-403), YYYY-MM-DD for the date filter;
     // nil when it is not. Hatti's own.
     preorder_ships_on: doc.preorderShipsOn ?? null,
+    // When the sale it is in now ends (ADR-445), ISO 8601 for a countdown; nil when it is in none.
+    // Hatti's own.
+    sale_ends_at: doc.saleEndsAt ?? null,
     // Its size chart (ADR-407), each measurement in inches and centimetres; nil when it has none.
     // Hatti's own.
     size_chart: sizeChartObject(doc),
@@ -413,6 +416,10 @@ function variantObject(variant: VariantDoc, product: ProductDoc, images: readonl
     price: variant.price,
     compare_at_price: variant.compareAtPrice,
     available: variant.available,
+    // How many are left, as Shopify says it, where 5 or fewer are (ADR-445): Hatti says no more,
+    // so "only 3 left" is never a guess. Nil otherwise, as for stock Shopify does not count.
+    inventory_quantity: variant.left ?? null,
+    inventory_management: variant.left === undefined ? null : 'shopify',
     options: variant.options,
     option1: variant.options[0] ?? null,
     option2: variant.options[1] ?? null,

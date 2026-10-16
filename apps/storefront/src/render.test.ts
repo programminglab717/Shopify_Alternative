@@ -1188,6 +1188,46 @@ describe('Storefront rendering', () => {
     expect(urdu.html).toContain('اس سیٹ میں');
   });
 
+  it("counts down a running sale's end, and says how many are left where few are (ADR-445)", async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const onSale = {
+      ...first!,
+      saleEndsAt: '2026-11-12T18:59:00.000Z',
+      variants: first!.variants.map((each, index) => ({
+        ...each,
+        available: true,
+        ...(index === 0 && { left: 3 }),
+      })),
+    };
+    const shop = new MemoryStore({ ...sample, products: [onSale, ...rest] });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${onSale.handle}` }, shop.fresh());
+    expect(page.html).toMatch(
+      /<p\s+class="product__sale-ends"\s+data-sale-ends="2026-11-12T18:59:00.000Z"\s+data-words="Sale ends in \{time\}"\s+data-days="\{count\}d"\s*>Sale ends 12 November 2026<\/p>/,
+    );
+    expect(page.html).toMatch(
+      /<p\s+class="product__low-stock"\s+data-low-stock\s+data-words="Only \{count\} left"\s*>Only 3 left<\/p>/,
+    );
+    // Its variants say theirs, as Shopify's do, for the page's script.
+    const variants = JSON.parse(/data-variants>(.*?)<\/script>/s.exec(page.html)![1]!);
+    expect(
+      variants.map((each: { inventory_quantity: number | null }) => each.inventory_quantity),
+    ).toEqual(onSale.variants.map((_, index) => (index === 0 ? 3 : null)));
+    // A product in no sale, with plenty left, says neither.
+    const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());
+    expect(plain.html).not.toContain('class="product__sale-ends"');
+    expect(plain.html).toMatch(
+      /<p\s+class="product__low-stock"\s+data-low-stock[^>]*\shidden\s*><\/p>/,
+    );
+    // In Urdu too.
+    const urdu = await renderer.render(
+      { path: `/products/${onSale.handle}`, locale: 'ur' },
+      shop.fresh(),
+    );
+    expect(urdu.html).toContain('صرف 3 باقی');
+  });
+
   it('says a product on pre-order is one, and the day it ships by, on its page, card and cart line (ADR-403)', async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;
