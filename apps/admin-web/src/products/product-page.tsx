@@ -44,6 +44,7 @@ import {
 } from './product-form';
 import type { DetailsState } from './product-form';
 import { ProductBundleCard } from './bundle';
+import { ProductPairingsCard } from './pairings';
 import { DuplicateProduct } from './duplicate';
 import { ProductOptions } from './options';
 import { ProductPhotos } from './photos';
@@ -608,6 +609,7 @@ function ProductView() {
           product={product}
         />
       )}
+      {edits && <ProductPairingsCard product={product} />}
       <ProductUrduCard product={product} />
     </div>
   );

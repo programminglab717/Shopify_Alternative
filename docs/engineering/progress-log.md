@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the admin's card for the products
-a shop pairs with one (MKT-09), then the cart's cross-sells, then the one-tap offer on a
-cash-on-delivery order's page until it is packed (05 §8). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the cart's cross-sells, the
+products paired with what it holds (MKT-09), then the one-tap offer on a cash-on-delivery
+order's page until it is packed (05 §8). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,13 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### Complementary products in the admin
+
+* **A "Pairs well with" card on the product's page** ([ADR-436](../architecture/13-decision-log.md#adr-436--complementary-products-in-the-admin-a-card-on-the-products-page-the-products-found-by-name-and-put-in-order), MKT-09) finds products by name,
+  puts them in order and saves them as the products it pairs with.
+* 2860 tests, from 2857: two for the admin. The admin's row was one short since
+  ADR-433 and is counted again.
 
 ### 4cf046a · Complementary products
 

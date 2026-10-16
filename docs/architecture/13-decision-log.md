@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-435 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-436 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -443,6 +443,7 @@
 | 433 | COD to prepaid on the automations page: on and off, with the store credit it offers, sent from Hatti's number with no template to choose | Accepted |
 | 434 | Related products: worked out as each product's document is built, and served as Shopify's product recommendations for Hatti Base's product page to ask for | Accepted |
 | 435 | Complementary products: the products a shop pairs with one, kept by the catalog in its order, and recommended where a theme asks for complementary ones | Accepted |
+| 436 | Complementary products in the admin: a card on the product's page, the products found by name and put in order | Accepted |
 
 ---
 
@@ -16710,3 +16711,22 @@
     checks the products are the shop's.
   * **Pairing variants rather than products:** Shopify pairs products. A page shows the product
     and its options.
+
+## ADR-436 · Complementary products in the admin: a card on the product's page, the products found by name and put in order
+
+* **Context:**
+  * ADR-435 keeps the products a shop pairs with one, and the storefront recommends them. A shop
+    could set them only through the Admin API.
+* **Decision:**
+  * **A "Pairs well with" card on the product's page,** for staff who may change products.
+    * It lists the products paired with it, in order. Each moves up or down, or is removed.
+    * Products are found by name, as the link page finds them, and added at the end. The card
+      refuses the product itself, one already listed and more than ten before asking the core.
+    * Saving sends the whole list through `productComplementsSet`. The core's problem with a
+      product is shown with its title.
+  * **The product's query reads `complementaryProducts`** with its other parts.
+* **Consequences:**
+  * The order set on the card is the order the storefront shows them in.
+* **Alternatives:**
+  * **Dragging to reorder:** buttons work by touch and keyboard alike, as the menus' do.
+  * **Pairing from the products list, many at once:** a pairing is chosen product by product.

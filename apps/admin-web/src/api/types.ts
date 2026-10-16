@@ -485,6 +485,11 @@ export interface ProductDetail {
   sizeChart?: { id: string; name: string } | null;
   /** What it is made of, where it is a bundle (ADR-409); absent where a fake core leaves it out. */
   bundle?: ProductBundle | null;
+  /**
+   * The products the shop pairs with it, in order (ADR-435); absent where a fake core leaves it
+   * out.
+   */
+  complementaryProducts?: { id: string; title: string }[];
   options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
   media: ProductMedia[];
   variants: ProductVariantDetail[];
@@ -3151,6 +3156,13 @@ export interface ProductBundle {
 
 export interface ProductBundleSetData {
   productBundleSet: { bundle: ProductBundle | null; userErrors: UserError[] };
+}
+
+export interface ProductComplementsSetData {
+  productComplementsSet: {
+    complementaryProducts: { id: string; title: string }[] | null;
+    userErrors: UserError[];
+  };
 }
 
 export type SizeChartUnit = 'INCHES' | 'CENTIMETERS';

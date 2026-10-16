@@ -233,7 +233,7 @@ function ProductRow({
 }
 
 /** Products found by name, to add to the page. */
-function ProductFinder({
+export function ProductFinder({
   onAdd,
   note,
 }: {

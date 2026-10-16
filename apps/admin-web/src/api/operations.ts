@@ -925,6 +925,10 @@ const PRODUCT = /* GraphQL */ `
         quantity
       }
     }
+    complementaryProducts {
+      id
+      title
+    }
     options {
       id
       name
@@ -7334,6 +7338,25 @@ export const ProductBundleSetMutation = /* GraphQL */ `
           variantTitle
           quantity
         }
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/**
+ * Pairs a product with others, in order, in place of those it had; none, and it pairs with none
+ * (MKT-09, ADR-435).
+ */
+export const ProductComplementsSetMutation = /* GraphQL */ `
+  mutation ProductComplementsSet($productId: ID!, $complementIds: [ID!]!) {
+    productComplementsSet(productId: $productId, complementIds: $complementIds) {
+      complementaryProducts {
+        id
+        title
       }
       userErrors {
         ...Problems
