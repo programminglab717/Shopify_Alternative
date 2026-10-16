@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### COD to prepaid in the admin
+### 91d9d47 · COD to prepaid in the admin
 
 * **COD to prepaid has its card** on Marketing's automations page ([ADR-433](../architecture/13-decision-log.md#adr-433--cod-to-prepaid-on-the-automations-page-on-and-off-with-the-store-credit-it-offers-sent-from-hattis-number-with-no-template-to-choose), MKT-04): the shop
   turns it on and off and sets the store credit it offers, with no template to choose.
