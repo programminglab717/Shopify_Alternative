@@ -323,7 +323,10 @@ function contactOf(body: unknown): { name: string; phone: string } {
  * What a POST to a checkout's page does: applies the discount code it carries
  * (`action=discount`), takes the code off (`action=remove_discount`), adds the shop's gift wrap
  * or takes it off (`action=gift_wrap`, `remove_gift_wrap`, ADR-413), sends the shopper to the
- * shop's gateway to pay the order placed online (`action=pay`, ADR-152), or places the order.
+ * shop's gateway to pay the order placed online (`action=pay`, ADR-152), fills in a returning
+ * shopper's saved address once their number is proved, sending the code (`action=recall`, with
+ * `channel=sms` for one by SMS) or checking it (`action=recall_code`, ADR-447), or places the
+ * order.
  */
 async function posted(
   checkouts: CheckoutService,
@@ -342,6 +345,17 @@ async function posted(
       return checkouts.giftWrap(token, false, options);
     case 'pay':
       return checkouts.payOnline(token, { ...options, gateway: field(body, 'gateway') });
+    case 'recall':
+    case 'recall_code':
+      return checkouts.recall(
+        token,
+        {
+          phone: field(body, 'phone'),
+          code: field(body, 'action') === 'recall_code' ? field(body, 'code') : null,
+          channel: field(body, 'channel') === 'sms' ? 'sms' : 'whatsapp',
+        },
+        options,
+      );
     default:
       return checkouts.place(token, field(body, 'shown'), formOf(body), options);
   }

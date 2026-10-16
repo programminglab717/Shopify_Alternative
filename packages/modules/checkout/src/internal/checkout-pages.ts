@@ -63,6 +63,7 @@ import {
   type CheckoutView,
   type ClosedLinkReason,
   type PickupPoint,
+  type RecallState,
 } from './checkout.service.js';
 import { deliveryDays, type DeliveryDays, type DeliverySettingsRecord } from './delivery.js';
 import { MARKETING_FIELDS, marketingTicked, marketingWords } from './marketing.js';
@@ -111,6 +112,8 @@ const LABELS = {
   code: { en: 'Code', ur: 'کوڈ' },
   codeBySms: { en: 'Send the code by SMS instead', ur: 'کوڈ ایس ایم ایس سے بھیجیں' },
   codeOnWhatsapp: { en: 'Send a new code on WhatsApp', ur: 'واٹس ایپ پر نیا کوڈ بھیجیں' },
+  orderedBefore: { en: 'Ordered here before?', ur: 'پہلے یہاں سے آرڈر کیا ہے؟' },
+  fillAddress: { en: 'Fill in my address', ur: 'میرا پتہ بھر دیں' },
   storeCredit: { en: 'Store credit', ur: 'اسٹور کریڈٹ' },
   backToCart: { en: 'Back to cart', ur: 'واپس کارٹ پر' },
   continueShopping: { en: 'Continue shopping', ur: 'خریداری جاری رکھیں' },
@@ -273,9 +276,11 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
         ? 429
         : problem?.kind === 'code'
           ? { sent: 200, wrong: 422, expired: 422, too_many: 429 }[problem.state]
-          : problem
-            ? 409
-            : 200;
+          : problem?.kind === 'recall'
+            ? RECALL_STATUS[problem.state]
+            : problem
+              ? 409
+              : 200;
   // The code sent to the number, where the shop asks for one (CHK-09): its box above the button,
   // and other codes asked for below it, so pressing Enter in the box places the order.
   const asked = problem?.kind === 'code' && problem.state !== 'too_many' ? problem : null;
@@ -327,8 +332,12 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
     [
       shopName(shop),
       heading(LABELS.title),
-      // A code's problem is said by its field.
-      problem && problem.kind !== 'discount' && banner(problemWords(problem, ways)),
+      // A code's problem is said by its field; a returning shopper's, by its section until the
+      // form is filled in.
+      problem &&
+        problem.kind !== 'discount' &&
+        !(problem.kind === 'recall' && !RECALL_DONE.includes(problem.state)) &&
+        banner(problemWords(problem, ways)),
       cartSummary(
         cart,
         charges,
@@ -351,6 +360,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
       ),
       discountSection(discount, problem?.kind === 'discount' ? problem : null),
       orderable && giftWrapSection(view.gift),
+      orderable && recallSection(form.phone, problem?.kind === 'recall' ? problem : null),
       orderable &&
         html`<form method="post">
           <input type="hidden" name="shown" value="${view.shown}" />
@@ -426,8 +436,8 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
  * page's own site alone; without it, the page keeps them as it is posted.
  */
 export const CONTACT_SCRIPT = `(function () {
-  var phone = document.querySelector('input[name="phone"]');
-  var name = document.querySelector('input[name="name"]');
+  var phone = document.getElementById('phone');
+  var name = document.getElementById('name');
   if (!phone || !window.fetch || !window.URLSearchParams) return;
   var sent = '';
   function send() {
@@ -1351,6 +1361,129 @@ function codeWords(problem: Extract<CheckoutProblem, { kind: 'code' }>): Sentenc
   }
 }
 
+/** The status a returning shopper's ask answers with (ADR-447). */
+const RECALL_STATUS: Record<RecallState, number> = {
+  sent: 200,
+  filled: 200,
+  nothing: 200,
+  wrong: 422,
+  expired: 422,
+  invalid: 422,
+  too_many: 429,
+};
+
+/** Where the number is proved and the form filled in, or found to have nothing to fill it from. */
+const RECALL_DONE: readonly RecallState[] = ['filled', 'nothing'];
+
+/**
+ * A returning shopper's saved address (CHK-03, ADR-447): their number, for a code to prove it is
+ * theirs, then the code; forms of their own, posted with an `action`, which place nothing, before
+ * the address they fill in. Gone once the number is proved.
+ */
+function recallSection(
+  phone: string,
+  problem: Extract<CheckoutProblem, { kind: 'recall' }> | null,
+): Html | false {
+  if (problem && RECALL_DONE.includes(problem.state)) return false;
+  const said =
+    problem && html`<div id="recall-said">${paragraphs(recallWords(problem), 'small')}</div>`;
+  if (problem && problem.state !== 'invalid' && problem.state !== 'too_many') {
+    return html`<section class="section">
+      <h2 class="label">${say('bilingual', LABELS.orderedBefore)}</h2>
+      ${said}
+      <form method="post">
+        <input type="hidden" name="action" value="recall_code" />
+        <input type="hidden" name="phone" value="${phone}" />
+        <label class="label" for="recall-code">${say('bilingual', LABELS.code)}</label>
+        <input
+          id="recall-code"
+          name="code"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          maxlength="6"
+          dir="ltr"
+          aria-required="true"
+          aria-describedby="recall-said"
+          ${problem.state !== 'sent' && html`aria-invalid="true"`}
+        />
+        <button class="button secondary" type="submit">
+          ${say('bilingual', LABELS.fillAddress)}
+        </button>
+      </form>
+      <form method="post">
+        <input type="hidden" name="action" value="recall" />
+        <input type="hidden" name="phone" value="${phone}" />
+        <input type="hidden" name="channel" value="sms" />
+        <button class="button secondary" type="submit">
+          ${say('bilingual', LABELS.codeBySms)}
+        </button>
+      </form>
+    </section>`;
+  }
+  return html`<section class="section">
+    <form method="post">
+      <input type="hidden" name="action" value="recall" />
+      <h2 class="label">${say('bilingual', LABELS.orderedBefore)}</h2>
+      ${paragraphs(
+        {
+          en: "Type your number and we'll send you a code to fill in your address.",
+          ur: 'اپنا نمبر لکھیں، ہم آپ کا پتہ بھرنے کے لیے کوڈ بھیجیں گے۔',
+        },
+        'small muted',
+      )}
+      <label class="label" for="recall-phone">${say('bilingual', LABELS.mobile)}</label>
+      <input
+        id="recall-phone"
+        name="phone"
+        type="tel"
+        dir="ltr"
+        value="${phone}"
+        autocomplete="tel"
+        maxlength="40"
+        ${problem && html`aria-invalid="true" aria-describedby="recall-said"`}
+      />
+      ${said}
+      <button class="button secondary" type="submit">
+        ${say('bilingual', LABELS.fillAddress)}
+      </button>
+    </form>
+  </section>`;
+}
+
+function recallWords(problem: Extract<CheckoutProblem, { kind: 'recall' }>): Sentence {
+  const phone = problem.phone;
+  switch (problem.state) {
+    case 'sent': {
+      const where =
+        problem.channel === 'sms'
+          ? { en: 'by SMS', ur: 'ایس ایم ایس سے' }
+          : { en: 'on WhatsApp', ur: 'واٹس ایپ پر' };
+      return {
+        en: `Type the code we sent ${where.en} to ${phone}.`,
+        ur: html`وہ کوڈ لکھیں جو ہم نے ${where.ur} ${ltr(phone)} پر بھیجا ہے۔`,
+      };
+    }
+    case 'filled':
+      return {
+        en: 'We filled in the address of your last order. Check it before you place your order.',
+        ur: 'ہم نے آپ کے پچھلے آرڈر کا پتہ بھر دیا ہے۔ آرڈر دینے سے پہلے اسے دیکھ لیں۔',
+      };
+    case 'nothing':
+      return {
+        en: `We have no address for ${phone} yet. Fill in your details below.`,
+        ur: html`ہمارے پاس ابھی ${ltr(phone)} کا کوئی پتہ نہیں۔ نیچے اپنی معلومات لکھیں۔`,
+      };
+    case 'invalid':
+      return {
+        en: 'Type a Pakistani mobile number, such as 0300 1234567.',
+        ur: html`پاکستانی موبائل نمبر لکھیں، جیسے ${ltr('0300 1234567')}۔`,
+      };
+    default:
+      return codeWords({ ...problem, kind: 'code', state: problem.state });
+  }
+}
+
 function problemWords(
   problem: CheckoutProblem,
   ways: PrepaidWays = { transfer: false, online: false },
@@ -1358,6 +1491,8 @@ function problemWords(
   switch (problem.kind) {
     case 'code':
       return codeWords(problem);
+    case 'recall':
+      return recallWords(problem);
     case 'changed':
       return {
         en:

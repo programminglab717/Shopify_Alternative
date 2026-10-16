@@ -249,6 +249,32 @@ describe.skipIf(!server)('Checkouts', () => {
     expect(used.json().data.discountCodeByCode).toEqual({ usageCount: 1 });
   });
 
+  it("fills in a returning shopper's address once a code proves their number (CHK-03, ADR-447)", async () => {
+    const first = await checkout();
+    const shown = await app.inject({ method: 'GET', url: first });
+    expect(shown.body).toContain('Ordered here before?');
+    expect((await post(first, { ...FORM, shown: shownIn(shown.body) })).statusCode).toBe(303);
+
+    const path = await checkout();
+    const asked = await post(path, { action: 'recall', phone: '0300-1234567', channel: 'sms' });
+    expect(asked.statusCode).toBe(200);
+    expect(asked.body).toContain('Type the code we sent by SMS to 0300 ••••567.');
+    const { rows } = await admin.query<{ code: string }>(
+      `SELECT variables ->> 'code' AS code FROM messaging.messages
+        WHERE kind = 'one_time_code' AND recipient = '+923001234567' AND channel = 'sms'
+        ORDER BY created_at DESC LIMIT 1`,
+    );
+    const filled = await post(path, {
+      action: 'recall_code',
+      phone: '0300-1234567',
+      code: rows[0]!.code,
+    });
+    expect(filled.statusCode).toBe(200);
+    expect(filled.body).toContain('We filled in the address of your last order.');
+    expect(filled.body).toContain('value="Near Liberty Market"');
+    expect(filled.body).not.toContain('Ordered here before?');
+  });
+
   it("shows the shop's logo on its page, through a URL storage signed, the page allowing it", async () => {
     const fileId = newId();
     const key = `shops/${shopA}/files/${fileId}/Zari.png`;

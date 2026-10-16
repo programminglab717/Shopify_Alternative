@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-446 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-447 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -454,6 +454,7 @@
 | 444 | The admin's sales page under Products: sales set ahead with products found by name, listed with their state, cancelled ahead or ended early | Accepted |
 | 445 | A product's page counts down to its running sale's end, and says how many are left only where 5 or fewer are, as Shopify's inventory_quantity | Accepted |
 | 446 | A closed shop's password page takes a waitlist: shoppers sign up tagged waitlist, and each is told once on WhatsApp from Hatti's number when the shop opens | Accepted |
+| 447 | A returning shopper fills in checkout's address from their last order, once a code sent to their number, or their browser's proof of it, shows the number is theirs | Accepted |
 
 ---
 
@@ -17037,3 +17038,45 @@
     they open, not before.
   * **A separate waitlist table:** the customer, consent and tag records already hold all it
     needs, with consent kept as the law asks.
+
+## ADR-447 · A returning shopper fills in checkout's address from their last order, once a code sent to their number, or their browser's proof of it, shows the number is theirs
+
+* **Context:**
+  * CHK-03 asks that a shopper who ordered before need not type their address again: they give
+    their number, prove it with a code, and the address is filled in.
+  * Shoppers in Pakistan type the same long address, with its area and landmark, on every order,
+    on a phone. Many leave at that step.
+  * Orders keep the address each went to, as corrected on the order's page (ADR-128). Checkout
+    already sends codes that prove a number (CHK-09, ADR-148), with their limits (ADR-249), and
+    remembers a browser that proved one for 30 days (ADR-199).
+  * An address is personal data. Nobody should learn where a number lives, or even whether it
+    ordered here, by typing it in.
+* **Decision:**
+  * **"Ordered here before?" on checkout's page:** a form of its own above the address, posted
+    with `action=recall` and the number. It places nothing, as the discount code's form doesn't.
+  * **The number must be proved first:**
+    * A browser that proved the number lately (ADR-199), or a code already proved in this
+      checkout, fills the address in at once.
+    * Otherwise a code goes to the number on WhatsApp, or by SMS when asked, with checkout's
+      usual limits. The shopper types it into the section, posted with `action=recall_code`.
+  * **The same answer for every number:** a code is sent to any mobile number typed, as at
+    placing. Only once the number is proved does the page say there is no address to fill in.
+  * **What is filled in:** from the newest order the shop delivered to that number, as last
+    corrected: the name, email, city, house and street, area, landmark, province and map pin.
+    * Orders that were cancelled, picked up, or erased with their customer are skipped.
+    * The orders module reads it through its facade, `savedAddressIn`.
+  * **The code counts for placing:** where the shop's risk rules ask for a code, the one proved to
+    fill in the address spares the shopper another, as one asked for then would.
+* **Consequences:**
+  * Nothing new is kept. The address lives on the order, so a customer's erasure (ADR-147) and
+    their data export already cover it.
+  * Each address asked for costs the shop one code message, counted against the same limits as
+    codes at placing.
+  * The page's contact script now finds its fields by id, as the section has a number field of
+    its own.
+* **Alternatives:**
+  * **An address book on the customer:** a second copy of every address to keep, correct and
+    erase. Orders already hold the true, corrected one.
+  * **Sending codes only to numbers that ordered before:** saves a message, but tells anyone
+    typing a number whether it is a customer here.
+  * **Filling in without a code:** anyone typing a neighbour's number would see their address.

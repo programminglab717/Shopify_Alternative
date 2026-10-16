@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### A returning shopper's address filled in
+
+* **A shopper who ordered before fills in checkout's address from their last order, once a
+  code shows the number is theirs** ([ADR-447](../architecture/13-decision-log.md#adr-447--a-returning-shopper-fills-in-checkouts-address-from-their-last-order-once-a-code-sent-to-their-number-or-their-browsers-proof-of-it-shows-the-number-is-theirs), CHK-03). A browser that proved the number lately
+  needs no code, and the code proved counts for placing the order.
+* 2890 tests, from 2887: checkout's two and the core's one.
+
 ### 575f289 · The pre-launch waitlist
 
 * **A closed shop's password page takes a waitlist, and each shopper on it hears on WhatsApp

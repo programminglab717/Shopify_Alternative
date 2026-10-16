@@ -33,6 +33,7 @@ import {
   codLimitError,
   offeredBankTransferIn,
   prepaidDiscountOf,
+  savedAddressIn,
   transferOwed,
   type AttributionValue,
   type BankAccountValue,
@@ -321,7 +322,23 @@ export type CheckoutProblem =
       phone: string;
       channel: PhoneChannel;
       state: 'sent' | Exclude<CodeCheck, 'verified' | 'none'>;
+    }
+  /**
+   * A returning shopper asked for the address they ordered to before (CHK-03, ADR-447): `phone`,
+   * masked, and where its code went; then whether it was sent, the one typed was wrong, too late
+   * or one too many, or the number is no mobile; and once it is proved, whether the form was
+   * filled in from their last order, or the number has none to fill it from.
+   */
+  | {
+      kind: 'recall';
+      phone: string;
+      channel: PhoneChannel;
+      state: RecallState;
     };
+
+/** How a returning shopper's ask for their saved address went (ADR-447). */
+export type RecallState =
+  'sent' | Exclude<CodeCheck, 'verified' | 'none'> | 'invalid' | 'filled' | 'nothing';
 
 export interface CheckoutShop {
   name: string;
@@ -562,6 +579,91 @@ export class CheckoutService {
       const view = await this.#view(tx, found, false, EMPTY_FORM);
       if (view.kind !== 'open') return false;
       return keepContactIn(tx, found.shopId, found.checkoutId, typed, view.cart);
+    });
+  }
+
+  /**
+   * A returning shopper's saved address (CHK-03, ADR-447): asked for by number, it fills in the
+   * form from the last order the shop delivered to it once the number is proved: by this browser
+   * lately (ADR-199), by a code proved in this checkout, or else by a code sent now on `channel`,
+   * which `code` then carries. A code goes to any number typed, as at placing (CHK-09), so the
+   * page says the same whether or not the number ordered here before; only once it is proved does
+   * it say there is nothing to fill in. The code proved counts for placing the order, as one asked
+   * for then would. With `shopId`, only for that shop's checkouts.
+   */
+  async recall(
+    token: string,
+    asked: { phone: string; code: string | null; channel: PhoneChannel },
+    options: { shopId?: string; client?: CheckoutClient } = {},
+  ): Promise<CheckoutView> {
+    const found = await this.#resolve(token, options.shopId);
+    if (!found) return { kind: 'not_found' };
+    const { client } = options;
+    return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
+      const typed = { ...EMPTY_FORM, phone: asked.phone.slice(0, 40) };
+      const view = await this.#view(tx, found, false, typed);
+      if (view.kind !== 'open') return view;
+      const phone = new InputChecker().mobile(['phone'], asked.phone, { required: true });
+      const said = (state: RecallState, channel = asked.channel): CheckoutView => ({
+        ...view,
+        problem: {
+          kind: 'recall',
+          phone: phone ? maskPkMobile(phone) : '',
+          channel,
+          state,
+        },
+      });
+      if (!phone) return said('invalid');
+      const proved =
+        (await numberVerifiedIn(tx, found.shopId, found.checkoutId, phone)) ??
+        (client?.proof ? await provedByBrowserIn(tx, found.shopId, client.proof, phone) : null);
+      if (!proved) {
+        if (asked.code === null) {
+          const sent = await sendCodeIn(tx, this.messages, {
+            shopId: found.shopId,
+            checkoutId: found.checkoutId,
+            phone,
+            channel: asked.channel,
+            shop: view.shop.name,
+            ip: client?.ip ?? null,
+          });
+          return said(sent);
+        }
+        const checked = await checkCodeIn(tx, found.shopId, found.checkoutId, phone, asked.code);
+        if (checked !== 'verified') {
+          const { rows } = await tx.execute<{ channel: PhoneChannel }>(sql`
+            SELECT channel FROM checkout.number_codes
+             WHERE shop_id = ${found.shopId} AND checkout_id = ${found.checkoutId}
+               AND phone = ${phone}
+             ORDER BY created_at DESC
+             LIMIT 1`);
+          return said(checked === 'none' ? 'expired' : checked, rows[0]?.channel);
+        }
+      }
+      const saved = await savedAddressIn(tx, found.shopId, phone);
+      if (!saved) return said('nothing');
+      const { address } = saved;
+      return {
+        ...view,
+        form: {
+          ...typed,
+          name: address.name,
+          email: saved.email ?? '',
+          city: address.city,
+          address1: address.address1,
+          address2: address.address2 ?? '',
+          landmark: address.landmark ?? '',
+          province: address.provinceCode ?? '',
+          latitude: address.location ? String(address.location.latitude) : '',
+          longitude: address.location ? String(address.location.longitude) : '',
+        },
+        problem: {
+          kind: 'recall',
+          phone: maskPkMobile(phone),
+          channel: asked.channel,
+          state: 'filled',
+        },
+      };
     });
   }
 
