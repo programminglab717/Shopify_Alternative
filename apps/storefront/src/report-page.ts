@@ -226,3 +226,31 @@ function errorText(error: Words): Html {
   return html`<p class="error" lang="en">${error.en}</p>
     <p class="error" lang="ur" dir="rtl">${error.ur}</p>`;
 }
+
+const TAKEN_DOWN = {
+  title: { en: 'This store is not available', ur: 'یہ دکان دستیاب نہیں ہے' },
+} satisfies Record<string, Words>;
+
+/**
+ * The page a store Hatti has taken down shows on every address (ADR-461), in place of its own: its
+ * name, and that Hatti closed it after what shoppers reported, in English and Urdu.
+ */
+export function takenDownPage(shopName: string): RenderedPage {
+  return renderPage({
+    title: `${TAKEN_DOWN.title.en} · ${shopName}`,
+    body: html`
+      <p class="shop"><bdi>${shopName}</bdi></p>
+      <h1 class="title stack">${say('bilingual', TAKEN_DOWN.title)}</h1>
+      <div class="text center muted">
+        <p lang="en">
+          Hatti has taken <bdi>${shopName}</bdi> down after what shoppers reported of it. Its pages
+          and its checkout are closed. If you paid it for an order, keep your receipt.
+        </p>
+        <p lang="ur" dir="rtl">
+          خریداروں کی شکایات کے بعد ہٹی نے <bdi>${shopName}</bdi> کو بند کر دیا ہے۔ اس کے صفحات اور
+          چیک آؤٹ بند ہیں۔ اگر آپ نے اسے کسی آرڈر کی ادائیگی کی ہے تو اپنی رسید سنبھال کر رکھیں۔
+        </p>
+      </div>
+    `,
+  });
+}

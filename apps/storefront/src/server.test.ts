@@ -2609,6 +2609,48 @@ describe('Carts', () => {
     await over.close();
   });
 
+  it("answers every address of a store Hatti took down with Hatti's page saying so (ADR-461)", async () => {
+    const sample = sampleStore();
+    const app = server({
+      sample: new MemoryStore({
+        ...sample,
+        shop: { ...sample.shop, suspended: true, password: { verifier: 'x', message: '' } },
+      }),
+    });
+    const get = (url: string, headers: Record<string, string> = {}) =>
+      app.inject({ method: 'GET', url, headers: { host: 'localhost', ...headers } });
+    for (const url of ['/', `/ur/products/${lawn.handle}`, '/password', '/report', '/track']) {
+      const answer = await get(url);
+      expect(
+        [answer.statusCode, answer.headers['cache-control'], answer.headers['x-robots-tag']],
+        url,
+      ).toEqual([404, 'private, no-store', 'noindex']);
+      expect(answer.body, url).toContain('This store is not available');
+      expect(answer.body, url).toContain('یہ دکان دستیاب نہیں ہے');
+    }
+    expect((await get('/')).headers['content-security-policy']).toContain("default-src 'none'");
+    // Scripts, feeds and forms are told in a line, and nothing reaches the core.
+    for (const url of ['/cart.js', '/robots.txt', '/sitemap.xml', PRODUCT_FEED_PATH]) {
+      const answer = await get(url);
+      expect([answer.statusCode, answer.body], url).toEqual([
+        404,
+        'This store is not available.\n',
+      ]);
+    }
+    const added = await app.inject({
+      method: 'POST',
+      url: '/cart/add',
+      headers: FORM,
+      payload: form({ id: String(variant.id), quantity: '1' }),
+    });
+    expect(added.statusCode).toBe(404);
+    expect(core.actions).toEqual([]);
+    // Staff's previews show it no more than shoppers.
+    core.previews.set(PREVIEW_TOKEN, previewing('Winter', 'Winter Sale'));
+    expect((await get('/', { cookie: `hatti_preview=${PREVIEW_TOKEN}` })).statusCode).toBe(404);
+    await app.close();
+  });
+
   it('refuses changes from other sites, forgets carts that are gone, and says when the core is not there', async () => {
     const app = server();
     const crossSite = await app.inject({

@@ -101,6 +101,7 @@ import {
   type HandledKind,
   type ShopDoc,
 } from '@hatti/storefront-data';
+import { TrustEvents } from '@hatti/trust/public';
 import type { Redis } from 'ioredis';
 import { articleImagePathOf } from '../api/article-images.js';
 import { logoPathOf } from '../api/logos.js';
@@ -381,6 +382,10 @@ export function itemsFor(event: DomainEvent): string[] {
     case ShopEvents.ShopOpened:
       // Its storefront, at its handle's subdomain: a shop without documents gets all of them.
       return [Items.everything];
+    case TrustEvents.StoreSuspended:
+    case TrustEvents.StoreRestored:
+      // Its document says whether Hatti took it down (ADR-461).
+      return [Items.shop];
     default:
       return [];
   }
@@ -436,6 +441,8 @@ export const PUBLISHED_EVENTS = [
   FileEvents.ShopBrandUpdated,
   FileEvents.FileDeleted,
   ShopEvents.ShopOpened,
+  TrustEvents.StoreSuspended,
+  TrustEvents.StoreRestored,
 ];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -835,7 +842,8 @@ export class StorefrontPublisher {
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];
-    if (profile.status === 'active') {
+    // A store taken down keeps its addresses, for its storefront to say so (ADR-461).
+    if (profile.status === 'active' || profile.status === 'suspended') {
       await this.directory.set(shopId, profile.handle, previous);
       await this.directory.setDomains(shopId, hosts, before?.domains);
     } else {

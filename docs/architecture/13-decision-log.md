@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-460 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-461 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -468,6 +468,7 @@
 | 458 | A broadcast goes by SMS too: the shop's own words from Hatti's shared sender, to those who agreed to hear by SMS, in marketing hours, each message ending on a link to a page that stops the shop's SMS to the number | Accepted |
 | 459 | The admin's new broadcast is sent by WhatsApp or SMS: by SMS, the shop's words with their count, the language of the link to stop, the message as customers read it, and an estimate by its parts | Accepted |
 | 460 | Shoppers report a store to Hatti from every store's footer: what is wrong, kept by a trust module, due a decision in 48 hours, dismissed or upheld by Hatti's people | Accepted |
+| 461 | Hatti's people take a store down when its reports are upheld: the shop suspended, its storefront answering with Hatti's page saying so, its checkout and admin closed, its owner told why, and restored the same way | Accepted |
 
 ---
 
@@ -17533,3 +17534,43 @@
     Hatti's, at the same path on every store; Hatti Base links to it, and other themes may.
   * **Reports kept with the shop's data, read through the Admin API:** the shop would see who
     reported it.
+
+## ADR-461 · Hatti's people take a store down when its reports are upheld: the shop suspended, its storefront answering with Hatti's page saying so, its checkout and admin closed, its owner told why, and restored the same way
+
+* **Context:**
+  * Shoppers report stores to Hatti, and Hatti's people dismiss or uphold each report
+    (ADR-460). An upheld report about a scam or fake goods needs the store stopped.
+  * `control.shops.status` has had `suspended` since the foundation (0001). Access tokens,
+    staff's shop roles, checkouts, draft and order links, and staff notices already refuse a
+    shop that is not active. Nothing set the status until now.
+* **Decision:**
+  * **A takedown is kept by the trust module** (`trust.takedowns`): the reason, from the
+    reports' reasons; what the owner is told of why; who took it down and when; and, once
+    restored, who restored it, when and why. A store is down once at a time.
+  * **Taking a store down suspends the shop** with the system login, which alone may change a
+    shop's status. It records `trust.store_suspended`. Restoring sets the shop active again and
+    records `trust.store_restored`. Either event publishes the shop's storefront document again.
+  * **Its storefront shows Hatti's page.** A suspended shop keeps its handle and domains in the
+    storefronts' directory, unlike a closed one, and its document says `suspended`. Every
+    address answers with Hatti's page, in English and Urdu, saying Hatti took the store down
+    after what shoppers reported, its pages and checkout closed. Scripts, feeds and forms get a
+    line of text. Everything answers 404, not kept, `noindex`, so search engines drop its
+    pages. Nothing of the shop's own runs: not its password page, not its staff's previews.
+  * **Its checkout, admin and API close** as they already do for a shop not active.
+  * **Its owner is told** at the shop's alerts number on WhatsApp and by email, at Hatti's cost
+    and whatever the shop turned off, with Hatti's people's words. The takedown notice is queued
+    before the shop goes down, because identity gives an owner's address for active shops alone.
+    The restore notice is queued once it is open again.
+  * **Hatti's people use the same command-line tool:** `takedowns [--all]`, `suspend <shop>
+    --reason --by --note`, `restore <shop> --by --note`, the shop named by its handle.
+* **Consequences:**
+  * A store found cheating shoppers stops taking orders within a minute of the decision, and
+    shoppers who reach it learn why instead of finding a broken link.
+  * Its customers' order links and tracking page close with it, as for any shop not active.
+  * The owner can't sign in while it is down. Their appeal (TNS-01's last part) must reach Hatti
+    without the admin.
+* **Alternatives:**
+  * **Removing the store from the directory, as a closed shop is:** its addresses would say no
+    shop answers there, which tells a shopper who paid nothing.
+  * **Telling the owner from the worker, on the event:** by then the shop is suspended, and
+    identity gives no owner's address for it.

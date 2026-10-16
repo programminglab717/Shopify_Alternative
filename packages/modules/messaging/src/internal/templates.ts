@@ -52,6 +52,8 @@ export const MESSAGE_KINDS = [
   'orders_limit_near',
   'orders_limit_reached',
   'store_export_ready',
+  'store_suspended',
+  'store_restored',
   'broadcast',
   'automation',
   'sms_broadcast',
@@ -80,7 +82,8 @@ export type AnyMessageKind = MessageKind | PlatformMessageKind;
  * Messages a shop cannot turn off: what a shopper asked for, as a code to prove their number, and
  * Hatti's notices of the shop's bills (ADR-169), among them what Hatti found of a transfer the
  * shop said it made (ADR-254), of a domain of its own DNS points elsewhere (ADR-262), of its
- * orders nearing its plan's limit (ADR-263), and of the whole store's export made (ADR-417).
+ * orders nearing its plan's limit (ADR-263), of the whole store's export made (ADR-417), and of
+ * its store taken down and restored (ADR-461).
  */
 export const ALWAYS_SENT: readonly MessageKind[] = [
   'one_time_code',
@@ -106,6 +109,9 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'orders_limit_near',
   'orders_limit_reached',
   'store_export_ready',
+  // Its store taken down by Hatti, and restored (ADR-461).
+  'store_suspended',
+  'store_restored',
   // The shop's own, which it schedules itself (ADR-421, ADR-458), or sets going (ADR-425).
   'broadcast',
   'automation',
@@ -200,6 +206,8 @@ export interface MessageVariables {
   date?: string;
   /** For a sign-in alert (ADR-179): what signed in, "Chrome on Android". */
   device?: string;
+  /** For a store taken down or restored (ADR-461): why, in Hatti's people's words. */
+  note?: string;
   /**
    * For a domain of the shop's own DNS points elsewhere (ADR-262): the domain, "www.zari.pk"; and,
    * in `date`, when it is disconnected unless DNS points it back before.
@@ -893,6 +901,34 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: "{shop}'s export is ready to download",
       ur: '{shop} کی ایکسپورٹ ڈاؤن لوڈ کے لیے تیار ہے',
+    },
+  },
+  store_suspended: {
+    whatsapp: 'hatti_store_suspended',
+    category: 'utility',
+    parameters: ['shop', 'note'],
+    hattiPays: true,
+    text: {
+      en: 'Hatti: we have taken {shop} down after what shoppers reported of it: {note}. Its storefront, checkout and admin are closed while it is down.',
+      ur: 'ہٹی: خریداروں کی شکایات کے بعد ہم نے {shop} کو بند کر دیا ہے: {note}۔ جب تک یہ بند ہے، اس کا اسٹور فرنٹ، چیک آؤٹ اور ایڈمن بند رہیں گے۔',
+    },
+    subject: {
+      en: 'Hatti has taken {shop} down',
+      ur: 'ہٹی نے {shop} کو بند کر دیا ہے',
+    },
+  },
+  store_restored: {
+    whatsapp: 'hatti_store_restored',
+    category: 'utility',
+    parameters: ['shop', 'note'],
+    hattiPays: true,
+    text: {
+      en: 'Hatti: {shop} is open again: {note}. Its storefront, checkout and admin work as before.',
+      ur: 'ہٹی: {shop} دوبارہ کھل گئی ہے: {note}۔ اس کا اسٹور فرنٹ، چیک آؤٹ اور ایڈمن پہلے کی طرح کام کر رہے ہیں۔',
+    },
+    subject: {
+      en: '{shop} is open again',
+      ur: '{shop} دوبارہ کھل گئی ہے',
     },
   },
 };

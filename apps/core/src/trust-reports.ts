@@ -1,8 +1,16 @@
 import { Database } from '@hatti/db';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
-import { ReportsService, type ReportRecord } from '@hatti/trust/public';
+import { MessagesService } from '@hatti/messaging/public';
+import {
+  REPORT_REASONS,
+  ReportsService,
+  TakedownsService,
+  type ReportRecord,
+  type TakedownRecord,
+} from '@hatti/trust/public';
 import { parseArgs } from 'node:util';
 import { loadTrustReportsConfig } from './config.js';
+import { restoreStore, takeDown } from './takedowns.js';
 
 // Shoppers' reports of stores (TNS-01, ADR-460), for Hatti's people: those open, the soonest due
 // first, overdue marked; each dismissed, or upheld with what was done. Every report is due a
@@ -12,11 +20,21 @@ import { loadTrustReportsConfig } from './config.js';
 //   pnpm --filter @hatti/core trust-reports list [--all]
 //   pnpm --filter @hatti/core trust-reports dismiss rpt_… --by Ayesha --note "Delivered: courier proof"
 //   pnpm --filter @hatti/core trust-reports uphold rpt_… --by Ayesha --note "Warned; refunded"
+//
+// A store whose reports are upheld is taken down, and restored once it is put right (ADR-461),
+// its owner told each time:
+//
+//   pnpm --filter @hatti/core trust-reports takedowns [--all]
+//   pnpm --filter @hatti/core trust-reports suspend zari --reason scam --by Ayesha --note "…"
+//   pnpm --filter @hatti/core trust-reports restore zari --by Ayesha --note "Refunded every advance"
 
 const USAGE =
   'Usage: trust-reports list [--all]\n' +
   '       trust-reports dismiss <report> --by <who> --note <why>\n' +
-  '       trust-reports uphold <report> --by <who> --note <what was done>';
+  '       trust-reports uphold <report> --by <who> --note <what was done>\n' +
+  '       trust-reports takedowns [--all]\n' +
+  `       trust-reports suspend <shop> --reason <${REPORT_REASONS.join('|')}> --by <who> --note <why, as the owner is told>\n` +
+  '       trust-reports restore <shop> --by <who> --note <why, as the owner is told>';
 
 function usage(problem?: string): never {
   if (problem) console.error(problem);
@@ -26,7 +44,10 @@ function usage(problem?: string): never {
 
 type Command =
   | { command: 'list'; all: boolean }
-  | { command: 'dismiss' | 'uphold'; id: string; report: string; by: string; note: string };
+  | { command: 'takedowns'; all: boolean }
+  | { command: 'dismiss' | 'uphold'; id: string; report: string; by: string; note: string }
+  | { command: 'suspend'; shop: string; reason: string; by: string; note: string }
+  | { command: 'restore'; shop: string; by: string; note: string };
 
 let parsed: Command;
 try {
@@ -42,8 +63,36 @@ const database = new Database({
   applicationName: 'trust-reports',
 });
 const reports = new ReportsService(database);
+const takedowns = new TakedownsService(database);
+const messages = new MessagesService(database);
 try {
-  if (parsed.command === 'list') {
+  if (parsed.command === 'takedowns') {
+    const found = await takedowns.list({ all: parsed.all });
+    if (found.length === 0)
+      console.log(parsed.all ? 'No store taken down yet.' : 'No store is down.');
+    for (const takedown of found) console.log(takedownLine(takedown));
+  } else if (parsed.command === 'suspend' || parsed.command === 'restore') {
+    const done =
+      parsed.command === 'suspend'
+        ? await takeDown(database, takedowns, messages, parsed.shop, parsed)
+        : await restoreStore(database, takedowns, messages, parsed.shop, parsed);
+    if (typeof done === 'string') {
+      console.error(
+        {
+          not_found: `No shop ${parsed.shop}: name it by its handle.`,
+          not_active: `${parsed.shop} is not open: only an open store is taken down.`,
+          not_suspended: `${parsed.shop} is not down.`,
+        }[done],
+      );
+      process.exitCode = 1;
+    } else {
+      console.log(
+        parsed.command === 'suspend'
+          ? `${done.shopName} (${done.shopHandle}) is down; its owner is told.`
+          : `${done.shopName} (${done.shopHandle}) is open again; its owner is told.`,
+      );
+    }
+  } else if (parsed.command === 'list') {
     const found = await reports.list({ all: parsed.all });
     if (found.length === 0) console.log(parsed.all ? 'No report yet.' : 'No report is open.');
     const now = Date.now();
@@ -86,7 +135,20 @@ function line(report: ReportRecord, now: number): string {
   ].join('\t');
 }
 
-/** The command line, checked: what to do, and with which report. */
+/** A takedown on one line, tab-separated: those of stores still down say so first. */
+function takedownLine(takedown: TakedownRecord): string {
+  return [
+    takedown.restoredAt ? `restored ${takedown.restoredAt.toISOString()}` : 'DOWN',
+    `since ${takedown.createdAt.toISOString()}`,
+    `${takedown.shopName} (${takedown.shopHandle})`,
+    takedown.reason,
+    `by ${takedown.takenBy}`,
+    takedown.note.replace(/\s+/g, ' '),
+    takedown.restoreNote ? `restored by ${takedown.restoredBy}: ${takedown.restoreNote}` : '',
+  ].join('\t');
+}
+
+/** The command line, checked: what to do, and with which report or shop. */
 function parseCommand(args: string[]): Command {
   const { positionals, values } = parseArgs({
     args,
@@ -95,19 +157,41 @@ function parseCommand(args: string[]): Command {
       all: { type: 'boolean' },
       by: { type: 'string' },
       note: { type: 'string' },
+      reason: { type: 'string' },
     },
   });
   const [command, id, ...rest] = positionals;
   if (rest.length > 0) throw new Error(`Unexpected: ${rest.join(' ')}`);
-  if (command === 'list') {
+  if (command === 'list' || command === 'takedowns') {
     if (id) throw new Error(`Unexpected: ${id}`);
     return { command, all: values.all ?? false };
   }
-  if (command !== 'dismiss' && command !== 'uphold') throw new Error('Say what to do');
-  if (!id) throw new Error('Name the report, as the list shows it');
+  if (
+    command !== 'dismiss' &&
+    command !== 'uphold' &&
+    command !== 'suspend' &&
+    command !== 'restore'
+  ) {
+    throw new Error('Say what to do');
+  }
+  if (!id) {
+    throw new Error(
+      command === 'suspend' || command === 'restore'
+        ? 'Name the shop, by its handle'
+        : 'Name the report, as the list shows it',
+    );
+  }
   const by = values.by?.trim();
   if (!by) throw new Error("Say who among Hatti's people decided it, with --by");
   const note = values.note?.trim();
   if (!note) throw new Error('Say why, or what was done, with --note');
+  if (command === 'restore') return { command, shop: id, by, note };
+  if (command === 'suspend') {
+    const reason = values.reason?.trim() ?? '';
+    if (!(REPORT_REASONS as readonly string[]).includes(reason)) {
+      throw new Error(`Say why it is taken down, with --reason: ${REPORT_REASONS.join(', ')}`);
+    }
+    return { command, shop: id, reason, by, note };
+  }
   return { command, id, report: tryFromPublicId(id, 'storeReport') ?? id, by, note };
 }

@@ -457,6 +457,17 @@ describe("Messages' words", () => {
       'Zari Fashions',
       '20 Oct, 3:00 pm',
     ]);
+    // Its store taken down, and restored (ADR-461).
+    const down = { shop: 'Zari Fashions', note: 'advances taken for orders never sent' };
+    expect(messageText('store_suspended', 'en', down)).toBe(
+      'Hatti: we have taken Zari Fashions down after what shoppers reported of it: advances ' +
+        'taken for orders never sent. Its storefront, checkout and admin are closed while it is ' +
+        'down.',
+    );
+    expect(templateParameters('store_restored', down)).toEqual([
+      'Zari Fashions',
+      'advances taken for orders never sent',
+    ]);
     // The orders a month its plan allows (ADR-263).
     const counted = { shop: 'Zari Fashions', orders: '40', limit: '50', plan: 'Free' };
     expect(messageText('orders_limit_near', 'en', counted)).toBe(
@@ -480,6 +491,8 @@ describe("Messages' words", () => {
       'orders_limit_near',
       'orders_limit_reached',
       'store_export_ready',
+      'store_suspended',
+      'store_restored',
     ]);
     expect(ALWAYS_SENT).toEqual([
       'one_time_code',
@@ -504,6 +517,9 @@ describe("Messages' words", () => {
       'orders_limit_near',
       'orders_limit_reached',
       'store_export_ready',
+      // Its store taken down and restored (ADR-461).
+      'store_suspended',
+      'store_restored',
       'broadcast',
       'automation',
       // The shop's SMS campaign, which its customer can stop by its link (ADR-458).
@@ -638,6 +654,8 @@ describe("Messages' words", () => {
       'orders_limit_near',
       'orders_limit_reached',
       'store_export_ready',
+      'store_suspended',
+      'store_restored',
     ]);
     const shipped = messageEmail('order_shipped', 'en', SHIPPED.variables)!;
     expect(shipped.from).toBe('shop');

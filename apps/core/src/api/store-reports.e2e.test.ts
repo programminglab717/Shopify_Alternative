@@ -1,12 +1,15 @@
 import 'reflect-metadata';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import type { TenantContext } from '@hatti/api';
 import { fromPublicId, newId } from '@hatti/ids';
+import { MessagesService, MessagingSettingsService } from '@hatti/messaging/public';
 import { StorefrontApiClient } from '@hatti/storefront-api';
-import { ReportsService } from '@hatti/trust/public';
+import { ReportsService, TakedownsService } from '@hatti/trust/public';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { restoreStore, takeDown } from '../takedowns.js';
 import { TEST_STOREFRONT_KEY, startTestApi, type TestApi } from '../testing/api.js';
 
 const server = testDatabaseServer();
@@ -80,5 +83,66 @@ describe.skipIf(!server)("Reports of stores, from storefronts to Hatti's people 
       status: 'open',
       openOfShop: 1,
     });
+  });
+
+  it('takes the store down once, its owner told why, and restores it, told again (ADR-461)', async () => {
+    const tenant: TenantContext = {
+      shopId,
+      currency: 'PKR',
+      actor: { kind: 'app', tokenId: newId() },
+      scopes: new Set(['write_settings']),
+    };
+    const settings = await new MessagingSettingsService(database).update(tenant, {
+      alertsPhone: '0333 5550009',
+    });
+    expect(settings.ok).toBe(true);
+    const takedowns = new TakedownsService(database);
+    const messages = new MessagesService(database);
+    const told = async () =>
+      (
+        await admin.query<{ kind: string; channel: string; recipient: string; variables: object }>(
+          `SELECT kind, channel, recipient, variables FROM messaging.messages
+            WHERE shop_id = $1 AND kind LIKE 'store_%' ORDER BY created_at, id`,
+          [shopId],
+        )
+      ).rows;
+    const handle = (
+      await admin.query<{ handle: string }>('SELECT handle FROM control.shops WHERE id = $1', [
+        shopId,
+      ])
+    ).rows[0]!.handle;
+
+    const note = 'advances taken for orders never sent';
+    const down = await takeDown(database, takedowns, messages, handle, {
+      reason: 'scam',
+      note,
+      by: 'Ayesha',
+    });
+    expect(down).toMatchObject({ shopId, reason: 'scam', takenBy: 'Ayesha' });
+    expect(await told()).toEqual([
+      {
+        kind: 'store_suspended',
+        channel: 'whatsapp',
+        recipient: '+923335550009',
+        variables: { shop: 'Zari', note },
+      },
+    ]);
+    // Down once at a time.
+    expect(
+      await takeDown(database, takedowns, messages, handle, { reason: 'scam', note, by: 'A' }),
+    ).toBe('not_active');
+
+    const reopened = await restoreStore(database, takedowns, messages, shopId, {
+      note: 'every advance refunded',
+      by: 'Bilal',
+    });
+    expect(reopened).toMatchObject({ restoredBy: 'Bilal', restoreNote: 'every advance refunded' });
+    expect((await told()).map((message) => [message.kind, message.variables])).toEqual([
+      ['store_suspended', { shop: 'Zari', note }],
+      ['store_restored', { shop: 'Zari', note: 'every advance refunded' }],
+    ]);
+    expect(await restoreStore(database, takedowns, messages, shopId, { note: 'x', by: 'B' })).toBe(
+      'not_suspended',
+    );
   });
 });

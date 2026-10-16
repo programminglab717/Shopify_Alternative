@@ -50,6 +50,8 @@ export enum MessageKind {
   ORDERS_LIMIT_NEAR = 'ORDERS_LIMIT_NEAR',
   ORDERS_LIMIT_REACHED = 'ORDERS_LIMIT_REACHED',
   STORE_EXPORT_READY = 'STORE_EXPORT_READY',
+  STORE_SUSPENDED = 'STORE_SUSPENDED',
+  STORE_RESTORED = 'STORE_RESTORED',
   BROADCAST = 'BROADCAST',
   AUTOMATION = 'AUTOMATION',
   SMS_BROADCAST = 'SMS_BROADCAST',
@@ -242,6 +244,16 @@ registerEnumType(MessageKind, {
       description:
         "For the shop's owner, from Hatti and paid by Hatti, by email: the whole store's export " +
         'they asked for is ready to download, and until when (ADR-417).',
+    },
+    STORE_SUSPENDED: {
+      description:
+        "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
+        'Hatti has taken its store down after what shoppers reported, and why (ADR-461).',
+    },
+    STORE_RESTORED: {
+      description:
+        "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
+        'its store is open again, and why (ADR-461).',
     },
     BROADCAST: {
       description:

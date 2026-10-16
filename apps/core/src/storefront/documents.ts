@@ -574,6 +574,8 @@ export function shopDoc(
         until: preferences.maintenance.until?.toISOString() ?? null,
       },
     }),
+    // Taken down by Hatti (ADR-461), left out while it is not, likewise.
+    ...(profile.status === 'suspended' && { suspended: true as const }),
     robotsRules: preferences.robotsTxtRules,
     policies: [...policies],
     // Left out without one, so a shop without one keeps its document as it was.

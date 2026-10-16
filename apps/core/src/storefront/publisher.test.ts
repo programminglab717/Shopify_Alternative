@@ -751,15 +751,20 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect((await store().shop()).theme).toEqual({ id: winter.id, version: published.version });
   });
 
-  it("takes a suspended shop's handle out of the directory, and gives it back", async () => {
+  it("keeps a suspended shop's handle for its storefront to say so, takes a closed one's out, and gives it back (ADR-461)", async () => {
     const status = (value: string) =>
       admin.query('UPDATE control.shops SET status = $2 WHERE id = $1', [shopId, value]);
     await status('suspended');
+    await publisher.publishAll(shopId);
+    expect(await publisher.directory.find('zari-fashions')).toBe(shopId);
+    expect((await store().shop()).suspended).toBe(true);
+    await status('closed');
     await publisher.publishAll(shopId);
     expect(await publisher.directory.find('zari-fashions')).toBeNull();
     await status('active');
     await publisher.publishAll(shopId);
     expect(await publisher.directory.find('zari-fashions')).toBe(shopId);
+    expect((await store().shop()).suspended).toBeUndefined();
   });
 
   it('publishes a shop again when its documents are of an older shape', async () => {

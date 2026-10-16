@@ -69,7 +69,7 @@ import {
 } from './sitemap.js';
 import { LINK_TAP_PATH, linkKey, linkTargets, tapTarget } from './link-page.js';
 import { maintenancePage, retryAfterOf } from './maintenance.js';
-import { EMPTY_REPORT, reportPage, reportTakenPage } from './report-page.js';
+import { EMPTY_REPORT, reportPage, reportTakenPage, takenDownPage } from './report-page.js';
 import { VISIT_PATH, isRobot, sessionOf } from './sessions.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
 import {
@@ -727,6 +727,43 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
     return lock;
   };
+
+  // A store Hatti has taken down (ADR-461) answers every address with Hatti's page saying so, and
+  // scripts and forms in a line of text, all with 404, never kept, so that search engines drop its
+  // pages; nothing of the shop's own runs, its password page and staff's previews included.
+  app.addHook('preHandler', async (request, reply) => {
+    const shop = await shopFor(request, reply);
+    if (!shop) return;
+    let doc: ShopDoc;
+    try {
+      doc = await shop.store.shop();
+    } catch (error) {
+      // Not published: the handler says so.
+      if (error instanceof StoreMissingError) return;
+      throw error;
+    }
+    if (!doc.suspended) return;
+    reply.header('cache-control', 'private, no-store').header('x-robots-tag', 'noindex');
+    const url = new URL(request.url, 'http://storefront');
+    const page =
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      !fromScript(request) &&
+      !asksForSections(url) &&
+      !/\.(js|json|xml|atom|txt)$/.test(url.pathname);
+    if (!page) {
+      return reply
+        .code(404)
+        .type('text/plain; charset=utf-8')
+        .send('This store is not available.\n');
+    }
+    const down = takenDownPage(doc.name);
+    return reply
+      .code(404)
+      .header('content-security-policy', down.contentSecurityPolicy)
+      .header('x-content-type-options', 'nosniff')
+      .type('text/html; charset=utf-8')
+      .send(down.html);
+  });
 
   // A shop closed behind its password shows shoppers without it nothing but the password page:
   // a page sends them there, and a script is told the shop is not open.

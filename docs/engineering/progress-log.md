@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### Stores taken down
+
+* **Hatti's people take a store down when its reports are upheld, and restore it** ([ADR-461](../architecture/13-decision-log.md#adr-461--hattis-people-take-a-store-down-when-its-reports-are-upheld-the-shop-suspended-its-storefront-answering-with-hattis-page-saying-so-its-checkout-and-admin-closed-its-owner-told-why-and-restored-the-same-way),
+  TNS-01). The shop is suspended. Its storefront answers with Hatti's page saying so, and its
+  checkout and admin close. Its owner is told on WhatsApp and by email.
+* 2939 tests, from 2936: the trust module's takedowns test, the core's takedown
+  test, and the storefront's server test.
+
 ### 76a03fd · Reports of stores
 
 * **Shoppers report a store to Hatti from every store's footer; each report is due a decision in

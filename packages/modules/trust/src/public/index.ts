@@ -10,5 +10,14 @@ export {
   type ReportRecord,
   type ReportStatus,
 } from '../internal/reports.service.js';
+export {
+  TAKEDOWN_LIMITS,
+  TakedownsService,
+  TrustEvents,
+  type TakedownPayload,
+  type TakedownRecord,
+  type TakedownResult,
+  type TakedownShop,
+} from '../internal/takedowns.service.js';
 export { ReportsController } from '../internal/reports.controller.js';
 export { TrustModule } from '../internal/trust.module.js';

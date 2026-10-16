@@ -6298,6 +6298,16 @@ enum MessageKind {
   STORE_OPEN
 
   """
+  For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: its store is open again, and why (ADR-461).
+  """
+  STORE_RESTORED
+
+  """
+  For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: Hatti has taken its store down after what shoppers reported, and why (ADR-461).
+  """
+  STORE_SUSPENDED
+
+  """
   For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: Hatti found the transfer it said it made into Hatti's account, which paid its invoice (ADR-254).
   """
   TRANSFER_CONFIRMED
