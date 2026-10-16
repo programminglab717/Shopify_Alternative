@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Rights complaints
+### dd5cd78 · Rights complaints
 
 * **Owners of a trademark or copyright complain of a store's listings from its rights page,
   naming them by their addresses and swearing to it; Hatti's people decide within 48 hours**
