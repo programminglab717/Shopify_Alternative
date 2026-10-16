@@ -4480,6 +4480,55 @@ export const ShopVerificationQuery = /* GraphQL */ `
   }
 `;
 
+/** The name the shop's SMS go from, and its requests for one of its own (MKT-02, ADR-469). */
+export const SmsSenderQuery = /* GraphQL */ `
+  query SmsSender {
+    smsSender {
+      name
+      requests {
+        id
+        name
+        status
+        createdAt
+        decidedAt
+        answer
+      }
+    }
+  }
+`;
+
+/** Asks Hatti for the shop's SMS to go from a name of its own. */
+export const SmsSenderRequestMutation = /* GraphQL */ `
+  mutation SmsSenderRequest($name: String!) {
+    smsSenderRequest(name: $name) {
+      request {
+        id
+        status
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Withdraws the shop's request for a sender name waiting for Hatti. */
+export const SmsSenderWithdrawMutation = /* GraphQL */ `
+  mutation SmsSenderWithdraw {
+    smsSenderWithdraw {
+      request {
+        id
+        status
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** The owner asks Hatti to verify the shop, with its documents' staged uploads (ONB-11). */
 export const ShopVerificationSubmitMutation = /* GraphQL */ `
   mutation ShopVerificationSubmit($input: ShopVerificationInput!) {

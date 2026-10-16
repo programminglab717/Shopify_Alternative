@@ -28,6 +28,7 @@ import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { CheckField, Problems, SelectField, settingProblem } from './settings-form';
 import { BackToSettings } from './settings-page';
+import { SmsSenderCard } from './sms-sender';
 
 /** What the shop's customers hear of their orders, which it may turn off (MSG-01). */
 const TO_CUSTOMERS = [
@@ -418,8 +419,8 @@ export function OrderMessages({ orderId }: { orderId: string }) {
 /**
  * Customer messages (MSG-01, MSG-03, ADR-146): how the shop's customers hear of their orders, on
  * WhatsApp for everything or by SMS for the updates that need no answer, in which language; which
- * messages it turns off, to customers and to the shop; where Hatti's alerts to the shop go; and
- * the messages sent, with how each went.
+ * messages it turns off, to customers and to the shop; where Hatti's alerts to the shop go; the
+ * name its SMS go from (ADR-469); and the messages sent, with how each went.
  */
 export function MessagesPage() {
   const { t } = useLocale();
@@ -444,6 +445,7 @@ export function MessagesPage() {
           prices={query.data.billingMessagePrices}
         />
       )}
+      <SmsSenderCard />
       <SentMessages />
     </div>
   );

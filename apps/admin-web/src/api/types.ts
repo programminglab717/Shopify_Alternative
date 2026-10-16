@@ -1868,6 +1868,37 @@ export interface VerificationRequest {
   answer: string | null;
 }
 
+export type SmsSenderStatus =
+  'WAITING' | 'APPROVED' | 'REFUSED' | 'WITHDRAWN' | 'REPLACED' | 'REVOKED';
+
+/** A request for the shop's SMS to go from a name of its own (ADR-469). */
+export interface SmsSenderRequest {
+  id: string;
+  name: string;
+  status: SmsSenderStatus;
+  createdAt: string;
+  decidedAt: string | null;
+  answer: string | null;
+}
+
+export interface SmsSenderData {
+  smsSender: { name: string | null; requests: SmsSenderRequest[] };
+}
+
+export interface SmsSenderRequestData {
+  smsSenderRequest: {
+    request: { id: string; status: SmsSenderStatus } | null;
+    userErrors: UserError[];
+  };
+}
+
+export interface SmsSenderWithdrawData {
+  smsSenderWithdraw: {
+    request: { id: string; status: SmsSenderStatus } | null;
+    userErrors: UserError[];
+  };
+}
+
 export interface ShopVerificationData {
   shopVerification: { level: VerificationLevel | null; requests: VerificationRequest[] };
 }

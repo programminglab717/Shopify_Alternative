@@ -48,10 +48,36 @@ const MESSAGES = [
   },
 ];
 
-function core(role: StaffRole) {
+/** Requests for the shop's own SMS sender name, the newest first (ADR-469). */
+type Request = { id: string; name: string; status: string; answer: string | null };
+
+function core(role: StaffRole, requests: Request[] = []) {
   let settings: Record<string, unknown> = SETTINGS;
+  const kept = [...requests];
+  const at = { createdAt: '2026-10-08T09:00:00Z', decidedAt: null };
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
+      case 'SmsSender':
+        return {
+          smsSender: {
+            name: kept.find((request) => request.status === 'APPROVED')?.name ?? null,
+            requests: kept.map((request) => ({ ...at, ...request })),
+          },
+        };
+      case 'SmsSenderRequest': {
+        const name = String(variables.name).trim();
+        kept.unshift({ id: `snd_${kept.length + 1}`, name, status: 'WAITING', answer: null });
+        return {
+          smsSenderRequest: { request: { id: kept[0]!.id, status: 'WAITING' }, userErrors: [] },
+        };
+      }
+      case 'SmsSenderWithdraw': {
+        const waiting = kept.find((request) => request.status === 'WAITING')!;
+        waiting.status = 'WITHDRAWN';
+        return {
+          smsSenderWithdraw: { request: { id: waiting.id, status: 'WITHDRAWN' }, userErrors: [] },
+        };
+      }
       case 'MessagingSettings':
         return { messagingSettings: settings, billingMessagePrices: PRICES };
       case 'MessagingSettingsUpdate': {
@@ -147,6 +173,50 @@ describe('Customer messages', () => {
       },
     });
     expect((screen.getByLabelText('Alerts number') as HTMLInputElement).value).toBe('0300 1234567');
+  });
+
+  it("asks for the shop's own SMS sender name, checked as typed, and withdraws it (ADR-469)", async () => {
+    const fake = core('owner', [
+      { id: 'snd_1', name: 'ZARI PK', status: 'REFUSED', answer: 'Jazz refused it' },
+    ]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/messages');
+
+    const card = await screen.findByRole('region', { name: 'SMS sender name' });
+    expect(await within(card).findByText('Your SMS come from Hatti’s shared name.')).toBeTruthy();
+    expect(
+      within(card).getByText('Hatti could not register ZARI PK: Jazz refused it'),
+    ).toBeTruthy();
+    const ask = within(card).getByRole('button', { name: 'Ask Hatti' }) as HTMLButtonElement;
+    type('Name to send from', 'Zari!');
+    expect(
+      within(card).getByText('Use 3 to 11 English letters, digits and spaces, with a letter.'),
+    ).toBeTruthy();
+    expect(ask.disabled).toBe(true);
+    type('Name to send from', ' ZARI ');
+    fireEvent.click(ask);
+    expect(await within(card).findByText(/^Hatti is registering ZARI, asked for on/)).toBeTruthy();
+    expect(sentOf(fake, 'SmsSenderRequest')).toEqual([{ name: ' ZARI ' }]);
+    expect(within(card).queryByRole('button', { name: 'Ask Hatti' })).toBeNull();
+
+    fireEvent.click(within(card).getByRole('button', { name: 'Withdraw' }));
+    expect(await within(card).findByRole('button', { name: 'Ask Hatti' })).toBeTruthy();
+    expect(sentOf(fake, 'SmsSenderWithdraw')).toHaveLength(1);
+  });
+
+  it("shows marketers the name the shop's SMS go from, the form the owner's and managers'", async () => {
+    const fake = core('marketer', [
+      { id: 'snd_1', name: 'ZARI', status: 'APPROVED', answer: null },
+    ]);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/messages');
+
+    const card = await screen.findByRole('region', { name: 'SMS sender name' });
+    expect(await within(card).findByText('Your SMS come from ZARI.')).toBeTruthy();
+    expect(
+      within(card).getByText('The shop’s owner and managers ask for a name of its own.'),
+    ).toBeTruthy();
+    expect(within(card).queryByRole('button', { name: 'Ask Hatti' })).toBeNull();
   });
 
   it('lists the messages sent, by status, with their orders and why one failed', async () => {

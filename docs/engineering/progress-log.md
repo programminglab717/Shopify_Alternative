@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### The SMS sender name in the admin
+
+* **The admin's Customer messages page shows the name the shop's SMS go from, the request
+  waiting, which may be withdrawn, and why the last was refused or taken back, and takes owners'
+  and managers' requests** ([ADR-470](../architecture/13-decision-log.md#adr-470--the-admins-customer-messages-page-shows-the-name-the-shops-sms-go-from-the-request-waiting-which-may-be-withdrawn-and-why-the-last-was-refused-or-taken-back-and-takes-owners-and-managers-requests), MKT-02).
+* 2967 tests, 5 more: the card for an owner and for a marketer, and
+  the three new operations checked against the schema.
+
 ### 380a8ee · A shop's own SMS sender
 
 * **A shop asks for its customers' SMS to come from a name of its own, which Hatti's people

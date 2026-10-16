@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-469 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-470 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -477,6 +477,7 @@
 | 467 | The admin's verification page shows what Hatti verified and why a request was refused, and takes the owner's next request, photos uploaded before they confirm who they are | Accepted |
 | 468 | A shop says how many days buyers have to return an order, and whether for an exchange or their money: on each product page, and to search engines as its return policy | Accepted |
 | 469 | A shop asks for its customers' SMS to come from a name of its own, which Hatti's people approve once operators register it for a verified shop; what Hatti tells the shop itself still comes from Hatti's | Accepted |
+| 470 | The admin's Customer messages page shows the name the shop's SMS go from, the request waiting, which may be withdrawn, and why the last was refused or taken back, and takes owners' and managers' requests | Accepted |
 
 ---
 
@@ -17831,3 +17832,23 @@
   * **A name sent before it is registered:** operators drop SMS from unregistered masks.
   * **Hatti's alerts from the shop's name:** they are Hatti's word, and the shop would read
     them as its own.
+
+## ADR-470 · The admin's Customer messages page shows the name the shop's SMS go from, the request waiting, which may be withdrawn, and why the last was refused or taken back, and takes owners' and managers' requests
+
+* **Context:**
+  * A shop asks for its customers' SMS to come from a name of its own through the Admin API
+    (ADR-469). Its owner needs to ask without the API, and to see where the request stands.
+* **Decision:**
+  * **A card on Settings → Customer messages**, "SMS sender name", says whether the shop's SMS
+    come from Hatti's shared name or its own; the request waiting, with when it was asked and a
+    Withdraw button; or, failing that, why the last was refused or taken back.
+  * **Its form**, while nothing waits: the name, checked as typed as the API checks it, 3 to 11
+    English letters, digits and spaces with a letter among them; Ask Hatti sends it.
+  * **Owners and managers** ask and withdraw; the rest of the staff see the name alone.
+  * In English and Urdu.
+* **Consequences:**
+  * Hatti's people's decisions still come through `trust-reports`; the card shows them as soon as
+    the page is read again.
+* **Alternatives:**
+  * **A page of its own in Settings:** the name belongs with how customers are told, where the
+    shop already chooses WhatsApp or SMS.
