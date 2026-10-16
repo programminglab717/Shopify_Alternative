@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### The admin's gift cards
+### a4e009c · The admin's gift cards
 
 * **Products → Gift cards issues cards, shows each code once to copy, finds cards by the code's
   end, and adds to, takes from or deactivates them** ([ADR-450](../architecture/13-decision-log.md#adr-450--the-admins-gift-cards-page-under-products-issues-cards-showing-each-code-once-to-copy-finds-them-by-the-codes-end-and-adds-to-takes-from-or-deactivates-them), CAT-12, PAY-13).
