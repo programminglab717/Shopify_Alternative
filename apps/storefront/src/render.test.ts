@@ -2386,7 +2386,7 @@ describe('Storefront rendering', () => {
       limit: number,
       locale?: string,
       intent: 'related' | 'complementary' = 'related',
-      section = intent,
+      section: string = intent,
     ) =>
       (
         await renderer.sections(
