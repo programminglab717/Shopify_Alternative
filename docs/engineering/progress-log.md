@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### The offer in the admin
+### 7417fc8 · The offer in the admin
 
 * **The checkout page's settings** ([ADR-427](../architecture/13-decision-log.md#adr-427--the-offer-after-the-checkout-reminder-is-chosen-under-the-reminder-on-the-checkout-pages-settings-from-the-shops-codes-that-take-something-off-and-the-abandoned-list-says-who-was-offered-which-code), CHK-12) choose the code offered after the
   reminder, once a reminder is on, and how long after: 12 hours, 1 day or 2 days.
