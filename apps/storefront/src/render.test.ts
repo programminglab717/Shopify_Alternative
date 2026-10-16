@@ -1326,6 +1326,24 @@ describe('Storefront rendering', () => {
     expect(none).not.toContain('object-position');
   });
 
+  it("tells themes a product sold as a gift card is one, as Shopify's product.gift_card? (ADR-451)", async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const card = { ...first!, giftCard: true as const };
+    const shop = new MemoryStore({ ...sample, products: [card, ...rest] });
+    const theme = loadTheme({
+      ...files,
+      'sections/main-product.liquid':
+        '<p class="gift">{% if product.gift_card? %}gift card{% else %}goods{% endif %}</p>' +
+        '{% schema %}{ "name": "Product" }{% endschema %}',
+    });
+    const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${card.handle}` }, shop.fresh());
+    expect(page.html).toContain('<p class="gift">gift card</p>');
+    const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());
+    expect(plain.html).toContain('<p class="gift">goods</p>');
+  });
+
   it("gives themes a product's videos among its media, with Shopify's video filters, and Hatti Base plays them (ADR-258)", async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;

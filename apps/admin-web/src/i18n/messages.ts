@@ -3734,6 +3734,12 @@ const en = {
   'activity.subject.review_settings': 'Review settings',
   'activity.verb.written': 'written',
   'activity.verb.hidden': 'hidden',
+  'giftCardProduct.title': 'Gift card',
+  'giftCardProduct.hint':
+    'Sell it as a gift card: each one paid for is a card worth its price, its code sent to the buyer on WhatsApp.',
+  'giftCardProduct.on': 'Sell as a gift card',
+  'giftCardProduct.onHint':
+    'Cards are issued once the order is paid in full, and listed under Products → Gift cards.',
   'preorder.title': 'Pre-order',
   'preorder.hint':
     'Sell it before it is in stock, telling customers the day it ships by. Each order keeps the day it was placed with.',
@@ -7644,6 +7650,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'activity.subject.review_settings': 'ریویو کی ترتیبات',
   'activity.verb.written': 'لکھا گیا',
   'activity.verb.hidden': 'چھپایا گیا',
+  'giftCardProduct.title': 'گفٹ کارڈ',
+  'giftCardProduct.hint':
+    'اسے گفٹ کارڈ کے طور پر بیچیں: ہر ادا شدہ کارڈ اپنی قیمت کا ہوتا ہے، اور اس کا کوڈ خریدار کو واٹس ایپ پر بھیجا جاتا ہے۔',
+  'giftCardProduct.on': 'گفٹ کارڈ کے طور پر بیچیں',
+  'giftCardProduct.onHint':
+    'کارڈ آرڈر کی پوری ادائیگی کے بعد جاری ہوتے ہیں، اور پروڈکٹس ← گفٹ کارڈز میں دکھائے جاتے ہیں۔',
   'preorder.title': 'پیشگی آرڈر',
   'preorder.hint':
     'اسٹاک آنے سے پہلے بیچیں، گاہکوں کو روانگی کا دن بتا کر۔ ہر آرڈر وہی دن رکھتا ہے جس کے ساتھ دیا گیا۔',

@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### Gift card products in the admin and themes
+
+* **A product's page sells it as a gift card with one box, saved at once; themes read
+  `product.gift_card?` and a cart line's `gift_card`** ([ADR-452](../architecture/13-decision-log.md#adr-452--a-products-page-in-the-admin-sells-it-as-a-gift-card-with-one-box-saved-at-once-and-themes-read-shopifys-productgift_card-and-a-cart-lines-gift_card), CAT-12).
+* 2917 tests, from 2914: the admin's two and the storefront's one.
+
 ### c8fc196 · Gift cards sold as products
 
 * **A product can be sold as a gift card: once its order is paid in full, a card is issued for

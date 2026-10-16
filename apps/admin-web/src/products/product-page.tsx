@@ -49,6 +49,7 @@ import { ProductSchedule } from './schedule';
 import { DuplicateProduct } from './duplicate';
 import { ProductOptions } from './options';
 import { ProductPhotos } from './photos';
+import { GiftCardProduct } from './gift-card-product';
 import { ProductPreorder } from './preorder';
 import { ProductSizeChart } from './size-charts';
 import { StockRules } from './stock-rules';
@@ -604,6 +605,7 @@ function ProductView() {
       {edits && <StockRules product={product} />}
       {/* Shown afresh when the core's day changes. */}
       {edits && <ProductPreorder product={product} />}
+      {edits && <GiftCardProduct key={String(product.isGiftCard)} product={product} />}
       {edits && <ProductSizeChart product={product} />}
       {/* A product of options is no bundle: its parts have them (ADR-409). */}
       {edits && (single(product) || product.bundle) && (

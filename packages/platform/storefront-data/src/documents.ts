@@ -124,6 +124,8 @@ export interface BundleDoc {
 
 export interface ProductDoc {
   id: string;
+  /** Sold as a gift card (CAT-12, ADR-451): Liquid's `product.gift_card?`. Absent when it is not. */
+  giftCard?: true;
   /** What it holds, where it is a bundle (ADR-411). */
   bundle?: BundleDoc;
   /** The size chart its page shows, if any (ADR-407). */

@@ -184,6 +184,7 @@ export function productDoc(
         })),
       },
     }),
+    ...(record.giftCard && { giftCard: true as const }),
     ...(preorderShipsOn && { preorderShipsOn }),
     ...(saleEndsAt && { saleEndsAt: saleEndsAt.toISOString() }),
     ...(sizeChart && { sizeChart }),

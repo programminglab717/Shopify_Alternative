@@ -908,6 +908,7 @@ const PRODUCT = /* GraphQL */ `
     tags
     totalInventory
     tracksInventory
+    isGiftCard
     preorder {
       shipsOn
     }

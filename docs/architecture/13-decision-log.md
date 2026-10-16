@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-451 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-452 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -459,6 +459,7 @@
 | 449 | A shopper applies a gift card on checkout's page by its code, and it pays what it can of the order as it is placed; a cancelled order gives it back | Accepted |
 | 450 | The admin's gift cards page under Products issues cards, showing each code once to copy, finds them by the code's end, and adds to, takes from or deactivates them | Accepted |
 | 451 | A product can be sold as a gift card: once its order is paid in full, the worker issues a card for each unit at its price, given to the buyer, and sends each code on WhatsApp, kept nowhere once sent | Accepted |
+| 452 | A product's page in the admin sells it as a gift card with one box, saved at once, and themes read Shopify's product.gift_card? and a cart line's gift_card | Accepted |
 
 ---
 
@@ -17248,3 +17249,27 @@
   * **Showing the code on the thank-you page:** the order is paid later for cash on delivery,
     and a page reloaded or shared would show it again.
   * **Keeping the code to send it again:** whoever reads the database could spend every card.
+
+## ADR-452 · A product's page in the admin sells it as a gift card with one box, saved at once, and themes read Shopify's product.gift_card? and a cart line's gift_card
+
+* **Context:**
+  * A product can be sold as a gift card through the Admin API and the product CSV (ADR-451).
+    Shops need to set it where they manage the product, and themes need to know it, as
+    Shopify's do.
+* **Decision:**
+  * **The admin.** A product's page has a **Gift card** card, for those who edit products, with
+    one box: "Sell as a gift card". It is saved at once through `productUpdate`, as stock rules
+    are (ADR-361), and put back, with the core's words, if the core refuses.
+    * Its hint says when cards are issued, once the order is paid in full, and where they are
+      listed: Products → Gift cards (ADR-450).
+  * **The storefront.** A gift card product's document carries `giftCard` (left out otherwise,
+    as documents leave out what is unset). Liquid reads it as Shopify's `product.gift_card?`,
+    and a cart line's `gift_card` and the Ajax cart's say it, where they said false before.
+* **Consequences:**
+  * A shop sells a gift card from the admin alone, and a theme can show it as one, for example
+    leaving out sizes and delivery times.
+  * Not yet: Hatti Base saying anything of its own for a gift card product.
+* **Alternatives:**
+  * **The box on the form saved with the product's details:** a choice of what the product is,
+    not what it says. Saved at once, as stock rules are, it is not lost with a form left
+    unsaved.

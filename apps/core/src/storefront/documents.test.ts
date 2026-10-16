@@ -110,6 +110,9 @@ describe("products' documents", () => {
     expect(doc.variants[0]!.image).toBe(1);
     // No video: its images are its media.
     expect(doc.media).toBeUndefined();
+    // Not a gift card, so not said; one is (ADR-451).
+    expect(doc.giftCard).toBeUndefined();
+    expect(productDoc({ ...record, giftCard: true }, new Map(), () => null).giftCard).toBe(true);
   });
 
   it("show a product's videos ready to play among its media, its images by their places (ADR-258)", () => {

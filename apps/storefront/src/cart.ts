@@ -359,7 +359,7 @@ export function ajaxLineItem(
         }
       : null,
     requires_shipping: true,
-    gift_card: false,
+    gift_card: product?.giftCard === true,
     taxable: item.taxable,
     /** Hatti's: the most the line can have now, when fewer than its quantity. */
     max_quantity: item.maxQuantity,

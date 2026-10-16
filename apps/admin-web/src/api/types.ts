@@ -479,6 +479,8 @@ export interface ProductDetail {
   tags: string[];
   totalInventory: number;
   tracksInventory: boolean;
+  /** Whether it is sold as a gift card (ADR-451); absent where a fake core leaves it out. */
+  isGiftCard?: boolean;
   /** Its pre-order, if it is on one (ADR-403); absent where a fake core leaves it out. */
   preorder?: { shipsOn: string } | null;
   /** The size chart its page shows (ADR-406); absent where a fake core leaves it out. */

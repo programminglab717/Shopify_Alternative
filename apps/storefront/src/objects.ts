@@ -311,6 +311,8 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     selected_variant: selected,
     selected_or_first_available_variant: current,
     has_only_default_variant: onlyDefault,
+    // Sold as a gift card (ADR-451), a card issued for each one once the order is paid.
+    'gift_card?': doc.giftCard === true,
     options: doc.options.map((option) => option.name),
     options_with_values: doc.options.map((option, index) => ({
       name: option.name,
@@ -1228,7 +1230,7 @@ function lineItemObject(
       value: at >= 0 ? (doc!.variants[at]!.options[index] ?? '') : '',
     })),
     requires_shipping: true,
-    gift_card: false,
+    gift_card: doc?.giftCard === true,
     taxable: item.taxable,
     grams: item.grams,
     /** Hatti's: the most the line can have now, when fewer than its quantity; else nil. */
