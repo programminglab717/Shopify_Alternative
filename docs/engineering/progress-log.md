@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### The offer after the purchase
+### 831ee54 · The offer after the purchase
 
 * **A confirmed cash-on-delivery order's page offers a product the shop pairs with it** ([ADR-438](../architecture/13-decision-log.md#adr-438--the-offer-after-the-purchase-a-cash-on-delivery-orders-page-offers-a-product-the-shop-pairs-with-what-it-holds-at-the-shops-percentage-off-added-with-a-tap-and-paid-at-the-door-until-it-is-packed),
   MKT-09, 05 §8), at the shop's percentage off. One tap adds it, paid at the door with the rest,
