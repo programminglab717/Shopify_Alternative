@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### AI drafts on the admin's Urdu pages
+### 00500bd · AI drafts on the admin's Urdu pages
 
 * **One tap drafts a thing's empty Urdu boxes with AI, each marked as AI's until the shop saves
   it** ([ADR-464](../architecture/13-decision-log.md#adr-464--the-admins-urdu-pages-draft-a-things-empty-boxes-with-ai-in-one-tap-each-marked-as-ais-until-the-shop-saves-it-options-values-and-links-are-left-to-the-shop), CAT-07, now whole). Options, values and links are left to the shop.
