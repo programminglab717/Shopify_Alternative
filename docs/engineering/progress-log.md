@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Appeals of stores taken down
+### 1b055af · Appeals of stores taken down
 
 * **The owner of a store taken down appeals through a link of its own in the notice; Hatti's
   people refuse with why, or restore the store, which upholds it** ([ADR-462](../architecture/13-decision-log.md#adr-462--the-owner-of-a-store-taken-down-appeals-through-a-link-of-its-own-in-the-notice-its-page-says-why-takes-their-side-and-shows-hattis-answer-refused-with-why-or-upheld-by-restoring-the-store), TNS-01, now whole).
