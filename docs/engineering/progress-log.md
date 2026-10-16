@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Cashback
+### 7844502 · Cashback
 
 * **Loyalty as cashback: a recipe gives back a share of each delivered, paid order in store
   credit, once, lasting the days the shop sets, which checkout spends** ([ADR-453](../architecture/13-decision-log.md#adr-453--loyalty-is-cashback-a-recipe-of-the-shops-automations-gives-back-a-share-of-each-delivered-paid-orders-goods-in-store-credit-once-lasting-the-days-it-sets-which-checkout-spends), PAY-13).
