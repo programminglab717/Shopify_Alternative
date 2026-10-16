@@ -3438,13 +3438,21 @@ export interface WhatsAppTemplatesSyncData {
 export type BroadcastStatus = 'SCHEDULED' | 'SENDING' | 'SENT' | 'CANCELLED' | 'FAILED';
 
 /** A WhatsApp broadcast (ADR-421): one approved template to a segment's subscribed customers. */
+/** How a broadcast goes: from the shop's own WhatsApp number, or by SMS (ADR-458). */
+export type BroadcastChannel = 'WHATSAPP' | 'SMS';
+
 export interface Broadcast {
   id: string;
   name: string;
-  templateId: string;
-  templateName: string;
+  channel: BroadcastChannel;
+  /** A WhatsApp broadcast's template; none for SMS. */
+  templateId: string | null;
+  templateName: string | null;
+  /** The template's language; for SMS, that of the words Hatti adds to the shop's. */
   templateLanguage: MessageLanguage;
-  templateBody: string;
+  templateBody: string | null;
+  /** An SMS campaign's own words; none for WhatsApp. */
+  text: string | null;
   segmentId: string | null;
   segmentName: string | null;
   sendAt: string;
@@ -3472,12 +3480,24 @@ export interface BroadcastsData {
 }
 
 export interface BroadcastEstimateData {
-  broadcastEstimate: { recipients: number; pricePerMessage: MoneyValue; cost: MoneyValue };
+  broadcastEstimate: {
+    recipients: number;
+    /** The SMS each message goes in; one on WhatsApp. */
+    partsPerMessage: number;
+    pricePerMessage: MoneyValue;
+    cost: MoneyValue;
+  };
 }
 
 export interface BroadcastInput {
   name: string;
-  templateId: string;
+  /** WhatsApp unless said. */
+  channel?: BroadcastChannel;
+  /** For WhatsApp. */
+  templateId?: string;
+  /** For SMS: the shop's words, and the language of what Hatti adds to them. */
+  text?: string;
+  language?: MessageLanguage;
   segmentId: string | null;
   sendAt: string | null;
 }

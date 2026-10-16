@@ -11,7 +11,7 @@ import {
   Workflow,
   XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   BroadcastCancelMutation,
@@ -23,11 +23,13 @@ import {
 } from '../api/operations';
 import type {
   Broadcast,
+  BroadcastChannel,
   BroadcastEstimateData,
   BroadcastInput,
   BroadcastPayloadData,
   BroadcastsData,
   BroadcastStatus,
+  MessageLanguage,
   SegmentsData,
   WhatsAppTemplatesData,
 } from '../api/types';
@@ -61,36 +63,80 @@ const BADGES = {
 
 type When = 'now' | 'later';
 
+/** The most an SMS campaign's own words may be (ADR-458). */
+export const SMS_TEXT_MAX = 320;
+
+/** What Hatti puts before the link to stop that ends each SMS, in its language (ADR-458). */
+const TO_STOP: Record<MessageLanguage, string> = { EN: 'To stop:', UR: 'روکنے کے لیے:' };
+
+/** A value once it has stopped changing for `ms`, so typing asks the core once. */
+function useSettled<T>(value: T, ms = 400): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettled(value), ms);
+    return () => window.clearTimeout(timer);
+  }, [value, ms]);
+  return settled;
+}
+
 /**
  * Who a broadcast would reach now, and about what it costs from the shop's credit (ADR-421): those
- * of the segment, or of all, who agreed to hear from the shop on WhatsApp.
+ * of the segment, or of all, who agreed to hear from the shop on WhatsApp; or by SMS, priced by
+ * the parts its words go in (ADR-458).
  */
-function Estimate({ segmentId }: { segmentId: string }) {
+function Estimate({
+  segmentId,
+  channel,
+  text,
+  language,
+}: {
+  segmentId: string;
+  channel: BroadcastChannel;
+  text: string;
+  language: MessageLanguage;
+}) {
   const { t } = useLocale();
+  const sms = channel === 'SMS';
+  const words = useSettled(sms ? text.trim() : '');
   const query = useAdminQuery<BroadcastEstimateData>(
-    ['broadcastEstimate', segmentId],
+    ['broadcastEstimate', segmentId, channel, words, language],
     BroadcastEstimateQuery,
-    { segmentId: segmentId || null },
+    sms
+      ? { segmentId: segmentId || null, channel, text: words || null, language }
+      : { segmentId: segmentId || null },
   );
   if (query.isPending) return <Loading label={t('state.loading')} />;
   if (query.isError) return <Alert tone="danger">{errorText(query.error, t)}</Alert>;
-  const { recipients, cost, pricePerMessage } = query.data.broadcastEstimate;
-  if (recipients === 0) return <Alert tone="warning">{t('broadcasts.reachesNone')}</Alert>;
+  const { recipients, cost, pricePerMessage, partsPerMessage } = query.data.broadcastEstimate;
+  if (recipients === 0) {
+    return (
+      <Alert tone="warning">
+        {t(sms ? 'broadcasts.reachesNoneSms' : 'broadcasts.reachesNone')}
+      </Alert>
+    );
+  }
+  const shown = {
+    count: formatCount(recipients),
+    cost: formatMoney(cost.amount, cost.currencyCode),
+    price: formatMoney(pricePerMessage.amount, pricePerMessage.currencyCode),
+  };
   return (
     <Alert tone="info">
-      {t('broadcasts.reaches', {
-        count: formatCount(recipients),
-        cost: formatMoney(cost.amount, cost.currencyCode),
-        price: formatMoney(pricePerMessage.amount, pricePerMessage.currencyCode),
-      })}
+      {sms
+        ? t('broadcasts.reachesSms', { ...shown, parts: formatCount(partsPerMessage) })
+        : t('broadcasts.reaches', shown)}
     </Alert>
   );
 }
 
-/** A new broadcast: its name, approved template, segment and time, estimated as it is chosen. */
+/**
+ * A new broadcast: its name, how it goes, its approved template or, by SMS, the shop's own words
+ * (ADR-458), its segment and time, estimated as it is chosen.
+ */
 function NewBroadcast() {
   const { t } = useLocale();
-  const shopId = useShop().id;
+  const shop = useShop();
+  const shopId = shop.id;
   const templates = useAdminQuery<WhatsAppTemplatesData>(
     ['whatsAppTemplates'],
     WhatsAppTemplatesQuery,
@@ -100,6 +146,9 @@ function NewBroadcast() {
     BroadcastCreateMutation,
   );
   const [name, setName] = useState('');
+  const [channel, setChannel] = useState<BroadcastChannel>('WHATSAPP');
+  const [text, setText] = useState('');
+  const [language, setLanguage] = useState<MessageLanguage>('EN');
   const [templateId, setTemplateId] = useState('');
   const [segmentId, setSegmentId] = useState('');
   const [when, setWhen] = useState<When>('now');
@@ -110,25 +159,13 @@ function NewBroadcast() {
   if (templates.isPending) return <Loading label={t('state.loading')} />;
   if (templates.isError) return <Alert tone="danger">{errorText(templates.error, t)}</Alert>;
   const approved = templates.data.whatsAppTemplates.filter((each) => each.status === 'APPROVED');
-  if (approved.length === 0) {
-    return (
-      <Card className="flex flex-col gap-2 p-4">
-        <h2 className="font-medium">{t('broadcasts.new')}</h2>
-        <p>{t('broadcasts.noTemplate')}</p>
-        {templates.data.whatsAppTemplates.length === 0 && <NoNumberHint />}
-        <Link
-          to="/$shopId/marketing/templates"
-          params={{ shopId }}
-          className="font-medium text-primary hover:underline"
-        >
-          {t('broadcasts.writeTemplate')}
-        </Link>
-      </Card>
-    );
-  }
-  const chosen = approved.find((each) => each.id === templateId) ?? approved[0]!;
+  const sms = channel === 'SMS';
+  const chosen = approved.find((each) => each.id === templateId) ?? approved[0] ?? null;
   const sendAt = when === 'later' && at ? new Date(at).toISOString() : null;
-  const ready = name.trim() !== '' && (when === 'now' || sendAt !== null);
+  const ready =
+    name.trim() !== '' &&
+    (when === 'now' || sendAt !== null) &&
+    (sms ? text.trim() !== '' : chosen !== null);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -138,12 +175,16 @@ function NewBroadcast() {
     try {
       const payload = Object.values(
         await create.mutateAsync({
-          input: {
-            name: name.trim(),
-            templateId: chosen.id,
-            segmentId: segmentId || null,
-            sendAt,
-          },
+          input: sms
+            ? {
+                name: name.trim(),
+                channel,
+                text: text.trim(),
+                language,
+                segmentId: segmentId || null,
+                sendAt,
+              }
+            : { name: name.trim(), templateId: chosen!.id, segmentId: segmentId || null, sendAt },
         }),
       )[0]!;
       const error = payload.userErrors[0];
@@ -152,6 +193,7 @@ function NewBroadcast() {
         return;
       }
       setName('');
+      setText('');
       setWhen('now');
       setAt('');
       setScheduled(true);
@@ -164,78 +206,155 @@ function NewBroadcast() {
     <Card className="p-4">
       <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-3">
         <h2 className="font-medium">{t('broadcasts.new')}</h2>
-        <TextField
-          label={t('broadcasts.name')}
-          hint={t('broadcasts.nameHint')}
-          value={name}
-          required
-          maxLength={100}
-          dir="auto"
-          onChange={(event) => setName(event.target.value)}
-        />
-        <SelectField<string>
-          label={t('broadcasts.template')}
-          value={chosen.id}
-          options={approved.map((each) => ({
-            value: each.id,
-            label: `${each.name} · ${t(`templates.language.${each.language}` as MessageKey)}`,
-          }))}
-          onChange={setTemplateId}
-        />
-        <div className="flex flex-col gap-1">
-          <span className="font-medium">{t('broadcasts.says')}</span>
-          <p
-            className="whitespace-pre-line rounded-control border border-line bg-canvas p-3"
-            dir="auto"
-          >
-            {chosen.body}
-          </p>
-        </div>
-        <SelectField<string>
-          label={t('broadcasts.to')}
-          value={segmentId}
+        <SelectField<BroadcastChannel>
+          label={t('broadcasts.channel')}
+          value={channel}
           options={[
-            { value: '', label: t('broadcasts.everyone') },
-            ...(segments.data?.segments.nodes ?? []).map((each) => ({
-              value: each.id,
-              label: each.name,
-            })),
+            { value: 'WHATSAPP', label: t('broadcasts.channel.WHATSAPP') },
+            { value: 'SMS', label: t('broadcasts.channel.SMS') },
           ]}
-          onChange={setSegmentId}
+          onChange={setChannel}
         />
-        <Estimate segmentId={segmentId} />
-        <SelectField<When>
-          label={t('broadcasts.when')}
-          value={when}
-          options={[
-            { value: 'now', label: t('broadcasts.now') },
-            { value: 'later', label: t('broadcasts.later') },
-          ]}
-          onChange={setWhen}
-        />
-        {when === 'later' && (
-          <TextField
-            label={t('broadcasts.at')}
-            type="datetime-local"
-            value={at}
-            required
-            onChange={(event) => setAt(event.target.value)}
-          />
+        {!sms && !chosen ? (
+          <>
+            <p>{t('broadcasts.noTemplate')}</p>
+            {templates.data.whatsAppTemplates.length === 0 && <NoNumberHint />}
+            <Link
+              to="/$shopId/marketing/templates"
+              params={{ shopId }}
+              className="self-start font-medium text-primary hover:underline"
+            >
+              {t('broadcasts.writeTemplate')}
+            </Link>
+          </>
+        ) : (
+          <>
+            <TextField
+              label={t('broadcasts.name')}
+              hint={t('broadcasts.nameHint')}
+              value={name}
+              required
+              maxLength={100}
+              dir="auto"
+              onChange={(event) => setName(event.target.value)}
+            />
+            {sms ? (
+              <>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="broadcast-text" className="font-medium">
+                    {t('broadcasts.text')}
+                  </label>
+                  <textarea
+                    id="broadcast-text"
+                    value={text}
+                    rows={3}
+                    dir="auto"
+                    maxLength={SMS_TEXT_MAX}
+                    onChange={(event) => setText(event.target.value)}
+                    className="rounded-control border border-line bg-surface px-3 py-2 text-text"
+                  />
+                  <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                    {t('broadcasts.textCount', {
+                      count: text.trim().length,
+                      most: SMS_TEXT_MAX,
+                    })}
+                  </span>
+                </div>
+                <SelectField<MessageLanguage>
+                  label={t('broadcasts.language')}
+                  value={language}
+                  options={(['EN', 'UR'] as const).map((each) => ({
+                    value: each,
+                    label: t(`templates.language.${each}` as MessageKey),
+                  }))}
+                  onChange={setLanguage}
+                />
+                <div className="flex flex-col gap-1">
+                  <span className="font-medium">{t('broadcasts.says')}</span>
+                  <p
+                    className="whitespace-pre-line rounded-control border border-line bg-canvas p-3"
+                    dir="auto"
+                  >
+                    {`${shop.name}: ${text.trim() || '…'} ${TO_STOP[language]} https://…`}
+                  </p>
+                  <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                    {t('broadcasts.smsHint')}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <SelectField<string>
+                  label={t('broadcasts.template')}
+                  value={chosen!.id}
+                  options={approved.map((each) => ({
+                    value: each.id,
+                    label: `${each.name} · ${t(`templates.language.${each.language}` as MessageKey)}`,
+                  }))}
+                  onChange={setTemplateId}
+                />
+                <div className="flex flex-col gap-1">
+                  <span className="font-medium">{t('broadcasts.says')}</span>
+                  <p
+                    className="whitespace-pre-line rounded-control border border-line bg-canvas p-3"
+                    dir="auto"
+                  >
+                    {chosen!.body}
+                  </p>
+                </div>
+              </>
+            )}
+            <SelectField<string>
+              label={t('broadcasts.to')}
+              value={segmentId}
+              options={[
+                { value: '', label: t(sms ? 'broadcasts.everyoneSms' : 'broadcasts.everyone') },
+                ...(segments.data?.segments.nodes ?? []).map((each) => ({
+                  value: each.id,
+                  label: each.name,
+                })),
+              ]}
+              onChange={setSegmentId}
+            />
+            <Estimate segmentId={segmentId} channel={channel} text={text} language={language} />
+            <SelectField<When>
+              label={t('broadcasts.when')}
+              value={when}
+              options={[
+                { value: 'now', label: t('broadcasts.now') },
+                { value: 'later', label: t('broadcasts.later') },
+              ]}
+              onChange={setWhen}
+            />
+            {when === 'later' && (
+              <TextField
+                label={t('broadcasts.at')}
+                type="datetime-local"
+                value={at}
+                required
+                onChange={(event) => setAt(event.target.value)}
+              />
+            )}
+            <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+              {t('broadcasts.hoursHint')}
+            </p>
+            {problem && <Alert tone="danger">{problem}</Alert>}
+            {scheduled && (
+              <Alert tone="success">
+                {t(sms ? 'broadcasts.scheduledSms' : 'broadcasts.scheduled')}
+              </Alert>
+            )}
+            <Button
+              type="submit"
+              className="self-start"
+              busy={create.isPending}
+              disabled={!ready}
+              icon={<Megaphone aria-hidden className="size-5" />}
+            >
+              {t('broadcasts.schedule')}
+            </Button>
+          </>
         )}
-        <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-          {t('broadcasts.hoursHint')}
-        </p>
-        {problem && <Alert tone="danger">{problem}</Alert>}
-        {scheduled && <Alert tone="success">{t('broadcasts.scheduled')}</Alert>}
-        <Button
-          type="submit"
-          className="self-start"
-          busy={create.isPending}
-          disabled={!ready}
-          icon={<Megaphone aria-hidden className="size-5" />}
-        >
-          {t('broadcasts.schedule')}
-        </Button>
       </form>
     </Card>
   );
@@ -272,10 +391,14 @@ function BroadcastRow({ broadcast }: { broadcast: Broadcast }) {
             {broadcast.name}
           </span>
           <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-            {t('broadcasts.sends', {
-              template: broadcast.templateName,
-              to: broadcast.segmentName ?? t('broadcasts.everyone'),
-            })}
+            {broadcast.channel === 'SMS'
+              ? t('broadcasts.sendsSms', {
+                  to: broadcast.segmentName ?? t('broadcasts.everyoneSms'),
+                })
+              : t('broadcasts.sends', {
+                  template: broadcast.templateName ?? '',
+                  to: broadcast.segmentName ?? t('broadcasts.everyone'),
+                })}
           </span>
         </span>
         <Badge
@@ -284,6 +407,11 @@ function BroadcastRow({ broadcast }: { broadcast: Broadcast }) {
           label={t(`broadcasts.status.${broadcast.status}` as MessageKey)}
         />
       </div>
+      {broadcast.text && (
+        <p className="whitespace-pre-line" dir="auto">
+          {broadcast.text}
+        </p>
+      )}
       <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
         {t(open ? 'broadcasts.goes' : 'broadcasts.went', {
           date: formatDateTime(broadcast.sendAt, timezone, locale),
@@ -328,8 +456,8 @@ function BroadcastRow({ broadcast }: { broadcast: Broadcast }) {
 }
 
 /**
- * Marketing (MKT-01): the shop's WhatsApp broadcasts, a new one estimated as it is chosen and
- * scheduled (ADR-421), and those made, the latest first, with how their messages went; and the
+ * Marketing (MKT-01): the shop's broadcasts on WhatsApp, and by SMS (MKT-02, ADR-459), a new one
+ * estimated as it is chosen and scheduled (ADR-421), and those made, the latest first, with how their messages went; and the
  * way to its templates and its automations (ADR-428).
  */
 export function BroadcastsPage() {

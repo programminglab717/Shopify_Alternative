@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-458 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-459 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -466,6 +466,7 @@
 | 456 | The admin's Analytics page shows the stock over its period: sell-through, how long ago the stock on hand last sold, what ran out, and the variants listed three ways | Accepted |
 | 457 | Hatti Base's sign-up pop-up asks for a shopper's number on WhatsApp through Shopify's customer form, after some seconds or as they leave, stays away once closed or signed up, and gives the shop's code to those who sign up | Accepted |
 | 458 | A broadcast goes by SMS too: the shop's own words from Hatti's shared sender, to those who agreed to hear by SMS, in marketing hours, each message ending on a link to a page that stops the shop's SMS to the number | Accepted |
+| 459 | The admin's new broadcast is sent by WhatsApp or SMS: by SMS, the shop's words with their count, the language of the link to stop, the message as customers read it, and an estimate by its parts | Accepted |
 
 ---
 
@@ -17473,3 +17474,24 @@
     for them.
   * **SMS campaigns kept apart from broadcasts:** their scheduling, queuing, counting and
     cancelling would be written twice.
+
+## ADR-459 · The admin's new broadcast is sent by WhatsApp or SMS: by SMS, the shop's words with their count, the language of the link to stop, the message as customers read it, and an estimate by its parts
+
+* **Context:**
+  * Broadcasts go by SMS too (ADR-458); the admin's Marketing page made WhatsApp broadcasts alone
+    (ADR-424).
+* **Decision:**
+  * **A new broadcast is sent by** WhatsApp, from the shop's number, or by SMS. WhatsApp keeps
+    its template and its words. Without an approved template, the shop is sent to write one, and
+    may still choose SMS.
+  * **By SMS:** the message, up to 320 characters, counted as typed; the language of the link to
+    stop; and the message as customers read it, the shop's name first and the link last. Urdu,
+    or a character SMS lacks, fits fewer characters in each SMS, which the page says.
+  * **The estimate** asks the core again once the words stop changing, and says the customers
+    who agreed to hear by SMS, the price of a message and the SMS it goes in.
+  * **The list** says an SMS campaign goes by SMS, to whom, and its words.
+* **Consequences:**
+  * A shop schedules an SMS campaign as it does a WhatsApp broadcast, knowing its cost first.
+* **Alternatives:**
+  * **Counting parts in the admin:** the core decides what each message says and costs; asking
+    it keeps one rule.

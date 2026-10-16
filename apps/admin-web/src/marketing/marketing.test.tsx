@@ -29,6 +29,8 @@ function broadcast(id: string, extra: Record<string, unknown> = {}) {
   return {
     id,
     name: 'Eid sale',
+    channel: 'WHATSAPP',
+    text: null,
     templateId: 'wtm_1',
     templateName: 'eid_sale',
     templateLanguage: 'EN',
@@ -143,9 +145,27 @@ function core(role: StaffRole, options: { templates?: unknown[]; broadcasts?: un
         };
       case 'BroadcastEstimate':
         return {
-          broadcastEstimate: variables.segmentId
-            ? { recipients: 1, pricePerMessage: MONEY('14.58'), cost: MONEY('14.58') }
-            : { recipients: 2400, pricePerMessage: MONEY('14.58'), cost: MONEY('34992.00') },
+          broadcastEstimate:
+            variables.channel === 'SMS'
+              ? {
+                  recipients: 300,
+                  partsPerMessage: variables.text ? 2 : 1,
+                  pricePerMessage: MONEY(variables.text ? '5.00' : '2.50'),
+                  cost: MONEY(variables.text ? '1500.00' : '750.00'),
+                }
+              : variables.segmentId
+                ? {
+                    recipients: 1,
+                    partsPerMessage: 1,
+                    pricePerMessage: MONEY('14.58'),
+                    cost: MONEY('14.58'),
+                  }
+                : {
+                    recipients: 2400,
+                    partsPerMessage: 1,
+                    pricePerMessage: MONEY('14.58'),
+                    cost: MONEY('34992.00'),
+                  },
         };
       case 'Broadcasts': {
         const index = variables.after ? 1 : 0;
@@ -295,6 +315,87 @@ describe('Marketing: WhatsApp broadcasts and templates (MKT-01, ADR-424)', () =>
     );
     expect(
       await screen.findByText('Scheduled. Its messages go from your number at the time chosen.'),
+    ).toBeTruthy();
+  });
+
+  it('writes an SMS campaign, estimated by its parts, with the link to stop it shown (ADR-459)', async () => {
+    const fake = core('marketer', {
+      broadcasts: [
+        [
+          broadcast('bdc_7', {
+            channel: 'SMS',
+            text: 'Eid lawn is 20% off this week.',
+            templateId: null,
+            templateName: null,
+            templateBody: null,
+          }),
+        ],
+      ],
+    });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/marketing');
+
+    // An SMS campaign in the list: by SMS, its words.
+    const [row] = await screen.findAllByRole('listitem');
+    expect(within(row!).getByText('By SMS to VIPs')).toBeTruthy();
+    expect(within(row!).getByText('Eid lawn is 20% off this week.')).toBeTruthy();
+
+    await screen.findByLabelText('Template');
+    fireEvent.change(screen.getByLabelText('Send by'), { target: { value: 'SMS' } });
+    expect(screen.queryByLabelText('Template')).toBeNull();
+    expect((screen.getByLabelText('To') as HTMLSelectElement).options[0]!.text).toBe(
+      'Everyone who agreed to hear by SMS',
+    );
+    expect(
+      await screen.findByText(/Reaches 300 customers who agreed to hear from you by SMS/),
+    ).toBeTruthy();
+    const schedule = screen.getByRole('button', {
+      name: 'Schedule broadcast',
+    }) as HTMLButtonElement;
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Eid by SMS' } });
+    expect(schedule.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('Message'), {
+      target: { value: 'Eid lawn: 20% off till Sunday.' },
+    });
+    expect(screen.getByText('30 of 320 characters')).toBeTruthy();
+    expect(
+      screen.getByText('Zari: Eid lawn: 20% off till Sunday. To stop: https://…'),
+    ).toBeTruthy();
+    // The estimate asks again once the words settle: two parts each.
+    expect(
+      await screen.findByText(
+        'Reaches 300 customers who agreed to hear from you by SMS, for about Rs 1,500 from your message credit (Rs 5 a message, in 2 SMS).',
+        {},
+        { timeout: 2000 },
+      ),
+    ).toBeTruthy();
+    expect(
+      fake.sent.filter((each) => each.operation === 'BroadcastEstimate').at(-1)!.variables,
+    ).toEqual({
+      segmentId: null,
+      channel: 'SMS',
+      text: 'Eid lawn: 20% off till Sunday.',
+      language: 'EN',
+    });
+    fireEvent.change(screen.getByLabelText('Language of the link to stop'), {
+      target: { value: 'UR' },
+    });
+    expect(screen.getByText(/Eid lawn: 20% off till Sunday\. روکنے کے لیے:/)).toBeTruthy();
+    fireEvent.click(schedule);
+    await waitFor(() =>
+      expect(fake.sent.find((each) => each.operation === 'BroadcastCreate')?.variables).toEqual({
+        input: {
+          name: 'Eid by SMS',
+          channel: 'SMS',
+          text: 'Eid lawn: 20% off till Sunday.',
+          language: 'UR',
+          segmentId: null,
+          sendAt: null,
+        },
+      }),
+    );
+    expect(
+      await screen.findByText('Scheduled. Its messages go by SMS at the time chosen.'),
     ).toBeTruthy();
   });
 

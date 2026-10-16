@@ -7798,6 +7798,8 @@ const BROADCAST = /* GraphQL */ `
   fragment BroadcastFields on Broadcast {
     id
     name
+    channel
+    text
     templateId
     templateName
     templateLanguage
@@ -7838,11 +7840,20 @@ export const BroadcastsQuery = /* GraphQL */ `
   ${BROADCAST}
 `;
 
-/** Who a broadcast to a segment, or to everyone, would reach now, and what it would cost. */
+/**
+ * Who a broadcast to a segment, or to everyone, would reach now, and what it would cost: by SMS,
+ * by the parts its words go in (ADR-458).
+ */
 export const BroadcastEstimateQuery = /* GraphQL */ `
-  query BroadcastEstimate($segmentId: ID) {
-    broadcastEstimate(segmentId: $segmentId) {
+  query BroadcastEstimate(
+    $segmentId: ID
+    $channel: BroadcastChannel
+    $text: String
+    $language: MessageLanguage
+  ) {
+    broadcastEstimate(segmentId: $segmentId, channel: $channel, text: $text, language: $language) {
       recipients
+      partsPerMessage
       pricePerMessage {
         amount
         currencyCode
