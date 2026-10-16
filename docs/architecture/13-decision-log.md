@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-465 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-466 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -473,6 +473,7 @@
 | 463 | AI drafts a resource's Urdu through one gateway whose model and key come from the host's configuration; drafts are never kept, the shop checks and saves them as translations, and each ask is logged with its tokens, a hundred a day | Accepted |
 | 464 | The admin's Urdu pages draft a thing's empty boxes with AI in one tap, each marked as AI's until the shop saves it; options, values and links are left to the shop | Accepted |
 | 465 | Hatti verifies a shop's owner by their CNIC, then its business by its NTN, from photos its owner sends; Hatti's people decide, the photos are deleted once they do, and the storefront's document says what is verified | Accepted |
+| 466 | Hatti Base says beside a product's promises, and in its footer, that Hatti verified the shop: its seller's identity, or a registered business | Accepted |
 
 ---
 
@@ -17718,3 +17719,25 @@
   * **A badge from the phone number alone:** every shop has one. It would tell shoppers nothing.
   * **Uploads through a form of its own:** staged uploads already check size and type, and leave
     nothing a shop can reach.
+
+## ADR-466 · Hatti Base says beside a product's promises, and in its footer, that Hatti verified the shop: its seller's identity, or a registered business
+
+* **Context:**
+  * The storefront's document says what Hatti verified of a shop (ADR-465). OS-11 asks for a
+    verified badge among a product page's trust elements, beside what delivery costs and takes
+    to each city and the shop's returns (ADR-454).
+* **Decision:**
+  * **Liquid's `shop.verified`** is Hatti's own: `identity`, `business`, or nil, as the document
+    says.
+  * **On the product page**, the last of the promises under the price says "Verified by Hatti:
+    the seller's identity is checked", or "Verified by Hatti: a registered business".
+  * **In the footer of every page**, "Verified by Hatti", beside the link to report the store.
+  * In English and Urdu; nothing for a shop not verified.
+* **Consequences:**
+  * Shoppers see what Hatti checked, in words, and nothing more: no CNIC, no NTN, no date.
+  * A verification taken back takes the words with it as the document is published again.
+* **Alternatives:**
+  * **An image badge:** a picture says less than the words, and another theme would have to
+    copy it to say the same.
+  * **The NTN on the page:** it is the business's to show, as its invoices do (ADR-190), not
+    Hatti's.

@@ -815,6 +815,8 @@ export function shopObject(
     password_message: doc.password?.message ?? '',
     // Whether the shop tells shoppers when a sold-out variant is back (ADR-429), for its form.
     back_in_stock: doc.backInStock === true,
+    // What Hatti verified of the shop (ADR-465), Hatti's own: "identity", "business", or nil.
+    verified: doc.verified ?? null,
     brand: brandObject(doc),
     ...policiesObject(doc, language),
   };

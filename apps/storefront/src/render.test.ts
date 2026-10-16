@@ -2426,6 +2426,27 @@ describe('Storefront rendering', () => {
     ).html;
     expect(plain).not.toContain('product__cities');
     expect(plain).not.toContain('Returns and exchanges: see our policy');
+    expect(plain).not.toContain('Verified by Hatti');
+
+    // What Hatti verified of the shop (ADR-466), beside the rest and in the footer.
+    const verified = async (level: 'identity' | 'business', locale?: string) =>
+      (
+        await renderer.render(
+          { path: `/products/${lawn!.handle}`, ...(locale && { locale }) },
+          shop({}, { verified: level }),
+        )
+      ).html.replace(/\s+/g, ' ');
+    const owner = await verified('identity');
+    expect(owner).toContain(
+      '<li class="product__verified"> Verified by Hatti: the seller&#39;s identity is checked </li>',
+    );
+    expect(owner).toContain(
+      '<p class="footer__verified"><span aria-hidden="true">✓</span> Verified by Hatti</p>',
+    );
+    expect(await verified('business')).toContain(
+      '<li class="product__verified"> Verified by Hatti: a registered business </li>',
+    );
+    expect(await verified('business', 'ur')).toContain('ہٹی سے تصدیق شدہ: رجسٹرڈ کاروبار');
   });
 
   it("offers sign-ups for the shop's news on WhatsApp, saying how one went", async () => {

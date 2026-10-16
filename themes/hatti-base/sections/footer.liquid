@@ -17,6 +17,9 @@
     {%- endif -%}
     {%- assign year = 'now' | date: '%Y' -%}
     <p class="footer__rights">{{ 'footer.rights' | t: year: year, shop: shop.name }}</p>
+    {%- if shop.verified -%}
+      <p class="footer__verified"><span aria-hidden="true">✓</span> {{ 'footer.verified' | t }}</p>
+    {%- endif -%}
     {%- comment -%} Reporting the store to Hatti, on every store's pages (ADR-460). {%- endcomment -%}
     {%- if routes.root_url == '/' -%}
       {%- assign report_url = '/report' -%}
@@ -35,6 +38,7 @@
   .footer__policies { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin: 0; padding: 0; list-style: none; font-size: 0.875rem; }
   .footer__policies a { color: var(--color-muted); }
   .footer__rights { color: var(--color-muted); font-size: 0.875rem; }
+  .footer__verified { margin: 0; font-size: 0.875rem; font-weight: 600; }
   .footer__report { margin: 0; font-size: 0.75rem; }
   .footer__report a { color: var(--color-muted); }
 {% endstylesheet %}

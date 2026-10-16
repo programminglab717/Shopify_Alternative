@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### The verified badge
+
+* **Hatti Base says beside a product's promises, and in its footer, that Hatti verified the shop:
+  its seller's identity, or a registered business** ([ADR-466](../architecture/13-decision-log.md#adr-466--hatti-base-says-beside-a-products-promises-and-in-its-footer-that-hatti-verified-the-shop-its-sellers-identity-or-a-registered-business), ONB-11, OS-11).
+* 2952 tests, as before: the storefront's trust test covers the badge too.
+
 ### c66094a · Shops verified by Hatti
 
 * **Hatti verifies a shop's owner by their CNIC, then its business by its NTN, from photos its

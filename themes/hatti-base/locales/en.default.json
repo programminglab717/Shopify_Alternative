@@ -69,6 +69,8 @@
       "elsewhere": "Everywhere else",
       "free": "Free",
       "returns": "Returns and exchanges: see our policy",
+      "verified_identity": "Verified by Hatti: the seller's identity is checked",
+      "verified_business": "Verified by Hatti: a registered business",
       "rating": "Rated {{ rating }} out of 5",
       "reviews_count": {
         "one": "{{ count }} review",
@@ -208,7 +210,8 @@
   "footer": {
     "rights": "© {{ year }} {{ shop }}",
     "cod": "Pay cash when your order arrives",
-    "report": "Report this store to Hatti"
+    "report": "Report this store to Hatti",
+    "verified": "Verified by Hatti"
   },
   "cart": {
     "errors": {
