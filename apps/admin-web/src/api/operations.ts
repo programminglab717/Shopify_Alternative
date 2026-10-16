@@ -7561,6 +7561,56 @@ export const WhatsAppTemplatesQuery = /* GraphQL */ `
   ${WHATSAPP_TEMPLATE}
 `;
 
+const MARKETING_AUTOMATION = /* GraphQL */ `
+  fragment AutomationFields on MarketingAutomation {
+    kind
+    enabled
+    afterDays
+    updatedAt
+    template {
+      id
+      name
+      language
+      status
+    }
+  }
+`;
+
+/** The shop's automations (MKT-04, ADR-425), and its templates to choose from. */
+export const MarketingAutomationsQuery = /* GraphQL */ `
+  query MarketingAutomations {
+    marketingAutomations {
+      ...AutomationFields
+    }
+    whatsAppTemplates {
+      id
+      name
+      language
+      status
+    }
+  }
+  ${MARKETING_AUTOMATION}
+`;
+
+/** One of the shop's automations turned on or off, its template or its days changed. */
+export const MarketingAutomationUpdateMutation = /* GraphQL */ `
+  mutation MarketingAutomationUpdate(
+    $kind: MarketingAutomationKind!
+    $input: MarketingAutomationInput!
+  ) {
+    marketingAutomationUpdate(kind: $kind, input: $input) {
+      marketingAutomation {
+        ...AutomationFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${MARKETING_AUTOMATION}
+  ${USER_ERRORS}
+`;
+
 /** A template written, sent to Meta to approve. */
 export const WhatsAppTemplateCreateMutation = /* GraphQL */ `
   mutation WhatsAppTemplateCreate($input: WhatsAppTemplateInput!) {

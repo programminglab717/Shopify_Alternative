@@ -3270,6 +3270,33 @@ export interface WhatsAppTemplate {
   updatedAt: string;
 }
 
+/** One of the shop's automations' recipes (MKT-04, ADR-425). */
+export type MarketingAutomationKind = 'WELCOME' | 'WIN_BACK';
+
+/** A template as an automation names it. */
+export type AutomationTemplate = Pick<WhatsAppTemplate, 'id' | 'name' | 'language' | 'status'>;
+
+export interface MarketingAutomation {
+  kind: MarketingAutomationKind;
+  enabled: boolean;
+  /** For a win-back: how many days after the customer's last order. */
+  afterDays: number | null;
+  updatedAt: string | null;
+  template: AutomationTemplate | null;
+}
+
+export interface MarketingAutomationsData {
+  marketingAutomations: MarketingAutomation[];
+  whatsAppTemplates: AutomationTemplate[];
+}
+
+export interface MarketingAutomationUpdateData {
+  marketingAutomationUpdate: {
+    marketingAutomation: MarketingAutomation | null;
+    userErrors: UserError[];
+  };
+}
+
 export interface WhatsAppTemplateInput {
   name: string;
   language: MessageLanguage;

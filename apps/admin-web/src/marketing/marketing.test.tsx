@@ -72,6 +72,16 @@ function core(role: StaffRole, options: { templates?: unknown[]; broadcasts?: un
       }),
     ],
   ];
+  // The shop's automations (ADR-425): off until set.
+  let automations: {
+    kind: string;
+    enabled: boolean;
+    afterDays: number | null;
+    [key: string]: unknown;
+  }[] = [
+    { kind: 'WELCOME', enabled: false, template: null, afterDays: null, updatedAt: null },
+    { kind: 'WIN_BACK', enabled: false, template: null, afterDays: 60, updatedAt: null },
+  ];
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'WhatsAppTemplates':
@@ -137,6 +147,49 @@ function core(role: StaffRole, options: { templates?: unknown[]; broadcasts?: un
             userErrors: [],
           },
         };
+      case 'MarketingAutomations':
+        return { marketingAutomations: automations, whatsAppTemplates: templates };
+      case 'MarketingAutomationUpdate': {
+        const input = variables.input as {
+          enabled: boolean;
+          templateId: string | null;
+          afterDays?: number;
+        };
+        const chosen = (templates as { id: string; status: string }[]).find(
+          (each) => each.id === input.templateId,
+        );
+        if (input.enabled && chosen?.status !== 'APPROVED') {
+          return {
+            marketingAutomationUpdate: {
+              marketingAutomation: null,
+              userErrors: [
+                {
+                  field: ['input', 'templateId'],
+                  code: 'INVALID',
+                  message: "Meta hasn't approved this template",
+                },
+              ],
+            },
+          };
+        }
+        automations = automations.map((each) =>
+          each.kind === variables.kind
+            ? {
+                ...each,
+                enabled: input.enabled,
+                template: chosen ?? null,
+                afterDays: input.afterDays ?? each.afterDays,
+                updatedAt: LATER,
+              }
+            : each,
+        );
+        return {
+          marketingAutomationUpdate: {
+            marketingAutomation: automations.find((each) => each.kind === variables.kind),
+            userErrors: [],
+          },
+        };
+      }
       case 'BroadcastCancel':
         return {
           broadcastCancel: {
@@ -356,5 +409,84 @@ describe('Marketing: WhatsApp broadcasts and templates (MKT-01, ADR-424)', () =>
   it('names a template as Meta takes it', () => {
     expect(templateNameOf('  Eid Sale-2026! ')).toBe('eid_sale_2026');
     expect(templateNameOf('عید')).toBe('');
+  });
+});
+
+describe('Marketing: automations (MKT-04, ADR-428)', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    signedIn();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('turns the welcome on with an approved template, from Marketing', async () => {
+    const fake = core('marketer');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/marketing');
+
+    fireEvent.click(await screen.findByRole('link', { name: /Automations/ }));
+    await screen.findByRole('heading', { name: 'Win-back' });
+    const [welcome, winBack] = screen
+      .getAllByRole('heading', { level: 2 })
+      .map((heading) => heading.closest('form')!);
+    expect(within(welcome!).getByText('Off')).toBeTruthy();
+    // Approved templates alone to choose from.
+    const which = within(welcome!).getByLabelText('Template') as HTMLSelectElement;
+    expect([...which.options].map((option) => option.text)).toEqual([
+      'Choose a template',
+      'eid_sale (en)',
+    ]);
+    fireEvent.change(which, { target: { value: 'wtm_1' } });
+    fireEvent.click(within(welcome!).getByLabelText('Send it'));
+    fireEvent.click(within(welcome!).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(
+        fake.sent.find((each) => each.operation === 'MarketingAutomationUpdate')?.variables,
+      ).toEqual({ kind: 'WELCOME', input: { enabled: true, templateId: 'wtm_1' } }),
+    );
+    expect(await screen.findByText('On')).toBeTruthy();
+    expect(within(winBack!).getByLabelText('Days after their last order')).toBeTruthy();
+  });
+
+  it("sets a win-back's days within their bounds, and says why the core refused", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/marketing/automations');
+
+    const days = (await screen.findByLabelText('Days after their last order')) as HTMLInputElement;
+    expect(days.value).toBe('60');
+    const form = days.closest('form')!;
+    fireEvent.change(days, { target: { value: '7' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    expect(await within(form).findByText('Give days from 14 to 365')).toBeTruthy();
+    expect(fake.sent.some((each) => each.operation === 'MarketingAutomationUpdate')).toBe(false);
+
+    fireEvent.change(days, { target: { value: '90' } });
+    fireEvent.click(within(form).getByLabelText('Send it'));
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    // On with no template: the core says why.
+    expect(await within(form).findByText(/Meta hasn't approved this template/)).toBeTruthy();
+    expect(
+      fake.sent.filter((each) => each.operation === 'MarketingAutomationUpdate').at(-1)!.variables,
+    ).toEqual({ kind: 'WIN_BACK', input: { enabled: true, templateId: null, afterDays: 90 } });
+  });
+
+  it('sends to the templates page while none is approved', async () => {
+    vi.stubGlobal(
+      'fetch',
+      core('manager', { templates: [template('wtm_2', { status: 'PENDING' })] }).fetcher,
+    );
+    renderAdmin('/shop_1/marketing/automations');
+
+    expect(
+      await screen.findByText(/An automation sends a template Meta approved\. You have none yet\./),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'WhatsApp templates' }).getAttribute('href')).toBe(
+      '/shop_1/marketing/templates',
+    );
   });
 });

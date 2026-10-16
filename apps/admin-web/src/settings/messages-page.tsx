@@ -86,6 +86,9 @@ const ALWAYS_SENT = [
   'ORDERS_LIMIT_REACHED',
   // Turned on and off with the reviews page's own setting (ADR-400).
   'REVIEW_REQUEST',
+  // The shop's own marketing, sent as it sets them on Marketing (ADR-422, ADR-428).
+  'BROADCAST',
+  'AUTOMATION',
 ] as const;
 
 const KNOWN: ReadonlySet<string> = new Set([...TO_CUSTOMERS, ...TO_THE_SHOP, ...ALWAYS_SENT]);

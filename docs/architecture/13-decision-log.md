@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-427 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-428 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -435,6 +435,7 @@
 | 425 | Automations send the shop's own approved template from its own number: a welcome once a customer subscribes, and a win-back some days after their last order | Accepted |
 | 426 | Shoppers reminded of a checkout who still have not ordered are offered one of the shop's own discount codes some hours after, its link applying the code to their items | Accepted |
 | 427 | The offer after the checkout reminder is chosen under the reminder on the checkout page's settings, from the shop's codes that take something off, and the abandoned list says who was offered which code | Accepted |
+| 428 | Automations in the admin: a page under Marketing with the welcome and the win-back, each turned on with an approved template, the win-back's days set there | Accepted |
 
 ---
 
@@ -16437,3 +16438,29 @@
 * **Alternatives:**
   * **The offer on the abandoned checkouts page itself**: the reminder's setting is on the
     checkout page's settings already, and the two go together.
+
+## ADR-428 · Automations in the admin: a page under Marketing with the welcome and the win-back, each turned on with an approved template, the win-back's days set there
+
+* **Context:**
+  * ADR-425 gives the shop two automations through the Admin API: a welcome and a win-back.
+    Each sends one of its approved templates from its own number.
+  * Marketing in the admin (ADR-424) holds broadcasts and templates, for the owner, managers
+    and marketers.
+* **Decision:**
+  * **Marketing → Automations** (`/marketing/automations`) is linked from Marketing's page
+    under the templates. It shows one card per recipe, each with its own save, so changing one
+    never touches the other.
+    * Each card shows whether the recipe is on. It lets staff choose the template, from the
+      approved ones (and the one chosen, whatever Meta has made of it since), and turn it on.
+    * The win-back's card sets its days, 14 to 365, checked before sending. The core's own
+      refusals are shown as it words them.
+  * **While no template is approved**, the page says so. It links to the templates, or to
+    where the number is connected when it has none.
+  * The messages settings name the `BROADCAST` and `AUTOMATION` kinds among those always sent,
+    as their own pages set them.
+* **Consequences:**
+  * Back in stock and the COD→prepaid nudge, MKT-04's other recipes, come as more cards on
+    the same page.
+* **Alternatives:**
+  * **One form for both recipes**: one save would change both, and the core takes one recipe
+    at a time.
