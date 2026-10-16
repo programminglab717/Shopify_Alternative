@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-455 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-456 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -463,6 +463,7 @@
 | 453 | Loyalty is cashback: a recipe of the shop's automations gives back a share of each delivered, paid order's goods in store credit, once, lasting the days it sets, which checkout spends | Accepted |
 | 454 | A product's page in Hatti Base says what delivery costs and takes to each of the shop's cities, and links its returns, as trust elements | Accepted |
 | 455 | Inventory reports are worked out from the stock ledger when asked: sell-through over 7, 30 or 90 days, how long ago the stock on hand last sold with its cost, and what ran out and for how long | Accepted |
+| 456 | The admin's Analytics page shows the stock over its period: sell-through, how long ago the stock on hand last sold, what ran out, and the variants listed three ways | Accepted |
 
 ---
 
@@ -17371,3 +17372,28 @@
     already holds.
   * **Out of stock at all locations together:** most shops have one location; for the rest, the
     worst location says what shoppers there met.
+
+## ADR-456 · The admin's Analytics page shows the stock over its period: sell-through, how long ago the stock on hand last sold, what ran out, and the variants listed three ways
+
+* **Context:**
+  * ADR-455 gave the API inventory reports and left the admin's page for later.
+  * The Analytics page (ADR-279) already shows sales, visits, COD health and couriers over the
+    last 7, 30 or 90 days, the same periods the report takes.
+* **Decision:**
+  * A **Stock** section at the foot of the Analytics page, over the period its tabs choose:
+    * units sold, with how many are on hand now; the sell-through; how many variants ran out;
+      how many are out now;
+    * the stock on hand by how long ago it last sold, with its value at cost for owners and
+      managers alone, who see what the stock is worth (ADR-369);
+    * the variants listed by what sells through fastest, what is slowest to sell or what was
+      out longest, chosen from a list, each linking to its product, the last column saying
+      what the order is by.
+  * Everyone who reads Analytics reads it: each of those roles reads stock and products.
+* **Consequences:**
+  * A shop sees what to reorder and what to discount beside what it sold.
+  * Not yet: reports by product rather than variant, and a CSV.
+* **Alternatives:**
+  * **A page of its own under Stock:** packers would reach it; they plan nothing, and the
+    period's tabs are on Analytics already.
+  * **Cost shown to all who read the report:** marketers and accountants would see what the
+    stock cost when the stock's worth is kept from them.

@@ -19,7 +19,7 @@ const counts = (
   conversionRate: sessions ? Math.round((converted / sessions) * 10_000) / 10_000 : null,
 });
 
-/** A fake core with the shop's sales, COD health and couriers quiet, and its visits as given. */
+/** A fake core with the shop's sales, COD health, couriers and stock quiet, and its visits as given. */
 function core(visits: { now: ReturnType<typeof counts>; before: ReturnType<typeof counts> }) {
   let visitorsNow = 3;
   const fake = fakeCore('manager', (operation) => {
@@ -27,6 +27,7 @@ function core(visits: { now: ReturnType<typeof counts>; before: ReturnType<typeo
       case 'Sales':
       case 'CodHealth':
       case 'CourierPerformance':
+      case 'InventoryReport':
         throw new Error('not this time');
       case 'StorefrontLiveView':
         return { storefrontLiveView: { visitorsNow: visitorsNow++, today: counts(41, 5, 3, 2) } };

@@ -6926,6 +6926,41 @@ export const InventoryValueQuery = /* GraphQL */ `
   }
 `;
 
+export const InventoryReportQuery = /* GraphQL */ `
+  query InventoryReport($days: Int!, $sortKey: InventoryReportSortKey!) {
+    inventoryReport(days: $days, sortKey: $sortKey, first: 50) {
+      days
+      sold
+      onHand
+      sellThrough
+      ranOut
+      outNow
+      ageing {
+        bucket
+        variants
+        units
+        unitsWithoutCost
+        value {
+          amount
+        }
+      }
+      rows {
+        variantId
+        productId
+        productTitle
+        variantTitle
+        sku
+        sold
+        available
+        sellThrough
+        daysSinceSale
+        stockouts
+        daysOut
+      }
+    }
+  }
+`;
+
 const COURIER_RULE = /* GraphQL */ `
   fragment CourierRuleFields on CourierRule {
     id

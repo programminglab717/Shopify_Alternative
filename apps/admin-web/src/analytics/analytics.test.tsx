@@ -54,9 +54,24 @@ const none = {
   conversionRate: null,
 };
 
-/** The online store's visits and couriers' parcels, none: the page asks for them beside its sales. */
+const NO_STOCK = {
+  days: 30,
+  sold: 0,
+  onHand: 0,
+  sellThrough: null,
+  ranOut: 0,
+  outNow: 0,
+  ageing: [],
+  rows: [],
+};
+
+/**
+ * The online store's visits, couriers' parcels and stock, none: the page asks for them beside its
+ * sales.
+ */
 const NO_VISITS: Record<string, unknown> = {
   CourierPerformance: { courierPerformance: [] },
+  InventoryReport: { inventoryReport: NO_STOCK },
   StorefrontLiveView: { storefrontLiveView: { visitorsNow: 0, today: none } },
   StorefrontSessions: {
     storefrontSessions: { totals: none, periods: [] },
@@ -245,6 +260,110 @@ describe('Analytics in the admin', () => {
     expect(Date.parse(String(asked.shippedBefore)) - Date.parse(String(asked.shippedFrom))).toBe(
       30 * 86_400_000,
     );
+  });
+
+  it('shows how the stock sold, how old it is and what ran out, its cost to owners', async () => {
+    const bucket = (name: string, units: number, value: string) => ({
+      bucket: name,
+      variants: units ? 1 : 0,
+      units,
+      unitsWithoutCost: 0,
+      value: rupees(value),
+    });
+    const row = (fields: Record<string, unknown>) => ({
+      variantId: 'var_1',
+      productId: 'prod_1',
+      productTitle: 'Lawn suit',
+      variantTitle: 'Small',
+      sku: 'LS-S',
+      sold: 12,
+      available: 4,
+      sellThrough: 75,
+      daysSinceSale: 2,
+      stockouts: 0,
+      daysOut: 0,
+      ...fields,
+    });
+    const report = (sortKey: unknown) => ({
+      ...NO_STOCK,
+      sold: 30,
+      onHand: 50,
+      sellThrough: 37.5,
+      ranOut: 2,
+      outNow: 1,
+      ageing: [
+        bucket('DAYS_0_30', 20, '20000'),
+        bucket('DAYS_31_60', 0, '0'),
+        bucket('DAYS_61_90', 0, '0'),
+        bucket('OVER_90', 0, '0'),
+        bucket('NEVER', 30, '45000'),
+      ],
+      rows:
+        sortKey === 'STOCKOUTS'
+          ? [
+              row({
+                productTitle: 'Chiffon dupatta',
+                variantTitle: 'Default Title',
+                available: 0,
+                stockouts: 2,
+                daysOut: 4.5,
+              }),
+            ]
+          : sortKey === 'SLOWEST'
+            ? [row({ productTitle: 'Khaddar shawl', daysSinceSale: null, sold: 0, sellThrough: 0 })]
+            : [row({})],
+    });
+    const render = (role: 'owner' | 'marketer') => {
+      const core = fakeCore(role, (operation, variables) => {
+        if (operation === 'InventoryReport') return { inventoryReport: report(variables.sortKey) };
+        if (operation in NO_VISITS) return NO_VISITS[operation];
+        if (operation === 'CodHealth' || operation === 'Sales') throw new Error('not this time');
+        throw new Error(`unexpected ${operation}`);
+      });
+      vi.stubGlobal('fetch', core.fetcher);
+      renderAdmin('/shop_1/analytics');
+      return core;
+    };
+
+    const core = render('owner');
+    await screen.findByText('50 on hand now');
+    expect(screen.getByText('38%')).toBeTruthy();
+    expect(screen.getByText('Out of stock now').nextElementSibling?.textContent).toBe('1');
+    // Stock that never sold, and what it cost the shop.
+    const never = screen.getAllByText('Never')[0]!.closest('tr')!;
+    expect([...never.querySelectorAll('td')].map((cell) => cell.textContent)).toEqual([
+      'Never',
+      '30',
+      'Rs 45,000',
+    ]);
+    const suit = screen.getByRole('link', { name: 'Lawn suit' });
+    expect(suit.getAttribute('href')).toBe('/shop_1/products/prod_1');
+    expect(suit.closest('tr')!.lastElementChild?.textContent).toBe('75%');
+    expect(core.sent.find((each) => each.operation === 'InventoryReport')!.variables).toEqual({
+      days: 30,
+      sortKey: 'SELL_THROUGH',
+    });
+
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'STOCKOUTS' } });
+    const dupatta = await screen.findByRole('link', { name: 'Chiffon dupatta' });
+    expect(dupatta.closest('tr')!.lastElementChild?.textContent).toBe('4.5 days · 2 times');
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'SLOWEST' } });
+    const shawl = await screen.findByRole('link', { name: 'Khaddar shawl' });
+    expect(shawl.closest('tr')!.lastElementChild?.textContent).toBe('Never');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Last 7 days' }));
+    await waitFor(() =>
+      expect(
+        core.sent.filter((each) => each.operation === 'InventoryReport').at(-1)?.variables.days,
+      ).toBe(7),
+    );
+
+    // A marketer sees how the stock sold, not what it cost.
+    cleanup();
+    render('marketer');
+    await screen.findByText('50 on hand now');
+    expect(screen.queryByText('At cost')).toBeNull();
+    expect(screen.queryByText('Rs 45,000')).toBeNull();
   });
 
   it('works out whole days in the shop’s time zone and the change from before', () => {

@@ -2927,6 +2927,48 @@ export interface InventoryValueData {
   };
 }
 
+export type InventoryReportSortKey = 'SELL_THROUGH' | 'SLOWEST' | 'STOCKOUTS';
+export type InventoryAgeingBucket = 'DAYS_0_30' | 'DAYS_31_60' | 'DAYS_61_90' | 'OVER_90' | 'NEVER';
+
+/** One variant in the inventory report (ANL-05, ADR-455). */
+export interface InventoryReportRowValue {
+  variantId: string;
+  productId: string;
+  productTitle: string;
+  variantTitle: string;
+  sku: string | null;
+  /** Units sold in the period, less those released. */
+  sold: number;
+  available: number;
+  /** In percent; null with neither sold nor available. */
+  sellThrough: number | null;
+  /** Null when it never sold. */
+  daysSinceSale: number | null;
+  stockouts: number;
+  /** At the location it was out longest, to one decimal. */
+  daysOut: number;
+}
+
+/** What sold of what there was, how old the stock is, and what ran out (ANL-05, ADR-455). */
+export interface InventoryReportData {
+  inventoryReport: {
+    days: number;
+    sold: number;
+    onHand: number;
+    sellThrough: number | null;
+    ranOut: number;
+    outNow: number;
+    ageing: {
+      bucket: InventoryAgeingBucket;
+      variants: number;
+      units: number;
+      unitsWithoutCost: number;
+      value: { amount: string };
+    }[];
+    rows: InventoryReportRowValue[];
+  };
+}
+
 /** Which courier account books the orders a rule matches (SHP-06, ADR-382). */
 export interface CourierRuleValue {
   id: string;
