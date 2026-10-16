@@ -207,7 +207,8 @@
   },
   "footer": {
     "rights": "© {{ year }} {{ shop }}",
-    "cod": "Pay cash when your order arrives"
+    "cod": "Pay cash when your order arrives",
+    "report": "Report this store to Hatti"
   },
   "cart": {
     "errors": {

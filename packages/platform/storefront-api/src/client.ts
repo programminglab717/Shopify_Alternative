@@ -41,6 +41,12 @@ import {
   type SearchResponse,
 } from './search.js';
 import {
+  reportsPath,
+  type ReportErrorResponse,
+  type ReportRequest,
+  type ReportResponse,
+} from './reports.js';
+import {
   signUpsPath,
   type SignUpErrorResponse,
   type SignUpRequest,
@@ -74,6 +80,7 @@ export type CartActionResult =
   ({ ok: true } & CartChangeResponse) | { ok: false; error: CartError };
 
 export type SignUpResult = ({ ok: true } & SignUpResponse) | ({ ok: false } & SignUpErrorResponse);
+export type ReportResult = ({ ok: true } & ReportResponse) | ({ ok: false } & ReportErrorResponse);
 
 export type StockWatchResult =
   ({ ok: true } & StockWatchResponse) | ({ ok: false } & StockWatchErrorResponse);
@@ -273,6 +280,18 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return { ok: true, ...((await response.json()) as SignUpResponse) };
+  }
+
+  /** A shopper's report of the store (ADR-460): its number, or what was wrong with it. */
+  async report(shopId: string, request: ReportRequest): Promise<ReportResult> {
+    const response = await this.#request('POST', reportsPath(shopId), null, request);
+    if (response.status === 422) {
+      return { ok: false, ...((await response.json()) as ReportErrorResponse) };
+    }
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return { ok: true, ...((await response.json()) as ReportResponse) };
   }
 
   /**

@@ -34,6 +34,8 @@ import {
   type CommentResult,
   type SignUpRequest,
   type SignUpResult,
+  type ReportRequest,
+  type ReportResult,
   type StockWatchRequest,
   type StockWatchResult,
   type StorefrontVisit,
@@ -439,6 +441,16 @@ class FakeCore {
     this.stockWatches.push({ shopId, request });
     if (this.watched instanceof Error) throw this.watched;
     return this.watched;
+  }
+
+  /** The reports of the store sent on, and how the core answers them (ADR-460). */
+  readonly reports: { shopId: string; request: ReportRequest }[] = [];
+  reported: ReportResult | Error = { ok: true, id: 'rpt_7Kq2xY' };
+
+  async report(shopId: string, request: ReportRequest): Promise<ReportResult> {
+    this.reports.push({ shopId, request });
+    if (this.reported instanceof Error) throw this.reported;
+    return this.reported;
   }
 
   /** The comments sent on, and how the core answers them (ADR-220). */
@@ -2448,6 +2460,8 @@ describe('Carts', () => {
     expect((await get(PRODUCT_FEED_PATH)).headers.location).toBe('/password');
     expect((await get('/cart.js')).statusCode).toBe(401);
     expect((await get('/?section_id=header')).statusCode).toBe(401);
+    // Reporting it to Hatti stays open (ADR-460).
+    expect((await get('/report')).statusCode).toBe(200);
     const robots = await get('/robots.txt');
     expect([robots.body, robots.headers['cache-control']]).toEqual([
       'User-agent: *\nDisallow: /\n',
@@ -2564,13 +2578,15 @@ describe('Carts', () => {
     expect(added.statusCode).toBe(503);
     expect(core.actions).toEqual([]);
 
-    // What crawlers read stays, so that they keep its pages, as do its tracking page and
-    // checkouts, which the core says are paused, and orders placed before as they were.
+    // What crawlers read stays, so that they keep its pages, as do its tracking page, reporting
+    // it to Hatti, and checkouts, which the core says are paused, and orders placed before as
+    // they were.
     const robots = await get('/robots.txt');
     expect(robots.statusCode).toBe(200);
     expect(robots.body).not.toMatch(/^Disallow: \/$/m);
     expect((await get('/sitemap.xml')).statusCode).toBe(200);
     expect((await get('/track')).statusCode).toBe(200);
+    expect((await get('/ur/report')).statusCode).toBe(200);
     core.page = { placed: false, status: 503, headers: {}, html: '<p>Paused</p>' };
     const checkout = await get('/checkouts/abcdefghijklmnopqrstuv');
     expect([checkout.statusCode, checkout.body]).toEqual([503, '<p>Paused</p>']);
@@ -2776,6 +2792,93 @@ describe('Carts', () => {
     core.watched = new StorefrontApiError(502, 'Bad gateway');
     expect((await post(wish)).statusCode).toBe(503);
     expect(core.stockWatches).toHaveLength(3);
+    await app.close();
+  });
+
+  it("reports the store to Hatti from its own page, then gives the report's number (ADR-460)", async () => {
+    const app = server();
+    const get = (url: string, headers: Record<string, string> = {}) =>
+      app.inject({ method: 'GET', url, headers: { host: 'localhost', ...headers } });
+    const post = (
+      fields: Record<string, string>,
+      headers: Record<string, string> = {},
+      url = '/report',
+    ) =>
+      app.inject({ method: 'POST', url, headers: { ...FORM, ...headers }, payload: form(fields) });
+
+    // Hatti's page, never kept, with the page the shopper came from.
+    const page = await get('/report', { referer: 'http://localhost/products/lawn?variant=2' });
+    expect([page.statusCode, page.headers['cache-control']]).toEqual([200, 'private, no-store']);
+    expect(page.headers['content-security-policy']).toContain("form-action 'self'");
+    expect(page.body).toContain('Report this store');
+    expect(page.body).toContain('اس دکان کی شکایت کریں');
+    expect(page.body).toContain('<form method="post" action="/report">');
+    expect(page.body).toContain('name="from" value="/products/lawn?variant=2"');
+    expect(page.body).toContain('<option value="never_delivered"');
+    expect((await get('/ur/report')).body).toContain('action="/ur/report"');
+
+    const report = {
+      reason: 'never_delivered',
+      details: 'Paid an advance; nothing came in three weeks.',
+      phone: '0300 1234567',
+      orderName: '#1042',
+      from: '/products/lawn?variant=2',
+    };
+    const taken = await post(report);
+    expect([taken.statusCode, taken.headers['cache-control']]).toEqual([200, 'private, no-store']);
+    expect(taken.body).toContain('Thank you: Hatti has your report');
+    expect(taken.body).toContain('rpt_7Kq2xY');
+    expect(taken.body).toContain('href="/products/lawn?variant=2"');
+    // What was wrong shows on the form again, as typed, in Urdu from Urdu pages.
+    core.reported = {
+      ok: false,
+      errors: [{ field: 'phone', message: 'Enter a Pakistani mobile number' }],
+    };
+    const wrong = await post(
+      { ...report, phone: '123', orderName: '', from: '//elsewhere.example/x' },
+      {},
+      '/ur/report',
+    );
+    expect(wrong.statusCode).toBe(422);
+    expect(wrong.body).toContain('Enter a Pakistani mobile number, such as 0300 1234567.');
+    expect(wrong.body).toContain('aria-invalid="true" aria-describedby="phone-error"');
+    expect(wrong.body).toContain('Paid an advance; nothing came in three weeks.</textarea>');
+    expect(wrong.body).toContain('<option value="never_delivered" selected');
+    core.reported = {
+      ok: false,
+      errors: [{ field: 'base', message: 'You have reported this store today already' }],
+    };
+    expect((await post(report)).body).toContain('You have reported this store today already');
+    expect(core.reports).toEqual([
+      {
+        shopId: 'sample',
+        request: {
+          reason: 'never_delivered',
+          details: 'Paid an advance; nothing came in three weeks.',
+          phone: '0300 1234567',
+          orderName: '#1042',
+          pageUrl: 'http://localhost/products/lawn?variant=2',
+          client: '127.0.0.1',
+          language: 'en',
+        },
+      },
+      {
+        shopId: 'sample',
+        request: {
+          reason: 'never_delivered',
+          details: 'Paid an advance; nothing came in three weeks.',
+          phone: '123',
+          client: '127.0.0.1',
+          language: 'ur',
+        },
+      },
+      expect.objectContaining({ shopId: 'sample' }),
+    ]);
+
+    // Only from the shop itself; the core away says so.
+    expect((await post(report, { 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403);
+    core.reported = new StorefrontApiError(502, 'Bad gateway');
+    expect((await post(report)).statusCode).toBe(503);
     await app.close();
   });
 

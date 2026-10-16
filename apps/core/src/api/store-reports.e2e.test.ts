@@ -1,0 +1,84 @@
+import 'reflect-metadata';
+import { Database } from '@hatti/db';
+import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
+import { fromPublicId, newId } from '@hatti/ids';
+import { StorefrontApiClient } from '@hatti/storefront-api';
+import { ReportsService } from '@hatti/trust/public';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import pg from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { TEST_STOREFRONT_KEY, startTestApi, type TestApi } from '../testing/api.js';
+
+const server = testDatabaseServer();
+
+describe.skipIf(!server)("Reports of stores, from storefronts to Hatti's people (ADR-460)", () => {
+  let testDb: TestDatabase;
+  let admin: pg.Client;
+  let api: TestApi;
+  let app: NestFastifyApplication;
+  let database: Database;
+  let client: StorefrontApiClient;
+  const shopId = newId();
+
+  beforeAll(async () => {
+    testDb = await createTestDatabase(server);
+    admin = new pg.Client({ connectionString: testDb.adminUrl });
+    await admin.connect();
+    await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Zari')`, [shopId]);
+    api = await startTestApi(testDb);
+    app = api.app;
+    await app.listen(0, '127.0.0.1');
+    client = new StorefrontApiClient({ baseUrl: await app.getUrl(), key: TEST_STOREFRONT_KEY });
+    database = new Database({
+      appUrl: testDb.appUrl,
+      systemUrl: testDb.systemUrl,
+      applicationName: 'store-reports-test',
+    });
+  });
+
+  afterAll(async () => {
+    await database?.close();
+    await api?.close();
+    await admin?.end();
+    await testDb?.drop();
+  });
+
+  it('takes a report through the storefront API, numbered for the shopper, open for Hatti', async () => {
+    const report = {
+      reason: 'never_delivered',
+      details: 'Paid an advance; nothing came.',
+      phone: '0300 1234567',
+      pageUrl: 'https://zari.hatti.test/products/lawn',
+      client: '203.0.113.9',
+      language: 'ur' as const,
+    };
+    const taken = await client.report(shopId, report);
+    if (!taken.ok) throw new Error(JSON.stringify(taken.errors));
+    expect(taken.id).toMatch(/^rpt_/);
+    expect(await client.report(shopId, { ...report, reason: 'rude', phone: '123' })).toEqual({
+      ok: false,
+      errors: [
+        { field: 'reason', message: 'Say what is wrong' },
+        { field: 'phone', message: 'Enter a Pakistani mobile number' },
+      ],
+    });
+    // Only for the storefronts, with their key; and only for shops there are.
+    const plain = await app.inject({
+      method: 'POST',
+      url: `/storefront/shops/${shopId}/reports`,
+      payload: report,
+    });
+    expect(plain.statusCode).toBe(401);
+    expect((await client.report(newId(), report)).ok).toBe(false);
+
+    const [open] = await new ReportsService(database).list();
+    expect(open).toMatchObject({
+      id: fromPublicId(taken.id, 'storeReport'),
+      shopName: 'Zari',
+      phone: '+923001234567',
+      language: 'ur',
+      status: 'open',
+      openOfShop: 1,
+    });
+  });
+});

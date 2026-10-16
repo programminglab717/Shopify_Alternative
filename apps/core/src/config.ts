@@ -543,6 +543,15 @@ const billingTransfersSchema = z.object({
 });
 
 /**
+ * Hatti's people decide on shoppers' reports of stores (ADR-460), with the system login, which
+ * reads every shop's.
+ */
+const trustReportsSchema = z.object({
+  DATABASE_URL: env.postgresUrl(),
+  DATABASE_SYSTEM_URL: env.postgresUrl(),
+});
+
+/**
  * Hatti's people review couriers' names for cities across shops, and keep Hatti's own (ADR-260),
  * with the system login, which reads every shop's.
  */
@@ -573,6 +582,7 @@ export type SupportAgentConfig = z.output<typeof supportAgentSchema>;
 export type EmailSuppressionConfig = z.output<typeof emailSuppressionSchema>;
 export type BillingTransfersConfig = z.output<typeof billingTransfersSchema>;
 export type CourierCitiesConfig = z.output<typeof courierCitiesSchema>;
+export type TrustReportsConfig = z.output<typeof trustReportsSchema>;
 
 export const loadApiConfig = (source?: Env): ApiConfig => parseEnv(apiSchema, source);
 export const loadWorkerConfig = (source?: Env): WorkerConfig => parseEnv(workerSchema, source);
@@ -585,3 +595,5 @@ export const loadBillingTransfersConfig = (source?: Env): BillingTransfersConfig
   parseEnv(billingTransfersSchema, source);
 export const loadCourierCitiesConfig = (source?: Env): CourierCitiesConfig =>
   parseEnv(courierCitiesSchema, source);
+export const loadTrustReportsConfig = (source?: Env): TrustReportsConfig =>
+  parseEnv(trustReportsSchema, source);

@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### Reports of stores
+
+* **Shoppers report a store to Hatti from every store's footer; each report is due a decision in
+  48 hours, dismissed or upheld by Hatti's people** ([ADR-460](../architecture/13-decision-log.md#adr-460--shoppers-report-a-store-to-hatti-from-every-stores-footer-what-is-wrong-kept-by-a-trust-module-due-a-decision-in-48-hours-dismissed-or-upheld-by-hattis-people), TNS-01). A trust module keeps
+  them; the storefront's `/report` page is Hatti's, not the theme's; a command-line tool is the
+  queue.
+* 2936 tests, from 2931: the trust module's test, the core's reports test, and
+  the storefront's server and render tests.
+
 ### 111a5cf · SMS campaigns in the admin
 
 * **A new broadcast is sent by WhatsApp or SMS: by SMS, the shop's words, shown as customers

@@ -1,0 +1,44 @@
+{
+  "name": "@hatti/trust",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Trust module: shoppers' reports of stores, from the link in every store's footer, each due a decision from Hatti's people within 48 hours (TNS-01). Other code imports only @hatti/trust/public.",
+  "type": "module",
+  "exports": {
+    "./public": {
+      "types": "./dist/public/index.d.ts",
+      "default": "./dist/public/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hatti/api": "workspace:*",
+    "@hatti/db": "workspace:*",
+    "@hatti/ids": "workspace:*",
+    "@hatti/pk": "workspace:*",
+    "@hatti/storefront-api": "workspace:*",
+    "drizzle-orm": "catalog:"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "catalog:",
+    "reflect-metadata": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

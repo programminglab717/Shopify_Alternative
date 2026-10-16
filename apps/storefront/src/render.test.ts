@@ -2511,6 +2511,15 @@ describe('Storefront rendering', () => {
     expect(editing).toMatch(/<hatti-sign-up-popup[^>]*data-design/);
   });
 
+  it("links every page's footer to reporting the store to Hatti, in its language (ADR-460)", async () => {
+    expect((await render({ path: '/' })).html).toContain(
+      '<p class="footer__report"><a href="/report" rel="nofollow">Report this store to Hatti</a></p>',
+    );
+    expect((await render({ path: '/', locale: 'ur' })).html).toContain(
+      '<a href="/ur/report" rel="nofollow">اس دکان کی شکایت ہٹی سے کریں</a>',
+    );
+  });
+
   it('asks for related and paired products as Shopify themes do, and renders them, those for sale, when asked (ADR-434, ADR-435)', async () => {
     const sample = sampleStore();
     const [first, second, third, fourth, ...rest] = sample.products as [

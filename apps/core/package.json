@@ -14,7 +14,8 @@
     "support-agent": "node --env-file-if-exists=../../.env --enable-source-maps dist/support-agent.js",
     "email-suppression": "node --env-file-if-exists=../../.env --enable-source-maps dist/email-suppression.js",
     "billing-transfers": "node --env-file-if-exists=../../.env --enable-source-maps dist/billing-transfers.js",
-    "courier-cities": "node --env-file-if-exists=../../.env --enable-source-maps dist/courier-cities.js"
+    "courier-cities": "node --env-file-if-exists=../../.env --enable-source-maps dist/courier-cities.js",
+    "trust-reports": "node --env-file-if-exists=../../.env --enable-source-maps dist/trust-reports.js"
   },
   "dependencies": {
     "@hatti/api": "workspace:*",
@@ -48,6 +49,7 @@
     "@hatti/storefront-data": "workspace:*",
     "@hatti/tax": "workspace:*",
     "@hatti/telemetry": "workspace:*",
+    "@hatti/trust": "workspace:*",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "@nestjs/graphql": "catalog:",

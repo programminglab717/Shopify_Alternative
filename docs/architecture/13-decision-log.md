@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-459 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-460 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -467,6 +467,7 @@
 | 457 | Hatti Base's sign-up pop-up asks for a shopper's number on WhatsApp through Shopify's customer form, after some seconds or as they leave, stays away once closed or signed up, and gives the shop's code to those who sign up | Accepted |
 | 458 | A broadcast goes by SMS too: the shop's own words from Hatti's shared sender, to those who agreed to hear by SMS, in marketing hours, each message ending on a link to a page that stops the shop's SMS to the number | Accepted |
 | 459 | The admin's new broadcast is sent by WhatsApp or SMS: by SMS, the shop's words with their count, the language of the link to stop, the message as customers read it, and an estimate by its parts | Accepted |
+| 460 | Shoppers report a store to Hatti from every store's footer: what is wrong, kept by a trust module, due a decision in 48 hours, dismissed or upheld by Hatti's people | Accepted |
 
 ---
 
@@ -17495,3 +17496,40 @@
 * **Alternatives:**
   * **Counting parts in the admin:** the core decides what each message says and costs; asking
     it keeps one rule.
+
+## ADR-460 · Shoppers report a store to Hatti from every store's footer: what is wrong, kept by a trust module, due a decision in 48 hours, dismissed or upheld by Hatti's people
+
+* **Context:**
+  * TNS-01 (V1) asks for a report-this-store link in every store's footer, worked through
+    within a time Hatti promises, with takedowns and appeals after it. Shoppers in Pakistan
+    meet stores that take an advance and send nothing, or sell copies as the real brand; the
+    marketplace's name rides on every store it hosts.
+* **Decision:**
+  * **A trust module of its own** (`@hatti/trust`, schema `trust`): reports of stores. Each
+    says why (never delivered, not as described, fake goods, prohibited goods, a scam,
+    impersonation, or something else), what happened in the shopper's words, up to 2,000
+    characters, and, if they say, a Pakistani mobile number to reach them on and the order's
+    number. It keeps the store's page they came from, the language they wrote in, and a hash of
+    their address with the shop's, never the address. Three a day of one store from one
+    address are taken; more are told Hatti is looking into it.
+  * **Due in 48 hours:** each report is open until Hatti's people dismiss it or uphold it with
+    what was done, once, by name.
+  * **The storefront's page** at `/report` and `/ur/report`: Hatti's page, in the platform's
+    markup in English and Urdu, not the theme's, so no shop can change or hide it. It answers
+    while the shop is paused or behind its password, takes posts only from the shop itself,
+    five a minute from one address, and gives the report's number, `rpt_…`. Hatti Base links
+    to it from its footer, in the page's language.
+  * **Hatti's people's queue** is a command-line tool, as support's, bank transfers' and
+    couriers' city names are (ADR-156, ADR-254, ADR-260): those open, the soonest due first
+    and the overdue marked, with how many are open of the same store; `dismiss` and `uphold`
+    with who and why. It reads with the system login.
+  * **The shop is never told who reported it**, and no Admin API reads reports.
+* **Consequences:**
+  * A shopper anywhere on a Hatti store can tell Hatti, and Hatti can count what it owes them.
+  * Suspending a store's storefront and checkout when a report is upheld, telling its owner, and
+    the owner's appeal are TNS-01's next parts.
+* **Alternatives:**
+  * **The link in the theme alone:** a shop could remove it from its own theme. The page is
+    Hatti's, at the same path on every store; Hatti Base links to it, and other themes may.
+  * **Reports kept with the shop's data, read through the Admin API:** the shop would see who
+    reported it.

@@ -15,6 +15,7 @@ import { SecretBox } from '@hatti/crypto';
 import { CustomersModule } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
 import { FilesModule } from '@hatti/files/public';
+import { TrustModule } from '@hatti/trust/public';
 import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
 import { InventoryCopiedVariantStock, InventoryModule } from '@hatti/inventory/public';
 import { type Couriers, LogisticsModule } from '@hatti/logistics/public';
@@ -222,6 +223,7 @@ export class ApiModule {
         LogisticsModule.forRoot({ couriers: options.couriers }),
         FilesModule,
         TaxModule,
+        TrustModule,
         MarketingModule,
         AppsModule,
         MessagingModule.forRoot({

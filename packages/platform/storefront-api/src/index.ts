@@ -43,6 +43,7 @@ export {
   StorefrontApiClient,
   type CartActionResult,
   type CommentResult,
+  type ReportResult,
   type SignUpResult,
   type StockWatchResult,
   type StorefrontApiOptions,
@@ -67,6 +68,13 @@ export {
   type SearchOptions,
   type SearchResponse,
 } from './search.js';
+export {
+  REPORT_REASON_VALUES,
+  reportsPath,
+  type ReportErrorResponse,
+  type ReportRequest,
+  type ReportResponse,
+} from './reports.js';
 export {
   SIGN_UP_LIMITS,
   signUpsPath,

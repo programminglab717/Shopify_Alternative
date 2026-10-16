@@ -1,3 +1,4 @@
+import type { RenderedPage } from '@hatti/documents';
 import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { checkPassword } from '@hatti/crypto';
@@ -68,6 +69,7 @@ import {
 } from './sitemap.js';
 import { LINK_TAP_PATH, linkKey, linkTargets, tapTarget } from './link-page.js';
 import { maintenancePage, retryAfterOf } from './maintenance.js';
+import { EMPTY_REPORT, reportPage, reportTakenPage } from './report-page.js';
 import { VISIT_PATH, isRobot, sessionOf } from './sessions.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
 import {
@@ -171,6 +173,12 @@ const STOCK_WATCHES = { name: 'stock-watches', limit: 10, windowMs: 60_000 };
 const COMMENTS = { name: 'comments', limit: 5, windowMs: 60_000 };
 
 /**
+ * Reports of stores an address may send a minute (ADR-460): a shopper sends one, and a script
+ * many; the core takes three a day of one store from one address.
+ */
+const REPORTS = { name: 'store-reports', limit: 5, windowMs: 60_000 };
+
+/**
  * Orders an address may look up a minute on a shop's tracking page (ADR-251): a customer looks
  * for one or two, and a script trying numbers many.
  */
@@ -186,6 +194,9 @@ const OPEN_ROUTES = new Set([
   // Sign-ups, as a closed shop's password page asks shoppers to be told when it opens.
   '/contact',
   '/ur/contact',
+  // Reports of the store to Hatti (ADR-460), whatever the shop shows.
+  '/report',
+  '/ur/report',
   '/robots.txt',
   '/assets/:version/:file',
   '/images/*',
@@ -195,8 +206,8 @@ const OPEN_ROUTES = new Set([
 
 /**
  * Routes a paused shop answers as ever (ADR-252): what crawlers read, so they keep its pages;
- * theme files and images; its tracking page, for orders placed before; and checkouts, whose
- * pages the core shows paused, and a placed order's as it was.
+ * theme files and images; its tracking page, for orders placed before; checkouts, whose pages
+ * the core shows paused, and a placed order's as it was; and reports of it to Hatti (ADR-460).
  */
 const PAUSE_OPEN_ROUTES = new Set([
   '/robots.txt',
@@ -209,6 +220,8 @@ const PAUSE_OPEN_ROUTES = new Set([
   '/track',
   '/ur/track',
   '/checkouts/:token',
+  '/report',
+  '/ur/report',
 ]);
 
 /** What a previewed page is: the shopper's own, never kept, and not for search engines. */
@@ -1932,6 +1945,79 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
   };
   for (const path of ['/back-in-stock', '/ur/back-in-stock']) app.post(path, backInStock);
+
+  /**
+   * Reporting the store to Hatti (TNS-01, ADR-460), from the link in Hatti Base's footer: Hatti's
+   * page, not the shop's theme's, asking what is wrong, sent on to the core for Hatti's people,
+   * then the report's number. The page it came from goes with it, and the shopper's address,
+   * which the core keeps only hashed with the shop's.
+   */
+  const report = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    reply.header('cache-control', 'private, no-store');
+    const urdu = request.url.startsWith('/ur/');
+    const send = (page: RenderedPage, status = 200) =>
+      reply
+        .code(status)
+        .header('content-security-policy', page.contentSecurityPolicy)
+        .header('x-content-type-options', 'nosniff')
+        .type('text/html; charset=utf-8')
+        .send(page.html);
+    try {
+      const shopName = (await found.store.shop()).name;
+      if (request.method !== 'POST') {
+        const from = refererPath(request) ?? '';
+        return await send(reportPage(shopName, { ...EMPTY_REPORT, from }, [], { urdu }));
+      }
+      if (request.headers['sec-fetch-site'] === 'cross-site') {
+        return await reply
+          .code(403)
+          .type('text/plain; charset=utf-8')
+          .send('Reports are made from the shop itself.\n');
+      }
+      if (limiter && !(await limiter.hit(REPORTS, request.ip)).allowed) {
+        return await reply
+          .code(429)
+          .type('text/plain; charset=utf-8')
+          .send('Too many reports. Please wait a minute.\n');
+      }
+      if (!core) throw new StorefrontApiError(503, 'This storefront takes no reports');
+      const params = paramsOf(request);
+      const text = (name: string) => (typeof params[name] === 'string' ? params[name] : '');
+      const form = {
+        reason: text('reason'),
+        details: text('details'),
+        phone: text('phone'),
+        orderName: text('orderName'),
+        from: localPath(text('from')) ?? '',
+      };
+      const origin = await originOf(request, found);
+      const result = await core.report(found.shopId, {
+        reason: form.reason,
+        details: form.details,
+        ...(form.phone && { phone: form.phone }),
+        ...(form.orderName && { orderName: form.orderName }),
+        ...(form.from && { pageUrl: `${origin}${form.from}` }),
+        client: request.ip,
+        language: urdu ? 'ur' : 'en',
+      });
+      if (!result.ok) return await send(reportPage(shopName, form, result.errors, { urdu }), 422);
+      return await send(
+        reportTakenPage(shopName, result.id, { back: form.from || (urdu ? '/ur' : '/') }),
+      );
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return reply
+        .code(503)
+        .type('text/plain; charset=utf-8')
+        .send('Hatti cannot be reached just now. Please try again in a minute.\n');
+    }
+  };
+  for (const path of ['/report', '/ur/report']) {
+    app.route({ method: ['GET', 'POST'], url: path, handler: report });
+  }
 
   /**
    * Shopify's new_comment form, which themes' article pages post (ADR-220): the shopper's comment,
