@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Reports of stores
+### 76a03fd · Reports of stores
 
 * **Shoppers report a store to Hatti from every store's footer; each report is due a decision in
   48 hours, dismissed or upheld by Hatti's people** ([ADR-460](../architecture/13-decision-log.md#adr-460--shoppers-report-a-store-to-hatti-from-every-stores-footer-what-is-wrong-kept-by-a-trust-module-due-a-decision-in-48-hours-dismissed-or-upheld-by-hattis-people), TNS-01). A trust module keeps
