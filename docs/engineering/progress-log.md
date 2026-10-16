@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### SMS campaigns
+### dc43ff9 · SMS campaigns
 
 * **Broadcasts by SMS from Hatti's shared sender, each with a link to stop** ([ADR-458](../architecture/13-decision-log.md#adr-458--a-broadcast-goes-by-sms-too-the-shops-own-words-from-hattis-shared-sender-to-those-who-agreed-to-hear-by-sms-in-marketing-hours-each-message-ending-on-a-link-to-a-page-that-stops-the-shops-sms-to-the-number), MKT-02).
 * 2930 tests, from 2927: the messaging module's one, the sender's, and the API's.
