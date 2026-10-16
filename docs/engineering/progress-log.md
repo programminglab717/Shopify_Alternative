@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Back in stock on the storefront
+### b60adcd · Back in stock on the storefront
 
 * **Hatti Base asks for a shopper's number** on a sold-out variant's page while the shop's back
   in stock automation is on ([ADR-431](../architecture/13-decision-log.md#adr-431--back-in-stock-on-the-storefront-hattis-back_in_stock-form-on-a-sold-out-variants-page-sent-on-to-the-core-and-back-to-the-page), MKT-04), in English and Urdu.
