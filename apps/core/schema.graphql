@@ -7055,6 +7055,11 @@ type Mutation {
 
   """Shows a review on its product's storefront page."""
   productReviewPublish(id: ID!): ProductReviewPayload!
+
+  """
+  Puts a draft on sale by itself at `publishAt`, a minute to a year ahead, as a drop "goes live at 00:00"; null takes the time away. Set on sale or archived by hand, a product loses its time.
+  """
+  productSchedulePublish(productId: ID!, publishAt: DateTime): ProductUpdatePayload!
   productUpdate(input: ProductUpdateInput!): ProductUpdatePayload!
   productUpdateMedia(media: [UpdateMediaInput!]!, productId: ID!): ProductPayload!
 
@@ -9428,6 +9433,11 @@ type Product {
   preorder: ProductPreorder
   priceRange: ProductPriceRange!
   productType: String
+
+  """
+  When the draft goes on sale by itself, made active by the worker within a minute of it (ADR-441); null for no time set.
+  """
+  publishAt: DateTime
 
   """
   What search engines and link previews are told in place of its title and description (ADR-231).

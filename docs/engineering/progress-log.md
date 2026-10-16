@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows still
-open, taken in the order the alpha's shops need them. Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: CAT-17's price changes at a time
+ahead, for sales, and the publish time on the admin's product page; then the feature catalog's
+V1 rows still open, in the order the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +16,13 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### Drafts put on sale at a time ahead
+
+* **A draft goes on sale by itself at the time the shop sets** ([ADR-441](../architecture/13-decision-log.md#adr-441--a-draft-is-put-on-sale-by-itself-at-a-time-ahead-a-minute-to-a-year-off-by-the-workers-sweep-of-scheduled-content-set-on-sale-or-archived-by-hand-it-loses-its-time), CAT-17), for drops that
+  go live at midnight. The worker's sweep of scheduled content sets it active within a minute,
+  as setting it by hand would.
+* 2869 tests, from 2864: the catalog's three and the core's two.
 
 ### 52b861a · The cart drawer's cross-sells
 

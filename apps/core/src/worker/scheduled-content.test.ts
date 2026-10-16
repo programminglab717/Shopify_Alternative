@@ -2,8 +2,8 @@ import type { Logger } from '@hatti/logger';
 import { describe, expect, it, vi } from 'vitest';
 import { ScheduledContent, scheduledKinds } from './scheduled-content.js';
 
-describe('Articles and pages shown when their time comes (ADR-215, ADR-217)', () => {
-  it("shows each shop's articles and pages due, one shop's failure not the others'", async () => {
+describe('Articles, pages and products shown when their time comes (ADR-215, ADR-217, ADR-441)', () => {
+  it("shows each shop's articles, pages and products due, one shop's failure not the others'", async () => {
     const articles = {
       shopsWithArticlesDue: vi.fn(async () => ['shop-a', 'shop-b', 'shop-c']),
       showDue: vi.fn(async (shopId: string) => {
@@ -15,16 +15,21 @@ describe('Articles and pages shown when their time comes (ADR-215, ADR-217)', ()
       shopsWithPagesDue: vi.fn(async () => ['shop-b']),
       showDue: vi.fn(async () => 1),
     };
+    const products = {
+      shopsWithProductsDue: vi.fn(async () => ['shop-c']),
+      publishDue: vi.fn(async () => 4),
+    };
     const warned: unknown[] = [];
     const logger = { info: vi.fn(), warn: (obj: unknown) => warned.push(obj) } as unknown as Logger;
-    const sweeps = new ScheduledContent(scheduledKinds(articles, pages), logger);
-    expect(await sweeps.sweep()).toEqual({ articles: 3, pages: 1 });
+    const sweeps = new ScheduledContent(scheduledKinds(articles, pages, products), logger);
+    expect(await sweeps.sweep()).toEqual({ articles: 3, pages: 1, products: 4 });
     expect(articles.showDue.mock.calls.map(([shopId]) => shopId)).toEqual([
       'shop-a',
       'shop-b',
       'shop-c',
     ]);
     expect(pages.showDue).toHaveBeenCalledWith('shop-b');
+    expect(products.publishDue).toHaveBeenCalledWith('shop-c');
     expect(warned).toEqual([expect.objectContaining({ shopId: 'shop-b', kind: 'articles' })]);
   });
 });

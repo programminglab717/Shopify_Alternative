@@ -73,6 +73,8 @@ export const products = catalogSchema.table(
     searchText: text('search_text').notNull().default(''),
     /** The words of what the shop wrote in Urdu for it, folded as `searchText` (ADR-240). */
     translatedText: text('translated_text').notNull().default(''),
+    /** When a draft goes on sale by itself (CAT-17, ADR-441); null for no time set. */
+    publishAt: timestamp('publish_at', { withTimezone: true }),
     version: integer('version').notNull().default(1),
     ...timestamps,
   },

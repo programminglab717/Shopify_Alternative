@@ -16,7 +16,7 @@ import { collections } from './schema.js';
  */
 export async function refreshMemberships(
   tx: Tx,
-  tenant: TenantContext,
+  tenant: Pick<TenantContext, 'shopId' | 'currency'>,
   scope: { productIds: string[] } | { collectionIds: string[] },
 ): Promise<void> {
   const conditions = [eq(collections.shopId, tenant.shopId), isNotNull(collections.rules)];

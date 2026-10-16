@@ -441,7 +441,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     closers.push(() => domainChecks.stop());
     // Articles and pages published at a time ahead shown once it comes (ADR-215, ADR-217).
     const scheduledContent = new ScheduledContent(
-      scheduledKinds(new ArticleService(database), new PageService(database)),
+      scheduledKinds(
+        new ArticleService(database),
+        new PageService(database),
+        new ProductService(database),
+      ),
       logger,
     ).start(config.SCHEDULED_INTERVAL_MS);
     closers.push(() => scheduledContent.stop());

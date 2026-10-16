@@ -1,11 +1,17 @@
 import { randomBytes } from 'node:crypto';
-import { checkSeo, type SeoInputValue, type SeoValue, type TenantContext } from '@hatti/api';
+import {
+  checkSeo,
+  shopProfile,
+  type SeoInputValue,
+  type SeoValue,
+  type TenantContext,
+} from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { correctionsOf, prefixKey, searchKey, typosAllowed, type Correction } from '@hatti/pk';
 import { Injectable, Optional } from '@nestjs/common';
-import { and, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, lte, ne, sql } from 'drizzle-orm';
 import { refreshMemberships } from './collection-store.js';
 import {
   CatalogEvents,
@@ -156,8 +162,12 @@ type ProductChanges = Partial<
     | 'tags'
     | 'seoTitle'
     | 'seoDescription'
+    | 'publishAt'
   >
 >;
+
+/** How far ahead a draft may be put on sale (CAT-17, ADR-441), and how near is now. */
+export const PUBLISH_AHEAD = { maxDays: 365, nowWithinMs: 60_000 } as const;
 
 /** What became of products acted on many at once (CAT-04). */
 export interface ProductBulkResult<T> {
@@ -515,6 +525,8 @@ export class ProductService {
     if (input.status !== undefined) {
       if (input.status === null) check.add(['input', 'status'], 'BLANK', "can't be blank");
       else changes.status = input.status;
+      // On sale or archived by hand, a time set to put it on sale goes (ADR-441).
+      if (input.status && input.status !== 'draft') changes.publishAt = null;
     }
     if (input.vendor !== undefined) {
       changes.vendor = check.text(['input', 'vendor'], input.vendor, { max: LIMITS.shortText });
@@ -539,7 +551,7 @@ export class ProductService {
    * what changed; null changes nothing, and errors refuse it. The product as it ends up.
    */
   async #change(
-    tenant: TenantContext,
+    tenant: Pick<TenantContext, 'shopId' | 'currency'>,
     id: string,
     field: string[],
     changesOf: (current: ProductRow) => ProductChanges | FieldError[] | null,
@@ -614,13 +626,111 @@ export class ProductService {
     }
   }
 
+  /**
+   * Puts a draft on sale by itself at `publishAt` (CAT-17, ADR-441), as a drop "goes live at
+   * 00:00": a minute ahead at least, a year at most; null takes the time away. A product on sale
+   * or archived is given none.
+   */
+  async schedulePublish(
+    tenant: TenantContext,
+    id: string,
+    publishAt: Date | null,
+  ): Promise<MutationResult<ProductRecord>> {
+    if (publishAt) {
+      const ahead = publishAt.getTime() - Date.now();
+      if (Number.isNaN(ahead) || ahead < PUBLISH_AHEAD.nowWithinMs) {
+        return failOne(['publishAt'], 'INVALID', 'Give a time a minute ahead at least');
+      }
+      if (ahead > PUBLISH_AHEAD.maxDays * 86_400_000) {
+        return failOne(['publishAt'], 'INVALID', 'Give a time within a year');
+      }
+    }
+    return this.#change(tenant, id, ['productId'], (current) =>
+      publishAt && current.status !== 'draft'
+        ? [
+            {
+              field: ['productId'],
+              code: 'INVALID',
+              message:
+                'Only a draft is put on sale at a time ahead: this one is on sale or archived',
+            },
+          ]
+        : { publishAt },
+    );
+  }
+
+  /** When each of `ids` that has a time set goes on sale (ADR-441). */
+  async publishTimesOf(tenant: TenantContext, ids: readonly string[]): Promise<Map<string, Date>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.db.tenant(tenant.shopId, (tx) =>
+      tx
+        .select({ id: products.id, publishAt: products.publishAt })
+        .from(products)
+        .where(
+          and(
+            eq(products.shopId, tenant.shopId),
+            inArray(products.id, [...ids]),
+            isNotNull(products.publishAt),
+          ),
+        ),
+    );
+    return new Map(rows.map((row) => [row.id, row.publishAt!]));
+  }
+
+  /** The shops with drafts whose time to go on sale came (ADR-441), found with the system role. */
+  async shopsWithProductsDue(): Promise<string[]> {
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string }>(sql`
+        SELECT DISTINCT shop_id FROM catalog.products
+         WHERE publish_at IS NOT NULL AND publish_at <= now()`),
+    );
+    return rows.map((row) => row.shop_id);
+  }
+
+  /**
+   * Puts the shop's drafts whose time came on sale (ADR-441), each as its status set to active
+   * would be: its `product.updated`, which the storefront follows, and its smart collections looked
+   * at again. How many.
+   */
+  async publishDue(shopId: string): Promise<number> {
+    const { ids, currency } = await this.db.tenant(shopId, async (tx) => ({
+      ids: (
+        await tx
+          .select({ id: products.id })
+          .from(products)
+          .where(
+            and(
+              eq(products.shopId, shopId),
+              isNotNull(products.publishAt),
+              lte(products.publishAt, sql`now()`),
+            ),
+          )
+      ).map((row) => row.id),
+      currency: (await shopProfile(tx, shopId)).currency as TenantContext['currency'],
+    }));
+    let published = 0;
+    for (const id of ids) {
+      const done = await this.#change({ shopId, currency }, id, ['id'], (current) => {
+        if (!current.publishAt || current.publishAt.getTime() > Date.now()) return null;
+        // One archived since keeps its status; its time goes either way.
+        return current.status === 'draft'
+          ? { status: 'active', publishAt: null }
+          : { publishAt: null };
+      });
+      if (done.ok && done.value.status === 'active') published += 1;
+    }
+    return published;
+  }
+
   /** Shows, hides or archives many products at once (CAT-04); see {@link update}. */
   bulkSetStatus(
     tenant: TenantContext,
     ids: readonly string[],
     status: ProductStatusValue,
   ): Promise<MutationResult<ProductBulkResult<ProductRecord>>> {
-    return this.#bulk(ids, (id) => this.#change(tenant, id, ['id'], () => ({ status })));
+    // On sale or archived, a time set to put it on sale goes (ADR-441).
+    const changes: ProductChanges = status === 'draft' ? { status } : { status, publishAt: null };
+    return this.#bulk(ids, (id) => this.#change(tenant, id, ['id'], () => changes));
   }
 
   /** Adds tags to many products; tags a product has already, in any case, are left as they are. */

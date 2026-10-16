@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-440 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-441 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -448,6 +448,7 @@
 | 438 | The offer after the purchase: a cash-on-delivery order's page offers a product the shop pairs with what it holds, at the shop's percentage off, added with a tap and paid at the door until it is packed | Accepted |
 | 439 | The offer after the purchase in the admin: turned on in the order settings, with its percentage off | Accepted |
 | 440 | The cart drawer's cross-sells: the cart page's, in the drawer, from one snippet and a theme script both load | Accepted |
+| 441 | A draft is put on sale by itself at a time ahead, a minute to a year off, by the worker's sweep of scheduled content; set on sale or archived by hand, it loses its time | Accepted |
 
 ---
 
@@ -16843,3 +16844,34 @@
     the cart.
 * **Alternatives:**
   * **Copying the element into the drawer's own script:** two copies to keep in step.
+
+## ADR-441 · A draft is put on sale by itself at a time ahead, a minute to a year off, by the worker's sweep of scheduled content; set on sale or archived by hand, it loses its time
+
+* **Context:**
+  * CAT-17 asks for drops and sales that "go live at 00:00". Shops in the alpha launch
+    collections at midnight before Eid and announce them ahead on Instagram. Today someone stays
+    up to set each product active by hand.
+  * Articles (ADR-215) and pages (ADR-217) are already published at a time ahead, by a worker
+    sweep that finds the shops with something due under the system role.
+* **Decision:**
+  * **A product keeps `publish_at`** (migration 0205), the time it goes on sale. Only a draft
+    takes one, a minute to a year ahead. Null takes it away.
+    * `productSchedulePublish(productId, publishAt)` sets it, with the scopes products take.
+      `Product.publishAt` reads it, batched per request.
+    * A product set on sale or archived by hand, alone or many at once, loses its time. Other
+      changes to a draft keep it.
+  * **The worker's sweep of scheduled content takes products as a third kind.** Each due product
+    is set active exactly as by hand: its `product.updated`, which the storefront's publisher
+    follows, and its smart collections looked at again. One archived in the meantime stays
+    archived and loses its time. One shop's failure is not the others'.
+  * The sweep runs at its interval (a minute by default), so a product goes on sale within a
+    minute of its time.
+* **Consequences:**
+  * The time is kept in UTC and given as an ISO time. The admin shows and takes it in the
+    shop's own zone.
+  * Price changes at a time ahead, the other half of CAT-17, come next and use the same sweep.
+* **Alternatives:**
+  * **A separate scheduler per product (a delayed job):** a second source of truth to keep in
+    step with the product when it is edited, archived or deleted.
+  * **Keeping the time on an active product to take it off sale later:** no shop in the alpha
+    asked for it. A sale ending is the price change's work.

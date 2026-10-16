@@ -1,4 +1,5 @@
 import type { Logger } from '@hatti/logger';
+import type { ProductService } from '@hatti/catalog/public';
 import type { ArticleService, PageService } from '@hatti/online-store/public';
 import { repeat } from './repeat.js';
 
@@ -8,10 +9,14 @@ export interface ScheduledKind {
   showDue(shopId: string): Promise<number>;
 }
 
-/** The online store's articles (ADR-215) and pages (ADR-217), as the sweep shows them. */
+/**
+ * The online store's articles (ADR-215) and pages (ADR-217), and the catalog's products
+ * (ADR-441), as the sweep shows them.
+ */
 export function scheduledKinds(
   articles: Pick<ArticleService, 'shopsWithArticlesDue' | 'showDue'>,
   pages: Pick<PageService, 'shopsWithPagesDue' | 'showDue'>,
+  products: Pick<ProductService, 'shopsWithProductsDue' | 'publishDue'>,
 ): Record<string, ScheduledKind> {
   return {
     articles: {
@@ -19,14 +24,18 @@ export function scheduledKinds(
       showDue: (shop) => articles.showDue(shop),
     },
     pages: { shopsDue: () => pages.shopsWithPagesDue(), showDue: (shop) => pages.showDue(shop) },
+    products: {
+      shopsDue: () => products.shopsWithProductsDue(),
+      showDue: (shop) => products.publishDue(shop),
+    },
   };
 }
 
 /**
- * Shows the articles and pages published at a time ahead once it comes (ADR-215, ADR-217): each
- * sweep, the shops with some due, found with the system role, each shown in its own transaction
- * with its `article.updated` or `page.updated`, which the storefront's publisher follows. One
- * shop's failure is not the others'.
+ * Shows the articles, pages and products published at a time ahead once it comes (ADR-215,
+ * ADR-217, ADR-441): each sweep, the shops with some due, found with the system role, each shown
+ * in its own transaction with its `article.updated`, `page.updated` or `product.updated`, which
+ * the storefront's publisher follows. One shop's failure is not the others'.
  */
 export class ScheduledContent {
   constructor(

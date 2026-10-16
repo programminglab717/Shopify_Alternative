@@ -10,6 +10,7 @@ import { BundleResolver } from './graphql/bundle.resolver.js';
 import { BundleService } from './bundles.js';
 import { ComplementService } from './complements.js';
 import { ComplementResolver } from './graphql/complement.resolver.js';
+import { ProductScheduleResolver } from './graphql/schedule.resolver.js';
 import { MediaService } from './media.service.js';
 import { OptionService } from './option.service.js';
 import { ProductExportService } from './product-export.service.js';
@@ -47,6 +48,7 @@ import { VariantService } from './variant.service.js';
     SizeChartResolver,
     BundleResolver,
     ComplementResolver,
+    ProductScheduleResolver,
   ],
   controllers: [StorefrontSearchController],
   exports: [
