@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-448 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-449 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -456,6 +456,7 @@
 | 446 | A closed shop's password page takes a waitlist: shoppers sign up tagged waitlist, and each is told once on WhatsApp from Hatti's number when the shop opens | Accepted |
 | 447 | A returning shopper fills in checkout's address from their last order, once a code sent to their number, or their browser's proof of it, shows the number is theirs | Accepted |
 | 448 | Gift cards are codes the shop keeps only a digest of, worth a balance kept on the card with a ledger of every change, issued, changed and deactivated through Shopify's giftCard mutations | Accepted |
+| 449 | A shopper applies a gift card on checkout's page by its code, and it pays what it can of the order as it is placed; a cancelled order gives it back | Accepted |
 
 ---
 
@@ -17129,3 +17130,43 @@
     spend every card. A digest gives nothing to spend.
   * **Balance worked out from the ledger, as store credit's is:** store credit expires credit by
     credit; a card expires whole, and a kept balance is one lock and one read.
+
+## ADR-449 · A shopper applies a gift card on checkout's page by its code, and it pays what it can of the order as it is placed; a cancelled order gives it back
+
+* **Context:**
+  * Gift cards are kept and issued (ADR-448). PAY-13 asks that shoppers spend them at
+    checkout.
+  * Checkout already takes a discount code in a form of its own (ADR-063), and spends store
+    credit as the order is placed, in the same transaction (ADR-186).
+* **Decision:**
+  * **"Gift card" on checkout's page**, below the discount code: a form of its own, posted with
+    `action=gift_card` and the code as printed (spaces, dashes and small letters are fine). It
+    places nothing.
+    * The card applied is kept on the checkout. The page shows its code's end and what it has
+      left, and, in the order's summary, what it pays and what is left to pay.
+    * `action=remove_gift_card` takes it off.
+    * A code that is no card's counts a try. After 10, the page takes no more, as with discount
+      codes. A card deactivated, past its day or empty is not applied, and the page says why.
+  * **Placing spends it**, after any store credit, in the order's own transaction, holding the
+    card's lock: as much as the order owes and the card has.
+    * The order is paid that much ahead, as store credit pays it. Cash on delivery collects the
+      rest at the door, and a card that covers it all leaves nothing to collect. The timeline
+      says "Paid Rs 1,500 with gift card •••• NPQR".
+    * The thank-you page shows what each card paid.
+    * A card that can no longer pay when the order is placed undoes the order. The page says
+      why, until the shopper takes the card off.
+  * **A cancelled order gives the card back**, as it gives back store credit (ADR-185), unless
+    refunds took more of what was paid than the rest left. The card gets it back even if it was
+    deactivated or has passed its day, as Shopify does.
+  * Orders spend and give back through the customers module's facade (`spendGiftCardIn`,
+    `revertOrderGiftCardsIn`, `giftCardsPaidIn`). Neither checkout nor orders reads its tables.
+* **Consequences:**
+  * One card an order: a second code replaces the first.
+  * A refund of an order a card paid is given as the shop chooses (ADR-029), not back to the
+    card.
+  * Not yet: the admin's gift card pages, and cards sold as products and sent on WhatsApp.
+* **Alternatives:**
+  * **Spending the card when it is applied:** an abandoned checkout would hold the money.
+    Spending it as the order is placed holds nothing until then.
+  * **Letting the shopper choose how much of the card to spend:** another field on a phone, for
+    a choice almost nobody makes.

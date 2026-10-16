@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### Gift cards at checkout
+
+* **A shopper applies a gift card on checkout's page, and it pays what it can of the order as it
+  is placed** ([ADR-449](../architecture/13-decision-log.md#adr-449--a-shopper-applies-a-gift-card-on-checkouts-page-by-its-code-and-it-pays-what-it-can-of-the-order-as-it-is-placed-a-cancelled-order-gives-it-back), PAY-13). Cash on delivery collects the rest, and a cancelled order gives
+  the card back.
+* 2902 tests, from 2898: checkout's four.
+
 ### fd2ce44 · Gift cards kept and issued
 
 * **A shop issues gift cards through Shopify's Admin API mutations, each a code it keeps only a

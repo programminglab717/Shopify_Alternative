@@ -1,5 +1,5 @@
 import type { FieldError } from '@hatti/api';
-import type { MarketingChannelValue } from '@hatti/customers/public';
+import type { GiftCardRefusal, MarketingChannelValue } from '@hatti/customers/public';
 import {
   html,
   ltr,
@@ -57,6 +57,7 @@ import {
   type CheckoutDiscount,
   type CheckoutForm,
   type CheckoutGift,
+  type CheckoutGiftCard,
   type CheckoutPayments,
   type CheckoutProblem,
   type CheckoutShop,
@@ -84,6 +85,8 @@ const LABELS = {
   discountCode: { en: 'Discount code', ur: 'ڈسکاؤنٹ کوڈ' },
   apply: { en: 'Apply', ur: 'لاگو کریں' },
   remove: { en: 'Remove', ur: 'ہٹائیں' },
+  giftCard: { en: 'Gift card', ur: 'گفٹ کارڈ' },
+  leftToPay: { en: 'Left to pay', ur: 'باقی ادائیگی' },
   giftWrap: { en: 'Gift wrap', ur: 'گفٹ ریپ' },
   addGiftWrap: { en: 'Add gift wrap', ur: 'گفٹ ریپ شامل کریں' },
   giftMessage: { en: 'Gift message', ur: 'تحفے کا پیغام' },
@@ -270,7 +273,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const { codRules } = payments;
   const errors = problem?.kind === 'address' ? problem.errors : [];
   const status =
-    problem?.kind === 'address' || problem?.kind === 'discount'
+    problem?.kind === 'address' || problem?.kind === 'discount' || problem?.kind === 'gift_card'
       ? 422
       : problem?.kind === 'too_many'
         ? 429
@@ -336,6 +339,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
       // form is filled in.
       problem &&
         problem.kind !== 'discount' &&
+        problem.kind !== 'gift_card' &&
         !(problem.kind === 'recall' && !RECALL_DONE.includes(problem.state)) &&
         banner(problemWords(problem, ways)),
       cartSummary(
@@ -355,10 +359,12 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
               ? (advance ?? 0n)
               : (pastLimit ?? 0n)
             : 0n,
+          giftCard: view.giftCard?.refusal ? null : view.giftCard,
         },
         view.tax,
       ),
       discountSection(discount, problem?.kind === 'discount' ? problem : null),
+      orderable && giftCardSection(view.giftCard, problem?.kind === 'gift_card' ? problem : null),
       orderable && giftWrapSection(view.gift),
       orderable && recallSection(form.phone, problem?.kind === 'recall' ? problem : null),
       orderable &&
@@ -965,6 +971,12 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
           ${row(LABELS.total, rs(order.total), 'total')}
           ${[...taxByRate(order)].map(([rate, tax]) => row(taxIncludedWords(rate), rs(tax)))}
           ${view.storeCredit > 0n && row(LABELS.storeCredit, `−${rs(view.storeCredit)}`)}
+          ${view.giftCards.map((card) =>
+            row(
+              { ...LABELS.giftCard, en: `${LABELS.giftCard.en} (•••• ${card.lastCharacters})` },
+              `−${rs(card.amount)}`,
+            ),
+          )}
         </table>
       </section>`,
       view.pickup &&
@@ -1021,6 +1033,8 @@ function cartSummary(
     /** Whose `off` is: paying by transfer's or online's. */
     offWay: 'transfer' | 'online';
     advance: bigint;
+    /** The gift card applied that can pay (ADR-449). */
+    giftCard?: CheckoutGiftCard | null;
   },
   tax: TaxRates,
 ): Html {
@@ -1093,6 +1107,25 @@ function cartSummary(
               amount(totals.total + fee - off),
               'due',
             ))
+      }
+      ${
+        // What the gift card applied pays of it, and what is left (ADR-449).
+        totals.total !== null &&
+        pay.giftCard &&
+        (() => {
+          const due = totals.total + fee - off;
+          const byCard = pay.giftCard.balance < due ? pay.giftCard.balance : due;
+          return [
+            row(
+              {
+                ...LABELS.giftCard,
+                en: `${LABELS.giftCard.en} (•••• ${pay.giftCard.lastCharacters})`,
+              },
+              `−${amount(byCard)}`,
+            ),
+            row(LABELS.leftToPay, amount(due - byCard), 'due'),
+          ];
+        })()
       }
       ${
         // A line a rate, as the order's invoice will have them.
@@ -1538,6 +1571,8 @@ function problemWords(
           };
     case 'discount':
       return refusalWords(problem.code, problem.refusal);
+    case 'gift_card':
+      return giftCardWords(problem.refusal);
     case 'cod_unavailable':
       return codRefusalWords(problem.refusal, ways);
     case 'cod_limit': {
@@ -1660,6 +1695,90 @@ function discountSection(
       <button class="button secondary" type="submit">${say('bilingual', LABELS.apply)}</button>
     </form>
   </section>`;
+}
+
+/**
+ * The gift card the shopper applied (PAY-13, ADR-449), what it has left, and a form to take it
+ * off; or a form to apply one, with what went wrong under it. Forms of their own, posted with an
+ * `action`, which place nothing, as the discount code's are.
+ */
+function giftCardSection(
+  card: CheckoutGiftCard | null,
+  problem: Extract<CheckoutProblem, { kind: 'gift_card' }> | null,
+): Html {
+  if (card) {
+    const left = amount(card.balance);
+    return html`<section class="section">
+      <h2 class="label">${say('bilingual', LABELS.giftCard)}</h2>
+      ${paragraphs(
+        card.refusal
+          ? giftCardWords(card.refusal)
+          : {
+              en: html`<span dir="ltr">•••• ${card.lastCharacters}</span> is applied: ${left} left.`,
+              ur: html`${ltr(`•••• ${card.lastCharacters}`)} لاگو ہو گیا ہے: ${ltr(left)} باقی۔`,
+            },
+        card.refusal ? 'error' : '',
+      )}
+      <form method="post">
+        <input type="hidden" name="action" value="remove_gift_card" />
+        <button class="button secondary" type="submit">${say('bilingual', LABELS.remove)}</button>
+      </form>
+    </section>`;
+  }
+  const said =
+    problem &&
+    html`<div id="gift-card-error">${paragraphs(giftCardWords(problem.refusal), 'error')}</div>`;
+  return html`<section class="section">
+    <form method="post">
+      <input type="hidden" name="action" value="gift_card" />
+      <label class="label" for="gift-card">${say('bilingual', LABELS.giftCard)}</label>
+      <input
+        id="gift-card"
+        name="gift_card"
+        type="text"
+        dir="ltr"
+        value="${problem?.code ?? ''}"
+        autocomplete="off"
+        autocapitalize="characters"
+        spellcheck="false"
+        maxlength="64"
+        ${problem && html`aria-invalid="true" aria-describedby="gift-card-error"`}
+      />
+      ${said}
+      <button class="button secondary" type="submit">${say('bilingual', LABELS.apply)}</button>
+    </form>
+  </section>`;
+}
+
+/** Why a gift card pays nothing, in both languages. */
+function giftCardWords(refusal: GiftCardRefusal | 'unknown' | 'attempts'): Sentence {
+  switch (refusal) {
+    case 'unknown':
+      return {
+        en: "There's no gift card with this code here. Check it and try again.",
+        ur: 'یہاں اس کوڈ کا کوئی گفٹ کارڈ نہیں۔ دیکھ کر دوبارہ کوشش کریں۔',
+      };
+    case 'expired':
+      return {
+        en: 'This gift card has expired.',
+        ur: 'اس گفٹ کارڈ کی مدت ختم ہو چکی ہے۔',
+      };
+    case 'deactivated':
+      return {
+        en: 'This gift card can no longer be used.',
+        ur: 'یہ گفٹ کارڈ اب استعمال نہیں ہو سکتا۔',
+      };
+    case 'empty':
+      return {
+        en: 'This gift card has nothing left on it.',
+        ur: 'اس گفٹ کارڈ پر کچھ باقی نہیں۔',
+      };
+    case 'attempts':
+      return {
+        en: 'This page has been given too many gift card codes. Ask the shop for help.',
+        ur: 'اس صفحے پر بہت زیادہ گفٹ کارڈ کوڈ لکھے جا چکے ہیں۔ مدد کے لیے دکان سے رابطہ کریں۔',
+      };
+  }
 }
 
 /** Why a code takes nothing off, in both languages. */

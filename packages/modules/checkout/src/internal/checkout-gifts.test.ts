@@ -62,7 +62,10 @@ describe.skipIf(!server)('Gift wrap and gift messages at checkout (CHK-16, ADR-4
     // Neither until the shop chooses: nothing on the page.
     const before = await checkout();
     expect(before.view.gift).toBeNull();
-    expect(checkoutPage(before.view).html).not.toContain('gift');
+    // Nothing of gift wrap or a message: the gift card's field is another thing (ADR-449).
+    const empty = checkoutPage(before.view).html;
+    expect(empty).not.toContain('gift_wrap');
+    expect(empty).not.toContain('Gift message');
 
     expect(unwrap(await gifts.update(f.a, { wrapVariantId: wrap, messages: true }))).toEqual({
       wrap: {

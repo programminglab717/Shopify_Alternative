@@ -489,6 +489,141 @@ export class GiftCardService {
   }
 }
 
+/** Why a card can't be spent at `at`: deactivated, past its last day, or empty; null if it can. */
+export function giftCardRefusalOf(card: GiftCardRecord): GiftCardRefusal | null {
+  if (card.deactivatedAt) return 'deactivated';
+  if (card.expired) return 'expired';
+  if (card.balance === 0n) return 'empty';
+  return null;
+}
+
+/** The shop's card whose code is `typed`, as a shopper types it; null for none. */
+export async function giftCardByCodeIn(
+  tx: Tx,
+  shopId: string,
+  typed: string,
+  at: Date = new Date(),
+): Promise<GiftCardRecord | null> {
+  const code = normalizeGiftCardCode(typed);
+  if (code.length < GIFT_CARD_LIMITS.codeMin || code.length > GIFT_CARD_LIMITS.codeMax) return null;
+  const { rows } = await tx.execute<{ id: string }>(sql`
+    SELECT id FROM customers.gift_cards
+     WHERE shop_id = ${shopId} AND code_hash = ${giftCardDigest(code)}`);
+  return rows[0] ? giftCardIn(tx, shopId, rows[0].id, at) : null;
+}
+
+/** Card `id` as it is at `at`, in the caller's transaction; null if there is none. */
+export async function giftCardOfIn(
+  tx: Tx,
+  shopId: string,
+  id: string,
+  at: Date = new Date(),
+): Promise<GiftCardRecord | null> {
+  return giftCardIn(tx, shopId, id, at);
+}
+
+/**
+ * Spends up to `most` of card `giftCardId` on order `orderId`, in the caller's transaction,
+ * holding the card's lock (ADR-449): what it has, or `most` if it has more. What it spent, or why
+ * it can spend nothing.
+ */
+export async function spendGiftCardIn(
+  tx: Tx,
+  shopId: string,
+  spend: { giftCardId: string; most: bigint; orderId: string },
+  at: Date = new Date(),
+): Promise<{ ok: true; spent: bigint } | { ok: false; refusal: GiftCardRefusal | 'unknown' }> {
+  const row = await lockCard(tx, shopId, spend.giftCardId);
+  if (!row) return { ok: false, refusal: 'unknown' };
+  const card = toCard(row, dayIn((await shopProfile(tx, shopId)).timezone, at));
+  const refusal = giftCardRefusalOf(card);
+  if (refusal) return { ok: false, refusal };
+  if (spend.most <= 0n) return { ok: true, spent: 0n };
+  const spent = card.balance < spend.most ? card.balance : spend.most;
+  await changeBalance(tx, shopId, 'system', row, {
+    kind: 'debit',
+    amount: spent,
+    balanceAfter: card.balance - spent,
+    orderId: spend.orderId,
+    sourceId: null,
+    note: '',
+  });
+  return { ok: true, spent };
+}
+
+/** What gift cards paid of order `orderId` and was not given back. */
+export async function giftCardsPaidIn(tx: Tx, shopId: string, orderId: string): Promise<bigint> {
+  const { rows } = await tx.execute<{ paid: string }>(sql`
+    SELECT coalesce(sum(d.amount), 0)::text AS paid FROM customers.gift_card_transactions d
+     WHERE d.shop_id = ${shopId} AND d.order_id = ${orderId} AND d.kind = 'debit'
+       AND NOT EXISTS (SELECT 1 FROM customers.gift_card_transactions r
+                        WHERE r.shop_id = d.shop_id AND r.kind = 'debit_revert'
+                          AND r.source_id = d.id)`);
+  return BigInt(rows[0]!.paid);
+}
+
+/** The cards that paid order `orderId`, by their last characters, and what each paid. */
+export async function giftCardPaymentsIn(
+  tx: Tx,
+  shopId: string,
+  orderId: string,
+): Promise<{ giftCardId: string; lastCharacters: string; amount: bigint }[]> {
+  const { rows } = await tx.execute<{ id: string; last_characters: string; amount: string }>(sql`
+    SELECT c.id, c.last_characters, sum(d.amount)::text AS amount
+      FROM customers.gift_card_transactions d
+      JOIN customers.gift_cards c ON c.shop_id = d.shop_id AND c.id = d.gift_card_id
+     WHERE d.shop_id = ${shopId} AND d.order_id = ${orderId} AND d.kind = 'debit'
+       AND NOT EXISTS (SELECT 1 FROM customers.gift_card_transactions r
+                        WHERE r.shop_id = d.shop_id AND r.kind = 'debit_revert'
+                          AND r.source_id = d.id)
+     GROUP BY c.id, c.last_characters
+     ORDER BY min(d.created_at), c.id`);
+  return rows.map((row) => ({
+    giftCardId: row.id,
+    lastCharacters: row.last_characters,
+    amount: BigInt(row.amount),
+  }));
+}
+
+/**
+ * Gives back to their cards every debit that paid order `orderId` and was not given back yet, in
+ * the caller's transaction, as when the order is cancelled (ADR-449): to cards deactivated or
+ * past their day too, as Shopify does. What it gave back.
+ */
+export async function revertOrderGiftCardsIn(
+  tx: Tx,
+  shopId: string,
+  actor: Actor | 'system',
+  orderId: string,
+): Promise<bigint> {
+  const { rows: debits } = await tx.execute<{ id: string; gift_card_id: string; amount: string }>(
+    sql`
+      SELECT d.id, d.gift_card_id, d.amount::text AS amount
+        FROM customers.gift_card_transactions d
+       WHERE d.shop_id = ${shopId} AND d.order_id = ${orderId} AND d.kind = 'debit'
+         AND NOT EXISTS (SELECT 1 FROM customers.gift_card_transactions r
+                          WHERE r.shop_id = d.shop_id AND r.kind = 'debit_revert'
+                            AND r.source_id = d.id)
+       ORDER BY d.created_at, d.id`,
+  );
+  let given = 0n;
+  for (const debit of debits) {
+    const card = await lockCard(tx, shopId, debit.gift_card_id);
+    if (!card) continue;
+    const amount = BigInt(debit.amount);
+    await changeBalance(tx, shopId, actor, card, {
+      kind: 'debit_revert',
+      amount,
+      balanceAfter: BigInt(card.balance) + amount,
+      orderId,
+      sourceId: debit.id,
+      note: '',
+    });
+    given += amount;
+  }
+  return given;
+}
+
 /**
  * The cards given to a customer, in the caller's transaction: what their own file says
  * (ADR-448). The code is not in it: the shop keeps none.

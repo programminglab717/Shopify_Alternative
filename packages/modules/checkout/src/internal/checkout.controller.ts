@@ -321,7 +321,8 @@ function contactOf(body: unknown): { name: string; phone: string } {
 
 /**
  * What a POST to a checkout's page does: applies the discount code it carries
- * (`action=discount`), takes the code off (`action=remove_discount`), adds the shop's gift wrap
+ * (`action=discount`), takes the code off (`action=remove_discount`), applies a gift card or takes
+ * it off (`action=gift_card`, `remove_gift_card`, ADR-449), adds the shop's gift wrap
  * or takes it off (`action=gift_wrap`, `remove_gift_wrap`, ADR-413), sends the shopper to the
  * shop's gateway to pay the order placed online (`action=pay`, ADR-152), fills in a returning
  * shopper's saved address once their number is proved, sending the code (`action=recall`, with
@@ -339,6 +340,10 @@ async function posted(
       return checkouts.applyDiscount(token, field(body, 'discount'), options);
     case 'remove_discount':
       return checkouts.removeDiscount(token, options);
+    case 'gift_card':
+      return checkouts.applyGiftCard(token, field(body, 'gift_card'), options);
+    case 'remove_gift_card':
+      return checkouts.removeGiftCard(token, options);
     case 'gift_wrap':
       return checkouts.giftWrap(token, true, options);
     case 'remove_gift_wrap':

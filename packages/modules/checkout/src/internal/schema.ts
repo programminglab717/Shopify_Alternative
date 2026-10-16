@@ -61,6 +61,10 @@ export const checkouts = checkoutSchema.table(
     orderId: uuid('order_id'),
     /** Codes its page was given that took nothing off. */
     discountAttempts: smallint('discount_attempts').notNull().default(0),
+    /** The gift card the shopper applied on the page (ADR-449); null for none. */
+    giftCardId: uuid('gift_card_id'),
+    /** Codes given on the page that were no card's (ADR-449). */
+    giftCardAttempts: smallint('gift_card_attempts').notNull().default(0),
     /**
      * Where the shopper came to the online store from, as the storefront passed it when they
      * began (ADR-139), for the order placed; null when it knew no visit.

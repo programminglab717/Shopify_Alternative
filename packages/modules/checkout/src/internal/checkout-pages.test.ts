@@ -154,6 +154,7 @@ function openView(
     problem: null,
     attribution: null,
     storeCredit: false,
+    giftCard: null,
     marketing: [],
     paymentLink: null,
     pickup: [],
@@ -344,6 +345,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      giftCards: [],
       pickup: null,
     });
     expect(placed.html).toContain('Location pin on the map');
@@ -409,6 +411,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      giftCards: [],
       pickup: null,
     });
     expect(page.status).toBe(200);
@@ -750,6 +753,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      giftCards: [],
       pickup: null,
     });
     expect(placed.html).toMatch(/Cash on delivery fee<\/span>[\s\S]*?Rs 100/);
@@ -826,6 +830,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      giftCards: [],
       pickup: null,
     });
     expect(placed.html).toMatch(
@@ -929,6 +934,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      giftCards: [],
       pickup: null,
     }).html;
     expect(placed).toContain(
@@ -943,6 +949,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      giftCards: [],
       pickup: null,
     }).html;
     expect(paid).toContain('Your order #1001 is placed. Zari will be in touch before sending it.');
@@ -1113,6 +1120,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      giftCards: [],
       pickup: null,
     });
     expect(page.html).toContain(
@@ -1134,6 +1142,7 @@ describe('checkoutPage', () => {
         online: null,
         payment: null,
         storeCredit: 0n,
+        giftCards: [],
         pickup: null,
       }).html,
     ).not.toContain('Raast ID');
@@ -1149,6 +1158,7 @@ describe('checkoutPage', () => {
         online: null,
         payment: null,
         storeCredit: 0n,
+        giftCards: [],
         pickup: null,
       });
       expect(later.html).toContain('Your order #1001 is placed. Zari will be in touch');
@@ -1238,6 +1248,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      giftCards: [],
       pickup: null,
     }).html;
     expect(placed).toContain('href="https://zari.hatti.test/policies/shipping-policy"');
@@ -1299,6 +1310,7 @@ describe('checkoutPage', () => {
         online: null,
         payment: null,
         storeCredit: 0n,
+        giftCards: [],
         pickup: null,
       }),
       checkoutPage({ kind: 'expired', shop: amber }),
@@ -1330,6 +1342,7 @@ describe('checkoutPage', () => {
         online: null,
         payment: null,
         storeCredit: 0n,
+        giftCards: [],
         pickup: null,
       }),
       checkoutPage({ kind: 'expired', shop: branded }),
@@ -1458,6 +1471,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      giftCards: [],
       pickup: null,
     }).html;
     expect(html).toContain('Discount (EID25)');
@@ -1509,6 +1523,7 @@ describe('checkoutPage', () => {
       online: null,
       payment: null,
       storeCredit: 0n,
+      giftCards: [],
       pickup: null,
     }).html;
     expect(placed).toMatch(

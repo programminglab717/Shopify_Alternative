@@ -2,10 +2,15 @@ import { createHash } from 'node:crypto';
 import { InputChecker, PublicSite, StorefrontSite, shopProfile, type FieldError } from '@hatti/api';
 import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
 import {
+  giftCardByCodeIn,
+  giftCardOfIn,
+  giftCardPaymentsIn,
+  giftCardRefusalOf,
   recordCheckoutConsentIn,
   shopGivesStoreCreditIn,
   storeCreditOfPhoneIn,
   storeCreditPaidIn,
+  type GiftCardRefusal,
   type MarketingChannelValue,
 } from '@hatti/customers/public';
 import { secretToken, sha256 } from '@hatti/crypto';
@@ -107,6 +112,20 @@ const TOKEN = /^[A-Za-z0-9_-]{22}$/;
  * cannot be guessed.
  */
 export const DISCOUNT_ATTEMPTS = 10;
+
+/** Gift card codes a checkout's page takes that are no card's before it takes no more (ADR-449). */
+export const GIFT_CARD_ATTEMPTS = 10;
+
+/**
+ * The gift card the shopper applied on the page (PAY-13, ADR-449): its code's end, what it has
+ * left, and why it can't pay, if it can't.
+ */
+export interface CheckoutGiftCard {
+  id: string;
+  lastCharacters: string;
+  balance: bigint;
+  refusal: GiftCardRefusal | null;
+}
 
 /**
  * How many orders checkout takes from one mobile number a day, and from one internet address an
@@ -334,6 +353,15 @@ export type CheckoutProblem =
       phone: string;
       channel: PhoneChannel;
       state: RecallState;
+    }
+  /**
+   * A gift card code took nothing (ADR-449): no card's, or a card that can't pay, as typed; or
+   * the page has been given too many that were no card's. Empty `code` for the card applied.
+   */
+  | {
+      kind: 'gift_card';
+      code: string;
+      refusal: GiftCardRefusal | 'unknown' | 'attempts';
     };
 
 /** How a returning shopper's ask for their saved address went (ADR-447). */
@@ -441,6 +469,8 @@ export type CheckoutView =
       pickup: PickupPoint[];
       /** Gift wrap and a gift message (ADR-413); null where the shop offers neither. */
       gift: CheckoutGift | null;
+      /** The gift card applied (ADR-449); null for none. */
+      giftCard: CheckoutGiftCard | null;
     }
   | {
       kind: 'placed';
@@ -458,6 +488,8 @@ export type CheckoutView =
       payment: 'paid' | OnlinePaymentProblem | null;
       /** What of it store credit paid, in minor units (ADR-186). */
       storeCredit: bigint;
+      /** What gift cards paid of it, by their code's end (ADR-449). */
+      giftCards: { lastCharacters: string; amount: bigint }[];
       /** Where the shopper picks it up (ADR-391); null for delivered, or a location gone since. */
       pickup: PickupPoint | null;
       /**
@@ -688,7 +720,13 @@ export class CheckoutService {
       // The shop asks for a code first, or the shopper's store credit does: the order is
       // undone, and one sent on WhatsApp.
       if (error instanceof NeedsCode) return this.#sendCode(found, form, 'whatsapp', client);
-      if (!(error instanceof DiscountRefused) && !(error instanceof RefusedForRisk)) throw error;
+      if (
+        !(error instanceof DiscountRefused) &&
+        !(error instanceof RefusedForRisk) &&
+        !(error instanceof GiftCardRefused)
+      ) {
+        throw error;
+      }
       // The order is undone; the page says why, with what the shopper typed.
       return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
         const view = await this.#view(tx, found, false, form);
@@ -698,6 +736,9 @@ export class CheckoutService {
             ...view,
             problem: { kind: 'discount', code: error.code, refusal: error.refusal },
           };
+        }
+        if (error instanceof GiftCardRefused) {
+          return { ...view, problem: { kind: 'gift_card', code: '', refusal: error.refusal } };
         }
         // A transfer, or paying online, where the shop takes it, is chosen for the shopper's
         // next post.
@@ -801,6 +842,13 @@ export class CheckoutService {
       const view = await this.#view(tx, found, true, form);
       if (view.kind !== 'open' || view.problem) return view;
       if (view.shown !== shown) return { ...view, problem: { kind: 'changed' } };
+      // A gift card applied that can no longer pay: the shopper takes it off, or gives another.
+      if (view.giftCard?.refusal) {
+        return {
+          ...view,
+          problem: { kind: 'gift_card', code: '', refusal: view.giftCard.refusal },
+        };
+      }
       // A way to pay the page no longer offers, or never did.
       const paymentMethod = paymentOf(form.payment, view.payments);
       if (!paymentMethod) return { ...view, problem: { kind: 'changed' } };
@@ -1037,6 +1085,17 @@ export class CheckoutService {
       const storeCredit = withCredit
         ? await this.orders.payPlacedWithStoreCreditIn(tx, found.shopId, placed.value.id)
         : 0n;
+      // The gift card applied pays what it can of the rest (ADR-449); one that can't since the
+      // page was shown undoes the order.
+      const byCard = view.giftCard
+        ? await this.orders.payPlacedWithGiftCardIn(
+            tx,
+            found.shopId,
+            placed.value.id,
+            view.giftCard.id,
+          )
+        : null;
+      if (byCard && !byCard.ok) throw new GiftCardRefused(byCard.refusal);
       // The boxes ticked for the shop's news and offers, as the page worded them (ADR-187).
       const ticked = marketingTicked(form.marketing, view.marketing);
       if (ticked.length > 0) {
@@ -1061,7 +1120,7 @@ export class CheckoutService {
       await recoverIn(tx, found.shopId, address.phone, placed.value.id, found.checkoutId);
       await this.carts.emptyIn(tx, found.shopId, view.cartId);
       const order =
-        storeCredit > 0n
+        storeCredit > 0n || (byCard?.ok && byCard.paid > 0n)
           ? ((await this.orders.orderOf(tx, found.shopId, placed.value.id)) ?? placed.value)
           : placed.value;
       // Proved by a code here: the browser is spared one for the number for a while (ADR-199).
@@ -1075,6 +1134,10 @@ export class CheckoutService {
         online: null,
         payment: null,
         storeCredit,
+        giftCards:
+          byCard?.ok && byCard.paid > 0n
+            ? [{ lastCharacters: view.giftCard!.lastCharacters, amount: byCard.paid }]
+            : [],
         pickup: pickupAt,
         ...(proof && { proof }),
       };
@@ -1115,6 +1178,7 @@ export class CheckoutService {
         online: gateways.length > 0 ? { gateways, amount: owed } : null,
         payment: null,
         storeCredit: await storeCreditPaidIn(tx, shopId, order.id),
+        giftCards: (await giftCardPaymentsIn(tx, shopId, order.id)).map(paidByCard),
         pickup:
           order.deliveryMethod === 'pickup'
             ? ((await this.#pickupPoints(tx, shopId)).find(
@@ -1237,6 +1301,7 @@ export class CheckoutService {
       paymentLink: link && { id: link.id, title: link.title },
       pickup: await this.#pickupPoints(tx, shopId),
       gift: await this.#gift(tx, shopId, cart),
+      giftCard: checkout.giftCardId ? await giftCardOn(tx, shopId, checkout.giftCardId) : null,
       problem:
         !codRefusal || payments.bankTransfer || payments.online
           ? null
@@ -1376,6 +1441,61 @@ export class CheckoutService {
         return { ...view, problem: { kind: 'discount', code: shown, refusal: applied.refusal } };
       }
       await this.carts.setDiscountCodesIn(tx, found.shopId, view.cartId, [applied.code.code]);
+      return this.#view(tx, found, false, EMPTY_FORM);
+    });
+  }
+
+  /**
+   * Applies the gift card whose code the shopper typed (PAY-13, ADR-449): kept on the checkout,
+   * to pay what it can of the order as it is placed. A code that is no card's counts a try; past
+   * {@link GIFT_CARD_ATTEMPTS}, the page takes no more. A card that can't pay is not applied,
+   * the page saying why. With `shopId`, only for that shop's checkouts.
+   */
+  async applyGiftCard(
+    token: string,
+    typed: string,
+    options: { shopId?: string } = {},
+  ): Promise<CheckoutView> {
+    const found = await this.#resolve(token, options.shopId);
+    if (!found) return { kind: 'not_found' };
+    return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
+      const view = await this.#view(tx, found, true, EMPTY_FORM);
+      if (view.kind !== 'open') return view;
+      const shown = typed.trim().slice(0, 64);
+      const where = and(eq(checkouts.shopId, found.shopId), eq(checkouts.id, found.checkoutId));
+      const [checkout] = await tx
+        .select({ attempts: checkouts.giftCardAttempts })
+        .from(checkouts)
+        .where(where);
+      if ((checkout?.attempts ?? 0) >= GIFT_CARD_ATTEMPTS) {
+        return { ...view, problem: { kind: 'gift_card', code: shown, refusal: 'attempts' } };
+      }
+      const card = await giftCardByCodeIn(tx, found.shopId, typed);
+      if (!card) {
+        await tx
+          .update(checkouts)
+          .set({ giftCardAttempts: sql`${checkouts.giftCardAttempts} + 1` })
+          .where(where);
+        return { ...view, problem: { kind: 'gift_card', code: shown, refusal: 'unknown' } };
+      }
+      const refusal = giftCardRefusalOf(card);
+      if (refusal) return { ...view, problem: { kind: 'gift_card', code: shown, refusal } };
+      await tx.update(checkouts).set({ giftCardId: card.id }).where(where);
+      return this.#view(tx, found, false, EMPTY_FORM);
+    });
+  }
+
+  /** Takes the gift card off the checkout (ADR-449). */
+  async removeGiftCard(token: string, options: { shopId?: string } = {}): Promise<CheckoutView> {
+    const found = await this.#resolve(token, options.shopId);
+    if (!found) return { kind: 'not_found' };
+    return this.db.tenant(found.shopId, async (tx): Promise<CheckoutView> => {
+      const view = await this.#view(tx, found, true, EMPTY_FORM);
+      if (view.kind !== 'open') return view;
+      await tx
+        .update(checkouts)
+        .set({ giftCardId: null })
+        .where(and(eq(checkouts.shopId, found.shopId), eq(checkouts.id, found.checkoutId)));
       return this.#view(tx, found, false, EMPTY_FORM);
     });
   }
@@ -1613,6 +1733,31 @@ class RefusedForRisk extends Error {
     super("The order's risk is at the shop's limit for cash on delivery");
     this.name = 'RefusedForRisk';
   }
+}
+
+/** The gift card applied can't pay since the page was shown (ADR-449): the order is undone. */
+class GiftCardRefused extends Error {
+  constructor(readonly refusal: GiftCardRefusal | 'unknown') {
+    super(`The gift card was refused: ${refusal}`);
+    this.name = 'GiftCardRefused';
+  }
+}
+
+/** The gift card applied on a checkout, as its page shows it (ADR-449); null once it is gone. */
+async function giftCardOn(tx: Tx, shopId: string, id: string): Promise<CheckoutGiftCard | null> {
+  const card = await giftCardOfIn(tx, shopId, id);
+  return card
+    ? {
+        id: card.id,
+        lastCharacters: card.lastCharacters,
+        balance: card.balance,
+        refusal: giftCardRefusalOf(card),
+      }
+    : null;
+}
+
+function paidByCard(paid: { lastCharacters: string; amount: bigint }) {
+  return { lastCharacters: paid.lastCharacters, amount: paid.amount };
 }
 
 class DiscountRefused extends Error {

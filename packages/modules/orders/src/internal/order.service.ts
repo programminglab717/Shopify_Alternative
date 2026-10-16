@@ -17,7 +17,11 @@ import {
   CustomerService,
   blockReasonText,
   debitStoreCreditIn,
+  giftCardOfIn,
+  giftCardsPaidIn,
+  revertOrderGiftCardsIn,
   revertOrderStoreCreditIn,
+  spendGiftCardIn,
   withdrawOrderCreditIn,
   storeCreditAccountsIn,
   storeCreditPaidIn,
@@ -1682,9 +1686,15 @@ export class OrderService {
     // Store credit that paid it goes back to its customer, the payment void (ADR-185), unless
     // refunds took more of what was paid than the rest left.
     const credit = await storeCreditPaidIn(tx, shopId, order.id);
-    const voided = credit > 0n && order.amountPaid - order.amountRefunded >= credit;
-    if (voided) await revertOrderStoreCreditIn(tx, shopId, by.actor, order.id);
-    const paid = voided ? order.amountPaid - credit : order.amountPaid;
+    const creditVoided = credit > 0n && order.amountPaid - order.amountRefunded >= credit;
+    if (creditVoided) await revertOrderStoreCreditIn(tx, shopId, by.actor, order.id);
+    // Gift cards that paid it get it back likewise (ADR-449), from what refunds left after.
+    const cards = await giftCardsPaidIn(tx, shopId, order.id);
+    const cardsVoided =
+      cards > 0n && order.amountPaid - order.amountRefunded - (creditVoided ? credit : 0n) >= cards;
+    if (cardsVoided) await revertOrderGiftCardsIn(tx, shopId, by.actor, order.id);
+    const voided = creditVoided || cardsVoided;
+    const paid = order.amountPaid - (creditVoided ? credit : 0n) - (cardsVoided ? cards : 0n);
     const updated = await updateOrder(
       tx,
       shopId,
@@ -2594,8 +2604,59 @@ export class OrderService {
       at,
     );
     if (!debited.ok) return debited;
-    // An advance still owed is paid first; what is left of the credit comes off the cash at
-    // the door.
+    return { ok: true, value: await this.#paidAhead(tx, by, order, amount, 'with store credit') };
+  }
+
+  /**
+   * Pays order `orderId`, just placed, in the caller's transaction, with gift card `giftCardId`
+   * (ADR-449): as much as the order owes and the card has. What it paid, or why the card pays
+   * nothing: deactivated, past its day, empty, or gone.
+   */
+  async payPlacedWithGiftCardIn(
+    tx: Tx,
+    shopId: string,
+    orderId: string,
+    giftCardId: string,
+    at: Date = new Date(),
+  ): Promise<
+    | { ok: true; paid: bigint }
+    | { ok: false; refusal: 'deactivated' | 'expired' | 'empty' | 'unknown' }
+  > {
+    const order = await lockOrder(tx, shopId, orderId);
+    const card = await giftCardOfIn(tx, shopId, giftCardId, at);
+    if (!order || !card) return { ok: false, refusal: 'unknown' };
+    const spent = await spendGiftCardIn(
+      tx,
+      shopId,
+      { giftCardId, most: order.total - order.amountPaid, orderId },
+      at,
+    );
+    if (!spent.ok) return spent;
+    if (spent.spent > 0n) {
+      await this.#paidAhead(
+        tx,
+        { shopId, actor: 'system' },
+        order,
+        spent.spent,
+        `with gift card •••• ${card.lastCharacters}`,
+      );
+    }
+    return { ok: true, paid: spent.spent };
+  }
+
+  /**
+   * Records `amount` paid ahead on `order`, locked, `how` it was paid, as with store credit
+   * (ADR-185) or a gift card (ADR-449). The order as it is then.
+   */
+  async #paidAhead(
+    tx: Tx,
+    by: { shopId: string; actor: Actor | 'system' },
+    order: OrderRow,
+    amount: bigint,
+    how: string,
+  ): Promise<OrderRow> {
+    const rupees = (value: bigint) => formatMoney(money(value, order.currency as CurrencyCode));
+    // An advance still owed is paid first; what is left comes off the cash at the door.
     const owedAhead =
       order.advanceDue > order.amountPaid ? order.advanceDue - order.amountPaid : 0n;
     const offDoor =
@@ -2627,7 +2688,7 @@ export class OrderService {
       order.id,
       by.actor,
       'paid',
-      `Paid ${rupees(amount)} with store credit` +
+      `Paid ${rupees(amount)} ${how}` +
         (full
           ? ', paying it in full'
           : offDoor > 0n
@@ -2640,7 +2701,7 @@ export class OrderService {
       aggregateId: order.id,
       payload: { amountPaid: paid.toString(), stage: updated.stage, version: updated.version },
     });
-    return { ok: true, value: updated };
+    return updated;
   }
 
   /**
