@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### COD to prepaid
+### fba1101 · COD to prepaid
 
 * **A confirmed cash-on-delivery order's customer is offered store credit** ([ADR-432](../architecture/13-decision-log.md#adr-432--cod-to-prepaid-a-confirmed-cash-on-delivery-orders-customer-offered-store-credit-for-paying-the-rest-online-before-it-is-packed-given-once-it-is-paid-in-full), MKT-04)
   for paying the rest online before it is packed, on WhatsApp from Hatti's number, while the
