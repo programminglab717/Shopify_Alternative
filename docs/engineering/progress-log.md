@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### The admin's sales
+### e1831ec · The admin's sales
 
 * **Products → Sales in the admin sets sales ahead, lists them and cancels or ends them**
   ([ADR-444](../architecture/13-decision-log.md#adr-444--the-admins-sales-page-under-products-sales-set-ahead-with-products-found-by-name-listed-with-their-state-cancelled-ahead-or-ended-early), CAT-17). This completes CAT-17.
