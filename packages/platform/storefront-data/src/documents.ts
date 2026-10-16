@@ -381,6 +381,12 @@ export interface ShopDoc {
   timezone?: string;
   /** For "Order on WhatsApp" links, in E.164. */
   whatsapp: string | null;
+  /**
+   * Whether shoppers may ask, on a sold-out variant's page, to hear on WhatsApp when it is back
+   * (ADR-429): while the shop's automation is on. Absent while it is off, as in documents written
+   * before shops could.
+   */
+  backInStock?: true;
   /** Cash on delivery: whether it is offered, its fee and its limit, in minor units. */
   cod: { available: boolean; fee: number; limit: number | null };
   /**

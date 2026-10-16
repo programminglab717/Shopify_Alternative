@@ -515,6 +515,8 @@ export function shopDoc(
   sharingImage: ImageDoc | null = null,
   /** Its home page's words for search engines as it translated them (ADR-245). */
   translations?: TranslatedFields,
+  /** Whether its back in stock automation is on (ADR-429). */
+  backInStock = false,
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -525,6 +527,8 @@ export function shopDoc(
     // The days its sessions are counted in (ADR-180).
     timezone: profile.timezone,
     whatsapp: preferences.whatsappNumber,
+    // Left out while off, so a shop that never turned it on keeps its document as it was.
+    ...(backInStock && { backInStock: true as const }),
     cod: { available: true, fee: 0, limit: null },
     delivery: {
       charge: Number(delivery.charge),

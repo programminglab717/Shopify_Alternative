@@ -30,6 +30,7 @@ export enum MessageKind {
   CHECKOUT_REMINDER = 'CHECKOUT_REMINDER',
   CHECKOUT_OFFER = 'CHECKOUT_OFFER',
   REVIEW_REQUEST = 'REVIEW_REQUEST',
+  BACK_IN_STOCK = 'BACK_IN_STOCK',
   ONE_TIME_CODE = 'ONE_TIME_CODE',
   STOCK_LOW = 'STOCK_LOW',
   STOCK_OUT = 'STOCK_OUT',
@@ -134,6 +135,12 @@ registerEnumType(MessageKind, {
         "A delivered order's customer asked once to rate what it brought, with its page's link " +
         "(MKT-05, ADR-400): sent as many days after delivery as the shop's review settings say, " +
         'which turn it on and off, not here.',
+    },
+    BACK_IN_STOCK: {
+      description:
+        'A shopper who asked on the storefront to hear when a sold-out variant is for sale ' +
+        "again, told once with its page's link (MKT-04, ADR-429): sent while the shop's back in " +
+        'stock automation is on, which turns it on and off, not here.',
     },
     ONE_TIME_CODE: {
       description:

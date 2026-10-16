@@ -25,6 +25,11 @@ import {
   type SizeChartChangedPayload,
 } from '@hatti/catalog/public';
 import { CheckoutEvents, DeliveryService } from '@hatti/checkout/public';
+import {
+  MessagingEvents,
+  automationOnIn,
+  type MarketingAutomationUpdatedPayload,
+} from '@hatti/messaging/public';
 import type { Database, Tx } from '@hatti/db';
 import type { DomainEvent } from '@hatti/events';
 import {
@@ -256,6 +261,12 @@ export function itemsFor(event: DomainEvent): string[] {
     case OnlineStoreEvents.PreferencesUpdated:
     case CheckoutEvents.DeliverySettingsUpdated:
       return [Items.shop];
+    case MessagingEvents.MarketingAutomationUpdated:
+      // Whether its product pages offer to tell shoppers a variant is back (ADR-429).
+      return (event.payload as unknown as MarketingAutomationUpdatedPayload).kind ===
+        'back_in_stock'
+        ? [Items.shop]
+        : [];
     case OnlineStoreEvents.DomainCreated:
     case OnlineStoreEvents.DomainUpdated:
     case OnlineStoreEvents.DomainDeleted:
@@ -410,6 +421,7 @@ export const PUBLISHED_EVENTS = [
   OnlineStoreEvents.PolicyUpdated,
   OnlineStoreEvents.TranslationsUpdated,
   CheckoutEvents.DeliverySettingsUpdated,
+  MessagingEvents.MarketingAutomationUpdated,
   MarketingEvents.MetaConversionsUpdated,
   MarketingEvents.MetaConversionsDeleted,
   FileEvents.ShopBrandUpdated,
@@ -788,6 +800,7 @@ export class StorefrontPublisher {
       brand,
       sharingImage,
       translations.get(shopId),
+      await automationOnIn(tx, shopId, 'back_in_stock'),
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];

@@ -5437,6 +5437,11 @@ input MarketingAutomationInput {
 """One of the shop's automations' recipes (MKT-04, ADR-425)."""
 enum MarketingAutomationKind {
   """
+  Once, to a shopper who asked on the storefront to hear when a sold-out variant is for sale again: from Hatti's number, with the product's link, needing no template of the shop's (ADR-429).
+  """
+  BACK_IN_STOCK
+
+  """
   Once, to a customer who agrees to hear from the shop on WhatsApp at checkout or on its storefront.
   """
   WELCOME
@@ -5792,6 +5797,11 @@ enum MessageKind {
   Sent by one of the shop's automations, a welcome or a win-back, from its own WhatsApp number to a customer who agreed to hear from it there (ADR-425): never by SMS.
   """
   AUTOMATION
+
+  """
+  A shopper who asked on the storefront to hear when a sold-out variant is for sale again, told once with its page's link (MKT-04, ADR-429): sent while the shop's back in stock automation is on, which turns it on and off, not here.
+  """
+  BACK_IN_STOCK
 
   """
   One of the shop's own broadcasts, from its own WhatsApp number to a customer who agreed to hear from it there (ADR-422): never by SMS.

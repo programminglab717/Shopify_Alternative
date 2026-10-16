@@ -7,7 +7,8 @@ import { sql } from 'drizzle-orm';
  * Messages' part in merging, erasing and exporting customers (ADR-146). A merged duplicate's
  * messages become the customer's. An erased customer's messages go: they hold their number, or
  * their email (ADR-181), and name. Their numbers' opt-outs stay, so the shop never writes to them
- * again by mistake. A customer's own file has the messages sent them and their opt-outs.
+ * again by mistake. Their wishes to hear when a product is back in stock (ADR-429) go too. A
+ * customer's own file has the messages sent them, their opt-outs and those wishes.
  */
 export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
   key: 'messaging',
@@ -29,6 +30,9 @@ export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
          AND (customer_id = ${customer.id}
               OR recipient = ANY(${sql.param(customer.phones)}::text[])
               OR (channel = 'email' AND recipient = lower(${customer.email}::text)))`);
+    await tx.execute(sql`
+      DELETE FROM messaging.stock_watches
+       WHERE shop_id = ${shopId} AND phone = ANY(${sql.param(customer.phones)}::text[])`);
   },
 
   async export(tx, shopId, customer) {
@@ -61,6 +65,15 @@ export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
       SELECT channel, recipient, said, created_at FROM messaging.opt_outs
        WHERE shop_id = ${shopId} AND recipient = ANY(${sql.param(customer.phones)}::text[])
        ORDER BY created_at`);
+    const { rows: watches } = await tx.execute<{
+      variant_id: string;
+      phone: string;
+      created_at: string | Date;
+      notified_at: string | Date | null;
+    }>(sql`
+      SELECT variant_id, phone, created_at, notified_at FROM messaging.stock_watches
+       WHERE shop_id = ${shopId} AND phone = ANY(${sql.param(customer.phones)}::text[])
+       ORDER BY created_at, id`);
     return {
       messages: messages.map((row) => ({
         kind: row.kind,
@@ -79,6 +92,12 @@ export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
         number: row.recipient,
         said: row.said,
         at: toDate(row.created_at),
+      })),
+      backInStockRequests: watches.map((row) => ({
+        variantId: row.variant_id,
+        number: row.phone,
+        askedAt: toDate(row.created_at),
+        toldAt: toDateOrNull(row.notified_at),
       })),
     };
   },

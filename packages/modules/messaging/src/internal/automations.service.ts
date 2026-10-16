@@ -19,9 +19,12 @@ import {
   type WhatsAppTemplateRecord,
 } from './whatsapp-templates.service.js';
 
-/** The shop's automations' recipes (MKT-04, ADR-425). */
-export const AUTOMATION_KINDS = ['welcome', 'win_back'] as const;
+/** The shop's automations' recipes (MKT-04, ADR-425, ADR-429). */
+export const AUTOMATION_KINDS = ['welcome', 'win_back', 'back_in_stock'] as const;
 export type AutomationKind = (typeof AUTOMATION_KINDS)[number];
+
+/** Recipes that send Hatti's own template from its shared number, needing none of the shop's. */
+const HATTI_TEMPLATE_KINDS: readonly AutomationKind[] = ['back_in_stock'];
 
 /** How many days after a customer's last order a win-back goes: by default, and its bounds. */
 export const WIN_BACK_DAYS = { default: 60, min: 14, max: 365 } as const;
@@ -46,7 +49,10 @@ export interface AutomationCustomer {
 export interface AutomationRecord {
   kind: AutomationKind;
   enabled: boolean;
-  /** The template it sends: null when none was chosen, or the one chosen is gone. */
+  /**
+   * The template it sends: null when none was chosen, or the one chosen is gone, and for back in
+   * stock, which sends Hatti's own.
+   */
   template: WhatsAppTemplateRecord | null;
   /** For a win-back: how many days after the customer's last order. */
   afterDays: number | null;
@@ -73,7 +79,9 @@ type AutomationRow = {
  * WhatsApp templates (ADR-420) from its own number (ADR-419) to a customer who agreed to hear from
  * it there, as broadcasts are sent (ADR-422). A welcome goes once, when a customer subscribes at
  * checkout or on the storefront; a win-back goes some days after a customer's last order, once
- * for each time they lapse. Changing one is audited and an event.
+ * for each time they lapse. Back in stock (ADR-429) tells a shopper who asked on the storefront,
+ * once, from Hatti's number, when a sold-out variant is for sale again. Changing one is audited
+ * and an event.
  */
 @Injectable()
 export class AutomationsService {
@@ -131,8 +139,19 @@ export class AutomationsService {
     }
     if (!check.ok) return { ok: false, errors: check.errors };
 
-    const templateId =
-      input.templateId === undefined ? (current.template?.id ?? null) : input.templateId;
+    const hatti = HATTI_TEMPLATE_KINDS.includes(kind);
+    if (hatti && input.templateId) {
+      return failOne(
+        ['input', 'templateId'],
+        'INVALID',
+        "Back in stock is sent from Hatti's number, with no template of the shop's",
+      );
+    }
+    const templateId = hatti
+      ? null
+      : input.templateId === undefined
+        ? (current.template?.id ?? null)
+        : input.templateId;
     const enabled = input.enabled ?? current.enabled;
     let template: WhatsAppTemplateRecord | null = null;
     if (templateId) {
@@ -145,7 +164,7 @@ export class AutomationsService {
         );
       }
     }
-    if (enabled) {
+    if (enabled && !hatti) {
       if (!template) {
         return failOne(['input', 'templateId'], 'BLANK', 'Choose the template it sends');
       }
@@ -310,4 +329,13 @@ async function automationsIn(tx: Tx, shopId: string): Promise<AutomationRow[]> {
     SELECT kind, enabled, template_id, after_days, updated_at
       FROM messaging.automations WHERE shop_id = ${shopId}`);
   return rows;
+}
+
+/** Whether the shop's automation of `kind` is on, in the caller's transaction `tx`. */
+export async function automationOnIn(
+  tx: Tx,
+  shopId: string,
+  kind: AutomationKind,
+): Promise<boolean> {
+  return (await automationsIn(tx, shopId)).some((row) => row.kind === kind && row.enabled);
 }

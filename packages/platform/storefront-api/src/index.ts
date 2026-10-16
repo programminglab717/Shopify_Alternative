@@ -44,6 +44,7 @@ export {
   type CartActionResult,
   type CommentResult,
   type SignUpResult,
+  type StockWatchResult,
   type StorefrontApiOptions,
 } from './client.js';
 export {
@@ -73,6 +74,12 @@ export {
   type SignUpRequest,
   type SignUpResponse,
 } from './sign-ups.js';
+export {
+  stockWatchesPath,
+  type StockWatchErrorResponse,
+  type StockWatchRequest,
+  type StockWatchResponse,
+} from './stock-watches.js';
 export {
   THEME_PREVIEW_HEADER,
   themeImagePath,

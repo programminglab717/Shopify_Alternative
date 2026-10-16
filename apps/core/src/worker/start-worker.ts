@@ -26,7 +26,7 @@ import {
 } from '@hatti/events';
 import { StoreExportService } from '@hatti/files/public';
 import { ImageFetcher } from '@hatti/images';
-import { LowStockService, StockService } from '@hatti/inventory/public';
+import { InventoryService, LowStockService, StockService } from '@hatti/inventory/public';
 import type { Logger } from '@hatti/logger';
 import {
   ConversionsService,
@@ -37,6 +37,7 @@ import {
   AutomationsService,
   BroadcastsService,
   MessagesService,
+  StockWatchService,
   WhatsAppAccountsService,
   WhatsAppTemplatesService,
 } from '@hatti/messaging/public';
@@ -97,6 +98,7 @@ import { StoreCreditNotices } from './store-credit-notices.js';
 import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
+import { BackInStockAlerts } from './back-in-stock.js';
 import { ParcelSteps } from './parcel-steps.js';
 import { PaymentInquiries } from './payment-inquiries.js';
 import { MessagesSender, OrderNotifications } from './notifications.js';
@@ -124,6 +126,7 @@ export interface EventConsumers {
   conversions?: ConversionMoments;
   notifications?: OrderNotifications;
   lowStock?: LowStockAlerts;
+  backInStock?: BackInStockAlerts;
   parcelSteps?: ParcelSteps;
   billing?: BillingNotices;
   staff?: StaffAlerts;
@@ -146,6 +149,7 @@ export function eventHandlers(
     conversions,
     notifications,
     lowStock,
+    backInStock,
     parcelSteps,
     billing,
     staff,
@@ -193,6 +197,13 @@ export function eventHandlers(
   }
   if (lowStock) {
     for (const type of LowStockAlerts.EVENTS) registry.on(type, (event) => lowStock.handle(event));
+  }
+  if (backInStock) {
+    for (const type of BackInStockAlerts.EVENTS) {
+      registry.on(type, async (event) => {
+        await backInStock.handle(event);
+      });
+    }
   }
   if (parcelSteps) {
     for (const type of ParcelSteps.EVENTS) registry.on(type, (event) => parcelSteps.handle(event));
@@ -291,6 +302,14 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           database,
           new LowStockService(database, new VariantService(database)),
           new MessagesService(database),
+        ),
+        backInStock: new BackInStockAlerts(
+          database,
+          new StockWatchService(database, new MessagesService(database)),
+          new InventoryService(database, new VariantService(database)),
+          new VariantService(database),
+          new ProductService(database),
+          new StorefrontSite(config.STOREFRONT_URL ?? 'http://localhost:4100'),
         ),
         parcelSteps: new ParcelSteps(new FulfillmentService(database, new StockService()), logger),
         billing: new BillingNotices(database, new MessagesService(database)),

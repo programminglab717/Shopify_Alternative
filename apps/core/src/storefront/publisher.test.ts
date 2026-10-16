@@ -250,6 +250,13 @@ describe('What storefront documents an event makes stale', () => {
 
   it('rebuilds the shop when its delivery charges change', () => {
     expect(itemsFor(event('delivery_settings.updated', { changed: ['charge'] }))).toEqual(['shop']);
+    // Whether product pages offer to tell shoppers a variant is back (ADR-429); no other recipe.
+    expect(
+      itemsFor(event('marketing_automation.updated', { kind: 'back_in_stock', enabled: true })),
+    ).toEqual(['shop']);
+    expect(
+      itemsFor(event('marketing_automation.updated', { kind: 'welcome', enabled: true })),
+    ).toEqual([]);
   });
 
   it('rebuilds the shop when its own domains change, which its document and the directory name', () => {

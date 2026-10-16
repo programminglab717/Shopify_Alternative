@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-428 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-429 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -436,6 +436,7 @@
 | 426 | Shoppers reminded of a checkout who still have not ordered are offered one of the shop's own discount codes some hours after, its link applying the code to their items | Accepted |
 | 427 | The offer after the checkout reminder is chosen under the reminder on the checkout page's settings, from the shop's codes that take something off, and the abandoned list says who was offered which code | Accepted |
 | 428 | Automations in the admin: a page under Marketing with the welcome and the win-back, each turned on with an approved template, the win-back's days set there | Accepted |
+| 429 | Back in stock: a shopper who finds a variant sold out leaves their number, and is told once on WhatsApp from Hatti's number when it sells online again, while the shop's automation is on | Accepted |
 
 ---
 
@@ -16464,3 +16465,46 @@
 * **Alternatives:**
   * **One form for both recipes**: one save would change both, and the core takes one recipe
     at a time.
+
+## ADR-429 · Back in stock: a shopper who finds a variant sold out leaves their number, and is told once on WhatsApp from Hatti's number when it sells online again, while the shop's automation is on
+
+* **Context:**
+  * MKT-04's recipes include back in stock: a shopper who wants a sold-out item hears when it
+    is back (07 §5.2).
+  * The shop's own templates (ADR-420) greet a customer by name and say nothing else that
+    changes. A message naming a product and linking to it needs a template of its own, as the
+    checkout reminder has on Hatti's shared number (ADR-393).
+  * The worker hears every change of a variant's stock (`inventory_level.updated`), and of
+    whether it is tracked or kept selling at zero (`inventory_item.updated`), as low-stock
+    alerts do (ADR-157).
+* **Decision:**
+  * **A recipe of the shop's automations,** `back_in_stock`, which the shop turns on and off.
+    It sends Hatti's own template, `hatti_back_in_stock`, Meta's marketing category, so it
+    needs and takes no template of the shop's. Migration 0200 lets that recipe be on without
+    one, and never with one.
+  * **Wishes** are kept in `messaging.stock_watches`: the variant and its product, the number,
+    the storefront's language, and when the shopper was told.
+    * A number waits for a variant once, and for at most 20 variants in a shop.
+    * A wish is kept until told, or for 90 days; told, the number may ask again.
+    * An erased customer's wishes go with their numbers, and a customer's own file lists them.
+  * **The storefront sends a wish on** with `POST /storefront/shops/{shop}/stock-watches`
+    (the variant, the number, the page's language), behind the storefront key.
+    * It is refused for a variant not of an active product of the shop's, for a number not a
+      Pakistani mobile, and while the automation is off.
+  * **The worker** hears each stock change of a variant someone waits for. Once the variant can
+    be sold online again, its product active and the automation on, it tells each one waiting:
+    the product and variant by name, and a link to the product's page with the variant chosen,
+    in the language they asked in. Each is told once (`back_in_stock:<wish>`), then kept as
+    told.
+  * **The shop's storefront document** carries `backInStock: true` while the automation is on,
+    for themes to offer the form only then. The publisher rebuilds it when that recipe changes.
+* **Consequences:**
+  * The form on Hatti Base's sold-out product pages and the recipe's card on the automations
+    page come next.
+  * A shopper is told when stock comes back, even if it sells out again before they look. The
+    product's page then says so.
+* **Alternatives:**
+  * **The shop's own template, from its own number:** it cannot name the product or link to it,
+    and a shop without a connected number could not offer it.
+  * **Web push** (07 §3): most shoppers here are on WhatsApp, and push needs the storefront to
+    be installed as an app first.

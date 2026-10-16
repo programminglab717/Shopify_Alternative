@@ -47,6 +47,12 @@ import {
   type SignUpResponse,
 } from './sign-ups.js';
 import {
+  stockWatchesPath,
+  type StockWatchErrorResponse,
+  type StockWatchRequest,
+  type StockWatchResponse,
+} from './stock-watches.js';
+import {
   THEME_PREVIEW_HEADER,
   themeImagePath,
   themePreviewPath,
@@ -68,6 +74,9 @@ export type CartActionResult =
   ({ ok: true } & CartChangeResponse) | { ok: false; error: CartError };
 
 export type SignUpResult = ({ ok: true } & SignUpResponse) | ({ ok: false } & SignUpErrorResponse);
+
+export type StockWatchResult =
+  ({ ok: true } & StockWatchResponse) | ({ ok: false } & StockWatchErrorResponse);
 
 export type CommentResult =
   ({ ok: true } & CommentResponse) | ({ ok: false } & CommentErrorResponse);
@@ -264,6 +273,21 @@ export class StorefrontApiClient {
       throw new StorefrontApiError(response.status, await response.text());
     }
     return { ok: true, ...((await response.json()) as SignUpResponse) };
+  }
+
+  /**
+   * A shopper's wish to hear when a sold-out variant is back (ADR-429): what the core made of it,
+   * or what was wrong with it.
+   */
+  async watchStock(shopId: string, request: StockWatchRequest): Promise<StockWatchResult> {
+    const response = await this.#request('POST', stockWatchesPath(shopId), null, request);
+    if (response.status === 422) {
+      return { ok: false, ...((await response.json()) as StockWatchErrorResponse) };
+    }
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return { ok: true, ...((await response.json()) as StockWatchResponse) };
   }
 
   /**

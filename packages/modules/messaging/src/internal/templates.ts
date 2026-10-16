@@ -32,6 +32,7 @@ export const MESSAGE_KINDS = [
   'checkout_reminder',
   'checkout_offer',
   'review_request',
+  'back_in_stock',
   'one_time_code',
   'stock_low',
   'stock_out',
@@ -84,6 +85,8 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'checkout_offer',
   // Turned on and off with the reviews' own setting, which says when (ADR-400).
   'review_request',
+  // Asked for by the shopper, with the shop's automation on (ADR-429).
+  'back_in_stock',
   'invoice_due',
   'plan_ended',
   'credit_low',
@@ -583,6 +586,22 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur:
         'السلام علیکم {name}! {shop} سے آپ کا آرڈر {order} کیسا رہا؟ ایک منٹ میں اپنی خریداری ' +
         'کو ریٹ کریں، اس سے دوسرے خریداروں کو انتخاب میں مدد ملتی ہے:',
+    },
+  },
+  back_in_stock: {
+    whatsapp: 'hatti_back_in_stock',
+    // A nudge to buy, though the shopper asked for it (ADR-429).
+    category: 'marketing',
+    parameters: ['shop', 'product'],
+    // The product's page, the variant chosen.
+    buttons: [{ type: 'url' }],
+    text: {
+      en:
+        '{shop}: {product} is back in stock, as you asked to hear. Order it here before it ' +
+        'runs out again:',
+      ur:
+        '{shop}: {product} دوبارہ اسٹاک میں آ گیا ہے، جیسا کہ آپ نے پوچھا تھا۔ دوبارہ ختم ہونے سے ' +
+        'پہلے یہاں آرڈر کریں:',
     },
   },
   stock_low: {

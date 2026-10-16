@@ -100,9 +100,11 @@ export class MessagingSettingsService {
             ? "checkout's recovery setting turns it on and off"
             : kind === 'review_request'
               ? 'the reviews setting turns it on and off'
-              : paidByShop(kind as MessageKind)
-                ? 'shoppers ask for it'
-                : 'it tells the shop of its bills with Hatti';
+              : kind === 'back_in_stock'
+                ? 'its automation turns it on and off'
+                : paidByShop(kind as MessageKind)
+                  ? 'shoppers ask for it'
+                  : 'it tells the shop of its bills with Hatti';
         check.add(['input', 'disabled'], 'INVALID', `can't turn off "${kind}": ${why}`);
         break;
       }

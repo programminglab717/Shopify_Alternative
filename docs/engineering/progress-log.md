@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the other automation recipes of
-MKT-04, back in stock and the COD→prepaid nudge. Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: back in stock's card on the admin's
+automations page, then the form on Hatti Base's sold-out product pages that sends shoppers'
+wishes (MKT-04), then the COD→prepaid nudge. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +16,17 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### Back in stock
+
+* **A shopper who finds a variant sold out** ([ADR-429](../architecture/13-decision-log.md#adr-429--back-in-stock-a-shopper-who-finds-a-variant-sold-out-leaves-their-number-and-is-told-once-on-whatsapp-from-hattis-number-when-it-sells-online-again-while-the-shops-automation-is-on), MKT-04) can leave their number, through
+  the storefront's API, while the shop's new automation is on.
+* **When the variant sells online again,** the worker tells each one waiting, once, on WhatsApp
+  from Hatti's number, with the product's link.
+* The shop's storefront document says when the recipe is on, for the theme's form, which comes
+  next with the recipe's card in the admin.
+* 2839 tests, from 2833: three for messaging, one for the storefront API, two for
+  the core.
 
 ### d0fd3cf · Automations in the admin
 

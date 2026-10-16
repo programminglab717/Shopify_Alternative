@@ -113,6 +113,18 @@ describe('StorefrontApiClient', () => {
     await expect(down.trackingPage('shop-1', null)).rejects.toThrow(StorefrontApiError);
   });
 
+  it("posts a shopper's wish to hear a variant is back, and says what was wrong (ADR-429)", async () => {
+    const wish = { variantId: 'var-1', phone: '0300 1234567', language: 'ur' as const };
+    const { client, requests } = clientAnswering(() => Response.json({ created: true }));
+    expect(await client.watchStock('shop-1', wish)).toEqual({ ok: true, created: true });
+    expect(requests[0]!.method).toBe('POST');
+    expect(requests[0]!.url).toBe('http://core.test/storefront/shops/shop-1/stock-watches');
+    expect(await requests[0]!.json()).toEqual(wish);
+    const errors = [{ field: 'phone', message: 'Enter a Pakistani mobile number' }];
+    const { client: refusing } = clientAnswering(() => Response.json({ errors }, { status: 422 }));
+    expect(await refusing.watchStock('shop-1', wish)).toEqual({ ok: false, errors });
+  });
+
   it('opens a payment link, with the visits that brought the shopper', async () => {
     const closed = { status: 410, headers: { 'x-a': '1' }, html: '<p>Closed</p>' };
     const { client, requests } = clientAnswering((request) =>

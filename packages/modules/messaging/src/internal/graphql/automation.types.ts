@@ -13,6 +13,7 @@ import { WhatsAppTemplate } from './whatsapp-template.types.js';
 export enum MarketingAutomationKind {
   WELCOME = 'WELCOME',
   WIN_BACK = 'WIN_BACK',
+  BACK_IN_STOCK = 'BACK_IN_STOCK',
 }
 
 registerEnumType(MarketingAutomationKind, {
@@ -28,6 +29,12 @@ registerEnumType(MarketingAutomationKind, {
       description:
         'To a customer who agreed to hear on WhatsApp, some days after their last order: once ' +
         'each time they lapse.',
+    },
+    BACK_IN_STOCK: {
+      description:
+        'Once, to a shopper who asked on the storefront to hear when a sold-out variant is for ' +
+        "sale again: from Hatti's number, with the product's link, needing no template of the " +
+        "shop's (ADR-429).",
     },
   },
 });

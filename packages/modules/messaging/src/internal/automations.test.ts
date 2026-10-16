@@ -9,7 +9,7 @@ import { newId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AutomationsService } from './automations.service.js';
+import { AutomationsService, automationOnIn } from './automations.service.js';
 import { MessagesService } from './messages.service.js';
 import { FakeGraph, NUMBER, WABA } from './test-support.js';
 import { WhatsAppAccountsService } from './whatsapp-accounts.service.js';
@@ -162,6 +162,7 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
     expect(await automations.list(a)).toEqual([
       { kind: 'welcome', enabled: false, template: null, afterDays: null, updatedAt: null },
       { kind: 'win_back', enabled: false, template: null, afterDays: 60, updatedAt: null },
+      { kind: 'back_in_stock', enabled: false, template: null, afterDays: null, updatedAt: null },
     ]);
     const code = async (result: Promise<MutationResult<unknown>>) => {
       const done = await result;
@@ -182,6 +183,18 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
     expect(await code(automations.update(a, 'win_back', { afterDays: 7 }))).toBe(
       'INVALID: A win-back goes between 14 and 365 days after the last order',
     );
+    // Back in stock sends Hatti's own template: none of the shop's, and on without one (ADR-429).
+    expect(await code(automations.update(a, 'back_in_stock', { templateId: approved }))).toBe(
+      "INVALID: Back in stock is sent from Hatti's number, with no template of the shop's",
+    );
+    expect(await automations.update(a, 'back_in_stock', { enabled: true })).toMatchObject({
+      ok: true,
+      value: { kind: 'back_in_stock', enabled: true, template: null },
+    });
+    expect(await db.tenant(a.shopId, (tx) => automationOnIn(tx, a.shopId, 'back_in_stock'))).toBe(
+      true,
+    );
+    expect(await db.tenant(a.shopId, (tx) => automationOnIn(tx, a.shopId, 'welcome'))).toBe(false);
     // A template not yet approved can be chosen while it is off.
     expect(await code(automations.update(a, 'win_back', { templateId: pending }))).toBe('ok');
 
@@ -200,6 +213,7 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
       [a.shopId],
     );
     expect(rows.map((row) => row.payload)).toEqual([
+      expect.objectContaining({ kind: 'back_in_stock', enabled: true }),
       expect.objectContaining({ kind: 'win_back', enabled: false }),
       expect.objectContaining({ kind: 'welcome', enabled: true }),
     ]);

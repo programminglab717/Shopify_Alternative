@@ -487,6 +487,8 @@ describe("Messages' words", () => {
       'checkout_offer',
       // And the reviews' own, this (ADR-400).
       'review_request',
+      // And its automation, this (ADR-429).
+      'back_in_stock',
       'invoice_due',
       'plan_ended',
       'credit_low',

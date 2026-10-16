@@ -142,6 +142,7 @@ describe.skipIf(!server)('Admin GraphQL API: marketing automations (MKT-04, ADR-
     expect(await data(tokens.reader, list)).toEqual([
       { kind: 'WELCOME', enabled: false, afterDays: null, template: null },
       { kind: 'WIN_BACK', enabled: false, afterDays: 60, template: null },
+      { kind: 'BACK_IN_STOCK', enabled: false, afterDays: null, template: null },
     ]);
 
     const update = `mutation ($kind: MarketingAutomationKind!, $input: MarketingAutomationInput!) {

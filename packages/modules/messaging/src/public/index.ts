@@ -136,6 +136,7 @@ export { MARKETING_HOURS, marketingHours } from '../internal/marketing-hours.js'
 export {
   AUTOMATION_KINDS,
   AutomationsService,
+  automationOnIn,
   WIN_BACK_DAYS,
   WIN_BACK_GRACE_DAYS,
   type AutomationCustomer,
@@ -143,3 +144,11 @@ export {
   type AutomationKind,
   type AutomationRecord,
 } from '../internal/automations.service.js';
+export {
+  STOCK_WATCH_DAYS,
+  STOCK_WATCHES_PER_PHONE,
+  StockWatchService,
+  type StockWatchInput,
+  type StockWatchOutcome,
+  type StockWatchRecord,
+} from '../internal/stock-watches.service.js';
