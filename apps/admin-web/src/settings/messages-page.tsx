@@ -89,6 +89,8 @@ const ALWAYS_SENT = [
   // The shop's own marketing, sent as it sets them on Marketing (ADR-422, ADR-428).
   'BROADCAST',
   'AUTOMATION',
+  // Turned on and off on Marketing's automations page (ADR-430).
+  'BACK_IN_STOCK',
 ] as const;
 
 const KNOWN: ReadonlySet<string> = new Set([...TO_CUSTOMERS, ...TO_THE_SHOP, ...ALWAYS_SENT]);

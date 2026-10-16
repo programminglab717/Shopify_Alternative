@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: back in stock's card on the admin's
-automations page, then the form on Hatti Base's sold-out product pages that sends shoppers'
-wishes (MKT-04), then the COD→prepaid nudge. Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the form on Hatti Base's sold-out
+product pages that sends shoppers' wishes (MKT-04), then the COD→prepaid nudge. Urdu handles
+wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,13 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### Back in stock in the admin
+
+* **Back in stock has its card** on Marketing's automations page ([ADR-430](../architecture/13-decision-log.md#adr-430--back-in-stock-on-the-automations-page-turned-on-and-off-alone-sent-from-hattis-number-with-no-template-to-choose), MKT-04): the shop
+  turns it on and off, with no template to choose, as it sends Hatti's own from Hatti's number.
+* Messages' list and settings name its messages.
+* 2840 tests, from 2839: one for the admin.
 
 ### 092edf2 · Back in stock
 

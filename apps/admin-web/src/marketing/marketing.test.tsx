@@ -81,6 +81,7 @@ function core(role: StaffRole, options: { templates?: unknown[]; broadcasts?: un
   }[] = [
     { kind: 'WELCOME', enabled: false, template: null, afterDays: null, updatedAt: null },
     { kind: 'WIN_BACK', enabled: false, template: null, afterDays: 60, updatedAt: null },
+    { kind: 'BACK_IN_STOCK', enabled: false, template: null, afterDays: null, updatedAt: null },
   ];
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
@@ -158,7 +159,7 @@ function core(role: StaffRole, options: { templates?: unknown[]; broadcasts?: un
         const chosen = (templates as { id: string; status: string }[]).find(
           (each) => each.id === input.templateId,
         );
-        if (input.enabled && chosen?.status !== 'APPROVED') {
+        if (input.enabled && variables.kind !== 'BACK_IN_STOCK' && chosen?.status !== 'APPROVED') {
           return {
             marketingAutomationUpdate: {
               marketingAutomation: null,
@@ -487,6 +488,31 @@ describe('Marketing: automations (MKT-04, ADR-428)', () => {
     ).toBeTruthy();
     expect(screen.getByRole('link', { name: 'WhatsApp templates' }).getAttribute('href')).toBe(
       '/shop_1/marketing/templates',
+    );
+  });
+
+  it("turns back in stock on with no template, as it sends Hatti's own (ADR-430)", async () => {
+    const fake = core('marketer', { templates: [] });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/marketing/automations');
+
+    const form = (await screen.findByRole('heading', { name: 'Back in stock' })).closest('form')!;
+    expect(within(form).queryByLabelText('Template')).toBeNull();
+    expect(within(form).getByText(/Sent from Hatti's WhatsApp number/)).toBeTruthy();
+    fireEvent.click(within(form).getByLabelText('Send it'));
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(
+        fake.sent.find((each) => each.operation === 'MarketingAutomationUpdate')?.variables,
+      ).toEqual({ kind: 'BACK_IN_STOCK', input: { enabled: true } }),
+    );
+    // Saved, the card comes again as the core keeps it.
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('heading', { name: 'Back in stock' }).closest('form')!).getByText(
+          'On',
+        ),
+      ).toBeTruthy(),
     );
   });
 });

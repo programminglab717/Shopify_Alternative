@@ -22,6 +22,9 @@ import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { BackToMarketing, NoNumberHint } from './templates-page';
 
+/** Recipes that send Hatti's own template from its number, choosing none of the shop's (ADR-429). */
+const FROM_HATTI: readonly MarketingAutomationKind[] = ['BACK_IN_STOCK'];
+
 /** The days a win-back may wait after the customer's last order (ADR-425). */
 const WIN_BACK_DAYS = { min: 14, max: 365 } as const;
 
@@ -46,10 +49,11 @@ function Recipe({
     MarketingAutomationUpdateData,
     {
       kind: MarketingAutomationKind;
-      input: { enabled: boolean; templateId: string | null; afterDays?: number | null };
+      input: { enabled: boolean; templateId?: string | null; afterDays?: number | null };
     }
   >(MarketingAutomationUpdateMutation);
   const winBack = automation.kind === 'WIN_BACK';
+  const hatti = FROM_HATTI.includes(automation.kind);
   const [enabled, setEnabled] = useState(automation.enabled);
   const [templateId, setTemplateId] = useState(automation.template?.id ?? '');
   const [days, setDays] = useState(String(automation.afterDays ?? ''));
@@ -87,7 +91,7 @@ function Recipe({
         kind: automation.kind,
         input: {
           enabled,
-          templateId: templateId || null,
+          ...(!hatti && { templateId: templateId || null }),
           ...(winBack && { afterDays }),
         },
       });
@@ -118,18 +122,24 @@ function Recipe({
             <Badge colour="returned" icon={CirclePause} label={t('automations.isOff')} />
           )}
         </div>
-        <SelectField<string>
-          label={t('automations.template')}
-          value={templateId}
-          options={[
-            { value: '', label: t('automations.chooseTemplate') },
-            ...choices.map((template) => ({
-              value: template.id,
-              label: templateLabel(template, t),
-            })),
-          ]}
-          onChange={setTemplateId}
-        />
+        {hatti ? (
+          <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+            {t('automations.fromHatti')}
+          </p>
+        ) : (
+          <SelectField<string>
+            label={t('automations.template')}
+            value={templateId}
+            options={[
+              { value: '', label: t('automations.chooseTemplate') },
+              ...choices.map((template) => ({
+                value: template.id,
+                label: templateLabel(template, t),
+              })),
+            ]}
+            onChange={setTemplateId}
+          />
+        )}
         {winBack && (
           <TextField
             label={t('automations.afterDays')}
@@ -160,7 +170,8 @@ function Recipe({
 /**
  * Marketing's automations (MKT-04, ADR-428): a welcome to a customer who agrees to hear from the
  * shop on WhatsApp, and a win-back some days after a customer's last order, each sending one of
- * the shop's approved templates from its own number once turned on.
+ * the shop's approved templates from its own number once turned on; and back in stock, which
+ * tells shoppers who asked when a sold-out variant sells again, from Hatti's number (ADR-430).
  */
 export function AutomationsPage() {
   const { t } = useLocale();

@@ -3271,7 +3271,7 @@ export interface WhatsAppTemplate {
 }
 
 /** One of the shop's automations' recipes (MKT-04, ADR-425). */
-export type MarketingAutomationKind = 'WELCOME' | 'WIN_BACK';
+export type MarketingAutomationKind = 'WELCOME' | 'WIN_BACK' | 'BACK_IN_STOCK';
 
 /** A template as an automation names it. */
 export type AutomationTemplate = Pick<WhatsAppTemplate, 'id' | 'name' | 'language' | 'status'>;

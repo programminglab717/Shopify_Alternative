@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-429 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-430 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -437,6 +437,7 @@
 | 427 | The offer after the checkout reminder is chosen under the reminder on the checkout page's settings, from the shop's codes that take something off, and the abandoned list says who was offered which code | Accepted |
 | 428 | Automations in the admin: a page under Marketing with the welcome and the win-back, each turned on with an approved template, the win-back's days set there | Accepted |
 | 429 | Back in stock: a shopper who finds a variant sold out leaves their number, and is told once on WhatsApp from Hatti's number when it sells online again, while the shop's automation is on | Accepted |
+| 430 | Back in stock on the automations page: turned on and off alone, sent from Hatti's number with no template to choose | Accepted |
 
 ---
 
@@ -16508,3 +16509,25 @@
     and a shop without a connected number could not offer it.
   * **Web push** (07 §3): most shoppers here are on WhatsApp, and push needs the storefront to
     be installed as an app first.
+
+## ADR-430 · Back in stock on the automations page: turned on and off alone, sent from Hatti's number with no template to choose
+
+* **Context:**
+  * Back in stock (ADR-429) is a recipe of the shop's automations, but it sends Hatti's own
+    template from Hatti's number. The core refuses a template of the shop's for it.
+  * The automations page (ADR-428) shows each recipe as a card with an approved template to
+    choose, and keeps the switch off until one is chosen.
+* **Decision:**
+  * **Back in stock gets its own card** on Marketing's automations page, with the welcome and
+    the win-back: what it does, and its switch.
+    * It has no template to choose. The card says it is sent from Hatti's number with Hatti's
+      own message, and saving sends only whether it is on.
+  * **Messages' list** names back in stock's messages, and its settings page counts the kind
+    among those always sent, which the shop cannot turn off there.
+  * Its words are in English and Urdu.
+* **Consequences:**
+  * A shop turns back in stock on from the admin. Its storefront document then says so, for the
+    form on Hatti Base's sold-out product pages, which comes next.
+* **Alternatives:**
+  * **A setting of its own, outside the automations:** the shop looks for its recipes in one
+    place, and the core already keeps it among them.

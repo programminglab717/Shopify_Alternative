@@ -3601,6 +3601,11 @@ const en = {
   'automations.WIN_BACK': 'Win-back',
   'automations.WIN_BACK.hint':
     'To a subscribed customer who has not ordered for some days: once each time they lapse.',
+  'automations.BACK_IN_STOCK': 'Back in stock',
+  'automations.BACK_IN_STOCK.hint':
+    "Once, to a shopper who asked on a sold-out product's page to hear when it is back.",
+  'automations.fromHatti':
+    "Sent from Hatti's WhatsApp number, naming the product with a link to it, so it needs no template of yours. While it is on, sold-out product pages offer the form.",
   'automations.isOn': 'On',
   'automations.isOff': 'Off',
   'automations.on': 'Send it',
@@ -3707,6 +3712,7 @@ const en = {
   'messages.kind.REVIEW_REQUEST': 'Asked for a review',
   'messages.kind.BROADCAST': 'Broadcast',
   'messages.kind.AUTOMATION': 'Automation',
+  'messages.kind.BACK_IN_STOCK': 'Back in stock',
   'activity.subject.product_review': 'Review',
   'activity.subject.review_settings': 'Review settings',
   'activity.verb.written': 'written',
@@ -7381,6 +7387,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'automations.WIN_BACK': 'واپسی کا پیغام',
   'automations.WIN_BACK.hint':
     'اس سبسکرائب گاہک کو جس نے کچھ دنوں سے آرڈر نہ کیا ہو: ہر بار ایک دفعہ۔',
+  'automations.BACK_IN_STOCK': 'دوبارہ اسٹاک میں',
+  'automations.BACK_IN_STOCK.hint':
+    'ایک بار، اس خریدار کو جس نے ختم شدہ پروڈکٹ کے صفحے پر پوچھا کہ یہ دوبارہ کب آئے گی۔',
+  'automations.fromHatti':
+    'ہٹی کے واٹس ایپ نمبر سے، پروڈکٹ کے نام اور لنک کے ساتھ جاتا ہے، اس لیے آپ کے کسی ٹیمپلیٹ کی ضرورت نہیں۔ جب یہ آن ہو تو ختم شدہ پروڈکٹس کے صفحات پر فارم نظر آتا ہے۔',
   'automations.isOn': 'آن',
   'automations.isOff': 'آف',
   'automations.on': 'بھیجیں',
@@ -7490,6 +7501,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'messages.kind.REVIEW_REQUEST': 'ریویو مانگا گیا',
   'messages.kind.BROADCAST': 'براڈکاسٹ',
   'messages.kind.AUTOMATION': 'خودکار پیغام',
+  'messages.kind.BACK_IN_STOCK': 'دوبارہ اسٹاک میں',
   'activity.subject.product_review': 'ریویو',
   'activity.subject.review_settings': 'ریویو کی ترتیبات',
   'activity.verb.written': 'لکھا گیا',
