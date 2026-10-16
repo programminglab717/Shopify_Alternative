@@ -1,15 +1,15 @@
 import 'reflect-metadata';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import type { TenantContext } from '@hatti/api';
+import { PublicSite, type TenantContext } from '@hatti/api';
 import { fromPublicId, newId } from '@hatti/ids';
 import { MessagesService, MessagingSettingsService } from '@hatti/messaging/public';
 import { StorefrontApiClient } from '@hatti/storefront-api';
-import { ReportsService, TakedownsService } from '@hatti/trust/public';
+import { AppealsService, ReportsService, TakedownsService } from '@hatti/trust/public';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { restoreStore, takeDown } from '../takedowns.js';
+import { refuseAppeal, restoreStore, takeDown } from '../takedowns.js';
 import { TEST_STOREFRONT_KEY, startTestApi, type TestApi } from '../testing/api.js';
 
 const server = testDatabaseServer();
@@ -85,7 +85,7 @@ describe.skipIf(!server)("Reports of stores, from storefronts to Hatti's people 
     });
   });
 
-  it('takes the store down once, its owner told why, and restores it, told again (ADR-461)', async () => {
+  it('takes the store down once, its owner told why with the link to appeal by, and restores it, told again (ADR-461, ADR-462)', async () => {
     const tenant: TenantContext = {
       shopId,
       currency: 'PKR',
@@ -97,10 +97,17 @@ describe.skipIf(!server)("Reports of stores, from storefronts to Hatti's people 
     });
     expect(settings.ok).toBe(true);
     const takedowns = new TakedownsService(database);
+    const appeals = new AppealsService(database);
     const messages = new MessagesService(database);
+    const site = new PublicSite(await app.getUrl());
     const told = async () =>
       (
-        await admin.query<{ kind: string; channel: string; recipient: string; variables: object }>(
+        await admin.query<{
+          kind: string;
+          channel: string;
+          recipient: string;
+          variables: Record<string, string>;
+        }>(
           `SELECT kind, channel, recipient, variables FROM messaging.messages
             WHERE shop_id = $1 AND kind LIKE 'store_%' ORDER BY created_at, id`,
           [shopId],
@@ -113,33 +120,81 @@ describe.skipIf(!server)("Reports of stores, from storefronts to Hatti's people 
     ).rows[0]!.handle;
 
     const note = 'advances taken for orders never sent';
-    const down = await takeDown(database, takedowns, messages, handle, {
+    const down = await takeDown(database, takedowns, messages, site, handle, {
       reason: 'scam',
       note,
       by: 'Ayesha',
     });
     expect(down).toMatchObject({ shopId, reason: 'scam', takenBy: 'Ayesha' });
-    expect(await told()).toEqual([
-      {
-        kind: 'store_suspended',
-        channel: 'whatsapp',
-        recipient: '+923335550009',
-        variables: { shop: 'Zari', note },
-      },
-    ]);
+    const [suspended] = await told();
+    expect(suspended).toMatchObject({
+      kind: 'store_suspended',
+      channel: 'whatsapp',
+      recipient: '+923335550009',
+      variables: { shop: 'Zari', note },
+    });
+    const link = new URL(suspended!.variables.url!);
+    expect(link.pathname).toMatch(/^\/appeal\/[A-Za-z0-9_-]{32}$/);
     // Down once at a time.
     expect(
-      await takeDown(database, takedowns, messages, handle, { reason: 'scam', note, by: 'A' }),
+      await takeDown(database, takedowns, messages, site, handle, {
+        reason: 'scam',
+        note,
+        by: 'A',
+      }),
     ).toBe('not_active');
 
+    // The owner's page: why, and their side of it, sent as a form; never kept or indexed.
+    const page = await app.inject({ method: 'GET', url: link.pathname });
+    expect([page.statusCode, page.headers['cache-control'], page.headers['x-robots-tag']]).toEqual([
+      200,
+      'no-store',
+      'noindex, nofollow',
+    ]);
+    expect(page.body).toContain('Your store is taken down');
+    expect(page.body).toContain(note);
+    const post = (words: string) =>
+      app.inject({
+        method: 'POST',
+        url: link.pathname,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: new URLSearchParams({ words }).toString(),
+      });
+    expect((await post('   ')).statusCode).toBe(422);
+    const sent = await post('Every order was sent; I have the courier receipts.');
+    expect(sent.statusCode).toBe(200);
+    expect(sent.body).toContain('Hatti has your appeal');
+    expect((await app.inject({ method: 'GET', url: '/appeal/nothing' })).statusCode).toBe(404);
+
+    const [waiting] = await appeals.list();
+    expect(waiting).toMatchObject({
+      shopId,
+      words: 'Every order was sent; I have the courier receipts.',
+    });
+    const refused = await refuseAppeal(database, appeals, messages, waiting!.id, {
+      by: 'Bilal',
+      answer: 'the receipts show none delivered',
+    });
+    expect(refused).toMatchObject({ status: 'refused' });
+    expect((await app.inject({ method: 'GET', url: link.pathname })).body).toContain(
+      'the receipts show none delivered',
+    );
+    expect((await post('Refunded every advance today.')).statusCode).toBe(200);
+
+    // Restoring it upholds the appeal waiting.
     const reopened = await restoreStore(database, takedowns, messages, shopId, {
       note: 'every advance refunded',
       by: 'Bilal',
     });
     expect(reopened).toMatchObject({ restoredBy: 'Bilal', restoreNote: 'every advance refunded' });
     expect((await told()).map((message) => [message.kind, message.variables])).toEqual([
-      ['store_suspended', { shop: 'Zari', note }],
+      ['store_suspended', { shop: 'Zari', note, url: link.href }],
+      ['store_appeal_refused', { shop: 'Zari', note: 'the receipts show none delivered' }],
       ['store_restored', { shop: 'Zari', note: 'every advance refunded' }],
+    ]);
+    expect((await appeals.list({ all: true })).map((appeal) => appeal.status)).toEqual([
+      'upheld',
+      'refused',
     ]);
     expect(await restoreStore(database, takedowns, messages, shopId, { note: 'x', by: 'B' })).toBe(
       'not_suspended',

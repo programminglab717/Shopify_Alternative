@@ -1599,9 +1599,15 @@ importers:
       '@hatti/api':
         specifier: workspace:*
         version: link:../../platform/api
+      '@hatti/crypto':
+        specifier: workspace:*
+        version: link:../../platform/crypto
       '@hatti/db':
         specifier: workspace:*
         version: link:../../platform/db
+      '@hatti/documents':
+        specifier: workspace:*
+        version: link:../../platform/documents
       '@hatti/events':
         specifier: workspace:*
         version: link:../../platform/events
@@ -1630,6 +1636,9 @@ importers:
       '@types/pg':
         specifier: 'catalog:'
         version: 8.23.1
+      fastify:
+        specifier: 'catalog:'
+        version: 5.12.5
       pg:
         specifier: 'catalog:'
         version: 8.23.0

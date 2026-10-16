@@ -6278,6 +6278,11 @@ enum MessageKind {
   STOCK_OUT
 
   """
+  For the shop, from Hatti and paid by Hatti, at its alerts number: Hatti has refused its appeal of its store's takedown, and why (ADR-462).
+  """
+  STORE_APPEAL_REFUSED
+
+  """
   A store credit of theirs with something left expires within the week: how much, and when (ADR-192). Once a credit.
   """
   STORE_CREDIT_EXPIRING

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### Appeals of stores taken down
+
+* **The owner of a store taken down appeals through a link of its own in the notice; Hatti's
+  people refuse with why, or restore the store, which upholds it** ([ADR-462](../architecture/13-decision-log.md#adr-462--the-owner-of-a-store-taken-down-appeals-through-a-link-of-its-own-in-the-notice-its-page-says-why-takes-their-side-and-shows-hattis-answer-refused-with-why-or-upheld-by-restoring-the-store), TNS-01, now whole).
+* 2940 tests, from 2939: the trust module's appeals test, with the core's
+  takedown test and the messaging test covering more.
+
 ### 55c1aff · Stores taken down
 
 * **Hatti's people take a store down when its reports are upheld, and restore it** ([ADR-461](../architecture/13-decision-log.md#adr-461--hattis-people-take-a-store-down-when-its-reports-are-upheld-the-shop-suspended-its-storefront-answering-with-hattis-page-saying-so-its-checkout-and-admin-closed-its-owner-told-why-and-restored-the-same-way),

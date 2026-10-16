@@ -458,11 +458,23 @@ describe("Messages' words", () => {
       '20 Oct, 3:00 pm',
     ]);
     // Its store taken down, and restored (ADR-461).
-    const down = { shop: 'Zari Fashions', note: 'advances taken for orders never sent' };
+    const down = {
+      shop: 'Zari Fashions',
+      note: 'advances taken for orders never sent',
+      url: 'https://hatti.pk/appeal/Zx8kQ2mN4pR6sT0vW1yA3bC5dE7fG9hJ',
+    };
     expect(messageText('store_suspended', 'en', down)).toBe(
       'Hatti: we have taken Zari Fashions down after what shoppers reported of it: advances ' +
         'taken for orders never sent. Its storefront, checkout and admin are closed while it is ' +
-        'down.',
+        'down. To appeal, tell us your side here: https://hatti.pk/appeal/Zx8kQ2mN4pR6sT0vW1yA3bC5dE7fG9hJ',
+    );
+    expect(templateParameters('store_suspended', down)).toEqual([
+      'Zari Fashions',
+      'advances taken for orders never sent',
+      'https://hatti.pk/appeal/Zx8kQ2mN4pR6sT0vW1yA3bC5dE7fG9hJ',
+    ]);
+    expect(messageText('store_appeal_refused', 'en', down)).toContain(
+      "we have refused Zari Fashions's appeal: advances taken for orders never sent.",
     );
     expect(templateParameters('store_restored', down)).toEqual([
       'Zari Fashions',
@@ -492,6 +504,7 @@ describe("Messages' words", () => {
       'orders_limit_reached',
       'store_export_ready',
       'store_suspended',
+      'store_appeal_refused',
       'store_restored',
     ]);
     expect(ALWAYS_SENT).toEqual([
@@ -519,6 +532,7 @@ describe("Messages' words", () => {
       'store_export_ready',
       // Its store taken down and restored (ADR-461).
       'store_suspended',
+      'store_appeal_refused',
       'store_restored',
       'broadcast',
       'automation',
@@ -655,6 +669,7 @@ describe("Messages' words", () => {
       'orders_limit_reached',
       'store_export_ready',
       'store_suspended',
+      'store_appeal_refused',
       'store_restored',
     ]);
     const shipped = messageEmail('order_shipped', 'en', SHIPPED.variables)!;

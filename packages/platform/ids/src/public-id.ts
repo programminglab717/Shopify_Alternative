@@ -107,6 +107,7 @@ export const ID_PREFIXES = {
   staffInvitation: 'sti',
   supportGrant: 'sgr',
   storeReport: 'rpt',
+  storeAppeal: 'apl',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

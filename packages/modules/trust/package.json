@@ -20,7 +20,9 @@
   },
   "dependencies": {
     "@hatti/api": "workspace:*",
+    "@hatti/crypto": "workspace:*",
     "@hatti/db": "workspace:*",
+    "@hatti/documents": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/pk": "workspace:*",
@@ -29,9 +31,11 @@
   },
   "peerDependencies": {
     "@nestjs/common": "catalog:",
+    "fastify": "catalog:",
     "reflect-metadata": "catalog:"
   },
   "devDependencies": {
+    "fastify": "catalog:",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "@types/node": "catalog:",

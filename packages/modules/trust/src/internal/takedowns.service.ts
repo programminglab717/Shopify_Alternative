@@ -1,3 +1,4 @@
+import { sha256 } from '@hatti/crypto';
 import { Database, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { isUuid } from '@hatti/ids';
@@ -84,7 +85,13 @@ export class TakedownsService {
    */
   async suspend(
     named: string,
-    input: { reason: string; note: string; by: string },
+    input: {
+      reason: string;
+      note: string;
+      by: string;
+      /** The secret of the link to appeal by, which its owner is sent; kept only as its digest. */
+      appealToken?: string;
+    },
     now: Date = new Date(),
   ): Promise<TakedownResult> {
     if (!(REPORT_REASONS as readonly string[]).includes(input.reason)) {
@@ -101,8 +108,9 @@ export class TakedownsService {
         RETURNING id`);
       if (rows.length === 0) return 'not_active';
       const { rows: taken } = await tx.execute<{ id: string }>(sql`
-        INSERT INTO trust.takedowns (shop_id, reason, note, taken_by, created_at)
-        VALUES (${shop.id}, ${input.reason}, ${note}, ${by}, ${now.toISOString()})
+        INSERT INTO trust.takedowns (shop_id, reason, note, taken_by, created_at, appeal_digest)
+        VALUES (${shop.id}, ${input.reason}, ${note}, ${by}, ${now.toISOString()},
+                ${input.appealToken ? sha256(input.appealToken) : null})
         RETURNING id`);
       const id = taken[0]!.id;
       await appendEvent<TakedownPayload>(tx, shop.id, {
@@ -133,6 +141,12 @@ export class TakedownsService {
          WHERE shop_id = ${shop.id} AND restored_at IS NULL
         RETURNING id`);
       if (rows.length === 0) return 'not_suspended';
+      // Restoring it upholds the appeal waiting, if one is, with the same words.
+      await tx.execute(sql`
+        UPDATE trust.appeals
+           SET status = 'upheld', answered_at = ${now.toISOString()}, answered_by = ${by},
+               answer = ${note}
+         WHERE shop_id = ${shop.id} AND takedown_id = ${rows[0]!.id} AND status = 'open'`);
       await tx.execute(sql`
         UPDATE control.shops SET status = 'active', updated_at = ${now.toISOString()}
          WHERE id = ${shop.id}`);

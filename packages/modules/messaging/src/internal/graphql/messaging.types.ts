@@ -51,6 +51,7 @@ export enum MessageKind {
   ORDERS_LIMIT_REACHED = 'ORDERS_LIMIT_REACHED',
   STORE_EXPORT_READY = 'STORE_EXPORT_READY',
   STORE_SUSPENDED = 'STORE_SUSPENDED',
+  STORE_APPEAL_REFUSED = 'STORE_APPEAL_REFUSED',
   STORE_RESTORED = 'STORE_RESTORED',
   BROADCAST = 'BROADCAST',
   AUTOMATION = 'AUTOMATION',
@@ -249,6 +250,11 @@ registerEnumType(MessageKind, {
       description:
         "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
         'Hatti has taken its store down after what shoppers reported, and why (ADR-461).',
+    },
+    STORE_APPEAL_REFUSED: {
+      description:
+        'For the shop, from Hatti and paid by Hatti, at its alerts number: Hatti has refused its ' +
+        "appeal of its store's takedown, and why (ADR-462).",
     },
     STORE_RESTORED: {
       description:

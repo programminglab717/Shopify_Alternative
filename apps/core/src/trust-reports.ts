@@ -1,16 +1,19 @@
+import { PublicSite } from '@hatti/api';
 import { Database } from '@hatti/db';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import { MessagesService } from '@hatti/messaging/public';
 import {
+  AppealsService,
   REPORT_REASONS,
   ReportsService,
   TakedownsService,
+  type AppealRecord,
   type ReportRecord,
   type TakedownRecord,
 } from '@hatti/trust/public';
 import { parseArgs } from 'node:util';
 import { loadTrustReportsConfig } from './config.js';
-import { restoreStore, takeDown } from './takedowns.js';
+import { refuseAppeal, restoreStore, takeDown } from './takedowns.js';
 
 // Shoppers' reports of stores (TNS-01, ADR-460), for Hatti's people: those open, the soonest due
 // first, overdue marked; each dismissed, or upheld with what was done. Every report is due a
@@ -27,6 +30,12 @@ import { restoreStore, takeDown } from './takedowns.js';
 //   pnpm --filter @hatti/core trust-reports takedowns [--all]
 //   pnpm --filter @hatti/core trust-reports suspend zari --reason scam --by Ayesha --note "…"
 //   pnpm --filter @hatti/core trust-reports restore zari --by Ayesha --note "Refunded every advance"
+//
+// Its owner appeals through the link in the notice (ADR-462); restoring the store upholds the
+// appeal waiting, and refusing it says why on the link's page and on WhatsApp:
+//
+//   pnpm --filter @hatti/core trust-reports appeals [--all]
+//   pnpm --filter @hatti/core trust-reports refuse apl_… --by Ayesha --note "Tracking shows none delivered"
 
 const USAGE =
   'Usage: trust-reports list [--all]\n' +
@@ -34,7 +43,9 @@ const USAGE =
   '       trust-reports uphold <report> --by <who> --note <what was done>\n' +
   '       trust-reports takedowns [--all]\n' +
   `       trust-reports suspend <shop> --reason <${REPORT_REASONS.join('|')}> --by <who> --note <why, as the owner is told>\n` +
-  '       trust-reports restore <shop> --by <who> --note <why, as the owner is told>';
+  '       trust-reports restore <shop> --by <who> --note <why, as the owner is told>\n' +
+  '       trust-reports appeals [--all]\n' +
+  '       trust-reports refuse <appeal> --by <who> --note <why, as the owner is told>';
 
 function usage(problem?: string): never {
   if (problem) console.error(problem);
@@ -45,6 +56,8 @@ function usage(problem?: string): never {
 type Command =
   | { command: 'list'; all: boolean }
   | { command: 'takedowns'; all: boolean }
+  | { command: 'appeals'; all: boolean }
+  | { command: 'refuse'; id: string; appeal: string; by: string; note: string }
   | { command: 'dismiss' | 'uphold'; id: string; report: string; by: string; note: string }
   | { command: 'suspend'; shop: string; reason: string; by: string; note: string }
   | { command: 'restore'; shop: string; by: string; note: string };
@@ -65,16 +78,45 @@ const database = new Database({
 const reports = new ReportsService(database);
 const takedowns = new TakedownsService(database);
 const messages = new MessagesService(database);
+const appeals = new AppealsService(database);
 try {
   if (parsed.command === 'takedowns') {
     const found = await takedowns.list({ all: parsed.all });
     if (found.length === 0)
       console.log(parsed.all ? 'No store taken down yet.' : 'No store is down.');
     for (const takedown of found) console.log(takedownLine(takedown));
+  } else if (parsed.command === 'appeals') {
+    const found = await appeals.list({ all: parsed.all });
+    if (found.length === 0) console.log(parsed.all ? 'No appeal yet.' : 'No appeal is waiting.');
+    for (const appeal of found) console.log(appealLine(appeal));
+  } else if (parsed.command === 'refuse') {
+    const refused = await refuseAppeal(database, appeals, messages, parsed.appeal, {
+      by: parsed.by,
+      answer: parsed.note,
+    });
+    if (refused === 'not_found') {
+      console.error(`No appeal ${parsed.id}: see the list.`);
+      process.exitCode = 1;
+    } else if (refused === 'answered') {
+      console.error(`Appeal ${parsed.id} was answered already.`);
+      process.exitCode = 1;
+    } else {
+      console.log(`${refused.shopName}'s appeal is refused; its owner is told.`);
+    }
   } else if (parsed.command === 'suspend' || parsed.command === 'restore') {
+    if (parsed.command === 'suspend' && !config.PUBLIC_URL) {
+      usage('Set PUBLIC_URL: the notice links to the page its owner appeals on there.');
+    }
     const done =
       parsed.command === 'suspend'
-        ? await takeDown(database, takedowns, messages, parsed.shop, parsed)
+        ? await takeDown(
+            database,
+            takedowns,
+            messages,
+            new PublicSite(config.PUBLIC_URL!),
+            parsed.shop,
+            parsed,
+          )
         : await restoreStore(database, takedowns, messages, parsed.shop, parsed);
     if (typeof done === 'string') {
       console.error(
@@ -135,6 +177,19 @@ function line(report: ReportRecord, now: number): string {
   ].join('\t');
 }
 
+/** An appeal on one line, tab-separated: those waiting say so first. */
+function appealLine(appeal: AppealRecord): string {
+  return [
+    toPublicId('storeAppeal', appeal.id),
+    appeal.status === 'open' ? 'WAITING' : appeal.status,
+    `since ${appeal.createdAt.toISOString()}`,
+    `${appeal.shopName} (${appeal.shopHandle})`,
+    `down for ${appeal.reason}: ${appeal.takedownNote.replace(/\s+/g, ' ')}`,
+    appeal.words.replace(/\s+/g, ' '),
+    appeal.answer ? `answered by ${appeal.answeredBy}: ${appeal.answer}` : '',
+  ].join('\t');
+}
+
 /** A takedown on one line, tab-separated: those of stores still down say so first. */
 function takedownLine(takedown: TakedownRecord): string {
   return [
@@ -162,7 +217,7 @@ function parseCommand(args: string[]): Command {
   });
   const [command, id, ...rest] = positionals;
   if (rest.length > 0) throw new Error(`Unexpected: ${rest.join(' ')}`);
-  if (command === 'list' || command === 'takedowns') {
+  if (command === 'list' || command === 'takedowns' || command === 'appeals') {
     if (id) throw new Error(`Unexpected: ${id}`);
     return { command, all: values.all ?? false };
   }
@@ -170,7 +225,8 @@ function parseCommand(args: string[]): Command {
     command !== 'dismiss' &&
     command !== 'uphold' &&
     command !== 'suspend' &&
-    command !== 'restore'
+    command !== 'restore' &&
+    command !== 'refuse'
   ) {
     throw new Error('Say what to do');
   }
@@ -178,7 +234,9 @@ function parseCommand(args: string[]): Command {
     throw new Error(
       command === 'suspend' || command === 'restore'
         ? 'Name the shop, by its handle'
-        : 'Name the report, as the list shows it',
+        : command === 'refuse'
+          ? 'Name the appeal, as the list of appeals shows it'
+          : 'Name the report, as the list shows it',
     );
   }
   const by = values.by?.trim();
@@ -186,6 +244,9 @@ function parseCommand(args: string[]): Command {
   const note = values.note?.trim();
   if (!note) throw new Error('Say why, or what was done, with --note');
   if (command === 'restore') return { command, shop: id, by, note };
+  if (command === 'refuse') {
+    return { command, id, appeal: tryFromPublicId(id, 'storeAppeal') ?? id, by, note };
+  }
   if (command === 'suspend') {
     const reason = values.reason?.trim() ?? '';
     if (!(REPORT_REASONS as readonly string[]).includes(reason)) {

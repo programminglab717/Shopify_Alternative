@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-461 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-462 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -469,6 +469,7 @@
 | 459 | The admin's new broadcast is sent by WhatsApp or SMS: by SMS, the shop's words with their count, the language of the link to stop, the message as customers read it, and an estimate by its parts | Accepted |
 | 460 | Shoppers report a store to Hatti from every store's footer: what is wrong, kept by a trust module, due a decision in 48 hours, dismissed or upheld by Hatti's people | Accepted |
 | 461 | Hatti's people take a store down when its reports are upheld: the shop suspended, its storefront answering with Hatti's page saying so, its checkout and admin closed, its owner told why, and restored the same way | Accepted |
+| 462 | The owner of a store taken down appeals through a link of its own in the notice: its page says why, takes their side, and shows Hatti's answer; refused with why, or upheld by restoring the store | Accepted |
 
 ---
 
@@ -17574,3 +17575,33 @@
     shop answers there, which tells a shopper who paid nothing.
   * **Telling the owner from the worker, on the event:** by then the shop is suspended, and
     identity gives no owner's address for it.
+
+## ADR-462 · The owner of a store taken down appeals through a link of its own in the notice: its page says why, takes their side, and shows Hatti's answer; refused with why, or upheld by restoring the store
+
+* **Context:**
+  * A store taken down is closed to its staff too: no session or token resolves for a shop that
+    is not active (ADR-461). TNS-01 asks for appeals, and the owner can't reach the admin to
+    make one.
+* **Decision:**
+  * **The takedown notice carries a link**, `/appeal/<secret>` on the core's public address. The
+    secret is 24 random bytes, kept only as its SHA-256 digest on the takedown. The core finds
+    the takedown through a database function, as draft and order links do (ADR-031,
+    ADR-032), since requests have no system login. It finds it whatever the shop's status.
+  * **Its page** is in English and Urdu, never kept, indexed or framed. It says why the store is
+    down, in Hatti's people's words. It shows each appeal with Hatti's answer and takes another
+    while one may come: up to 2,000 characters, one waiting at a time, three a takedown, none
+    once the store is open again.
+  * **Hatti's people** list the appeals waiting, the oldest first, with `trust-reports appeals`.
+    `refuse <appeal> --by --note` answers one: the page shows why, and the owner is told on
+    WhatsApp. Not by email, which identity gives for active shops alone. Restoring the store
+    upholds the appeal waiting, with the restore's words.
+* **Consequences:**
+  * TNS-01 is whole: a shopper's report, Hatti's decision within 48 hours, a takedown, and an
+    appeal answered where the owner can read it.
+  * Whoever holds the notice holds the link, as with the order links customers get.
+* **Alternatives:**
+  * **Letting a suspended shop's owner sign in to appeal from the admin:** every session and
+    token check would have to tell a suspended shop's owner from its other staff and from its
+    apps. One page with one secret opens nothing else.
+  * **Appealing by writing to Hatti's people:** nothing would keep the appeal with its
+    takedown, nor show the owner the answer.

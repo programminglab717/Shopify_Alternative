@@ -549,6 +549,11 @@ const billingTransfersSchema = z.object({
 const trustReportsSchema = z.object({
   DATABASE_URL: env.postgresUrl(),
   DATABASE_SYSTEM_URL: env.postgresUrl(),
+  /**
+   * The core's public address, where a takedown's link to appeal by goes (ADR-462): needed to
+   * take a store down.
+   */
+  PUBLIC_URL: env.httpUrl().optional(),
 });
 
 /**

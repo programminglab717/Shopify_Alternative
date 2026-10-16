@@ -53,6 +53,7 @@ export const MESSAGE_KINDS = [
   'orders_limit_reached',
   'store_export_ready',
   'store_suspended',
+  'store_appeal_refused',
   'store_restored',
   'broadcast',
   'automation',
@@ -83,7 +84,7 @@ export type AnyMessageKind = MessageKind | PlatformMessageKind;
  * Hatti's notices of the shop's bills (ADR-169), among them what Hatti found of a transfer the
  * shop said it made (ADR-254), of a domain of its own DNS points elsewhere (ADR-262), of its
  * orders nearing its plan's limit (ADR-263), of the whole store's export made (ADR-417), and of
- * its store taken down and restored (ADR-461).
+ * its store taken down, its appeal refused and its store restored (ADR-461, ADR-462).
  */
 export const ALWAYS_SENT: readonly MessageKind[] = [
   'one_time_code',
@@ -111,6 +112,7 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'store_export_ready',
   // Its store taken down by Hatti, and restored (ADR-461).
   'store_suspended',
+  'store_appeal_refused',
   'store_restored',
   // The shop's own, which it schedules itself (ADR-421, ADR-458), or sets going (ADR-425).
   'broadcast',
@@ -906,15 +908,29 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
   store_suspended: {
     whatsapp: 'hatti_store_suspended',
     category: 'utility',
-    parameters: ['shop', 'note'],
+    parameters: ['shop', 'note', 'url'],
     hattiPays: true,
     text: {
-      en: 'Hatti: we have taken {shop} down after what shoppers reported of it: {note}. Its storefront, checkout and admin are closed while it is down.',
-      ur: 'ہٹی: خریداروں کی شکایات کے بعد ہم نے {shop} کو بند کر دیا ہے: {note}۔ جب تک یہ بند ہے، اس کا اسٹور فرنٹ، چیک آؤٹ اور ایڈمن بند رہیں گے۔',
+      en: 'Hatti: we have taken {shop} down after what shoppers reported of it: {note}. Its storefront, checkout and admin are closed while it is down. To appeal, tell us your side here:',
+      ur: 'ہٹی: خریداروں کی شکایات کے بعد ہم نے {shop} کو بند کر دیا ہے: {note}۔ جب تک یہ بند ہے، اس کا اسٹور فرنٹ، چیک آؤٹ اور ایڈمن بند رہیں گے۔ اپیل کے لیے اپنا مؤقف یہاں بتائیں:',
     },
     subject: {
       en: 'Hatti has taken {shop} down',
       ur: 'ہٹی نے {shop} کو بند کر دیا ہے',
+    },
+  },
+  store_appeal_refused: {
+    whatsapp: 'hatti_store_appeal_refused',
+    category: 'utility',
+    parameters: ['shop', 'note'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: we have refused {shop}'s appeal: {note}. The store stays down. The link we sent when it was taken down shows our answer, and takes another appeal.",
+      ur: 'ہٹی: ہم نے {shop} کی اپیل مسترد کر دی ہے: {note}۔ دکان بند رہے گی۔ دکان بند ہونے پر بھیجا گیا لنک ہمارا جواب دکھاتا ہے، اور دوسری اپیل بھی لیتا ہے۔',
+    },
+    subject: {
+      en: "Hatti has refused {shop}'s appeal",
+      ur: 'ہٹی نے {shop} کی اپیل مسترد کر دی ہے',
     },
   },
   store_restored: {
