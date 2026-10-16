@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Gift cards kept and issued
+### fd2ce44 · Gift cards kept and issued
 
 * **A shop issues gift cards through Shopify's Admin API mutations, each a code it keeps only a
   digest of, with a balance and a ledger** ([ADR-448](../architecture/13-decision-log.md#adr-448--gift-cards-are-codes-the-shop-keeps-only-a-digest-of-worth-a-balance-kept-on-the-card-with-a-ledger-of-every-change-issued-changed-and-deactivated-through-shopifys-giftcard-mutations), CAT-12, PAY-13). The code is given once,
