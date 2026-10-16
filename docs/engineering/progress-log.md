@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Drafts put on sale at a time ahead
+### cca0063 · Drafts put on sale at a time ahead
 
 * **A draft goes on sale by itself at the time the shop sets** ([ADR-441](../architecture/13-decision-log.md#adr-441--a-draft-is-put-on-sale-by-itself-at-a-time-ahead-a-minute-to-a-year-off-by-the-workers-sweep-of-scheduled-content-set-on-sale-or-archived-by-hand-it-loses-its-time), CAT-17), for drops that
   go live at midnight. The worker's sweep of scheduled content sets it active within a minute,
