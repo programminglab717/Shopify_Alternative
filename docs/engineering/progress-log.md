@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### The admin's verification page
+### 61dd8c6 · The admin's verification page
 
 * **The admin's verification page shows what Hatti verified and why a request was refused, and
   takes the owner's next request, photos uploaded before they confirm who they are** ([ADR-467](../architecture/13-decision-log.md#adr-467--the-admins-verification-page-shows-what-hatti-verified-and-why-a-request-was-refused-and-takes-the-owners-next-request-photos-uploaded-before-they-confirm-who-they-are),
