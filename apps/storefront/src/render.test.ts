@@ -2160,6 +2160,19 @@ describe('Storefront rendering', () => {
     const page = await render({ path: '/cart', cart });
     expect([page.status, page.errors]).toEqual([200, []]);
     expect(page.html).toContain('<title>Your cart · Zari Fashions</title>');
+    // It asks for the products paired with each of its products, those it holds left out
+    // (ADR-437).
+    const upsells =
+      /<hatti-cart-upsells\s+class="page-width section-spacing"\s+data-urls="([^"]+)"\s+data-in-cart="([^"]+)"\s+data-limit="4"\s+hidden\s*>\s*<h2 dir="auto">Goes well with your order<\/h2>/.exec(
+        page.html,
+      );
+    expect(upsells?.[1]?.replace(/&amp;/g, '&').split(' ')).toEqual(
+      [lawn.id, 'gone-product'].map(
+        (id) =>
+          `/recommendations/products?section_id=cart-upsells&intent=complementary&product_id=${id}&limit=4`,
+      ),
+    );
+    expect(upsells?.[2]).toBe(`${lawn.id} gone-product`);
     expect(page.html).toContain('<span class="count" data-cart-count>3</span>');
     expect(page.html).toContain(
       '<form method="post" action="/cart" accept-charset="UTF-8" class="cart__form"',
@@ -2198,7 +2211,9 @@ describe('Storefront rendering', () => {
     expect(refused.html).toContain(
       '<p class="cart__error" role="alert" dir="auto">Rose Lawn is sold out.</p>',
     );
-    expect((await render({ path: '/cart', cart: null })).html).toContain('Your cart is empty.');
+    const empty = (await render({ path: '/cart', cart: null })).html;
+    expect(empty).toContain('Your cart is empty.');
+    expect(empty).not.toContain('<hatti-cart-upsells');
     const product = await render({ path: `/products/${lawn.handle}` });
     expect(product.html).toContain('<span class="count" data-cart-count>0</span>');
     expect(product.html).toContain('<form method="post" action="/cart/add"');
@@ -2407,6 +2422,14 @@ describe('Storefront rendering', () => {
       ['complementary'],
     );
     expect(alone.get('complementary')).not.toContain('Pairs well with');
+    // The cart's cross-sells ask for the same, rendered by their own section (ADR-437).
+    const forCart = await asked(4, undefined, 'complementary', 'cart-upsells');
+    expect(
+      [...forCart.matchAll(/<li class="grid__item" data-product-id="([^"]+)">/g)].map(
+        (match) => match[1],
+      ),
+    ).toEqual([fourth.id, second.id]);
+    expect(forCart).not.toContain('<h2');
   });
 
   it("asks for a number on a sold-out variant's page while the shop sends back in stock messages (ADR-431)", async () => {

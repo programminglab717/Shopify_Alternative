@@ -202,6 +202,17 @@
           "label": "Message it starts with"
         }
       }
+    },
+    "cart-upsells": {
+      "name": "Goes well with the cart",
+      "settings": {
+        "title": {
+          "label": "Heading"
+        },
+        "products_to_show": {
+          "label": "Products to show"
+        }
+      }
     }
   },
   "settings_schema": {

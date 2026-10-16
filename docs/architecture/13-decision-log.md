@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-436 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-437 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -444,6 +444,7 @@
 | 434 | Related products: worked out as each product's document is built, and served as Shopify's product recommendations for Hatti Base's product page to ask for | Accepted |
 | 435 | Complementary products: the products a shop pairs with one, kept by the catalog in its order, and recommended where a theme asks for complementary ones | Accepted |
 | 436 | Complementary products in the admin: a card on the product's page, the products found by name and put in order | Accepted |
+| 437 | The cart's cross-sells: the products paired with what it holds, asked for as complementary recommendations and shown together on Hatti Base's cart page | Accepted |
 
 ---
 
@@ -16730,3 +16731,31 @@
 * **Alternatives:**
   * **Dragging to reorder:** buttons work by touch and keyboard alike, as the menus' do.
   * **Pairing from the products list, many at once:** a pairing is chosen product by product.
+
+## ADR-437 · The cart's cross-sells: the products paired with what it holds, asked for as complementary recommendations and shown together on Hatti Base's cart page
+
+* **Context:**
+  * MKT-09 asks for cross-sells in the cart. ADR-435 keeps the products a shop pairs with each
+    product, and the storefront answers complementary recommendations for one product at a time.
+  * The recommendations route is cached a minute at the edge for every shopper, so it cannot
+    know a shopper's cart.
+* **Decision:**
+  * **Hatti Base's cart page gets a `cart-upsells` section.**
+    * It names the cart's first three products. The page asks for each one's complementary
+      products, rendered by the section's own file.
+    * It shows them together, in turn: none the cart holds, none twice, and as many as the
+      section's setting (four by default).
+    * It stays hidden until there is one to show, and is left out of an empty cart.
+  * **Asked for itself, the section renders only the products,** each with its ID, so the page
+    can merge the answers. No new route is needed: a section is found by its file, as Shopify's
+    section rendering finds one.
+  * **The cart's own products are left out in the browser,** which knows the cart. The answers
+    stay the same for everyone and stay cached.
+* **Consequences:**
+  * A cart of many products recommends what goes with its first three, the newest first.
+  * The cart drawer has no cross-sells yet.
+* **Alternatives:**
+  * **A route that takes the cart:** its answer would differ by shopper and could not be cached at
+    the edge.
+  * **Several product IDs in one request:** Shopify's route takes one, and themes written for it
+    ask that way.

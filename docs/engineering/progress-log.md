@@ -6,9 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the cart's cross-sells, the
-products paired with what it holds (MKT-09), then the one-tap offer on a cash-on-delivery
-order's page until it is packed (05 §8). Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the one-tap offer on a
+cash-on-delivery order's page until it is packed (MKT-09, 05 §8), then the cart drawer's
+cross-sells. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +16,13 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### The cart's cross-sells
+
+* **Hatti Base's cart page shows what goes with the cart** ([ADR-437](../architecture/13-decision-log.md#adr-437--the-carts-cross-sells-the-products-paired-with-what-it-holds-asked-for-as-complementary-recommendations-and-shown-together-on-hatti-bases-cart-page), MKT-09): the products the
+  shop pairs with its first three products, none it holds already, asked for as Shopify's
+  complementary recommendations.
+* 2860 tests, as before: the storefront's cart and recommendations tests check it.
 
 ### 2069abe · Complementary products in the admin
 

@@ -1,6 +1,10 @@
 {
   "sections": {
-    "main": { "type": "main-cart" }
+    "main": { "type": "main-cart" },
+    "upsells": {
+      "type": "cart-upsells",
+      "settings": { "title": "Goes well with your order", "products_to_show": 4 }
+    }
   },
-  "order": ["main"]
+  "order": ["main", "upsells"]
 }
