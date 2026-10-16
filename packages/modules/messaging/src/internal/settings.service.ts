@@ -100,7 +100,7 @@ export class MessagingSettingsService {
             ? "checkout's recovery setting turns it on and off"
             : kind === 'review_request'
               ? 'the reviews setting turns it on and off'
-              : kind === 'back_in_stock'
+              : kind === 'back_in_stock' || kind === 'cod_prepaid'
                 ? 'its automation turns it on and off'
                 : paidByShop(kind as MessageKind)
                   ? 'shoppers ask for it'

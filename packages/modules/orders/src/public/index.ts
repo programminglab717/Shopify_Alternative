@@ -147,6 +147,7 @@ export {
   OnlinePayments,
   orderBuyerIn,
   orderPaymentFactsIn,
+  offerPrepayIn,
   receiveOnlinePaymentIn,
   type OnlineGateway,
   type OnlinePaymentReceipt,

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-431 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-432 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -439,6 +439,7 @@
 | 429 | Back in stock: a shopper who finds a variant sold out leaves their number, and is told once on WhatsApp from Hatti's number when it sells online again, while the shop's automation is on | Accepted |
 | 430 | Back in stock on the automations page: turned on and off alone, sent from Hatti's number with no template to choose | Accepted |
 | 431 | Back in stock on the storefront: Hatti's back_in_stock form on a sold-out variant's page, sent on to the core and back to the page | Accepted |
+| 432 | COD to prepaid: a confirmed cash-on-delivery order's customer offered store credit for paying the rest online before it is packed, given once it is paid in full | Accepted |
 
 ---
 
@@ -16564,3 +16565,45 @@
     as the theme's other forms do.
   * **Shopify's customer form with a tag naming the variant:** that keeps marketing consent,
     which a shopper asking about one item has not given.
+
+## ADR-432 · COD to prepaid: a confirmed cash-on-delivery order's customer offered store credit for paying the rest online before it is packed, given once it is paid in full
+
+* **Context:**
+  * MKT-04's recipes end with the COD to prepaid nudge: a cash-on-delivery order's customer is
+    offered something to pay now (07 §5.2, 05 §8). It turns a doubtful parcel into a paid one,
+    and brings the shop its money before the courier does.
+  * An order's page took online only what an order waits for before it ships (ADR-151): a
+    transfer's total, or a cash-on-delivery order's advance. A plain cash-on-delivery order
+    could not be paid online.
+  * Paid online, an order's cash to collect stayed as it was. Store credit paying an order
+    already lowers it (ADR-185).
+* **Decision:**
+  * **A recipe of the shop's automations,** `cod_prepaid`, with the store credit it offers:
+    Rs 10 to Rs 10,000, Rs 100 unless the shop says otherwise. It sends Hatti's own template,
+    `hatti_cod_prepaid`, Meta's marketing category, from Hatti's number, as back in stock does
+    (ADR-429).
+  * **The worker** hears each order confirmed. It offers the credit when:
+    * the recipe is on and the shop takes payments online through a gateway of its own;
+    * the order still has cash to collect, and is not packed;
+    * what is left to pay is more than the credit.
+  * **The order keeps the offer,** once an order, on its timeline too. The customer gets a
+    WhatsApp message with what is left to pay, the credit, and the order's page.
+  * **The order's page offers to take the rest online** while the offer is open: the order not
+    packed, nothing shipped. It says the credit comes back for the next order.
+  * **Paid online,** a cash-on-delivery order not shipped has no more cash to collect at the
+    door than it still owes, whatever offered it.
+  * **Paid in full while offered,** its customer is given the credit, once, as an adjustment of
+    their store credit naming the order. The customer is told as for any credit (ADR-184).
+  * **Cancelled after that,** the order takes back what is left of the credit it gave.
+* **Consequences:**
+  * The recipe's card on the automations page, with its credit, comes next.
+  * The credit is the shop's cost. A customer who cancels after paying, as the shop's policy
+    lets them, loses what is left of it, taken back as an adjustment on the order's timeline.
+    What they spent of it meanwhile stays spent.
+  * A shop without a gateway, as on the free plan (ADR-264), never sends it.
+* **Alternatives:**
+  * **Something off the order instead of credit:** it changes the order's total after the
+    customer agreed to it, and its invoice and tax with it. Credit brings them back as well.
+  * **The offer at checkout or on the thank-you page:** paying online at checkout already takes
+    the shop's discount for it (ADR-222). This reaches those who chose cash on delivery, once
+    they meant it.

@@ -306,6 +306,13 @@ export interface OrderRecord {
    */
   advanceDue: bigint;
   /**
+   * The store credit its customer was offered for paying the rest of a cash-on-delivery order
+   * online before it is packed (MKT-04, ADR-432); null for none.
+   */
+  prepayCredit: bigint | null;
+  /** When that credit was given, the order paid in full online. */
+  prepayCreditedAt: Date | null;
+  /**
    * The account a bank-transfer order's customer was told to pay into, as it was when it was
    * placed (ADR-074), or a cash-on-delivery order's for its advance; null for other orders, and
    * when the shop had none.

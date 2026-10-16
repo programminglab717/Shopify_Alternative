@@ -1,4 +1,5 @@
 import type { MutationResult, TenantContext } from '@hatti/api';
+import { creditStoreCreditIn } from '@hatti/customers/public';
 import type { Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
@@ -8,7 +9,7 @@ import { OrderEvents, type OrderPaidPayload } from './events.js';
 import type { GatewayFormStart } from './online-payment-page.js';
 import type { PrepaidDiscountValue } from './prepaid-discount.js';
 import { addTimelineEntry, lockOrder, updateOrder } from './order-store.js';
-import { itemName, orderName, transferOwed } from './rules.js';
+import { itemName, onlineOwed, orderName, prepayOwed } from './rules.js';
 import { lines, orders, type OrderStatusValue } from './schema.js';
 
 /**
@@ -116,9 +117,9 @@ export async function orderPaymentFactsIn(
     name: orderName(order.number),
     status: order.status,
     currency: order.currency as CurrencyCode,
-    // As its page offers it: before anything ships, once confirmed.
-    awaited:
-      order.status === 'open' && order.stage === 'awaiting_payment' ? transferOwed(order) : 0n,
+    // As its page offers it: before anything ships, once confirmed; or the rest of a
+    // cash-on-delivery order offered credit for paying it (ADR-432).
+    awaited: onlineOwed(order),
     refundable: order.amountPaid - order.amountRefunded,
   };
 }
@@ -250,19 +251,31 @@ export async function receiveOnlinePaymentIn(
   if (applied > 0n) {
     const paid = order.amountPaid + applied;
     const full = paid === order.total;
+    // Before a cash-on-delivery order ships, the courier collects no more than it still owes
+    // (ADR-432).
+    const rest = order.total - paid;
+    const codAmount =
+      order.paymentMethod === 'cash_on_delivery' &&
+      order.fulfillmentStatus === 'unfulfilled' &&
+      order.codAmount > rest
+        ? rest
+        : order.codAmount;
+    // Paid in full while offered store credit for it: the credit is given, once.
+    const credit = full && prepayOwed(order) > 0n ? order.prepayCredit : null;
     const updated = await updateOrder(
       tx,
       shopId,
       order,
       {
         amountPaid: paid,
+        codAmount,
         financialStatus: !full
           ? 'partially_paid'
           : order.amountRefunded > 0n
             ? 'partially_refunded'
             : 'paid',
       },
-      full ? ['paidAt'] : [],
+      [...(full ? (['paidAt'] as const) : []), ...(credit ? (['prepayCreditedAt'] as const) : [])],
     );
     // Its advance, when this is what makes it up.
     const advance = order.advanceDue > 0n && order.amountPaid < order.advanceDue;
@@ -274,8 +287,35 @@ export async function receiveOnlinePaymentIn(
       'paid',
       `${rupees(applied)} paid ${via}` +
         (advance && paid >= order.advanceDue ? ': the advance it asked for' : '') +
-        (full ? ', paying it in full' : ''),
+        (full ? ', paying it in full' : '') +
+        (codAmount < order.codAmount ? `; ${rupees(codAmount)} to collect at the door` : ''),
     );
+    if (credit) {
+      const given = await creditStoreCreditIn(
+        tx,
+        { shopId, actor: 'system' },
+        {
+          customerId: order.customerId,
+          currency,
+          amount: credit,
+          event: 'adjustment',
+          orderId: order.id,
+          note: `For paying ${orderName(order.number)} online`,
+        },
+        ['orderId'],
+      );
+      await addTimelineEntry(
+        tx,
+        shopId,
+        order.id,
+        'system',
+        'prepay_credited',
+        given.ok
+          ? `${rupees(credit)} given in store credit for paying it online, as offered`
+          : `${rupees(credit)} offered in store credit for paying it online could not be given: ` +
+              given.errors.map((error) => error.message).join('; '),
+      );
+    }
     await appendEvent<OrderPaidPayload>(tx, shopId, {
       type: OrderEvents.OrderPaid,
       aggregateType: 'order',
@@ -296,4 +336,34 @@ export async function receiveOnlinePaymentIn(
     );
   }
   return { applied, excess };
+}
+
+/**
+ * Offers the customer of a confirmed cash-on-delivery order `credit` in store credit for paying
+ * the rest of it online before it is packed (MKT-04, ADR-432), in the caller's transaction, the
+ * order locked: once an order, and only while the rest is more than the credit. What its page
+ * then takes online; 0 when it is not offered.
+ */
+export async function offerPrepayIn(
+  tx: Tx,
+  shopId: string,
+  orderId: string,
+  credit: bigint,
+): Promise<bigint> {
+  const order = await lockOrder(tx, shopId, orderId);
+  if (!order || order.prepayCredit !== null || credit <= 0n) return 0n;
+  if (order.stage !== 'to_pack' && order.stage !== 'awaiting_payment') return 0n;
+  const rest = prepayOwed({ ...order, prepayCredit: credit });
+  if (rest <= credit) return 0n;
+  await updateOrder(tx, shopId, order, { prepayCredit: credit });
+  const rupees = (value: bigint) => formatMoney(money(value, order.currency as CurrencyCode));
+  await addTimelineEntry(
+    tx,
+    shopId,
+    order.id,
+    'system',
+    'prepay_offered',
+    `${rupees(credit)} in store credit offered for paying the rest, ${rupees(rest)}, online`,
+  );
+  return rest;
 }

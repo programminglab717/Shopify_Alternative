@@ -5410,6 +5410,9 @@ type MarketingAutomation {
   """For a win-back: how many days after the customer's last order it goes."""
   afterDays: Int
 
+  """For COD to prepaid: the store credit offered for paying online."""
+  creditAmount: Money
+
   """Whether it sends."""
   enabled: Boolean!
   kind: MarketingAutomationKind!
@@ -5427,6 +5430,9 @@ input MarketingAutomationInput {
   """For a win-back: 14 to 365 days after the customer's last order."""
   afterDays: Int
 
+  """For COD to prepaid: Rs 10 to Rs 10,000 of store credit, as "100"."""
+  creditAmount: String
+
   """On only with a template Meta approved."""
   enabled: Boolean
 
@@ -5440,6 +5446,11 @@ enum MarketingAutomationKind {
   Once, to a shopper who asked on the storefront to hear when a sold-out variant is for sale again: from Hatti's number, with the product's link, needing no template of the shop's (ADR-429).
   """
   BACK_IN_STOCK
+
+  """
+  Once, when a cash-on-delivery order is confirmed: store credit offered for paying the rest online before it is packed, from Hatti's number with the order's link, needing no template of the shop's (ADR-432).
+  """
+  COD_PREPAID
 
   """
   Once, to a customer who agrees to hear from the shop on WhatsApp at checkout or on its storefront.
@@ -5817,6 +5828,11 @@ enum MessageKind {
   A shopper who typed their number at checkout and left without ordering, reminded once with a link back to the items (CHK-12, ADR-393): sent as the shop's checkout recovery setting says, which turns it on and off, not here.
   """
   CHECKOUT_REMINDER
+
+  """
+  A confirmed cash-on-delivery order's customer offered store credit for paying the rest online, with its page's link (MKT-04, ADR-432): sent while the shop's COD to prepaid automation is on, which turns it on and off, not here.
+  """
+  COD_PREPAID
 
   """
   For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: its message credit fell below Rs 100 (ADR-169, ADR-195).
@@ -6652,7 +6668,7 @@ type Mutation {
   locationMakePrimary(locationId: ID!): LocationMakePrimaryPayload!
 
   """
-  Turns one of the shop's automations on or off, or changes its template or days: on only with a template Meta approved on the shop's number.
+  Turns one of the shop's automations on or off, or changes its template, days or credit: on only with a template Meta approved on the shop's number, but for those Hatti sends.
   """
   marketingAutomationUpdate(input: MarketingAutomationInput!, kind: MarketingAutomationKind!): MarketingAutomationUpdatePayload!
 

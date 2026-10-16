@@ -243,6 +243,45 @@ export function transferOwed(order: {
   return awaited > order.amountPaid ? awaited - order.amountPaid : 0n;
 }
 
+/**
+ * What a cash-on-delivery order whose customer was offered store credit for paying online
+ * (ADR-432) may still pay online for it: the rest of its total, while it is open, not packed and
+ * the credit not given; nothing otherwise.
+ */
+export function prepayOwed(order: {
+  paymentMethod: PaymentMethodValue;
+  status: OrderStatusValue;
+  packedAt: Date | null;
+  fulfillmentStatus: FulfillmentStatusValue;
+  prepayCredit: bigint | null;
+  prepayCreditedAt: Date | null;
+  amountPaid: bigint;
+  total: bigint;
+}): bigint {
+  const open =
+    order.paymentMethod === 'cash_on_delivery' &&
+    order.status === 'open' &&
+    !order.packedAt &&
+    order.fulfillmentStatus === 'unfulfilled' &&
+    order.prepayCredit !== null &&
+    !order.prepayCreditedAt;
+  return open && order.total > order.amountPaid ? order.total - order.amountPaid : 0n;
+}
+
+/**
+ * What an order's page offers to take online (ADR-151, ADR-432): what it waits for before it
+ * ships, or the rest of a cash-on-delivery order offered credit for paying it, whichever is more.
+ */
+export function onlineOwed(
+  order: Parameters<typeof prepayOwed>[0] &
+    Parameters<typeof transferOwed>[0] & { stage: OrderStageValue },
+): bigint {
+  const awaited =
+    order.status === 'open' && order.stage === 'awaiting_payment' ? transferOwed(order) : 0n;
+  const prepay = prepayOwed(order);
+  return prepay > awaited ? prepay : awaited;
+}
+
 /** Whether an order waits for money by transfer before it ships, as {@link transferOwed} says. */
 export function awaitsTransfer(order: {
   paymentMethod: PaymentMethodValue;

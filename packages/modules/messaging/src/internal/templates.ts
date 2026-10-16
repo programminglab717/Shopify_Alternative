@@ -33,6 +33,7 @@ export const MESSAGE_KINDS = [
   'checkout_offer',
   'review_request',
   'back_in_stock',
+  'cod_prepaid',
   'one_time_code',
   'stock_low',
   'stock_out',
@@ -87,6 +88,8 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'review_request',
   // Asked for by the shopper, with the shop's automation on (ADR-429).
   'back_in_stock',
+  // Sent while the shop's automation is on (ADR-432).
+  'cod_prepaid',
   'invoice_due',
   'plan_ended',
   'credit_low',
@@ -158,6 +161,11 @@ export interface MessageVariables {
   invoice?: string;
   amount?: string;
   plan?: string;
+  /**
+   * For COD to prepaid (ADR-432): the store credit offered for paying the order online, its
+   * `amount` what is left to pay.
+   */
+  credit?: string;
   /**
    * For a transfer the shop said it made into Hatti's account (ADR-254): the reference it gave
    * the transfer, and why Hatti refused it.
@@ -602,6 +610,22 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur:
         '{shop}: {product} دوبارہ اسٹاک میں آ گیا ہے، جیسا کہ آپ نے پوچھا تھا۔ دوبارہ ختم ہونے سے ' +
         'پہلے یہاں آرڈر کریں:',
+    },
+  },
+  cod_prepaid: {
+    whatsapp: 'hatti_cod_prepaid',
+    // An offer, though about an order placed (ADR-432).
+    category: 'marketing',
+    parameters: ['name', 'order', 'shop', 'amount', 'credit'],
+    // The order's page, which takes the payment.
+    buttons: [{ type: 'url' }],
+    text: {
+      en:
+        'Hi {name}, your order {order} from {shop} is confirmed. Pay the {amount} online now ' +
+        'instead of cash on delivery, and get {credit} back as store credit for your next order:',
+      ur:
+        '{name}، {shop} سے آپ کا آرڈر {order} کنفرم ہو گیا ہے۔ کیش آن ڈیلیوری کے بجائے ابھی ' +
+        '{amount} آن لائن ادا کریں اور اگلے آرڈر کے لیے {credit} اسٹور کریڈٹ کے طور پر واپس پائیں:',
     },
   },
   stock_low: {

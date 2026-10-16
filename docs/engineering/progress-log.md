@@ -6,8 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the COD→prepaid nudge, the last of
-MKT-04's recipes. Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: COD to prepaid's card on the admin's
+automations page, with the credit it offers, which finishes MKT-04's recipes. Urdu handles wait,
+as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -15,6 +16,16 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### COD to prepaid
+
+* **A confirmed cash-on-delivery order's customer is offered store credit** ([ADR-432](../architecture/13-decision-log.md#adr-432--cod-to-prepaid-a-confirmed-cash-on-delivery-orders-customer-offered-store-credit-for-paying-the-rest-online-before-it-is-packed-given-once-it-is-paid-in-full), MKT-04)
+  for paying the rest online before it is packed, on WhatsApp from Hatti's number, while the
+  shop's new automation is on and it takes payments online.
+* **The order's page takes the rest online.** Paid in full, the order has no cash left to
+  collect at the door, and the customer is given the credit, once. Cancelled after that, the
+  order takes back what is left of it.
+* 2846 tests, from 2842: one for messaging, one for payments, two for the core.
 
 ### b60adcd · Back in stock on the storefront
 

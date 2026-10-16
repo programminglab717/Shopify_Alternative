@@ -31,6 +31,7 @@ export enum MessageKind {
   CHECKOUT_OFFER = 'CHECKOUT_OFFER',
   REVIEW_REQUEST = 'REVIEW_REQUEST',
   BACK_IN_STOCK = 'BACK_IN_STOCK',
+  COD_PREPAID = 'COD_PREPAID',
   ONE_TIME_CODE = 'ONE_TIME_CODE',
   STOCK_LOW = 'STOCK_LOW',
   STOCK_OUT = 'STOCK_OUT',
@@ -141,6 +142,12 @@ registerEnumType(MessageKind, {
         'A shopper who asked on the storefront to hear when a sold-out variant is for sale ' +
         "again, told once with its page's link (MKT-04, ADR-429): sent while the shop's back in " +
         'stock automation is on, which turns it on and off, not here.',
+    },
+    COD_PREPAID: {
+      description:
+        "A confirmed cash-on-delivery order's customer offered store credit for paying the rest " +
+        "online, with its page's link (MKT-04, ADR-432): sent while the shop's COD to prepaid " +
+        'automation is on, which turns it on and off, not here.',
     },
     ONE_TIME_CODE: {
       description:

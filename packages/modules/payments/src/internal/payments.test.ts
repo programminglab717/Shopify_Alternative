@@ -12,7 +12,12 @@ import type { AddressInfo } from 'node:net';
 import { InputChecker, PlanAllowance } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { toPublicId } from '@hatti/ids';
-import { checkAddress, orderLinkPage, type PrepaidDiscountInput } from '@hatti/orders/public';
+import {
+  checkAddress,
+  offerPrepayIn,
+  orderLinkPage,
+  type PrepaidDiscountInput,
+} from '@hatti/orders/public';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { jazzCashHash } from './gateways.js';
 import {
@@ -1414,6 +1419,100 @@ describe.skipIf(!server)('Payments online', () => {
     expect((await f.timeline(f.a, order.id))[0]).toMatch(
       /^Rs 500 paid online through Test gateway, reference T-\w+: the advance it asked for$/,
     );
+  });
+
+  it('offers store credit for paying a confirmed cash-on-delivery order online, given once it is paid (ADR-432)', async () => {
+    const placed = unwrap(
+      await f.orders.create(f.a, {
+        lineItems: [{ variantId: kurta, quantity: 1 }],
+        shippingAddress: {
+          name: 'Ayesha Khan',
+          phone: '0300 1234567',
+          address1: 'House 12, Street 4',
+          city: 'Lahore',
+        },
+      }),
+    );
+    unwrap(await f.orders.confirm(f.a, placed.id));
+    const token = await f.linkOf(f.a, placed.id);
+    await f.connectTest(f.a);
+    const viewed = async () => {
+      const view = await f.links.viewLink(token);
+      if (view.kind !== 'order') throw new Error(view.kind);
+      return view;
+    };
+    // A cash-on-delivery order offered nothing is paid at the door.
+    expect((await viewed()).onlinePayment).toBeNull();
+    const offer = (credit: bigint) =>
+      f.db.tenant(f.a.shopId, (tx) => offerPrepayIn(tx, f.a.shopId, placed.id, credit));
+    // No more credit than it costs; then once an order.
+    expect(await offer(2_000_00n)).toBe(0n);
+    expect(await offer(100_00n)).toBe(2_000_00n);
+    expect(await offer(150_00n)).toBe(0n);
+    const view = await viewed();
+    expect(view.onlinePayment).toEqual({
+      gateways: [{ gateway: 'test', name: 'Test gateway', origin: null }],
+      amount: 2_000_00n,
+      credit: 100_00n,
+    });
+    const page = orderLinkPage(view).html;
+    expect(page).toContain('You pay Rs 2,000 when it arrives.');
+    expect(page).toContain(
+      'Pay Rs 2,000 now by card or wallet, through Test gateway, and get Rs 100 back as store ' +
+        'credit for your next order.',
+    );
+
+    const started = await f.links.payOnline(token);
+    if (!('url' in started)) throw new Error(JSON.stringify(started));
+    expect(await f.links.paidOnline(token, formOf(started.url))).toMatchObject({ problem: null });
+    expect(await f.orders.get(f.a, placed.id)).toMatchObject({
+      amountPaid: 2_000_00n,
+      codAmount: 0n,
+      financialStatus: 'paid',
+      stage: 'to_pack',
+      prepayCredit: 100_00n,
+      prepayCreditedAt: expect.any(Date),
+    });
+    const timeline = await f.timeline(f.a, placed.id);
+    expect(timeline[0]).toBe('Rs 100 given in store credit for paying it online, as offered');
+    expect(timeline[1]).toMatch(
+      /^Rs 2,000 paid online through Test gateway, reference T-\w+, paying it in full; Rs 0 to collect at the door$/,
+    );
+    expect(timeline).toContain(
+      'Rs 100 in store credit offered for paying the rest, Rs 2,000, online',
+    );
+    const { rows } = await f.admin.query<{ amount: string; event: string; note: string }>(
+      `SELECT amount, event, note FROM customers.store_credit_transactions
+        WHERE shop_id = $1 AND order_id = $2`,
+      [f.a.shopId, placed.id],
+    );
+    expect(rows).toEqual([
+      { amount: '10000', event: 'adjustment', note: `For paying #${placed.number} online` },
+    ]);
+    // Paid: nothing left to pay, at the door or online.
+    const paid = await viewed();
+    expect(paid.onlinePayment).toBeNull();
+    expect(orderLinkPage(paid).html).not.toContain('when it arrives');
+
+    // Cancelled once paid, the credit goes with it, but what was spent of it.
+    await f.admin.query(
+      `UPDATE customers.store_credit_transactions SET remaining = 4000
+        WHERE shop_id = $1 AND order_id = $2 AND kind = 'credit'`,
+      [f.a.shopId, placed.id],
+    );
+    unwrap(await f.orders.cancel(f.a, placed.id, { reason: 'customer' }));
+    expect((await f.timeline(f.a, placed.id))[0]).toBe(
+      'Took back Rs 40 of the store credit given for paying it online',
+    );
+    const after = await f.admin.query<{ kind: string; amount: string; remaining: string | null }>(
+      `SELECT kind, amount, remaining FROM customers.store_credit_transactions
+        WHERE shop_id = $1 AND order_id = $2 ORDER BY created_at, kind`,
+      [f.a.shopId, placed.id],
+    );
+    expect(after.rows).toEqual([
+      { kind: 'credit', amount: '10000', remaining: '0' },
+      { kind: 'debit', amount: '4000', remaining: null },
+    ]);
   });
 
   it("pays nothing through a gateway's sandbox: a test, said on the page and the timeline", async () => {

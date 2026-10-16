@@ -9,7 +9,7 @@ import { newId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AutomationsService, automationOnIn } from './automations.service.js';
+import { AutomationsService, automationOnIn, codPrepaidCreditIn } from './automations.service.js';
 import { MessagesService } from './messages.service.js';
 import { FakeGraph, NUMBER, WABA } from './test-support.js';
 import { WhatsAppAccountsService } from './whatsapp-accounts.service.js';
@@ -160,9 +160,38 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
 
   it("is off until the shop turns it on, with a template Meta approved and a win-back's days", async () => {
     expect(await automations.list(a)).toEqual([
-      { kind: 'welcome', enabled: false, template: null, afterDays: null, updatedAt: null },
-      { kind: 'win_back', enabled: false, template: null, afterDays: 60, updatedAt: null },
-      { kind: 'back_in_stock', enabled: false, template: null, afterDays: null, updatedAt: null },
+      {
+        kind: 'welcome',
+        enabled: false,
+        template: null,
+        afterDays: null,
+        creditAmount: null,
+        updatedAt: null,
+      },
+      {
+        kind: 'win_back',
+        enabled: false,
+        template: null,
+        afterDays: 60,
+        creditAmount: null,
+        updatedAt: null,
+      },
+      {
+        kind: 'back_in_stock',
+        enabled: false,
+        template: null,
+        afterDays: null,
+        creditAmount: null,
+        updatedAt: null,
+      },
+      {
+        kind: 'cod_prepaid',
+        enabled: false,
+        template: null,
+        afterDays: null,
+        creditAmount: 100_00n,
+        updatedAt: null,
+      },
     ]);
     const code = async (result: Promise<MutationResult<unknown>>) => {
       const done = await result;
@@ -222,6 +251,42 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
       [a.shopId],
     );
     expect(audit.rows.map((row) => row.action)).toContain('marketing_automation.updated');
+  });
+
+  it("offers store credit for paying a COD order online, from Hatti's number, as much as the shop sets (ADR-432)", async () => {
+    const code = async (result: Promise<MutationResult<unknown>>) => {
+      const done = await result;
+      return done.ok ? 'ok' : `${done.errors[0]!.code}: ${done.errors[0]!.message}`;
+    };
+    const credit = () => db.tenant(a.shopId, (tx) => codPrepaidCreditIn(tx, a.shopId));
+    expect(await credit()).toBeNull();
+    expect(await code(automations.update(a, 'cod_prepaid', { templateId: approved }))).toBe(
+      "INVALID: COD to prepaid is sent from Hatti's number, with no template of the shop's",
+    );
+    expect(await code(automations.update(a, 'welcome', { creditAmount: '100' }))).toBe(
+      'INVALID: Only COD to prepaid offers store credit',
+    );
+    for (const amount of ['5', '20000', 'lots']) {
+      expect(await code(automations.update(a, 'cod_prepaid', { creditAmount: amount }))).toMatch(
+        /^INVALID: /,
+      );
+    }
+    // On with Rs 100 unless the shop says otherwise.
+    expect(unwrap(await automations.update(a, 'cod_prepaid', { enabled: true }))).toMatchObject({
+      kind: 'cod_prepaid',
+      enabled: true,
+      template: null,
+      creditAmount: 100_00n,
+    });
+    expect(await credit()).toBe(100_00n);
+    unwrap(await automations.update(a, 'cod_prepaid', { creditAmount: '250' }));
+    expect(await credit()).toBe(250_00n);
+    // Off, it offers nothing; on again, as much as before.
+    unwrap(await automations.update(a, 'cod_prepaid', { enabled: false }));
+    expect(await credit()).toBeNull();
+    expect(unwrap(await automations.update(a, 'cod_prepaid', { enabled: true })).creditAmount).toBe(
+      250_00n,
+    );
   });
 
   it('welcomes a customer who subscribed once, from the shop number with its template', async () => {

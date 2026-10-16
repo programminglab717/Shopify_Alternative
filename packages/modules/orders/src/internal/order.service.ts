@@ -18,6 +18,7 @@ import {
   blockReasonText,
   debitStoreCreditIn,
   revertOrderStoreCreditIn,
+  withdrawOrderCreditIn,
   storeCreditAccountsIn,
   storeCreditPaidIn,
   type BlocklistEntryRecord,
@@ -1710,6 +1711,28 @@ export class OrderService {
           : `${rupees} of store credit paid it, more than refunds left of what was paid: give ` +
               'back what is owed as a refund',
       );
+    }
+    // Credit given for paying it online goes with it, but what was spent of it (ADR-432).
+    if (order.prepayCreditedAt) {
+      const name = orderName(order.number);
+      const taken = await withdrawOrderCreditIn(
+        tx,
+        shopId,
+        by.actor,
+        order.id,
+        `${name} cancelled, after paying it online`,
+      );
+      if (taken > 0n) {
+        await addTimelineEntry(
+          tx,
+          shopId,
+          order.id,
+          by.actor,
+          'prepay_withdrawn',
+          `Took back ${formatMoney(money(taken, order.currency as CurrencyCode))} of the store ` +
+            'credit given for paying it online',
+        );
+      }
     }
     await appendEvent<OrderCancelledPayload>(tx, shopId, {
       type: OrderEvents.OrderCancelled,

@@ -1,11 +1,13 @@
 import {
   CurrentTenant,
+  Money,
   RequireScopes,
   UserError,
   badUserInput,
   type TenantContext,
 } from '@hatti/api';
 import { tryFromPublicId } from '@hatti/ids';
+import { money } from '@hatti/money';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
   AutomationsService,
@@ -31,13 +33,13 @@ export class AutomationResolver {
   async marketingAutomations(
     @CurrentTenant() tenant: TenantContext,
   ): Promise<MarketingAutomation[]> {
-    return (await this.service.list(tenant)).map(toAutomation);
+    return (await this.service.list(tenant)).map((record) => toAutomation(record, tenant));
   }
 
   @Mutation(() => MarketingAutomationUpdatePayload, {
     description:
-      "Turns one of the shop's automations on or off, or changes its template or days: on only " +
-      "with a template Meta approved on the shop's number.",
+      "Turns one of the shop's automations on or off, or changes its template, days or credit: " +
+      "on only with a template Meta approved on the shop's number, but for those Hatti sends.",
   })
   @RequireScopes('write_marketing_events')
   async marketingAutomationUpdate(
@@ -55,18 +57,21 @@ export class AutomationResolver {
       enabled: input.enabled ?? undefined,
       templateId,
       afterDays: input.afterDays,
+      creditAmount: input.creditAmount,
     });
     return Object.assign(new MarketingAutomationUpdatePayload(), {
-      marketingAutomation: result.ok ? toAutomation(result.value) : null,
+      marketingAutomation: result.ok ? toAutomation(result.value, tenant) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }
 }
 
-function toAutomation(record: AutomationRecord): MarketingAutomation {
+function toAutomation(record: AutomationRecord, tenant: TenantContext): MarketingAutomation {
   return Object.assign(new MarketingAutomation(), {
     ...record,
     kind: record.kind.toUpperCase() as MarketingAutomationKind,
     template: record.template && toTemplate(record.template),
+    creditAmount:
+      record.creditAmount === null ? null : Money.from(money(record.creditAmount, tenant.currency)),
   });
 }

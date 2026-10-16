@@ -17,11 +17,13 @@ export type OnlinePaymentProblem = 'unavailable' | 'pending' | 'test';
  * A shop with one gateway shows one button, Pay online, naming its gateway below it.
  */
 export function payOnlineForm(
-  online: { gateways: readonly OnlineGateway[]; amount: bigint },
+  online: { gateways: readonly OnlineGateway[]; amount: bigint; credit?: bigint | null },
   currency: CurrencyCode,
   transfer: boolean,
 ): Html {
   const due = formatMoney(money(online.amount, currency));
+  // Store credit offered for paying a cash-on-delivery order online (ADR-432).
+  const credit = online.credit ? formatMoney(money(online.credit, currency)) : null;
   const names = gatewayNames(online.gateways);
   const one = online.gateways.length === 1;
   return html`<form method="post">
@@ -33,13 +35,21 @@ export function payOnlineForm(
         </button>`,
     )}
     ${paragraphs(
-      {
-        en:
-          `Pay ${due} by card or wallet, through ${names.en}.` +
-          (transfer ? ' Or transfer it to the account below.' : ''),
-        ur: html`${ltr(due)} کارڈ یا والیٹ سے ${names.ur} کے ذریعے ادا
-        کریں۔${transfer && ' یا نیچے دیے گئے اکاؤنٹ میں ٹرانسفر کریں۔'}`,
-      },
+      credit
+        ? {
+            en:
+              `Pay ${due} now by card or wallet, through ${names.en}, and get ${credit} back ` +
+              'as store credit for your next order.',
+            ur: html`ابھی ${ltr(due)} کارڈ یا والیٹ سے ${names.ur} کے ذریعے ادا کریں اور اگلے آرڈر
+            کے لیے ${ltr(credit)} اسٹور کریڈٹ کے طور پر واپس پائیں۔`,
+          }
+        : {
+            en:
+              `Pay ${due} by card or wallet, through ${names.en}.` +
+              (transfer ? ' Or transfer it to the account below.' : ''),
+            ur: html`${ltr(due)} کارڈ یا والیٹ سے ${names.ur} کے ذریعے ادا
+            کریں۔${transfer && ' یا نیچے دیے گئے اکاؤنٹ میں ٹرانسفر کریں۔'}`,
+          },
       'center small muted',
     )}
   </form>`;

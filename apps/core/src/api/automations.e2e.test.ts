@@ -138,11 +138,27 @@ describe.skipIf(!server)('Admin GraphQL API: marketing automations (MKT-04, ADR-
       { input: { name: 'welcome_offer', language: 'EN', body: 'Welcome {{1}}! 10% off.' } },
     );
 
-    const list = `{ marketingAutomations { kind enabled afterDays template { name } } }`;
+    const list = `{
+      marketingAutomations { kind enabled afterDays creditAmount { formatted } template { name } }
+    }`;
     expect(await data(tokens.reader, list)).toEqual([
-      { kind: 'WELCOME', enabled: false, afterDays: null, template: null },
-      { kind: 'WIN_BACK', enabled: false, afterDays: 60, template: null },
-      { kind: 'BACK_IN_STOCK', enabled: false, afterDays: null, template: null },
+      { kind: 'WELCOME', enabled: false, afterDays: null, creditAmount: null, template: null },
+      { kind: 'WIN_BACK', enabled: false, afterDays: 60, creditAmount: null, template: null },
+      {
+        kind: 'BACK_IN_STOCK',
+        enabled: false,
+        afterDays: null,
+        creditAmount: null,
+        template: null,
+      },
+      // COD to prepaid offers Rs 100 of store credit until the shop says otherwise (ADR-432).
+      {
+        kind: 'COD_PREPAID',
+        enabled: false,
+        afterDays: null,
+        creditAmount: { formatted: 'Rs 100' },
+        template: null,
+      },
     ]);
 
     const update = `mutation ($kind: MarketingAutomationKind!, $input: MarketingAutomationInput!) {

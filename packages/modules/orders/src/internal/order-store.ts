@@ -61,6 +61,8 @@ interface OrderJsonRow extends Record<string, unknown> {
   amount_refunded: string;
   cod_amount: string;
   advance_due: string;
+  prepay_credit: string | null;
+  prepay_credited_at: string | null;
   bank_account: BankAccountValue | null;
   customer_id: string;
   phone: string | null;
@@ -211,6 +213,8 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
     amountRefunded: BigInt(row.amount_refunded),
     codAmount: BigInt(row.cod_amount),
     advanceDue: BigInt(row.advance_due),
+    prepayCredit: row.prepay_credit === null ? null : BigInt(row.prepay_credit),
+    prepayCreditedAt: toDateOrNull(row.prepay_credited_at),
     // Orders placed before Raast IDs were kept have none.
     bankAccount: row.bank_account && {
       ...row.bank_account,
@@ -397,7 +401,8 @@ export async function loadOrders(
            o.subtotal, o.discount,
            o.shipping, o.cod_fee, o.tax_rate, o.total_tax, o.shipping_tax, o.transfer_discount,
            o.online_discount, o.total, o.discount_codes, o.amount_paid,
-           o.amount_refunded, o.cod_amount, o.advance_due, o.bank_account, o.customer_id,
+           o.amount_refunded, o.cod_amount, o.advance_due, o.prepay_credit,
+           o.prepay_credited_at, o.bank_account, o.customer_id,
            o.phone, o.email, o.shipping_address, o.location_id, o.note, o.gift_message, o.tags,
            o.cancel_reason,
            o.merged_into_id,
@@ -604,7 +609,14 @@ export async function parcelSummary(
 
 /** Timestamps an update can set to the transaction's time. */
 export type OrderStamp =
-  'confirmedAt' | 'packedAt' | 'cancelledAt' | 'paidAt' | 'closedAt' | 'agreedAt' | 'assignedAt';
+  | 'confirmedAt'
+  | 'packedAt'
+  | 'cancelledAt'
+  | 'paidAt'
+  | 'closedAt'
+  | 'agreedAt'
+  | 'assignedAt'
+  | 'prepayCreditedAt';
 
 type OrderChanges = Partial<
   Omit<OrderRow, 'shopId' | 'id' | 'stage' | 'fulfillmentStatus' | 'version' | 'updatedAt'>

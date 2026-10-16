@@ -399,6 +399,13 @@ export const orders = ordersSchema.table(
      * minor units, zero for none. Received, it counts in amountPaid.
      */
     advanceDue: money('advance_due').notNull().default(0n),
+    /**
+     * The store credit its customer was offered for paying the rest of a cash-on-delivery order
+     * online before it ships (MKT-04, ADR-432); minor units, null for none.
+     */
+    prepayCredit: money('prepay_credit'),
+    /** When that credit was given, the order paid in full online. */
+    prepayCreditedAt: timestamp('prepay_credited_at', { withTimezone: true }),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

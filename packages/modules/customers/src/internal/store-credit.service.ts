@@ -561,6 +561,78 @@ export async function debitStoreCreditIn(
   });
 }
 
+/**
+ * Credits a customer in the caller's transaction, for something the system gives them, as paying
+ * a cash-on-delivery order online when offered credit for it (ADR-432): their account in the
+ * currency opened if they have none. The transaction's ID, or why it can't be, under `field`.
+ */
+export async function creditStoreCreditIn(
+  tx: Tx,
+  tenant: { shopId: string; actor: Actor | 'system' },
+  grant: StoreCreditGrant,
+  field: string[],
+  at: Date = new Date(),
+): Promise<MutationResult<string>> {
+  const account = await openAccount(tx, tenant.shopId, grant.customerId, grant.currency);
+  if (!account) return failOne(field, 'NOT_FOUND', 'The customer has no account to credit');
+  return creditIn(tx, tenant.shopId, tenant.actor, account, {
+    id: grant.id,
+    amount: grant.amount,
+    event: grant.event,
+    expiresAt: grant.expiresAt ?? null,
+    orderId: grant.orderId ?? null,
+    refundId: grant.refundId ?? null,
+    note: grant.note ?? '',
+    field,
+    at,
+  });
+}
+
+/**
+ * Takes back, in the caller's transaction, what is left of the credit an order earned its
+ * customer, as for paying a cash-on-delivery order online (ADR-432), once the order is cancelled:
+ * an adjustment debit of each such credit's rest, noted `note`. What was spent of it stays spent.
+ * How much it took back.
+ */
+export async function withdrawOrderCreditIn(
+  tx: Tx,
+  shopId: string,
+  actor: Actor | 'system',
+  orderId: string,
+  note: string,
+): Promise<bigint> {
+  const { rows: credits } = await tx.execute<{ id: string; account_id: string }>(sql`
+    SELECT id, account_id FROM customers.store_credit_transactions
+     WHERE shop_id = ${shopId} AND order_id = ${orderId} AND kind = 'credit'
+       AND event = 'adjustment' AND remaining > 0
+     ORDER BY created_at, id`);
+  const { actorKind, actorId } = actorOf(actor);
+  let taken = 0n;
+  for (const credit of credits) {
+    // Held as every change of the account is made; what is left read once it is.
+    await lockAccount(tx, shopId, credit.account_id);
+    const { rows } = await tx.execute<{ remaining: string }>(sql`
+      SELECT remaining::text AS remaining FROM customers.store_credit_transactions
+       WHERE shop_id = ${shopId} AND id = ${credit.id}`);
+    const left = BigInt(rows[0]!.remaining);
+    if (left === 0n) continue;
+    const id = newId();
+    await tx.execute(sql`
+      INSERT INTO customers.store_credit_transactions
+             (shop_id, id, account_id, kind, event, amount, order_id, note, actor_kind, actor_id)
+      VALUES (${shopId}, ${id}, ${credit.account_id}, 'debit', 'adjustment', ${left},
+              ${orderId}, ${note}, ${actorKind}, ${actorId})`);
+    await tx.execute(sql`
+      UPDATE customers.store_credit_transactions SET remaining = 0
+       WHERE shop_id = ${shopId} AND id = ${credit.id}`);
+    await tx.execute(sql`
+      INSERT INTO customers.store_credit_allocations (shop_id, debit_id, credit_id, amount)
+      VALUES (${shopId}, ${id}, ${credit.id}, ${left})`);
+    taken += left;
+  }
+  return taken;
+}
+
 /** Whether the shop has given any customer store credit: checkout offers it only then. */
 export async function shopGivesStoreCreditIn(tx: Tx, shopId: string): Promise<boolean> {
   const { rows } = await tx.execute<{ gives: boolean }>(sql`

@@ -19,12 +19,18 @@ import {
   type WhatsAppTemplateRecord,
 } from './whatsapp-templates.service.js';
 
-/** The shop's automations' recipes (MKT-04, ADR-425, ADR-429). */
-export const AUTOMATION_KINDS = ['welcome', 'win_back', 'back_in_stock'] as const;
+/** The shop's automations' recipes (MKT-04, ADR-425, ADR-429, ADR-432). */
+export const AUTOMATION_KINDS = ['welcome', 'win_back', 'back_in_stock', 'cod_prepaid'] as const;
 export type AutomationKind = (typeof AUTOMATION_KINDS)[number];
 
 /** Recipes that send Hatti's own template from its shared number, needing none of the shop's. */
-const HATTI_TEMPLATE_KINDS: readonly AutomationKind[] = ['back_in_stock'];
+const HATTI_TEMPLATE_KINDS: readonly AutomationKind[] = ['back_in_stock', 'cod_prepaid'];
+
+/**
+ * The store credit COD to prepaid offers for paying a confirmed order online (ADR-432), in
+ * minor units: by default, and its bounds, Rs 10 to Rs 10,000.
+ */
+export const COD_PREPAID_CREDIT = { default: 10_000n, min: 1_000n, max: 1_000_000n } as const;
 
 /** How many days after a customer's last order a win-back goes: by default, and its bounds. */
 export const WIN_BACK_DAYS = { default: 60, min: 14, max: 365 } as const;
@@ -56,6 +62,8 @@ export interface AutomationRecord {
   template: WhatsAppTemplateRecord | null;
   /** For a win-back: how many days after the customer's last order. */
   afterDays: number | null;
+  /** For COD to prepaid: the store credit offered, in minor units. */
+  creditAmount: bigint | null;
   /** When the shop last changed it; null for one never set. */
   updatedAt: Date | null;
 }
@@ -64,6 +72,8 @@ export interface AutomationInput {
   enabled?: boolean;
   templateId?: string | null;
   afterDays?: number | null;
+  /** For COD to prepaid: the store credit offered, in the shop's currency's major units. */
+  creditAmount?: string | null;
 }
 
 type AutomationRow = {
@@ -71,6 +81,7 @@ type AutomationRow = {
   enabled: boolean;
   template_id: string | null;
   after_days: number | null;
+  credit_amount: string | null;
   updated_at: string | Date;
 };
 
@@ -103,6 +114,12 @@ export class AutomationsService {
         enabled: row?.enabled ?? false,
         template: templates.find((each) => each.id === row?.template_id) ?? null,
         afterDays: kind === 'win_back' ? (row?.after_days ?? WIN_BACK_DAYS.default) : null,
+        creditAmount:
+          kind === 'cod_prepaid'
+            ? row?.credit_amount
+              ? BigInt(row.credit_amount)
+              : COD_PREPAID_CREDIT.default
+            : null,
         updatedAt: row ? toDate(row.updated_at) : null,
       };
     });
@@ -137,6 +154,22 @@ export class AutomationsService {
         afterDays = input.afterDays;
       }
     }
+    let creditAmount = current.creditAmount;
+    if (input.creditAmount !== undefined && input.creditAmount !== null) {
+      const field = ['input', 'creditAmount'];
+      if (kind !== 'cod_prepaid') {
+        check.addMessage(field, 'INVALID', 'Only COD to prepaid offers store credit');
+      } else {
+        const amount = check.price(field, input.creditAmount, tenant.currency, { required: true });
+        if (amount !== null) {
+          if (amount < COD_PREPAID_CREDIT.min || amount > COD_PREPAID_CREDIT.max) {
+            check.addMessage(field, 'INVALID', 'Offer between Rs 10 and Rs 10,000 in store credit');
+          } else {
+            creditAmount = amount;
+          }
+        }
+      }
+    }
     if (!check.ok) return { ok: false, errors: check.errors };
 
     const hatti = HATTI_TEMPLATE_KINDS.includes(kind);
@@ -144,7 +177,8 @@ export class AutomationsService {
       return failOne(
         ['input', 'templateId'],
         'INVALID',
-        "Back in stock is sent from Hatti's number, with no template of the shop's",
+        `${kind === 'cod_prepaid' ? 'COD to prepaid' : 'Back in stock'} is sent from Hatti's ` +
+          "number, with no template of the shop's",
       );
     }
     const templateId = hatti
@@ -175,12 +209,15 @@ export class AutomationsService {
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<AutomationRow>(sql`
-        INSERT INTO messaging.automations (shop_id, kind, enabled, template_id, after_days)
-        VALUES (${tenant.shopId}, ${kind}, ${enabled}, ${templateId}, ${afterDays})
+        INSERT INTO messaging.automations
+               (shop_id, kind, enabled, template_id, after_days, credit_amount)
+        VALUES (${tenant.shopId}, ${kind}, ${enabled}, ${templateId}, ${afterDays},
+                ${creditAmount})
         ON CONFLICT (shop_id, kind) DO UPDATE
            SET enabled = EXCLUDED.enabled, template_id = EXCLUDED.template_id,
-               after_days = EXCLUDED.after_days, updated_at = now()
-        RETURNING kind, enabled, template_id, after_days, updated_at`);
+               after_days = EXCLUDED.after_days, credit_amount = EXCLUDED.credit_amount,
+               updated_at = now()
+        RETURNING kind, enabled, template_id, after_days, credit_amount, updated_at`);
       const row = rows[0]!;
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<MarketingAutomationUpdatedPayload>(tx, tenant.shopId, {
@@ -194,7 +231,13 @@ export class AutomationsService {
         subjectType: 'shop',
         subjectId: tenant.shopId,
         ...actor,
-        details: { kind, enabled, template: template?.name ?? null, afterDays },
+        details: {
+          kind,
+          enabled,
+          template: template?.name ?? null,
+          afterDays,
+          creditAmount: creditAmount?.toString() ?? null,
+        },
       });
       return {
         ok: true,
@@ -203,6 +246,7 @@ export class AutomationsService {
           enabled: row.enabled,
           template,
           afterDays: row.after_days,
+          creditAmount: row.credit_amount === null ? null : BigInt(row.credit_amount),
           updatedAt: toDate(row.updated_at),
         },
       };
@@ -326,9 +370,20 @@ export class AutomationsService {
 
 async function automationsIn(tx: Tx, shopId: string): Promise<AutomationRow[]> {
   const { rows } = await tx.execute<AutomationRow>(sql`
-    SELECT kind, enabled, template_id, after_days, updated_at
+    SELECT kind, enabled, template_id, after_days, credit_amount, updated_at
       FROM messaging.automations WHERE shop_id = ${shopId}`);
   return rows;
+}
+
+/**
+ * The store credit the shop's COD to prepaid offers, in the caller's transaction `tx`, while it is
+ * on (ADR-432); null while it is off.
+ */
+export async function codPrepaidCreditIn(tx: Tx, shopId: string): Promise<bigint | null> {
+  const row = (await automationsIn(tx, shopId)).find(
+    (each) => each.kind === 'cod_prepaid' && each.enabled,
+  );
+  return row ? BigInt(row.credit_amount ?? COD_PREPAID_CREDIT.default) : null;
 }
 
 /** Whether the shop's automation of `kind` is on, in the caller's transaction `tx`. */

@@ -49,8 +49,9 @@ import {
   awaitsCustomer,
   cancellableByCustomer,
   orderLinkExpiry,
+  onlineOwed,
   orderName,
-  transferOwed,
+  prepayOwed,
 } from './rules.js';
 import { orders, type OrderRow } from './schema.js';
 import { shownDigest, shownOfOrder, type ShownTerm } from './shown-order.js';
@@ -129,7 +130,11 @@ export type OrderLinkView =
        * While it waits for money and the shop takes it online (ADR-151): through which gateways,
        * for the customer to choose among (ADR-219), and how much, in minor units.
        */
-      onlinePayment: { gateways: OnlineGateway[]; amount: bigint } | null;
+      /**
+       * What the shop's gateways take online, and the store credit paying it all gives, offered
+       * a cash-on-delivery order (ADR-432).
+       */
+      onlinePayment: { gateways: OnlineGateway[]; amount: bigint; credit?: bigint } | null;
       /** Its parcels' steps on their way (ADR-160), by parcel. */
       steps: ParcelSteps;
       /** Once it is delivered, its products to rate (ADR-399); empty before. */
@@ -429,7 +434,7 @@ export class OrderLinkService {
     // Back partway: on to the gateway's next page, as Easypaisa's asks (ADR-214).
     if (outcome && view.onlinePayment) return { ...view, gatewayForm: outcome };
     // Its webhook may have said so already; or nothing has yet.
-    const owed = view.order.status === 'open' ? transferOwed(view.order) : 0n;
+    const owed = view.order.status === 'open' ? onlineOwed(view.order) : 0n;
     return owed > 0n ? { ...view, problem: { kind: 'payment', reason: 'pending' } } : view;
   }
 
@@ -492,9 +497,10 @@ export class OrderLinkService {
       awaitsCustomer(record) && !record.agreement
         ? await linkTermsIn(tx, shopId, this.storefronts)
         : [];
-    // What it waits for before it ships, which the shop's gateways may take online.
-    const owed =
-      record.status === 'open' && record.stage === 'awaiting_payment' ? transferOwed(record) : 0n;
+    // What it waits for before it ships, or the rest of a cash-on-delivery order offered credit
+    // for paying it (ADR-432), which the shop's gateways may take online.
+    const owed = onlineOwed(record);
+    const credit = prepayOwed(record) > 0n ? record.prepayCredit : null;
     const gateways =
       owed > 0n && this.payments ? await this.payments.gatewaysOf(tx, shopId, record.currency) : [];
     return {
@@ -509,7 +515,8 @@ export class OrderLinkService {
         record.paymentMethod === 'bank_transfer' || record.advanceDue > 0n
           ? await receiptCountIn(tx, shopId, order.id)
           : 0,
-      onlinePayment: gateways.length > 0 ? { gateways, amount: owed } : null,
+      onlinePayment:
+        gateways.length > 0 ? { gateways, amount: owed, ...(credit !== null && { credit }) } : null,
       steps: await fulfillmentEventsIn(
         tx,
         shopId,

@@ -99,6 +99,7 @@ import { ErasedReceipts } from './erased-receipts.js';
 import { HandleRedirects } from './handle-redirects.js';
 import { LowStockAlerts } from './low-stock-alerts.js';
 import { BackInStockAlerts } from './back-in-stock.js';
+import { CodPrepaidOffers } from './cod-prepaid-offers.js';
 import { ParcelSteps } from './parcel-steps.js';
 import { PaymentInquiries } from './payment-inquiries.js';
 import { MessagesSender, OrderNotifications } from './notifications.js';
@@ -127,6 +128,7 @@ export interface EventConsumers {
   notifications?: OrderNotifications;
   lowStock?: LowStockAlerts;
   backInStock?: BackInStockAlerts;
+  codPrepaid?: CodPrepaidOffers;
   parcelSteps?: ParcelSteps;
   billing?: BillingNotices;
   staff?: StaffAlerts;
@@ -150,6 +152,7 @@ export function eventHandlers(
     notifications,
     lowStock,
     backInStock,
+    codPrepaid,
     parcelSteps,
     billing,
     staff,
@@ -202,6 +205,13 @@ export function eventHandlers(
     for (const type of BackInStockAlerts.EVENTS) {
       registry.on(type, async (event) => {
         await backInStock.handle(event);
+      });
+    }
+  }
+  if (codPrepaid) {
+    for (const type of CodPrepaidOffers.EVENTS) {
+      registry.on(type, async (event) => {
+        await codPrepaid.handle(event);
       });
     }
   }
@@ -325,6 +335,13 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           automations: new AutomationTriggers(
             workerAutomations(database, config.ENCRYPTION_KEYS),
             new CustomerService(database),
+          ),
+          // COD to prepaid offers credit only where the shop's gateways take payments (ADR-432).
+          codPrepaid: new CodPrepaidOffers(
+            database,
+            new MessagesService(database),
+            workerOnlinePayments(database, config, config.ENCRYPTION_KEYS),
+            new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
           ),
         }),
       }),
@@ -521,18 +538,8 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       }).start(config.COURIER_BOOKINGS_INTERVAL_MS);
       closers.push(() => bookings.stop());
       // Payments started online whose customers never came back, asked after (ADR-208).
-      const gateways = paymentGatewaysOf({ production: config.NODE_ENV === 'production' });
       const inquiries = new PaymentInquiries(
-        new OnlinePaymentService(
-          database,
-          new GatewayAccountService(
-            database,
-            config.ENCRYPTION_KEYS,
-            new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
-            gateways,
-          ),
-          gateways,
-        ),
+        workerOnlinePayments(database, config, config.ENCRYPTION_KEYS),
         logger,
       ).start(config.SWEEP_INTERVAL_MS);
       closers.push(() => inquiries.stop());
@@ -612,6 +619,25 @@ function workerSegments(database: Database): SegmentService {
   const registry = new SegmentFieldRegistry();
   registry.register(ORDER_SEGMENT_FACTS);
   return new SegmentService(database, registry);
+}
+
+/** The shops' gateways, as the API takes payments through them (ADR-151). */
+function workerOnlinePayments(
+  database: Database,
+  config: WorkerConfig,
+  box: SecretBox,
+): OnlinePaymentService {
+  const gateways = paymentGatewaysOf({ production: config.NODE_ENV === 'production' });
+  return new OnlinePaymentService(
+    database,
+    new GatewayAccountService(
+      database,
+      box,
+      new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
+      gateways,
+    ),
+    gateways,
+  );
 }
 
 /** Cloudflare's cache, in front of storefronts and images, where it is set up; else none. */

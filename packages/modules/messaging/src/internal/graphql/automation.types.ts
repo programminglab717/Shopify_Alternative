@@ -1,4 +1,4 @@
-import { UserError } from '@hatti/api';
+import { Money, UserError } from '@hatti/api';
 import {
   Field,
   GraphQLISODateTime,
@@ -14,6 +14,7 @@ export enum MarketingAutomationKind {
   WELCOME = 'WELCOME',
   WIN_BACK = 'WIN_BACK',
   BACK_IN_STOCK = 'BACK_IN_STOCK',
+  COD_PREPAID = 'COD_PREPAID',
 }
 
 registerEnumType(MarketingAutomationKind, {
@@ -35,6 +36,12 @@ registerEnumType(MarketingAutomationKind, {
         'Once, to a shopper who asked on the storefront to hear when a sold-out variant is for ' +
         "sale again: from Hatti's number, with the product's link, needing no template of the " +
         "shop's (ADR-429).",
+    },
+    COD_PREPAID: {
+      description:
+        'Once, when a cash-on-delivery order is confirmed: store credit offered for paying the ' +
+        "rest online before it is packed, from Hatti's number with the order's link, needing no " +
+        "template of the shop's (ADR-432).",
     },
   },
 });
@@ -63,6 +70,12 @@ export class MarketingAutomation {
   })
   afterDays!: number | null;
 
+  @Field(() => Money, {
+    nullable: true,
+    description: 'For COD to prepaid: the store credit offered for paying online.',
+  })
+  creditAmount!: Money | null;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'When the shop last changed it; null for one never set.',
@@ -83,6 +96,12 @@ export class MarketingAutomationInput {
     description: "For a win-back: 14 to 365 days after the customer's last order.",
   })
   afterDays?: number | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'For COD to prepaid: Rs 10 to Rs 10,000 of store credit, as "100".',
+  })
+  creditAmount?: string | null;
 }
 
 @ObjectType()

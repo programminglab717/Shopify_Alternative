@@ -742,7 +742,7 @@ function statusPage(
     /** They came back from paying online, and it is in. */
     paid?: boolean;
     /** What the shop's gateways take online of what the order waits for (ADR-151, ADR-219). */
-    onlinePayment?: { gateways: OnlineGateway[]; amount: bigint } | null;
+    onlinePayment?: { gateways: OnlineGateway[]; amount: bigint; credit?: bigint | null } | null;
     /** Its parcels' steps on their way (ADR-160). */
     steps?: ParcelSteps;
     /** Once delivered, its products to rate (ADR-399). */
@@ -854,6 +854,8 @@ function statusPage(
         },
         true,
         pay,
+        // Store credit offered for paying the rest online instead (ADR-432).
+        onlinePayment && payOnlineForm(onlinePayment, shown.currency, false),
         summary(shown),
         address(shown, { changeable }),
         cancellable && cancelLink(),
