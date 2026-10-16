@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Sign-up pop-up
+### 90eb047 · Sign-up pop-up
 
 * **Hatti Base's pop-up for sign-ups on WhatsApp, with an offer's code** ([ADR-457](../architecture/13-decision-log.md#adr-457--hatti-bases-sign-up-pop-up-asks-for-a-shoppers-number-on-whatsapp-through-shopifys-customer-form-after-some-seconds-or-as-they-leave-stays-away-once-closed-or-signed-up-and-gives-the-shops-code-to-those-who-sign-up), MKT-13).
 * 2927 tests, from 2926: the storefront's render test of it.
