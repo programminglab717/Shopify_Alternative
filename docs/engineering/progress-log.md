@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Back in stock
+### 092edf2 · Back in stock
 
 * **A shopper who finds a variant sold out** ([ADR-429](../architecture/13-decision-log.md#adr-429--back-in-stock-a-shopper-who-finds-a-variant-sold-out-leaves-their-number-and-is-told-once-on-whatsapp-from-hattis-number-when-it-sells-online-again-while-the-shops-automation-is-on), MKT-04) can leave their number, through
   the storefront's API, while the shop's new automation is on.
