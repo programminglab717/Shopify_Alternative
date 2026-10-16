@@ -1,9 +1,18 @@
-import { InputChecker, fail, failOne, type MutationResult, type TenantContext } from '@hatti/api';
+import { AiGateway, TRANSLATION_DRAFT_MAX_CHARACTERS, draftTranslations } from '@hatti/ai';
+import {
+  InputChecker,
+  fail,
+  failOne,
+  shopProfile,
+  type MutationResult,
+  type TenantContext,
+} from '@hatti/api';
 import { CollectionService, ProductService } from '@hatti/catalog/public';
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
+import { newId } from '@hatti/ids';
 import { searchKey } from '@hatti/pk';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { ArticleService } from './article.service.js';
 import { BlogService } from './blog.service.js';
@@ -12,7 +21,14 @@ import { OnlineStoreEvents, type TranslationsUpdatedPayload } from './events.js'
 import { MenuService } from './menu.service.js';
 import { PageService } from './page.service.js';
 import type { MenuItemRecord, Page } from './records.js';
-import { articles, pages, policies, preferences, translations } from './schema.js';
+import {
+  articles,
+  pages,
+  policies,
+  preferences,
+  translationDrafts,
+  translations,
+} from './schema.js';
 import {
   TRANSLATABLE_FIELDS,
   TRANSLATION_LIMITS,
@@ -55,6 +71,24 @@ export interface TranslationInputValue {
   value: string;
   /** The digest of the words it translates, as the API gave it. */
   translatableContentDigest: string;
+}
+
+/** An AI draft of a field's translation, for the shop to check and keep (CAT-07, ADR-463). */
+export interface TranslationDraftRecord {
+  key: TranslationKey;
+  value: string;
+  /** The digest of the shop's words it was drafted for, as a translation names it to keep it. */
+  digest: string;
+}
+
+/** How many AI drafts a shop may ask for, and in what time. */
+export const TRANSLATION_DRAFT_LIMITS = { perDay: 100 } as const;
+
+/** Whether a shop may ask for AI drafts, and how many it has asked for in the last day. */
+export interface TranslationDraftingRecord {
+  available: boolean;
+  usedToday: number;
+  limitPerDay: number;
 }
 
 /** Translations as the storefront's documents take them: words by language, then field. */
@@ -120,7 +154,130 @@ export class TranslationService {
     private readonly blogService: BlogService,
     private readonly articleService: ArticleService,
     private readonly menus: MenuService,
+    /** The AI gateway, where the host configured one (ADR-463): without it, no drafts. */
+    @Optional() @Inject(AiGateway) private readonly ai?: AiGateway | null,
   ) {}
+
+  /** Whether the shop may ask for AI drafts of translations, and how many are left today. */
+  async drafting(
+    tenant: TenantContext,
+    now: Date = new Date(),
+  ): Promise<TranslationDraftingRecord> {
+    const usedToday = await this.db.tenant(tenant.shopId, (tx) =>
+      draftsSince(tx, tenant.shopId, now),
+    );
+    return { available: Boolean(this.ai), usedToday, limitPerDay: TRANSLATION_DRAFT_LIMITS.perDay };
+  }
+
+  /**
+   * AI drafts of the resource's fields in `locale` (CAT-07, ADR-463): those named, or all with
+   * words, each checked as a translation is and with the digest of the words it was drafted for.
+   * Nothing is kept: the shop checks them in its form and keeps them as translations, which is
+   * its review. A hundred asks a day at most, each logged with what it cost.
+   */
+  async draft(
+    tenant: TenantContext,
+    kind: TranslatableKind,
+    id: string,
+    input: { locale: string; keys?: readonly string[] | null },
+    now: Date = new Date(),
+  ): Promise<MutationResult<TranslationDraftRecord[]>> {
+    const ai = this.ai;
+    if (!ai) return failOne(['base'], 'UNAVAILABLE', "AI drafts aren't set up here");
+    if (!isTranslationLocale(input.locale)) {
+      return failOne(
+        ['locale'],
+        'INVALID',
+        `Locale ${input.locale.slice(0, 20)} is not one the storefront shows besides the shop's ` +
+          `own: ${TRANSLATION_LOCALES.join(', ')}`,
+      );
+    }
+    const wanted = input.keys && input.keys.length > 0 ? new Set(input.keys) : null;
+    for (const key of wanted ?? []) {
+      if (!TRANSLATABLE_FIELDS[kind].includes(key as TranslationKey)) {
+        return failOne(
+          ['keys'],
+          'INVALID',
+          `Key ${key.slice(0, 40)} is not a field of ${aName(kind)} that can be translated: ` +
+            TRANSLATABLE_FIELDS[kind].join(', '),
+        );
+      }
+    }
+    const read = await this.db.tenant(tenant.shopId, async (tx) => {
+      const [content] = (await this.#contents(tx, tenant.shopId, kind, [id])).values();
+      if (!content) return null;
+      const used = await draftsSince(tx, tenant.shopId, now);
+      return { content, used, shopName: (await shopProfile(tx, tenant.shopId)).name };
+    });
+    if (!read) return failOne(['resourceId'], 'NOT_FOUND', `No such ${NAMES[kind]}`);
+    if (read.used >= TRANSLATION_DRAFT_LIMITS.perDay) {
+      return failOne(
+        ['base'],
+        'TOO_MANY',
+        `A shop may ask for ${TRANSLATION_DRAFT_LIMITS.perDay} AI drafts a day: try again tomorrow`,
+      );
+    }
+    const fields = read.content.filter((field) => !wanted || wanted.has(field.key));
+    if (fields.length === 0) {
+      return failOne(['keys'], 'BLANK', `The ${NAMES[kind]} has no words to draft`);
+    }
+    const characters = fields.reduce((sum, field) => sum + field.value.length, 0);
+    if (characters > TRANSLATION_DRAFT_MAX_CHARACTERS) {
+      return failOne(
+        ['keys'],
+        'TOO_LONG',
+        `A draft takes ${TRANSLATION_DRAFT_MAX_CHARACTERS.toLocaleString('en')} characters at ` +
+          'most: ask for fewer fields at once',
+      );
+    }
+    const result = await draftTranslations(ai, {
+      shopName: read.shopName,
+      resource: NAMES[kind],
+      fields: fields.map((field) => ({ key: field.key, type: field.type, text: field.value })),
+    });
+    const usage = result.usage ?? { inputTokens: 0, outputTokens: 0 };
+    await this.db.tenant(tenant.shopId, (tx) =>
+      tx.insert(translationDrafts).values({
+        shopId: tenant.shopId,
+        id: newId(),
+        resourceId: id,
+        locale: input.locale,
+        keys: fields.map((field) => field.key),
+        outcome: result.ok ? 'drafted' : result.reason,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        createdAt: now,
+      }),
+    );
+    if (!result.ok) {
+      return failOne(
+        ['base'],
+        'UNAVAILABLE',
+        result.reason === 'refused'
+          ? 'The AI would not draft these words: write them yourself'
+          : 'The AI could not draft these words just now: try again in a minute',
+      );
+    }
+    const byKey = new Map(fields.map((field) => [field.key, field]));
+    const drafts: TranslationDraftRecord[] = [];
+    for (const drafted of result.value) {
+      const field = byKey.get(drafted.key as TranslationKey);
+      if (!field) continue;
+      // As a translation is checked when kept: a draft that would not be kept is left out.
+      const check = new InputChecker();
+      const value = checkTranslation(check, ['value'], kind, field.key, drafted.value);
+      if (!check.ok || !value) continue;
+      drafts.push({
+        key: field.key,
+        value: translationValue(kind, field.key, value),
+        digest: field.digest,
+      });
+    }
+    if (drafts.length === 0) {
+      return failOne(['base'], 'UNAVAILABLE', 'The AI gave no draft to use: write them yourself');
+    }
+    return { ok: true, value: drafts };
+  }
 
   /** One resource's fields and their translations; null when the shop has none by the ID. */
   async resource(
@@ -591,4 +748,13 @@ export async function shopTranslationsOf(
       return [id, fields];
     }),
   );
+}
+
+/** How many AI drafts the shop asked for in the day before `now`. */
+async function draftsSince(tx: Tx, shopId: string, now: Date): Promise<number> {
+  const { rows } = await tx.execute<{ count: number }>(sql`
+    SELECT count(*)::int AS count FROM online_store.translation_drafts
+     WHERE shop_id = ${shopId}
+       AND created_at > ${new Date(now.getTime() - 86_400_000).toISOString()}`);
+  return rows[0]!.count;
 }

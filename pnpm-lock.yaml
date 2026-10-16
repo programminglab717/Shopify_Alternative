@@ -249,6 +249,9 @@ importers:
 
   apps/core:
     dependencies:
+      '@hatti/ai':
+        specifier: workspace:*
+        version: link:../../packages/platform/ai
       '@hatti/api':
         specifier: workspace:*
         version: link:../../packages/platform/api
@@ -1237,6 +1240,9 @@ importers:
 
   packages/modules/online-store:
     dependencies:
+      '@hatti/ai':
+        specifier: workspace:*
+        version: link:../../platform/ai
       '@hatti/api':
         specifier: workspace:*
         version: link:../../platform/api
@@ -1648,6 +1654,18 @@ importers:
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@24.19.0)(happy-dom@20.14.5)(vite@8.3.2(@types/node@24.19.0)(jiti@2.7.0)(yaml@2.9.1))
+
+  packages/platform/ai:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

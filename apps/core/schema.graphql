@@ -7660,6 +7660,11 @@ type Mutation {
   themePublish(id: ID!): ThemePublishPayload!
 
   """
+  AI drafts of a resource's fields in a language (CAT-07, ADR-463): those named, or all with words. Nothing is kept: the shop checks each and keeps it through translationsRegister with its digest. A hundred a day per shop.
+  """
+  translationsDraft(keys: [String!], locale: String!, resourceId: ID!): TranslationsDraftPayload!
+
+  """
   Keeps translations of a resource's fields, each naming the digest of the words it translates, as Shopify's translationsRegister: one kept already for a field in the language is replaced, and the storefront's Urdu pages show them a moment later.
   """
   translationsRegister(resourceId: ID!, translations: [TranslationInput!]!): TranslationsRegisterPayload!
@@ -11637,6 +11642,11 @@ type Query {
     """
     resourceIds: [ID!]!
   ): TranslatableResourceConnection!
+
+  """
+  Whether the shop may ask for AI drafts of translations (CAT-07), and how many it asked for in the last 24 hours.
+  """
+  translationDrafting: TranslationDrafting!
   urlRedirect(id: ID!): UrlRedirect
 
   """The shop's URL redirects, oldest first."""
@@ -13412,6 +13422,34 @@ type Translation {
   value: String
 }
 
+"""
+An AI draft of a field's translation (CAT-07, ADR-463): never kept until the shop keeps it through translationsRegister, with this digest, once it has checked it.
+"""
+type TranslationDraft {
+  """The field, by Shopify's key for it."""
+  key: String!
+
+  """The digest of the shop's words it was drafted for, to keep it by."""
+  translatableContentDigest: String!
+
+  """The draft, as a translation of the field would be given."""
+  value: String!
+}
+
+"""
+Whether the shop may ask for AI drafts of translations, and how many are left.
+"""
+type TranslationDrafting {
+  """Whether this Hatti drafts translations with AI at all."""
+  available: Boolean!
+
+  """Drafts a shop may ask for in 24 hours."""
+  limitPerDay: Int!
+
+  """Drafts asked for in the last 24 hours."""
+  usedToday: Int!
+}
+
 """A field's translation, as Shopify's TranslationInput."""
 input TranslationInput {
   """The field, by Shopify's key, as its TranslatableContent names it."""
@@ -13429,6 +13467,12 @@ input TranslationInput {
   Its words: a title on one line; a product's or collection's description as HTML, kept as its paragraphs and line breaks, as the description is; HTML of a page or article cleaned of anything that could run.
   """
   value: String!
+}
+
+type TranslationsDraftPayload {
+  """The drafts; null on errors."""
+  drafts: [TranslationDraft!]
+  userErrors: [UserError!]!
 }
 
 type TranslationsRegisterPayload {

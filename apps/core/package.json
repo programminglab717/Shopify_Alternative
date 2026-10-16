@@ -18,6 +18,7 @@
     "trust-reports": "node --env-file-if-exists=../../.env --enable-source-maps dist/trust-reports.js"
   },
   "dependencies": {
+    "@hatti/ai": "workspace:*",
     "@hatti/api": "workspace:*",
     "@hatti/apps": "workspace:*",
     "@hatti/billing": "workspace:*",

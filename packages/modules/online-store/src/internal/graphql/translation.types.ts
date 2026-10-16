@@ -237,3 +237,44 @@ export class TranslationsRemovePayload {
   @Field(() => [UserError])
   userErrors!: UserError[];
 }
+
+@ObjectType({
+  description:
+    "An AI draft of a field's translation (CAT-07, ADR-463): never kept until the shop keeps it " +
+    'through translationsRegister, with this digest, once it has checked it.',
+})
+export class TranslationDraft {
+  @Field(() => String, { description: "The field, by Shopify's key for it." })
+  key!: string;
+
+  @Field(() => String, { description: 'The draft, as a translation of the field would be given.' })
+  value!: string;
+
+  @Field(() => String, {
+    description: "The digest of the shop's words it was drafted for, to keep it by.",
+  })
+  translatableContentDigest!: string;
+}
+
+@ObjectType()
+export class TranslationsDraftPayload {
+  @Field(() => [TranslationDraft], { nullable: true, description: 'The drafts; null on errors.' })
+  drafts!: TranslationDraft[] | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType({
+  description: 'Whether the shop may ask for AI drafts of translations, and how many are left.',
+})
+export class TranslationDrafting {
+  @Field(() => Boolean, { description: 'Whether this Hatti drafts translations with AI at all.' })
+  available!: boolean;
+
+  @Field(() => Int, { description: 'Drafts asked for in the last 24 hours.' })
+  usedToday!: number;
+
+  @Field(() => Int, { description: 'Drafts a shop may ask for in 24 hours.' })
+  limitPerDay!: number;
+}

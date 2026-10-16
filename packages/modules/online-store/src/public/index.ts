@@ -83,8 +83,11 @@ export {
   type TranslationKey,
 } from '../internal/translation-content.js';
 export {
+  TRANSLATION_DRAFT_LIMITS,
   TranslationService,
   shopTranslationsOf,
+  type TranslationDraftRecord,
+  type TranslationDraftingRecord,
   type TranslatableResourceRecord,
   type TranslatedFields,
   type TranslationInputValue,

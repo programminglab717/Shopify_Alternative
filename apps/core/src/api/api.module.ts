@@ -1,3 +1,4 @@
+import { AiGateway } from '@hatti/ai';
 import {
   DnsLookup,
   PublicSite,
@@ -94,6 +95,8 @@ export interface ApiModuleOptions {
   dnsLookup?: DnsLookup;
   /** Where files are kept (ADR-079): R2 in production, a directory in development. */
   storage: ObjectStorage;
+  /** The AI gateway (ADR-463), where configured; without it, nothing is drafted with AI. */
+  ai?: AiGateway | null;
   /** The couriers shops connect accounts with and book through (ADR-149); PostEx unless given. */
   couriers?: Couriers;
   /**
@@ -136,6 +139,7 @@ class InfrastructureModule {
         },
         { provide: DnsLookup, useValue: options.dnsLookup ?? new SystemDnsLookup() },
         { provide: ObjectStorage, useValue: options.storage },
+        { provide: AiGateway, useValue: options.ai ?? null },
         // The keys staff sign-in encrypts with; theme previews' links are sealed with them too.
         { provide: SecretBox, useValue: options.identity.secretBox },
         // A duplicated product's stock settings, which the catalog asks the inventory for (ADR-343).
@@ -150,6 +154,7 @@ class InfrastructureModule {
         DnsLookup,
         SecretBox,
         ObjectStorage,
+        AiGateway,
         CopiedVariantStock,
       ],
     };

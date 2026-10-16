@@ -305,8 +305,20 @@ const apiSchema = z
     BILLING_BANK_NAME: z.string().trim().min(1).max(100).optional(),
     BILLING_BANK_IBAN: pkIban().optional(),
     BILLING_RAAST_ID: pkMobile().optional(),
+    /**
+     * The AI gateway (ADR-463): the model provider's API key and the model's ID, both or neither,
+     * and the provider's address where it is not Anthropic's own, as for a proxy. No model is
+     * named in code: changing it is a change here. Without them, nothing is drafted with AI.
+     */
+    AI_API_KEY: env.secret(16).optional(),
+    AI_MODEL: z.string().trim().min(1).max(200).optional(),
+    AI_BASE_URL: env.httpUrl().optional(),
     ...messageSending,
     ...storage,
+  })
+  .refine((config) => (config.AI_API_KEY === undefined) === (config.AI_MODEL === undefined), {
+    path: ['AI_MODEL'],
+    message: 'Set both AI_API_KEY and AI_MODEL, or neither',
   })
   .refine(
     (config) =>

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-462 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-463 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -470,6 +470,7 @@
 | 460 | Shoppers report a store to Hatti from every store's footer: what is wrong, kept by a trust module, due a decision in 48 hours, dismissed or upheld by Hatti's people | Accepted |
 | 461 | Hatti's people take a store down when its reports are upheld: the shop suspended, its storefront answering with Hatti's page saying so, its checkout and admin closed, its owner told why, and restored the same way | Accepted |
 | 462 | The owner of a store taken down appeals through a link of its own in the notice: its page says why, takes their side, and shows Hatti's answer; refused with why, or upheld by restoring the store | Accepted |
+| 463 | AI drafts a resource's Urdu through one gateway whose model and key come from the host's configuration; drafts are never kept, the shop checks and saves them as translations, and each ask is logged with its tokens, a hundred a day | Accepted |
 
 ---
 
@@ -17605,3 +17606,50 @@
     apps. One page with one secret opens nothing else.
   * **Appealing by writing to Hatti's people:** nothing would keep the appeal with its
     takedown, nor show the owner the answer.
+
+## ADR-463 · AI drafts a resource's Urdu through one gateway whose model and key come from the host's configuration; drafts are never kept, the shop checks and saves them as translations, and each ask is logged with its tokens, a hundred a day
+
+* **Context:**
+  * CAT-07 asks for English and Urdu content with AI drafts of the translation, reviewed before
+    they are used. Shops keep their Urdu as Shopify's translations, each written for the digest
+    of the shop's own words (ADR-238).
+  * 09 §2 puts every model call behind one gateway, so models, keys and prompts are changed in
+    one place. A host may have no key at all, as in development and CI.
+* **Decision:**
+  * **`@hatti/ai` is the gateway.** It calls Anthropic's Messages API with the key, the model's
+    ID and, if given, the API's address from the host's configuration (`AI_API_KEY`,
+    `AI_MODEL`, `AI_BASE_URL`), both or neither. No model is named in code. An answer a machine
+    reads comes back through the one tool the model must call, and is checked before it is
+    used. A refusal, a failure and an answer that does not fit are told apart. A busy provider
+    (429, 5xx, 529) or a lost connection is tried once more. Each route's prompt lives in the
+    package; translation's is the first.
+  * **Without a key, nothing is drafted.** The API is given no gateway.
+    `translationDrafting.available` is false, and `translationsDraft` answers `UNAVAILABLE`.
+    Everything else works as before.
+  * **`translationsDraft(resourceId, locale, keys)`**, with `write_translations`, drafts a
+    resource's fields into Urdu: all those with words, or those named, 20,000 characters at most.
+    The shop's words go to the model as data between tags it is told never to obey. Names,
+    numbers, prices and HTML tags are kept, and words Pakistani shoppers say in English are
+    written in Urdu script. Each draft is checked as a translation is when it is kept; one that
+    would be refused is left out. The drafts come back with the digest of the words they
+    translate.
+  * **Drafts are never kept.** The admin fills its form with them. Saving them through
+    `translationsRegister`, with their digests, is the review. A draft of words that changed in
+    the meantime is refused as STALE, as any translation is.
+  * **Each ask is logged** in `online_store.translation_drafts`: the resource, its fields, what
+    came of it and the provider's input and output tokens, for what AI costs each shop. A shop
+    asks 100 times in 24 hours at most, counted from the log, whatever came of each.
+    `translationDrafting` gives whether drafts are available, and how many of the day's are used.
+* **Consequences:**
+  * Drafting works the moment a host is given a key and a model, and changing the model is a
+    configuration change.
+  * The model is called outside any transaction, so a slow provider holds no connection. Two
+    asks at the same moment may both pass the day's last place; a shop may go a draft or two
+    over the limit.
+  * Tests answer through a `fetch` of their own, so none needs a key or reaches the provider.
+* **Alternatives:**
+  * **Keeping drafts as translations marked as a machine's:** the storefront would have to tell
+    them apart, and an unread draft would show to shoppers if a flag were missed. A draft that
+    lives only in the form can't reach a shopper unsaved.
+  * **A provider's SDK:** one HTTP call needs none, and the gateway keeps its own types.
+  * **A model named in code as a default:** a host without one would call a model nobody chose.

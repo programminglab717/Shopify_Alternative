@@ -354,3 +354,21 @@ export const translations = onlineStoreSchema.table(
 );
 
 export type TranslationRow = typeof translations.$inferSelect;
+
+/** Asks for AI drafts of translations (ADR-463), kept for the quota and their cost alone. */
+export const translationDrafts = onlineStoreSchema.table(
+  'translation_drafts',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    resourceId: uuid('resource_id').notNull(),
+    locale: text('locale').notNull(),
+    keys: text('keys').array().notNull(),
+    /** "drafted", or the model's "refused", a "failed" call, an "invalid" answer. */
+    outcome: text('outcome').notNull(),
+    inputTokens: integer('input_tokens').notNull().default(0),
+    outputTokens: integer('output_tokens').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);

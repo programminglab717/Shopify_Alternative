@@ -1,3 +1,4 @@
+import type { AiGateway } from '@hatti/ai';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -72,6 +73,8 @@ export async function startTestApi(
     emails?: AccountEmails;
     /** Valkey, where storefronts count their sessions (ADR-180); without it, none are read. */
     redis?: Redis;
+    /** The AI gateway (ADR-463); without it, nothing is drafted with AI. */
+    ai?: AiGateway;
   } = {},
 ): Promise<TestApi> {
   const database = new Database({ appUrl: testDb.appUrl, applicationName: 'api-test' });
@@ -89,6 +92,7 @@ export async function startTestApi(
     database,
     storage,
     redis: options.redis ?? null,
+    ai: options.ai ?? null,
     logger: createLogger({ name: 'api-test', level: 'silent' }),
     identity: {
       db: identityDatabase.app,

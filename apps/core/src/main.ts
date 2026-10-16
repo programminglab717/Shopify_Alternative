@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { AiGateway } from '@hatti/ai';
 import { Database } from '@hatti/db';
 import { createRedis } from '@hatti/events';
 import { HaveIBeenPwnedChecker, noBreachCheck } from '@hatti/identity/public';
@@ -83,6 +84,14 @@ const app = await createApi({
   paymentGateways: paymentGatewaysOf({ production: config.NODE_ENV === 'production' }),
   billingGateway: hattiGatewayOf(config),
   billingBankAccount: hattiBankAccountOf(config),
+  ai:
+    config.AI_API_KEY && config.AI_MODEL
+      ? new AiGateway({
+          apiKey: config.AI_API_KEY,
+          model: config.AI_MODEL,
+          ...(config.AI_BASE_URL && { baseUrl: config.AI_BASE_URL }),
+        })
+      : null,
 });
 await app.listen({ host: config.HOST, port: config.PORT });
 

@@ -32,7 +32,10 @@ import {
   TranslatableResourcesArgs,
   TranslatableResourcesByIdsArgs,
   Translation,
+  TranslationDraft,
+  TranslationDrafting,
   TranslationInput,
+  TranslationsDraftPayload,
   TranslationsRegisterPayload,
   TranslationsRemovePayload,
 } from './translation.types.js';
@@ -137,6 +140,45 @@ export class TranslationResolver {
     const result = await this.service.register(tenant, kind, id, translations);
     return Object.assign(new TranslationsRegisterPayload(), {
       translations: result.ok ? result.value.map(toTranslation) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Query(() => TranslationDrafting, {
+    description:
+      'Whether the shop may ask for AI drafts of translations (CAT-07), and how many it asked ' +
+      'for in the last 24 hours.',
+  })
+  @RequireScopes('read_translations')
+  async translationDrafting(@CurrentTenant() tenant: TenantContext): Promise<TranslationDrafting> {
+    return Object.assign(new TranslationDrafting(), await this.service.drafting(tenant));
+  }
+
+  @Mutation(() => TranslationsDraftPayload, {
+    description:
+      "AI drafts of a resource's fields in a language (CAT-07, ADR-463): those named, or all " +
+      'with words. Nothing is kept: the shop checks each and keeps it through ' +
+      'translationsRegister with its digest. A hundred a day per shop.',
+  })
+  @RequireScopes('write_translations')
+  async translationsDraft(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('resourceId', { type: () => ID }) resourceId: string,
+    @Args('locale', { type: () => String }) locale: string,
+    @Args('keys', { type: () => [String], nullable: true }) keys: string[] | null,
+  ): Promise<TranslationsDraftPayload> {
+    const { kind, id } = resourceOf(resourceId);
+    const result = await this.service.draft(tenant, kind, id, { locale, keys });
+    return Object.assign(new TranslationsDraftPayload(), {
+      drafts: result.ok
+        ? result.value.map((draft) =>
+            Object.assign(new TranslationDraft(), {
+              key: draft.key,
+              value: draft.value,
+              translatableContentDigest: draft.digest,
+            }),
+          )
+        : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }

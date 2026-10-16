@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### AI drafts of translations
+
+* **AI drafts a resource's Urdu through one gateway whose model and key come from the host's
+  configuration; drafts are never kept, the shop checks and saves them** ([ADR-463](../architecture/13-decision-log.md#adr-463--ai-drafts-a-resources-urdu-through-one-gateway-whose-model-and-key-come-from-the-hosts-configuration-drafts-are-never-kept-the-shop-checks-and-saves-them-as-translations-and-each-ask-is-logged-with-its-tokens-a-hundred-a-day), CAT-07, the
+  admin's button next). Without a key, nothing is drafted.
+* 2945 tests, from 2940: the gateway's two, the online store's two drafting tests
+  and the core's drafting test, each answering through a `fetch` of its own.
+
 ### 1b055af · Appeals of stores taken down
 
 * **The owner of a store taken down appeals through a link of its own in the notice; Hatti's
