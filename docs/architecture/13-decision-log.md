@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-468 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-469 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -476,6 +476,7 @@
 | 466 | Hatti Base says beside a product's promises, and in its footer, that Hatti verified the shop: its seller's identity, or a registered business | Accepted |
 | 467 | The admin's verification page shows what Hatti verified and why a request was refused, and takes the owner's next request, photos uploaded before they confirm who they are | Accepted |
 | 468 | A shop says how many days buyers have to return an order, and whether for an exchange or their money: on each product page, and to search engines as its return policy | Accepted |
+| 469 | A shop asks for its customers' SMS to come from a name of its own, which Hatti's people approve once operators register it for a verified shop; what Hatti tells the shop itself still comes from Hatti's | Accepted |
 
 ---
 
@@ -17801,3 +17802,32 @@
     would be lost in its words.
   * **A window per product:** Pakistani shops state one for the whole shop; a product's own can
     come when a shop asks.
+
+## ADR-469 · A shop asks for its customers' SMS to come from a name of its own, which Hatti's people approve once operators register it for a verified shop; what Hatti tells the shop itself still comes from Hatti's
+
+* **Context:**
+  * Every SMS goes from Hatti's shared sender (ADR-146, ADR-458). MKT-02 lets a shop send as
+    itself. Pakistan's operators register alphanumeric senders ("masks") for a known business,
+    in about two weeks, outside any API Hatti can call (07 §3).
+* **Decision:**
+  * **`messaging.sms_senders`** keeps a shop's requests: a name of 3 to 11 letters, digits and
+    single spaces with a letter among them, waiting, approved, refused, withdrawn, replaced or
+    revoked. One waits at a time and one is in use; no two shops use the same name.
+  * **The Admin API:** `smsSender` reads the name in use and the latest requests;
+    `smsSenderRequest(name)` asks, in place of any name in use; `smsSenderWithdraw` withdraws
+    the request waiting. `read_settings` and `write_settings`.
+  * **Hatti's people** list the requests and approve, refuse or take back a name through
+    `trust-reports senders`, `approve-sender`, `refuse-sender` and `revoke-sender`. A name is
+    approved only for a shop Hatti verified (ADR-465), and replaces the one before. The shop
+    hears of each decision at its alerts number and by email, at Hatti's cost.
+  * **The worker** sends each SMS to the shop's customers, order news, codes and SMS campaigns
+    alike, with the shop's name as the gateway's `sender`; its alerts, its staff's word and
+    Hatti's notices keep Hatti's.
+* **Consequences:**
+  * Customers see the shop's name on its SMS once its operators have it; until then nothing
+    changes.
+  * A name taken back puts the shop back on the shared sender at once.
+* **Alternatives:**
+  * **A name sent before it is registered:** operators drop SMS from unregistered masks.
+  * **Hatti's alerts from the shop's name:** they are Hatti's word, and the shop would read
+    them as its own.

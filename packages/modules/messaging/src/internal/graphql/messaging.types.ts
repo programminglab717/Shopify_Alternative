@@ -56,6 +56,9 @@ export enum MessageKind {
   SHOP_VERIFIED = 'SHOP_VERIFIED',
   SHOP_VERIFICATION_REFUSED = 'SHOP_VERIFICATION_REFUSED',
   SHOP_VERIFICATION_REVOKED = 'SHOP_VERIFICATION_REVOKED',
+  SMS_SENDER_APPROVED = 'SMS_SENDER_APPROVED',
+  SMS_SENDER_REFUSED = 'SMS_SENDER_REFUSED',
+  SMS_SENDER_REVOKED = 'SMS_SENDER_REVOKED',
   BROADCAST = 'BROADCAST',
   AUTOMATION = 'AUTOMATION',
   SMS_BROADCAST = 'SMS_BROADCAST',
@@ -278,6 +281,21 @@ registerEnumType(MessageKind, {
       description:
         'For the shop, from Hatti and paid by Hatti, at its alerts number: Hatti has taken its ' +
         'verification back, and why (ADR-465).',
+    },
+    SMS_SENDER_APPROVED: {
+      description:
+        "For the shop, from Hatti and paid by Hatti, at its alerts number: its customers' SMS " +
+        'now come from its own name (ADR-469).',
+    },
+    SMS_SENDER_REFUSED: {
+      description:
+        'For the shop, from Hatti and paid by Hatti, at its alerts number: the name it asked ' +
+        'for could not be registered, and why (ADR-469).',
+    },
+    SMS_SENDER_REVOKED: {
+      description:
+        'For the shop, from Hatti and paid by Hatti, at its alerts number: its SMS no longer ' +
+        "come from its own name, and why; they come from Hatti's shared sender again (ADR-469).",
     },
     BROADCAST: {
       description:

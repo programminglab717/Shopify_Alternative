@@ -30,6 +30,11 @@ export interface OutgoingMessage {
   recipient: string;
   language: MessageLanguage;
   variables: MessageVariables;
+  /**
+   * For an SMS to the shop's customers: the name the shop's own sender registered (ADR-469), in
+   * place of the gateway's shared one.
+   */
+  sender?: string | null;
 }
 
 export type SendResult =
@@ -146,7 +151,7 @@ export interface SmsGatewayOptions {
   /** Where the gateway takes messages: a POST of `{ to, text, sender }` as JSON. */
   url: string;
   apiKey: string;
-  /** The sender ID the gateway sends from: Hatti's shared one. */
+  /** The sender ID the gateway sends from: Hatti's shared one, unless a message gives its own. */
   sender: string;
   timeoutMs?: number;
 }
@@ -171,7 +176,7 @@ export class SmsGatewayProvider implements MessageProvider {
         body: JSON.stringify({
           to: message.recipient,
           text: messageText(message.kind, message.language, message.variables),
-          sender,
+          sender: message.sender ?? sender,
         }),
         signal: AbortSignal.timeout(timeoutMs ?? 10_000),
       });

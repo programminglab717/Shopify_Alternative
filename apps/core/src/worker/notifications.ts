@@ -8,6 +8,7 @@ import {
   MARKETING_KINDS,
   MessagingEvents,
   SECRET_KINDS,
+  TO_THE_SHOP_KINDS,
   WHATSAPP_ONLY_KINDS,
   chargedFor,
   messageCostOf,
@@ -572,8 +573,20 @@ export interface MessagesSenderOptions {
    * shop that has not connected one. Without it, broadcasts fail, as not set up.
    */
   shopNumbers?: (shopId: string) => Promise<MessageProvider | null>;
+  /**
+   * The name each shop's customers' SMS go from, once Hatti approves one (ADR-469): null for
+   * Hatti's shared sender. Without it, every SMS goes from the shared sender.
+   */
+  smsSenders?: (shopId: string) => Promise<string | null>;
   logger?: Logger;
 }
+
+/** A message the sender took, with the name its SMS goes from where the shop has its own. */
+type Outgoing = ClaimedMessage & { sender?: string | null };
+
+/** Whether `message` goes from the shop's own SMS sender: an SMS to its customers (ADR-469). */
+const fromShopSender = (message: ClaimedMessage): boolean =>
+  message.channel === 'sms' && !TO_THE_SHOP_KINDS.includes(message.kind);
 
 /** Why a broadcast failed: the shop's own number is not there to send it. */
 const NO_SHOP_NUMBER = "The shop's own WhatsApp number is not connected";
@@ -603,7 +616,8 @@ const NO_CREDIT = {
  * not sent at all. Hatti's own notices to the shop about its bills cost it nothing (ADR-169), nor
  * do its customers' emails (ADR-181). A broadcast's messages go from the shop's own number, in
  * marketing hours alone, and never by SMS (ADR-422); an SMS campaign's by SMS, in those hours
- * too, and never by WhatsApp (ADR-458).
+ * too, and never by WhatsApp (ADR-458). A shop's SMS to its customers go from its own sender name
+ * once Hatti approves one (ADR-469).
  */
 export class MessagesSender {
   constructor(private readonly options: MessagesSenderOptions) {}
@@ -637,14 +651,18 @@ export class MessagesSender {
       stopped.set(channel, await messages.optedOut(shopId, channel, recipients));
     }
     const marketing = await this.#marketing(shopId, claimed, at);
+    const { smsSenders } = this.options;
+    const sender = smsSenders && claimed.some(fromShopSender) ? await smsSenders(shopId) : null;
     // What the shop's credit has left to pay for, as the round spends it.
     const { charges } = this.options;
     let credit = charges ? await charges.balanceOf(shopId) : null;
     // Those not tried by half the lease wait for it to end: past it, another sender may take them.
     const deadline = Date.now() + LEASE_MS / 2;
     let sent = 0;
-    for (const message of claimed) {
+    for (const claimedMessage of claimed) {
       if (Date.now() > deadline) break;
+      const message: Outgoing =
+        sender && fromShopSender(claimedMessage) ? { ...claimedMessage, sender } : claimedMessage;
       // Hatti's own notices to the shop are Hatti's to pay for, whatever its credit (ADR-169), as
       // are emails (ADR-181).
       const paid = charges !== undefined && chargedFor(message);
@@ -694,7 +712,7 @@ export class MessagesSender {
    * Nothing goes in their place. Each is paid for, as any marketing message is.
    */
   async #marketingAttempt(
-    message: ClaimedMessage,
+    message: Outgoing,
     marketing: Marketing | null,
     stopped: ReadonlyMap<MessageChannel, ReadonlySet<string>>,
     at: Date,
@@ -722,7 +740,7 @@ export class MessagesSender {
   }
 
   async #attempt(
-    message: ClaimedMessage,
+    message: Outgoing,
     provider: MessageProvider | undefined,
     stopped: ReadonlyMap<MessageChannel, ReadonlySet<string>>,
     at: Date,

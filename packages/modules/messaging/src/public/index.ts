@@ -65,6 +65,7 @@ export {
   SECRET_KINDS,
   TEMPLATES,
   MARKETING_KINDS,
+  TO_THE_SHOP_KINDS,
   WHATSAPP_ONLY_KINDS,
   asksToStop,
   messageEmail,
@@ -170,3 +171,13 @@ export {
 export { StopLinkController } from '../internal/stop.controller.js';
 export { BroadcastChannel as BroadcastChannelEnum } from '../internal/graphql/broadcast.types.js';
 export { MessageLanguage as MessageLanguageEnum } from '../internal/graphql/messaging.types.js';
+export {
+  SMS_SENDER_LIMITS,
+  SmsSendersService,
+  smsSenderName,
+  type ShopSmsSenderRecord,
+  type SmsSenderDecisionProblem,
+  type SmsSenderRecord,
+  type SmsSenderReview,
+  type SmsSenderStatus,
+} from '../internal/sms-senders.service.js';

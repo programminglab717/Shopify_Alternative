@@ -6285,6 +6285,21 @@ enum MessageKind {
   SMS_BROADCAST
 
   """
+  For the shop, from Hatti and paid by Hatti, at its alerts number: its customers' SMS now come from its own name (ADR-469).
+  """
+  SMS_SENDER_APPROVED
+
+  """
+  For the shop, from Hatti and paid by Hatti, at its alerts number: the name it asked for could not be registered, and why (ADR-469).
+  """
+  SMS_SENDER_REFUSED
+
+  """
+  For the shop, from Hatti and paid by Hatti, at its alerts number: its SMS no longer come from its own name, and why; they come from Hatti's shared sender again (ADR-469).
+  """
+  SMS_SENDER_REVOKED
+
+  """
   For the shop: a variant fell to its low-stock threshold for sale online (INV-01), once a spell, until it is stocked above it again.
   """
   STOCK_LOW
@@ -7567,6 +7582,14 @@ type Mutation {
 
   """Changes a chart; the products showing it show it changed."""
   sizeChartUpdate(id: ID!, input: SizeChartInput!): SizeChartPayload!
+
+  """
+  Asks Hatti for the shop's SMS to its customers to go from a name of its own: 3 to 11 letters, digits and spaces, like ZARI, in place of any it has. Operators register it, in about two weeks, for a shop Hatti has verified; Hatti tells the shop when it is approved or why not. One request waits at a time.
+  """
+  smsSenderRequest(name: String!): SmsSenderRequestPayload!
+
+  """Withdraws the shop's request waiting for Hatti, if one does."""
+  smsSenderWithdraw: SmsSenderWithdrawPayload!
 
   """
   Invites someone to work in the shop in `role`, by a link the inviter sends them, good for 7 days and accepted once; with `email`, Hatti emails it there too, 20 a day for a shop at most (ADR-167). The owner invites any role but its own; managers, those below them. Staff confirm who they are first when they signed in over 15 minutes ago.
@@ -11581,6 +11604,9 @@ type Query {
   """The shop's size charts, by name; 50 at most."""
   sizeCharts: [SizeChart!]!
 
+  """The name the shop's SMS go from, and its requests for one of its own."""
+  smsSender: SmsSender!
+
   """
   Invitations neither accepted, taken back nor expired, the newest first. Staff need to be the owner or a manager.
   """
@@ -12722,6 +12748,53 @@ The unit a chart's measurements are written in; shoppers may read them in either
 enum SizeChartUnit {
   CENTIMETERS
   INCHES
+}
+
+"""The name the shop's SMS go from (MKT-02, ADR-469)."""
+type SmsSender {
+  """
+  The name approved, which its customers' SMS go from; null while they go from Hatti's shared sender. What Hatti tells the shop itself goes from Hatti’s, whatever it is.
+  """
+  name: String
+
+  """Its latest 10 requests, the newest first."""
+  requests: [SmsSenderRequest!]!
+}
+
+"""A request for the shop’s SMS to go from a name of its own."""
+type SmsSenderRequest {
+  """Why Hatti refused it or took it back, or a note on its approval."""
+  answer: String
+  createdAt: DateTime!
+  decidedAt: DateTime
+  id: ID!
+
+  """The name asked for, as phones would show it: "ZARI"."""
+  name: String!
+  status: SmsSenderStatus!
+}
+
+type SmsSenderRequestPayload {
+  request: SmsSenderRequest
+  userErrors: [UserError!]!
+}
+
+"""
+WAITING for Hatti's people, APPROVED and in use, REFUSED with why, WITHDRAWN by the shop, REPLACED by a name approved after it, or REVOKED: taken back, with why.
+"""
+enum SmsSenderStatus {
+  APPROVED
+  REFUSED
+  REPLACED
+  REVOKED
+  WAITING
+  WITHDRAWN
+}
+
+type SmsSenderWithdrawPayload {
+  """The request withdrawn; null where none waited."""
+  request: SmsSenderRequest
+  userErrors: [UserError!]!
 }
 
 """

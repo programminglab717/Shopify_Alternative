@@ -38,6 +38,7 @@ import {
   AutomationsService,
   BroadcastsService,
   MessagesService,
+  SmsSendersService,
   StockWatchService,
   WhatsAppAccountsService,
   WhatsAppTemplatesService,
@@ -608,10 +609,13 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     }
     // Each message is paid for from its shop's credit as it goes (ADR-155).
     const wallet = new MessageWallet(database);
+    const smsSenders = new SmsSendersService(database);
     const messages = new MessagesSender({
       messages: new MessagesService(database, wallet),
       providers: messageProvidersOf(config, logger),
       charges: wallet,
+      // Customers' SMS go from each shop's own sender name, once approved (ADR-469).
+      smsSenders: (shopId) => smsSenders.senderOf(shopId),
       // Broadcasts go from each shop's own number (ADR-422), whose token is sealed.
       ...(config.ENCRYPTION_KEYS && {
         shopNumbers: shopNumbersOf(

@@ -1,7 +1,7 @@
 import { PublicSite } from '@hatti/api';
 import { Database } from '@hatti/db';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
-import { MessagesService } from '@hatti/messaging/public';
+import { MessagesService, SmsSendersService, type SmsSenderReview } from '@hatti/messaging/public';
 import {
   AppealsService,
   REPORT_REASONS,
@@ -16,6 +16,7 @@ import {
 } from '@hatti/trust/public';
 import { parseArgs } from 'node:util';
 import { loadTrustReportsConfig } from './config.js';
+import { approveSmsSender, refuseSmsSender, revokeSmsSender } from './sms-senders.js';
 import { createStorage } from './storage.js';
 import { refuseAppeal, restoreStore, takeDown } from './takedowns.js';
 import { approveVerification, refuseVerification, revokeVerification } from './verifications.js';
@@ -50,6 +51,15 @@ import { approveVerification, refuseVerification, revokeVerification } from './v
 //   pnpm --filter @hatti/core trust-reports verify vrf_… --by Ayesha [--note "…"]
 //   pnpm --filter @hatti/core trust-reports refuse-verification vrf_… --by Ayesha --note "The photo is blurred"
 //   pnpm --filter @hatti/core trust-reports unverify zari --level identity --by Ayesha --note "…"
+//
+// Shops ask for their customers' SMS to come from a name of their own (MKT-02, ADR-469), which
+// operators register for a verified shop; once they have, it is approved, or refused with why,
+// and may be taken back. The shop is told each time:
+//
+//   pnpm --filter @hatti/core trust-reports senders [--all]
+//   pnpm --filter @hatti/core trust-reports approve-sender snd_… --by Ayesha [--note "…"]
+//   pnpm --filter @hatti/core trust-reports refuse-sender snd_… --by Ayesha --note "Jazz refused it"
+//   pnpm --filter @hatti/core trust-reports revoke-sender zari --by Ayesha --note "…"
 
 const USAGE =
   'Usage: trust-reports list [--all]\n' +
@@ -63,7 +73,11 @@ const USAGE =
   '       trust-reports verifications [--all]\n' +
   '       trust-reports verify <verification> --by <who> [--note <note>]\n' +
   '       trust-reports refuse-verification <verification> --by <who> --note <why, as the owner is told>\n' +
-  '       trust-reports unverify <shop> --level <identity|business> --by <who> --note <why, as the owner is told>';
+  '       trust-reports unverify <shop> --level <identity|business> --by <who> --note <why, as the owner is told>\n' +
+  '       trust-reports senders [--all]\n' +
+  '       trust-reports approve-sender <request> --by <who> [--note <note>]\n' +
+  '       trust-reports refuse-sender <request> --by <who> --note <why, as the shop is told>\n' +
+  '       trust-reports revoke-sender <shop> --by <who> --note <why, as the shop is told>';
 
 function usage(problem?: string): never {
   if (problem) console.error(problem);
@@ -76,6 +90,10 @@ type Command =
   | { command: 'takedowns'; all: boolean }
   | { command: 'appeals'; all: boolean }
   | { command: 'verifications'; all: boolean }
+  | { command: 'senders'; all: boolean }
+  | { command: 'approve-sender'; id: string; request: string; by: string; note: string }
+  | { command: 'refuse-sender'; id: string; request: string; by: string; note: string }
+  | { command: 'revoke-sender'; shop: string; by: string; note: string }
   | { command: 'verify'; id: string; verification: string; by: string; note: string }
   | { command: 'refuse-verification'; id: string; verification: string; by: string; note: string }
   | { command: 'unverify'; shop: string; level: VerificationLevel; by: string; note: string }
@@ -105,8 +123,54 @@ const verifications = new VerificationsService(
   database,
   createStorage(config, config.PUBLIC_URL ?? 'http://localhost:3000'),
 );
+const senders = new SmsSendersService(database);
 try {
-  if (parsed.command === 'verifications') {
+  if (parsed.command === 'senders') {
+    const found = await senders.list({ all: parsed.all });
+    if (found.length === 0) {
+      console.log(parsed.all ? 'No sender name asked for yet.' : 'No sender name is waiting.');
+    }
+    for (const request of found) console.log(senderLine(request));
+  } else if (
+    parsed.command === 'approve-sender' ||
+    parsed.command === 'refuse-sender' ||
+    parsed.command === 'revoke-sender'
+  ) {
+    const done =
+      parsed.command === 'approve-sender'
+        ? await approveSmsSender(database, senders, messages, parsed.request, {
+            by: parsed.by,
+            note: parsed.note,
+          })
+        : parsed.command === 'refuse-sender'
+          ? await refuseSmsSender(database, senders, messages, parsed.request, {
+              by: parsed.by,
+              answer: parsed.note,
+            })
+          : await revokeSmsSender(database, senders, messages, parsed.shop, {
+              by: parsed.by,
+              answer: parsed.note,
+            });
+    if (typeof done === 'string') {
+      console.error(
+        {
+          not_found:
+            parsed.command === 'revoke-sender'
+              ? `No shop ${parsed.shop}: name it by its handle.`
+              : 'No such request: see the list of senders.',
+          decided: 'It was decided already.',
+          taken: 'Another shop sends from that name.',
+          not_verified: "Hatti hasn't verified the shop: its sender waits for that.",
+          not_approved: `${parsed.command === 'revoke-sender' ? parsed.shop : 'It'} has no name of its own.`,
+        }[done],
+      );
+      process.exitCode = 1;
+    } else {
+      console.log(
+        `${done.shopName} (${done.shopHandle}): ${done.name} ${done.status}; the shop is told.`,
+      );
+    }
+  } else if (parsed.command === 'verifications') {
     const found = await verifications.list({ all: parsed.all });
     if (found.length === 0) {
       console.log(parsed.all ? 'No verification asked for yet.' : 'No verification is waiting.');
@@ -282,6 +346,18 @@ function verificationLine(review: VerificationReview): string {
   ].join('\t');
 }
 
+/** A sender name asked for, on one line, tab-separated: those waiting say so first. */
+function senderLine(request: SmsSenderReview): string {
+  return [
+    toPublicId('smsSender', request.id),
+    request.status === 'waiting' ? 'WAITING' : request.status,
+    `since ${request.createdAt.toISOString()}`,
+    `${request.shopName} (${request.shopHandle})`,
+    request.name,
+    request.decidedBy ? `${request.status} by ${request.decidedBy}: ${request.answer ?? ''}` : '',
+  ].join('\t');
+}
+
 /** A takedown on one line, tab-separated: those of stores still down say so first. */
 function takedownLine(takedown: TakedownRecord): string {
   return [
@@ -314,7 +390,8 @@ function parseCommand(args: string[]): Command {
     command === 'list' ||
     command === 'takedowns' ||
     command === 'appeals' ||
-    command === 'verifications'
+    command === 'verifications' ||
+    command === 'senders'
   ) {
     if (id) throw new Error(`Unexpected: ${id}`);
     return { command, all: values.all ?? false };
@@ -327,19 +404,27 @@ function parseCommand(args: string[]): Command {
     command !== 'refuse' &&
     command !== 'verify' &&
     command !== 'refuse-verification' &&
-    command !== 'unverify'
+    command !== 'unverify' &&
+    command !== 'approve-sender' &&
+    command !== 'refuse-sender' &&
+    command !== 'revoke-sender'
   ) {
     throw new Error('Say what to do');
   }
   if (!id) {
     throw new Error(
-      command === 'suspend' || command === 'restore' || command === 'unverify'
+      command === 'suspend' ||
+        command === 'restore' ||
+        command === 'unverify' ||
+        command === 'revoke-sender'
         ? 'Name the shop, by its handle'
-        : command === 'verify' || command === 'refuse-verification'
-          ? 'Name the verification, as the list of verifications shows it'
-          : command === 'refuse'
-            ? 'Name the appeal, as the list of appeals shows it'
-            : 'Name the report, as the list shows it',
+        : command === 'approve-sender' || command === 'refuse-sender'
+          ? 'Name the request, as the list of senders shows it'
+          : command === 'verify' || command === 'refuse-verification'
+            ? 'Name the verification, as the list of verifications shows it'
+            : command === 'refuse'
+              ? 'Name the appeal, as the list of appeals shows it'
+              : 'Name the report, as the list shows it',
     );
   }
   const by = values.by?.trim();
@@ -348,9 +433,16 @@ function parseCommand(args: string[]): Command {
     const verification = tryFromPublicId(id, 'verification') ?? id;
     return { command, id, verification, by, note: values.note?.trim() ?? '' };
   }
+  if (command === 'approve-sender') {
+    const request = tryFromPublicId(id, 'smsSender') ?? id;
+    return { command, id, request, by, note: values.note?.trim() ?? '' };
+  }
   const note = values.note?.trim();
   if (!note) throw new Error('Say why, or what was done, with --note');
-  if (command === 'restore') return { command, shop: id, by, note };
+  if (command === 'restore' || command === 'revoke-sender') return { command, shop: id, by, note };
+  if (command === 'refuse-sender') {
+    return { command, id, request: tryFromPublicId(id, 'smsSender') ?? id, by, note };
+  }
   if (command === 'refuse-verification') {
     return { command, id, verification: tryFromPublicId(id, 'verification') ?? id, by, note };
   }

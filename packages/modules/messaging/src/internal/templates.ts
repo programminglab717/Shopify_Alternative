@@ -58,6 +58,9 @@ export const MESSAGE_KINDS = [
   'shop_verified',
   'shop_verification_refused',
   'shop_verification_revoked',
+  'sms_sender_approved',
+  'sms_sender_refused',
+  'sms_sender_revoked',
   'broadcast',
   'automation',
   'sms_broadcast',
@@ -87,8 +90,9 @@ export type AnyMessageKind = MessageKind | PlatformMessageKind;
  * Hatti's notices of the shop's bills (ADR-169), among them what Hatti found of a transfer the
  * shop said it made (ADR-254), of a domain of its own DNS points elsewhere (ADR-262), of its
  * orders nearing its plan's limit (ADR-263), of the whole store's export made (ADR-417), and of
- * its store taken down, its appeal refused and its store restored (ADR-461, ADR-462), and of its
- * verification by Hatti approved, refused or taken back (ADR-465).
+ * its store taken down, its appeal refused and its store restored (ADR-461, ADR-462), of its
+ * verification by Hatti approved, refused or taken back (ADR-465), and of its own SMS sender name
+ * (ADR-469).
  */
 export const ALWAYS_SENT: readonly MessageKind[] = [
   'one_time_code',
@@ -122,6 +126,10 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'shop_verified',
   'shop_verification_refused',
   'shop_verification_revoked',
+  // Its own SMS sender name, approved, refused or taken back (ADR-469).
+  'sms_sender_approved',
+  'sms_sender_refused',
+  'sms_sender_revoked',
   // The shop's own, which it schedules itself (ADR-421, ADR-458), or sets going (ADR-425).
   'broadcast',
   'automation',
@@ -133,6 +141,38 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
  * to hear on WhatsApp, from the shop's own number (ADR-422, ADR-425), and no SMS goes in its place.
  */
 export const WHATSAPP_ONLY_KINDS: readonly MessageKind[] = ['broadcast', 'automation'];
+
+/**
+ * Messages to the shop itself and its staff: its alerts, its staff's word of their own work and
+ * Hatti's notices. By SMS they go from Hatti's shared sender, whatever name the shop's customers'
+ * SMS go from (ADR-469).
+ */
+export const TO_THE_SHOP_KINDS: readonly MessageKind[] = [
+  'stock_low',
+  'stock_out',
+  'daily_summary',
+  'order_assigned',
+  'order_mentioned',
+  'order_receipt_sent',
+  'invoice_due',
+  'plan_ended',
+  'credit_low',
+  'transfer_confirmed',
+  'transfer_refused',
+  'domain_unpointed',
+  'orders_limit_near',
+  'orders_limit_reached',
+  'store_export_ready',
+  'store_suspended',
+  'store_appeal_refused',
+  'store_restored',
+  'shop_verified',
+  'shop_verification_refused',
+  'shop_verification_revoked',
+  'sms_sender_approved',
+  'sms_sender_refused',
+  'sms_sender_revoked',
+];
 
 /**
  * Marketing a customer agreed to hear (CUS-04): it goes in the hours marketing may go alone, and
@@ -218,6 +258,8 @@ export interface MessageVariables {
   device?: string;
   /** For a store taken down or restored (ADR-461): why, in Hatti's people's words. */
   note?: string;
+  /** For the shop's own SMS sender (ADR-469): the name its customers' SMS go from, "ZARI". */
+  sender?: string;
   /**
    * For a domain of the shop's own DNS points elsewhere (ADR-262): the domain, "www.zari.pk"; and,
    * in `date`, when it is disconnected unless DNS points it back before.
@@ -995,6 +1037,48 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: "Hatti has taken back {shop}'s verification",
       ur: 'ہٹی نے {shop} کی تصدیق واپس لے لی ہے',
+    },
+  },
+  sms_sender_approved: {
+    whatsapp: 'hatti_sms_sender_approved',
+    category: 'utility',
+    parameters: ['shop', 'sender'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: {sender} is registered for {shop}. Your customers' SMS now come from {sender}.",
+      ur: 'ہٹی: {sender} کو {shop} کے لیے رجسٹر کر دیا گیا ہے۔ اب آپ کے گاہکوں کو ایس ایم ایس {sender} سے آتے ہیں۔',
+    },
+    subject: {
+      en: '{shop} now sends SMS as {sender}',
+      ur: '{shop} اب {sender} کے نام سے ایس ایم ایس بھیجتی ہے',
+    },
+  },
+  sms_sender_refused: {
+    whatsapp: 'hatti_sms_sender_refused',
+    category: 'utility',
+    parameters: ['shop', 'sender', 'note'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: we could not register {sender} for {shop}: {note}. You can ask for another name from Settings > Customer messages in Hatti's admin.",
+      ur: 'ہٹی: ہم {shop} کے لیے {sender} رجسٹر نہیں کر سکے: {note}۔ آپ ہٹی کے ایڈمن میں سیٹنگز > کسٹمر میسجز سے کوئی اور نام مانگ سکتے ہیں۔',
+    },
+    subject: {
+      en: 'Hatti could not register {sender} for {shop}',
+      ur: 'ہٹی {shop} کے لیے {sender} رجسٹر نہیں کر سکا',
+    },
+  },
+  sms_sender_revoked: {
+    whatsapp: 'hatti_sms_sender_revoked',
+    category: 'utility',
+    parameters: ['shop', 'sender', 'note'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: {shop}'s SMS no longer come from {sender}: {note}. They come from Hatti's shared sender again.",
+      ur: 'ہٹی: {shop} کے ایس ایم ایس اب {sender} سے نہیں آتے: {note}۔ وہ دوبارہ ہٹی کے مشترکہ نام سے آتے ہیں۔',
+    },
+    subject: {
+      en: "{shop}'s SMS no longer come from {sender}",
+      ur: '{shop} کے ایس ایم ایس اب {sender} سے نہیں آتے',
     },
   },
 };

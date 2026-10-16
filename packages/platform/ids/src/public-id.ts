@@ -70,6 +70,7 @@ export const ID_PREFIXES = {
   exportSchedule: 'exs',
   storeExport: 'sxp',
   verification: 'vrf',
+  smsSender: 'snd',
   lineItem: 'li',
   orderEvent: 'oev',
   orderComment: 'ocm',

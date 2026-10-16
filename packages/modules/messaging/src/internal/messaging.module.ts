@@ -8,6 +8,8 @@ import { AutomationResolver } from './graphql/automation.resolver.js';
 import { BroadcastResolver } from './graphql/broadcast.resolver.js';
 import { MessagingResolver } from './graphql/messaging.resolver.js';
 import { MessagesService } from './messages.service.js';
+import { SmsSenderResolver } from './graphql/sms-sender.resolver.js';
+import { SmsSendersService } from './sms-senders.service.js';
 import { StopLinkController } from './stop.controller.js';
 import { MessagingSettingsService } from './settings.service.js';
 import { WhatsAppAccountResolver } from './graphql/whatsapp-account.resolver.js';
@@ -52,6 +54,8 @@ export class MessagingModule {
         AutomationsService,
         StockWatchService,
         AutomationResolver,
+        SmsSendersService,
+        SmsSenderResolver,
       ],
       exports: [
         MessagesService,

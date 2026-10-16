@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### A shop's own SMS sender
+
+* **A shop asks for its customers' SMS to come from a name of its own, which Hatti's people
+  approve once operators register it for a verified shop; what Hatti tells the shop itself
+  still comes from Hatti's** ([ADR-469](../architecture/13-decision-log.md#adr-469--a-shop-asks-for-its-customers-sms-to-come-from-a-name-of-its-own-which-hattis-people-approve-once-operators-register-it-for-a-verified-shop-what-hatti-tells-the-shop-itself-still-comes-from-hattis), MKT-02).
+* 2962 tests, 3 more: the senders kept by messaging, and the API,
+  the decisions and the worker's SMS together in the core.
+
 ### d9819e7 · The return window
 
 * **A shop says how many days buyers have to return an order, and whether for an exchange or

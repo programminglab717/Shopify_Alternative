@@ -493,6 +493,16 @@ describe("Messages' words", () => {
       'Zari Fashions',
       'the CNIC photo is blurred',
     ]);
+    // Its own SMS sender name (ADR-469).
+    const named = { shop: 'Zari Fashions', sender: 'ZARI', note: 'Jazz refused it' };
+    expect(messageText('sms_sender_approved', 'en', named)).toBe(
+      "Hatti: ZARI is registered for Zari Fashions. Your customers' SMS now come from ZARI.",
+    );
+    expect(templateParameters('sms_sender_refused', named)).toEqual([
+      'Zari Fashions',
+      'ZARI',
+      'Jazz refused it',
+    ]);
     // The orders a month its plan allows (ADR-263).
     const counted = { shop: 'Zari Fashions', orders: '40', limit: '50', plan: 'Free' };
     expect(messageText('orders_limit_near', 'en', counted)).toBe(
@@ -522,6 +532,9 @@ describe("Messages' words", () => {
       'shop_verified',
       'shop_verification_refused',
       'shop_verification_revoked',
+      'sms_sender_approved',
+      'sms_sender_refused',
+      'sms_sender_revoked',
     ]);
     expect(ALWAYS_SENT).toEqual([
       'one_time_code',
@@ -553,6 +566,10 @@ describe("Messages' words", () => {
       'shop_verified',
       'shop_verification_refused',
       'shop_verification_revoked',
+      // Its own SMS sender name (ADR-469).
+      'sms_sender_approved',
+      'sms_sender_refused',
+      'sms_sender_revoked',
       'broadcast',
       'automation',
       // The shop's SMS campaign, which its customer can stop by its link (ADR-458).
@@ -693,6 +710,9 @@ describe("Messages' words", () => {
       'shop_verified',
       'shop_verification_refused',
       'shop_verification_revoked',
+      'sms_sender_approved',
+      'sms_sender_refused',
+      'sms_sender_revoked',
     ]);
     const shipped = messageEmail('order_shipped', 'en', SHIPPED.variables)!;
     expect(shipped.from).toBe('shop');
