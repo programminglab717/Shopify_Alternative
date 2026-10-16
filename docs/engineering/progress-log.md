@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Automations in the admin
+### d0fd3cf · Automations in the admin
 
 * **Marketing → Automations** ([ADR-428](../architecture/13-decision-log.md#adr-428--automations-in-the-admin-a-page-under-marketing-with-the-welcome-and-the-win-back-each-turned-on-with-an-approved-template-the-win-backs-days-set-there), MKT-04) turns the welcome and the win-back on, each
   with one of the shop's approved templates, and sets the win-back's days.
