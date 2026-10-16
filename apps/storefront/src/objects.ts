@@ -752,7 +752,7 @@ function levelsOf(links: readonly Record<string, unknown>[]): number {
  * `free_above`. Documents from before shops set charges have none: delivery is free. How many
  * working days it takes (ADR-235): `min_days` to `max_days` wherever it goes, the fewest
  * anywhere to the most, nil unless the shop said how long it takes everywhere; and each zone's,
- * its own or everywhere's.
+ * its own or everywhere's; and everywhere's own, outside the zones (OS-11, ADR-454).
  */
 export function deliveryObject(doc: ShopDoc): Record<string, unknown> {
   const delivery = doc.delivery ?? { charge: 0, freeAbove: null, zones: [] };
@@ -776,6 +776,8 @@ export function deliveryObject(doc: ShopDoc): Record<string, unknown> {
     free_above: delivery.freeAbove,
     min_days: range?.min ?? null,
     max_days: range?.max ?? null,
+    everywhere_min_days: everywhere?.min ?? null,
+    everywhere_max_days: everywhere?.max ?? null,
     zones,
   };
 }

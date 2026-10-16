@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-453 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-454 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -461,6 +461,7 @@
 | 451 | A product can be sold as a gift card: once its order is paid in full, the worker issues a card for each unit at its price, given to the buyer, and sends each code on WhatsApp, kept nowhere once sent | Accepted |
 | 452 | A product's page in the admin sells it as a gift card with one box, saved at once, and themes read Shopify's product.gift_card? and a cart line's gift_card | Accepted |
 | 453 | Loyalty is cashback: a recipe of the shop's automations gives back a share of each delivered, paid order's goods in store credit, once, lasting the days it sets, which checkout spends | Accepted |
+| 454 | A product's page in Hatti Base says what delivery costs and takes to each of the shop's cities, and links its returns, as trust elements | Accepted |
 
 ---
 
@@ -17311,3 +17312,31 @@
   * **A discount code for the next order:** it is shared and leaks; store credit is the
     customer's own number's.
   * **Cashback at once, on placing:** a cash-on-delivery order may never be delivered or paid.
+
+## ADR-454 · A product's page in Hatti Base says what delivery costs and takes to each of the shop's cities, and links its returns, as trust elements
+
+* **Context:**
+  * OS-11 asks for trust on the product page: a verified badge, a delivery estimate by city,
+    cash on delivery's availability, and a summary of returns.
+  * Hatti Base's delivery block already says whether cash on delivery is taken and at what fee,
+    how many working days delivery takes anywhere (ADR-235), and what it costs at least. A
+    shopper in Multan cannot tell from it what their own order costs or takes.
+* **Decision:**
+  * **By city.** Where the shop has zones of cities (ADR-043), the block has "Delivery to your
+    city", a `<details>` the shopper opens: each zone's cities, its charge, or Free, and its
+    days, its own or everywhere's; then "Everywhere else", with the shop's own charge and days.
+    It needs no script and no picker: the shop's zones are few, and the cities are named.
+    * Liquid's `delivery` gains `everywhere_min_days` and `everywhere_max_days`, everywhere's own
+      days outside the zones, Hatti's own.
+  * **Returns.** Where the shop has a refund policy (ADR-056), the block links it: "Returns and
+    exchanges: see our policy".
+  * Both in English and Urdu, as the rest of the block is.
+* **Consequences:**
+  * The trust OS-11 asks for is on the page but for the verified badge, which waits on
+    business verification (ONB-11).
+  * Not yet: a structured return window (days, exchanges only) said in words and in the
+    product's structured data as a MerchantReturnPolicy.
+* **Alternatives:**
+  * **A city picker that works out one city's charge:** a script, for what a short list says to
+    everyone at once.
+  * **The policy's text on the page:** long; a line and a link is what shoppers read.

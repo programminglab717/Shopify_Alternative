@@ -230,6 +230,37 @@
               {%- assign from = lowest | money -%}
               <li>{{ 'products.product.delivery_from' | t: amount: from }}</li>
             {%- endif -%}
+            {%- comment -%}
+              What delivery to their own city costs and takes (OS-11, ADR-454): each of the shop's
+              zones, with its cities, then everywhere else. Shown once a shopper asks.
+            {%- endcomment -%}
+            {%- if delivery.zones.size > 0 -%}
+              <li>
+                <details class="product__cities">
+                  <summary>{{ 'products.product.delivery_by_city' | t }}</summary>
+                  <ul role="list">
+                    {%- for zone in delivery.zones -%}
+                      <li>
+                        <strong dir="auto">{{ zone.cities | join: ', ' }}</strong>:
+                        {% if zone.charge > 0 %}{{ zone.charge | money }}{% else %}{{ 'products.product.free' | t }}{% endif -%}
+                        {%- if zone.max_days != nil %} · {% render 'delivery-days', min: zone.min_days, max: zone.max_days %}{% endif %}
+                      </li>
+                    {%- endfor -%}
+                    <li>
+                      <strong>{{ 'products.product.elsewhere' | t }}</strong>:
+                      {% if delivery.charge > 0 %}{{ delivery.charge | money }}{% else %}{{ 'products.product.free' | t }}{% endif -%}
+                      {%- if delivery.everywhere_max_days != nil %} · {% render 'delivery-days', min: delivery.everywhere_min_days, max: delivery.everywhere_max_days %}{% endif %}
+                    </li>
+                  </ul>
+                </details>
+              </li>
+            {%- endif -%}
+            {%- comment -%} What the shop's refund policy says of returns, a tap away (OS-11). {%- endcomment -%}
+            {%- if shop.refund_policy -%}
+              <li>
+                <a href="{{ shop.refund_policy.url }}">{{ 'products.product.returns' | t }}</a>
+              </li>
+            {%- endif -%}
           </ul>
 
         {%- when 'description' -%}

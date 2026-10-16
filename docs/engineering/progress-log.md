@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### Trust on the product page
+
+* **A product's page says what delivery costs and takes to each of the shop's cities, and links
+  its returns** ([ADR-454](../architecture/13-decision-log.md#adr-454--a-products-page-in-hatti-base-says-what-delivery-costs-and-takes-to-each-of-the-shops-cities-and-links-its-returns-as-trust-elements), OS-11).
+* 2923 tests, from 2922: the storefront's one.
+
 ### 7844502 · Cashback
 
 * **Loyalty as cashback: a recipe gives back a share of each delivered, paid order in store

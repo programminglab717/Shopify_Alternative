@@ -65,6 +65,10 @@
       },
       "free_delivery_from": "Free delivery on orders of {{ amount }} or more",
       "delivery_from": "Delivery from {{ amount }}",
+      "delivery_by_city": "Delivery to your city",
+      "elsewhere": "Everywhere else",
+      "free": "Free",
+      "returns": "Returns and exchanges: see our policy",
       "rating": "Rated {{ rating }} out of 5",
       "reviews_count": {
         "one": "{{ count }} review",

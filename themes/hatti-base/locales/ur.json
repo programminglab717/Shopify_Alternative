@@ -65,6 +65,10 @@
       },
       "free_delivery_from": "{{ amount }} یا اس سے زیادہ کے آرڈر پر مفت ڈیلیوری",
       "delivery_from": "ڈیلیوری {{ amount }} سے",
+      "delivery_by_city": "آپ کے شہر میں ڈیلیوری",
+      "elsewhere": "باقی تمام شہر",
+      "free": "مفت",
+      "returns": "واپسی اور تبادلہ: ہماری پالیسی دیکھیں",
       "rating": "5 میں سے {{ rating }} ستارے",
       "reviews_count": {
         "one": "{{ count }} ریویو",

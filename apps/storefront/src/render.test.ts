@@ -2368,6 +2368,66 @@ describe('Storefront rendering', () => {
     );
   });
 
+  it("says on a product's page what delivery costs and takes to each city, and links the shop's returns (OS-11, ADR-454)", async () => {
+    const sample = sampleStore();
+    const [lawn] = sample.products;
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const shop = (delivery: Partial<NonNullable<typeof sample.shop.delivery>>, more = {}) =>
+      new MemoryStore({
+        ...sample,
+        shop: {
+          ...sample.shop,
+          ...more,
+          delivery: { ...sample.shop.delivery!, charge: 25_000, ...delivery },
+        },
+      }).fresh();
+    const zoned = shop(
+      {
+        days: { min: 2, max: 4 },
+        zones: [
+          {
+            name: 'Twin cities',
+            cities: ['Islamabad', 'Rawalpindi'],
+            charge: 0,
+            days: { min: 1, max: 1 },
+          },
+          { name: 'Lahore', cities: ['Lahore'], charge: 15_000 },
+        ],
+      },
+      { policies: ['refund_policy'] },
+    );
+    const page = (await renderer.render({ path: `/products/${lawn!.handle}` }, zoned)).html;
+    const cities = page.slice(page.indexOf('<details class="product__cities">'));
+    const items = [
+      ...cities.slice(0, cities.indexOf('</details>')).matchAll(/<li>([^]*?)<\/li>/g),
+    ].map((match) => match[1]!.replace(/\s+/g, ' ').trim());
+    expect(cities).toMatch(
+      /^<details class="product__cities">\s*<summary>Delivery to your city<\/summary>/,
+    );
+    expect(items).toEqual([
+      '<strong dir="auto">Islamabad, Rawalpindi</strong>: Free · Delivered in 1 working day',
+      // A zone without days of its own takes everywhere's.
+      '<strong dir="auto">Lahore</strong>: Rs 150 · Delivered in 2 to 4 working days',
+      '<strong>Everywhere else</strong>: Rs 250 · Delivered in 2 to 4 working days',
+    ]);
+    expect(page).toMatch(
+      /<li>\s*<a href="\/policies\/refund-policy">Returns and exchanges: see our policy<\/a>\s*<\/li>/,
+    );
+    const urdu = (await renderer.render({ path: `/products/${lawn!.handle}`, locale: 'ur' }, zoned))
+      .html;
+    expect(urdu).toContain('آپ کے شہر میں ڈیلیوری');
+    expect(urdu).toContain('واپسی اور تبادلہ: ہماری پالیسی دیکھیں');
+    // No zones and no refund policy: neither is said.
+    const plain = (
+      await renderer.render(
+        { path: `/products/${lawn!.handle}` },
+        shop({ zones: [] }, { policies: [] }),
+      )
+    ).html;
+    expect(plain).not.toContain('product__cities');
+    expect(plain).not.toContain('Returns and exchanges: see our policy');
+  });
+
   it("offers sign-ups for the shop's news on WhatsApp, saying how one went", async () => {
     const home = (await render({ path: '/' })).html;
     expect(home).toContain(
