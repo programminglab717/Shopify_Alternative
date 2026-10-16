@@ -40,6 +40,7 @@ import {
   type LinkShop,
 } from './links.js';
 import { orderSettingsIn } from './order-settings.service.js';
+import { PostPurchaseOffers, type PostPurchaseOffer } from './post-purchase-offer.js';
 import { addTimelineEntry, loadOrder, lockOrder, updateOrder } from './order-store.js';
 import { OrderService } from './order.service.js';
 import type { OrderRecord } from './records.js';
@@ -139,6 +140,11 @@ export type OrderLinkView =
       steps: ParcelSteps;
       /** Once it is delivered, its products to rate (ADR-399); empty before. */
       reviewable: ReviewableProduct[];
+      /**
+       * Until a cash-on-delivery order is packed, a product the shop pairs with what it holds,
+       * offered to add with a tap and pay at the door (MKT-09, ADR-438); null for none.
+       */
+      offer: PostPurchaseOffer | null;
       problem: LinkProblem | null;
       /**
        * The form that takes the customer on to the shop's gateway, once they asked to pay online
@@ -169,7 +175,23 @@ export class OrderLinkService {
     @Optional() private readonly storage?: ObjectStorage,
     /** Paying online through the shop's gateway (ADR-151); without it, transfers alone. */
     @Optional() private readonly payments?: OnlinePayments,
+    /** The offer made after the purchase (ADR-438); without it, none is made. */
+    @Optional() private readonly offers?: PostPurchaseOffers,
   ) {}
+
+  /**
+   * Adds one of `variantId` to the link's order at the price its page offered it (MKT-09,
+   * ADR-438), as its customer tapped: paid at the door with the rest. Too late once the offer is
+   * gone, as when the order was packed or took one already.
+   */
+  async takeOffer(token: string, variantId: string): Promise<OrderLinkView> {
+    return this.#act(token, async (tx, shopId, order) => {
+      if (!this.offers) return { kind: 'too_late', action: 'upsell' };
+      const why = await this.offers.takeLocked(tx, shopId, order, variantId);
+      if (why === 'gone') return { kind: 'too_late', action: 'upsell' };
+      return why === 'refused' ? { kind: 'refused' } : null;
+    });
+  }
 
   /**
    * A new link for an open order's customer, working until 30 days after the order ends, or for
@@ -523,6 +545,7 @@ export class OrderLinkService {
         record.fulfillments.map((parcel) => parcel.id),
       ),
       reviewable: reviewable(record) ? await reviewableIn(tx, shopId, record) : [],
+      offer: this.offers ? await this.offers.offerIn(tx, shopId, record) : null,
       problem,
     };
   }

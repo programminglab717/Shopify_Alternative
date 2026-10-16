@@ -3,6 +3,7 @@ import {
   InputChecker,
   failOne,
   type FieldError,
+  type Actor,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
@@ -123,11 +124,25 @@ interface Rewrite {
   shortField: (variantId: string) => string[];
   /** Its other fields that change with it, such as a merged order's note. */
   also: Partial<OrderRow>;
+  /** When it takes the offer its page made (ADR-438), as `upsoldAt`. */
+  stamps?: OrderStamp[];
   /** Its timeline entry, words from its total now and before when that changed. */
   kind: string;
   message: (totals: [now: string, was: string] | null) => string;
   /** What `order.updated` says changed. */
   changed: string[];
+}
+
+/** Who changes an order's items: staff or an app through the API, or its customer's page. */
+interface EditCaller {
+  shopId: string;
+  actor: Actor | 'system';
+}
+
+/** The edit's lists, checked, each entry with where it is in the input. */
+interface CheckedEdit {
+  quantities: { lineItemId: string; quantity: number; field: string[] }[];
+  additions: { variantId: string; quantity: number; price: bigint | null; field: string[] }[];
 }
 
 /** A rewrite's amounts, worked out and checked. */
@@ -173,160 +188,203 @@ export class OrderEditService {
       if (!order) return failOne(['id'], 'NOT_FOUND', 'Order not found');
       const refusal = editRefusal(order);
       if (refusal) return failOne(['id'], 'INVALID', refusal);
-      const current = await linesOf(tx, shopId, order.id);
-      const lineIds = new Set(current.map((line) => line.id));
-      const unknown = quantities.filter((entry) => !lineIds.has(entry.lineItemId));
-      if (unknown.length > 0) {
-        return {
-          ok: false,
-          errors: unknown.map((entry) => ({
-            field: [...entry.field, 'lineItemId'],
-            code: 'NOT_FOUND',
-            message: 'Line item not found on this order',
-          })),
-        };
-      }
-      const asked = new Map(quantities.map((entry) => [entry.lineItemId, entry]));
-      const unchanged = current.every(
-        (line) => (asked.get(line.id)?.quantity ?? line.quantity) === line.quantity,
-      );
-      if (unchanged && additions.length === 0) {
-        return { ok: true, value: (await loadOrder(tx, shopId, order.id))! };
-      }
+      return this.#editLocked(tx, tenant, order, quantities, additions, 'Changed the items');
+    });
+  }
 
-      const snapshots = await this.variants.snapshotsOf(tx, shopId, [
-        ...current.map((line) => line.variantId),
-        ...additions.map((line) => line.variantId),
-      ]);
-      const errors: FieldError[] = [];
-      const edited: EditedLine[] = [];
-      for (const line of current) {
-        const entry = asked.get(line.id);
-        const quantity = entry?.quantity ?? line.quantity;
-        const snapshot = snapshots.get(line.variantId);
-        // Selling more of it is selling it: a variant gone or archived sells no more.
-        if (entry && quantity > line.quantity && notForSale(snapshot)) {
-          errors.push({
-            field: [...entry.field, 'quantity'],
-            code: 'INVALID',
-            message: snapshot
-              ? `"${snapshot.productTitle}" is archived, so no more of it can be sold`
-              : `"${itemName(line)}" was deleted, so no more of it can be sold`,
-          });
-        }
-        if (quantity === 0) continue;
-        edited.push({
-          ...line,
-          quantity,
-          taxCode: snapshot?.taxCode ?? null,
-          field: entry ? entry.field : null,
+  /**
+   * Adds one of `variantId` at `price` to an order locked in `tx`, as its customer takes the
+   * offer its page makes them (MKT-09, ADR-438): its stock, totals, tax and cash at the door
+   * follow, as an edit's do. Errors name `variantId`.
+   */
+  async addOfferedLocked(
+    tx: Tx,
+    shopId: string,
+    order: OrderRow,
+    variantId: string,
+    price: bigint,
+  ): Promise<MutationResult<OrderRecord>> {
+    const refusal = editRefusal(order);
+    if (refusal) return failOne(['variantId'], 'INVALID', refusal);
+    return this.#editLocked(
+      tx,
+      { shopId, actor: 'system' },
+      order,
+      [],
+      [{ variantId, quantity: 1, price, field: [] }],
+      'The customer took the offer on their page',
+      ['upsoldAt'],
+    );
+  }
+
+  /**
+   * Changes the items of an order locked in `tx`, which may change, as {@link editLineItems}
+   * says; `what` begins its timeline entry.
+   */
+  async #editLocked(
+    tx: Tx,
+    caller: EditCaller,
+    order: OrderRow,
+    quantities: CheckedEdit['quantities'],
+    additions: CheckedEdit['additions'],
+    what: string,
+    stamps: OrderStamp[] = [],
+  ): Promise<MutationResult<OrderRecord>> {
+    const { shopId } = caller;
+    const current = await linesOf(tx, shopId, order.id);
+    const lineIds = new Set(current.map((line) => line.id));
+    const unknown = quantities.filter((entry) => !lineIds.has(entry.lineItemId));
+    if (unknown.length > 0) {
+      return {
+        ok: false,
+        errors: unknown.map((entry) => ({
+          field: [...entry.field, 'lineItemId'],
+          code: 'NOT_FOUND',
+          message: 'Line item not found on this order',
+        })),
+      };
+    }
+    const asked = new Map(quantities.map((entry) => [entry.lineItemId, entry]));
+    const unchanged = current.every(
+      (line) => (asked.get(line.id)?.quantity ?? line.quantity) === line.quantity,
+    );
+    if (unchanged && additions.length === 0) {
+      return { ok: true, value: (await loadOrder(tx, shopId, order.id))! };
+    }
+
+    const snapshots = await this.variants.snapshotsOf(tx, shopId, [
+      ...current.map((line) => line.variantId),
+      ...additions.map((line) => line.variantId),
+    ]);
+    const errors: FieldError[] = [];
+    const edited: EditedLine[] = [];
+    for (const line of current) {
+      const entry = asked.get(line.id);
+      const quantity = entry?.quantity ?? line.quantity;
+      const snapshot = snapshots.get(line.variantId);
+      // Selling more of it is selling it: a variant gone or archived sells no more.
+      if (entry && quantity > line.quantity && notForSale(snapshot)) {
+        errors.push({
+          field: [...entry.field, 'quantity'],
+          code: 'INVALID',
+          message: snapshot
+            ? `"${snapshot.productTitle}" is archived, so no more of it can be sold`
+            : `"${itemName(line)}" was deleted, so no more of it can be sold`,
         });
       }
-      const onOrder = new Set(current.map((line) => line.variantId));
-      // A bundle added is its parts added, which the edit names itself (ADR-410).
-      const bundles = await bundlesOfVariantsIn(
-        tx,
-        shopId,
-        additions.map((line) => line.variantId),
+      if (quantity === 0) continue;
+      edited.push({
+        ...line,
+        quantity,
+        taxCode: snapshot?.taxCode ?? null,
+        field: entry ? entry.field : null,
+      });
+    }
+    const onOrder = new Set(current.map((line) => line.variantId));
+    // A bundle added is its parts added, which the edit names itself (ADR-410).
+    const bundles = await bundlesOfVariantsIn(
+      tx,
+      shopId,
+      additions.map((line) => line.variantId),
+    );
+    const preorders = await preordersIn(
+      tx,
+      shopId,
+      [...snapshots.values()].map((snapshot) => snapshot.productId),
+    );
+    for (const line of additions) {
+      const snapshot = snapshots.get(line.variantId);
+      const field = [...line.field, 'variantId'];
+      if (!snapshot) {
+        errors.push({ field, code: 'NOT_FOUND', message: 'Variant not found' });
+      } else if (notForSale(snapshot)) {
+        errors.push({
+          field,
+          code: 'INVALID',
+          message: `"${snapshot.productTitle}" is archived, so it can't be sold`,
+        });
+      } else if (bundles.has(line.variantId)) {
+        errors.push({
+          field,
+          code: 'INVALID',
+          message: `"${snapshot.productTitle}" is a bundle: add its parts instead`,
+        });
+      } else if (onOrder.has(line.variantId)) {
+        errors.push({
+          field,
+          code: 'INVALID',
+          message:
+            `"${itemName({ title: snapshot.productTitle, variantTitle: snapshot.variantTitle })}" ` +
+            'is on the order already: change its quantity instead',
+        });
+      } else {
+        edited.push({
+          id: newId(),
+          variantId: line.variantId,
+          productId: snapshot.productId,
+          title: snapshot.productTitle,
+          variantTitle: snapshot.variantTitle,
+          sku: snapshot.sku,
+          quantity: line.quantity,
+          unitPrice: line.price ?? snapshot.price,
+          unitCost: snapshot.cost,
+          weightGrams: snapshot.weightGrams,
+          taxable: snapshot.taxable,
+          taxCode: snapshot.taxCode,
+          createdAt: null,
+          preorderShipsOn: preorders.get(snapshot.productId) ?? null,
+          field: line.field,
+        });
+      }
+    }
+    if (errors.length > 0) return { ok: false, errors };
+    if (edited.length === 0) {
+      return failOne(['input'], 'INVALID', 'An order keeps at least one item: cancel it instead');
+    }
+    if (edited.length > LIMITS.lines) {
+      return failOne(
+        ['input', 'addVariants'],
+        'TOO_MANY',
+        `An order can have at most ${LIMITS.lines} items`,
       );
-      const preorders = await preordersIn(
-        tx,
-        shopId,
-        [...snapshots.values()].map((snapshot) => snapshot.productId),
-      );
-      for (const line of additions) {
-        const snapshot = snapshots.get(line.variantId);
-        const field = [...line.field, 'variantId'];
-        if (!snapshot) {
-          errors.push({ field, code: 'NOT_FOUND', message: 'Variant not found' });
-        } else if (notForSale(snapshot)) {
-          errors.push({
-            field,
-            code: 'INVALID',
-            message: `"${snapshot.productTitle}" is archived, so it can't be sold`,
-          });
-        } else if (bundles.has(line.variantId)) {
-          errors.push({
-            field,
-            code: 'INVALID',
-            message: `"${snapshot.productTitle}" is a bundle: add its parts instead`,
-          });
-        } else if (onOrder.has(line.variantId)) {
-          errors.push({
-            field,
-            code: 'INVALID',
-            message:
-              `"${itemName({ title: snapshot.productTitle, variantTitle: snapshot.variantTitle })}" ` +
-              'is on the order already: change its quantity instead',
-          });
-        } else {
-          edited.push({
-            id: newId(),
-            variantId: line.variantId,
-            productId: snapshot.productId,
-            title: snapshot.productTitle,
-            variantTitle: snapshot.variantTitle,
-            sku: snapshot.sku,
-            quantity: line.quantity,
-            unitPrice: line.price ?? snapshot.price,
-            unitCost: snapshot.cost,
-            weightGrams: snapshot.weightGrams,
-            taxable: snapshot.taxable,
-            taxCode: snapshot.taxCode,
-            createdAt: null,
-            preorderShipsOn: preorders.get(snapshot.productId) ?? null,
-            field: line.field,
-          });
-        }
-      }
-      if (errors.length > 0) return { ok: false, errors };
-      if (edited.length === 0) {
-        return failOne(['input'], 'INVALID', 'An order keeps at least one item: cancel it instead');
-      }
-      if (edited.length > LIMITS.lines) {
-        return failOne(
-          ['input', 'addVariants'],
-          'TOO_MANY',
-          `An order can have at most ${LIMITS.lines} items`,
-        );
-      }
+    }
 
-      // Its stock, at its location: units added committed, units taken off let go.
-      const before = unitsByVariant(current);
-      const after = unitsByVariant(edited);
-      const commit: StockLine[] = [];
-      const release: StockLine[] = [];
-      for (const variantId of new Set([...before.keys(), ...after.keys()])) {
-        const change = (after.get(variantId) ?? 0) - (before.get(variantId) ?? 0);
-        const stockLine = { variantId, locationId: order.locationId, quantity: Math.abs(change) };
-        if (change > 0) commit.push(stockLine);
-        else if (change < 0) release.push(stockLine);
-      }
-      const rewrite: Rewrite = {
-        current,
-        edited,
-        discount: order.discount,
-        transferDiscount: order.transferDiscount,
-        onlineDiscount: order.onlineDiscount,
-        shipping: order.shipping,
-        stock: { commit, release },
-        field: ['input'],
-        shortField: (variantId) => {
-          const line =
-            edited.find((each) => each.variantId === variantId && each.field) ??
-            edited.find((each) => each.variantId === variantId)!;
-          return [...(line.field ?? ['input']), 'quantity'];
-        },
-        also: {},
-        kind: 'edited',
-        message: (totals) => changeWords('Changed the items', current, edited, totals),
-        changed: ['lineItems'],
-      };
-      const amounts = await this.#prepare(tx, tenant, order, rewrite);
-      if (!amounts.ok) return amounts;
-      await this.#write(tx, tenant, order, rewrite, amounts.value);
-      return { ok: true, value: (await loadOrder(tx, shopId, order.id))! };
-    });
+    // Its stock, at its location: units added committed, units taken off let go.
+    const before = unitsByVariant(current);
+    const after = unitsByVariant(edited);
+    const commit: StockLine[] = [];
+    const release: StockLine[] = [];
+    for (const variantId of new Set([...before.keys(), ...after.keys()])) {
+      const change = (after.get(variantId) ?? 0) - (before.get(variantId) ?? 0);
+      const stockLine = { variantId, locationId: order.locationId, quantity: Math.abs(change) };
+      if (change > 0) commit.push(stockLine);
+      else if (change < 0) release.push(stockLine);
+    }
+    const rewrite: Rewrite = {
+      current,
+      edited,
+      discount: order.discount,
+      transferDiscount: order.transferDiscount,
+      onlineDiscount: order.onlineDiscount,
+      shipping: order.shipping,
+      stock: { commit, release },
+      field: ['input'],
+      shortField: (variantId) => {
+        const line =
+          edited.find((each) => each.variantId === variantId && each.field) ??
+          edited.find((each) => each.variantId === variantId)!;
+        return [...(line.field ?? ['input']), 'quantity'];
+      },
+      also: {},
+      stamps,
+      kind: 'edited',
+      message: (totals) => changeWords(what, current, edited, totals),
+      changed: ['lineItems'],
+    };
+    const amounts = await this.#prepare(tx, caller, order, rewrite);
+    if (!amounts.ok) return amounts;
+    await this.#write(tx, caller, order, rewrite, amounts.value);
+    return { ok: true, value: (await loadOrder(tx, shopId, order.id))! };
   }
 
   /**
@@ -887,11 +945,11 @@ export class OrderEditService {
    */
   async #prepare(
     tx: Tx,
-    tenant: TenantContext,
+    caller: EditCaller,
     order: OrderRow,
     rewrite: Rewrite,
   ): Promise<MutationResult<Amounts>> {
-    const { shopId } = tenant;
+    const { shopId } = caller;
     const { edited, discount, field } = rewrite;
     const currency = order.currency as CurrencyCode;
     const format = (value: bigint) => formatMoney(money(value, currency));
@@ -948,7 +1006,7 @@ export class OrderEditService {
       charges: rewrite.shipping + order.codFee,
     });
 
-    const moved = await this.stock.recommit(tx, { shopId, actor: tenant.actor }, rewrite.stock, {
+    const moved = await this.stock.recommit(tx, { shopId, actor: caller.actor }, rewrite.stock, {
       referenceDocumentUri: orderReference(order.id),
     });
     if (!moved.ok) {
@@ -983,12 +1041,12 @@ export class OrderEditService {
    */
   async #write(
     tx: Tx,
-    tenant: TenantContext,
+    caller: EditCaller,
     order: OrderRow,
     rewrite: Rewrite,
     amounts: Amounts,
   ): Promise<void> {
-    const { shopId } = tenant;
+    const { shopId } = caller;
     const { edited } = rewrite;
     const { subtotal, total, codAmount, tax } = amounts;
     const currency = order.currency as CurrencyCode;
@@ -1019,7 +1077,10 @@ export class OrderEditService {
       ...(financialStatus !== 'paid' && { paidAt: null }),
       ...rewrite.also,
     };
-    const stamps: OrderStamp[] = financialStatus === 'paid' && !order.paidAt ? ['paidAt'] : [];
+    const stamps: OrderStamp[] = [
+      ...(rewrite.stamps ?? []),
+      ...(financialStatus === 'paid' && !order.paidAt ? (['paidAt'] as const) : []),
+    ];
     // A cash-on-delivery order scored when it was placed is scored again for what it holds now,
     // and waits for review if that is what makes it risky, as a new address does.
     let held: RiskAssessment | null = null;
@@ -1050,7 +1111,7 @@ export class OrderEditService {
       tx,
       shopId,
       order.id,
-      tenant.actor,
+      caller.actor,
       rewrite.kind,
       rewrite.message(order.total === total ? null : [format(total), format(order.total)]),
     );
@@ -1067,13 +1128,7 @@ export class OrderEditService {
 }
 
 /** The edit's lists, checked, each entry with where it is in the input. */
-function checkEdit(
-  tenant: TenantContext,
-  edit: OrderLineItemsEdit,
-): MutationResult<{
-  quantities: { lineItemId: string; quantity: number; field: string[] }[];
-  additions: { variantId: string; quantity: number; price: bigint | null; field: string[] }[];
-}> {
+function checkEdit(tenant: TenantContext, edit: OrderLineItemsEdit): MutationResult<CheckedEdit> {
   const check = new InputChecker();
   const setQuantities = edit.setQuantities ?? [];
   const addVariants = edit.addVariants ?? [];

@@ -131,6 +131,7 @@ export class OrderLinkController {
     @Query('sent') sent: string | undefined,
     @Query('paid') paid: string | undefined,
     @Query('reviewed') reviewed: string | undefined,
+    @Query('added') added: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const view = await this.links.viewLink(token);
@@ -143,6 +144,7 @@ export class OrderLinkController {
         sent: sent !== undefined,
         paid: paid !== undefined,
         reviewed: reviewed !== undefined,
+        added: added !== undefined,
       }),
     );
   }
@@ -209,6 +211,9 @@ export class OrderLinkController {
       case 'review':
         view = await this.links.review(token, reviewForm(body));
         break;
+      case 'upsell':
+        view = await this.links.takeOffer(token, field(body, 'variant'));
+        break;
       case 'pay': {
         // To the gateway the customer chose (ADR-219), linked or by its form (ADR-163), or the
         // page again with why not.
@@ -225,7 +230,9 @@ export class OrderLinkController {
         return;
     }
     if (view.kind === 'order' && !view.problem) {
-      const done = { address: 'saved', receipt: 'sent', review: 'reviewed' }[action as string];
+      const done = { address: 'saved', receipt: 'sent', review: 'reviewed', upsell: 'added' }[
+        action as string
+      ];
       return seeOther(reply, done ? `${token}?${done}` : token);
     }
     await send(reply, orderLinkPage(view, { form: action === 'address' ? action : undefined }));

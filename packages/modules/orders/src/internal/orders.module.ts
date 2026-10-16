@@ -53,6 +53,7 @@ import { OrderCommentResolver } from './graphql/order-comment.resolver.js';
 import { OrderCommentService } from './order-comment.service.js';
 import { OrderEditResolver } from './graphql/order-edit.resolver.js';
 import { OrderEditService } from './order-edit.service.js';
+import { PostPurchaseOffers } from './post-purchase-offer.js';
 import { OrderService } from './order.service.js';
 import { RefundService } from './refund.service.js';
 import { ReturnResolver } from './graphql/return.resolver.js';
@@ -99,6 +100,7 @@ import { TransferReceiptService } from './transfer-receipt.service.js';
     OrderTrackingService,
     OrderCommentService,
     OrderEditService,
+    PostPurchaseOffers,
     ReturnService,
     OrderResolver,
     FulfillmentResolver,

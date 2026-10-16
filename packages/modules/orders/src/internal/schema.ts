@@ -406,6 +406,8 @@ export const orders = ordersSchema.table(
     prepayCredit: money('prepay_credit'),
     /** When that credit was given, the order paid in full online. */
     prepayCreditedAt: timestamp('prepay_credited_at', { withTimezone: true }),
+    /** When its customer took the offer its page made them (MKT-09, ADR-438): once an order. */
+    upsoldAt: timestamp('upsold_at', { withTimezone: true }),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

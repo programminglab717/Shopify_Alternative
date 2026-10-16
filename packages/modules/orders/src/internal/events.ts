@@ -282,6 +282,8 @@ export interface OrderSettingsUpdatedPayload {
   deskWaitsForReminder: boolean;
   cancelUnreachableAfterDays: number | null;
   cancelUnpaidAfterDays: number | null;
+  /** The post-purchase offer's percentage off (ADR-438); null for no offer. */
+  upsellPercentOff: number | null;
   /** Who changed them. */
   actorKind: 'app' | 'staff';
   actorId: string;

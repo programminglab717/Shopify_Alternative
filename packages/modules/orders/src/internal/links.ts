@@ -95,7 +95,7 @@ export type LinkProblem =
    * change its address (once packed or shipped) or send a receipt for it (once paid) here; or
    * not far enough for them to rate what it brought them (until it is delivered).
    */
-  | { kind: 'too_late'; action: 'cancel' | 'address' | 'receipt' | 'pay' | 'review' }
+  | { kind: 'too_late'; action: 'cancel' | 'address' | 'receipt' | 'pay' | 'review' | 'upsell' }
   /** A review form posted with no stars given (ADR-399). */
   | { kind: 'review'; reason: 'none' }
   /**

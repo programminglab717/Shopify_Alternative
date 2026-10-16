@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-437 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-438 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -445,6 +445,7 @@
 | 435 | Complementary products: the products a shop pairs with one, kept by the catalog in its order, and recommended where a theme asks for complementary ones | Accepted |
 | 436 | Complementary products in the admin: a card on the product's page, the products found by name and put in order | Accepted |
 | 437 | The cart's cross-sells: the products paired with what it holds, asked for as complementary recommendations and shown together on Hatti Base's cart page | Accepted |
+| 438 | The offer after the purchase: a cash-on-delivery order's page offers a product the shop pairs with what it holds, at the shop's percentage off, added with a tap and paid at the door until it is packed | Accepted |
 
 ---
 
@@ -16759,3 +16760,40 @@
     the edge.
   * **Several product IDs in one request:** Shopify's route takes one, and themes written for it
     ask that way.
+
+## ADR-438 · The offer after the purchase: a cash-on-delivery order's page offers a product the shop pairs with what it holds, at the shop's percentage off, added with a tap and paid at the door until it is packed
+
+* **Context:**
+  * 05 §8 asks for a one-tap "Add X for Rs 499, pay on delivery" offer on a cash-on-delivery
+    order, open until the order is packed. Nothing is paid again, which is cash on delivery's
+    advantage.
+  * MKT-09 asks for post-purchase upsells. ADR-435 keeps the products a shop pairs with each
+    product.
+  * An order's items change while it waits to be packed, through the edits of ADR-131: its stock,
+    totals, tax and cash at the door follow.
+* **Decision:**
+  * **The shop sets a percentage off in its order settings** (`upsellPercentOff`, 0 to 50; null
+    for no offer; migration 0204).
+  * **What is offered:** the first product the shop pairs with the order's items, in their order,
+    that the order does not hold, is for sale, is not a bundle and has a variant in stock. It is
+    offered at its price less the percentage, rounded down to a whole rupee. Each variant for
+    sale is a button of its own.
+  * **When:** on a confirmed cash-on-delivery order's page, delivered rather than picked up, open
+    and not packed, not refunded or held over the plan, and only until it takes one offer
+    (`upsold_at`).
+  * **One tap adds it** through the edit's own path, in the link's locked transaction, at the
+    offer's price. The offer is worked out again first, so a stale page cannot add what is no
+    longer offered.
+    * The timeline says "The customer took the offer on their page", by the system.
+    * The page then says it was added, to be paid with the rest at the door.
+    * An offer gone says so. One the order cannot take, such as one past the cash cap, is refused.
+* **Consequences:**
+  * The confirmed page carries the offer above the order's summary, in English and Urdu.
+  * The admin sets the percentage through the Admin API for now. Its card in the order settings
+    comes next.
+* **Alternatives:**
+  * **A product the shop picks for every order:** pairings already say what goes with what.
+  * **Offering before confirming:** the customer is still deciding on the order itself. Adding
+    to it then would change what they confirm.
+  * **A discount line rather than a lower price:** the order's discount is shared over its items
+    (ADR-134). A line at its offered price keeps the offer to that item.

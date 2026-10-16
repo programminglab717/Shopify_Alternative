@@ -8672,6 +8672,11 @@ type OrderSettings {
 
   """When the shop last changed them; none while it has the defaults."""
   updatedAt: DateTime
+
+  """
+  The percentage off at which a cash-on-delivery order's page offers its customer a product the shop pairs with what they bought, added with a tap and paid at the door, until it is packed (MKT-09, ADR-438); null for no offer, 0 for its price.
+  """
+  upsellPercentOff: Int
 }
 
 """Those not given stay as they are."""
@@ -8689,6 +8694,9 @@ input OrderSettingsInput {
 
   """5 to 1440; null for no target."""
   firstCallMinutes: Int
+
+  """0 to 50; null for no offer."""
+  upsellPercentOff: Int
 }
 
 type OrderSettingsUpdatePayload {

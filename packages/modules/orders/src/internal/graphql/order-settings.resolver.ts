@@ -49,6 +49,7 @@ export class OrderSettingsResolver {
       ...(input.cancelUnpaidAfterDays !== undefined && {
         cancelUnpaidAfterDays: input.cancelUnpaidAfterDays,
       }),
+      ...(input.upsellPercentOff !== undefined && { upsellPercentOff: input.upsellPercentOff }),
     });
     return Object.assign(new OrderSettingsUpdatePayload(), {
       orderSettings: result.ok ? toOrderSettings(result.value) : null,
@@ -70,6 +71,7 @@ function toOrderSettings(record: OrderSettingsRecord): OrderSettings {
     deskWaitsForReminder: record.deskWaitsForReminder,
     cancelUnreachableAfterDays: record.cancelUnreachableAfterDays,
     cancelUnpaidAfterDays: record.cancelUnpaidAfterDays,
+    upsellPercentOff: record.upsellPercentOff,
     updatedAt: record.updatedAt,
   });
 }

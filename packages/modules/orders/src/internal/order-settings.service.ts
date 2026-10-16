@@ -44,6 +44,12 @@ export interface OrderSettingsRecord {
    * to be checked, it is cancelled (ADR-168); null for never.
    */
   cancelUnpaidAfterDays: number | null;
+  /**
+   * The percentage off at which a cash-on-delivery order's page offers its customer a product
+   * the shop pairs with what they bought, until it is packed (MKT-09, ADR-438); null for no
+   * offer, 0 for its price.
+   */
+  upsellPercentOff: number | null;
   /** Null while the shop has the defaults. */
   updatedAt: Date | null;
 }
@@ -57,6 +63,7 @@ export interface OrderSettingsInput {
   deskWaitsForReminder?: boolean;
   cancelUnreachableAfterDays?: number | null;
   cancelUnpaidAfterDays?: number | null;
+  upsellPercentOff?: number | null;
 }
 
 export const UNPAID_LIMITS = {
@@ -107,7 +114,11 @@ export const DEFAULT_ORDER_SETTINGS: Omit<OrderSettingsRecord, 'updatedAt'> = {
   deskWaitsForReminder: false,
   cancelUnreachableAfterDays: null,
   cancelUnpaidAfterDays: null,
+  upsellPercentOff: null,
 };
+
+/** The most a post-purchase offer takes off (ADR-438). */
+export const UPSELL_PERCENT = { min: 0, max: 50 } as const;
 
 /** The shop's order settings, in the caller's transaction `tx`, or the defaults. */
 export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSettingsRecord> {
@@ -119,11 +130,12 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
     desk_waits_for_reminder: boolean;
     cancel_unreachable_after_days: number | null;
     cancel_unpaid_after_days: number | null;
+    upsell_percent_off: number | null;
     updated_at: string;
   }>(sql`
     SELECT customer_cancellation, calling_opens, calling_closes, first_call_minutes,
            desk_waits_for_reminder, cancel_unreachable_after_days, cancel_unpaid_after_days,
-           updated_at
+           upsell_percent_off, updated_at
       FROM orders.order_settings WHERE shop_id = ${shopId}`);
   const row = rows[0];
   if (!row) return { ...DEFAULT_ORDER_SETTINGS, updatedAt: null };
@@ -137,6 +149,7 @@ export async function orderSettingsIn(tx: Tx, shopId: string): Promise<OrderSett
     deskWaitsForReminder: row.desk_waits_for_reminder,
     cancelUnreachableAfterDays: row.cancel_unreachable_after_days,
     cancelUnpaidAfterDays: row.cancel_unpaid_after_days,
+    upsellPercentOff: row.upsell_percent_off,
     updatedAt: toDateOrNull(row.updated_at),
   };
 }
@@ -148,8 +161,13 @@ function checkOrderSettings(
   input: OrderSettingsInput,
 ): Omit<OrderSettingsRecord, 'updatedAt'> | null {
   const before = check.errors.length;
-  let { callingHours, firstCallMinutes, cancelUnreachableAfterDays, cancelUnpaidAfterDays } =
-    current;
+  let {
+    callingHours,
+    firstCallMinutes,
+    cancelUnreachableAfterDays,
+    cancelUnpaidAfterDays,
+    upsellPercentOff,
+  } = current;
   if (input.callingHours !== undefined) {
     callingHours = null;
     if (input.callingHours !== null) {
@@ -196,6 +214,13 @@ function checkOrderSettings(
       UNPAID_LIMITS.days,
     );
   }
+  if (input.upsellPercentOff !== undefined) {
+    upsellPercentOff = check.integer(
+      ['input', 'upsellPercentOff'],
+      input.upsellPercentOff,
+      UPSELL_PERCENT,
+    );
+  }
   if (check.errors.length > before) return null;
   return {
     customerCancellation: input.customerCancellation ?? current.customerCancellation,
@@ -204,6 +229,7 @@ function checkOrderSettings(
     deskWaitsForReminder: input.deskWaitsForReminder ?? current.deskWaitsForReminder,
     cancelUnreachableAfterDays,
     cancelUnpaidAfterDays,
+    upsellPercentOff,
   };
 }
 
@@ -219,6 +245,7 @@ function settingsDetails(settings: Omit<OrderSettingsRecord, 'updatedAt'>) {
     deskWaitsForReminder: settings.deskWaitsForReminder,
     cancelUnreachableAfterDays: settings.cancelUnreachableAfterDays,
     cancelUnpaidAfterDays: settings.cancelUnpaidAfterDays,
+    upsellPercentOff: settings.upsellPercentOff,
   };
 }
 
@@ -249,11 +276,12 @@ export class OrderSettingsService {
       await tx.execute(sql`
         INSERT INTO orders.order_settings
                (shop_id, customer_cancellation, calling_opens, calling_closes, first_call_minutes,
-                desk_waits_for_reminder, cancel_unreachable_after_days, cancel_unpaid_after_days)
+                desk_waits_for_reminder, cancel_unreachable_after_days, cancel_unpaid_after_days,
+                upsell_percent_off)
         VALUES (${tenant.shopId}, ${next.customerCancellation}, ${next.callingHours?.opens ?? null},
                 ${next.callingHours?.closes ?? null}, ${next.firstCallMinutes},
                 ${next.deskWaitsForReminder}, ${next.cancelUnreachableAfterDays},
-                ${next.cancelUnpaidAfterDays})
+                ${next.cancelUnpaidAfterDays}, ${next.upsellPercentOff})
             ON CONFLICT (shop_id) DO UPDATE
                    SET customer_cancellation = excluded.customer_cancellation,
                        calling_opens = excluded.calling_opens,
@@ -262,6 +290,7 @@ export class OrderSettingsService {
                        desk_waits_for_reminder = excluded.desk_waits_for_reminder,
                        cancel_unreachable_after_days = excluded.cancel_unreachable_after_days,
                        cancel_unpaid_after_days = excluded.cancel_unpaid_after_days,
+                       upsell_percent_off = excluded.upsell_percent_off,
                        version = orders.order_settings.version + 1, updated_at = now()`);
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<OrderSettingsUpdatedPayload>(tx, tenant.shopId, {

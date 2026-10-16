@@ -312,6 +312,8 @@ export interface OrderRecord {
   prepayCredit: bigint | null;
   /** When that credit was given, the order paid in full online. */
   prepayCreditedAt: Date | null;
+  /** When its customer took the offer its page made them (MKT-09, ADR-438); null until then. */
+  upsoldAt: Date | null;
   /**
    * The account a bank-transfer order's customer was told to pay into, as it was when it was
    * placed (ADR-074), or a cash-on-delivery order's for its advance; null for other orders, and

@@ -99,6 +99,7 @@ describe.skipIf(!server)('Order links', () => {
       deskWaitsForReminder: false,
       cancelUnreachableAfterDays: null,
       cancelUnpaidAfterDays: null,
+      upsellPercentOff: null,
       updatedAt: null,
     });
     await f.admin.query('DELETE FROM platform.outbox_events; DELETE FROM platform.audit_log');
@@ -124,6 +125,7 @@ describe.skipIf(!server)('Order links', () => {
           deskWaitsForReminder: false,
           cancelUnreachableAfterDays: null,
           cancelUnpaidAfterDays: null,
+          upsellPercentOff: null,
           actorKind: 'app',
           actorId: appId,
         },
@@ -142,6 +144,7 @@ describe.skipIf(!server)('Order links', () => {
           deskWaitsForReminder: false,
           cancelUnreachableAfterDays: null,
           cancelUnpaidAfterDays: null,
+          upsellPercentOff: null,
         },
       },
     ]);

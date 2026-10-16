@@ -88,6 +88,15 @@ export class OrderSettings {
   })
   cancelUnpaidAfterDays!: number | null;
 
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      "The percentage off at which a cash-on-delivery order's page offers its customer a " +
+      'product the shop pairs with what they bought, added with a tap and paid at the door, ' +
+      'until it is packed (MKT-09, ADR-438); null for no offer, 0 for its price.',
+  })
+  upsellPercentOff!: number | null;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'When the shop last changed them; none while it has the defaults.',
@@ -123,6 +132,9 @@ export class OrderSettingsInput {
 
   @Field(() => Int, { nullable: true, description: '1 to 30; null for never.' })
   cancelUnpaidAfterDays?: number | null;
+
+  @Field(() => Int, { nullable: true, description: '0 to 50; null for no offer.' })
+  upsellPercentOff?: number | null;
 }
 
 @ObjectType()

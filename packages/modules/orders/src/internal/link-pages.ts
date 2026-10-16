@@ -32,6 +32,7 @@ import {
 } from './online-payment-page.js';
 import type { OnlineGateway } from './online-payments.js';
 import type { OrderLinkView, ReviewableProduct } from './order-link.service.js';
+import type { PostPurchaseOffer } from './post-purchase-offer.js';
 import type { TrackingView } from './tracking.service.js';
 import type { FulfillmentEventRecord, FulfillmentRecord, OrderRecord } from './records.js';
 import { addressChangeable, awaitsCustomer, itemName, orderName } from './rules.js';
@@ -151,6 +152,8 @@ export interface LinkPageOptions {
   paid?: boolean;
   /** Their rating of what the order brought them was taken just now (ADR-399). */
   reviewed?: boolean;
+  /** The item offered them was added just now (ADR-438). */
+  added?: boolean;
 }
 
 /**
@@ -238,6 +241,8 @@ export function orderLinkPage(view: OrderLinkView, options: LinkPageOptions = {}
           steps: view.steps,
           reviewable: view.reviewable,
           reviewed: Boolean(options.reviewed) && !problem,
+          offer: view.offer,
+          added: Boolean(options.added) && !problem,
         });
       }
       return confirmPage({
@@ -749,6 +754,10 @@ function statusPage(
     reviewable?: readonly ReviewableProduct[];
     /** Their rating was taken just now. */
     reviewed?: boolean;
+    /** A product offered them to add, paid at the door (ADR-438). */
+    offer?: PostPurchaseOffer | null;
+    /** The item offered them was added just now. */
+    added?: boolean;
   },
 ): LinkPage {
   const {
@@ -763,6 +772,8 @@ function statusPage(
     steps = NO_STEPS,
     reviewable = [],
     reviewed = false,
+    offer = null,
+    added = false,
   } = options;
   const name = orderName(order.number);
   const shown = shownOfOrder(order);
@@ -793,6 +804,7 @@ function statusPage(
         sent && receiptNotice(shop),
         paid && onlinePaidNotice(shop.name),
         reviewed && reviewedNotice(shop),
+        added && addedNotice(),
         mark && html`<div class="mark" aria-hidden="true">✓</div>`,
         heading(title),
         paragraphs(sentence, 'center'),
@@ -856,6 +868,8 @@ function statusPage(
         pay,
         // Store credit offered for paying the rest online instead (ADR-432).
         onlinePayment && payOnlineForm(onlinePayment, shown.currency, false),
+        // Something to add to it, paid at the door with the rest (ADR-438).
+        offer && offerForm(offer, shown.currency),
         summary(shown),
         address(shown, { changeable }),
         cancellable && cancelLink(),
@@ -1300,6 +1314,70 @@ function receiptNotice(shop: LinkShop): Html {
   </div>`;
 }
 
+function addedNotice(): Html {
+  return html`<div class="banner done" role="status">
+    ${paragraphs(
+      {
+        en: "Added to your order. You pay for it with the rest when it's delivered.",
+        ur: 'آپ کے آرڈر میں شامل ہو گیا۔ اس کی ادائیگی باقی رقم کے ساتھ ڈیلیوری پر کریں۔',
+      },
+      '',
+    )}
+  </div>`;
+}
+
+/**
+ * The offer made after the purchase (MKT-09, ADR-438): a product the shop pairs with what the
+ * order holds, at its price less the shop's percentage, added with one tap, each of its variants
+ * for sale a button of its own, and paid at the door. No payment is asked again.
+ */
+function offerForm(offer: PostPurchaseOffer, currency: CurrencyCode): Html {
+  const price = (value: bigint) => formatMoney(money(value, currency));
+  const one = offer.variants.length === 1;
+  const first = offer.variants[0]!;
+  const off = offer.percentOff > 0;
+  return html`<form method="post" class="offer">
+    <input type="hidden" name="action" value="upsell" />
+    ${paragraphs(
+      one
+        ? {
+            en:
+              `Add ${offer.title} for ${price(first.price)}` +
+              (off ? ` (was ${price(first.was)})` : '') +
+              ", and pay for it when it's delivered.",
+            ur: html`${text(offer.title)} ${ltr(price(first.price))} میں شامل
+            کریں${off && html` (پہلے ${ltr(price(first.was))})`}، اور اس کی ادائیگی ڈیلیوری پر کریں۔`,
+          }
+        : {
+            en:
+              `Add ${offer.title}` +
+              (off ? `, ${offer.percentOff}% off,` : '') +
+              " and pay for it when it's delivered.",
+            ur: html`${text(offer.title)}${off && html` ${ltr(`${offer.percentOff}%`)} رعایت پر`}
+            شامل کریں، اور اس کی ادائیگی ڈیلیوری پر کریں۔`,
+          },
+      'center',
+    )}
+    ${offer.variants.map(
+      (variant) =>
+        html`<button class="button stack" type="submit" name="variant" value="${variant.variantId}">
+          ${say(
+            'bilingual',
+            one
+              ? {
+                  en: `Add for ${price(variant.price)}`,
+                  ur: `${price(variant.price)} میں شامل کریں`,
+                }
+              : {
+                  en: `Add ${variant.title}, ${price(variant.price)}`,
+                  ur: `${variant.title} شامل کریں، ${price(variant.price)}`,
+                },
+          )}
+        </button>`,
+    )}
+  </form>`;
+}
+
 function savedNotice(): Html {
   return html`<div class="banner done" role="status">
     ${paragraphs({ en: 'Your new address is saved.', ur: 'آپ کا نیا پتہ محفوظ ہو گیا ہے۔' }, '')}
@@ -1355,7 +1433,9 @@ function problemWords(problem: LinkProblem, shown: ShownOrder): Sentence {
 }
 
 /** Why the customer can no longer do `action` here, and whom to ask instead. */
-function tooLateWords(action: 'cancel' | 'address' | 'receipt' | 'pay' | 'review'): Sentence {
+function tooLateWords(
+  action: 'cancel' | 'address' | 'receipt' | 'pay' | 'review' | 'upsell',
+): Sentence {
   switch (action) {
     case 'cancel':
       return {
@@ -1381,6 +1461,11 @@ function tooLateWords(action: 'cancel' | 'address' | 'receipt' | 'pay' | 'review
       return {
         en: 'You can rate what you bought once your order is delivered.',
         ur: 'آرڈر پہنچنے کے بعد آپ اپنی خریداری کو ریٹ کر سکتے ہیں۔',
+      };
+    case 'upsell':
+      return {
+        en: 'This offer is no longer open. Ask the shop in your chat to add anything else.',
+        ur: 'یہ آفر اب دستیاب نہیں۔ کچھ اور شامل کرنے کے لیے اپنی چیٹ میں دکان سے پوچھیں۔',
       };
   }
 }
