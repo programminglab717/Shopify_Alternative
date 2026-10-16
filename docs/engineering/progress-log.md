@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### Listings taken down for rights complaints
+
+* **A rights complaint upheld takes its listings off sale and holds them there, copies too,
+  marked with its number; the store's owner is told who complained and how to reach them**
+  ([ADR-475](../architecture/13-decision-log.md#adr-475--a-rights-complaint-upheld-takes-its-listings-off-sale-and-holds-them-there-copies-too-marked-with-its-number-the-stores-owner-is-told-who-complained-and-how-to-reach-them), TNS-04 in part).
+* 2987 tests, 2 more: products held and let go, and a complaint
+  upheld end to end.
+
 ### dd5cd78 · Rights complaints
 
 * **Owners of a trademark or copyright complain of a store's listings from its rights page,

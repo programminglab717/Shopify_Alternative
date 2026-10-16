@@ -170,6 +170,7 @@ type ProductChanges = Partial<
     | 'seoDescription'
     | 'publishAt'
     | 'giftCard'
+    | 'heldBy'
   >
 >;
 
@@ -246,7 +247,13 @@ export class ProductService {
       const original = await loadProduct(tx, tenant.shopId, input.productId);
       if (!original) return failOne<ProductRecord>(['productId'], 'NOT_FOUND', 'Product not found');
       // A copy on sale is screened as a new product is (ADR-473): a clearance stays with the one.
+      // A copy of one Hatti holds off sale is held with it (ADR-475).
+      const [{ heldBy } = { heldBy: null }] = await tx
+        .select({ heldBy: products.heldBy })
+        .from(products)
+        .where(and(eq(products.shopId, tenant.shopId), eq(products.id, original.id)));
       if ((input.newStatus ?? original.status) === 'active') {
+        if (heldBy) return fail<ProductRecord>([heldError(heldBy)]);
         const prohibited = prohibitedError(original);
         if (prohibited) return fail<ProductRecord>([prohibited]);
       }
@@ -295,6 +302,12 @@ export class ProductService {
         to: variantIds[index]!,
         productId: product.id,
       }));
+      if (heldBy) {
+        await tx
+          .update(products)
+          .set({ heldBy })
+          .where(and(eq(products.shopId, tenant.shopId), eq(products.id, product.id)));
+      }
       if (input.includeImages) await copyMedia(tx, tenant.shopId, original, product.id, copies);
       await joinManualCollections(tx, tenant.shopId, original.id, product.id);
       await copySizeChartIn(tx, tenant.shopId, original.id, product.id);
@@ -600,6 +613,10 @@ export class ProductService {
         if (changed.length > 0) {
           // On sale, as it is or as it becomes: screened for what Hatti does not allow (ADR-473).
           const next = { ...current, ...changes };
+          // Held off sale after a rights complaint (ADR-475): a draft until Hatti lets it go.
+          if (next.status === 'active' && next.heldBy && changed.includes('status')) {
+            return fail<ProductRecord>([heldError(next.heldBy)]);
+          }
           if (next.status === 'active' && changed.some((key) => SCREENED.includes(key))) {
             const prohibited = prohibitedError(next, next.screeningCleared);
             if (prohibited) return fail<ProductRecord>([prohibited]);
@@ -748,8 +765,10 @@ export class ProductService {
       const done = await this.#change({ shopId, currency }, id, ['id'], (current) => {
         if (!current.publishAt || current.publishAt.getTime() > Date.now()) return null;
         // One archived since keeps its status, as one naming what Hatti does not allow stays a
-        // draft (ADR-473); its time goes either way.
-        return current.status === 'draft' && !prohibitedError(current, current.screeningCleared)
+        // draft (ADR-473), and one Hatti holds off sale (ADR-475); its time goes either way.
+        return current.status === 'draft' &&
+          !current.heldBy &&
+          !prohibitedError(current, current.screeningCleared)
           ? { status: 'active', publishAt: null }
           : { publishAt: null };
       });
@@ -780,6 +799,54 @@ export class ProductService {
         found: screen(row).flatMap((finding) => finding.words),
       };
     });
+  }
+
+  /**
+   * Takes the shop's products `ids` off sale for the rights complaint `reference`, `ipc_…`
+   * (TNS-04, ADR-475), by Hatti's people: each made a draft, its time to go on sale gone, and held
+   * so that neither it nor a copy goes on sale until {@link releaseHold}. Those held, with their
+   * titles; IDs of no product of the shop are passed over.
+   */
+  async holdOffSale(
+    shopId: string,
+    ids: readonly string[],
+    reference: string,
+  ): Promise<{ id: string; title: string }[]> {
+    const currency = (await this.db.tenant(shopId, (tx) => shopProfile(tx, shopId)))
+      .currency as TenantContext['currency'];
+    const held: { id: string; title: string }[] = [];
+    for (const id of new Set(ids)) {
+      if (!isUuid(id)) continue;
+      const done = await this.#change({ shopId, currency }, id, ['id'], (current) => ({
+        status: current.status === 'active' ? 'draft' : current.status,
+        publishAt: null,
+        heldBy: reference,
+      }));
+      if (done.ok) held.push({ id: done.value.id, title: done.value.title });
+    }
+    return held;
+  }
+
+  /**
+   * Lets go the shop's products held for the rights complaint `reference`, copies too (ADR-475):
+   * they may go on sale again, which their shop does. How many were let go.
+   */
+  async releaseHold(shopId: string, reference: string): Promise<number> {
+    const { ids, currency } = await this.db.tenant(shopId, async (tx) => ({
+      ids: (
+        await tx
+          .select({ id: products.id })
+          .from(products)
+          .where(and(eq(products.shopId, shopId), eq(products.heldBy, reference)))
+      ).map((row) => row.id),
+      currency: (await shopProfile(tx, shopId)).currency as TenantContext['currency'],
+    }));
+    let released = 0;
+    for (const id of ids) {
+      const done = await this.#change({ shopId, currency }, id, ['id'], () => ({ heldBy: null }));
+      if (done.ok) released += 1;
+    }
+    return released;
   }
 
   /** Shows, hides or archives many products at once (CAT-04); see {@link update}. */
@@ -1137,6 +1204,17 @@ export async function activeProductsIn(tx: Tx, shopId: string): Promise<number> 
 }
 
 /** What screening looks at, of a product's columns: a change to one screens it again. */
+/** Why a product Hatti holds off sale may not go on sale (ADR-475). */
+function heldError(reference: string): FieldError {
+  return {
+    field: ['input', 'status'],
+    code: 'HELD',
+    message:
+      `Hatti took this product off sale after a rights complaint (${reference}). It stays a ` +
+      "draft until the complaint is settled: answer it from Hatti's notice",
+  };
+}
+
 const SCREENED: readonly string[] = [
   'status',
   'title',

@@ -82,6 +82,8 @@ export const products = catalogSchema.table(
      * (TNS-03, ADR-473); null where they have not.
      */
     screeningCleared: text('screening_cleared'),
+    /** The rights complaint holding it off sale, `ipc_…` (ADR-475): a draft until let go. */
+    heldBy: text('held_by'),
     version: integer('version').notNull().default(1),
     ...timestamps,
   },

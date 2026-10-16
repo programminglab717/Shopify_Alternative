@@ -2,7 +2,8 @@ import 'reflect-metadata';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { PublicSite, type TenantContext } from '@hatti/api';
-import { fromPublicId, newId } from '@hatti/ids';
+import { fromPublicId, newId, toPublicId } from '@hatti/ids';
+import { ProductService } from '@hatti/catalog/public';
 import { MessagesService, MessagingSettingsService } from '@hatti/messaging/public';
 import { StorefrontApiClient } from '@hatti/storefront-api';
 import {
@@ -14,6 +15,7 @@ import {
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { upholdRights } from '../rights.js';
 import { refuseAppeal, restoreStore, takeDown } from '../takedowns.js';
 import { TEST_STOREFRONT_KEY, startTestApi, type TestApi } from '../testing/api.js';
 
@@ -136,6 +138,89 @@ describe.skipIf(!server)("Reports of stores, from storefronts to Hatti's people 
       listings: [listing],
       status: 'open',
     });
+  });
+
+  it("upholds a rights complaint: its listings taken off sale and held, the store's owner told (ADR-475)", async () => {
+    const tenant: TenantContext = {
+      shopId,
+      currency: 'PKR',
+      actor: { kind: 'app', tokenId: newId() },
+      scopes: new Set(['write_settings', 'write_products']),
+    };
+    expect(
+      (
+        await new MessagingSettingsService(database).update(tenant, {
+          alertsPhone: '0333 5550009',
+        })
+      ).ok,
+    ).toBe(true);
+    const products = new ProductService(database);
+    const created = await products.create(tenant, { title: 'Gul lawn', status: 'active' });
+    if (!created.ok) throw new Error(JSON.stringify(created.errors));
+    const lawn = created.value;
+    const rights = new RightsComplaintsService(database);
+    const taken = await rights.complain(shopId, {
+      kind: 'counterfeit',
+      rightsOwner: 'Gul Ahmed',
+      complainant: 'Sana Iqbal',
+      actingAs: 'agent',
+      email: 'legal@example.pk',
+      listings: [
+        { id: lawn.id, title: 'Gul lawn', url: 'https://zari.hatti.test/products/gul-lawn' },
+      ],
+      details: 'Sold as Gul Ahmed lawn; it is a copy.',
+      signature: 'Sana Iqbal',
+      sworn: true,
+    });
+    if (!taken.ok) throw new Error(JSON.stringify(taken.errors));
+    const messages = new MessagesService(database);
+    const note = 'the label copies Gul Ahmed’s mark';
+
+    const upheld = await upholdRights(database, rights, products, messages, taken.value.id, {
+      by: 'Ayesha',
+      note,
+    });
+    if (typeof upheld === 'string') throw new Error(upheld);
+    expect(upheld.held).toEqual([{ id: lawn.id, title: 'Gul lawn' }]);
+    expect(upheld.complaint).toMatchObject({
+      status: 'upheld',
+      decidedBy: 'Ayesha',
+      decision: note,
+    });
+    const reference = toPublicId('rightsComplaint', taken.value.id);
+    const { rows } = await admin.query<{ status: string; held_by: string }>(
+      'SELECT status, held_by FROM catalog.products WHERE id = $1',
+      [lawn.id],
+    );
+    expect(rows).toEqual([{ status: 'draft', held_by: reference }]);
+    const told = await admin.query<{ kind: string; recipient: string; variables: object }>(
+      `SELECT kind, recipient, variables FROM messaging.messages
+        WHERE shop_id = $1 AND kind = 'listings_taken_down'`,
+      [shopId],
+    );
+    expect(told.rows).toEqual([
+      {
+        kind: 'listings_taken_down',
+        recipient: '+923335550009',
+        variables: {
+          shop: 'Zari',
+          product: '"Gul lawn"',
+          name: 'Sana Iqbal for Gul Ahmed',
+          reference,
+          note,
+          email: 'legal@example.pk',
+        },
+      },
+    ]);
+    // Once; the shop can't put it on sale again.
+    expect(
+      await upholdRights(database, rights, products, messages, taken.value.id, { by: 'A', note }),
+    ).toBe('decided');
+    expect(
+      await upholdRights(database, rights, products, messages, newId(), { by: 'A', note }),
+    ).toBe('not_found');
+    const again = await products.update(tenant, { id: lawn.id, status: 'active' });
+    expect(again.ok || again.errors[0]!.code).toBe('HELD');
   });
 
   it('takes the store down once, its owner told why with the link to appeal by, and restores it, told again (ADR-461, ADR-462)', async () => {

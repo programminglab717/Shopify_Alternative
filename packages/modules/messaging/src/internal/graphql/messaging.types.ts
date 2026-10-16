@@ -59,6 +59,7 @@ export enum MessageKind {
   SMS_SENDER_APPROVED = 'SMS_SENDER_APPROVED',
   SMS_SENDER_REFUSED = 'SMS_SENDER_REFUSED',
   SMS_SENDER_REVOKED = 'SMS_SENDER_REVOKED',
+  LISTINGS_TAKEN_DOWN = 'LISTINGS_TAKEN_DOWN',
   BROADCAST = 'BROADCAST',
   AUTOMATION = 'AUTOMATION',
   SMS_BROADCAST = 'SMS_BROADCAST',
@@ -296,6 +297,11 @@ registerEnumType(MessageKind, {
       description:
         'For the shop, from Hatti and paid by Hatti, at its alerts number: its SMS no longer ' +
         "come from its own name, and why; they come from Hatti's shared sender again (ADR-469).",
+    },
+    LISTINGS_TAKEN_DOWN: {
+      description:
+        'For the shop, from Hatti and paid by Hatti, at its alerts number: listings taken off ' +
+        'sale after a rights complaint Hatti upheld, who complained and how to reach them (ADR-475).',
     },
     BROADCAST: {
       description:

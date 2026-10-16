@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-474 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-475 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -482,6 +482,7 @@
 | 472 | The admin's product form writes a product's title and description with AI in the language chosen, from what the form says, for the shop to check before it saves | Accepted |
 | 473 | A product whose words name goods Hatti does not allow selling stays a draft: never on sale until its words change or Hatti's people clear them | Accepted |
 | 474 | Owners of a trademark or copyright complain of a store's listings from its rights page, naming them by their addresses and swearing to it; Hatti's people decide within 48 hours | Accepted |
+| 475 | A rights complaint upheld takes its listings off sale and holds them there, copies too, marked with its number; the store's owner is told who complained and how to reach them | Accepted |
 
 ---
 
@@ -17974,3 +17975,35 @@
     and its products are at hand.
   * **Folding complaints into reports:** a report needs no statement, no owner and no listings,
     and a takedown of listings is not a takedown of the store.
+
+## ADR-475 · A rights complaint upheld takes its listings off sale and holds them there, copies too, marked with its number; the store's owner is told who complained and how to reach them
+
+* **Context:**
+  * Rights owners complain of a store's listings, and Hatti's people decide within 48 hours
+    (ADR-474). Notice and takedown (TNS-04) needs an upheld complaint to take the listings down,
+    and keep them down: a seller who sets one on sale again, or copies it, undoes the decision.
+  * The listings are the catalog's; the complaint is the trust module's. Neither reads the
+    other's tables.
+* **Decision:**
+  * **The catalog holds products off sale** (`catalog.products.held_by`): its facade's
+    `holdOffSale` makes each of the shop's products named a draft, its time to go on sale gone,
+    marked with the complaint's number, `ipc_…`; `releaseHold` lets go every product so marked.
+    Each goes through the catalog's own change, so its event takes it off the storefront as any
+    change does.
+  * **A held product doesn't go on sale:** putting it on sale by hand, many at once, from a file
+    or at its time is refused with `HELD`, saying why and where to answer; other changes go
+    through. A copy is held with it.
+  * **`trust-reports uphold-rights`** holds the listings still the shop's, records the decision
+    with what was done, and tells the store's owner at its alerts number and by email, at
+    Hatti's cost: the listings, who complained (for whom, if an agent), the complaint's number,
+    Hatti's words, and the complainant's email.
+* **Consequences:**
+  * An upheld complaint stops the listings selling within the minute, and they stay down.
+  * The complainant's email goes to the seller, as the rights page says it may (ADR-474), so the
+    two can settle it; Hatti's people let the listings go when they do.
+  * The seller's own answer through Hatti, and letting go after it, are TNS-04's last part.
+* **Alternatives:**
+  * **Archiving the listings:** an archived product goes back on sale with one change, and
+    nothing says why it went.
+  * **Deleting them:** the seller loses its work, and nothing is left to restore if the
+    complaint was wrong.

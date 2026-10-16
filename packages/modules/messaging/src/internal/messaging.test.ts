@@ -535,6 +535,7 @@ describe("Messages' words", () => {
       'sms_sender_approved',
       'sms_sender_refused',
       'sms_sender_revoked',
+      'listings_taken_down',
     ]);
     expect(ALWAYS_SENT).toEqual([
       'one_time_code',
@@ -570,6 +571,7 @@ describe("Messages' words", () => {
       'sms_sender_approved',
       'sms_sender_refused',
       'sms_sender_revoked',
+      'listings_taken_down',
       'broadcast',
       'automation',
       // The shop's SMS campaign, which its customer can stop by its link (ADR-458).
@@ -713,6 +715,7 @@ describe("Messages' words", () => {
       'sms_sender_approved',
       'sms_sender_refused',
       'sms_sender_revoked',
+      'listings_taken_down',
     ]);
     const shipped = messageEmail('order_shipped', 'en', SHIPPED.variables)!;
     expect(shipped.from).toBe('shop');

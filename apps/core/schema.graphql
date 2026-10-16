@@ -6174,6 +6174,11 @@ enum MessageKind {
   INVOICE_DUE
 
   """
+  For the shop, from Hatti and paid by Hatti, at its alerts number: listings taken off sale after a rights complaint Hatti upheld, who complained and how to reach them (ADR-475).
+  """
+  LISTINGS_TAKEN_DOWN
+
+  """
   A code to prove their number at checkout (CHK-09), which the shop cannot turn off; the code is not kept once sent.
   """
   ONE_TIME_CODE

@@ -19,6 +19,7 @@ import {
 } from '@hatti/trust/public';
 import { parseArgs } from 'node:util';
 import { loadTrustReportsConfig } from './config.js';
+import { upholdRights } from './rights.js';
 import { approveSmsSender, refuseSmsSender, revokeSmsSender } from './sms-senders.js';
 import { createStorage } from './storage.js';
 import { refuseAppeal, restoreStore, takeDown } from './takedowns.js';
@@ -72,10 +73,12 @@ import { approveVerification, refuseVerification, revokeVerification } from './v
 // Owners of a trademark or copyright, or someone acting for them, complain of a store's listings
 // from its rights page (TNS-04, ADR-474), each due a decision within 48 hours. The list gives
 // whose right, who complains and their email, and the listings; one found wanting is dismissed,
-// and the complainant written to:
+// and the complainant written to. One upheld takes its listings off sale, held there, and tells
+// the store's owner who complained and how to reach them (ADR-475):
 //
 //   pnpm --filter @hatti/core trust-reports rights [--all]
 //   pnpm --filter @hatti/core trust-reports dismiss-rights ipc_… --by Ayesha --note "Its own label"
+//   pnpm --filter @hatti/core trust-reports uphold-rights ipc_… --by Ayesha --note "Sold as Gul Ahmed's"
 
 const USAGE =
   'Usage: trust-reports list [--all]\n' +
@@ -96,7 +99,8 @@ const USAGE =
   '       trust-reports revoke-sender <shop> --by <who> --note <why, as the shop is told>\n' +
   '       trust-reports clear-listing <product> --by <who>\n' +
   '       trust-reports rights [--all]\n' +
-  '       trust-reports dismiss-rights <complaint> --by <who> --note <why>';
+  '       trust-reports dismiss-rights <complaint> --by <who> --note <why>\n' +
+  '       trust-reports uphold-rights <complaint> --by <who> --note <why, as the owner is told>';
 
 function usage(problem?: string): never {
   if (problem) console.error(problem);
@@ -112,6 +116,7 @@ type Command =
   | { command: 'senders'; all: boolean }
   | { command: 'rights'; all: boolean }
   | { command: 'dismiss-rights'; id: string; complaint: string; by: string; note: string }
+  | { command: 'uphold-rights'; id: string; complaint: string; by: string; note: string }
   | { command: 'approve-sender'; id: string; request: string; by: string; note: string }
   | { command: 'refuse-sender'; id: string; request: string; by: string; note: string }
   | { command: 'revoke-sender'; shop: string; by: string; note: string }
@@ -155,6 +160,31 @@ try {
     }
     const now = Date.now();
     for (const complaint of found) console.log(rightsLines(complaint, now));
+  } else if (parsed.command === 'uphold-rights') {
+    const upheld = await upholdRights(
+      database,
+      rights,
+      new ProductService(database),
+      messages,
+      parsed.complaint,
+      { by: parsed.by, note: parsed.note },
+    );
+    if (upheld === 'not_found') {
+      console.error(`No rights complaint ${parsed.id}: see the list.`);
+      process.exitCode = 1;
+    } else if (upheld === 'decided') {
+      console.error(`Rights complaint ${parsed.id} was decided already.`);
+      process.exitCode = 1;
+    } else {
+      const { complaint, held } = upheld;
+      console.log(
+        `${toPublicId('rightsComplaint', complaint.id)} upheld by ${complaint.decidedBy}; ` +
+          (held.length > 0
+            ? `${held.length} listing(s) of ${complaint.shopName} taken off sale, its owner told`
+            : `none of its listings is ${complaint.shopName}'s any longer`) +
+          `; write to ${complaint.complainant} at ${complaint.email}.`,
+      );
+    }
   } else if (parsed.command === 'dismiss-rights') {
     const decided = await rights.decide(parsed.complaint, {
       status: 'dismissed',
@@ -495,7 +525,8 @@ function parseCommand(args: string[]): Command {
     command !== 'refuse-sender' &&
     command !== 'revoke-sender' &&
     command !== 'clear-listing' &&
-    command !== 'dismiss-rights'
+    command !== 'dismiss-rights' &&
+    command !== 'uphold-rights'
   ) {
     throw new Error('Say what to do');
   }
@@ -508,7 +539,7 @@ function parseCommand(args: string[]): Command {
         ? 'Name the shop, by its handle'
         : command === 'clear-listing'
           ? "Name the product, by its ID as the shop's admin shows it"
-          : command === 'dismiss-rights'
+          : command === 'dismiss-rights' || command === 'uphold-rights'
             ? 'Name the complaint, as the list of rights complaints shows it'
             : command === 'approve-sender' || command === 'refuse-sender'
               ? 'Name the request, as the list of senders shows it'
@@ -548,7 +579,7 @@ function parseCommand(args: string[]): Command {
     }
     return { command, shop: id, level, by, note };
   }
-  if (command === 'dismiss-rights') {
+  if (command === 'dismiss-rights' || command === 'uphold-rights') {
     return { command, id, complaint: tryFromPublicId(id, 'rightsComplaint') ?? id, by, note };
   }
   if (command === 'refuse') {

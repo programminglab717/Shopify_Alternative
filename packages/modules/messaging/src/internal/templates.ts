@@ -61,6 +61,7 @@ export const MESSAGE_KINDS = [
   'sms_sender_approved',
   'sms_sender_refused',
   'sms_sender_revoked',
+  'listings_taken_down',
   'broadcast',
   'automation',
   'sms_broadcast',
@@ -130,6 +131,8 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'sms_sender_approved',
   'sms_sender_refused',
   'sms_sender_revoked',
+  // Its listings taken off sale after a rights complaint Hatti upheld (ADR-475).
+  'listings_taken_down',
   // The shop's own, which it schedules itself (ADR-421, ADR-458), or sets going (ADR-425).
   'broadcast',
   'automation',
@@ -172,6 +175,7 @@ export const TO_THE_SHOP_KINDS: readonly MessageKind[] = [
   'sms_sender_approved',
   'sms_sender_refused',
   'sms_sender_revoked',
+  'listings_taken_down',
 ];
 
 /**
@@ -260,6 +264,12 @@ export interface MessageVariables {
   note?: string;
   /** For the shop's own SMS sender (ADR-469): the name its customers' SMS go from, "ZARI". */
   sender?: string;
+  /**
+   * For listings taken off sale after a rights complaint (ADR-475): the complainant's email, as
+   * the store may answer them; `name` says who complains, `reference` the complaint's number and
+   * `product` the listings.
+   */
+  email?: string;
   /**
    * For a domain of the shop's own DNS points elsewhere (ADR-262): the domain, "www.zari.pk"; and,
    * in `date`, when it is disconnected unless DNS points it back before.
@@ -1079,6 +1089,20 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: "{shop}'s SMS no longer come from {sender}",
       ur: '{shop} کے ایس ایم ایس اب {sender} سے نہیں آتے',
+    },
+  },
+  listings_taken_down: {
+    whatsapp: 'hatti_listings_taken_down',
+    category: 'utility',
+    parameters: ['shop', 'product', 'name', 'reference', 'note', 'email'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: we have taken {product} off sale on {shop} after {name} complained that it infringes their rights ({reference}): {note}. It stays a draft until the complaint is settled. You can reach them at {email}, or write to Hatti's support quoting {reference}.",
+      ur: 'ہٹی: {name} کی شکایت پر کہ یہ ان کے حقوق کی خلاف ورزی ہے ({reference})، ہم نے {shop} پر {product} کی فروخت روک دی ہے: {note}۔ شکایت طے ہونے تک یہ ڈرافٹ رہے گی۔ آپ ان سے {email} پر رابطہ کر سکتے ہیں، یا {reference} کے حوالے سے ہٹی کی سپورٹ کو لکھ سکتے ہیں۔',
+    },
+    subject: {
+      en: 'Hatti has taken listings on {shop} off sale',
+      ur: 'ہٹی نے {shop} پر کچھ اشیاء کی فروخت روک دی ہے',
     },
   },
 };

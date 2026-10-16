@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { newId } from '@hatti/ids';
 import { screen, screeningMessage } from './prohibited.js';
 import { catalogFixture, errorsOf, unwrap, type CatalogFixture } from './test-support.js';
 
@@ -94,3 +95,94 @@ describe.skipIf(!server)('Prohibited-items screening, of products (TNS-03, ADR-4
     expect(await f.products.clearScreening('not-a-product')).toBeNull();
   });
 });
+
+describe.skipIf(!server)(
+  'Products Hatti holds off sale after a rights complaint (TNS-04, ADR-475)',
+  () => {
+    let f: CatalogFixture;
+
+    beforeAll(async () => {
+      f = await catalogFixture(server!);
+    }, 120_000);
+    afterAll(() => f?.close());
+    beforeEach(() => f.reset());
+
+    it('takes products off sale and holds them, copies too, until Hatti lets them go', async () => {
+      const lawn = unwrap(await f.products.create(f.a, { title: 'Gul lawn', status: 'active' }));
+      const shawl = unwrap(await f.products.create(f.a, { title: 'Shawl', status: 'draft' }));
+      await f.admin.query(
+        `UPDATE catalog.products SET publish_at = now() + interval '1 day' WHERE id = $1`,
+        [shawl.id],
+      );
+      const before = await f.admin.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM platform.outbox_events WHERE event_type = 'product.updated'`,
+      );
+
+      // Its own shop's products alone, each once.
+      const held = await f.products.holdOffSale(
+        f.a.shopId,
+        [lawn.id, shawl.id, lawn.id, 'nonsense', newId()],
+        'ipc_7Kq2xYmNpQrStUvWxYz012345',
+      );
+      expect(held).toEqual([
+        { id: lawn.id, title: 'Gul lawn' },
+        { id: shawl.id, title: 'Shawl' },
+      ]);
+      const { rows } = await f.admin.query<{
+        status: string;
+        publish_at: Date | null;
+        held_by: string;
+      }>(
+        'SELECT status, publish_at, held_by FROM catalog.products WHERE id = ANY($1) ORDER BY title',
+        [[lawn.id, shawl.id]],
+      );
+      expect(rows).toEqual([
+        { status: 'draft', publish_at: null, held_by: 'ipc_7Kq2xYmNpQrStUvWxYz012345' },
+        { status: 'draft', publish_at: null, held_by: 'ipc_7Kq2xYmNpQrStUvWxYz012345' },
+      ]);
+      // Storefronts hear of it, as of any change.
+      const after = await f.admin.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM platform.outbox_events WHERE event_type = 'product.updated'`,
+      );
+      expect(after.rows[0]!.n - before.rows[0]!.n).toBe(2);
+      expect(await f.products.holdOffSale(f.b.shopId, [lawn.id], 'ipc_x')).toEqual([]);
+
+      // Not put on sale, by hand, many at once, or as a copy; other changes go through.
+      expect(errorsOf(await f.products.update(f.a, { id: lawn.id, status: 'active' }))).toEqual([
+        ['input.status', 'HELD'],
+      ]);
+      expect(
+        JSON.stringify(unwrap(await f.products.bulkSetStatus(f.a, [lawn.id], 'active'))),
+      ).toContain('HELD');
+      unwrap(await f.products.update(f.a, { id: lawn.id, vendor: 'Zari' }));
+      expect(
+        errorsOf(
+          await f.products.duplicate(f.a, {
+            productId: lawn.id,
+            newTitle: 'Lawn 2',
+            newStatus: 'active',
+          }),
+        ),
+      ).toEqual([['input.status', 'HELD']]);
+      const copy = unwrap(
+        await f.products.duplicate(f.a, {
+          productId: lawn.id,
+          newTitle: 'Lawn 2',
+          newStatus: 'draft',
+        }),
+      );
+      expect(errorsOf(await f.products.update(f.a, { id: copy.id, status: 'active' }))).toEqual([
+        ['input.status', 'HELD'],
+      ]);
+
+      // Let go, the copy with them, and the shop puts them on sale again itself.
+      expect(await f.products.releaseHold(f.a.shopId, 'ipc_7Kq2xYmNpQrStUvWxYz012345')).toBe(3);
+      expect(unwrap(await f.products.update(f.a, { id: lawn.id, status: 'active' })).status).toBe(
+        'active',
+      );
+      expect(unwrap(await f.products.update(f.a, { id: copy.id, status: 'active' })).status).toBe(
+        'active',
+      );
+    });
+  },
+);
