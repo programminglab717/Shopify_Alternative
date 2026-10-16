@@ -1135,19 +1135,18 @@ function pageTitle(
 }
 
 /**
- * The products recommended beside the one `asked` names (ADR-434): those related to it, as its
- * document names them, still published and with something for sale, at most as many as asked;
- * none of a kind Hatti does not work out, as complementary ones.
+ * The products recommended beside the one `asked` names: those related to it (ADR-434), or those
+ * the shop pairs with it, complementary (ADR-435), as its document names them, still published
+ * and with something for sale, at most as many as asked.
  */
 async function recommendedProducts(
   data: RequestData,
   asked: NonNullable<PageRequest['recommendations']>,
 ): Promise<string[]> {
-  if (asked.intent !== 'related') return [];
   const [product] = await data.products([asked.productId]);
-  const related = product?.related ?? [];
-  if (related.length === 0) return [];
-  const docs = await data.products(related);
+  const ids = (asked.intent === 'complementary' ? product?.complements : product?.related) ?? [];
+  if (ids.length === 0) return [];
+  const docs = await data.products(ids);
   return docs
     .filter((doc) => doc !== null && doc.variants.some((variant) => variant.available))
     .slice(0, asked.limit)

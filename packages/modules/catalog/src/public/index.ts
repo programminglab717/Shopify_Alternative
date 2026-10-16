@@ -183,3 +183,9 @@ export {
   type ProductBundleUpdatedPayload,
 } from '../internal/bundles.js';
 export { RELATED_PRODUCTS, relatedProductsIn } from '../internal/related-products.js';
+export {
+  COMPLEMENTARY_PRODUCTS,
+  ComplementEvents,
+  ComplementService,
+  complementsIn,
+} from '../internal/complements.js';

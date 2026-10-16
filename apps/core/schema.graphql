@@ -7008,6 +7008,11 @@ type Mutation {
   Makes a product of one variant a bundle of other products’ variants, a number of each, in place of any parts it had; no parts, and it is a bundle no longer.
   """
   productBundleSet(components: [ProductBundleComponentInput!]!, productId: ID!): ProductBundleSetPayload!
+
+  """
+  Pairs a product with other products of the shop, in their order, in place of those it had, at most 10; none, and it pairs with none.
+  """
+  productComplementsSet(complementIds: [ID!]!, productId: ID!): ProductComplementsSetPayload!
   productCreate(input: ProductCreateInput!): ProductCreatePayload!
 
   """Adds images by URL, after the existing ones."""
@@ -9393,6 +9398,11 @@ type Product {
     """Page size, 1 to 250."""
     first: Int = 50
   ): CollectionConnection!
+
+  """
+  The products the shop pairs with it, in its order, at most 10: what its page and the cart recommend beside it as complementary (ADR-435).
+  """
+  complementaryProducts: [Product!]!
   createdAt: DateTime!
   description: String!
 
@@ -9494,6 +9504,14 @@ input ProductBundleComponentInput {
 type ProductBundleSetPayload {
   """Null once it is no bundle."""
   bundle: ProductBundle
+  userErrors: [UserError!]!
+}
+
+type ProductComplementsSetPayload {
+  """
+  The products it pairs with now, in order; null when it could not be set.
+  """
+  complementaryProducts: [Product!]
   userErrors: [UserError!]!
 }
 

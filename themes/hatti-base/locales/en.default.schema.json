@@ -177,6 +177,15 @@
         },
         "products_to_show": {
           "label": "Products to show"
+        },
+        "intent": {
+          "label": "Products shown",
+          "options__1": {
+            "label": "Related to this one"
+          },
+          "options__2": {
+            "label": "Those you pair with it"
+          }
         }
       }
     },

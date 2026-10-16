@@ -2664,13 +2664,17 @@ describe('Carts', () => {
     await app.close();
   });
 
-  it('renders the section of related products a product page asks for, kept briefly at the edge (ADR-434)', async () => {
+  it('renders the section of related or paired products a product page asks for, kept briefly at the edge (ADR-434, ADR-435)', async () => {
     const sample = sampleStore();
     const [first, second, ...rest] = sample.products;
     const app = server({
       sample: new MemoryStore({
         ...sample,
-        products: [{ ...first!, related: [second!.id] }, second!, ...rest],
+        products: [
+          { ...first!, related: [second!.id], complements: [rest[0]!.id] },
+          second!,
+          ...rest,
+        ],
       }),
     });
     const get = (url: string) => app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
@@ -2690,6 +2694,13 @@ describe('Carts', () => {
       200,
       true,
     ]);
+    // Those the shop pairs with it, where the section asks for them (ADR-435).
+    const paired = await get(
+      `/recommendations/products?section_id=complementary&product_id=${first!.id}&intent=complementary`,
+    );
+    expect(paired.body).toMatch(/^<div id="hatti-section-complementary"/);
+    expect(paired.body).toContain(`href="/products/${rest[0]!.handle}"`);
+    expect(paired.body).not.toContain(`href="/products/${second!.handle}"`);
     // Without a product or a section to render, or for a product the shop has not.
     for (const url of [
       '/recommendations/products?section_id=related',

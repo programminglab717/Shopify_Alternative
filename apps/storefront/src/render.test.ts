@@ -2323,7 +2323,7 @@ describe('Storefront rendering', () => {
     expect(wrong).toMatch(/name="contact\[phone\]"[^>]*aria-invalid="true"/);
   });
 
-  it('asks for related products as Shopify themes do, and renders them, those for sale, when asked (ADR-434)', async () => {
+  it('asks for related and paired products as Shopify themes do, and renders them, those for sale, when asked (ADR-434, ADR-435)', async () => {
     const sample = sampleStore();
     const [first, second, third, fourth, ...rest] = sample.products as [
       ProductDoc,
@@ -2340,7 +2340,11 @@ describe('Storefront rendering', () => {
       ...sample,
       // A product gone since it was built is left out, as one sold out.
       products: [
-        { ...first, related: [second.id, 'p-gone', soldOut.id, fourth.id] },
+        {
+          ...first,
+          related: [second.id, 'p-gone', soldOut.id, fourth.id],
+          complements: [fourth.id, 'p-gone', second.id],
+        },
         second,
         soldOut,
         fourth,
@@ -2350,19 +2354,24 @@ describe('Storefront rendering', () => {
     const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
     const path = `/products/${first.handle}`;
     const page = (await renderer.render({ path }, shop.fresh())).html;
-    // The page asks for them: the section is empty until then.
-    const url =
-      /<hatti-related-products\s+class="page-width section-spacing"\s+data-url="([^"]+)"\s*>\s*<\/hatti-related-products>/.exec(
-        page,
-      )?.[1];
-    expect(url?.replace(/&amp;/g, '&')).toBe(
-      `/recommendations/products?section_id=related&product_id=${first.id}&limit=4`,
-    );
+    // The page asks for them, those the shop pairs with it first: the sections are empty until
+    // then.
+    const urls = [
+      ...page.matchAll(
+        /<hatti-related-products\s+class="page-width section-spacing"\s+data-url="([^"]+)"\s*>\s*<\/hatti-related-products>/g,
+      ),
+    ].map((match) => match[1]!.replace(/&amp;/g, '&'));
+    expect(urls).toEqual([
+      `/recommendations/products?section_id=complementary&product_id=${first.id}&limit=4&intent=complementary`,
+      `/recommendations/products?section_id=related&product_id=${first.id}&limit=4&intent=related`,
+    ]);
     expect(page).not.toContain('You may also like');
+    expect(page).not.toContain('Pairs well with');
     const asked = async (
       limit: number,
       locale?: string,
       intent: 'related' | 'complementary' = 'related',
+      section = intent,
     ) =>
       (
         await renderer.sections(
@@ -2372,9 +2381,9 @@ describe('Storefront rendering', () => {
             recommendations: { productId: first.id, intent, limit },
           },
           shop.fresh(),
-          ['related'],
+          [section],
         )
-      ).get('related')!;
+      ).get(section)!;
     const links = (html: string) =>
       [...html.matchAll(/href="\/products\/([\w-]+)" class="card__link"/g)].map(
         (match) => match[1],
@@ -2384,8 +2393,20 @@ describe('Storefront rendering', () => {
     expect(links(shown)).toEqual([second.handle, fourth.handle]);
     expect(links(await asked(1))).toEqual([second.handle]);
     expect(links(await asked(4, 'ur'))).toEqual([second.handle, fourth.handle]);
-    // Complementary products Hatti does not work out yet: none, and nothing shown.
-    expect(await asked(4, undefined, 'complementary')).not.toContain('You may also like');
+    // Those the shop pairs with it, in its order, those gone left out (ADR-435).
+    const paired = await asked(4, undefined, 'complementary');
+    expect(paired).toContain('<h2 dir="auto">Pairs well with</h2>');
+    expect(links(paired)).toEqual([fourth.handle, second.handle]);
+    // A product the shop pairs with none shows none.
+    const alone = await renderer.sections(
+      {
+        path: `/products/${second.handle}`,
+        recommendations: { productId: second.id, intent: 'complementary', limit: 4 },
+      },
+      shop.fresh(),
+      ['complementary'],
+    );
+    expect(alone.get('complementary')).not.toContain('Pairs well with');
   });
 
   it("asks for a number on a sold-out variant's page while the shop sends back in stock messages (ADR-431)", async () => {

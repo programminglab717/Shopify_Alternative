@@ -4,12 +4,14 @@ import {
   CollectionService,
   ProductService,
   BundleEvents,
+  ComplementEvents,
   ReviewEvents,
   SizeChartEvents,
   bundleProductIdsIn,
   bundleSellable,
   bundlesContainingIn,
   bundlesOfProductsIn,
+  complementsIn,
   relatedProductsIn,
   VariantService,
   imagePathOf,
@@ -236,7 +238,10 @@ export function itemsFor(event: DomainEvent): string[] {
       const { productId } = event.payload as { productId: string };
       return [Items.product(productId), Items.bundlesWith(productId)];
     }
+    // Its bundle's parts, or the products the shop pairs with it, which its page and the cart
+    // recommend (ADR-435).
     case BundleEvents.Updated:
+    case ComplementEvents.Updated:
       return [Items.product(id)];
     case ReviewEvents.Written:
     case ReviewEvents.Published:
@@ -386,6 +391,7 @@ export const PUBLISHED_EVENTS = [
   ReviewEvents.Published,
   ReviewEvents.Hidden,
   BundleEvents.Updated,
+  ComplementEvents.Updated,
   SizeChartEvents.Updated,
   SizeChartEvents.Deleted,
   SizeChartEvents.ProductsUpdated,
@@ -485,6 +491,12 @@ export interface PublisherServices {
   /** The products related to each, for its page (MKT-09, ADR-434). */
   related: {
     relatedProductsOf(
+      tx: Tx,
+      shopId: string,
+      productIds: readonly string[],
+    ): Promise<Map<string, string[]>>;
+    /** Those the shop pairs with each, in its order (ADR-435). */
+    complementsOf(
       tx: Tx,
       shopId: string,
       productIds: readonly string[],
@@ -985,6 +997,11 @@ export class StorefrontPublisher {
       shopId,
       active.map((record) => record.id),
     );
+    const complements = await this.services.related.complementsOf(
+      tx,
+      shopId,
+      active.map((record) => record.id),
+    );
     const docs = active.map((record) =>
       productDoc(
         record,
@@ -1004,6 +1021,7 @@ export class StorefrontPublisher {
         sizeCharts.get(record.id),
         bundleDoc(bundles.get(record.id), parts),
         related.get(record.id),
+        complements.get(record.id),
       ),
     );
     await writer.putProducts(docs);
@@ -1237,7 +1255,7 @@ export function createStorefrontPublisher(
       articles: new ArticleService(database),
       reviews: { shownReviewsOf: shownReviewsIn },
       preorders: { preordersOf: preordersIn },
-      related: { relatedProductsOf: relatedProductsIn },
+      related: { relatedProductsOf: relatedProductsIn, complementsOf: complementsIn },
       sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
       bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
       comments: new CommentService(database),

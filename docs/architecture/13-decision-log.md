@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-434 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-435 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -442,6 +442,7 @@
 | 432 | COD to prepaid: a confirmed cash-on-delivery order's customer offered store credit for paying the rest online before it is packed, given once it is paid in full | Accepted |
 | 433 | COD to prepaid on the automations page: on and off, with the store credit it offers, sent from Hatti's number with no template to choose | Accepted |
 | 434 | Related products: worked out as each product's document is built, and served as Shopify's product recommendations for Hatti Base's product page to ask for | Accepted |
+| 435 | Complementary products: the products a shop pairs with one, kept by the catalog in its order, and recommended where a theme asks for complementary ones | Accepted |
 
 ---
 
@@ -16675,3 +16676,37 @@
     collection or more on every product page.
   * **Recommendations from what customers bought together:** too few orders per shop at first.
     It can feed the same list later.
+
+## ADR-435 · Complementary products: the products a shop pairs with one, kept by the catalog in its order, and recommended where a theme asks for complementary ones
+
+* **Context:**
+  * MKT-09 asks for cross-sells on the product page and in the cart. ADR-434 served Shopify's
+    product recommendations with related products. Asked for complementary ones, it found none.
+  * On Shopify, a shop names a product's complementary products in the Search & Discovery app,
+    at most ten, in order. Themes ask `/recommendations/products?intent=complementary` for them,
+    as Dawn's complementary products block does.
+* **Decision:**
+  * **The catalog keeps the products a shop pairs with each one** (migration 0203,
+    `catalog.product_complements`): at most ten, in the shop's order.
+    * Only the shop's own other products, each once. A product deleted leaves the lists it was in.
+    * `productComplementsSet(productId, complementIds)` replaces the list. An empty list clears it.
+    * `Product.complementaryProducts` reads the list, loaded together for a page of products.
+      Both take the scopes products take.
+    * A change records `product_complements.updated`. The same list again records nothing.
+  * **The publisher keeps the list in the product's document** (`complements`), rebuilt on that
+    event. It names products whatever their status. The storefront shows only those still
+    published with something for sale, as with related products.
+  * **The storefront answers `intent=complementary`** with that list, in the shop's order, up to
+    the limit asked.
+  * **Hatti Base's recommendations section takes an intent:** related or complementary. The product
+    page shows "Pairs well with" above "You may also like".
+* **Consequences:**
+  * A shop sets its pairings through the Admin API now. The admin's card, and the cart's
+    cross-sells, come next.
+  * Products deleted or made drafts drop out of the pages that pair with them, with no rebuild of
+    those pages.
+* **Alternatives:**
+  * **A metafield, as Shopify keeps them:** Hatti has no metafields yet, and a table of its own
+    checks the products are the shop's.
+  * **Pairing variants rather than products:** Shopify pairs products. A page shows the product
+    and its options.

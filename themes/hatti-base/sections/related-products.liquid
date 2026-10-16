@@ -1,12 +1,13 @@
 {%- comment -%}
-  Products related to the one on the page (MKT-09, ADR-434), as Shopify's product
+  Products recommended beside the one on the page (MKT-09), as Shopify's product
   recommendations: once the section nears the screen, the page asks for it again at
-  routes.product_recommendations_url, rendered with the products related to this one, and shows
-  them. Until then, and where there are none, it shows nothing.
+  routes.product_recommendations_url, rendered with the products related to this one (ADR-434),
+  or those the shop pairs with it where its intent is complementary (ADR-435), and shows them.
+  Until then, and where there are none, it shows nothing.
 {%- endcomment -%}
 <hatti-related-products
   class="page-width section-spacing"
-  data-url="{{ routes.product_recommendations_url }}?section_id={{ section.id }}&product_id={{ product.id }}&limit={{ section.settings.products_to_show }}"
+  data-url="{{ routes.product_recommendations_url }}?section_id={{ section.id }}&product_id={{ product.id }}&limit={{ section.settings.products_to_show }}&intent={{ section.settings.intent | default: 'related' }}"
 >
   {%- if recommendations.performed? and recommendations.products_count > 0 -%}
     {%- if section.settings.title != blank -%}
@@ -57,6 +58,22 @@
       "id": "title",
       "label": "t:sections.related-products.settings.title.label",
       "default": "You may also like"
+    },
+    {
+      "type": "select",
+      "id": "intent",
+      "label": "t:sections.related-products.settings.intent.label",
+      "options": [
+        {
+          "value": "related",
+          "label": "t:sections.related-products.settings.intent.options__1.label"
+        },
+        {
+          "value": "complementary",
+          "label": "t:sections.related-products.settings.intent.options__2.label"
+        }
+      ],
+      "default": "related"
     },
     {
       "type": "range",

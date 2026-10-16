@@ -6,11 +6,13 @@ import {
   MediaService,
   ProductReviewService,
   BundleService,
+  ComplementService,
   ProductService,
   SizeChartService,
   bundleProductIdsIn,
   bundlesContainingIn,
   bundlesOfProductsIn,
+  complementsIn,
   relatedProductsIn,
   VariantService,
   shownReviewsIn,
@@ -145,6 +147,8 @@ describe('What storefront documents an event makes stale', () => {
     expect(itemsFor(event('product_bundle.updated', { variantIds: ['v1'] }))).toEqual([
       'product:a1',
     ]);
+    // The products the shop pairs with one, which its page recommends (ADR-435).
+    expect(itemsFor(event('product_complements.updated'))).toEqual(['product:a1']);
     expect(itemsFor(event('product.deleted'))).toContain('every-bundle');
     expect(itemsFor(event('location.updated', { changed: ['name'] }))).toEqual([]);
     // A size chart changed or given: the products whose pages show it (ADR-407).
@@ -449,7 +453,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         articles,
         reviews: { shownReviewsOf: shownReviewsIn },
         preorders: { preordersOf: preordersIn },
-        related: { relatedProductsOf: relatedProductsIn },
+        related: { relatedProductsOf: relatedProductsIn, complementsOf: complementsIn },
         sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
         bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
         comments: new CommentService(database),
@@ -1259,6 +1263,28 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
     expect((await store().productByHandle(lawn.handle))?.related).toEqual([printed.id]);
     for (const id of [lawn.id, printed.id]) unwrap(await products.delete(tenant, id));
+    await deliver();
+  });
+
+  it('publishes the products the shop pairs with each, in its order (ADR-435)', async () => {
+    const complements = new ComplementService(database);
+    const made = async (title: string) =>
+      unwrap(await products.create(tenant, { title, status: 'active' }));
+    const kurta = await made('Pairing kurta');
+    const dupatta = await made('Pairing dupatta');
+    const khussa = await made('Pairing khussa');
+    await deliver();
+    expect((await store().productByHandle(kurta.handle))?.complements).toBeUndefined();
+    unwrap(await complements.set(tenant, kurta.id, [khussa.id, dupatta.id]));
+    expect(await deliver()).toEqual(['product_complements.updated']);
+    expect((await store().productByHandle(kurta.handle))?.complements).toEqual([
+      khussa.id,
+      dupatta.id,
+    ]);
+    unwrap(await complements.set(tenant, kurta.id, []));
+    await deliver();
+    expect((await store().productByHandle(kurta.handle))?.complements).toBeUndefined();
+    for (const each of [kurta, dupatta, khussa]) unwrap(await products.delete(tenant, each.id));
     await deliver();
   });
 

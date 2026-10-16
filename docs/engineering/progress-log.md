@@ -6,8 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: MKT-09's next upsells, the products
-a shop pairs with one, shown on its page and in the cart, then the one-tap offer on a
+**Next, section by section as the alpha's shops need them**: the admin's card for the products
+a shop pairs with one (MKT-09), then the cart's cross-sells, then the one-tap offer on a
 cash-on-delivery order's page until it is packed (05 §8). Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
@@ -16,6 +16,14 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### Complementary products
+
+* **A shop pairs products with one** ([ADR-435](../architecture/13-decision-log.md#adr-435--complementary-products-the-products-a-shop-pairs-with-one-kept-by-the-catalog-in-its-order-and-recommended-where-a-theme-asks-for-complementary-ones), MKT-09), at most ten in its order, through the
+  Admin API. The catalog keeps them and the product's storefront document names them.
+* **The storefront answers Shopify's complementary recommendations,** and Hatti Base's product
+  page shows "Pairs well with" above its related products.
+* 2857 tests, from 2852: two for the catalog, three for the core.
 
 ### 534807b · Related products
 

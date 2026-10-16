@@ -8,6 +8,8 @@ import { ProductReviewResolver } from './graphql/reviews.resolver.js';
 import { SizeChartResolver } from './graphql/size-chart.resolver.js';
 import { BundleResolver } from './graphql/bundle.resolver.js';
 import { BundleService } from './bundles.js';
+import { ComplementService } from './complements.js';
+import { ComplementResolver } from './graphql/complement.resolver.js';
 import { MediaService } from './media.service.js';
 import { OptionService } from './option.service.js';
 import { ProductExportService } from './product-export.service.js';
@@ -36,6 +38,7 @@ import { VariantService } from './variant.service.js';
     ProductReviewService,
     SizeChartService,
     BundleService,
+    ComplementService,
     ProductResolver,
     ProductPartsResolver,
     ProductMediaResolver,
@@ -43,6 +46,7 @@ import { VariantService } from './variant.service.js';
     ProductReviewResolver,
     SizeChartResolver,
     BundleResolver,
+    ComplementResolver,
   ],
   controllers: [StorefrontSearchController],
   exports: [
@@ -57,6 +61,7 @@ import { VariantService } from './variant.service.js';
     ProductReviewService,
     SizeChartService,
     BundleService,
+    ComplementService,
   ],
 })
 export class CatalogModule {}

@@ -171,6 +171,11 @@ export interface ProductDoc {
    * last built: those gone or sold out since are left out where they are shown. Absent for none.
    */
   related?: string[];
+  /**
+   * The products the shop pairs with it, in its order (MKT-09, ADR-435): its complementary
+   * recommendations. Absent when it pairs with none.
+   */
+  complements?: string[];
 }
 
 /** A product's published reviews, as its page shows them (ADR-401). */
