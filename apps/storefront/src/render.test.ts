@@ -2456,6 +2456,61 @@ describe('Storefront rendering', () => {
     expect(wrong).toMatch(/name="contact\[phone\]"[^>]*aria-invalid="true"/);
   });
 
+  it('opens a pop-up for sign-ups on WhatsApp where the shop shows it, its code once signed up (ADR-457)', async () => {
+    // Hidden in Hatti Base until the shop shows it.
+    expect((await render({ path: '/' })).html).not.toContain('<hatti-sign-up-popup');
+    const footer = JSON.parse(files['sections/footer-group.json']!) as SectionList;
+    const shown = (settings: Record<string, unknown>) => ({
+      'sections/footer-group.json': JSON.stringify({
+        ...footer,
+        sections: {
+          ...footer.sections,
+          popup: { type: 'sign-up-popup', settings: { code: 'WELCOME10', ...settings } },
+        },
+      }),
+    });
+    const extra = shown({});
+    const home = (await render({ path: '/' }, { extra })).html;
+    expect(home).toMatch(/<hatti-sign-up-popup\s+data-delay="10"\s+data-days="14"\s+data-exit\s*>/);
+    expect(home).toContain('<dialog class="sign-up-popup" id="sign-up-popup"');
+    expect(home).toContain(
+      '<form method="post" action="/contact" accept-charset="UTF-8" id="sign-up-popup-form" ' +
+        'class="sign-up-popup__form"><input type="hidden" name="form_type" value="customer">',
+    );
+    expect(home).toContain('<input type="hidden" name="contact[tags]" value="popup">');
+    expect(home).toContain('<input type="hidden" name="return_to" value="/#sign-up-popup">');
+    expect(home).toContain(
+      '<label for="sign-up-popup-phone">Send me news and offers from Zari Fashions on WhatsApp</label>',
+    );
+    // Its code is for those who signed up.
+    expect(home).not.toContain('WELCOME10');
+    const { handle } = sampleStore().products[0]!;
+    expect((await render({ path: `/products/${handle}` }, { extra })).html).toContain(
+      '<hatti-sign-up-popup',
+    );
+
+    const taken = (await render({ path: '/', query: { customer_posted: 'true' } }, { extra })).html;
+    expect(taken).toMatch(
+      /Your code for the offer:\s*<strong class="sign-up-popup__code" dir="ltr">WELCOME10<\/strong>/,
+    );
+    const wrong = (await render({ path: '/', query: { customer_error: 'phone' } }, { extra })).html;
+    expect(wrong).toMatch(/id="sign-up-popup-phone"[^>]*aria-invalid="true"/);
+    const urdu = (await render({ path: '/', locale: 'ur' }, { extra })).html;
+    expect(urdu).toContain('<input type="hidden" name="return_to" value="/ur/#sign-up-popup">');
+    expect(urdu).toContain('ابھی نہیں');
+
+    // On the home page alone, without leaving; and opened at once in the theme editor.
+    const homeOnly = shown({ home_only: true, exit_intent: false, delay: 0 });
+    const product = (await render({ path: `/products/${handle}` }, { extra: homeOnly })).html;
+    expect(product).not.toContain('<hatti-sign-up-popup');
+    const plain = (await render({ path: '/' }, { extra: homeOnly })).html;
+    expect(plain).toMatch(/<hatti-sign-up-popup\s+data-delay="0"\s+data-days="14"\s*>/);
+    const editing = (
+      await render({ path: '/', editor: { origins: ['https://admin.hatti.pk'] } }, { extra })
+    ).html;
+    expect(editing).toMatch(/<hatti-sign-up-popup[^>]*data-design/);
+  });
+
   it('asks for related and paired products as Shopify themes do, and renders them, those for sale, when asked (ADR-434, ADR-435)', async () => {
     const sample = sampleStore();
     const [first, second, third, fourth, ...rest] = sample.products as [

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-456 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-457 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -464,6 +464,7 @@
 | 454 | A product's page in Hatti Base says what delivery costs and takes to each of the shop's cities, and links its returns, as trust elements | Accepted |
 | 455 | Inventory reports are worked out from the stock ledger when asked: sell-through over 7, 30 or 90 days, how long ago the stock on hand last sold with its cost, and what ran out and for how long | Accepted |
 | 456 | The admin's Analytics page shows the stock over its period: sell-through, how long ago the stock on hand last sold, what ran out, and the variants listed three ways | Accepted |
+| 457 | Hatti Base's sign-up pop-up asks for a shopper's number on WhatsApp through Shopify's customer form, after some seconds or as they leave, stays away once closed or signed up, and gives the shop's code to those who sign up | Accepted |
 
 ---
 
@@ -17397,3 +17398,35 @@
     period's tabs are on Analytics already.
   * **Cost shown to all who read the report:** marketers and accountants would see what the
     stock cost when the stock's worth is kept from them.
+
+## ADR-457 · Hatti Base's sign-up pop-up asks for a shopper's number on WhatsApp through Shopify's customer form, after some seconds or as they leave, stays away once closed or signed up, and gives the shop's code to those who sign up
+
+* **Context:**
+  * MKT-13 asks for pop-ups and capture forms, which Shopify's shops get from apps, for a
+    phone or WhatsApp opt-in.
+  * Hatti Base already signs shoppers up on WhatsApp through Shopify's customer form, in its
+    newsletter section, the consent kept in the form's words (ADR-189).
+  * The theme editor shows and hides sections, those of section groups too (ADR-324).
+* **Decision:**
+  * **A `sign-up-popup` section in the footer group,** so it is on every page, hidden until
+    the shop shows it from the theme editor. Its settings: a heading and a line; a discount
+    code to give those who sign up; the seconds before it opens, 0 to 60; whether it also
+    opens as a shopper on a computer leaves the page; the days it stays away once closed, 1
+    to 60; and the home page alone.
+  * **It posts the newsletter's form,** in its words and with the tag `popup`, so the shop
+    sees where each sign-up came from; the shopper comes back to the pop-up, open, saying it
+    is done, with the code where the shop gave one, or what was wrong with the number.
+  * **It asks once:** closed, it stays away for the section's days; signed up, in it or in
+    another of the shop's forms, it stays away, as this browser remembers. It does not open
+    over the cart drawer. In the theme editor it opens at once, for the shop to see.
+  * In English and Urdu, its words the platform's but for the shop's own heading and line.
+* **Consequences:**
+  * A shop gathers WhatsApp sign-ups with an offer, without an app.
+  * The code is shown, not made: the shop names one of its discount codes, which anyone who
+    reads the page's source may find. A code made for each sign-up waits for the core to
+    make codes for customers.
+  * A browser that keeps nothing sees it again on its next page, after its seconds.
+* **Alternatives:**
+  * **A form of the platform's outside the theme:** shops could not place or word it, and
+    themes would not see it in the editor.
+  * **On by default:** a pop-up the shop has not chosen interrupts every new shopper.

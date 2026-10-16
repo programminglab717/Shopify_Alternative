@@ -213,6 +213,33 @@
           "label": "Products to show"
         }
       }
+    },
+    "sign-up-popup": {
+      "name": "Sign-up pop-up",
+      "settings": {
+        "heading": {
+          "label": "Heading"
+        },
+        "text": {
+          "label": "Text"
+        },
+        "code": {
+          "label": "Discount code shown after signing up",
+          "info": "One of your discount codes; leave empty for none."
+        },
+        "delay": {
+          "label": "Seconds before it opens"
+        },
+        "exit_intent": {
+          "label": "Also open when a shopper on a computer is leaving"
+        },
+        "days_hidden": {
+          "label": "Days it stays away once closed"
+        },
+        "home_only": {
+          "label": "On the home page alone"
+        }
+      }
     }
   },
   "settings_schema": {

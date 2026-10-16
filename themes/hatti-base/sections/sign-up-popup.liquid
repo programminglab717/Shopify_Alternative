@@ -1,0 +1,222 @@
+{%- comment -%}
+  A pop-up asking shoppers to sign up for the shop's news and offers on WhatsApp (MKT-13,
+  ADR-457): Shopify's customer form, as the newsletter section posts it (ADR-189), tagged
+  `popup`. It opens once its seconds have passed, or as a shopper on a computer leaves the page;
+  closed, it stays away for the section's days; once a shopper signs up, here or in another form,
+  it stays away for good. Signed up here, it opens again saying so, with the shop's code for them
+  where it gives one. Hidden in the footer group until the shop shows it; in the theme editor it
+  opens at once, to be seen.
+{%- endcomment -%}
+{%- liquid
+  assign show = true
+  if section.settings.home_only and template.name != 'index'
+    assign show = false
+  endif
+  assign consent = 'sections.newsletter.consent' | t: shop: shop.name
+  assign back = request.path
+  if routes.root_url != '/'
+    assign back = routes.root_url | append: request.path
+  endif
+-%}
+{%- if show -%}
+  <hatti-sign-up-popup
+    data-delay="{{ section.settings.delay }}"
+    data-days="{{ section.settings.days_hidden }}"
+    {% if section.settings.exit_intent %}data-exit{% endif %}
+    {% if request.design_mode %}data-design{% endif %}
+  >
+    <dialog class="sign-up-popup" id="sign-up-popup" aria-labelledby="sign-up-popup-heading">
+      <button
+        type="button"
+        class="sign-up-popup__close"
+        data-close
+        aria-label="{{ 'sections.sign_up_popup.close' | t }}"
+      >
+        &times;
+      </button>
+      <h2 id="sign-up-popup-heading" dir="auto">{{ section.settings.heading | escape }}</h2>
+      {%- if section.settings.text != blank -%}
+        <p dir="auto">{{ section.settings.text | escape }}</p>
+      {%- endif -%}
+      {%- form 'customer', id: 'sign-up-popup-form', class: 'sign-up-popup__form' -%}
+        {%- if form.posted_successfully? -%}
+          <p role="status">{{ 'sections.newsletter.success' | t }}</p>
+          {%- if section.settings.code != blank -%}
+            <p class="sign-up-popup__offer">
+              {{ 'sections.sign_up_popup.code' | t }}
+              <strong class="sign-up-popup__code" dir="ltr">{{ section.settings.code | escape }}</strong>
+            </p>
+          {%- endif -%}
+        {%- else -%}
+          <input type="hidden" name="contact[tags]" value="popup">
+          <input type="hidden" name="contact[consent]" value="{{ consent }}">
+          <input type="hidden" name="return_to" value="{{ back | escape }}#sign-up-popup">
+          <label for="sign-up-popup-phone">{{ consent }}</label>
+          <input
+            id="sign-up-popup-phone"
+            type="tel"
+            name="contact[phone]"
+            autocomplete="tel"
+            inputmode="tel"
+            dir="ltr"
+            required
+            placeholder="0300 1234567"
+            {%- if form.errors %} aria-invalid="true" aria-describedby="sign-up-popup-error"{% endif %}
+          >
+          {%- if form.errors -%}
+            <p id="sign-up-popup-error" class="sign-up-popup__error" role="alert">
+              {{- 'sections.newsletter.error' | t -}}
+            </p>
+          {%- endif -%}
+          <button type="submit" class="button">{{ 'sections.newsletter.submit' | t }}</button>
+        {%- endif -%}
+      {%- endform -%}
+      <button type="button" class="sign-up-popup__later" data-close>
+        {{- 'sections.sign_up_popup.later' | t -}}
+      </button>
+    </dialog>
+  </hatti-sign-up-popup>
+{%- endif -%}
+
+{% stylesheet %}
+  .sign-up-popup { inline-size: min(calc(100% - 2rem), 26rem); padding: 1.5rem; border: 0; border-radius: 0.75rem; background: var(--color-background); color: var(--color-text); text-align: center; }
+  .sign-up-popup::backdrop { background: rgb(15 23 42 / 0.5); }
+  .sign-up-popup h2 { margin-block: 0 0.5rem; }
+  .sign-up-popup__close { position: absolute; inset-block-start: 0.5rem; inset-inline-end: 0.5rem; min-inline-size: 2.75rem; min-block-size: 2.75rem; border: 0; background: none; color: inherit; font-size: 1.5rem; cursor: pointer; }
+  .sign-up-popup__form { display: grid; gap: 0.75rem; margin-block-start: 1rem; }
+  .sign-up-popup__form input[type='tel'] { padding: 0.6rem 0.75rem; font: inherit; }
+  .sign-up-popup__error { color: #b91c1c; margin: 0; }
+  .sign-up-popup__code { font-size: 1.25rem; letter-spacing: 0.05em; }
+  .sign-up-popup__later { margin-block-start: 0.75rem; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+{% endstylesheet %}
+
+{% javascript %}
+  class HattiSignUpPopup extends HTMLElement {
+    connectedCallback() {
+      this.dialog = this.querySelector('dialog');
+      for (const button of this.querySelectorAll('[data-close]')) {
+        button.addEventListener('click', () => this.dialog.close());
+      }
+      // A click on the backdrop lands on the dialog itself.
+      this.dialog.addEventListener('click', (event) => {
+        if (event.target === this.dialog) this.dialog.close();
+      });
+      this.dialog.addEventListener('close', () => this.remember('closed'));
+      if ('design' in this.dataset) return this.open();
+
+      const query = new URLSearchParams(location.search);
+      const here = location.hash === '#sign-up-popup';
+      // Signed up, in this form or another: never again; this one's answer, at once.
+      if (query.get('customer_posted') === 'true') {
+        this.remember('signed_up');
+        if (here) this.open();
+        return;
+      }
+      if (here && query.has('customer_error')) return this.open();
+      const kept = this.kept();
+      if (kept?.signedUp) return;
+      const days = Number(this.dataset.days) || 14;
+      if (kept?.closedAt && Date.now() - kept.closedAt < days * 86_400_000) return;
+
+      this.timer = setTimeout(() => this.open(), (Number(this.dataset.delay) || 0) * 1000);
+      if ('exit' in this.dataset && matchMedia('(pointer: fine)').matches) {
+        this.leaving = (event) => {
+          if (!event.relatedTarget && event.clientY <= 0) this.open();
+        };
+        document.addEventListener('mouseout', this.leaving);
+      }
+    }
+
+    disconnectedCallback() {
+      clearTimeout(this.timer);
+      if (this.leaving) document.removeEventListener('mouseout', this.leaving);
+    }
+
+    open() {
+      clearTimeout(this.timer);
+      if (this.leaving) document.removeEventListener('mouseout', this.leaving);
+      // Not over another dialog, such as the cart drawer.
+      if (this.dialog.open || document.querySelector('dialog[open]')) return;
+      this.dialog.showModal();
+    }
+
+    kept() {
+      try {
+        return JSON.parse(localStorage.getItem('hatti:sign-up-popup') ?? 'null');
+      } catch {
+        return null;
+      }
+    }
+
+    remember(what) {
+      if ('design' in this.dataset) return;
+      const kept = this.kept() ?? {};
+      if (what === 'signed_up') kept.signedUp = true;
+      else kept.closedAt = Date.now();
+      try {
+        localStorage.setItem('hatti:sign-up-popup', JSON.stringify(kept));
+      } catch {
+        // A browser that keeps nothing sees the pop-up again on its next page.
+      }
+    }
+  }
+  if (!customElements.get('hatti-sign-up-popup')) {
+    customElements.define('hatti-sign-up-popup', HattiSignUpPopup);
+  }
+{% endjavascript %}
+
+{% schema %}
+{
+  "name": "t:sections.sign-up-popup.name",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:sections.sign-up-popup.settings.heading.label",
+      "default": "Get our offers on WhatsApp"
+    },
+    {
+      "type": "text",
+      "id": "text",
+      "label": "t:sections.sign-up-popup.settings.text.label",
+      "default": "Be the first to hear of new arrivals and sales."
+    },
+    {
+      "type": "text",
+      "id": "code",
+      "label": "t:sections.sign-up-popup.settings.code.label",
+      "info": "t:sections.sign-up-popup.settings.code.info"
+    },
+    {
+      "type": "range",
+      "id": "delay",
+      "label": "t:sections.sign-up-popup.settings.delay.label",
+      "min": 0,
+      "max": 60,
+      "step": 5,
+      "default": 10
+    },
+    {
+      "type": "checkbox",
+      "id": "exit_intent",
+      "label": "t:sections.sign-up-popup.settings.exit_intent.label",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "days_hidden",
+      "label": "t:sections.sign-up-popup.settings.days_hidden.label",
+      "min": 1,
+      "max": 60,
+      "step": 1,
+      "default": 14
+    },
+    {
+      "type": "checkbox",
+      "id": "home_only",
+      "label": "t:sections.sign-up-popup.settings.home_only.label",
+      "default": false
+    }
+  ]
+}
+{% endschema %}

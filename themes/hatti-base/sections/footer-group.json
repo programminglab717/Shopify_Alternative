@@ -4,8 +4,15 @@
   "sections": {
     "footer": {
       "type": "footer",
-      "settings": { "menu": "footer" }
+      "settings": {
+        "menu": "footer"
+      }
+    },
+    "popup": {
+      "type": "sign-up-popup",
+      "disabled": true,
+      "settings": {}
     }
   },
-  "order": ["footer"]
+  "order": ["footer", "popup"]
 }
