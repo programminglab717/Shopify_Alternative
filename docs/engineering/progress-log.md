@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### AI product copy
+### ce76224 · AI product copy
 
 * **A product's title, description and search engine words are drafted with AI from what the
   shop says of it, in English, Urdu or Roman Urdu, never kept, a hundred a day** ([ADR-471](../architecture/13-decision-log.md#adr-471--a-products-title-description-and-search-engine-words-are-drafted-with-ai-from-what-the-shop-says-of-it-in-english-urdu-or-roman-urdu-never-kept-a-hundred-a-day),
