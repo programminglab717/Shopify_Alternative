@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Listings taken down for rights complaints
+### 3a01356 · Listings taken down for rights complaints
 
 * **A rights complaint upheld takes its listings off sale and holds them there, copies too,
   marked with its number; the store's owner is told who complained and how to reach them**
