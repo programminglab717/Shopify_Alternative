@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### AI product copy in the admin
+### 8555e6e · AI product copy in the admin
 
 * **The admin's product form writes a product's title and description with AI in the language
   chosen, from what the form says, for the shop to check before it saves** ([ADR-472](../architecture/13-decision-log.md#adr-472--the-admins-product-form-writes-a-products-title-and-description-with-ai-in-the-language-chosen-from-what-the-form-says-for-the-shop-to-check-before-it-saves), CAT-20).
