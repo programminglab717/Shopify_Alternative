@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### The offer after the purchase in the admin
+### 83a752f · The offer after the purchase in the admin
 
 * **Settings → Orders turns the offer after the purchase on** ([ADR-439](../architecture/13-decision-log.md#adr-439--the-offer-after-the-purchase-in-the-admin-turned-on-in-the-order-settings-with-its-percentage-off), MKT-09), with its
   percentage off.
