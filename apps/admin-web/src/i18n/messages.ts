@@ -2275,6 +2275,14 @@ const en = {
   'orderPolicies.highValueHint':
     'Orders of this total or more count as high value and score higher. Now {amount}.',
   'orderPolicies.holdAt': 'Hold for review at a score of (%)',
+  'orderPolicies.upsell': 'Offer after the purchase',
+  'orderPolicies.upsellHint':
+    "A confirmed cash-on-delivery order's page offers a product you pair with what it holds, added with one tap and paid at the door, until it is packed.",
+  'orderPolicies.upsellOn': "Offer a paired product on the order's page",
+  'orderPolicies.upsellOnHint':
+    "The first product paired with the order's items that it doesn't hold and has in stock. Pair products on each product's page.",
+  'orderPolicies.upsellPercent': 'Percentage off (%)',
+  'orderPolicies.upsellPercentHint': '0 to 50; blank or 0 offers it at its price.',
   'orderPolicies.holdAtHint':
     'Medium risk starts at 30, high at 60. They wait under Needs review. Leave it blank to hold none.',
   'orderPolicies.notWhole': 'give a whole number',
@@ -6092,6 +6100,14 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'orderPolicies.highValueHint':
     'اس ٹوٹل یا اس سے زیادہ کے آرڈرز زیادہ مالیت کے گنے جاتے ہیں اور زیادہ اسکور پاتے ہیں۔ ابھی {amount}۔',
   'orderPolicies.holdAt': 'اس اسکور (%) پر جائزے کے لیے روکیں',
+  'orderPolicies.upsell': 'خریداری کے بعد آفر',
+  'orderPolicies.upsellHint':
+    'کنفرم کیش آن ڈیلیوری آرڈر کا صفحہ اس کے ساتھ جوڑی گئی ایک پراڈکٹ پیش کرتا ہے، جو ایک ٹیپ سے شامل ہو اور ڈیلیوری پر ادا ہو، پیک ہونے تک۔',
+  'orderPolicies.upsellOn': 'آرڈر کے صفحے پر جوڑی گئی پراڈکٹ پیش کریں',
+  'orderPolicies.upsellOnHint':
+    'آرڈر کی چیزوں کے ساتھ جوڑی گئی پہلی پراڈکٹ جو آرڈر میں نہیں اور اسٹاک میں ہے۔ ہر پراڈکٹ کے صفحے پر جوڑیاں بنائیں۔',
+  'orderPolicies.upsellPercent': 'رعایت (%)',
+  'orderPolicies.upsellPercentHint': '0 سے 50؛ خالی یا 0 پر اپنی قیمت پر پیش ہوتی ہے۔',
   'orderPolicies.holdAtHint':
     'درمیانہ رسک 30 سے، زیادہ 60 سے۔ یہ جائزہ درکار میں انتظار کرتے ہیں۔ کوئی نہ روکنا ہو تو خالی چھوڑ دیں۔',
   'orderPolicies.notWhole': 'پورا عدد دیں',

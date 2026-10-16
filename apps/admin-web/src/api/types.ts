@@ -2431,6 +2431,11 @@ export interface OrderSettings {
   cancelUnpaidAfterDays: number | null;
   cancelUnreachableAfterDays: number | null;
   customerCancellation: CustomerCancellation;
+  /**
+   * The offer after the purchase's percentage off (ADR-438); null for no offer, absent where a
+   * fake core leaves it out.
+   */
+  upsellPercentOff?: number | null;
   updatedAt: string | null;
 }
 

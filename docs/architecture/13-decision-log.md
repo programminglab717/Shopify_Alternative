@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-438 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-439 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -446,6 +446,7 @@
 | 436 | Complementary products in the admin: a card on the product's page, the products found by name and put in order | Accepted |
 | 437 | The cart's cross-sells: the products paired with what it holds, asked for as complementary recommendations and shown together on Hatti Base's cart page | Accepted |
 | 438 | The offer after the purchase: a cash-on-delivery order's page offers a product the shop pairs with what it holds, at the shop's percentage off, added with a tap and paid at the door until it is packed | Accepted |
+| 439 | The offer after the purchase in the admin: turned on in the order settings, with its percentage off | Accepted |
 
 ---
 
@@ -16797,3 +16798,23 @@
     to it then would change what they confirm.
   * **A discount line rather than a lower price:** the order's discount is shared over its items
     (ADR-134). A line at its offered price keeps the offer to that item.
+
+## ADR-439 · The offer after the purchase in the admin: turned on in the order settings, with its percentage off
+
+* **Context:**
+  * ADR-438 offers a paired product on a confirmed cash-on-delivery order's page, at the shop's
+    percentage off, set only through the Admin API as `upsellPercentOff`.
+* **Decision:**
+  * **Settings → Orders gets an "Offer after the purchase" section.**
+    * A box turns the offer on or off.
+    * Turned on, a field takes the percentage off, 0 to 50. Left blank, it offers at the price.
+    * It saves with the page's other order settings, and only when changed. A percentage that is
+      not a whole number is refused before the core is asked. The core's problems are shown
+      against the field.
+  * The section points shops to the product page's pairings (ADR-436), where what is offered
+    comes from.
+* **Consequences:**
+  * Owners and managers, who change the order settings, set the offer.
+* **Alternatives:**
+  * **A section under Marketing:** the offer changes orders, with their totals and stock, as the
+    order settings do.

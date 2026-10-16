@@ -119,6 +119,33 @@ describe('Order policies', () => {
     expect(sentOf(fake, 'OrderRiskSettingsUpdate')).toEqual([]);
   });
 
+  it('offers a paired product after the purchase at a percentage off, and offers none again (ADR-438)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/orders');
+
+    const offer = (await screen.findByLabelText(
+      /^Offer a paired product on the order's page/,
+    )) as HTMLInputElement;
+    expect(offer.checked).toBe(false);
+    expect(screen.queryByLabelText('Percentage off (%)')).toBeNull();
+    fireEvent.click(offer);
+    type('Percentage off (%)', 'lots');
+    fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
+    expect(await screen.findByText('Percentage off (%): give a whole number')).toBeTruthy();
+    type('Percentage off (%)', '15');
+    fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
+    expect(await screen.findByText('Saved. Orders from now on follow these.')).toBeTruthy();
+    fireEvent.click(screen.getByLabelText(/^Offer a paired product on the order's page/));
+    fireEvent.click(screen.getByRole('button', { name: 'Save order policies' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'OrderSettingsUpdate')).toEqual([
+        { input: { upsellPercentOff: 15 } },
+        { input: { upsellPercentOff: null } },
+      ]),
+    );
+  });
+
   it('changes high value and the score that holds an order, and refuses what is not a number', async () => {
     const fake = core('manager');
     vi.stubGlobal('fetch', fake.fetcher);

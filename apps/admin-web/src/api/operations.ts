@@ -5585,6 +5585,7 @@ const ORDER_SETTINGS = /* GraphQL */ `
     cancelUnpaidAfterDays
     cancelUnreachableAfterDays
     customerCancellation
+    upsellPercentOff
     updatedAt
   }
 `;

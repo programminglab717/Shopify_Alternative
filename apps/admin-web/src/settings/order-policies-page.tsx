@@ -47,6 +47,7 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   cancelUnreachableAfterDays: 'orderPolicies.unreachableDays',
   highValue: 'orderPolicies.highValue',
   holdAt: 'orderPolicies.holdAt',
+  upsellPercentOff: 'orderPolicies.upsellPercent',
 };
 
 /** A number of whole units as typed, or blank for none; what is not one stays NaN. */
@@ -62,6 +63,8 @@ function orderInputOf(state: {
   unpaid: string;
   unreachable: string;
   cancellation: CustomerCancellation;
+  upsell: boolean;
+  upsellPercent: string;
 }) {
   return {
     callingHours: state.anyTime ? null : { opens: state.opens, closes: state.closes },
@@ -70,10 +73,13 @@ function orderInputOf(state: {
     cancelUnpaidAfterDays: wholeOrNone(state.unpaid),
     cancelUnreachableAfterDays: wholeOrNone(state.unreachable),
     customerCancellation: state.cancellation,
+    // Offered at no percentage given is offered at its price (ADR-438).
+    upsellPercentOff: state.upsell ? (wholeOrNone(state.upsellPercent) ?? 0) : null,
   };
 }
 
 function stateOf(settings: OrderSettings) {
+  const upsell = settings.upsellPercentOff ?? null;
   return {
     anyTime: settings.callingHours === null,
     opens: settings.callingHours?.opens ?? '10:00',
@@ -86,6 +92,8 @@ function stateOf(settings: OrderSettings) {
         ? ''
         : String(settings.cancelUnreachableAfterDays),
     cancellation: settings.customerCancellation,
+    upsell: upsell !== null,
+    upsellPercent: upsell === null ? '' : String(upsell),
   };
 }
 
@@ -261,6 +269,25 @@ function PoliciesForm({ settings, risk }: { settings: OrderSettings; risk: Order
             </label>
           ))}
         </fieldset>
+      </FormSection>
+
+      <FormSection title={t('orderPolicies.upsell')} hint={t('orderPolicies.upsellHint')}>
+        <CheckField
+          label={t('orderPolicies.upsellOn')}
+          hint={t('orderPolicies.upsellOnHint')}
+          checked={state.upsell}
+          onChange={(upsell) => set({ upsell })}
+        />
+        {state.upsell && (
+          <TextField
+            label={t('orderPolicies.upsellPercent')}
+            hint={t('orderPolicies.upsellPercentHint')}
+            inputMode="numeric"
+            ltr
+            value={state.upsellPercent}
+            onChange={(event) => set({ upsellPercent: event.target.value })}
+          />
+        )}
       </FormSection>
 
       <FormSection title={t('orderPolicies.risk')} hint={t('orderPolicies.riskHint')}>
