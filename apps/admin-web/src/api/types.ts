@@ -3165,6 +3165,41 @@ export interface ProductBundleSetData {
   productBundleSet: { bundle: ProductBundle | null; userErrors: UserError[] };
 }
 
+export type PriceSaleStatus = 'SCHEDULED' | 'RUNNING' | 'ENDED' | 'CANCELLED';
+
+/** A sale set ahead (ADR-443). */
+export interface PriceSale {
+  id: string;
+  name: string;
+  percentOff: number;
+  status: PriceSaleStatus;
+  startsAt: string;
+  endsAt: string;
+  endedAt: string | null;
+  productsCount: number;
+  products: { id: string; title: string }[];
+}
+
+export interface PriceSalesData {
+  priceSales: PriceSale[];
+}
+
+export interface PriceSaleCreateInput {
+  name: string;
+  percentOff: number;
+  startsAt: string;
+  endsAt: string;
+  productIds: string[];
+}
+
+export interface PriceSaleCreateData {
+  priceSaleCreate: { priceSale: PriceSale | null; userErrors: UserError[] };
+}
+
+export interface PriceSaleCancelData {
+  priceSaleCancel: { priceSale: PriceSale | null; userErrors: UserError[] };
+}
+
 export interface ProductSchedulePublishData {
   productSchedulePublish: {
     product: { id: string; status: string; publishAt: string | null } | null;

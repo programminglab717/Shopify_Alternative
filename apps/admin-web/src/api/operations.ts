@@ -7400,6 +7400,62 @@ const SIZE_CHART = /* GraphQL */ `
 `;
 
 /** The shop's size charts, by name (CAT-10, ADR-406). */
+const PRICE_SALE = /* GraphQL */ `
+  fragment PriceSaleFields on PriceSale {
+    id
+    name
+    percentOff
+    status
+    startsAt
+    endsAt
+    endedAt
+    productsCount
+    products {
+      id
+      title
+    }
+  }
+`;
+
+export const PriceSalesQuery = /* GraphQL */ `
+  query PriceSales {
+    priceSales {
+      ...PriceSaleFields
+    }
+  }
+  ${PRICE_SALE}
+`;
+
+export const PriceSaleCreateMutation = /* GraphQL */ `
+  mutation PriceSaleCreate($input: PriceSaleCreateInput!) {
+    priceSaleCreate(input: $input) {
+      priceSale {
+        ...PriceSaleFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${PRICE_SALE}
+  ${USER_ERRORS}
+`;
+
+export const PriceSaleCancelMutation = /* GraphQL */ `
+  mutation PriceSaleCancel($id: ID!) {
+    priceSaleCancel(id: $id) {
+      priceSale {
+        ...PriceSaleFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${PRICE_SALE}
+  ${USER_ERRORS}
+`;
+
 export const SizeChartsQuery = /* GraphQL */ `
   query SizeCharts {
     sizeCharts {

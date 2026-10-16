@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-443 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-444 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -451,6 +451,7 @@
 | 441 | A draft is put on sale by itself at a time ahead, a minute to a year off, by the worker's sweep of scheduled content; set on sale or archived by hand, it loses its time | Accepted |
 | 442 | The admin sets a draft's time to go on sale on its page, typed in the phone's own time and said back in the shop's | Accepted |
 | 443 | A sale set ahead cuts its products' prices by a percentage at its start, the old price shown struck through, and puts them back at its end unless changed by hand meanwhile | Accepted |
+| 444 | The admin's sales page under Products: sales set ahead with products found by name, listed with their state, cancelled ahead or ended early | Accepted |
 
 ---
 
@@ -16940,3 +16941,31 @@
     (storefront documents, cart, checkout, feeds, orders) would have to know about sales.
   * **Fixed new prices per variant, as a file:** more work for the shop, for the same percentage
     on every product in the alpha's sales.
+
+## ADR-444 · The admin's sales page under Products: sales set ahead with products found by name, listed with their state, cancelled ahead or ended early
+
+* **Context:**
+  * ADR-443 sets sales ahead through the Admin API alone.
+  * A sale changes products' prices, so it needs the scopes products take, as size charts do
+    (ADR-406). Size charts are a page under Products, linked from the products list.
+* **Decision:**
+  * **Products → Sales** (`/products/sales`), linked from the products list beside size charts.
+  * **Owners and managers set a sale ahead** with a name, a percentage off, a start and an end in
+    the phone's own time (as articles' times are), and products.
+    * Products are found by name with the finder the link page and pairings use (ADR-436). The
+      same product can't be added twice.
+    * The core's refusals are shown, naming the product where one is refused, such as one already
+      in another sale for some of those days.
+  * **Every sale is listed,** latest start first, with:
+    * its state as a badge (set ahead, running, ended, cancelled);
+    * its percentage and how many products;
+    * its times in the shop's zone, and when it ended if it did;
+    * its products' names.
+  * A sale set ahead can be cancelled, and a running one ended now. Other staff read the list
+    with nothing to change.
+  * The activity log names a sale's entries "Sale".
+* **Consequences:**
+  * CAT-17 is complete: drafts on sale at a time (ADR-441, ADR-442) and sales (ADR-443, ADR-444).
+* **Alternatives:**
+  * **Under Marketing:** a sale changes prices, which staff who market without changing products
+    may not do.

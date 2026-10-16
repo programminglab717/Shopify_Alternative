@@ -6,9 +6,8 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the admin's sales page for the sales
-set ahead; then the feature catalog's V1 rows still open, in the order the alpha's shops need
-them. Urdu handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the feature catalog's V1 rows still
+open, in the order the alpha's shops need them. Urdu handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -16,6 +15,13 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### The admin's sales
+
+* **Products → Sales in the admin sets sales ahead, lists them and cancels or ends them**
+  ([ADR-444](../architecture/13-decision-log.md#adr-444--the-admins-sales-page-under-products-sales-set-ahead-with-products-found-by-name-listed-with-their-state-cancelled-ahead-or-ended-early), CAT-17). This completes CAT-17.
+* 2884 tests, from 2878: the admin's three, and the checks of its three new
+  operations against the schema.
 
 ### 6ebcd27 · Sales set ahead
 
@@ -28,7 +34,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 * **A draft's page in the admin sets the time it goes on sale** ([ADR-442](../architecture/13-decision-log.md#adr-442--the-admin-sets-a-drafts-time-to-go-on-sale-on-its-page-typed-in-the-phones-own-time-and-said-back-in-the-shops), CAT-17), in the phone's
   own time, said back in the shop's.
-* 2872 tests, from 2869: the admin's two, and one the admin's count had missed.
+* 2872 tests, from 2869: the admin's two, and the check of its new mutation against the schema.
 
 ### cca0063 · Drafts put on sale at a time ahead
 

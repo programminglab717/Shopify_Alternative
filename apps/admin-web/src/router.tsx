@@ -88,6 +88,7 @@ import { DomainsPage } from './settings/domains-page';
 import { LocationsPage } from './settings/locations-page';
 import { ProductFilesPage } from './products/files-page';
 import { ReviewsPage } from './products/reviews-page';
+import { SalesPage } from './products/sales-page';
 import { SizeChartPage, SizeChartsPage } from './products/size-charts';
 import { BankTransferPage } from './settings/bank-transfer-page';
 import { BillingPage } from './settings/billing-page';
@@ -281,6 +282,12 @@ const productReviews = createRoute({
   getParentRoute: () => shop,
   path: 'products/reviews',
   component: ReviewsPage,
+});
+
+const productSales = createRoute({
+  getParentRoute: () => shop,
+  path: 'products/sales',
+  component: SalesPage,
 });
 
 const productSizeCharts = createRoute({
@@ -815,6 +822,7 @@ export const routeTree = root.addChildren([
     newProduct,
     productFiles,
     productReviews,
+    productSales,
     productSizeCharts,
     productSizeChart,
     product,
