@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### The SMS sender name in the admin
+### bbc36b6 · The SMS sender name in the admin
 
 * **The admin's Customer messages page shows the name the shop's SMS go from, the request
   waiting, which may be withdrawn, and why the last was refused or taken back, and takes owners'
