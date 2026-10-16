@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Complementary products
+### 4cf046a · Complementary products
 
 * **A shop pairs products with one** ([ADR-435](../architecture/13-decision-log.md#adr-435--complementary-products-the-products-a-shop-pairs-with-one-kept-by-the-catalog-in-its-order-and-recommended-where-a-theme-asks-for-complementary-ones), MKT-09), at most ten in its order, through the
   Admin API. The catalog keeps them and the product's storefront document names them.
