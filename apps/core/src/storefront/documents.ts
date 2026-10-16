@@ -580,6 +580,10 @@ export function shopDoc(
     ...(profile.status === 'suspended' && { suspended: true as const }),
     // Verified by Hatti (ADR-465), left out while it is not, likewise.
     ...(verified && { verified }),
+    // Its return window (ADR-468), left out while it says nothing of it, likewise.
+    ...(preferences.returns.days !== null && {
+      returns: { days: preferences.returns.days, exchangesOnly: preferences.returns.exchangesOnly },
+    }),
     robotsRules: preferences.robotsTxtRules,
     policies: [...policies],
     // Left out without one, so a shop without one keeps its document as it was.

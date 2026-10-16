@@ -194,8 +194,53 @@ function SearchForm({ preferences }: { preferences: StorefrontPreferences }) {
 }
 
 /**
- * The storefront's preferences (OS-09, OS-15), for owners and managers: its password while the
- * shop gets ready, a pause while it is open, and its home page for search engines.
+ * The return window each product page states and tells search engines (OS-11, ADR-468): empty
+ * says nothing, 0 says no returns, and the rest a number of days, for an exchange or the money.
+ */
+function ReturnsForm({ preferences }: { preferences: StorefrontPreferences }) {
+  const { t } = useLocale();
+  const kept = preferences.returnDays === null ? '' : String(preferences.returnDays);
+  const [days, setDays] = useState(kept);
+  const [exchangesOnly, setExchangesOnly] = useState(preferences.returnExchangesOnly);
+  const typed = days.trim();
+  const valid = typed === '' || (/^\d{1,2}$/.test(typed) && Number(typed) <= 90);
+  const input = {
+    ...(typed !== kept && { returnDays: typed === '' ? null : Number(typed) }),
+    ...(exchangesOnly !== preferences.returnExchangesOnly && {
+      returnExchangesOnly: exchangesOnly,
+    }),
+  };
+  return (
+    <PreferencesForm
+      title={t('storefront.returns')}
+      hint={t('storefront.returnsHint')}
+      input={input}
+      ready={valid}
+    >
+      <TextField
+        label={t('storefront.returnDays')}
+        hint={t(valid ? 'storefront.returnDaysHint' : 'storefront.returnDaysInvalid')}
+        ltr
+        inputMode="numeric"
+        value={days}
+        onChange={(event) => setDays(event.target.value)}
+      />
+      {typed !== '0' && (
+        <CheckField
+          label={t('storefront.returnExchangesOnly')}
+          hint={t(exchangesOnly ? 'storefront.returnExchangesOn' : 'storefront.returnExchangesOff')}
+          checked={exchangesOnly}
+          onChange={setExchangesOnly}
+        />
+      )}
+    </PreferencesForm>
+  );
+}
+
+/**
+ * The storefront's preferences (OS-09, OS-11, OS-15), for owners and managers: its password while
+ * the shop gets ready, a pause while it is open, its home page for search engines, and its return
+ * window.
  */
 export function StorefrontPreferencesTab() {
   const { t } = useLocale();
@@ -218,6 +263,7 @@ export function StorefrontPreferencesTab() {
       <PasswordForm preferences={preferences} />
       <PauseForm preferences={preferences} />
       <SearchForm preferences={preferences} />
+      <ReturnsForm preferences={preferences} />
       <HomeUrduCard />
     </div>
   );

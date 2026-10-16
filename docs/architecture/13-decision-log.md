@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-467 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-468 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -475,6 +475,7 @@
 | 465 | Hatti verifies a shop's owner by their CNIC, then its business by its NTN, from photos its owner sends; Hatti's people decide, the photos are deleted once they do, and the storefront's document says what is verified | Accepted |
 | 466 | Hatti Base says beside a product's promises, and in its footer, that Hatti verified the shop: its seller's identity, or a registered business | Accepted |
 | 467 | The admin's verification page shows what Hatti verified and why a request was refused, and takes the owner's next request, photos uploaded before they confirm who they are | Accepted |
+| 468 | A shop says how many days buyers have to return an order, and whether for an exchange or their money: on each product page, and to search engines as its return policy | Accepted |
 
 ---
 
@@ -17770,3 +17771,33 @@
     shops are one person selling.
   * **Uploading after confirming who they are:** a failed confirmation would lose nothing, but
     a slow phone would upload while the owner waits on the confirmation panel.
+
+## ADR-468 · A shop says how many days buyers have to return an order, and whether for an exchange or their money: on each product page, and to search engines as its return policy
+
+* **Context:**
+  * A product page links the shop's refund policy among its trust elements (ADR-454). OS-11
+    asks for the return window itself, and Google reads an offer's `hasMerchantReturnPolicy`
+    for the days a buyer has to return it.
+  * The refund policy is the shop's own words (ONB-09); a number cannot be read out of them.
+* **Decision:**
+  * **The online store's preferences** keep `returnDays`, 0 to 90 or null, and
+    `returnExchangesOnly`; null says nothing, 0 says the shop takes no returns. Through
+    `onlineStorePreferencesUpdate` as the rest are.
+  * **The storefront's document** carries `returns: { days, exchangesOnly }` only while the
+    shop says a number; Liquid's `shop.returns` gives `days` and `exchanges_only`.
+  * **Hatti Base's product page** says "Returns within 7 days", "Exchanges within 7 days" or
+    "No returns", linking the refund policy where there is one; with no window, the link alone as
+    before.
+  * **Each offer's structured data** gets a `MerchantReturnPolicy` for Pakistan:
+    `MerchantReturnFiniteReturnWindow` with its days and `FullRefund` or `ExchangeRefund`, or
+    `MerchantReturnNotPermitted` for 0.
+  * **The admin's storefront preferences** take it under Returns, the days checked as typed.
+* **Consequences:**
+  * The page, search results and the refund policy can disagree if the shop changes one alone;
+    the hint beside the days says the policy says the rest.
+  * Days count from delivery; what condition a return must be in stays in the policy.
+* **Alternatives:**
+  * **Days written in the policy's template:** the policy is the shop's to edit, and the number
+    would be lost in its words.
+  * **A window per product:** Pakistani shops state one for the whole shop; a product's own can
+    come when a shop asks.

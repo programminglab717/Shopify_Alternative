@@ -51,7 +51,17 @@ export interface PreferencesInput {
    * open it. Left as it is if absent; opening it takes it away.
    */
   maintenanceUntil?: Date | null;
+  /**
+   * Days after delivery it takes items back, up to 90; 0 for no returns; null to say nothing
+   * besides its refund policy. Left as it is if absent.
+   */
+  returnDays?: number | null;
+  /** Whether it exchanges what comes back, never refunding it. Left as it is if absent. */
+  returnExchangesOnly?: boolean | null;
 }
+
+/** The longest return window a shop may give, in days (ADR-468). */
+export const RETURN_LIMITS = { days: 90 } as const;
 
 /** What a social sharing image's words for those who cannot see it may be, as a file's alt. */
 export const SHARING_IMAGE_ALT_MAX = 512;
@@ -97,8 +107,8 @@ type PreferencesRow = typeof preferences.$inferSelect;
  * What a shop sets for its storefront as a whole (ADR-041): the WhatsApp number its "Order on
  * WhatsApp" links and WhatsApp section go to, the password it is closed behind until it opens
  * (ADR-054), rules it adds to its robots.txt (ADR-055), its home page's title, description and
- * social sharing image for search engines and link previews (ADR-243), and whether it is paused
- * for a while (ADR-252). A shop that set nothing has no number, an open storefront, the
+ * social sharing image for search engines and link previews (ADR-243), whether it is paused
+ * for a while (ADR-252), and its return window (ADR-468). A shop that set nothing has no number, an open storefront, the
  * platform's robots.txt, and its name for its home page.
  */
 @Injectable()
@@ -210,6 +220,18 @@ export class PreferencesService {
         }
       } else robots = rules;
     }
+    const returnDays = input.returnDays;
+    if (
+      returnDays !== undefined &&
+      returnDays !== null &&
+      !(Number.isInteger(returnDays) && returnDays >= 0 && returnDays <= RETURN_LIMITS.days)
+    ) {
+      check.addMessage(
+        ['returnDays'],
+        'INVALID',
+        `Return window must be a whole number of days from 0 to ${RETURN_LIMITS.days}`,
+      );
+    }
     const linkPage = input.linkPage ? checkLinkPage(check, input.linkPage) : undefined;
     const seo = checkSeo(check, ['seo'], input.seo);
     const sharingAlt = input.sharingImage
@@ -264,6 +286,10 @@ export class PreferencesService {
           maintenanceMessage ?? was.maintenance.message,
           until === undefined ? was.maintenance.until : until,
         ),
+        returns: {
+          days: returnDays === undefined ? was.returns.days : returnDays,
+          exchangesOnly: input.returnExchangesOnly ?? was.returns.exchangesOnly,
+        },
       };
       if (next.passwordEnabled && next.password === null) {
         return failOne(
@@ -295,6 +321,10 @@ export class PreferencesService {
         ...(next.maintenance.until?.getTime() !== was.maintenance.until?.getTime()
           ? ['maintenanceUntil']
           : []),
+        ...(next.returns.days !== was.returns.days ? ['returnDays'] : []),
+        ...(next.returns.exchangesOnly !== was.returns.exchangesOnly
+          ? ['returnExchangesOnly']
+          : []),
       ];
       if (changed.length === 0) return { ok: true, value: was };
       const newPassword = changed.includes('password') && next.password !== null;
@@ -318,6 +348,8 @@ export class PreferencesService {
         maintenanceEnabled: next.maintenance.enabled,
         maintenanceMessage: next.maintenance.message,
         maintenanceUntil: next.maintenance.until,
+        returnDays: next.returns.days,
+        returnExchangesOnly: next.returns.exchangesOnly,
       };
       const [row] = await tx
         .insert(preferences)
@@ -451,6 +483,10 @@ function toRecord(row: PreferencesRow | undefined, now = new Date()): Preference
       ? { fileId: row.sharingImageId, altText: row.sharingImageAlt }
       : null,
     maintenance: pausedUntil(paused, row?.maintenanceMessage ?? '', until),
+    returns: {
+      days: row?.returnDays ?? null,
+      exchangesOnly: row?.returnExchangesOnly ?? false,
+    },
   };
 }
 

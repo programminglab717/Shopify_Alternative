@@ -69,6 +69,16 @@
       "elsewhere": "Everywhere else",
       "free": "Free",
       "returns": "Returns and exchanges: see our policy",
+      "returns_within": {
+        "one": "Returns within {{ count }} day of delivery",
+        "other": "Returns within {{ count }} days of delivery"
+      },
+      "exchanges_within": {
+        "one": "Exchanges within {{ count }} day of delivery",
+        "other": "Exchanges within {{ count }} days of delivery"
+      },
+      "returns_none": "No returns or exchanges",
+      "returns_policy": "our policy",
       "verified_identity": "Verified by Hatti: the seller's identity is checked",
       "verified_business": "Verified by Hatti: a registered business",
       "rating": "Rated {{ rating }} out of 5",

@@ -447,6 +447,12 @@ export interface ShopDoc {
    */
   verified?: 'identity' | 'business';
   /**
+   * Its return window (OS-11, ADR-468): days after delivery it takes items back, 0 for none, and
+   * whether it exchanges them alone. Absent while it says nothing besides its refund policy, as
+   * in documents written before shops could say it.
+   */
+  returns?: { days: number; exchangesOnly: boolean };
+  /**
    * Rules it adds to its robots.txt (ADR-055), one a line, as the online store checked them.
    * Absent or empty for none, as in documents written before shops had them.
    */

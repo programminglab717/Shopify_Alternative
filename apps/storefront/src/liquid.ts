@@ -287,7 +287,7 @@ function filters(theme: Theme): Record<string, FilterImplOptions> {
       const shop = (this.context.globals as { shop?: Record<string, unknown> }).shop;
       const origin = String(shop?.url ?? '');
       const data =
-        productData(value, origin) ??
+        productData(value, origin, shop) ??
         articleData(value, origin, shop) ??
         (shop && value === shop ? shopData(shop, origin) : null);
       return data ? scriptJson(data) : '';
@@ -306,8 +306,15 @@ export function scriptJson(value: unknown, space = 0): string {
   );
 }
 
-/** A product object as schema.org's Product, with an offer per variant; null for anything else. */
-function productData(value: unknown, origin: string): Record<string, unknown> | null {
+/**
+ * A product object as schema.org's Product, with an offer per variant, each with the shop's return
+ * policy where it says one (ADR-468); null for anything else.
+ */
+function productData(
+  value: unknown,
+  origin: string,
+  shop?: Record<string, unknown>,
+): Record<string, unknown> | null {
   const product = value as Record<string, unknown> | null;
   if (!product || product.object_type !== 'product') return null;
   const images = (product.images as ImageDrop[] | undefined) ?? [];
@@ -315,6 +322,7 @@ function productData(value: unknown, origin: string): Record<string, unknown> | 
   const text = unescapeHtml(String(product.description ?? '').replace(/<[^>]*>/g, ' '))
     .replace(/\s+/g, ' ')
     .trim();
+  const returns = returnPolicyData(shop);
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -335,8 +343,34 @@ function productData(value: unknown, origin: string): Record<string, unknown> | 
       availability: variant.available
         ? 'https://schema.org/InStock'
         : 'https://schema.org/OutOfStock',
+      ...(returns && { hasMerchantReturnPolicy: returns }),
     })),
     ...reviewData(product),
+  };
+}
+
+/**
+ * The shop's return window as schema.org's MerchantReturnPolicy (ADR-468): none, or within so many
+ * days, refunded or exchanged; null while it says nothing of it.
+ */
+function returnPolicyData(shop?: Record<string, unknown>): Record<string, unknown> | null {
+  const returns = shop?.returns as { days: number; exchanges_only: boolean } | null | undefined;
+  if (!returns) return null;
+  if (returns.days === 0) {
+    return {
+      '@type': 'MerchantReturnPolicy',
+      applicableCountry: 'PK',
+      returnPolicyCategory: 'https://schema.org/MerchantReturnNotPermitted',
+    };
+  }
+  return {
+    '@type': 'MerchantReturnPolicy',
+    applicableCountry: 'PK',
+    returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+    merchantReturnDays: returns.days,
+    refundType: returns.exchanges_only
+      ? 'https://schema.org/ExchangeRefund'
+      : 'https://schema.org/FullRefund',
   };
 }
 

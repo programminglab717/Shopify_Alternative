@@ -817,6 +817,10 @@ export function shopObject(
     back_in_stock: doc.backInStock === true,
     // What Hatti verified of the shop (ADR-465), Hatti's own: "identity", "business", or nil.
     verified: doc.verified ?? null,
+    // Its return window (ADR-468), Hatti's own: days, 0 for none, and exchanges alone; or nil.
+    returns: doc.returns
+      ? { days: doc.returns.days, exchanges_only: doc.returns.exchangesOnly }
+      : null,
     brand: brandObject(doc),
     ...policiesObject(doc, language),
   };

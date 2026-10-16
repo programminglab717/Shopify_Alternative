@@ -39,6 +39,7 @@ describe.skipIf(!server)('PreferencesService', () => {
     seo: { title: null, description: null },
     sharingImage: null,
     maintenance: { enabled: false, message: '', until: null },
+    returns: { days: null, exchangesOnly: false },
   };
 
   it("keeps a shop's WhatsApp number in E.164, recording each change", async () => {
@@ -81,6 +82,7 @@ describe.skipIf(!server)('PreferencesService', () => {
       seo: { title: null, description: null },
       sharingImage: null,
       maintenance: { enabled: false, message: '', until: null },
+      returns: { days: null, exchangesOnly: false },
     });
   });
 
@@ -426,6 +428,33 @@ describe.skipIf(!server)('PreferencesService', () => {
       seo: { title: null, description: null },
       sharingImage: null,
     });
+  });
+
+  it('keeps how many days after delivery the shop takes items back, and whether to exchange them alone (ADR-468)', async () => {
+    expect((await f.preferences.get(f.a)).returns).toEqual({ days: null, exchangesOnly: false });
+    expect(
+      unwrap(await f.preferences.update(f.a, { returnDays: 7, returnExchangesOnly: true })).returns,
+    ).toEqual({ days: 7, exchangesOnly: true });
+    // No returns at all; left as it is when not given.
+    unwrap(await f.preferences.update(f.a, { returnDays: 0 }));
+    unwrap(await f.preferences.update(f.a, { whatsappNumber: '0300 1234567' }));
+    expect((await f.preferences.get(f.a)).returns).toEqual({ days: 0, exchangesOnly: true });
+    for (const days of [-1, 91, 2.5]) {
+      expect(errorsOf(await f.preferences.update(f.a, { returnDays: days }))).toEqual([
+        ['returnDays', 'INVALID', 'Return window must be a whole number of days from 0 to 90'],
+      ]);
+    }
+    // Null says nothing besides the refund policy.
+    expect(
+      unwrap(await f.preferences.update(f.a, { returnDays: null, returnExchangesOnly: false }))
+        .returns,
+    ).toEqual({ days: null, exchangesOnly: false });
+    expect((await f.outbox()).map((event) => event.payload)).toEqual([
+      { changed: ['returnDays', 'returnExchangesOnly'] },
+      { changed: ['returnDays'] },
+      { changed: ['whatsappNumber'] },
+      { changed: ['returnDays', 'returnExchangesOnly'] },
+    ]);
   });
 
   it('pauses the open storefront for a while, until its staff open it or the time it set (ADR-252)', async () => {

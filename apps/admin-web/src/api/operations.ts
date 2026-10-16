@@ -4789,10 +4789,15 @@ const STOREFRONT_PREFERENCES = /* GraphQL */ `
       title
       description
     }
+    returnDays
+    returnExchangesOnly
   }
 `;
 
-/** The storefront's password, its pause, and its home page for search engines (OS-09, OS-15). */
+/**
+ * The storefront's password, its pause, its home page for search engines, and the return window
+ * its products show (OS-09, OS-11, OS-15).
+ */
 export const StorefrontPreferencesQuery = /* GraphQL */ `
   query StorefrontPreferences {
     onlineStorePreferences {

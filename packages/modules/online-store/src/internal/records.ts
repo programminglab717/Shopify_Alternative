@@ -249,6 +249,16 @@ export interface PreferencesRecord {
   sharingImage: SharingImageRecord | null;
   /** Its storefront paused for a while, or not (ADR-252). */
   maintenance: MaintenanceRecord;
+  /** What it says of returns besides its refund policy (ADR-468). */
+  returns: ReturnsRecord;
+}
+
+/** A shop's return window (OS-11, ADR-468), which its product pages say. */
+export interface ReturnsRecord {
+  /** Days after delivery it takes items back; 0 for no returns; null for nothing said. */
+  days: number | null;
+  /** Whether it exchanges what comes back, never refunding it. */
+  exchangesOnly: boolean;
 }
 
 /**

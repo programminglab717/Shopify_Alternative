@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### The return window
+
+* **A shop says how many days buyers have to return an order, and whether for an exchange or
+  their money: on each product page, and to search engines as its return policy** ([ADR-468](../architecture/13-decision-log.md#adr-468--a-shop-says-how-many-days-buyers-have-to-return-an-order-and-whether-for-an-exchange-or-their-money-on-each-product-page-and-to-search-engines-as-its-return-policy),
+  OS-11).
+* 2959 tests, 3 more: the online store's preferences, the
+  publisher, and the admin's storefront preferences; the storefront's trust test covers the
+  page and its structured data.
+
 ### 61dd8c6 · The admin's verification page
 
 * **The admin's verification page shows what Hatti verified and why a request was refused, and

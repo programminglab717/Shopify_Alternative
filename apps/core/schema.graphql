@@ -7852,6 +7852,14 @@ type OnlineStorePreferences {
   passwordMessage: String!
 
   """
+  Days after delivery the shop takes items back (OS-11, ADR-468), which its product pages say and its products' structured data gives: 0 for no returns; null for nothing said besides its refund policy.
+  """
+  returnDays: Int
+
+  """Whether the shop exchanges what comes back, never refunding it."""
+  returnExchangesOnly: Boolean!
+
+  """
   Rules the shop adds to its storefront's robots.txt, one a line, as crawlers read them; empty for none.
   """
   robotsTxtRules: String!
@@ -7905,6 +7913,14 @@ input OnlineStorePreferencesInput {
   What the password page tells shoppers, up to 1,000 characters; blank for nothing.
   """
   passwordMessage: String
+
+  """
+  Days after delivery the shop takes items back, up to 90; 0 for no returns; null to say nothing besides its refund policy. Left as it is if not given.
+  """
+  returnDays: Int
+
+  """Whether the shop exchanges what comes back, never refunding it."""
+  returnExchangesOnly: Boolean
 
   """
   Rules for the storefront's robots.txt, replacing those it had: `User-agent`, `Allow`, `Disallow`, `Crawl-delay` and `Sitemap` lines, and comments. Rules before any `User-agent` are for every crawler. Blank for none.

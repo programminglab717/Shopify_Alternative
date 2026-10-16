@@ -1718,6 +1718,16 @@ const en = {
   'storefront.searchDescription': 'Home page description',
   'storefront.searchDescriptionHint':
     '{count} of 320 letters. What you sell, in a sentence or two.',
+  'storefront.returns': 'Returns',
+  'storefront.returnsHint':
+    'The return window each product page shows, and tells Google. Your refund policy says the rest.',
+  'storefront.returnDays': 'Days to return an order',
+  'storefront.returnDaysHint':
+    'From delivery, up to 90. 0 says you take no returns; leave it empty to say nothing.',
+  'storefront.returnDaysInvalid': 'Give a whole number of days from 0 to 90, or leave it empty.',
+  'storefront.returnExchangesOnly': 'Exchanges only',
+  'storefront.returnExchangesOn': 'Buyers swap what they return for another size or piece.',
+  'storefront.returnExchangesOff': 'Buyers get their money back for what they return.',
   'redirects.intro':
     "Send old addresses, such as your Shopify store's, on to where their pages are now, so links shared before still work.",
   'redirects.search': 'Find a redirect',
@@ -5746,6 +5756,16 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'storefront.searchDescription': 'ہوم پیج کی تفصیل',
   'storefront.searchDescriptionHint':
     '320 میں سے {count} حروف۔ آپ کیا بیچتے ہیں، ایک دو جملوں میں۔',
+  'storefront.returns': 'واپسی',
+  'storefront.returnsHint':
+    'واپسی کی مدت جو ہر پروڈکٹ کا صفحہ دکھاتا ہے، اور گوگل کو بتاتا ہے۔ باقی آپ کی ریفنڈ پالیسی بتاتی ہے۔',
+  'storefront.returnDays': 'آرڈر واپس کرنے کے دن',
+  'storefront.returnDaysHint':
+    'ڈیلیوری سے، 90 تک۔ 0 کا مطلب ہے آپ واپسی نہیں لیتے؛ کچھ نہ کہنا ہو تو خالی چھوڑ دیں۔',
+  'storefront.returnDaysInvalid': '0 سے 90 تک پورے دن دیں، یا خالی چھوڑ دیں۔',
+  'storefront.returnExchangesOnly': 'صرف تبدیلی',
+  'storefront.returnExchangesOn': 'خریدار واپس کی گئی چیز کسی اور سائز یا پیس سے بدلتے ہیں۔',
+  'storefront.returnExchangesOff': 'خریداروں کو واپس کی گئی چیز کے پیسے واپس ملتے ہیں۔',
   'redirects.intro':
     'پرانے ایڈریس، جیسے آپ کے شاپیفائی اسٹور کے، وہاں بھیجیں جہاں ان کے صفحے اب ہیں، تاکہ پہلے شیئر کیے گئے لنک چلتے رہیں۔',
   'redirects.search': 'ری ڈائریکٹ تلاش کریں',

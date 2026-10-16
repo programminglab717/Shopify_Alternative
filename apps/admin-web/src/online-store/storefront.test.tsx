@@ -11,6 +11,8 @@ const PREFERENCES = {
   maintenanceMessage: '',
   maintenanceUntil: null,
   seo: { title: null, description: null },
+  returnDays: null,
+  returnExchangesOnly: false,
 };
 
 const CHECKED = {
@@ -151,6 +153,31 @@ describe("The storefront's preferences and redirects", () => {
             description: 'Unstitched lawn, delivered across Pakistan.',
           },
         },
+      }),
+    );
+  });
+
+  it('sets the return window product pages show, refusing more than 90 days (ADR-468)', async () => {
+    const fake = core('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=storefront');
+
+    const returns = await screen.findByRole('region', { name: 'Returns' });
+    const save = within(returns).getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+    type('Days to return an order', '120');
+    expect(
+      within(returns).getByText('Give a whole number of days from 0 to 90, or leave it empty.'),
+    ).toBeTruthy();
+    expect(save.disabled).toBe(true);
+    // No returns at all leaves nothing to exchange.
+    type('Days to return an order', '0');
+    expect(within(returns).queryByLabelText(/Exchanges only/)).toBeNull();
+    type('Days to return an order', ' 7 ');
+    fireEvent.click(within(returns).getByLabelText(/Exchanges only/));
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(sentOf(fake, 'StorefrontPreferencesUpdate').at(-1)).toEqual({
+        input: { returnDays: 7, returnExchangesOnly: true },
       }),
     );
   });

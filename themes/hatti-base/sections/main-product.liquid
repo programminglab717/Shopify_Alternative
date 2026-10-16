@@ -255,8 +255,22 @@
                 </details>
               </li>
             {%- endif -%}
-            {%- comment -%} What the shop's refund policy says of returns, a tap away (OS-11). {%- endcomment -%}
-            {%- if shop.refund_policy -%}
+            {%- comment -%}
+              What the shop says of returns (OS-11, ADR-468): its window, none, or nothing said;
+              and what its refund policy says, a tap away.
+            {%- endcomment -%}
+            {%- if shop.returns -%}
+              <li class="product__returns">
+                {%- if shop.returns.days == 0 -%}
+                  {{ 'products.product.returns_none' | t }}
+                {%- elsif shop.returns.exchanges_only -%}
+                  {{ 'products.product.exchanges_within' | t: count: shop.returns.days }}
+                {%- else -%}
+                  {{ 'products.product.returns_within' | t: count: shop.returns.days }}
+                {%- endif -%}
+                {%- if shop.refund_policy %} · <a href="{{ shop.refund_policy.url }}">{{ 'products.product.returns_policy' | t }}</a>{% endif -%}
+              </li>
+            {%- elsif shop.refund_policy -%}
               <li>
                 <a href="{{ shop.refund_policy.url }}">{{ 'products.product.returns' | t }}</a>
               </li>

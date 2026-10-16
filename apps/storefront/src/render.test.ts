@@ -2447,6 +2447,51 @@ describe('Storefront rendering', () => {
       '<li class="product__verified"> Verified by Hatti: a registered business </li>',
     );
     expect(await verified('business', 'ur')).toContain('ہٹی سے تصدیق شدہ: رجسٹرڈ کاروبار');
+
+    // The shop's return window (ADR-468): in words beside its policy's link, and in each offer.
+    const returned = async (returns: { days: number; exchangesOnly: boolean }, locale?: string) =>
+      (
+        await renderer.render(
+          { path: `/products/${lawn!.handle}`, ...(locale && { locale }) },
+          shop({}, { policies: ['refund_policy'], returns }),
+        )
+      ).html;
+    const week = await returned({ days: 7, exchangesOnly: false });
+    expect(week.replace(/\s+/g, ' ')).toContain(
+      '<li class="product__returns">Returns within 7 days of delivery · ' +
+        '<a href="/policies/refund-policy">our policy</a></li>',
+    );
+    expect(week).not.toContain('Returns and exchanges: see our policy');
+    const offers = (html: string) =>
+      (
+        JSON.parse(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html)![1]!) as {
+          offers: Record<string, unknown>[];
+        }
+      ).offers;
+    expect(offers(week)[0]!.hasMerchantReturnPolicy).toEqual({
+      '@type': 'MerchantReturnPolicy',
+      applicableCountry: 'PK',
+      returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+      merchantReturnDays: 7,
+      refundType: 'https://schema.org/FullRefund',
+    });
+    const day = await returned({ days: 1, exchangesOnly: true });
+    expect(day).toContain('Exchanges within 1 day of delivery');
+    expect(offers(day)[0]!.hasMerchantReturnPolicy).toMatchObject({
+      refundType: 'https://schema.org/ExchangeRefund',
+    });
+    const none = await returned({ days: 0, exchangesOnly: false });
+    expect(none).toContain('No returns or exchanges');
+    expect(offers(none)[0]!.hasMerchantReturnPolicy).toEqual({
+      '@type': 'MerchantReturnPolicy',
+      applicableCountry: 'PK',
+      returnPolicyCategory: 'https://schema.org/MerchantReturnNotPermitted',
+    });
+    expect(await returned({ days: 7, exchangesOnly: true }, 'ur')).toContain(
+      'ڈیلیوری کے 7 دن کے اندر تبادلہ',
+    );
+    // Nothing said, nothing given.
+    expect(offers(plain)[0]!.hasMerchantReturnPolicy).toBeUndefined();
   });
 
   it("offers sign-ups for the shop's news on WhatsApp, saying how one went", async () => {

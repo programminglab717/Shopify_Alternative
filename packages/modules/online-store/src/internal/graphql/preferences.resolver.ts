@@ -88,6 +88,8 @@ function toPreferences(view: PreferencesView): OnlineStorePreferences {
     maintenanceEnabled: view.maintenance.enabled,
     maintenanceMessage: view.maintenance.message,
     maintenanceUntil: view.maintenance.until,
+    returnDays: view.returns.days,
+    returnExchangesOnly: view.returns.exchangesOnly,
     sharingImage:
       view.sharingImage &&
       Object.assign(new SharingImage(), {

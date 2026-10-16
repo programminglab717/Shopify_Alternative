@@ -8,6 +8,7 @@ import {
   jsonb,
   pgSchema,
   primaryKey,
+  smallint,
   text,
   timestamp,
   unique,
@@ -225,6 +226,9 @@ export const preferences = onlineStoreSchema.table('preferences', {
   maintenanceEnabled: boolean('maintenance_enabled').notNull().default(false),
   maintenanceMessage: text('maintenance_message').notNull().default(''),
   maintenanceUntil: timestamp('maintenance_until', { withTimezone: true }),
+  /** Its return window (ADR-468): days after delivery, 0 for none, null for nothing said. */
+  returnDays: smallint('return_days'),
+  returnExchangesOnly: boolean('return_exchanges_only').notNull().default(false),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

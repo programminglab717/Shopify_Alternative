@@ -1,5 +1,5 @@
 import { SEO, SEOInput, UserError } from '@hatti/api';
-import { Field, GraphQLISODateTime, ID, InputType, ObjectType } from '@nestjs/graphql';
+import { Field, GraphQLISODateTime, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
 
 @ObjectType({
   description:
@@ -156,6 +156,18 @@ export class OnlineStorePreferences {
       'its staff open it, and while it is open.',
   })
   maintenanceUntil!: Date | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Days after delivery the shop takes items back (OS-11, ADR-468), which its product pages ' +
+      "say and its products' structured data gives: 0 for no returns; null for nothing said " +
+      'besides its refund policy.',
+  })
+  returnDays!: number | null;
+
+  @Field({ description: 'Whether the shop exchanges what comes back, never refunding it.' })
+  returnExchangesOnly!: boolean;
 }
 
 @InputType()
@@ -291,6 +303,20 @@ export class OnlineStorePreferencesInput {
       'staff open it. Left as it is if not given; opening the storefront takes it away.',
   })
   maintenanceUntil?: Date | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Days after delivery the shop takes items back, up to 90; 0 for no returns; null to say ' +
+      'nothing besides its refund policy. Left as it is if not given.',
+  })
+  returnDays?: number | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description: 'Whether the shop exchanges what comes back, never refunding it.',
+  })
+  returnExchangesOnly?: boolean | null;
 }
 
 @ObjectType()

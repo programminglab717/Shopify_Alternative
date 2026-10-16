@@ -1993,6 +1993,9 @@ export interface StorefrontPreferences {
   maintenanceMessage: string;
   maintenanceUntil: string | null;
   seo: { title: string | null; description: string | null };
+  /** Days a buyer has to return an order, null while the shop says nothing (ADR-468). */
+  returnDays: number | null;
+  returnExchangesOnly: boolean;
 }
 
 export interface StorefrontPreferencesData {

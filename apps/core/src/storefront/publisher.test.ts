@@ -1714,6 +1714,20 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect((await store().shop()).whatsapp).toBeNull();
   });
 
+  it("publishes the shop's return window, and leaves it out while the shop says none (ADR-468)", async () => {
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).returns).toBeUndefined();
+    unwrap(await preferences.update(tenant, { returnDays: 7, returnExchangesOnly: true }));
+    await deliver();
+    expect((await store().shop()).returns).toEqual({ days: 7, exchangesOnly: true });
+    unwrap(await preferences.update(tenant, { returnDays: 0 }));
+    await deliver();
+    expect((await store().shop()).returns).toEqual({ days: 0, exchangesOnly: true });
+    unwrap(await preferences.update(tenant, { returnDays: null }));
+    await deliver();
+    expect((await store().shop()).returns).toBeUndefined();
+  });
+
   it("closes the shop's storefront behind its password, with what shoppers are told, and opens it", async () => {
     forgotten.length = 0;
     unwrap(
