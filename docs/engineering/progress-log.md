@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Gift cards sold as products
+### c8fc196 · Gift cards sold as products
 
 * **A product can be sold as a gift card: once its order is paid in full, a card is issued for
   each unit at its price, given to the buyer, and its code sent on WhatsApp, kept nowhere once
