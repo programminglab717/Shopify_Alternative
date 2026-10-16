@@ -4460,6 +4460,42 @@ export const TranslationsRemoveMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** The shop's verification by Hatti: what is verified, and its requests (ONB-11, ADR-465). */
+export const ShopVerificationQuery = /* GraphQL */ `
+  query ShopVerification {
+    shopVerification {
+      level
+      requests {
+        id
+        level
+        name
+        cnicLast4
+        ntn
+        status
+        createdAt
+        decidedAt
+        answer
+      }
+    }
+  }
+`;
+
+/** The owner asks Hatti to verify the shop, with its documents' staged uploads (ONB-11). */
+export const ShopVerificationSubmitMutation = /* GraphQL */ `
+  mutation ShopVerificationSubmit($input: ShopVerificationInput!) {
+    shopVerificationSubmit(input: $input) {
+      request {
+        id
+        status
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** Whether AI drafts the shop's Urdu here, and how many of the day's it asked for (CAT-07). */
 export const TranslationDraftingQuery = /* GraphQL */ `
   query TranslationDrafting {

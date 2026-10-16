@@ -75,6 +75,7 @@ import { ProductsPage, validateProductsSearch } from './products/products-page';
 import { ActivityPage } from './settings/activity-page';
 import { SupportAccessPage } from './settings/support-page';
 import { StoreExportPage } from './settings/export-page';
+import { VerificationPage } from './settings/verification-page';
 import { AppsPage } from './settings/apps-page';
 import { WhatsAppPage } from './settings/whatsapp-page';
 import { AutomationsPage } from './marketing/automations-page';
@@ -671,6 +672,12 @@ const settingsExport = createRoute({
   component: StoreExportPage,
 });
 
+const settingsVerification = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/verification',
+  component: VerificationPage,
+});
+
 const settingsApps = createRoute({
   getParentRoute: () => shop,
   path: 'settings/apps',
@@ -898,6 +905,7 @@ export const routeTree = root.addChildren([
     settingsActivity,
     settingsSupport,
     settingsExport,
+    settingsVerification,
     settingsApps,
     settingsWhatsApp,
     marketing,

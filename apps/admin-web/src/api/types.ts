@@ -1853,6 +1853,32 @@ export interface UrduResource {
   translations: { key: string; value: string | null; outdated: boolean }[];
 }
 
+export type VerificationLevel = 'IDENTITY' | 'BUSINESS';
+export type VerificationStatus = 'WAITING' | 'APPROVED' | 'REFUSED' | 'REVOKED';
+
+export interface VerificationRequest {
+  id: string;
+  level: VerificationLevel;
+  name: string;
+  cnicLast4: string | null;
+  ntn: string | null;
+  status: VerificationStatus;
+  createdAt: string;
+  decidedAt: string | null;
+  answer: string | null;
+}
+
+export interface ShopVerificationData {
+  shopVerification: { level: VerificationLevel | null; requests: VerificationRequest[] };
+}
+
+export interface ShopVerificationSubmitData {
+  shopVerificationSubmit: {
+    request: { id: string; status: VerificationStatus } | null;
+    userErrors: UserError[];
+  };
+}
+
 export interface TranslationDraftingData {
   translationDrafting: { available: boolean; usedToday: number; limitPerDay: number };
 }

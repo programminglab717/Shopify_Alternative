@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-466 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-467 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -474,6 +474,7 @@
 | 464 | The admin's Urdu pages draft a thing's empty boxes with AI in one tap, each marked as AI's until the shop saves it; options, values and links are left to the shop | Accepted |
 | 465 | Hatti verifies a shop's owner by their CNIC, then its business by its NTN, from photos its owner sends; Hatti's people decide, the photos are deleted once they do, and the storefront's document says what is verified | Accepted |
 | 466 | Hatti Base says beside a product's promises, and in its footer, that Hatti verified the shop: its seller's identity, or a registered business | Accepted |
+| 467 | The admin's verification page shows what Hatti verified and why a request was refused, and takes the owner's next request, photos uploaded before they confirm who they are | Accepted |
 
 ---
 
@@ -17741,3 +17742,31 @@
     copy it to say the same.
   * **The NTN on the page:** it is the business's to show, as its invoices do (ADR-190), not
     Hatti's.
+
+## ADR-467 · The admin's verification page shows what Hatti verified and why a request was refused, and takes the owner's next request, photos uploaded before they confirm who they are
+
+* **Context:**
+  * Owners ask Hatti to verify the shop through the Admin API, with staged uploads of their
+    documents, having proved who they are lately (ADR-465). Settings is where owners and
+    managers keep the shop's account with Hatti (ADR-415's export, billing).
+* **Decision:**
+  * **Settings → Verification** shows the shop's level, Hatti's privacy promise (photos deleted
+    once it decides, four digits of the CNIC kept), and the request waiting, or the last one's
+    refusal or withdrawal with Hatti's words.
+  * **The owner's form asks for the next level only:** who runs the shop until that stands,
+    then the business. A name, the CNIC or NTN, and one to three photos or PDFs of at most
+    10 MB, checked in the browser before anything is sent.
+  * **Photos are uploaded first**, to staged uploads, then the request is sent. When the owner
+    must confirm who they are, only the request is sent again: the photos go up once.
+  * Managers see the same page without the form; other staff don't open settings.
+  * The requests are listed with what came of each, a CNIC as its last four digits.
+* **Consequences:**
+  * ONB-11 is whole in its first slice: the request, Hatti's decision, the shop told, the
+    storefront's badge and the owner's page.
+  * Photos staged for a request the owner abandons stay staged uploads, which the shop never
+    sees as files, and which the files module deletes once they are a day old.
+* **Alternatives:**
+  * **Asking for both levels on one form:** the business's needs its owner's to stand, and most
+    shops are one person selling.
+  * **Uploading after confirming who they are:** a failed confirmation would lose nothing, but
+    a slow phone would upload while the owner waits on the confirmation panel.

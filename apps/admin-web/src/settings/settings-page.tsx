@@ -16,6 +16,7 @@ import {
   MessageSquareText,
   Percent,
   Receipt,
+  ShieldCheck,
   Store,
   Truck,
   UserCog,
@@ -54,6 +55,7 @@ interface Section {
     | '/$shopId/settings/activity'
     | '/$shopId/settings/support'
     | '/$shopId/settings/export'
+    | '/$shopId/settings/verification'
     | '/$shopId/settings/apps'
     | '/$shopId/settings/tax'
     | '/$shopId/settings/messages'
@@ -172,6 +174,12 @@ const SECTIONS: readonly Section[] = [
     icon: Archive,
   },
   {
+    to: '/$shopId/settings/verification',
+    label: 'settings.verification',
+    hint: 'settings.verificationHint',
+    icon: ShieldCheck,
+  },
+  {
     to: '/$shopId/settings/activity',
     label: 'settings.activity',
     hint: 'settings.activityHint',
@@ -185,7 +193,7 @@ const SECTIONS: readonly Section[] = [
   },
 ];
 
-/** Settings (docs/design/02 §4), as far as they are built: the shop, its domains, order policies, locations, delivery and payments, the checkout page, sales tax, customer messages, couriers, staff, apps, billing, the store's export, activity and support access. */
+/** Settings (docs/design/02 §4), as far as they are built: the shop, its domains, order policies, locations, delivery and payments, the checkout page, sales tax, customer messages, couriers, staff, apps, billing, the store's export, its verification by Hatti, activity and support access. */
 export function SettingsPage() {
   const { t } = useLocale();
   const shopId = useShop().id;
