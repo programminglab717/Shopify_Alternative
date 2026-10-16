@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### A draft's time to go on sale, in the admin
+### c2fff38 · A draft's time to go on sale, in the admin
 
 * **A draft's page in the admin sets the time it goes on sale** ([ADR-442](../architecture/13-decision-log.md#adr-442--the-admin-sets-a-drafts-time-to-go-on-sale-on-its-page-typed-in-the-phones-own-time-and-said-back-in-the-shops), CAT-17), in the phone's
   own time, said back in the shop's.
