@@ -11,11 +11,12 @@ import {
 import { Database, exactTime, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
 import { toPublicId } from '@hatti/ids';
-import { formatMoney, money } from '@hatti/money';
+import { formatMoney, money, toMajorString } from '@hatti/money';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import { CustomerDataRegistry } from './customer-data.js';
+import { giftCardsOfCustomerIn, mergeGiftCardsIn } from './gift-cards.service.js';
 import { toCustomerRecord } from './customer.service.js';
 import {
   CustomerEvents,
@@ -180,6 +181,8 @@ export class CustomerDataService {
       await tx.execute(sql`SELECT customers.move_consent_history(${duplicate.id}, ${keep.id})`);
       // Their store credit too, its ledger as one (ADR-184).
       await mergeStoreCreditIn(tx, shopId, duplicate.id, keep.id);
+      // And the gift cards given to them (ADR-448).
+      await mergeGiftCardsIn(tx, shopId, duplicate.id, keep.id);
       await tx
         .delete(customers)
         .where(and(eq(customers.shopId, shopId), eq(customers.id, duplicate.id)));
@@ -575,6 +578,17 @@ export class CustomerDataService {
           collectedAt: event.collectedAt,
         })),
         storeCredit: await storeCreditFileIn(tx, shopId, id),
+        // The gift cards the shop gave them, without their codes, which it keeps none of
+        // (ADR-448).
+        giftCards: (await giftCardsOfCustomerIn(tx, shopId, id)).map((card) => ({
+          lastCharacters: card.lastCharacters,
+          initialValue: toMajorString(money(card.initialValue, card.currency)),
+          balance: toMajorString(money(card.balance, card.currency)),
+          currency: card.currency,
+          expiresOn: card.expiresOn,
+          deactivatedAt: card.deactivatedAt,
+          issuedAt: card.createdAt,
+        })),
       };
       const identity = { id, phones: [...phones].sort(), email: customer.email };
       for (const handler of this.registry.handlers) {

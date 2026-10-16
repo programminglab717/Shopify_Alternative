@@ -173,6 +173,17 @@ describe('scopes', () => {
     expect(credit('marketer')).toEqual([]);
   });
 
+  it('lets owners and managers issue and change gift cards, accountants and agents look them up', () => {
+    const cards = (role: keyof typeof ROLE_SCOPES) =>
+      ROLE_SCOPES[role].filter((scope) => scope.endsWith('_gift_cards'));
+    expect(cards('owner')).toEqual(['write_gift_cards']);
+    expect(cards('manager')).toEqual(['write_gift_cards']);
+    expect(cards('accountant')).toEqual(['read_gift_cards']);
+    expect(cards('confirmation_agent')).toEqual(['read_gift_cards']);
+    expect(cards('packer')).toEqual([]);
+    expect(cards('marketer')).toEqual([]);
+  });
+
   it("lets only owners and managers change shop settings and the online store's themes", () => {
     for (const resource of ['_settings', '_themes']) {
       const granted = Object.entries(ROLE_SCOPES)

@@ -4325,6 +4325,161 @@ input FulfillmentTrackingInput {
 }
 
 """
+A code worth an amount at the shop (CAT-12, PAY-13, ADR-448), as Shopify's GiftCard: whoever has the code spends it until its balance is used up, it expires, or the shop deactivates it. The shop keeps no copy of the code, only its last characters.
+"""
+type GiftCard {
+  balance: Money!
+  createdAt: DateTime!
+
+  """Who it was given to, if any."""
+  customer: Customer
+  deactivatedAt: DateTime
+
+  """Not deactivated. A card deactivated is so for good."""
+  enabled: Boolean!
+
+  """Past its last day."""
+  expired: Boolean!
+
+  """The last day it can be spent, in the shop's time zone: YYYY-MM-DD."""
+  expiresOn: String
+  id: ID!
+  initialValue: Money!
+
+  """The code's last four characters, to tell it by."""
+  lastCharacters: String!
+
+  """The code as it may be shown: "•••• •••• •••• NPQR"."""
+  maskedCode: String!
+
+  """For the shop's records."""
+  note: String!
+
+  """Its ledger, the newest first."""
+  transactions(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+  ): GiftCardTransactionConnection!
+  updatedAt: DateTime!
+}
+
+type GiftCardConnection {
+  edges: [GiftCardEdge!]!
+  nodes: [GiftCard!]!
+  pageInfo: PageInfo!
+}
+
+input GiftCardCreateInput {
+  """
+  The shop’s own code, 8 to 20 letters and digits; one of 16 is made if left out.
+  """
+  code: String
+
+  """The customer it is given to, if any."""
+  customerId: ID
+
+  """
+  The last day it can be spent, YYYY-MM-DD in the shop's time zone; never if left out.
+  """
+  expiresOn: String
+
+  """What it is worth, in the shop's currency: "5000" or "2499.50"."""
+  initialValue: String!
+
+  """For the shop's records."""
+  note: String
+}
+
+type GiftCardCreatePayload {
+  giftCard: GiftCard
+
+  """The whole code, in groups of four: given this once, and never again."""
+  giftCardCode: String
+  userErrors: [UserError!]!
+}
+
+input GiftCardCreditInput {
+  creditAmount: MoneyInput!
+
+  """Why, for the shop's records."""
+  note: String
+}
+
+input GiftCardDebitInput {
+  debitAmount: MoneyInput!
+
+  """Why, for the shop's records."""
+  note: String
+}
+
+type GiftCardEdge {
+  cursor: String!
+  node: GiftCard!
+}
+
+type GiftCardPayload {
+  giftCard: GiftCard
+  userErrors: [UserError!]!
+}
+
+"""A change of a gift card's balance (ADR-448)."""
+type GiftCardTransaction {
+  """What it added to the balance, or took from it, less than zero."""
+  amount: Money!
+  balanceAfterTransaction: Money!
+  id: ID!
+  kind: GiftCardTransactionKind!
+
+  """For the shop's records."""
+  note: String!
+
+  """The order it paid, or whose cancellation gave it back."""
+  orderId: ID
+  processedAt: DateTime!
+}
+
+type GiftCardTransactionConnection {
+  edges: [GiftCardTransactionEdge!]!
+  nodes: [GiftCardTransaction!]!
+  pageInfo: PageInfo!
+}
+
+type GiftCardTransactionEdge {
+  cursor: String!
+  node: GiftCardTransaction!
+}
+
+"""Which way a transaction moved a gift card's balance (ADR-448)."""
+enum GiftCardTransactionKind {
+  """Added by hand: giftCardCredit."""
+  CREDIT
+
+  """Spent on an order, or taken by hand: giftCardDebit."""
+  DEBIT
+
+  """A debit given back, as when the order it paid is cancelled."""
+  DEBIT_REVERT
+
+  """What the card was issued for."""
+  ISSUE
+}
+
+type GiftCardTransactionPayload {
+  giftCard: GiftCard
+  giftCardTransaction: GiftCardTransaction
+  userErrors: [UserError!]!
+}
+
+"""Fields left out stay as they are; null takes one away."""
+input GiftCardUpdateInput {
+  customerId: ID
+  expiresOn: String
+  note: String
+}
+
+"""
 What waits for the shop, as the admin's home shows it first: orders to confirm, review, see paid, pack and book, parcels and returns coming back, lost parcels to claim and claims to follow up, and the cash on delivery still to come; and how today has gone (ANL-01).
 """
 type Home {
@@ -6593,6 +6748,29 @@ type Mutation {
   Sets a parcel's courier, tracking number and link, e.g. once it is booked.
   """
   fulfillmentTrackingInfoUpdate(id: ID!, trackingInfo: FulfillmentTrackingInput!): FulfillmentTrackingInfoUpdatePayload!
+
+  """
+  Issues a gift card, as Shopify's giftCardCreate: worth up to Rs 100,000, with the shop's own code or one made for it, which the payload gives this once. Audited. Needs an Idempotency-Key header.
+  """
+  giftCardCreate(input: GiftCardCreateInput!): GiftCardCreatePayload!
+
+  """
+  Adds to a gift card's balance, as Shopify's giftCardCredit. Audited. Needs an Idempotency-Key header.
+  """
+  giftCardCredit(creditInput: GiftCardCreditInput!, id: ID!): GiftCardTransactionPayload!
+
+  """Deactivates a gift card for good, as Shopify's giftCardDeactivate."""
+  giftCardDeactivate(id: ID!): GiftCardPayload!
+
+  """
+  Takes from a gift card's balance, as Shopify's giftCardDebit. Audited. Needs an Idempotency-Key header.
+  """
+  giftCardDebit(debitInput: GiftCardDebitInput!, id: ID!): GiftCardTransactionPayload!
+
+  """
+  Changes a gift card's expiry, customer or note, as Shopify's giftCardUpdate.
+  """
+  giftCardUpdate(id: ID!, input: GiftCardUpdateInput!): GiftCardPayload!
 
   """
   Adds to or takes from quantities: a delivery received, damaged goods written off. Stock recorded for an untracked item starts tracking it. All changes apply, or none. Needs an Idempotency-Key header.
@@ -10685,6 +10863,22 @@ type Query {
     """1 to 250; default 50."""
     first: Int
   ): FileConnection!
+
+  """A gift card by ID, or null."""
+  giftCard(id: ID!): GiftCard
+
+  """The shop's gift cards, the newest first."""
+  giftCards(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """
+    The code's last characters, as read off the card: those whose code ends so.
+    """
+    query: String
+  ): GiftCardConnection!
 
   """What waits for the shop: the admin's home."""
   home(

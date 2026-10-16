@@ -1757,6 +1757,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'write_marketing_events',
         'read_store_credit_accounts',
         'write_store_credit_account_transactions',
+        'write_gift_cards',
       ]);
     });
 

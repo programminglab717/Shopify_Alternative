@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-447 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-448 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -455,6 +455,7 @@
 | 445 | A product's page counts down to its running sale's end, and says how many are left only where 5 or fewer are, as Shopify's inventory_quantity | Accepted |
 | 446 | A closed shop's password page takes a waitlist: shoppers sign up tagged waitlist, and each is told once on WhatsApp from Hatti's number when the shop opens | Accepted |
 | 447 | A returning shopper fills in checkout's address from their last order, once a code sent to their number, or their browser's proof of it, shows the number is theirs | Accepted |
+| 448 | Gift cards are codes the shop keeps only a digest of, worth a balance kept on the card with a ledger of every change, issued, changed and deactivated through Shopify's giftCard mutations | Accepted |
 
 ---
 
@@ -17080,3 +17081,51 @@
   * **Sending codes only to numbers that ordered before:** saves a message, but tells anyone
     typing a number whether it is a customer here.
   * **Filling in without a code:** anyone typing a neighbour's number would see their address.
+
+## ADR-448 · Gift cards are codes the shop keeps only a digest of, worth a balance kept on the card with a ledger of every change, issued, changed and deactivated through Shopify's giftCard mutations
+
+* **Context:**
+  * CAT-12 and PAY-13 ask for gift cards beside store credit (ADR-184): a code a shop sells or
+    gives, spent on its orders. Shops in the alpha give them at Eid and as apologies, and
+    Shopify apps and themes expect Shopify's `GiftCard`.
+  * Store credit belongs to a customer, and is spent once they prove their number (ADR-186). A
+    gift card belongs to whoever holds its code: the code is the credential.
+* **Decision:**
+  * **A card is a code and a balance**, in the customers module beside store credit, as
+    Shopify's `GiftCard`.
+    * The code is 16 letters and digits made for it (80 random bits, none that reads as
+      another), or the shop's own of 8 to 20.
+    * It is kept only as a SHA-256 digest of its capitals without spaces or dashes, and its
+      last four characters to tell it by. `giftCardCreate` gives the whole code, in groups of
+      four, that once.
+    * Codes are each shop's own: two shops may have the same one.
+  * **The balance is kept on the card**, changed only holding its row lock. Unlike store credit,
+    a card expires whole, on its last day in the shop's time zone, so its balance needs no
+    working out.
+    * Every change goes in a ledger written once: the issue, credits and debits by hand, and,
+      from the next section, the orders it pays and those given back. Request code can't
+      rewrite or delete the ledger, delete a card, or change its code or value.
+    * A card holds at most Rs 100,000.
+  * **The Admin API is Shopify's:** `giftCards` (newest first, found by the code's end),
+    `giftCard`, `giftCardCreate`, `giftCardUpdate` (expiry, customer, note),
+    `giftCardDeactivate` (for good), `giftCardCredit` and `giftCardDebit`.
+    * New scopes `read_gift_cards` and `write_gift_cards`. Owners and managers write;
+      accountants and confirmation agents read.
+    * Issuing, changing, crediting, debiting and deactivating are on the activity log, with the
+      code's last characters alone.
+  * **A card may name the customer it was given to.** It follows them through a merge, and is in
+    their own file without its code. Erasing them leaves the card the shop's to honour, with no
+    one named.
+* **Consequences:**
+  * A lost code can't be shown again. The shop deactivates the card and issues another for its
+    balance.
+  * Not yet: spending cards at checkout and on orders, given back when an order is cancelled;
+    the admin's pages; cards sold as products and sent on WhatsApp. These follow in the next
+    sections.
+* **Alternatives:**
+  * **Gift cards as store credit:** credit needs its customer to prove their number, and a gift
+    card is given to someone the shop has never met.
+  * **Keeping the code encrypted, to show it again:** anyone with the database and the key could
+    spend every card. A digest gives nothing to spend.
+  * **Balance worked out from the ledger, as store credit's is:** store credit expires credit by
+    credit; a card expires whole, and a kept balance is one lock and one read.

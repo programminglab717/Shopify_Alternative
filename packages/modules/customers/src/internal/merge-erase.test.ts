@@ -448,6 +448,7 @@ describe.skipIf(!server)("Customers' numbers, merging, erasure and their own exp
       ],
       // What the shop owes them in store credit, with its ledger (ADR-184): none yet.
       storeCredit: [],
+      giftCards: [],
       orders: [{ name: '#1001' }],
     });
     expect(file.json).toContain('\n  "customer": {\n    "id": ');

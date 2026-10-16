@@ -62,6 +62,8 @@ export const ID_PREFIXES = {
   consentEvent: 'cev',
   storeCreditAccount: 'sca',
   storeCreditTransaction: 'sct',
+  giftCard: 'gc',
+  giftCardTransaction: 'gct',
   order: 'ord',
   draftOrder: 'dft',
   savedSearch: 'svs',

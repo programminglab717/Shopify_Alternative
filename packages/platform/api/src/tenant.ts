@@ -45,6 +45,8 @@ export const ACCESS_SCOPES = [
   'read_store_credit_accounts',
   'read_store_credit_account_transactions',
   'write_store_credit_account_transactions',
+  'read_gift_cards',
+  'write_gift_cards',
 ] as const;
 export type AccessScope = (typeof ACCESS_SCOPES)[number];
 
@@ -85,7 +87,8 @@ const VIEW_CATALOG: readonly AccessScope[] = ['read_products', 'read_inventory',
  * are marketing, the files they upload, the ad platforms its orders go to (ADR-143), and the
  * shop's own WhatsApp templates and broadcasts (ADR-420): marketers too. Store credit (ADR-184):
  * owners and managers credit and debit it; accountants see it all, and confirmation agents what
- * a customer has.
+ * a customer has. Gift cards (ADR-448), likewise: owners and managers issue and change them;
+ * accountants and confirmation agents look them up.
  */
 export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = {
   owner: [
@@ -107,6 +110,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_marketing_events',
     'read_store_credit_accounts',
     'write_store_credit_account_transactions',
+    'write_gift_cards',
   ],
   manager: [
     ...EDIT_CATALOG,
@@ -127,12 +131,14 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_marketing_events',
     'read_store_credit_accounts',
     'write_store_credit_account_transactions',
+    'write_gift_cards',
   ],
   confirmation_agent: [
     ...VIEW_CATALOG,
     'write_orders',
     'read_customers',
     'read_store_credit_accounts',
+    'read_gift_cards',
   ],
   packer: [...VIEW_CATALOG, 'write_orders'],
   marketer: [
@@ -153,6 +159,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'read_orders',
     'read_store_credit_accounts',
     'read_store_credit_account_transactions',
+    'read_gift_cards',
   ],
 };
 

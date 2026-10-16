@@ -96,6 +96,25 @@ export {
   type StoreCreditTransactionRecord,
 } from '../internal/store-credit.service.js';
 export {
+  GIFT_CARD_KINDS,
+  GIFT_CARD_LIMITS,
+  GiftCardService,
+  dayIn,
+  formatGiftCardCode,
+  giftCardDigest,
+  newGiftCardCode,
+  normalizeGiftCardCode,
+  type GiftCardAdjustInput,
+  type GiftCardChange,
+  type GiftCardCreateInput,
+  type GiftCardIssued,
+  type GiftCardKindValue,
+  type GiftCardRecord,
+  type GiftCardRefusal,
+  type GiftCardTransactionRecord,
+  type GiftCardUpdateInput,
+} from '../internal/gift-cards.service.js';
+export {
   BLOCK_REASONS,
   CONSENT_SOURCES,
   MARKETING_CHANNELS,

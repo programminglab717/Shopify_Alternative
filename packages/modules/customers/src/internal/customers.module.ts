@@ -4,9 +4,11 @@ import { CustomerDataRegistry } from './customer-data.js';
 import { CustomerDataService } from './customer-data.service.js';
 import { CustomerTransferService } from './customer-transfer.service.js';
 import { CustomerService } from './customer.service.js';
+import { GiftCardService } from './gift-cards.service.js';
 import { BlocklistResolver } from './graphql/blocklist.resolver.js';
 import { CustomerTransferResolver } from './graphql/customer-transfer.resolver.js';
 import { CustomerResolver } from './graphql/customer.resolver.js';
+import { GiftCardResolver } from './graphql/gift-card.resolver.js';
 import { SegmentResolver } from './graphql/segment.resolver.js';
 import {
   CustomerStoreCreditResolver,
@@ -38,6 +40,8 @@ import { StoreCreditService } from './store-credit.service.js';
     StoreCreditService,
     StoreCreditResolver,
     CustomerStoreCreditResolver,
+    GiftCardService,
+    GiftCardResolver,
     SignUpService,
   ],
   // Sign-ups through the online store's form, under /storefront/, which the host application
@@ -51,6 +55,7 @@ import { StoreCreditService } from './store-credit.service.js';
     CustomerDataRegistry,
     CustomerDataService,
     StoreCreditService,
+    GiftCardService,
     SignUpService,
   ],
 })
