@@ -1853,6 +1853,17 @@ export interface UrduResource {
   translations: { key: string; value: string | null; outdated: boolean }[];
 }
 
+export interface TranslationDraftingData {
+  translationDrafting: { available: boolean; usedToday: number; limitPerDay: number };
+}
+
+export interface TranslationsDraftData {
+  translationsDraft: {
+    drafts: { key: string; value: string; translatableContentDigest: string }[] | null;
+    userErrors: UserError[];
+  };
+}
+
 export interface InUrduData {
   translatableResourcesByIds: { nodes: UrduResource[] };
 }

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-463 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-464 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -471,6 +471,7 @@
 | 461 | Hatti's people take a store down when its reports are upheld: the shop suspended, its storefront answering with Hatti's page saying so, its checkout and admin closed, its owner told why, and restored the same way | Accepted |
 | 462 | The owner of a store taken down appeals through a link of its own in the notice: its page says why, takes their side, and shows Hatti's answer; refused with why, or upheld by restoring the store | Accepted |
 | 463 | AI drafts a resource's Urdu through one gateway whose model and key come from the host's configuration; drafts are never kept, the shop checks and saves them as translations, and each ask is logged with its tokens, a hundred a day | Accepted |
+| 464 | The admin's Urdu pages draft a thing's empty boxes with AI in one tap, each marked as AI's until the shop saves it; options, values and links are left to the shop | Accepted |
 
 ---
 
@@ -17653,3 +17654,31 @@
     lives only in the form can't reach a shopper unsaved.
   * **A provider's SDK:** one HTTP call needs none, and the gateway keeps its own types.
   * **A model named in code as a default:** a host without one would call a model nobody chose.
+
+## ADR-464 · The admin's Urdu pages draft a thing's empty boxes with AI in one tap, each marked as AI's until the shop saves it; options, values and links are left to the shop
+
+* **Context:**
+  * The core drafts a resource's Urdu with AI where the host has a key, and keeps nothing until
+    the shop saves it (ADR-463). Staff write the shop's Urdu on a page for each thing, each
+    field beside the shop's own words (ADR-327).
+* **Decision:**
+  * **One button on each Urdu page**, "Draft the empty boxes with AI", shown only where
+    `translationDrafting` says drafts are available. Beneath it, how many of the day's 100
+    are used. It is disabled once the day's are used or no box is empty.
+  * **It drafts the empty boxes alone**, one ask for each thing on the page with an empty box,
+    naming those fields. Boxes with Urdu, and boxes typed in while it drafts, are left as they
+    are. A draft for words that changed since the page read them is left out.
+  * **Options, their values and menus' links aren't drafted.** Each is its own resource, and so
+    its own ask from the day's hundred, for a word or two the shop writes as fast.
+  * **Each draft is marked** "Drafted by AI: check it against your words before you save" until
+    the page is saved. Saving keeps it as any Urdu typed there is kept, for the digest of the
+    words it translates.
+* **Consequences:**
+  * CAT-07 is whole: English and Urdu fields, with AI drafts the shop reviews before they are
+    kept.
+  * A host without a key shows the Urdu pages as before, with no button.
+* **Alternatives:**
+  * **A button by each box:** a product would take three asks of the day's hundred where one
+    does, and a page of fields would be a row of buttons.
+  * **Drafting every box, those with Urdu too:** the shop's own Urdu would be overwritten by a
+    machine's.

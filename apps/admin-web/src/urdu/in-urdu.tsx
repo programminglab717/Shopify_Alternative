@@ -1,14 +1,30 @@
 import type { OrderStage } from '@hatti/tokens';
-import { CircleCheck, CircleDashed, Languages, PenLine, Save, TriangleAlert } from 'lucide-react';
+import {
+  CircleCheck,
+  CircleDashed,
+  Languages,
+  PenLine,
+  Save,
+  Sparkles,
+  TriangleAlert,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import {
   InUrduQuery,
+  TranslationDraftingQuery,
+  TranslationsDraftMutation,
   TranslationsRegisterMutation,
   TranslationsRemoveMutation,
 } from '../api/operations';
-import type { InUrduData, UrduResource, UserError } from '../api/types';
+import type {
+  InUrduData,
+  TranslationDraftingData,
+  TranslationsDraftData,
+  UrduResource,
+  UserError,
+} from '../api/types';
 import type { StaffRole } from '../auth/session';
 import { errorText } from '../i18n/errors';
 import { useLocale } from '../i18n/locale';
@@ -75,6 +91,8 @@ interface Field {
   outdated: boolean;
   /** How many levels in it is, as an option's value or a menu's link under another. */
   depth: number;
+  /** Whether it is named by its words alone, as an option is: such fields AI doesn't draft. */
+  named: boolean;
 }
 
 const LABELS: Readonly<Record<string, MessageKey>> = {
@@ -179,6 +197,7 @@ function fieldsOf(things: readonly UrduThing[], nodes: readonly UrduResource[], 
           keptAsHtml: urdu.asHtml,
           outdated: kept?.outdated ?? false,
           depth: thing.depth ?? 0,
+          named,
         },
       ];
     });
@@ -241,7 +260,8 @@ function problemOf(error: UserError, fields: readonly Field[], t: Translate): st
 
 /**
  * A field of the shop's own beside its Urdu (OS-06): its words for reference, the Urdu written
- * right to left in Urdu's own font, and, where the shop's words changed since, a word saying so.
+ * right to left in Urdu's own font, and, where the shop's words changed since, a word saying so;
+ * where AI drafted it (CAT-07), a word saying that, until it is saved.
  */
 function UrduField({
   field,
@@ -249,12 +269,14 @@ function UrduField({
   onChange,
   confirmed,
   onConfirm,
+  drafted,
 }: {
   field: Field;
   value: string;
   onChange: (value: string) => void;
   confirmed: boolean;
   onConfirm: () => void;
+  drafted: boolean;
 }) {
   const { t } = useLocale();
   const id = useId();
@@ -299,6 +321,12 @@ function UrduField({
           {t(asHtml ? 'pages.bodyHtmlHint' : 'pages.bodyHint')}
         </p>
       )}
+      {drafted && value.trim() !== '' && (
+        <div className="flex items-center gap-2 text-primary">
+          <Sparkles aria-hidden className="size-5 shrink-0" />
+          <span className="text-text">{t('urdu.drafted')}</span>
+        </div>
+      )}
       {field.outdated && field.kept.trim() !== '' && !changed && (
         <div className="flex flex-wrap items-center gap-2 text-warning">
           <TriangleAlert aria-hidden className="size-5 shrink-0" />
@@ -336,6 +364,17 @@ function UrduForm({
   const [busy, setBusy] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
+  /** Fields AI drafted, until saved, and whether a draft is HTML a plain box can't hold. */
+  const [drafted, setDrafted] = useState<Record<string, { asHtml: boolean }>>({});
+  const [drafting, setDrafting] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const draftingQuery = useAdminQuery<TranslationDraftingData>(
+    ['translationDrafting'],
+    TranslationDraftingQuery,
+  );
+  const draft = useAdminMutation<TranslationsDraftData, { resourceId: string; keys: string[] }>(
+    TranslationsDraftMutation,
+  );
   const register = useAdminMutation<
     { translationsRegister: { userErrors: UserError[] } },
     { resourceId: string; translations: Record<string, string>[] }
@@ -347,7 +386,9 @@ function UrduForm({
 
   const groups = sections.map((section) => ({
     ...section,
-    fields: fieldsOf(section.things, nodes, t),
+    fields: fieldsOf(section.things, nodes, t).map((field) =>
+      drafted[field.id]?.asHtml ? { ...field, keptAsHtml: true } : field,
+    ),
   }));
   const fields = groups.flatMap((group) => group.fields);
   const valueOf = (field: Field) => edits[field.id] ?? field.kept;
@@ -361,6 +402,55 @@ function UrduForm({
     (field) => valueOf(field).trim() === '' && field.kept.trim() !== '',
   );
   const dirty = toKeep.length + toForget.length > 0;
+  const allowance = draftingQuery.data?.translationDrafting;
+  // Each thing's own empty fields, a draft for each thing; options and links are left to the shop.
+  const toDraft = fields.filter((field) => !field.named && valueOf(field).trim() === '');
+
+  /** AI's drafts of the empty fields, put in their boxes to check; nothing is kept until saved. */
+  const onDraft = async () => {
+    if (busy || drafting || toDraft.length === 0) return;
+    setDrafting(true);
+    setProblems([]);
+    setSaved(false);
+    setNote(null);
+    const found: string[] = [];
+    const filled: Record<string, string> = {};
+    const marks: Record<string, { asHtml: boolean }> = {};
+    try {
+      for (const resourceId of [...new Set(toDraft.map((field) => field.resourceId))]) {
+        const asked = toDraft.filter((field) => field.resourceId === resourceId);
+        const { translationsDraft } = await draft.mutateAsync({
+          resourceId,
+          keys: asked.map((field) => field.key),
+        });
+        found.push(...translationsDraft.userErrors.map((each) => problemText(each, t)));
+        for (const each of translationsDraft.drafts ?? []) {
+          const field = asked.find((one) => one.key === each.key);
+          // A draft of words changed since the page read them would be kept for the wrong words.
+          if (!field || each.translatableContentDigest !== field.digest) continue;
+          const words = editable(field.shape, each.value);
+          filled[field.id] = words.text;
+          marks[field.id] = { asHtml: words.asHtml };
+        }
+      }
+    } catch (failure) {
+      found.push(errorText(failure, t));
+    }
+    // Only boxes still empty: what was typed while AI drafted stays.
+    setEdits((now) => {
+      const next = { ...now };
+      for (const field of toDraft) {
+        const value = filled[field.id];
+        if (value !== undefined && (now[field.id] ?? '').trim() === '') next[field.id] = value;
+      }
+      return next;
+    });
+    setDrafted((now) => ({ ...now, ...marks }));
+    void draftingQuery.refetch();
+    setDrafting(false);
+    if (found.length > 0) setProblems(found);
+    else setNote(t(Object.keys(filled).length > 0 ? 'urdu.draftsIn' : 'urdu.noDrafts'));
+  };
 
   const onSave = async (event: FormEvent) => {
     event.preventDefault();
@@ -406,12 +496,31 @@ function UrduForm({
     }
     setEdits({});
     setConfirmed(new Set());
+    setDrafted({});
+    setNote(null);
     setSaved(true);
   };
 
   if (fields.length === 0) return <EmptyState title={t('urdu.nothing')} />;
   return (
     <form onSubmit={(event) => void onSave(event)} className="flex flex-col gap-4">
+      {allowance?.available && fields.some((field) => !field.named) && (
+        <div className="flex flex-col items-start gap-2">
+          <Button
+            variant="secondary"
+            busy={drafting}
+            disabled={busy || toDraft.length === 0 || allowance.usedToday >= allowance.limitPerDay}
+            icon={<Sparkles aria-hidden className="size-5" />}
+            onClick={() => void onDraft()}
+          >
+            {t('urdu.draft')}
+          </Button>
+          <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+            {t('urdu.draftHint', { used: allowance.usedToday, limit: allowance.limitPerDay })}
+          </p>
+          {note && <Alert tone="info">{note}</Alert>}
+        </div>
+      )}
       {groups
         .filter((group) => group.fields.length > 0)
         .map((group) => (
@@ -427,6 +536,7 @@ function UrduForm({
                 }}
                 confirmed={confirmed.has(field.id)}
                 onConfirm={() => setConfirmed((now) => new Set([...now, field.id]))}
+                drafted={field.id in drafted}
               />
             ))}
           </FormSection>

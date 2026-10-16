@@ -82,7 +82,15 @@ interface Kept {
 }
 
 /** A fake core keeping the Urdu it is sent, refusing one written for words since changed. */
-function core(role: StaffRole, kept: Record<string, Kept[]> = {}, options = { stale: false }) {
+/** AI's drafts of a thing's fields, as the core gives them, each with the digest of its words. */
+type Drafts = Record<string, { key: string; value: string }[]>;
+
+function core(
+  role: StaffRole,
+  kept: Record<string, Kept[]> = {},
+  options: { stale?: boolean; drafts?: Drafts } = {},
+) {
+  let used = 7;
   const urdu: Record<string, Kept[]> = structuredClone(kept);
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
@@ -126,6 +134,26 @@ function core(role: StaffRole, kept: Record<string, Kept[]> = {}, options = { st
           ];
         }
         return { translationsRegister: { userErrors: [] } };
+      }
+      case 'TranslationDrafting':
+        if (!options.drafts) throw new Error('not answered');
+        return { translationDrafting: { available: true, usedToday: used, limitPerDay: 100 } };
+      case 'TranslationsDraft': {
+        used += 1;
+        const id = variables.resourceId as string;
+        const keys = variables.keys as string[];
+        return {
+          translationsDraft: {
+            drafts: (options.drafts?.[id] ?? [])
+              .filter((draft) => keys.includes(draft.key))
+              .map((draft) => ({
+                ...draft,
+                translatableContentDigest: CONTENT[id]!.find((field) => field.key === draft.key)!
+                  .digest,
+              })),
+            userErrors: [],
+          },
+        };
       }
       case 'TranslationsRemove': {
         const id = variables.resourceId as string;
@@ -224,6 +252,73 @@ describe("The shop's words in Urdu", () => {
     expect(valueOf('Description in Urdu')).toBe('نرم لان۔\n\nتین پیس اور دوپٹہ۔');
     expect(
       (screen.getByRole('button', { name: 'Save the Urdu' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("drafts a product's empty boxes with AI, marked until the shop checks and saves them (CAT-07)", async () => {
+    const fake = core(
+      'marketer',
+      { prod_1: [{ key: 'title', value: 'لان سوٹ', outdated: false }] },
+      {
+        drafts: {
+          prod_1: [
+            { key: 'body_html', value: '<p>نرم لان۔</p><p>تین پیس اور دوپٹہ۔</p>' },
+            { key: 'product_type', value: 'سوٹ' },
+          ],
+        },
+      },
+    );
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/products/prod_1/urdu');
+
+    const button = await screen.findByRole('button', { name: 'Draft the empty boxes with AI' });
+    expect(screen.getByText(/7 of 100 drafts used today/)).toBeTruthy();
+    await act(async () => fireEvent.click(button));
+
+    // The product's own empty fields alone, its title kept and its options left to the shop.
+    expect(sentOf(fake, 'TranslationsDraft')).toEqual([
+      { resourceId: 'prod_1', keys: ['body_html', 'product_type'] },
+    ]);
+    expect(
+      await screen.findByText('Drafts are in the empty boxes. Check each one, then save.'),
+    ).toBeTruthy();
+    expect(valueOf('Description in Urdu')).toBe('نرم لان۔\n\nتین پیس اور دوپٹہ۔');
+    expect(valueOf('Type in Urdu')).toBe('سوٹ');
+    expect(valueOf('Title in Urdu')).toBe('لان سوٹ');
+    expect(
+      screen.getAllByText('Drafted by AI: check it against your words before you save.'),
+    ).toHaveLength(2);
+    expect(await screen.findByText(/8 of 100 drafts used today/)).toBeTruthy();
+    // Nothing is kept until the shop saves it.
+    expect(sentOf(fake, 'TranslationsRegister')).toEqual([]);
+
+    type('Type in Urdu', 'سوٹ کا جوڑا');
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save the Urdu' })));
+    await screen.findByText("Saved. Your store's Urdu pages show it in a moment.");
+    expect(sentOf(fake, 'TranslationsRegister')).toEqual([
+      {
+        resourceId: 'prod_1',
+        translations: [
+          {
+            key: 'body_html',
+            locale: 'ur',
+            translatableContentDigest: 'd_body',
+            value: '<p>نرم لان۔</p><p>تین پیس اور دوپٹہ۔</p>',
+          },
+          {
+            key: 'product_type',
+            locale: 'ur',
+            translatableContentDigest: 'd_type',
+            value: 'سوٹ کا جوڑا',
+          },
+        ],
+      },
+    ]);
+    expect(screen.queryByText(/Drafted by AI/)).toBeNull();
+    // Every box with words now: nothing left to draft.
+    expect(
+      (screen.getByRole('button', { name: 'Draft the empty boxes with AI' }) as HTMLButtonElement)
+        .disabled,
     ).toBe(true);
   });
 

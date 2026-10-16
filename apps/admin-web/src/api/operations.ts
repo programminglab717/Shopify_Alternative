@@ -4460,6 +4460,34 @@ export const TranslationsRemoveMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** Whether AI drafts the shop's Urdu here, and how many of the day's it asked for (CAT-07). */
+export const TranslationDraftingQuery = /* GraphQL */ `
+  query TranslationDrafting {
+    translationDrafting {
+      available
+      usedToday
+      limitPerDay
+    }
+  }
+`;
+
+/** AI drafts of a thing's fields in Urdu, each with the digest of its words; none kept (CAT-07). */
+export const TranslationsDraftMutation = /* GraphQL */ `
+  mutation TranslationsDraft($resourceId: ID!, $keys: [String!]) {
+    translationsDraft(resourceId: $resourceId, locale: "ur", keys: $keys) {
+      drafts {
+        key
+        value
+        translatableContentDigest
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** Translations kept, each naming the digest of the words it translates (OS-06). */
 export const TranslationsRegisterMutation = /* GraphQL */ `
   mutation TranslationsRegister($resourceId: ID!, $translations: [TranslationInput!]!) {
