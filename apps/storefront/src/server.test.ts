@@ -36,6 +36,7 @@ import {
   type SignUpResult,
   type ReportRequest,
   type ReportResult,
+  type RightsComplaintRequest,
   type StockWatchRequest,
   type StockWatchResult,
   type StorefrontVisit,
@@ -451,6 +452,16 @@ class FakeCore {
     this.reports.push({ shopId, request });
     if (this.reported instanceof Error) throw this.reported;
     return this.reported;
+  }
+
+  /** The rights complaints sent on, and how the core answers them (ADR-474). */
+  readonly complaints: { shopId: string; request: RightsComplaintRequest }[] = [];
+  complained: ReportResult | Error = { ok: true, id: 'ipc_3Rt9Lm' };
+
+  async complainOfRights(shopId: string, request: RightsComplaintRequest): Promise<ReportResult> {
+    this.complaints.push({ shopId, request });
+    if (this.complained instanceof Error) throw this.complained;
+    return this.complained;
   }
 
   /** The comments sent on, and how the core answers them (ADR-220). */
@@ -2921,6 +2932,88 @@ describe('Carts', () => {
     expect((await post(report, { 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403);
     core.reported = new StorefrontApiError(502, 'Bad gateway');
     expect((await post(report)).statusCode).toBe(503);
+    await app.close();
+  });
+
+  it("takes a rights owner's complaint naming the store's listings by their addresses (ADR-474)", async () => {
+    const app = server();
+    const other = sample.products[1]!;
+    const get = (url: string) => app.inject({ method: 'GET', url, headers: { host: 'localhost' } });
+    const post = (fields: Record<string, string>, url = '/report/rights') =>
+      app.inject({ method: 'POST', url, headers: FORM, payload: form(fields) });
+
+    // Linked from the report page; Hatti's page, never kept.
+    expect((await get('/report')).body).toContain('href="/report/rights"');
+    expect((await get('/ur/report')).body).toContain('href="/ur/report/rights"');
+    const page = await get('/report/rights');
+    expect([page.statusCode, page.headers['cache-control']]).toEqual([200, 'private, no-store']);
+    expect(page.body).toContain('Rights complaint');
+    expect(page.body).toContain('حقوق کی شکایت');
+    expect(page.body).toContain('<form method="post" action="/report/rights">');
+    expect(page.body).toContain('<option value="counterfeit"');
+    expect(page.body).toContain('name="sworn"');
+
+    const complaint = {
+      kind: 'counterfeit',
+      rightsOwner: 'Gul Ahmed',
+      registration: 'TM 123456',
+      complainant: 'Sana Iqbal',
+      actingAs: 'agent',
+      email: 'legal@example.pk',
+      listings: `http://localhost/products/${lawn.handle}\n/ur/products/${other.handle}\n\n/collections/all/products/${lawn.handle}`,
+      details: 'Sold as Gul Ahmed lawn; it is a copy.',
+      sworn: '1',
+      signature: 'Sana Iqbal',
+    };
+    const taken = await post(complaint);
+    expect([taken.statusCode, taken.headers['cache-control']]).toEqual([200, 'private, no-store']);
+    expect(taken.body).toContain('Hatti has your complaint');
+    expect(taken.body).toContain('ipc_3Rt9Lm');
+    const [sent] = core.complaints;
+    expect(sent).toEqual({
+      shopId: 'sample',
+      request: {
+        kind: 'counterfeit',
+        rightsOwner: 'Gul Ahmed',
+        registration: 'TM 123456',
+        complainant: 'Sana Iqbal',
+        actingAs: 'agent',
+        email: 'legal@example.pk',
+        // Each product once, as the store has it.
+        listings: [
+          { id: lawn.id, title: lawn.title, url: `http://localhost/products/${lawn.handle}` },
+          { id: other.id, title: other.title, url: `http://localhost/products/${other.handle}` },
+        ],
+        details: 'Sold as Gul Ahmed lawn; it is a copy.',
+        signature: 'Sana Iqbal',
+        sworn: true,
+        client: '127.0.0.1',
+        language: 'en',
+      },
+    });
+
+    // Listings on another store, or none there is, are not sent on: the form says so, as typed.
+    const elsewhere = await post(
+      {
+        ...complaint,
+        listings: `https://other.example/products/${lawn.handle}\n/products/nothing`,
+      },
+      '/ur/report/rights',
+    );
+    expect(elsewhere.statusCode).toBe(422);
+    expect(elsewhere.body).toContain('Give the address of each product on this store');
+    expect(elsewhere.body).toContain('aria-invalid="true" aria-describedby="listings-error"');
+    expect(elsewhere.body).toContain(`https://other.example/products/${lawn.handle}`);
+    expect(core.complaints).toHaveLength(1);
+    // What the core finds wrong shows too.
+    core.complained = {
+      ok: false,
+      errors: [{ field: 'sworn', message: 'Swear the statement to send the complaint' }],
+    };
+    const unsworn = await post({ ...complaint, sworn: '' });
+    expect(unsworn.statusCode).toBe(422);
+    expect(unsworn.body).toContain('Tick the statement to send the complaint.');
+    expect(core.complaints[1]!.request.sworn).toBe(false);
     await app.close();
   });
 

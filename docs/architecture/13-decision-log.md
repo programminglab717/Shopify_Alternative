@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-473 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-474 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -481,6 +481,7 @@
 | 471 | A product's title, description and search engine words are drafted with AI from what the shop says of it, in English, Urdu or Roman Urdu, never kept, a hundred a day | Accepted |
 | 472 | The admin's product form writes a product's title and description with AI in the language chosen, from what the form says, for the shop to check before it saves | Accepted |
 | 473 | A product whose words name goods Hatti does not allow selling stays a draft: never on sale until its words change or Hatti's people clear them | Accepted |
+| 474 | Owners of a trademark or copyright complain of a store's listings from its rights page, naming them by their addresses and swearing to it; Hatti's people decide within 48 hours | Accepted |
 
 ---
 
@@ -17935,3 +17936,41 @@
     for every match, most of them a seller who should simply change a word.
   * **Screening images too:** as the catalog notes, V1 matches words; images wait for a model
     that can tell a toy from a pistol.
+
+## ADR-474 · Owners of a trademark or copyright complain of a store's listings from its rights page, naming them by their addresses and swearing to it; Hatti's people decide within 48 hours
+
+* **Context:**
+  * TNS-04 (V1) asks for notice and takedown of listings that infringe a trademark or copyright,
+    or pass copies off as a brand's own: "replica" and "master copy" listings of well-known
+    Pakistani labels are common (11 §6). Shoppers' reports (ADR-460) are about a store; a rights
+    owner's complaint is about its listings, and must say whose right and swear to it.
+  * Prohibited-items screening (ADR-473) catches the words a seller uses of a copy; it can't
+    tell a brand's own goods from goods sold as that brand.
+* **Decision:**
+  * **Hatti's rights page on every store**, at `/report/rights` and `/ur/report/rights`, linked
+    from its report page: the platform's markup in English and Urdu, as the report page is,
+    answering while the shop is paused or behind its password. It asks what right (a trademark,
+    a copyright, or fakes sold as the brand), whose, and its registration if any; who complains,
+    whether as the owner or acting for them, an email and, if they say, a mobile; the listings,
+    and how they infringe; and a good-faith statement sworn by ticking it and typing their name.
+  * **Listings are named by their addresses**, whole or as paths, one on each line, up to 20.
+    The storefront finds each among the store's own products and sends the core its ID, title
+    and address as the store showed it; an address on another host, or of no product there, is
+    refused on the form.
+  * **The trust module keeps each complaint** (`trust.rights_complaints`), numbered `ipc_…`, due
+    a decision within 48 hours, its complainant's address kept only as a hash with the shop's;
+    five a day of one store from one address. No Admin API reads complaints.
+  * **Hatti's people's queue** is the same command-line tool: `rights [--all]` lists each with
+    its listings, the soonest due first and the overdue marked; `dismiss-rights` records why and
+    names whom to write to.
+* **Consequences:**
+  * A brand finding copies of its goods on a Hatti store can tell Hatti, with what a decision
+    needs, without an account.
+  * Upholding a complaint, which takes its listings down and tells the store's owner with the
+    complaint and a way to answer it, is TNS-04's next part.
+* **Alternatives:**
+  * **One page on Hatti's own site for every store:** the complainant would have to name the
+    store and Hatti find it from any of its domains. On the store itself, the store is known
+    and its products are at hand.
+  * **Folding complaints into reports:** a report needs no statement, no owner and no listings,
+    and a takedown of listings is not a takedown of the store.

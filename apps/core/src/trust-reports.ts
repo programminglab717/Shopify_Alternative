@@ -7,10 +7,12 @@ import {
   AppealsService,
   REPORT_REASONS,
   ReportsService,
+  RightsComplaintsService,
   TakedownsService,
   VerificationsService,
   type AppealRecord,
   type ReportRecord,
+  type RightsComplaintRecord,
   type TakedownRecord,
   type VerificationLevel,
   type VerificationReview,
@@ -66,6 +68,14 @@ import { approveVerification, refuseVerification, revokeVerification } from './v
 // one found by mistake is cleared for its words as they are, and may then go on sale:
 //
 //   pnpm --filter @hatti/core trust-reports clear-listing prod_… --by Ayesha
+//
+// Owners of a trademark or copyright, or someone acting for them, complain of a store's listings
+// from its rights page (TNS-04, ADR-474), each due a decision within 48 hours. The list gives
+// whose right, who complains and their email, and the listings; one found wanting is dismissed,
+// and the complainant written to:
+//
+//   pnpm --filter @hatti/core trust-reports rights [--all]
+//   pnpm --filter @hatti/core trust-reports dismiss-rights ipc_… --by Ayesha --note "Its own label"
 
 const USAGE =
   'Usage: trust-reports list [--all]\n' +
@@ -84,7 +94,9 @@ const USAGE =
   '       trust-reports approve-sender <request> --by <who> [--note <note>]\n' +
   '       trust-reports refuse-sender <request> --by <who> --note <why, as the shop is told>\n' +
   '       trust-reports revoke-sender <shop> --by <who> --note <why, as the shop is told>\n' +
-  '       trust-reports clear-listing <product> --by <who>';
+  '       trust-reports clear-listing <product> --by <who>\n' +
+  '       trust-reports rights [--all]\n' +
+  '       trust-reports dismiss-rights <complaint> --by <who> --note <why>';
 
 function usage(problem?: string): never {
   if (problem) console.error(problem);
@@ -98,6 +110,8 @@ type Command =
   | { command: 'appeals'; all: boolean }
   | { command: 'verifications'; all: boolean }
   | { command: 'senders'; all: boolean }
+  | { command: 'rights'; all: boolean }
+  | { command: 'dismiss-rights'; id: string; complaint: string; by: string; note: string }
   | { command: 'approve-sender'; id: string; request: string; by: string; note: string }
   | { command: 'refuse-sender'; id: string; request: string; by: string; note: string }
   | { command: 'revoke-sender'; shop: string; by: string; note: string }
@@ -132,8 +146,34 @@ const verifications = new VerificationsService(
   createStorage(config, config.PUBLIC_URL ?? 'http://localhost:3000'),
 );
 const senders = new SmsSendersService(database);
+const rights = new RightsComplaintsService(database);
 try {
-  if (parsed.command === 'clear-listing') {
+  if (parsed.command === 'rights') {
+    const found = await rights.list({ all: parsed.all });
+    if (found.length === 0) {
+      console.log(parsed.all ? 'No rights complaint yet.' : 'No rights complaint is open.');
+    }
+    const now = Date.now();
+    for (const complaint of found) console.log(rightsLines(complaint, now));
+  } else if (parsed.command === 'dismiss-rights') {
+    const decided = await rights.decide(parsed.complaint, {
+      status: 'dismissed',
+      by: parsed.by,
+      note: parsed.note,
+    });
+    if (decided === 'not_found') {
+      console.error(`No rights complaint ${parsed.id}: see the list.`);
+      process.exitCode = 1;
+    } else if (decided === 'decided') {
+      console.error(`Rights complaint ${parsed.id} was decided already.`);
+      process.exitCode = 1;
+    } else {
+      console.log(
+        `${toPublicId('rightsComplaint', decided.id)} dismissed by ${decided.decidedBy}; ` +
+          `write to ${decided.complainant} at ${decided.email} with why.`,
+      );
+    }
+  } else if (parsed.command === 'clear-listing') {
     const cleared = await new ProductService(database).clearScreening(parsed.product);
     if (!cleared) {
       console.error(`No product ${parsed.id}: name it by its ID, as the shop's admin shows it.`);
@@ -321,6 +361,31 @@ try {
   await database.close();
 }
 
+/**
+ * A rights complaint on one line, tab-separated, overdue ones saying so first, then each listing
+ * it names on a line of its own.
+ */
+function rightsLines(complaint: RightsComplaintRecord, now: number): string {
+  const overdue = complaint.status === 'open' && complaint.dueAt.getTime() < now;
+  return [
+    [
+      toPublicId('rightsComplaint', complaint.id),
+      overdue ? 'OVERDUE' : complaint.status,
+      `due ${complaint.dueAt.toISOString()}`,
+      `${complaint.shopName} (${complaint.shopHandle})`,
+      complaint.kind,
+      complaint.rightsOwner + (complaint.registration ? ` [${complaint.registration}]` : ''),
+      `${complaint.complainant} (${complaint.actingAs}) <${complaint.email}>`,
+      complaint.phone ?? '-',
+      `signed ${complaint.signature}`,
+      complaint.details.replace(/\s+/g, ' '),
+    ].join('\t'),
+    ...complaint.listings.map(
+      (listing) => `\t${toPublicId('product', listing.id)}\t${listing.title}\t${listing.url}`,
+    ),
+  ].join('\n');
+}
+
 /** A report on one line, tab-separated: overdue ones say so first. */
 function line(report: ReportRecord, now: number): string {
   const overdue = report.status === 'open' && report.dueAt.getTime() < now;
@@ -411,7 +476,8 @@ function parseCommand(args: string[]): Command {
     command === 'takedowns' ||
     command === 'appeals' ||
     command === 'verifications' ||
-    command === 'senders'
+    command === 'senders' ||
+    command === 'rights'
   ) {
     if (id) throw new Error(`Unexpected: ${id}`);
     return { command, all: values.all ?? false };
@@ -428,7 +494,8 @@ function parseCommand(args: string[]): Command {
     command !== 'approve-sender' &&
     command !== 'refuse-sender' &&
     command !== 'revoke-sender' &&
-    command !== 'clear-listing'
+    command !== 'clear-listing' &&
+    command !== 'dismiss-rights'
   ) {
     throw new Error('Say what to do');
   }
@@ -441,13 +508,15 @@ function parseCommand(args: string[]): Command {
         ? 'Name the shop, by its handle'
         : command === 'clear-listing'
           ? "Name the product, by its ID as the shop's admin shows it"
-          : command === 'approve-sender' || command === 'refuse-sender'
-            ? 'Name the request, as the list of senders shows it'
-            : command === 'verify' || command === 'refuse-verification'
-              ? 'Name the verification, as the list of verifications shows it'
-              : command === 'refuse'
-                ? 'Name the appeal, as the list of appeals shows it'
-                : 'Name the report, as the list shows it',
+          : command === 'dismiss-rights'
+            ? 'Name the complaint, as the list of rights complaints shows it'
+            : command === 'approve-sender' || command === 'refuse-sender'
+              ? 'Name the request, as the list of senders shows it'
+              : command === 'verify' || command === 'refuse-verification'
+                ? 'Name the verification, as the list of verifications shows it'
+                : command === 'refuse'
+                  ? 'Name the appeal, as the list of appeals shows it'
+                  : 'Name the report, as the list shows it',
     );
   }
   const by = values.by?.trim();
@@ -478,6 +547,9 @@ function parseCommand(args: string[]): Command {
       throw new Error('Say what to take back, with --level: identity or business');
     }
     return { command, shop: id, level, by, note };
+  }
+  if (command === 'dismiss-rights') {
+    return { command, id, complaint: tryFromPublicId(id, 'rightsComplaint') ?? id, by, note };
   }
   if (command === 'refuse') {
     return { command, id, appeal: tryFromPublicId(id, 'storeAppeal') ?? id, by, note };

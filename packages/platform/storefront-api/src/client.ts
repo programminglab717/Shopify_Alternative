@@ -42,9 +42,11 @@ import {
 } from './search.js';
 import {
   reportsPath,
+  rightsComplaintsPath,
   type ReportErrorResponse,
   type ReportRequest,
   type ReportResponse,
+  type RightsComplaintRequest,
 } from './reports.js';
 import {
   signUpsPath,
@@ -285,6 +287,21 @@ export class StorefrontApiClient {
   /** A shopper's report of the store (ADR-460): its number, or what was wrong with it. */
   async report(shopId: string, request: ReportRequest): Promise<ReportResult> {
     const response = await this.#request('POST', reportsPath(shopId), null, request);
+    if (response.status === 422) {
+      return { ok: false, ...((await response.json()) as ReportErrorResponse) };
+    }
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return { ok: true, ...((await response.json()) as ReportResponse) };
+  }
+
+  /**
+   * A rights owner's complaint of listings on the store (TNS-04, ADR-474): its number, or what was
+   * wrong with it.
+   */
+  async complainOfRights(shopId: string, request: RightsComplaintRequest): Promise<ReportResult> {
+    const response = await this.#request('POST', rightsComplaintsPath(shopId), null, request);
     if (response.status === 422) {
       return { ok: false, ...((await response.json()) as ReportErrorResponse) };
     }

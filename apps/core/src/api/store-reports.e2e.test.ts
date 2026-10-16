@@ -5,7 +5,12 @@ import { PublicSite, type TenantContext } from '@hatti/api';
 import { fromPublicId, newId } from '@hatti/ids';
 import { MessagesService, MessagingSettingsService } from '@hatti/messaging/public';
 import { StorefrontApiClient } from '@hatti/storefront-api';
-import { AppealsService, ReportsService, TakedownsService } from '@hatti/trust/public';
+import {
+  AppealsService,
+  ReportsService,
+  RightsComplaintsService,
+  TakedownsService,
+} from '@hatti/trust/public';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -82,6 +87,54 @@ describe.skipIf(!server)("Reports of stores, from storefronts to Hatti's people 
       language: 'ur',
       status: 'open',
       openOfShop: 1,
+    });
+  });
+
+  it("takes a rights owner's complaint of the store's listings through the storefront API (ADR-474)", async () => {
+    const listing = {
+      id: newId(),
+      title: 'Lawn 3-pc (master copy)',
+      url: 'https://zari.hatti.test/products/lawn',
+    };
+    const complaint = {
+      kind: 'counterfeit',
+      rightsOwner: 'Gul Ahmed',
+      complainant: 'Sana Iqbal',
+      actingAs: 'agent',
+      email: 'legal@example.pk',
+      listings: [listing],
+      details: 'Sold as Gul Ahmed lawn; it is a copy.',
+      signature: 'Sana Iqbal',
+      sworn: true,
+      client: '203.0.113.9',
+      language: 'en' as const,
+    };
+    const taken = await client.complainOfRights(shopId, complaint);
+    if (!taken.ok) throw new Error(JSON.stringify(taken.errors));
+    expect(taken.id).toMatch(/^ipc_/);
+    expect(
+      await client.complainOfRights(shopId, { ...complaint, sworn: false, listings: [] }),
+    ).toEqual({
+      ok: false,
+      errors: [
+        { field: 'listings', message: "Name the store's listings by their addresses" },
+        { field: 'sworn', message: 'Swear the statement to send the complaint' },
+      ],
+    });
+    const plain = await app.inject({
+      method: 'POST',
+      url: `/storefront/shops/${shopId}/rights-complaints`,
+      payload: complaint,
+    });
+    expect(plain.statusCode).toBe(401);
+
+    const [open] = await new RightsComplaintsService(database).list();
+    expect(open).toMatchObject({
+      id: fromPublicId(taken.id, 'rightsComplaint'),
+      shopName: 'Zari',
+      rightsOwner: 'Gul Ahmed',
+      listings: [listing],
+      status: 'open',
     });
   });
 

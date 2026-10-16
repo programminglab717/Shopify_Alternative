@@ -49,7 +49,22 @@ export {
   type VerificationReview,
   type VerificationStatus,
 } from '../internal/verifications.service.js';
+export {
+  RIGHTS_ACTING_AS,
+  RIGHTS_KINDS,
+  RIGHTS_LIMITS,
+  RIGHTS_STATUSES,
+  RightsComplaintsService,
+  type RightsActingAs,
+  type RightsComplaintInput,
+  type RightsComplaintRecord,
+  type RightsDecided,
+  type RightsKind,
+  type RightsListing,
+  type RightsStatus,
+} from '../internal/rights.service.js';
 export { appealPage } from '../internal/appeal-page.js';
 export { AppealController } from '../internal/appeal.controller.js';
 export { ReportsController } from '../internal/reports.controller.js';
+export { RightsComplaintsController } from '../internal/rights.controller.js';
 export { TrustModule } from '../internal/trust.module.js';

@@ -70,10 +70,14 @@ export {
 } from './search.js';
 export {
   REPORT_REASON_VALUES,
+  RIGHTS_ACTING_AS_VALUES,
+  RIGHTS_KIND_VALUES,
   reportsPath,
+  rightsComplaintsPath,
   type ReportErrorResponse,
   type ReportRequest,
   type ReportResponse,
+  type RightsComplaintRequest,
 } from './reports.js';
 export {
   SIGN_UP_LIMITS,

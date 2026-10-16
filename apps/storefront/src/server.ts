@@ -69,7 +69,17 @@ import {
 } from './sitemap.js';
 import { LINK_TAP_PATH, linkKey, linkTargets, tapTarget } from './link-page.js';
 import { maintenancePage, retryAfterOf } from './maintenance.js';
-import { EMPTY_REPORT, reportPage, reportTakenPage, takenDownPage } from './report-page.js';
+import {
+  EMPTY_REPORT,
+  EMPTY_RIGHTS,
+  RIGHTS_LISTINGS_MAX,
+  listingAddresses,
+  reportPage,
+  reportTakenPage,
+  rightsPage,
+  rightsTakenPage,
+  takenDownPage,
+} from './report-page.js';
 import { VISIT_PATH, isRobot, sessionOf } from './sessions.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
 import {
@@ -197,6 +207,8 @@ const OPEN_ROUTES = new Set([
   // Reports of the store to Hatti (ADR-460), whatever the shop shows.
   '/report',
   '/ur/report',
+  '/report/rights',
+  '/ur/report/rights',
   '/robots.txt',
   '/assets/:version/:file',
   '/images/*',
@@ -222,6 +234,8 @@ const PAUSE_OPEN_ROUTES = new Set([
   '/checkouts/:token',
   '/report',
   '/ur/report',
+  '/report/rights',
+  '/ur/report/rights',
 ]);
 
 /** What a previewed page is: the shopper's own, never kept, and not for search engines. */
@@ -2054,6 +2068,113 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   };
   for (const path of ['/report', '/ur/report']) {
     app.route({ method: ['GET', 'POST'], url: path, handler: report });
+  }
+
+  /**
+   * A rights owner's complaint of the store's listings (TNS-04, ADR-474), from the report page:
+   * Hatti's page, naming the listings by their addresses on this store, which the storefront finds
+   * among its products, sent on to the core for Hatti's people, then the complaint's number.
+   */
+  const rights = async (request: FastifyRequest, reply: FastifyReply) => {
+    const found = await shopFor(request, reply);
+    if (!found) return notFound(reply, 'No shop answers at this address.');
+    reply.header('cache-control', 'private, no-store');
+    const urdu = request.url.startsWith('/ur/');
+    const send = (page: RenderedPage, status = 200) =>
+      reply
+        .code(status)
+        .header('content-security-policy', page.contentSecurityPolicy)
+        .header('x-content-type-options', 'nosniff')
+        .type('text/html; charset=utf-8')
+        .send(page.html);
+    try {
+      const shopName = (await found.store.shop()).name;
+      if (request.method !== 'POST') {
+        return await send(rightsPage(shopName, EMPTY_RIGHTS, [], { urdu }));
+      }
+      if (request.headers['sec-fetch-site'] === 'cross-site') {
+        return await reply
+          .code(403)
+          .type('text/plain; charset=utf-8')
+          .send('Complaints are made from the shop itself.\n');
+      }
+      if (limiter && !(await limiter.hit(REPORTS, request.ip)).allowed) {
+        return await reply
+          .code(429)
+          .type('text/plain; charset=utf-8')
+          .send('Too many complaints. Please wait a minute.\n');
+      }
+      if (!core) throw new StorefrontApiError(503, 'This storefront takes no complaints');
+      const params = paramsOf(request);
+      const text = (name: string) => (typeof params[name] === 'string' ? params[name] : '');
+      const form = {
+        kind: text('kind'),
+        rightsOwner: text('rightsOwner'),
+        registration: text('registration'),
+        complainant: text('complainant'),
+        actingAs: text('actingAs'),
+        email: text('email'),
+        phone: text('phone'),
+        listings: text('listings').slice(0, 10_000),
+        details: text('details'),
+        sworn: params.sworn !== undefined && params.sworn !== '',
+        signature: text('signature'),
+      };
+      const origin = await originOf(request, found);
+      const hosts = [hostName(request.headers.host ?? ''), hostName(new URL(origin).host)];
+      const addresses = listingAddresses(form.listings, hosts);
+      const listings: { id: string; title: string; url: string }[] = [];
+      let listingsWrong = addresses.wrong.length > 0 || addresses.found.length === 0;
+      if (addresses.found.length > RIGHTS_LISTINGS_MAX) listingsWrong = true;
+      else {
+        for (const address of addresses.found) {
+          const product = await found.store.productByHandle(address.handle);
+          if (!product) listingsWrong = true;
+          else if (!listings.some((each) => each.id === product.id)) {
+            listings.push({
+              id: product.id,
+              title: product.title,
+              url: `${origin}/products/${product.handle}`,
+            });
+          }
+        }
+      }
+      const result = listingsWrong
+        ? null
+        : await core.complainOfRights(found.shopId, {
+            kind: form.kind,
+            rightsOwner: form.rightsOwner,
+            ...(form.registration && { registration: form.registration }),
+            complainant: form.complainant,
+            actingAs: form.actingAs,
+            email: form.email,
+            ...(form.phone && { phone: form.phone }),
+            listings,
+            details: form.details,
+            signature: form.signature,
+            sworn: form.sworn,
+            client: request.ip,
+            language: urdu ? 'ur' : 'en',
+          });
+      if (!result || !result.ok) {
+        const errors = [
+          ...(listingsWrong ? [{ field: 'listings', message: 'Name listings on this store' }] : []),
+          ...(result && !result.ok ? result.errors : []),
+        ];
+        return await send(rightsPage(shopName, form, errors, { urdu }), 422);
+      }
+      return await send(rightsTakenPage(shopName, result.id, { back: urdu ? '/ur' : '/' }));
+    } catch (error) {
+      if (error instanceof StoreMissingError) return notFound(reply, 'This shop is not open yet.');
+      if (!unreachable(request, error)) throw error;
+      return reply
+        .code(503)
+        .type('text/plain; charset=utf-8')
+        .send('Hatti cannot be reached just now. Please try again in a minute.\n');
+    }
+  };
+  for (const path of ['/report/rights', '/ur/report/rights']) {
+    app.route({ method: ['GET', 'POST'], url: path, handler: rights });
   }
 
   /**

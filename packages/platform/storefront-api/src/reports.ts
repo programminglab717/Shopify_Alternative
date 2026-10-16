@@ -48,3 +48,42 @@ export interface ReportResponse {
 export interface ReportErrorResponse {
   errors: { field: string; message: string }[];
 }
+
+/**
+ * POST a {@link RightsComplaintRequest}: a rights owner's complaint of listings on the store
+ * (TNS-04, ADR-474), answered with a {@link ReportResponse} whose number is ipc_…; 422, with a
+ * {@link ReportErrorResponse}, says what was wrong with it.
+ */
+export function rightsComplaintsPath(shopId: string): string {
+  return `${STOREFRONT_API_PREFIX}shops/${shopId}/rights-complaints`;
+}
+
+/** The right a complaint says the listings infringe. */
+export const RIGHTS_KIND_VALUES = ['trademark', 'copyright', 'counterfeit'] as const;
+
+/** Whether the complainant owns the right or acts for its owner. */
+export const RIGHTS_ACTING_AS_VALUES = ['owner', 'agent'] as const;
+
+export interface RightsComplaintRequest {
+  /** One of {@link RIGHTS_KIND_VALUES}. */
+  kind: string;
+  /** Whose right: the brand's or the work's owner. */
+  rightsOwner: string;
+  /** Its registration number, if it has one. */
+  registration?: string;
+  complainant: string;
+  /** One of {@link RIGHTS_ACTING_AS_VALUES}. */
+  actingAs: string;
+  email: string;
+  phone?: string;
+  /** The store's listings it names, as the storefront found them by their addresses. */
+  listings: { id: string; title: string; url: string }[];
+  details: string;
+  /** The complainant's name, typed under the good-faith statement. */
+  signature: string;
+  /** That they swore the statement. */
+  sworn: boolean;
+  /** Their address, which the core keeps only as a hash with the shop's. */
+  client?: string;
+  language: 'en' | 'ur';
+}

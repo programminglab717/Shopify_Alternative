@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### Rights complaints
+
+* **Owners of a trademark or copyright complain of a store's listings from its rights page,
+  naming them by their addresses and swearing to it; Hatti's people decide within 48 hours**
+  ([ADR-474](../architecture/13-decision-log.md#adr-474--owners-of-a-trademark-or-copyright-complain-of-a-stores-listings-from-its-rights-page-naming-them-by-their-addresses-and-swearing-to-it-hattis-people-decide-within-48-hours), TNS-04 in part).
+* 2985 tests, 5 more: complaints taken and refused, listings found by
+  their addresses, the storefront API's path, and the queue's decisions.
+
 ### 377dc3b · Prohibited-items screening
 
 * **A product whose words name goods Hatti does not allow selling stays a draft: never on sale
