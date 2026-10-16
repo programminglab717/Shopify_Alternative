@@ -19,18 +19,37 @@ import {
   type WhatsAppTemplateRecord,
 } from './whatsapp-templates.service.js';
 
-/** The shop's automations' recipes (MKT-04, ADR-425, ADR-429, ADR-432). */
-export const AUTOMATION_KINDS = ['welcome', 'win_back', 'back_in_stock', 'cod_prepaid'] as const;
+/** The shop's automations' recipes (MKT-04, ADR-425, ADR-429, ADR-432, ADR-453). */
+export const AUTOMATION_KINDS = [
+  'welcome',
+  'win_back',
+  'back_in_stock',
+  'cod_prepaid',
+  'cashback',
+] as const;
 export type AutomationKind = (typeof AUTOMATION_KINDS)[number];
 
 /** Recipes that send Hatti's own template from its shared number, needing none of the shop's. */
-const HATTI_TEMPLATE_KINDS: readonly AutomationKind[] = ['back_in_stock', 'cod_prepaid'];
+const HATTI_TEMPLATE_KINDS: readonly AutomationKind[] = [
+  'back_in_stock',
+  'cod_prepaid',
+  'cashback',
+];
 
 /**
  * The store credit COD to prepaid offers for paying a confirmed order online (ADR-432), in
  * minor units: by default, and its bounds, Rs 10 to Rs 10,000.
  */
 export const COD_PREPAID_CREDIT = { default: 10_000n, min: 1_000n, max: 1_000_000n } as const;
+
+/**
+ * Cashback (PAY-13, ADR-453): the share of a delivered, paid order's goods given back in store
+ * credit, in whole percent, and how many days the credit lasts: by default, and their bounds.
+ */
+export const CASHBACK = {
+  percent: { default: 5, min: 1, max: 20 },
+  days: { default: 90, min: 7, max: 365 },
+} as const;
 
 /** How many days after a customer's last order a win-back goes: by default, and its bounds. */
 export const WIN_BACK_DAYS = { default: 60, min: 14, max: 365 } as const;
@@ -43,6 +62,13 @@ export const WIN_BACK_GRACE_DAYS = 7;
 
 /** The customers a round of the win-back sweep takes of one shop. */
 const WIN_BACK_BATCH = 500;
+
+/** The recipes Hatti sends, by name, for the words that refuse a template for them. */
+const HATTI_NAMES: Partial<Record<AutomationKind, string>> = {
+  back_in_stock: 'Back in stock',
+  cod_prepaid: 'COD to prepaid',
+  cashback: 'Cashback',
+};
 
 /** A customer an automation greets: their number and the name the shop has for them. */
 export interface AutomationCustomer {
@@ -64,6 +90,10 @@ export interface AutomationRecord {
   afterDays: number | null;
   /** For COD to prepaid: the store credit offered, in minor units. */
   creditAmount: bigint | null;
+  /** For cashback: the share of an order's goods given back, in whole percent. */
+  cashbackPercent: number | null;
+  /** For cashback: how many days the credit lasts. */
+  creditDays: number | null;
   /** When the shop last changed it; null for one never set. */
   updatedAt: Date | null;
 }
@@ -74,6 +104,10 @@ export interface AutomationInput {
   afterDays?: number | null;
   /** For COD to prepaid: the store credit offered, in the shop's currency's major units. */
   creditAmount?: string | null;
+  /** For cashback: the share of an order's goods given back, in whole percent. */
+  cashbackPercent?: number | null;
+  /** For cashback: how many days the credit lasts. */
+  creditDays?: number | null;
 }
 
 type AutomationRow = {
@@ -82,6 +116,8 @@ type AutomationRow = {
   template_id: string | null;
   after_days: number | null;
   credit_amount: string | null;
+  cashback_percent: number | null;
+  credit_days: number | null;
   updated_at: string | Date;
 };
 
@@ -120,6 +156,9 @@ export class AutomationsService {
               ? BigInt(row.credit_amount)
               : COD_PREPAID_CREDIT.default
             : null,
+        cashbackPercent:
+          kind === 'cashback' ? (row?.cashback_percent ?? CASHBACK.percent.default) : null,
+        creditDays: kind === 'cashback' ? (row?.credit_days ?? CASHBACK.days.default) : null,
         updatedAt: row ? toDate(row.updated_at) : null,
       };
     });
@@ -170,6 +209,35 @@ export class AutomationsService {
         }
       }
     }
+    const cashback = (
+      name: 'cashbackPercent' | 'creditDays',
+      bounds: { min: number; max: number },
+      words: string,
+      current: number | null,
+    ): number | null => {
+      const value = input[name];
+      if (value === undefined || value === null) return current;
+      if (kind !== 'cashback') {
+        check.addMessage(['input', name], 'INVALID', 'Only cashback gives a share back');
+      } else if (!Number.isInteger(value) || value < bounds.min || value > bounds.max) {
+        check.addMessage(['input', name], 'INVALID', words);
+      } else {
+        return value;
+      }
+      return current;
+    };
+    const cashbackPercent = cashback(
+      'cashbackPercent',
+      CASHBACK.percent,
+      `Give back between ${CASHBACK.percent.min}% and ${CASHBACK.percent.max}%`,
+      current.cashbackPercent,
+    );
+    const creditDays = cashback(
+      'creditDays',
+      CASHBACK.days,
+      `The credit lasts between ${CASHBACK.days.min} and ${CASHBACK.days.max} days`,
+      current.creditDays,
+    );
     if (!check.ok) return { ok: false, errors: check.errors };
 
     const hatti = HATTI_TEMPLATE_KINDS.includes(kind);
@@ -177,7 +245,7 @@ export class AutomationsService {
       return failOne(
         ['input', 'templateId'],
         'INVALID',
-        `${kind === 'cod_prepaid' ? 'COD to prepaid' : 'Back in stock'} is sent from Hatti's ` +
+        `${HATTI_NAMES[kind] ?? 'Back in stock'} is sent from Hatti's ` +
           "number, with no template of the shop's",
       );
     }
@@ -210,14 +278,17 @@ export class AutomationsService {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<AutomationRow>(sql`
         INSERT INTO messaging.automations
-               (shop_id, kind, enabled, template_id, after_days, credit_amount)
+               (shop_id, kind, enabled, template_id, after_days, credit_amount,
+                cashback_percent, credit_days)
         VALUES (${tenant.shopId}, ${kind}, ${enabled}, ${templateId}, ${afterDays},
-                ${creditAmount})
+                ${creditAmount}, ${cashbackPercent}, ${creditDays})
         ON CONFLICT (shop_id, kind) DO UPDATE
            SET enabled = EXCLUDED.enabled, template_id = EXCLUDED.template_id,
                after_days = EXCLUDED.after_days, credit_amount = EXCLUDED.credit_amount,
-               updated_at = now()
-        RETURNING kind, enabled, template_id, after_days, credit_amount, updated_at`);
+               cashback_percent = EXCLUDED.cashback_percent,
+               credit_days = EXCLUDED.credit_days, updated_at = now()
+        RETURNING kind, enabled, template_id, after_days, credit_amount, cashback_percent,
+                  credit_days, updated_at`);
       const row = rows[0]!;
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<MarketingAutomationUpdatedPayload>(tx, tenant.shopId, {
@@ -237,6 +308,7 @@ export class AutomationsService {
           template: template?.name ?? null,
           afterDays,
           creditAmount: creditAmount?.toString() ?? null,
+          ...(kind === 'cashback' && { cashbackPercent, creditDays }),
         },
       });
       return {
@@ -247,6 +319,8 @@ export class AutomationsService {
           template,
           afterDays: row.after_days,
           creditAmount: row.credit_amount === null ? null : BigInt(row.credit_amount),
+          cashbackPercent: row.cashback_percent,
+          creditDays: row.credit_days,
           updatedAt: toDate(row.updated_at),
         },
       };
@@ -370,7 +444,8 @@ export class AutomationsService {
 
 async function automationsIn(tx: Tx, shopId: string): Promise<AutomationRow[]> {
   const { rows } = await tx.execute<AutomationRow>(sql`
-    SELECT kind, enabled, template_id, after_days, credit_amount, updated_at
+    SELECT kind, enabled, template_id, after_days, credit_amount, cashback_percent, credit_days,
+           updated_at
       FROM messaging.automations WHERE shop_id = ${shopId}`);
   return rows;
 }
@@ -384,6 +459,26 @@ export async function codPrepaidCreditIn(tx: Tx, shopId: string): Promise<bigint
     (each) => each.kind === 'cod_prepaid' && each.enabled,
   );
   return row ? BigInt(row.credit_amount ?? COD_PREPAID_CREDIT.default) : null;
+}
+
+/**
+ * The shop's cashback, in the caller's transaction `tx`, while it is on (ADR-453): the share of a
+ * delivered, paid order's goods it gives back in store credit, and how many days the credit
+ * lasts; null while it is off.
+ */
+export async function cashbackIn(
+  tx: Tx,
+  shopId: string,
+): Promise<{ percent: number; days: number } | null> {
+  const row = (await automationsIn(tx, shopId)).find(
+    (each) => each.kind === 'cashback' && each.enabled,
+  );
+  return row
+    ? {
+        percent: row.cashback_percent ?? CASHBACK.percent.default,
+        days: row.credit_days ?? CASHBACK.days.default,
+      }
+    : null;
 }
 
 /** Whether the shop's automation of `kind` is on, in the caller's transaction `tx`. */

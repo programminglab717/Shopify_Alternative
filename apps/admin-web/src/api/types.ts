@@ -3334,7 +3334,8 @@ export interface WhatsAppTemplate {
 }
 
 /** One of the shop's automations' recipes (MKT-04, ADR-425). */
-export type MarketingAutomationKind = 'WELCOME' | 'WIN_BACK' | 'BACK_IN_STOCK' | 'COD_PREPAID';
+export type MarketingAutomationKind =
+  'WELCOME' | 'WIN_BACK' | 'BACK_IN_STOCK' | 'COD_PREPAID' | 'CASHBACK';
 
 /** A template as an automation names it. */
 export type AutomationTemplate = Pick<WhatsAppTemplate, 'id' | 'name' | 'language' | 'status'>;
@@ -3346,6 +3347,10 @@ export interface MarketingAutomation {
   afterDays: number | null;
   /** For COD to prepaid: the store credit it offers (ADR-432). */
   creditAmount: MoneyValue | null;
+  /** For cashback: the share of an order's goods given back (ADR-453); absent from a fake core. */
+  cashbackPercent?: number | null;
+  /** For cashback: how many days its store credit lasts; absent from a fake core. */
+  creditDays?: number | null;
   updatedAt: string | null;
   template: AutomationTemplate | null;
 }

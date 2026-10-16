@@ -564,7 +564,9 @@ export async function debitStoreCreditIn(
 /**
  * Credits a customer in the caller's transaction, for something the system gives them, as paying
  * a cash-on-delivery order online when offered credit for it (ADR-432): their account in the
- * currency opened if they have none. The transaction's ID, or why it can't be, under `field`.
+ * currency opened if they have none. Once by the ID a grant names, as cashback's (ADR-453): a
+ * credit with it already is left as it is. The transaction's ID, or why it can't be, under
+ * `field`.
  */
 export async function creditStoreCreditIn(
   tx: Tx,
@@ -573,6 +575,12 @@ export async function creditStoreCreditIn(
   field: string[],
   at: Date = new Date(),
 ): Promise<MutationResult<string>> {
+  if (grant.id) {
+    const { rows } = await tx.execute(sql`
+      SELECT 1 FROM customers.store_credit_transactions
+       WHERE shop_id = ${tenant.shopId} AND id = ${grant.id}`);
+    if (rows.length > 0) return { ok: true, value: grant.id };
+  }
   const account = await openAccount(tx, tenant.shopId, grant.customerId, grant.currency);
   if (!account) return failOne(field, 'NOT_FOUND', 'The customer has no account to credit');
   return creditIn(tx, tenant.shopId, tenant.actor, account, {

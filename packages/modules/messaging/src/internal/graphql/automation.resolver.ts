@@ -58,6 +58,8 @@ export class AutomationResolver {
       templateId,
       afterDays: input.afterDays,
       creditAmount: input.creditAmount,
+      cashbackPercent: input.cashbackPercent,
+      creditDays: input.creditDays,
     });
     return Object.assign(new MarketingAutomationUpdatePayload(), {
       marketingAutomation: result.ok ? toAutomation(result.value, tenant) : null,

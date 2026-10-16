@@ -137,6 +137,8 @@ export {
   AUTOMATION_KINDS,
   AutomationsService,
   automationOnIn,
+  CASHBACK,
+  cashbackIn,
   codPrepaidCreditIn,
   COD_PREPAID_CREDIT,
   WIN_BACK_DAYS,

@@ -90,6 +90,16 @@ function core(role: StaffRole, options: { templates?: unknown[]; broadcasts?: un
       creditAmount: { amount: '100.00', currencyCode: 'PKR' },
       updatedAt: null,
     },
+    {
+      kind: 'CASHBACK',
+      enabled: false,
+      template: null,
+      afterDays: null,
+      creditAmount: null,
+      cashbackPercent: 5,
+      creditDays: 90,
+      updatedAt: null,
+    },
   ];
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
@@ -164,11 +174,15 @@ function core(role: StaffRole, options: { templates?: unknown[]; broadcasts?: un
           templateId: string | null;
           afterDays?: number;
           creditAmount?: string;
+          cashbackPercent?: number;
+          creditDays?: number;
         };
         const chosen = (templates as { id: string; status: string }[]).find(
           (each) => each.id === input.templateId,
         );
-        const hatti = variables.kind === 'BACK_IN_STOCK' || variables.kind === 'COD_PREPAID';
+        const hatti = ['BACK_IN_STOCK', 'COD_PREPAID', 'CASHBACK'].includes(
+          variables.kind as string,
+        );
         if (input.enabled && !hatti && chosen?.status !== 'APPROVED') {
           return {
             marketingAutomationUpdate: {
@@ -192,6 +206,10 @@ function core(role: StaffRole, options: { templates?: unknown[]; broadcasts?: un
                 afterDays: input.afterDays ?? each.afterDays,
                 ...(input.creditAmount && {
                   creditAmount: { amount: `${input.creditAmount}.00`, currencyCode: 'PKR' },
+                }),
+                ...(input.cashbackPercent && {
+                  cashbackPercent: input.cashbackPercent,
+                  creditDays: input.creditDays,
                 }),
                 updatedAt: LATER,
               }
@@ -563,6 +581,50 @@ describe('Marketing: automations (MKT-04, ADR-428)', () => {
       expect(
         (within(again).getByLabelText('Store credit offered (Rs)') as HTMLInputElement).value,
       ).toBe('250');
+    });
+  });
+
+  it('turns cashback on with its share and days, checked first (ADR-453)', async () => {
+    const fake = core('owner', { templates: [] });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/marketing/automations');
+
+    const heading = { name: 'Cashback' };
+    const form = (await screen.findByRole('heading', heading)).closest('form')!;
+    expect(within(form).queryByLabelText('Template')).toBeNull();
+    expect(
+      within(form).getByText(/checkout spends once the customer proves their number/),
+    ).toBeTruthy();
+    const share = within(form).getByLabelText('Share given back (%)') as HTMLInputElement;
+    const days = within(form).getByLabelText('Days the credit lasts') as HTMLInputElement;
+    expect([share.value, days.value]).toEqual(['5', '90']);
+    // Past their bounds: said before anything is sent.
+    fireEvent.change(share, { target: { value: '25' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    expect(await within(form).findByText('Give back between 1% and 20%.')).toBeTruthy();
+    fireEvent.change(share, { target: { value: '3' } });
+    fireEvent.change(days, { target: { value: '3' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    expect(await within(form).findByText('The credit lasts between 7 and 365 days.')).toBeTruthy();
+    expect(fake.sent.some((each) => each.operation === 'MarketingAutomationUpdate')).toBe(false);
+
+    fireEvent.change(days, { target: { value: '30' } });
+    fireEvent.click(within(form).getByLabelText('Send it'));
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(
+        fake.sent.find((each) => each.operation === 'MarketingAutomationUpdate')?.variables,
+      ).toEqual({
+        kind: 'CASHBACK',
+        input: { enabled: true, cashbackPercent: 3, creditDays: 30 },
+      }),
+    );
+    await waitFor(() => {
+      const again = screen.getByRole('heading', heading).closest('form')!;
+      expect(within(again).getByText('On')).toBeTruthy();
+      expect(
+        (within(again).getByLabelText('Days the credit lasts') as HTMLInputElement).value,
+      ).toBe('30');
     });
   });
 });

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-452 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-453 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -460,6 +460,7 @@
 | 450 | The admin's gift cards page under Products issues cards, showing each code once to copy, finds them by the code's end, and adds to, takes from or deactivates them | Accepted |
 | 451 | A product can be sold as a gift card: once its order is paid in full, the worker issues a card for each unit at its price, given to the buyer, and sends each code on WhatsApp, kept nowhere once sent | Accepted |
 | 452 | A product's page in the admin sells it as a gift card with one box, saved at once, and themes read Shopify's product.gift_card? and a cart line's gift_card | Accepted |
+| 453 | Loyalty is cashback: a recipe of the shop's automations gives back a share of each delivered, paid order's goods in store credit, once, lasting the days it sets, which checkout spends | Accepted |
 
 ---
 
@@ -17273,3 +17274,40 @@
   * **The box on the form saved with the product's details:** a choice of what the product is,
     not what it says. Saved at once, as stock rules are, it is not lost with a form left
     unsaved.
+
+## ADR-453 · Loyalty is cashback: a recipe of the shop's automations gives back a share of each delivered, paid order's goods in store credit, once, lasting the days it sets, which checkout spends
+
+* **Context:**
+  * PAY-13 asks for loyalty at checkout alongside store credit and gift cards. Shopify leaves
+    loyalty to apps, which mostly keep points that buy a discount.
+  * Hatti already has store credit that checkout spends once the shopper proves their number
+    (ADR-186), and that WhatsApp tells them of (ADR-192). Pakistani shoppers know cashback,
+    from wallets and banks, better than points.
+* **Decision:**
+  * **Cashback** is a recipe of the shop's automations (ADR-425), beside COD to prepaid, set on
+    Marketing → Automations: on or off, the share given back, 1% to 20% (5% unless set), and
+    how many days the credit lasts, 7 to 365 (90 unless set). It sends no template of the
+    shop's (migration 0210).
+  * **Earning.** The worker hears an order paid and a parcel delivered, in whichever order they
+    come. Once the order is delivered or picked up, paid in full and not cancelled, its
+    customer is credited the share of what its goods came to after its discount, rounded down
+    to a whole rupee, lasting the recipe's days, noted "Cashback: 5% of order #N".
+  * **Once.** The credit's ID is made from the order's, and `creditStoreCreditIn` leaves a
+    credit already given with that ID as it is: an event heard twice, or both events, give it
+    once.
+  * **Spending and telling** are store credit's own: checkout offers it once the shopper proves
+    their number (ADR-186), the customer hears of it on WhatsApp with what they have in all
+    (ADR-192), and a week before it expires.
+* **Consequences:**
+  * A shop runs loyalty with two numbers and nothing to teach its customers: money back for
+    their next order.
+  * Cashback given stays given if the order is later refunded, returned or cancelled: staff take
+    it back by hand from the customer's store credit (ADR-184) for now.
+  * Not yet: cashback taken back with a refund, a return or a cancellation, gift card products
+    earning none, tiers, and points.
+* **Alternatives:**
+  * **Points that buy a discount:** another balance to explain, and another ledger, for the
+    same money back.
+  * **A discount code for the next order:** it is shared and leaks; store credit is the
+    customer's own number's.
+  * **Cashback at once, on placing:** a cash-on-delivery order may never be delivered or paid.

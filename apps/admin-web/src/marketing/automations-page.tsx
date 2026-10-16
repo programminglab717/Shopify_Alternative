@@ -24,9 +24,13 @@ import { BackToMarketing, NoNumberHint } from './templates-page';
 
 /**
  * Recipes that send Hatti's own template from its number, choosing none of the shop's (ADR-429,
- * ADR-432).
+ * ADR-432, ADR-453).
  */
-const FROM_HATTI: readonly MarketingAutomationKind[] = ['BACK_IN_STOCK', 'COD_PREPAID'];
+const FROM_HATTI: readonly MarketingAutomationKind[] = ['BACK_IN_STOCK', 'COD_PREPAID', 'CASHBACK'];
+
+/** Cashback's share of the goods given back, and the days its credit lasts (ADR-453). */
+const CASHBACK_PERCENT = { min: 1, max: 20 } as const;
+const CASHBACK_DAYS = { min: 7, max: 365 } as const;
 
 /** The store credit COD to prepaid may offer, in rupees (ADR-432), and as the page says them. */
 const CREDIT_RUPEES = { min: 10, max: 10_000 } as const;
@@ -66,16 +70,21 @@ function Recipe({
         templateId?: string | null;
         afterDays?: number | null;
         creditAmount?: string;
+        cashbackPercent?: number;
+        creditDays?: number;
       };
     }
   >(MarketingAutomationUpdateMutation);
   const winBack = automation.kind === 'WIN_BACK';
   const prepaid = automation.kind === 'COD_PREPAID';
+  const cashback = automation.kind === 'CASHBACK';
   const hatti = FROM_HATTI.includes(automation.kind);
   const [enabled, setEnabled] = useState(automation.enabled);
   const [templateId, setTemplateId] = useState(automation.template?.id ?? '');
   const [days, setDays] = useState(String(automation.afterDays ?? ''));
   const [credit, setCredit] = useState(rupeesOf(automation.creditAmount?.amount));
+  const [percent, setPercent] = useState(String(automation.cashbackPercent ?? ''));
+  const [creditDays, setCreditDays] = useState(String(automation.creditDays ?? ''));
   const [problem, setProblem] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   // The approved templates, and the one chosen whatever Meta made of it since.
@@ -86,7 +95,10 @@ function Recipe({
     enabled !== automation.enabled ||
     templateId !== (automation.template?.id ?? '') ||
     (winBack && days.trim() !== String(automation.afterDays ?? '')) ||
-    (prepaid && credit.trim() !== rupeesOf(automation.creditAmount?.amount));
+    (prepaid && credit.trim() !== rupeesOf(automation.creditAmount?.amount)) ||
+    (cashback &&
+      (percent.trim() !== String(automation.cashbackPercent ?? '') ||
+        creditDays.trim() !== String(automation.creditDays ?? '')));
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -118,6 +130,22 @@ function Recipe({
         return;
       }
     }
+    const within = (text: string, bounds: { min: number; max: number }) => {
+      const value = parseWhole(text);
+      return value !== null && !Number.isNaN(value) && value >= bounds.min && value <= bounds.max
+        ? value
+        : null;
+    };
+    const share = cashback ? within(percent, CASHBACK_PERCENT) : null;
+    const lasts = cashback ? within(creditDays, CASHBACK_DAYS) : null;
+    if (cashback && share === null) {
+      setProblem(t('automations.badPercent', CASHBACK_PERCENT));
+      return;
+    }
+    if (cashback && lasts === null) {
+      setProblem(t('automations.badCreditDays', CASHBACK_DAYS));
+      return;
+    }
     try {
       const { marketingAutomationUpdate } = await update.mutateAsync({
         kind: automation.kind,
@@ -126,6 +154,7 @@ function Recipe({
           ...(!hatti && { templateId: templateId || null }),
           ...(winBack && { afterDays }),
           ...(prepaid && { creditAmount: credit.trim() }),
+          ...(cashback && { cashbackPercent: share!, creditDays: lasts! }),
         },
       });
       const error = marketingAutomationUpdate.userErrors[0];
@@ -157,7 +186,13 @@ function Recipe({
         </div>
         {hatti ? (
           <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-            {t(prepaid ? 'automations.codPrepaidFromHatti' : 'automations.fromHatti')}
+            {t(
+              prepaid
+                ? 'automations.codPrepaidFromHatti'
+                : cashback
+                  ? 'automations.cashbackFromHatti'
+                  : 'automations.fromHatti',
+            )}
           </p>
         ) : (
           <SelectField<string>
@@ -193,6 +228,26 @@ function Recipe({
             onChange={(event) => setCredit(event.target.value)}
           />
         )}
+        {cashback && (
+          <>
+            <TextField
+              label={t('automations.percent')}
+              hint={t('automations.percentHint', CASHBACK_PERCENT)}
+              inputMode="numeric"
+              ltr
+              value={percent}
+              onChange={(event) => setPercent(event.target.value)}
+            />
+            <TextField
+              label={t('automations.creditDays')}
+              hint={t('automations.creditDaysHint', CASHBACK_DAYS)}
+              inputMode="numeric"
+              ltr
+              value={creditDays}
+              onChange={(event) => setCreditDays(event.target.value)}
+            />
+          </>
+        )}
         <CheckField label={t('automations.on')} checked={enabled} onChange={setEnabled} />
         {problem && <Alert tone="danger">{problem}</Alert>}
         {saved && !changed && <Alert tone="success">{t('automations.saved')}</Alert>}
@@ -216,7 +271,8 @@ function Recipe({
  * the shop's approved templates from its own number once turned on; back in stock, which tells
  * shoppers who asked when a sold-out variant sells again, from Hatti's number (ADR-430); and COD
  * to prepaid, which offers the store credit the shop sets for paying a confirmed cash-on-delivery
- * order online, from Hatti's number too (ADR-433).
+ * order online, from Hatti's number too (ADR-433); and cashback, which gives back a share of a
+ * delivered, paid order in store credit (ADR-453).
  */
 export function AutomationsPage() {
   const { t } = useLocale();

@@ -9,7 +9,12 @@ import { newId } from '@hatti/ids';
 import { sql } from 'drizzle-orm';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AutomationsService, automationOnIn, codPrepaidCreditIn } from './automations.service.js';
+import {
+  AutomationsService,
+  automationOnIn,
+  cashbackIn,
+  codPrepaidCreditIn,
+} from './automations.service.js';
 import { MessagesService } from './messages.service.js';
 import { FakeGraph, NUMBER, WABA } from './test-support.js';
 import { WhatsAppAccountsService } from './whatsapp-accounts.service.js';
@@ -166,6 +171,8 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
         template: null,
         afterDays: null,
         creditAmount: null,
+        cashbackPercent: null,
+        creditDays: null,
         updatedAt: null,
       },
       {
@@ -174,6 +181,8 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
         template: null,
         afterDays: 60,
         creditAmount: null,
+        cashbackPercent: null,
+        creditDays: null,
         updatedAt: null,
       },
       {
@@ -182,6 +191,8 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
         template: null,
         afterDays: null,
         creditAmount: null,
+        cashbackPercent: null,
+        creditDays: null,
         updatedAt: null,
       },
       {
@@ -190,6 +201,18 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
         template: null,
         afterDays: null,
         creditAmount: 100_00n,
+        cashbackPercent: null,
+        creditDays: null,
+        updatedAt: null,
+      },
+      {
+        kind: 'cashback',
+        enabled: false,
+        template: null,
+        afterDays: null,
+        creditAmount: null,
+        cashbackPercent: 5,
+        creditDays: 90,
         updatedAt: null,
       },
     ]);
@@ -287,6 +310,49 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
     expect(unwrap(await automations.update(a, 'cod_prepaid', { enabled: true })).creditAmount).toBe(
       250_00n,
     );
+  });
+
+  it("gives back a share of delivered orders in store credit, as the shop sets, from Hatti's number (ADR-453)", async () => {
+    const code = async (result: Promise<MutationResult<unknown>>) => {
+      const done = await result;
+      return done.ok ? 'ok' : `${done.errors[0]!.code}: ${done.errors[0]!.message}`;
+    };
+    const cashback = () => db.tenant(a.shopId, (tx) => cashbackIn(tx, a.shopId));
+    expect(await cashback()).toBeNull();
+    expect(await code(automations.update(a, 'cashback', { templateId: approved }))).toBe(
+      "INVALID: Cashback is sent from Hatti's number, with no template of the shop's",
+    );
+    expect(await code(automations.update(a, 'welcome', { cashbackPercent: 5 }))).toBe(
+      'INVALID: Only cashback gives a share back',
+    );
+    for (const cashbackPercent of [0, 21, 2.5]) {
+      expect(await code(automations.update(a, 'cashback', { cashbackPercent }))).toBe(
+        'INVALID: Give back between 1% and 20%',
+      );
+    }
+    for (const creditDays of [6, 366]) {
+      expect(await code(automations.update(a, 'cashback', { creditDays }))).toBe(
+        'INVALID: The credit lasts between 7 and 365 days',
+      );
+    }
+    // On with 5% for 90 days unless the shop says otherwise.
+    expect(unwrap(await automations.update(a, 'cashback', { enabled: true }))).toMatchObject({
+      kind: 'cashback',
+      enabled: true,
+      template: null,
+      cashbackPercent: 5,
+      creditDays: 90,
+    });
+    expect(await cashback()).toEqual({ percent: 5, days: 90 });
+    unwrap(await automations.update(a, 'cashback', { cashbackPercent: 3, creditDays: 30 }));
+    expect(await cashback()).toEqual({ percent: 3, days: 30 });
+    // Off, it gives nothing; on again, as much as before.
+    unwrap(await automations.update(a, 'cashback', { enabled: false }));
+    expect(await cashback()).toBeNull();
+    expect(unwrap(await automations.update(a, 'cashback', { enabled: true }))).toMatchObject({
+      cashbackPercent: 3,
+      creditDays: 30,
+    });
   });
 
   it('welcomes a customer who subscribed once, from the shop number with its template', async () => {

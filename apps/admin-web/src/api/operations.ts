@@ -7668,6 +7668,8 @@ const MARKETING_AUTOMATION = /* GraphQL */ `
       amount
       currencyCode
     }
+    cashbackPercent
+    creditDays
     updatedAt
     template {
       id

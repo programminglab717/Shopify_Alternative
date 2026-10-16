@@ -15,6 +15,7 @@ export enum MarketingAutomationKind {
   WIN_BACK = 'WIN_BACK',
   BACK_IN_STOCK = 'BACK_IN_STOCK',
   COD_PREPAID = 'COD_PREPAID',
+  CASHBACK = 'CASHBACK',
 }
 
 registerEnumType(MarketingAutomationKind, {
@@ -42,6 +43,12 @@ registerEnumType(MarketingAutomationKind, {
         'Once, when a cash-on-delivery order is confirmed: store credit offered for paying the ' +
         "rest online before it is packed, from Hatti's number with the order's link, needing no " +
         "template of the shop's (ADR-432).",
+    },
+    CASHBACK: {
+      description:
+        'Once an order is delivered and paid in full: a share of its goods given back in store ' +
+        "credit, which its customer spends at checkout and hears of on WhatsApp from Hatti's " +
+        "number, needing no template of the shop's (PAY-13, ADR-453).",
     },
   },
 });
@@ -76,6 +83,18 @@ export class MarketingAutomation {
   })
   creditAmount!: Money | null;
 
+  @Field(() => Int, {
+    nullable: true,
+    description: "For cashback: the share of an order's goods given back, in whole percent.",
+  })
+  cashbackPercent!: number | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'For cashback: how many days the store credit given lasts.',
+  })
+  creditDays!: number | null;
+
   @Field(() => GraphQLISODateTime, {
     nullable: true,
     description: 'When the shop last changed it; null for one never set.',
@@ -102,6 +121,18 @@ export class MarketingAutomationInput {
     description: 'For COD to prepaid: Rs 10 to Rs 10,000 of store credit, as "100".',
   })
   creditAmount?: string | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: "For cashback: 1 to 20 percent of an order's goods given back.",
+  })
+  cashbackPercent?: number | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'For cashback: the store credit given lasts 7 to 365 days.',
+  })
+  creditDays?: number | null;
 }
 
 @ObjectType()

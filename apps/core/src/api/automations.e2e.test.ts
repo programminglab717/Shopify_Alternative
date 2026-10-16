@@ -159,6 +159,7 @@ describe.skipIf(!server)('Admin GraphQL API: marketing automations (MKT-04, ADR-
         creditAmount: { formatted: 'Rs 100' },
         template: null,
       },
+      { kind: 'CASHBACK', enabled: false, afterDays: null, creditAmount: null, template: null },
     ]);
 
     const update = `mutation ($kind: MarketingAutomationKind!, $input: MarketingAutomationInput!) {
@@ -196,5 +197,28 @@ describe.skipIf(!server)('Admin GraphQL API: marketing automations (MKT-04, ADR-
       userErrors: [],
     });
     expect((await data(tokens.reader, list))[1]).toMatchObject({ kind: 'WIN_BACK', enabled: true });
+
+    // Cashback: a share of delivered orders in store credit, from Hatti's number (ADR-453).
+    expect(
+      await data(
+        tokens.owner,
+        `mutation ($input: MarketingAutomationInput!) {
+          marketingAutomationUpdate(kind: CASHBACK, input: $input) {
+            marketingAutomation { kind enabled cashbackPercent creditDays template { name } }
+            userErrors { field code message }
+          }
+        }`,
+        { input: { enabled: true, cashbackPercent: 3, creditDays: 30 } },
+      ),
+    ).toEqual({
+      marketingAutomation: {
+        kind: 'CASHBACK',
+        enabled: true,
+        cashbackPercent: 3,
+        creditDays: 30,
+        template: null,
+      },
+      userErrors: [],
+    });
   });
 });

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
+### Cashback
+
+* **Loyalty as cashback: a recipe gives back a share of each delivered, paid order in store
+  credit, once, lasting the days the shop sets, which checkout spends** ([ADR-453](../architecture/13-decision-log.md#adr-453--loyalty-is-cashback-a-recipe-of-the-shops-automations-gives-back-a-share-of-each-delivered-paid-orders-goods-in-store-credit-once-lasting-the-days-it-sets-which-checkout-spends), PAY-13).
+* 2922 tests, from 2917: the worker's three, the recipe's own and the admin's
+  card.
+
 ### fe90ef7 · Gift card products in the admin and themes
 
 * **A product's page sells it as a gift card with one box, saved at once; themes read
