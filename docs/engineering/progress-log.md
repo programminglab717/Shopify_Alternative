@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Shops verified by Hatti
+### c66094a · Shops verified by Hatti
 
 * **Hatti verifies a shop's owner by their CNIC, then its business by its NTN, from photos its
   owner sends; Hatti's people decide, the photos are deleted once they do, and the storefront's
