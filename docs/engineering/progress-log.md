@@ -6,14 +6,28 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the admin's page for automations
-under Marketing (MKT-04), then the other recipes: back in stock and the COD→prepaid nudge. Urdu
-handles wait, as decided.
+**Next, section by section as the alpha's shops need them**: the offer of a code in the admin's
+abandoned checkouts page (CHK-12), then the admin's page for automations under Marketing
+(MKT-04), then the other recipes: back in stock and the COD→prepaid nudge. Urdu handles wait,
+as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
+
+## 2026-10-16
+
+### An offer after the checkout reminder
+
+* **A second message** ([ADR-426](../architecture/13-decision-log.md#adr-426--shoppers-reminded-of-a-checkout-who-still-have-not-ordered-are-offered-one-of-the-shops-own-discount-codes-some-hours-after-its-link-applying-the-code-to-their-items), CHK-12) goes to shoppers reminded of a checkout who still have
+  not ordered: one of the shop's own discount codes, 12, 24 or 48 hours after the reminder.
+* **Its link** opens their items with the code already applied.
+* It goes once a checkout, never to a number that has ordered since, and only while the code
+  applies to the items left.
+* It is set through the Admin API; choosing it in the admin's abandoned checkouts page is
+  next.
+* 2827 tests, from 2824: two for checkout, one for the core.
 
 ## 2026-10-13
 

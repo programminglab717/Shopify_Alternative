@@ -9,11 +9,20 @@ export const REMINDER_LINK_PATH = 'r';
 export const REMINDER_DELAYS = [30, 60, 180, 600] as const;
 export type ReminderDelay = (typeof REMINDER_DELAYS)[number];
 
+/**
+ * The hours after the reminder a shop may offer one of its discount codes to shoppers who still
+ * have not ordered (ADR-426).
+ */
+export const OFFER_DELAYS = [12, 24, 48] as const;
+export type OfferDelay = (typeof OFFER_DELAYS)[number];
+
 export const ABANDONED = {
   /** How long a checkout with a number is kept for the shop to see, past its page's day. */
   keptDays: 30,
   /** Shoppers who left longer ago than this are not reminded, as when the shop turns it on. */
   remindWithinHours: 24,
+  /** Nor offered a code longer than this after the offer was due, as when the shop sets one. */
+  offerWithinHours: 24,
   /** An order the same number places this long after leaving recovers the checkout. */
   recoveredWithinDays: 7,
 } as const;
@@ -40,7 +49,12 @@ export function contactLinesOf(cart: Pick<CartJson, 'items'>): ContactLineValue[
  * The storefront's cart permalink for the items (CH-07): `/cart/{variant}:{quantity},…`, which
  * fills a cart with them and opens its checkout; the storefront's home with none.
  */
-export function permalinkOf(lines: readonly ContactLineValue[]): string {
+export function permalinkOf(
+  lines: readonly ContactLineValue[],
+  discount: string | null = null,
+): string {
   if (lines.length === 0) return '/';
-  return `/cart/${lines.map((line) => `${line.variantId}:${line.quantity}`).join(',')}`;
+  const items = lines.map((line) => `${line.variantId}:${line.quantity}`).join(',');
+  // An offer's code, applied to the cart the link fills (ADR-426).
+  return `/cart/${items}${discount ? `?discount=${encodeURIComponent(discount)}` : ''}`;
 }

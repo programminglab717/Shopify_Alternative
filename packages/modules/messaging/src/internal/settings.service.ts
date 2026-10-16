@@ -96,7 +96,7 @@ export class MessagingSettingsService {
       }
       if ((ALWAYS_SENT as readonly string[]).includes(kind)) {
         const why =
-          kind === 'checkout_reminder'
+          kind === 'checkout_reminder' || kind === 'checkout_offer'
             ? "checkout's recovery setting turns it on and off"
             : kind === 'review_request'
               ? 'the reviews setting turns it on and off'

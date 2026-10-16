@@ -220,6 +220,19 @@ export async function discountCodeIn(
   return row ? toRecord(row) : null;
 }
 
+/** The shop's code of that ID, in the caller's transaction `tx`; null for one deleted. */
+export async function discountCodeByIdIn(
+  tx: Tx,
+  shopId: string,
+  id: string,
+): Promise<DiscountCodeRecord | null> {
+  const [row] = await tx
+    .select()
+    .from(discountCodes)
+    .where(and(eq(discountCodes.shopId, shopId), eq(discountCodes.id, id)));
+  return row ? toRecord(row) : null;
+}
+
 function taken(code: string): MutationResult<DiscountCodeRecord> {
   return failOne(
     ['code'],

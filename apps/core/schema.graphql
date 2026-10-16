@@ -13,6 +13,12 @@ type AbandonedCheckout {
   """The name they typed, if any."""
   name: String
 
+  """The code they were offered, as it was named then."""
+  offerCode: String
+
+  """When they were offered a discount code after the reminder (ADR-426)."""
+  offeredAt: DateTime
+
   """
   The number they typed, in E.164; masked like "0300 ••••567" for roles that see customers' numbers masked.
   """
@@ -1234,9 +1240,17 @@ type CheckoutMarketingChannelsUpdatePayload {
 }
 
 """
-Whether, and how long after they leave, the shop reminds shoppers who typed their number at checkout, once, on WhatsApp, with a link back to their items (ADR-393).
+Whether, and how long after they leave, the shop reminds shoppers who typed their number at checkout, once, on WhatsApp, with a link back to their items (ADR-393); and the discount code it offers those who still have not ordered, some hours after (ADR-426).
 """
 type CheckoutRecoverySettings {
+  """How many hours after the reminder: 12, 24 or 48; null with no offer."""
+  offerAfterHours: Int
+
+  """
+  The shop's code offered after the reminder, a percentage or an amount off, applied to the cart its link opens; null for none, as when the code chosen was deleted.
+  """
+  offerDiscountCode: DiscountCode
+
   """30, 60, 180 or 600 minutes; null for never, as until the shop chooses."""
   reminderAfterMinutes: Int
 }
@@ -5785,6 +5799,11 @@ enum MessageKind {
   BROADCAST
 
   """
+  A shopper reminded of a checkout they left, still without ordering, offered one of the shop's discount codes with the link back to the items, the code applied (CHK-12, ADR-426): sent as the shop's checkout recovery setting says, not here.
+  """
+  CHECKOUT_OFFER
+
+  """
   A shopper who typed their number at checkout and left without ordering, reminded once with a link back to the items (CHK-12, ADR-393): sent as the shop's checkout recovery setting says, which turns it on and off, not here.
   """
   CHECKOUT_REMINDER
@@ -6187,9 +6206,9 @@ type Mutation {
   checkoutMarketingChannelsUpdate(channels: [MarketingChannel!]!): CheckoutMarketingChannelsUpdatePayload!
 
   """
-  Sets how long after a shopper leaves checkout, having typed their number, they are reminded once on WhatsApp, of 30, 60, 180 or 600 minutes; null for never. Each reminder is a marketing message, charged to the shop as its messages are.
+  Sets how long after a shopper leaves checkout, having typed their number, they are reminded once on WhatsApp, of 30, 60, 180 or 600 minutes; null for never. And which of the shop's discount codes, a percentage or an amount off, those still not ordering are offered 12, 24 or 48 hours after the reminder (ADR-426): left out, the offer stays as it is; null for none. No offer goes without the reminder. Each reminder and offer is a marketing message, charged to the shop as its messages are.
   """
-  checkoutRecoverySettingsUpdate(reminderAfterMinutes: Int): CheckoutRecoverySettingsUpdatePayload!
+  checkoutRecoverySettingsUpdate(offerAfterHours: Int, offerDiscountCodeId: ID, reminderAfterMinutes: Int): CheckoutRecoverySettingsUpdatePayload!
 
   """
   Replaces the badges the checkout's page shows, in the order given: up to 4, each once. WHATSAPP needs the shop's WhatsApp number, from the online store's preferences.
@@ -10238,7 +10257,7 @@ type Query {
   checkoutMarketingChannels: [MarketingChannel!]!
 
   """
-  Whether, and how long after they leave, the shop reminds shoppers (ADR-393).
+  Whether, and how long after they leave, the shop reminds shoppers (ADR-393), and the code it offers them after (ADR-426).
   """
   checkoutRecoverySettings: CheckoutRecoverySettings!
 

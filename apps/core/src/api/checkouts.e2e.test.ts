@@ -3,7 +3,7 @@ import { PublicSite, StorefrontSite, generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { AbandonedCheckoutService } from '@hatti/checkout/public';
 import { Database } from '@hatti/db';
-import { fromPublicId, newId } from '@hatti/ids';
+import { fromPublicId, newId, toPublicId } from '@hatti/ids';
 import { MessagesService } from '@hatti/messaging/public';
 import { OrderService } from '@hatti/orders/public';
 import {
@@ -396,7 +396,6 @@ describe.skipIf(!server)('Checkouts', () => {
       app.get(PublicSite),
     );
     expect(await abandoned.remindDue(new Date(Date.now() + 61 * 60_000))).toBe(1);
-    await database.close();
     const { rows } = await admin.query<{ url: string; handle: string }>(
       `SELECT m.variables ->> 'url' AS url, s.handle
          FROM messaging.messages m JOIN control.shops s ON s.id = m.shop_id
@@ -409,7 +408,58 @@ describe.skipIf(!server)('Checkouts', () => {
       new RegExp(`^https?://${rows[0]!.handle}\\.[^/]+/cart/${kurta}:2$`),
     );
     expect((await app.inject({ method: 'GET', url: '/r/' + 'x'.repeat(22) })).statusCode).toBe(404);
-    await admin.query(`DELETE FROM checkout.recovery_settings; DELETE FROM messaging.messages`);
+
+    // And offers one of its codes a day after the reminder (ADR-426), its link applying it.
+    const codeId = newId();
+    await admin.query(
+      `INSERT INTO pricing.discount_codes (shop_id, id, code, title, kind, percentage_bps)
+       VALUES ($1, $2, 'BACK10', 'BACK10', 'percentage', 1000)`,
+      [shopA, codeId],
+    );
+    const OFFER = `mutation ($code: ID, $hours: Int) {
+      checkoutRecoverySettingsUpdate(
+        reminderAfterMinutes: 60, offerDiscountCodeId: $code, offerAfterHours: $hours
+      ) {
+        checkoutRecoverySettings {
+          reminderAfterMinutes offerDiscountCode { code percentage } offerAfterHours
+        }
+        userErrors { field code }
+      }
+    }`;
+    const code = toPublicId('discountCode', codeId);
+    expect((await gql(settings, OFFER, { code, hours: 24 })).json().data).toEqual({
+      checkoutRecoverySettingsUpdate: {
+        checkoutRecoverySettings: {
+          reminderAfterMinutes: 60,
+          offerDiscountCode: { code: 'BACK10', percentage: 10 },
+          offerAfterHours: 24,
+        },
+        userErrors: [],
+      },
+    });
+    expect((await gql(settings, OFFER, { code: 'nope', hours: 24 })).json().errors[0].message).toBe(
+      'Invalid discountCode id: nope',
+    );
+    expect(await abandoned.offerDue(new Date(Date.now() + 26 * 3_600_000))).toBe(1);
+    await database.close();
+    const offered = await admin.query<{ url: string }>(
+      `SELECT variables ->> 'url' AS url FROM messaging.messages WHERE kind = 'checkout_offer'`,
+    );
+    const offerLink = await app.inject({
+      method: 'GET',
+      url: new URL(offered.rows[0]!.url).pathname,
+    });
+    expect(offerLink.headers.location).toMatch(
+      new RegExp(`^https?://${rows[0]!.handle}\\.[^/]+/cart/${kurta}:2\\?discount=BACK10$`),
+    );
+    const [listed] = (
+      await gql(adminToken, '{ abandonedCheckouts { offeredAt offerCode } }')
+    ).json().data.abandonedCheckouts;
+    expect(listed).toEqual({ offeredAt: expect.any(String), offerCode: 'BACK10' });
+    await admin.query(
+      `DELETE FROM checkout.recovery_settings; DELETE FROM messaging.messages;
+       DELETE FROM pricing.discount_codes WHERE code = 'BACK10'`,
+    );
   });
 
   it('keeps what the shopper agreed to with the order, which the Admin API shows as it was', async () => {

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-425 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-426 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -433,6 +433,7 @@
 | 423 | The admin connects the shop's own WhatsApp number in its settings through Meta's Embedded Signup, in Facebook's window, and the core trades the code it gives | Accepted |
 | 424 | Marketing in the admin: broadcasts estimated and scheduled, and the shop's own templates written for Meta, for the owner, managers and marketers | Accepted |
 | 425 | Automations send the shop's own approved template from its own number: a welcome once a customer subscribes, and a win-back some days after their last order | Accepted |
+| 426 | Shoppers reminded of a checkout who still have not ordered are offered one of the shop's own discount codes some hours after, its link applying the code to their items | Accepted |
 
 ---
 
@@ -16359,3 +16360,52 @@
     alpha's shops.
   * **Welcoming every subscription, whatever its source**: an import of a thousand subscribed
     customers would send a thousand welcomes at once.
+
+## ADR-426 · Shoppers reminded of a checkout who still have not ordered are offered one of the shop's own discount codes some hours after, its link applying the code to their items
+
+* **Context:**
+  * CHK-12 reminds a shopper who left a checkout once, on WhatsApp (ADR-393). Its design
+    (05 §9) also has a second message with an offer, about a day later, for those who still
+    have not ordered.
+  * Discount codes (ADR-062) take a percentage or an amount off, or give free delivery. They
+    carry no condition on how the order is paid; the discount for paying online is
+    checkout's own (ADR-244).
+  * A shop keeps at most 10,000 codes, and staff see them all in one list.
+  * The cart permalink takes `?discount=CODE` and applies it (CH-07).
+* **Decision:**
+  * **The shop chooses one of its own codes** to offer, a percentage or an amount off, not free
+    delivery, and **12, 24 or 48 hours** after the reminder (24 when not said). There is no
+    offer without the reminder: turning the reminder off takes the offer with it.
+    * `checkout.recovery_settings` keeps the code's ID and the hours. A code deleted since
+      offers nothing until another is chosen.
+    * `checkoutRecoverySettingsUpdate` takes `offerDiscountCodeId` and `offerAfterHours`.
+      Left out, the offer stays as it is, so the admin's existing form keeps it. Null removes
+      it. `recovery_settings.updated` carries the code and the hours.
+  * **The worker's sweep** offers the code, once a checkout, to shoppers reminded that many
+    hours ago, within the day after, who have not ordered or completed it since.
+    * An order the number placed meanwhile recovers the checkout instead, as for the reminder.
+    * Nothing goes while the code would not apply to the items left: before its start, after
+      its end, its uses run out, or the items below its minimum. Within the day, a later sweep
+      may still send it.
+  * **The message** is a new kind, `checkout_offer`: Hatti's shared-number template
+    `hatti_checkout_offer`, Meta's marketing category. It carries the name, the shop, what
+    the code takes off ("10%" or "Rs 500"), the code, and a link. Like the reminder, it is
+    turned on and off by checkout's setting, not the notification settings.
+  * **The link** is a secret of its own at `/r/<secret>`, kept as its SHA-256 as the
+    reminder's is. `checkout.resolve_reminder` finds either secret and returns the code for an
+    offer's. The offer's link opens the cart permalink of the items with `?discount=CODE`. The
+    reminder's link stays as it was.
+  * The checkout keeps when it was offered and the code as it was named then: `offeredAt` and
+    `offerCode` on `AbandonedCheckout`.
+* **Consequences:**
+  * Any shopper who has the link, or the code, can use it as any other shopper can, and with
+    any payment method. A shop that wants it once a customer, or limited in uses, sets the
+    code so.
+  * Choosing the offer in the admin's abandoned checkouts page comes next.
+* **Alternatives:**
+  * **A code made for each checkout, single-use** (as first proposed): it would fill the shop's
+    list of codes and run into its limit, and it gives little a code set to once a customer
+    does not.
+  * **A code for online payment only**: discount codes have no payment condition, and adding
+    one would rework the totals checkout already computes per payment method. The shop's
+    discount for paying online still applies on top where it has one.

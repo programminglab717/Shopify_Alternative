@@ -2,6 +2,7 @@
 export { DISCOUNT_CUSTOMER_DATA } from '../internal/customer-data.js';
 export {
   DiscountCodeService,
+  discountCodeByIdIn,
   discountCodeIn,
   type DiscountCodeInput,
 } from '../internal/discount-code.service.js';
@@ -11,6 +12,7 @@ export {
   discountOf,
   discountStatus,
   discountSummary,
+  discountValueText,
   typedCode,
   type DiscountAmounts,
 } from '../internal/discounts.js';

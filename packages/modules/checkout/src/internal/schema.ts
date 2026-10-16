@@ -205,6 +205,8 @@ export const marketingOptions = checkoutSchema.table('marketing_options', {
 export const recoverySettings = checkoutSchema.table('recovery_settings', {
   shopId: uuid('shop_id').primaryKey(),
   reminderAfterMinutes: integer('reminder_after_minutes'),
+  offerCodeId: uuid('offer_code_id'),
+  offerAfterHours: integer('offer_after_hours'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

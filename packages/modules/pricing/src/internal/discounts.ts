@@ -62,6 +62,19 @@ export function percentText(bps: number): string {
 }
 
 /**
+ * What a percentage or an amount off takes off, in a word for shoppers: "10%" or "Rs 500"; null
+ * for free delivery (ADR-426).
+ */
+export function discountValueText(
+  code: Pick<DiscountCodeRecord, 'kind' | 'percentageBps' | 'amount'>,
+  currency: CurrencyCode,
+): string | null {
+  if (code.kind === 'percentage') return percentText(code.percentageBps ?? 0);
+  if (code.kind === 'fixed_amount') return formatMoney(money(code.amount ?? 0n, currency));
+  return null;
+}
+
+/**
  * What a code gives, in a line for staff: "10% off orders of Rs 3,000 or more; one use a
  * customer".
  */

@@ -30,6 +30,7 @@ export const MESSAGE_KINDS = [
   'store_credit_given',
   'store_credit_expiring',
   'checkout_reminder',
+  'checkout_offer',
   'review_request',
   'one_time_code',
   'stock_low',
@@ -78,8 +79,9 @@ export type AnyMessageKind = MessageKind | PlatformMessageKind;
  */
 export const ALWAYS_SENT: readonly MessageKind[] = [
   'one_time_code',
-  // Turned on and off with checkout's own setting, which says when (ADR-393).
+  // Turned on and off with checkout's own setting, which says when (ADR-393, ADR-426).
   'checkout_reminder',
+  'checkout_offer',
   // Turned on and off with the reviews' own setting, which says when (ADR-400).
   'review_request',
   'invoice_due',
@@ -214,6 +216,12 @@ export interface MessageVariables {
   template?: string;
   /** For an automation (ADR-425): which of the shop's recipes sent it, "welcome" or "win_back". */
   automation?: string;
+  /**
+   * For the offer to a shopper who left a checkout (ADR-426): the shop's discount code, "EID10",
+   * and what it takes off their items, "10%" or "Rs 500".
+   */
+  discount?: string;
+  offer?: string;
 }
 
 /**
@@ -543,6 +551,22 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
       ur:
         'السلام علیکم {name}! آپ نے {shop} پر اپنی ٹوکری میں کچھ چیزیں چھوڑ دی تھیں۔ وہ ابھی ' +
         'آپ کی منتظر ہیں، اپنا آرڈر یہاں مکمل کریں:',
+    },
+  },
+  checkout_offer: {
+    whatsapp: 'hatti_checkout_offer',
+    // An offer to buy, as the reminder before it (ADR-426).
+    category: 'marketing',
+    parameters: ['name', 'shop', 'offer', 'discount'],
+    // Back to the items left, the code already applied to the cart.
+    buttons: [{ type: 'url' }],
+    text: {
+      en:
+        'Assalam-o-Alaikum {name}! Your cart at {shop} is still waiting, now with {offer} off: ' +
+        'use code {discount}, already applied when you finish your order here:',
+      ur:
+        'السلام علیکم {name}! {shop} پر آپ کی ٹوکری ابھی آپ کی منتظر ہے، اب {offer} کی رعایت ' +
+        'کے ساتھ: کوڈ {discount} استعمال کریں، جو یہاں آرڈر مکمل کرتے ہوئے پہلے سے لگا ہوا ہے:',
     },
   },
   review_request: {

@@ -44,6 +44,9 @@ export interface MarketingOptionsUpdatedPayload {
 export interface RecoverySettingsUpdatedPayload {
   /** 30, 60, 180 or 600; null for never. */
   reminderAfterMinutes: number | null;
+  /** The discount code offered after the reminder, and how many hours after (ADR-426). */
+  offerCode: string | null;
+  offerAfterHours: number | null;
 }
 
 /** The shop changed the gift options its checkout offers (CHK-16, ADR-413). */

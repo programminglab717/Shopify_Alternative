@@ -3,6 +3,7 @@ import {
   discountOf,
   discountStatus,
   discountSummary,
+  discountValueText,
   percentText,
   typedCode,
 } from './discounts.js';
@@ -65,6 +66,14 @@ describe('Discount codes', () => {
     expect(percentText(1_005)).toBe('10.05%');
     expect(percentText(1)).toBe('0.01%');
     expect(discountSummary(CODE, 'PKR')).toBe('25% off the order');
+    // What the offer to a shopper who left a checkout says it takes off (ADR-426).
+    expect(discountValueText(CODE, 'PKR')).toBe('25%');
+    expect(
+      discountValueText({ kind: 'fixed_amount', percentageBps: null, amount: 500_00n }, 'PKR'),
+    ).toBe('Rs 500');
+    expect(
+      discountValueText({ kind: 'free_shipping', percentageBps: null, amount: null }, 'PKR'),
+    ).toBeNull();
     expect(
       discountSummary(
         {
