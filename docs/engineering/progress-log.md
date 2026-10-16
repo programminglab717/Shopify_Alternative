@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### Inventory reports in the admin
+### 6d17f89 · Inventory reports in the admin
 
 * **The Analytics page's Stock section: sell-through, how long ago the stock on hand last sold,
   and what ran out, over the page's period** ([ADR-456](../architecture/13-decision-log.md#adr-456--the-admins-analytics-page-shows-the-stock-over-its-period-sell-through-how-long-ago-the-stock-on-hand-last-sold-what-ran-out-and-the-variants-listed-three-ways), ANL-05).
