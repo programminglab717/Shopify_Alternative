@@ -7,6 +7,34 @@ function core(role: StaffRole, whatsappNumber: string | null) {
   let badges: unknown[] = [{ kind: 'CASH_ON_DELIVERY', days: null }];
   let channels = ['WHATSAPP'];
   let reminderAfterMinutes: number | null = null;
+  // The shop's codes, and the one offered after the reminder (ADR-426).
+  const codes = [
+    {
+      id: 'dsc_1',
+      code: 'EID10',
+      kind: 'PERCENTAGE',
+      summary: '10% off the order',
+      status: 'ACTIVE',
+    },
+    {
+      id: 'dsc_2',
+      code: 'FREESHIP',
+      kind: 'FREE_SHIPPING',
+      summary: 'Free delivery',
+      status: 'ACTIVE',
+    },
+    {
+      id: 'dsc_3',
+      code: 'OLD500',
+      kind: 'FIXED_AMOUNT',
+      summary: 'Rs 500 off the order',
+      status: 'EXPIRED',
+    },
+  ];
+  let offer: { offerDiscountCode: unknown; offerAfterHours: number | null } = {
+    offerDiscountCode: null,
+    offerAfterHours: null,
+  };
   let gifts: { wrap: unknown; messages: boolean } = {
     wrap: {
       variantId: 'var_9',
@@ -24,7 +52,8 @@ function core(role: StaffRole, whatsappNumber: string | null) {
           checkoutTrustBadges: badges,
           checkoutMarketingChannels: channels,
           onlineStorePreferences: { whatsappNumber },
-          checkoutRecoverySettings: { reminderAfterMinutes },
+          checkoutRecoverySettings: { reminderAfterMinutes, ...offer },
+          discountCodes: { nodes: codes },
           checkoutGiftOptions: gifts,
         };
       case 'DraftVariants':
@@ -61,14 +90,20 @@ function core(role: StaffRole, whatsappNumber: string | null) {
         };
         return { checkoutGiftOptionsUpdate: { checkoutGiftOptions: gifts, userErrors: [] } };
       }
-      case 'CheckoutRecoverySettingsUpdate':
+      case 'CheckoutRecoverySettingsUpdate': {
         reminderAfterMinutes = variables.reminderAfterMinutes as number | null;
+        const code = codes.find((each) => each.id === variables.offerDiscountCodeId);
+        offer = {
+          offerDiscountCode: code ?? null,
+          offerAfterHours: code ? (variables.offerAfterHours as number) : null,
+        };
         return {
           checkoutRecoverySettingsUpdate: {
-            checkoutRecoverySettings: { reminderAfterMinutes },
+            checkoutRecoverySettings: { reminderAfterMinutes, ...offer },
             userErrors: [],
           },
         };
+      }
       case 'CheckoutTrustBadgesUpdate':
         badges = (variables.badges as { kind: string; days?: number }[]).map((badge) => ({
           kind: badge.kind,
@@ -196,7 +231,9 @@ describe('The checkout page', () => {
     fireEvent.change(when, { target: { value: '60' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save checkout page' }));
     expect(await screen.findByText('Saved. The checkout shows it in a moment.')).toBeTruthy();
-    expect(sentOf(fake, 'CheckoutRecoverySettingsUpdate')).toEqual([{ reminderAfterMinutes: 60 }]);
+    expect(sentOf(fake, 'CheckoutRecoverySettingsUpdate')).toEqual([
+      { reminderAfterMinutes: 60, offerDiscountCodeId: null, offerAfterHours: null },
+    ]);
     // Only what changed is sent.
     expect(sentOf(fake, 'CheckoutTrustBadgesUpdate')).toEqual([]);
 
@@ -204,9 +241,49 @@ describe('The checkout page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save checkout page' }));
     await waitFor(() =>
       expect(sentOf(fake, 'CheckoutRecoverySettingsUpdate')).toEqual([
-        { reminderAfterMinutes: 60 },
-        { reminderAfterMinutes: null },
+        { reminderAfterMinutes: 60, offerDiscountCodeId: null, offerAfterHours: null },
+        { reminderAfterMinutes: null, offerDiscountCodeId: null, offerAfterHours: null },
       ]),
+    );
+  });
+
+  it("offers one of the shop's codes some hours after the reminder, only with it (ADR-426)", async () => {
+    const fake = core('owner', null);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/checkout');
+
+    // No offer without the reminder.
+    await screen.findByLabelText('Remind them');
+    expect(screen.queryByLabelText('Then offer a discount code')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Remind them'), { target: { value: '180' } });
+    const which = screen.getByLabelText('Then offer a discount code') as HTMLSelectElement;
+    // Codes that take something off the items, an expired one said so; not free delivery.
+    expect([...which.options].map((option) => option.text)).toEqual([
+      'No offer',
+      'EID10 · 10% off the order',
+      'OLD500 · Rs 500 off the order (expired)',
+    ]);
+    expect(screen.queryByLabelText('After the reminder')).toBeNull();
+    fireEvent.change(which, { target: { value: 'dsc_1' } });
+    const after = screen.getByLabelText('After the reminder') as HTMLSelectElement;
+    expect(after.value).toBe('24');
+    fireEvent.change(after, { target: { value: '48' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save checkout page' }));
+    expect(await screen.findByText('Saved. The checkout shows it in a moment.')).toBeTruthy();
+    expect(sentOf(fake, 'CheckoutRecoverySettingsUpdate')).toEqual([
+      { reminderAfterMinutes: 180, offerDiscountCodeId: 'dsc_1', offerAfterHours: 48 },
+    ]);
+
+    // The reminder turned off takes the offer with it.
+    fireEvent.change(screen.getByLabelText('Remind them'), { target: { value: '' } });
+    expect(screen.queryByLabelText('Then offer a discount code')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save checkout page' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'CheckoutRecoverySettingsUpdate').at(-1)).toEqual({
+        reminderAfterMinutes: null,
+        offerDiscountCodeId: null,
+        offerAfterHours: null,
+      }),
     );
   });
 });

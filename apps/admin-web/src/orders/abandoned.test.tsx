@@ -29,6 +29,7 @@ function core(
     [
       left('ack_1', { remindedAt: LATER }),
       left('ack_2', { name: null, recoveredOrder: { id: 'ord_31', name: '#1031' } }),
+      left('ack_3', { name: 'Sana', remindedAt: LATER, offeredAt: LATER, offerCode: 'EID10' }),
     ],
   ],
   reminderAfterMinutes: number | null = 60,
@@ -39,7 +40,11 @@ function core(
         const page = variables.after ? 1 : 0;
         return {
           abandonedCheckouts: pages[page] ?? [],
-          checkoutRecoverySettings: { reminderAfterMinutes },
+          checkoutRecoverySettings: {
+            reminderAfterMinutes,
+            offerAfterHours: 24,
+            offerDiscountCode: { id: 'dsc_1', code: 'EID10' },
+          },
         };
       }
       default:
@@ -65,10 +70,16 @@ describe('Abandoned checkouts (CHK-12, ADR-393)', () => {
 
     await screen.findByRole('heading', { name: 'Abandoned checkouts' });
     expect(await screen.findByText(/and reminded once on WhatsApp 1 hour after\./)).toBeTruthy();
+    // And offered the shop's code after (ADR-426).
+    expect(
+      screen.getByText(/Those who still do not order are offered code EID10 1 day after\./),
+    ).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Change' }).getAttribute('href')).toBe(
       '/shop_1/settings/checkout',
     );
-    const [reminded, ordered] = screen.getAllByRole('listitem');
+    const [reminded, ordered, offered] = screen.getAllByRole('listitem');
+    expect(within(offered!).getByText(/^Offered EID10 /)).toBeTruthy();
+    expect(within(offered!).queryByText(/^Reminded /)).toBeNull();
     expect(within(reminded!).getByText('Ayesha Khan')).toBeTruthy();
     expect(within(reminded!).getByText('0300 1234567')).toBeTruthy();
     expect(within(reminded!).getByText('2 × Lawn suit (M), 1 × Dupatta')).toBeTruthy();

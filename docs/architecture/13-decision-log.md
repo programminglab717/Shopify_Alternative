@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-426 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-427 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -434,6 +434,7 @@
 | 424 | Marketing in the admin: broadcasts estimated and scheduled, and the shop's own templates written for Meta, for the owner, managers and marketers | Accepted |
 | 425 | Automations send the shop's own approved template from its own number: a welcome once a customer subscribes, and a win-back some days after their last order | Accepted |
 | 426 | Shoppers reminded of a checkout who still have not ordered are offered one of the shop's own discount codes some hours after, its link applying the code to their items | Accepted |
+| 427 | The offer after the checkout reminder is chosen under the reminder on the checkout page's settings, from the shop's codes that take something off, and the abandoned list says who was offered which code | Accepted |
 
 ---
 
@@ -16409,3 +16410,30 @@
   * **A code for online payment only**: discount codes have no payment condition, and adding
     one would rework the totals checkout already computes per payment method. The shop's
     discount for paying online still applies on top where it has one.
+
+## ADR-427 · The offer after the checkout reminder is chosen under the reminder on the checkout page's settings, from the shop's codes that take something off, and the abandoned list says who was offered which code
+
+* **Context:**
+  * ADR-426 lets a shop offer one of its discount codes some hours after the checkout
+    reminder, through the Admin API.
+  * The reminder's delay is set on the checkout page's settings (ADR-394). The abandoned
+    checkouts list says who was reminded and who ordered.
+* **Decision:**
+  * **On the checkout page's settings**, under the reminder, "Then offer a discount code"
+    appears once a delay is chosen. It lists the shop's codes that take a percentage or an
+    amount off; free delivery is not among them, and an expired code says so. Once a code is
+    chosen, "After the reminder" offers 12 hours, 1 day or 2 days (1 day at first).
+    * The page sends the reminder, the code and the hours together. Turning the reminder off
+      sends no offer.
+    * With no such code, the page says to make one.
+  * **On the abandoned checkouts list:** the page says which code those who still do not order
+    are offered, and when. A checkout offered a code shows "Offered EID10" with its time, in
+    place of "Reminded".
+  * The message kind is named among those always sent on the messages settings, as the
+    reminder is.
+* **Consequences:**
+  * The settings page asks for the shop's first hundred codes. A shop with more sees the code it
+    offers still listed, at the top.
+* **Alternatives:**
+  * **The offer on the abandoned checkouts page itself**: the reminder's setting is on the
+    checkout page's settings already, and the two go together.

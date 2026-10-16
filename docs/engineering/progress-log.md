@@ -6,10 +6,9 @@
 
 ## In progress
 
-**Next, section by section as the alpha's shops need them**: the offer of a code in the admin's
-abandoned checkouts page (CHK-12), then the admin's page for automations under Marketing
-(MKT-04), then the other recipes: back in stock and the COD→prepaid nudge. Urdu handles wait,
-as decided.
+**Next, section by section as the alpha's shops need them**: the admin's page for automations
+under Marketing (MKT-04), then the other recipes: back in stock and the COD→prepaid nudge. Urdu
+handles wait, as decided.
 Alerts for orders waiting too long are V1's confirmation policies (COD-05).
 The rest of the merchant's tax profile and a series of invoices of their own are V1's (TAX-02,
 TAX-05), and FBR's digital invoicing Growth's (TAX-04).
@@ -17,6 +16,13 @@ Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documen
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
 ## 2026-10-16
+
+### The offer in the admin
+
+* **The checkout page's settings** ([ADR-427](../architecture/13-decision-log.md#adr-427--the-offer-after-the-checkout-reminder-is-chosen-under-the-reminder-on-the-checkout-pages-settings-from-the-shops-codes-that-take-something-off-and-the-abandoned-list-says-who-was-offered-which-code), CHK-12) choose the code offered after the
+  reminder, once a reminder is on, and how long after: 12 hours, 1 day or 2 days.
+* **The abandoned checkouts list** says which code is offered, and shows who was offered it.
+* 2828 tests, from 2827: one for the admin.
 
 ### cf0db38 · An offer after the checkout reminder
 

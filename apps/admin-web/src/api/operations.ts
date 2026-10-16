@@ -5788,6 +5788,21 @@ export const CheckoutPageQuery = /* GraphQL */ `
     }
     checkoutRecoverySettings {
       reminderAfterMinutes
+      offerAfterHours
+      offerDiscountCode {
+        id
+        code
+        summary
+      }
+    }
+    discountCodes(first: 100) {
+      nodes {
+        id
+        code
+        kind
+        summary
+        status
+      }
     }
     checkoutGiftOptions {
       ...GiftOptions
@@ -5796,12 +5811,29 @@ export const CheckoutPageQuery = /* GraphQL */ `
   ${GIFT_OPTIONS}
 `;
 
-/** How long after a shopper leaves checkout they are reminded on WhatsApp; null for never. */
+/**
+ * How long after a shopper leaves checkout they are reminded on WhatsApp, null for never; and the
+ * shop's code offered some hours after, null for none (ADR-426).
+ */
 export const CheckoutRecoverySettingsUpdateMutation = /* GraphQL */ `
-  mutation CheckoutRecoverySettingsUpdate($reminderAfterMinutes: Int) {
-    checkoutRecoverySettingsUpdate(reminderAfterMinutes: $reminderAfterMinutes) {
+  mutation CheckoutRecoverySettingsUpdate(
+    $reminderAfterMinutes: Int
+    $offerDiscountCodeId: ID
+    $offerAfterHours: Int
+  ) {
+    checkoutRecoverySettingsUpdate(
+      reminderAfterMinutes: $reminderAfterMinutes
+      offerDiscountCodeId: $offerDiscountCodeId
+      offerAfterHours: $offerAfterHours
+    ) {
       checkoutRecoverySettings {
         reminderAfterMinutes
+        offerAfterHours
+        offerDiscountCode {
+          id
+          code
+          summary
+        }
       }
       userErrors {
         ...Problems
@@ -5831,6 +5863,8 @@ export const AbandonedCheckoutsQuery = /* GraphQL */ `
         currencyCode
       }
       remindedAt
+      offeredAt
+      offerCode
       recoveredOrder {
         id
         name
@@ -5838,6 +5872,11 @@ export const AbandonedCheckoutsQuery = /* GraphQL */ `
     }
     checkoutRecoverySettings {
       reminderAfterMinutes
+      offerAfterHours
+      offerDiscountCode {
+        id
+        code
+      }
     }
   }
 `;

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { CircleCheck, Clock, MessageCircle, Send } from 'lucide-react';
+import { CircleCheck, Clock, MessageCircle, Send, TicketPercent } from 'lucide-react';
 import { useState } from 'react';
 import { AbandonedCheckoutsQuery } from '../api/operations';
 import type { AbandonedCheckout, AbandonedCheckoutsData } from '../api/types';
@@ -80,6 +80,15 @@ function Left({ checkout }: { checkout: AbandonedCheckout }) {
               label={t('abandoned.recovered', { name: checkout.recoveredOrder.name })}
             />
           </Link>
+        ) : checkout.offeredAt ? (
+          <Badge
+            colour="confirmed"
+            icon={TicketPercent}
+            label={t('abandoned.offered', {
+              code: checkout.offerCode ?? '',
+              date: formatDateTime(checkout.offeredAt, timezone, locale),
+            })}
+          />
         ) : checkout.remindedAt ? (
           <Badge
             colour="confirmed"
@@ -109,8 +118,9 @@ function Left({ checkout }: { checkout: AbandonedCheckout }) {
 
 /**
  * Checkouts shoppers left after typing their number (CHK-12, ADR-393), the latest first: who,
- * what they would have ordered, and whether they were reminded on WhatsApp or ordered since. The
- * reminder is the shop's to turn on, in Settings, which the page points owners and managers to.
+ * what they would have ordered, and whether they were reminded on WhatsApp, offered a code after
+ * (ADR-426), or ordered since. The reminder and the offer are the shop's to set, in Settings,
+ * which the page points owners and managers to.
  */
 export function AbandonedPage() {
   const { t } = useLocale();
@@ -149,6 +159,7 @@ export function AbandonedPage() {
   }
   const { abandonedCheckouts: left, checkoutRecoverySettings: recovery } = query.data;
   const minutes = recovery.reminderAfterMinutes;
+  const offer = minutes === null ? null : (recovery.offerDiscountCode ?? null);
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-8">
       {heading}
@@ -158,6 +169,13 @@ export function AbandonedPage() {
           : t('abandoned.remindersOn', {
               after: t(`checkoutPage.reminder.${minutes}` as MessageKey).toLowerCase(),
             })}{' '}
+        {offer &&
+          `${t('abandoned.offerOn', {
+            code: offer.code,
+            after: t(
+              `checkoutPage.offerAfter.${recovery.offerAfterHours ?? 24}` as MessageKey,
+            ).toLowerCase(),
+          })} `}
         {OPENS_SETTINGS.includes(shop.role) && (
           <Link
             to="/$shopId/settings/checkout"

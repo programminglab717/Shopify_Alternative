@@ -2499,7 +2499,11 @@ export interface CheckoutPageData {
   checkoutTrustBadges: CheckoutTrustBadge[];
   checkoutMarketingChannels: MarketingChannel[];
   onlineStorePreferences: { whatsappNumber: string | null };
-  checkoutRecoverySettings: { reminderAfterMinutes: number | null };
+  checkoutRecoverySettings: CheckoutRecoverySettings;
+  /** The shop's codes, of which it may offer one after the reminder (ADR-426). */
+  discountCodes?: {
+    nodes: Pick<DiscountCodeValue, 'id' | 'code' | 'kind' | 'summary' | 'status'>[];
+  };
   /** Gift wrap and messages (ADR-413); absent where a fake core leaves it out. */
   checkoutGiftOptions?: CheckoutGiftOptions;
 }
@@ -2523,9 +2527,20 @@ export interface CheckoutGiftOptionsUpdateData {
   };
 }
 
+/**
+ * Whether, and how long after they leave, the shop reminds shoppers (ADR-393); and the code it
+ * offers them some hours after (ADR-426).
+ */
+export interface CheckoutRecoverySettings {
+  reminderAfterMinutes: number | null;
+  /** 12, 24 or 48; absent where a fake core leaves it out. */
+  offerAfterHours?: number | null;
+  offerDiscountCode?: { id: string; code: string; summary?: string } | null;
+}
+
 export interface CheckoutRecoverySettingsUpdateData {
   checkoutRecoverySettingsUpdate: {
-    checkoutRecoverySettings: { reminderAfterMinutes: number | null } | null;
+    checkoutRecoverySettings: CheckoutRecoverySettings | null;
     userErrors: UserError[];
   };
 }
@@ -2541,12 +2556,15 @@ export interface AbandonedCheckout {
   lineItems: { variantId: string; title: string; variantTitle: string; quantity: number }[];
   subtotalPrice: MoneyValue;
   remindedAt: string | null;
+  /** When they were offered a code after the reminder, and which (ADR-426). */
+  offeredAt?: string | null;
+  offerCode?: string | null;
   recoveredOrder: { id: string; name: string } | null;
 }
 
 export interface AbandonedCheckoutsData {
   abandonedCheckouts: AbandonedCheckout[];
-  checkoutRecoverySettings: { reminderAfterMinutes: number | null };
+  checkoutRecoverySettings: CheckoutRecoverySettings;
 }
 
 export interface CheckoutTrustBadgesUpdateData {

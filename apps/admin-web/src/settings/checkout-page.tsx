@@ -52,6 +52,10 @@ const MOST = 4;
 export const REMINDER_DELAYS = ['', '30', '60', '180', '600'] as const;
 type ReminderDelay = (typeof REMINDER_DELAYS)[number];
 
+/** How many hours after the reminder the shop may offer one of its codes (ADR-426). */
+const OFFER_DELAYS = ['12', '24', '48'] as const;
+type OfferDelay = (typeof OFFER_DELAYS)[number];
+
 interface BadgeRow {
   key: number;
   kind: CheckoutTrustBadgeKind;
@@ -84,12 +88,33 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
   >(CheckoutMarketingChannelsUpdateMutation);
   const updateRecovery = useAdminMutation<
     CheckoutRecoverySettingsUpdateData,
-    { reminderAfterMinutes: number | null }
+    {
+      reminderAfterMinutes: number | null;
+      offerDiscountCodeId: string | null;
+      offerAfterHours: number | null;
+    }
   >(CheckoutRecoverySettingsUpdateMutation);
-  const delayWas = String(
-    data.checkoutRecoverySettings.reminderAfterMinutes ?? '',
-  ) as ReminderDelay;
+  const recovery = data.checkoutRecoverySettings;
+  const delayWas = String(recovery.reminderAfterMinutes ?? '') as ReminderDelay;
   const [delay, setDelay] = useState<ReminderDelay>(delayWas);
+  // The code offered after the reminder, and how long after (ADR-426): '' for none.
+  const offerWas = recovery.offerDiscountCode?.id ?? '';
+  const hoursWas = String(recovery.offerAfterHours ?? 24) as OfferDelay;
+  const [offer, setOffer] = useState(offerWas);
+  const [hours, setHours] = useState<OfferDelay>(hoursWas);
+  // Codes that take something off the items; the one offered even if past the first hundred.
+  const offerable = (data.discountCodes?.nodes ?? []).filter(
+    (code) => code.kind !== 'FREE_SHIPPING',
+  );
+  if (recovery.offerDiscountCode && !offerable.some((code) => code.id === offerWas)) {
+    offerable.unshift({
+      id: recovery.offerDiscountCode.id,
+      code: recovery.offerDiscountCode.code,
+      kind: 'PERCENTAGE',
+      summary: recovery.offerDiscountCode.summary ?? '',
+      status: 'ACTIVE',
+    });
+  }
   const [rows, setRows] = useState<BadgeRow[]>(keyed);
   const [channels, setChannels] = useState<MarketingChannel[]>(data.checkoutMarketingChannels);
   const updateGift = useAdminMutation<
@@ -125,7 +150,9 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
   const channelsChanged =
     JSON.stringify(channelsNow) !==
     JSON.stringify(CHANNELS.filter((channel) => data.checkoutMarketingChannels.includes(channel)));
-  const delayChanged = delay !== delayWas;
+  const offerNow = delay === '' ? '' : offer;
+  const delayChanged =
+    delay !== delayWas || offerNow !== offerWas || (offerNow !== '' && hours !== hoursWas);
   const changed = badgesChanged || channelsChanged || delayChanged || giftChanged;
 
   const move = (index: number, by: -1 | 1) =>
@@ -174,6 +201,8 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
       if (delayChanged) {
         const { checkoutRecoverySettingsUpdate } = await updateRecovery.mutateAsync({
           reminderAfterMinutes: delay === '' ? null : Number(delay),
+          offerDiscountCodeId: offerNow || null,
+          offerAfterHours: offerNow ? Number(hours) : null,
         });
         if (checkoutRecoverySettingsUpdate.userErrors.length > 0) {
           setProblems(
@@ -337,6 +366,39 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
           }))}
           onChange={setDelay}
         />
+        {delay !== '' && (
+          <>
+            <SelectField<string>
+              label={t('checkoutPage.offer')}
+              value={offer}
+              options={[
+                { value: '', label: t('checkoutPage.offerNone') },
+                ...offerable.map((code) => ({
+                  value: code.id,
+                  label:
+                    code.status === 'EXPIRED'
+                      ? t('checkoutPage.offerExpired', { code: code.code, summary: code.summary })
+                      : `${code.code} · ${code.summary}`,
+                })),
+              ]}
+              onChange={setOffer}
+            />
+            {offer !== '' && (
+              <SelectField<OfferDelay>
+                label={t('checkoutPage.offerAfter')}
+                value={hours}
+                options={OFFER_DELAYS.map((value) => ({
+                  value,
+                  label: t(`checkoutPage.offerAfter.${value}` as MessageKey),
+                }))}
+                onChange={setHours}
+              />
+            )}
+            <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+              {t(offerable.length === 0 ? 'checkoutPage.offerNoCodes' : 'checkoutPage.offerHint')}
+            </p>
+          </>
+        )}
       </FormSection>
 
       <FormSection title={t('checkoutPage.gifts')} hint={t('checkoutPage.giftsHint')}>
@@ -407,8 +469,9 @@ function CheckoutForm({ data }: { data: CheckoutPageData }) {
 /**
  * The checkout's page (CHK-14, CUS-04, ADR-187): the badges under its button that reassure a
  * shopper paying on delivery, up to four in the shop's order, with the days for exchanges and
- * returns; the boxes it offers for the shop's news and offers, each unticked until ticked; and
- * how long after a shopper leaves it they are reminded on WhatsApp, if at all (CHK-12, ADR-393).
+ * returns; the boxes it offers for the shop's news and offers, each unticked until ticked; how
+ * long after a shopper leaves it they are reminded on WhatsApp, if at all (CHK-12, ADR-393); and
+ * which of the shop's codes those who still do not order are offered after, if any (ADR-426).
  */
 export function CheckoutPage() {
   const { t } = useLocale();
