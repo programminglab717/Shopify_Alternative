@@ -17,7 +17,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-16
 
-### The cart's cross-sells
+### c192103 · The cart's cross-sells
 
 * **Hatti Base's cart page shows what goes with the cart** ([ADR-437](../architecture/13-decision-log.md#adr-437--the-carts-cross-sells-the-products-paired-with-what-it-holds-asked-for-as-complementary-recommendations-and-shown-together-on-hatti-bases-cart-page), MKT-09): the products the
   shop pairs with its first three products, none it holds already, asked for as Shopify's
