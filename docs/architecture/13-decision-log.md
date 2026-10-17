@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-507 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-508 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -515,6 +515,7 @@
 | 505 | Partners' revenue share: 20% of each plan invoice a store they brought pays, recorded as it is paid, owed until Hatti's people pay it into their bank account | Accepted |
 | 506 | Push notifications for staff: Web Push to the browsers each member turns on, for the news their role does, encrypted and signed with node's crypto, once each | Accepted |
 | 507 | Camera-first products: a product added from a photo, its copy drafted by the AI from the photos themselves, made small for the model, and squared to the product | Accepted |
+| 508 | Local support: each plan's way to reach Hatti's people, requests from the admin kept for them and answered with a command, and a help centre in English and Urdu | Accepted |
 
 ---
 
@@ -19259,3 +19260,63 @@
     tokens and keeps everything a description needs.
   * **Drafting before the photos are processed, from the browser's own copy:** the catalog's
     clean, cropped image is what shoppers see, and the model should describe that.
+
+## ADR-508 · Local support: each plan's way to reach Hatti's people, requests from the admin kept for them and answered with a command, and a help centre in English and Urdu
+
+* **Context:** Pakistan's merchants expect to reach a person, on WhatsApp or by phone, in Urdu or
+  English. The pricing (docs/product/03) promises each plan a way: Free the help centre, Starter
+  WhatsApp, Growth priority WhatsApp, Pro priority WhatsApp and a call. Until now the admin said
+  nothing about how to reach Hatti, and nothing kept what a shop asked (BIL-05).
+* **Decision:**
+  * **Each plan's tier is the billing module's constant.**
+
+    | Plan | Way | Priority | Answered within |
+    | --- | --- | --- | --- |
+    | Free | Help centre and requests | 3 | 48 working hours |
+    | Starter | WhatsApp | 2 | 24 working hours |
+    | Growth | Priority WhatsApp | 1 | 8 working hours |
+    | Pro | Priority WhatsApp and calls | 1 | 4 working hours |
+
+  * **Hatti's own lines come from the host's configuration:** `SUPPORT_WHATSAPP` (a Pakistani
+    mobile), `SUPPORT_PHONE`, `SUPPORT_EMAIL`, and `SUPPORT_HOURS` with `SUPPORT_HOURS_UR`, both or
+    neither. `hattiSupport` gives any member of a shop's staff the shop's plan and tier and the
+    lines its plan allows: the WhatsApp number from Starter, the phone line on Pro alone, the
+    email and hours to all. No scope is asked: help is for everyone at the shop.
+  * **A request from the admin is kept** in `billing.support_requests`, under the shop's tenant
+    isolation:
+    * Who asks is the signed-in member of staff, never an app. They give a topic, 10 to 2,000
+      characters in their words, the language for the answer, and an optional Pakistani mobile to
+      call back on.
+    * The shop's plan when it asked sets the request's priority.
+    * A shop has at most five requests open, so a stuck shop is answered rather than flooding the
+      queue.
+    * The shop closes a request when it is answered enough or no longer needed.
+  * **Hatti's people answer with a command,** `pnpm --filter @hatti/core support-requests`, as
+    for transfers (ADR-254):
+    * `list` shows the requests waiting across shops, the most urgent then the oldest first, with
+      the system login.
+    * `answer sreq_… --by --text` answers one, in the shop's tenant. A request is answered once.
+    * The answer, and who gave it, shows on the shop's Help page.
+  * **The admin's Help page** (Help, for every role) has three parts:
+    * A help centre of short articles in English and Urdu, searched in either language, kept with
+      the admin so it works offline and on Free.
+    * How to reach Hatti, as the plan allows: a wa.me link, a phone link, an email link, and the
+      hours in the admin's language.
+    * The request form, and the shop's last 20 requests with their answers.
+* **Consequences:**
+  * WhatsApp and calls happen outside Hatti: a conversation on Hatti's support number is not
+    kept with the shop's requests. Requests are the record Hatti keeps.
+  * Working hours are promised, not measured: nothing yet alerts Hatti's people to a request past
+    its time. The priority-then-age order is what keeps the promise.
+  * Without the support lines configured, shops see requests alone, which is honest for a host
+    without a support team.
+  * The help centre's articles ship with the admin: changing one is a release. Video tutorials
+    (BIL-05) wait for a place to host them.
+* **Alternatives:**
+  * **A support desk product (Zendesk, Freshdesk):** another account for each merchant, priced
+    per agent in dollars, and English first. The requests table and the command do what Hatti's
+    few people need now, and a desk can read the table later.
+  * **Requests by WhatsApp alone:** Free has no WhatsApp, and a request typed in the admin
+    carries the shop and its plan without asking.
+  * **Answering from an internal web tool:** Hatti's people answer transfers and reports with
+    commands already, and a web tool for Hatti's own people is its own project.

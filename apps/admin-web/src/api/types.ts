@@ -4036,3 +4036,39 @@ export interface StoreBuildData {
     userErrors: UserError[];
   };
 }
+
+/** Hatti's support for the shop (BIL-05, ADR-508). */
+export type SupportChannel = 'HELP_CENTRE' | 'WHATSAPP' | 'PRIORITY_WHATSAPP' | 'PRIORITY_CALL';
+export type SupportTopic =
+  'ORDERS' | 'PAYMENTS' | 'COURIERS' | 'STORE' | 'BILLING' | 'ACCOUNT' | 'OTHER';
+export type SupportRequestStatus = 'OPEN' | 'ANSWERED' | 'CLOSED';
+
+export interface SupportRequestValue {
+  id: string;
+  topic: SupportTopic;
+  message: string;
+  callBack: string | null;
+  status: SupportRequestStatus;
+  answer: string | null;
+  answeredBy: string | null;
+  answeredAt: string | null;
+  createdAt: string;
+}
+
+export interface HattiSupportData {
+  hattiSupport: {
+    plan: 'FREE' | 'STARTER' | 'GROWTH' | 'PRO';
+    channel: SupportChannel;
+    answerWithinHours: number;
+    whatsapp: string | null;
+    phone: string | null;
+    email: string | null;
+    hours: { en: string; ur: string } | null;
+    requests: SupportRequestValue[];
+  };
+}
+
+export interface SupportRequestPayload {
+  request: SupportRequestValue | null;
+  userErrors: UserError[];
+}

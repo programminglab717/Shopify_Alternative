@@ -8704,3 +8704,69 @@ export const PushUnsubscribeMutation = /* GraphQL */ `
     }
   }
 `;
+
+const SUPPORT_REQUEST = /* GraphQL */ `
+  fragment SupportRequestFields on SupportRequest {
+    id
+    topic
+    message
+    callBack
+    status
+    answer
+    answeredBy
+    answeredAt
+    createdAt
+  }
+`;
+
+/** Hatti's support for the shop (BIL-05, ADR-508): how to reach Hatti's people, and its requests. */
+export const HattiSupportQuery = /* GraphQL */ `
+  query HattiSupport {
+    hattiSupport {
+      plan
+      channel
+      answerWithinHours
+      whatsapp
+      phone
+      email
+      hours {
+        en
+        ur
+      }
+      requests {
+        ...SupportRequestFields
+      }
+    }
+  }
+  ${SUPPORT_REQUEST}
+`;
+
+export const SupportRequestCreateMutation = /* GraphQL */ `
+  mutation SupportRequestCreate($input: SupportRequestInput!) {
+    supportRequestCreate(input: $input) {
+      request {
+        ...SupportRequestFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SUPPORT_REQUEST}
+  ${USER_ERRORS}
+`;
+
+export const SupportRequestCloseMutation = /* GraphQL */ `
+  mutation SupportRequestClose($id: ID!) {
+    supportRequestClose(id: $id) {
+      request {
+        ...SupportRequestFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${SUPPORT_REQUEST}
+  ${USER_ERRORS}
+`;

@@ -80,6 +80,7 @@ import { ActivityPage } from './settings/activity-page';
 import { SupportAccessPage } from './settings/support-page';
 import { StoreExportPage } from './settings/export-page';
 import { VerificationPage } from './settings/verification-page';
+import { HelpPage } from './help/help-page';
 import { CustomDataPage } from './settings/custom-data-page';
 import { AppsPage } from './settings/apps-page';
 import { WhatsAppPage } from './settings/whatsapp-page';
@@ -577,6 +578,12 @@ const account = createRoute({
   component: AccountPage,
 });
 
+const help = createRoute({
+  getParentRoute: () => shop,
+  path: 'help',
+  component: HelpPage,
+});
+
 const stock = createRoute({
   getParentRoute: () => shop,
   path: 'stock',
@@ -928,6 +935,7 @@ export const routeTree = root.addChildren([
     newTransfer,
     transfer,
     account,
+    help,
     onlineStore,
     newPage,
     pageEditor,

@@ -1,4 +1,4 @@
-import type { HattiBankAccount, HattiGateway } from '@hatti/billing/public';
+import type { HattiBankAccount, HattiGateway, SupportContact } from '@hatti/billing/public';
 import { SafepayGateway, TestGateway } from '@hatti/payments/public';
 import type { ApiConfig } from './config.js';
 
@@ -61,4 +61,26 @@ export function hattiBankAccountOf(
     iban: config.BILLING_BANK_IBAN,
     raastId: config.BILLING_RAAST_ID ?? null,
   };
+}
+
+/**
+ * Hatti's own support lines (ADR-508), shown to shops as their plans allow; none where none is
+ * set, so that shops send requests from the admin alone.
+ */
+export function supportContactOf(
+  config: Pick<
+    ApiConfig,
+    'SUPPORT_WHATSAPP' | 'SUPPORT_PHONE' | 'SUPPORT_EMAIL' | 'SUPPORT_HOURS' | 'SUPPORT_HOURS_UR'
+  >,
+): SupportContact | null {
+  const contact: SupportContact = {
+    whatsapp: config.SUPPORT_WHATSAPP ?? null,
+    phone: config.SUPPORT_PHONE ?? null,
+    email: config.SUPPORT_EMAIL ?? null,
+    hours:
+      config.SUPPORT_HOURS && config.SUPPORT_HOURS_UR
+        ? { en: config.SUPPORT_HOURS, ur: config.SUPPORT_HOURS_UR }
+        : null,
+  };
+  return Object.values(contact).some((value) => value !== null) ? contact : null;
 }

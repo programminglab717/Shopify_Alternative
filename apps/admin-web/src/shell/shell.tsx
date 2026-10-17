@@ -5,6 +5,7 @@ import {
   ChartColumn,
   Headset,
   House,
+  LifeBuoy,
   Link2,
   LogOut,
   Megaphone,
@@ -58,7 +59,8 @@ interface NavItem {
     | '/$shopId/online-store'
     | '/$shopId/analytics'
     | '/$shopId/cash'
-    | '/$shopId/settings';
+    | '/$shopId/settings'
+    | '/$shopId/help';
   label: MessageKey;
   /** A shorter name for the phone's bottom bar, where the label is too long. */
   short?: MessageKey;
@@ -119,6 +121,7 @@ export const NAV: readonly NavItem[] = [
   { to: '/$shopId/analytics', label: 'nav.analytics', icon: ChartColumn, roles: READS_ANALYTICS },
   { to: '/$shopId/cash', label: 'nav.cash', icon: Wallet, roles: RECONCILES_CASH },
   { to: '/$shopId/settings', label: 'nav.settings', icon: Settings, roles: OPENS_SETTINGS },
+  { to: '/$shopId/help', label: 'nav.help', icon: LifeBuoy },
 ];
 
 /** The sections a role sees. */

@@ -351,6 +351,21 @@ const apiSchema = z
     BILLING_BANK_IBAN: pkIban().optional(),
     BILLING_RAAST_ID: pkMobile().optional(),
     /**
+     * Hatti's own support lines (ADR-508), shown to shops as their plans allow: the WhatsApp
+     * number for Starter and above, a phone line for Pro, an email for all, and the hours Hatti's
+     * people answer in, in English and Urdu, both or neither. Without them, shops send requests
+     * from the admin alone.
+     */
+    SUPPORT_WHATSAPP: pkMobile().optional(),
+    SUPPORT_PHONE: z
+      .string()
+      .transform((value) => value.replace(/[\s-]/g, ''))
+      .pipe(z.string().regex(/^\+92[0-9]{9,10}$/, 'Expected a Pakistani number: +924235761999'))
+      .optional(),
+    SUPPORT_EMAIL: z.string().trim().email().max(200).optional(),
+    SUPPORT_HOURS: z.string().trim().min(1).max(100).optional(),
+    SUPPORT_HOURS_UR: z.string().trim().min(1).max(100).optional(),
+    /**
      * The AI gateway (ADR-463): the model provider's API key and the model's ID, both or neither,
      * and the provider's address where it is not Anthropic's own, as for a proxy. No model is
      * named in code: changing it is a change here. Without them, nothing is drafted with AI.
@@ -409,6 +424,13 @@ const apiSchema = z
     {
       path: ['BILLING_BANK_IBAN'],
       message: 'Set BILLING_BANK_TITLE, BILLING_BANK_NAME and BILLING_BANK_IBAN together, or none',
+    },
+  )
+  .refine(
+    (config) => (config.SUPPORT_HOURS === undefined) === (config.SUPPORT_HOURS_UR === undefined),
+    {
+      path: ['SUPPORT_HOURS_UR'],
+      message: 'Set both SUPPORT_HOURS and SUPPORT_HOURS_UR, or neither',
     },
   )
   .refine(
@@ -607,6 +629,15 @@ const billingTransfersSchema = z.object({
 });
 
 /**
+ * Hatti's people answer shops' support requests (ADR-508) with the app login and the system login,
+ * which finds them across shops.
+ */
+const supportRequestsSchema = z.object({
+  DATABASE_URL: env.postgresUrl(),
+  DATABASE_SYSTEM_URL: env.postgresUrl(),
+});
+
+/**
  * Hatti's people decide on shoppers' reports of stores (ADR-460) and shops' verifications (ADR-465),
  * with the system login, which reads every shop's.
  */
@@ -664,6 +695,7 @@ export type SupportAgentConfig = z.output<typeof supportAgentSchema>;
 export type PartnerPayoutsConfig = z.output<typeof partnerPayoutsSchema>;
 export type EmailSuppressionConfig = z.output<typeof emailSuppressionSchema>;
 export type BillingTransfersConfig = z.output<typeof billingTransfersSchema>;
+export type SupportRequestsConfig = z.output<typeof supportRequestsSchema>;
 export type CourierCitiesConfig = z.output<typeof courierCitiesSchema>;
 export type TrustReportsConfig = z.output<typeof trustReportsSchema>;
 export type StatusIncidentsConfig = z.output<typeof statusIncidentsSchema>;
@@ -679,6 +711,8 @@ export const loadEmailSuppressionConfig = (source?: Env): EmailSuppressionConfig
   parseEnv(emailSuppressionSchema, source);
 export const loadBillingTransfersConfig = (source?: Env): BillingTransfersConfig =>
   parseEnv(billingTransfersSchema, source);
+export const loadSupportRequestsConfig = (source?: Env): SupportRequestsConfig =>
+  parseEnv(supportRequestsSchema, source);
 export const loadCourierCitiesConfig = (source?: Env): CourierCitiesConfig =>
   parseEnv(courierCitiesSchema, source);
 export const loadTrustReportsConfig = (source?: Env): TrustReportsConfig =>

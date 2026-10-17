@@ -4599,6 +4599,25 @@ input GiftCardUpdateInput {
   note: String
 }
 
+"""Hatti's support for the shop (BIL-05, ADR-508), as its plan allows."""
+type HattiSupport {
+  """How soon a request is answered, in working hours."""
+  answerWithinHours: Int!
+  channel: SupportChannel!
+  email: String
+  hours: SupportHours
+
+  """Hatti's phone line, on Pro."""
+  phone: String
+  plan: BillingPlanCode!
+
+  """The shop's latest 20 requests, the newest first."""
+  requests: [SupportRequest!]!
+
+  """Hatti's support WhatsApp, E.164, for plans that have it."""
+  whatsapp: String
+}
+
 """
 What waits for the shop, as the admin's home shows it first: orders to confirm, review, see paid, pack and book, parcels and returns coming back, lost parcels to claim and claims to follow up, and the cash on delivery still to come; and how today has gone (ANL-01).
 """
@@ -8071,6 +8090,16 @@ type Mutation {
     """What it is for, up to 200 characters: "Order #1043 won't ship"."""
     note: String
   ): SupportAccessGrantPayload!
+
+  """
+  Closes one of the shop’s requests: answered enough, or no longer needed.
+  """
+  supportRequestClose(id: ID!): SupportRequestPayload!
+
+  """
+  Asks Hatti's people for help, as the signed-in member of staff, answered as the shop's plan allows. At most 5 open at once.
+  """
+  supportRequestCreate(input: SupportRequestInput!): SupportRequestPayload!
 
   """
   Changes the sales tax the shop charges, for orders placed from now on: those placed keep theirs. Those not given stay as they are.
@@ -12058,6 +12087,11 @@ type Query {
     query: String
   ): GiftCardConnection!
 
+  """
+  How the shop reaches Hatti's people, as its plan allows, and its requests.
+  """
+  hattiSupport: HattiSupport!
+
   """What waits for the shop: the admin's home."""
   home(
     """
@@ -14526,6 +14560,79 @@ type SupportAccessGrantPayload {
 enum SupportAccessLevel {
   """It looks, numbers masked as most staff see them, and changes nothing."""
   READ
+}
+
+"""
+How the shop reaches Hatti's people, as its plan allows: the HELP_CENTRE and requests from the admin on Free; WHATSAPP on Starter; PRIORITY_WHATSAPP on Growth; PRIORITY_CALL, WhatsApp and a phone line, on Pro.
+"""
+enum SupportChannel {
+  HELP_CENTRE
+  PRIORITY_CALL
+  PRIORITY_WHATSAPP
+  WHATSAPP
+}
+
+"""When Hatti’s people answer."""
+type SupportHours {
+  en: String!
+  ur: String!
+}
+
+enum SupportLanguage {
+  ENGLISH
+  URDU
+}
+
+"""A request the shop sent Hatti’s people, and their answer."""
+type SupportRequest {
+  answer: String
+  answeredAt: DateTime
+
+  """Who at Hatti answered."""
+  answeredBy: String
+
+  """The mobile to call back at, E.164; null for no call."""
+  callBack: String
+  createdAt: DateTime!
+  id: ID!
+  message: String!
+  status: SupportRequestStatus!
+  topic: SupportTopic!
+}
+
+input SupportRequestInput {
+  """
+  A Pakistani mobile for Hatti to call back at, if the shop wants a call.
+  """
+  callBack: String
+
+  """The language it is in, which the answer is in."""
+  language: SupportLanguage!
+
+  """What the shop needs, 10 to 2000 characters."""
+  message: String!
+  topic: SupportTopic!
+}
+
+type SupportRequestPayload {
+  request: SupportRequest
+  userErrors: [UserError!]!
+}
+
+enum SupportRequestStatus {
+  ANSWERED
+  CLOSED
+  OPEN
+}
+
+enum SupportTopic {
+  ACCOUNT
+  BILLING
+  COURIERS
+  ORDERS
+  OTHER
+  PAYMENTS
+  STORE
 }
 
 """

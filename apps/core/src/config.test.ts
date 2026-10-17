@@ -1,9 +1,10 @@
 import { SecretBox } from '@hatti/crypto';
 import { describe, expect, it } from 'vitest';
-import { hattiBankAccountOf, hattiGatewayOf } from './billing.js';
+import { hattiBankAccountOf, hattiGatewayOf, supportContactOf } from './billing.js';
 import {
   loadApiConfig,
   loadBillingTransfersConfig,
+  loadSupportRequestsConfig,
   loadWorkerConfig,
   passkeysOf,
   vapidKeysOf,
@@ -259,6 +260,57 @@ describe('API configuration', () => {
     );
     expect(() => loadApiConfig({ ...env, BILLING_RAAST_ID: '03001234567' })).toThrow(
       "BILLING_RAAST_ID: Set Hatti's account with BILLING_BANK_IBAN first",
+    );
+  });
+
+  it("takes Hatti's support lines, each checked, the hours in both languages or neither (ADR-508)", () => {
+    // Without them, shops send requests from the admin alone.
+    expect(supportContactOf(loadApiConfig(env))).toBeNull();
+    expect(
+      supportContactOf(
+        loadApiConfig({
+          ...env,
+          SUPPORT_WHATSAPP: '0300-1112233',
+          SUPPORT_PHONE: '+92 42 3576 1999',
+          SUPPORT_EMAIL: ' help@hatti.pk ',
+          SUPPORT_HOURS: 'Monday to Saturday, 10am to 7pm',
+          SUPPORT_HOURS_UR: 'پیر سے ہفتہ، صبح 10 سے شام 7',
+        }),
+      ),
+    ).toEqual({
+      whatsapp: '+923001112233',
+      phone: '+924235761999',
+      email: 'help@hatti.pk',
+      hours: { en: 'Monday to Saturday, 10am to 7pm', ur: 'پیر سے ہفتہ، صبح 10 سے شام 7' },
+    });
+    expect(supportContactOf(loadApiConfig({ ...env, SUPPORT_EMAIL: 'help@hatti.pk' }))).toEqual({
+      whatsapp: null,
+      phone: null,
+      email: 'help@hatti.pk',
+      hours: null,
+    });
+    expect(() => loadApiConfig({ ...env, SUPPORT_WHATSAPP: '042-111-222-333' })).toThrow(
+      'SUPPORT_WHATSAPP: Expected a Pakistani mobile number',
+    );
+    expect(() => loadApiConfig({ ...env, SUPPORT_PHONE: '111-222-333' })).toThrow(
+      'SUPPORT_PHONE: Expected a Pakistani number',
+    );
+    expect(() => loadApiConfig({ ...env, SUPPORT_EMAIL: 'help' })).toThrow('SUPPORT_EMAIL');
+    expect(() => loadApiConfig({ ...env, SUPPORT_HOURS: '10 to 7' })).toThrow(
+      'SUPPORT_HOURS_UR: Set both SUPPORT_HOURS and SUPPORT_HOURS_UR, or neither',
+    );
+  });
+});
+
+describe("Hatti's people's support requests tool (ADR-508)", () => {
+  it('reads the app and system logins', () => {
+    const logins = {
+      DATABASE_URL: env.DATABASE_URL,
+      DATABASE_SYSTEM_URL: 'postgres://hatti_system:secret@localhost:5432/hatti',
+    };
+    expect(loadSupportRequestsConfig(logins)).toEqual(logins);
+    expect(() => loadSupportRequestsConfig({ DATABASE_URL: env.DATABASE_URL })).toThrow(
+      'DATABASE_SYSTEM_URL',
     );
   });
 });

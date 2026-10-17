@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DnsLookup } from '@hatti/api';
-import type { HattiBankAccount, HattiGateway } from '@hatti/billing/public';
+import type { HattiBankAccount, HattiGateway, SupportContact } from '@hatti/billing/public';
 import type { AccountEmails, GoogleSignInSettings, PhoneCodeSender } from '@hatti/identity/public';
 import { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
@@ -69,6 +69,8 @@ export async function startTestApi(
      * for none.
      */
     billingBankAccount?: HattiBankAccount | null;
+    /** Hatti's own support lines (ADR-508); none unless given. */
+    support?: SupportContact | null;
     /** Where merchants' sign-in codes go (ADR-159); without it, no one signs in by phone. */
     phoneCodes?: PhoneCodeSender;
     /** Hatti's client IDs and Google's keys (ADR-164); without them, no one signs in with Google. */
@@ -124,6 +126,7 @@ export async function startTestApi(
       options.billingBankAccount === undefined
         ? TEST_HATTI_BANK_ACCOUNT
         : options.billingBankAccount,
+    support: options.support ?? null,
   });
   await app.getHttpAdapter().getInstance().ready();
   return {

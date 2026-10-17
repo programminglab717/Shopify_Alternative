@@ -9,7 +9,12 @@ import {
   type ApiContext,
 } from '@hatti/api';
 import { AppsModule } from '@hatti/apps/public';
-import { BillingModule, type HattiBankAccount, type HattiGateway } from '@hatti/billing/public';
+import {
+  BillingModule,
+  type HattiBankAccount,
+  type HattiGateway,
+  type SupportContact,
+} from '@hatti/billing/public';
 import { CatalogModule, CopiedVariantStock } from '@hatti/catalog/public';
 import { CheckoutModule } from '@hatti/checkout/public';
 import { SecretBox } from '@hatti/crypto';
@@ -123,6 +128,8 @@ export interface ApiModuleOptions {
    * without it, invoices are not paid by transfer.
    */
   billingBankAccount?: HattiBankAccount | null;
+  /** Hatti's own support lines (ADR-508); without them, shops send requests alone. */
+  support?: SupportContact | null;
 }
 
 /** Resources owned by the process entry point, shared with every module. */
@@ -249,6 +256,7 @@ export class ApiModule {
         BillingModule.forRoot({
           gateway: options.billingGateway ?? null,
           bankAccount: options.billingBankAccount ?? null,
+          support: options.support ?? null,
         }),
       ],
       controllers: [HealthController, StockWatchController],

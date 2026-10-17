@@ -54,3 +54,17 @@ export {
   type Plan,
   type PlanCode,
 } from '../internal/plans.js';
+export {
+  SUPPORT_CONTACT,
+  SUPPORT_LIMITS,
+  SUPPORT_TIERS,
+  SUPPORT_TOPICS,
+  SupportService,
+  type OpenSupportRequest,
+  type SupportChannel,
+  type SupportContact,
+  type SupportRecord,
+  type SupportRequestRecord,
+  type SupportTier,
+  type SupportTopic,
+} from '../internal/support.service.js';

@@ -52,6 +52,7 @@ export default defineConfig(
       '**/src/vapid-keys.ts',
       '**/src/email-suppression.ts',
       '**/src/billing-transfers.ts',
+      '**/src/support-requests.ts',
       '**/src/courier-cities.ts',
       '**/src/status-incidents.ts',
       '**/src/trust-reports.ts',

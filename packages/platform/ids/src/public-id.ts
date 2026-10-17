@@ -116,6 +116,7 @@ export const ID_PREFIXES = {
   metafieldDefinition: 'mfd',
   paymentSettlement: 'pst',
   incident: 'inc',
+  supportRequest: 'sreq',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;
