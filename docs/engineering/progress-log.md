@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### The shop's own images sized
+### 486b63b · The shop's own images sized
 
 * **A shop's own images are served at the widths and in the formats browsers take, each made once
   and kept beside its file, and removed with it** ([ADR-538](../architecture/13-decision-log.md#adr-538--a-shops-own-images-are-served-at-the-widths-and-in-the-formats-browsers-take-each-made-once-and-kept-beside-its-file-and-removed-with-it)).
