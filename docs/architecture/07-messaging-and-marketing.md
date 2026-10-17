@@ -289,7 +289,9 @@ The pixel is on the storefront's pages while the shop has Meta connected
 checkout's page runs none of the pixel's scripts, so there is nothing to
 deduplicate. The pixel's browser and click
 IDs, from its `_fbp` and `_fbc` cookies, go with the order placed, and its conversions send them.
-TikTok, Google and a consent banner come later.
+TikTok's pixel ([ADR-543](./13-decision-log.md#adr-543--a-shops-storefront-loads-its-tiktok-pixel-while-tiktok-is-connected-beside-metas-for-the-steps-shoppers-take-before-checkout-and-the-order-keeps-the-pixels-browser-id-for-the-events-api)) and Google's tag ([ADR-548](./13-decision-log.md#adr-548--the-storefront-loads-the-shops-google-tag-while-it-has-google-analytics-connected-tracking-the-same-steps-as-metas-and-tiktoks-pixels-and-checkout-passes-the-_ga-cookie-on-so-that-an-orders-server-events-are-the-browsers-that-came-from-the-ad)) load beside it, and a shop may ask its
+shoppers first: a banner until they answer, the pixels waiting for it, and orders of those who
+did not accept sent to no ad platform ([ADR-551](./13-decision-log.md#adr-551--a-shop-may-ask-its-shoppers-before-its-ad-platforms-pixels-load-a-banner-until-they-accept-or-decline-kept-in-a-cookie-of-the-shops-the-pixels-waiting-for-the-answer-and-an-order-placed-by-one-who-did-not-accept-sent-to-no-ad-platform)).
 
 ---
 

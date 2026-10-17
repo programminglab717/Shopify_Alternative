@@ -8736,6 +8736,11 @@ type OnlinePaymentSettingsUpdatePayload {
 """What the shop sets for its storefront as a whole."""
 type OnlineStorePreferences {
   """
+  Whether the storefront asks shoppers before the shop's ad platforms' pixels load (ADR-551): a banner until they accept or decline, and orders of those who declined sent to no ad platform.
+  """
+  consentBanner: Boolean!
+
+  """
   Whether the storefront hides "Powered by Hatti" (ADR-526), which plans from Starter allow.
   """
   hidePoweredBy: Boolean!
@@ -8801,6 +8806,11 @@ type OnlineStorePreferences {
 }
 
 input OnlineStorePreferencesInput {
+  """
+  Asks shoppers before the shop's ad platforms' pixels load, or stops asking (ADR-551). Left as it is if not given.
+  """
+  consentBanner: Boolean
+
   """
   Hides "Powered by Hatti" from the storefront, on a plan that allows it, or shows it again (ADR-526). Left as it is if not given.
   """

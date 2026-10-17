@@ -1567,8 +1567,15 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       }
       const form = posted ? textFields(paramsOf(request)) : null;
       // Where the shopper placed the order from, which the order keeps (ADR-057), with the IDs
-      // the shop's Meta pixel gave their browser, for its conversions (ADR-144).
-      const browserIds = browserIdsOf(request.headers.cookie);
+      // the shop's Meta pixel gave their browser, for its conversions (ADR-144); none, and that
+      // they declined, when the shop asked first and they did not accept (ADR-551).
+      const asks =
+        posted &&
+        (await found.store.shop().then(
+          (doc) => doc.consentBanner === true,
+          () => false,
+        ));
+      const browserIds = browserIdsOf(request.headers.cookie, asks);
       // And the number this browser proved lately at the shop's checkout (ADR-199).
       const proof = cookieOf(request.headers.cookie, NUMBER_PROOF_COOKIE);
       const client = {

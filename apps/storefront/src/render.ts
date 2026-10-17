@@ -48,8 +48,11 @@ import {
   type SearchFound,
 } from './objects.js';
 import {
+  CONSENT_STYLE,
+  consentScript,
   googleTagScript,
   metaPixelScript,
+  onceConsented,
   pixelProduct,
   tiktokPixelScript,
   type PixelProduct,
@@ -737,7 +740,7 @@ export class PageRenderer {
           ? alternateLinks([...theme.locales.keys()], theme.defaultLocale, addressIn)
           : '',
       // The shop's pixels, Meta's and TikTok's, and Google's tag, while it has them (ADR-144,
-      // ADR-543, ADR-548): shoppers' pages alone.
+      // ADR-543, ADR-548): shoppers' pages alone, after its consent banner while it asks (ADR-551).
       pixel:
         request.preview || request.editor
           ? ''
@@ -746,6 +749,7 @@ export class PageRenderer {
               name === 'product'
                 ? pixelProduct(resource.product as Record<string, unknown> | undefined)
                 : null,
+              { locale, prefix: locale === theme.defaultLocale ? '' : `/${locale}` },
             ),
       globals,
       renders,
@@ -965,21 +969,37 @@ function previewBar(name: string, locale: string): string {
 }
 
 /**
- * The time zone the shop's document names, where Intl knows it; Pakistan's for one written before
- * shops had one, or naming none Intl knows.
+ * The script tags of the shop's pixels for a page telling of `product`; empty for none. While the
+ * shop asks its shoppers first (ADR-551), its consent banner's before them, in the page's `locale`
+ * with its privacy policy under `prefix`, and each waits for the shopper to accept.
  */
-/** The script tags of the shop's pixels for a page telling of `product`; empty for none. */
-function pixelTags(shop: ShopDoc, product: PixelProduct | null): string {
-  return [
+function pixelTags(
+  shop: ShopDoc,
+  product: PixelProduct | null,
+  { locale, prefix }: { locale: string; prefix: string },
+): string {
+  const scripts = [
     shop.metaPixelId && metaPixelScript(shop.metaPixelId, product),
     shop.tiktokPixelCode && tiktokPixelScript(shop.tiktokPixelCode, product),
     shop.googleMeasurementId && googleTagScript(shop.googleMeasurementId, product),
-  ]
-    .filter((script): script is string => Boolean(script))
-    .map((script) => `<script data-hatti-pixel>${script}</script>`)
-    .join('');
+  ].filter((script): script is string => Boolean(script));
+  if (scripts.length === 0) return '';
+  const tag = (script: string) => `<script data-hatti-pixel>${script}</script>`;
+  if (!shop.consentBanner) return scripts.map(tag).join('');
+  const privacy = shop.policies?.includes('privacy_policy')
+    ? `${prefix}/policies/privacy-policy`
+    : null;
+  return (
+    `<style>${CONSENT_STYLE}</style>` +
+    `<script data-hatti-consent>${consentScript(locale, privacy)}</script>` +
+    scripts.map((script) => tag(onceConsented(script))).join('')
+  );
 }
 
+/**
+ * The time zone the shop's document names, where Intl knows it; Pakistan's for one written before
+ * shops had one, or naming none Intl knows.
+ */
 function timeZoneOf(shop: ShopDoc): string {
   const zone = shop.timezone;
   if (!zone) return DEFAULT_TIMEZONE;

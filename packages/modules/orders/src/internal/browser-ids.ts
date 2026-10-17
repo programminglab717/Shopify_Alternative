@@ -3,7 +3,9 @@
 // brought them, from `_fbc`; TikTok's browser ID, from its `_ttp` (ADR-541); and Google's tag's,
 // its `_ga` cookie as it is (ADR-548). The storefront
 // passes them as the order is placed through checkout, and the order keeps them for its
-// conversions to name the same browser the pixel's events did.
+// conversions to name the same browser the pixel's events did. When the shop asks its shoppers
+// first and the one placing it did not accept (ADR-551), the order keeps that alone, and goes to no
+// ad platform.
 
 /** The longest an ID is kept: Meta's are some sixty characters. */
 export const BROWSER_ID_LIMIT = 500;
@@ -18,6 +20,8 @@ export type BrowserIdsValue = {
   ttp?: string;
   /** Google's tag's cookie, `_ga`: `GA1.1.<random>.<first visit>`. */
   ga?: string;
+  /** The shopper did not accept the shop's consent banner (ADR-551): kept alone, without IDs. */
+  consent?: 'denied';
 };
 
 /** Meta's format, its last part as long as a cookie's value may be, without spaces. */
@@ -31,11 +35,15 @@ const GOOGLE_ID = /^GA1\.[0-9]\.[0-9]{1,20}\.[0-9]{1,20}$/;
 
 const FORMS = { fbp: META_ID, fbc: META_ID, ttp: TIKTOK_ID, ga: GOOGLE_ID } as const;
 
-/** The IDs of `given` in their platform's format and not too long; null when none is. */
+/**
+ * The IDs of `given` in their platform's format and not too long; null when none is. A declined
+ * consent, alone, whatever IDs came with it.
+ */
 export function browserIdsOf(
   given: Readonly<Record<string, unknown>> | null | undefined,
 ): BrowserIdsValue | null {
   if (!given) return null;
+  if (given.consent === 'denied') return { consent: 'denied' };
   const kept: BrowserIdsValue = {};
   for (const [name, form] of Object.entries(FORMS)) {
     const value = given[name];

@@ -253,6 +253,8 @@ export interface PreferencesRecord {
   returns: ReturnsRecord;
   /** Whether its storefront hides "Powered by Hatti" (ADR-526). */
   hidePoweredBy: boolean;
+  /** Whether its storefront asks shoppers before its ad platforms' pixels load (ADR-551). */
+  consentBanner: boolean;
 }
 
 /** A shop's return window (OS-11, ADR-468), which its product pages say. */

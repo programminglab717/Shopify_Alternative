@@ -65,6 +65,11 @@ export interface PreferencesInput {
    * (ADR-526). Left as it is if absent.
    */
   hidePoweredBy?: boolean | null;
+  /**
+   * Asks its shoppers before its ad platforms' pixels load, or stops asking (ADR-551). Left as it
+   * is if absent.
+   */
+  consentBanner?: boolean | null;
 }
 
 /** The longest return window a shop may give, in days (ADR-468). */
@@ -116,7 +121,8 @@ type PreferencesRow = typeof preferences.$inferSelect;
  * (ADR-054), rules it adds to its robots.txt (ADR-055), its home page's title, description and
  * social sharing image for search engines and link previews (ADR-243), whether it is paused
  * for a while (ADR-252), its return window (ADR-468), and whether it hides "Powered by Hatti"
- * (ADR-526), which a plan without it may not, though one hidden before stays hidden. A shop that set nothing has no number, an open storefront, the
+ * (ADR-526), which a plan without it may not, though one hidden before stays hidden, and whether
+ * it asks shoppers before its ad platforms' pixels load (ADR-551). A shop that set nothing has no number, an open storefront, the
  * platform's robots.txt, and its name for its home page.
  */
 @Injectable()
@@ -310,6 +316,7 @@ export class PreferencesService {
           exchangesOnly: input.returnExchangesOnly ?? was.returns.exchangesOnly,
         },
         hidePoweredBy: input.hidePoweredBy ?? was.hidePoweredBy,
+        consentBanner: input.consentBanner ?? was.consentBanner,
       };
       if (next.passwordEnabled && next.password === null) {
         return failOne(
@@ -346,6 +353,7 @@ export class PreferencesService {
           ? ['returnExchangesOnly']
           : []),
         ...(next.hidePoweredBy !== was.hidePoweredBy ? ['hidePoweredBy'] : []),
+        ...(next.consentBanner !== was.consentBanner ? ['consentBanner'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: was };
       const newPassword = changed.includes('password') && next.password !== null;
@@ -372,6 +380,7 @@ export class PreferencesService {
         returnDays: next.returns.days,
         returnExchangesOnly: next.returns.exchangesOnly,
         hidePoweredBy: next.hidePoweredBy,
+        consentBanner: next.consentBanner,
       };
       const [row] = await tx
         .insert(preferences)
@@ -510,6 +519,7 @@ function toRecord(row: PreferencesRow | undefined, now = new Date()): Preference
       exchangesOnly: row?.returnExchangesOnly ?? false,
     },
     hidePoweredBy: row?.hidePoweredBy ?? false,
+    consentBanner: row?.consentBanner ?? false,
   };
 }
 

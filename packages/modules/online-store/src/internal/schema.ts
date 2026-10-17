@@ -231,6 +231,8 @@ export const preferences = onlineStoreSchema.table('preferences', {
   returnExchangesOnly: boolean('return_exchanges_only').notNull().default(false),
   /** Whether its storefront hides "Powered by Hatti" (ADR-526). */
   hidePoweredBy: boolean('hide_powered_by').notNull().default(false),
+  /** Whether its storefront asks shoppers before its ad platforms' pixels load (ADR-551). */
+  consentBanner: boolean('consent_banner').notNull().default(false),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

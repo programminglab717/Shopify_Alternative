@@ -12,7 +12,10 @@ import { scriptJson } from './liquid.js';
 // TikTok's pixel loads beside it while the shop has TikTok connected (ADR-543), tracking the same
 // steps, and its browser cookie goes with the order for TikTok's Events API (ADR-541); and Google's
 // tag while the shop has Google connected (ADR-548), its cookie going with the order for the
-// Measurement Protocol's events (ADR-547) to name the same browser.
+// Measurement Protocol's events (ADR-547) to name the same browser. A shop may ask its shoppers
+// first (ADR-551): its pages then show a banner until the shopper accepts or declines, the pixels
+// waiting for the answer, and an order placed by one who did not accept says so, for it to go to
+// no ad platform.
 
 /** Where Meta serves its pixel's script. */
 export const META_PIXEL_SCRIPT = 'https://connect.facebook.net/en_US/fbevents.js';
@@ -43,9 +46,22 @@ const PIXEL_COOKIES = {
   ga: ['_ga', GOOGLE_ID],
 } as const;
 
-/** The IDs the shop's pixels gave the browser, from the request's cookies, for the order. */
-export function browserIdsOf(cookies: string | undefined): CheckoutClient['browserIds'] {
-  const ids: NonNullable<CheckoutClient['browserIds']> = {};
+/** The cookie keeping the shopper's answer to the shop's consent banner: granted or denied. */
+export const CONSENT_COOKIE = 'hatti_consent';
+
+/** How long the answer is kept, in seconds: some six months. */
+const CONSENT_MAX_AGE = 180 * 24 * 60 * 60;
+
+/**
+ * The IDs the shop's pixels gave the browser, from the request's cookies, for the order; when the
+ * shop `asks` first (ADR-551) and the shopper did not accept, none, and that they declined.
+ */
+export function browserIdsOf(
+  cookies: string | undefined,
+  asks = false,
+): CheckoutClient['browserIds'] {
+  if (asks && cookieOf(cookies, CONSENT_COOKIE) !== 'granted') return { consent: 'denied' };
+  const ids: Omit<NonNullable<CheckoutClient['browserIds']>, 'consent'> = {};
   for (const [name, [cookie, form]] of Object.entries(PIXEL_COOKIES)) {
     const value = cookieOf(cookies, cookie);
     if (value && form.test(value)) ids[name as keyof typeof PIXEL_COOKIES] = value;
@@ -307,4 +323,105 @@ export function googleTagScript(measurementId: string, product: PixelProduct | n
 ${shopperActions()}
   } catch (error) {}
 })();`;
+}
+
+/** What the consent banner says, in the storefront's languages. */
+const CONSENT_WORDS = {
+  en: {
+    label: 'Cookies',
+    text: 'This store uses cookies from its ad platforms to measure its ads and show you ones that fit.',
+    accept: 'Accept',
+    decline: 'Decline',
+    privacy: 'Privacy policy',
+  },
+  ur: {
+    label: 'کوکیز',
+    text: 'یہ اسٹور اپنے اشتہارات کی پیمائش اور آپ کو موزوں اشتہار دکھانے کے لیے اشتہاری پلیٹ فارمز کی کوکیز استعمال کرتا ہے۔',
+    accept: 'قبول کریں',
+    decline: 'انکار کریں',
+    privacy: 'پرائیویسی پالیسی',
+  },
+} as const;
+
+/**
+ * The script a page's head carries, before its pixels, while the shop asks its shoppers first
+ * (ADR-551): `window.hattiConsent(run)` runs a pixel once the shopper accepts, at once if they
+ * did; until they answer, a banner at the foot of the page asks, in the page's language, linking
+ * the shop's privacy policy at `privacyUrl` when it has one. The answer is kept in a cookie of the
+ * shop's for some six months; declining keeps every pixel from loading. Pages are the same for
+ * every shopper, kept at the edge, so the banner is the browser's to show.
+ */
+export function consentScript(locale: string, privacyUrl: string | null): string {
+  const words = locale === 'ur' ? CONSENT_WORDS.ur : CONSENT_WORDS.en;
+  return `(function () {
+  try {
+    var waiting = [];
+    var found = document.cookie.match(/(?:^|;\\s*)${CONSENT_COOKIE}=(granted|denied)(?:;|$)/);
+    var answer = found ? found[1] : null;
+    window.hattiConsent = function (run) {
+      if (answer === 'granted') run();
+      else if (!answer) waiting.push(run);
+    };
+    if (answer) return;
+    var words = ${scriptJson(words)};
+    var privacy = ${scriptJson(privacyUrl)};
+    var decide = function (choice, banner) {
+      answer = choice;
+      document.cookie = '${CONSENT_COOKIE}=' + choice + '; path=/; max-age=${CONSENT_MAX_AGE}; samesite=lax' +
+        (location.protocol === 'https:' ? '; secure' : '');
+      banner.remove();
+      if (choice === 'granted') {
+        waiting.splice(0).forEach(function (run) {
+          try {
+            run();
+          } catch (error) {}
+        });
+      }
+    };
+    var show = function () {
+      var banner = document.createElement('div');
+      banner.id = 'hatti-consent';
+      banner.setAttribute('role', 'region');
+      banner.setAttribute('aria-label', words.label);
+      banner.dir = ${scriptJson(locale === 'ur' ? 'rtl' : 'ltr')};
+      var text = document.createElement('p');
+      text.textContent = words.text + ' ';
+      if (privacy) {
+        var link = document.createElement('a');
+        link.href = privacy;
+        link.textContent = words.privacy;
+        text.append(link);
+      }
+      banner.append(text);
+      [['decline', 'denied'], ['accept', 'granted']].forEach(function (each) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = words[each[0]];
+        button.setAttribute('data-consent', each[1]);
+        button.addEventListener('click', function () {
+          decide(each[1], banner);
+        });
+        banner.append(button);
+      });
+      document.body.append(banner);
+    };
+    if (document.body) show();
+    else addEventListener('DOMContentLoaded', show);
+  } catch (error) {}
+})();`;
+}
+
+/** The banner's look: a bar at the foot of the page, above the theme's own. */
+export const CONSENT_STYLE =
+  '#hatti-consent{position:fixed;inset:auto 0 0 0;z-index:2147483000;display:flex;flex-wrap:wrap;' +
+  'align-items:center;gap:8px 12px;padding:12px 16px;background:#fff;color:#1a1a1a;' +
+  'border-top:1px solid #d4d4d4;box-shadow:0 -2px 8px rgba(0,0,0,.08);font:14px/1.4 system-ui,sans-serif}' +
+  '#hatti-consent p{flex:1 1 280px;margin:0}#hatti-consent a{color:inherit;text-decoration:underline}' +
+  '#hatti-consent button{min-height:40px;padding:0 16px;border-radius:6px;border:1px solid #1a1a1a;' +
+  'background:#fff;color:#1a1a1a;font:inherit;font-weight:600;cursor:pointer}' +
+  '#hatti-consent button[data-consent=granted]{background:#1a1a1a;color:#fff}';
+
+/** A pixel's `script`, run only once the shopper accepts the shop's consent banner (ADR-551). */
+export function onceConsented(script: string): string {
+  return `window.hattiConsent && window.hattiConsent(function () {\n${script}\n});`;
 }

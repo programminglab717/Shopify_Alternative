@@ -97,9 +97,10 @@ export interface CheckoutClient {
    * The IDs the shop's Meta pixel gave their browser, from its cookies on the shop's address
    * (MKT-10, ADR-144): `fbp` from `_fbp`, its browser ID; `fbc` from `_fbc`, the click on an ad
    * that brought it; `ttp` from TikTok's `_ttp`, its browser ID (ADR-541); and `ga`, Google's
-   * tag's `_ga` cookie (ADR-548). Each left out when the browser had none.
+   * tag's `_ga` cookie (ADR-548). Each left out when the browser had none. `consent: 'denied'`
+   * alone when the shop asked its shoppers first and this one did not accept (ADR-551).
    */
-  browserIds?: { fbp?: string; fbc?: string; ttp?: string; ga?: string };
+  browserIds?: { fbp?: string; fbc?: string; ttp?: string; ga?: string; consent?: 'denied' };
   /** The token of a number the browser proved lately, from its cookie (ADR-199). */
   proof?: string;
 }

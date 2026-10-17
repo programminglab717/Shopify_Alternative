@@ -233,6 +233,14 @@ export class ConversionsSender {
           });
           continue;
         }
+        if (order.browserIds?.consent === 'denied') {
+          outcomes.push({
+            id: conversion.id,
+            status: 'skipped',
+            error: "Not sent: the shopper declined the shop's ad cookies",
+          });
+          continue;
+        }
         const sender = senders.get(conversion.platform)!;
         const { event, name } = sender.eventOf(toConversionOrder(order), conversion, sourceUrl);
         const each = sending.get(conversion.platform) ?? [];

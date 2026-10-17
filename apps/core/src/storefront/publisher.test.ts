@@ -1850,6 +1850,17 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect((await store().shop()).hidePoweredBy).toBeUndefined();
   });
 
+  it('publishes that the shop asks shoppers before its pixels load, and leaves it out while it does not (ADR-551)', async () => {
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).consentBanner).toBeUndefined();
+    unwrap(await preferences.update(tenant, { consentBanner: true }));
+    await deliver();
+    expect((await store().shop()).consentBanner).toBe(true);
+    unwrap(await preferences.update(tenant, { consentBanner: false }));
+    await deliver();
+    expect((await store().shop()).consentBanner).toBeUndefined();
+  });
+
   it("closes the shop's storefront behind its password, with what shoppers are told, and opens it", async () => {
     forgotten.length = 0;
     unwrap(

@@ -498,7 +498,7 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
     ).toEqual([['Purchase', 4_250]]);
   });
 
-  it('tries again while Meta cannot take them, gives up on what it refuses or what is too old, and skips erased customers', async () => {
+  it('tries again while Meta cannot take them, gives up on what it refuses or what is too old, and skips erased customers and shoppers who declined', async () => {
     unwrap(await meta().update(tenant, { pixelId: '1234567890', accessToken: TOKEN }));
     const first = await placeOnline();
     await dispatch();
@@ -524,7 +524,13 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
     answer = { status: 200, body: { events_received: 1 } };
     const old = await placeOnline();
     const erased = await placeOnline();
+    const declined = await placeOnline();
     await dispatch();
+    // The shop asked first, and this shopper did not accept (ADR-551).
+    await admin.query(
+      `UPDATE orders.orders SET browser_ids = '{"consent": "denied"}' WHERE id = $1`,
+      [declined.id],
+    );
     await admin.query(
       `UPDATE marketing.conversions SET occurred_at = now() - interval '7 days' WHERE order_id = $1`,
       [old.id],
@@ -544,6 +550,10 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
     expect(await statusOf(erased.id)).toEqual([
       'skipped',
       "Not sent: the customer's data was erased",
+    ]);
+    expect(await statusOf(declined.id)).toEqual([
+      'skipped',
+      "Not sent: the shopper declined the shop's ad cookies",
     ]);
 
     // Disconnected with a moment waiting: it is not sent.

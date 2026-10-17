@@ -174,6 +174,14 @@ export class OnlineStorePreferences {
       'Whether the storefront hides "Powered by Hatti" (ADR-526), which plans from Starter allow.',
   })
   hidePoweredBy!: boolean;
+
+  @Field({
+    description:
+      "Whether the storefront asks shoppers before the shop's ad platforms' pixels load " +
+      '(ADR-551): a banner until they accept or decline, and orders of those who declined sent ' +
+      'to no ad platform.',
+  })
+  consentBanner!: boolean;
 }
 
 @InputType()
@@ -331,6 +339,14 @@ export class OnlineStorePreferencesInput {
       'again (ADR-526). Left as it is if not given.',
   })
   hidePoweredBy?: boolean | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      "Asks shoppers before the shop's ad platforms' pixels load, or stops asking (ADR-551). " +
+      'Left as it is if not given.',
+  })
+  consentBanner?: boolean | null;
 }
 
 @ObjectType()

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-550 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-551 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -558,6 +558,7 @@
 | 548 | The storefront loads the shop's Google tag while it has Google Analytics connected, tracking the same steps as Meta's and TikTok's pixels, and checkout passes the `_ga` cookie on so that an order's server events are the browser's that came from the ad | Accepted |
 | 549 | The admin's inbox lists a shop's WhatsApp conversations open, unread or closed, and a conversation's page reads it as it opens, closes and reopens it, and answers within the day WhatsApp allows, for those who work it; marketers read it alone | Accepted |
 | 550 | The admin's online store has a Google tab: the web stream connected with its measurement ID and API secret, its purchase moment chosen, disconnected once asked, and the moments sent to Google listed apart | Accepted |
+| 551 | A shop may ask its shoppers before its ad platforms' pixels load: a banner until they accept or decline, kept in a cookie of the shop's, the pixels waiting for the answer, and an order placed by one who did not accept sent to no ad platform | Accepted |
 
 ---
 
@@ -20751,3 +20752,34 @@
 * **Alternatives:**
   * **Signing in with Google to pick the stream:** saves copying two values, but needs Hatti to
     hold each shop's Google access, as ADR-547 chose not to.
+
+## ADR-551 · A shop may ask its shoppers before its ad platforms' pixels load: a banner until they accept or decline, kept in a cookie of the shop's, the pixels waiting for the answer, and an order placed by one who did not accept sent to no ad platform
+
+* **Context:** A shop's pages load Meta's and TikTok's pixels and Google's tag while it has them
+  connected (ADR-144, ADR-543, ADR-548), and its orders go to them from the server (ADR-143,
+  ADR-541, ADR-547), with no banner asking the shopper first. A shop selling to countries whose
+  laws ask for one, or that would rather ask, had no way to.
+* **Decision:**
+  * **A preference of the online store's** (`consentBanner`), off unless the shop turns it on, on
+    any plan: asking is not a feature to sell.
+  * **The banner:** while it is on and the shop has a pixel, each page's head carries a script
+    before the pixels that shows a bar at the foot of the page until the shopper answers, in the
+    page's language, English or Urdu, right to left in Urdu, linking the shop's privacy policy when
+    it has one. Pages are the same for every shopper and kept at the edge, so the browser decides
+    whether to show it, from the answer kept in the shop's `hatti_consent` cookie for some six
+    months.
+  * **The pixels wait:** each runs only once the shopper accepts, at once on later pages; declining,
+    or not answering, loads none, so their cookies are never set.
+  * **The order:** placed by a shopper who did not accept while the shop asks, it keeps that alone,
+    with no browser's IDs, and the worker skips its moments for every platform, saying the shopper
+    declined.
+* **Consequences:**
+  * A shop that asks tells its ads less; one that does not is as before.
+  * The banner does not come back once answered, short of the shopper clearing the cookie: no link
+    reopens it yet. The visits' first-party cookie (ADR-139) is the shop's own analytics and does
+    not wait for it.
+  * The admin does not set it yet: the API does.
+* **Alternatives:**
+  * **Google's and Meta's consent modes, the pixels loaded but told to hold back:** they still
+    load the platforms' scripts before the shopper answers.
+  * **A banner the theme renders:** every theme would need one, and the pixels are the platform's.

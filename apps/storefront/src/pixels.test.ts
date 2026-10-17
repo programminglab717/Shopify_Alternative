@@ -9,8 +9,10 @@ import {
   META_PIXEL_SCRIPT,
   TIKTOK_PIXEL_SCRIPT,
   browserIdsOf,
+  consentScript,
   googleTagScript,
   metaPixelScript,
+  onceConsented,
   pixelProduct,
   tiktokPixelScript,
   type PixelProduct,
@@ -370,5 +372,183 @@ describe("The shop's Google tag (ADR-548)", () => {
       ],
       ['event', 'begin_checkout'],
     ]);
+  });
+});
+
+/** An element of a page in the fake browser: what the consent banner makes of it. */
+class FakeElement {
+  readonly children: FakeElement[] = [];
+  readonly attributes: Record<string, string> = {};
+  readonly listeners: Record<string, (() => void)[]> = {};
+  textContent = '';
+  href = '';
+  id = '';
+  dir = '';
+  type = '';
+  src = '';
+  async = false;
+  removed = false;
+  constructor(readonly tag: string) {}
+  append(...children: FakeElement[]) {
+    this.children.push(...children);
+  }
+  setAttribute(name: string, value: string) {
+    this.attributes[name] = value;
+  }
+  addEventListener(type: string, listener: () => void) {
+    (this.listeners[type] ??= []).push(listener);
+  }
+  remove() {
+    this.removed = true;
+  }
+  /** Its words and its children's, as a shopper reads them. */
+  get words(): string {
+    return this.textContent + this.children.map((child) => child.words).join('');
+  }
+}
+
+/**
+ * A page of the shop's in a browser carrying `cookie`, its head's `scripts` run in order: the
+ * banner it shows, the cookies it sets, and Meta's pixel's calls.
+ */
+function browse(scripts: string[], cookie = '') {
+  const body = new FakeElement('body');
+  const set: string[] = [];
+  const window: Record<string, unknown> = {
+    document: {
+      body,
+      get cookie() {
+        return cookie;
+      },
+      set cookie(value: string) {
+        set.push(value);
+      },
+      createElement: (tag: string) => new FakeElement(tag),
+      head: { appendChild: () => undefined },
+      addEventListener: () => undefined,
+    },
+    location: {
+      href: 'https://www.zari.pk/',
+      origin: 'https://www.zari.pk',
+      protocol: 'https:',
+    },
+    URL,
+  };
+  window.window = window;
+  for (const script of scripts) runInNewContext(script, window);
+  const banner = () =>
+    body.children.find((child) => child.id === 'hatti-consent' && !child.removed);
+  const button = (consent: string) =>
+    banner()!.children.find((child) => child.attributes['data-consent'] === consent)!;
+  return {
+    banner,
+    set,
+    click: (consent: 'granted' | 'denied') =>
+      button(consent).listeners.click!.forEach((run) => run()),
+    calls: () => {
+      const fbq = window.fbq as { queue: ArrayLike<unknown>[] } | undefined;
+      return fbq ? fbq.queue.map((call) => Array.from(call)[0]) : null;
+    },
+  };
+}
+
+describe("The shop's consent banner (ADR-551)", () => {
+  const pixel = onceConsented(metaPixelScript('1234567890', null));
+
+  it('asks the shopper first, and loads the pixels once they accept', () => {
+    const page = browse([consentScript('en', '/policies/privacy-policy'), pixel]);
+    expect(page.calls()).toBeNull();
+    const banner = page.banner()!;
+    expect(banner.attributes).toEqual({ role: 'region', 'aria-label': 'Cookies' });
+    expect(banner.dir).toBe('ltr');
+    expect(banner.words).toContain('This store uses cookies from its ad platforms');
+    expect(banner.children[0]!.children[0]).toMatchObject({
+      tag: 'a',
+      href: '/policies/privacy-policy',
+      textContent: 'Privacy policy',
+    });
+    expect(banner.children.slice(1).map((each) => each.textContent)).toEqual(['Decline', 'Accept']);
+
+    page.click('granted');
+    expect(page.calls()).toEqual(['init', 'track']);
+    expect(page.banner()).toBeUndefined();
+    expect(page.set).toEqual([
+      'hatti_consent=granted; path=/; max-age=15552000; samesite=lax; secure',
+    ]);
+  });
+
+  it('loads none when they decline, and asks no more once they answered', () => {
+    const declined = browse([consentScript('en', null), pixel]);
+    declined.click('denied');
+    expect(declined.calls()).toBeNull();
+    expect(declined.banner()).toBeUndefined();
+    expect(declined.set).toEqual([
+      'hatti_consent=denied; path=/; max-age=15552000; samesite=lax; secure',
+    ]);
+
+    const before = browse([consentScript('en', null), pixel], 'cart=c1; hatti_consent=denied');
+    expect(before.banner()).toBeUndefined();
+    expect(before.calls()).toBeNull();
+    const accepted = browse([consentScript('en', null), pixel], 'hatti_consent=granted; cart=c1');
+    expect(accepted.banner()).toBeUndefined();
+    expect(accepted.calls()).toEqual(['init', 'track']);
+    // Another value is no answer.
+    expect(browse([consentScript('en', null), pixel], 'hatti_consent=yes').banner()).toBeDefined();
+  });
+
+  it('asks in Urdu on Urdu pages, without a policy link the shop has none for', () => {
+    const banner = browse([consentScript('ur', null), pixel]).banner()!;
+    expect(banner.dir).toBe('rtl');
+    expect(banner.words).toContain('کوکیز استعمال کرتا ہے');
+    expect(banner.children[0]!.children).toEqual([]);
+    expect(banner.children.slice(1).map((each) => each.textContent)).toEqual([
+      'انکار کریں',
+      'قبول کریں',
+    ]);
+  });
+
+  it('names no browser for the order when the shop asks and the shopper did not accept', () => {
+    const ids = '_fbp=fb.1.1727856000000.1116446470; _ga=GA1.1.1903423857.1760680000';
+    expect(browserIdsOf(ids, true)).toEqual({ consent: 'denied' });
+    expect(browserIdsOf(`${ids}; hatti_consent=denied`, true)).toEqual({ consent: 'denied' });
+    expect(browserIdsOf(`${ids}; hatti_consent=granted`, true)).toEqual({
+      fbp: 'fb.1.1727856000000.1116446470',
+      ga: 'GA1.1.1903423857.1760680000',
+    });
+    // A shop that does not ask passes them on as before.
+    expect(browserIdsOf(`${ids}; hatti_consent=denied`)).toEqual({
+      fbp: 'fb.1.1727856000000.1116446470',
+      ga: 'GA1.1.1903423857.1760680000',
+    });
+  });
+
+  it('is on the pages of a shop that asks, before its pixels, which wait for it', async () => {
+    const theme = loadTheme(await readThemeDir(THEME_DIR));
+    const render = async (shop: Record<string, unknown>, path = '/') => {
+      const sample = sampleStore();
+      const store = new MemoryStore({ ...sample, shop: { ...sample.shop, ...shop } });
+      const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+      const html = (await renderer.render({ path }, store.fresh(0))).html;
+      return html.slice(0, html.indexOf('</head>'));
+    };
+    const asking = await render({
+      metaPixelId: '1234567890',
+      googleMeasurementId: 'G-AB12CD34EF',
+      consentBanner: true,
+      policies: ['privacy_policy'],
+    });
+    expect(asking.indexOf('<script data-hatti-consent>')).toBeGreaterThan(-1);
+    expect(asking.indexOf('<script data-hatti-consent>')).toBeLessThan(
+      asking.indexOf('<script data-hatti-pixel>'),
+    );
+    expect(asking.split('<script data-hatti-pixel>window.hattiConsent && ')).toHaveLength(3);
+    expect(asking).toContain('"/policies/privacy-policy"');
+    expect(asking).toContain('#hatti-consent{');
+    // Without pixels there is nothing to ask of.
+    expect(await render({ consentBanner: true })).not.toContain('data-hatti-consent');
+    // Without asking, the pixels load as before.
+    const loading = await render({ metaPixelId: '1234567890' });
+    expect(loading).not.toContain('data-hatti-consent');
+    expect(loading).toContain('<script data-hatti-pixel>(function () {');
   });
 });

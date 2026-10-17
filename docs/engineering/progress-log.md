@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### A consent banner
+
+* **A shop may ask its shoppers before its ad platforms' pixels load: a banner until they accept or
+  decline, the pixels waiting for the answer, and an order placed by one who did not accept sent to
+  no ad platform** ([ADR-551](../architecture/13-decision-log.md#adr-551--a-shop-may-ask-its-shoppers-before-its-ad-platforms-pixels-load-a-banner-until-they-accept-or-decline-kept-in-a-cookie-of-the-shops-the-pixels-waiting-for-the-answer-and-an-order-placed-by-one-who-did-not-accept-sent-to-no-ad-platform), MKT-10). On any plan, through the API for now.
+* 3360 tests, 8 more: the banner in a browser, its place on the pages,
+  the order's browser IDs, the preference and its publishing.
+
 ### f843fe5 · Google's tab in the admin
 
 * **The admin's online store has a Google tab: the web stream connected with its measurement ID and
@@ -29,8 +37,8 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 * **The admin's inbox lists a shop's WhatsApp conversations open, unread or closed, and a
   conversation's page reads, closes and reopens it, and answers within the day WhatsApp allows**
   ([ADR-549](../architecture/13-decision-log.md#adr-549--the-admins-inbox-lists-a-shops-whatsapp-conversations-open-unread-or-closed-and-a-conversations-page-reads-it-as-it-opens-closes-and-reopens-it-and-answers-within-the-day-whatsapp-allows-for-those-who-work-it-marketers-read-it-alone), MSG-05). Marketers read it alone.
-* 3346 tests, 19 more: the inbox's 9, and the admin's count caught up with
-  the 10 it ran uncounted.
+* 3346 tests, 19 more: the inbox's 9 and its six operations checked against the API's schema,
+  and the admin's count caught up with the 4 it ran uncounted.
 
 ### f806c9c · Google's tag on the storefront
 

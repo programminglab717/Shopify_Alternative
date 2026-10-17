@@ -656,6 +656,8 @@ export function shopDoc(
     }),
     // Hiding "Powered by Hatti" (ADR-526), left out while it shows it, likewise.
     ...(preferences.hidePoweredBy && { hidePoweredBy: true as const }),
+    // Asking shoppers before the pixels load (ADR-551), likewise.
+    ...(preferences.consentBanner && { consentBanner: true as const }),
     robotsRules: preferences.robotsTxtRules,
     policies: [...policies],
     // Left out without one, so a shop without one keeps its document as it was.

@@ -43,6 +43,7 @@ describe.skipIf(!server)('PreferencesService', () => {
     maintenance: { enabled: false, message: '', until: null },
     returns: { days: null, exchangesOnly: false },
     hidePoweredBy: false,
+    consentBanner: false,
   };
 
   it("keeps a shop's WhatsApp number in E.164, recording each change", async () => {
@@ -87,7 +88,25 @@ describe.skipIf(!server)('PreferencesService', () => {
       maintenance: { enabled: false, message: '', until: null },
       returns: { days: null, exchangesOnly: false },
       hidePoweredBy: false,
+      consentBanner: false,
     });
+  });
+
+  it('asks shoppers before the pixels load, or stops asking, on any plan (ADR-551)', async () => {
+    expect(unwrap(await f.preferences.update(f.a, { consentBanner: true }))).toMatchObject({
+      consentBanner: true,
+    });
+    unwrap(await f.preferences.update(f.a, { consentBanner: true }));
+    unwrap(await f.preferences.update(f.a, { returnDays: 7 }));
+    expect((await f.preferences.get(f.a)).consentBanner).toBe(true);
+    expect(unwrap(await f.preferences.update(f.a, { consentBanner: false })).consentBanner).toBe(
+      false,
+    );
+    expect((await f.outbox()).map((event) => event.payload)).toEqual([
+      { changed: ['consentBanner'] },
+      { changed: ['returnDays'] },
+      { changed: ['consentBanner'] },
+    ]);
   });
 
   it('closes the storefront behind a password, kept sealed, with a verifier for the storefront', async () => {

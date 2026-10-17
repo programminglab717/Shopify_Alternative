@@ -508,6 +508,11 @@ export interface ShopDoc {
    */
   hidePoweredBy?: true;
   /**
+   * True while its storefront asks shoppers before its ad platforms' pixels load (ADR-551).
+   * Absent while it does not, as in documents written before shops could ask.
+   */
+  consentBanner?: true;
+  /**
    * Rules it adds to its robots.txt (ADR-055), one a line, as the online store checked them.
    * Absent or empty for none, as in documents written before shops had them.
    */
