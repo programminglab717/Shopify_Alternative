@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Invoice series
+### fc2bfc2 · Invoice series
 
 * **An order's invoice takes the next number in the shop's own series when it is first printed,
   counted afresh each tax year, with none skipped or given twice** ([ADR-495](../architecture/13-decision-log.md#adr-495--invoice-series-an-orders-invoice-numbered-in-the-shops-own-series-when-first-printed-counted-afresh-each-tax-year-from-1-july-with-no-number-skipped-or-given-twice), TAX-05 in part).
