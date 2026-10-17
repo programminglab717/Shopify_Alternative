@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### The admin's draft codes
+### 530e724 · The admin's draft codes
 
 * **The admin's draft page takes a discount code beside the amount off, and shows a draft's
   discount by its code, in English and Urdu** ([ADR-522](../architecture/13-decision-log.md#adr-522--the-admins-draft-page-takes-a-discount-code-beside-the-amount-off-while-a-code-is-given-the-amount-is-the-codes-to-set-and-is-not-asked-the-draft-shows-its-discount-by-the-code-and-emptying-the-code-takes-it-off), CHK-06, ORD-03).
