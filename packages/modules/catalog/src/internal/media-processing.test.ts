@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
+import { AiGateway } from '@hatti/ai';
 import { LocalStorage } from '@hatti/storage';
 import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { CopyDraftService } from './copy-drafts.service.js';
 import { cleanImageKey, cropNameOf, imagePathOf, parseImagePath, shownSizeOf } from './images.js';
 import { MediaProcessing } from './media-processing.js';
 import { MediaService } from './media.service.js';
@@ -377,6 +379,96 @@ describe.skipIf(!server)('product images (ADR-158)', () => {
       expect(
         errorsOf(await media.autoCrop(f.a, kurta.id, { aspect: 'square', mediaIds: [waiting!] })),
       ).toEqual([['mediaIds', 'INVALID']]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("drafts a product's copy from its first ready photos, as cropped (APP-02, ADR-507)", async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'hatti-photo-copy-'));
+    try {
+      const storage = new LocalStorage({
+        directory,
+        baseUrl: 'http://localhost:4000/storage',
+        secret: 'a'.repeat(32),
+      });
+      const sent: { content: { type: string; source?: { data: string } }[] }[] = [];
+      const fetch = (async (_url: string, init: RequestInit) => {
+        const body = JSON.parse(init.body as string) as { messages: (typeof sent)[number][] };
+        sent.push(body.messages[0]!);
+        return new Response(
+          JSON.stringify({
+            content: [
+              {
+                type: 'tool_use',
+                name: 'give_product_copy',
+                input: {
+                  title: 'Plum kurta',
+                  description_html: '<p>A plum kurta.</p>',
+                  seo_title: 'Plum kurta',
+                  seo_description: 'A plum kurta.',
+                },
+              },
+            ],
+            stop_reason: 'tool_use',
+            usage: { input_tokens: 1600, output_tokens: 90 },
+          }),
+          { status: 200 },
+        );
+      }) as unknown as typeof globalThis.fetch;
+      const drafts = new CopyDraftService(
+        f.db,
+        new AiGateway({ apiKey: 'test', model: 'model-from-config', fetch }),
+        storage,
+      );
+      const media = new MediaService(f.db, storage);
+      const kurta = await product(f.a, 'New product', 2);
+      const [front, back] = kurta.mediaIds;
+      const noted = { language: 'en' as const, productId: kurta.id, usePhotos: true };
+
+      // Not until a photo is ready; never without a product.
+      expect(errorsOf(await drafts.draft(f.a, noted))).toEqual([['input.usePhotos', 'INVALID']]);
+      expect(errorsOf(await drafts.draft(f.a, { ...noted, productId: null }))).toEqual([
+        ['input.productId', 'BLANK'],
+      ]);
+      expect(errorsOf(await drafts.draft(f.b, noted))).toEqual([['input.productId', 'NOT_FOUND']]);
+
+      const whole = await sharp({
+        create: { width: 2400, height: 1600, channels: 3, background: '#5B2A4E' },
+      })
+        .jpeg()
+        .toBuffer();
+      await processing.claim(f.a.shopId, now, 2, LEASE);
+      for (const id of [front!, back!]) {
+        await storage.put(cleanImageKey(f.a.shopId, id, 'jpeg'), whole, 'image/jpeg');
+        await processing.ready(f.a.shopId, id, {
+          format: 'jpeg',
+          width: 2400,
+          height: 1600,
+          size: whole.length,
+        });
+      }
+      unwrap(
+        await media.update(f.a, kurta.id, [
+          { id: back!, crop: { left: 0, top: 0, width: 800, height: 1600 } },
+        ]),
+      );
+
+      // Nothing said of it but its photos.
+      expect(unwrap(await drafts.draft(f.a, noted)).title).toBe('Plum kurta');
+      const [first, second, text] = sent[0]!.content;
+      expect([first!.type, second!.type, text!.type]).toEqual(['image', 'image', 'text']);
+      const sizes = await Promise.all(
+        [first!, second!].map(async (block) => {
+          const shown = await sharp(Buffer.from(block.source!.data, 'base64')).metadata();
+          return [shown.format, shown.width, shown.height];
+        }),
+      );
+      // Made small for the model, the cropped one as cropped.
+      expect(sizes).toEqual([
+        ['jpeg', 1024, 683],
+        ['jpeg', 512, 1024],
+      ]);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

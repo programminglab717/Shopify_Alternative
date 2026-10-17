@@ -1,6 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import {
+  Camera,
   ChevronRight,
   FileSpreadsheet,
   FolderOpen,
@@ -261,6 +262,16 @@ export function ProductsPage() {
             >
               <FileSpreadsheet aria-hidden className="size-5" />
               {t('files.title')}
+            </Link>
+          )}
+          {edits && (
+            <Link
+              to="/$shopId/products/snap"
+              params={{ shopId: shop.id }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-control border border-line bg-surface px-4 font-medium hover:bg-canvas md:min-h-10"
+            >
+              <Camera aria-hidden className="size-5" />
+              {t('snap.link')}
             </Link>
           )}
           {edits && (

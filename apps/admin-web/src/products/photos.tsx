@@ -252,9 +252,12 @@ function MediaTile({
  * uploaded straight to storage, and shown as the core makes each ready, or says why it could not;
  * the first is the one listings show.
  */
-export function ProductPhotos({ product, edits }: { product: ProductDetail; edits: boolean }) {
+/**
+ * Puts photos up to a product: each made ready to go up ({@link preparePhoto}), staged, sent and
+ * added, ten at a time, in the order they were chosen. What went wrong, in the merchant's words.
+ */
+export function usePhotoUpload() {
   const { t } = useLocale();
-  const input = useRef<HTMLInputElement>(null);
   const stage = useAdminMutation<StagedUploadsCreateData, { input: Record<string, string>[] }>(
     StagedUploadsCreateMutation,
   );
@@ -262,24 +265,10 @@ export function ProductPhotos({ product, edits }: { product: ProductDetail; edit
     ProductCreateMediaData,
     { productId: string; media: Record<string, string>[] }
   >(ProductCreateMediaMutation);
-  const remove = useAdminMutation<
-    ProductDeleteMediaData,
-    { productId: string; mediaIds: string[] }
-  >(ProductDeleteMediaMutation);
-  const reorder = useAdminMutation<
-    ProductReorderMediaData,
-    { productId: string; moves: { id: string; newPosition: number }[] }
-  >(ProductReorderMediaMutation);
-  const [uploading, setUploading] = useState(0);
-  const [problems, setProblems] = useState<string[]>([]);
-  const busy = uploading > 0 || remove.isPending || reorder.isPending;
-  const images = product.media.filter((each) => each.mediaContentType === 'IMAGE');
 
-  const upload = async (chosen: File[]) => {
-    setProblems([]);
+  return async (productId: string, chosen: File[], alt: string): Promise<string[]> => {
     const wrong: string[] = [];
     const ready: File[] = [];
-    setUploading(chosen.length);
     try {
       for (const file of chosen) {
         const photo = await preparePhoto(file);
@@ -320,10 +309,10 @@ export function ProductPhotos({ product, edits }: { product: ProductDetail; edit
         const uploaded = sent.filter((url) => url !== null);
         if (uploaded.length === 0) continue;
         const { productCreateMedia } = await create.mutateAsync({
-          productId: product.id,
+          productId,
           media: uploaded.map((originalSource) => ({
             originalSource,
-            alt: product.title,
+            alt,
             mediaContentType: 'IMAGE',
           })),
         });
@@ -331,9 +320,35 @@ export function ProductPhotos({ product, edits }: { product: ProductDetail; edit
       }
     } catch (failure) {
       wrong.push(errorText(failure, t));
+    }
+    return wrong;
+  };
+}
+
+export function ProductPhotos({ product, edits }: { product: ProductDetail; edits: boolean }) {
+  const { t } = useLocale();
+  const input = useRef<HTMLInputElement>(null);
+  const putUp = usePhotoUpload();
+  const remove = useAdminMutation<
+    ProductDeleteMediaData,
+    { productId: string; mediaIds: string[] }
+  >(ProductDeleteMediaMutation);
+  const reorder = useAdminMutation<
+    ProductReorderMediaData,
+    { productId: string; moves: { id: string; newPosition: number }[] }
+  >(ProductReorderMediaMutation);
+  const [uploading, setUploading] = useState(0);
+  const [problems, setProblems] = useState<string[]>([]);
+  const busy = uploading > 0 || remove.isPending || reorder.isPending;
+  const images = product.media.filter((each) => each.mediaContentType === 'IMAGE');
+
+  const upload = async (chosen: File[]) => {
+    setProblems([]);
+    setUploading(chosen.length);
+    try {
+      setProblems(await putUp(product.id, chosen, product.title));
     } finally {
       setUploading(0);
-      setProblems(wrong);
     }
   };
 

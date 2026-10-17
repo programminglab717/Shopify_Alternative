@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { crc32, deflateSync } from 'node:zlib';
 import sharp, { type Sharp } from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { MAX_IMAGE_SIDE, cleanImage, cropImage } from './clean.js';
+import { MAX_IMAGE_SIDE, MODEL_IMAGE_SIDE, cleanImage, cropImage, modelImage } from './clean.js';
 import { ImageFetcher } from './fetch.js';
 import { sniffImage } from './formats.js';
 import { frame, subjectCrop } from './subject.js';
@@ -189,6 +189,28 @@ describe('crops', () => {
       40,
       true,
     ]);
+  });
+});
+
+describe('pictures for an AI model (APP-02, ADR-507)', () => {
+  it('are JPEGs no longer than the model needs, see-through on white, small ones kept small', async () => {
+    const large = await (await photo(3000, 1500)).jpeg().toBuffer();
+    const small = await modelImage(large);
+    const metadata = await sharp(small).metadata();
+    expect([metadata.format, metadata.width, metadata.height]).toEqual([
+      'jpeg',
+      MODEL_IMAGE_SIDE,
+      MODEL_IMAGE_SIDE / 2,
+    ]);
+    const seeThrough = await sharp({
+      create: { width: 40, height: 30, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    })
+      .png()
+      .toBuffer();
+    const flat = await modelImage(seeThrough);
+    const { data, info } = await sharp(flat).raw().toBuffer({ resolveWithObject: true });
+    expect([info.width, info.height, info.channels]).toEqual([40, 30, 3]);
+    expect(data[0]).toBeGreaterThan(250);
   });
 });
 

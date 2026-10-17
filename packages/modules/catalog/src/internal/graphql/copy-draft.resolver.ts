@@ -81,6 +81,16 @@ export class ProductCopyDraftInput {
     description: 'Its description as it stands, which the draft may build on.',
   })
   description?: string | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    defaultValue: false,
+    description:
+      'Whether the AI looks at the product’s first three ready photos too, saying what they ' +
+      'plainly show (APP-02): for a product added from a photo, with nothing else said of it. ' +
+      'Needs `productId`.',
+  })
+  usePhotos?: boolean | null;
 }
 
 @ObjectType({
@@ -162,6 +172,7 @@ export class CopyDraftResolver {
             options: input.options ?? [],
             notes: input.notes,
             description: input.description,
+            usePhotos: input.usePhotos ?? false,
           });
     return Object.assign(new ProductCopyDraftPayload(), {
       draft: result.ok ? Object.assign(new ProductCopyDraft(), result.value) : null,

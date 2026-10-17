@@ -71,6 +71,45 @@ describe('AI product copy (CAT-20, ADR-471)', () => {
     expect(prompt.match(/<\/facts>/g)).toHaveLength(1);
   });
 
+  it('drafts from photos of the product, given before the facts, at most five', async () => {
+    const answer = {
+      title: 'Mint printed three-piece suit',
+      description_html: '<p>Mint, with a printed border.</p>',
+      seo_title: 'Mint printed three-piece suit',
+      seo_description: 'A mint three-piece suit with a printed border.',
+    };
+    const { gateway, requests } = provider(answer);
+    const jpeg = { mediaType: 'image/jpeg' as const, data: Buffer.from([0xff, 0xd8, 0xff, 1]) };
+    const drafted = await draftProductCopy(gateway, {
+      shopName: 'Zari',
+      language: 'en',
+      facts: {},
+      images: [jpeg, { ...jpeg, mediaType: 'image/png' }],
+    });
+    expect(drafted).toMatchObject({ ok: true, value: { title: 'Mint printed three-piece suit' } });
+    const sent = requests[0]! as {
+      system: string;
+      messages: { content: { type: string; text?: string; source?: unknown }[] }[];
+    };
+    const [first, second, text] = sent.messages[0]!.content;
+    expect(first).toEqual({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/jpeg', data: '/9j/AQ==' },
+    });
+    expect(second).toMatchObject({ type: 'image', source: { media_type: 'image/png' } });
+    expect(text!.type).toBe('text');
+    expect(text!.text).toContain('2 photos of the product come above.');
+    expect(sent.system).toContain('A photo\ncannot tell its fabric');
+
+    const tooMany = await draftProductCopy(provider(answer).gateway, {
+      shopName: 'Zari',
+      language: 'en',
+      facts: {},
+      images: Array.from({ length: 6 }, () => jpeg),
+    });
+    expect(tooMany).toMatchObject({ ok: false, reason: 'invalid' });
+  });
+
   it('gives nothing to use for an answer without a title or a description', async () => {
     const { gateway } = provider({
       title: ' ',

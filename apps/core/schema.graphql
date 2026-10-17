@@ -10834,6 +10834,11 @@ input ProductCopyDraftInput {
   productType: String
   tags: [String!]
   title: String
+
+  """
+  Whether the AI looks at the product’s first three ready photos too, saying what they plainly show (APP-02): for a product added from a photo, with nothing else said of it. Needs `productId`.
+  """
+  usePhotos: Boolean = false
   vendor: String
 }
 

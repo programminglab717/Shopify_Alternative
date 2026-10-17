@@ -36,10 +36,21 @@ export type AiResult<T> =
   | { ok: true; value: T; usage: AiUsage }
   | { ok: false; reason: AiFailure; detail: string; usage?: AiUsage };
 
+/** A picture the model looks at with the prompt (APP-02): a JPEG, PNG, WebP or GIF's bytes. */
+export interface AiImage {
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+  data: Buffer;
+}
+
+/** The most pictures one request takes. */
+export const AI_IMAGE_LIMITS = { count: 5, bytes: 3_750_000 } as const;
+
 /** A request whose answer comes back through one tool, checked by `parse`. */
 export interface StructuredRequest<T> {
   system: string;
   prompt: string;
+  /** Pictures given before the prompt, for the model to look at. */
+  images?: readonly AiImage[];
   tool: { name: string; description: string; inputSchema: Record<string, unknown> };
   maxTokens: number;
   /** What the tool's input means, or null when it does not fit. */
@@ -79,11 +90,32 @@ export class AiGateway {
    * request's `parse`, or why there is none to use. Tried once more when the provider is busy.
    */
   async structured<T>(request: StructuredRequest<T>): Promise<AiResult<T>> {
+    const images = request.images ?? [];
+    if (
+      images.length > AI_IMAGE_LIMITS.count ||
+      images.some((image) => image.data.length > AI_IMAGE_LIMITS.bytes)
+    ) {
+      return { ok: false, reason: 'invalid', detail: 'Too many pictures, or one too large' };
+    }
+    const content =
+      images.length === 0
+        ? request.prompt
+        : [
+            ...images.map((image) => ({
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: image.mediaType,
+                data: image.data.toString('base64'),
+              },
+            })),
+            { type: 'text', text: request.prompt },
+          ];
     const body = JSON.stringify({
       model: this.options.model,
       max_tokens: request.maxTokens,
       system: request.system,
-      messages: [{ role: 'user', content: request.prompt }],
+      messages: [{ role: 'user', content }],
       tools: [
         {
           name: request.tool.name,

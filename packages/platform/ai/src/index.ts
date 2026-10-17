@@ -1,6 +1,8 @@
 export {
+  AI_IMAGE_LIMITS,
   AiGateway,
   type AiFailure,
+  type AiImage,
   type AiGatewayOptions,
   type AiResult,
   type AiUsage,

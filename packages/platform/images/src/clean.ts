@@ -135,6 +135,22 @@ export async function cropImage(
   return (format === 'jpeg' ? part.jpeg({ quality: 90 }) : part.png()).toBuffer();
 }
 
+/** The longest side of a picture an AI model looks at (APP-02): enough to tell a print. */
+export const MODEL_IMAGE_SIDE = 1024;
+
+/**
+ * A clean image as an AI model is given it (APP-02): a JPEG no longer than
+ * {@link MODEL_IMAGE_SIDE} on its longest side, transparency on white, so that each photo costs
+ * the model's tokens of a small picture, not of the original.
+ */
+export async function modelImage(clean: Buffer): Promise<Buffer> {
+  return sharp(clean, INPUT)
+    .resize(MODEL_IMAGE_SIDE, MODEL_IMAGE_SIDE, { fit: 'inside', withoutEnlargement: true })
+    .flatten({ background: '#ffffff' })
+    .jpeg({ quality: 80 })
+    .toBuffer();
+}
+
 function problem(code: ImageProblemCode, message: string): CleanResult {
   return { ok: false, problem: { code, message } };
 }

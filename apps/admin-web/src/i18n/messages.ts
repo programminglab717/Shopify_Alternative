@@ -4137,6 +4137,33 @@ const en = {
   'push.unsupported': 'This browser does not show notifications.',
   'push.off': 'Hatti does not send notifications yet.',
   'push.none': 'Your role has no news to be told of.',
+  'snap.link': 'Add from a photo',
+  'snap.title': 'Add a product from a photo',
+  'snap.photos': 'Photos of the product',
+  'snap.hint':
+    'Take a photo of the product, or choose a few. Hatti adds it as a draft with the photos squared, and writes its title and description from what they show, for you to check.',
+  'snap.hintNoAi':
+    'Take a photo of the product, or choose a few. Hatti adds it as a draft with the photos squared, for you to name and put on sale.',
+  'snap.take': 'Take a photo',
+  'snap.takeAnother': 'Add another photo',
+  'snap.price': 'Price (optional)',
+  'snap.notes': 'What a photo can’t show (optional): fabric, sizes, what is in the box',
+  'snap.draft': 'Add and write it with AI',
+  'snap.add': 'Add the product',
+  'snap.untitled': 'New product from a photo',
+  'snap.creating': 'Adding the product…',
+  'snap.uploading': 'Putting the photos up…',
+  'snap.waiting': 'Getting the photos ready…',
+  'snap.cropping': 'Squaring the photos…',
+  'snap.drafting': 'Writing its title and description…',
+  'snap.saving': 'Saving the words…',
+  'snap.notReady':
+    'The photos weren’t ready in time, so nothing was written: name the product yourself.',
+  'snap.noDraft': 'The AI could not write about this product: name it yourself.',
+  'product.fromPhoto':
+    'Added from your photo as a draft. Check its title and description, give it its price and stock, then put it on sale.',
+  'product.fromPhotoPartly':
+    'Added from your photo as a draft, but not everything went: check its photos and words below.',
   'automations.title': 'Automations',
   'automations.linkHint': 'A welcome and a win-back, sent on their own',
   'automations.intro':
@@ -8661,6 +8688,33 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'push.unsupported': 'یہ براؤزر نوٹیفکیشنز نہیں دکھاتا۔',
   'push.off': 'ہٹی ابھی نوٹیفکیشنز نہیں بھیجتا۔',
   'push.none': 'آپ کے رول کے لیے کوئی خبر نہیں۔',
+  'snap.link': 'تصویر سے شامل کریں',
+  'snap.title': 'تصویر سے پروڈکٹ شامل کریں',
+  'snap.photos': 'پروڈکٹ کی تصویریں',
+  'snap.hint':
+    'پروڈکٹ کی تصویر لیں یا چند چنیں۔ ہٹی اسے تصویروں کے ساتھ ڈرافٹ کے طور پر شامل کرے گا، تصویریں چوکور کرے گا، اور جو تصویروں میں دکھے اس سے عنوان اور تفصیل لکھے گا، آپ کے جانچنے کے لیے۔',
+  'snap.hintNoAi':
+    'پروڈکٹ کی تصویر لیں یا چند چنیں۔ ہٹی اسے تصویروں کے ساتھ ڈرافٹ کے طور پر شامل کرے گا اور تصویریں چوکور کرے گا، نام آپ رکھیں۔',
+  'snap.take': 'تصویر لیں',
+  'snap.takeAnother': 'ایک اور تصویر',
+  'snap.price': 'قیمت (اختیاری)',
+  'snap.notes': 'جو تصویر نہ دکھا سکے (اختیاری): کپڑا، سائز، ڈبے میں کیا ہے',
+  'snap.draft': 'شامل کریں اور AI سے لکھوائیں',
+  'snap.add': 'پروڈکٹ شامل کریں',
+  'snap.untitled': 'تصویر سے نئی پروڈکٹ',
+  'snap.creating': 'پروڈکٹ شامل ہو رہی ہے…',
+  'snap.uploading': 'تصویریں اپ لوڈ ہو رہی ہیں…',
+  'snap.waiting': 'تصویریں تیار ہو رہی ہیں…',
+  'snap.cropping': 'تصویریں چوکور ہو رہی ہیں…',
+  'snap.drafting': 'عنوان اور تفصیل لکھی جا رہی ہے…',
+  'snap.saving': 'الفاظ محفوظ ہو رہے ہیں…',
+  'snap.notReady':
+    'تصویریں وقت پر تیار نہ ہوئیں، اس لیے کچھ نہیں لکھا گیا: پروڈکٹ کا نام خود رکھیں۔',
+  'snap.noDraft': 'AI اس پروڈکٹ کے بارے میں نہیں لکھ سکا: نام خود رکھیں۔',
+  'product.fromPhoto':
+    'آپ کی تصویر سے ڈرافٹ کے طور پر شامل ہو گئی۔ عنوان اور تفصیل جانچیں، قیمت اور اسٹاک لکھیں، پھر فروخت پر لگائیں۔',
+  'product.fromPhotoPartly':
+    'آپ کی تصویر سے ڈرافٹ کے طور پر شامل ہو گئی، لیکن سب کچھ نہیں ہوا: نیچے تصویریں اور الفاظ جانچیں۔',
   'automations.title': 'خودکار پیغامات',
   'automations.linkHint': 'خوش آمدید اور واپسی کے پیغام، جو خود جاتے ہیں',
   'automations.intro':

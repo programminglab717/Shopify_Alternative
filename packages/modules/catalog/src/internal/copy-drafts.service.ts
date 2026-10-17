@@ -3,24 +3,32 @@ import {
   PRODUCT_COPY_LIMITS,
   draftProductCopy,
   factsText,
+  type AiImage,
   type CopyLanguage,
   type ProductCopy,
   type ProductFacts,
 } from '@hatti/ai';
 import { shopProfile, type TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
+import { cropImage, modelImage } from '@hatti/images';
+import { ObjectStorage } from '@hatti/storage';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
+import { cleanImageKey } from './images.js';
 import { failOne, type MutationResult } from './input-checker.js';
+import { loadProduct } from './product-store.js';
 
 // AI drafts of products' copy (CAT-20, ADR-471): a product's title, description and search engine
 // title and description, from what the shop says of it, in English, Urdu or Roman Urdu. Nothing
 // is kept: the draft comes back to the product's form, where the shop checks it and saves it as
-// any product is saved. A hundred asks a day at most, each logged with what it cost.
+// any product is saved. A hundred asks a day at most, each logged with what it cost. The AI may
+// look at the product's photos too (APP-02, ADR-507), for a listing drafted from a picture.
 
 export const COPY_DRAFT_LIMITS = {
   /** Asks a shop may make in a day. */
   perDay: 100,
+  /** The product's ready photos the AI looks at, the first in its order. */
+  photos: 3,
 } as const;
 
 export const COPY_LANGUAGES: readonly CopyLanguage[] = ['en', 'ur', 'roman_ur'];
@@ -36,6 +44,8 @@ export interface CopyDraftInput extends ProductFacts {
   language: CopyLanguage;
   /** The product it is for, once there is one. */
   productId?: string | null;
+  /** Whether the AI looks at the product's first ready photos too (APP-02). */
+  usePhotos?: boolean;
 }
 
 @Injectable()
@@ -44,6 +54,8 @@ export class CopyDraftService {
     private readonly db: Database,
     /** The AI gateway, where the host configured one (ADR-463): without it, no drafts. */
     @Optional() @Inject(AiGateway) private readonly ai?: AiGateway | null,
+    /** Where products' images are kept, to show the AI their photos. */
+    @Optional() private readonly storage?: ObjectStorage | null,
   ) {}
 
   /** Whether the shop may ask for drafts, and how many it has asked for in the last day. */
@@ -63,7 +75,19 @@ export class CopyDraftService {
     const ai = this.ai;
     if (!ai) return failOne(['base'], 'UNAVAILABLE', "AI drafts aren't set up here");
     const facts = factsText(input);
-    if (!input.title?.trim() && !input.notes?.trim()) {
+    if (input.usePhotos && !input.productId) {
+      return failOne(['input', 'productId'], 'BLANK', 'Save the product with its photos first');
+    }
+    const images = input.usePhotos ? await this.photosOf(tenant, input.productId!) : [];
+    if (images === null) return failOne(['input', 'productId'], 'NOT_FOUND', 'No such product');
+    if (input.usePhotos && images.length === 0) {
+      return failOne(
+        ['input', 'usePhotos'],
+        'INVALID',
+        'The product has no photo ready yet: wait for it, or say what it is',
+      );
+    }
+    if (!input.title?.trim() && !input.notes?.trim() && images.length === 0) {
       return failOne(
         ['input', 'title'],
         'BLANK',
@@ -94,6 +118,7 @@ export class CopyDraftService {
       shopName: read.shopName,
       language: input.language,
       facts: input,
+      ...(images.length > 0 && { images }),
     });
     const usage = result.usage ?? { inputTokens: 0, outputTokens: 0 };
     await this.db.tenant(tenant.shopId, (tx) =>
@@ -114,6 +139,36 @@ export class CopyDraftService {
       );
     }
     return { ok: true, value: result.value };
+  }
+
+  /**
+   * The product's first ready photos, as the shop cropped them, made small enough for the AI;
+   * null where the shop has no such product.
+   */
+  private async photosOf(tenant: TenantContext, productId: string): Promise<AiImage[] | null> {
+    const product = await this.db.tenant(tenant.shopId, (tx) =>
+      loadProduct(tx, tenant.shopId, productId),
+    );
+    if (!product) return null;
+    if (!this.storage) return [];
+    const ready = product.media
+      .filter(
+        (media) =>
+          media.mediaType === 'image' && media.status === 'ready' && media.imageFormat !== null,
+      )
+      .slice(0, COPY_DRAFT_LIMITS.photos);
+    const images: AiImage[] = [];
+    for (const media of ready) {
+      const clean = await this.storage.read(
+        cleanImageKey(tenant.shopId, media.id, media.imageFormat!),
+      );
+      if (!clean) continue;
+      const shown = media.crop
+        ? await cropImage(clean.body, media.crop, media.imageFormat!)
+        : clean.body;
+      images.push({ mediaType: 'image/jpeg', data: await modelImage(shown) });
+    }
+    return images;
   }
 }
 

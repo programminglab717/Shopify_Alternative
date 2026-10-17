@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Products from a photo
+
+* **A merchant takes a photo, and Hatti adds the product as a draft with the photo squared, its
+  title and description written by the AI from what the photo shows** ([ADR-507](../architecture/13-decision-log.md#adr-507--camera-first-products-a-product-added-from-a-photo-its-copy-drafted-by-the-ai-from-the-photos-themselves-made-small-for-the-model-and-squared-to-the-product), APP-02).
+* 3162 tests, 6 more: pictures through the gateway and the copy route,
+  pictures made small, photos read in the catalog, and the admin's add-from-a-photo flow.
+
 ### 7a0800a · Push notifications for staff
 
 * **Staff's phones are told of new orders, orders to review, cash remitted and low stock by Web

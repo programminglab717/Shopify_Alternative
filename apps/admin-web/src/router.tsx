@@ -73,6 +73,7 @@ import { OrderPage, validateOrderSearch } from './orders/order-page';
 import { OrdersPage, validateOrdersSearch } from './orders/orders-page';
 import { PackersPage } from './orders/packers-page';
 import { NewProductPage } from './products/new-product-page';
+import { SnapProductPage } from './products/snap-page';
 import { ProductPage, validateProductSearch } from './products/product-page';
 import { ProductsPage, validateProductsSearch } from './products/products-page';
 import { ActivityPage } from './settings/activity-page';
@@ -293,6 +294,12 @@ const newProduct = createRoute({
   getParentRoute: () => shop,
   path: 'products/new',
   component: NewProductPage,
+});
+
+const snapProduct = createRoute({
+  getParentRoute: () => shop,
+  path: 'products/snap',
+  component: SnapProductPage,
 });
 
 const productFiles = createRoute({
@@ -887,6 +894,7 @@ export const routeTree = root.addChildren([
     deskAgents,
     products,
     newProduct,
+    snapProduct,
     productFiles,
     productReviews,
     productSales,

@@ -61,12 +61,15 @@ import { ProductUrduCard } from '../urdu/urdu-pages';
 
 /** A product's page's search: whether it was just added, and its stock with it, or copied. */
 export interface ProductSearch {
-  added?: 'ok' | 'noStock' | 'copy';
+  /** Copied; added from a photo, its words drafted, or only partly (ADR-507). */
+  added?: 'ok' | 'noStock' | 'copy' | 'photo' | 'photoPartly';
 }
 
+const ADDED = new Set(['ok', 'noStock', 'copy', 'photo', 'photoPartly']);
+
 export function validateProductSearch(search: Record<string, unknown>): ProductSearch {
-  return search.added === 'ok' || search.added === 'noStock' || search.added === 'copy'
-    ? { added: search.added }
+  return typeof search.added === 'string' && ADDED.has(search.added)
+    ? { added: search.added as NonNullable<ProductSearch['added']> }
     : {};
 }
 
@@ -598,6 +601,10 @@ function ProductView() {
         <Alert tone="warning">{t('product.addedNoStock')}</Alert>
       ) : added === 'copy' ? (
         <Alert tone="success">{t('product.copied')}</Alert>
+      ) : added === 'photo' ? (
+        <Alert tone="info">{t('product.fromPhoto')}</Alert>
+      ) : added === 'photoPartly' ? (
+        <Alert tone="warning">{t('product.fromPhotoPartly')}</Alert>
       ) : null}
       <ProductPhotos product={product} edits={edits} />
       {/* Filled in afresh after each save, and as variants or their tracking change; not as photos change. */}
