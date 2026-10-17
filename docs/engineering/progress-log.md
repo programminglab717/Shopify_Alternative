@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### FBR's digital invoicing
+### f36d9d7 · FBR's digital invoicing
 
 * **A sales-tax-registered shop reports its invoices through FBR's digital invoicing instead of
   the POS integration, by the same worker, its credit notes left to its return** ([ADR-562](../architecture/13-decision-log.md#adr-562--a-sales-tax-registered-shop-reports-its-invoices-through-fbrs-digital-invoicing-instead-of-the-pos-integration-by-the-same-worker-its-credit-notes-left-to-its-return),
