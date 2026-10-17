@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Outages told to shops on WhatsApp
+### ec93de5 · Outages told to shops on WhatsApp
 
 * **Every shop hears on WhatsApp when an outage of Hatti's begins and ends, at its alerts number
   and at Hatti's cost, each update once** ([ADR-544](../architecture/13-decision-log.md#adr-544--every-shop-hears-on-whatsapp-when-an-outage-of-hattis-begins-and-ends-at-its-alerts-number-and-at-hattis-cost-each-update-once), BIL-06).
