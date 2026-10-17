@@ -1,4 +1,5 @@
 import type { TenantContext } from '@hatti/api';
+import { easternWearText, type EasternWear } from './eastern-wear.js';
 import { executePrepared, literalLimit, toDate, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { searchKey } from '@hatti/pk';
@@ -24,6 +25,7 @@ interface ProductJsonRow extends Record<string, unknown> {
   seo_title: string | null;
   seo_description: string | null;
   gift_card: boolean;
+  eastern_wear: EasternWear | null;
   version: number;
   created_at: string;
   updated_at: string;
@@ -105,6 +107,7 @@ function toProductRecord(row: ProductJsonRow): ProductRecord {
     tags: row.tags,
     seo: { title: row.seo_title, description: row.seo_description },
     giftCard: row.gift_card,
+    easternWear: easternWearOf(row.eastern_wear),
     version: row.version,
     createdAt: toDate(row.created_at),
     updatedAt: toDate(row.updated_at),
@@ -140,7 +143,8 @@ export async function queryProducts(
 ): Promise<{ record: ProductRecord; key: string | null }[]> {
   const query = sql`
     SELECT p.id, p.title, p.handle, p.status, p.description, p.vendor, p.product_type, p.tags,
-           p.seo_title, p.seo_description, p.gift_card, p.version, p.created_at, p.updated_at,
+           p.seo_title, p.seo_description, p.gift_card, p.eastern_wear, p.version, p.created_at,
+           p.updated_at,
            (${options.key ?? sql`NULL`})::text AS sort_key,
            (SELECT coalesce(json_agg(json_build_object(
                      'id', o.id, 'name', o.name, 'position', o.position,
@@ -231,8 +235,29 @@ export function searchTextOf(fields: {
   vendor: string | null;
   productType: string | null;
   tags: string[];
+  /** Found by its fabrics, stitching, pieces and season too (ADR-477). */
+  easternWear?: EasternWear | null;
 }): string {
-  return searchKey([fields.title, fields.vendor, fields.productType, ...fields.tags].join(' '));
+  return searchKey(
+    [
+      fields.title,
+      fields.vendor,
+      fields.productType,
+      ...fields.tags,
+      easternWearText(fields.easternWear),
+    ].join(' '),
+  );
+}
+
+/** Eastern-wear attributes as kept, each key there, or null for none. */
+function easternWearOf(value: Partial<EasternWear> | null): EasternWear | null {
+  if (!value) return null;
+  return {
+    stitching: value.stitching ?? null,
+    pieces: value.pieces ?? null,
+    fabrics: value.fabrics ?? [],
+    season: value.season ?? null,
+  };
 }
 
 /**

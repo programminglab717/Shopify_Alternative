@@ -15,6 +15,7 @@ import {
   unique,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { EasternWear } from './eastern-wear.js';
 
 export const catalogSchema = pgSchema('catalog');
 
@@ -84,6 +85,8 @@ export const products = catalogSchema.table(
     screeningCleared: text('screening_cleared'),
     /** The rights complaint holding it off sale, `ipc_…` (ADR-475): a draft until let go. */
     heldBy: text('held_by'),
+    /** Whether stitched, its pieces, fabrics and season (CAT-08, ADR-477); null where none said. */
+    easternWear: jsonb('eastern_wear').$type<EasternWear | null>(),
     version: integer('version').notNull().default(1),
     ...timestamps,
   },

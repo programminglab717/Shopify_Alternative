@@ -909,6 +909,12 @@ const PRODUCT = /* GraphQL */ `
     totalInventory
     tracksInventory
     isGiftCard
+    easternWear {
+      stitching
+      pieces
+      fabrics
+      season
+    }
     preorder {
       shipsOn
     }

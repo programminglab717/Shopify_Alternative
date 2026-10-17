@@ -1,5 +1,6 @@
 import { Drop } from 'liquidjs';
 import type {
+  AttributeWordDoc,
   ArticleDoc,
   BlogDoc,
   CollectionDoc,
@@ -331,10 +332,13 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     updated_at: doc.updatedAt ?? doc.createdAt ?? null,
     // Its published reviews (ADR-401): their stars as Shopify's standard review metafields hold
     // them, which themes and apps read, and the latest of them, Hatti's own.
-    metafields: reviewMetafields(doc),
+    metafields: { ...reviewMetafields(doc), ...easternWearMetafields(doc) },
     // The day it ships by while it is on pre-order (ADR-403), YYYY-MM-DD for the date filter;
     // nil when it is not. Hatti's own.
     preorder_ships_on: doc.preorderShipsOn ?? null,
+    // Whether it comes stitched, its pieces, fabrics and season (ADR-477), each its value and its
+    // words in the page's language; nil where none is said. Hatti's own.
+    eastern_wear: easternWearObject(doc),
     // When the sale it is in now ends (ADR-445), ISO 8601 for a countdown; nil when it is in none.
     // Hatti's own.
     sale_ends_at: doc.saleEndsAt ?? null,
@@ -405,6 +409,59 @@ function reviewMetafields(doc: ProductDoc): Record<string, Record<string, unknow
         value: { rating: doc.reviews.rating, scale_min: 1, scale_max: 5 },
       },
       rating_count: { type: 'number_integer', value: doc.reviews.count },
+    },
+  };
+}
+
+/**
+ * A product's eastern-wear attributes for Liquid (ADR-477): each `value` as filters match it and
+ * `label` as the page says it, `fabrics` a list, and `summary` all of them in a line: "Unstitched ·
+ * 3-piece · Lawn, Chiffon · Summer". Nil where none is said.
+ */
+function easternWearObject(doc: ProductDoc): Record<string, unknown> | null {
+  const wear = doc.easternWear;
+  if (!wear) return null;
+  const word = (each: AttributeWordDoc | undefined) =>
+    each ? { value: each.value, label: each.label } : null;
+  const fabrics = wear.fabrics.map((fabric) => word(fabric)!);
+  return {
+    stitching: word(wear.stitching),
+    pieces: wear.pieces ? { value: Number(wear.pieces.value), label: wear.pieces.label } : null,
+    fabrics,
+    season: word(wear.season),
+    summary: [
+      wear.stitching?.label,
+      wear.pieces?.label,
+      fabrics.map((fabric) => fabric.label).join(', '),
+      wear.season?.label,
+    ]
+      .filter(Boolean)
+      .join(' · '),
+  };
+}
+
+/**
+ * The same attributes as metafields of Hatti's own namespace, as Shopify's themes read a
+ * product's: `product.metafields.hatti.fabric.value`, a list of its fabrics' words. None where
+ * none is said.
+ */
+function easternWearMetafields(doc: ProductDoc): Record<string, Record<string, unknown>> {
+  const wear = doc.easternWear;
+  if (!wear) return {};
+  const text = (value: string) => ({ type: 'single_line_text_field', value });
+  return {
+    hatti: {
+      ...(wear.stitching && { stitching: text(wear.stitching.label) }),
+      ...(wear.pieces && {
+        pieces: { type: 'number_integer', value: Number(wear.pieces.value) },
+      }),
+      ...(wear.fabrics.length > 0 && {
+        fabric: {
+          type: 'list.single_line_text_field',
+          value: wear.fabrics.map((fabric) => fabric.label),
+        },
+      }),
+      ...(wear.season && { season: text(wear.season.label) }),
     },
   };
 }

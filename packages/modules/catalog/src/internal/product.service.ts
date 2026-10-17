@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { checkEasternWear, type EasternWear, type EasternWearInput } from './eastern-wear.js';
 import {
   checkSeo,
   shopProfile,
@@ -92,6 +93,8 @@ export interface CreateProductInput {
   variants?: VariantFieldsInput[] | null;
   /** Sold as a gift card, as Shopify's `giftCard` (CAT-12, ADR-451). False unless given. */
   giftCard?: boolean | null;
+  /** Whether stitched, its pieces, fabrics and season (CAT-08, ADR-477). */
+  easternWear?: EasternWearInput | null;
 }
 
 /** Omitted (undefined) fields stay as they are; null clears optional fields. */
@@ -113,6 +116,8 @@ export interface UpdateProductInput {
   redirectNewHandle?: boolean | null;
   /** Sold as a gift card (ADR-451). */
   giftCard?: boolean | null;
+  /** Its eastern-wear attributes, all of them; null clears them (ADR-477). */
+  easternWear?: EasternWearInput | null;
 }
 
 /** What `duplicate` copies, and how (ADR-343). */
@@ -150,6 +155,7 @@ interface CheckedProduct {
   seo: Partial<SeoValue>;
   requestedHandle: string | null;
   giftCard: boolean;
+  easternWear: EasternWear | null;
   options: OptionShape[];
   /** A copy's variants keep their titles; others' are made from their option values. */
   variants: { title?: string; fields: VariantFields; optionValues: string[] }[];
@@ -171,6 +177,7 @@ type ProductChanges = Partial<
     | 'publishAt'
     | 'giftCard'
     | 'heldBy'
+    | 'easternWear'
   >
 >;
 
@@ -271,6 +278,7 @@ export class ProductService {
           seo: original.seo,
           requestedHandle: null,
           giftCard: original.giftCard,
+          easternWear: original.easternWear,
           options: options.map((option) => ({
             name: option.name,
             values: [...option.values]
@@ -340,6 +348,7 @@ export class ProductService {
       requestedHandle,
       options,
       giftCard,
+      easternWear,
     } = checked;
     const productId = newId();
     const base = requestedHandle ?? (toHandle(title) || 'product');
@@ -355,7 +364,8 @@ export class ProductService {
       seoTitle: seo.title ?? null,
       seoDescription: seo.description ?? null,
       giftCard,
-      searchText: searchTextOf({ title, vendor, productType, tags }),
+      easternWear,
+      searchText: searchTextOf({ title, vendor, productType, tags, easternWear }),
     };
 
     let product: ProductRow | undefined;
@@ -518,6 +528,7 @@ export class ProductService {
       }
       return { fields, optionValues: optionValues ?? [] };
     });
+    const easternWear = checkEasternWear(check, ['input', 'easternWear'], input.easternWear);
     if (!check.ok || title === null) return { ok: false, errors: check.errors };
     // On sale from the start: screened for what Hatti does not allow (ADR-473).
     if (input.status === 'active') {
@@ -535,6 +546,7 @@ export class ProductService {
         seo,
         requestedHandle,
         giftCard: input.giftCard === true,
+        easternWear,
         options,
         variants: variantValues,
       },
@@ -583,6 +595,9 @@ export class ProductService {
     if (seo.title !== undefined) changes.seoTitle = seo.title;
     if (seo.description !== undefined) changes.seoDescription = seo.description;
     if (input.giftCard !== undefined && input.giftCard !== null) changes.giftCard = input.giftCard;
+    if (input.easternWear !== undefined) {
+      changes.easternWear = checkEasternWear(check, ['input', 'easternWear'], input.easternWear);
+    }
     if (!check.ok) return fail(check.errors);
 
     return this.#change(tenant, input.id, ['input', 'id'], () => changes, input.redirectNewHandle);

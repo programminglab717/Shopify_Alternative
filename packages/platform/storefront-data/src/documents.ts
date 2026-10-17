@@ -122,10 +122,33 @@ export interface BundleDoc {
   }[];
 }
 
+/** One of Hatti's words for an attribute (ADR-477): its value, and how pages say it. */
+export interface AttributeWordDoc {
+  /** As filters and themes match it: "lawn", "unstitched", "3". */
+  value: string;
+  /** In English: "Lawn". */
+  label: string;
+  /** In Urdu, which Urdu pages show in its place. */
+  ur: string;
+}
+
+/** A product's eastern-wear attributes (CAT-08, ADR-477); each may be unsaid. */
+export interface EasternWearDoc {
+  stitching?: AttributeWordDoc;
+  pieces?: AttributeWordDoc;
+  fabrics: AttributeWordDoc[];
+  season?: AttributeWordDoc;
+}
+
 export interface ProductDoc {
   id: string;
   /** Sold as a gift card (CAT-12, ADR-451): Liquid's `product.gift_card?`. Absent when it is not. */
   giftCard?: true;
+  /**
+   * Whether it comes stitched, its pieces, fabrics and season (CAT-08, ADR-477), each in Hatti's
+   * words. Absent where none is said.
+   */
+  easternWear?: EasternWearDoc;
   /** What it holds, where it is a bundle (ADR-411). */
   bundle?: BundleDoc;
   /** The size chart its page shows, if any (ADR-407). */

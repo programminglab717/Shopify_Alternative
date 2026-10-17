@@ -1,5 +1,6 @@
 import { Money, PageInfo, SEO, SEOInput, UserError } from '@hatti/api';
 import type { MediaRecord } from '../records.js';
+import { EasternWear, EasternWearInput } from './eastern-wear.types.js';
 import {
   ArgsType,
   Field,
@@ -432,6 +433,14 @@ export class Product {
   })
   isGiftCard!: boolean;
 
+  @Field(() => EasternWear, {
+    nullable: true,
+    description:
+      'Whether it comes stitched, its pieces, fabrics and season (CAT-08, ADR-477); null where ' +
+      'none is said.',
+  })
+  easternWear!: EasternWear | null;
+
   @Field(() => [String])
   tags!: string[];
 
@@ -648,6 +657,12 @@ export class ProductCreateInput {
     description: "Sold as a gift card, as Shopify's giftCard (ADR-451). False unless given.",
   })
   giftCard?: boolean | null;
+
+  @Field(() => EasternWearInput, {
+    nullable: true,
+    description: 'Whether it comes stitched, its pieces, fabrics and season (ADR-477).',
+  })
+  easternWear?: EasternWearInput | null;
 }
 
 @InputType()
@@ -692,6 +707,12 @@ export class ProductUpdateInput {
 
   @Field(() => Boolean, { nullable: true, description: 'Sold as a gift card (ADR-451).' })
   giftCard?: boolean | null;
+
+  @Field(() => EasternWearInput, {
+    nullable: true,
+    description: 'Replaces all its eastern-wear attributes (ADR-477); null clears them.',
+  })
+  easternWear?: EasternWearInput | null;
 }
 
 @InputType()

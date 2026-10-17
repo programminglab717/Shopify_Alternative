@@ -1,4 +1,5 @@
 import { Money, PageInfo, SEO, UserError, badUserInput, encodeCursor } from '@hatti/api';
+import { EasternWear } from './eastern-wear.types.js';
 import { toPublicId, tryFromPublicId, type IdKind } from '@hatti/ids';
 import { money, type CurrencyCode } from '@hatti/money';
 import type { FieldError } from '../input-checker.js';
@@ -155,6 +156,9 @@ export function toProduct(record: ProductRecord, currency: CurrencyCode): Produc
     vendor: record.vendor,
     productType: record.productType,
     isGiftCard: record.giftCard,
+    easternWear:
+      record.easternWear &&
+      Object.assign(new EasternWear(), record.easternWear as unknown as EasternWear),
     tags: record.tags,
     seo: Object.assign(new SEO(), record.seo),
     options: record.options.map((option) =>

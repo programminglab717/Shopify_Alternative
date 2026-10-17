@@ -1,5 +1,6 @@
 import type {
   ArticleDoc,
+  AttributeWordDoc,
   BlogDoc,
   CollectionDoc,
   MenuDoc,
@@ -48,7 +49,7 @@ export function translated<T extends Translatable>(doc: T, locale: string): T {
  * language.
  */
 export function translatedProduct(doc: ProductDoc, locale: string): ProductDoc {
-  const shown = translated(doc, locale);
+  const shown = urduWords(translated(doc, locale), locale);
   const options = doc.translations?.[locale]?.options;
   if (!options) return shown;
   return {
@@ -61,6 +62,30 @@ export function translatedProduct(doc: ProductDoc, locale: string): ProductDoc {
       return { ...variant, options: values, title: values.join(' / ') };
     }),
   };
+}
+
+/** A product's eastern-wear attributes in Urdu words on Urdu pages (ADR-477). */
+function urduWords(doc: ProductDoc, locale: string): ProductDoc {
+  const wear = doc.easternWear;
+  if (locale !== 'ur' || !wear) return doc;
+  const inUrdu = (word: AttributeWordDoc | undefined) => word && { ...word, label: word.ur };
+  return {
+    ...doc,
+    easternWear: {
+      ...defined({
+        stitching: inUrdu(wear.stitching),
+        pieces: inUrdu(wear.pieces),
+        season: inUrdu(wear.season),
+      }),
+      fabrics: wear.fabrics.map((fabric) => inUrdu(fabric)!),
+    },
+  };
+}
+
+function defined<T extends object>(value: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, each]) => each !== undefined),
+  ) as Partial<T>;
 }
 
 /**

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-476 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-477 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -484,6 +484,7 @@
 | 474 | Owners of a trademark or copyright complain of a store's listings from its rights page, naming them by their addresses and swearing to it; Hatti's people decide within 48 hours | Accepted |
 | 475 | A rights complaint upheld takes its listings off sale and holds them there, copies too, marked with its number; the store's owner is told who complained and how to reach them | Accepted |
 | 476 | The store's owner answers a rights complaint once, sworn, through a link in the notice; Hatti's people refuse the answer with why, or let the listings go | Accepted |
+| 477 | A product says whether it comes stitched, its pieces, fabrics and season in Hatti's own words, in English and Urdu: kept by the catalog, set from its admin page, shown on its storefront page and given to themes | Accepted |
 
 ---
 
@@ -18039,3 +18040,35 @@
     shop more than its own answer needs.
   * **Letting the listings go on any answer, as the US DMCA's counter-notice does after ten
     days:** Pakistani law sets no such clock for platforms, and Hatti's people judge each.
+
+## ADR-477 · A product says whether it comes stitched, its pieces, fabrics and season in Hatti's own words, in English and Urdu: kept by the catalog, set from its admin page, shown on its storefront page and given to themes
+
+* **Context:**
+  * Pakistani shoppers choose eastern wear by whether it comes stitched, in how many pieces,
+    of what fabric and for which season before its size or colour (CAT-08, V1). Shops write it
+    in titles and tags, each their own way: "3pc lawn", "Unstitched 3-Piece", "LAWN 25".
+  * Filters across a store's collections (SRC-03) need the same words on every product, and
+    Urdu pages need them in Urdu.
+* **Decision:**
+  * **Hatti's own words**, kept with the catalog: stitching (unstitched, semi-stitched,
+    stitched), pieces (1 to 4), up to three fabrics of twenty (lawn, cambric, khaddar, karandi,
+    chiffon, organza, jamawar and the rest Pakistani shops sell), and season (summer, winter,
+    festive, all season), each with its English and Urdu words. A shop can't add its own; one
+    left out is unsaid, and none said is none at all (`catalog.products.eastern_wear`).
+  * **The Admin API** takes and gives them as `Product.easternWear`, with enums for each, on
+    `productCreate` and `productUpdate` (null clears them); a copy keeps them. Search finds a
+    product by their English words too.
+  * **The admin's product page** has an Eastern wear card: three choices, the fabrics ticked,
+    saved together.
+  * **The storefront's document** carries each with its value and its words in both languages;
+    Urdu pages show the Urdu. Themes read `product.eastern_wear` (each `value` and `label`, the
+    fabrics a list, and a `summary` line) and `product.metafields.hatti.*`, as Shopify's themes
+    read metafields. Hatti Base says the summary under the product's title.
+* **Consequences:**
+  * Every shop's lawn is the same lawn: filtering by them across a collection (SRC-03) is the
+    next part.
+  * Shops whose goods are not eastern wear see a card they can leave empty.
+* **Alternatives:**
+  * **Free text, or tags:** what the shop already writes, which no filter can gather.
+  * **Shopify's metafields, defined by each shop:** CAT-06's work, and each shop's definitions
+    would differ again.

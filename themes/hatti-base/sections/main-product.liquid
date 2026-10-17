@@ -46,6 +46,11 @@
               {% render 'wishlist-button', product: product %}
             </div>
             {%- if product.vendor != blank -%}<p class="product__vendor" dir="auto">{{ product.vendor | escape }}</p>{%- endif -%}
+            {%- comment -%}
+              How shoppers choose a suit (ADR-477): stitched or not, its pieces, fabrics and
+              season, in the page's language.
+            {%- endcomment -%}
+            {%- if product.eastern_wear -%}<p class="product__eastern-wear" dir="auto">{{ product.eastern_wear.summary | escape }}</p>{%- endif -%}
             {% render 'rating', product: product, link: true %}
           </div>
 
@@ -328,6 +333,7 @@
   .product__title { margin: 0; font-size: 1.75rem; }
   .product__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
   .product__vendor { color: var(--color-muted); }
+  .product__eastern-wear { margin-block: 0.25rem 0; font-size: 0.9375rem; }
   .product__form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-block: 1rem; }
   .product__option { display: flex; flex-wrap: wrap; gap: 0.5rem; min-inline-size: 0; border: 0; margin: 0; padding: 0; }
   .product__option legend { margin-block-end: 0.5rem; font-weight: 600; }

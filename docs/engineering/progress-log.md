@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Eastern-wear attributes
+
+* **A product says whether it comes stitched, its pieces, fabrics and season in Hatti's own
+  words, in English and Urdu: kept by the catalog, set from its admin page, shown on its
+  storefront page and given to themes** ([ADR-477](../architecture/13-decision-log.md#adr-477--a-product-says-whether-it-comes-stitched-its-pieces-fabrics-and-season-in-hattis-own-words-in-english-and-urdu-kept-by-the-catalog-set-from-its-admin-page-shown-on-its-storefront-page-and-given-to-themes), CAT-08 in part).
+* 2992 tests, 4 more: the catalog's words, the admin's card, and the
+  storefront's page in both languages.
+
 ### 06a6ac7 · Answers to rights complaints
 
 * **The store's owner answers a rights complaint once, sworn, through a link in the notice;

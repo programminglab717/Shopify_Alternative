@@ -1344,6 +1344,51 @@ describe('Storefront rendering', () => {
     expect(plain.html).toContain('<p class="gift">goods</p>');
   });
 
+  it("gives themes a product's eastern-wear attributes in the page's language, and Hatti Base says them (ADR-477)", async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const suit = {
+      ...first!,
+      easternWear: {
+        stitching: { value: 'unstitched', label: 'Unstitched', ur: 'ان سلا' },
+        pieces: { value: '3', label: '3-piece', ur: '3 پیس' },
+        fabrics: [
+          { value: 'lawn', label: 'Lawn', ur: 'لان' },
+          { value: 'chiffon', label: 'Chiffon', ur: 'شیفون' },
+        ],
+        season: { value: 'summer', label: 'Summer', ur: 'گرمیاں' },
+      },
+    };
+    const shop = new MemoryStore({ ...sample, products: [suit, ...rest] });
+    const renderer = new PageRenderer(loadTheme(files), { limits: { timeMs: 10_000 } });
+    const page = await renderer.render({ path: `/products/${suit.handle}` }, shop.fresh());
+    expect(page.html).toContain(
+      '<p class="product__eastern-wear" dir="auto">Unstitched · 3-piece · Lawn, Chiffon · Summer</p>',
+    );
+    const urdu = await renderer.render(
+      { path: `/products/${suit.handle}`, locale: 'ur' },
+      shop.fresh(),
+    );
+    expect(urdu.html).toContain('ان سلا · 3 پیس · لان, شیفون · گرمیاں');
+    // None said, no line.
+    const plain = await renderer.render({ path: `/products/${rest[0]!.handle}` }, shop.fresh());
+    expect(plain.html).not.toContain('class="product__eastern-wear"');
+
+    // Each value and its words, and as metafields of Hatti's own namespace.
+    const theme = loadTheme({
+      ...files,
+      'sections/main-product.liquid':
+        '<p class="wear">{{ product.eastern_wear.stitching.value }}|{{ product.eastern_wear.pieces.value | plus: 0 }}|' +
+        '{{ product.eastern_wear.fabrics | map: "value" | join: "," }}|' +
+        '{{ product.metafields.hatti.fabric.value | join: "/" }}|{{ product.metafields.hatti.season.value }}</p>' +
+        '{% schema %}{ "name": "Product" }{% endschema %}',
+    });
+    const custom = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+    expect(
+      (await custom.render({ path: `/products/${suit.handle}` }, shop.fresh())).html,
+    ).toContain('<p class="wear">unstitched|3|lawn,chiffon|Lawn/Chiffon|Summer</p>');
+  });
+
   it("gives themes a product's videos among its media, with Shopify's video filters, and Hatti Base plays them (ADR-258)", async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;

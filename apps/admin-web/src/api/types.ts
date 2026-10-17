@@ -481,6 +481,8 @@ export interface ProductDetail {
   tracksInventory: boolean;
   /** Whether it is sold as a gift card (ADR-451); absent where a fake core leaves it out. */
   isGiftCard?: boolean;
+  /** Stitched or not, its pieces, fabrics and season (ADR-477); absent where a fake core leaves it out. */
+  easternWear?: EasternWear | null;
   /** Its pre-order, if it is on one (ADR-403); absent where a fake core leaves it out. */
   preorder?: { shipsOn: string } | null;
   /** The size chart its page shows (ADR-406); absent where a fake core leaves it out. */
@@ -3630,4 +3632,41 @@ export interface GiftCardCreateData {
 
 export interface GiftCardPayloadData {
   [mutation: string]: { giftCard: GiftCard | null; userErrors: UserError[] };
+}
+
+/** Whether a suit comes stitched (ADR-477). */
+export type StitchingValue = 'UNSTITCHED' | 'SEMI_STITCHED' | 'STITCHED';
+
+/** A fabric Pakistani shops sell eastern wear in (ADR-477). */
+export type FabricValue =
+  | 'LAWN'
+  | 'CAMBRIC'
+  | 'COTTON'
+  | 'KHADDAR'
+  | 'KARANDI'
+  | 'LINEN'
+  | 'MARINA'
+  | 'VISCOSE'
+  | 'DOBBY'
+  | 'JACQUARD'
+  | 'CHIFFON'
+  | 'GEORGETTE'
+  | 'ORGANZA'
+  | 'NET'
+  | 'SILK'
+  | 'RAW_SILK'
+  | 'VELVET'
+  | 'JAMAWAR'
+  | 'WOOL'
+  | 'PASHMINA';
+
+/** The season it is for (ADR-477). */
+export type SeasonValue = 'SUMMER' | 'WINTER' | 'FESTIVE' | 'ALL_SEASON';
+
+/** A product's eastern-wear attributes (CAT-08, ADR-477); each may be unsaid. */
+export interface EasternWear {
+  stitching: StitchingValue | null;
+  pieces: number | null;
+  fabrics: FabricValue[];
+  season: SeasonValue | null;
 }

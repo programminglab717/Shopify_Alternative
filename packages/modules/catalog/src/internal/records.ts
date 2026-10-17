@@ -1,4 +1,5 @@
 import type { SeoValue } from '@hatti/api';
+import type { EasternWear } from './eastern-wear.js';
 import type {
   CollectionRuleValue,
   CollectionSortOrderValue,
@@ -135,6 +136,8 @@ export interface ProductRecord {
   seo: SeoValue;
   /** Sold as a gift card: each unit paid for issues one (CAT-12, ADR-451). */
   giftCard: boolean;
+  /** Whether stitched, its pieces, fabrics and season (CAT-08, ADR-477); null where none said. */
+  easternWear: EasternWear | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;

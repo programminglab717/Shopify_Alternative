@@ -10,6 +10,9 @@ import {
   type ProductRecord,
   type ShownReviews,
   type ShownSizeChart,
+  EASTERN_WEAR_WORDS,
+  piecesWords,
+  type EasternWear,
 } from '@hatti/catalog/public';
 import {
   commentHtml,
@@ -42,6 +45,7 @@ import {
   type SeoDoc,
   type ShopDoc,
   type ThemeDoc,
+  type EasternWearDoc,
 } from '@hatti/storefront-data';
 
 // The storefront's documents, made from the catalog's records (03 §8). Only what a theme may
@@ -185,12 +189,33 @@ export function productDoc(
       },
     }),
     ...(record.giftCard && { giftCard: true as const }),
+    ...(record.easternWear && { easternWear: easternWearDoc(record.easternWear) }),
     ...(preorderShipsOn && { preorderShipsOn }),
     ...(saleEndsAt && { saleEndsAt: saleEndsAt.toISOString() }),
     ...(sizeChart && { sizeChart }),
     ...(bundle && { bundle }),
     ...(related && related.length > 0 && { related: [...related] }),
     ...(complements && complements.length > 0 && { complements: [...complements] }),
+  };
+}
+
+/**
+ * A product's eastern-wear attributes as pages say them (ADR-477): each in Hatti's words in English
+ * and Urdu, which Urdu pages show.
+ */
+function easternWearDoc(wear: EasternWear): EasternWearDoc {
+  const word = (value: string, words: { en: string; ur: string }) => ({
+    value,
+    label: words.en,
+    ur: words.ur,
+  });
+  return {
+    ...(wear.stitching && {
+      stitching: word(wear.stitching, EASTERN_WEAR_WORDS.stitching[wear.stitching]),
+    }),
+    ...(wear.pieces !== null && { pieces: word(String(wear.pieces), piecesWords(wear.pieces)) }),
+    fabrics: wear.fabrics.map((fabric) => word(fabric, EASTERN_WEAR_WORDS.fabrics[fabric])),
+    ...(wear.season && { season: word(wear.season, EASTERN_WEAR_WORDS.seasons[wear.season]) }),
   };
 }
 

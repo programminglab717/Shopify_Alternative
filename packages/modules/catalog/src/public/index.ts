@@ -208,3 +208,16 @@ export {
   type CopyDraftInput,
   type CopyDraftingRecord,
 } from '../internal/copy-drafts.service.js';
+export {
+  EASTERN_WEAR_LIMITS,
+  EASTERN_WEAR_WORDS,
+  FABRICS,
+  SEASONS,
+  STITCHING,
+  piecesWords,
+  type EasternWear,
+  type EasternWearInput,
+  type Fabric,
+  type Season,
+  type Stitching,
+} from '../internal/eastern-wear.js';

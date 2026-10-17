@@ -38,6 +38,7 @@ describe("products' documents", () => {
       tags: [],
       seo: { title: null, description: null },
       giftCard: false,
+      easternWear: null,
       version: 1,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -113,6 +114,20 @@ describe("products' documents", () => {
     // Not a gift card, so not said; one is (ADR-451).
     expect(doc.giftCard).toBeUndefined();
     expect(productDoc({ ...record, giftCard: true }, new Map(), () => null).giftCard).toBe(true);
+    // Eastern-wear attributes in Hatti's words, English and Urdu (ADR-477); none said, none.
+    expect(doc.easternWear).toBeUndefined();
+    const wear = { stitching: 'unstitched', pieces: 3, fabrics: ['lawn'], season: null } as const;
+    expect(
+      productDoc(
+        { ...record, easternWear: { ...wear, fabrics: [...wear.fabrics] } },
+        new Map(),
+        () => null,
+      ).easternWear,
+    ).toEqual({
+      stitching: { value: 'unstitched', label: 'Unstitched', ur: 'ان سلا' },
+      pieces: { value: '3', label: '3-piece', ur: '3 پیس' },
+      fabrics: [{ value: 'lawn', label: 'Lawn', ur: 'لان' }],
+    });
   });
 
   it("show a product's videos ready to play among its media, its images by their places (ADR-258)", () => {
@@ -128,6 +143,7 @@ describe("products' documents", () => {
       tags: [],
       seo: { title: null, description: null },
       giftCard: false,
+      easternWear: null,
       version: 1,
       createdAt: new Date(),
       updatedAt: new Date(),

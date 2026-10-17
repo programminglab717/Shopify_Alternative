@@ -4012,6 +4012,30 @@ type DraftOrderUpdatePayload {
 }
 
 """
+How shoppers choose a suit (CAT-08, ADR-477): whether it comes stitched, in how many pieces, of what fabrics, and for which season. Each may be unsaid.
+"""
+type EasternWear {
+  """Up to 3: a shirt of one, a dupatta of another."""
+  fabrics: [Fabric!]!
+
+  """A shirt, trousers and dupatta are 3."""
+  pieces: Int
+  season: Season
+  stitching: Stitching
+}
+
+"""All of a product's eastern-wear attributes; one left out is unsaid."""
+input EasternWearInput {
+  """Up to 3, each once."""
+  fabrics: [Fabric!]
+
+  """From 1 to 4."""
+  pieces: Int
+  season: Season
+  stitching: Stitching
+}
+
+"""
 What Hatti's email says around its link: English, or Urdu right to left.
 """
 enum EmailLanguage {
@@ -4030,6 +4054,30 @@ type ExternalVideo {
 
   """Where it is watched."""
   originUrl: String!
+}
+
+"""A fabric Pakistani shops sell eastern wear in (ADR-477)."""
+enum Fabric {
+  CAMBRIC
+  CHIFFON
+  COTTON
+  DOBBY
+  GEORGETTE
+  JACQUARD
+  JAMAWAR
+  KARANDI
+  KHADDAR
+  LAWN
+  LINEN
+  MARINA
+  NET
+  ORGANZA
+  PASHMINA
+  RAW_SILK
+  SILK
+  VELVET
+  VISCOSE
+  WOOL
 }
 
 """
@@ -9942,6 +9990,11 @@ type Product {
   createdAt: DateTime!
   description: String!
 
+  """
+  Whether it comes stitched, its pieces, fabrics and season (CAT-08, ADR-477); null where none is said.
+  """
+  easternWear: EasternWear
+
   """Unique, URL-safe name within the shop, e.g. "lawn-3-piece-suit"."""
   handle: String!
   id: ID!
@@ -10127,6 +10180,9 @@ input ProductCopyOptionInput {
 
 input ProductCreateInput {
   description: String
+
+  """Whether it comes stitched, its pieces, fabrics and season (ADR-477)."""
+  easternWear: EasternWearInput
 
   """
   Sold as a gift card, as Shopify's giftCard (ADR-451). False unless given.
@@ -10407,6 +10463,9 @@ enum ProductStatus {
 
 input ProductUpdateInput {
   description: String
+
+  """Replaces all its eastern-wear attributes (ADR-477); null clears them."""
+  easternWear: EasternWearInput
 
   """Sold as a gift card (ADR-451)."""
   giftCard: Boolean
@@ -12394,6 +12453,14 @@ enum SearchResultType {
   PRODUCT
 }
 
+"""The season it is for (ADR-477)."""
+enum Season {
+  ALL_SEASON
+  FESTIVE
+  SUMMER
+  WINTER
+}
+
 """
 A saved customer filter, e.g. "Lahore · bought 2+ times · no order in 60 days". Its members are the customers who match it now.
 """
@@ -13019,6 +13086,13 @@ type StagedUploadParameter {
 type StagedUploadsCreatePayload {
   stagedTargets: [StagedMediaUploadTarget!]
   userErrors: [UserError!]!
+}
+
+"""Whether a suit comes stitched (ADR-477)."""
+enum Stitching {
+  SEMI_STITCHED
+  STITCHED
+  UNSTITCHED
 }
 
 """
