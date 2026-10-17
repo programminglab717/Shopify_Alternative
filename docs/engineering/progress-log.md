@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Ad spend in the admin
+### f0a212f · Ad spend in the admin
 
 * **The admin records ad spend a day at a time under Marketing, and analytics shows the spend and
   the sales each rupee of it brought, beside true profit** ([ADR-554](../architecture/13-decision-log.md#adr-554--the-admin-records-ad-spend-a-day-at-a-time-under-marketing-and-analytics-shows-the-spend-and-the-sales-each-rupee-of-it-brought-beside-true-profit), MKT-12, ANL-03).
