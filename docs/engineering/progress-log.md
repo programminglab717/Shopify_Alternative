@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Answers to rights complaints
+### 06a6ac7 · Answers to rights complaints
 
 * **The store's owner answers a rights complaint once, sworn, through a link in the notice;
   Hatti's people refuse the answer with why, or let the listings go** ([ADR-476](../architecture/13-decision-log.md#adr-476--the-stores-owner-answers-a-rights-complaint-once-sworn-through-a-link-in-the-notice-hattis-people-refuse-the-answer-with-why-or-let-the-listings-go), TNS-04 whole).
