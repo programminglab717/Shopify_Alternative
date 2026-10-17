@@ -123,6 +123,8 @@ describe('A merchant new to Hatti', () => {
 
     await screen.findByRole('heading', { name: 'Open your shop' });
     expect(router.state.location.pathname).toBe('/shops');
+    // A partner's link brought them (ADR-505): the shop takes its code, and it is forgotten.
+    window.localStorage.setItem('hatti.referral', 'k7mq2xpa');
     type('Shop name', 'Zari Fashions');
     await press('Open my shop');
 
@@ -133,7 +135,11 @@ describe('A merchant new to Hatti', () => {
       search: { shop: 'shop_1' },
     });
     expect(screen.getByText('JBSW Y3DP EHPK 3PXP')).toBeTruthy();
-    expect(core.sent.map((request) => request.path)).toContain('/auth/shops');
+    expect(core.sent.find((request) => request.path === '/auth/shops')?.body).toEqual({
+      name: 'Zari Fashions',
+      referralCode: 'k7mq2xpa',
+    });
+    expect(window.localStorage.getItem('hatti.referral')).toBeNull();
     expect(JSON.parse(window.localStorage.getItem('hatti.session')!)).toMatchObject({
       refreshToken: 'hsr_1',
     });

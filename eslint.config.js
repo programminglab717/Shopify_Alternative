@@ -48,6 +48,7 @@ export default defineConfig(
       '**/src/cli/**/*.ts',
       '**/src/seed.ts',
       '**/src/support-agent.ts',
+      '**/src/partner-payouts.ts',
       '**/src/email-suppression.ts',
       '**/src/billing-transfers.ts',
       '**/src/courier-cities.ts',

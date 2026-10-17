@@ -12,6 +12,7 @@ import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
+import { forgetReferral, referralCode, rememberReferral } from './referral';
 import { TextField } from '../ui/field';
 
 /** Opening a shop (ONB-01, ONB-10): its name; Pakistan's currency and time, and Free, to start. */
@@ -29,9 +30,12 @@ function OpenShopForm({ first }: { first: boolean }) {
     setBusy(true);
     setError(null);
     try {
+      // Brought by a partner's link (ADR-505): the shop is theirs, as referred.
+      const referral = referralCode();
       const { shop } = await store.auth<{ shop: ShopAccess }>('/auth/shops', {
-        body: { name: name.trim() },
+        body: { name: name.trim(), ...(referral && { referralCode: referral }) },
       });
+      forgetReferral();
       await queryClient.invalidateQueries({ queryKey: ME_KEY });
       await navigate({ to: '/$shopId', params: { shopId: shop.id } });
     } catch (failure) {
@@ -99,6 +103,8 @@ export function ShopsPage() {
   const shops = me.data?.shops ?? [];
   // An invitation opened before signing in comes first, once signed in.
   const [invited] = useState(takePendingInvitation);
+  // As does a partner's referral link to this page (ADR-505).
+  useState(() => rememberReferral());
   const only = !invited && shops.length === 1 ? shops[0] : undefined;
 
   useEffect(() => {

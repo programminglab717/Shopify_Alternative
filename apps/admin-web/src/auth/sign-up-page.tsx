@@ -8,6 +8,7 @@ import { useLocale } from '../i18n/locale';
 import { Button } from '../ui/button';
 import { Alert } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { rememberReferral } from '../shops/referral';
 import { AuthLayout } from './auth-layout';
 import { useSessionStore } from './context';
 import type { Tokens } from './session';
@@ -23,6 +24,8 @@ export function fieldErrors(error: unknown): Record<string, string> {
  * in by their mobile; a number may be added, and proved later.
  */
 export function SignUpPage() {
+  // A partner's referral link opens this page (ADR-505): its code, kept for the shop opened.
+  useState(() => rememberReferral());
   const { t, locale } = useLocale();
   const store = useSessionStore();
   const navigate = useNavigate();

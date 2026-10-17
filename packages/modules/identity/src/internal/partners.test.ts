@@ -9,7 +9,8 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AuthError } from './errors.js';
 import { IdentityService, type ClientInfo } from './identity.service.js';
-import { PartnersService } from './partners.service.js';
+import { newId } from '@hatti/ids';
+import { PartnersService, recordPartnerEarning } from './partners.service.js';
 import { StaffService } from './staff.service.js';
 
 const server = testDatabaseServer();
@@ -32,6 +33,7 @@ async function authError(promise: Promise<unknown>): Promise<AuthError> {
 describe.skipIf(!server || !redisUrl)("Hatti's partners (PRT-01, ADR-504)", () => {
   let testDb: TestDatabase;
   let identityDb: Database;
+  let appDb: Database;
   let admin: pg.Client;
   let redis: Redis;
   let identity: IdentityService;
@@ -52,6 +54,7 @@ describe.skipIf(!server || !redisUrl)("Hatti's partners (PRT-01, ADR-504)", () =
   beforeAll(async () => {
     testDb = await createTestDatabase(server);
     identityDb = new Database({ appUrl: testDb.identityUrl, applicationName: 'partners-test' });
+    appDb = new Database({ appUrl: testDb.appUrl, applicationName: 'partners-test-app' });
     admin = new pg.Client({ connectionString: testDb.adminUrl });
     await admin.connect();
     redis = new Redis(redisUrl!);
@@ -71,6 +74,7 @@ describe.skipIf(!server || !redisUrl)("Hatti's partners (PRT-01, ADR-504)", () =
     if (keys.length > 0) await redis.del(...keys);
     redis?.disconnect();
     await identityDb?.close();
+    await appDb?.close();
     await admin?.end();
     await testDb?.drop();
   });
@@ -200,5 +204,97 @@ describe.skipIf(!server || !redisUrl)("Hatti's partners (PRT-01, ADR-504)", () =
         )
       ).role,
     ).toBe('owner');
+  });
+
+  it('earns 20% of each plan invoice a store it brought pays, until Hatti pays it out (PRT-02, ADR-505)', async () => {
+    const agency = await signUp();
+    const { referralCode } = await partners.join(agency, {
+      businessName: 'Pixel Media',
+      payoutTitle: 'Pixel Media (Pvt) Ltd',
+      payoutIban: 'pk36 scbl 0000 0011 2345 6702',
+    });
+    expect(await partners.profile(agency)).toMatchObject({
+      payout: { title: 'Pixel Media (Pvt) Ltd', iban: 'PK36SCBL0000001123456702' },
+    });
+    expect(
+      (
+        await authError(
+          partners.join(agency, { businessName: 'Pixel Media', payoutIban: 'PK36 1234' }),
+        )
+      ).details.fields,
+    ).toEqual({
+      payoutIban: 'Give the IBAN as your bank prints it: PK, then 22 letters and digits',
+      payoutTitle: 'Give the account title and its IBAN together',
+    });
+
+    // A merchant comes by its link; another types a code that is no one's, or the agency's own.
+    const merchant = await signUp();
+    const session = (account: { tokens: { accessToken: string } }) =>
+      identity.authenticate(account.tokens.accessToken);
+    const referred = await identity.openShop(
+      await session(merchant),
+      { name: 'Zari Lawn', referralCode: ` ${referralCode.toUpperCase()} ` },
+      client(),
+    );
+    const stranger = await signUp();
+    await identity.openShop(
+      await session(stranger),
+      { name: 'Gota', referralCode: 'nosuchco' },
+      client(),
+    );
+    await identity.openShop(
+      await session(agency),
+      { name: 'Pixel Prints', referralCode },
+      client(),
+    );
+    const shopId = fromPublicId(referred.id, 'shop')!;
+    expect((await partners.stores(agency)).map((store) => [store.name, store.kind])).toEqual([
+      ['Zari Lawn', 'referred'],
+    ]);
+
+    // Its plan paid twice, once again by the same invoice; a shop no partner brought earns none.
+    const pay = (shop: string, id: string, amount: bigint, number = '1001') =>
+      appDb.tenant(shop, (tx) =>
+        recordPartnerEarning(tx, shop, { id, number, plan: 'growth', amount }),
+      );
+    const first = newId();
+    expect(await pay(shopId, first, 299_900n)).toBe(59_980n);
+    expect(await pay(shopId, first, 299_900n)).toBeNull();
+    expect(await pay(shopId, newId(), 2_999_000n, '1002')).toBe(599_800n);
+    const gota = fromPublicId(
+      (await identity.openShop(await session(stranger), { name: 'Other' }, client())).id,
+      'shop',
+    )!;
+    expect(await pay(gota, newId(), 299_900n)).toBeNull();
+    // Only for the shop of the transaction asking.
+    expect(
+      await appDb.tenant(gota, (tx) =>
+        recordPartnerEarning(tx, shopId, { id: newId(), number: '9', plan: 'pro', amount: 100n }),
+      ),
+    ).toBeNull();
+
+    const earned = await partners.earnings(agency);
+    expect([earned.earned, earned.paidOut, earned.owed]).toEqual([659_780n, 0n, 659_780n]);
+    expect(
+      earned.entries.map((entry) => [entry.shopName, entry.invoiceNumber, entry.amount]),
+    ).toEqual([
+      ['Zari Lawn', '1002', 599_800n],
+      ['Zari Lawn', '1001', 59_980n],
+    ]);
+    expect(earned.entries[0]).toMatchObject({ sharePercent: 20, invoiceAmount: 2_999_000n });
+
+    // Hatti's people see what is owed, pay it, and it is owed no more.
+    expect((await partners.owed()).find((each) => each.userId === agency.userId)).toMatchObject({
+      businessName: 'Pixel Media',
+      payout: { iban: 'PK36SCBL0000001123456702' },
+      owed: 659_780n,
+      entries: 2,
+    });
+    expect(await partners.payOut(agency.userId, 'IBFT 20261017-88')).toBe(659_780n);
+    expect(await partners.payOut(agency.userId, 'again')).toBe(0n);
+    expect((await partners.owed()).some((each) => each.userId === agency.userId)).toBe(false);
+    const after = await partners.earnings(agency);
+    expect([after.paidOut, after.owed]).toEqual([659_780n, 0n]);
+    expect(after.entries[0]).toMatchObject({ payoutReference: 'IBFT 20261017-88' });
   });
 });

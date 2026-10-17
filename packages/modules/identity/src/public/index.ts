@@ -73,6 +73,9 @@ export {
 export {
   PARTNER_LIMITS,
   PartnersService,
+  recordPartnerEarning,
+  type PartnerEarnings,
+  type PartnerOwed,
   type PartnerProfile,
   type PartnerStore,
   type PartnerStoreKind,

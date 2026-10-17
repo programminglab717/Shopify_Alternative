@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-504 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-505 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -512,6 +512,7 @@
 | 502 | The store builder: a shop set up from a few lines saying what it sells, its kit, theme colour, About us page and home page SEO, leaving what it set | Accepted |
 | 503 | Auto-crop: a product's photos cropped to the product against a plain backdrop, in the shape asked, through the crops a shop makes, leaving busy photos | Accepted |
 | 504 | Partners: agencies open development stores, closed to shoppers until handed to their clients as any shop is handed over, and see every store they built, brought or work in | Accepted |
+| 505 | Partners' revenue share: 20% of each plan invoice a store they brought pays, recorded as it is paid, owed until Hatti's people pay it into their bank account | Accepted |
 
 ---
 
@@ -19085,3 +19086,55 @@
     share, while a development store must stay closed until handed over, whatever its builder sets.
   * **A plan of its own for development stores:** billing stays as it is until shops are billed
     differently by kind.
+
+## ADR-505 · Partners' revenue share: 20% of each plan invoice a store they brought pays, recorded as it is paid, owed until Hatti's people pay it into their bank account
+
+* **Context:** Agencies and freelancers bring Hatti most of the stores it doesn't find itself.
+  They will send merchants Hatti's way, and keep them there, if they earn from it while the
+  store pays. Pakistan's partners are paid in rupees by bank transfer, not by card or PayPal
+  (PRT-02).
+* **Decision:**
+  * **What a partner earns:** 20% of each plan invoice paid by a store they brought, for as long
+    as it pays. A store they brought is one whose owner opened it through the partner's link, or
+    a development store they handed to its client (ADR-504).
+    * Message credit earns nothing.
+    * A development store the partner still builds earns nothing: its plan is the partner's own
+      to pay.
+  * **The referral link** is `/sign-up?ref=<code>`. The admin keeps the code in the browser from
+    the page the link opens until a shop is opened. That carries it across signing up and an
+    email's link. Opening the shop sends the code, and `/auth/shops` records the store as the
+    partner's, as referred.
+    * A code that is no partner's is ignored. So is the opener's own code. Neither stops the shop
+      opening.
+    * A store has one partner at most, for good.
+  * **Recording the share:**
+    * As billing says an invoice is paid, the worker records the share through
+      `identity.record_partner_earning`, in the shop's own transaction.
+    * The function is SECURITY DEFINER and works only for the shop of the transaction asking, so
+      the worker reads none of identity's tables (as with ADR-193).
+    * The 20% is fixed in the function, so no caller can pass another. Each invoice earns once,
+      so a re-delivered event changes nothing. The share is rounded down to the paisa.
+  * **The partner's view:**
+    * The dashboard (`GET /auth/partner`) adds their earnings: earned, paid out and still owed,
+      and the latest 50 shares, each with its store, invoice and whether it has been paid.
+    * The partner gives an account title and a Pakistani IBAN (PK, two digits, four letters, 16
+      digits) to be paid into. The two are given together or not at all.
+  * **Paying out:** Hatti's people run `partner-payouts list` to see who is owed what and into
+    which account. Once the transfer is made, `partner-payouts pay <partner> <reference>` marks
+    everything that partner was owed as paid, with the transfer's reference.
+  * The admin's partner page shows the referral link, the earnings and their shares, and the
+    payout account form.
+* **Consequences:**
+  * Shares are not taken back when Hatti refunds an invoice. Plan invoices are not refunded today
+    (ADR-154), and when they are, the refund will need a clawback line.
+  * Withholding tax on commissions paid to partners isn't deducted yet. Hatti's accountants deduct
+    it when they pay, and record only the net.
+  * Payouts are by hand, once a month, until there are enough partners for a bank's bulk
+    transfer file.
+* **Alternatives:**
+  * **Billing recording the share itself:** billing would have to read which partner brought a
+    shop, and that is identity's.
+  * **A share for a fixed term, such as 24 months:** a share for as long as the store pays keeps
+    partners looking after their stores.
+  * **Paying into a wallet to spend on Hatti:** partners run businesses, and they need rupees in
+    the bank.

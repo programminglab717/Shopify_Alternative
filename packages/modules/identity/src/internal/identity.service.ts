@@ -79,6 +79,7 @@ import {
   verifyPassword,
   type BreachedPasswordChecker,
 } from './passwords.js';
+import { referredBy } from './partners.service.js';
 import {
   PHONE_CODE,
   maskPhone,
@@ -2237,7 +2238,7 @@ export class IdentityService {
    */
   async openShop(
     auth: AuthenticatedSession,
-    input: { name: string; handle?: string | null },
+    input: { name: string; handle?: string | null; referralCode?: string | null },
     client: ClientInfo,
   ): Promise<OpenedShop> {
     await this.limit(RATE_LIMITS.openShopByUser, auth.userId);
@@ -2277,6 +2278,11 @@ export class IdentityService {
         numbered: asked === null,
       });
       await tx.insert(memberships).values({ userId: auth.userId, shopId, role: 'owner' });
+      // Brought by a partner's link (ADR-505): theirs, as referred. A code that is no one's is
+      // no reason not to open the shop.
+      if (input.referralCode?.trim()) {
+        await referredBy(tx, shopId, auth.userId, input.referralCode);
+      }
       await appendEvent<ShopOpenedPayload>(tx, shopId, {
         type: ShopEvents.ShopOpened,
         aggregateType: 'shop',

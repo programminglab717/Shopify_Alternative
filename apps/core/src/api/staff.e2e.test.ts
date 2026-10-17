@@ -243,6 +243,7 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       expect((await get('/auth/partner', accessToken)).json()).toEqual({
         partner: null,
         stores: [],
+        earnings: null,
       });
       expect((await post('/auth/partner/stores', { name: 'Zari' }, accessToken)).json()).toEqual({
         error: { code: 'NOT_PARTNER', message: "Join Hatti's partner programme first" },
@@ -277,6 +278,25 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
         },
       ]);
       expect((await post('/auth/partner', { businessName: 7 }, accessToken)).statusCode).toBe(400);
+
+      // A merchant comes by the partner's link (ADR-505): the store is theirs, as referred.
+      const { partner } = joined.json() as { partner: { referralCode: string } };
+      const merchant = await signUp();
+      const referred = await post(
+        '/auth/shops',
+        { name: 'Sana Prints', referralCode: partner.referralCode },
+        merchant.accessToken,
+      );
+      expect(referred.statusCode).toBe(201);
+      const after = (await get('/auth/partner', accessToken)).json() as {
+        stores: { name: string; kind: string }[];
+        earnings: Record<string, unknown>;
+      };
+      expect(after.stores.map((store) => [store.name, store.kind])).toEqual([
+        ['Sana Prints', 'referred'],
+        ['Noor Jewels', 'development'],
+      ]);
+      expect(after.earnings).toEqual({ earned: '0', paidOut: '0', owed: '0', entries: [] });
     });
 
     it('rotates tokens on refresh', async () => {

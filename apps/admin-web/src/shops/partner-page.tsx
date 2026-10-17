@@ -7,7 +7,7 @@ import type { StaffMemberRole } from '../api/types';
 import { AuthLayout } from '../auth/auth-layout';
 import { useSessionStore } from '../auth/context';
 import { errorText } from '../i18n/errors';
-import { formatDate } from '../i18n/format';
+import { formatDate, formatMoney } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { roleLabel } from '../settings/settings-page';
@@ -20,7 +20,27 @@ export interface Partner {
   businessName: string;
   website: string | null;
   referralCode: string;
+  /** The bank account Hatti pays their share into (ADR-505). */
+  payout: { title: string; iban: string } | null;
   joinedAt: string;
+}
+
+/** What a partner earned, in paisa as strings (ADR-505). */
+export interface PartnerEarnings {
+  earned: string;
+  paidOut: string;
+  owed: string;
+  entries: {
+    shopName: string;
+    invoiceNumber: string;
+    plan: string;
+    invoiceAmount: string;
+    sharePercent: number;
+    amount: string;
+    earnedAt: string;
+    paidOutAt: string | null;
+    payoutReference: string | null;
+  }[];
 }
 
 /** A store on a partner's dashboard (ADR-504). */
@@ -49,13 +69,23 @@ export function PartnerPage() {
   const store = useSessionStore();
   const dashboard = useQuery({
     queryKey: KEY,
-    queryFn: () => store.auth<{ partner: Partner | null; stores: PartnerStore[] }>('/auth/partner'),
+    queryFn: () =>
+      store.auth<{
+        partner: Partner | null;
+        stores: PartnerStore[];
+        earnings: PartnerEarnings | null;
+      }>('/auth/partner'),
   });
   const partner = dashboard.data?.partner ?? null;
   return (
     <AuthLayout title={t('partner.title')}>
       {dashboard.isPending ? null : partner ? (
-        <Dashboard partner={partner} stores={dashboard.data?.stores ?? []} />
+        <>
+          <Dashboard partner={partner} stores={dashboard.data?.stores ?? []} />
+          {dashboard.data?.earnings && (
+            <Earnings partner={partner} earnings={dashboard.data.earnings} />
+          )}
+        </>
       ) : (
         <Join />
       )}
@@ -213,5 +243,129 @@ function Dashboard({ partner, stores }: { partner: Partner; stores: PartnerStore
         )}
       </section>
     </div>
+  );
+}
+
+/** "Rs 599.80": paisa, as the API gives a partner's sums, in rupees. */
+const rupees = (paisa: string) => {
+  const value = BigInt(paisa);
+  return formatMoney(`${value / 100n}.${String(value % 100n).padStart(2, '0')}`);
+};
+
+/**
+ * What the partner earned of the stores they brought (PRT-02, ADR-505): 20% of each plan invoice
+ * they pay, the link that brings them, and the bank account Hatti pays it into.
+ */
+function Earnings({ partner, earnings }: { partner: Partner; earnings: PartnerEarnings }) {
+  const { t, locale } = useLocale();
+  const store = useSessionStore();
+  const queryClient = useQueryClient();
+  const [title, setTitle] = useState(partner.payout?.title ?? '');
+  const [iban, setIban] = useState(partner.payout?.iban ?? '');
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const link = `${window.location.origin}/sign-up?ref=${partner.referralCode}`;
+
+  const onSave = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setProblem(null);
+    setSaved(false);
+    try {
+      await store.auth('/auth/partner', {
+        body: {
+          businessName: partner.businessName,
+          website: partner.website,
+          payoutTitle: title.trim() || null,
+          payoutIban: iban.trim() || null,
+        },
+      });
+      setSaved(true);
+      await queryClient.invalidateQueries({ queryKey: KEY });
+    } catch (failure) {
+      setProblem(errorText(failure, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section aria-labelledby="partner-earnings" className="mt-6 flex flex-col gap-3">
+      <h2 id="partner-earnings" className="font-semibold">
+        {t('partner.earnings')}
+      </h2>
+      <p className="text-secondary">{t('partner.earningsBody')}</p>
+      <p className="text-secondary">
+        {t('partner.link')}{' '}
+        <bdi dir="ltr" className="break-all font-medium text-primary">
+          {link}
+        </bdi>
+      </p>
+      <dl className="grid grid-cols-3 gap-2 rounded-control border border-line p-3">
+        {(
+          [
+            ['partner.earned', earnings.earned],
+            ['partner.paidOut', earnings.paidOut],
+            ['partner.owed', earnings.owed],
+          ] as const
+        ).map(([label, amount]) => (
+          <div key={label} className="flex flex-col">
+            <dt className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+              {t(label)}
+            </dt>
+            <dd className="font-semibold">{rupees(amount)}</dd>
+          </div>
+        ))}
+      </dl>
+      {earnings.entries.length > 0 && (
+        <ul className="flex flex-col divide-y divide-line rounded-control border border-line">
+          {earnings.entries.map((entry) => (
+            <li key={entry.invoiceNumber} className="flex flex-wrap items-center gap-2 px-3 py-2">
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="font-medium" dir="auto">
+                  {entry.shopName}
+                </span>
+                <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                  {t('partner.share', {
+                    percent: entry.sharePercent,
+                    amount: rupees(entry.invoiceAmount),
+                  })}{' '}
+                  · {formatDate(entry.earnedAt, 'Asia/Karachi', locale)}
+                </span>
+              </span>
+              <span className="flex flex-col items-end">
+                <span className="font-medium">{rupees(entry.amount)}</span>
+                <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                  {entry.paidOutAt ? t('partner.paid') : t('partner.toPay')}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form onSubmit={(event) => void onSave(event)} className="flex flex-col gap-3">
+        <TextField
+          label={t('partner.payoutTitle')}
+          dir="auto"
+          maxLength={120}
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+        />
+        <TextField
+          label={t('partner.payoutIban')}
+          hint={t('partner.payoutIbanHint')}
+          ltr
+          maxLength={40}
+          value={iban}
+          onChange={(event) => setIban(event.target.value)}
+        />
+        {saved && <Alert tone="success">{t('partner.payoutSaved')}</Alert>}
+        {problem && <Alert tone="danger">{problem}</Alert>}
+        <Button type="submit" variant="secondary" busy={busy}>
+          {t('partner.payoutSave')}
+        </Button>
+      </form>
+    </section>
   );
 }

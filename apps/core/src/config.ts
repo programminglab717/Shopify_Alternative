@@ -543,6 +543,9 @@ const seedSchema = z.object({
 /** Hatti's support agents are added and removed with the identity login alone (ADR-156). */
 const supportAgentSchema = z.object({ DATABASE_IDENTITY_URL: env.postgresUrl() });
 
+/** Hatti's people pay partners their share (ADR-505), with the identity login, as for agents. */
+const partnerPayoutsSchema = supportAgentSchema;
+
 /**
  * Hatti's people list the transfers shops said they made into Hatti's account, and confirm or
  * refuse each (ADR-254), with the app login and the system login, which finds them across shops.
@@ -609,6 +612,7 @@ export type ApiConfig = z.output<typeof apiSchema>;
 export type WorkerConfig = z.output<typeof workerSchema>;
 export type SeedConfig = z.output<typeof seedSchema>;
 export type SupportAgentConfig = z.output<typeof supportAgentSchema>;
+export type PartnerPayoutsConfig = z.output<typeof partnerPayoutsSchema>;
 export type EmailSuppressionConfig = z.output<typeof emailSuppressionSchema>;
 export type BillingTransfersConfig = z.output<typeof billingTransfersSchema>;
 export type CourierCitiesConfig = z.output<typeof courierCitiesSchema>;
@@ -620,6 +624,8 @@ export const loadWorkerConfig = (source?: Env): WorkerConfig => parseEnv(workerS
 export const loadSeedConfig = (source?: Env): SeedConfig => parseEnv(seedSchema, source);
 export const loadSupportAgentConfig = (source?: Env): SupportAgentConfig =>
   parseEnv(supportAgentSchema, source);
+export const loadPartnerPayoutsConfig = (source?: Env): PartnerPayoutsConfig =>
+  parseEnv(partnerPayoutsSchema, source);
 export const loadEmailSuppressionConfig = (source?: Env): EmailSuppressionConfig =>
   parseEnv(emailSuppressionSchema, source);
 export const loadBillingTransfersConfig = (source?: Env): BillingTransfersConfig =>

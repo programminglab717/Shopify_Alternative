@@ -32,7 +32,12 @@ import {
 } from './passkeys.js';
 import { DEVICE_HEADER } from './sign-in-alerts.js';
 import { StaffService, type AccessRequestRecord } from './staff.service.js';
-import { PartnersService, type PartnerProfile, type PartnerStore } from './partners.service.js';
+import {
+  PartnersService,
+  type PartnerEarnings,
+  type PartnerProfile,
+  type PartnerStore,
+} from './partners.service.js';
 import { SupportAccessService } from './support-access.service.js';
 
 /** Sends {@link AuthError}s as `{ error: { code, message, fields? } }` with their status. */
@@ -129,11 +134,17 @@ const reauthenticateBody = z
   );
 const reauthenticationCodeBody = phoneCodeBody.omit({ phone: true });
 const refreshBody = z.object({ refreshToken: z.string().max(100) });
-const shopBody = z.object({ name: z.string().max(1_024), handle: z.string().max(100).nullish() });
+const shopBody = z.object({
+  name: z.string().max(1_024),
+  handle: z.string().max(100).nullish(),
+  referralCode: z.string().max(32).nullish(),
+});
 const codeBody = z.object({ code: z.string().max(32) });
 const partnerBody = z.object({
   businessName: z.string().max(1_024),
   website: z.string().max(1_024).nullish(),
+  payoutTitle: z.string().max(1_024).nullish(),
+  payoutIban: z.string().max(64).nullish(),
 });
 
 function parse<T extends z.ZodType>(schema: T, body: unknown): z.output<T> {
@@ -208,7 +219,24 @@ function partnerJson(partner: PartnerProfile) {
     businessName: partner.businessName,
     website: partner.website,
     referralCode: partner.referralCode,
+    payout: partner.payout,
     joinedAt: partner.joinedAt.toISOString(),
+  };
+}
+
+/** What a partner earned, its sums in paisa as strings (ADR-505). */
+function earningsJson(earnings: PartnerEarnings) {
+  return {
+    earned: earnings.earned.toString(),
+    paidOut: earnings.paidOut.toString(),
+    owed: earnings.owed.toString(),
+    entries: earnings.entries.map((entry) => ({
+      ...entry,
+      invoiceAmount: entry.invoiceAmount.toString(),
+      amount: entry.amount.toString(),
+      earnedAt: entry.earnedAt.toISOString(),
+      paidOutAt: entry.paidOutAt?.toISOString() ?? null,
+    })),
   };
 }
 
@@ -596,8 +624,9 @@ export class AuthController {
   }
 
   /**
-   * Opens a shop of the signed-in user's own (ONB-01, ADR-145): `{ name, handle? }`; the shop, its
-   * handle and the user's role in it. Its owner signs in with a second factor to use it.
+   * Opens a shop of the signed-in user's own (ONB-01, ADR-145): `{ name, handle?, referralCode? }`,
+   * the code a partner's link brought them by (ADR-505); the shop, its handle and the user's role
+   * in it. Its owner signs in with a second factor to use it.
    */
   @Post('shops')
   @HttpCode(201)
@@ -822,21 +851,29 @@ export class AuthController {
   }
 
   /**
-   * The signed-in account's partner profile and stores (PRT-01, ADR-504): `{ partner, stores }`,
-   * the partner null and the stores none until they join.
+   * The signed-in account's partner profile, stores and earnings (PRT-01, PRT-02, ADR-504,
+   * ADR-505): `{ partner, stores, earnings }`, the partner and earnings null and the stores none
+   * until they join.
    */
   @Get('partner')
   async partner(@Req() request: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
     noStore(reply);
     const session = await this.session(request);
     const partner = await this.partners.profile(session);
-    const stores = partner ? await this.partners.stores(session) : [];
-    return { partner: partner && partnerJson(partner), stores: stores.map(partnerStoreJson) };
+    const [stores, earnings] = partner
+      ? await Promise.all([this.partners.stores(session), this.partners.earnings(session)])
+      : [[], null];
+    return {
+      partner: partner && partnerJson(partner),
+      stores: stores.map(partnerStoreJson),
+      earnings: earnings && earningsJson(earnings),
+    };
   }
 
   /**
-   * Joins Hatti's partner programme, or changes the partner's details: `{ businessName, website? }`
-   * (ADR-504). The partner, with the referral code they were given.
+   * Joins Hatti's partner programme, or changes the partner's details: `{ businessName, website?,
+   * payoutTitle?, payoutIban? }` (ADR-504, ADR-505), the bank account their share is paid into
+   * given whole or not at all. The partner, with the referral code they were given.
    */
   @Post('partner')
   @HttpCode(200)

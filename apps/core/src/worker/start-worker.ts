@@ -79,6 +79,7 @@ import {
 import { workerStorage } from '../storage.js';
 import { storeExportBuilder } from '../store-export.js';
 import { BillingNotices } from './billing-notices.js';
+import { PartnerEarnings } from './partner-earnings.js';
 import { BillingRenewals } from './billing-renewals.js';
 import { AutomationTriggers, WinBacks } from './automations.js';
 import { BroadcastQueue } from './broadcasts.js';
@@ -138,6 +139,7 @@ export interface EventConsumers {
   codPrepaid?: CodPrepaidOffers;
   parcelSteps?: ParcelSteps;
   billing?: BillingNotices;
+  partnerEarnings?: PartnerEarnings;
   staff?: StaffAlerts;
   storeCredit?: StoreCreditNotices;
   giftCards?: GiftCardSales;
@@ -165,6 +167,7 @@ export function eventHandlers(
     codPrepaid,
     parcelSteps,
     billing,
+    partnerEarnings,
     staff,
     storeCredit,
     giftCards,
@@ -239,6 +242,11 @@ export function eventHandlers(
   }
   if (billing) {
     for (const type of BillingNotices.EVENTS) registry.on(type, (event) => billing.handle(event));
+  }
+  if (partnerEarnings) {
+    for (const type of PartnerEarnings.EVENTS) {
+      registry.on(type, (event) => partnerEarnings.handle(event));
+    }
   }
   if (staff) {
     for (const type of StaffAlerts.EVENTS) registry.on(type, (event) => staff.handle(event));
@@ -358,6 +366,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         ),
         parcelSteps: new ParcelSteps(new FulfillmentService(database, new StockService()), logger),
         billing: new BillingNotices(database, new MessagesService(database)),
+        partnerEarnings: new PartnerEarnings(database),
         staff: new StaffAlerts(database, new MessagesService(database)),
         storeCredit: new StoreCreditNotices(database, new MessagesService(database)),
         giftCards: new GiftCardSales(database, new MessagesService(database)),
