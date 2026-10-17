@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Discounts for some products or collections
+### 1017c9c · Discounts for some products or collections
 
 * **A code or an automatic discount can be for some products or collections, taking a
   percentage or an amount off their items alone, in the cart, at checkout and through the Admin
