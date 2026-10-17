@@ -186,4 +186,44 @@ describe('Discount codes in the admin', () => {
       }),
     );
   });
+  it('makes a buy one get one at half off code (ADR-520)', async () => {
+    const core = fakeCore('owner', (operation) => {
+      if (operation === 'DiscountCodes') return { discountCodes: { nodes: [] } };
+      if (operation === 'AutomaticDiscounts') return { automaticDiscounts: [] };
+      if (operation === 'DiscountCodeCreate') {
+        return {
+          discountCodeCreate: {
+            discountCode: code({ code: 'HALF', kind: 'BUY_X_GET_Y' }),
+            userErrors: [],
+          },
+        };
+      }
+      throw new Error(`unexpected ${operation}`);
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/discounts');
+
+    await screen.findByText('No discount codes yet.');
+    await press('New code');
+    type('Code', 'half');
+    fireEvent.change(screen.getByLabelText('It gives'), { target: { value: 'BUY_X_GET_Y' } });
+    type('Items bought', '1');
+    type('Percentage off the items given', '50');
+    await press('Make the code');
+
+    await waitFor(() =>
+      expect(core.sent.find((each) => each.operation === 'DiscountCodeCreate')?.variables).toEqual({
+        discountCode: {
+          code: 'HALF',
+          buyQuantity: 1,
+          getQuantity: 1,
+          percentage: 50,
+          minimumSubtotal: null,
+          usageLimit: null,
+          oncePerCustomer: false,
+          endsAt: null,
+        },
+      }),
+    );
+  });
 });

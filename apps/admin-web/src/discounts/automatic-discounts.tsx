@@ -26,6 +26,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { AppliesTo, itemInput, noneChosen, type ChosenItems } from './applies-to';
+import { BuyGetFields } from './buy-get';
 
 const STATUS_BADGES = {
   ACTIVE: { colour: 'delivered', icon: CircleCheck },
@@ -42,6 +43,8 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   endsAt: 'discounts.ends',
   productIds: 'appliesTo.label',
   collectionIds: 'appliesTo.label',
+  buyQuantity: 'buyGet.buy',
+  getQuantity: 'buyGet.get',
 };
 
 /** The start of a day typed in a date field, or its end, in the shop's time zone. */
@@ -65,6 +68,8 @@ function NewAutomaticForm({ onDone }: { onDone: (discount: AutomaticDiscountValu
   const [starts, setStarts] = useState('');
   const [ends, setEnds] = useState('');
   const [items, setItems] = useState<ChosenItems>(null);
+  const [buy, setBuy] = useState('2');
+  const [get, setGet] = useState('1');
   const [problems, setProblems] = useState<string[]>([]);
 
   const onSubmit = async (event: FormEvent) => {
@@ -81,6 +86,11 @@ function NewAutomaticForm({ onDone }: { onDone: (discount: AutomaticDiscountValu
           ...(kind === 'PERCENTAGE' && { percentage: Number(value.replace(/%$/, '').trim()) }),
           ...(kind === 'FIXED_AMOUNT' && { amount: value.trim() }),
           ...(kind === 'FREE_SHIPPING' && { freeShipping: true }),
+          ...(kind === 'BUY_X_GET_Y' && {
+            buyQuantity: Number(buy.trim()),
+            getQuantity: Number(get.trim()),
+            percentage: Number(value.replace(/%$/, '').trim()),
+          }),
           minimumSubtotal: minimum.trim() || null,
           combinesWithCodes: combines,
           ...(starts && { startsAt: dayInput(starts, false, timezone) }),
@@ -121,15 +131,22 @@ function NewAutomaticForm({ onDone }: { onDone: (discount: AutomaticDiscountValu
               { value: 'PERCENTAGE', label: t('discounts.kind.PERCENTAGE') },
               { value: 'FIXED_AMOUNT', label: t('discounts.kind.FIXED_AMOUNT') },
               { value: 'FREE_SHIPPING', label: t('discounts.kind.FREE_SHIPPING') },
+              { value: 'BUY_X_GET_Y', label: t('discounts.kind.BUY_X_GET_Y') },
             ]}
             onChange={(next) => {
               setKind(next);
-              setValue('');
+              setValue(next === 'BUY_X_GET_Y' ? '100' : '');
             }}
           />
           {kind !== 'FREE_SHIPPING' && (
             <TextField
-              label={t(kind === 'PERCENTAGE' ? 'discounts.percentage' : 'discounts.amount')}
+              label={t(
+                kind === 'PERCENTAGE'
+                  ? 'discounts.percentage'
+                  : kind === 'BUY_X_GET_Y'
+                    ? 'buyGet.off'
+                    : 'discounts.amount',
+              )}
               required
               inputMode="decimal"
               ltr
@@ -138,6 +155,9 @@ function NewAutomaticForm({ onDone }: { onDone: (discount: AutomaticDiscountValu
             />
           )}
         </Pair>
+        {kind === 'BUY_X_GET_Y' && (
+          <BuyGetFields buy={buy} get={get} onBuy={setBuy} onGet={setGet} />
+        )}
         {kind !== 'FREE_SHIPPING' && <AppliesTo value={items} onChange={setItems} />}
         <TextField
           label={t('discounts.minimum')}

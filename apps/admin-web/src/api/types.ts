@@ -1202,7 +1202,7 @@ export interface BillingData {
   } | null;
 }
 
-export type DiscountCodeKind = 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_SHIPPING';
+export type DiscountCodeKind = 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_SHIPPING' | 'BUY_X_GET_Y';
 
 export interface DiscountCodeValue {
   id: string;

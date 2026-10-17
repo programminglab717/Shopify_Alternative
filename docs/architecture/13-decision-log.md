@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-519 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-520 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -527,6 +527,7 @@
 | 517 | Discounts for some products or collections: a code or an automatic discount names up to 100 of each, and takes a percentage or an amount off only their items, its minimum being what they come to; free delivery stays for the whole order | Accepted |
 | 518 | The admin's discounts for some products or collections: a new code or automatic discount applies to the whole order or to products found by name and collections chosen from the shop's, shown as chips taken off with a tap; free delivery has no such choice | Accepted |
 | 519 | Buy X get Y: a code or an automatic discount gives, in each full group of X + Y of its items, the Y cheapest at a percentage off, free unless it says less; spending tiers are automatic discounts with rising minimums | Accepted |
+| 520 | The admin's buy X get Y: both discount forms offer items for others bought, with items bought and given, two for one unless changed, and how much off those given, free unless changed; for the whole order or some products and collections | Accepted |
 
 ---
 
@@ -19840,3 +19841,27 @@
     meant. The cheapest is what Shopify and the shops' own posters mean.
   * **A cap on uses an order:** every full group gives, as shops expect from "buy 2 get 1". A cap
     can come later if shops ask.
+
+## ADR-520 · The admin's buy X get Y: both discount forms offer items for others bought, with items bought and given, two for one unless changed, and how much off those given, free unless changed; for the whole order or some products and collections
+
+* **Context:** ADR-519 added buy X get Y to codes and automatic discounts through the Admin API.
+  The admin's forms offered a percentage, an amount or free delivery (ADR-276, ADR-516).
+* **Decision:**
+  * **What it gives:** both forms offer a fourth choice, "Items for others bought".
+  * **Its fields:**
+    * Items bought and items given, side by side, 2 and 1 unless changed.
+    * How much off the items given, 100% unless changed.
+    * A line says the cheapest items of each group are given, and 100% off makes them free.
+  * **Which items:** the "Applies to" choice (ADR-518) says which items count and are given: the
+    whole order's, or some products and collections.
+  * **Checked:** the API's errors on the quantities are named "Items bought" and "Items given".
+  * **The list:** each discount's line from the API says what it gives ("Buy 2, get 1 free of 1
+    collection").
+  * In English and Urdu.
+* **Consequences:** a shop starts "Buy 2 get 1 free on lawn" from a phone, as an automatic
+  discount or as a code.
+* **Alternatives:**
+  * **A separate form for buy X get Y:** it shares the title, dates, minimum, items and, for a
+    code, its limits with the others. One form with one more choice keeps them together.
+  * **Presets ("Buy 1 get 1", "Buy 2 get 1"):** two plain fields cover every case and read just
+    as clearly.

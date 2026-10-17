@@ -203,4 +203,63 @@ describe('Automatic discounts in the admin (ADR-515)', () => {
       },
     });
   });
+  it('starts a buy 2 get 1 free for a collection (ADR-520)', async () => {
+    const core = fakeCore('marketer', (operation) => {
+      if (operation === 'DiscountCodes') return { discountCodes: { nodes: [] } };
+      if (operation === 'AutomaticDiscounts') return { automaticDiscounts: [] };
+      if (operation === 'Collections') {
+        return {
+          collections: { nodes: [{ id: 'col_1', title: 'Lawn', productsCount: 9, ruleSet: null }] },
+        };
+      }
+      if (operation === 'AutomaticDiscountCreate') {
+        return {
+          automaticDiscountCreate: {
+            automaticDiscount: automatic({
+              title: 'Lawn: buy 2 get 1',
+              kind: 'BUY_X_GET_Y',
+              summary: 'Buy 2, get 1 free of 1 collection',
+            }),
+            userErrors: [],
+          },
+        };
+      }
+      throw new Error(`unexpected ${operation}`);
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/discounts');
+
+    await screen.findByText('No automatic discounts yet.');
+    await press('New automatic discount');
+    type('Title shoppers see', 'Lawn: buy 2 get 1');
+    fireEvent.change(screen.getByLabelText('It gives'), { target: { value: 'BUY_X_GET_Y' } });
+    // Free unless less is given, two bought for one given unless changed.
+    expect(
+      (screen.getByLabelText('Percentage off the items given') as HTMLInputElement).value,
+    ).toBe('100');
+    expect((screen.getByLabelText('Items bought') as HTMLInputElement).value).toBe('2');
+    type('Items given', '1');
+    fireEvent.change(screen.getByLabelText('Applies to'), { target: { value: 'SOME' } });
+    fireEvent.change(await screen.findByLabelText('Add a collection'), {
+      target: { value: 'col_1' },
+    });
+    await press('Start it');
+
+    await screen.findByText('Lawn: buy 2 get 1 is set: carts take it while it runs.');
+    expect(
+      core.sent.find((each) => each.operation === 'AutomaticDiscountCreate')?.variables,
+    ).toEqual({
+      automaticDiscount: {
+        title: 'Lawn: buy 2 get 1',
+        buyQuantity: 2,
+        getQuantity: 1,
+        percentage: 100,
+        minimumSubtotal: null,
+        combinesWithCodes: false,
+        endsAt: null,
+        productIds: [],
+        collectionIds: ['col_1'],
+      },
+    });
+  });
 });
