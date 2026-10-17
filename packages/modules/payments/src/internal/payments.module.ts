@@ -4,6 +4,8 @@ import { GatewayAccountService, PAYMENT_GATEWAYS } from './gateway-accounts.serv
 import { PaymentGateways, SafepayGateway } from './gateways.js';
 import { OnlinePaymentSettingsResolver } from './graphql/online-payment-settings.resolver.js';
 import { PaymentsResolver } from './graphql/payments.resolver.js';
+import { PaymentSettlementResolver } from './graphql/settlement.resolver.js';
+import { PaymentSettlementService } from './settlements.service.js';
 import { OnlinePaymentSettingsService } from './online-payment-settings.service.js';
 import { OnlinePaymentService } from './online-payment.service.js';
 import { PaymentWebhookController } from './webhooks.controller.js';
@@ -33,12 +35,15 @@ export class PaymentsModule {
         { provide: OnlinePayments, useExisting: OnlinePaymentService },
         PaymentsResolver,
         OnlinePaymentSettingsResolver,
+        PaymentSettlementService,
+        PaymentSettlementResolver,
       ],
       exports: [
         GatewayAccountService,
         OnlinePaymentService,
         OnlinePaymentSettingsService,
         OnlinePayments,
+        PaymentSettlementService,
       ],
     };
   }

@@ -21,11 +21,13 @@
   "dependencies": {
     "@hatti/api": "workspace:*",
     "@hatti/crypto": "workspace:*",
+    "@hatti/csv": "workspace:*",
     "@hatti/db": "workspace:*",
     "@hatti/events": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/money": "workspace:*",
     "@hatti/orders": "workspace:*",
+    "@hatti/xlsx": "workspace:*",
     "drizzle-orm": "catalog:"
   },
   "peerDependencies": {

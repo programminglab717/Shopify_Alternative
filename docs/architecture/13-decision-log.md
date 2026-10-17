@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-490 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-491 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -498,6 +498,7 @@
 | 488 | Requests for access: an agency asks a shop by its address, its owner approves or declines | Accepted |
 | 489 | Metafields: custom data on products, variants and collections, as Shopify keeps it, typed by the shop's definitions and read by themes in Liquid | Accepted |
 | 490 | Custom data in the admin: the shop's fields defined in Settings, keyed from their names, and filled on a product's page by the kind of field their type takes | Accepted |
+| 491 | Gateway settlements: the statements gateways send imported as they come, each line matched to a payment by the gateway's reference, and the fees and tax withheld kept beside it | Accepted |
 
 ---
 
@@ -18575,3 +18576,46 @@
 * **Alternatives:**
   * **A free form of namespace, key and value on each product:** shop owners would have to keep
     keys and types consistent across products. Definitions keep them so.
+
+## ADR-491 · Gateway settlements: the statements gateways send imported as they come, each line matched to a payment by the gateway's reference, and the fees and tax withheld kept beside it
+
+* **Context:** Gateways pay a shop what its customers paid online days later. They pay less
+  their fees and the income tax they withhold, with a statement of the payments it is for. The
+  shop has to check that every payment was settled, and at what cost. Its accountant needs the
+  tax withheld for the shop's return. Couriers' statements are reconciled already (ADR-066,
+  ADR-269); gateways' were not.
+* **Decision:**
+  * **`paymentSettlementImport` takes a gateway account's statement as the CSV or Excel workbook
+    the gateway sends.** Up to 20 title rows may come above its header. Its columns are found by
+    the names gateways use:
+    * the payment's reference ("Transaction ID", "Txn Ref", "Tracker");
+    * what the customer paid ("Gross Amount", "Amount");
+    * the fees ("MDR", "Commission") and the tax withheld ("WHT"), when it has them;
+    * what was paid over ("Net Amount").
+    Deductions count however signed, a refund's amount in brackets or below 0. A totals row is
+    passed over. A row that cannot be read is reported with its column, and the rest import.
+  * **Each line is matched to one of the account's paid payments by the gateway's reference or
+    Hatti's, whatever their case:**
+    * MATCHED when the line settled what was paid;
+    * DIFFERS when it settled another amount;
+    * UNMATCHED when no payment of the account has its reference;
+    * REPEATED when its payment was settled before, or earlier in the same file;
+    * REFUND when it takes money back.
+    A payment is settled once: a unique index on its matched line says so.
+  * **A dry run says what the import would do**: its counts, totals and the first 250 lines to
+    look into. **An import keeps the settlement whole or not at all.** Its lines keep their fees
+    and tax beside their payment, and its totals what the gateway paid over. A shop's imports run
+    one at a time. A reference used before by the same account is refused.
+  * `paymentSettlements` lists them, the newest first, and `paymentSettlement` reads one with its
+    lines, which may be filtered by outcome. Owners, managers and accountants reconcile. Apps read
+    with `read_orders` and import with `write_orders` too.
+* **Consequences:**
+  * The tax gateways withheld is kept per payment for the withholding report (TAX-03), with
+    couriers' tax.
+  * Payments never settled are not listed yet. The admin's page of settlements, and payouts
+    across gateways and couriers, come next.
+* **Alternatives:**
+  * **Gateways' settlement APIs:** few Pakistani gateways have one, and those that do differ.
+    Every gateway sends a statement.
+  * **Matching by amount and date:** two payments of one amount on a day are common. The
+    gateway's reference is exact.

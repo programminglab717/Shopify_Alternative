@@ -7661,6 +7661,21 @@ type Mutation {
   paymentRefundSettle(id: ID!, input: PaymentRefundSettleInput!): PaymentRefundSettlePayload!
 
   """
+  Imports a gateway's settlement statement, as the CSV or Excel workbook the gateway sends: a row per payment, found by its reference ("Transaction ID", "Txn Ref", "Tracker" and the like), with what the customer paid ("Amount"), and the fees, tax withheld and net amount when it has them, under a header row title rows may come above. Each line is matched to the account's payment by the gateway's reference for it, and its fees and tax kept beside it; lines that match none, or a payment settled before, or for another amount, are kept to look into. A statement with the same reference from the account again is refused. Staff need to be an owner, a manager or an accountant.
+  """
+  paymentSettlementImport(
+    accountId: ID!
+    csv: String
+    dryRun: Boolean
+
+    """The settlement's number or the payout's reference."""
+    reference: String
+
+    """The statement as an Excel workbook (.xlsx), in base64; or csv."""
+    xlsx: String
+  ): PaymentSettlementImportPayload!
+
+  """
   Cancels a sale not yet started, or ends one running now, its prices put back as at its end.
   """
   priceSaleCancel(id: ID!): PriceSalePayload!
@@ -10143,6 +10158,105 @@ enum PaymentSessionStatus {
 }
 
 """
+A gateway's settlement statement the shop imported (PAY-07, ADR-491): what it paid over, less its fees and the tax it withheld.
+"""
+type PaymentSettlement {
+  accountId: ID!
+  createdAt: DateTime!
+  fees: Money!
+
+  """The account's gateway, such as safepay."""
+  gateway: String!
+
+  """What customers paid, less refunds taken back."""
+  gross: Money!
+  id: ID!
+  lineCount: Int!
+
+  """Its lines in the file's order; those of one outcome, if given."""
+  lines(outcome: PaymentSettlementOutcome): [PaymentSettlementLine!]!
+
+  """What the gateway paid over."""
+  net: Money!
+  reference: String
+
+  """The tax the gateway withheld."""
+  tax: Money!
+}
+
+type PaymentSettlementImportPayload {
+  dryRun: Boolean!
+  fees: Money!
+  gross: Money!
+
+  """
+  The first 250 lines to look into: those not matched, or not settled in full.
+  """
+  issues: [PaymentSettlementLine!]!
+  net: Money!
+  outcomes: PaymentSettlementOutcomeCounts!
+  rowErrorCount: Int!
+  rowErrors: [PaymentSettlementRowError!]!
+
+  """Rows after the header."""
+  rows: Int!
+
+  """Null on a dry run."""
+  settlement: PaymentSettlement
+  tax: Money!
+  userErrors: [UserError!]!
+}
+
+"""A line of a gateway's settlement: one payment it paid over."""
+type PaymentSettlementLine {
+  fees: Money!
+
+  """What the customer paid; less than 0 for a refund."""
+  gross: Money!
+
+  """The order of the payment it matched."""
+  orderId: ID
+  outcome: PaymentSettlementOutcome!
+
+  """What the payment it matched was for."""
+  paid: Money
+
+  """Its row in the file."""
+  row: Int!
+
+  """The tax the gateway withheld."""
+  tax: Money!
+
+  """The gateway's reference for the payment, as the statement writes it."""
+  transactionRef: String!
+}
+
+"""
+What became of a settlement's line (ADR-491): MATCHED a payment for what the gateway settled; DIFFERS a payment for another amount; UNMATCHED no payment of the account; REPEATED a payment settled before; REFUND money the gateway took back.
+"""
+enum PaymentSettlementOutcome {
+  DIFFERS
+  MATCHED
+  REFUND
+  REPEATED
+  UNMATCHED
+}
+
+type PaymentSettlementOutcomeCounts {
+  differs: Int!
+  matched: Int!
+  refund: Int!
+  repeated: Int!
+  unmatched: Int!
+}
+
+type PaymentSettlementRowError {
+  column: String
+  message: String!
+  row: Int!
+}
+
+"""
 A percentage off the shop's chosen products from a time to a time (CAT-17, ADR-443): when it starts, each variant's price is cut to a whole unit and its old price shown as the compare-at price; when it ends, both come back, unless the price was changed by hand meanwhile.
 """
 type PriceSale {
@@ -11882,6 +11996,10 @@ type Query {
   The payments an order's customer started online from its page, the latest first: which are paid, how Hatti heard, and what of each was paid on the order.
   """
   paymentSessions(orderId: ID!): [PaymentSession!]!
+  paymentSettlement(id: ID!): PaymentSettlement
+
+  """The gateways' settlements the shop imported, the newest first."""
+  paymentSettlements(first: Int = 50): [PaymentSettlement!]!
   priceSale(id: ID!): PriceSale
 
   """The shop's sales, those starting latest first; the newest hundred."""

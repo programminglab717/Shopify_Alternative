@@ -92,3 +92,10 @@ export {
   type WebhookOutcome,
 } from '../internal/online-payment.service.js';
 export { PaymentsModule } from '../internal/payments.module.js';
+export {
+  PaymentSettlementService,
+  SETTLEMENT_OUTCOMES,
+  type SettlementLineRecord,
+  type SettlementOutcome,
+  type SettlementRecord,
+} from '../internal/settlements.service.js';

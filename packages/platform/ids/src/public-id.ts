@@ -114,6 +114,7 @@ export const ID_PREFIXES = {
   accessRequest: 'acr',
   metafield: 'mtf',
   metafieldDefinition: 'mfd',
+  paymentSettlement: 'pst',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;
