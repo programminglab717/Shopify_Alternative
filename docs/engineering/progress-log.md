@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### The shop's last data kept for offline use
+### 890f11b · The shop's last data kept for offline use
 
 * **Offline, the merchant admin shows what the session last saw of Home, the orders and
   customers lists and the orders and customers opened, saying how old it is** ([ADR-514](../architecture/13-decision-log.md#adr-514--the-admin-keeps-the-shops-last-data-for-use-offline-home-the-orders-and-customers-lists-first-pages-the-orders-and-customers-opened-and-the-account-in-the-browsers-storage-for-the-session-that-read-them-shown-offline-with-how-old-they-are-and-forgotten-on-signing-out)). It is
