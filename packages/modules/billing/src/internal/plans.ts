@@ -45,6 +45,8 @@ export interface Plan {
   trueProfit: boolean;
   /** Whether it may load the Meta pixel on its storefront, without the conversions API (ADR-531). */
   pixels: boolean;
+  /** AI credits it includes a month, each a draft the AI gives (ADR-533). */
+  aiCredits: number;
 }
 
 export const PLANS: Readonly<Record<PlanCode, Plan>> = {
@@ -64,6 +66,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     removeBranding: false,
     trueProfit: false,
     pixels: false,
+    aiCredits: 10,
   },
   starter: {
     code: 'starter',
@@ -81,6 +84,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     removeBranding: true,
     trueProfit: false,
     pixels: true,
+    aiCredits: 50,
   },
   growth: {
     code: 'growth',
@@ -98,6 +102,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     removeBranding: true,
     trueProfit: true,
     pixels: true,
+    aiCredits: 150,
   },
   pro: {
     code: 'pro',
@@ -115,6 +120,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     removeBranding: true,
     trueProfit: true,
     pixels: true,
+    aiCredits: 600,
   },
 };
 

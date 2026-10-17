@@ -190,6 +190,11 @@ export class BillingPlan {
       'API where the plan leaves that out (ADR-531).',
   })
   pixels!: boolean;
+
+  @Field(() => Int, {
+    description: 'AI credits it includes a month, each a draft the AI gives (ADR-533).',
+  })
+  aiCredits!: number;
 }
 
 @ObjectType({
@@ -430,6 +435,25 @@ export class BillingMessagePrice {
       'For a WhatsApp message, or for each part of an SMS: 160 characters, or 70 in Urdu.',
   })
   price!: Money;
+}
+
+@ObjectType({
+  description:
+    "The AI credits the shop's plan includes this month (ADR-533): each draft the AI gives, of a " +
+    "product's copy or of translations, spends one, and they come back on the 1st, Pakistan's time.",
+})
+export class BillingAiCredits {
+  @Field(() => Int)
+  perMonth!: number;
+
+  @Field(() => Int)
+  used!: number;
+
+  @Field(() => Int)
+  left!: number;
+
+  @Field(() => GraphQLISODateTime, { description: 'When they come back.' })
+  renewsAt!: Date;
 }
 
 @ObjectType({ description: "The credit the shop's messages are paid from (ADR-155)." })

@@ -97,6 +97,10 @@ describe.skipIf(!server)('Admin GraphQL API: AI drafts of translations (CAT-07)'
       drafts: [{ key: 'title', value: 'لان سوٹ', translatableContentDigest: expect.any(String) }],
       userErrors: [],
     });
+    // One of the Free plan's ten AI credits this month spent (ADR-533).
+    expect(
+      (await gql(tokens.reader, '{ translationDrafting { creditsLeft creditsPerMonth } }')).data,
+    ).toEqual({ translationDrafting: { creditsLeft: 9, creditsPerMonth: 10 } });
     // Kept only through translationsRegister; asking needs write_translations.
     const kept = await gql(
       tokens.writer,

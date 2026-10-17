@@ -524,6 +524,18 @@ type BankTransferSettingsUpdatePayload {
 }
 
 """
+The AI credits the shop's plan includes this month (ADR-533): each draft the AI gives, of a product's copy or of translations, spends one, and they come back on the 1st, Pakistan's time.
+"""
+type BillingAiCredits {
+  left: Int!
+  perMonth: Int!
+
+  """When they come back."""
+  renewsAt: DateTime!
+  used: Int!
+}
+
+"""
 Hatti's own bank account, which invoices are paid into by transfer or Raast (ADR-254).
 """
 type BillingBankAccount {
@@ -689,6 +701,9 @@ type BillingMessagePrice {
 
 """A plan shops pay Hatti for, priced in rupees (ADR-154)."""
 type BillingPlan {
+  """AI credits it includes a month, each a draft the AI gives (ADR-533)."""
+  aiCredits: Int!
+
   """
   Whether the shop may turn automations and the abandoned checkout reminder on (ADR-523).
   """
@@ -11117,6 +11132,14 @@ type ProductCopyDrafting {
   """Whether this Hatti writes products’ copy with AI at all."""
   available: Boolean!
 
+  """
+  The AI credits of the shop's plan left this month, each spent on a draft the AI gives (ADR-533): none left, it drafts no more until the next month.
+  """
+  creditsLeft: Int
+
+  """AI credits the shop's plan includes a month."""
+  creditsPerMonth: Int
+
   """Drafts a shop may ask for in 24 hours."""
   limitPerDay: Int!
 
@@ -11948,6 +11971,11 @@ type Query {
   The shop's bank account for transfers, whether checkout offers them, and what paying so takes off.
   """
   bankTransferSettings: BankTransferSettings!
+
+  """
+  The AI credits the shop's plan includes this month, and how many are left (ADR-533).
+  """
+  billingAiCredits: BillingAiCredits!
 
   """
   Hatti's own bank account, which invoices are paid into by transfer or Raast, writing the invoice's name as the transfer's purpose; null where none is set up. Staff need to be the owner or a manager.
@@ -15291,6 +15319,14 @@ Whether the shop may ask for AI drafts of translations, and how many are left.
 type TranslationDrafting {
   """Whether this Hatti drafts translations with AI at all."""
   available: Boolean!
+
+  """
+  The AI credits of the shop's plan left this month, each spent on a draft the AI gives (ADR-533): none left, it drafts no more until the next month.
+  """
+  creditsLeft: Int
+
+  """AI credits the shop's plan includes a month."""
+  creditsPerMonth: Int
 
   """Drafts a shop may ask for in 24 hours."""
   limitPerDay: Int!

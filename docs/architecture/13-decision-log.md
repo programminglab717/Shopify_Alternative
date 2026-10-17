@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-532 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-533 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -540,6 +540,7 @@
 | 530 | The admin's analytics show gross profit where the plan leaves true profit out, saying which plans give it, and the plan cards say which plans do | Accepted |
 | 531 | A shop on Starter connects its Meta pixel alone, without the conversions API's token, and its storefront loads it while orders go to no conversions API; Free connects neither | Accepted |
 | 532 | The admin's Meta settings connect the pixel without a token, saying orders then go to no conversions API, and the plan cards say which plans have the pixel | Accepted |
+| 533 | Each plan includes AI credits a month, kept by billing: each draft the AI gives, of a product's copy or of translations, spends one, and none are drafted past them until the month in Pakistan's time turns | Accepted |
 
 ---
 
@@ -20202,3 +20203,29 @@
     adds the rest.
 * **Alternatives:**
   * **A separate pixel form:** two places for one dataset.
+
+## ADR-533 · Each plan includes AI credits a month, kept by billing: each draft the AI gives, of a product's copy or of translations, spends one, and none are drafted past them until the month in Pakistan's time turns
+
+* **Context:** The pricing includes AI credits a month: Free 10, Starter 50, Growth 150, Pro
+  600. AI drafts of products' copy (ADR-471) and of translations (ADR-463) were limited only to a
+  hundred a day each, the same on every plan.
+* **Decision:**
+  * **Billing keeps the credits.** Plans say how many they include; migration 0250's
+    `billing.ai_credit_uses` holds one row per credit spent, with what it was spent on.
+  * **`AiCredits` in `@hatti/api`** is how other modules ask: a shop's balance this month, and
+    spending one. Billing provides it globally, as it does `PlanAllowance`; without it, as in
+    most tests, drafts are not counted.
+  * **A draft asks first, and spends on success.** With no credit left, the draft is refused
+    before the AI is asked, naming the plan and saying they come back on the 1st. A draft the AI
+    gives spends one; a refusal or a failure spends none.
+  * **The month is Pakistan's**, from midnight on the 1st in Karachi, for every plan.
+  * The daily hundred stays, against a runaway script.
+  * `productCopyDrafting` and `translationDrafting` say the credits left and the plan's month's;
+    `billingAiCredits` gives the balance, and `BillingPlan.aiCredits` each plan's.
+* **Consequences:**
+  * What AI costs Hatti follows what each plan pays. New AI features spend from the same
+    credits by asking `AiCredits`.
+* **Alternatives:**
+  * **Counting each module's own drafts:** modules don't read each other's tables, and a shop's
+    credits are one balance whatever they're spent on.
+  * **The shop's billing period:** Free has none, and a calendar month is easier to say.

@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### AI credits by plan
+
+* **Each plan includes AI credits a month, kept by billing: each draft the AI gives, of a
+  product's copy or of translations, spends one, and none are drafted past them until the month
+  in Pakistan's time turns** ([ADR-533](../architecture/13-decision-log.md#adr-533--each-plan-includes-ai-credits-a-month-kept-by-billing-each-draft-the-ai-gives-of-a-products-copy-or-of-translations-spends-one-and-none-are-drafted-past-them-until-the-month-in-pakistans-time-turns), BIL-01). Migration 0250. The pricing's other gates need
+  nothing more: Free's one member of staff is the Desk's one agent, and there is no code editor.
+* 3256 tests, 4 more: the month and the balance, and both kinds of
+  draft spending and refused.
+
 ### 9d83ee2 · The Meta pixel alone in the admin
 
 * **The admin's Meta settings connect the pixel without a token, saying orders then go to no

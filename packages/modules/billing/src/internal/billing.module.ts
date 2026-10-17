@@ -1,6 +1,7 @@
-import { PlanAllowance } from '@hatti/api';
+import { AiCredits, PlanAllowance } from '@hatti/api';
 import { MessageCharges } from '@hatti/messaging/public';
 import { type DynamicModule, Global, Module } from '@nestjs/common';
+import { AiCreditsService } from './ai-credits.js';
 import { BillingPagesController, BillingWebhookController } from './billing.controller.js';
 import {
   BILLING_BANK_ACCOUNT,
@@ -17,8 +18,8 @@ import { SUPPORT_CONTACT, SupportService, type SupportContact } from './support.
 
 /**
  * What shops pay Hatti (BIL-01, BIL-03, ADR-154, ADR-155). Global, as it gives other modules
- * {@link PlanAllowance}, the limits of each shop's plan, and {@link MessageCharges}, the credit
- * its messages are paid from. Needs the {@link Database} and PublicSite providers from the host
+ * {@link PlanAllowance}, the limits of each shop's plan, {@link MessageCharges}, the credit
+ * its messages are paid from, and {@link AiCredits}, the AI drafts its plan includes a month. Needs the {@link Database} and PublicSite providers from the host
  * application, which keeps each webhook request's raw body as `rawBody`; Hatti's own gateway
  * account, without which invoices are not paid online here; and Hatti's own bank account, without
  * which they are not paid by transfer (ADR-254); Hatti's registration for sales tax on services,
@@ -48,11 +49,21 @@ export class BillingModule {
         { provide: PlanAllowance, useExisting: BillingService },
         MessageWallet,
         { provide: MessageCharges, useExisting: MessageWallet },
+        AiCreditsService,
+        { provide: AiCredits, useExisting: AiCreditsService },
         BillingResolver,
         SupportService,
         SupportResolver,
       ],
-      exports: [BillingService, PlanAllowance, MessageWallet, MessageCharges, SupportService],
+      exports: [
+        BillingService,
+        PlanAllowance,
+        MessageWallet,
+        MessageCharges,
+        AiCreditsService,
+        AiCredits,
+        SupportService,
+      ],
     };
   }
 }

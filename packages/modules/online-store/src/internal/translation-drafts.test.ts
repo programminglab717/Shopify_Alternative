@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { AiGateway } from '@hatti/ai';
+import { AiCredits, type AiCreditBalance, type AiCreditUse } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -7,6 +8,30 @@ import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from '.
 import { TRANSLATION_DRAFT_LIMITS, TranslationService } from './translation.service.js';
 
 const server = testDatabaseServer();
+
+/** A plan's AI credits, as billing keeps them (ADR-533): `left` of ten this month. */
+class Credits extends AiCredits {
+  readonly spent: AiCreditUse[] = [];
+
+  constructor(private left: number) {
+    super();
+  }
+
+  async balanceOf(): Promise<AiCreditBalance> {
+    return {
+      perMonth: 10,
+      used: 10 - this.left,
+      left: this.left,
+      plan: 'Free',
+      renewsAt: new Date('2026-11-01T00:00:00+05:00'),
+    };
+  }
+
+  async spend(_shopId: string, use: AiCreditUse): Promise<void> {
+    this.spent.push(use);
+    this.left -= 1;
+  }
+}
 
 const codesOf = (result: Parameters<typeof errorsOf>[0]) =>
   errorsOf(result).map(([field, code]) => [field, code]);
@@ -120,6 +145,8 @@ describe.skipIf(!server)('AI drafts of translations (CAT-07, ADR-463)', () => {
       available: true,
       usedToday: 2,
       limitPerDay: TRANSLATION_DRAFT_LIMITS.perDay,
+      creditsLeft: null,
+      creditsPerMonth: null,
     });
   });
 
@@ -160,6 +187,40 @@ describe.skipIf(!server)('AI drafts of translations (CAT-07, ADR-463)', () => {
     );
     expect(codesOf(await drafts.draft(f.a, 'page', page.id, { locale: 'ur' }))).toEqual([
       ['base', 'TOO_MANY'],
+    ]);
+    expect(fake.prompts).toHaveLength(1);
+  });
+
+  it("spends one of the plan's AI credits on each draft given, and drafts none past them (ADR-533)", async () => {
+    const page = unwrap(
+      await f.pages.create(f.a, { title: 'About us', body: '<p>Since 1990</p>' }),
+    );
+    const credits = new Credits(1);
+    const counted = new TranslationService(
+      f.db,
+      f.products,
+      f.collections,
+      f.pages,
+      f.blogs,
+      f.articles,
+      f.menus,
+      new AiGateway({ apiKey: 'test', model: 'model-from-config', fetch: fake.fetch }),
+      credits,
+    );
+    expect(await counted.drafting(f.a)).toMatchObject({ creditsLeft: 1, creditsPerMonth: 10 });
+    fake.answer([{ key: 'title', value: 'ہمارے بارے میں' }]);
+    expect(
+      unwrap(await counted.draft(f.a, 'page', page.id, { locale: 'ur', keys: ['title'] })),
+    ).toHaveLength(1);
+    expect(credits.spent).toEqual(['translation']);
+    const refused = await counted.draft(f.a, 'page', page.id, { locale: 'ur' });
+    expect(refused.ok || refused.errors).toEqual([
+      {
+        field: ['base'],
+        code: 'TOO_MANY',
+        message:
+          "The Free plan includes 10 AI credits a month, and this month's are used: they come back on the 1st, or choose a bigger plan for more",
+      },
     ]);
     expect(fake.prompts).toHaveLength(1);
   });

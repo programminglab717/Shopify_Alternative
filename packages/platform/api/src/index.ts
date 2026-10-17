@@ -42,6 +42,12 @@ export {
   type PlanLimit,
   type PlanLimitKind,
 } from './plan-allowance.js';
+export {
+  AiCredits,
+  aiCreditsMessage,
+  type AiCreditBalance,
+  type AiCreditUse,
+} from './ai-credits.js';
 export { PublicSite, StorefrontSite } from './public-site.js';
 export { DnsLookup, SystemDnsLookup } from './dns.js';
 export { isPublicAddress } from './public-address.js';

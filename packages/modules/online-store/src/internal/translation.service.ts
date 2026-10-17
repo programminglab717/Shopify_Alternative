@@ -1,5 +1,7 @@
 import { AiGateway, TRANSLATION_DRAFT_MAX_CHARACTERS, draftTranslations } from '@hatti/ai';
 import {
+  AiCredits,
+  aiCreditsMessage,
   InputChecker,
   fail,
   failOne,
@@ -89,6 +91,9 @@ export interface TranslationDraftingRecord {
   available: boolean;
   usedToday: number;
   limitPerDay: number;
+  /** The plan's AI credits left this month, and how many it includes; null where uncounted. */
+  creditsLeft: number | null;
+  creditsPerMonth: number | null;
 }
 
 /** Translations as the storefront's documents take them: words by language, then field. */
@@ -156,6 +161,8 @@ export class TranslationService {
     private readonly menus: MenuService,
     /** The AI gateway, where the host configured one (ADR-463): without it, no drafts. */
     @Optional() @Inject(AiGateway) private readonly ai?: AiGateway | null,
+    /** The AI credits of the shop's plan (ADR-533); without them, drafts are not counted. */
+    @Optional() @Inject(AiCredits) private readonly credits?: AiCredits | null,
   ) {}
 
   /** Whether the shop may ask for AI drafts of translations, and how many are left today. */
@@ -166,14 +173,22 @@ export class TranslationService {
     const usedToday = await this.db.tenant(tenant.shopId, (tx) =>
       draftsSince(tx, tenant.shopId, now),
     );
-    return { available: Boolean(this.ai), usedToday, limitPerDay: TRANSLATION_DRAFT_LIMITS.perDay };
+    const balance = await this.credits?.balanceOf(tenant.shopId, now);
+    return {
+      available: Boolean(this.ai),
+      usedToday,
+      limitPerDay: TRANSLATION_DRAFT_LIMITS.perDay,
+      creditsLeft: balance?.left ?? null,
+      creditsPerMonth: balance?.perMonth ?? null,
+    };
   }
 
   /**
    * AI drafts of the resource's fields in `locale` (CAT-07, ADR-463): those named, or all with
    * words, each checked as a translation is and with the digest of the words it was drafted for.
    * Nothing is kept: the shop checks them in its form and keeps them as translations, which is
-   * its review. A hundred asks a day at most, each logged with what it cost.
+   * its review. A hundred asks a day at most, each logged with what it cost, and each draft given
+   * spends one of the AI credits the shop's plan includes a month (ADR-533).
    */
   async draft(
     tenant: TenantContext,
@@ -217,6 +232,10 @@ export class TranslationService {
         `A shop may ask for ${TRANSLATION_DRAFT_LIMITS.perDay} AI drafts a day: try again tomorrow`,
       );
     }
+    const balance = await this.credits?.balanceOf(tenant.shopId, now);
+    if (balance && balance.left <= 0) {
+      return failOne(['base'], 'TOO_MANY', aiCreditsMessage(balance));
+    }
     const fields = read.content.filter((field) => !wanted || wanted.has(field.key));
     if (fields.length === 0) {
       return failOne(['keys'], 'BLANK', `The ${NAMES[kind]} has no words to draft`);
@@ -249,6 +268,7 @@ export class TranslationService {
         createdAt: now,
       }),
     );
+    if (result.ok) await this.credits?.spend(tenant.shopId, 'translation', now);
     if (!result.ok) {
       return failOne(
         ['base'],

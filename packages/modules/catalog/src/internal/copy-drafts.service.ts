@@ -8,7 +8,7 @@ import {
   type ProductCopy,
   type ProductFacts,
 } from '@hatti/ai';
-import { shopProfile, type TenantContext } from '@hatti/api';
+import { AiCredits, aiCreditsMessage, shopProfile, type TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { cropImage, modelImage } from '@hatti/images';
 import { ObjectStorage } from '@hatti/storage';
@@ -21,7 +21,8 @@ import { loadProduct } from './product-store.js';
 // AI drafts of products' copy (CAT-20, ADR-471): a product's title, description and search engine
 // title and description, from what the shop says of it, in English, Urdu or Roman Urdu. Nothing
 // is kept: the draft comes back to the product's form, where the shop checks it and saves it as
-// any product is saved. A hundred asks a day at most, each logged with what it cost. The AI may
+// any product is saved. A hundred asks a day at most, each logged with what it cost, and each
+// draft given spends one of the AI credits the shop's plan includes a month (ADR-533). The AI may
 // look at the product's photos too (APP-02, ADR-507), for a listing drafted from a picture.
 
 export const COPY_DRAFT_LIMITS = {
@@ -38,6 +39,9 @@ export interface CopyDraftingRecord {
   available: boolean;
   usedToday: number;
   limitPerDay: number;
+  /** The plan's AI credits left this month, and how many it includes; null where uncounted. */
+  creditsLeft: number | null;
+  creditsPerMonth: number | null;
 }
 
 export interface CopyDraftInput extends ProductFacts {
@@ -56,6 +60,8 @@ export class CopyDraftService {
     @Optional() @Inject(AiGateway) private readonly ai?: AiGateway | null,
     /** Where products' images are kept, to show the AI their photos. */
     @Optional() private readonly storage?: ObjectStorage | null,
+    /** The AI credits of the shop's plan (ADR-533); without them, drafts are not counted. */
+    @Optional() @Inject(AiCredits) private readonly credits?: AiCredits | null,
   ) {}
 
   /** Whether the shop may ask for drafts, and how many it has asked for in the last day. */
@@ -63,7 +69,14 @@ export class CopyDraftService {
     const usedToday = await this.db.tenant(tenant.shopId, (tx) =>
       draftsSince(tx, tenant.shopId, now),
     );
-    return { available: Boolean(this.ai), usedToday, limitPerDay: COPY_DRAFT_LIMITS.perDay };
+    const balance = await this.credits?.balanceOf(tenant.shopId, now);
+    return {
+      available: Boolean(this.ai),
+      usedToday,
+      limitPerDay: COPY_DRAFT_LIMITS.perDay,
+      creditsLeft: balance?.left ?? null,
+      creditsPerMonth: balance?.perMonth ?? null,
+    };
   }
 
   /** A draft of the product's copy from what the shop says of it, never kept. */
@@ -114,6 +127,10 @@ export class CopyDraftService {
           'tomorrow',
       );
     }
+    const balance = await this.credits?.balanceOf(tenant.shopId, now);
+    if (balance && balance.left <= 0) {
+      return failOne(['base'], 'TOO_MANY', aiCreditsMessage(balance));
+    }
     const result = await draftProductCopy(ai, {
       shopName: read.shopName,
       language: input.language,
@@ -129,6 +146,7 @@ export class CopyDraftService {
                 ${result.ok ? 'drafted' : result.reason}, ${usage.inputTokens},
                 ${usage.outputTokens}, ${now.toISOString()})`),
     );
+    if (result.ok) await this.credits?.spend(tenant.shopId, 'product_copy', now);
     if (!result.ok) {
       return failOne(
         ['base'],

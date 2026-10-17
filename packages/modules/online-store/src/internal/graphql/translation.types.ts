@@ -277,4 +277,18 @@ export class TranslationDrafting {
 
   @Field(() => Int, { description: 'Drafts a shop may ask for in 24 hours.' })
   limitPerDay!: number;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      "The AI credits of the shop's plan left this month, each spent on a draft the AI gives " +
+      '(ADR-533): none left, it drafts no more until the next month.',
+  })
+  creditsLeft!: number | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: "AI credits the shop's plan includes a month.",
+  })
+  creditsPerMonth!: number | null;
 }

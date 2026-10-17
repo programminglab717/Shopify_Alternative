@@ -23,9 +23,11 @@ import {
   type SubscriptionRecord,
   type WalletRecord,
 } from '../billing.service.js';
+import { AiCreditsService } from '../ai-credits.js';
 import type { WalletEntryRecord } from '../credits.js';
 import { BILLING_CURRENCY, type Plan } from '../plans.js';
 import {
+  BillingAiCredits,
   BillingBankAccount,
   BillingCreditsBuyInput,
   BillingCreditsBuyPayload,
@@ -58,7 +60,10 @@ import {
  */
 @Resolver(() => BillingInvoice)
 export class BillingResolver {
-  constructor(private readonly billing: BillingService) {}
+  constructor(
+    private readonly billing: BillingService,
+    private readonly credits: AiCreditsService,
+  ) {}
 
   @Query(() => [BillingPlan], { description: 'The plans shops choose from, the smallest first.' })
   @RequireScopes('read_settings')
@@ -99,6 +104,21 @@ export class BillingResolver {
     managing(tenant);
     const account = this.billing.bankAccount();
     return account && toBankAccount(account);
+  }
+
+  @Query(() => BillingAiCredits, {
+    description:
+      "The AI credits the shop's plan includes this month, and how many are left (ADR-533).",
+  })
+  @RequireScopes('read_settings')
+  async billingAiCredits(@CurrentTenant() tenant: TenantContext): Promise<BillingAiCredits> {
+    const balance = await this.credits.balanceOf(tenant.shopId);
+    return Object.assign(new BillingAiCredits(), {
+      perMonth: balance.perMonth,
+      used: balance.used,
+      left: balance.left,
+      renewsAt: balance.renewsAt,
+    });
   }
 
   @Query(() => BillingWallet, {
@@ -277,6 +297,7 @@ function toPlan(plan: Plan): BillingPlan {
     removeBranding: plan.removeBranding,
     trueProfit: plan.trueProfit,
     pixels: plan.pixels,
+    aiCredits: plan.aiCredits,
   });
 }
 
