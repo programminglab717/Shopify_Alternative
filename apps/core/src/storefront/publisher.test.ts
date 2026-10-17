@@ -341,6 +341,8 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
   let admin: pg.Client;
   const redis = new Redis(redisUrl ?? '', { lazyConnect: true });
   const keys = new StorefrontKeys(`test-sfp-${randomBytes(4).toString('hex')}`);
+  /** What each product's orders bought with it, as the orders module would say (ADR-480). */
+  const bought = new Map<string, string[]>();
   let publisher: StorefrontPublisher;
   let products: ProductService;
   let collections: CollectionService;
@@ -457,7 +459,14 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         reviews: { shownReviewsOf: shownReviewsIn },
         preorders: { preordersOf: preordersIn },
         sales: { runningSalesOf: runningSalesIn },
-        related: { relatedProductsOf: relatedProductsIn, complementsOf: complementsIn },
+        related: {
+          relatedProductsOf: relatedProductsIn,
+          complementsOf: complementsIn,
+          boughtTogetherOf: (tx, shopId, ids) =>
+            Promise.resolve(
+              new Map(ids.filter((id) => bought.has(id)).map((id) => [id, bought.get(id)!])),
+            ),
+        },
         sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
         bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
         comments: new CommentService(database),
@@ -1327,6 +1336,26 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     await deliver();
     expect((await store().productByHandle(kurta.handle))?.complements).toBeUndefined();
     for (const each of [kurta, dupatta, khussa]) unwrap(await products.delete(tenant, each.id));
+    await deliver();
+  });
+
+  it('publishes what was bought with a product where the shop paired none with it (ADR-480)', async () => {
+    const complements = new ComplementService(database);
+    const made = async (title: string) =>
+      unwrap(await products.create(tenant, { title, status: 'active' }));
+    const kurta = await made('Bought kurta');
+    const shalwar = await made('Bought shalwar');
+    const khussa = await made('Bought khussa');
+    bought.set(kurta.id, [shalwar.id]);
+    unwrap(await products.update(tenant, { id: kurta.id, title: 'Bought kurta, cotton' }));
+    await deliver();
+    expect((await store().productByHandle(kurta.handle))?.complements).toEqual([shalwar.id]);
+    // The shop's own pairing comes first, in place of what was bought.
+    unwrap(await complements.set(tenant, kurta.id, [khussa.id]));
+    await deliver();
+    expect((await store().productByHandle(kurta.handle))?.complements).toEqual([khussa.id]);
+    bought.clear();
+    for (const each of [kurta, shalwar, khussa]) unwrap(await products.delete(tenant, each.id));
     await deliver();
   });
 

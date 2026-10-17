@@ -51,6 +51,7 @@ import {
   type LocationUpdatedPayload,
 } from '@hatti/inventory/public';
 import { ShopEvents } from '@hatti/identity/public';
+import { boughtTogetherIn } from '@hatti/orders/public';
 import {
   MarketingEvents,
   metaPixelIdIn,
@@ -510,6 +511,12 @@ export interface PublisherServices {
     ): Promise<Map<string, string[]>>;
     /** Those the shop pairs with each, in its order (ADR-435). */
     complementsOf(
+      tx: Tx,
+      shopId: string,
+      productIds: readonly string[],
+    ): Promise<Map<string, string[]>>;
+    /** Those bought with each in its orders, the most often first (SRC-05, ADR-480). */
+    boughtTogetherOf(
       tx: Tx,
       shopId: string,
       productIds: readonly string[],
@@ -1025,6 +1032,13 @@ export class StorefrontPublisher {
       shopId,
       active.map((record) => record.id),
     );
+    // Where the shop paired none with a product, those its customers bought with it (ADR-480).
+    const unpaired = active.filter((record) => !complements.has(record.id));
+    const boughtTogether = await this.services.related.boughtTogetherOf(
+      tx,
+      shopId,
+      unpaired.map((record) => record.id),
+    );
     const sales = await this.services.sales.runningSalesOf(
       tx,
       shopId,
@@ -1059,7 +1073,7 @@ export class StorefrontPublisher {
         sizeCharts.get(record.id),
         bundleDoc(bundles.get(record.id), parts),
         related.get(record.id),
-        complements.get(record.id),
+        complements.get(record.id) ?? boughtTogether.get(record.id),
         sales.get(record.id),
         left,
       ),
@@ -1296,7 +1310,11 @@ export function createStorefrontPublisher(
       reviews: { shownReviewsOf: shownReviewsIn },
       preorders: { preordersOf: preordersIn },
       sales: { runningSalesOf: runningSalesIn },
-      related: { relatedProductsOf: relatedProductsIn, complementsOf: complementsIn },
+      related: {
+        relatedProductsOf: relatedProductsIn,
+        complementsOf: complementsIn,
+        boughtTogetherOf: boughtTogetherIn,
+      },
       sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
       bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
       comments: new CommentService(database),

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Frequently bought together
+
+* **The products a shop's customers bought in the same orders, recommended as complementary
+  where the shop paired none with a product** ([ADR-480](../architecture/13-decision-log.md#adr-480--frequently-bought-together-the-products-a-shops-customers-bought-in-the-same-orders-recommended-as-complementary-where-the-shop-paired-none-with-a-product), SRC-05).
+* 3008 tests, 3 more: the orders module's pairs and the publisher's
+  fallback.
+
 ### 4fd2695 · Sorting, and the search page's filters
 
 * **A collection's page is put in the order a shopper asks for, by Shopify's `sort_by`, and

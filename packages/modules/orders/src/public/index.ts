@@ -100,6 +100,11 @@ export {
 } from '../internal/notification-facts.js';
 export { orderGiftCardFactsIn, type OrderGiftCardFacts } from '../internal/gift-card-facts.js';
 export { orderCashbackFactsIn, type OrderCashbackFacts } from '../internal/cashback-facts.js';
+export {
+  BOUGHT_TOGETHER,
+  BOUGHT_TOGETHER_ORDERS,
+  boughtTogetherIn,
+} from '../internal/bought-together.js';
 export { mentionsIn, staffAlertFactsIn, type StaffAlertFacts } from '../internal/staff-alerts.js';
 export { ORDER_SEGMENT_FACTS, customerFactsQuery } from '../internal/customer-facts.js';
 export {

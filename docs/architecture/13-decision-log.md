@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-479 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-480 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -487,6 +487,7 @@
 | 477 | A product says whether it comes stitched, its pieces, fabrics and season in Hatti's own words, in English and Urdu: kept by the catalog, set from its admin page, shown on its storefront page and given to themes | Accepted |
 | 478 | A collection's page filters its products by Shopify's filter parameters: availability, price, product type, brand, each option and the eastern-wear attributes, each value counted, as Shopify's collection.filters | Accepted |
 | 479 | A collection's page is put in the order a shopper asks for, by Shopify's sort_by, and the search page's products are filtered and ordered as a collection's are | Accepted |
+| 480 | Frequently bought together: the products a shop's customers bought in the same orders, recommended as complementary where the shop paired none with a product | Accepted |
 
 ---
 
@@ -18141,3 +18142,30 @@
     collection keeps its own order.
 * **Alternatives:**
   * **Ordering in the core:** each order a query, where the documents are already at hand.
+
+## ADR-480 · Frequently bought together: the products a shop's customers bought in the same orders, recommended as complementary where the shop paired none with a product
+
+* **Context:**
+  * SRC-05 asks for recommendations: related products (ADR-434) and those frequently bought
+    together. ADR-434 left the second for when shops had orders to learn from.
+  * Complementary products are what the shop pairs with one (ADR-435): Hatti Base shows them
+    on the product page and the cart offers them (ADR-437). Most shops pair none.
+* **Decision:**
+  * **The orders module works out what was bought together** (`boughtTogetherIn`): the other
+    products in a product's 500 latest orders of the past year, not cancelled; a pair counts
+    once two orders have both. Those in the most orders with it come first, then those bought
+    with it latest; at most 10. Migration 0225 indexes order lines by product.
+  * **The publisher** gives them as a product's complementary products where the shop paired
+    none with it: the shop's own pairing always wins. They are as fresh as the product's
+    document, which its stock's changes rebuild as it sells.
+  * Shopify's complementary recommendations, Hatti Base's product page and the cart's
+    cross-sells show them as they do the shop's pairings; products gone or sold out since are
+    left out where they are shown.
+* **Consequences:**
+  * A shop with no pairings gets cross-sells from its second repeated pair of orders on.
+  * A product whose stock isn't counted is rebuilt only when it changes, so what was bought with
+    it may lag.
+* **Alternatives:**
+  * **Mixed into related products:** related ones are alike (the same collection, type or
+    brand); bought together are what goes with it, which is what complementary means.
+  * **A nightly job over every shop's orders:** documents already rebuild as products sell.
