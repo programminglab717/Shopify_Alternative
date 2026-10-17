@@ -1,3 +1,5 @@
+import { ConversationsService } from './conversations.service.js';
+import { ConversationResolver } from './graphql/conversation.resolver.js';
 import { CustomersModule } from '@hatti/customers/public';
 import { Module, type DynamicModule } from '@nestjs/common';
 import { AutomationsService } from './automations.service.js';
@@ -53,6 +55,8 @@ export class MessagingModule {
         MessagesService,
         MessagingSettingsService,
         MessagingResolver,
+        ConversationsService,
+        ConversationResolver,
         MessagingCustomerData,
         WhatsAppAccountsService,
         WhatsAppAccountResolver,
@@ -70,6 +74,7 @@ export class MessagingModule {
       ],
       exports: [
         MessagesService,
+        ConversationsService,
         MessagingSettingsService,
         WhatsAppAccountsService,
         WhatsAppTemplatesService,

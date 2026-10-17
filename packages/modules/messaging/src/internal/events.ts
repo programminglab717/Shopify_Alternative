@@ -13,7 +13,18 @@ export const MessagingEvents = {
   BroadcastCancelled: 'broadcast.cancelled',
   BroadcastSent: 'broadcast.sent',
   MarketingAutomationUpdated: 'marketing_automation.updated',
+  ConversationMessageReceived: 'conversation.message_received',
 } as const;
+
+/**
+ * A customer wrote to the shop on WhatsApp, kept in its conversation with them (ADR-545). The
+ * aggregate is the conversation.
+ */
+export interface ConversationMessageReceivedPayload {
+  messageId: string;
+  /** When they wrote, as WhatsApp says. */
+  at: string;
+}
 
 /**
  * A customer answered one of the shop's messages with one of its buttons (ADR-147), as the

@@ -7,8 +7,9 @@ import { sql } from 'drizzle-orm';
  * Messages' part in merging, erasing and exporting customers (ADR-146). A merged duplicate's
  * messages become the customer's. An erased customer's messages go: they hold their number, or
  * their email (ADR-181), and name. Their numbers' opt-outs stay, so the shop never writes to them
- * again by mistake. Their wishes to hear when a product is back in stock (ADR-429) go too. A
- * customer's own file has the messages sent them, their opt-outs and those wishes.
+ * again by mistake. Their wishes to hear when a product is back in stock (ADR-429) go too, and
+ * their numbers' conversations with the shop (ADR-545). A customer's own file has the messages
+ * sent them, their opt-outs, those wishes and what they wrote to the shop.
  */
 export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
   key: 'messaging',
@@ -33,6 +34,10 @@ export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
     await tx.execute(sql`
       DELETE FROM messaging.stock_watches
        WHERE shop_id = ${shopId} AND phone = ANY(${sql.param(customer.phones)}::text[])`);
+    // What they wrote to the shop, and its answers (ADR-545).
+    await tx.execute(sql`
+      DELETE FROM messaging.conversations
+       WHERE shop_id = ${shopId} AND customer_phone = ANY(${sql.param(customer.phones)}::text[])`);
   },
 
   async export(tx, shopId, customer) {
@@ -74,7 +79,27 @@ export const MESSAGING_CUSTOMER_DATA: CustomerDataHandler = {
       SELECT variant_id, phone, created_at, notified_at FROM messaging.stock_watches
        WHERE shop_id = ${shopId} AND phone = ANY(${sql.param(customer.phones)}::text[])
        ORDER BY created_at, id`);
+    const { rows: conversation } = await tx.execute<{
+      customer_phone: string;
+      direction: string;
+      body: string | null;
+      media_kind: string | null;
+      at: string | Date;
+    }>(sql`
+      SELECT c.customer_phone, m.direction, m.body, m.media_kind, m.at
+        FROM messaging.conversation_messages m
+        JOIN messaging.conversations c ON c.shop_id = m.shop_id AND c.id = m.conversation_id
+       WHERE m.shop_id = ${shopId} AND c.customer_phone = ANY(${sql.param(customer.phones)}::text[])
+       ORDER BY m.at, m.id`);
     return {
+      // What they wrote to the shop on WhatsApp, and its answers (ADR-545).
+      conversationMessages: conversation.map((row) => ({
+        number: row.customer_phone,
+        direction: row.direction,
+        said: row.body,
+        held: row.media_kind,
+        at: toDate(row.at),
+      })),
       messages: messages.map((row) => ({
         kind: row.kind,
         channel: row.channel,

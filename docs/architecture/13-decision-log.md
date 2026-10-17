@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-544 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-545 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -552,6 +552,7 @@
 | 542 | The admin's online store has a TikTok tab: the pixel connected, changed and disconnected, and the moments sent to TikTok listed apart from Meta's | Accepted |
 | 543 | A shop's storefront loads its TikTok pixel while TikTok is connected, beside Meta's, for the steps shoppers take before checkout, and the order keeps the pixel's browser ID for the Events API | Accepted |
 | 544 | Every shop hears on WhatsApp when an outage of Hatti's begins and ends, at its alerts number and at Hatti's cost, each update once | Accepted |
+| 545 | What customers write to a shop on WhatsApp is kept as a conversation for each customer's number, the shop found by the number written to, the message answered or the last shop to write, for its staff to read, mark read and close | Accepted |
 
 ---
 
@@ -20555,3 +20556,38 @@
 * **Alternatives:**
   * **Every update to every shop:** an outage of hours would send each shop several messages.
   * **Only shops that ask:** the shops least in the admin, who most need it, would not.
+
+## ADR-545 · What customers write to a shop on WhatsApp is kept as a conversation for each customer's number, the shop found by the number written to, the message answered or the last shop to write, for its staff to read, mark read and close
+
+* **Context:** WhatsApp's webhook (ADR-146) hears what customers write, but kept only their
+  answers to buttons and their stop words; the rest was dropped. Customers ask about sizes,
+  delivery and payment on WhatsApp first, and a shop could not read what they asked (MSG-05).
+* **Decision:**
+  * **Kept:** every message a customer writes, its words or the kind of thing it held (a photo,
+    a voice note) where it had no words, in the shop's conversation with the customer's number,
+    one for each number. A message WhatsApp delivers twice is kept once, by WhatsApp's ID for it.
+    A reaction, holding neither, is not kept.
+  * **Whose:** a message to a shop's own number (ADR-419) is that shop's. One to Hatti's shared
+    number is the shop's whose message it answers, else the last shop to write to the customer, as
+    stop words are (ADR-146); one no shop wrote to is no one's and is not kept. The webhook finds
+    the shop through functions that see no shop's rows.
+  * **The inbox:** each conversation is open or closed, with how many of its messages are unread.
+    The Admin API lists them the latest written first, a page at a time, the unread or the
+    closed alone; counts those with unread messages; and gives a conversation's messages, the
+    latest first. Staff mark it read, or close it, which reads it; the customer writing again
+    opens it again, unread. Numbers are shown as the caller may see them (ADR-027).
+  * **Scopes:** `read_conversations` and `write_conversations`. Owners, managers and confirmation
+    agents work the inbox; marketers read it.
+  * **Customers' data:** an erased customer's numbers' conversations go with them, and their own
+    file has what they wrote.
+  * This slice keeps and reads. Replies, within the 24 hours WhatsApp lets a shop answer freely,
+    and the admin's inbox page come after.
+* **Consequences:**
+  * Nothing a customer writes to a shop is lost, and staff see what waits for an answer.
+  * A customer who writes to the shared number about one shop, having heard last from another,
+    lands with the other, as their stop words would.
+* **Alternatives:**
+  * **Keep only messages to shops' own numbers:** most shops send from Hatti's shared number,
+    and their customers would go unheard.
+  * **A conversation for each order:** customers write before they order and about several
+    orders; the number is what both sides know.

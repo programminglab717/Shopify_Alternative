@@ -118,6 +118,8 @@ export const ID_PREFIXES = {
   paymentSettlement: 'pst',
   incident: 'inc',
   supportRequest: 'sreq',
+  conversation: 'chat',
+  conversationMessage: 'cmsg',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

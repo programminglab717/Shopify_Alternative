@@ -6,9 +6,16 @@ export {
   smsParts,
   type MessageCost,
 } from '../internal/charges.js';
+export {
+  CONVERSATION_WINDOW_MS,
+  ConversationsService,
+  type ConversationMessageRecord,
+  type ConversationRecord,
+} from '../internal/conversations.service.js';
 export { MESSAGING_CUSTOMER_DATA, MessagingCustomerData } from '../internal/customer-data.js';
 export {
   MessagingEvents,
+  type ConversationMessageReceivedPayload,
   type MessageRepliedPayload,
   type MessagingSettingsUpdatedPayload,
   type WhatsAppAccountConnectedPayload,

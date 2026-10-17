@@ -184,6 +184,17 @@ describe('scopes', () => {
     expect(cards('marketer')).toEqual([]);
   });
 
+  it('lets owners, managers and agents work the inbox, marketers read it', () => {
+    const inbox = (role: keyof typeof ROLE_SCOPES) =>
+      ROLE_SCOPES[role].filter((scope) => scope.endsWith('_conversations'));
+    expect(inbox('owner')).toEqual(['write_conversations']);
+    expect(inbox('manager')).toEqual(['write_conversations']);
+    expect(inbox('confirmation_agent')).toEqual(['write_conversations']);
+    expect(inbox('marketer')).toEqual(['read_conversations']);
+    expect(inbox('accountant')).toEqual([]);
+    expect(inbox('packer')).toEqual([]);
+  });
+
   it("lets only owners and managers change shop settings and the online store's themes", () => {
     for (const resource of ['_settings', '_themes']) {
       const granted = Object.entries(ROLE_SCOPES)

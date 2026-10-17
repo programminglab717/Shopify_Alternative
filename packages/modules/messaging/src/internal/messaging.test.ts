@@ -943,6 +943,7 @@ describe("WhatsApp's webhook", () => {
             field: 'messages',
             value: {
               messaging_product: 'whatsapp',
+              metadata: { display_phone_number: '15550001111', phone_number_id: '106540352242922' },
               statuses: [
                 { id: 'wamid.1', status: 'delivered', timestamp: '1790940000' },
                 {
@@ -978,6 +979,13 @@ describe("WhatsApp's webhook", () => {
                     button_reply: { id: 'confirm', title: 'Confirm order' },
                   },
                 },
+                {
+                  from: '923004445556',
+                  id: 'wamid.photo',
+                  timestamp: '1790940300',
+                  type: 'image',
+                  image: { id: 'media-1', mime_type: 'image/jpeg' },
+                },
                 { from: '+92 300', type: 'text', text: { body: 'stop' } },
               ],
             },
@@ -1011,6 +1019,10 @@ describe("WhatsApp's webhook", () => {
           replyTo: null,
           payload: null,
           at: new Date(1790940120_000),
+          id: 'wamid.in',
+          // The number it was written to (ADR-545).
+          to: '106540352242922',
+          mediaKind: null,
         },
         {
           from: '+923007654321',
@@ -1018,6 +1030,9 @@ describe("WhatsApp's webhook", () => {
           replyTo: 'wamid.asked',
           payload: 'x',
           at: new Date(1790940180_000),
+          id: null,
+          to: '106540352242922',
+          mediaKind: null,
         },
         {
           from: '+923335550001',
@@ -1025,6 +1040,20 @@ describe("WhatsApp's webhook", () => {
           replyTo: 'wamid.confirm',
           payload: 'confirm',
           at: new Date(1790940240_000),
+          id: null,
+          to: '106540352242922',
+          mediaKind: null,
+        },
+        // A photo: what it is, its words none.
+        {
+          from: '+923004445556',
+          text: null,
+          replyTo: null,
+          payload: null,
+          at: new Date(1790940300_000),
+          id: 'wamid.photo',
+          to: '106540352242922',
+          mediaKind: 'image',
         },
       ],
       templates: [],

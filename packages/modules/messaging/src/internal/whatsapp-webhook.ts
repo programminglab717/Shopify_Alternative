@@ -16,6 +16,12 @@ export interface InboundMessage {
   /** The payload of the button they pressed: "confirm". */
   payload: string | null;
   at: Date;
+  /** WhatsApp's ID for it, which a webhook delivered twice names again (ADR-545). */
+  id: string | null;
+  /** The ID of the number it was written to: Hatti's shared one, or a shop's own. */
+  to: string | null;
+  /** What else it held, as WhatsApp names it: "image", "audio"; null for words and buttons. */
+  mediaKind: string | null;
 }
 
 /** Meta's word of a shop's template (ADR-420): approved, rejected, paused or disabled. */
@@ -56,6 +62,7 @@ export function parseWhatsAppWebhook(body: unknown): WhatsAppWebhook {
   for (const entry of arrayOf(field(body, 'entry'))) {
     for (const change of arrayOf(field(entry, 'changes'))) {
       const value = field(change, 'value');
+      const to = field(field(value, 'metadata'), 'phone_number_id');
       if (field(change, 'field') === 'message_template_status_update') {
         const id = field(value, 'message_template_id');
         const event = field(value, 'event');
@@ -97,12 +104,22 @@ export function parseWhatsAppWebhook(body: unknown): WhatsAppWebhook {
         const payload =
           field(field(message, 'button'), 'payload') ??
           field(field(field(message, 'interactive'), 'button_reply'), 'id');
+        const type = field(message, 'type');
+        const id = field(message, 'id');
         inbound.push({
           from: `+${from}`,
           text: typeof text === 'string' ? text.slice(0, 4096) : null,
           replyTo: typeof replyTo === 'string' ? replyTo.slice(0, 200) : null,
           payload: typeof payload === 'string' ? payload.slice(0, 100) : null,
           at: timeOf(field(message, 'timestamp')),
+          id: typeof id === 'string' ? id.slice(0, 200) : null,
+          to: typeof to === 'string' && /^[0-9]{1,30}$/.test(to) ? to : null,
+          mediaKind:
+            typeof type === 'string' &&
+            !['text', 'button', 'interactive'].includes(type) &&
+            /^[a-z_]{1,30}$/.test(type)
+              ? type
+              : null,
         });
       }
     }

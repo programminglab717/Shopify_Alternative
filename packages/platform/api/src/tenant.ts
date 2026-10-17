@@ -47,6 +47,8 @@ export const ACCESS_SCOPES = [
   'write_store_credit_account_transactions',
   'read_gift_cards',
   'write_gift_cards',
+  'read_conversations',
+  'write_conversations',
 ] as const;
 export type AccessScope = (typeof ACCESS_SCOPES)[number];
 
@@ -88,7 +90,8 @@ const VIEW_CATALOG: readonly AccessScope[] = ['read_products', 'read_inventory',
  * shop's own WhatsApp templates and broadcasts (ADR-420): marketers too. Store credit (ADR-184):
  * owners and managers credit and debit it; accountants see it all, and confirmation agents what
  * a customer has. Gift cards (ADR-448), likewise: owners and managers issue and change them;
- * accountants and confirmation agents look them up.
+ * accountants and confirmation agents look them up. The inbox's conversations with customers
+ * (ADR-545): owners, managers and confirmation agents work them; marketers read them.
  */
 export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = {
   owner: [
@@ -111,6 +114,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'read_store_credit_accounts',
     'write_store_credit_account_transactions',
     'write_gift_cards',
+    'write_conversations',
   ],
   manager: [
     ...EDIT_CATALOG,
@@ -132,6 +136,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'read_store_credit_accounts',
     'write_store_credit_account_transactions',
     'write_gift_cards',
+    'write_conversations',
   ],
   confirmation_agent: [
     ...VIEW_CATALOG,
@@ -139,6 +144,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'read_customers',
     'read_store_credit_accounts',
     'read_gift_cards',
+    'write_conversations',
   ],
   packer: [...VIEW_CATALOG, 'write_orders'],
   marketer: [
@@ -153,6 +159,7 @@ export const ROLE_SCOPES: Readonly<Record<StaffRole, readonly AccessScope[]>> = 
     'write_files',
     'write_pixels',
     'write_marketing_events',
+    'read_conversations',
   ],
   accountant: [
     ...VIEW_CATALOG,

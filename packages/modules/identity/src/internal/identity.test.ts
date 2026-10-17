@@ -1947,6 +1947,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         'read_store_credit_accounts',
         'write_store_credit_account_transactions',
         'write_gift_cards',
+        'write_conversations',
       ]);
     });
 

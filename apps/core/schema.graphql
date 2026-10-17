@@ -2412,6 +2412,87 @@ enum ConsentSource {
 }
 
 """
+A conversation with a customer on WhatsApp (MSG-05, ADR-545): what they wrote to the shop's own number, or to Hatti's shared one in answer to the shop.
+"""
+type Conversation {
+  createdAt: DateTime!
+
+  """The customer's number, masked as the caller may see it."""
+  customerPhone: String!
+  id: ID!
+
+  """
+  When the customer last wrote: WhatsApp lets the shop answer freely for a day.
+  """
+  lastInboundAt: DateTime
+  lastMessage: ConversationMessage
+  lastMessageAt: DateTime!
+  status: ConversationStatus!
+
+  """Messages the shop's staff have not read."""
+  unread: Int!
+
+  """Whether they last wrote to the shop's own number."""
+  viaOwnNumber: Boolean!
+}
+
+type ConversationConnection {
+  edges: [ConversationEdge!]!
+  nodes: [Conversation!]!
+  pageInfo: PageInfo!
+}
+
+type ConversationEdge {
+  cursor: String!
+  node: Conversation!
+}
+
+"""A message of a conversation with a customer (ADR-545)."""
+type ConversationMessage {
+  at: DateTime!
+
+  """What was written, or the button pressed; null for anything else."""
+  body: String
+  direction: ConversationMessageDirection!
+  id: ID!
+
+  """
+  What else it held, as WhatsApp names it: "image", "audio", "location". It is not kept: the customer's phone shows it.
+  """
+  mediaKind: String
+}
+
+type ConversationMessageConnection {
+  """The latest first."""
+  nodes: [ConversationMessage!]!
+  pageInfo: PageInfo!
+}
+
+enum ConversationMessageDirection {
+  """The customer wrote it."""
+  INBOUND
+
+  """The shop wrote it."""
+  OUTBOUND
+}
+
+"""
+Whether a conversation still wants the shop: the customer writing opens it again.
+"""
+enum ConversationStatus {
+  """Seen to; it opens again when the customer writes."""
+  CLOSED
+
+  """Still to be seen to."""
+  OPEN
+}
+
+type ConversationUpdatePayload {
+  conversation: Conversation
+  userErrors: [UserError!]!
+}
+
+"""
 A moment of an order placed through checkout, sent or to be sent to an ad platform, and how sending it went.
 """
 type ConversionEvent {
@@ -7272,6 +7353,14 @@ type Mutation {
   Deals you the most urgent order due that no one else has taken, yours for 15 minutes, so that no two agents call the same customer; the one you took already while you have it. Confirm or cancel it, or record the call, and ask for the next. Outside the shop's calling hours, none.
   """
   confirmationQueueNext: ConfirmationQueueNextPayload!
+
+  """Marks the conversation's messages read by the shop's staff."""
+  conversationMarkRead(id: ID!): ConversationUpdatePayload!
+
+  """
+  Closes the conversation, read, or opens it again. The customer writing opens it again.
+  """
+  conversationUpdateStatus(id: ID!, status: ConversationStatus!): ConversationUpdatePayload!
 
   """
   Archives a courier account: no more bookings with it, and its bookings waiting are cancelled; its parcels are still followed. The default passes to the oldest left.
@@ -12188,6 +12277,36 @@ type Query {
     """1 to 250; default 50."""
     first: Int
   ): ConfirmationQueue!
+  conversation(id: ID!): Conversation
+
+  """A conversation's messages, the latest first, a page at a time."""
+  conversationMessages(
+    """The messages before this one: the last the page before showed."""
+    before: ID
+    conversationId: ID!
+
+    """1 to 250; default 50."""
+    first: Int
+  ): ConversationMessageConnection!
+
+  """The shop's conversations with its customers, the latest written first."""
+  conversations(
+    after: String
+
+    """1 to 250; default 50."""
+    first: Int
+
+    """Those of this status alone."""
+    status: ConversationStatus
+
+    """Those with messages unread alone."""
+    unread: Boolean
+  ): ConversationConnection!
+
+  """
+  How many of the shop's conversations have messages its staff have not read.
+  """
+  conversationsUnreadCount: Int!
 
   """
   The moments of the shop's orders sent, or to be sent, to the ad platforms it connected, the latest first, with how sending each went.

@@ -14,6 +14,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { ConversationsService } from './conversations.service.js';
 import { MessagesService } from './messages.service.js';
 import { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
 import { asksToStop } from './templates.js';
@@ -38,8 +39,9 @@ const EARLY_MS = 10 * 60_000;
 /**
  * WhatsApp's webhook (ADR-146): how the messages Hatti's shared number sent went, and what
  * customers wrote back, of which "STOP" or "band karo" stops the shop they answered, or else the
- * shop that last wrote to them, and a button pressed is an answer for the worker (ADR-147). The host keeps each request's raw body as `rawBody`, which Meta's
- * signature covers. Everything in it can be heard twice: Meta sends again what was not taken.
+ * shop that last wrote to them, and a button pressed is an answer for the worker (ADR-147); each
+ * is kept in the shop's inbox (ADR-545). The host keeps each request's raw body as `rawBody`,
+ * which Meta's signature covers. Everything in it can be heard twice: Meta sends again what was not taken.
  */
 @Controller('webhooks/whatsapp')
 export class WhatsAppWebhookController {
@@ -47,6 +49,7 @@ export class WhatsAppWebhookController {
     @Inject(WHATSAPP_WEBHOOK) private readonly settings: WhatsAppWebhookSettings | null,
     private readonly messages: MessagesService,
     private readonly templates: WhatsAppTemplatesService,
+    private readonly conversations: ConversationsService,
   ) {}
 
   /** Meta's check, as the webhook is set up: the token it was given, and a challenge to echo. */
@@ -90,6 +93,8 @@ export class WhatsAppWebhookController {
           at: message.at,
         });
       }
+      // Kept in the shop's inbox too, its words and its buttons alike (ADR-545).
+      await this.conversations.recordInbound(message);
     }
     const now = Date.now();
     if (unmatched.some((status) => now - status.at.getTime() < EARLY_MS)) {
