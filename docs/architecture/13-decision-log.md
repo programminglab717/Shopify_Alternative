@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-555 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-556 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -563,6 +563,7 @@
 | 553 | A shop records what it spends on its ads, day by day, by platform and campaign, and the sales report takes it off the orders' profit and sets their sales against it | Accepted |
 | 554 | The admin records ad spend a day at a time under Marketing, and analytics shows the spend and the sales each rupee of it brought, beside true profit | Accepted |
 | 555 | A Tier-1 shop connects its POS to FBR, and each invoice and credit note it issues is reported to FBR's IMS as it is issued, tried again while FBR cannot be reached | Accepted |
+| 556 | A Tier-1 shop's invoices and credit notes print FBR's number and its QR code once FBR has numbered them, and say they await FBR until then | Accepted |
 
 ---
 
@@ -20896,3 +20897,28 @@
   never issued without being kept, nor kept without being issued. **The customer's name and
   number:** FBR asks none, and none kept is none to erase. **A PCT code each variant:** waits for
   the catalog's FBR fields (CAT-19).
+
+## ADR-556 · A Tier-1 shop's invoices and credit notes print FBR's number and its QR code once FBR has numbered them, and say they await FBR until then
+
+* **Context:** A Tier-1 shop's invoices and credit notes are reported to FBR as they are issued
+  (ADR-555), and FBR asks that the number it gives each, with its QR code, be printed on the copy
+  the customer gets. The documents had no QR codes, and the orders module did not read how its
+  invoices stood with FBR.
+* **Decision:**
+  * **QR codes** in the documents package: byte mode, error correction level M, versions 1 to 10
+    (up to 213 bytes, as FBR's numbers need far less), the smallest version that holds the value
+    and the mask the standard's penalty rules find easiest to read, drawn as one SVG path with
+    its quiet zone. Written for the package rather than taken from a library, as its Code 128
+    barcodes were; it was checked module for module against the Python qrcode library, at every
+    mask of every version, and a test keeps that library's matrices.
+  * **Printed:** an invoice, and each credit note, issued while the shop's POS was connected,
+    prints FBR's invoice number and its QR code, with a line saying to scan it in FBR's Tax Asaan
+    app, once FBR has numbered it; until then, that it awaits FBR, to be printed again once FBR has
+    numbered it. One issued before the POS was connected prints as before. English and Urdu.
+  * **In the API,** an order's invoice says how it stands with FBR, `fbrStatus`, and FBR's number,
+    `fbrInvoiceNumber`, read through the tax module's facade.
+* **Consequences:** A Tier-1 shop prints FBR-compliant invoices once FBR has answered, usually
+  within the worker's first round; one printed at once waits for its number.
+* **Alternatives:** **Reporting before the first print:** FBR answering slowly would hold the
+  invoice series' lock and every print behind it (ADR-555). **A library for QR codes:** the
+  package keeps no dependencies, and the encoder is a few hundred lines checked against one.

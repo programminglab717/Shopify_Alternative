@@ -130,6 +130,8 @@ table { width: 100%; border-collapse: collapse; }
 .small { font-size: 0.85em; }
 .footer { margin-top: 1.2em; text-align: center; }
 .barcode { display: block; width: 100%; height: 15mm; fill: #000; }
+.fbr { display: flex; gap: 1em; align-items: center; margin-top: 1em; break-inside: avoid; }
+.qr { display: block; flex: none; width: 26mm; height: 26mm; fill: #000; }
 .huge { font-size: 1.8em; font-weight: 800; letter-spacing: 0.02em; }
 .rule { margin: 0.5em 0; border: 0; border-top: 1.5px solid #111827; }
 .labels {

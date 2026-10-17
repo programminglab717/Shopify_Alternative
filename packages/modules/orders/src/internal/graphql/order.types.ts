@@ -1,5 +1,5 @@
 import { Money, PageInfo, UserError } from '@hatti/api';
-import { TaxLine } from '@hatti/tax/public';
+import { FiscalInvoiceStatus, TaxLine } from '@hatti/tax/public';
 import { BankAccount } from './bank-transfer.types.js';
 import { RefundReceipt } from './transfer-receipt.types.js';
 import {
@@ -1176,6 +1176,20 @@ export class OrderInvoice {
 
   @Field(() => GraphQLISODateTime)
   issuedAt!: Date;
+
+  @Field(() => FiscalInvoiceStatus, {
+    nullable: true,
+    description:
+      "How reporting it to FBR went, where the shop's POS was connected when it was issued " +
+      '(ADR-555); null where it was not.',
+  })
+  fbrStatus!: FiscalInvoiceStatus | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'The number FBR gave it, which its printed copy shows with its QR code (ADR-556).',
+  })
+  fbrInvoiceNumber!: string | null;
 }
 
 @ObjectType({ description: 'An order.' })

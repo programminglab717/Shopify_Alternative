@@ -4,6 +4,7 @@ import {
   formatDay,
   html,
   ltr,
+  qrCode,
   say,
   text,
   type Html,
@@ -13,7 +14,11 @@ import {
 import type { LocationRecord } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, parsePkMobile, type PkProvinceCode } from '@hatti/pk';
-import { taxIncludedWords, type TaxSettingsRecord } from '@hatti/tax/public';
+import {
+  taxIncludedWords,
+  type FiscalInvoiceRecord,
+  type TaxSettingsRecord,
+} from '@hatti/tax/public';
 import type { OrderInvoiceRecord } from './invoice-series.js';
 import { taxByRate } from './order-tax.js';
 import type { OrderLineRecord, OrderRecord } from './records.js';
@@ -42,6 +47,11 @@ export interface DocumentContext {
   registration: Pick<TaxSettingsRecord, 'ntn' | 'strn'>;
   /** The order's invoice, on an invoice once issued (ADR-495). */
   invoice?: Pick<OrderInvoiceRecord, 'name' | 'issuedAt'> | null;
+  /**
+   * How its invoice and credit notes stand with FBR, by their numbers, where the shop's POS was
+   * connected when they were issued (ADR-556).
+   */
+  fiscal?: ReadonlyMap<string, Pick<FiscalInvoiceRecord, 'status' | 'fbrInvoiceNumber'>>;
 }
 
 // Wording for documents that go to customers, in English and Urdu.
@@ -52,6 +62,15 @@ const WORDS = {
   invoiceNumber: { en: 'Invoice no.', ur: 'انوائس نمبر' },
   creditNote: { en: 'Credit note', ur: 'کریڈٹ نوٹ' },
   creditNoteNumber: { en: 'Credit note no.', ur: 'کریڈٹ نوٹ نمبر' },
+  fbrInvoiceNumber: { en: 'FBR invoice no.', ur: 'ایف بی آر انوائس نمبر' },
+  fbrVerify: {
+    en: "Scan it in FBR's Tax Asaan app to check it",
+    ur: 'تصدیق کے لیے ایف بی آر کی ٹیکس آسان ایپ میں اسکین کریں',
+  },
+  fbrAwaiting: {
+    en: 'Awaiting FBR: print it again once FBR has numbered it',
+    ur: 'ایف بی آر کا انتظار ہے: ایف بی آر کا نمبر ملنے پر دوبارہ پرنٹ کریں',
+  },
   taxRefunded: { en: 'Of which sales tax', ur: 'جس میں سیلز ٹیکس' },
   shipTo: { en: 'Ship to', ur: 'ترسیل کا پتہ' },
   billTo: { en: 'Bill to', ur: 'خریدار' },
@@ -271,6 +290,7 @@ export function invoice(order: OrderRecord, context: DocumentContext): Html {
         </tr>
       </tbody>
     </table>
+    ${context.invoice && fbr(context, context.invoice.name)}
     <p class="footer">${t(WORDS.thanks)}</p>
   `;
 }
@@ -344,10 +364,37 @@ export function creditNotes(order: OrderRecord, context: DocumentContext): Html[
             }
           </tbody>
         </table>
-        ${refund.note && html`<p dir="auto">${text(refund.note)}</p>`}
+        ${refund.note && html`<p dir="auto">${text(refund.note)}</p>`} ${fbr(context, note.name)}
       `,
     ];
   });
+}
+
+/**
+ * FBR's number for the invoice or credit note `usin` and its QR code, as FBR asks a Tier-1
+ * retailer's to show them (ADR-556); while FBR has not numbered it, that it waits. Nothing where
+ * the shop's POS was not connected when it was issued.
+ */
+function fbr(context: DocumentContext, usin: string): Html {
+  const record = context.fiscal?.get(usin);
+  if (!record) return html``;
+  const t = (words: Words) => say(context.language, words);
+  if (record.status === 'reported' && record.fbrInvoiceNumber) {
+    return html`<section class="fbr">
+      ${qrCode(record.fbrInvoiceNumber, `FBR ${record.fbrInvoiceNumber}`)}
+      <div>
+        <p class="label">${t(WORDS.fbrInvoiceNumber)}</p>
+        <p class="strong">${ltr(record.fbrInvoiceNumber)}</p>
+        <p class="small muted">${t(WORDS.fbrVerify)}</p>
+      </div>
+    </section>`;
+  }
+  return html`<section class="fbr">
+    <div>
+      <p class="label">${t(WORDS.fbrInvoiceNumber)}</p>
+      <p class="small">${t(WORDS.fbrAwaiting)}</p>
+    </div>
+  </section>`;
 }
 
 /**

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### FBR's number and QR code on invoices
+
+* **A Tier-1 shop's invoices and credit notes print FBR's number and its QR code once FBR has
+  numbered them, and say they await FBR until then** ([ADR-556](../architecture/13-decision-log.md#adr-556--a-tier-1-shops-invoices-and-credit-notes-print-fbrs-number-and-its-qr-code-once-fbr-has-numbered-them-and-say-they-await-fbr-until-then), POS-04, TAX-04).
+* 3387 tests, 3 more: QR codes against the reference library's, the
+  versions and limits, and the invoice and credit note printed before and after FBR's number.
+
 ### 21248b5 · Invoices reported to FBR
 
 * **A Tier-1 shop connects its POS to FBR, and each invoice and credit note it issues is reported

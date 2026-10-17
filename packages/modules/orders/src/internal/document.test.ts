@@ -399,6 +399,64 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     });
   });
 
+  it("prints FBR's number and its QR code once FBR has numbered them, or that they wait (ADR-556)", async () => {
+    const year = taxYearOf(new Date(), 'Asia/Karachi');
+    const print = (ids: string[], kind: 'invoice' | 'credit_note' = 'invoice') =>
+      f.documents.render(f.a, ids, { kind, paper: 'a4', language: 'english' });
+    // An order invoiced before the POS was connected prints as it did.
+    const before = await f.order(f.a, [kurta], { advancePaid: '1000' });
+    unwrap(await print([before.id]));
+    await f.admin.query(
+      `INSERT INTO tax.fbr_pos (shop_id, pos_id, access_token, token_hint, environment, pct_code)
+       VALUES ($1, 123456, 'sealed', 'f818', 'production', '62044200')`,
+      [f.a.shopId],
+    );
+    const order = await f.order(f.a, [kurta], { advancePaid: '1000' });
+
+    const waiting = pagesOf(unwrap(await print([order.id, before.id])).html);
+    expect(waiting[0]).toContain(
+      'FBR invoice no. Awaiting FBR: print it again once FBR has numbered it',
+    );
+    expect(waiting[1]).not.toContain('FBR');
+    expect((await f.documents.invoicesOf(f.a, [order.id])).get(order.id)?.fiscal).toMatchObject({
+      status: 'pending',
+      fbrInvoiceNumber: null,
+    });
+
+    const number = '123456ZZZZ17102026140509001';
+    await f.admin.query(
+      `UPDATE tax.fiscal_invoices SET status = 'reported', fbr_invoice_number = $2,
+              reported_at = now()
+        WHERE shop_id = $1 AND usin = $3`,
+      [f.a.shopId, number, invoiceName(year, 2)],
+    );
+    const document = unwrap(await print([order.id]));
+    expect(pagesOf(document.html)[0]).toContain(
+      `FBR invoice no. ${number} Scan it in FBR&#39;s Tax Asaan app to check it`,
+    );
+    expect(document.html).toContain(`<svg class="qr" viewBox="0 0 37 37"`);
+    expect(document.html).toContain(`aria-label="FBR ${number}"`);
+    expect((await f.documents.invoicesOf(f.a, [order.id])).get(order.id)?.fiscal).toMatchObject({
+      status: 'reported',
+      fbrInvoiceNumber: number,
+    });
+    // In Urdu too.
+    const urdu = unwrap(
+      await f.documents.render(f.a, [order.id], {
+        kind: 'invoice',
+        paper: 'thermal_80mm',
+        language: 'urdu',
+      }),
+    );
+    expect(urdu.html).toContain('ایف بی آر انوائس نمبر');
+
+    // A credit note waits for FBR's number of its own.
+    unwrap(await f.refunds.refund(f.a, order.id, { amount: '200', method: 'cash' }));
+    const note = pagesOf(unwrap(await print([order.id], 'credit_note')).html);
+    expect(note[0]).toContain(`Credit note no. ${creditNoteName(year, 1)}`);
+    expect(note[0]).toContain('Awaiting FBR');
+  });
+
   it('prints the gift message on the packing slip, escaped, and none once its customer is erased (ADR-413)', async () => {
     const order = await f.order(f.a, [kurta], { giftMessage: '  Eid Mubarak <3 Ammi  ' });
     expect(order.giftMessage).toBe('Eid Mubarak <3 Ammi');

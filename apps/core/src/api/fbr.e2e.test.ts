@@ -188,6 +188,14 @@ describe.skipIf(!server)("Admin GraphQL API: FBR's POS integration (POS-04, ADR-
       attempts: 0,
     });
     expect(kept.id).toMatch(/^fbr_/);
+    // The order's invoice says how it stands with FBR (ADR-556).
+    expect(
+      await data(
+        tokens.owner,
+        `query ($id: ID!) { order(id: $id) { invoice { number fbrStatus fbrInvoiceNumber } } }`,
+        { id: orderId },
+      ),
+    ).toEqual({ invoice: { number: usin, fbrStatus: 'PENDING', fbrInvoiceNumber: null } });
     expect(await data(tokens.reader, INVOICES, { status: 'FAILED' })).toEqual([]);
 
     // Only one not reported is sent again.

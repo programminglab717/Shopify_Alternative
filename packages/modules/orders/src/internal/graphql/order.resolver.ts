@@ -24,6 +24,7 @@ import {
   type LocationRecord,
 } from '@hatti/inventory/public';
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import type { FiscalInvoiceRecord, FiscalInvoiceStatus } from '@hatti/tax/public';
 import { OrderDocumentService } from '../document.service.js';
 import type { OrderInvoiceRecord } from '../invoice-series.js';
 import { OrderService, type BulkResult } from '../order.service.js';
@@ -181,12 +182,18 @@ export class OrderResolver {
     @Loaders() loaders: RequestLoaders,
     @Parent() order: Order,
   ): Promise<OrderInvoice | null> {
-    const loader = loaders.get<string, OrderInvoiceRecord>('orders.invoices', (ids) =>
-      this.documents.invoicesOf(tenant, ids),
+    const loader = loaders.get<string, OrderInvoiceRecord & { fiscal: FiscalInvoiceRecord | null }>(
+      'orders.invoices',
+      (ids) => this.documents.invoicesOf(tenant, ids),
     );
     const record = await loader.load(order.uuid);
     return record
-      ? Object.assign(new OrderInvoice(), { number: record.name, issuedAt: record.issuedAt })
+      ? Object.assign(new OrderInvoice(), {
+          number: record.name,
+          issuedAt: record.issuedAt,
+          fbrStatus: record.fiscal && (record.fiscal.status.toUpperCase() as FiscalInvoiceStatus),
+          fbrInvoiceNumber: record.fiscal?.fbrInvoiceNumber ?? null,
+        })
       : null;
   }
 

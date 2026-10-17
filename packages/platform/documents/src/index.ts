@@ -13,4 +13,5 @@ export {
   type Words,
 } from './document.js';
 export { escapeHtml, html, toMarkup, type Html, type HtmlValue } from './html.js';
+export { QR_MAX_VERSION, qrCode, qrMatrix, type QrMatrix } from './qr.js';
 export { renderPage, type PageOptions, type RenderedPage } from './page.js';

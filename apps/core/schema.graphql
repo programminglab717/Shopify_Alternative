@@ -9914,6 +9914,15 @@ enum OrderFulfillmentStatus {
 An order's invoice in the shop's series (TAX-05, ADR-495): numbered from 1 each tax year, from 1 July, the first time it is printed.
 """
 type OrderInvoice {
+  """
+  The number FBR gave it, which its printed copy shows with its QR code (ADR-556).
+  """
+  fbrInvoiceNumber: String
+
+  """
+  How reporting it to FBR went, where the shop's POS was connected when it was issued (ADR-555); null where it was not.
+  """
+  fbrStatus: FiscalInvoiceStatus
   issuedAt: DateTime!
 
   """"INV/2026-27/00001"."""

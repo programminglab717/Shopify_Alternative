@@ -36,6 +36,7 @@ export {
   type FiscalPaymentMode,
   type FiscalStatus,
 } from '../internal/fbr.js';
+export { FiscalInvoiceStatus } from '../internal/graphql/fbr.types.js';
 export { TaxCategory, TaxLine, TaxSettings, toTaxLine } from '../internal/graphql/tax.types.js';
 export {
   TaxSettingsService,

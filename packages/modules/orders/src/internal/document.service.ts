@@ -9,7 +9,7 @@ import { Database } from '@hatti/db';
 import { renderDocument, type Language, type Paper } from '@hatti/documents';
 import { LocationService } from '@hatti/inventory/public';
 import { maskPkMobile, parsePkMobile } from '@hatti/pk';
-import { taxSettingsIn } from '@hatti/tax/public';
+import { fiscalInvoicesIn, taxSettingsIn, type FiscalInvoiceRecord } from '@hatti/tax/public';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import {
@@ -63,7 +63,7 @@ export class OrderDocumentService {
       return failOne(['ids'], 'TOO_MANY', `Ids can have at most ${LIMITS.batch}`);
     }
     const wanted = [...new Set(ids)];
-    const { shop, registration, orders, locations, invoices } = await this.db.tenant(
+    const { shop, registration, orders, locations, invoices, fiscal } = await this.db.tenant(
       tenant.shopId,
       async (tx) => {
         const found = await loadOrders(tx, tenant.shopId, {
@@ -84,12 +84,20 @@ export class OrderDocumentService {
             : request.kind === 'credit_note'
               ? await invoicesIn(tx, tenant.shopId, ids)
               : new Map();
+        // How they stand with FBR, where the shop's POS was connected (ADR-556).
+        const numbers = [
+          ...[...invoices.values()].map((invoice) => invoice.name),
+          ...orders.flatMap((order) =>
+            order.refunds.flatMap((refund) => refund.creditNote?.name ?? []),
+          ),
+        ];
         return {
           shop,
           registration: await taxSettingsIn(tx, tenant.shopId),
           orders,
           locations: await this.locations.locationsOf(tx, tenant.shopId, locationIds),
           invoices,
+          fiscal: await fiscalInvoicesIn(tx, tenant.shopId, numbers),
         };
       },
     );
@@ -108,6 +116,7 @@ export class OrderDocumentService {
         phone: shownNumber(tenant, order.phone),
         registration,
         invoice: invoices.get(order.id) ?? null,
+        fiscal,
       };
       if (request.kind === 'credit_note') return creditNotes(order, context);
       return [(request.kind === 'invoice' ? invoice : packingSlip)(order, context)];
@@ -123,12 +132,28 @@ export class OrderDocumentService {
     return { ok: true, value: { html, title, fileName, orders } };
   }
 
-  /** The invoices issued for orders `ids`, by order (ADR-495). */
+  /**
+   * The invoices issued for orders `ids`, by order (ADR-495), with how each stands with FBR where
+   * the shop's POS was connected when it was issued (ADR-556).
+   */
   async invoicesOf(
     tenant: TenantContext,
     ids: readonly string[],
-  ): Promise<Map<string, OrderInvoiceRecord>> {
-    return this.db.tenant(tenant.shopId, (tx) => invoicesIn(tx, tenant.shopId, ids));
+  ): Promise<Map<string, OrderInvoiceRecord & { fiscal: FiscalInvoiceRecord | null }>> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const invoices = await invoicesIn(tx, tenant.shopId, ids);
+      const fiscal = await fiscalInvoicesIn(
+        tx,
+        tenant.shopId,
+        [...invoices.values()].map((invoice) => invoice.name),
+      );
+      return new Map(
+        [...invoices].map(([id, invoice]) => [
+          id,
+          { ...invoice, fiscal: fiscal.get(invoice.name) ?? null },
+        ]),
+      );
+    });
   }
 }
 

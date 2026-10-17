@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
+  QR_MAX_VERSION,
+  qrCode,
+  qrMatrix,
   CODE128_PATTERNS,
   code128,
   code128Symbols,
@@ -310,5 +313,79 @@ describe('code128', () => {
     expect(isCode128('x'.repeat(81))).toBe(false);
     expect(isCode128('لاہور')).toBe(false);
     expect(() => code128('CX\n1')).toThrow('Code 128 draws printable ASCII');
+  });
+});
+
+/**
+ * An FBR invoice number's QR code at mask 3, as the Python qrcode library 7.4.2 draws it (byte
+ * mode, level M): the encoder matched that library module for module at every mask, versions 1
+ * to 10, when it was written (ADR-556).
+ */
+const FBR_NUMBER_QR = [
+  '11111110100010011001001111111',
+  '10000010110010110100001000001',
+  '10111010011101110001101011101',
+  '10111010101010001110101011101',
+  '10111010000101000011101011101',
+  '10000010010000100001001000001',
+  '11111110101010101010101111111',
+  '00000000100101100110100000000',
+  '10110111011011101101101001011',
+  '01010100000000011001001011001',
+  '10110110101110110100100010100',
+  '00100100000111110001111101010',
+  '01000010001100001110110101110',
+  '11111100100011000111111101111',
+  '10110010011100100001101100001',
+  '10000100001001010010010010011',
+  '10101010001100000000000011000',
+  '00101100100001000010010000010',
+  '10000010111000000010010000110',
+  '00001001011000011111001111110',
+  '01011110111011010001111110001',
+  '00000000101101110111100010101',
+  '11111110100001001011101010000',
+  '10000010100110001101100010010',
+  '10111010011010110000111111011',
+  '10111010100011101100000000010',
+  '10111010100011011001010101101',
+  '10000010001011101001110001010',
+  '11111110100011011100100111110',
+];
+
+describe('qrCode', () => {
+  it('draws byte mode at level M as the standard does, module for module', () => {
+    const matrix = qrMatrix('123456ZZZZ17102026140509001', 3)!;
+    expect(matrix.version).toBe(3);
+    expect(matrix.modules.map((row) => row.map((dark) => (dark ? '1' : '0')).join(''))).toEqual(
+      FBR_NUMBER_QR,
+    );
+    // Version 8, past the version information's start, against the same library's digest.
+    const long = qrMatrix('x'.repeat(126), 5)!;
+    expect(long.version).toBe(8);
+    expect(
+      createHash('sha256')
+        .update(long.modules.map((row) => row.map((dark) => (dark ? '1' : '0')).join('')).join(''))
+        .digest('hex'),
+    ).toBe('4f219a6e503b33724be77e1f4d8ed399c9c4ccd2108397f36b8ec540eb3474d8');
+  });
+
+  it('takes the smallest version that holds it, the mask easiest to read, and nothing past version 10', () => {
+    expect(qrMatrix('INV')!.version).toBe(1);
+    expect(qrMatrix('x'.repeat(14))!.version).toBe(1);
+    expect(qrMatrix('x'.repeat(15))!.version).toBe(2);
+    expect(qrMatrix('x'.repeat(213))!.version).toBe(QR_MAX_VERSION);
+    expect(qrMatrix('x'.repeat(214))).toBeNull();
+    // Urdu is two bytes a letter.
+    expect(qrMatrix('لاہور')!.version).toBe(1);
+    const chosen = qrMatrix('123456ZZZZ17102026140509001')!;
+    expect(chosen.mask).toBeGreaterThanOrEqual(0);
+    expect(chosen.mask).toBeLessThan(8);
+    const svg = toMarkup(qrCode('123456ZZZZ17102026140509001', 'FBR invoice <1>'));
+    expect(svg).toMatch(/^<svg class="qr" viewBox="0 0 37 37"/);
+    expect(svg).toContain('aria-label="FBR invoice &lt;1&gt;"');
+    // The finder's corner, inside the quiet zone of four.
+    expect(svg).toContain('M4 4h1v1h-1z');
+    expect(toMarkup(qrCode('x'.repeat(214)))).toBe('');
   });
 });
