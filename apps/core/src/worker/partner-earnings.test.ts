@@ -17,13 +17,19 @@ describe.skipIf(!server)(
     const shopId = newId();
     const partnerId = newId();
 
-    const paid = (reason: string, plan: string | null, amount: string, id = newId()) => ({
+    const paid = (
+      reason: string,
+      plan: string | null,
+      amount: string,
+      id = newId(),
+      tax?: string,
+    ) => ({
       id: newId(),
       type: BillingEvents.InvoicePaid,
       shopId,
       aggregateType: 'billing_invoice',
       aggregateId: id,
-      payload: { number: 'HB-001234', reason, plan, interval: 'monthly', amount },
+      payload: { number: 'HB-001234', reason, plan, interval: 'monthly', amount, tax },
       occurredAt: new Date().toISOString(),
     });
 
@@ -64,15 +70,27 @@ describe.skipIf(!server)(
       // Heard again, as the outbox may deliver it: earned once.
       await earnings.handle(paid('renewal', 'growth', '299900', invoice));
       await earnings.handle(paid('credits', null, '100000'));
+      // A taxed invoice: the share is of what Hatti earns, without the sales tax (ADR-512).
+      const taxed = newId();
+      await earnings.handle(paid('renewal', 'growth', '347884', taxed, '47984'));
       const { rows } = await admin.query(
         `SELECT partner_id, invoice_id, invoice_number::text, plan, invoice_amount::text,
               share_percent, amount::text
-         FROM identity.partner_earnings`,
+         FROM identity.partner_earnings ORDER BY invoice_id`,
       );
       expect(rows).toEqual([
         {
           partner_id: partnerId,
           invoice_id: invoice,
+          invoice_number: '1234',
+          plan: 'growth',
+          invoice_amount: '299900',
+          share_percent: 20,
+          amount: '59980',
+        },
+        {
+          partner_id: partnerId,
+          invoice_id: taxed,
           invoice_number: '1234',
           plan: 'growth',
           invoice_amount: '299900',

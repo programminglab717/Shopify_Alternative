@@ -10,7 +10,7 @@ import { loadApiConfig, passkeysOf, vapidKeysOf } from './config.js';
 import { couriersOf } from './couriers.js';
 import { accountEmailsOf } from './emails.js';
 import { ProviderPhoneCodes, messageProvidersOf } from './messaging.js';
-import { hattiBankAccountOf, hattiGatewayOf, supportContactOf } from './billing.js';
+import { hattiBankAccountOf, hattiGatewayOf, hattiTaxOf, supportContactOf } from './billing.js';
 import { paymentGatewaysOf } from './payments.js';
 import { onShutdown } from './shutdown.js';
 import { LOCAL_STORAGE_PATH, createStorage } from './storage.js';
@@ -84,6 +84,7 @@ const app = await createApi({
   paymentGateways: paymentGatewaysOf({ production: config.NODE_ENV === 'production' }),
   billingGateway: hattiGatewayOf(config),
   billingBankAccount: hattiBankAccountOf(config),
+  billingTax: hattiTaxOf(config),
   support: supportContactOf(config),
   ai:
     config.AI_API_KEY && config.AI_MODEL

@@ -457,7 +457,7 @@ enum BillingInterval {
 An invoice of Hatti's to the shop, for a plan's period or for message credit.
 """
 type BillingInvoice {
-  """What is owed: price less credit."""
+  """What is owed: price less credit, and the tax."""
   amount: Money!
   createdAt: DateTime!
 
@@ -482,6 +482,24 @@ type BillingInvoice {
   """
   reference: String
   status: BillingInvoiceStatus!
+
+  """
+  Provincial sales tax on the price less credit, at Hatti's registration (BIL-02); nothing where Hatti charges none.
+  """
+  tax: Money!
+
+  """
+  The revenue authority the tax is for: PRA, SRB, KPRA, BRA or ICT; null for none.
+  """
+  taxAuthority: String
+
+  """The tax rate, as a percentage: 16 for 16%; 0 for none."""
+  taxRate: Float!
+
+  """
+  Hatti's registration number with that authority, as printed on the invoice.
+  """
+  taxRegistration: String
 
   """
   The transfers the owner said they made for it, into Hatti's account, the latest first.

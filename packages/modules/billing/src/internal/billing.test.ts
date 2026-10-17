@@ -3,6 +3,7 @@ import { testDatabaseServer } from '@hatti/db/testing';
 import { newId, toPublicId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { invoicePage } from './billing-pages.js';
+import { taxOn } from './tax.js';
 import { PLANS, periodEndOf } from './plans.js';
 import { billingFixture, errorsOf, unwrap, type BillingFixture } from './test-support.js';
 
@@ -384,6 +385,54 @@ describe.skipIf(!server)('Billing', () => {
     expect(rows[0].overdue_reminders).toBe(0);
   });
 
+  it("taxes invoices at Hatti's registration, the credit bought kept apart from its tax (BIL-02, ADR-512)", async () => {
+    expect(taxOn(2_499_00n, 1600)).toBe(399_84n);
+    expect(taxOn(3n, 1600)).toBe(0n);
+    expect(taxOn(4n, 1250)).toBe(1n);
+
+    // A plan chosen: its price, tax at PRA's 16%, and what the shop pays, with the authority and
+    // Hatti's number of then; the event says the tax in it.
+    const chosen = unwrap(
+      await f.taxed.changePlan(f.a, { plan: 'growth', interval: 'monthly' }),
+    ).invoice!;
+    expect(chosen).toMatchObject({
+      price: 6_999_00n,
+      credit: 0n,
+      tax: 1_119_84n,
+      taxRate: 1600,
+      taxAuthority: 'PRA',
+      taxRegistration: 'P7654321-0',
+      amount: 8_118_84n,
+    });
+    const created = (await f.outbox()).filter((e) => e.event_type === 'billing_invoice.created');
+    expect(created.at(-1)!.payload).toMatchObject({ amount: '811884', tax: '111984' });
+    const page = invoicePage(await f.taxed.pageOf(publicId(chosen.id))).html;
+    for (const words of [
+      'Rs 6,999',
+      'Rs 1,119.84',
+      '(PRA, 16%)',
+      'Rs 8,118.84',
+      'P7654321-0',
+      '1234567-8',
+    ]) {
+      expect(page, words).toContain(words);
+    }
+
+    // Credit bought: taxed, but the wallet gets the credit alone once paid.
+    const credit = unwrap(await f.taxed.buyCredits(f.a, { amount: '1000' })).invoice;
+    expect(credit).toMatchObject({ price: 1_000_00n, tax: 160_00n, amount: 1_160_00n });
+    const started = unwrap(await f.taxed.pay(f.a, credit.id));
+    await f.taxed.returned(publicId(credit.id), f.formOf(started.url));
+    expect(await f.wallet.balanceOf(f.a.shopId)).toBe(1_000_00n);
+
+    // Without a registration, none.
+    const plain = unwrap(
+      await f.billing.changePlan(f.b, { plan: 'starter', interval: 'monthly' }),
+    ).invoice!;
+    expect(plain).toMatchObject({ tax: 0n, taxRate: 0, taxAuthority: null, amount: 2_499_00n });
+    expect(invoicePage(await f.billing.pageOf(publicId(plain.id))).html).not.toContain('Sales tax');
+  });
+
   it("pays an invoice from Hatti's webhook once, even one set aside meanwhile", async () => {
     const first = unwrap(
       await f.billing.changePlan(f.a, { plan: 'starter', interval: 'monthly' }),
@@ -723,6 +772,7 @@ describe.skipIf(!server)('Billing', () => {
       plan: null,
       interval: null,
       amount: '150000',
+      tax: '0',
     });
     const { rows: audit } = await f.admin.query<{ action: string; details: unknown }>(
       'SELECT action, details FROM platform.audit_log ORDER BY occurred_at, id',

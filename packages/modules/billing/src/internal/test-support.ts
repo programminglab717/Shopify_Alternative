@@ -30,6 +30,8 @@ export interface BillingFixture {
   bank: HattiBankAccount;
   /** The billing service of a host that set up no gateway for Hatti, nor any bank account. */
   unpaid: BillingService;
+  /** The billing service of a host where Hatti is registered with PRA for sales tax (ADR-512). */
+  taxed: BillingService;
   /** The credit shops' messages are paid from. */
   wallet: MessageWallet;
   /**
@@ -103,6 +105,12 @@ export async function billingFixture(server: string): Promise<BillingFixture> {
     hatti,
     bank,
     unpaid: new BillingService(db, site, null, null),
+    taxed: new BillingService(db, site, hatti, bank, {
+      authority: 'PRA',
+      registration: 'P7654321-0',
+      rate: 1600,
+      ntn: '1234567-8',
+    }),
     wallet: new MessageWallet(db),
     async subscribe(tenant, plan, interval, period, next) {
       await admin.query(

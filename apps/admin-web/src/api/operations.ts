@@ -2673,6 +2673,11 @@ const BILLING_INVOICE = /* GraphQL */ `
     amount {
       ...Money
     }
+    tax {
+      ...Money
+    }
+    taxRate
+    taxAuthority
     plan {
       name
     }

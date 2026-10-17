@@ -13,6 +13,7 @@ import {
   BillingModule,
   type HattiBankAccount,
   type HattiGateway,
+  type HattiTax,
   type SupportContact,
 } from '@hatti/billing/public';
 import { CatalogModule, CopiedVariantStock } from '@hatti/catalog/public';
@@ -128,6 +129,8 @@ export interface ApiModuleOptions {
    * without it, invoices are not paid by transfer.
    */
   billingBankAccount?: HattiBankAccount | null;
+  /** Hatti's registration for sales tax on services (ADR-512); without it, invoices carry none. */
+  billingTax?: HattiTax | null;
   /** Hatti's own support lines (ADR-508); without them, shops send requests alone. */
   support?: SupportContact | null;
 }
@@ -256,6 +259,7 @@ export class ApiModule {
         BillingModule.forRoot({
           gateway: options.billingGateway ?? null,
           bankAccount: options.billingBankAccount ?? null,
+          tax: options.billingTax ?? null,
           support: options.support ?? null,
         }),
       ],

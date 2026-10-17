@@ -109,6 +109,15 @@ function InvoiceToPay({
           {t(`billing.reason.${invoice.reason}` as MessageKey, { plan: invoice.plan?.name ?? '' })}
         </span>
       </div>
+      {invoice.taxAuthority && (
+        <p className="text-secondary">
+          {t('billing.includesTax', {
+            tax: formatMoney(invoice.tax.amount),
+            authority: invoice.taxAuthority,
+            rate: String(invoice.taxRate),
+          })}
+        </p>
+      )}
       {latest?.status === 'WAITING' && (
         <Alert tone="info">{t('billing.transferWaiting', { reference: latest.reference })}</Alert>
       )}

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-511 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-512 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -519,6 +519,7 @@
 | 509 | TCS, the third courier: bookings, tracking, cancellations and cities through its COD API, with the shop's own account and the city it ships from | Accepted |
 | 510 | Trax, the fourth courier: bookings by Trax's city IDs from the shop's pickup address, tracking, cancellations and cities through its merchant API | Accepted |
 | 511 | Humane dunning: an overdue period's owner reminded the day it ends, with three days left and with one, each once, and the admin saying by when, the store open throughout | Accepted |
+| 512 | Sales tax on Hatti's invoices: provincial sales tax on services at Hatti's registration, kept on each invoice with its authority, rate and number, and paid on top of the price | Accepted |
 
 ---
 
@@ -19444,3 +19445,47 @@
     would make reminders rarer, not unnecessary.
   * **A longer grace:** a week matches how Pakistani merchants are paid and pay. The reminders
     make the week enough, and paying after Free still brings the plan back (ADR-154).
+
+## ADR-512 · Sales tax on Hatti's invoices: provincial sales tax on services at Hatti's registration, kept on each invoice with its authority, rate and number, and paid on top of the price
+
+* **Context:** Hatti's plans and message credit are priced exclusive of provincial sales tax on
+  services (docs/product/03). Its invoices must carry the tax and Hatti's registration numbers
+  (BIL-02). The rate depends on the revenue authority: PRA 16%, SRB, KPRA, BRA and ICT 15% as
+  standard (docs/research/03 §6.7). Until now Hatti's invoices carried none.
+* **Decision:**
+  * **Hatti's registration comes from the host's configuration:** `BILLING_TAX_AUTHORITY` and
+    `BILLING_TAX_REGISTRATION`, both or neither, with `BILLING_TAX_RATE` where the rate is not the
+    authority's standard one (a reduced rate for IT services, say), and `BILLING_NTN`. Without
+    them, invoices carry no tax, as before.
+  * **Each invoice keeps its tax** (migration 0242): the tax on the price less any credit, at the
+    rate in basis points, halves of a paisa rounded up. It also keeps the authority and Hatti's
+    number as they were when the invoice was made, so a later change of registration never
+    rewrites an issued invoice. `amount`, what the shop pays and every payment is checked
+    against, is now the price less the credit plus the tax.
+  * **Origin-based:** the tax follows Hatti's registration, not the shop's province. Hatti
+    registers where it is based, as the research advises, and charges that authority's rate on
+    every invoice.
+  * **What is not Hatti's revenue stays apart from it:**
+    * Credit bought adds the credit alone to the wallet, never its tax.
+    * A partner's share (ADR-505) is of the invoice less its tax. `billing_invoice.paid` carries
+      the tax for it.
+  * **Shown where the shop sees its bills:**
+    * The invoice's page lists the price, any unused period credited, the sales tax with its
+      authority and rate, the total, and Hatti's registration and NTN.
+    * The admin says how much of an open invoice is tax.
+    * `BillingInvoice` gains `tax`, `taxRate`, `taxAuthority` and `taxRegistration`.
+* **Consequences:**
+  * Turning the registration on raises what shops pay by the rate, as the pricing always said it
+    would. Invoices already issued keep their amounts.
+  * Destination-based tax, charging each shop its province's rate, needs Hatti registered in
+    every province and the shop's province from its tax profile. The invoice already stores the
+    authority per invoice, so that change is in how the authority is chosen, not in the data.
+  * Hatti files and pays the tax with its authority outside Hatti's own systems. Monthly totals
+    by authority can be read from the invoices.
+  * Get an adviser's sign-off before turning it on, as the research notes cross-province
+    disputes.
+* **Alternatives:**
+  * **Prices inclusive of tax:** the pricing page promises prices exclusive of it. Inclusive
+    prices would cut Hatti's revenue by the rate wherever it registers.
+  * **A tax line on the payment rather than the invoice:** the invoice is the tax document. Its
+    tax, authority and number must not change once issued.

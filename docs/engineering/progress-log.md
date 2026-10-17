@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Sales tax on Hatti's invoices
+
+* **Where Hatti is registered for sales tax on services, its invoices carry the tax at the
+  authority's rate, with its registration and NTN on the invoice's page** ([ADR-512](../architecture/13-decision-log.md#adr-512--sales-tax-on-hattis-invoices-provincial-sales-tax-on-services-at-hattis-registration-kept-on-each-invoice-with-its-authority-rate-and-number-and-paid-on-top-of-the-price), BIL-02).
+* 3188 tests, 3 more: taxed invoices in billing, the registration's
+  configuration, and the admin's tax line; partners' shares are now checked without the tax.
+
 ### 187b3cf · Humane dunning
 
 * **An overdue period's owner is reminded the day it ends, with three days left and with one,

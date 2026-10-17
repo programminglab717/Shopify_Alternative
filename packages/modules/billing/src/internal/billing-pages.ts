@@ -27,6 +27,12 @@ const WORDS = {
   raastId: { en: 'Raast ID', ur: 'راست آئی ڈی' },
   amount: { en: 'Amount', ur: 'رقم' },
   remarks: { en: 'Remarks', ur: 'ریمارکس' },
+  price: { en: 'Price', ur: 'قیمت' },
+  credit: { en: 'Unused period credited', ur: 'غیر استعمال شدہ مدت کی کٹوتی' },
+  salesTax: { en: 'Sales tax on services', ur: 'خدمات پر سیلز ٹیکس' },
+  total: { en: 'Total', ur: 'کل' },
+  registration: { en: "Hatti's registration", ur: 'ہٹی کی رجسٹریشن' },
+  ntn: { en: 'NTN', ur: 'این ٹی این' },
 } satisfies Record<string, Words>;
 
 /** The invoice's page, with its status; a page saying it isn't here for none. */
@@ -80,9 +86,33 @@ export function invoicePage(view: InvoicePageView | null): {
   const page = renderPage({
     title: `${TITLE.en} ${name}`,
     body: html`<h1 class="title stack">${say('bilingual', TITLE)} ${ltr(name)}</h1>
-      ${body}`,
+      ${body} ${invoice.taxAuthority && taxBreakdown(view)}`,
   });
   return { status: 200, ...page };
+}
+
+/**
+ * A taxed invoice's sums (ADR-512): its price, any unused period credited, the sales tax at its
+ * authority's rate, and the total, with Hatti's registration with the authority and its NTN.
+ */
+function taxBreakdown(view: InvoicePageView): Html {
+  const { invoice } = view;
+  const row = (label: Words, value: HtmlValue, extra = '') =>
+    html`<tr>
+      <td>${say('bilingual', label)}${extra}</td>
+      <td class="num">${value}</td>
+    </tr>`;
+  const rate = `${invoice.taxRate / 100}%`;
+  return html`<section class="section">
+    <table>
+      ${row(WORDS.price, ltr(rupees(invoice.price)))}
+      ${invoice.credit > 0n && row(WORDS.credit, ltr(`- ${rupees(invoice.credit)}`))}
+      ${row(WORDS.salesTax, ltr(rupees(invoice.tax)), ` (${invoice.taxAuthority}, ${rate})`)}
+      ${row(WORDS.total, ltr(rupees(invoice.amount)))}
+      ${row(WORDS.registration, ltr(`${invoice.taxAuthority} ${invoice.taxRegistration ?? ''}`))}
+      ${view.ntn && row(WORDS.ntn, ltr(view.ntn))}
+    </table>
+  </section>`;
 }
 
 /**

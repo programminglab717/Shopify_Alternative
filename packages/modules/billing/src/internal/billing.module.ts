@@ -9,6 +9,7 @@ import {
   type HattiBankAccount,
   type HattiGateway,
 } from './billing.service.js';
+import { BILLING_TAX, type HattiTax } from './tax.js';
 import { MessageWallet } from './credits.js';
 import { BillingResolver } from './graphql/billing.resolver.js';
 import { SupportResolver } from './graphql/support.resolver.js';
@@ -20,7 +21,8 @@ import { SUPPORT_CONTACT, SupportService, type SupportContact } from './support.
  * its messages are paid from. Needs the {@link Database} and PublicSite providers from the host
  * application, which keeps each webhook request's raw body as `rawBody`; Hatti's own gateway
  * account, without which invoices are not paid online here; and Hatti's own bank account, without
- * which they are not paid by transfer (ADR-254); and Hatti's support lines, without which shops
+ * which they are not paid by transfer (ADR-254); Hatti's registration for sales tax on services,
+ * without which invoices carry none (ADR-512); and Hatti's support lines, without which shops
  * reach Hatti's people by requests from the admin alone (ADR-508).
  */
 @Global()
@@ -30,6 +32,7 @@ export class BillingModule {
     options: {
       gateway?: HattiGateway | null;
       bankAccount?: HattiBankAccount | null;
+      tax?: HattiTax | null;
       support?: SupportContact | null;
     } = {},
   ): DynamicModule {
@@ -39,6 +42,7 @@ export class BillingModule {
       providers: [
         { provide: BILLING_GATEWAY, useValue: options.gateway ?? null },
         { provide: BILLING_BANK_ACCOUNT, useValue: options.bankAccount ?? null },
+        { provide: BILLING_TAX, useValue: options.tax ?? null },
         { provide: SUPPORT_CONTACT, useValue: options.support ?? null },
         BillingService,
         { provide: PlanAllowance, useExisting: BillingService },

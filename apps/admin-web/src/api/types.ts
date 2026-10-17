@@ -1147,6 +1147,10 @@ export interface BillingInvoiceValue {
   createdAt: string;
   paidAt: string | null;
   amount: MoneyValue;
+  /** Provincial sales tax in the amount (BIL-02); nothing where Hatti charges none. */
+  tax: MoneyValue;
+  taxRate: number;
+  taxAuthority: string | null;
   plan: { name: string } | null;
   transfers: {
     id: string;

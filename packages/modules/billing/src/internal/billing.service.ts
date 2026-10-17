@@ -54,6 +54,7 @@ import {
   type Plan,
   type PlanCode,
 } from './plans.js';
+import { BILLING_TAX, taxOn, type HattiTax, type TaxAuthority } from './tax.js';
 
 /** Hatti's own account with a payment gateway, which shops pay their plans through (ADR-154). */
 export interface HattiGateway {
@@ -155,6 +156,14 @@ export interface InvoiceRecord {
    */
   price: bigint;
   credit: bigint;
+  /** Paisa: provincial sales tax on the price less the credit (BIL-02, ADR-512); none unregistered. */
+  tax: bigint;
+  /** Basis points: 1600 for 16%; 0 without tax. */
+  taxRate: number;
+  /** The authority, and Hatti's registration with it, as they were when the invoice was made. */
+  taxAuthority: TaxAuthority | null;
+  taxRegistration: string | null;
+  /** Paisa: what the shop pays, the price less the credit and the tax. */
   amount: bigint;
   status: InvoiceStatusValue;
   /** The gateway's reference for its payment, once paid. */
@@ -206,6 +215,8 @@ export interface InvoicePageView {
   periodEnd: Date | null;
   /** Hatti's account to pay it into by transfer or Raast, while it is open; null for none. */
   bank: HattiBankAccount | null;
+  /** Hatti's national tax number, printed on a taxed invoice; null for none. */
+  ntn: string | null;
 }
 
 type SubscriptionRow = {
@@ -226,6 +237,10 @@ type InvoiceRow = {
   billing_interval: BillingIntervalValue | null;
   price: string;
   credit: string;
+  tax: string;
+  tax_rate: number;
+  tax_authority: TaxAuthority | null;
+  tax_registration: string | null;
   amount: string;
   status: InvoiceStatusValue;
   reference: string | null;
@@ -254,8 +269,9 @@ const TRANSFER_COLUMNS = sql.raw(
 );
 
 const INVOICE_COLUMNS = sql.raw(
-  `id, number::text, reason, plan, billing_interval, price::text, credit::text, amount::text,
-   status, reference, paid_at, created_at`,
+  `id, number::text, reason, plan, billing_interval, price::text, credit::text, tax::text,
+   tax_rate, tax_authority, tax_registration, amount::text, status, reference, paid_at,
+   created_at`,
 );
 
 /** A payment recorded, to start with Hatti's gateway; or what to answer at once. */
@@ -279,6 +295,7 @@ export class BillingService extends PlanAllowance {
     private readonly site: PublicSite,
     @Optional() @Inject(BILLING_GATEWAY) private readonly hatti?: HattiGateway | null,
     @Optional() @Inject(BILLING_BANK_ACCOUNT) private readonly bank?: HattiBankAccount | null,
+    @Optional() @Inject(BILLING_TAX) private readonly hattiTax: HattiTax | null = null,
   ) {
     super();
   }
@@ -628,13 +645,18 @@ export class BillingService extends PlanAllowance {
       await tx.execute(sql`
         UPDATE billing.invoices SET status = 'void', updated_at = now()
          WHERE shop_id = ${shopId} AND status = 'open' AND reason = 'credits'`);
-      const invoice = await insertInvoice(tx, shopId, {
-        reason: 'credits',
-        plan: null,
-        interval: null,
-        price: amount,
-        credit: 0n,
-      });
+      const invoice = await insertInvoice(
+        tx,
+        shopId,
+        {
+          reason: 'credits',
+          plan: null,
+          interval: null,
+          price: amount,
+          credit: 0n,
+        },
+        this.hattiTax,
+      );
       await recordAudit(tx, shopId, {
         action: 'billing.credits_chosen',
         subjectType: 'shop',
@@ -761,13 +783,18 @@ export class BillingService extends PlanAllowance {
         if (credit >= price) credit = price - 100n;
       }
       await voidOpenInvoices(tx, shopId);
-      const invoice = await insertInvoice(tx, shopId, {
-        reason: 'change',
-        plan: target,
-        interval: chosen.interval,
-        price,
-        credit,
-      });
+      const invoice = await insertInvoice(
+        tx,
+        shopId,
+        {
+          reason: 'change',
+          plan: target,
+          interval: chosen.interval,
+          price,
+          credit,
+        },
+        this.hattiTax,
+      );
       await audit('now');
       return done(invoice);
     });
@@ -980,13 +1007,18 @@ export class BillingService extends PlanAllowance {
     if (open.length > 0 || row.next_plan === 'free') return false;
     const plan = (row.next_plan ?? row.plan) as Exclude<PlanCode, 'free'>;
     const interval = row.next_interval ?? row.billing_interval!;
-    await insertInvoice(tx, shopId, {
-      reason: 'renewal',
-      plan,
-      interval,
-      price: PLANS[plan].prices[interval],
-      credit: 0n,
-    });
+    await insertInvoice(
+      tx,
+      shopId,
+      {
+        reason: 'renewal',
+        plan,
+        interval,
+        price: PLANS[plan].prices[interval],
+        credit: 0n,
+      },
+      this.hattiTax,
+    );
     return true;
   }
 
@@ -1080,7 +1112,8 @@ export class BillingService extends PlanAllowance {
       // What messages took below nothing is paid from it first.
       await walletEntryIn(tx, shopId, {
         kind: 'top_up',
-        amount: invoice.amount,
+        // The credit bought, never the tax on it.
+        amount: invoice.price - invoice.credit,
         invoiceId: invoice.id,
       });
       await paid();
@@ -1203,6 +1236,7 @@ export class BillingService extends PlanAllowance {
           ? toDate(row.period_end)
           : null,
       bank: invoice.status === 'open' ? (this.bank ?? null) : null,
+      ntn: this.hattiTax?.ntn ?? null,
     };
   }
 }
@@ -1324,6 +1358,10 @@ async function voidOpenInvoices(tx: Tx, shopId: string): Promise<void> {
      WHERE shop_id = ${shopId} AND status = 'open' AND reason <> 'credits'`);
 }
 
+/**
+ * Makes an invoice, taxed at Hatti's registration (ADR-512) where it has one: the tax on the price
+ * less the credit, at the rate and with the authority and number of then.
+ */
 async function insertInvoice(
   tx: Tx,
   shopId: string,
@@ -1334,11 +1372,16 @@ async function insertInvoice(
     price: bigint;
     credit: bigint;
   },
+  hattiTax: HattiTax | null,
 ): Promise<InvoiceRecord> {
+  const tax = hattiTax ? taxOn(invoice.price - invoice.credit, hattiTax.rate) : 0n;
   const { rows } = await tx.execute<InvoiceRow>(sql`
-    INSERT INTO billing.invoices (shop_id, reason, plan, billing_interval, price, credit)
+    INSERT INTO billing.invoices
+           (shop_id, reason, plan, billing_interval, price, credit, tax, tax_rate, tax_authority,
+            tax_registration)
     VALUES (${shopId}, ${invoice.reason}, ${invoice.plan}, ${invoice.interval}, ${invoice.price},
-            ${invoice.credit})
+            ${invoice.credit}, ${tax}, ${hattiTax?.rate ?? 0}, ${hattiTax?.authority ?? null},
+            ${hattiTax?.registration ?? null})
     RETURNING ${INVOICE_COLUMNS}`);
   const record = toInvoiceRecord(rows[0]!);
   await appendEvent<InvoicePayload>(tx, shopId, {
@@ -1357,6 +1400,7 @@ function invoicePayloadOf(invoice: InvoiceRecord): InvoicePayload {
     plan: invoice.plan?.code ?? null,
     interval: invoice.interval,
     amount: invoice.amount.toString(),
+    tax: invoice.tax.toString(),
   };
 }
 
@@ -1371,6 +1415,10 @@ function toInvoiceRecord(row: InvoiceRow): InvoiceRecord {
     interval: row.billing_interval,
     price: BigInt(row.price),
     credit: BigInt(row.credit),
+    tax: BigInt(row.tax),
+    taxRate: Number(row.tax_rate),
+    taxAuthority: row.tax_authority,
+    taxRegistration: row.tax_registration,
     amount: BigInt(row.amount),
     status: row.status,
     reference: row.reference,

@@ -2,6 +2,7 @@ import { Money, UserError } from '@hatti/api';
 import { MessageChannelEnum } from '@hatti/messaging/public';
 import {
   Field,
+  Float,
   GraphQLISODateTime,
   ID,
   InputType,
@@ -188,7 +189,29 @@ export class BillingInvoice {
   })
   credit!: Money;
 
-  @Field(() => Money, { description: 'What is owed: price less credit.' })
+  @Field(() => Money, {
+    description:
+      "Provincial sales tax on the price less credit, at Hatti's registration (BIL-02); nothing " +
+      'where Hatti charges none.',
+  })
+  tax!: Money;
+
+  @Field(() => Float, { description: 'The tax rate, as a percentage: 16 for 16%; 0 for none.' })
+  taxRate!: number;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'The revenue authority the tax is for: PRA, SRB, KPRA, BRA or ICT; null for none.',
+  })
+  taxAuthority!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "Hatti's registration number with that authority, as printed on the invoice.",
+  })
+  taxRegistration!: string | null;
+
+  @Field(() => Money, { description: 'What is owed: price less credit, and the tax.' })
   amount!: Money;
 
   @Field(() => BillingInvoiceStatus)

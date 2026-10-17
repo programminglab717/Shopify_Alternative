@@ -1,6 +1,6 @@
 import { SecretBox } from '@hatti/crypto';
 import { describe, expect, it } from 'vitest';
-import { hattiBankAccountOf, hattiGatewayOf, supportContactOf } from './billing.js';
+import { hattiBankAccountOf, hattiGatewayOf, hattiTaxOf, supportContactOf } from './billing.js';
 import {
   loadApiConfig,
   loadBillingTransfersConfig,
@@ -260,6 +260,36 @@ describe('API configuration', () => {
     );
     expect(() => loadApiConfig({ ...env, BILLING_RAAST_ID: '03001234567' })).toThrow(
       "BILLING_RAAST_ID: Set Hatti's account with BILLING_BANK_IBAN first",
+    );
+  });
+
+  it("takes Hatti's registration for sales tax whole or not at all, at its authority's rate unless given (ADR-512)", () => {
+    expect(hattiTaxOf(loadApiConfig(env))).toBeNull();
+    const registered = { BILLING_TAX_AUTHORITY: 'PRA', BILLING_TAX_REGISTRATION: ' P7654321-0 ' };
+    expect(hattiTaxOf(loadApiConfig({ ...env, ...registered, BILLING_NTN: '1234567-8' }))).toEqual({
+      authority: 'PRA',
+      registration: 'P7654321-0',
+      rate: 1600,
+      ntn: '1234567-8',
+    });
+    expect(
+      hattiTaxOf(
+        loadApiConfig({
+          ...env,
+          ...registered,
+          BILLING_TAX_AUTHORITY: 'SRB',
+          BILLING_TAX_RATE: '8',
+        }),
+      ),
+    ).toMatchObject({ authority: 'SRB', rate: 800, ntn: null });
+    expect(() => loadApiConfig({ ...env, BILLING_TAX_AUTHORITY: 'PRA' })).toThrow(
+      'BILLING_TAX_REGISTRATION: Set both BILLING_TAX_AUTHORITY and BILLING_TAX_REGISTRATION',
+    );
+    expect(() => loadApiConfig({ ...env, BILLING_TAX_RATE: '16' })).toThrow(
+      'BILLING_TAX_RATE only',
+    );
+    expect(() => loadApiConfig({ ...env, ...registered, BILLING_TAX_AUTHORITY: 'FBR' })).toThrow(
+      'BILLING_TAX_AUTHORITY',
     );
   });
 

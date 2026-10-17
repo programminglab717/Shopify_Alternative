@@ -43,6 +43,9 @@ const invoice = (overrides: Partial<BillingInvoiceValue> = {}): BillingInvoiceVa
   createdAt: LATER,
   paidAt: null,
   amount: rupees('50000.00'),
+  tax: rupees('0.00'),
+  taxRate: 0,
+  taxAuthority: null,
   plan: { name: 'Growth' },
   transfers: [],
   ...overrides,
@@ -281,6 +284,24 @@ describe('Plan and billing in the admin', () => {
 
     await screen.findByText('Nothing yet: credit bought and the messages it pays for show here.');
     expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
+  });
+
+  it('says how much of an invoice is sales tax, and for which authority (BIL-02)', async () => {
+    signedIn();
+    const core = billingCore('owner', {
+      open: invoice({
+        amount: rupees('8118.84'),
+        tax: rupees('1119.84'),
+        taxRate: 16,
+        taxAuthority: 'PRA',
+      }),
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/billing');
+
+    expect(
+      await screen.findByText('Includes Rs 1,119.84 sales tax on services (PRA, 16%).'),
+    ).toBeTruthy();
   });
 
   it('says by when an overdue invoice keeps the plan, and that the store stays open (BIL-04)', async () => {

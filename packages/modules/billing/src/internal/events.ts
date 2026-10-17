@@ -53,8 +53,9 @@ export interface InvoicePayload {
   /** None for credit. */
   plan: string | null;
   interval: string | null;
-  /** Paisa, as strings. */
+  /** Paisa, as strings: what the shop pays, and the sales tax in it (ADR-512). */
   amount: string;
+  tax?: string;
 }
 
 export interface PaymentOverduePayload {

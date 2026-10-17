@@ -351,6 +351,15 @@ const apiSchema = z
     BILLING_BANK_IBAN: pkIban().optional(),
     BILLING_RAAST_ID: pkMobile().optional(),
     /**
+     * Hatti's registration for sales tax on services (ADR-512): the revenue authority and Hatti's
+     * number with it, both or neither; the rate, as a percentage, where it is not the authority's
+     * standard one; and Hatti's NTN, printed on invoices. Without them, invoices carry no tax.
+     */
+    BILLING_TAX_AUTHORITY: z.enum(['PRA', 'SRB', 'KPRA', 'BRA', 'ICT']).optional(),
+    BILLING_TAX_REGISTRATION: z.string().trim().min(1).max(40).optional(),
+    BILLING_TAX_RATE: z.coerce.number().min(0).max(50).optional(),
+    BILLING_NTN: z.string().trim().min(1).max(20).optional(),
+    /**
      * Hatti's own support lines (ADR-508), shown to shops as their plans allow: the WhatsApp
      * number for Starter and above, a phone line for Pro, an email for all, and the hours Hatti's
      * people answer in, in English and Urdu, both or neither. Without them, shops send requests
@@ -431,6 +440,18 @@ const apiSchema = z
     {
       path: ['SUPPORT_HOURS_UR'],
       message: 'Set both SUPPORT_HOURS and SUPPORT_HOURS_UR, or neither',
+    },
+  )
+  .refine(
+    (config) =>
+      (config.BILLING_TAX_AUTHORITY === undefined) ===
+        (config.BILLING_TAX_REGISTRATION === undefined) &&
+      (config.BILLING_TAX_RATE === undefined || config.BILLING_TAX_AUTHORITY !== undefined),
+    {
+      path: ['BILLING_TAX_REGISTRATION'],
+      message:
+        'Set both BILLING_TAX_AUTHORITY and BILLING_TAX_REGISTRATION, or neither; ' +
+        'BILLING_TAX_RATE only with them',
     },
   )
   .refine(

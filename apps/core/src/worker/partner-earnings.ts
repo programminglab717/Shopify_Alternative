@@ -24,7 +24,8 @@ export class PartnerEarnings {
         id: event.aggregateId,
         number,
         plan: invoice.plan!,
-        amount: BigInt(invoice.amount),
+        // What Hatti earns: the invoice less the sales tax it collects for the province.
+        amount: BigInt(invoice.amount) - BigInt(invoice.tax ?? '0'),
       }),
     );
   }

@@ -69,3 +69,11 @@ export {
   type SupportTier,
   type SupportTopic,
 } from '../internal/support.service.js';
+export {
+  BILLING_TAX,
+  SERVICE_TAX_RATES,
+  TAX_AUTHORITIES,
+  taxOn,
+  type HattiTax,
+  type TaxAuthority,
+} from '../internal/tax.js';

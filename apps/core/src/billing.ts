@@ -1,4 +1,10 @@
-import type { HattiBankAccount, HattiGateway, SupportContact } from '@hatti/billing/public';
+import {
+  SERVICE_TAX_RATES,
+  type HattiBankAccount,
+  type HattiGateway,
+  type HattiTax,
+  type SupportContact,
+} from '@hatti/billing/public';
 import { SafepayGateway, TestGateway } from '@hatti/payments/public';
 import type { ApiConfig } from './config.js';
 
@@ -83,4 +89,26 @@ export function supportContactOf(
         : null,
   };
   return Object.values(contact).some((value) => value !== null) ? contact : null;
+}
+
+/**
+ * Hatti's registration for sales tax on services (ADR-512), where it is set: at the authority's
+ * standard rate unless another is given; none otherwise, so that invoices carry no tax.
+ */
+export function hattiTaxOf(
+  config: Pick<
+    ApiConfig,
+    'BILLING_TAX_AUTHORITY' | 'BILLING_TAX_REGISTRATION' | 'BILLING_TAX_RATE' | 'BILLING_NTN'
+  >,
+): HattiTax | null {
+  if (!config.BILLING_TAX_AUTHORITY || !config.BILLING_TAX_REGISTRATION) return null;
+  return {
+    authority: config.BILLING_TAX_AUTHORITY,
+    registration: config.BILLING_TAX_REGISTRATION,
+    rate:
+      config.BILLING_TAX_RATE === undefined
+        ? SERVICE_TAX_RATES[config.BILLING_TAX_AUTHORITY]
+        : Math.round(config.BILLING_TAX_RATE * 100),
+    ntn: config.BILLING_NTN ?? null,
+  };
 }
