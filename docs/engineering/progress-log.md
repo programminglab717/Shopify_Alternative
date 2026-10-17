@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Pakistan's marketing calendar
+### c1e1d81 · Pakistan's marketing calendar
 
 * **Ramadan, the Eids, Pakistan Day, Mother's Day, 14 August, 11.11, White Friday, 12.12 and
   the lawn, winter and wedding seasons, dated each year with when to start promoting and a
