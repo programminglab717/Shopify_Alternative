@@ -16,13 +16,20 @@ const ACCOUNT = {
 
 function core(
   role: StaffRole,
-  start: { account: object | null; signup: object | null } = { account: null, signup: SIGNUP },
+  start: { account: object | null; signup: object | null; templates?: object | null } = {
+    account: null,
+    signup: SIGNUP,
+  },
 ) {
   let account = start.account;
   return fakeCore(role, (operation, variables) => {
     switch (operation) {
       case 'WhatsAppAccount':
-        return { whatsAppAccount: account, whatsAppSignup: start.signup };
+        return {
+          whatsAppAccount: account,
+          whatsAppSignup: start.signup,
+          whatsAppOrderTemplates: account ? (start.templates ?? null) : null,
+        };
       case 'WhatsAppAccountConnect': {
         const input = variables.input as { code: string };
         if (input.code === 'expired') {
@@ -170,6 +177,31 @@ describe("The shop's own WhatsApp number (MKT-01, ADR-419)", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Yes, disconnect' }));
     expect(await screen.findByRole('button', { name: 'Connect with Facebook' })).toBeTruthy();
     expect(fake.sent.some((each) => each.operation === 'WhatsAppAccountDisconnect')).toBe(true);
+  });
+
+  it("says which number the customers' order updates go from (ADR-537)", async () => {
+    const shown = async (templates: object) => {
+      cleanup();
+      vi.stubGlobal(
+        'fetch',
+        core('owner', { account: ACCOUNT, signup: SIGNUP, templates }).fetcher,
+      );
+      renderAdmin('/shop_1/settings/whatsapp');
+      return (await screen.findByTestId('order-updates')).textContent;
+    };
+    const none = { total: 34, approved: 0, pending: 0, refused: 0, triedAt: null };
+    expect(await shown(none)).toBe(
+      "Hatti will send its order update templates to Meta for approval shortly. Until then, order updates go from Hatti's number.",
+    );
+    expect(await shown({ ...none, pending: 34, triedAt: LATER })).toMatch(
+      /^Hatti has sent its order update templates to Meta for approval\./,
+    );
+    expect(await shown({ ...none, approved: 30, pending: 2, refused: 2, triedAt: LATER })).toBe(
+      "Meta has approved 30 of Hatti's 34 order update templates on this number: those updates go from it, the rest from Hatti's number until Meta approves them. Meta refused 2 of them: those updates go from Hatti's number.",
+    );
+    expect(await shown({ ...none, approved: 34, triedAt: LATER })).toBe(
+      "Your customers' order updates go from this number.",
+    );
   });
 
   it('says so where the server is not set up for Embedded Signup', async () => {

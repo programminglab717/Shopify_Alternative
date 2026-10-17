@@ -10,6 +10,7 @@ import type {
   WhatsAppAccountConnectData,
   WhatsAppAccountData,
   WhatsAppAccountDisconnectData,
+  WhatsAppOrderTemplates,
   WhatsAppQualityRating,
   WhatsAppSignup,
 } from '../api/types';
@@ -33,8 +34,37 @@ const QUALITY = {
   UNKNOWN: { colour: 'inTransit', icon: CircleDashed },
 } as const satisfies Record<WhatsAppQualityRating, unknown>;
 
+/**
+ * Which number the shop's customers' order news goes from (ADR-537): this one for the kinds whose
+ * templates Meta approved on it, Hatti's for the rest.
+ */
+function OrderUpdates({ templates }: { templates: WhatsAppOrderTemplates }) {
+  const { t } = useLocale();
+  const { total, approved, pending, refused, triedAt } = templates;
+  const said =
+    approved >= total
+      ? t('whatsapp.orderUpdatesAll')
+      : approved > 0
+        ? t('whatsapp.orderUpdatesSome', { approved, total })
+        : pending > 0 || triedAt
+          ? t('whatsapp.orderUpdatesWaiting')
+          : t('whatsapp.orderUpdatesSoon');
+  return (
+    <p className="text-[length:var(--hatti-type-body-sm-size)]" data-testid="order-updates">
+      {said}
+      {refused > 0 && ` ${t('whatsapp.orderUpdatesRefused', { count: refused })}`}
+    </p>
+  );
+}
+
 /** The number connected: its name and number with WhatsApp, its quality, and disconnecting it. */
-function Connected({ account }: { account: WhatsAppAccount }) {
+function Connected({
+  account,
+  templates,
+}: {
+  account: WhatsAppAccount;
+  templates: WhatsAppOrderTemplates | null;
+}) {
   const { t, locale } = useLocale();
   const timezone = useShopTimezone();
   const disconnect = useAdminMutation<WhatsAppAccountDisconnectData, Record<string, never>>(
@@ -77,6 +107,7 @@ function Connected({ account }: { account: WhatsAppAccount }) {
           date: formatDateTime(account.connectedAt, timezone, locale),
         })}
       </p>
+      {templates && <OrderUpdates templates={templates} />}
       {problem && <Alert tone="danger">{problem}</Alert>}
       {asking ? (
         <div className="flex flex-col gap-2">
@@ -172,9 +203,10 @@ function Connect({ signup }: { signup: WhatsAppSignup | null }) {
 }
 
 /**
- * The shop's own WhatsApp number (MKT-01, ADR-419), which its broadcasts go from: connected through
- * Meta's Embedded Signup, shown with Meta's rating of it, and disconnected. Customers' order news
- * still goes from Hatti's number.
+ * The shop's own WhatsApp number (MKT-01, ADR-419), which its broadcasts go from, and its
+ * customers' order news once Meta approves Hatti's templates on it (ADR-537): connected through
+ * Meta's Embedded Signup, shown with Meta's rating of it and how far Meta has come with those
+ * templates, and disconnected.
  */
 export function WhatsAppPage() {
   const { t } = useLocale();
@@ -195,7 +227,10 @@ export function WhatsAppPage() {
           action={<Button onClick={() => void query.refetch()}>{t('action.retry')}</Button>}
         />
       ) : query.data.whatsAppAccount ? (
-        <Connected account={query.data.whatsAppAccount} />
+        <Connected
+          account={query.data.whatsAppAccount}
+          templates={query.data.whatsAppOrderTemplates ?? null}
+        />
       ) : (
         <Connect signup={query.data.whatsAppSignup} />
       )}

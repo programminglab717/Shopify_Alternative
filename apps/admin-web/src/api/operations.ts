@@ -8325,8 +8325,8 @@ const WHATSAPP_ACCOUNT = /* GraphQL */ `
 `;
 
 /**
- * The shop's own WhatsApp number (ADR-419), and what Meta's Embedded Signup starts with where
- * this server is set up for it.
+ * The shop's own WhatsApp number (ADR-419), what Meta's Embedded Signup starts with where this
+ * server is set up for it, and how far Meta has come with Hatti's order templates on it (ADR-537).
  */
 export const WhatsAppAccountQuery = /* GraphQL */ `
   query WhatsAppAccount {
@@ -8337,6 +8337,13 @@ export const WhatsAppAccountQuery = /* GraphQL */ `
       appId
       configurationId
       graphVersion
+    }
+    whatsAppOrderTemplates {
+      total
+      approved
+      pending
+      refused
+      triedAt
     }
   }
   ${WHATSAPP_ACCOUNT}

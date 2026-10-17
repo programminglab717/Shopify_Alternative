@@ -3800,9 +3800,19 @@ export interface WhatsAppSignup {
   graphVersion: string;
 }
 
+/** How far Meta has come with Hatti's order templates on the shop's number (ADR-537). */
+export interface WhatsAppOrderTemplates {
+  total: number;
+  approved: number;
+  pending: number;
+  refused: number;
+  triedAt: string | null;
+}
+
 export interface WhatsAppAccountData {
   whatsAppAccount: WhatsAppAccount | null;
   whatsAppSignup: WhatsAppSignup | null;
+  whatsAppOrderTemplates?: WhatsAppOrderTemplates | null;
 }
 
 export interface WhatsAppAccountConnectData {

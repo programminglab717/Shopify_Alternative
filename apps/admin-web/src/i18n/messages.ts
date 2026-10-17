@@ -3803,12 +3803,21 @@ const en = {
   'reviews.stars': '{rating} of 5 stars',
   'whatsapp.title': 'Your WhatsApp number',
   'whatsapp.intro':
-    "Broadcasts go from your shop's own WhatsApp Business number, in your shop's name. Order updates still go from Hatti's number.",
+    "Broadcasts go from your shop's own WhatsApp Business number, in your shop's name, and so do your customers' order updates once Meta approves Hatti's templates for them on it.",
   'whatsapp.quality.GREEN': 'High quality',
   'whatsapp.quality.YELLOW': 'Medium quality',
   'whatsapp.quality.RED': 'Low quality',
   'whatsapp.quality.UNKNOWN': 'Not rated yet',
   'whatsapp.connectedOn': 'Connected {date}',
+  'whatsapp.orderUpdatesAll': "Your customers' order updates go from this number.",
+  'whatsapp.orderUpdatesSome':
+    "Meta has approved {approved} of Hatti's {total} order update templates on this number: those updates go from it, the rest from Hatti's number until Meta approves them.",
+  'whatsapp.orderUpdatesWaiting':
+    "Hatti has sent its order update templates to Meta for approval. Until Meta approves them, order updates go from Hatti's number.",
+  'whatsapp.orderUpdatesSoon':
+    "Hatti will send its order update templates to Meta for approval shortly. Until then, order updates go from Hatti's number.",
+  'whatsapp.orderUpdatesRefused':
+    "Meta refused {count} of them: those updates go from Hatti's number.",
   'whatsapp.disconnect': 'Disconnect',
   'whatsapp.disconnectSure':
     'Disconnect {number}? Broadcasts waiting to go will fail, and its templates stay with Meta.',
@@ -8468,12 +8477,21 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'reviews.stars': '5 میں سے {rating} ستارے',
   'whatsapp.title': 'آپ کا واٹس ایپ نمبر',
   'whatsapp.intro':
-    'براڈکاسٹ آپ کی دکان کے اپنے واٹس ایپ بزنس نمبر سے، آپ کی دکان کے نام سے جاتے ہیں۔ آرڈرز کی خبریں اب بھی ہٹی کے نمبر سے جاتی ہیں۔',
+    'براڈکاسٹ آپ کی دکان کے اپنے واٹس ایپ بزنس نمبر سے، آپ کی دکان کے نام سے جاتے ہیں، اور جب Meta اس پر ہٹی کے ٹیمپلیٹ منظور کر دے تو آپ کے گاہکوں کو آرڈرز کی خبریں بھی۔',
   'whatsapp.quality.GREEN': 'اچھا معیار',
   'whatsapp.quality.YELLOW': 'درمیانہ معیار',
   'whatsapp.quality.RED': 'کم معیار',
   'whatsapp.quality.UNKNOWN': 'ابھی درجہ نہیں ملا',
   'whatsapp.connectedOn': '{date} کو جوڑا گیا',
+  'whatsapp.orderUpdatesAll': 'آپ کے گاہکوں کو آرڈرز کی خبریں اسی نمبر سے جاتی ہیں۔',
+  'whatsapp.orderUpdatesSome':
+    'Meta نے اس نمبر پر ہٹی کے آرڈر اپ ڈیٹ کے {total} میں سے {approved} ٹیمپلیٹ منظور کر دیے ہیں: وہ خبریں اسی نمبر سے جاتی ہیں، باقی منظوری تک ہٹی کے نمبر سے۔',
+  'whatsapp.orderUpdatesWaiting':
+    'ہٹی نے اپنے آرڈر اپ ڈیٹ کے ٹیمپلیٹ منظوری کے لیے Meta کو بھیج دیے ہیں۔ منظوری تک آرڈرز کی خبریں ہٹی کے نمبر سے جاتی ہیں۔',
+  'whatsapp.orderUpdatesSoon':
+    'ہٹی جلد اپنے آرڈر اپ ڈیٹ کے ٹیمپلیٹ منظوری کے لیے Meta کو بھیجے گا۔ تب تک آرڈرز کی خبریں ہٹی کے نمبر سے جاتی ہیں۔',
+  'whatsapp.orderUpdatesRefused':
+    'Meta نے ان میں سے {count} نامنظور کیے: وہ خبریں ہٹی کے نمبر سے جاتی ہیں۔',
   'whatsapp.disconnect': 'الگ کریں',
   'whatsapp.disconnectSure':
     '{number} الگ کر دیں؟ جانے کے منتظر براڈکاسٹ ناکام ہو جائیں گے، اور اس کے ٹیمپلیٹ Meta کے پاس رہیں گے۔',
