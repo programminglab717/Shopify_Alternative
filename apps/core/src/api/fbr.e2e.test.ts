@@ -14,18 +14,18 @@ const server = testDatabaseServer();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = any;
 
-const POS = '{ fbrPos { posId accessTokenHint environment pctCode } }';
+const POS = '{ fbrPos { system posId accessTokenHint environment pctCode } }';
 
 const UPDATE = `mutation ($input: FbrPosInput!) {
   fbrPosUpdate(input: $input) {
-    fbrPos { posId accessTokenHint environment pctCode }
+    fbrPos { system posId accessTokenHint environment pctCode }
     userErrors { field code message }
   }
 }`;
 
 const INVOICES = `query ($status: FiscalInvoiceStatus) {
   fiscalInvoices(status: $status) {
-    id kind usin orderId status fbrInvoiceNumber attempts error
+    id system kind usin orderId status fbrInvoiceNumber attempts error
   }
 }`;
 
@@ -132,6 +132,7 @@ describe.skipIf(!server)("Admin GraphQL API: FBR's POS integration (POS-04, ADR-
     ]);
     expect(await data(tokens.owner, UPDATE, { input })).toEqual({
       fbrPos: {
+        system: 'POS',
         posId: 123456,
         accessTokenHint: 'f818',
         environment: 'PRODUCTION',
@@ -180,6 +181,7 @@ describe.skipIf(!server)("Admin GraphQL API: FBR's POS integration (POS-04, ADR-
     const usin = printed.orders[0].invoice.number as string;
     const [kept] = (await data(tokens.reader, INVOICES)) as Json[];
     expect(kept).toMatchObject({
+      system: 'POS',
       kind: 'INVOICE',
       usin,
       orderId,
@@ -211,11 +213,93 @@ describe.skipIf(!server)("Admin GraphQL API: FBR's POS integration (POS-04, ADR-
     );
 
     // Disconnected, what waits is not sent.
-    expect(await data(tokens.owner, 'mutation { fbrPosDelete { deletedPosId } }')).toEqual({
-      deletedPosId: 123456,
-    });
+    expect(
+      await data(tokens.owner, 'mutation { fbrPosDelete { deletedSystem deletedPosId } }'),
+    ).toEqual({ deletedSystem: 'POS', deletedPosId: 123456 });
     expect(await data(tokens.reader, INVOICES)).toMatchObject([
       { usin, status: 'SKIPPED', error: 'Not reported: the shop disconnected FBR' },
     ]);
+  });
+
+  it("connects FBR's digital invoicing for a shop registered for sales tax, without a POS ID (ADR-562)", async () => {
+    const input = {
+      system: 'DIGITAL_INVOICING',
+      accessToken: TOKEN,
+      environment: 'SANDBOX',
+      pctCode: '6204.4200',
+    };
+    expect((await data(tokens.owner, UPDATE, { input })).userErrors).toEqual([
+      {
+        field: ['input', 'system'],
+        code: 'INVALID',
+        message:
+          "FBR's digital invoicing is for sellers registered for sales tax: set the shop's NTN, " +
+          'STRN and province in its tax settings first',
+      },
+    ]);
+    await admin.query(
+      `INSERT INTO tax.settings (shop_id, ntn, strn, province)
+       VALUES ($1, '1234567-8', '3277876175852', 'sindh')`,
+      [shop],
+    );
+    expect(
+      (await data(tokens.owner, UPDATE, { input: { ...input, posId: 1 } })).userErrors,
+    ).toEqual([
+      {
+        field: ['input', 'posId'],
+        code: 'INVALID',
+        message: "FBR's digital invoicing has no POS ID: leave it out",
+      },
+    ]);
+    expect(await data(tokens.owner, UPDATE, { input })).toEqual({
+      fbrPos: {
+        system: 'DIGITAL_INVOICING',
+        posId: null,
+        accessTokenHint: 'f818',
+        environment: 'SANDBOX',
+        pctCode: '62044200',
+      },
+      userErrors: [],
+    });
+
+    // An order's invoice printed is kept for digital invoicing.
+    const product = await data(
+      tokens.owner,
+      `mutation ($input: ProductCreateInput!) {
+         productCreate(input: $input) { product { variants { id } } userErrors { code } }
+       }`,
+      { input: { title: 'Lawn suit', status: 'ACTIVE', variants: [{ price: '3,500' }] } },
+    );
+    await admin.query(`UPDATE inventory.items SET inventory_policy = 'continue'`);
+    const placed = await data(
+      tokens.owner,
+      `mutation ($input: OrderCreateInput!) {
+         orderCreate(input: $input) { order { id } userErrors { field code message } }
+       }`,
+      {
+        input: {
+          lineItems: [{ variantId: product.product.variants[0].id, quantity: 1 }],
+          shippingAddress: ADDRESS,
+        },
+      },
+    );
+    const printed = await data(
+      tokens.owner,
+      `query ($ids: [ID!]!) {
+         orderDocument(ids: $ids, kind: INVOICE) { orders { invoice { number } } }
+       }`,
+      { ids: [placed.order.id] },
+    );
+    const [kept] = (await data(tokens.reader, INVOICES)) as Json[];
+    expect(kept).toMatchObject({
+      system: 'DIGITAL_INVOICING',
+      kind: 'INVOICE',
+      usin: printed.orders[0].invoice.number,
+      status: 'PENDING',
+    });
+
+    expect(
+      await data(tokens.owner, 'mutation { fbrPosDelete { deletedSystem deletedPosId } }'),
+    ).toEqual({ deletedSystem: 'DIGITAL_INVOICING', deletedPosId: null });
   });
 });

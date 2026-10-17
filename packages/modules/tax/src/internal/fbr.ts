@@ -1,6 +1,13 @@
 // FBR's POS integration (POS-04, TAX-04, ADR-555): what a Tier-1 retailer's POS sends FBR of each
 // invoice it issues, as FBR's IMS takes it. Amounts here are in minor units; FBR is sent rupees.
 
+/**
+ * How a shop reports to FBR: from a Tier-1 retailer's POS to FBR's IMS (ADR-555), or through
+ * FBR's digital invoicing, as a seller registered for sales tax (ADR-562).
+ */
+export const FBR_SYSTEMS = ['pos', 'digital_invoicing'] as const;
+export type FbrSystem = (typeof FBR_SYSTEMS)[number];
+
 /** FBR's two services: its sandbox, to try a POS on, and the real one. */
 export const FBR_ENVIRONMENTS = ['sandbox', 'production'] as const;
 export type FbrEnvironment = (typeof FBR_ENVIRONMENTS)[number];
@@ -47,6 +54,16 @@ export interface FiscalItem {
   pctCode?: string | null;
 }
 
+/** Who an invoice is to, as its order has it: digital invoicing names the buyer, IMS asks none. */
+export interface FiscalBuyer {
+  /** The customer's name on the order; blank once erased. */
+  name: string;
+  /** Where it went, in a line, or where it was collected. */
+  address: string;
+  /** Its province's code, as @hatti/pk has them, "SD"; null where none is known. */
+  province: string | null;
+}
+
 /** An invoice or credit note the shop issued, as the orders module gives it to report. */
 export interface FiscalDocument {
   kind: FiscalKind;
@@ -58,6 +75,10 @@ export interface FiscalDocument {
   issuedAt: Date;
   paymentMode: FiscalPaymentMode;
   items: readonly FiscalItem[];
+  /** Who it is to, for digital invoicing (ADR-562). */
+  buyer?: FiscalBuyer | null;
+  /** Where it was sold from, in a line: the location it ships from, or is collected at. */
+  sellerAddress?: string | null;
 }
 
 /** An item as FBR takes it; without a PCT code of its own, the shop's goes as it reports it. */
@@ -100,7 +121,7 @@ export type FbrInvoiceRequest = Omit<FbrInvoiceBody, 'Items'> & {
 };
 
 /** Minor units as FBR's rupees, to the paisa. */
-function rupees(amount: bigint): number {
+export function rupees(amount: bigint): number {
   return Number(amount) / 100;
 }
 

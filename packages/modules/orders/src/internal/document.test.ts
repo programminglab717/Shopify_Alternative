@@ -409,6 +409,110 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     });
   });
 
+  it("keeps invoices for FBR's digital invoicing from where they ship, to their customers, and no credit notes (ADR-562)", async () => {
+    await f.admin.query(
+      `INSERT INTO tax.settings (shop_id, rate, tax_delivery, ntn, strn, province)
+       VALUES ($1, 1800, true, '1234567-8', '3277876175852', 'punjab')`,
+      [f.a.shopId],
+    );
+    await f.admin.query(
+      `INSERT INTO tax.fbr_pos (shop_id, system, pos_id, access_token, token_hint, environment,
+                                pct_code)
+       VALUES ($1, 'digital_invoicing', NULL, 'sealed', 'f818', 'sandbox', '62044200')`,
+      [f.a.shopId],
+    );
+    const primary = await f.primary(f.a);
+    unwrap(
+      await f.locations.edit(f.a, primary.id, {
+        address: { address1: 'Shop 4, Zainab Market', city: 'lhr' },
+      }),
+    );
+    const print = (ids: string[], kind: 'invoice' | 'credit_note' = 'invoice') =>
+      f.documents.render(f.a, ids, { kind, paper: 'a4', language: 'english' });
+    const kept = async () =>
+      (
+        await f.admin.query<{
+          usin: string;
+          system: string;
+          kind: string;
+          status: string;
+          error: string | null;
+          payload: Record<string, unknown>;
+        }>(
+          `SELECT usin, system, kind, status, error, payload FROM tax.fiscal_invoices
+            WHERE shop_id = $1 ORDER BY usin`,
+          [f.a.shopId],
+        )
+      ).rows;
+
+    const order = await f.order(f.a, [kurta, size8], {
+      shippingPrice: '250',
+      discount: '500',
+      advancePaid: '1000',
+    });
+    unwrap(await print([order.id]));
+    const [invoice] = await kept();
+    expect(invoice).toMatchObject({
+      system: 'digital_invoicing',
+      kind: 'invoice',
+      status: 'pending',
+    });
+    const body = invoice!.payload as {
+      items: { productDescription: string; totalValues: number; salesTaxApplicable: number }[];
+    };
+    // The seller as the shop directory names it.
+    const {
+      rows: [shop],
+    } = await f.admin.query<{ name: string }>('SELECT name FROM control.shops WHERE id = $1', [
+      f.a.shopId,
+    ]);
+    expect(body).toMatchObject({
+      invoiceType: 'Sale Invoice',
+      sellerNTNCNIC: '1234567',
+      sellerBusinessName: shop!.name,
+      sellerProvince: 'Punjab',
+      sellerAddress: 'Shop 4, Zainab Market, Lahore, Punjab',
+      buyerBusinessName: 'Ayesha Khan',
+      buyerProvince: 'Sindh',
+      buyerAddress:
+        'House 12, Street 4, Block 5, Gulshan-e-Iqbal, Near Jamia Masjid, Karachi 75300, Sindh',
+      buyerRegistrationType: 'Unregistered',
+    });
+    // Its items add up to the order, the delivery charge among them.
+    const rupees = (amount: bigint) => Number(amount) / 100;
+    const sum = (of: (item: (typeof body.items)[number]) => number) =>
+      Math.round(body.items.reduce((total, item) => total + of(item), 0) * 100) / 100;
+    expect(body.items.map((item) => item.productDescription)).toEqual([
+      'Kurta',
+      expect.stringContaining('Peshawari Chappal'),
+      'Delivery',
+    ]);
+    expect(sum((item) => item.totalValues)).toBe(rupees(order.total));
+    expect(sum((item) => item.salesTaxApplicable)).toBe(rupees(order.totalTax));
+
+    // A refund's credit note goes in the sales tax return, not to digital invoicing, and its
+    // printed copy waits for no number from FBR.
+    unwrap(await f.refunds.refund(f.a, order.id, { amount: '200', method: 'cash' }));
+    expect((await kept()).find((each) => each.kind === 'credit_note')).toMatchObject({
+      system: 'digital_invoicing',
+      status: 'skipped',
+      error: expect.stringContaining('takes no credit notes'),
+    });
+    const note = unwrap(await print([order.id], 'credit_note'));
+    expect(pagesOf(note.html)[0]).not.toContain('FBR');
+
+    // One collected names where it was collected.
+    unwrap(await f.locations.enableLocalPickup(f.a, primary.id, { instructions: null }));
+    const collected = await f.order(f.a, [kurta], { deliveryMethod: 'pickup' });
+    unwrap(await print([collected.id]));
+    const last = (await kept()).filter((each) => each.kind === 'invoice').at(-1)!;
+    expect(last.payload).toMatchObject({
+      buyerBusinessName: 'Ayesha Khan',
+      buyerProvince: 'Punjab',
+      buyerAddress: `Collected at ${primary.name}, Shop 4, Zainab Market, Lahore, Punjab`,
+    });
+  });
+
   it("prints FBR's number and its QR code once FBR has numbered them, or that they wait (ADR-556)", async () => {
     const year = taxYearOf(new Date(), 'Asia/Karachi');
     const print = (ids: string[], kind: 'invoice' | 'credit_note' = 'invoice') =>

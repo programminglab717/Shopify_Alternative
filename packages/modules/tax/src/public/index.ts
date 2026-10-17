@@ -12,11 +12,28 @@ export {
   type FbrReportResult,
 } from '../internal/fbr-client.js';
 export {
+  FbrDigitalInvoicingClient,
+  type FbrDigitalInvoicingConnection,
+  type FbrDigitalInvoicingOptions,
+} from '../internal/fbr-di-client.js';
+export {
+  DI_NO_CREDIT_NOTES,
+  DI_SANDBOX_SCENARIO,
+  FBR_DI_URLS,
+  diInvoiceBody,
+  diInvoiceRequest,
+  type DiInvoiceBody,
+  type DiInvoiceRequest,
+  type DiItemBody,
+  type DiSeller,
+} from '../internal/fbr-di.js';
+export {
   FbrPosService,
   FiscalInvoicesService,
   fiscalInvoicesIn,
   recordFiscalDocumentsIn,
   type ClaimedFiscalInvoice,
+  type FbrConnection,
   type FbrPosInput,
   type FbrPosRecord,
   type FiscalInvoiceRecord,
@@ -24,12 +41,15 @@ export {
 } from '../internal/fbr-pos.service.js';
 export {
   FBR_ENVIRONMENTS,
+  FBR_SYSTEMS,
   fbrDateTime,
   fbrInvoiceBody,
   fbrInvoiceRequest,
   type FbrEnvironment,
   type FbrInvoiceBody,
   type FbrInvoiceRequest,
+  type FbrSystem,
+  type FiscalBuyer,
   type FiscalDocument,
   type FiscalItem,
   type FiscalKind,

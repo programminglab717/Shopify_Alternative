@@ -48,10 +48,13 @@ export interface DocumentContext {
   /** The order's invoice, on an invoice once issued (ADR-495). */
   invoice?: Pick<OrderInvoiceRecord, 'name' | 'issuedAt'> | null;
   /**
-   * How its invoice and credit notes stand with FBR, by their numbers, where the shop's POS was
-   * connected when they were issued (ADR-556).
+   * How its invoice and credit notes stand with FBR, by their numbers, where the shop was
+   * connected to FBR when they were issued (ADR-556, ADR-562).
    */
-  fiscal?: ReadonlyMap<string, Pick<FiscalInvoiceRecord, 'status' | 'fbrInvoiceNumber'>>;
+  fiscal?: ReadonlyMap<
+    string,
+    Pick<FiscalInvoiceRecord, 'system' | 'kind' | 'status' | 'fbrInvoiceNumber'>
+  >;
 }
 
 // Wording for documents that go to customers, in English and Urdu.
@@ -372,12 +375,14 @@ export function creditNotes(order: OrderRecord, context: DocumentContext): Html[
 
 /**
  * FBR's number for the invoice or credit note `usin` and its QR code, as FBR asks a Tier-1
- * retailer's to show them (ADR-556); while FBR has not numbered it, that it waits. Nothing where
- * the shop's POS was not connected when it was issued.
+ * retailer's, and a seller's reporting through digital invoicing, to show them (ADR-556,
+ * ADR-562); while FBR has not numbered it, that it waits. Nothing where the shop was not connected
+ * to FBR when it was issued, nor for a credit note digital invoicing does not take.
  */
 function fbr(context: DocumentContext, usin: string): Html {
   const record = context.fiscal?.get(usin);
   if (!record) return html``;
+  if (record.system === 'digital_invoicing' && record.kind === 'credit_note') return html``;
   const t = (words: Words) => say(context.language, words);
   if (record.status === 'reported' && record.fbrInvoiceNumber) {
     return html`<section class="fbr">
@@ -506,7 +511,7 @@ function amount(order: OrderRecord, value: bigint): string {
 }
 
 /** "House 12, Street 4", "Gulshan-e-Iqbal", "Near Nipa Chowrangi", "Karachi 75300, Sindh". */
-function addressLines(address: StoredAddressValue): string[] {
+export function addressLines(address: StoredAddressValue): string[] {
   return [address.address1, address.address2, address.landmark, cityLine(address)].filter(
     (line): line is string => Boolean(line),
   );
@@ -519,7 +524,8 @@ function locationLines(location: LocationRecord): string[] {
   );
 }
 
-function cityLine(address: {
+/** "Karachi 75300, Sindh". */
+export function cityLine(address: {
   city: string | null;
   zip: string | null;
   provinceCode: string | null;

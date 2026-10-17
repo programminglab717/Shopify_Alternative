@@ -4,6 +4,7 @@ import {
   actorColumnsOf,
   failOne,
   planFeatureMessage,
+  shopProfile,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
@@ -15,22 +16,43 @@ import { Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { TaxEvents, type FbrPosDeletedPayload, type FbrPosUpdatedPayload } from './events.js';
 import type { FbrPosConnection } from './fbr-client.js';
+import type { FbrDigitalInvoicingConnection } from './fbr-di-client.js';
+import {
+  DI_NO_CREDIT_NOTES,
+  diInvoiceBody,
+  diWithSeller,
+  type DiInvoiceBody,
+  type DiSeller,
+} from './fbr-di.js';
 import {
   FBR_ENVIRONMENTS,
   FBR_LIMITS,
+  FBR_SYSTEMS,
   FISCAL_STATUSES,
   fbrInvoiceBody,
   pctCodeOf,
   type FbrEnvironment,
   type FbrInvoiceBody,
+  type FbrSystem,
   type FiscalDocument,
   type FiscalKind,
   type FiscalStatus,
 } from './fbr.js';
+import { taxSettingsIn } from './tax-settings.service.js';
+import type { TaxSettingsRecord } from './tax.js';
 
-/** The shop's POS as FBR registered it, as the Admin API shows it: never its token. */
+/** What the shop's connection is called where it says how it reports. */
+const SYSTEM_NAMES: Record<FbrSystem, string> = {
+  pos: "FBR's POS integration",
+  digital_invoicing: "FBR's digital invoicing",
+};
+
+/** The shop's connection to FBR, as the Admin API shows it: never its token. */
 export interface FbrPosRecord {
-  posId: number;
+  /** A Tier-1 retailer's POS reporting to FBR's IMS, or digital invoicing (ADR-562). */
+  system: FbrSystem;
+  /** The POS ID FBR gave the POS; null for digital invoicing, which has none. */
+  posId: number | null;
   /** The token's last four characters. */
   tokenHint: string;
   environment: FbrEnvironment;
@@ -38,8 +60,13 @@ export interface FbrPosRecord {
   updatedAt: Date;
 }
 
-/** Fields left out stay as they are. Connecting needs them all. */
+/**
+ * Fields left out stay as they are. Connecting needs them all, but a POS ID for digital
+ * invoicing; switching how the shop reports needs a token for the other, and a POS ID for a POS.
+ */
 export interface FbrPosInput {
+  /** FBR's POS integration unless given, connecting; given, how the shop reports from now on. */
+  system?: FbrSystem | null;
   posId?: number | null;
   accessToken?: string | null;
   environment?: FbrEnvironment | null;
@@ -49,6 +76,8 @@ export interface FbrPosInput {
 /** An invoice or credit note the shop issued while connected, and how reporting it went. */
 export interface FiscalInvoiceRecord {
   id: string;
+  /** What it was kept for, and is sent to. */
+  system: FbrSystem;
   kind: FiscalKind;
   usin: string;
   orderId: string;
@@ -62,14 +91,20 @@ export interface FiscalInvoiceRecord {
   createdAt: Date;
 }
 
-/** One taken to report: what FBR is sent of it. */
-export interface ClaimedFiscalInvoice {
+/** One taken to report: what FBR is sent of it, in the shape of what it was kept for. */
+export type ClaimedFiscalInvoice = {
   id: string;
   usin: string;
-  body: FbrInvoiceBody;
   attempts: number;
   createdAt: Date;
-}
+} & (
+  { system: 'pos'; body: FbrInvoiceBody } | { system: 'digital_invoicing'; body: DiInvoiceBody }
+);
+
+/** The shop's connection as the worker reports through it, its token opened. */
+export type FbrConnection =
+  | ({ system: 'pos' } & FbrPosConnection)
+  | ({ system: 'digital_invoicing' } & FbrDigitalInvoicingConnection);
 
 /** How reporting one went. */
 export type FiscalOutcome =
@@ -84,7 +119,8 @@ export interface FiscalInvoicesListOptions {
 }
 
 type PosRow = {
-  pos_id: string | number;
+  system: FbrSystem;
+  pos_id: string | number | null;
   access_token: string;
   token_hint: string;
   environment: FbrEnvironment;
@@ -94,6 +130,7 @@ type PosRow = {
 
 type FiscalRow = {
   id: string;
+  system: FbrSystem;
   kind: FiscalKind;
   usin: string;
   order_id: string;
@@ -111,11 +148,13 @@ function sealedFor(shopId: string): string {
 }
 
 /**
- * The shop's POS as FBR registered it (POS-04, TAX-04, ADR-555): the POS ID FBR gave it, the
- * access token FBR gave with it, kept sealed and never shown again, FBR's sandbox or the real
- * one, and the PCT code its items are reported under. While connected, each invoice and credit
- * note it issues is reported to FBR. Changes are audited, the token never. A plan without FBR's
- * connectors connects nothing.
+ * The shop's connection to FBR (POS-04, TAX-04, ADR-555, ADR-562): a Tier-1 retailer's POS as FBR
+ * registered it, with the POS ID FBR gave it, reporting to FBR's IMS; or, for a seller registered
+ * for sales tax, FBR's digital invoicing. Either way, the token FBR gave, kept sealed and never
+ * shown again, FBR's sandbox or the real one, and the PCT code its items are reported under. While
+ * connected, each invoice and credit note it issues is reported to FBR, through the one it
+ * connected. Changes are audited, the token never. A plan without FBR's connectors connects
+ * nothing.
  */
 @Injectable()
 export class FbrPosService {
@@ -130,9 +169,21 @@ export class FbrPosService {
     return row && toPosRecord(row);
   }
 
-  /** Connects the shop's POS, or changes what is given, for invoices reported from now on. */
+  /**
+   * Connects the shop to FBR, or changes what is given, for invoices reported from now on.
+   * Digital invoicing is for a seller registered for sales tax: its tax settings name its NTN,
+   * STRN and province. Switching how it reports leaves those still waiting for the other unsent.
+   */
   async update(tenant: TenantContext, input: FbrPosInput): Promise<MutationResult<FbrPosRecord>> {
     const check = new InputChecker();
+    const system = input.system ?? undefined;
+    if (system !== undefined && !FBR_SYSTEMS.includes(system)) {
+      check.add(
+        ['input', 'system'],
+        'INVALID',
+        "must be FBR's POS integration or digital invoicing",
+      );
+    }
     const posId = input.posId ?? undefined;
     if (posId !== undefined && (!Number.isInteger(posId) || posId <= 0 || posId >= 1e10)) {
       check.add(['input', 'posId'], 'INVALID', 'must be the POS ID FBR gave the POS');
@@ -161,33 +212,64 @@ export class FbrPosService {
     if (!existing) {
       const plan = await this.allowance?.excludes(tenant.shopId, 'fiscalReporting');
       if (plan) {
-        return failOne(['input'], 'INVALID', planFeatureMessage(plan, "FBR's POS integration"));
+        const what = SYSTEM_NAMES[system ?? 'pos'];
+        return failOne(['input'], 'INVALID', planFeatureMessage(plan, what));
       }
     }
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const current = await posIn(tx, tenant.shopId, { lock: true });
-      if (!current) {
+      const nextSystem = system ?? current?.system ?? 'pos';
+      const switching = current !== null && current.system !== nextSystem;
+      if (nextSystem === 'digital_invoicing' && posId !== undefined) {
+        return failOne(
+          ['input', 'posId'],
+          'INVALID',
+          "FBR's digital invoicing has no POS ID: leave it out",
+        );
+      }
+      if (!current || switching) {
+        const doing = current ? `Reporting through ${SYSTEM_NAMES[nextSystem]}` : 'Connecting FBR';
         const missing = (
           [
-            ['posId', posId, 'the POS ID FBR gave the POS'],
-            ['accessToken', accessToken, 'the access token FBR gave it'],
-            ['environment', environment, "FBR's sandbox or production"],
-            ['pctCode', pctCode, 'the PCT code its items are reported under'],
+            ['posId', nextSystem === 'pos' ? posId : null, 'the POS ID FBR gave the POS'],
+            [
+              'accessToken',
+              accessToken,
+              nextSystem === 'pos'
+                ? 'the access token FBR gave it'
+                : 'the security token FBR issued the seller through IRIS',
+            ],
+            ['environment', environment ?? current?.environment, "FBR's sandbox or production"],
+            ['pctCode', pctCode ?? current?.pct_code, 'the PCT code its items are reported under'],
           ] as const
         ).find(([, value]) => value === undefined);
         if (missing) {
-          return failOne(['input', missing[0]], 'BLANK', `Connecting FBR needs ${missing[2]}`);
+          return failOne(['input', missing[0]], 'BLANK', `${doing} needs ${missing[2]}`);
+        }
+        if (nextSystem === 'digital_invoicing') {
+          const unregistered = sellerGaps(await taxSettingsIn(tx, tenant.shopId));
+          if (unregistered) {
+            return failOne(
+              ['input', 'system'],
+              'INVALID',
+              "FBR's digital invoicing is for sellers registered for sales tax: set the shop's " +
+                `${unregistered} in its tax settings first`,
+            );
+          }
         }
       }
       const opened = current && this.box.decrypt(current.access_token, sealedFor(tenant.shopId));
       const next = {
-        posId: posId ?? Number(current!.pos_id),
+        system: nextSystem,
+        posId: nextSystem === 'pos' ? (posId ?? Number(current!.pos_id)) : null,
         environment: environment ?? current!.environment,
         pctCode: pctCode ?? current!.pct_code,
       };
+      const before = current && toPosRecord(current);
       const changed = [
-        ...(current === null || next.posId !== Number(current.pos_id) ? ['posId'] : []),
+        ...(current === null || next.system !== current.system ? ['system'] : []),
+        ...(next.posId !== (before?.posId ?? null) ? ['posId'] : []),
         ...(accessToken !== undefined && accessToken !== opened?.toString('utf8')
           ? ['accessToken']
           : []),
@@ -201,14 +283,23 @@ export class FbrPosService {
           : this.box.encrypt(accessToken, sealedFor(tenant.shopId));
       const hint = accessToken === undefined ? current!.token_hint : accessToken.slice(-4);
       await tx.execute(sql`
-        INSERT INTO tax.fbr_pos (shop_id, pos_id, access_token, token_hint, environment, pct_code)
-        VALUES (${tenant.shopId}, ${next.posId}, ${sealed}, ${hint}, ${next.environment},
-                ${next.pctCode})
+        INSERT INTO tax.fbr_pos (shop_id, system, pos_id, access_token, token_hint, environment,
+                                 pct_code)
+        VALUES (${tenant.shopId}, ${next.system}, ${next.posId}, ${sealed}, ${hint},
+                ${next.environment}, ${next.pctCode})
             ON CONFLICT (shop_id) DO UPDATE
-                   SET pos_id = excluded.pos_id, access_token = excluded.access_token,
-                       token_hint = excluded.token_hint, environment = excluded.environment,
-                       pct_code = excluded.pct_code, version = tax.fbr_pos.version + 1,
-                       updated_at = now()`);
+                   SET system = excluded.system, pos_id = excluded.pos_id,
+                       access_token = excluded.access_token, token_hint = excluded.token_hint,
+                       environment = excluded.environment, pct_code = excluded.pct_code,
+                       version = tax.fbr_pos.version + 1, updated_at = now()`);
+      // Those kept for the other are in its shape, and go to neither.
+      if (switching) {
+        await tx.execute(sql`
+          UPDATE tax.fiscal_invoices
+             SET status = 'skipped',
+                 error = ${`Not reported: the shop now reports through ${SYSTEM_NAMES[nextSystem]}`}
+           WHERE shop_id = ${tenant.shopId} AND status = 'pending' AND system <> ${nextSystem}`);
+      }
       // A new token or POS may be what those waiting on FBR's refusal of the old one need.
       if (changed.some((field) => field !== 'pctCode')) {
         await tx.execute(sql`
@@ -220,7 +311,12 @@ export class FbrPosService {
         type: TaxEvents.FbrPosUpdated,
         aggregateType: 'fbr_pos',
         aggregateId: tenant.shopId,
-        payload: { changed, actorKind: actor.actorKind, actorId: actor.actorId },
+        payload: {
+          system: next.system,
+          changed,
+          actorKind: actor.actorKind,
+          actorId: actor.actorId,
+        },
       });
       await recordAudit(tx, tenant.shopId, {
         action: 'fbr_pos.updated',
@@ -229,15 +325,17 @@ export class FbrPosService {
         ...actor,
         details: {
           changed,
+          system: next.system,
           posId: next.posId,
           tokenHint: hint,
           environment: next.environment,
           pctCode: next.pctCode,
-          before: current && {
-            posId: Number(current.pos_id),
-            tokenHint: current.token_hint,
-            environment: current.environment,
-            pctCode: current.pct_code,
+          before: before && {
+            system: before.system,
+            posId: before.posId,
+            tokenHint: before.tokenHint,
+            environment: before.environment,
+            pctCode: before.pctCode,
           },
         },
       });
@@ -246,16 +344,19 @@ export class FbrPosService {
   }
 
   /**
-   * Disconnects the shop's POS: its token is forgotten, invoices issued from now on are not
-   * reported, and those still waiting for FBR are not sent. The POS ID it had, or null when none
-   * was connected.
+   * Disconnects the shop from FBR: its token is forgotten, invoices issued from now on are not
+   * reported, and those still waiting for FBR are not sent. How it reported and the POS ID it
+   * had, or null when nothing was connected.
    */
-  async delete(tenant: TenantContext): Promise<number | null> {
+  async delete(tenant: TenantContext): Promise<{ system: FbrSystem; posId: number | null } | null> {
     return this.db.tenant(tenant.shopId, async (tx) => {
-      const { rows } = await tx.execute<{ pos_id: string | number }>(sql`
-        DELETE FROM tax.fbr_pos WHERE shop_id = ${tenant.shopId} RETURNING pos_id`);
+      const { rows } = await tx.execute<Pick<PosRow, 'system' | 'pos_id'>>(sql`
+        DELETE FROM tax.fbr_pos WHERE shop_id = ${tenant.shopId} RETURNING system, pos_id`);
       if (!rows[0]) return null;
-      const posId = Number(rows[0].pos_id);
+      const deleted = {
+        system: rows[0].system,
+        posId: rows[0].pos_id === null ? null : Number(rows[0].pos_id),
+      };
       await tx.execute(sql`
         UPDATE tax.fiscal_invoices
            SET status = 'skipped', error = 'Not reported: the shop disconnected FBR'
@@ -265,35 +366,37 @@ export class FbrPosService {
         type: TaxEvents.FbrPosDeleted,
         aggregateType: 'fbr_pos',
         aggregateId: tenant.shopId,
-        payload: { posId, actorKind: actor.actorKind, actorId: actor.actorId },
+        payload: { ...deleted, actorKind: actor.actorKind, actorId: actor.actorId },
       });
       await recordAudit(tx, tenant.shopId, {
         action: 'fbr_pos.deleted',
         subjectType: 'shop',
         subjectId: tenant.shopId,
         ...actor,
-        details: { posId },
+        details: deleted,
       });
-      return posId;
+      return deleted;
     });
   }
 
-  /** The POS the worker reports the shop's invoices from, its token opened; null if none. */
-  async connectionOf(shopId: string): Promise<FbrPosConnection | null> {
+  /** How the worker reports the shop's invoices, its token opened; null if not connected. */
+  async connectionOf(shopId: string): Promise<FbrConnection | null> {
     const row = await this.db.tenant(shopId, (tx) => posIn(tx, shopId));
     if (!row) return null;
-    return {
-      posId: Number(row.pos_id),
+    const connection = {
       accessToken: this.box.decrypt(row.access_token, sealedFor(shopId)).toString('utf8'),
       environment: row.environment,
       pctCode: row.pct_code,
     };
+    return row.system === 'pos'
+      ? { system: 'pos', posId: Number(row.pos_id), ...connection }
+      : { system: 'digital_invoicing', ...connection };
   }
 }
 
 /**
- * The invoices and credit notes the shop issued while its POS was connected, as they are
- * reported to FBR (ADR-555): the worker takes those due, reports them, and settles each as FBR
+ * The invoices and credit notes the shop issued while connected to FBR, as they are reported to
+ * FBR (ADR-555, ADR-562): the worker takes those due, reports them, and settles each as FBR
  * answered; the shop sees each one's state, and has one FBR refused sent again.
  */
 @Injectable()
@@ -320,13 +423,16 @@ export class FiscalInvoicesService {
 
   /**
    * Has one FBR refused, or one the shop's disconnecting left unsent, reported again from now,
-   * while its POS is connected.
+   * while the shop reports through what it was kept for. One for digital invoicing names the
+   * seller as its tax settings now have it, which may be what FBR refused.
    */
   async retry(tenant: TenantContext, id: string): Promise<MutationResult<FiscalInvoiceRecord>> {
     return this.db.tenant(tenant.shopId, async (tx) => {
-      const { rows } = await tx.execute<FiscalRow & { connected: boolean }>(sql`
-        SELECT ${FISCAL_COLUMNS},
-               EXISTS (SELECT 1 FROM tax.fbr_pos WHERE shop_id = ${tenant.shopId}) AS connected
+      const { rows } = await tx.execute<
+        FiscalRow & { payload: DiInvoiceBody; connected: FbrSystem | null }
+      >(sql`
+        SELECT ${FISCAL_COLUMNS}, payload,
+               (SELECT system FROM tax.fbr_pos WHERE shop_id = ${tenant.shopId}) AS connected
           FROM tax.fiscal_invoices
          WHERE shop_id = ${tenant.shopId} AND id = ${id}
            FOR UPDATE`);
@@ -340,10 +446,35 @@ export class FiscalInvoicesService {
         );
       }
       if (!row.connected) {
-        return failOne(['id'], 'INVALID', "Connect FBR's POS first: nothing is sent without it");
+        return failOne(['id'], 'INVALID', 'Connect FBR first: nothing is sent without it');
+      }
+      if (row.connected !== row.system) {
+        return failOne(
+          ['id'],
+          'INVALID',
+          `It was kept for ${SYSTEM_NAMES[row.system]}, and the shop now reports through ` +
+            SYSTEM_NAMES[row.connected],
+        );
+      }
+      let payload = sql`payload`;
+      if (row.system === 'digital_invoicing') {
+        if (row.kind === 'credit_note') {
+          return failOne(['id'], 'INVALID', DI_NO_CREDIT_NOTES.replace('Not reported: ', ''));
+        }
+        const { seller, gaps } = await sellerIn(tx, tenant.shopId);
+        if (gaps) {
+          return failOne(
+            ['id'],
+            'INVALID',
+            `Set the shop's ${gaps} in its tax settings first: FBR's digital invoicing names ` +
+              'the seller by them',
+          );
+        }
+        payload = sql`${JSON.stringify(diWithSeller(row.payload, seller))}::jsonb`;
       }
       const { rows: updated } = await tx.execute<FiscalRow>(sql`
-        UPDATE tax.fiscal_invoices SET status = 'pending', next_attempt_at = now()
+        UPDATE tax.fiscal_invoices
+           SET status = 'pending', next_attempt_at = now(), payload = ${payload}
          WHERE shop_id = ${tenant.shopId} AND id = ${id}
         RETURNING ${FISCAL_COLUMNS}`);
       return { ok: true, value: toFiscalRecord(updated[0]!) };
@@ -375,8 +506,9 @@ export class FiscalInvoicesService {
     return this.db.tenant(shopId, async (tx) => {
       const { rows } = await tx.execute<{
         id: string;
+        system: FbrSystem;
         usin: string;
-        payload: FbrInvoiceBody;
+        payload: FbrInvoiceBody | DiInvoiceBody;
         attempts: number;
         created_at: string | Date;
       }>(sql`
@@ -392,15 +524,19 @@ export class FiscalInvoicesService {
                next_attempt_at = ${new Date(at.getTime() + leaseMs).toISOString()}
           FROM due
          WHERE f.shop_id = ${shopId} AND f.id = due.id
-        RETURNING f.id, f.usin, f.payload, f.attempts, f.created_at`);
+        RETURNING f.id, f.system, f.usin, f.payload, f.attempts, f.created_at`);
       return rows
-        .map((row) => ({
-          id: row.id,
-          usin: row.usin,
-          body: row.payload,
-          attempts: row.attempts,
-          createdAt: toDate(row.created_at),
-        }))
+        .map(
+          (row) =>
+            ({
+              id: row.id,
+              system: row.system,
+              usin: row.usin,
+              body: row.payload,
+              attempts: row.attempts,
+              createdAt: toDate(row.created_at),
+            }) as ClaimedFiscalInvoice,
+        )
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1));
     });
   }
@@ -428,8 +564,10 @@ export class FiscalInvoicesService {
 
 /**
  * Keeps `documents`, the invoices and credit notes the shop just issued, to be reported to FBR,
- * in the caller's transaction, so they are kept only if it commits: while its POS is connected,
- * and none twice. How many were kept.
+ * in the caller's transaction, so they are kept only if it commits: while it is connected, in the
+ * shape of what it reports through, and none twice. Digital invoicing takes no credit notes, and
+ * they are kept as not to be sent; nor goes an invoice whose seller its tax settings no longer
+ * name, until the shop names it and has it sent again. How many were kept.
  */
 export async function recordFiscalDocumentsIn(
   tx: Tx,
@@ -438,19 +576,64 @@ export async function recordFiscalDocumentsIn(
   timeZone: string,
 ): Promise<number> {
   if (documents.length === 0) return 0;
-  const { rows } = await tx.execute<{ connected: boolean }>(sql`
-    SELECT EXISTS (SELECT 1 FROM tax.fbr_pos WHERE shop_id = ${shopId}) AS connected`);
-  if (!rows[0]?.connected) return 0;
+  const { rows } = await tx.execute<{ system: FbrSystem }>(sql`
+    SELECT system FROM tax.fbr_pos WHERE shop_id = ${shopId}`);
+  const system = rows[0]?.system;
+  if (!system) return 0;
+  const seller = system === 'digital_invoicing' ? await sellerIn(tx, shopId) : null;
   let kept = 0;
   for (const document of documents) {
+    const { payload, status, error } = !seller
+      ? { payload: fbrInvoiceBody(document, timeZone), status: 'pending', error: null }
+      : document.kind === 'credit_note'
+        ? { payload: {}, status: 'skipped', error: DI_NO_CREDIT_NOTES }
+        : {
+            payload: diInvoiceBody(document, seller.seller, timeZone),
+            status: seller.gaps ? 'failed' : 'pending',
+            error:
+              seller.gaps &&
+              `Not reported: set the shop's ${seller.gaps} in its tax settings, which FBR's ` +
+                'digital invoicing names the seller by, and send it again',
+          };
     const { rowCount } = await tx.execute(sql`
-      INSERT INTO tax.fiscal_invoices (shop_id, id, kind, usin, order_id, payload)
-      VALUES (${shopId}, ${newId()}, ${document.kind}, ${document.usin}, ${document.orderId},
-              ${JSON.stringify(fbrInvoiceBody(document, timeZone))}::jsonb)
+      INSERT INTO tax.fiscal_invoices (shop_id, id, system, kind, usin, order_id, payload, status,
+                                       error)
+      VALUES (${shopId}, ${newId()}, ${system}, ${document.kind}, ${document.usin},
+              ${document.orderId}, ${JSON.stringify(payload)}::jsonb, ${status}, ${error})
           ON CONFLICT (shop_id, usin) DO NOTHING`);
     kept += rowCount ?? 0;
   }
   return kept;
+}
+
+/**
+ * The seller as digital invoicing names it, from the shop's tax settings and its name in the shop
+ * directory; with what of a seller registered for sales tax its tax settings lack, if anything.
+ */
+async function sellerIn(
+  tx: Tx,
+  shopId: string,
+): Promise<{ seller: DiSeller; gaps: string | null }> {
+  const settings = await taxSettingsIn(tx, shopId);
+  const { name } = await shopProfile(tx, shopId);
+  return {
+    seller: { ntn: settings.ntn, businessName: name, province: settings.province },
+    gaps: sellerGaps(settings),
+  };
+}
+
+/**
+ * What a seller registered for sales tax names that the shop's tax settings `settings` do not:
+ * "NTN, STRN and province"; null when they name it all.
+ */
+function sellerGaps(settings: Pick<TaxSettingsRecord, 'ntn' | 'strn' | 'province'>): string | null {
+  const gaps = [
+    ...(settings.ntn ? [] : ['NTN']),
+    ...(settings.strn ? [] : ['STRN']),
+    ...(settings.province ? [] : ['province']),
+  ];
+  if (gaps.length === 0) return null;
+  return gaps.length === 1 ? gaps[0]! : `${gaps.slice(0, -1).join(', ')} and ${gaps.at(-1)}`;
 }
 
 /** How the shop's invoices `usins` stand with FBR, by USIN: those never sent are left out. */
@@ -467,7 +650,8 @@ export async function fiscalInvoicesIn(
 }
 
 const FISCAL_COLUMNS = sql.raw(
-  'id, kind, usin, order_id, status, fbr_invoice_number, attempts, error, reported_at, created_at',
+  'id, system, kind, usin, order_id, status, fbr_invoice_number, attempts, error, reported_at, ' +
+    'created_at',
 );
 
 async function posIn(
@@ -476,7 +660,7 @@ async function posIn(
   options: { lock?: boolean } = {},
 ): Promise<PosRow | null> {
   const { rows } = await tx.execute<PosRow>(sql`
-    SELECT pos_id, access_token, token_hint, environment, pct_code, updated_at
+    SELECT system, pos_id, access_token, token_hint, environment, pct_code, updated_at
       FROM tax.fbr_pos
      WHERE shop_id = ${shopId}
      ${options.lock ? sql`FOR UPDATE` : sql``}`);
@@ -485,7 +669,8 @@ async function posIn(
 
 function toPosRecord(row: PosRow): FbrPosRecord {
   return {
-    posId: Number(row.pos_id),
+    system: row.system,
+    posId: row.pos_id === null ? null : Number(row.pos_id),
     tokenHint: row.token_hint,
     environment: row.environment,
     pctCode: row.pct_code,
@@ -496,6 +681,7 @@ function toPosRecord(row: PosRow): FbrPosRecord {
 function toFiscalRecord(row: FiscalRow): FiscalInvoiceRecord {
   return {
     id: row.id,
+    system: row.system,
     kind: row.kind,
     usin: row.usin,
     orderId: row.order_id,

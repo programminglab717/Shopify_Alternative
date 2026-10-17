@@ -96,7 +96,12 @@ import { CheckoutReminders } from './checkout-reminders.js';
 import { ReviewRequests } from './review-requests.js';
 import { WebhookDeliveries, WebhookFanOut } from './webhooks.js';
 import { ConfirmationReminders } from './confirmation-reminders.js';
-import { FbrPosClient, FbrPosService, FiscalInvoicesService } from '@hatti/tax/public';
+import {
+  FbrDigitalInvoicingClient,
+  FbrPosClient,
+  FbrPosService,
+  FiscalInvoicesService,
+} from '@hatti/tax/public';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
 import { FiscalReporter } from './fiscal-reports.js';
 import { CourierBookings } from './courier-bookings.js';
@@ -641,13 +646,18 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         logger,
       }).start(config.CONVERSIONS_INTERVAL_MS);
       closers.push(() => conversions.stop());
-      // Tier-1 shops' invoices reported to FBR from the POS each connected (ADR-555).
+      // Shops' invoices reported to FBR from the POS each connected (ADR-555), or through
+      // digital invoicing (ADR-562).
       const fiscal = new FiscalReporter({
         fiscal: new FiscalInvoicesService(database),
         pos: new FbrPosService(database, config.ENCRYPTION_KEYS),
         client: new FbrPosClient({
           productionUrl: config.FBR_POS_URL,
           sandboxUrl: config.FBR_POS_SANDBOX_URL,
+        }),
+        digitalInvoicing: new FbrDigitalInvoicingClient({
+          productionUrl: config.FBR_DI_URL,
+          sandboxUrl: config.FBR_DI_SANDBOX_URL,
         }),
         logger,
       }).start(config.FISCAL_INTERVAL_MS);

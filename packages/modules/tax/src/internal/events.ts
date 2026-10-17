@@ -1,3 +1,5 @@
+import type { FbrSystem } from './fbr.js';
+
 /**
  * Events the tax module publishes. Payloads are thin: fetch current state through the API.
  */
@@ -13,17 +15,22 @@ export interface TaxSettingsUpdatedPayload {
   changed: string[];
 }
 
-/** The shop connected its POS to FBR, or changed what it gave (ADR-555). */
+/** The shop connected to FBR, or changed what it gave (ADR-555, ADR-562). */
 export interface FbrPosUpdatedPayload {
-  /** What changed: "posId", "accessToken", "environment" or "pctCode". */
+  /** How it reports now: from its POS to FBR's IMS, or through digital invoicing. */
+  system: FbrSystem;
+  /** What changed: "system", "posId", "accessToken", "environment" or "pctCode". */
   changed: string[];
   actorKind: 'app' | 'staff';
   actorId: string;
 }
 
-/** The shop disconnected its POS from FBR: its invoices are not reported from now on. */
+/** The shop disconnected from FBR: its invoices are not reported from now on. */
 export interface FbrPosDeletedPayload {
-  posId: number;
+  /** How it reported. */
+  system: FbrSystem;
+  /** Its POS's ID; null for digital invoicing. */
+  posId: number | null;
   actorKind: 'app' | 'staff';
   actorId: string;
 }

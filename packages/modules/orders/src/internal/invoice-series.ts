@@ -1,5 +1,5 @@
 import type { Tx } from '@hatti/db';
-import { harmonizedSystemCodesIn } from '@hatti/inventory/public';
+import { harmonizedSystemCodesIn, type LocationRecord } from '@hatti/inventory/public';
 import { recordFiscalDocumentsIn } from '@hatti/tax/public';
 import { sql } from 'drizzle-orm';
 import { fiscalCreditNoteOf, fiscalInvoiceOf } from './fiscal.js';
@@ -9,7 +9,7 @@ import type { OrderRecord } from './records.js';
 // which in Pakistan starts on 1 July, with no number skipped or given twice. An order's invoice
 // takes its number the first time it is printed, and keeps it. A refund on an order whose
 // invoice was issued takes a credit note's number, in a series of its own (ADR-496). While the
-// shop's POS is connected to FBR, each is kept to be reported to FBR as it is issued (ADR-555).
+// shop is connected to FBR, each is kept to be reported to FBR as it is issued (ADR-555, ADR-562).
 
 /** An order's invoice as issued. */
 export interface OrderInvoiceRecord {
@@ -101,13 +101,15 @@ export async function invoicesIn(
  * The invoices of orders `orders`, issuing the next numbers, in the order given, to those not
  * cancelled that have none; in the caller's transaction, so numbers come back if it rolls back.
  * A shop's invoices are issued one transaction at a time, so none is numbered twice and no
- * number is skipped. Those issued are kept to report to FBR, while the shop's POS is connected.
+ * number is skipped. Those issued are kept to report to FBR, while the shop is connected to FBR:
+ * from the locations they ship from, in `locations` by ID.
  */
 export async function issueInvoicesIn(
   tx: Tx,
   shopId: string,
   orders: readonly OrderRecord[],
   timeZone: string,
+  locations: ReadonlyMap<string, LocationRecord> = new Map(),
   now = new Date(),
 ): Promise<Map<string, OrderInvoiceRecord>> {
   await lockSeriesIn(tx, shopId);
@@ -139,7 +141,13 @@ export async function issueInvoicesIn(
       tx,
       shopId,
       fiscal.map(({ order, invoice }) =>
-        fiscalInvoiceOf(order, invoice.name, invoice.issuedAt, hsCodes),
+        fiscalInvoiceOf(
+          order,
+          invoice.name,
+          invoice.issuedAt,
+          hsCodes,
+          locations.get(order.locationId) ?? null,
+        ),
       ),
       timeZone,
     );
@@ -149,8 +157,8 @@ export async function issueInvoicesIn(
 
 /**
  * A credit note for `refund` of `order`, if the order's invoice was issued: the next number of
- * the shop's credit notes, in the caller's transaction, kept to report to FBR while the shop's POS
- * is connected. Null if it has no invoice: the invoice says what was refunded before it was
+ * the shop's credit notes, in the caller's transaction, kept to report to FBR while the shop is
+ * connected to FBR. Null if it has no invoice: the invoice says what was refunded before it was
  * printed.
  */
 export async function issueCreditNoteIn(

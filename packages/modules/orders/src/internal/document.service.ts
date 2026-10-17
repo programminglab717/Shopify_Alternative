@@ -77,14 +77,15 @@ export class OrderDocumentService {
         // numbers, unless an order in the batch is past the plan's limit and nothing prints.
         const printable = orders.every((order) => order.overLimitAt === null);
         const ids = orders.map((order) => order.id);
+        const locations = await this.locations.locationsOf(tx, tenant.shopId, locationIds);
         const invoices: Map<string, OrderInvoiceRecord> = !printable
           ? new Map()
           : request.kind === 'invoice'
-            ? await issueInvoicesIn(tx, tenant.shopId, orders, shop.timezone)
+            ? await issueInvoicesIn(tx, tenant.shopId, orders, shop.timezone, locations)
             : request.kind === 'credit_note'
               ? await invoicesIn(tx, tenant.shopId, ids)
               : new Map();
-        // How they stand with FBR, where the shop's POS was connected (ADR-556).
+        // How they stand with FBR, where the shop was connected to FBR (ADR-556).
         const numbers = [
           ...[...invoices.values()].map((invoice) => invoice.name),
           ...orders.flatMap((order) =>
@@ -95,7 +96,7 @@ export class OrderDocumentService {
           shop,
           registration: await taxSettingsIn(tx, tenant.shopId),
           orders,
-          locations: await this.locations.locationsOf(tx, tenant.shopId, locationIds),
+          locations,
           invoices,
           fiscal: await fiscalInvoicesIn(tx, tenant.shopId, numbers),
         };
@@ -134,7 +135,7 @@ export class OrderDocumentService {
 
   /**
    * The invoices issued for orders `ids`, by order (ADR-495), with how each stands with FBR where
-   * the shop's POS was connected when it was issued (ADR-556).
+   * the shop was connected to FBR when it was issued (ADR-556).
    */
   async invoicesOf(
     tenant: TenantContext,

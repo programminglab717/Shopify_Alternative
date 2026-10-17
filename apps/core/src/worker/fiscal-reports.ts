@@ -1,9 +1,13 @@
 import type { Logger } from '@hatti/logger';
 import {
+  FbrDigitalInvoicingClient,
   FbrPosClient,
   FbrPosService,
   FiscalInvoicesService,
   fbrInvoiceRequest,
+  type ClaimedFiscalInvoice,
+  type FbrConnection,
+  type FbrReportResult,
   type FiscalOutcome,
 } from '@hatti/tax/public';
 import { repeat } from './repeat.js';
@@ -22,18 +26,28 @@ export function fiscalRetryDelayMs(attempts: number): number {
   return Math.min(60_000 * 2 ** Math.max(attempts - 1, 0), 6 * 60 * 60_000);
 }
 
+/** What the shop's connection is called, saying it is not what an invoice was kept for. */
+const SYSTEM_NAMES = {
+  pos: "FBR's POS integration",
+  digital_invoicing: "FBR's digital invoicing",
+} as const;
+
 export interface FiscalReporterOptions {
   fiscal: FiscalInvoicesService;
   pos: FbrPosService;
+  /** FBR's IMS, for shops reporting from their POS. */
   client: FbrPosClient;
+  /** FBR's digital invoicing, for shops registered for sales tax (ADR-562). */
+  digitalInvoicing: FbrDigitalInvoicingClient;
   logger?: Logger;
 }
 
 /**
- * Reports Tier-1 shops' invoices and credit notes to FBR's IMS as they are issued (POS-04,
- * ADR-555), from the POS each shop connected, the oldest first: each one FBR takes is settled with
- * the number FBR gave it, one FBR refuses fails saying why, and one FBR cannot be reached for is
- * tried again later, for a week.
+ * Reports shops' invoices and credit notes to FBR as they are issued, the oldest first: Tier-1
+ * shops' to FBR's IMS from the POS each connected (POS-04, ADR-555), and invoices of shops
+ * registered for sales tax through FBR's digital invoicing (TAX-04, ADR-562), each through what
+ * it was kept for. Each one FBR takes is settled with the number FBR gave it, one FBR refuses
+ * fails saying why, and one FBR cannot be reached for is tried again later, for a week.
  */
 export class FiscalReporter {
   constructor(private readonly options: FiscalReporterOptions) {}
@@ -55,7 +69,7 @@ export class FiscalReporter {
 
   /** Reports the shop's invoices due at `at`. How many FBR took. */
   async report(shopId: string, at: Date): Promise<number> {
-    const { fiscal, pos, client } = this.options;
+    const { fiscal, pos } = this.options;
     const claimed = await fiscal.claim(shopId, at, BATCH, LEASE_MS);
     if (claimed.length === 0) return 0;
     const connection = await pos.connectionOf(shopId);
@@ -69,10 +83,16 @@ export class FiscalReporter {
         });
         continue;
       }
-      const result = await client.report(
-        connection,
-        fbrInvoiceRequest(invoice.body, connection.posId, connection.pctCode),
-      );
+      // Kept in the shape of the other, it goes to neither.
+      if (connection.system !== invoice.system) {
+        outcomes.push({
+          id: invoice.id,
+          status: 'skipped',
+          error: `Not reported: the shop now reports through ${SYSTEM_NAMES[connection.system]}`,
+        });
+        continue;
+      }
+      const result = await this.send(connection, invoice);
       if (result.ok) {
         outcomes.push({ id: invoice.id, status: 'reported', invoiceNumber: result.invoiceNumber });
       } else if (result.retry && at.getTime() - invoice.createdAt.getTime() < FISCAL_GIVE_UP_MS) {
@@ -88,6 +108,22 @@ export class FiscalReporter {
     }
     await fiscal.settle(shopId, outcomes, at);
     return outcomes.filter((outcome) => outcome.status === 'reported').length;
+  }
+
+  /** Sends `invoice` through `connection`, which is what it was kept for. */
+  private send(connection: FbrConnection, invoice: ClaimedFiscalInvoice): Promise<FbrReportResult> {
+    if (connection.system === 'pos' && invoice.system === 'pos') {
+      return this.options.client.report(
+        connection,
+        fbrInvoiceRequest(invoice.body, connection.posId, connection.pctCode),
+      );
+    }
+    if (connection.system === 'digital_invoicing' && invoice.system === 'digital_invoicing') {
+      return this.options.digitalInvoicing.report(connection, invoice.body);
+    }
+    throw new Error(
+      `Invoice ${invoice.id} was kept for ${invoice.system}, not ${connection.system}`,
+    );
   }
 
   /** Reports now, then every `intervalMs`, a round never overlapping the last. */

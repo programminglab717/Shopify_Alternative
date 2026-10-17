@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-561 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-562 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -569,6 +569,7 @@
 | 559 | The admin's product page takes each variant's HS code with its stock rules, saved as the field is left | Accepted |
 | 560 | What a shop's staff write to Hatti's support WhatsApp number is kept as a request of their shop, threaded, and Hatti's answer goes back on WhatsApp within the day | Accepted |
 | 561 | The admin's Help page shows a request asked on WhatsApp with its thread, the answer once with how it went on WhatsApp, and says the shop can write there too | Accepted |
+| 562 | A sales-tax-registered shop reports its invoices through FBR's digital invoicing instead of the POS integration, by the same worker, its credit notes left to its return | Accepted |
 
 ---
 
@@ -21033,3 +21034,35 @@
   answer reached its phone.
 * **Alternatives:** **A link between the answer and its message in the API:** the answer's words
   match the message sent with them, and an unmatched one still shows, in full, after the thread.
+
+## ADR-562 · A sales-tax-registered shop reports its invoices through FBR's digital invoicing instead of the POS integration, by the same worker, its credit notes left to its return
+
+* **Context:** FBR asks sales-tax-registered persons to issue their invoices through its digital
+  invoicing (DI), PRAL's API, apart from the POS integration Tier-1 retailers report through
+  (ADR-555). The shop's NTN, STRN and province are kept with its tax settings (ADR-190, ADR-500).
+* **Decision:**
+  * **One connection to FBR, of either system:** the shop's FBR connection says whether it reports
+    through the POS integration or DI; for DI, the security token FBR issued the seller through
+    IRIS, sealed as the POS's is, FBR's sandbox or production, and its default PCT code, and no
+    POS ID. Connecting DI needs the shop's NTN, STRN and province. Each invoice is kept for the
+    system it was issued under; switching leaves the other system's waiting ones unreported, and
+    neither is sent to the wrong one.
+  * **What DI is sent:** a sale invoice with the seller's NTN, name, province and the address it
+    ships or is collected from, the buyer as an unregistered consumer with the order's name,
+    address and province (the seller's where the order has none), and each item with its HS code
+    as "dddd.dddd" (its own, ADR-557, else the shop's), rate, unit, value without tax, tax, total
+    and discount, the delivery charge an item of its own. The sandbox is sent the scenario a sale
+    to an unregistered buyer is tested under. FBR's constants are in one place, after its DI
+    technical specification (v1.12), and proved by FBR's sandbox scenarios before production.
+  * **What FBR said:** taken only when the invoice and every item are valid and FBR numbered it;
+    refused, with FBR's codes and errors item by item, is not retried; a token refused, FBR down
+    or not answering is tried again, for a week, as for the POS (ADR-555). A retry reads the
+    seller's details afresh, so a corrected NTN is sent.
+  * **Credit notes** are not sent to DI, which has no credit notes: they are kept as not reported,
+    for the sales tax return, and their printed copy shows no FBR block.
+  * In the API, the connection and each invoice say their system.
+* **Consequences:** A registered online seller's invoices carry FBR's number and QR code, as
+  Tier-1 retailers' do (ADR-556), from the same worker, list and retries.
+* **Alternatives:** **A connection and list of its own for DI:** the token, environment, retries
+  and printing are the same, and a shop reports through one system at a time. **Sending a refund
+  as a debit note:** a debit note raises a supply, the opposite of a refund.

@@ -1,9 +1,16 @@
 import { DEFAULT_VARIANT_TITLE } from '@hatti/catalog/public';
-import { discountShares, type FiscalDocument, type FiscalItem } from '@hatti/tax/public';
+import type { LocationRecord } from '@hatti/inventory/public';
+import {
+  discountShares,
+  type FiscalBuyer,
+  type FiscalDocument,
+  type FiscalItem,
+} from '@hatti/tax/public';
+import { addressLines, cityLine } from './documents.js';
 import type { OrderRecord } from './records.js';
 
-// What FBR is sent of a shop's invoices and credit notes while its POS is connected (POS-04,
-// ADR-555): the tax module reports them, the orders module says what they hold.
+// What FBR is sent of a shop's invoices and credit notes while it is connected to FBR (POS-04,
+// ADR-555, ADR-562): the tax module reports them, the orders module says what they hold.
 
 /** Pakistan's PCT codes are an HS code's 8 digits; null for an HS code of any other length. */
 function pctCodeOf(hsCode: string | undefined): string | null {
@@ -15,12 +22,44 @@ function paymentModeOf(order: Pick<OrderRecord, 'paymentMethod'>): FiscalDocumen
   return order.paymentMethod === 'cash_on_delivery' ? 'cash' : 'card';
 }
 
+/** A location's address in a line, as the invoice prints where it ships from; null for none. */
+function locationLine(location: LocationRecord): string | null {
+  const { address } = location;
+  const lines = [address.address1, address.address2, cityLine(address)].filter(Boolean);
+  return lines.length > 0 ? lines.join(', ') : null;
+}
+
+/**
+ * Who the order's invoice is to, as digital invoicing names the buyer (ADR-562): its customer, by
+ * the name on its address, where it went, in a line, or, collected, where it was collected.
+ */
+function buyerOf(
+  order: Pick<OrderRecord, 'shippingAddress' | 'deliveryMethod'>,
+  from: LocationRecord | null,
+): FiscalBuyer {
+  const address = order.shippingAddress;
+  if (order.deliveryMethod === 'pickup') {
+    const at = from ? [from.name, locationLine(from)].filter(Boolean).join(', ') : 'the shop';
+    return {
+      name: address.name ?? '',
+      address: `Collected at ${at}`,
+      province: from?.address.provinceCode ?? address.provinceCode,
+    };
+  }
+  return {
+    name: address.name ?? '',
+    address: addressLines(address).join(', '),
+    province: address.provinceCode,
+  };
+}
+
 /**
  * An order's invoice `usin`, issued at `issuedAt`, as FBR is sent it: a line each, at what was
  * paid for it after its share of the discount, as its tax was worked out (ADR-096), and its
  * delivery charge and fee for paying on delivery as one line more. The items add up to the
  * order's total, and their tax to its tax. Lines go under their variants' PCT codes, from
- * `hsCodes` by variant, where they have them.
+ * `hsCodes` by variant, where they have them. It is from `from`, the location the order ships
+ * from or is collected at, and to its customer, for digital invoicing (ADR-562).
  */
 export function fiscalInvoiceOf(
   order: Pick<
@@ -33,10 +72,13 @@ export function fiscalInvoiceOf(
     | 'shippingTax'
     | 'taxRate'
     | 'paymentMethod'
+    | 'shippingAddress'
+    | 'deliveryMethod'
   >,
   usin: string,
   issuedAt: Date,
   hsCodes: ReadonlyMap<string, string> = new Map(),
+  from: LocationRecord | null = null,
 ): FiscalDocument {
   const shares = discountShares(
     order.lines.map((line) => line.total),
@@ -77,6 +119,8 @@ export function fiscalInvoiceOf(
     issuedAt,
     paymentMode: paymentModeOf(order),
     items,
+    buyer: buyerOf(order, from),
+    sellerAddress: from && locationLine(from),
   };
 }
 

@@ -485,6 +485,9 @@ describe('Worker configuration', () => {
       // Tier-1 shops' invoices go to FBR's IMS, or its sandbox (ADR-555).
       FBR_POS_URL: 'https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData',
       FBR_POS_SANDBOX_URL: 'https://esp.fbr.gov.pk:8244/FBR/v1/api/Live/PostData',
+      // Sales-tax-registered shops' through its digital invoicing, or its sandbox (ADR-562).
+      FBR_DI_URL: 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata',
+      FBR_DI_SANDBOX_URL: 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb',
       FISCAL_INTERVAL_MS: 15_000,
     });
     // Without the keys, no conversions are sent.

@@ -11,7 +11,8 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
-import type { FbrEnvironment, FbrInvoiceBody, FiscalKind, FiscalStatus } from './fbr.js';
+import type { DiInvoiceBody } from './fbr-di.js';
+import type { FbrEnvironment, FbrInvoiceBody, FbrSystem, FiscalKind, FiscalStatus } from './fbr.js';
 import type { FilerStatus, TaxCategoryValue, TaxProvince } from './tax.js';
 
 export const taxSchema = pgSchema('tax');
@@ -39,10 +40,15 @@ export const taxSettings = taxSchema.table('settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** The shop's POS as FBR registered it (ADR-555); a shop without a row reports nothing. */
+/**
+ * The shop's connection to FBR (ADR-555, ADR-562): its POS as FBR registered it, or digital
+ * invoicing; a shop without a row reports nothing.
+ */
 export const fbrPos = taxSchema.table('fbr_pos', {
   shopId: uuid('shop_id').primaryKey(),
-  posId: bigint('pos_id', { mode: 'number' }).notNull(),
+  system: text('system').$type<FbrSystem>().notNull().default('pos'),
+  /** Its POS's; null for digital invoicing. */
+  posId: bigint('pos_id', { mode: 'number' }),
   /** Sealed for the shop alone, and never shown again. */
   accessToken: text('access_token').notNull(),
   tokenHint: text('token_hint').notNull(),
@@ -60,12 +66,17 @@ export const fiscalInvoices = taxSchema.table(
   {
     shopId: uuid('shop_id').notNull(),
     id: uuid('id').notNull(),
+    /** What it was kept for, and its payload is in the shape of. */
+    system: text('system').$type<FbrSystem>().notNull().default('pos'),
     kind: text('kind').$type<FiscalKind>().notNull(),
     /** The shop's own number for it, FBR's USIN. */
     usin: text('usin').notNull(),
     orderId: uuid('order_id').notNull(),
-    /** What FBR is sent, but the POS ID and items' PCT code. */
-    payload: jsonb('payload').$type<FbrInvoiceBody>().notNull(),
+    /**
+     * What FBR is sent, but the POS ID and items' PCT code, or the sandbox's scenario and items'
+     * HS code.
+     */
+    payload: jsonb('payload').$type<FbrInvoiceBody | DiInvoiceBody>().notNull(),
     status: text('status').$type<FiscalStatus>().notNull().default('pending'),
     fbrInvoiceNumber: text('fbr_invoice_number'),
     attempts: integer('attempts').notNull().default(0),

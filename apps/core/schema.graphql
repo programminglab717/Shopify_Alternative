@@ -4521,10 +4521,12 @@ enum FbrEnvironment {
 }
 
 """
-The shop's POS as FBR registered it (POS-04, TAX-04, ADR-555): while it is connected, each invoice and credit note the shop issues is reported to FBR, which gives it a number of its own.
+The shop's connection to FBR (POS-04, TAX-04, ADR-555, ADR-562): its POS as FBR registered it, or FBR's digital invoicing. While it is connected, each invoice the shop issues is reported to FBR, which gives it a number of its own, and each credit note, where FBR takes them: IMS does, digital invoicing does not.
 """
 type FbrPos {
-  """The last four characters of its access token, never shown again."""
+  """
+  The last four characters of its token, the POS's access token or the seller's security token, never shown again.
+  """
   accessTokenHint: String!
   environment: FbrEnvironment!
 
@@ -4533,20 +4535,28 @@ type FbrPos {
   """
   pctCode: String!
 
-  """The POS ID FBR gave the POS when it registered it."""
-  posId: Int!
+  """
+  The POS ID FBR gave the POS when it registered it; null for digital invoicing, which has none.
+  """
+  posId: Int
+  system: FbrSystem!
   updatedAt: DateTime!
 }
 
 type FbrPosDeletePayload {
-  """The POS ID that was connected; null when none was."""
+  """
+  The POS ID that was connected; null when none was, as for digital invoicing.
+  """
   deletedPosId: Int
+
+  """How the shop reported; null when it was not connected."""
+  deletedSystem: FbrSystem
   userErrors: [UserError!]!
 }
 
 input FbrPosInput {
   """
-  The access token FBR gave for the POS: needed to connect, kept sealed, and never shown again.
+  The access token FBR gave for the POS, or the security token FBR issued the seller through IRIS for digital invoicing: needed to connect, kept sealed, and never shown again.
   """
   accessToken: String
 
@@ -4558,13 +4568,28 @@ input FbrPosInput {
   """
   pctCode: String
 
-  """The POS ID FBR gave the POS: needed to connect."""
+  """
+  The POS ID FBR gave the POS: needed to connect a POS; none for digital invoicing.
+  """
   posId: Int
+
+  """
+  How the shop reports: POS unless given, connecting. DIGITAL_INVOICING needs the NTN, STRN and province in the shop's tax settings. Switching needs the other's token, and a POS ID for a POS, and leaves those still waiting for the other unsent.
+  """
+  system: FbrSystem
 }
 
 type FbrPosUpdatePayload {
   fbrPos: FbrPos
   userErrors: [UserError!]!
+}
+
+"""
+How a shop reports its invoices to FBR: POS, a Tier-1 retailer's POS reporting to FBR's IMS (ADR-555); or DIGITAL_INVOICING, FBR's digital invoicing, for a seller registered for sales tax (ADR-562).
+"""
+enum FbrSystem {
+  DIGITAL_INVOICING
+  POS
 }
 
 """
@@ -4633,7 +4658,7 @@ enum FilerStatus {
 }
 
 """
-An invoice or credit note the shop issued while its POS was connected, and how reporting it to FBR went.
+An invoice or credit note the shop issued while connected to FBR, and how reporting it to FBR went.
 """
 type FiscalInvoice {
   """How many times it was sent."""
@@ -4655,6 +4680,9 @@ type FiscalInvoice {
   reportedAt: DateTime
   status: FiscalInvoiceStatus!
 
+  """What it was kept for, and is sent to."""
+  system: FbrSystem!
+
   """The shop's own number for it, FBR's USIN: "INV/2026-27/00001"."""
   usin: String!
 }
@@ -4671,7 +4699,7 @@ type FiscalInvoiceRetryPayload {
 }
 
 """
-PENDING until FBR takes it, tried again while FBR cannot be reached; REPORTED with the number FBR gave it; FAILED when FBR refused it, saying why; SKIPPED when the shop disconnected FBR before it went.
+PENDING until FBR takes it, tried again while FBR cannot be reached; REPORTED with the number FBR gave it; FAILED when FBR refused it, saying why; SKIPPED when the shop disconnected FBR or switched how it reports before it went, or for a credit note, which digital invoicing takes none of.
 """
 enum FiscalInvoiceStatus {
   FAILED
@@ -7834,12 +7862,12 @@ type Mutation {
   draftOrderUpdate(id: ID!, input: DraftOrderInput!): DraftOrderUpdatePayload!
 
   """
-  Disconnects the shop's POS from FBR: its token is forgotten, and invoices are not reported from now on, those still waiting among them.
+  Disconnects the shop from FBR, its POS or digital invoicing: its token is forgotten, and invoices are not reported from now on, those still waiting among them.
   """
   fbrPosDelete: FbrPosDeletePayload!
 
   """
-  Connects the shop's POS to FBR, or changes what it gave (POS-04, ADR-555): from then on, each invoice and credit note it issues is reported to FBR as it is issued. Audited, the token never. Staff confirm who they are first when they signed in over 15 minutes ago.
+  Connects the shop's POS to FBR, or FBR's digital invoicing, or changes what it gave (POS-04, TAX-04, ADR-555, ADR-562): from then on, each invoice it issues is reported to FBR as it is issued, and each credit note to FBR's IMS. Audited, the token never. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   fbrPosUpdate(input: FbrPosInput!): FbrPosUpdatePayload!
 
@@ -7852,7 +7880,7 @@ type Mutation {
   fileDelete(fileIds: [ID!]!): FileDeletePayload!
 
   """
-  Reports again one FBR refused, or one that disconnecting left unsent, once the shop has put right why, while its POS is connected.
+  Reports again one FBR refused, or one that disconnecting left unsent, once the shop has put right why, while it reports through what the invoice was kept for.
   """
   fiscalInvoiceRetry(id: ID!): FiscalInvoiceRetryPayload!
 
@@ -12811,7 +12839,9 @@ type Query {
     status: DraftOrderStatus
   ): DraftOrderConnection!
 
-  """The shop's POS as FBR registered it; null while it has none connected."""
+  """
+  The shop's connection to FBR, its POS or digital invoicing; null while it has none.
+  """
   fbrPos: FbrPos
   file(id: ID!): File
 
@@ -12824,7 +12854,7 @@ type Query {
   ): FileConnection!
 
   """
-  The invoices and credit notes the shop issued while its POS was connected, the latest first, with how reporting each to FBR went.
+  The invoices and credit notes the shop issued while connected to FBR, the latest first, with how reporting each to FBR went.
   """
   fiscalInvoices(
     """At most 100; 50 unless given."""

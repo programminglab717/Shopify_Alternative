@@ -1,6 +1,7 @@
 import { env, parseEnv, z, type Env } from '@hatti/config';
 import { SecretBox } from '@hatti/crypto';
 import { normalizePkIban, parsePkMobile } from '@hatti/pk';
+import { FBR_DI_URLS } from '@hatti/tax/public';
 import { STATUS_COMPONENTS, type StatusComponent } from '@hatti/trust/public';
 
 /** "id:base64key,…", newest first. Parsed at startup so a bad key stops the process. */
@@ -647,6 +648,10 @@ const workerSchema = z
     FBR_POS_SANDBOX_URL: env
       .httpUrl()
       .default('https://esp.fbr.gov.pk:8244/FBR/v1/api/Live/PostData'),
+    /** FBR's digital invoicing, which shops registered for sales tax report through (ADR-562). */
+    FBR_DI_URL: env.httpUrl().default(FBR_DI_URLS.production),
+    /** FBR's sandbox of it, for shops proving FBR's scenarios. */
+    FBR_DI_SANDBOX_URL: env.httpUrl().default(FBR_DI_URLS.sandbox),
     /** How often invoices due go to FBR. */
     FISCAL_INTERVAL_MS: z.coerce.number().int().min(1_000).default(15_000),
     /** How often messages due go out. */
