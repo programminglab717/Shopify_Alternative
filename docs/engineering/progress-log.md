@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Invoices reported to FBR
+### 21248b5 · Invoices reported to FBR
 
 * **A Tier-1 shop connects its POS to FBR, and each invoice and credit note it issues is reported
   to FBR's IMS as it is issued, tried again while FBR cannot be reached** ([ADR-555](../architecture/13-decision-log.md#adr-555--a-tier-1-shop-connects-its-pos-to-fbr-and-each-invoice-and-credit-note-it-issues-is-reported-to-fbrs-ims-as-it-is-issued-tried-again-while-fbr-cannot-be-reached), POS-04,
