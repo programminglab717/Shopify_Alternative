@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Gateway settlements
+### 5297ad9 · Gateway settlements
 
 * **Gateways' settlement statements are imported as they send them, each line matched to its
   payment, with the fees and tax withheld kept beside it** ([ADR-491](../architecture/13-decision-log.md#adr-491--gateway-settlements-the-statements-gateways-send-imported-as-they-come-each-line-matched-to-a-payment-by-the-gateways-reference-and-the-fees-and-tax-withheld-kept-beside-it), PAY-07 in part).
