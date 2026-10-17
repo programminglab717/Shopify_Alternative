@@ -13,6 +13,7 @@ import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '
 import { CollectionService } from '../collection.service.js';
 import type { MutationResult } from '../input-checker.js';
 import { ProductService, type ProductBulkResult } from '../product.service.js';
+import { PRODUCT_CATEGORIES } from '../taxonomy.js';
 import type { CollectionRecord, Page, ProductRecord } from '../records.js';
 import { CollectionConnection } from './collection.types.js';
 import {
@@ -123,6 +124,16 @@ export class ProductResolver {
     @Args('first', { type: () => Int, ...FACET_LIMIT }) first: number,
   ): Promise<string[]> {
     return this.service.facetValues(tenant, 'productType', pageSize(first));
+  }
+
+  @Query(() => [String], {
+    description:
+      "The standard categories a product may be in, each its path in Google's product taxonomy " +
+      '(CAT-18, ADR-483).',
+  })
+  @RequireScopes('read_products')
+  productCategories(): readonly string[] {
+    return PRODUCT_CATEGORIES;
   }
 
   @Query(() => [String], { description: 'Vendors in use.' })

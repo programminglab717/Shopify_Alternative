@@ -1,5 +1,6 @@
 import type { SeoValue } from '@hatti/api';
 import type { EasternWear } from './eastern-wear.js';
+import type { ProductCategory, ProductCondition } from './taxonomy.js';
 import type {
   CollectionRuleValue,
   CollectionSortOrderValue,
@@ -138,6 +139,10 @@ export interface ProductRecord {
   giftCard: boolean;
   /** Whether stitched, its pieces, fabrics and season (CAT-08, ADR-477); null where none said. */
   easternWear: EasternWear | null;
+  /** Its standard category, a path in Google's product taxonomy (CAT-18, ADR-483). */
+  category: ProductCategory | null;
+  /** New, refurbished or used (ADR-483). */
+  condition: ProductCondition;
   version: number;
   createdAt: Date;
   updatedAt: Date;

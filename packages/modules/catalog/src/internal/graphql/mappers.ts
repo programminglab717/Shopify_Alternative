@@ -27,6 +27,7 @@ import {
   MediaErrorCode,
   MediaStatus,
   Product,
+  ProductConditionValue,
   ProductConnection,
   ProductEdge,
   ProductMedia,
@@ -159,6 +160,8 @@ export function toProduct(record: ProductRecord, currency: CurrencyCode): Produc
     easternWear:
       record.easternWear &&
       Object.assign(new EasternWear(), record.easternWear as unknown as EasternWear),
+    category: record.category,
+    condition: record.condition as ProductConditionValue,
     tags: record.tags,
     seo: Object.assign(new SEO(), record.seo),
     options: record.options.map((option) =>

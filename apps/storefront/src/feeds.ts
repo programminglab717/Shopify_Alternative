@@ -86,9 +86,14 @@ export function feedItems(product: ProductDoc, shop: FeedShop, origin: string): 
         ['g:price', priceOf(onSale ? variant.compareAtPrice! : variant.price)],
         ...(onSale ? [['g:sale_price', priceOf(variant.price)] as [string, string]] : []),
         ['g:brand', clip(product.vendor || shop.name, 70)],
-        ['g:condition', 'new'],
-        // Shops make most of what they sell: no barcodes to give.
-        ['g:identifier_exists', 'no'],
+        ['g:condition', product.condition ?? 'new'],
+        // Its GTIN where it has one; shops make most of what they sell, without (ADR-483).
+        ...(variant.gtin
+          ? [['g:gtin', variant.gtin] as [string, string]]
+          : [['g:identifier_exists', 'no'] as [string, string]]),
+        ...(product.category
+          ? [['g:google_product_category', product.category] as [string, string]]
+          : []),
         ...(product.productType
           ? [['g:product_type', clip(product.productType, 750)] as [string, string]]
           : []),

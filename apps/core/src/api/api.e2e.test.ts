@@ -294,6 +294,38 @@ describe.skipIf(!server)('Admin GraphQL API', () => {
       ]);
     });
 
+    it("keeps a product's standard category and condition, from the categories offered (ADR-483)", async () => {
+      const { body: listed } = await gql(tokens.a, '{ productCategories }');
+      expect(listed.data?.productCategories).toContain('Apparel & Accessories > Shoes');
+      const { body } = await gql(
+        tokens.a,
+        `mutation ($input: ProductCreateInput!) {
+           productCreate(input: $input) { product { id category condition } userErrors { field code } }
+         }`,
+        {
+          input: {
+            title: 'Preloved Khussa',
+            category: 'Apparel & Accessories > Shoes',
+            condition: 'USED',
+          },
+        },
+      );
+      expect(body.data?.productCreate.product).toMatchObject({
+        category: 'Apparel & Accessories > Shoes',
+        condition: 'USED',
+      });
+      const { body: refused } = await gql(
+        tokens.a,
+        `mutation ($input: ProductUpdateInput!) {
+           productUpdate(input: $input) { product { id } userErrors { field code } }
+         }`,
+        { input: { id: body.data?.productCreate.product.id, category: 'Vehicles & Parts' } },
+      );
+      expect(refused.data?.productUpdate.userErrors).toEqual([
+        { field: ['input', 'category'], code: 'INVALID' },
+      ]);
+    });
+
     it('searches with Roman Urdu spelling variants and pages through results', async () => {
       await createProduct(tokens.a, { title: 'Qameez Shalwar, Wash & Wear' });
       await createProduct(tokens.a, { title: 'Kurta Kameez' });

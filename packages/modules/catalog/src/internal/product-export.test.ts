@@ -72,6 +72,8 @@ function mugRecord(): ProductRecord {
     seo: { title: null, description: null },
     giftCard: false,
     easternWear: null,
+    category: null,
+    condition: 'new',
     version: 1,
     createdAt: new Date(),
     updatedAt: new Date(),

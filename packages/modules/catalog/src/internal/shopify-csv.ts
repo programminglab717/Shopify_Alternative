@@ -4,6 +4,7 @@ import { toHandle } from './handle.js';
 import { LIMITS } from './input-checker.js';
 import type { CreateProductInput } from './product.service.js';
 import type { MediaRecord, ProductRecord } from './records.js';
+import { PRODUCT_CONDITIONS, productCategoryOf, type ProductCondition } from './taxonomy.js';
 
 /** How much one import takes: a file as customers' imports take it. */
 export const PRODUCT_IMPORT_LIMITS = {
@@ -51,6 +52,8 @@ const COLUMNS = {
   seoTitle: 'SEO Title',
   seoDescription: 'SEO Description',
   cost: 'Cost per item',
+  category: 'Product Category',
+  condition: 'Google Shopping / Condition',
 } as const;
 type Column = keyof typeof COLUMNS;
 /** A column of Shopify's product CSV the import reads, by its key. */
@@ -260,6 +263,11 @@ export function readShopifyProducts(csv: string): ShopifyFileResult {
           seo: { title: main('seoTitle') || null, description: main('seoDescription') || null },
         }),
         status,
+        // Its standard category and condition, where Hatti offers them (ADR-483).
+        ...(productCategoryOf(main('category')) && {
+          category: productCategoryOf(main('category'))!,
+        }),
+        ...(conditionOf(main('condition')) && { condition: conditionOf(main('condition'))! }),
         options: names
           .slice(0, optionCount)
           .map((name, at) => ({ name, values: [...values[at]!.values()] })),
@@ -415,6 +423,14 @@ function statusOf(status: string, published: string): 'active' | 'draft' | 'arch
   const named = status.toLowerCase();
   if (named === 'active' || named === 'draft' || named === 'archived') return named;
   return published.toLowerCase() === 'true' ? 'active' : 'draft';
+}
+
+/** Google Shopping's condition, as the catalog keeps it; null for none it knows. */
+function conditionOf(cell: string): ProductCondition | null {
+  const condition = cell.trim().toLowerCase();
+  return (PRODUCT_CONDITIONS as readonly string[]).includes(condition)
+    ? (condition as ProductCondition)
+    : null;
 }
 
 /** A variant's stock where Shopify tracked it, whole and not below 0. */

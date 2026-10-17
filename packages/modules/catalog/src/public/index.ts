@@ -222,3 +222,10 @@ export {
   type Season,
   type Stitching,
 } from '../internal/eastern-wear.js';
+export {
+  PRODUCT_CATEGORIES,
+  PRODUCT_CONDITIONS,
+  productCategoryOf,
+  type ProductCategory,
+  type ProductCondition,
+} from '../internal/taxonomy.js';

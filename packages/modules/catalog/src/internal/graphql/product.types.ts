@@ -29,6 +29,18 @@ registerEnumType(ProductStatus, {
   },
 });
 
+/** Whether a product is new, refurbished or used, as feeds say it (CAT-18, ADR-483). */
+export enum ProductConditionValue {
+  NEW = 'new',
+  REFURBISHED = 'refurbished',
+  USED = 'used',
+}
+
+registerEnumType(ProductConditionValue, {
+  name: 'ProductCondition',
+  description: 'Whether a product is new, refurbished or used, as shopping feeds say it.',
+});
+
 export enum MediaStatus {
   UPLOADED = 'UPLOADED',
   PROCESSING = 'PROCESSING',
@@ -441,6 +453,17 @@ export class Product {
   })
   easternWear!: EasternWear | null;
 
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Its standard category, a path in Google's product taxonomy, one productCategories lists " +
+      '(CAT-18, ADR-483); null for none.',
+  })
+  category!: string | null;
+
+  @Field(() => ProductConditionValue, { description: 'New, refurbished or used (ADR-483).' })
+  condition!: ProductConditionValue;
+
   @Field(() => [String])
   tags!: string[];
 
@@ -663,6 +686,18 @@ export class ProductCreateInput {
     description: 'Whether it comes stitched, its pieces, fabrics and season (ADR-477).',
   })
   easternWear?: EasternWearInput | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Its standard category, one productCategories lists (ADR-483).',
+  })
+  category?: string | null;
+
+  @Field(() => ProductConditionValue, {
+    nullable: true,
+    description: 'New, refurbished or used; NEW unless given (ADR-483).',
+  })
+  condition?: ProductConditionValue | null;
 }
 
 @InputType()
@@ -713,6 +748,18 @@ export class ProductUpdateInput {
     description: 'Replaces all its eastern-wear attributes (ADR-477); null clears them.',
   })
   easternWear?: EasternWearInput | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Its standard category, one productCategories lists; null or blank clears it.',
+  })
+  category?: string | null;
+
+  @Field(() => ProductConditionValue, {
+    nullable: true,
+    description: 'New, refurbished or used (ADR-483).',
+  })
+  condition?: ProductConditionValue | null;
 }
 
 @InputType()

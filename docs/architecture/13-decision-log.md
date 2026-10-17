@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-482 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-483 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -490,6 +490,7 @@
 | 480 | Frequently bought together: the products a shop's customers bought in the same orders, recommended as complementary where the shop paired none with a product | Accepted |
 | 481 | A commerce lexicon: a storefront's search finds what a word means in English, Roman Urdu or Urdu, "juta" the shop's shoes, after what holds the word as typed | Accepted |
 | 482 | Products from a WooCommerce export: productsImport reads WooCommerce's product CSV, its variable products' variations the variants, as Shopify's file would make them | Accepted |
+| 483 | Product taxonomy: a product's category in Google's product taxonomy and its condition, barcodes that are GTINs published as such, all three in the catalog feed | Accepted |
 
 ---
 
@@ -18230,3 +18231,39 @@
 * **Alternatives:**
   * **WooCommerce's REST API with the shop's keys:** a connection for a one-time move, and the
     file is what the shop already knows how to make.
+
+## ADR-483 · Product taxonomy: a product's category in Google's product taxonomy and its condition, barcodes that are GTINs published as such, all three in the catalog feed
+
+* **Context:**
+  * CAT-18 asks for a standard product taxonomy, condition and GTINs, so Google Shopping and
+    Meta's catalogs take a shop's products without each being fixed by hand.
+  * The catalog feed (ADR-142) said every product was new and had no identifiers. Google
+    rejects or limits products in categories that need them when neither a GTIN nor
+    `identifier_exists` is given, and places products better when their category is said.
+  * Shopify's product CSV carries `Product Category` (a path in Google's taxonomy) and
+    `Google Shopping / Condition`.
+* **Decision:**
+  * **A product has a category and a condition** (migration 0226). The category is one of
+    the paths of Google's product taxonomy Hatti offers (`PRODUCT_CATEGORIES`, those the
+    shops it serves sell in: clothing and its traditional and ceremonial kinds, shoes,
+    jewellery, bags, beauty, home and kitchen, electronics, toys, food and more), matched
+    however it is spaced or cased; one Hatti doesn't offer is refused. Blank clears it.
+    The condition is new, refurbished or used, new unless said. A duplicate keeps both.
+  * **The Admin API** has `Product.category` and `condition`, both on `productCreate` and
+    `productUpdate`, and `productCategories` lists the paths offered.
+  * **Shopify's CSV** fills both from its columns; a category Hatti doesn't offer is left out
+    and the product goes in.
+  * **A barcode that is a GTIN** (8, 12, 13 or 14 digits whose check digit holds) is published
+    in the storefront document as the variant's GTIN; other barcodes stay the shop's own.
+  * **The catalog feed** says each product's condition, its `google_product_category`, its
+    GTIN where it has one, and `identifier_exists no` where it hasn't.
+  * **The admin's product page** has a card for the category and condition.
+* **Consequences:**
+  * The whole of Google's taxonomy (about 5,600 paths) is not offered: a shop picks from the
+    few dozen its kind of shop needs, and the list grows as shops ask.
+  * Meta's catalog reads the same feed, so it gets the same fields.
+* **Alternatives:**
+  * **Google's numeric category IDs:** what Google prefers, but paths are what Shopify's CSV
+    carries and what a merchant reads; Google takes either.
+  * **A GTIN field of its own on variants:** barcodes already hold them, and a second field
+    would be one more to fill in.

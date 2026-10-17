@@ -398,6 +398,8 @@ function productChanges(product: ShopifyProduct, run: ImportRun): Omit<UpdatePro
     ...(has('vendor') && { vendor: input.vendor ?? null }),
     ...(has('type') && { productType: input.productType ?? null }),
     ...(has('tags') && { tags: input.tags ?? [] }),
+    ...(has('category') && { category: input.category ?? null }),
+    ...(has('condition') && input.condition && { condition: input.condition }),
     ...((has('status') || has('published')) && { status: input.status ?? null }),
     ...((has('seoTitle') || has('seoDescription')) && {
       seo: {

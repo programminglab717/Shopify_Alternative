@@ -15,6 +15,7 @@ import {
   unique,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { ProductCondition } from './taxonomy.js';
 import type { EasternWear } from './eastern-wear.js';
 
 export const catalogSchema = pgSchema('catalog');
@@ -87,6 +88,10 @@ export const products = catalogSchema.table(
     heldBy: text('held_by'),
     /** Whether stitched, its pieces, fabrics and season (CAT-08, ADR-477); null where none said. */
     easternWear: jsonb('eastern_wear').$type<EasternWear | null>(),
+    /** Its standard category, a path in Google's product taxonomy (CAT-18, ADR-483). */
+    category: text('category'),
+    /** New, refurbished or used, as feeds say it (ADR-483). */
+    condition: text('condition').$type<ProductCondition>().notNull().default('new'),
     version: integer('version').notNull().default(1),
     ...timestamps,
   },

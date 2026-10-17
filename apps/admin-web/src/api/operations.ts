@@ -909,6 +909,8 @@ const PRODUCT = /* GraphQL */ `
     totalInventory
     tracksInventory
     isGiftCard
+    category
+    condition
     easternWear {
       stitching
       pieces
@@ -4553,6 +4555,12 @@ export const ShopVerificationSubmitMutation = /* GraphQL */ `
 
 /** Whether AI drafts the shop's Urdu here, and how many of the day's it asked for (CAT-07). */
 /** Whether this Hatti writes products' copy with AI, and how many of the day's drafts are used. */
+export const ProductCategoriesQuery = /* GraphQL */ `
+  query ProductCategories {
+    productCategories
+  }
+`;
+
 export const ProductCopyDraftingQuery = /* GraphQL */ `
   query ProductCopyDrafting {
     productCopyDrafting {

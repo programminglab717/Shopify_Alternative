@@ -481,6 +481,10 @@ export interface ProductDetail {
   tracksInventory: boolean;
   /** Whether it is sold as a gift card (ADR-451); absent where a fake core leaves it out. */
   isGiftCard?: boolean;
+  /** Its category in Google's taxonomy (ADR-483); absent where a fake core leaves it out. */
+  category?: string | null;
+  /** Whether it is new, refurbished or used (ADR-483); absent where a fake core leaves it out. */
+  condition?: ProductConditionValue;
   /** Stitched or not, its pieces, fabrics and season (ADR-477); absent where a fake core leaves it out. */
   easternWear?: EasternWear | null;
   /** Its pre-order, if it is on one (ADR-403); absent where a fake core leaves it out. */
@@ -1913,6 +1917,14 @@ export interface ShopVerificationSubmitData {
 }
 
 export type CopyLanguage = 'ENGLISH' | 'URDU' | 'ROMAN_URDU';
+
+/** Whether a product is new, refurbished or used (ADR-483). */
+export type ProductConditionValue = 'NEW' | 'REFURBISHED' | 'USED';
+
+/** The categories of Google's taxonomy a product may be given (ADR-483). */
+export interface ProductCategoriesData {
+  productCategories: string[];
+}
 
 export interface ProductCopyDraftingData {
   productCopyDrafting: { available: boolean; usedToday: number; limitPerDay: number };

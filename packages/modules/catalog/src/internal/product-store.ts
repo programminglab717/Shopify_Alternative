@@ -1,5 +1,6 @@
 import type { TenantContext } from '@hatti/api';
 import { easternWearText, type EasternWear } from './eastern-wear.js';
+import { productCategoryOf, type ProductCondition } from './taxonomy.js';
 import { executePrepared, literalLimit, toDate, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { searchKey } from '@hatti/pk';
@@ -26,6 +27,8 @@ interface ProductJsonRow extends Record<string, unknown> {
   seo_description: string | null;
   gift_card: boolean;
   eastern_wear: EasternWear | null;
+  category: string | null;
+  condition: ProductCondition;
   version: number;
   created_at: string;
   updated_at: string;
@@ -108,6 +111,8 @@ function toProductRecord(row: ProductJsonRow): ProductRecord {
     seo: { title: row.seo_title, description: row.seo_description },
     giftCard: row.gift_card,
     easternWear: easternWearOf(row.eastern_wear),
+    category: productCategoryOf(row.category),
+    condition: row.condition,
     version: row.version,
     createdAt: toDate(row.created_at),
     updatedAt: toDate(row.updated_at),
@@ -143,7 +148,7 @@ export async function queryProducts(
 ): Promise<{ record: ProductRecord; key: string | null }[]> {
   const query = sql`
     SELECT p.id, p.title, p.handle, p.status, p.description, p.vendor, p.product_type, p.tags,
-           p.seo_title, p.seo_description, p.gift_card, p.eastern_wear, p.version, p.created_at,
+           p.seo_title, p.seo_description, p.gift_card, p.eastern_wear, p.category, p.condition, p.version, p.created_at,
            p.updated_at,
            (${options.key ?? sql`NULL`})::text AS sort_key,
            (SELECT coalesce(json_agg(json_build_object(

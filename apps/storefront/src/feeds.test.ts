@@ -150,6 +150,29 @@ describe('Catalog feeds', () => {
     expect(feedItems({ ...kurta, images: [] }, SHOP, ORIGIN)).toBe('');
   });
 
+  it("gives a product's standard category, its condition and its variants' GTINs (ADR-483)", () => {
+    const used: ProductDoc = {
+      ...kurta,
+      category: 'Apparel & Accessories > Clothing > Shirts & Tops',
+      condition: 'used',
+      variants: [
+        { ...kurta.variants[0]!, gtin: '8964000123454' },
+        { ...kurta.variants[1]!, gtin: undefined },
+      ],
+    };
+    const items = itemsOf(feedItems(used, SHOP, ORIGIN)).map((item) => Object.fromEntries(item));
+    expect(items.map((item) => item['g:google_product_category'])).toEqual([
+      'Apparel &amp; Accessories &gt; Clothing &gt; Shirts &amp; Tops',
+      'Apparel &amp; Accessories &gt; Clothing &gt; Shirts &amp; Tops',
+    ]);
+    expect(items.map((item) => item['g:condition'])).toEqual(['used', 'used']);
+    // A GTIN where the variant has one; else no identifier, as shops' own goods have none.
+    expect(items.map((item) => [item['g:gtin'], item['g:identifier_exists']])).toEqual([
+      ['8964000123454', undefined],
+      [undefined, 'no'],
+    ]);
+  });
+
   it("sends a shop's products a chunk at a time, in the same order each time", async () => {
     const sample = sampleStore();
     const store = new MemoryStore(sample);

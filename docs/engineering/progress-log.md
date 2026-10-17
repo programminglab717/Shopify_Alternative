@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Product taxonomy and feed attributes
+
+* **A product's category in Google's product taxonomy and its condition, kept by the catalog,
+  through the Admin API, Shopify's CSV and the admin's product page; barcodes that are GTINs
+  published as such; all three in the catalog feed** ([ADR-483](../architecture/13-decision-log.md#adr-483--product-taxonomy-a-products-category-in-googles-product-taxonomy-and-its-condition-barcodes-that-are-gtins-published-as-such-all-three-in-the-catalog-feed), CAT-18).
+* 3027 tests, 9 more: the catalog's taxonomy, GTINs in storefront
+  documents, the feed, the Admin API and the admin's card.
+
 ### 9d41b97 · Products from a WooCommerce export
 
 * **productsImport reads WooCommerce's product CSV, its variable products' variations the

@@ -9977,6 +9977,11 @@ type Product {
   """
   bundle: ProductBundle
 
+  """
+  Its standard category, a path in Google's product taxonomy, one productCategories lists (CAT-18, ADR-483); null for none.
+  """
+  category: String
+
   """The collections it is in, by id."""
   collections(
     """Cursor from a previous page."""
@@ -9990,6 +9995,9 @@ type Product {
   The products the shop pairs with it, in its order, at most 10: what its page and the cart recommend beside it as complementary (ADR-435).
   """
   complementaryProducts: [Product!]!
+
+  """New, refurbished or used (ADR-483)."""
+  condition: ProductCondition!
   createdAt: DateTime!
   description: String!
 
@@ -10117,6 +10125,15 @@ type ProductComplementsSetPayload {
   userErrors: [UserError!]!
 }
 
+"""
+Whether a product is new, refurbished or used, as shopping feeds say it.
+"""
+enum ProductCondition {
+  NEW
+  REFURBISHED
+  USED
+}
+
 type ProductConnection {
   edges: [ProductEdge!]!
   nodes: [Product!]!
@@ -10182,6 +10199,11 @@ input ProductCopyOptionInput {
 }
 
 input ProductCreateInput {
+  """Its standard category, one productCategories lists (ADR-483)."""
+  category: String
+
+  """New, refurbished or used; NEW unless given (ADR-483)."""
+  condition: ProductCondition
   description: String
 
   """Whether it comes stitched, its pieces, fabrics and season (ADR-477)."""
@@ -10476,6 +10498,13 @@ enum ProductStatus {
 }
 
 input ProductUpdateInput {
+  """
+  Its standard category, one productCategories lists; null or blank clears it.
+  """
+  category: String
+
+  """New, refurbished or used (ADR-483)."""
+  condition: ProductCondition
   description: String
 
   """Replaces all its eastern-wear attributes (ADR-477); null clears them."""
@@ -11606,6 +11635,11 @@ type Query {
 
   """A product by handle, or null."""
   productByHandle(handle: String!): Product
+
+  """
+  The standard categories a product may be in, each its path in Google's product taxonomy (CAT-18, ADR-483).
+  """
+  productCategories: [String!]!
 
   """
   Whether the shop may ask for AI drafts of products’ copy (CAT-20), and how many it asked for in the last 24 hours.

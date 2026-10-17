@@ -49,7 +49,7 @@ import {
 } from '@hatti/storefront-data';
 
 // The storefront's documents, made from the catalog's records (03 §8). Only what a theme may
-// show: no costs, barcodes or stock counts.
+// show: no costs or stock counts, and a barcode only where it is a GTIN (ADR-483).
 
 /** `/collections/all`, every active product, newest first, unless a collection has the handle. */
 export const ALL_PRODUCTS = 'all';
@@ -147,6 +147,7 @@ export function productDoc(
           )
         : [DEFAULT_VARIANT_TITLE],
       image: variant.mediaId === null ? null : (imageAt.get(variant.mediaId) ?? null),
+      ...(variant.barcode && isGtin(variant.barcode) && { gtin: variant.barcode }),
       ...(left.has(variant.id) && { left: left.get(variant.id) }),
     })),
     images: images.map(({ media, src }) => {
@@ -190,6 +191,8 @@ export function productDoc(
     }),
     ...(record.giftCard && { giftCard: true as const }),
     ...(record.easternWear && { easternWear: easternWearDoc(record.easternWear) }),
+    ...(record.category && { category: record.category }),
+    ...(record.condition !== 'new' && { condition: record.condition }),
     ...(preorderShipsOn && { preorderShipsOn }),
     ...(saleEndsAt && { saleEndsAt: saleEndsAt.toISOString() }),
     ...(sizeChart && { sizeChart }),
@@ -203,6 +206,21 @@ export function productDoc(
  * A product's eastern-wear attributes as pages say them (ADR-477): each in Hatti's words in English
  * and Urdu, which Urdu pages show.
  */
+/**
+ * Whether a barcode is a GTIN, as feeds take it: 8, 12, 13 or 14 digits, the last the check digit
+ * of the rest (ADR-483). A shop's own codes are not.
+ */
+export function isGtin(code: string): boolean {
+  if (!/^(\d{8}|\d{12,14})$/.test(code)) return false;
+  const digits = [...code].map(Number);
+  const check = digits.pop()!;
+  // From the right, the digits are weighed 3, 1, 3, 1...
+  const sum = digits
+    .reverse()
+    .reduce((total, digit, at) => total + digit * (at % 2 === 0 ? 3 : 1), 0);
+  return (10 - (sum % 10)) % 10 === check;
+}
+
 function easternWearDoc(wear: EasternWear): EasternWearDoc {
   const word = (value: string, words: { en: string; ur: string }) => ({
     value,

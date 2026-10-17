@@ -90,6 +90,11 @@ export interface VariantDoc {
   /** Its image, by position in the product's images. */
   image: number | null;
   /**
+   * Its barcode where it is a GTIN, its check digit right (CAT-18, ADR-483): what shopping feeds
+   * identify it by. Absent where it has none, or one of the shop's own.
+   */
+  gtin?: string;
+  /**
    * How many are left to sell, where 5 or fewer are (MKT-14, ADR-445): for honest "only 3 left"
    * words. Absent where more are, where stock is not counted, or where it sells on at zero.
    */
@@ -149,6 +154,10 @@ export interface ProductDoc {
    * words. Absent where none is said.
    */
   easternWear?: EasternWearDoc;
+  /** Its standard category, a path in Google's product taxonomy (CAT-18, ADR-483). */
+  category?: string;
+  /** Refurbished or used, as feeds say it (ADR-483); absent where it is new. */
+  condition?: 'refurbished' | 'used';
   /** What it holds, where it is a bundle (ADR-411). */
   bundle?: BundleDoc;
   /** The size chart its page shows, if any (ADR-407). */

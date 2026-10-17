@@ -1,6 +1,6 @@
 import type { MediaRecord, ProductRecord } from '@hatti/catalog/public';
 import { describe, expect, it } from 'vitest';
-import { productDoc } from './documents.js';
+import { isGtin, productDoc } from './documents.js';
 
 const media = (id: string, fields: Partial<MediaRecord>): MediaRecord => ({
   id,
@@ -39,6 +39,8 @@ describe("products' documents", () => {
       seo: { title: null, description: null },
       giftCard: false,
       easternWear: null,
+      category: null,
+      condition: 'new',
       version: 1,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -130,6 +132,65 @@ describe("products' documents", () => {
     });
   });
 
+  it("give a product's standard category and condition, and a variant's barcode only as a GTIN (ADR-483)", () => {
+    expect(isGtin('8964000123454')).toBe(true);
+    expect(isGtin('96385074')).toBe(true);
+    expect(isGtin('012345678905')).toBe(true);
+    // A check digit wrong, a shop's own code, or a length GTINs don't have.
+    expect(isGtin('8964000123457')).toBe(false);
+    expect(isGtin('KUR-RED-M')).toBe(false);
+    expect(isGtin('123456789')).toBe(false);
+
+    const record = {
+      id: 'p1',
+      title: 'Used Watch',
+      handle: 'used-watch',
+      status: 'active',
+      description: '',
+      vendor: null,
+      productType: null,
+      tags: [],
+      seo: { title: null, description: null },
+      giftCard: false,
+      easternWear: null,
+      category: 'Apparel & Accessories > Jewelry > Watches',
+      condition: 'used',
+      version: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      options: [],
+      media: [],
+      variants: [
+        { id: 'v1', barcode: '8964000123454' },
+        { id: 'v2', barcode: 'WATCH-2' },
+      ].map((variant, at) => ({
+        ...variant,
+        productId: 'p1',
+        title: 'Default Title',
+        position: at + 1,
+        sku: null,
+        price: 1_000_000n,
+        compareAtPrice: null,
+        cost: null,
+        taxable: true,
+        taxCode: null,
+        weightGrams: null,
+        mediaId: null,
+        selectedOptions: [],
+      })),
+    } as unknown as ProductRecord;
+    const doc = productDoc(record, new Map(), () => null);
+    expect([doc.category, doc.condition]).toEqual([
+      'Apparel & Accessories > Jewelry > Watches',
+      'used',
+    ]);
+    expect(doc.variants.map((variant) => variant.gtin)).toEqual(['8964000123454', undefined]);
+    // New is not said.
+    expect(
+      productDoc({ ...record, condition: 'new' }, new Map(), () => null).condition,
+    ).toBeUndefined();
+  });
+
   it("show a product's videos ready to play among its media, its images by their places (ADR-258)", () => {
     const ready = { status: 'ready' as const, imageFormat: 'jpeg' as const, imageSize: 9_000 };
     const record = {
@@ -144,6 +205,8 @@ describe("products' documents", () => {
       seo: { title: null, description: null },
       giftCard: false,
       easternWear: null,
+      category: null,
+      condition: 'new',
       version: 1,
       createdAt: new Date(),
       updatedAt: new Date(),

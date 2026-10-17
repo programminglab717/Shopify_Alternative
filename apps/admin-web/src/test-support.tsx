@@ -129,7 +129,14 @@ export function fakeCore(
             ? orElse(() => answer(operation, variables), {
                 productCopyDrafting: { available: false, usedToday: 0, limitPerDay: 100 },
               })
-            : answer(operation, variables);
+            : operation === 'ProductCategories'
+              ? orElse(() => answer(operation, variables), {
+                  productCategories: [
+                    'Apparel & Accessories > Clothing',
+                    'Apparel & Accessories > Shoes',
+                  ],
+                })
+              : answer(operation, variables);
     if (data instanceof GraphQLErrors) return json({ data: null, errors: data.errors });
     return json({ data });
   });

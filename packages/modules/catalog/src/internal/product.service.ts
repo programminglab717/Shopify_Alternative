@@ -28,6 +28,12 @@ import {
   type ProductUpdatedPayload,
 } from './events.js';
 import { handleCandidate, movedFrom, toHandle } from './handle.js';
+import {
+  checkCategory,
+  checkCondition,
+  type ProductCategory,
+  type ProductCondition,
+} from './taxonomy.js';
 import { CopiedVariantStock, copyMedia, joinManualCollections } from './product-copy.js';
 import { copySizeChartIn } from './size-charts.js';
 import { productSearchConditions } from './product-filter.js';
@@ -102,6 +108,10 @@ export interface CreateProductInput {
   giftCard?: boolean | null;
   /** Whether stitched, its pieces, fabrics and season (CAT-08, ADR-477). */
   easternWear?: EasternWearInput | null;
+  /** Its standard category, a path in Google's product taxonomy (CAT-18, ADR-483). */
+  category?: string | null;
+  /** New, refurbished or used; new where not given (ADR-483). */
+  condition?: ProductCondition | null;
 }
 
 /** Omitted (undefined) fields stay as they are; null clears optional fields. */
@@ -125,6 +135,10 @@ export interface UpdateProductInput {
   giftCard?: boolean | null;
   /** Its eastern-wear attributes, all of them; null clears them (ADR-477). */
   easternWear?: EasternWearInput | null;
+  /** Its standard category; null or blank clears it (ADR-483). */
+  category?: string | null;
+  /** New, refurbished or used (ADR-483). */
+  condition?: ProductCondition | null;
 }
 
 /** What `duplicate` copies, and how (ADR-343). */
@@ -163,6 +177,8 @@ interface CheckedProduct {
   requestedHandle: string | null;
   giftCard: boolean;
   easternWear: EasternWear | null;
+  category: ProductCategory | null;
+  condition: ProductCondition;
   options: OptionShape[];
   /** A copy's variants keep their titles; others' are made from their option values. */
   variants: { title?: string; fields: VariantFields; optionValues: string[] }[];
@@ -185,6 +201,8 @@ type ProductChanges = Partial<
     | 'giftCard'
     | 'heldBy'
     | 'easternWear'
+    | 'category'
+    | 'condition'
   >
 >;
 
@@ -286,6 +304,8 @@ export class ProductService {
           requestedHandle: null,
           giftCard: original.giftCard,
           easternWear: original.easternWear,
+          category: original.category,
+          condition: original.condition,
           options: options.map((option) => ({
             name: option.name,
             values: [...option.values]
@@ -356,6 +376,8 @@ export class ProductService {
       options,
       giftCard,
       easternWear,
+      category,
+      condition,
     } = checked;
     const productId = newId();
     const base = requestedHandle ?? (toHandle(title) || 'product');
@@ -372,6 +394,8 @@ export class ProductService {
       seoDescription: seo.description ?? null,
       giftCard,
       easternWear,
+      category,
+      condition,
       searchText: searchTextOf({ title, vendor, productType, tags, easternWear }),
     };
 
@@ -536,6 +560,8 @@ export class ProductService {
       return { fields, optionValues: optionValues ?? [] };
     });
     const easternWear = checkEasternWear(check, ['input', 'easternWear'], input.easternWear);
+    const category = checkCategory(check, ['input', 'category'], input.category) ?? null;
+    const condition = checkCondition(check, ['input', 'condition'], input.condition) ?? 'new';
     if (!check.ok || title === null) return { ok: false, errors: check.errors };
     // On sale from the start: screened for what Hatti does not allow (ADR-473).
     if (input.status === 'active') {
@@ -554,6 +580,8 @@ export class ProductService {
         requestedHandle,
         giftCard: input.giftCard === true,
         easternWear,
+        category,
+        condition,
         options,
         variants: variantValues,
       },
@@ -605,6 +633,10 @@ export class ProductService {
     if (input.easternWear !== undefined) {
       changes.easternWear = checkEasternWear(check, ['input', 'easternWear'], input.easternWear);
     }
+    const category = checkCategory(check, ['input', 'category'], input.category);
+    if (category !== undefined) changes.category = category;
+    const condition = checkCondition(check, ['input', 'condition'], input.condition);
+    if (condition) changes.condition = condition;
     if (!check.ok) return fail(check.errors);
 
     return this.#change(tenant, input.id, ['input', 'id'], () => changes, input.redirectNewHandle);
