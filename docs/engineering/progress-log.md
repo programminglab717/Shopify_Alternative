@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### The store builder
+### ccf4e32 · The store builder
 
 * **A shop is set up from a few lines saying what it sells: its kit, theme colour, About us page
   and home page SEO, leaving what it set** ([ADR-502](../architecture/13-decision-log.md#adr-502--the-store-builder-a-shop-set-up-from-a-few-lines-saying-what-it-sells-its-kit-theme-colour-about-us-page-and-home-page-seo-leaving-what-it-set), ONB-03).
