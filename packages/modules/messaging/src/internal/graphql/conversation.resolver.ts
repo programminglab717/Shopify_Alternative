@@ -6,6 +6,7 @@ import {
   badUserInput,
   decodeTimeCursor,
   encodeCursor,
+  failOne,
   pageSize,
   shownPhone,
   type TenantContext,
@@ -13,6 +14,7 @@ import {
 import { isUuid, toPublicId, tryFromPublicId } from '@hatti/ids';
 import { Args, ID, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
+  CONVERSATION_WINDOW_MS,
   ConversationsService,
   type ConversationMessageRecord,
   type ConversationRecord,
@@ -25,6 +27,8 @@ import {
   ConversationMessageConnection,
   ConversationMessageDirection,
   ConversationMessagesArgs,
+  ConversationReplyPayload,
+  ConversationReplyStatus,
   ConversationStatus,
   ConversationsArgs,
   ConversationUpdatePayload,
@@ -32,7 +36,8 @@ import {
 
 /**
  * The inbox (MSG-05, ADR-545): the shop's conversations with its customers on WhatsApp, their
- * messages, and marking them read or closed. Numbers are shown as the caller may see them.
+ * messages, marking them read or closed, and answering them (ADR-546). Numbers are shown as the
+ * caller may see them.
  */
 @Resolver(() => Conversation)
 export class ConversationResolver {
@@ -154,6 +159,28 @@ export class ConversationResolver {
         : null,
     );
   }
+
+  @Mutation(() => ConversationReplyPayload, {
+    description:
+      "Answers the customer on WhatsApp in the shop's own words, from the number they wrote to: " +
+      'only within a day of their last message, as WhatsApp allows. Marks the conversation read.',
+  })
+  @RequireScopes('write_conversations')
+  async conversationReply(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('body') body: string,
+  ): Promise<ConversationReplyPayload> {
+    const uuid = tryFromPublicId(id, 'conversation');
+    const result = uuid
+      ? await this.inbox.reply(tenant, uuid, body)
+      : failOne<never>(['id'], 'NOT_FOUND', 'No such conversation');
+    return Object.assign(new ConversationReplyPayload(), {
+      conversation: result.ok ? toConversation(tenant, result.value.conversation) : null,
+      message: result.ok ? toMessage(result.value.message) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
 }
 
 function payload(
@@ -177,6 +204,8 @@ function toConversation(tenant: TenantContext, record: ConversationRecord): Conv
     unread: record.unread,
     lastMessageAt: record.lastMessageAt,
     lastInboundAt: record.lastInboundAt,
+    replyableUntil:
+      record.lastInboundAt && new Date(record.lastInboundAt.getTime() + CONVERSATION_WINDOW_MS),
     lastMessage: record.lastMessage && toMessage(record.lastMessage),
     createdAt: record.createdAt,
   });
@@ -189,5 +218,7 @@ function toMessage(record: ConversationMessageRecord): ConversationMessage {
     body: record.body,
     mediaKind: record.mediaKind,
     at: record.at,
+    status: record.status && (record.status.toUpperCase() as ConversationReplyStatus),
+    error: record.error,
   });
 }

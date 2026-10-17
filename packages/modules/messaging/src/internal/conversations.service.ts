@@ -1,24 +1,35 @@
-import type { TenantContext } from '@hatti/api';
+import { actorColumnsOf, failOne, type MutationResult, type TenantContext } from '@hatti/api';
 import { Database, exactTime, toDate, toDateOrNull, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
-import { MessagingEvents, type ConversationMessageReceivedPayload } from './events.js';
-import type { Page } from './messages.service.js';
-import { WHATSAPP_CLOUD } from './providers.js';
+import {
+  MessagingEvents,
+  type ConversationMessageReceivedPayload,
+  type ConversationRepliedPayload,
+} from './events.js';
+import type { Page, StatusUpdate } from './messages.service.js';
+import { WHATSAPP_CLOUD, WhatsAppCloudProvider } from './providers.js';
+import { WhatsAppAccountsService } from './whatsapp-accounts.service.js';
 import type { InboundMessage } from './whatsapp-webhook.js';
 
 // The inbox (MSG-05, ADR-545): what customers write to a shop on WhatsApp, kept for its staff to
 // read, a conversation for each customer's number. A message to a shop's own number is that
 // shop's; one to Hatti's shared number is the shop's whose message it answers, else the one that
 // last wrote to the number; one no shop wrote to is no one's, and is not kept. The webhook works
-// with the application's login, finding the shop through functions that see no shop's rows.
+// with the application's login, finding the shop through functions that see no shop's rows. Staff
+// answer in their own words within the day WhatsApp allows, from the number the customer wrote to
+// (ADR-546): sent at once, and followed to delivery as the webhook says.
 
 /** How long after a customer last wrote WhatsApp lets the shop answer them freely. */
 export const CONVERSATION_WINDOW_MS = 24 * 3_600_000;
 
+/** The longest reply WhatsApp takes, in characters. */
+export const REPLY_MAX_LENGTH = 4096;
+
 export type ConversationStatusValue = 'open' | 'closed';
 export type ConversationDirectionValue = 'inbound' | 'outbound';
+export type ReplyStatusValue = 'sent' | 'delivered' | 'read' | 'failed';
 
 /** A message of a conversation, as the shop's staff read it. */
 export interface ConversationMessageRecord {
@@ -27,7 +38,23 @@ export interface ConversationMessageRecord {
   body: string | null;
   mediaKind: string | null;
   at: Date;
+  /** How a reply went, as WhatsApp says; null for what the customer wrote. */
+  status: ReplyStatusValue | null;
+  /** Why WhatsApp could not deliver a reply. */
+  error: string | null;
 }
+
+/**
+ * Meta's Graph API as replies go through it, and Hatti's shared number with its token: null
+ * where it is not set up, as in development, and replies to it are refused.
+ */
+export interface WhatsAppReplySettings {
+  baseUrl: string;
+  version: string;
+  shared: { phoneNumberId: string; accessToken: string } | null;
+}
+
+export const WHATSAPP_REPLIES = Symbol('WHATSAPP_REPLIES');
 
 /** A conversation with a customer, as the inbox lists it. */
 export interface ConversationRecord {
@@ -71,6 +98,8 @@ type ConversationRow = {
   body: string | null;
   media_kind: string | null;
   at: string | Date | null;
+  message_status: ReplyStatusValue | null;
+  message_error: string | null;
 };
 
 type MessageRow = {
@@ -79,11 +108,27 @@ type MessageRow = {
   body: string | null;
   media_kind: string | null;
   at: string | Date;
+  status: ReplyStatusValue | null;
+  error: string | null;
+};
+
+/** What WhatsApp's statuses may move a reply on from: never back, and failed only undelivered. */
+const STATUS_FROM: Record<StatusUpdate['status'], readonly ReplyStatusValue[]> = {
+  sent: [],
+  delivered: ['sent'],
+  read: ['sent', 'delivered'],
+  failed: ['sent'],
 };
 
 @Injectable()
 export class ConversationsService {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    @Optional()
+    @Inject(WHATSAPP_REPLIES)
+    private readonly replies: WhatsAppReplySettings | null = null,
+    @Optional() private readonly accounts: WhatsAppAccountsService | null = null,
+  ) {}
 
   /**
    * Keeps `message`, which a customer wrote on WhatsApp, in the conversation of the shop it is
@@ -184,7 +229,7 @@ export class ConversationsService {
   ): Promise<Page<ConversationMessageRecord>> {
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<MessageRow>(sql`
-        SELECT m.id, m.direction, m.body, m.media_kind, m.at
+        SELECT m.id, m.direction, m.body, m.media_kind, m.at, m.status, m.error
           FROM messaging.conversation_messages m
          WHERE m.shop_id = ${tenant.shopId} AND m.conversation_id = ${conversationId}
            ${
@@ -231,6 +276,150 @@ export class ConversationsService {
     });
   }
 
+  /**
+   * Answers the customer in `body`, from the number they last wrote to, while WhatsApp lets the
+   * shop write freely: within a day of their last message. Sent at once; kept, and the
+   * conversation read, once WhatsApp takes it. What WhatsApp refuses is not kept.
+   */
+  async reply(
+    tenant: TenantContext,
+    id: string,
+    body: string,
+    now: Date = new Date(),
+  ): Promise<
+    MutationResult<{ conversation: ConversationRecord; message: ConversationMessageRecord }>
+  > {
+    const text = body.trim();
+    if (!text) return failOne(['body'], 'BLANK', 'Write something to send');
+    if (text.length > REPLY_MAX_LENGTH) {
+      return failOne(['body'], 'TOO_LONG', `A reply is at most ${REPLY_MAX_LENGTH} characters`);
+    }
+    const found = await this.db.tenant(tenant.shopId, (tx) =>
+      tx.execute<{
+        customer_phone: string;
+        via_phone_number_id: string | null;
+        last_inbound_at: string | Date | null;
+      }>(sql`
+        SELECT customer_phone, via_phone_number_id, last_inbound_at
+          FROM messaging.conversations
+         WHERE shop_id = ${tenant.shopId} AND id = ${id}`),
+    );
+    const conversation = found.rows[0];
+    if (!conversation) return failOne(['id'], 'NOT_FOUND', 'No such conversation');
+    const lastInbound = toDateOrNull(conversation.last_inbound_at);
+    if (!lastInbound || now.getTime() - lastInbound.getTime() >= CONVERSATION_WINDOW_MS) {
+      return failOne(
+        ['id'],
+        'WINDOW_CLOSED',
+        'WhatsApp lets a shop answer only within a day of the customer’s last message',
+      );
+    }
+    const provider = await this.#replyingNumber(tenant.shopId, conversation.via_phone_number_id);
+    if (!provider) {
+      return failOne(
+        ['id'],
+        'UNAVAILABLE',
+        conversation.via_phone_number_id
+          ? 'The number the customer wrote to is no longer connected'
+          : 'WhatsApp is not set up to send replies',
+      );
+    }
+    const sent = await provider.sendText(conversation.customer_phone, text);
+    if (!sent.ok) {
+      return failOne(['body'], sent.outcome === 'retry' ? 'UNAVAILABLE' : 'NOT_SENT', sent.error);
+    }
+    const actor = actorColumnsOf(tenant.actor);
+    return {
+      ok: true,
+      value: await this.db.tenant(tenant.shopId, async (tx) => {
+        const at = now.toISOString();
+        const { rows } = await tx.execute<MessageRow>(sql`
+          INSERT INTO messaging.conversation_messages
+                 (shop_id, conversation_id, direction, body, provider_message_id, at, status,
+                  actor_kind, actor_id)
+          VALUES (${tenant.shopId}, ${id}, 'outbound', ${text}, ${sent.providerMessageId}, ${at},
+                  'sent', ${actor.actorKind}, ${actor.actorId})
+          RETURNING id, direction, body, media_kind, at, status, error`);
+        const message = rows[0]!;
+        await tx.execute(sql`
+          UPDATE messaging.conversations
+             SET unread = 0, last_message_at = greatest(last_message_at, ${at}::timestamptz)
+           WHERE shop_id = ${tenant.shopId} AND id = ${id}`);
+        await appendEvent<ConversationRepliedPayload>(tx, tenant.shopId, {
+          type: MessagingEvents.ConversationReplied,
+          aggregateType: 'conversation',
+          aggregateId: id,
+          payload: { messageId: message.id, at },
+        });
+        return {
+          conversation: (await conversationIn(tx, tenant.shopId, id))!,
+          message: toMessage(message),
+        };
+      }),
+    };
+  }
+
+  /**
+   * How the replies WhatsApp's webhook names went: delivered, then read; failed only before
+   * delivery. Each found by its ID across shops, then changed as its shop. Those not found are
+   * given back, for the messages' own statuses or none.
+   */
+  async recordStatuses(updates: readonly StatusUpdate[]): Promise<StatusUpdate[]> {
+    if (updates.length === 0) return [];
+    const { rows } = await this.db.app.execute<{
+      shop_id: string;
+      message_id: string;
+      provider_message_id: string;
+    }>(sql`
+      SELECT shop_id, message_id, provider_message_id
+        FROM messaging.resolve_conversation_messages(
+               ${sql.param(updates.map((update) => update.providerMessageId))}::text[])`);
+    const found = new Map(rows.map((row) => [row.provider_message_id, row]));
+    for (const update of updates) {
+      const reply = found.get(update.providerMessageId);
+      if (!reply) continue;
+      const from = STATUS_FROM[update.status];
+      if (from.length === 0) continue;
+      await this.db.tenant(reply.shop_id, (tx) =>
+        tx.execute(sql`
+          UPDATE messaging.conversation_messages
+             SET status = ${update.status},
+                 error = CASE WHEN ${update.status} = 'failed'
+                              THEN ${(update.error ?? 'WhatsApp could not deliver it').slice(0, 1_000)}
+                              ELSE error END
+           WHERE shop_id = ${reply.shop_id} AND id = ${reply.message_id}
+             AND status = ANY(${sql.param(from)}::text[])`),
+      );
+    }
+    return updates.filter((update) => !found.has(update.providerMessageId));
+  }
+
+  /**
+   * The number a reply goes from: the shop's own, where the customer last wrote to it and it is
+   * still connected; Hatti's shared number where they wrote to that. None otherwise.
+   */
+  async #replyingNumber(
+    shopId: string,
+    viaPhoneNumberId: string | null,
+  ): Promise<WhatsAppCloudProvider | null> {
+    if (!this.replies) return null;
+    const { baseUrl, version } = this.replies;
+    if (viaPhoneNumberId) {
+      const sender = await this.accounts?.senderOf(shopId);
+      return sender?.phoneNumberId === viaPhoneNumberId
+        ? new WhatsAppCloudProvider({
+            baseUrl,
+            version,
+            phoneNumberId: sender.phoneNumberId,
+            accessToken: sender.accessToken,
+            shopNumber: true,
+          })
+        : null;
+    }
+    const { shared } = this.replies;
+    return shared && new WhatsAppCloudProvider({ baseUrl, version, ...shared });
+  }
+
   /** The shop a customer's message is for, and whether it was written to its own number. */
   async #shopOf(message: InboundMessage): Promise<{ shopId: string; own: boolean } | null> {
     if (message.to) {
@@ -257,10 +446,11 @@ function conversationSelect(shopId: string) {
     SELECT c.id, c.customer_phone, c.via_phone_number_id, c.status, c.unread, c.last_message_at,
            c.last_inbound_at, c.created_at,
            ${exactTime(sql`c.last_message_at`)} AS last_message_at_exactly,
-           m.id AS message_id, m.direction, m.body, m.media_kind, m.at
+           m.id AS message_id, m.direction, m.body, m.media_kind, m.at,
+           m.status AS message_status, m.error AS message_error
       FROM messaging.conversations c
       LEFT JOIN LATERAL (
-        SELECT l.id, l.direction, l.body, l.media_kind, l.at
+        SELECT l.id, l.direction, l.body, l.media_kind, l.at, l.status, l.error
           FROM messaging.conversation_messages l
          WHERE l.shop_id = c.shop_id AND l.conversation_id = c.id
          ORDER BY l.at DESC, l.id DESC LIMIT 1) m ON true
@@ -296,6 +486,8 @@ function toConversation(row: ConversationRow): ConversationRecord {
             body: row.body,
             media_kind: row.media_kind,
             at: row.at,
+            status: row.message_status,
+            error: row.message_error,
           })
         : null,
     lastMessageAtExactly: row.last_message_at_exactly,
@@ -309,5 +501,7 @@ function toMessage(row: MessageRow): ConversationMessageRecord {
     body: row.body,
     mediaKind: row.media_kind,
     at: toDate(row.at),
+    status: row.status,
+    error: row.error,
   };
 }

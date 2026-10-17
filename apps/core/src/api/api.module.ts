@@ -30,6 +30,7 @@ import { MarketingModule } from '@hatti/marketing/public';
 import {
   MessagingModule,
   type VapidKeys,
+  type WhatsAppReplySettings,
   type WhatsAppSignupSettings,
   type WhatsAppWebhookSettings,
 } from '@hatti/messaging/public';
@@ -104,6 +105,11 @@ export interface ApiModuleOptions {
    * connect WhatsApp numbers of their own.
    */
   whatsAppSignup?: WhatsAppSignupSettings | null;
+  /**
+   * Meta's Graph API and Hatti's shared number, as the inbox answers customers (ADR-546); without
+   * them, replies are refused.
+   */
+  whatsAppReplies?: WhatsAppReplySettings | null;
   /** Hatti's VAPID keys (ADR-506); without them, nothing is pushed to staff's browsers. */
   push?: VapidKeys | null;
   /** Asks DNS whether shops' own domains point at the platform; the system's resolvers unless given. */
@@ -254,6 +260,7 @@ export class ApiModule {
           whatsapp: options.whatsapp ?? null,
           signup: options.whatsAppSignup ?? null,
           push: options.push ?? null,
+          replies: options.whatsAppReplies ?? null,
         }),
         PaymentsModule.forRoot({ gateways: options.paymentGateways }),
         BillingModule.forRoot({

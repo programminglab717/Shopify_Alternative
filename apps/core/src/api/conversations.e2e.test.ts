@@ -1,5 +1,7 @@
 import 'reflect-metadata';
 import { createHmac } from 'node:crypto';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId, toPublicId } from '@hatti/ids';
@@ -19,6 +21,15 @@ const WHATSAPP = { appSecret: 'whatsapp-app-secret-1234', verifyToken: 'verify-t
 const AYESHA = '+923001234567';
 const SHARED = '100000000000001';
 const OWN = '200000000000002';
+const SHARED_TOKEN = 'EAAQsharedToken'.padEnd(80, 'y');
+
+const REPLY = `mutation ($id: ID!, $body: String!) {
+  conversationReply(id: $id, body: $body) {
+    conversation { id unread replyableUntil lastMessage { id direction status } }
+    message { id direction body status error at }
+    userErrors { field code message }
+  }
+}`;
 
 const CONVERSATIONS = `query ($first: Int, $after: String, $unread: Boolean, $status: ConversationStatus) {
   conversations(first: $first, after: $after, unread: $unread, status: $status) {
@@ -32,7 +43,7 @@ const CONVERSATIONS = `query ($first: Int, $after: String, $unread: Boolean, $st
 
 const MESSAGES = `query ($conversationId: ID!, $first: Int, $before: ID) {
   conversationMessages(conversationId: $conversationId, first: $first, before: $before) {
-    nodes { id direction body mediaKind at }
+    nodes { id direction body mediaKind at status }
     pageInfo { hasNextPage endCursor }
   }
 }`;
@@ -59,6 +70,9 @@ describe.skipIf(!server)("The inbox's API (MSG-05, ADR-545)", () => {
   const shop = newId();
   const other = newId();
   const tokens = { writer: '', reader: '', none: '', other: '' };
+  /** Meta's Graph API as replies go through it: each message sent kept, each given an ID. */
+  const sent: { path: string; auth: string | undefined; body: Json }[] = [];
+  let graph: Server;
 
   async function issueToken(shopId: string, scopes: string[]): Promise<string> {
     const { token, hash, hint } = generateAccessToken();
@@ -88,25 +102,26 @@ describe.skipIf(!server)("The inbox's API (MSG-05, ADR-545)", () => {
 
   /** Customers' messages to `to`, posted to the webhook as Meta does. */
   async function written(to: string, messages: object[]) {
+    const response = await posted({
+      messaging_product: 'whatsapp',
+      metadata: { display_phone_number: '15550001111', phone_number_id: to },
+      messages,
+    });
+    expect(response.statusCode).toBe(200);
+  }
+
+  /** A change of the messages field, posted to the webhook as Meta does. */
+  async function posted(value: object) {
     const raw = JSON.stringify({
       object: 'whatsapp_business_account',
       entry: [
         {
           id: 'WABA',
-          changes: [
-            {
-              field: 'messages',
-              value: {
-                messaging_product: 'whatsapp',
-                metadata: { display_phone_number: '15550001111', phone_number_id: to },
-                messages,
-              },
-            },
-          ],
+          changes: [{ field: 'messages', value }],
         },
       ],
     });
-    const response = await app.inject({
+    return app.inject({
       method: 'POST',
       url: '/webhooks/whatsapp',
       headers: {
@@ -115,7 +130,6 @@ describe.skipIf(!server)("The inbox's API (MSG-05, ADR-545)", () => {
       },
       payload: raw,
     });
-    expect(response.statusCode).toBe(200);
   }
 
   const at = (iso: string) => String(Math.floor(new Date(iso).getTime() / 1000));
@@ -139,11 +153,33 @@ describe.skipIf(!server)("The inbox's API (MSG-05, ADR-545)", () => {
     tokens.reader = await issueToken(shop, ['read_conversations']);
     tokens.none = await issueToken(shop, ['read_orders']);
     tokens.other = await issueToken(other, ['write_conversations']);
-    api = await startTestApi(testDb, { whatsapp: WHATSAPP });
+    graph = createServer((request, response) => {
+      let raw = '';
+      request.on('data', (chunk: Buffer) => (raw += chunk.toString()));
+      request.on('end', () => {
+        sent.push({
+          path: request.url!,
+          auth: request.headers.authorization,
+          body: JSON.parse(raw),
+        });
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ messages: [{ id: `wamid.REPLY${sent.length}` }] }));
+      });
+    });
+    await new Promise<void>((resolve) => graph.listen(0, '127.0.0.1', resolve));
+    api = await startTestApi(testDb, {
+      whatsapp: WHATSAPP,
+      whatsAppReplies: {
+        baseUrl: `http://127.0.0.1:${(graph.address() as AddressInfo).port}`,
+        version: 'v26.0',
+        shared: { phoneNumberId: SHARED, accessToken: SHARED_TOKEN },
+      },
+    });
     app = api.app;
   });
 
   afterAll(async () => {
+    await new Promise((resolve) => graph?.close(resolve));
     await api?.close();
     await admin?.end();
     await testDb?.drop();
@@ -287,5 +323,92 @@ describe.skipIf(!server)("The inbox's API (MSG-05, ADR-545)", () => {
     });
     expect(bad.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
     expect(await data(tokens.reader, '{ conversationsUnreadCount }')).toBe(1);
+  });
+
+  it('answers within the day from the number written to, and follows the reply to delivery', async () => {
+    await admin.query(
+      `INSERT INTO messaging.messages
+              (shop_id, kind, channel, recipient, language, dedupe_key, status, provider,
+               provider_message_id, sent_at)
+       VALUES ($1, 'order_placed', 'whatsapp', $2, 'en', 'test:2', 'sent', 'whatsapp_cloud',
+               'wamid.ZARI2', now())`,
+      [shop, AYESHA],
+    );
+    const wrote = new Date(Math.floor(Date.now() / 1000) * 1000 - 60_000);
+    await written(SHARED, [
+      {
+        from: AYESHA.slice(1),
+        id: 'wamid.IN20',
+        type: 'text',
+        timestamp: String(wrote.getTime() / 1000),
+        context: { from: '15550001111', id: 'wamid.ZARI2' },
+        text: { body: 'Kab tak aayega?' },
+      },
+    ]);
+    const [conversation] = (await data(tokens.reader, CONVERSATIONS, {})).nodes;
+    const id = conversation.id;
+
+    const readOnly = await gql(tokens.reader, REPLY, { id, body: 'Kal tak' });
+    expect(readOnly.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+    expect(await data(tokens.other, REPLY, { id, body: 'Kal tak' })).toMatchObject({
+      message: null,
+      userErrors: [{ field: ['id'], code: 'NOT_FOUND' }],
+    });
+    expect(sent).toEqual([]);
+
+    const replied = await data(tokens.writer, REPLY, { id, body: 'Kal tak pohanch jayega' });
+    expect(replied).toEqual({
+      conversation: {
+        id,
+        unread: 0,
+        replyableUntil: new Date(wrote.getTime() + 24 * 3_600_000).toISOString(),
+        lastMessage: { id: replied.message.id, direction: 'OUTBOUND', status: 'SENT' },
+      },
+      message: {
+        id: expect.stringMatching(/^cmsg_/),
+        direction: 'OUTBOUND',
+        body: 'Kal tak pohanch jayega',
+        status: 'SENT',
+        error: null,
+        at: expect.any(String),
+      },
+      userErrors: [],
+    });
+    expect(sent).toEqual([
+      {
+        path: `/v26.0/${SHARED}/messages`,
+        auth: `Bearer ${SHARED_TOKEN}`,
+        body: {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: AYESHA.slice(1),
+          type: 'text',
+          text: { body: 'Kal tak pohanch jayega', preview_url: true },
+        },
+      },
+    ]);
+
+    // WhatsApp's word of it, as of the shop's other messages.
+    const now = String(Math.floor(Date.now() / 1000));
+    const statuses = await posted({
+      messaging_product: 'whatsapp',
+      statuses: [
+        { id: 'wamid.REPLY1', status: 'delivered', timestamp: now },
+        { id: 'wamid.REPLY1', status: 'read', timestamp: now },
+      ],
+    });
+    expect(statuses.statusCode).toBe(200);
+    const [latest] = (await data(tokens.reader, MESSAGES, { conversationId: id, first: 1 })).nodes;
+    expect(latest).toMatchObject({ id: replied.message.id, status: 'READ' });
+
+    // Past the day, nothing is sent.
+    await admin.query(
+      `UPDATE messaging.conversations SET last_inbound_at = now() - interval '25 hours'`,
+    );
+    expect(await data(tokens.writer, REPLY, { id, body: 'Hello?' })).toMatchObject({
+      message: null,
+      userErrors: [{ field: ['id'], code: 'WINDOW_CLOSED' }],
+    });
+    expect(sent).toHaveLength(1);
   });
 });

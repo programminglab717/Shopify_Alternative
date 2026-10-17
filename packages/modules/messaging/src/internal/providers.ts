@@ -100,14 +100,39 @@ export class WhatsAppCloudProvider implements MessageProvider {
   constructor(private readonly options: WhatsAppCloudOptions) {}
 
   async send(message: OutgoingMessage): Promise<SendResult> {
+    const parameters =
+      this.options.shopNumber && (LIBRARY_KINDS as readonly string[]).includes(message.kind)
+        ? libraryParameters(message.kind as MessageKind, message.language, message.variables)
+        : templateParameters(message.kind, message.variables);
+    return this.#post(message.recipient, {
+      type: 'template',
+      template: {
+        name: templateName(message.kind, message.variables),
+        language: { code: message.language },
+        components: [
+          // A template with no variables, as word of a number removed, takes no body's.
+          ...(parameters.length > 0
+            ? [{ type: 'body', parameters: parameters.map((text) => ({ type: 'text', text })) }]
+            : []),
+          ...templateButtons(message.kind, message.variables),
+        ],
+      },
+    });
+  }
+
+  /**
+   * Sends `text` as it was written, not a template: what WhatsApp lets a business send a customer
+   * within a day of their last message to the number (ADR-546). Its links are previewed.
+   */
+  async sendText(recipient: string, text: string): Promise<SendResult> {
+    return this.#post(recipient, { type: 'text', text: { body: text, preview_url: true } });
+  }
+
+  async #post(recipient: string, content: Record<string, unknown>): Promise<SendResult> {
     const { baseUrl, version, phoneNumberId, accessToken, timeoutMs } = this.options;
     const url = `${baseUrl.replace(/\/+$/, '')}/${version}/${phoneNumberId}/messages`;
     let response: Response;
     try {
-      const parameters =
-        this.options.shopNumber && (LIBRARY_KINDS as readonly string[]).includes(message.kind)
-          ? libraryParameters(message.kind as MessageKind, message.language, message.variables)
-          : templateParameters(message.kind, message.variables);
       response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -117,19 +142,8 @@ export class WhatsAppCloudProvider implements MessageProvider {
         body: JSON.stringify({
           messaging_product: 'whatsapp',
           recipient_type: 'individual',
-          to: message.recipient.slice(1),
-          type: 'template',
-          template: {
-            name: templateName(message.kind, message.variables),
-            language: { code: message.language },
-            components: [
-              // A template with no variables, as word of a number removed, takes no body's.
-              ...(parameters.length > 0
-                ? [{ type: 'body', parameters: parameters.map((text) => ({ type: 'text', text })) }]
-                : []),
-              ...templateButtons(message.kind, message.variables),
-            ],
-          },
+          to: recipient.slice(1),
+          ...content,
         }),
         signal: AbortSignal.timeout(timeoutMs ?? 10_000),
       });

@@ -1,4 +1,8 @@
-import { ConversationsService } from './conversations.service.js';
+import {
+  ConversationsService,
+  WHATSAPP_REPLIES,
+  type WhatsAppReplySettings,
+} from './conversations.service.js';
 import { ConversationResolver } from './graphql/conversation.resolver.js';
 import { CustomersModule } from '@hatti/customers/public';
 import { Module, type DynamicModule } from '@nestjs/common';
@@ -32,7 +36,8 @@ import { WebPushSender, type VapidKeys } from './web-push.js';
  * Needs {@link Database} and {@link SecretBox} providers from the host application, which keeps
  * each webhook request's raw body as `rawBody`. Without WhatsApp's settings, its webhook answers
  * 404; without Embedded Signup's, shops cannot connect numbers of their own (ADR-419); without
- * VAPID keys, nothing is pushed to staff's browsers (ADR-506).
+ * VAPID keys, nothing is pushed to staff's browsers (ADR-506); without Meta's Graph API for
+ * replies, the inbox cannot answer customers (ADR-546).
  */
 @Module({})
 export class MessagingModule {
@@ -40,6 +45,7 @@ export class MessagingModule {
     whatsapp: WhatsAppWebhookSettings | null;
     signup?: WhatsAppSignupSettings | null;
     push?: VapidKeys | null;
+    replies?: WhatsAppReplySettings | null;
   }): DynamicModule {
     return {
       module: MessagingModule,
@@ -48,6 +54,7 @@ export class MessagingModule {
       providers: [
         { provide: WHATSAPP_WEBHOOK, useValue: options.whatsapp },
         { provide: WHATSAPP_SIGNUP, useValue: options.signup ?? null },
+        { provide: WHATSAPP_REPLIES, useValue: options.replies ?? null },
         {
           provide: PUSH_SENDER,
           useValue: options.push ? new WebPushSender(options.push) : null,

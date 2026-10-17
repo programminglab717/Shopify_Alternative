@@ -16,6 +16,7 @@ import type { TestDatabase } from '@hatti/db/testing';
 import { createLogger } from '@hatti/logger';
 import type {
   VapidKeys,
+  WhatsAppReplySettings,
   WhatsAppSignupSettings,
   WhatsAppWebhookSettings,
 } from '@hatti/messaging/public';
@@ -66,6 +67,8 @@ export async function startTestApi(
     whatsapp?: WhatsAppWebhookSettings;
     /** Hatti's Meta app and Embedded Signup's configuration (ADR-419); none unless given. */
     whatsAppSignup?: WhatsAppSignupSettings;
+    /** Meta's Graph API as the inbox answers customers (ADR-546); none unless given. */
+    whatsAppReplies?: WhatsAppReplySettings;
     paymentGateways?: PaymentGateways;
     /** Hatti's own gateway account (ADR-154); the test gateway unless given, or null for none. */
     billingGateway?: HattiGateway | null;
@@ -122,6 +125,7 @@ export async function startTestApi(
     dnsLookup: options.dns ?? new TestDns(),
     whatsapp: options.whatsapp ?? null,
     whatsAppSignup: options.whatsAppSignup ?? null,
+    whatsAppReplies: options.whatsAppReplies ?? null,
     push: options.push ?? null,
     couriers: couriersOf({ production: false }),
     paymentGateways: options.paymentGateways ?? paymentGatewaysOf({ production: false }),

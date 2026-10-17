@@ -40,7 +40,11 @@ export type FieldErrorCode =
   /** What Hatti's Acceptable Use Policy forbids selling (ADR-473): it may stay a draft. */
   | 'PROHIBITED'
   /** Hatti holds it off sale after a rights complaint it upheld (ADR-475). */
-  | 'HELD';
+  | 'HELD'
+  /** Past the day WhatsApp lets a shop answer a customer freely after they last wrote (ADR-546). */
+  | 'WINDOW_CLOSED'
+  /** The channel refused the message for good, as WhatsApp may a number it cannot reach. */
+  | 'NOT_SENT';
 
 export interface FieldError {
   /** Path to the input field at fault, e.g. ["input", "title"]. */

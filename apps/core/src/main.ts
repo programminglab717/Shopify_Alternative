@@ -79,6 +79,17 @@ const app = await createApi({
           version: config.META_GRAPH_VERSION,
         }
       : null,
+  whatsAppReplies: {
+    baseUrl: config.META_GRAPH_URL,
+    version: config.META_GRAPH_VERSION,
+    shared:
+      config.WHATSAPP_PHONE_NUMBER_ID && config.WHATSAPP_ACCESS_TOKEN
+        ? {
+            phoneNumberId: config.WHATSAPP_PHONE_NUMBER_ID,
+            accessToken: config.WHATSAPP_ACCESS_TOKEN,
+          }
+        : null,
+  },
   storefrontKey: config.STOREFRONT_SERVICE_KEY,
   couriers: couriersOf({ production: config.NODE_ENV === 'production' }),
   paymentGateways: paymentGatewaysOf({ production: config.NODE_ENV === 'production' }),

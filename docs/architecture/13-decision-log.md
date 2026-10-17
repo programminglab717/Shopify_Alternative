@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-545 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-546 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -553,6 +553,7 @@
 | 543 | A shop's storefront loads its TikTok pixel while TikTok is connected, beside Meta's, for the steps shoppers take before checkout, and the order keeps the pixel's browser ID for the Events API | Accepted |
 | 544 | Every shop hears on WhatsApp when an outage of Hatti's begins and ends, at its alerts number and at Hatti's cost, each update once | Accepted |
 | 545 | What customers write to a shop on WhatsApp is kept as a conversation for each customer's number, the shop found by the number written to, the message answered or the last shop to write, for its staff to read, mark read and close | Accepted |
+| 546 | The inbox's staff answer a customer in their own words within the day WhatsApp allows after the customer last wrote, sent at once from the number the customer wrote to, and followed to delivery as the webhook says | Accepted |
 
 ---
 
@@ -20591,3 +20592,35 @@
     and their customers would go unheard.
   * **A conversation for each order:** customers write before they order and about several
     orders; the number is what both sides know.
+
+## ADR-546 · The inbox's staff answer a customer in their own words within the day WhatsApp allows after the customer last wrote, sent at once from the number the customer wrote to, and followed to delivery as the webhook says
+
+* **Context:** The inbox keeps what customers write (ADR-545), but a shop could only read it.
+  WhatsApp lets a business write to a customer in its own words, not a template, for 24 hours
+  after the customer's last message to that number, and charges nothing for it (MSG-05).
+* **Decision:**
+  * **Who and when:** owners, managers and confirmation agents (`write_conversations`) answer a
+    conversation while the day after the customer last wrote lasts; after it, the reply is
+    refused (`WINDOW_CLOSED`), and the shop writes again through its templates. The API says
+    until when each conversation may be answered.
+  * **From where:** the number the customer last wrote to: the shop's own, while it is still
+    connected (ADR-419), else Hatti's shared number. A reply is never sent from a number the
+    customer did not write to, where WhatsApp would refuse it anyway.
+  * **At once:** the API sends the reply through WhatsApp's Cloud API as staff send it, not
+    through the worker's queue: staff wait for it, and are told at once if WhatsApp refused it
+    (`NOT_SENT`) or could not be reached (`UNAVAILABLE`), to try again. Only what WhatsApp took
+    is kept: its words, who wrote it and WhatsApp's ID for it. Sending marks the conversation
+    read.
+  * **Followed:** WhatsApp's webhook moves each reply on as it moves the shop's other messages
+    (ADR-146): sent, delivered, read, or failed with why, never back. A status the webhook names
+    before the reply is kept is given back to Meta to send again, as for messages.
+  * **Free:** replies are not charged to the shop's credit (ADR-155): WhatsApp charges nothing
+    for them.
+* **Consequences:**
+  * A customer's question is answered where they asked it, and the shop sees it read.
+  * An inbox reply waits on WhatsApp's answer, a second or so.
+* **Alternatives:**
+  * **Queue replies for the worker:** staff would not know a reply failed until later, and a
+    reply sent in the last minutes of the day could miss it.
+  * **Answer past the day with a template:** a different act, with its cost and approval; the
+    shop's templates and broadcasts (ADR-420) already do it.

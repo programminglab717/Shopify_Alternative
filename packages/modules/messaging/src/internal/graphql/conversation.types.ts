@@ -36,6 +36,24 @@ registerEnumType(ConversationMessageDirection, {
   },
 });
 
+export enum ConversationReplyStatus {
+  SENT = 'SENT',
+  DELIVERED = 'DELIVERED',
+  READ = 'READ',
+  FAILED = 'FAILED',
+}
+
+registerEnumType(ConversationReplyStatus, {
+  name: 'ConversationReplyStatus',
+  description: "How a reply went, as WhatsApp's webhook says (ADR-546).",
+  valuesMap: {
+    SENT: { description: 'WhatsApp took it.' },
+    DELIVERED: { description: "On the customer's phone." },
+    READ: { description: 'The customer opened it.' },
+    FAILED: { description: 'WhatsApp could not deliver it.' },
+  },
+});
+
 @ObjectType({ description: 'A message of a conversation with a customer (ADR-545).' })
 export class ConversationMessage {
   @Field(() => ID)
@@ -60,6 +78,18 @@ export class ConversationMessage {
 
   @Field(() => GraphQLISODateTime)
   at!: Date;
+
+  @Field(() => ConversationReplyStatus, {
+    nullable: true,
+    description: "How the shop's reply went; null for what the customer wrote.",
+  })
+  status!: ConversationReplyStatus | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Why WhatsApp could not deliver the reply.',
+  })
+  error!: string | null;
 }
 
 @ObjectType()
@@ -100,6 +130,14 @@ export class Conversation {
     description: 'When the customer last wrote: WhatsApp lets the shop answer freely for a day.',
   })
   lastInboundAt!: Date | null;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      'Until when the shop may answer in its own words: a day after the customer last wrote ' +
+      '(ADR-546). Null if they never wrote.',
+  })
+  replyableUntil!: Date | null;
 
   @Field(() => ConversationMessage, { nullable: true })
   lastMessage!: ConversationMessage | null;
@@ -163,6 +201,21 @@ export class ConversationMessagesArgs {
 export class ConversationUpdatePayload {
   @Field(() => Conversation, { nullable: true })
   conversation!: Conversation | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class ConversationReplyPayload {
+  @Field(() => Conversation, { nullable: true })
+  conversation!: Conversation | null;
+
+  @Field(() => ConversationMessage, {
+    nullable: true,
+    description: 'The reply, as WhatsApp took it.',
+  })
+  message!: ConversationMessage | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

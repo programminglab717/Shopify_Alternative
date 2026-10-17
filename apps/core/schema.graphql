@@ -2427,6 +2427,11 @@ type Conversation {
   lastInboundAt: DateTime
   lastMessage: ConversationMessage
   lastMessageAt: DateTime!
+
+  """
+  Until when the shop may answer in its own words: a day after the customer last wrote (ADR-546). Null if they never wrote.
+  """
+  replyableUntil: DateTime
   status: ConversationStatus!
 
   """Messages the shop's staff have not read."""
@@ -2454,12 +2459,18 @@ type ConversationMessage {
   """What was written, or the button pressed; null for anything else."""
   body: String
   direction: ConversationMessageDirection!
+
+  """Why WhatsApp could not deliver the reply."""
+  error: String
   id: ID!
 
   """
   What else it held, as WhatsApp names it: "image", "audio", "location". It is not kept: the customer's phone shows it.
   """
   mediaKind: String
+
+  """How the shop's reply went; null for what the customer wrote."""
+  status: ConversationReplyStatus
 }
 
 type ConversationMessageConnection {
@@ -2474,6 +2485,29 @@ enum ConversationMessageDirection {
 
   """The shop wrote it."""
   OUTBOUND
+}
+
+type ConversationReplyPayload {
+  conversation: Conversation
+
+  """The reply, as WhatsApp took it."""
+  message: ConversationMessage
+  userErrors: [UserError!]!
+}
+
+"""How a reply went, as WhatsApp's webhook says (ADR-546)."""
+enum ConversationReplyStatus {
+  """On the customer's phone."""
+  DELIVERED
+
+  """WhatsApp could not deliver it."""
+  FAILED
+
+  """The customer opened it."""
+  READ
+
+  """WhatsApp took it."""
+  SENT
 }
 
 """
@@ -7356,6 +7390,11 @@ type Mutation {
 
   """Marks the conversation's messages read by the shop's staff."""
   conversationMarkRead(id: ID!): ConversationUpdatePayload!
+
+  """
+  Answers the customer on WhatsApp in the shop's own words, from the number they wrote to: only within a day of their last message, as WhatsApp allows. Marks the conversation read.
+  """
+  conversationReply(body: String!, id: ID!): ConversationReplyPayload!
 
   """
   Closes the conversation, read, or opens it again. The customer writing opens it again.

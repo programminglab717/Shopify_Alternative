@@ -78,7 +78,9 @@ export class WhatsAppWebhookController {
       throw new UnauthorizedException('The request is not signed with the app secret');
     }
     const { statuses, inbound, templates } = parseWhatsAppWebhook(request.body);
-    const { unmatched } = await this.messages.recordStatuses(statuses);
+    const { unmatched: notMessages } = await this.messages.recordStatuses(statuses);
+    // Replies from the inbox (ADR-546), followed as messages are.
+    const unmatched = await this.conversations.recordStatuses(notMessages);
     // What Meta decided of shops' own templates (ADR-420).
     await this.templates.recordStatuses(templates);
     for (const message of inbound) {

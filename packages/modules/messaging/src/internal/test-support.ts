@@ -2,11 +2,15 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 // What the messaging module's tests share: Meta's Graph API as Hatti asks it of a shop's own
-// WhatsApp number (ADR-419) and its templates (ADR-420).
+// WhatsApp number (ADR-419) and its templates (ADR-420), and as the inbox's replies go through it
+// (ADR-546).
 
 export const TOKEN = 'EAAQbusinessToken'.padEnd(80, 'x');
 export const WABA = '102290129340398';
 export const NUMBER = '106540352242922';
+/** Hatti's shared notifications number, and the system user's token for it. */
+export const SHARED_NUMBER = '100000000000001';
+export const SHARED_TOKEN = 'EAAQsharedToken'.padEnd(80, 'y');
 
 /** Meta's Graph API, each request kept. */
 export class FakeGraph {
@@ -26,6 +30,10 @@ export class FakeGraph {
   templateError: string | null = null;
   /** What Meta says of a template it refuses by its name and language, "name:ur". */
   readonly templateRefusals = new Map<string, string>();
+  /** What Meta says of the next message sent, if it refuses it, with its code. */
+  messageError: { code: number; message: string; status?: number } | null = null;
+  /** The messages sent through it, as WhatsApp's IDs name them. */
+  readonly sent: { from: string; id: string; body: Record<string, unknown> }[] = [];
   readonly #server: Server;
 
   constructor() {
@@ -55,6 +63,25 @@ export class FakeGraph {
             : send(400, {
                 error: { message: 'This authorization code has been used.', code: 100 },
               });
+        }
+        const messages = /^([0-9]+)\/messages$/.exec(path);
+        if (messages && request.method === 'POST') {
+          const token = request.headers.authorization;
+          if (token !== `Bearer ${TOKEN}` && token !== `Bearer ${SHARED_TOKEN}`) {
+            return send(401, { error: { message: 'Invalid OAuth access token', code: 190 } });
+          }
+          if (this.messageError) {
+            const { code, message, status } = this.messageError;
+            this.messageError = null;
+            return send(status ?? 400, { error: { message, code } });
+          }
+          const id = `wamid.out-${this.sent.length + 1}`;
+          this.sent.push({
+            from: messages[1]!,
+            id,
+            body: JSON.parse(raw) as Record<string, unknown>,
+          });
+          return send(200, { messaging_product: 'whatsapp', messages: [{ id }] });
         }
         if (request.headers.authorization !== `Bearer ${TOKEN}`) {
           return send(401, { error: { message: 'Invalid OAuth access token', code: 190 } });

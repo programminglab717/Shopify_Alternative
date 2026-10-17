@@ -14,6 +14,7 @@ export const MessagingEvents = {
   BroadcastSent: 'broadcast.sent',
   MarketingAutomationUpdated: 'marketing_automation.updated',
   ConversationMessageReceived: 'conversation.message_received',
+  ConversationReplied: 'conversation.replied',
 } as const;
 
 /**
@@ -23,6 +24,15 @@ export const MessagingEvents = {
 export interface ConversationMessageReceivedPayload {
   messageId: string;
   /** When they wrote, as WhatsApp says. */
+  at: string;
+}
+
+/**
+ * The shop's staff answered a customer's conversation on WhatsApp, and WhatsApp took the reply
+ * (ADR-546). The aggregate is the conversation.
+ */
+export interface ConversationRepliedPayload {
+  messageId: string;
   at: string;
 }
 

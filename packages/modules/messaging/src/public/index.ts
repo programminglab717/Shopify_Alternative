@@ -9,6 +9,9 @@ export {
 export {
   CONVERSATION_WINDOW_MS,
   ConversationsService,
+  REPLY_MAX_LENGTH,
+  WHATSAPP_REPLIES,
+  type WhatsAppReplySettings,
   type ConversationMessageRecord,
   type ConversationRecord,
 } from '../internal/conversations.service.js';
@@ -16,6 +19,7 @@ export { MESSAGING_CUSTOMER_DATA, MessagingCustomerData } from '../internal/cust
 export {
   MessagingEvents,
   type ConversationMessageReceivedPayload,
+  type ConversationRepliedPayload,
   type MessageRepliedPayload,
   type MessagingSettingsUpdatedPayload,
   type WhatsAppAccountConnectedPayload,
