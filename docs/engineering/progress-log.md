@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Powered by Hatti
+### 1913b6b · Powered by Hatti
 
 * **Every storefront says it is "Powered by Hatti", as Shopify's powered_by_link does; a shop on
   Starter or above may hide it, and one hidden before stays hidden on a smaller plan**
