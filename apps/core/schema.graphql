@@ -724,6 +724,11 @@ type BillingPlan {
   """
   orderLimit: Int
 
+  """
+  Whether the shop may hide "Powered by Hatti" from its storefront (ADR-526).
+  """
+  removeBranding: Boolean!
+
   """Members of staff it has room for, the owner among them."""
   staffLimit: Int!
 
@@ -8476,6 +8481,11 @@ type OnlinePaymentSettingsUpdatePayload {
 
 """What the shop sets for its storefront as a whole."""
 type OnlineStorePreferences {
+  """
+  Whether the storefront hides "Powered by Hatti" (ADR-526), which plans from Starter allow.
+  """
+  hidePoweredBy: Boolean!
+
   """Its link-in-bio page, at /links on its storefront."""
   linkPage: LinkPage!
 
@@ -8537,6 +8547,11 @@ type OnlineStorePreferences {
 }
 
 input OnlineStorePreferencesInput {
+  """
+  Hides "Powered by Hatti" from the storefront, on a plan that allows it, or shows it again (ADR-526). Left as it is if not given.
+  """
+  hidePoweredBy: Boolean
+
   """Its link-in-bio page."""
   linkPage: LinkPageInput
 

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-525 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-526 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -533,6 +533,7 @@
 | 523 | Plans gate more of what the pricing leaves out: custom apps, automations and the abandoned checkout reminder from Starter, cashback and Meta's conversions API from Growth; refused when made, connected or turned on, those already are kept | Accepted |
 | 524 | The admin's plan cards say which of the features a plan gates each includes: automations and abandoned checkout reminders, cashback, Meta's conversions API and custom apps, beside its limits, domain and payments | Accepted |
 | 525 | A shop's support request still open past its plan's time is flagged to Hatti's people once: the worker's sweep marks it, logs it and emails Hatti's support address the list, and the command says when each request is due | Accepted |
+| 526 | Every storefront says it is "Powered by Hatti", as Shopify's powered_by_link does; a shop on Starter or above may hide it, and one hidden before stays hidden on a smaller plan | Accepted |
 
 ---
 
@@ -20033,3 +20034,35 @@
     telling of it; the warning in the log is there however the email went.
   * **Working hours:** they need Hatti's own calendar of hours and holidays, which the core
     doesn't keep.
+
+## ADR-526 · Every storefront says it is "Powered by Hatti", as Shopify's powered_by_link does; a shop on Starter or above may hide it, and one hidden before stays hidden on a smaller plan
+
+* **Context:**
+  * The pricing shows "Powered by Hatti" on Free and lets paying plans remove it. It's how
+    shoppers who like a store find Hatti, and part of what Free pays for.
+  * Storefronts said nothing of Hatti, and themes ported from Shopify that print
+    `powered_by_link` printed nothing.
+* **Decision:**
+  * **`powered_by_link`** is a global on every storefront page, as on Shopify: a link to Hatti's
+    site, `rel="nofollow"`, opening a new tab, with campaign parameters saying it came from a
+    storefront.
+    * It reads "Powered by Hatti", and "ہٹی کے ذریعے" on Urdu pages.
+    * It's blank while the shop hides it.
+  * **Hatti Base** prints it at the foot of its footer, under the link to report the store.
+  * **Hiding it:**
+    * Hiding it is a preference of the online store, `hidePoweredBy`, kept with the shop's
+      preferences (migration 0248) and published in the shop's document.
+    * The plan gates it, as ADR-523 gates the rest: `removeBranding`, Starter and above. Free is
+      refused with the plan's name.
+    * One hidden before stays hidden after a move to Free. Showing it again is always allowed;
+      hiding it again needs a plan with it.
+* **Consequences:**
+  * Free stores carry Hatti's name to their shoppers, linked so Hatti can count what it brings.
+  * A theme that leaves `powered_by_link` out shows nothing. Hatti doesn't put the link into
+    themes that don't ask for it, as Shopify doesn't.
+  * The admin doesn't yet have the switch; ADR-527 will.
+* **Alternatives:**
+  * **Showing it again when a shop moves down to Free:** it would change a shop's storefront by
+    itself when its plan changes. Keeping what was set matches ADR-523 and ADR-264.
+  * **Translated words from the theme's own locale files:** every theme would need the same
+    words. The storefront gives them, as Shopify does.

@@ -229,6 +229,8 @@ export const preferences = onlineStoreSchema.table('preferences', {
   /** Its return window (ADR-468): days after delivery, 0 for none, null for nothing said. */
   returnDays: smallint('return_days'),
   returnExchangesOnly: boolean('return_exchanges_only').notNull().default(false),
+  /** Whether its storefront hides "Powered by Hatti" (ADR-526). */
+  hidePoweredBy: boolean('hide_powered_by').notNull().default(false),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

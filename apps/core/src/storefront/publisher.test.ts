@@ -1827,6 +1827,17 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect((await store().shop()).returns).toBeUndefined();
   });
 
+  it('publishes that the shop hides "Powered by Hatti", and leaves it out while it shows it (ADR-526)', async () => {
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).hidePoweredBy).toBeUndefined();
+    unwrap(await preferences.update(tenant, { hidePoweredBy: true }));
+    await deliver();
+    expect((await store().shop()).hidePoweredBy).toBe(true);
+    unwrap(await preferences.update(tenant, { hidePoweredBy: false }));
+    await deliver();
+    expect((await store().shop()).hidePoweredBy).toBeUndefined();
+  });
+
   it("closes the shop's storefront behind its password, with what shoppers are told, and opens it", async () => {
     forgotten.length = 0;
     unwrap(

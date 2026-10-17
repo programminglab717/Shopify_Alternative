@@ -274,6 +274,7 @@ function toPlan(plan: Plan): BillingPlan {
     automations: plan.automations,
     loyalty: plan.loyalty,
     conversionsApi: plan.conversionsApi,
+    removeBranding: plan.removeBranding,
   });
 }
 

@@ -90,6 +90,7 @@ function toPreferences(view: PreferencesView): OnlineStorePreferences {
     maintenanceUntil: view.maintenance.until,
     returnDays: view.returns.days,
     returnExchangesOnly: view.returns.exchangesOnly,
+    hidePoweredBy: view.hidePoweredBy,
     sharingImage:
       view.sharingImage &&
       Object.assign(new SharingImage(), {

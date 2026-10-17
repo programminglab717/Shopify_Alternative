@@ -1,10 +1,12 @@
 import 'reflect-metadata';
+import { PlanAllowance } from '@hatti/api';
 import { VariantService } from '@hatti/catalog/public';
+import { SecretBox } from '@hatti/crypto';
 import { checkPassword } from '@hatti/crypto';
 import { testDatabaseServer } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { shopPreferencesOf } from './preferences.service.js';
+import { PreferencesService, shopPreferencesOf } from './preferences.service.js';
 import { preferences } from './schema.js';
 import { errorsOf, onlineStoreFixture, unwrap, type OnlineStoreFixture } from './test-support.js';
 
@@ -40,6 +42,7 @@ describe.skipIf(!server)('PreferencesService', () => {
     sharingImage: null,
     maintenance: { enabled: false, message: '', until: null },
     returns: { days: null, exchangesOnly: false },
+    hidePoweredBy: false,
   };
 
   it("keeps a shop's WhatsApp number in E.164, recording each change", async () => {
@@ -83,6 +86,7 @@ describe.skipIf(!server)('PreferencesService', () => {
       sharingImage: null,
       maintenance: { enabled: false, message: '', until: null },
       returns: { days: null, exchangesOnly: false },
+      hidePoweredBy: false,
     });
   });
 
@@ -455,6 +459,53 @@ describe.skipIf(!server)('PreferencesService', () => {
       { changed: ['whatsappNumber'] },
       { changed: ['returnDays', 'returnExchangesOnly'] },
     ]);
+  });
+
+  it('hides "Powered by Hatti" on a plan that lets it, and keeps it hidden on one that does not (ADR-526)', async () => {
+    let plan: string | null = 'Free';
+    const allowance = new (class extends PlanAllowance {
+      async limitOf(): Promise<null> {
+        return null;
+      }
+
+      async limitIn(): Promise<null> {
+        return null;
+      }
+
+      async excludes(): Promise<string | null> {
+        return plan;
+      }
+    })();
+    const planned = new PreferencesService(
+      f.db,
+      new SecretBox([{ id: 'test', key: Buffer.alloc(32, 5) }]),
+      f.products,
+      allowance,
+    );
+    expect((await planned.get(f.a)).hidePoweredBy).toBe(false);
+    expect(errorsOf(await planned.update(f.a, { hidePoweredBy: true }))).toEqual([
+      [
+        'hidePoweredBy',
+        'INVALID',
+        'The Free plan doesn\'t include hiding "Powered by Hatti": choose a bigger plan to hide it',
+      ],
+    ]);
+    // Showing it is always allowed.
+    unwrap(await planned.update(f.a, { hidePoweredBy: false }));
+    plan = null;
+    expect(unwrap(await planned.update(f.a, { hidePoweredBy: true })).hidePoweredBy).toBe(true);
+    // Back on Free, it stays hidden, and other preferences change as before.
+    plan = 'Free';
+    expect(unwrap(await planned.update(f.a, { returnDays: 7 })).hidePoweredBy).toBe(true);
+    expect(unwrap(await planned.update(f.a, { hidePoweredBy: true })).hidePoweredBy).toBe(true);
+    expect(unwrap(await planned.update(f.a, { hidePoweredBy: false })).hidePoweredBy).toBe(false);
+    expect(errorsOf(await planned.update(f.a, { hidePoweredBy: true }))).toHaveLength(1);
+    expect((await f.outbox()).map((event) => event.payload)).toEqual([
+      { changed: ['hidePoweredBy'] },
+      { changed: ['returnDays'] },
+      { changed: ['hidePoweredBy'] },
+    ]);
+    expect((await f.preferences.get(f.b)).hidePoweredBy).toBe(false);
   });
 
   it('pauses the open storefront for a while, until its staff open it or the time it set (ADR-252)', async () => {

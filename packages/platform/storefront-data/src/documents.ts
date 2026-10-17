@@ -503,6 +503,11 @@ export interface ShopDoc {
    */
   returns?: { days: number; exchangesOnly: boolean };
   /**
+   * True while it hides "Powered by Hatti" from its storefront (ADR-526), on a plan that let it.
+   * Absent while it shows it, as in documents written before shops could hide it.
+   */
+  hidePoweredBy?: true;
+  /**
    * Rules it adds to its robots.txt (ADR-055), one a line, as the online store checked them.
    * Absent or empty for none, as in documents written before shops had them.
    */

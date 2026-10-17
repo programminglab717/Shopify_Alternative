@@ -172,6 +172,11 @@ export class BillingPlan {
 
   @Field({ description: "Whether the shop may connect Meta's conversions API (ADR-523)." })
   conversionsApi!: boolean;
+
+  @Field({
+    description: 'Whether the shop may hide "Powered by Hatti" from its storefront (ADR-526).',
+  })
+  removeBranding!: boolean;
 }
 
 @ObjectType({

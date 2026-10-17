@@ -650,6 +650,8 @@ export function shopDoc(
     ...(preferences.returns.days !== null && {
       returns: { days: preferences.returns.days, exchangesOnly: preferences.returns.exchangesOnly },
     }),
+    // Hiding "Powered by Hatti" (ADR-526), left out while it shows it, likewise.
+    ...(preferences.hidePoweredBy && { hidePoweredBy: true as const }),
     robotsRules: preferences.robotsTxtRules,
     policies: [...policies],
     // Left out without one, so a shop without one keeps its document as it was.

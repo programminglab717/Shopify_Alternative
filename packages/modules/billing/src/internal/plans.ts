@@ -39,6 +39,8 @@ export interface Plan {
   automations: boolean;
   loyalty: boolean;
   conversionsApi: boolean;
+  /** Whether it may hide "Powered by Hatti" from its storefront (ADR-526). */
+  removeBranding: boolean;
 }
 
 export const PLANS: Readonly<Record<PlanCode, Plan>> = {
@@ -55,6 +57,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     automations: false,
     loyalty: false,
     conversionsApi: false,
+    removeBranding: false,
   },
   starter: {
     code: 'starter',
@@ -69,6 +72,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     automations: true,
     loyalty: false,
     conversionsApi: false,
+    removeBranding: true,
   },
   growth: {
     code: 'growth',
@@ -83,6 +87,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     automations: true,
     loyalty: true,
     conversionsApi: true,
+    removeBranding: true,
   },
   pro: {
     code: 'pro',
@@ -97,6 +102,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     automations: true,
     loyalty: true,
     conversionsApi: true,
+    removeBranding: true,
   },
 };
 

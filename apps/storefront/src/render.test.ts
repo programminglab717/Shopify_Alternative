@@ -2423,7 +2423,7 @@ describe('Storefront rendering', () => {
     expect(page.html).toContain(`<p class="cart-item__detail" dir="auto">${variant.title}</p>`);
     // What the shopper typed, escaped; properties starting with _ are the shop's own.
     expect(page.html).toContain('Stitching: Yes, &lt;i&gt;please&lt;/i&gt;');
-    expect(page.html).not.toContain('_campaign');
+    expect(page.html.replace(/utm_campaign/g, '')).not.toContain('_campaign');
     expect(page.html).toContain(
       `href="/cart/change?id=${encodeURIComponent(cart.items[0]!.key)}&quantity=0"`,
     );
@@ -2629,6 +2629,23 @@ describe('Storefront rendering', () => {
       '<li class="product__verified"> Verified by Hatti: a registered business </li>',
     );
     expect(await verified('business', 'ur')).toContain('ہٹی سے تصدیق شدہ: رجسٹرڈ کاروبار');
+
+    // "Powered by Hatti" in the footer, as Shopify's powered_by_link, unless the shop hides it
+    // (ADR-526).
+    expect(plain).toContain(
+      '<p class="footer__powered"><a target="_blank" rel="nofollow" ' +
+        'href="https://hatti.pk/?utm_campaign=poweredby&amp;utm_medium=hatti&amp;' +
+        'utm_source=onlinestore">Powered by Hatti</a></p>',
+    );
+    expect(await verified('identity', 'ur')).toContain('>ہٹی کے ذریعے</a>');
+    const hidden = (
+      await renderer.render(
+        { path: `/products/${lawn!.handle}` },
+        shop({}, { hidePoweredBy: true }),
+      )
+    ).html;
+    expect(hidden).not.toContain('<p class="footer__powered">');
+    expect(hidden).not.toContain('Powered by Hatti');
 
     // The shop's return window (ADR-468): in words beside its policy's link, and in each offer.
     const returned = async (returns: { days: number; exchangesOnly: boolean }, locale?: string) =>

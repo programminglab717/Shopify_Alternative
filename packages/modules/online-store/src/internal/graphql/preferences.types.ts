@@ -168,6 +168,12 @@ export class OnlineStorePreferences {
 
   @Field({ description: 'Whether the shop exchanges what comes back, never refunding it.' })
   returnExchangesOnly!: boolean;
+
+  @Field({
+    description:
+      'Whether the storefront hides "Powered by Hatti" (ADR-526), which plans from Starter allow.',
+  })
+  hidePoweredBy!: boolean;
 }
 
 @InputType()
@@ -317,6 +323,14 @@ export class OnlineStorePreferencesInput {
     description: 'Whether the shop exchanges what comes back, never refunding it.',
   })
   returnExchangesOnly?: boolean | null;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      'Hides "Powered by Hatti" from the storefront, on a plan that allows it, or shows it ' +
+      'again (ADR-526). Left as it is if not given.',
+  })
+  hidePoweredBy?: boolean | null;
 }
 
 @ObjectType()

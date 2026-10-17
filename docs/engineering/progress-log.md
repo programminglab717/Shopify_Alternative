@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Powered by Hatti
+
+* **Every storefront says it is "Powered by Hatti", as Shopify's powered_by_link does; a shop on
+  Starter or above may hide it, and one hidden before stays hidden on a smaller plan**
+  ([ADR-526](../architecture/13-decision-log.md#adr-526--every-storefront-says-it-is-powered-by-hatti-as-shopifys-powered_by_link-does-a-shop-on-starter-or-above-may-hide-it-and-one-hidden-before-stays-hidden-on-a-smaller-plan), BIL-01). Migration 0248.
+* 3245 tests, 2 more: the preference by plan and the shop's document;
+  the storefront's link in its footer.
+
 ### 029438e · Support requests past their time
 
 * **A shop's support request still open past its plan's time is flagged to Hatti's people once:

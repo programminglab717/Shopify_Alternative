@@ -251,6 +251,8 @@ export interface PreferencesRecord {
   maintenance: MaintenanceRecord;
   /** What it says of returns besides its refund policy (ADR-468). */
   returns: ReturnsRecord;
+  /** Whether its storefront hides "Powered by Hatti" (ADR-526). */
+  hidePoweredBy: boolean;
 }
 
 /** A shop's return window (OS-11, ADR-468), which its product pages say. */

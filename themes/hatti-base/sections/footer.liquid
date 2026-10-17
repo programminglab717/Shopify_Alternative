@@ -27,6 +27,9 @@
       {%- assign report_url = routes.root_url | append: '/report' -%}
     {%- endif -%}
     <p class="footer__report"><a href="{{ report_url }}" rel="nofollow">{{ 'footer.report' | t }}</a></p>
+    {%- if powered_by_link != blank -%}
+      <p class="footer__powered">{{ powered_by_link }}</p>
+    {%- endif -%}
   </div>
 </footer>
 
@@ -41,6 +44,8 @@
   .footer__verified { margin: 0; font-size: 0.875rem; font-weight: 600; }
   .footer__report { margin: 0; font-size: 0.75rem; }
   .footer__report a { color: var(--color-muted); }
+  .footer__powered { margin: 0; font-size: 0.75rem; }
+  .footer__powered a { color: var(--color-muted); }
 {% endstylesheet %}
 
 {% schema %}

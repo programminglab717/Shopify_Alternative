@@ -660,6 +660,11 @@ export class PageRenderer {
         })),
         country: { iso_code: 'PK', name: 'Pakistan', currency: { iso_code: 'PKR', symbol: 'Rs' } },
       },
+      // A link to Hatti, as Shopify's: none while the shop hides it on a plan that lets it
+      // (ADR-526).
+      powered_by_link: shopDoc.hidePoweredBy
+        ? ''
+        : poweredByLink(this.options.platformUrl ?? 'https://hatti.pk', locale),
       // Hatti's own (04 §3.2).
       direction: localeInfo.rtl ? 'rtl' : 'ltr',
       cod: { available: shopDoc.cod.available, fee: shopDoc.cod.fee, limit: shopDoc.cod.limit },
@@ -1187,4 +1192,16 @@ async function recommendedProducts(
     .filter((doc) => doc !== null && doc.variants.some((variant) => variant.available))
     .slice(0, asked.limit)
     .map((doc) => doc!.id);
+}
+
+/**
+ * "Powered by Hatti", linking to Hatti's own site, as Shopify's powered_by_link does to Shopify's
+ * (ADR-526): in Urdu on the storefront's Urdu pages, in English on the others.
+ */
+export function poweredByLink(platformUrl: string, locale: string): string {
+  const words = locale === 'ur' ? 'ہٹی کے ذریعے' : 'Powered by Hatti';
+  const href =
+    `${platformUrl.replace(/\/+$/, '')}/?utm_campaign=poweredby&amp;utm_medium=hatti` +
+    '&amp;utm_source=onlinestore';
+  return `<a target="_blank" rel="nofollow" href="${href}">${words}</a>`;
 }

@@ -1,8 +1,10 @@
 import {
   InputChecker,
+  PlanAllowance,
   checkSeo,
   fail,
   failOne,
+  planFeatureMessage,
   type FieldError,
   type MutationResult,
   type SeoInputValue,
@@ -15,7 +17,7 @@ import { appendEvent } from '@hatti/events';
 import { readyImagesIn } from '@hatti/files/public';
 import { isUuid } from '@hatti/ids';
 import { parsePkMobile } from '@hatti/pk';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { OnlineStoreEvents, type PreferencesUpdatedPayload } from './events.js';
 import type { LinkPageRecord, MaintenanceRecord, PreferencesRecord } from './records.js';
@@ -58,6 +60,11 @@ export interface PreferencesInput {
   returnDays?: number | null;
   /** Whether it exchanges what comes back, never refunding it. Left as it is if absent. */
   returnExchangesOnly?: boolean | null;
+  /**
+   * Hides "Powered by Hatti" from its storefront, on a plan that lets it, or shows it again
+   * (ADR-526). Left as it is if absent.
+   */
+  hidePoweredBy?: boolean | null;
 }
 
 /** The longest return window a shop may give, in days (ADR-468). */
@@ -108,7 +115,8 @@ type PreferencesRow = typeof preferences.$inferSelect;
  * WhatsApp" links and WhatsApp section go to, the password it is closed behind until it opens
  * (ADR-054), rules it adds to its robots.txt (ADR-055), its home page's title, description and
  * social sharing image for search engines and link previews (ADR-243), whether it is paused
- * for a while (ADR-252), and its return window (ADR-468). A shop that set nothing has no number, an open storefront, the
+ * for a while (ADR-252), its return window (ADR-468), and whether it hides "Powered by Hatti"
+ * (ADR-526), which a plan without it may not, though one hidden before stays hidden. A shop that set nothing has no number, an open storefront, the
  * platform's robots.txt, and its name for its home page.
  */
 @Injectable()
@@ -118,6 +126,7 @@ export class PreferencesService {
     private readonly box: SecretBox,
     /** For the products a link page shows. */
     private readonly products: ProductService,
+    @Optional() private readonly allowance?: PlanAllowance,
   ) {}
 
   async get(tenant: TenantContext): Promise<PreferencesView> {
@@ -240,6 +249,16 @@ export class PreferencesService {
         }) ?? '')
       : '';
     if (!check.ok) return fail(check.errors);
+    if (input.hidePoweredBy && this.allowance) {
+      const plan = await this.allowance.excludes(tenant.shopId, 'removeBranding');
+      if (plan && !(await this.get(tenant)).hidePoweredBy) {
+        return failOne(
+          ['hidePoweredBy'],
+          'INVALID',
+          planFeatureMessage(plan, 'hiding "Powered by Hatti"', 'hide it'),
+        );
+      }
+    }
     // Some 50 ms of scrypt, before the transaction rather than inside it.
     const verifier = password === undefined ? undefined : await passwordVerifier(password);
 
@@ -290,6 +309,7 @@ export class PreferencesService {
           days: returnDays === undefined ? was.returns.days : returnDays,
           exchangesOnly: input.returnExchangesOnly ?? was.returns.exchangesOnly,
         },
+        hidePoweredBy: input.hidePoweredBy ?? was.hidePoweredBy,
       };
       if (next.passwordEnabled && next.password === null) {
         return failOne(
@@ -325,6 +345,7 @@ export class PreferencesService {
         ...(next.returns.exchangesOnly !== was.returns.exchangesOnly
           ? ['returnExchangesOnly']
           : []),
+        ...(next.hidePoweredBy !== was.hidePoweredBy ? ['hidePoweredBy'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: was };
       const newPassword = changed.includes('password') && next.password !== null;
@@ -350,6 +371,7 @@ export class PreferencesService {
         maintenanceUntil: next.maintenance.until,
         returnDays: next.returns.days,
         returnExchangesOnly: next.returns.exchangesOnly,
+        hidePoweredBy: next.hidePoweredBy,
       };
       const [row] = await tx
         .insert(preferences)
@@ -487,6 +509,7 @@ function toRecord(row: PreferencesRow | undefined, now = new Date()): Preference
       days: row?.returnDays ?? null,
       exchangesOnly: row?.returnExchangesOnly ?? false,
     },
+    hidePoweredBy: row?.hidePoweredBy ?? false,
   };
 }
 

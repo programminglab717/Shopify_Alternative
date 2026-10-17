@@ -9,10 +9,17 @@ export type PlanLimitKind = 'staff' | 'locations' | 'ordersPerMonth';
 /**
  * What a shop's plan with Hatti includes or leaves out (BIL-01, ADR-264): a domain of the shop's
  * own, and its accounts with payment gateways; custom apps, automations and the abandoned
- * checkout reminder, cashback, and Meta's conversions API (ADR-523).
+ * checkout reminder, cashback, and Meta's conversions API (ADR-523); and hiding "Powered by
+ * Hatti" from its storefront (ADR-526).
  */
 export type PlanFeature =
-  'customDomains' | 'onlineGateways' | 'customApps' | 'automations' | 'loyalty' | 'conversionsApi';
+  | 'customDomains'
+  | 'onlineGateways'
+  | 'customApps'
+  | 'automations'
+  | 'loyalty'
+  | 'conversionsApi'
+  | 'removeBranding';
 
 /** A limit of the shop's plan. */
 export interface PlanLimit {
