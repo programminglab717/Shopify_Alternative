@@ -547,41 +547,42 @@ describe.skipIf(!server)('TranslationService', () => {
     expect(rest.hasNextPage).toBe(false);
   });
   it("finds products, pages and articles by the shop's Urdu for them, until it is removed (ADR-240)", async () => {
+    // Words outside Hatti's commerce lexicon (ADR-481), so only the shop's Urdu finds them.
     const kurta = unwrap(
       await f.products.create(f.a, {
-        title: 'Cotton Kurta',
+        title: 'Ajrak Chadar',
         status: 'active',
-        productType: 'Kurta',
+        productType: 'Chadar',
         variants: [{ price: '2,500' }],
       }),
     );
     const search = (terms: string) =>
       f.db.tenant(f.a.shopId, (tx) => f.products.searchIdsOf(tx, f.a.shopId, terms, 10));
-    expect(await search('کرتا')).toEqual([]);
+    expect(await search('چادر')).toEqual([]);
     unwrap(
       await f.translations.register(f.a, 'product', kurta.id, [
         {
           locale: 'ur',
           key: 'title',
-          value: 'سوتی کرتا',
-          translatableContentDigest: digestOf('Cotton Kurta'),
+          value: 'اجرک چادر',
+          translatableContentDigest: digestOf('Ajrak Chadar'),
         },
         {
           locale: 'ur',
           key: 'product_type',
-          value: 'کرتے',
-          translatableContentDigest: digestOf('Kurta'),
+          value: 'چادریں',
+          translatableContentDigest: digestOf('Chadar'),
         },
       ]),
     );
     // By its Urdu, its type's too, a typo forgiven as in its own words; and by its own still.
-    expect(await search('سوتی کرتا')).toEqual([kurta.id]);
-    expect(await search('کرتے')).toEqual([kurta.id]);
-    expect(await search('سوطی')).toEqual([kurta.id]);
-    expect(await search('cotton kurta')).toEqual([kurta.id]);
+    expect(await search('اجرک چادر')).toEqual([kurta.id]);
+    expect(await search('چادریں')).toEqual([kurta.id]);
+    expect(await search('اجرگ')).toEqual([kurta.id]);
+    expect(await search('ajrak chadar')).toEqual([kurta.id]);
     unwrap(await f.translations.remove(f.a, 'product', kurta.id, ['title'], ['ur']));
-    expect(await search('سوتی')).toEqual([]);
-    expect(await search('کرتے')).toEqual([kurta.id]);
+    expect(await search('اجرک')).toEqual([]);
+    expect(await search('چادریں')).toEqual([kurta.id]);
 
     // A page by its Urdu text, and an article by its Urdu title.
     const about = unwrap(
