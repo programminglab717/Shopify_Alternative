@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### The store speed score
+### 3346981 · The store speed score
 
 * **Shoppers' own Core Web Vitals, measured by their browsers on each page and counted by the
   storefront by device and kind of page for 28 days; a score per device, ratings and fixes on
