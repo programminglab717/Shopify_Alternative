@@ -26,6 +26,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { AppliesTo, itemInput, noneChosen, type ChosenItems } from './applies-to';
 import { AutomaticDiscounts } from './automatic-discounts';
 
 /** The roles that make and end discount codes (the core's write_discounts). */
@@ -57,6 +58,8 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   usageLimit: 'discounts.usageLimit',
   startsAt: 'discounts.starts',
   endsAt: 'discounts.ends',
+  productIds: 'appliesTo.label',
+  collectionIds: 'appliesTo.label',
 };
 
 function NewCodeForm({ onDone }: { onDone: (code: DiscountCodeValue) => void }) {
@@ -74,10 +77,15 @@ function NewCodeForm({ onDone }: { onDone: (code: DiscountCodeValue) => void }) 
   const [once, setOnce] = useState(false);
   const [starts, setStarts] = useState('');
   const [ends, setEnds] = useState('');
+  const [items, setItems] = useState<ChosenItems>(null);
   const [problems, setProblems] = useState<string[]>([]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (kind !== 'FREE_SHIPPING' && noneChosen(items)) {
+      setProblems([t('appliesTo.none')]);
+      return;
+    }
     const usageLimit = limit.trim() ? Number(limit.replace(/,/g, '')) : null;
     if (usageLimit !== null && !Number.isInteger(usageLimit)) {
       setProblems([`${t('discounts.usageLimit')}: ${t('settings.badNumber')}`]);
@@ -96,6 +104,7 @@ function NewCodeForm({ onDone }: { onDone: (code: DiscountCodeValue) => void }) 
           oncePerCustomer: once,
           ...(starts && { startsAt: dayInput(starts, false, timezone) }),
           endsAt: dayInput(ends, true, timezone),
+          ...(kind !== 'FREE_SHIPPING' && itemInput(items)),
         },
       });
       if (discountCodeCreate.userErrors.length > 0 || !discountCodeCreate.discountCode) {
@@ -154,6 +163,7 @@ function NewCodeForm({ onDone }: { onDone: (code: DiscountCodeValue) => void }) 
             />
           )}
         </Pair>
+        {kind !== 'FREE_SHIPPING' && <AppliesTo value={items} onChange={setItems} />}
         <Pair>
           <TextField
             label={t('discounts.minimum')}

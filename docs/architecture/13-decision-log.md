@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-517 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-518 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -525,6 +525,7 @@
 | 515 | Automatic discounts: a percentage or an amount off the items, or free delivery, given without a code to every cart and checkout that qualifies; the one taking most off the items applies with free delivery beside it, and with a code only where each combines with codes, else whichever takes more | Accepted |
 | 516 | The admin's automatic discounts, on the discounts page below the codes: each with what it gives in a line and whether it runs; started with a title shoppers see, what it gives, a minimum, dates and whether codes go with it; ended at once or deleted | Accepted |
 | 517 | Discounts for some products or collections: a code or an automatic discount names up to 100 of each, and takes a percentage or an amount off only their items, its minimum being what they come to; free delivery stays for the whole order | Accepted |
+| 518 | The admin's discounts for some products or collections: a new code or automatic discount applies to the whole order or to products found by name and collections chosen from the shop's, shown as chips taken off with a tap; free delivery has no such choice | Accepted |
 
 ---
 
@@ -19757,3 +19758,37 @@
     the order. Once an order keeps the sum plain at checkout.
   * **Collections copied onto the discount as product lists:** that is wrong as soon as a smart
     collection's products change. Asking at checkout follows the collection as it is.
+
+## ADR-518 · The admin's discounts for some products or collections: a new code or automatic discount applies to the whole order or to products found by name and collections chosen from the shop's, shown as chips taken off with a tap; free delivery has no such choice
+
+* **Context:** ADR-517 let codes and automatic discounts be for some products or collections
+  through the Admin API. The admin's discounts page made them for whole orders only (ADR-276,
+  ADR-516).
+* **Decision:**
+  * **Where:** in both forms, under what the discount gives, an "Applies to" choice: the whole
+    order, or some products or collections.
+  * **Choosing:**
+    * Products are found by name, as menus find them (ADR-291), and added with a tap; one
+      already chosen is not offered again.
+    * Collections are chosen from the shop's own, asked for only once "some" is chosen.
+    * What is chosen shows as chips, collections marked so, each taken off with its button.
+    * A line says the discount takes off only these items, its minimum is theirs, and free
+      delivery is always for the whole order.
+  * **Checked:**
+    * "Some" with nothing chosen is stopped before it is sent, saying to choose one or make it
+      for the whole order.
+    * The API's errors on the lists are named "Applies to".
+  * **Free delivery:** the choice is hidden while the discount gives free delivery, and nothing of
+    it is sent.
+  * **The list:** each discount's line from the API says what it is for ("Rs 500 off 2 products
+    and 1 collection").
+  * In English and Urdu.
+* **Consequences:**
+  * A shop makes "20% off the Eid edit" or "Rs 500 off khussas" from a phone.
+  * Which products and collections an existing discount is for is not listed by name, nor
+    changed in place. A shop ends one and starts another, as for its value (ADR-516).
+* **Alternatives:**
+  * **A picker showing the whole catalog:** shops with thousands of products scroll forever on a
+    phone. Finding by name is what the drafts and menus already do.
+  * **Choosing variants:** Shopify allows it, but shops here run sales on products and
+    collections. Variants would add a step for little gain.

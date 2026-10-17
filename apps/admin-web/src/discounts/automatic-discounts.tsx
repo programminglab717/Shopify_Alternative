@@ -25,6 +25,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { AppliesTo, itemInput, noneChosen, type ChosenItems } from './applies-to';
 
 const STATUS_BADGES = {
   ACTIVE: { colour: 'delivered', icon: CircleCheck },
@@ -39,6 +40,8 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   minimumSubtotal: 'discounts.minimum',
   startsAt: 'discounts.starts',
   endsAt: 'discounts.ends',
+  productIds: 'appliesTo.label',
+  collectionIds: 'appliesTo.label',
 };
 
 /** The start of a day typed in a date field, or its end, in the shop's time zone. */
@@ -61,10 +64,15 @@ function NewAutomaticForm({ onDone }: { onDone: (discount: AutomaticDiscountValu
   const [combines, setCombines] = useState(false);
   const [starts, setStarts] = useState('');
   const [ends, setEnds] = useState('');
+  const [items, setItems] = useState<ChosenItems>(null);
   const [problems, setProblems] = useState<string[]>([]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (kind !== 'FREE_SHIPPING' && noneChosen(items)) {
+      setProblems([t('appliesTo.none')]);
+      return;
+    }
     setProblems([]);
     try {
       const { automaticDiscountCreate } = await create.mutateAsync({
@@ -77,6 +85,7 @@ function NewAutomaticForm({ onDone }: { onDone: (discount: AutomaticDiscountValu
           combinesWithCodes: combines,
           ...(starts && { startsAt: dayInput(starts, false, timezone) }),
           endsAt: dayInput(ends, true, timezone),
+          ...(kind !== 'FREE_SHIPPING' && itemInput(items)),
         },
       });
       if (
@@ -129,6 +138,7 @@ function NewAutomaticForm({ onDone }: { onDone: (discount: AutomaticDiscountValu
             />
           )}
         </Pair>
+        {kind !== 'FREE_SHIPPING' && <AppliesTo value={items} onChange={setItems} />}
         <TextField
           label={t('discounts.minimum')}
           hint={t('discounts.minimumHint')}

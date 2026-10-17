@@ -124,4 +124,83 @@ describe('Automatic discounts in the admin (ADR-515)', () => {
     await screen.findByText('Free delivery week');
     expect(screen.getByRole('button', { name: 'New automatic discount' })).toBeTruthy();
   });
+  it('starts one for some products and collections, chosen by name, or says to choose one (ADR-518)', async () => {
+    const core = fakeCore('owner', (operation, variables) => {
+      if (operation === 'DiscountCodes') return { discountCodes: { nodes: [] } };
+      if (operation === 'AutomaticDiscounts') return { automaticDiscounts: [] };
+      if (operation === 'Collections') {
+        return {
+          collections: {
+            nodes: [
+              { id: 'col_1', title: 'Eid edit', productsCount: 12, ruleSet: null },
+              { id: 'col_2', title: 'Footwear', productsCount: 4, ruleSet: null },
+            ],
+          },
+        };
+      }
+      if (operation === 'CollectionProductSearch') {
+        expect(variables).toEqual({ query: 'lawn' });
+        return {
+          products: {
+            nodes: [
+              { id: 'prod_1', title: 'Lawn 3-piece', status: 'ACTIVE' },
+              { id: 'prod_2', title: 'Lawn dupatta', status: 'ACTIVE' },
+            ],
+          },
+        };
+      }
+      if (operation === 'AutomaticDiscountCreate') {
+        return {
+          automaticDiscountCreate: {
+            automaticDiscount: automatic({ summary: '20% off 1 product and 1 collection' }),
+            userErrors: [],
+          },
+        };
+      }
+      throw new Error(`unexpected ${operation}`);
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/discounts');
+
+    await screen.findByText('No automatic discounts yet.');
+    await press('New automatic discount');
+    type('Title shoppers see', 'Eid sale');
+    type('Percentage off', '20');
+    fireEvent.change(screen.getByLabelText('Applies to'), { target: { value: 'SOME' } });
+    await press('Start it');
+    expect(
+      screen.getByText('Choose a product or collection, or make it for the whole order.'),
+    ).toBeTruthy();
+    expect(core.sent.some((each) => each.operation === 'AutomaticDiscountCreate')).toBe(false);
+
+    type('Find a product to add', 'lawn');
+    fireEvent.keyDown(screen.getByLabelText('Find a product to add'), { key: 'Enter' });
+    await screen.findByRole('button', { name: 'Add Lawn 3-piece' });
+    await press('Add Lawn 3-piece');
+    await press('Add Lawn dupatta');
+    // One chosen is not offered again, and is taken off with its button.
+    expect(screen.queryByRole('button', { name: 'Add Lawn 3-piece' })).toBeNull();
+    await press('Take off Lawn dupatta');
+    fireEvent.change(await screen.findByLabelText('Add a collection'), {
+      target: { value: 'col_1' },
+    });
+    const chosen = screen.getByRole('list', { name: 'Chosen products and collections' });
+    expect(within(chosen).getByText('Eid edit (collection)')).toBeTruthy();
+    await press('Start it');
+
+    await screen.findByText('Eid sale is set: carts take it while it runs.');
+    expect(
+      core.sent.find((each) => each.operation === 'AutomaticDiscountCreate')?.variables,
+    ).toEqual({
+      automaticDiscount: {
+        title: 'Eid sale',
+        percentage: 20,
+        minimumSubtotal: null,
+        combinesWithCodes: false,
+        endsAt: null,
+        productIds: ['prod_1'],
+        collectionIds: ['col_1'],
+      },
+    });
+  });
 });

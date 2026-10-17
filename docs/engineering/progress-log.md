@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### The admin's discounts for some products or collections
+
+* **The admin's forms for codes and automatic discounts choose whether they are for the whole
+  order or for some products, found by name, and collections, in English and Urdu** ([ADR-518](../architecture/13-decision-log.md#adr-518--the-admins-discounts-for-some-products-or-collections-a-new-code-or-automatic-discount-applies-to-the-whole-order-or-to-products-found-by-name-and-collections-chosen-from-the-shops-shown-as-chips-taken-off-with-a-tap-free-delivery-has-no-such-choice),
+  CHK-06).
+* 3225 tests, 2 more: an automatic discount and a code made for some
+  items, and the choice stopped or hidden where it can't apply.
+
 ### 1017c9c · Discounts for some products or collections
 
 * **A code or an automatic discount can be for some products or collections, taking a

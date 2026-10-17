@@ -138,4 +138,52 @@ describe('Discount codes in the admin', () => {
     const made = newCode();
     expect(made).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
   });
+  it('makes a code for one product, and none for free delivery (ADR-518)', async () => {
+    const core = fakeCore('manager', (operation) => {
+      if (operation === 'DiscountCodes') return { discountCodes: { nodes: [] } };
+      if (operation === 'AutomaticDiscounts') return { automaticDiscounts: [] };
+      if (operation === 'Collections') return { collections: { nodes: [] } };
+      if (operation === 'CollectionProductSearch') {
+        return { products: { nodes: [{ id: 'prod_9', title: 'Khussa', status: 'ACTIVE' }] } };
+      }
+      if (operation === 'DiscountCodeCreate') {
+        return { discountCodeCreate: { discountCode: code({ code: 'KHUSSA' }), userErrors: [] } };
+      }
+      throw new Error(`unexpected ${operation}`);
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/discounts');
+
+    await screen.findByText('No discount codes yet.');
+    await press('New code');
+    type('Code', 'khussa');
+    fireEvent.change(screen.getByLabelText('It gives'), { target: { value: 'FIXED_AMOUNT' } });
+    type('Amount off, in rupees', '500');
+    fireEvent.change(screen.getByLabelText('Applies to'), { target: { value: 'SOME' } });
+    type('Find a product to add', 'khussa');
+    fireEvent.keyDown(screen.getByLabelText('Find a product to add'), { key: 'Enter' });
+    await screen.findByRole('button', { name: 'Add Khussa' });
+    await press('Add Khussa');
+    // Free delivery is for the whole order: the choice goes.
+    fireEvent.change(screen.getByLabelText('It gives'), { target: { value: 'FREE_SHIPPING' } });
+    expect(screen.queryByLabelText('Applies to')).toBeNull();
+    fireEvent.change(screen.getByLabelText('It gives'), { target: { value: 'FIXED_AMOUNT' } });
+    type('Amount off, in rupees', '500');
+    await press('Make the code');
+
+    await waitFor(() =>
+      expect(core.sent.find((each) => each.operation === 'DiscountCodeCreate')?.variables).toEqual({
+        discountCode: {
+          code: 'KHUSSA',
+          amount: '500',
+          minimumSubtotal: null,
+          usageLimit: null,
+          oncePerCustomer: false,
+          endsAt: null,
+          productIds: ['prod_9'],
+          collectionIds: [],
+        },
+      }),
+    );
+  });
 });
