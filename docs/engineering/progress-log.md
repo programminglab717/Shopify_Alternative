@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Local support
+### def1f7d · Local support
 
 * **Shops reach Hatti's people as their plans allow, and ask from the admin's Help page; Hatti's
   people answer with a command, the answer shown in the admin** ([ADR-508](../architecture/13-decision-log.md#adr-508--local-support-each-plans-way-to-reach-hattis-people-requests-from-the-admin-kept-for-them-and-answered-with-a-command-and-a-help-centre-in-english-and-urdu), BIL-05).
