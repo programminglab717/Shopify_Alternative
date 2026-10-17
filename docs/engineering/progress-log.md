@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Features gated by plan
+### c36e3ee · Features gated by plan
 
 * **Plans gate custom apps, automations and the abandoned checkout reminder from Starter, and
   cashback and Meta's conversions API from Growth, as the pricing sets them; refused when made,
