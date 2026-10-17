@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-535 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-536 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -543,6 +543,7 @@
 | 533 | Each plan includes AI credits a month, kept by billing: each draft the AI gives, of a product's copy or of translations, spends one, and none are drafted past them until the month in Pakistan's time turns | Accepted |
 | 534 | The admin's AI drafts say the plan's AI credits left this month, and draft none once they are used; the plan cards say each plan's | Accepted |
 | 535 | Anyone may ask on the status page to be emailed its updates: a link to confirm first, a link to stop in every email, and the worker sending both, each once | Accepted |
+| 536 | The worker checks addresses given for Hatti's parts, posts an outage on the status page after three failed checks in a row, and resolves it when the part answers again | Accepted |
 
 ---
 
@@ -20279,3 +20280,30 @@
     owners. Asking keeps it to those who want it.
   * **Sending the link from the request itself:** the API process would need the email sender,
     and a slow SES would slow the page; the worker's next sweep is within a minute.
+
+## ADR-536 · The worker checks addresses given for Hatti's parts, posts an outage on the status page after three failed checks in a row, and resolves it when the part answers again
+
+* **Context:** The status page says what Hatti's people post (ADR-498). When a part stops
+  answering at night, nothing is posted until someone notices.
+* **Decision:**
+  * **`STATUS_PROBES`** gives the worker an address for each part to check, as
+    `part=address` pairs; without it, nothing is checked.
+  * **A check** asks the address and takes any status below 500 within ten seconds as an
+    answer: a page that says "not found" still answers. Each sweep checks each part, at most
+    once a minute.
+  * **Three failed checks in a row** post an incident, down, for that part, as "Hatti's checks",
+    in English and Urdu; one already open by the checks for that part means no second. An answer
+    between failures starts the count again, so one slow answer posts nothing.
+  * **An answer again** resolves the checks' incident, saying so. Incidents Hatti's people post
+    are theirs to end.
+  * The counts are kept in the worker's memory: a restart starts them again, which costs at
+    most three more checks.
+  * What the checks post goes to the page, its history (ADR-528) and its emails (ADR-535) like
+    anything else.
+* **Consequences:**
+  * A part that goes down is on the status page within minutes, and off it when it's back.
+* **Alternatives:**
+  * **An outside monitor posting through the command:** another service to run and keep in
+    step; the worker already sweeps every minute.
+  * **Posting on the first failure:** one slow answer would post and resolve an incident, and
+    email every subscriber twice.

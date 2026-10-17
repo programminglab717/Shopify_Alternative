@@ -121,7 +121,8 @@ import { StoreExports } from './store-exports.js';
 import { StaffAlerts } from './staff-alerts.js';
 import { SupportAlerts } from './support-alerts.js';
 import { StatusMail } from './status-mail.js';
-import { StatusSubscriptionsService } from '@hatti/trust/public';
+import { StatusProbes } from './status-probes.js';
+import { IncidentsService, StatusSubscriptionsService } from '@hatti/trust/public';
 import { StorefrontSessions } from './storefront-sessions.js';
 import { StorefrontSweep } from './storefront-sweep.js';
 import { UnpaidOrders } from './unpaid-orders.js';
@@ -593,6 +594,16 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => statusMail.stop());
+    // Hatti's parts checked, incidents posted when one stops answering (ADR-536).
+    if (config.STATUS_PROBES.length > 0) {
+      const probes = new StatusProbes(
+        new IncidentsService(database),
+        config.STATUS_PROBES,
+        fetch,
+        logger,
+      ).start(Math.max(config.SWEEP_INTERVAL_MS, 60_000));
+      closers.push(() => probes.stop());
+    }
     if (config.ENCRYPTION_KEYS) {
       const conversions = new ConversionsSender({
         database,

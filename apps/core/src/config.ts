@@ -1,6 +1,7 @@
 import { env, parseEnv, z, type Env } from '@hatti/config';
 import { SecretBox } from '@hatti/crypto';
 import { normalizePkIban, parsePkMobile } from '@hatti/pk';
+import { STATUS_COMPONENTS, type StatusComponent } from '@hatti/trust/public';
 
 /** "id:base64key,…", newest first. Parsed at startup so a bad key stops the process. */
 const encryptionKeys = () =>
@@ -514,6 +515,30 @@ export function passkeysOf(
   };
 }
 
+/** An address the worker checks for one of Hatti's parts (ADR-536). */
+export interface StatusProbe {
+  component: StatusComponent;
+  url: string;
+}
+
+/** "part=address" pairs, comma-separated; null if one is not, or names no part. */
+export function statusProbesOf(value: string): StatusProbe[] | null {
+  const probes: StatusProbe[] = [];
+  for (const pair of value
+    .split(',')
+    .map((each) => each.trim())
+    .filter(Boolean)) {
+    const at = pair.indexOf('=');
+    const component = pair.slice(0, at).trim() as StatusComponent;
+    const url = pair.slice(at + 1).trim();
+    if (at < 1 || !STATUS_COMPONENTS.includes(component) || !/^https?:\/\/\S+$/.test(url)) {
+      return null;
+    }
+    probes.push({ component, url });
+  }
+  return probes;
+}
+
 const workerSchema = z
   .object({
     ...common,
@@ -601,6 +626,27 @@ const workerSchema = z
      * plan's time (ADR-525). Without it, they are logged alone.
      */
     SUPPORT_EMAIL: z.string().trim().email().max(200).optional(),
+    /**
+     * Addresses the worker checks for each of Hatti's parts, posting an incident on the status
+     * page when one stops answering (ADR-536): "storefronts=https://demo.hatti.pk/,
+     * admin=https://admin.hatti.pk/health". Without it, nothing is checked.
+     */
+    STATUS_PROBES: z
+      .string()
+      .trim()
+      .max(2_000)
+      .optional()
+      .transform((value, context) => {
+        const probes = statusProbesOf(value ?? '');
+        if (probes === null) {
+          context.addIssue({
+            code: 'custom',
+            message: `Give part=https://address pairs, the parts of: ${STATUS_COMPONENTS.join(', ')}`,
+          });
+          return z.NEVER;
+        }
+        return probes;
+      }),
     ...messageSending,
     ...storage,
     ...webPush,

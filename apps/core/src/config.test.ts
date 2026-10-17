@@ -369,6 +369,22 @@ describe('Worker configuration', () => {
     REDIS_URL: env.REDIS_URL,
   };
 
+  it("takes the addresses to check for Hatti's parts as part=address pairs (ADR-536)", () => {
+    expect(loadWorkerConfig(worker).STATUS_PROBES).toEqual([]);
+    expect(
+      loadWorkerConfig({
+        ...worker,
+        STATUS_PROBES: ' storefronts=https://demo.hatti.pk/ , admin=https://admin.hatti.pk/health',
+      }).STATUS_PROBES,
+    ).toEqual([
+      { component: 'storefronts', url: 'https://demo.hatti.pk/' },
+      { component: 'admin', url: 'https://admin.hatti.pk/health' },
+    ]);
+    for (const wrong of ['fax=https://x.pk', 'admin=ftp://x.pk', 'https://x.pk']) {
+      expect(() => loadWorkerConfig({ ...worker, STATUS_PROBES: wrong })).toThrow('STATUS_PROBES');
+    }
+  });
+
   it("takes Cloudflare's zone and token together, or neither, to purge storefront pages", () => {
     expect(loadWorkerConfig(worker).CLOUDFLARE_ZONE_ID).toBeUndefined();
     expect(() => loadWorkerConfig({ ...worker, CLOUDFLARE_ZONE_ID: 'zone-1' })).toThrow(
