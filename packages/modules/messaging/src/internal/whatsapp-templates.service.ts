@@ -14,8 +14,16 @@ import {
   type WhatsAppTemplateChangedPayload,
   type WhatsAppTemplateStatusPayload,
 } from './events.js';
+import {
+  LIBRARY_KINDS,
+  LIBRARY_LANGUAGES,
+  LIBRARY_LIMITS,
+  libraryKey,
+  libraryTemplate,
+} from './template-library.js';
 import type { MessageLanguage } from './templates.js';
 import { WhatsAppAccountsService } from './whatsapp-accounts.service.js';
+import type { WhatsAppBusinessClient } from './whatsapp-business.js';
 import type { TemplateStatusUpdate } from './whatsapp-webhook.js';
 
 export const WHATSAPP_TEMPLATE_STATUSES = [
@@ -96,6 +104,29 @@ const META_STATUSES: Record<string, WhatsAppTemplateStatus> = {
   PENDING_DELETION: 'disabled',
   DELETED: 'disabled',
 };
+
+/** How far Meta has come with Hatti's order templates on the shop's account (ADR-537). */
+export interface WhatsAppLibraryRecord {
+  /** The templates the library has: each kind of order news in each language. */
+  total: number;
+  approved: number;
+  pending: number;
+  /** Refused, paused or disabled by Meta: those kinds go from Hatti's number. */
+  refused: number;
+  /** When the library was last sent to the account; null before it first is. */
+  triedAt: Date | null;
+}
+
+/** What sending the library to an account came to: how many Meta took, or had, and why not. */
+export interface LibrarySent {
+  submitted: number;
+  /** Those the account had already, as from a shop connected before. */
+  adopted: number;
+  errors: string[];
+}
+
+/** The names Hatti's own templates have, which a shop's cannot take (ADR-537). */
+const HATTI_PREFIX = 'hatti_';
 
 /** {{1}} and its like, as Meta reads them. */
 const PLACEHOLDER = /\{\{\s*([^{}]*?)\s*\}\}/g;
@@ -214,7 +245,8 @@ export class WhatsAppTemplatesService {
     }
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<TemplateRow & { business_account_id: string }>(sql`
-        DELETE FROM messaging.whatsapp_templates WHERE shop_id = ${tenant.shopId} AND id = ${id}
+        DELETE FROM messaging.whatsapp_templates
+         WHERE shop_id = ${tenant.shopId} AND id = ${id} AND library_kind IS NULL
         RETURNING ${COLUMNS}, business_account_id`);
       const gone = rows[0];
       if (!gone) return failOne<string>(['id'], 'NOT_FOUND', 'No such template');
@@ -238,6 +270,140 @@ export class WhatsAppTemplatesService {
       });
     }
     return { ok: true, value: await this.list(tenant) };
+  }
+
+  /**
+   * The shops whose accounts lack some of Hatti's order templates (ADR-537), those never sent
+   * them first: each at most once a day.
+   */
+  async libraryDue(
+    at: Date = new Date(),
+    limit: number = LIBRARY_LIMITS.shopsPerSweep,
+  ): Promise<string[]> {
+    const before = new Date(at.getTime() - LIBRARY_LIMITS.retryHours * 3_600_000);
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<{ shop_id: string }>(sql`
+        SELECT a.shop_id FROM messaging.whatsapp_accounts a
+         WHERE (a.library_tried_at IS NULL OR a.library_tried_at <= ${before})
+           AND (SELECT count(*) FROM messaging.whatsapp_templates t
+                 WHERE t.shop_id = a.shop_id AND t.business_account_id = a.business_account_id
+                   AND t.library_kind IS NOT NULL) < ${LIBRARY_KINDS.length * LIBRARY_LANGUAGES.length}
+         ORDER BY a.library_tried_at NULLS FIRST, a.shop_id
+         LIMIT ${limit}`),
+    );
+    return rows.map((row) => row.shop_id);
+  }
+
+  /**
+   * Sends the shop's account the order templates it lacks, each to Meta for approval in the
+   * utility category through `graph`, with links to `orderPage` followed by an order's own part;
+   * one the account has already, under its name and language, is kept as Meta says it stands.
+   * Tried, whatever came of it, at `at`: not again for a day.
+   */
+  async sendLibrary(
+    shopId: string,
+    orderPage: string,
+    graph: Pick<WhatsAppBusinessClient, 'templatesOf' | 'submitTemplate'>,
+    at: Date = new Date(),
+  ): Promise<LibrarySent> {
+    const sent: LibrarySent = { submitted: 0, adopted: 0, errors: [] };
+    const sender = await this.accounts.senderOf(shopId);
+    if (!sender) return sent;
+    const account = sender.businessAccountId;
+    const have = await this.db.tenant(shopId, async (tx) => {
+      await tx.execute(sql`
+        UPDATE messaging.whatsapp_accounts SET library_tried_at = ${at}
+         WHERE shop_id = ${shopId} AND business_account_id = ${account}`);
+      const { rows } = await tx.execute<{ library_kind: string; language: string }>(sql`
+        SELECT library_kind, language FROM messaging.whatsapp_templates
+         WHERE shop_id = ${shopId} AND business_account_id = ${account}
+           AND library_kind IS NOT NULL`);
+      return new Set(rows.map((row) => libraryKey(row.library_kind, row.language)));
+    });
+    const found = await graph.templatesOf(sender.accessToken, account);
+    if (!found.ok) return { ...sent, errors: [found.error] };
+    for (const kind of LIBRARY_KINDS) {
+      for (const language of LIBRARY_LANGUAGES) {
+        if (have.has(libraryKey(kind, language))) continue;
+        const template = libraryTemplate(kind, language, orderPage);
+        const existing = found.value.find(
+          (each) => each.name === template.name && each.language === language,
+        );
+        let meta = existing && {
+          id: existing.id,
+          status: existing.status,
+          reason: existing.rejectedReason,
+        };
+        if (!meta) {
+          const created = await graph.submitTemplate(sender.accessToken, account, template);
+          if (!created.ok) {
+            sent.errors.push(`${template.name} (${language}): ${created.error}`);
+            continue;
+          }
+          meta = { id: created.value.id, status: created.value.status, reason: null };
+        }
+        const status = META_STATUSES[meta.status] ?? 'pending';
+        const body = (template.components[0] as { text: string }).text;
+        await this.db.tenant(shopId, (tx) =>
+          tx.execute(sql`
+            INSERT INTO messaging.whatsapp_templates
+                   (shop_id, business_account_id, name, language, body, status, meta_template_id,
+                    rejected_reason, library_kind)
+            VALUES (${shopId}, ${account}, ${template.name}, ${language}, ${body}, ${status},
+                    ${meta.id},
+                    ${status === 'approved' || status === 'pending' ? null : (meta.reason?.slice(0, 500) ?? null)},
+                    ${kind})
+            ON CONFLICT DO NOTHING`),
+        );
+        if (existing) sent.adopted++;
+        else sent.submitted++;
+      }
+    }
+    return sent;
+  }
+
+  /**
+   * The order templates Meta approved on the shop's account `businessAccountId`, each by its kind
+   * and language, as libraryKey names it: what goes from the shop's own number.
+   */
+  async libraryApproved(shopId: string, businessAccountId: string): Promise<Set<string>> {
+    const { rows } = await this.db.tenant(shopId, (tx) =>
+      tx.execute<{ library_kind: string; language: string }>(sql`
+        SELECT library_kind, language FROM messaging.whatsapp_templates
+         WHERE shop_id = ${shopId} AND business_account_id = ${businessAccountId}
+           AND library_kind IS NOT NULL AND status = 'approved'`),
+    );
+    return new Set(rows.map((row) => libraryKey(row.library_kind, row.language)));
+  }
+
+  /** How far Meta has come with the order templates on the shop's account; null without one. */
+  async library(tenant: TenantContext): Promise<WhatsAppLibraryRecord | null> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const { rows: accounts } = await tx.execute<{
+        business_account_id: string;
+        library_tried_at: string | Date | null;
+      }>(sql`
+        SELECT business_account_id, library_tried_at FROM messaging.whatsapp_accounts
+         WHERE shop_id = ${tenant.shopId}`);
+      const account = accounts[0];
+      if (!account) return null;
+      const { rows } = await tx.execute<{ status: WhatsAppTemplateStatus; count: number }>(sql`
+        SELECT status, count(*)::int AS count FROM messaging.whatsapp_templates
+         WHERE shop_id = ${tenant.shopId} AND business_account_id = ${account.business_account_id}
+           AND library_kind IS NOT NULL
+         GROUP BY status`);
+      const count = (...statuses: WhatsAppTemplateStatus[]) =>
+        rows
+          .filter((row) => statuses.includes(row.status))
+          .reduce((sum, row) => sum + row.count, 0);
+      return {
+        total: LIBRARY_KINDS.length * LIBRARY_LANGUAGES.length,
+        approved: count('approved'),
+        pending: count('pending'),
+        refused: count('rejected', 'paused', 'disabled'),
+        triedAt: account.library_tried_at === null ? null : toDate(account.library_tried_at),
+      };
+    });
   }
 
   /**
@@ -328,6 +494,8 @@ function checkTemplate(
       'INVALID',
       'can have only lowercase letters, digits and underscores',
     );
+  } else if (name.startsWith(HATTI_PREFIX)) {
+    check.add(['input', 'name'], 'INVALID', `can't begin with ${HATTI_PREFIX}: Hatti's own do`);
   }
   const header = check.text(['input', 'header'], input.header, { max: limits.header }) ?? null;
   const body = check.text(['input', 'body'], input.body, { max: limits.body, required: true });
@@ -392,6 +560,7 @@ async function templatesIn(
   const { rows } = await tx.execute<TemplateRow>(sql`
     SELECT ${COLUMNS} FROM messaging.whatsapp_templates
      WHERE shop_id = ${shopId} AND business_account_id = ${businessAccountId}
+       AND library_kind IS NULL
      ORDER BY created_at DESC, id DESC`);
   return rows;
 }
@@ -403,7 +572,7 @@ async function templateIn(
 ): Promise<(TemplateRow & { business_account_id: string }) | null> {
   const { rows } = await tx.execute<TemplateRow & { business_account_id: string }>(sql`
     SELECT ${COLUMNS}, business_account_id FROM messaging.whatsapp_templates
-     WHERE shop_id = ${shopId} AND id = ${id}`);
+     WHERE shop_id = ${shopId} AND id = ${id} AND library_kind IS NULL`);
   return rows[0] ?? null;
 }
 

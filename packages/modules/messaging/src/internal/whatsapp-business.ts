@@ -19,6 +19,16 @@ export interface WhatsAppSignupSettings {
   timeoutMs?: number;
 }
 
+/**
+ * What asking Meta's Graph API with a shop's own token takes: where it is. Exchanging a code
+ * takes Hatti's app too.
+ */
+export type WhatsAppGraphSettings = Pick<
+  WhatsAppSignupSettings,
+  'baseUrl' | 'version' | 'timeoutMs'
+> &
+  Partial<Pick<WhatsAppSignupSettings, 'appId' | 'appSecret'>>;
+
 /** A number of a WhatsApp Business Account, as Meta shows it. */
 export interface WhatsAppNumber {
   id: string;
@@ -41,6 +51,17 @@ export interface TemplateSubmission {
   body: string;
   footer: string | null;
   button: { text: string; url: string } | null;
+}
+
+/**
+ * A template as Meta's API takes it, its components already laid out: Hatti's library's, in the
+ * utility category (ADR-537), or a shop's own, in marketing.
+ */
+export interface PreparedTemplate {
+  name: string;
+  language: 'en' | 'ur';
+  category: 'MARKETING' | 'UTILITY';
+  components: object[];
 }
 
 /** An example of {{1}} that Meta asks for with a body that has it. */
@@ -67,6 +88,16 @@ export function templateComponents(template: TemplateSubmission): object[] {
   ];
 }
 
+/** A template of an account, as Meta says it stands. */
+export interface MetaTemplate {
+  id: string;
+  name: string;
+  /** "en", "ur". */
+  language: string;
+  status: string;
+  rejectedReason: string | null;
+}
+
 /** What Meta said of a request: what was asked for, or why not. */
 export type GraphResult<T> =
   | { ok: true; value: T }
@@ -75,15 +106,13 @@ export type GraphResult<T> =
 
 /** Asks Meta's Graph API for what connecting a shop's own number takes. */
 export class WhatsAppBusinessClient {
-  constructor(private readonly settings: WhatsAppSignupSettings) {}
+  constructor(private readonly settings: WhatsAppGraphSettings) {}
 
   /** The business token for the code Embedded Signup gave the admin. */
   async exchangeCode(code: string): Promise<GraphResult<string>> {
-    const query = new URLSearchParams({
-      client_id: this.settings.appId,
-      client_secret: this.settings.appSecret,
-      code,
-    });
+    const { appId, appSecret } = this.settings;
+    if (!appId || !appSecret) return { ok: false, error: "Hatti's Meta app isn't set up here" };
+    const query = new URLSearchParams({ client_id: appId, client_secret: appSecret, code });
     const result = await this.#request<{ access_token?: unknown }>(
       'GET',
       `oauth/access_token?${query}`,
@@ -146,13 +175,27 @@ export class WhatsAppBusinessClient {
   }
 
   /**
-   * Sends a template to Meta for approval on the account, in the marketing category: Meta's ID
-   * for it and how it stands, as a status Meta names ("PENDING").
+   * Sends a shop's own template to Meta for approval on the account, in the marketing category:
+   * Meta's ID for it and how it stands, as a status Meta names ("PENDING").
    */
   async createTemplate(
     token: string,
     businessAccountId: string,
     template: TemplateSubmission,
+  ): Promise<GraphResult<{ id: string; status: string }>> {
+    return this.submitTemplate(token, businessAccountId, {
+      name: template.name,
+      language: template.language,
+      category: 'MARKETING',
+      components: templateComponents(template),
+    });
+  }
+
+  /** Sends a template laid out already to Meta for approval on the account, as createTemplate. */
+  async submitTemplate(
+    token: string,
+    businessAccountId: string,
+    template: PreparedTemplate,
   ): Promise<GraphResult<{ id: string; status: string }>> {
     const result = await this.#request<{ id?: unknown; status?: unknown }>(
       'POST',
@@ -160,8 +203,8 @@ export class WhatsAppBusinessClient {
       {
         name: template.name,
         language: template.language,
-        category: 'MARKETING',
-        components: templateComponents(template),
+        category: template.category,
+        components: template.components,
       },
       token,
     );
@@ -189,7 +232,7 @@ export class WhatsAppBusinessClient {
   async templatesOf(
     token: string,
     businessAccountId: string,
-  ): Promise<GraphResult<{ id: string; status: string; rejectedReason: string | null }[]>> {
+  ): Promise<GraphResult<MetaTemplate[]>> {
     const fields = 'id,name,language,status,rejected_reason';
     const result = await this.#request<{ data?: unknown }>(
       'GET',
@@ -198,13 +241,15 @@ export class WhatsAppBusinessClient {
       token,
     );
     if (!result.ok) return result;
-    const templates = [];
+    const templates: MetaTemplate[] = [];
     for (const each of Array.isArray(result.value.data) ? result.value.data : []) {
       const row = each as Record<string, unknown>;
       if (typeof row.id !== 'string' || typeof row.status !== 'string') continue;
       const reason = row.rejected_reason;
       templates.push({
         id: row.id,
+        name: typeof row.name === 'string' ? row.name : '',
+        language: typeof row.language === 'string' ? row.language : '',
         status: row.status,
         rejectedReason: typeof reason === 'string' && reason !== 'NONE' ? reason : null,
       });

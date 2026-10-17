@@ -7,6 +7,7 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { LIBRARY_KINDS } from './template-library.js';
 import { FakeGraph, NUMBER, WABA } from './test-support.js';
 import { WhatsAppAccountsService } from './whatsapp-accounts.service.js';
 import { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
@@ -90,6 +91,7 @@ describe.skipIf(!server)("A shop's own WhatsApp templates (MKT-01, ADR-420)", ()
     graph.requests.length = 0;
     graph.templates.length = 0;
     graph.templateError = null;
+    graph.templateRefusals.clear();
     await admin.query(
       'DELETE FROM messaging.whatsapp_templates; DELETE FROM messaging.whatsapp_accounts; ' +
         'DELETE FROM platform.outbox_events; DELETE FROM platform.audit_log',
@@ -269,5 +271,95 @@ describe.skipIf(!server)("A shop's own WhatsApp templates (MKT-01, ADR-420)", ()
     graph.requests.length = 0;
     expect(unwrap(await templates.delete(a, kept.id))).toBe(kept.id);
     expect(graph.requests).toEqual([]);
+  });
+
+  it("sends Hatti's order templates to the shop's account, and knows those Meta approved (ADR-537)", async () => {
+    // A shop without its own number is sent none.
+    const at = new Date('2026-10-17T10:00:00Z');
+    expect(await templates.libraryDue(at)).toEqual([]);
+    unwrap(await connect());
+    expect(await templates.libraryDue(at)).toEqual([a.shopId]);
+    // The account has one already, as from a shop connected before; Meta refuses one.
+    graph.templates.push({
+      id: '594425479260001',
+      name: 'hatti_order_placed',
+      language: 'en',
+      status: 'APPROVED',
+    });
+    graph.templateRefusals.set('hatti_order_shipped:ur', 'Variables are too close together');
+    graph.requests.length = 0;
+
+    const total = LIBRARY_KINDS.length * 2;
+    const sent = await templates.sendLibrary(a.shopId, 'https://hatti.pk/o/', accounts.graph!, at);
+    expect(sent).toEqual({
+      submitted: total - 2,
+      adopted: 1,
+      errors: [expect.stringMatching(/^hatti_order_shipped \(ur\): Meta 100: Variables are/)],
+    });
+    const posts = graph.requests.filter((request) => request.method === 'POST');
+    expect(posts).toHaveLength(total - 1);
+    expect(
+      posts.find((post) => (post.body as { name: string }).name === 'hatti_order_shipped'),
+    ).toMatchObject({
+      auth: expect.stringMatching(/^Bearer EAAQ/),
+      body: {
+        language: 'en',
+        category: 'UTILITY',
+        components: [
+          {
+            type: 'BODY',
+            text: 'Your order {{1}} from {{2}} is on its way with {{3}}. Tracking number: {{4}}.',
+          },
+          {
+            type: 'BUTTONS',
+            buttons: [{ type: 'URL', text: 'Track your order', url: 'https://hatti.pk/o/{{1}}' }],
+          },
+        ],
+      },
+    });
+
+    // Tried today: not again until tomorrow, when the one refused is asked for again.
+    expect(await templates.libraryDue(at)).toEqual([]);
+    expect(await templates.libraryDue(new Date(at.getTime() + 25 * 3_600_000))).toEqual([a.shopId]);
+    graph.requests.length = 0;
+    const again = await templates.sendLibrary(a.shopId, 'https://hatti.pk/o/', accounts.graph!, at);
+    expect(again.errors).toHaveLength(1);
+    expect(graph.requests.filter((request) => request.method === 'POST')).toHaveLength(1);
+
+    // They are not among the shop's own templates, nor its to delete.
+    expect(await templates.list(a)).toEqual([]);
+    expect(await templates.library(a)).toEqual({
+      total,
+      approved: 1,
+      pending: total - 2,
+      refused: 0,
+      triedAt: at,
+    });
+    expect(await templates.library(b)).toBeNull();
+    expect([...(await templates.libraryApproved(a.shopId, WABA))]).toEqual(['order_placed:en']);
+
+    // Meta approves one, by its webhook: it goes from the shop's number now.
+    const shipped = graph.templates.find(
+      (each) => each.name === 'hatti_order_confirmation' && each.language === 'ur',
+    )!;
+    await templates.recordStatuses([
+      { metaTemplateId: shipped.id, event: 'APPROVED', reason: null },
+    ]);
+    expect([...(await templates.libraryApproved(a.shopId, WABA))].sort()).toEqual([
+      'order_confirmation:ur',
+      'order_placed:en',
+    ]);
+    expect(await templates.libraryApproved(a.shopId, '999')).toEqual(new Set());
+
+    // A shop's own cannot take the name of one of Hatti's.
+    const taken = await templates.create(a, { ...EID, name: 'hatti_order_placed' });
+    expect(taken.ok || taken.errors[0]).toMatchObject({
+      field: ['input', 'name'],
+      code: 'INVALID',
+    });
+
+    // Connected again, the account is sent what it lacks at once.
+    unwrap(await connect());
+    expect(await templates.libraryDue(at)).toEqual([a.shopId]);
   });
 });

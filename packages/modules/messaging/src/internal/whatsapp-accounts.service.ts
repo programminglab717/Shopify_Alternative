@@ -178,6 +178,7 @@ export class WhatsAppAccountsService {
                          verified_name = excluded.verified_name,
                          quality_rating = excluded.quality_rating,
                          access_token = excluded.access_token, pin = excluded.pin,
+                         library_tried_at = NULL,
                          version = messaging.whatsapp_accounts.version + 1,
                          created_at = now(), updated_at = now()`);
         const actor = actorColumnsOf(tenant.actor);

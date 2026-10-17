@@ -4,6 +4,7 @@ import type { DomainEvent } from '@hatti/events';
 import { shopLogoOf } from '@hatti/files/public';
 import type { Logger } from '@hatti/logger';
 import {
+  LIBRARY_KINDS,
   MessagesService,
   MARKETING_KINDS,
   MessagingEvents,
@@ -11,6 +12,7 @@ import {
   TO_THE_SHOP_KINDS,
   WHATSAPP_ONLY_KINDS,
   chargedFor,
+  libraryKey,
   messageCostOf,
   settingsIn,
   type ClaimedMessage,
@@ -41,6 +43,7 @@ import {
   type OrderNotificationFacts,
 } from '@hatti/orders/public';
 import { LOGOS_PATH } from '../api/logos.js';
+import type { OwnNumber } from '../messaging.js';
 import { repeat } from './repeat.js';
 
 /** How the timeline names what customers do through Hatti's messages. */
@@ -578,6 +581,12 @@ export interface MessagesSenderOptions {
    * Hatti's shared sender. Without it, every SMS goes from the shared sender.
    */
   smsSenders?: (shopId: string) => Promise<string | null>;
+  /**
+   * Each shop's own number for its customers' order news (ADR-537), with Hatti's order templates
+   * Meta approved on its account: a message whose template is approved there goes from it, the
+   * rest from Hatti's number. Without it, all go from Hatti's.
+   */
+  ownNumbers?: (shopId: string) => Promise<OwnNumber | null>;
   logger?: Logger;
 }
 
@@ -587,6 +596,10 @@ type Outgoing = ClaimedMessage & { sender?: string | null };
 /** Whether `message` goes from the shop's own SMS sender: an SMS to its customers (ADR-469). */
 const fromShopSender = (message: ClaimedMessage): boolean =>
   message.channel === 'sms' && !TO_THE_SHOP_KINDS.includes(message.kind);
+
+/** Whether `message` may go from the shop's own number: order news on WhatsApp (ADR-537). */
+const fromOwnNumber = (message: ClaimedMessage): boolean =>
+  message.channel === 'whatsapp' && LIBRARY_KINDS.includes(message.kind);
 
 /** Why a broadcast failed: the shop's own number is not there to send it. */
 const NO_SHOP_NUMBER = "The shop's own WhatsApp number is not connected";
@@ -617,7 +630,8 @@ const NO_CREDIT = {
  * do its customers' emails (ADR-181). A broadcast's messages go from the shop's own number, in
  * marketing hours alone, and never by SMS (ADR-422); an SMS campaign's by SMS, in those hours
  * too, and never by WhatsApp (ADR-458). A shop's SMS to its customers go from its own sender name
- * once Hatti approves one (ADR-469).
+ * once Hatti approves one (ADR-469). A shop's customers' order news goes from the shop's own
+ * number where Meta approved Hatti's template for it on the shop's account (ADR-537).
  */
 export class MessagesSender {
   constructor(private readonly options: MessagesSenderOptions) {}
@@ -653,6 +667,8 @@ export class MessagesSender {
     const marketing = await this.#marketing(shopId, claimed, at);
     const { smsSenders } = this.options;
     const sender = smsSenders && claimed.some(fromShopSender) ? await smsSenders(shopId) : null;
+    const { ownNumbers } = this.options;
+    const own = ownNumbers && claimed.some(fromOwnNumber) ? await ownNumbers(shopId) : null;
     // What the shop's credit has left to pay for, as the round spends it.
     const { charges } = this.options;
     let credit = charges ? await charges.balanceOf(shopId) : null;
@@ -671,7 +687,11 @@ export class MessagesSender {
         ? await this.#marketingAttempt(message, marketing, stopped, at, credit, price)
         : await this.#attempt(
             message,
-            this.options.providers[message.channel],
+            own &&
+              fromOwnNumber(message) &&
+              own.approved.has(libraryKey(message.kind, message.language))
+              ? own.provider
+              : this.options.providers[message.channel],
             stopped,
             at,
             !paid || credit === null || credit >= price,

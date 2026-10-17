@@ -4,6 +4,7 @@ import {
   GraphQLISODateTime,
   ID,
   InputType,
+  Int,
   ObjectType,
   registerEnumType,
 } from '@nestjs/graphql';
@@ -124,4 +125,32 @@ export class WhatsAppTemplatesSyncPayload {
 
   @Field(() => [UserError])
   userErrors!: UserError[];
+}
+
+@ObjectType({
+  description:
+    "How far Meta has come with Hatti's order templates on the shop's own WhatsApp Business " +
+    "Account (ADR-537): each kind of order news goes from the shop's number once Meta approves " +
+    "its template, and from Hatti's until then.",
+})
+export class WhatsAppOrderTemplates {
+  @Field(() => Int, { description: 'The templates the library has, in English and Urdu.' })
+  total!: number;
+
+  @Field(() => Int)
+  approved!: number;
+
+  @Field(() => Int)
+  pending!: number;
+
+  @Field(() => Int, {
+    description: "Refused, paused or disabled by Meta: those go from Hatti's number.",
+  })
+  refused!: number;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When Hatti last sent the library to the account; null before it first did.',
+  })
+  triedAt!: Date | null;
 }

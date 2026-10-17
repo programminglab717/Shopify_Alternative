@@ -5,9 +5,11 @@ import {
   templateName,
   templateParameters,
   type AnyMessageKind,
+  type MessageKind,
   type MessageLanguage,
   type MessageVariables,
 } from './templates.js';
+import { LIBRARY_KINDS, libraryParameters } from './template-library.js';
 
 // The channels messages go by (ADR-146): WhatsApp's Cloud API from Hatti's shared notifications
 // number (MSG-03), an SMS gateway, email for the news of orders (ADR-181), which the host
@@ -79,11 +81,17 @@ export interface WhatsAppCloudOptions {
   phoneNumberId: string;
   accessToken: string;
   timeoutMs?: number;
+  /**
+   * Whether the number is a shop's own, whose account has Hatti's order templates as the library
+   * lays them out (ADR-537): their variables go in the order their words name them.
+   */
+  shopNumber?: boolean;
 }
 
 /**
  * Sends Hatti's approved templates from its shared notifications number through WhatsApp's Cloud
- * API. What WhatsApp refuses for good, an SMS may still carry.
+ * API, or from a shop's own number (ADR-422, ADR-537). What WhatsApp refuses for good, an SMS may
+ * still carry.
  */
 export class WhatsAppCloudProvider implements MessageProvider {
   readonly name = WHATSAPP_CLOUD;
@@ -96,7 +104,10 @@ export class WhatsAppCloudProvider implements MessageProvider {
     const url = `${baseUrl.replace(/\/+$/, '')}/${version}/${phoneNumberId}/messages`;
     let response: Response;
     try {
-      const parameters = templateParameters(message.kind, message.variables);
+      const parameters =
+        this.options.shopNumber && (LIBRARY_KINDS as readonly string[]).includes(message.kind)
+          ? libraryParameters(message.kind as MessageKind, message.language, message.variables)
+          : templateParameters(message.kind, message.variables);
       response = await fetch(url, {
         method: 'POST',
         headers: {

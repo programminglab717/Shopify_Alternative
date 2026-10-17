@@ -1176,6 +1176,80 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
     expect((await queued()).filter((message) => message.channel === 'sms')).toEqual([]);
   });
 
+  it("sends order news from the shop's own number where Meta approved its template there (ADR-537)", async () => {
+    const at = new Date('2026-10-14T05:00:00.000Z');
+    const news = (kind: 'order_confirmation' | 'order_shipped', language: 'en' | 'ur') =>
+      messages().queue(shopId, {
+        kind,
+        recipient: AYESHA,
+        channel: 'whatsapp',
+        language,
+        dedupeKey: `${kind}:${language}`,
+        variables: {
+          name: 'Ayesha',
+          shop: 'Zari Fashions',
+          order: '#1001',
+          total: 'Rs 4,500',
+          courier: 'TCS',
+          tracking: '7712345678',
+          url: 'https://hatti.pk/o/Xk3fQ9',
+        },
+      });
+    await news('order_confirmation', 'en');
+    await news('order_shipped', 'ur');
+    await admin.query(
+      `UPDATE messaging.messages SET created_at = $1, next_attempt_at = $1 WHERE shop_id = $2`,
+      [new Date(at.getTime() - 60_000), shopId],
+    );
+    const asked: string[] = [];
+    const own = new WhatsAppCloudProvider({
+      baseUrl: providerUrl,
+      version: 'v26.0',
+      phoneNumberId: '106540352242922',
+      accessToken: 'EAAQ-shop-token',
+      shopNumber: true,
+    });
+    answers.whatsapp.push(
+      { status: 200, body: { messages: [{ id: 'wamid.OWN' }] } },
+      { status: 200, body: { messages: [{ id: 'wamid.HATTI' }] } },
+    );
+    const sent = await new MessagesSender({
+      messages: messages(),
+      providers: { whatsapp: whatsapp(), sms: sms() },
+      ownNumbers: async (shop) => {
+        asked.push(shop);
+        return { provider: own, approved: new Set(['order_confirmation:en']) };
+      },
+    }).sweep(at);
+    expect(sent).toBe(2);
+    expect(asked).toEqual([shopId]);
+    // Its approved template from the shop's number, its variables as the shop's account has
+    // them; the one Meta has not approved there from Hatti's.
+    expect(requests.map((request) => request.url)).toEqual([
+      '/v26.0/106540352242922/messages',
+      '/v26.0/1098765432/messages',
+    ]);
+    expect(requests[0]!.body).toMatchObject({
+      template: {
+        name: 'hatti_order_confirmation',
+        components: [
+          {
+            type: 'body',
+            parameters: ['Ayesha', '#1001', 'Zari Fashions', 'Rs 4,500'].map((text) => ({
+              type: 'text',
+              text,
+            })),
+          },
+          {},
+          {},
+          {},
+        ],
+      },
+    });
+    expect(requests[1]!.body).toMatchObject({ template: { name: 'hatti_order_shipped' } });
+    expect((await queued()).map((message) => message.status)).toEqual(['sent', 'sent']);
+  });
+
   it("sends an SMS campaign's messages by SMS in marketing hours, its link to stop at the end (ADR-458)", async () => {
     const night = new Date('2026-10-13T17:00:00.000Z');
     const morning = new Date('2026-10-14T05:00:00.000Z');

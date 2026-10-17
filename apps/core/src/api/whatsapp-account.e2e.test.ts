@@ -158,8 +158,20 @@ describe.skipIf(!server)(
         `POST ${WABA}/subscribed_apps`,
         `POST ${NUMBER}/register`,
       ]);
-      const shown = await gql(tokens.reader, `{ whatsAppAccount { ${ACCOUNT} connectedAt } }`);
+      const shown = await gql(
+        tokens.reader,
+        `{ whatsAppAccount { ${ACCOUNT} connectedAt }
+           whatsAppOrderTemplates { total approved pending refused triedAt } }`,
+      );
       expect(shown.data.whatsAppAccount).toMatchObject({ phoneNumberId: NUMBER });
+      // Hatti's order templates go to the account from the worker (ADR-537): none yet.
+      expect(shown.data.whatsAppOrderTemplates).toEqual({
+        total: 34,
+        approved: 0,
+        pending: 0,
+        refused: 0,
+        triedAt: null,
+      });
       expect(JSON.stringify(shown)).not.toContain(TOKEN.slice(0, 16));
 
       const bad = await gql(tokens.settings, connect, {
@@ -178,9 +190,14 @@ describe.skipIf(!server)(
         disconnectedPhoneNumber: '+92 300 1234567',
         userErrors: [],
       });
-      expect((await gql(tokens.reader, `{ whatsAppAccount { phoneNumberId } }`)).data).toEqual({
-        whatsAppAccount: null,
-      });
+      expect(
+        (
+          await gql(
+            tokens.reader,
+            `{ whatsAppAccount { phoneNumberId } whatsAppOrderTemplates { total } }`,
+          )
+        ).data,
+      ).toEqual({ whatsAppAccount: null, whatsAppOrderTemplates: null });
     });
   },
 );

@@ -14,6 +14,7 @@ import {
 } from '../whatsapp-templates.service.js';
 import type { MessageLanguage } from './messaging.types.js';
 import {
+  WhatsAppOrderTemplates,
   WhatsAppTemplate,
   WhatsAppTemplateCreatePayload,
   WhatsAppTemplateDeletePayload,
@@ -34,6 +35,20 @@ export class WhatsAppTemplateResolver {
   @RequireScopes('read_marketing_events')
   async whatsAppTemplates(@CurrentTenant() tenant: TenantContext): Promise<WhatsAppTemplate[]> {
     return (await this.templates.list(tenant)).map(toTemplate);
+  }
+
+  @Query(() => WhatsAppOrderTemplates, {
+    nullable: true,
+    description:
+      "How far Meta has come with Hatti's order templates on the shop's own number; null " +
+      'without one connected.',
+  })
+  @RequireScopes('read_settings')
+  async whatsAppOrderTemplates(
+    @CurrentTenant() tenant: TenantContext,
+  ): Promise<WhatsAppOrderTemplates | null> {
+    const record = await this.templates.library(tenant);
+    return record && Object.assign(new WhatsAppOrderTemplates(), record);
   }
 
   @Mutation(() => WhatsAppTemplateCreatePayload, {

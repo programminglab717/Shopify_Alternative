@@ -13041,6 +13041,11 @@ type Query {
   whatsAppAccount: WhatsAppAccount
 
   """
+  How far Meta has come with Hatti's order templates on the shop's own number; null without one connected.
+  """
+  whatsAppOrderTemplates: WhatsAppOrderTemplates
+
+  """
   What the admin starts Meta's Embedded Signup with; null where this server has none set up.
   """
   whatsAppSignup: WhatsAppSignup
@@ -15726,6 +15731,25 @@ type WhatsAppAccountDisconnectPayload {
   """
   disconnectedPhoneNumber: String
   userErrors: [UserError!]!
+}
+
+"""
+How far Meta has come with Hatti's order templates on the shop's own WhatsApp Business Account (ADR-537): each kind of order news goes from the shop's number once Meta approves its template, and from Hatti's until then.
+"""
+type WhatsAppOrderTemplates {
+  approved: Int!
+  pending: Int!
+
+  """Refused, paused or disabled by Meta: those go from Hatti's number."""
+  refused: Int!
+
+  """The templates the library has, in English and Urdu."""
+  total: Int!
+
+  """
+  When Hatti last sent the library to the account; null before it first did.
+  """
+  triedAt: DateTime
 }
 
 """

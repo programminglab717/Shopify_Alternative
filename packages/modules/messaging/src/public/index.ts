@@ -109,8 +109,11 @@ export {
   WhatsAppBusinessClient,
   qualityOf,
   templateComponents,
+  type MetaTemplate,
+  type PreparedTemplate,
   type TemplateSubmission,
   type GraphResult,
+  type WhatsAppGraphSettings,
   type WhatsAppNumber,
   type WhatsAppQuality,
   type WhatsAppSignupSettings,
@@ -119,10 +122,21 @@ export {
   WHATSAPP_TEMPLATE_LIMITS,
   WHATSAPP_TEMPLATE_STATUSES,
   WhatsAppTemplatesService,
+  type LibrarySent,
+  type WhatsAppLibraryRecord,
   type WhatsAppTemplateInput,
   type WhatsAppTemplateRecord,
   type WhatsAppTemplateStatus,
 } from '../internal/whatsapp-templates.service.js';
+export {
+  LIBRARY_KINDS,
+  LIBRARY_LANGUAGES,
+  LIBRARY_LIMITS,
+  libraryKey,
+  libraryParameters,
+  libraryTemplate,
+  libraryVariables,
+} from '../internal/template-library.js';
 export {
   BROADCAST_AHEAD_DAYS,
   BROADCAST_CHANNELS,

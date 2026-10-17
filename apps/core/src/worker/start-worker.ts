@@ -43,6 +43,7 @@ import {
   StockWatchService,
   WebPushSender,
   WhatsAppAccountsService,
+  WhatsAppBusinessClient,
   WhatsAppTemplatesService,
 } from '@hatti/messaging/public';
 import {
@@ -62,6 +63,7 @@ import {
   CustomerAnswers,
   ExportScheduleService,
   FulfillmentService,
+  ORDER_LINK_PATH,
   ORDER_SEGMENT_FACTS,
   OrderExportService,
 } from '@hatti/orders/public';
@@ -70,7 +72,7 @@ import { StorefrontActivity } from '@hatti/storefront-data';
 import { vapidKeysOf, type WorkerConfig } from '../config.js';
 import { couriersOf } from '../couriers.js';
 import { exportEmailsOf, hattiEmailsOf } from '../emails.js';
-import { messageProvidersOf, shopNumbersOf } from '../messaging.js';
+import { messageProvidersOf, ownNumbersOf, shopNumbersOf } from '../messaging.js';
 import { paymentGatewaysOf } from '../payments.js';
 import { CloudflareCache, NO_EDGE_CACHE, type EdgeCache } from '../storefront/edge-cache.js';
 import {
@@ -121,6 +123,7 @@ import { StoreExports } from './store-exports.js';
 import { StaffAlerts } from './staff-alerts.js';
 import { SupportAlerts } from './support-alerts.js';
 import { StatusMail } from './status-mail.js';
+import { OrderTemplates } from './order-templates.js';
 import { StatusProbes } from './status-probes.js';
 import { IncidentsService, StatusSubscriptionsService } from '@hatti/trust/public';
 import { StorefrontSessions } from './storefront-sessions.js';
@@ -669,22 +672,39 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
     // Each message is paid for from its shop's credit as it goes (ADR-155).
     const wallet = new MessageWallet(database);
     const smsSenders = new SmsSendersService(database);
+    const whatsAppAccounts =
+      config.ENCRYPTION_KEYS && new WhatsAppAccountsService(database, config.ENCRYPTION_KEYS, null);
     const messages = new MessagesSender({
       messages: new MessagesService(database, wallet),
       providers: messageProvidersOf(config, logger),
       charges: wallet,
       // Customers' SMS go from each shop's own sender name, once approved (ADR-469).
       smsSenders: (shopId) => smsSenders.senderOf(shopId),
-      // Broadcasts go from each shop's own number (ADR-422), whose token is sealed.
-      ...(config.ENCRYPTION_KEYS && {
-        shopNumbers: shopNumbersOf(
-          new WhatsAppAccountsService(database, config.ENCRYPTION_KEYS, null),
+      // Broadcasts go from each shop's own number (ADR-422), whose token is sealed, as does its
+      // customers' order news once Meta approves Hatti's templates on its account (ADR-537).
+      ...(whatsAppAccounts && {
+        shopNumbers: shopNumbersOf(whatsAppAccounts, config),
+        ownNumbers: ownNumbersOf(
+          whatsAppAccounts,
+          new WhatsAppTemplatesService(database, whatsAppAccounts),
           config,
         ),
       }),
       logger,
     }).start(config.MESSAGES_INTERVAL_MS);
     closers.push(() => messages.stop());
+    if (whatsAppAccounts) {
+      const orderTemplates = new OrderTemplates(
+        new WhatsAppTemplatesService(database, whatsAppAccounts),
+        new WhatsAppBusinessClient({
+          baseUrl: config.META_GRAPH_URL,
+          version: config.META_GRAPH_VERSION,
+        }),
+        new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000').url(`/${ORDER_LINK_PATH}/`),
+        logger,
+      ).start(Math.max(config.SWEEP_INTERVAL_MS, 60_000));
+      closers.push(() => orderTemplates.stop());
+    }
   }
 
   logger.info({ roles: config.WORKER_ROLES }, 'worker started');

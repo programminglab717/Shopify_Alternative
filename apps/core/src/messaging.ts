@@ -14,6 +14,7 @@ import {
   type OutgoingMessage,
   type SendResult,
   type WhatsAppAccountsService,
+  type WhatsAppTemplatesService,
 } from '@hatti/messaging/public';
 import type { MessageSendingConfig } from './config.js';
 import { SesMessageEmails } from './emails.js';
@@ -82,8 +83,44 @@ export function shopNumbersOf(
         version: config.META_GRAPH_VERSION,
         phoneNumberId: sender.phoneNumberId,
         accessToken: sender.accessToken,
+        shopNumber: true,
       })
     );
+  };
+}
+
+/** A shop's own number as its order news goes from it (ADR-537), with what it may send. */
+export interface OwnNumber {
+  provider: MessageProvider;
+  /** Hatti's order templates Meta approved on the shop's account, as libraryKey names them. */
+  approved: ReadonlySet<string>;
+}
+
+/**
+ * Each shop's own WhatsApp number as its customers' order news goes from it (ADR-537): none for
+ * a shop that has not connected one, or whose account has none of Hatti's order templates
+ * approved yet.
+ */
+export function ownNumbersOf(
+  accounts: Pick<WhatsAppAccountsService, 'senderOf'>,
+  templates: Pick<WhatsAppTemplatesService, 'libraryApproved'>,
+  config: Pick<MessageSendingConfig, 'META_GRAPH_URL' | 'META_GRAPH_VERSION'>,
+): (shopId: string) => Promise<OwnNumber | null> {
+  return async (shopId) => {
+    const sender = await accounts.senderOf(shopId);
+    if (!sender) return null;
+    const approved = await templates.libraryApproved(shopId, sender.businessAccountId);
+    if (approved.size === 0) return null;
+    return {
+      approved,
+      provider: new WhatsAppCloudProvider({
+        baseUrl: config.META_GRAPH_URL,
+        version: config.META_GRAPH_VERSION,
+        phoneNumberId: sender.phoneNumberId,
+        accessToken: sender.accessToken,
+        shopNumber: true,
+      }),
+    };
   };
 }
 

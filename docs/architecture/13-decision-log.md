@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-536 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-537 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -544,6 +544,7 @@
 | 534 | The admin's AI drafts say the plan's AI credits left this month, and draft none once they are used; the plan cards say each plan's | Accepted |
 | 535 | Anyone may ask on the status page to be emailed its updates: a link to confirm first, a link to stop in every email, and the worker sending both, each once | Accepted |
 | 536 | The worker checks addresses given for Hatti's parts, posts an outage on the status page after three failed checks in a row, and resolves it when the part answers again | Accepted |
+| 537 | Hatti's order templates go to each shop's own WhatsApp account for approval, and a shop's customers' order news goes from its own number for each one Meta approves there | Accepted |
 
 ---
 
@@ -20307,3 +20308,61 @@
     step; the worker already sweeps every minute.
   * **Posting on the first failure:** one slow answer would post and resolve an incident, and
     email every subscriber twice.
+
+## ADR-537 · Hatti's order templates go to each shop's own WhatsApp account for approval, and a shop's customers' order news goes from its own number for each one Meta approves there
+
+* **Context:** A shop that connects its own WhatsApp number (ADR-419) sends broadcasts from it
+  (ADR-422). Its customers' order news still came from Hatti's number, under Hatti's name. 07 §2.2
+  says Hatti's template library is sent to each connected account for approval, and order news
+  moves to the shop's number once it is approved.
+* **Decision:**
+  * **The library** is Hatti's utility templates to a shop's customers: the order's news from
+    placed to delivered, cancelled and paid, the confirmation and its reminder, the payment
+    reminder, store credit, and the request for a review. That is 17 kinds, each in English and
+    Urdu, so 34 templates. Some messages stay on Hatti's number:
+    * codes, which take Meta's authentication category;
+    * the gift card's code, kept nowhere once sent;
+    * what goes to the shop itself;
+    * marketing.
+  * **The templates' names** are the ones they have on Hatti's number, so the code sends a message
+    the same way whichever number it goes from.
+  * **The words** are the messages' own. Each variable is numbered in the order the words name it,
+    so a variable named twice is two variables. The shop's number sends values in that order; on
+    Hatti's number the templates stay numbered as they were. Meta refuses a body that begins or
+    ends with a variable, so a greeting goes before one that would begin with one and a full stop
+    after one that would end with one. Buttons:
+    * answer buttons are worded for what they answer;
+    * the link button opens the order's page.
+  * **The worker** checks each round for accounts missing some of the library, a few shops a
+    round. It asks Meta for the account's templates, then:
+    * keeps one the account already has by its name and language, as for a shop that connected
+      before;
+    * sends the rest to Meta in the utility category.
+
+    What Meta refuses is logged, and the account is tried again the next day, at most once a day.
+    Connecting a number again tries it at once.
+  * **Kept with the shop's templates:** each template is a row in the shop's templates, marked
+    with the kind of message it carries. Meta's webhook, and asking Meta again, keep its status
+    as for any other template. They are not among the templates the shop lists or deletes, and a
+    shop's own template cannot take a name beginning `hatti_`.
+  * **Sending:** a message of the library's kinds on WhatsApp goes from the shop's own number when
+    Meta has approved its template, in its language, on the account the shop has now. Otherwise it
+    goes from Hatti's number. Everything else is as before: it falls back to SMS, retries the same
+    way, and is paid for as before, as ADR-422 does for broadcasts.
+  * **The admin's WhatsApp page** says which number order news goes from:
+    * this number;
+    * this number for those Meta has approved, Hatti's for the rest;
+    * Hatti's, while Meta looks at the templates or before they are sent.
+
+    It also says how many Meta refused.
+* **Consequences:**
+  * A shop with its own number has its customers' order news in its own name, with no step of
+    its own, as Meta approves the templates.
+  * A template Meta refuses or pauses leaves that kind on Hatti's number, so nothing goes unsent.
+* **Alternatives:**
+  * **Sending the library as the shop connects:** connecting would wait on 34 requests to Meta,
+    and one refused would have no second try.
+  * **Hatti's own numbering of the variables:** some templates would name a variable out of order
+    or twice, which Meta may refuse.
+  * **Moving all the news at once when all 34 are approved:** one refused template would keep the
+    other 33 on Hatti's number.

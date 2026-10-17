@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Order updates from shops' own numbers
+
+* **Hatti's order templates go to each shop's own WhatsApp account for approval, and a shop's
+  customers' order news goes from its own number for each one Meta approves there** ([ADR-537](../architecture/13-decision-log.md#adr-537--hattis-order-templates-go-to-each-shops-own-whatsapp-account-for-approval-and-a-shops-customers-order-news-goes-from-its-own-number-for-each-one-meta-approves-there),
+  MSG-03).
+* 3272 tests, 6 more: the library's layout, sending it to an account,
+  the sender's choice of number, the worker's sweep, and the admin's line.
+
 ### 2eb2ccb · The status probes
 
 * **The worker checks addresses given for Hatti's parts, posts an outage on the status page

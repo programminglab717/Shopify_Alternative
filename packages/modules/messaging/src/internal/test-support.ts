@@ -24,6 +24,8 @@ export class FakeGraph {
   }[] = [];
   /** What Meta says of the next template sent, if it refuses it. */
   templateError: string | null = null;
+  /** What Meta says of a template it refuses by its name and language, "name:ur". */
+  readonly templateRefusals = new Map<string, string>();
   readonly #server: Server;
 
   constructor() {
@@ -85,10 +87,14 @@ export class FakeGraph {
               },
             });
           }
-          const sent = JSON.parse(raw) as { name: string; language: string };
+          const sent = JSON.parse(raw) as { name: string; language: string; category: string };
+          const refusal = this.templateRefusals.get(`${sent.name}:${sent.language}`);
+          if (refusal) {
+            return send(400, { error: { message: refusal, error_user_msg: refusal, code: 100 } });
+          }
           const id = String(594425479261596 + this.templates.length);
           this.templates.push({ id, name: sent.name, language: sent.language, status: 'PENDING' });
-          return send(200, { id, status: 'PENDING', category: 'MARKETING' });
+          return send(200, { id, status: 'PENDING', category: sent.category });
         }
         if (path === `${WABA}/message_templates` && request.method === 'GET') {
           return send(200, { data: this.templates });
