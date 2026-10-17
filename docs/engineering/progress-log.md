@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### FBR in the admin
+### e2f545c · FBR in the admin
 
 * **The admin connects a Tier-1 shop's POS to FBR on the sales tax page, lists what was reported
   and sends again what was not, and an order's page says how its invoice stands with FBR**
