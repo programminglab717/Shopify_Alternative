@@ -9,8 +9,8 @@ export type PlanLimitKind = 'staff' | 'locations' | 'ordersPerMonth';
 /**
  * What a shop's plan with Hatti includes or leaves out (BIL-01, ADR-264): a domain of the shop's
  * own, and its accounts with payment gateways; custom apps, automations and the abandoned
- * checkout reminder, cashback, and Meta's conversions API (ADR-523); and hiding "Powered by
- * Hatti" from its storefront (ADR-526).
+ * checkout reminder, cashback, and Meta's conversions API (ADR-523); hiding "Powered by
+ * Hatti" from its storefront (ADR-526); and true profit in the sales report (ADR-529).
  */
 export type PlanFeature =
   | 'customDomains'
@@ -19,7 +19,8 @@ export type PlanFeature =
   | 'automations'
   | 'loyalty'
   | 'conversionsApi'
-  | 'removeBranding';
+  | 'removeBranding'
+  | 'trueProfit';
 
 /** A limit of the shop's plan. */
 export interface PlanLimit {
@@ -43,6 +44,7 @@ export abstract class PlanAllowance {
   /**
    * The name of the shop's plan, such as "Free", when it leaves `feature` out; null when it
    * includes it. Asked before connecting, making or turning one on: those already are kept.
+   * What is only shown, as true profit is, is asked each time it is shown.
    */
   abstract excludes(shopId: string, feature: PlanFeature): Promise<string | null>;
 }

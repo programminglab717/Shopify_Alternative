@@ -1,6 +1,7 @@
 import {
   CurrentTenant,
   Money,
+  PlanAllowance,
   RequireScopes,
   badUserInput,
   pageSize,
@@ -8,6 +9,7 @@ import {
 } from '@hatti/api';
 import { toPublicId } from '@hatti/ids';
 import { money } from '@hatti/money';
+import { Optional } from '@nestjs/common';
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import {
   SalesReportService,
@@ -32,14 +34,17 @@ import {
 
 @Resolver()
 export class SalesReportResolver {
-  constructor(private readonly sales: SalesReportService) {}
+  constructor(
+    private readonly sales: SalesReportService,
+    @Optional() private readonly allowance?: PlanAllowance,
+  ) {}
 
   @Query(() => SalesReport, {
     description:
       "Sales analytics (ANL-02): what a period's orders came to, day by day, week by week or " +
       "month by month in the shop's time zone, the products that sold most, and by channel, " +
       'or by where their last visits came from or their campaigns. Worked out from the orders ' +
-      'when asked.',
+      'when asked. Its true profit lines are on Growth and bigger plans (ADR-529).',
   })
   @RequireScopes('read_orders')
   async salesReport(
@@ -57,7 +62,9 @@ export class SalesReportResolver {
     });
     if (!result.ok) throw badUserInput(result.errors[0]!.message);
     const report = result.value;
+    const trueProfit = !(await this.allowance?.excludes(tenant.shopId, 'trueProfit'));
     const amount = (minor: bigint) => Money.from(money(minor, tenant.currency));
+    const profitLine = (minor: bigint) => (trueProfit ? amount(minor) : null);
     const toSales = (tally: SalesTally) => {
       const net = netSales(tally);
       const average = averageOrderValue(tally);
@@ -78,11 +85,11 @@ export class SalesReportResolver {
         grossProfit: amount(gross),
         // To four places, as COD health's rates are.
         grossMargin: net > 0n ? Math.round((Number(gross) / Number(net)) * 10_000) / 10_000 : null,
-        shippingCosts: amount(tally.shippingCosts),
-        shippingCostsEstimated: amount(tally.shippingCostsEstimated),
-        writeOffs: amount(tally.writeOffs),
-        claimsRecovered: amount(tally.claimsRecovered),
-        profit: amount(profit(tally)),
+        shippingCosts: profitLine(tally.shippingCosts),
+        shippingCostsEstimated: profitLine(tally.shippingCostsEstimated),
+        writeOffs: profitLine(tally.writeOffs),
+        claimsRecovered: profitLine(tally.claimsRecovered),
+        profit: profitLine(profit(tally)),
         refunds: amount(tally.refunds),
       });
     };
@@ -113,6 +120,7 @@ export class SalesReportResolver {
           sales: toSales(row),
         }),
       ),
+      trueProfit,
     });
   }
 }

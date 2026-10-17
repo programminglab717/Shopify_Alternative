@@ -41,6 +41,7 @@ const SALES = `
       previous { placedFrom placedBefore totals { orders totalSales { amount } } }
       periods { start sales { orders } }
       topProducts { productId title unitsSold orders grossSales { amount } costOfGoods { amount } }
+      trueProfit
     }
   }`;
 
@@ -125,7 +126,24 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
       expect(placed.data?.orderCreate.userErrors).toEqual([]);
     }
 
+    // On Free, the report leaves its true profit lines out (ADR-529); gross profit stays.
+    const free = (await gql(tokens.owner, SALES, period)).data?.salesReport;
+    expect(free.trueProfit).toBe(false);
+    expect(free.totals).toMatchObject({
+      grossProfit: { amount: '2499.00' },
+      shippingCosts: null,
+      writeOffs: null,
+      claimsRecovered: null,
+      profit: null,
+    });
+    await admin.query(
+      `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+       VALUES ($1, 'growth', 'monthly', now(), now() + interval '1 month')`,
+      [shop],
+    );
+
     const report = (await gql(tokens.owner, SALES, period)).data?.salesReport;
+    expect(report.trueProfit).toBe(true);
     expect(report.totals).toEqual({
       orders: 2,
       grossSales: { amount: '7497.00' },

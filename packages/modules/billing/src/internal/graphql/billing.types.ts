@@ -177,6 +177,12 @@ export class BillingPlan {
     description: 'Whether the shop may hide "Powered by Hatti" from its storefront (ADR-526).',
   })
   removeBranding!: boolean;
+
+  @Field({
+    description:
+      'Whether its sales report gives true profit: couriers, write-offs and claims (ADR-529).',
+  })
+  trueProfit!: boolean;
 }
 
 @ObjectType({

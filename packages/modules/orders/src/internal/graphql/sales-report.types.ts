@@ -11,6 +11,9 @@ import {
 } from '@nestjs/graphql';
 import { SALES_REPORT_LIMITS } from '../sales-report.service.js';
 
+/** What the true profit lines say of a plan without it (ADR-529). */
+const PLAN_LEAVES_OUT = " Null when the shop's plan leaves true profit out (ADR-529).";
+
 export enum SalesInterval {
   DAY = 'DAY',
   WEEK = 'WEEK',
@@ -166,38 +169,47 @@ export class Sales {
   grossMargin!: number | null;
 
   @Field(() => Money, {
+    nullable: true,
     description:
       "What couriers' statements charged for the orders' parcels, out and back; for a parcel no " +
       "statement has charged yet, what its courier account's rate card says it is likely to " +
-      'cost as it stands (ADR-383).',
+      'cost as it stands (ADR-383).' +
+      PLAN_LEAVES_OUT,
   })
-  shippingCosts!: Money;
+  shippingCosts!: Money | null;
 
   @Field(() => Money, {
+    nullable: true,
     description:
-      'Of shippingCosts, what is estimated by rate cards, no statement having charged it.',
+      'Of shippingCosts, what is estimated by rate cards, no statement having charged it.' +
+      PLAN_LEAVES_OUT,
   })
-  shippingCostsEstimated!: Money;
+  shippingCostsEstimated!: Money | null;
 
   @Field(() => Money, {
+    nullable: true,
     description:
       'What the items written off cost when sold: those of parcels that came back and were not ' +
-      "restocked, of parcels lost, and of customers' returns checked in and not restocked.",
+      "restocked, of parcels lost, and of customers' returns checked in and not restocked." +
+      PLAN_LEAVES_OUT,
   })
-  writeOffs!: Money;
+  writeOffs!: Money | null;
 
   @Field(() => Money, {
-    description: 'What couriers paid of claims for parcels lost or damaged.',
+    nullable: true,
+    description: 'What couriers paid of claims for parcels lost or damaged.' + PLAN_LEAVES_OUT,
   })
-  claimsRecovered!: Money;
+  claimsRecovered!: Money | null;
 
   @Field(() => Money, {
+    nullable: true,
     description:
       "What the orders made (ANL-03): total sales less taxes, the cost of goods, couriers' " +
       'charges and write-offs, plus claims recovered. Payment fees and ad spend are not in it ' +
-      'yet.',
+      'yet.' +
+      PLAN_LEAVES_OUT,
   })
-  profit!: Money;
+  profit!: Money | null;
 
   @Field(() => Money, {
     description:
@@ -298,4 +310,12 @@ export class SalesReport {
     description: 'By what `by` names, most total sales first; none without it.',
   })
   rows!: SalesRow[];
+
+  @Field({
+    description:
+      "Whether the shop's plan includes true profit (ANL-03, ADR-529): without it, every " +
+      "Sales' shippingCosts, shippingCostsEstimated, writeOffs, claimsRecovered and profit are " +
+      'null.',
+  })
+  trueProfit!: boolean;
 }

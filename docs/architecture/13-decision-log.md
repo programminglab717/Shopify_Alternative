@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-528 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-529 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -536,6 +536,7 @@
 | 526 | Every storefront says it is "Powered by Hatti", as Shopify's powered_by_link does; a shop on Starter or above may hide it, and one hidden before stays hidden on a smaller plan | Accepted |
 | 527 | The admin's storefront settings show or hide "Powered by Hatti" with a switch, saying the core's refusal on a plan without it, and the plan cards say which plans hide it | Accepted |
 | 528 | The status page shows each part's last 90 days: a bar a day by the worst it was, and its uptime, counting incidents that took it down and not maintenance posted ahead | Accepted |
+| 529 | The sales report's true profit lines are on Growth and bigger plans: smaller plans get them null, with the report saying so, and gross profit stays on every plan | Accepted |
 
 ---
 
@@ -20119,3 +20120,24 @@
     in step with them when one is corrected. 90 days of incidents are few to read.
   * **Counting maintenance against uptime:** stricter, but unlike other status pages, and it
     would punish telling shops ahead.
+
+## ADR-529 · The sales report's true profit lines are on Growth and bigger plans: smaller plans get them null, with the report saying so, and gross profit stays on every plan
+
+* **Context:** The pricing gives true profit analytics, profit after couriers' charges,
+  write-offs and claims (ANL-03, ADR-141), to Growth and bigger plans. The sales report gave it
+  to every shop.
+* **Decision:**
+  * **Plans say whether they include it.** `trueProfit` is on Growth and Pro, as `BillingPlan`
+    says, and `PlanAllowance` answers it as it does other features.
+  * **The report asks each time it is read.** On a plan without it, every `Sales`'
+    `shippingCosts`, `shippingCostsEstimated`, `writeOffs`, `claimsRecovered` and `profit` are
+    null, now nullable, and `SalesReport.trueProfit` says false.
+    * Gross profit and margin, from the cost of goods as Shopify's reports give them, stay on
+      every plan.
+    * Unlike features turned on, nothing is kept after a downgrade: it is only shown, and shows
+      again when the shop's plan includes it.
+* **Consequences:**
+  * The plan's promise holds in the API as in the admin. Apps reading `profit` must allow null.
+* **Alternatives:**
+  * **Refusing the whole report on smaller plans:** sales over time are on every plan.
+  * **Computing the lines and hiding them in the admin:** the API would still give them.

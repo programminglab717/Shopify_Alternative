@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### True profit on Growth
+
+* **The sales report's true profit lines are on Growth and bigger plans: smaller plans get them
+  null, with the report saying so, and gross profit stays on every plan** ([ADR-529](../architecture/13-decision-log.md#adr-529--the-sales-reports-true-profit-lines-are-on-growth-and-bigger-plans-smaller-plans-get-them-null-with-the-report-saying-so-and-gross-profit-stays-on-every-plan), BIL-01,
+  ANL-03).
+* 3249 tests, as many as before: the sales report's test reads it on Free, then on Growth.
+
 ### 302b360 · The status page's 90 days
 
 * **The status page shows each part's last 90 days: a bar a day by the worst it was, and its
