@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Custom data in the admin
+### d45e87f · Custom data in the admin
 
 * **Settings → Custom data defines the shop's own fields for products, variants and collections,
   and a product's page fills them in by the kind of field their type takes** ([ADR-490](../architecture/13-decision-log.md#adr-490--custom-data-in-the-admin-the-shops-fields-defined-in-settings-keyed-from-their-names-and-filled-on-a-products-page-by-the-kind-of-field-their-type-takes), CAT-06 in
