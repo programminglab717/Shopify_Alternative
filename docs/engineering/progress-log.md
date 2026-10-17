@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Products from a WooCommerce export
+### 9d41b97 · Products from a WooCommerce export
 
 * **productsImport reads WooCommerce's product CSV, its variable products' variations the
   variants, as Shopify's file would make them; the admin's import card asks where the file is
