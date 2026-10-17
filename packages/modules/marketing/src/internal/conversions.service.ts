@@ -92,8 +92,8 @@ export class ConversionsService {
   constructor(private readonly db: Database) {}
 
   /**
-   * Records an order's placing, once, for each platform its shop has connected, Meta's and
-   * TikTok's (ADR-541): how many it was recorded for.
+   * Records an order's placing, once, for each platform its shop has connected, Meta's, TikTok's
+   * (ADR-541) and Google's (ADR-547): how many it was recorded for.
    */
   async recordPlaced(shopId: string, orderId: string, occurredAt: Date): Promise<number> {
     return this.db.tenant(shopId, async (tx) => {
@@ -108,6 +108,11 @@ export class ConversionsService {
         SELECT shop_id, 'tiktok', ${orderId}::uuid, 'placed',
                ${occurredAt.toISOString()}::timestamptz
           FROM marketing.tiktok_settings
+         WHERE shop_id = ${shopId}
+         UNION ALL
+        SELECT shop_id, 'google', ${orderId}::uuid, 'placed',
+               ${occurredAt.toISOString()}::timestamptz
+          FROM marketing.google_settings
          WHERE shop_id = ${shopId}
             ON CONFLICT DO NOTHING
         RETURNING id`);

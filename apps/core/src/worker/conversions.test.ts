@@ -13,10 +13,13 @@ import { InventoryService, LocationService, StockService } from '@hatti/inventor
 import { createLogger } from '@hatti/logger';
 import {
   ConversionsService,
+  GoogleAnalyticsClient,
+  GoogleAnalyticsService,
   MetaConversionsClient,
   MetaConversionsService,
   TikTokEventsClient,
   TikTokEventsService,
+  type GoogleEventsPayload,
   type MetaServerEvent,
   type TikTokEvent,
 } from '@hatti/marketing/public';
@@ -66,6 +69,9 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
     };
   }[] = [];
   let tiktokAnswer: { status: number; body: unknown } = { status: 200, body: {} };
+  /** What the fake Google Analytics was sent, and what it answers next. */
+  const googleRequests: { url: string; body: GoogleEventsPayload }[] = [];
+  let googleAnswer: { status: number; body: string } = { status: 204, body: '' };
   const shopId = newId();
   const tenant: TenantContext = {
     shopId,
@@ -79,6 +85,7 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
 
   const meta = () => new MetaConversionsService(database, box);
   const tiktok = () => new TikTokEventsService(database, box);
+  const google = () => new GoogleAnalyticsService(database, box);
   const moments = () => new ConversionsService(database);
   const orders = () => workerOrders(database);
   const sender = () =>
@@ -90,6 +97,8 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
       client: new MetaConversionsClient({ baseUrl: graphUrl, version: 'v26.0' }),
       tiktok: tiktok(),
       tiktokClient: new TikTokEventsClient({ baseUrl: graphUrl }),
+      google: google(),
+      googleClient: new GoogleAnalyticsClient({ baseUrl: graphUrl }),
       storefronts: new StorefrontSite('http://localhost:4100'),
     });
   const handlers = () =>
@@ -258,6 +267,15 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
       let text = '';
       request.on('data', (chunk: Buffer) => (text += chunk.toString('utf8')));
       request.on('end', () => {
+        if (request.url?.startsWith('/mp/collect')) {
+          googleRequests.push({
+            url: request.url,
+            body: JSON.parse(text) as GoogleEventsPayload,
+          });
+          response.writeHead(googleAnswer.status);
+          response.end(googleAnswer.body);
+          return;
+        }
         if (request.url?.startsWith('/open_api/')) {
           tiktokRequests.push({
             url: request.url,
@@ -292,11 +310,13 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
   beforeEach(async () => {
     requests.splice(0);
     tiktokRequests.splice(0);
+    googleRequests.splice(0);
+    googleAnswer = { status: 204, body: '' };
     answer = { status: 200, body: { events_received: 1, fbtrace_id: 'AbC123' } };
     tiktokAnswer = { status: 200, body: { code: 0, message: 'OK', request_id: 'req-1' } };
     await admin.query(
       'DELETE FROM marketing.meta_settings; DELETE FROM marketing.tiktok_settings; ' +
-        'DELETE FROM marketing.conversions',
+        'DELETE FROM marketing.google_settings; DELETE FROM marketing.conversions',
     );
     await dispatch();
   });
@@ -680,6 +700,115 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
     ).toEqual([
       ['meta', 'sent', null],
       ['tiktok', 'skipped', 'Not sent: the shop disconnected TikTok'],
+    ]);
+  });
+
+  it("sends an order to Google Analytics, a request for each moment, within Google's three days", async () => {
+    const secret = 'Xy9_kq2LmN0pQrStUvWz';
+    unwrap(
+      await google().update(tenant, {
+        measurementId: 'g-ab12cd34ef',
+        apiSecret: secret,
+        purchaseAt: 'confirmed',
+      }),
+    );
+    const order = await placeOnline();
+    unwrap(await orders().confirm(tenant, order.id));
+    await dispatch();
+    const platforms = async () =>
+      (
+        await admin.query<{
+          platform: string;
+          moment: string;
+          status: string;
+          event_name: string | null;
+          error: string | null;
+        }>(
+          `SELECT platform, moment, status, event_name, error FROM marketing.conversions
+            WHERE order_id = $1 ORDER BY occurred_at, platform`,
+          [order.id],
+        )
+      ).rows.map((row) => [row.platform, row.moment, row.status, row.event_name, row.error]);
+
+    expect(await sender().sweep()).toBe(2);
+    expect(googleRequests.map((request) => request.url)).toEqual([
+      `/mp/collect?measurement_id=G-AB12CD34EF&api_secret=${secret}`,
+      `/mp/collect?measurement_id=G-AB12CD34EF&api_secret=${secret}`,
+    ]);
+    const [placed, confirmed] = googleRequests.splice(0).map((request) => request.body);
+    const customer = sha256(order.customerId);
+    expect(placed).toEqual({
+      client_id: customer.slice(0, 32),
+      user_id: customer,
+      timestamp_micros: expect.any(Number) as number,
+      user_data: {
+        sha256_phone_number: [sha256('+923001112223')],
+        sha256_email_address: [sha256('ayesha@example.com')],
+      },
+      events: [
+        {
+          // Not its purchase: the shop counts that when the order is confirmed.
+          name: 'order_placed',
+          params: {
+            transaction_id: String(order.number),
+            currency: 'PKR',
+            value: 5_000,
+            items: [
+              { item_id: variantId, quantity: 2, price: 2_000 },
+              { item_id: otherVariantId, quantity: 1, price: 750 },
+            ],
+          },
+        },
+      ],
+    });
+    expect(confirmed!.events[0]!.name).toBe('purchase');
+    expect(await platforms()).toEqual([
+      ['google', 'placed', 'sent', 'order_placed', null],
+      ['google', 'confirmed', 'sent', 'purchase', null],
+    ]);
+
+    // Google in trouble: the moment waits; refused for good, it fails.
+    const fulfillments = new FulfillmentService(database, new StockService());
+    const { fulfillmentId } = unwrap(await fulfillments.fulfill(tenant, order.id, {}));
+    unwrap(await fulfillments.markDelivered(tenant, fulfillmentId));
+    await dispatch();
+    googleAnswer = { status: 503, body: 'Service Unavailable' };
+    const now = new Date();
+    expect(await sender().send(shopId, now)).toBe(0);
+    expect((await platforms())[2]).toEqual([
+      'google',
+      'delivered',
+      'pending',
+      null,
+      'Google 503: Service Unavailable',
+    ]);
+    googleAnswer = { status: 400, body: 'Bad Request' };
+    expect(await sender().send(shopId, new Date(now.getTime() + 61_000))).toBe(0);
+    expect((await platforms())[2]).toEqual([
+      'google',
+      'delivered',
+      'failed',
+      'order_delivered',
+      'Google 400: Bad Request',
+    ]);
+
+    // Older than Google's three days by the time it could go: expired, not sent.
+    const late = await placeOnline();
+    await dispatch();
+    googleRequests.splice(0);
+    expect(await sender().send(shopId, new Date(Date.now() + 72 * 3_600_000))).toBe(0);
+    expect(googleRequests).toEqual([]);
+    expect((await statusOf(late.id))![1]).toBe(
+      'Not sent: Google takes events up to three days after they happened',
+    );
+
+    // Disconnected with a moment waiting: it is not sent.
+    const another = await placeOnline();
+    await dispatch();
+    expect(await google().delete(tenant)).toBe('G-AB12CD34EF');
+    expect(await statusOf(another.id)).toEqual([
+      'skipped',
+      'Not sent: the shop disconnected Google',
     ]);
   });
 

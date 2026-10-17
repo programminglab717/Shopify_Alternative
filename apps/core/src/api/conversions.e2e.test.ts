@@ -328,6 +328,79 @@ describe.skipIf(!server)("Admin GraphQL API: Meta's conversions API", () => {
     ).toBe(true);
   });
 
+  it("connects the shop's Google Analytics stream, never showing its secret again, and disconnects it (ADR-547)", async () => {
+    const GOOGLE = '{ googleAnalytics { measurementId apiSecretHint purchaseAt } }';
+    const CONNECT = `mutation ($input: GoogleAnalyticsInput!) {
+      googleAnalyticsUpdate(input: $input) {
+        googleAnalytics { measurementId apiSecretHint purchaseAt }
+        userErrors { field code message }
+      }
+    }`;
+    const secret = 'Xy9_kq2LmN0pQrStGo47';
+    expect(await data(tokens.owner, GOOGLE)).toBeNull();
+    expect(await data(tokens.owner, CONNECT, { input: { measurementId: 'G-AB12CD34EF' } })).toEqual(
+      {
+        googleAnalytics: null,
+        userErrors: [
+          {
+            field: ['input', 'apiSecret'],
+            code: 'BLANK',
+            message: 'Connecting Google needs a Measurement Protocol API secret',
+          },
+        ],
+      },
+    );
+    expect(
+      await data(tokens.owner, CONNECT, {
+        input: { measurementId: 'g-ab12cd34ef', apiSecret: secret, purchaseAt: 'DELIVERED' },
+      }),
+    ).toEqual({
+      googleAnalytics: {
+        measurementId: 'G-AB12CD34EF',
+        apiSecretHint: 'Go47',
+        purchaseAt: 'DELIVERED',
+      },
+      userErrors: [],
+    });
+    expect(await data(tokens.reader, GOOGLE)).toMatchObject({ apiSecretHint: 'Go47' });
+    expect(JSON.stringify(await gql(tokens.owner, GOOGLE))).not.toContain(secret.slice(0, 12));
+    for (const [token, query] of [
+      [tokens.orders, GOOGLE],
+      [tokens.reader, CONNECT],
+      [tokens.reader, 'mutation { googleAnalyticsDelete { deletedMeasurementId } }'],
+    ] as const) {
+      const denied = await gql(token, query, { input: { measurementId: 'G-AB12CD34EF' } });
+      expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+    }
+    expect(await data(tokens.other, GOOGLE)).toBeNull();
+
+    const deleted =
+      'mutation { googleAnalyticsDelete { deletedMeasurementId userErrors { code } } }';
+    expect(await data(tokens.owner, deleted)).toEqual({
+      deletedMeasurementId: 'G-AB12CD34EF',
+      userErrors: [],
+    });
+    expect(await data(tokens.owner, deleted)).toEqual({
+      deletedMeasurementId: null,
+      userErrors: [],
+    });
+    expect(await data(tokens.owner, GOOGLE)).toBeNull();
+
+    // Its moments listed apart from the others'.
+    await admin.query(
+      `INSERT INTO marketing.conversions
+              (shop_id, platform, order_id, moment, occurred_at, status, event_name, sent_at)
+       VALUES ($1, 'google', $2, 'placed', now(), 'sent', 'purchase', now())`,
+      [shop, newId()],
+    );
+    const BY_PLATFORM = `query ($platform: ConversionPlatform) {
+      conversionEvents(platform: $platform) { nodes { platform eventName traceId } }
+    }`;
+    expect((await data(tokens.reader, BY_PLATFORM, { platform: 'GOOGLE' })).nodes).toEqual([
+      { platform: 'GOOGLE', eventName: 'purchase', traceId: null },
+    ]);
+  });
+
   it("lists Pakistan's marketing calendar from the shop's today, each moment with its kit (ADR-484)", async () => {
     const CALENDAR = `query ($days: Int) {
       marketingCalendar(days: $days) {

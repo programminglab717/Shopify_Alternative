@@ -45,7 +45,8 @@ registerEnumType(ConversionStatus, {
     FAILED: { description: 'The platform refused it, for good: `error` says why.' },
     EXPIRED: {
       description:
-        'Too old for the platform by the time it could go: Meta and TikTok take seven days.',
+        'Too old for the platform by the time it could go: Meta and TikTok take seven days, ' +
+        'Google three.',
     },
     SKIPPED: {
       description:
@@ -57,6 +58,7 @@ registerEnumType(ConversionStatus, {
 export enum ConversionPlatform {
   META = 'META',
   TIKTOK = 'TIKTOK',
+  GOOGLE = 'GOOGLE',
 }
 
 registerEnumType(ConversionPlatform, {
@@ -65,6 +67,9 @@ registerEnumType(ConversionPlatform, {
   valuesMap: {
     META: { description: "Meta's conversions API, for Facebook's and Instagram's ads." },
     TIKTOK: { description: "TikTok's Events API, for TikTok's ads (ADR-541)." },
+    GOOGLE: {
+      description: "Google Analytics' Measurement Protocol, for Google's ads (ADR-547).",
+    },
   },
 });
 
@@ -403,4 +408,69 @@ export class MarketingDate {
 
   @Field(() => MarketingKit)
   kit!: MarketingKit;
+}
+
+@ObjectType({
+  description:
+    "The shop's Google Analytics web stream, which its orders placed through checkout go to " +
+    'through the Measurement Protocol as they are placed, confirmed and delivered, for Google ' +
+    'Ads to import its purchase as a conversion (MKT-10, ADR-547).',
+})
+export class GoogleAnalytics {
+  @Field({ description: "The web stream's measurement ID, as Google Analytics shows it." })
+  measurementId!: string;
+
+  @Field({ description: 'The last four characters of its API secret, never shown again.' })
+  apiSecretHint!: string;
+
+  @Field(() => ConversionMoment, {
+    description:
+      "Which moment of an order is Google's purchase; the others go as order_placed, " +
+      'order_confirmed and order_delivered. DELIVERED counts only the sales that turned out.',
+  })
+  purchaseAt!: ConversionMoment;
+
+  @Field(() => GraphQLISODateTime)
+  updatedAt!: Date;
+}
+
+@InputType()
+export class GoogleAnalyticsInput {
+  @Field(() => String, {
+    nullable: true,
+    description: 'The web stream\'s measurement ID, "G-…": needed to connect.',
+  })
+  measurementId?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "A Measurement Protocol API secret the web stream's settings made: needed to connect, " +
+      'kept sealed, and never shown again.',
+  })
+  apiSecret?: string | null;
+
+  @Field(() => ConversionMoment, { nullable: true, description: 'PLACED unless set.' })
+  purchaseAt?: ConversionMoment | null;
+}
+
+@ObjectType()
+export class GoogleAnalyticsUpdatePayload {
+  @Field(() => GoogleAnalytics, { nullable: true })
+  googleAnalytics!: GoogleAnalytics | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class GoogleAnalyticsDeletePayload {
+  @Field(() => String, {
+    nullable: true,
+    description: 'The measurement ID that was connected; null when none was.',
+  })
+  deletedMeasurementId!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
 }

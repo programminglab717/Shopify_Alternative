@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Orders sent to Google
+
+* **Orders placed through checkout go to Google Analytics' Measurement Protocol from the worker
+  beside Meta's and TikTok's, for Google Ads to import its purchase as a conversion** ([ADR-547](../architecture/13-decision-log.md#adr-547--orders-placed-through-checkout-go-to-google-analytics-measurement-protocol-from-the-worker-beside-metas-and-tiktoks-the-shop-connecting-its-web-stream-with-an-api-secret-for-google-ads-to-import-its-purchase-as-a-conversion),
+  MKT-10). The shop connects its web stream with an API secret.
+* 3323 tests, 10 more: the stream, the events, the client, the worker's
+  sending and the API.
+
 ### 8c80ced · The inbox answers customers
 
 * **The inbox's staff answer a customer in their own words within the day WhatsApp allows, sent at

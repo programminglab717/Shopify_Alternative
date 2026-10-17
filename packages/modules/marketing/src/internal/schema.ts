@@ -37,6 +37,21 @@ export const tiktokSettings = marketingSchema.table('tiktok_settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** The shop's Google Analytics web stream, and the API secret made for it (ADR-547). */
+export const googleSettings = marketingSchema.table('google_settings', {
+  shopId: uuid('shop_id').primaryKey(),
+  measurementId: text('measurement_id').notNull(),
+  /** Sealed for the shop alone, and never shown again. */
+  apiSecret: text('api_secret').notNull(),
+  /** Its last four characters. */
+  secretHint: text('secret_hint').notNull(),
+  /** Which of an order's moments is Google's purchase. */
+  purchaseAt: text('purchase_at', { enum: CONVERSION_MOMENTS }).notNull().default('placed'),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Each moment of an order to send to an ad platform, and how sending it went. */
 export const conversions = marketingSchema.table(
   'conversions',

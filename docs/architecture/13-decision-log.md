@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-546 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-547 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -554,6 +554,7 @@
 | 544 | Every shop hears on WhatsApp when an outage of Hatti's begins and ends, at its alerts number and at Hatti's cost, each update once | Accepted |
 | 545 | What customers write to a shop on WhatsApp is kept as a conversation for each customer's number, the shop found by the number written to, the message answered or the last shop to write, for its staff to read, mark read and close | Accepted |
 | 546 | The inbox's staff answer a customer in their own words within the day WhatsApp allows after the customer last wrote, sent at once from the number the customer wrote to, and followed to delivery as the webhook says | Accepted |
+| 547 | Orders placed through checkout go to Google Analytics' Measurement Protocol from the worker beside Meta's and TikTok's, the shop connecting its web stream with an API secret, for Google Ads to import its purchase as a conversion | Accepted |
 
 ---
 
@@ -20624,3 +20625,48 @@
     reply sent in the last minutes of the day could miss it.
   * **Answer past the day with a template:** a different act, with its cost and approval; the
     shop's templates and broadcasts (ADR-420) already do it.
+
+## ADR-547 · Orders placed through checkout go to Google Analytics' Measurement Protocol from the worker beside Meta's and TikTok's, the shop connecting its web stream with an API secret, for Google Ads to import its purchase as a conversion
+
+* **Context:** Orders reach Meta's and TikTok's ads from the server (ADR-143, ADR-541), but
+  Google's ads, search and YouTube among them, learned nothing of the orders that turned out
+  (MKT-10). Google Ads' own conversion upload needs a developer token and each shop's Google
+  account signed in through OAuth; Google Analytics takes events from a server with a stream's
+  measurement ID and a secret the shop makes in a minute, and Google Ads imports its events as
+  conversions.
+* **Decision:**
+  * **The shop connects its Google Analytics web stream** with its measurement ID and a
+    Measurement Protocol API secret (`googleAnalyticsUpdate`), both needed. The secret is sealed
+    for the shop alone and never shown again; changes are audited, the secret never. A plan
+    without the conversions API connects none, as for Meta and TikTok (ADR-523).
+  * **The same moments:** an order placed through checkout is recorded for Google when it is
+    placed, if the shop has it connected, and its confirming and delivery follow, as for the other
+    platforms, a row of `marketing.conversions` for each.
+  * **The worker sends them** a request for each moment, as Google takes one browser's events
+    in a request. The moment the shop chose as its purchase goes as Google's recommended
+    `purchase`, the others as `order_placed`, `order_confirmed` and `order_delivered`, each with the
+    order's number as the transaction, its total and its items by variant, dated when the moment
+    happened. The customer's number in E.164 and email go hashed with SHA-256 as user-provided
+    data, and their ID with the shop, hashed, as the user and, shortened, as the browser, so that
+    one customer's orders read as one visitor's until the storefront's Google tag names the
+    browser.
+  * **Three days:** Google dates an event at most 72 hours back, so a moment that could not go
+    within them expires, where Meta's and TikTok's wait seven days.
+  * **What Google says:** it answers every well-formed request alike and says nothing of events it
+    drops, so a request taken is sent; Google in trouble, over its limits or unreachable, tried
+    again on the same backoff; anything else, failed with Google's answer. A request refused
+    stops the shop's others for the round, and those sent before it go again with it; Google
+    keeps one purchase for each transaction.
+  * **Disconnecting** forgets the secret and skips the moments waiting for Google.
+  * **The Admin API** reads the stream (`googleAnalytics`), connects and changes it, disconnects it,
+    and lists Google's moments with the others' (`conversionEvents(platform: GOOGLE)`).
+* **Consequences:**
+  * A shop advertising on Google tells its ads which orders were real, confirmed or delivered,
+    once it marks the purchase as a key event and imports it into Google Ads.
+  * Google's tag is not on the storefront yet: events from the server alone, and an order is not
+    tied to the ad click that brought it until the tag names the browser.
+* **Alternatives:**
+  * **Google Ads' conversion upload by click ID:** ties each order to its click, but asks every
+    shop to sign Hatti into its Google Ads account and Hatti to hold a developer token.
+  * **Google's tag in the browser only:** ad blockers and checkout's scriptless page lose the
+    orders that matter most.

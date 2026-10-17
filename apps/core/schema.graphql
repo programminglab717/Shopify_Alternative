@@ -2588,6 +2588,9 @@ enum ConversionMoment {
 
 """An ad platform orders go to."""
 enum ConversionPlatform {
+  """Google Analytics' Measurement Protocol, for Google's ads (ADR-547)."""
+  GOOGLE
+
   """Meta's conversions API, for Facebook's and Instagram's ads."""
   META
 
@@ -2598,7 +2601,7 @@ enum ConversionPlatform {
 """How sending a moment to an ad platform went."""
 enum ConversionStatus {
   """
-  Too old for the platform by the time it could go: Meta and TikTok take seven days.
+  Too old for the platform by the time it could go: Meta and TikTok take seven days, Google three.
   """
   EXPIRED
 
@@ -4955,6 +4958,47 @@ input GiftCardUpdateInput {
   customerId: ID
   expiresOn: String
   note: String
+}
+
+"""
+The shop's Google Analytics web stream, which its orders placed through checkout go to through the Measurement Protocol as they are placed, confirmed and delivered, for Google Ads to import its purchase as a conversion (MKT-10, ADR-547).
+"""
+type GoogleAnalytics {
+  """The last four characters of its API secret, never shown again."""
+  apiSecretHint: String!
+
+  """The web stream's measurement ID, as Google Analytics shows it."""
+  measurementId: String!
+
+  """
+  Which moment of an order is Google's purchase; the others go as order_placed, order_confirmed and order_delivered. DELIVERED counts only the sales that turned out.
+  """
+  purchaseAt: ConversionMoment!
+  updatedAt: DateTime!
+}
+
+type GoogleAnalyticsDeletePayload {
+  """The measurement ID that was connected; null when none was."""
+  deletedMeasurementId: String
+  userErrors: [UserError!]!
+}
+
+input GoogleAnalyticsInput {
+  """
+  A Measurement Protocol API secret the web stream's settings made: needed to connect, kept sealed, and never shown again.
+  """
+  apiSecret: String
+
+  """The web stream's measurement ID, "G-…": needed to connect."""
+  measurementId: String
+
+  """PLACED unless set."""
+  purchaseAt: ConversionMoment
+}
+
+type GoogleAnalyticsUpdatePayload {
+  googleAnalytics: GoogleAnalytics
+  userErrors: [UserError!]!
 }
 
 """Hatti's support for the shop (BIL-05, ADR-508), as its plan allows."""
@@ -7714,6 +7758,16 @@ type Mutation {
   Changes a gift card's expiry, customer or note, as Shopify's giftCardUpdate.
   """
   giftCardUpdate(id: ID!, input: GiftCardUpdateInput!): GiftCardPayload!
+
+  """
+  Disconnects the shop's Google Analytics web stream: its secret is forgotten, and moments still waiting are not sent.
+  """
+  googleAnalyticsDelete: GoogleAnalyticsDeletePayload!
+
+  """
+  Connects the shop's Google Analytics web stream, or changes how its orders go to it (ADR-547): from then on, each order placed through checkout goes to the Measurement Protocol as it is placed, confirmed and delivered, its customer's details hashed. Audited, the secret never. Staff confirm who they are first when they signed in over 15 minutes ago.
+  """
+  googleAnalyticsUpdate(input: GoogleAnalyticsInput!): GoogleAnalyticsUpdatePayload!
 
   """
   Adds to or takes from quantities: a delivery received, damaged goods written off. Stock recorded for an untracked item starts tracking it. All changes apply, or none. Needs an Idempotency-Key header.
@@ -12562,6 +12616,11 @@ type Query {
     """
     query: String
   ): GiftCardConnection!
+
+  """
+  The shop's Google Analytics web stream its orders go to (MKT-10); null until it connects one.
+  """
+  googleAnalytics: GoogleAnalytics
 
   """
   How the shop reaches Hatti's people, as its plan allows, and its requests.

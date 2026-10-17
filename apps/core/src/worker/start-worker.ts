@@ -31,6 +31,8 @@ import { InventoryService, LowStockService, StockService } from '@hatti/inventor
 import type { Logger } from '@hatti/logger';
 import {
   ConversionsService,
+  GoogleAnalyticsClient,
+  GoogleAnalyticsService,
   MetaConversionsClient,
   MetaConversionsService,
   TikTokEventsClient,
@@ -631,6 +633,8 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         }),
         tiktok: new TikTokEventsService(database, config.ENCRYPTION_KEYS),
         tiktokClient: new TikTokEventsClient({ baseUrl: config.TIKTOK_API_URL }),
+        google: new GoogleAnalyticsService(database, config.ENCRYPTION_KEYS),
+        googleClient: new GoogleAnalyticsClient({ baseUrl: config.GOOGLE_ANALYTICS_URL }),
         storefronts: new StorefrontSite(config.STOREFRONT_URL ?? 'http://localhost:4100'),
         logger,
       }).start(config.CONVERSIONS_INTERVAL_MS);

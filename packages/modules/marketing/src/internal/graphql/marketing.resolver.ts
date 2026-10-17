@@ -22,6 +22,7 @@ import type {
 } from '../meta.js';
 import { MetaConversionsService, type MetaConversionsRecord } from '../meta-settings.service.js';
 import { TikTokEventsService, type TikTokEventsRecord } from '../tiktok-settings.service.js';
+import { GoogleAnalyticsService, type GoogleAnalyticsRecord } from '../google-settings.service.js';
 import {
   ConversionEvent,
   ConversionEventConnection,
@@ -30,6 +31,10 @@ import {
   ConversionMoment,
   ConversionPlatform,
   ConversionStatus,
+  GoogleAnalytics,
+  GoogleAnalyticsDeletePayload,
+  GoogleAnalyticsInput,
+  GoogleAnalyticsUpdatePayload,
   MetaConversions,
   MetaConversionsDeletePayload,
   MetaConversionsInput,
@@ -47,6 +52,7 @@ export class MarketingResolver {
   constructor(
     private readonly meta: MetaConversionsService,
     private readonly tiktok: TikTokEventsService,
+    private readonly google: GoogleAnalyticsService,
     private readonly conversions: ConversionsService,
     private readonly calendar: MarketingCalendarService,
   ) {}
@@ -178,6 +184,59 @@ export class MarketingResolver {
     });
   }
 
+  @Query(() => GoogleAnalytics, {
+    nullable: true,
+    description:
+      "The shop's Google Analytics web stream its orders go to (MKT-10); null until it connects one.",
+  })
+  @RequireScopes('read_pixels')
+  async googleAnalytics(@CurrentTenant() tenant: TenantContext): Promise<GoogleAnalytics | null> {
+    const record = await this.google.get(tenant);
+    return record && toGoogleAnalytics(record);
+  }
+
+  @Mutation(() => GoogleAnalyticsUpdatePayload, {
+    description:
+      "Connects the shop's Google Analytics web stream, or changes how its orders go to it " +
+      '(ADR-547): from then on, each order placed through checkout goes to the Measurement ' +
+      "Protocol as it is placed, confirmed and delivered, its customer's details hashed. " +
+      'Audited, the secret never. Staff confirm who they are first when they signed in over 15 ' +
+      'minutes ago.',
+  })
+  @RequireScopes('write_pixels')
+  @RequireRecentAuthentication()
+  async googleAnalyticsUpdate(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('input') input: GoogleAnalyticsInput,
+  ): Promise<GoogleAnalyticsUpdatePayload> {
+    const result = await this.google.update(tenant, {
+      measurementId: input.measurementId,
+      apiSecret: input.apiSecret,
+      purchaseAt: input.purchaseAt
+        ? (input.purchaseAt.toLowerCase() as ConversionMomentValue)
+        : null,
+    });
+    return Object.assign(new GoogleAnalyticsUpdatePayload(), {
+      googleAnalytics: result.ok ? toGoogleAnalytics(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => GoogleAnalyticsDeletePayload, {
+    description:
+      "Disconnects the shop's Google Analytics web stream: its secret is forgotten, and moments " +
+      'still waiting are not sent.',
+  })
+  @RequireScopes('write_pixels')
+  async googleAnalyticsDelete(
+    @CurrentTenant() tenant: TenantContext,
+  ): Promise<GoogleAnalyticsDeletePayload> {
+    return Object.assign(new GoogleAnalyticsDeletePayload(), {
+      deletedMeasurementId: await this.google.delete(tenant),
+      userErrors: [],
+    });
+  }
+
   @Query(() => ConversionEventConnection, {
     description:
       "The moments of the shop's orders sent, or to be sent, to the ad platforms it connected, " +
@@ -237,6 +296,15 @@ function toTikTokEvents(record: TikTokEventsRecord): TikTokEvents {
     pixelCode: record.pixelCode,
     accessTokenHint: record.tokenHint,
     testEventCode: record.testEventCode,
+    purchaseAt: record.purchaseAt.toUpperCase() as ConversionMoment,
+    updatedAt: record.updatedAt,
+  });
+}
+
+function toGoogleAnalytics(record: GoogleAnalyticsRecord): GoogleAnalytics {
+  return Object.assign(new GoogleAnalytics(), {
+    measurementId: record.measurementId,
+    apiSecretHint: record.secretHint,
     purchaseAt: record.purchaseAt.toUpperCase() as ConversionMoment,
     updatedAt: record.updatedAt,
   });

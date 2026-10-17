@@ -4,11 +4,15 @@ import type { DomainEvent } from '@hatti/events';
 import type { Logger } from '@hatti/logger';
 import {
   ConversionsService,
+  GOOGLE_EVENT_WINDOW_MS,
+  GoogleAnalyticsClient,
+  GoogleAnalyticsService,
   META_EVENT_WINDOW_MS,
   MetaConversionsClient,
   MetaConversionsService,
   TikTokEventsClient,
   TikTokEventsService,
+  googleEvent,
   metaEvent,
   retryDelayMs,
   tiktokEvent,
@@ -16,6 +20,7 @@ import {
   type ConversionOrder,
   type ConversionOutcome,
   type ConversionPlatformValue,
+  type GoogleEventsPayload,
   type MetaServerEvent,
   type TikTokEvent,
 } from '@hatti/marketing/public';
@@ -116,6 +121,9 @@ export interface ConversionsSenderOptions {
   /** The shop's TikTok pixel, and the client its events go to TikTok by (ADR-541). */
   tiktok: TikTokEventsService;
   tiktokClient: TikTokEventsClient;
+  /** The shop's Google Analytics stream, and the client its events go to Google by (ADR-547). */
+  google: GoogleAnalyticsService;
+  googleClient: GoogleAnalyticsClient;
   /** Where the shops' storefronts answer: the address events name. */
   storefronts: StorefrontSite;
   database: Database;
@@ -131,6 +139,8 @@ type PlatformResult =
 interface PlatformSender {
   /** Its name, as what is said of it reads. */
   name: string;
+  /** How long after a moment it still takes it, and what to say of one too old. */
+  window: { ms: number; said: string };
   /** The event of an order's moment, and the name it goes by. */
   eventOf(
     order: ConversionOrder,
@@ -142,8 +152,9 @@ interface PlatformSender {
 
 /**
  * Sends the moments due to the ad platforms shops connect, a shop at a time, a hundred in a
- * request: to Meta's conversions API as server events (ADR-143), and to TikTok's Events API as
- * web events (ADR-541), each its order as it is when sent. Those a platform cannot take yet are
+ * request: to Meta's conversions API as server events (ADR-143), to TikTok's Events API as web
+ * events (ADR-541), and to Google Analytics' Measurement Protocol, a request for each (ADR-547),
+ * each its order as it is when sent. Those a platform cannot take yet are
  * tried again later, a minute after the first try and doubling to six hours, while they are new
  * enough to go; those it refuses for good are failed, with what it said.
  */
@@ -185,11 +196,11 @@ export class ConversionsSender {
         });
         return false;
       }
-      if (at.getTime() - conversion.occurredAt.getTime() > META_EVENT_WINDOW_MS) {
+      if (at.getTime() - conversion.occurredAt.getTime() > sender.window.ms) {
         outcomes.push({
           id: conversion.id,
           status: 'expired',
-          error: `Not sent: ${sender.name} takes events up to seven days after they happened`,
+          error: `Not sent: ${sender.name} takes events up to ${sender.window.said} after they happened`,
         });
         return false;
       }
@@ -278,12 +289,13 @@ export class ConversionsSender {
     shopId: string,
     platform: ConversionPlatformValue,
   ): Promise<PlatformSender | null> {
-    const { meta, client, tiktok, tiktokClient } = this.options;
+    const { meta, client, tiktok, tiktokClient, google, googleClient } = this.options;
     if (platform === 'meta') {
       const dataset = await meta.datasetOf(shopId);
       if (!dataset) return null;
       return {
         name: 'Meta',
+        window: SEVEN_DAYS,
         eventOf: (order, conversion, sourceUrl) => {
           const event = metaEvent(order, conversion, {
             purchaseAt: dataset.purchaseAt,
@@ -294,10 +306,29 @@ export class ConversionsSender {
         send: (events) => client.send(dataset, events as MetaServerEvent[]),
       };
     }
+    if (platform === 'google') {
+      const stream = await google.streamOf(shopId);
+      if (!stream) return null;
+      return {
+        name: 'Google',
+        window: { ms: GOOGLE_EVENT_WINDOW_MS, said: 'three days' },
+        eventOf: (order, conversion) => {
+          const event = googleEvent(order, conversion, { purchaseAt: stream.purchaseAt });
+          return { event, name: event.events[0]!.name };
+        },
+        send: async (events) => {
+          const result = await googleClient.send(stream, events as GoogleEventsPayload[]);
+          return result.ok
+            ? { ok: true, traceId: null }
+            : { ok: false, retry: result.retry, message: result.message, traceId: null };
+        },
+      };
+    }
     const pixel = await tiktok.pixelOf(shopId);
     if (!pixel) return null;
     return {
       name: 'TikTok',
+      window: SEVEN_DAYS,
       eventOf: (order, conversion, sourceUrl) => {
         const event = tiktokEvent(order, conversion, {
           purchaseAt: pixel.purchaseAt,
@@ -334,7 +365,11 @@ export class ConversionsSender {
 const PLATFORM_NAMES: Readonly<Record<ConversionPlatformValue, string>> = {
   meta: 'Meta',
   tiktok: 'TikTok',
+  google: 'Google',
 };
+
+/** Meta's window, and TikTok's: a website event up to seven days after it happened. */
+const SEVEN_DAYS = { ms: META_EVENT_WINDOW_MS, said: 'seven days' };
 
 /** An order's facts as the ad platforms hear of them: the visits that brought its customer, the last first. */
 function toConversionOrder(order: OrderConversionFacts): ConversionOrder {

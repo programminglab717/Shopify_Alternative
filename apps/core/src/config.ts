@@ -603,6 +603,8 @@ const workerSchema = z
     PUBLIC_URL: env.httpUrl().optional(),
     /** TikTok's Business API, which shops' orders go to through its Events API (ADR-541). */
     TIKTOK_API_URL: env.httpUrl().default('https://business-api.tiktok.com'),
+    /** Google Analytics, which shops' orders go to through its Measurement Protocol (ADR-547). */
+    GOOGLE_ANALYTICS_URL: env.httpUrl().default('https://www.google-analytics.com'),
     /** How often the moments of orders due go to the ad platforms. */
     CONVERSIONS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(15_000),
     /** How often messages due go out. */

@@ -19,9 +19,32 @@ export {
   MarketingEvents,
   type MetaConversionsDeletedPayload,
   type MetaConversionsUpdatedPayload,
+  type GoogleAnalyticsDeletedPayload,
+  type GoogleAnalyticsUpdatedPayload,
   type TikTokEventsDeletedPayload,
   type TikTokEventsUpdatedPayload,
 } from '../internal/events.js';
+export {
+  GoogleAnalyticsClient,
+  type GoogleAnalyticsOptions,
+  type GoogleSendResult,
+  type GoogleStream,
+} from '../internal/google-client.js';
+export {
+  GOOGLE_LIMITS,
+  GoogleAnalyticsService,
+  type GoogleAnalyticsInput,
+  type GoogleAnalyticsRecord,
+  type GoogleStreamSettings,
+} from '../internal/google-settings.service.js';
+export {
+  GOOGLE_EVENT_WINDOW_MS,
+  googleClientId,
+  googleEvent,
+  googleEventName,
+  googleUserData,
+  type GoogleEventsPayload,
+} from '../internal/google.js';
 export { MarketingModule } from '../internal/marketing.module.js';
 export {
   MetaConversionsClient,

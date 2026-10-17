@@ -6,6 +6,8 @@ export const MarketingEvents = {
   MetaConversionsDeleted: 'meta_conversions.deleted',
   TikTokEventsUpdated: 'tiktok_events.updated',
   TikTokEventsDeleted: 'tiktok_events.deleted',
+  GoogleAnalyticsUpdated: 'google_analytics.updated',
+  GoogleAnalyticsDeleted: 'google_analytics.deleted',
 } as const;
 
 /** The shop connected its Meta dataset, or changed how its orders go to it. */
@@ -34,6 +36,21 @@ export interface TikTokEventsUpdatedPayload {
 /** The shop disconnected its TikTok pixel: its orders go to TikTok no more. */
 export interface TikTokEventsDeletedPayload {
   pixelCode: string;
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/** The shop connected its Google Analytics stream, or changed how its orders go to it (ADR-547). */
+export interface GoogleAnalyticsUpdatedPayload {
+  /** What changed: "measurementId", "apiSecret" or "purchaseAt". */
+  changed: string[];
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/** The shop disconnected its Google Analytics stream: its orders go to Google no more. */
+export interface GoogleAnalyticsDeletedPayload {
+  measurementId: string;
   actorKind: 'app' | 'staff';
   actorId: string;
 }
