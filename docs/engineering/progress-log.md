@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Collection filters
+### 62563b8 · Collection filters
 
 * **A collection's page filters its products by Shopify's filter parameters: availability,
   price, product type, brand, each option and the eastern-wear attributes, each value
