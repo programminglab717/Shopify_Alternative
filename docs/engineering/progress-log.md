@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Partners
+### 9e1669c · Partners
 
 * **Agencies open development stores, closed to shoppers until handed to their clients as any
   shop is handed over, and see every store they built, brought or work in** ([ADR-504](../architecture/13-decision-log.md#adr-504--partners-agencies-open-development-stores-closed-to-shoppers-until-handed-to-their-clients-as-any-shop-is-handed-over-and-see-every-store-they-built-brought-or-work-in), PRT-01).
