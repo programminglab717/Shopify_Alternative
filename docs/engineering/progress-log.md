@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### AI credits by plan
+### 22ff845 · AI credits by plan
 
 * **Each plan includes AI credits a month, kept by billing: each draft the AI gives, of a
   product's copy or of translations, spends one, and none are drafted past them until the month
