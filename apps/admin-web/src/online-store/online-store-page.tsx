@@ -18,6 +18,7 @@ import { SpeedTab } from './speed';
 import { StoreBuilderTab } from './store-builder';
 import { StorefrontPreferencesTab } from './storefront';
 import { EDITS_THEMES, ThemesTab } from './themes';
+import { TikTokTab } from './tiktok';
 
 export const ONLINE_STORE_TABS = [
   'pages',
@@ -31,6 +32,7 @@ export const ONLINE_STORE_TABS = [
   'redirects',
   'links',
   'meta',
+  'tiktok',
   'urdu',
 ] as const;
 export type OnlineStoreTab = (typeof ONLINE_STORE_TABS)[number];
@@ -72,6 +74,7 @@ const TABS: Record<
   redirects: { label: 'onlineStore.redirects', roles: EDITS_MENUS, body: () => <RedirectsTab /> },
   links: { label: 'onlineStore.linkPage', roles: EDITS_MENUS, body: () => <LinkPageTab /> },
   meta: { label: 'onlineStore.meta', roles: SETS_META, body: () => <MetaTab /> },
+  tiktok: { label: 'onlineStore.tiktok', roles: SETS_META, body: () => <TikTokTab /> },
   urdu: { label: 'onlineStore.urdu', roles: WRITES_URDU, body: () => <UrduOverview /> },
 };
 
@@ -84,7 +87,7 @@ export const OPENS_ONLINE_STORE: readonly StaffRole[] = [
  * The online store (OS-02, OS-06, OS-07, OS-09, OS-15): the shop's pages, blogs, menus and policies,
  * its storefront's password, pause and home page for search engines, its themes, its speed (OS-13), its
  * redirects, its
- * link page, Meta and the catalog feed (MKT-10, MKT-11), and what is left to put in Urdu; a tab for
+ * link page, Meta and the catalog feed (MKT-10, MKT-11), TikTok (ADR-542), and what is left to put in Urdu; a tab for
  * each part its role works in.
  */
 export function OnlineStorePage() {

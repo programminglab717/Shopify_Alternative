@@ -24,6 +24,7 @@ const CONNECTED = {
 const EVENTS = [
   {
     id: 'cev_1',
+    platform: 'META',
     orderId: 'order_1',
     moment: 'DELIVERED',
     eventName: 'Purchase',
@@ -36,6 +37,7 @@ const EVENTS = [
   },
   {
     id: 'cev_2',
+    platform: 'META',
     orderId: 'order_2',
     moment: 'PLACED',
     eventName: null,
@@ -206,7 +208,10 @@ describe('Meta and the catalog feed', () => {
 
     fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'FAILED' } });
     await waitFor(() => expect(screen.queryByText('fbtrace_id AbC123')).toBeNull());
-    expect(sentOf(fake, 'ConversionEvents')).toEqual([{ status: null }, { status: 'FAILED' }]);
+    expect(sentOf(fake, 'ConversionEvents')).toEqual([
+      { status: null, platform: 'META' },
+      { status: 'FAILED', platform: 'META' },
+    ]);
 
     type('Test event code', 'TEST4821');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));

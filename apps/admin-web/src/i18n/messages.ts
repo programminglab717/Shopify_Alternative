@@ -2345,6 +2345,36 @@ const en = {
   'meta.noEvents':
     'Nothing yet. Orders placed through your checkout appear here as they go to Meta.',
   'meta.latestOnly': 'Showing the latest 50.',
+  'onlineStore.tiktok': 'TikTok',
+  'tiktok.title': "TikTok's Events API",
+  'tiktok.hint':
+    "Orders placed through your checkout go to your TikTok pixel as they are placed, confirmed and delivered, from Hatti's servers, so TikTok's ads learn from the orders that turned out. Customers' details go hashed. On Growth and bigger plans.",
+  'tiktok.connected': 'Connected to pixel {pixelCode}.',
+  'tiktok.testing': 'Test events show in Events Manager under code {code}.',
+  'tiktok.pixelCode': 'Pixel code',
+  'tiktok.pixelCodeHint':
+    "Your pixel's code, as TikTok's Events Manager shows it under Web: capital letters and digits.",
+  'tiktok.accessTokenHint':
+    "Made in TikTok's Events Manager: your pixel's Settings, then Events API, then Generate access token.",
+  'tiktok.purchaseAt': 'Tell TikTok of a purchase',
+  'tiktok.purchaseHint.PLACED':
+    'With cash on delivery, TikTok also learns from orders refused at the door.',
+  'tiktok.purchaseHint.CONFIRMED':
+    'Once the customer or your staff confirm it, or its payment comes in. TikTok learns from fewer fake orders.',
+  'tiktok.purchaseHint.DELIVERED':
+    'Only the parcels customers took count as purchases, so TikTok finds people who pay. They reach TikTok days later.',
+  'tiktok.testEventCodeHint':
+    "From Events Manager's Test events, while you try it out. Clear it when you are done.",
+  'tiktok.connect': 'Connect TikTok',
+  'tiktok.saved': 'Saved. Orders placed from now on go to TikTok like this.',
+  'tiktok.disconnect': 'Disconnect TikTok',
+  'tiktok.disconnectAsk':
+    'Disconnect pixel {pixelCode}? Hatti forgets its access token, and moments still waiting are not sent.',
+  'tiktok.events': 'Sent to TikTok',
+  'tiktok.eventsHint':
+    'The latest moments of your orders, and how sending each went. TikTok takes them up to seven days late.',
+  'tiktok.noEvents':
+    'Nothing yet. Orders placed through your checkout appear here as they go to TikTok.',
   'settings.messages': 'Customer messages',
   'settings.messagesHint': 'WhatsApp or SMS, which messages go, and alerts to you',
   'settings.whatsapp': 'Your WhatsApp number',
@@ -7036,6 +7066,36 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'meta.order': 'اس کا آرڈر',
   'meta.noEvents': 'ابھی کچھ نہیں۔ آپ کے چیک آؤٹ سے آنے والے آرڈر میٹا کو جاتے ہی یہاں دکھیں گے۔',
   'meta.latestOnly': 'تازہ ترین 50 دکھائے جا رہے ہیں۔',
+  'onlineStore.tiktok': 'ٹک ٹاک',
+  'tiktok.title': 'ٹک ٹاک کا ایونٹس API',
+  'tiktok.hint':
+    'آپ کے چیک آؤٹ سے آنے والے آرڈر ہٹی کے سرورز سے آپ کے ٹک ٹاک پکسل کو جاتے ہیں جب وہ آئیں، کنفرم ہوں اور ڈیلیور ہوں، تاکہ ٹک ٹاک کے اشتہار ان آرڈرز سے سیکھیں جو پورے ہوئے۔ کسٹمرز کی تفصیلات ہیش ہو کر جاتی ہیں۔ گروتھ اور بڑے پلانز پر۔',
+  'tiktok.connected': 'پکسل {pixelCode} سے منسلک۔',
+  'tiktok.testing': 'ٹیسٹ ایونٹس ایونٹس مینیجر میں کوڈ {code} کے تحت دکھتے ہیں۔',
+  'tiktok.pixelCode': 'پکسل کوڈ',
+  'tiktok.pixelCodeHint':
+    'آپ کے پکسل کا کوڈ، جیسے ٹک ٹاک کے ایونٹس مینیجر میں Web کے نیچے دکھتا ہے: بڑے حروف اور ہندسے۔',
+  'tiktok.accessTokenHint':
+    'ٹک ٹاک کے ایونٹس مینیجر میں بنتا ہے: پکسل کی سیٹنگز، پھر Events API، پھر Generate access token۔',
+  'tiktok.purchaseAt': 'ٹک ٹاک کو خریداری کب بتائیں',
+  'tiktok.purchaseHint.PLACED':
+    'کیش آن ڈیلیوری میں ٹک ٹاک دروازے پر انکار ہونے والے آرڈرز سے بھی سیکھتا ہے۔',
+  'tiktok.purchaseHint.CONFIRMED':
+    'جب کسٹمر یا آپ کا اسٹاف کنفرم کرے، یا ادائیگی آ جائے۔ ٹک ٹاک کم جعلی آرڈرز سے سیکھتا ہے۔',
+  'tiktok.purchaseHint.DELIVERED':
+    'صرف وہ پارسل خریداری گنے جاتے ہیں جو کسٹمرز نے لیے، تاکہ ٹک ٹاک ادائیگی کرنے والے لوگ ڈھونڈے۔ یہ ٹک ٹاک تک کچھ دن بعد پہنچتے ہیں۔',
+  'tiktok.testEventCodeHint':
+    'ایونٹس مینیجر کے Test events سے، جب تک آپ آزما رہے ہوں۔ ختم ہونے پر ہٹا دیں۔',
+  'tiktok.connect': 'ٹک ٹاک منسلک کریں',
+  'tiktok.saved': 'محفوظ ہو گیا۔ اب سے آنے والے آرڈر اسی طرح ٹک ٹاک کو جائیں گے۔',
+  'tiktok.disconnect': 'ٹک ٹاک الگ کریں',
+  'tiktok.disconnectAsk':
+    'پکسل {pixelCode} الگ کریں؟ ہٹی اس کا ایکسیس ٹوکن بھول جائے گا، اور انتظار میں موجود لمحے نہیں بھیجے جائیں گے۔',
+  'tiktok.events': 'ٹک ٹاک کو بھیجے گئے',
+  'tiktok.eventsHint':
+    'آپ کے آرڈرز کے تازہ ترین لمحے، اور ہر ایک کا بھیجنا کیسا رہا۔ ٹک ٹاک انہیں سات دن تک دیر سے لیتا ہے۔',
+  'tiktok.noEvents':
+    'ابھی کچھ نہیں۔ آپ کے چیک آؤٹ سے آنے والے آرڈر ٹک ٹاک کو جاتے ہی یہاں دکھیں گے۔',
   'settings.messages': 'کسٹمر میسجز',
   'settings.messagesHint': 'واٹس ایپ یا SMS، کون سے میسج جائیں، اور آپ کو الرٹس',
   'settings.whatsapp': 'آپ کا واٹس ایپ نمبر',

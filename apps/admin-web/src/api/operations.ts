@@ -6209,12 +6209,65 @@ export const MetaConversionsDeleteMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
-/** The latest moments of the shop's orders sent, or to be sent, to Meta, and how each went. */
+const TIKTOK_EVENTS = /* GraphQL */ `
+  fragment TikTokEventsParts on TikTokEvents {
+    pixelCode
+    accessTokenHint
+    purchaseAt
+    testEventCode
+    updatedAt
+  }
+`;
+
+/** The shop's TikTok pixel, if it connected one (ADR-541). */
+export const TikTokEventsQuery = /* GraphQL */ `
+  query TikTokEvents {
+    tiktokEvents {
+      ...TikTokEventsParts
+    }
+  }
+  ${TIKTOK_EVENTS}
+`;
+
+/** The shop's TikTok pixel connected, or how its orders go to it changed. */
+export const TikTokEventsUpdateMutation = /* GraphQL */ `
+  mutation TikTokEventsUpdate($input: TikTokEventsInput!) {
+    tiktokEventsUpdate(input: $input) {
+      tiktokEvents {
+        ...TikTokEventsParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${TIKTOK_EVENTS}
+  ${USER_ERRORS}
+`;
+
+/** The shop's TikTok pixel disconnected: its token forgotten, moments waiting not sent. */
+export const TikTokEventsDeleteMutation = /* GraphQL */ `
+  mutation TikTokEventsDelete {
+    tiktokEventsDelete {
+      deletedPixelCode
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/**
+ * The latest moments of the shop's orders sent, or to be sent, to one ad platform, and how each
+ * went.
+ */
 export const ConversionEventsQuery = /* GraphQL */ `
-  query ConversionEvents($status: ConversionStatus) {
-    conversionEvents(first: 50, status: $status) {
+  query ConversionEvents($status: ConversionStatus, $platform: ConversionPlatform) {
+    conversionEvents(first: 50, status: $status, platform: $platform) {
       nodes {
         id
+        platform
         orderId
         moment
         eventName

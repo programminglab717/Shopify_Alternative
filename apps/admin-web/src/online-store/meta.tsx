@@ -12,6 +12,7 @@ import type {
   ConversionEvent,
   ConversionEventsData,
   ConversionMoment,
+  ConversionPlatform,
   MetaConversions,
   MetaConversionsData,
   MetaConversionsDeleteData,
@@ -33,7 +34,7 @@ import { TextField } from '../ui/field';
 /** Who sets where the shop's orders go to Meta, and sees how they went (ADR-143). */
 export const SETS_META: readonly StaffRole[] = ['owner', 'manager', 'marketer'];
 
-const MOMENTS: readonly ConversionMoment[] = ['PLACED', 'CONFIRMED', 'DELIVERED'];
+export const MOMENTS: readonly ConversionMoment[] = ['PLACED', 'CONFIRMED', 'DELIVERED'];
 
 /** The moments listed: all of them, or those of one status. */
 const STATUSES = ['ALL', 'PENDING', 'SENT', 'FAILED', 'EXPIRED', 'SKIPPED'] as const;
@@ -257,7 +258,26 @@ function Disconnect({ pixelId }: { pixelId: string }) {
   );
 }
 
-/** One moment of an order sent, or to be sent, to Meta, and how it went. */
+/** What each platform's list says, and what it calls the trace of a request. */
+const PLATFORM_TEXT: Record<
+  ConversionPlatform,
+  { title: MessageKey; hint: MessageKey; none: MessageKey; trace: string }
+> = {
+  META: {
+    title: 'meta.events',
+    hint: 'meta.eventsHint',
+    none: 'meta.noEvents',
+    trace: 'fbtrace_id',
+  },
+  TIKTOK: {
+    title: 'tiktok.events',
+    hint: 'tiktok.eventsHint',
+    none: 'tiktok.noEvents',
+    trace: 'request_id',
+  },
+};
+
+/** One moment of an order sent, or to be sent, to an ad platform, and how it went. */
 function EventRow({ event, timezone }: { event: ConversionEvent; timezone: string }) {
   const { t, locale } = useLocale();
   const shop = useShop();
@@ -305,26 +325,27 @@ function EventRow({ event, timezone }: { event: ConversionEvent; timezone: strin
       )}
       {event.traceId && (
         <span className="num text-secondary text-[length:var(--hatti-type-body-sm-size)]" dir="ltr">
-          fbtrace_id {event.traceId}
+          {PLATFORM_TEXT[event.platform].trace} {event.traceId}
         </span>
       )}
     </li>
   );
 }
 
-/** The latest moments sent to Meta, all of them or those of one status. */
-function EventsList() {
+/** The latest moments sent to one platform, all of them or those of one status. */
+export function EventsList({ platform }: { platform: ConversionPlatform }) {
   const { t } = useLocale();
   const timezone = useShopTimezone();
   const [status, setStatus] = useState<StatusChoice>('ALL');
   const query = useAdminQuery<ConversionEventsData>(
-    ['conversionEvents', status],
+    ['conversionEvents', platform, status],
     ConversionEventsQuery,
-    { status: status === 'ALL' ? null : status },
+    { status: status === 'ALL' ? null : status, platform },
   );
+  const text = PLATFORM_TEXT[platform];
 
   return (
-    <FormSection title={t('meta.events')} hint={t('meta.eventsHint')}>
+    <FormSection title={t(text.title)} hint={t(text.hint)}>
       <SelectField<StatusChoice>
         label={t('meta.showing')}
         value={status}
@@ -342,7 +363,7 @@ function EventsList() {
           action={<Button onClick={() => void query.refetch()}>{t('action.retry')}</Button>}
         />
       ) : query.data.conversionEvents.nodes.length === 0 ? (
-        <p className="text-secondary">{t('meta.noEvents')}</p>
+        <p className="text-secondary">{t(text.none)}</p>
       ) : (
         <>
           <Card>
@@ -399,7 +420,7 @@ export function MetaTab() {
         <MetaForm current={current} />
         {current && <Disconnect pixelId={current.pixelId} />}
       </FormSection>
-      {current?.accessTokenHint && <EventsList />}
+      {current?.accessTokenHint && <EventsList platform="META" />}
     </div>
   );
 }

@@ -2835,8 +2835,12 @@ export interface MetaConversionsDeleteData {
   metaConversionsDelete: { deletedPixelId: string | null; userErrors: UserError[] };
 }
 
+/** The ad platforms a shop's orders go to (ADR-143, ADR-541). */
+export type ConversionPlatform = 'META' | 'TIKTOK';
+
 export interface ConversionEvent {
   id: string;
+  platform: ConversionPlatform;
   orderId: string;
   moment: ConversionMoment;
   eventName: string | null;
@@ -2846,6 +2850,27 @@ export interface ConversionEvent {
   traceId: string | null;
   occurredAt: string;
   sentAt: string | null;
+}
+
+/** The shop's TikTok pixel (ADR-541): its token never shown, its last four characters alone. */
+export interface TikTokEvents {
+  pixelCode: string;
+  accessTokenHint: string;
+  purchaseAt: ConversionMoment;
+  testEventCode: string | null;
+  updatedAt: string;
+}
+
+export interface TikTokEventsData {
+  tiktokEvents: TikTokEvents | null;
+}
+
+export interface TikTokEventsUpdateData {
+  tiktokEventsUpdate: { tiktokEvents: TikTokEvents | null; userErrors: UserError[] };
+}
+
+export interface TikTokEventsDeleteData {
+  tiktokEventsDelete: { deletedPixelCode: string | null; userErrors: UserError[] };
 }
 
 export interface ConversionEventsData {
