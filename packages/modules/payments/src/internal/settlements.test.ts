@@ -129,6 +129,7 @@ describe.skipIf(!server)("Gateways' settlements in the database (PAY-07, ADR-491
       gateway: 'safepay',
       reference: 'SP-2026-10-15',
       lineCount: 5,
+      issueCount: 3,
       fees: 16000n,
       tax: 6400n,
       net: 567600n,

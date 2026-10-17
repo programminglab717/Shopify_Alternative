@@ -28,6 +28,11 @@ export type SettlementOutcome = (typeof SETTLEMENT_OUTCOMES)[number];
 /** Lines that need no one to look into them. */
 const SETTLED: readonly SettlementOutcome[] = ['matched', 'refund'];
 
+/** A settlement's lines to look into, counted from its lines' primary key. */
+const ISSUE_COUNT = sql.raw(`(SELECT count(*)::int FROM payments.settlement_lines l
+   WHERE l.shop_id = s.shop_id AND l.settlement_id = s.id
+     AND l.outcome NOT IN ('matched', 'refund')) AS issue_count`);
+
 export interface SettlementRecord {
   id: string;
   accountId: string;
@@ -35,6 +40,8 @@ export interface SettlementRecord {
   gateway: string;
   reference: string | null;
   lineCount: number;
+  /** Its lines to look into: those neither matched nor refunds. */
+  issueCount: number;
   /** In minor units, as are the rest. */
   gross: bigint;
   fees: bigint;
@@ -96,6 +103,7 @@ type SettlementRow = {
   gateway: string;
   reference: string | null;
   line_count: number;
+  issue_count: number;
   gross: string | number;
   fees: string | number;
   tax: string | number;
@@ -110,6 +118,7 @@ function toSettlement(row: SettlementRow): SettlementRecord {
     gateway: row.gateway,
     reference: row.reference,
     lineCount: row.line_count,
+    issueCount: row.issue_count,
     gross: BigInt(row.gross),
     fees: BigInt(row.fees),
     tax: BigInt(row.tax),
@@ -298,8 +307,8 @@ export class PaymentSettlementService {
   async list(tenant: TenantContext, first = 50): Promise<SettlementRecord[]> {
     const { rows } = await this.db.tenant(tenant.shopId, (tx) =>
       tx.execute<SettlementRow>(sql`
-        SELECT s.id, s.account_id, a.gateway, s.reference, s.line_count, s.gross, s.fees, s.tax,
-               s.net, s.created_at
+        SELECT s.id, s.account_id, a.gateway, s.reference, s.line_count, ${ISSUE_COUNT},
+               s.gross, s.fees, s.tax, s.net, s.created_at
           FROM payments.settlements s
           JOIN payments.gateway_accounts a ON a.shop_id = s.shop_id AND a.id = s.account_id
          WHERE s.shop_id = ${tenant.shopId}
@@ -353,8 +362,8 @@ export class PaymentSettlementService {
 
   private async load(tx: Tx, shopId: string, id: string): Promise<SettlementRecord | null> {
     const { rows } = await tx.execute<SettlementRow>(sql`
-      SELECT s.id, s.account_id, a.gateway, s.reference, s.line_count, s.gross, s.fees, s.tax,
-             s.net, s.created_at
+      SELECT s.id, s.account_id, a.gateway, s.reference, s.line_count, ${ISSUE_COUNT},
+             s.gross, s.fees, s.tax, s.net, s.created_at
         FROM payments.settlements s
         JOIN payments.gateway_accounts a ON a.shop_id = s.shop_id AND a.id = s.account_id
        WHERE s.shop_id = ${shopId} AND s.id = ${id}`);

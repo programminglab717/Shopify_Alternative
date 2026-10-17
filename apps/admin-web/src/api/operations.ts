@@ -3548,6 +3548,132 @@ export const CashStatementImportMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+const PAYMENT_SETTLEMENT_SUMMARY = /* GraphQL */ `
+  fragment PaymentSettlementSummary on PaymentSettlement {
+    id
+    accountId
+    gateway
+    gatewayName
+    reference
+    createdAt
+    lineCount
+    issueCount
+    gross {
+      ...Money
+    }
+    fees {
+      ...Money
+    }
+    tax {
+      ...Money
+    }
+    net {
+      ...Money
+    }
+  }
+`;
+
+/** The gateway accounts whose settlements the shop imports, and those imported (PAY-07). */
+export const PaymentSettlementsQuery = /* GraphQL */ `
+  query PaymentSettlements {
+    paymentSettlementAccounts {
+      id
+      gateway
+      gatewayName
+      sandbox
+    }
+    paymentSettlements(first: 50) {
+      ...PaymentSettlementSummary
+    }
+  }
+  ${PAYMENT_SETTLEMENT_SUMMARY}
+  ${MONEY}
+`;
+
+/** A gateway's settlement with its lines, in the file's order. */
+export const PaymentSettlementQuery = /* GraphQL */ `
+  query PaymentSettlement($id: ID!) {
+    paymentSettlement(id: $id) {
+      ...PaymentSettlementSummary
+      lines {
+        row
+        transactionRef
+        orderId
+        outcome
+        gross {
+          ...Money
+        }
+        fees {
+          ...Money
+        }
+        tax {
+          ...Money
+        }
+        paid {
+          ...Money
+        }
+      }
+    }
+  }
+  ${PAYMENT_SETTLEMENT_SUMMARY}
+  ${MONEY}
+`;
+
+/** A gateway's settlement statement read, and imported unless only checked. */
+export const PaymentSettlementImportMutation = /* GraphQL */ `
+  mutation PaymentSettlementImport(
+    $accountId: ID!
+    $csv: String
+    $xlsx: String
+    $reference: String
+    $dryRun: Boolean
+  ) {
+    paymentSettlementImport(
+      accountId: $accountId
+      csv: $csv
+      xlsx: $xlsx
+      reference: $reference
+      dryRun: $dryRun
+    ) {
+      dryRun
+      rows
+      rowErrorCount
+      rowErrors {
+        row
+        column
+        message
+      }
+      outcomes {
+        matched
+        differs
+        unmatched
+        repeated
+        refund
+      }
+      gross {
+        ...Money
+      }
+      fees {
+        ...Money
+      }
+      tax {
+        ...Money
+      }
+      net {
+        ...Money
+      }
+      settlement {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${MONEY}
+  ${USER_ERRORS}
+`;
+
 const PARCEL_CLAIM = /* GraphQL */ `
   fragment ParcelClaim on FulfillmentClaim {
     status

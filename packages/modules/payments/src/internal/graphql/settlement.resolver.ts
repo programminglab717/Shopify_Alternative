@@ -11,7 +11,10 @@ import {
 } from '@hatti/api';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import { money, type CurrencyCode } from '@hatti/money';
+import { Inject } from '@nestjs/common';
 import { Args, ID, Int, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import { GatewayAccountService, PAYMENT_GATEWAYS } from '../gateway-accounts.service.js';
+import type { PaymentGateways } from '../gateways.js';
 import {
   PaymentSettlementService,
   type SettlementLineRecord,
@@ -19,6 +22,7 @@ import {
 } from '../settlements.service.js';
 import {
   PaymentSettlement,
+  PaymentSettlementAccount,
   PaymentSettlementImportPayload,
   PaymentSettlementLine,
   PaymentSettlementOutcome,
@@ -55,6 +59,7 @@ function toSettlement(record: SettlementRecord, currency: CurrencyCode): Payment
     gateway: record.gateway,
     reference: record.reference,
     lineCount: record.lineCount,
+    issueCount: record.issueCount,
     gross: amount(record.gross, currency),
     fees: amount(record.fees, currency),
     tax: amount(record.tax, currency),
@@ -79,7 +84,31 @@ function toLine(line: SettlementLineRecord, currency: CurrencyCode): PaymentSett
 /** Gateways' settlement statements (PAY-07, ADR-491). */
 @Resolver(() => PaymentSettlement)
 export class PaymentSettlementResolver {
-  constructor(private readonly service: PaymentSettlementService) {}
+  constructor(
+    private readonly service: PaymentSettlementService,
+    private readonly accounts: GatewayAccountService,
+    @Inject(PAYMENT_GATEWAYS) private readonly catalog: PaymentGateways,
+  ) {}
+
+  @Query(() => [PaymentSettlementAccount], {
+    description:
+      "The shop's live gateway accounts, whose settlements it imports, for those who reconcile " +
+      'them; paymentGatewayAccounts is for those who see the settings.',
+  })
+  @RequireScopes('read_orders')
+  async paymentSettlementAccounts(
+    @CurrentTenant() tenant: TenantContext,
+  ): Promise<PaymentSettlementAccount[]> {
+    mayReconcile(tenant, false);
+    return (await this.accounts.list(tenant)).map((account) =>
+      Object.assign(new PaymentSettlementAccount(), {
+        id: toPublicId('paymentGatewayAccount', account.id),
+        gateway: account.gateway,
+        gatewayName: account.gatewayName,
+        sandbox: account.environment !== 'production',
+      }),
+    );
+  }
 
   @Mutation(() => PaymentSettlementImportPayload, {
     description:
@@ -199,6 +228,11 @@ export class PaymentSettlementResolver {
     const settlementId = tryFromPublicId(id, 'paymentSettlement');
     const record = settlementId ? await this.service.get(tenant, settlementId) : null;
     return record && toSettlement(record, tenant.currency);
+  }
+
+  @ResolveField(() => String, { description: 'Such as "Safepay".' })
+  gatewayName(@Parent() settlement: PaymentSettlement): string {
+    return this.catalog.of(settlement.gateway)?.info.name ?? settlement.gateway;
   }
 
   @ResolveField(() => [PaymentSettlementLine], {

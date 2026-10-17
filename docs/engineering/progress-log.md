@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Gateway settlements in the admin
+
+* **Gateways' settlements have a page beside the cash page: imported once checked, and each
+  opened on the lines to look into** ([ADR-492](../architecture/13-decision-log.md#adr-492--gateway-settlements-in-the-admin-imported-beside-couriers-statements-checked-before-they-are-and-each-opened-on-the-lines-to-look-into), PAY-07 in part).
+* 3090 tests, 5 more: the settlements page, a settlement's page, and
+  their operations.
+
 ### 5297ad9 · Gateway settlements
 
 * **Gateways' settlement statements are imported as they send them, each line matched to its

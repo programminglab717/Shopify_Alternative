@@ -27,7 +27,7 @@ const STATEMENT = [
 const IMPORT = `mutation ($accountId: ID!, $csv: String, $reference: String, $dryRun: Boolean) {
   paymentSettlementImport(accountId: $accountId, csv: $csv, reference: $reference,
                           dryRun: $dryRun) {
-    settlement { id gateway reference lineCount fees { amount } tax { amount } net { amount } }
+    settlement { id gateway gatewayName reference lineCount issueCount fees { amount } tax { amount } net { amount } }
     rows outcomes { matched differs unmatched repeated refund }
     issues { row transactionRef outcome orderId paid { amount } }
     rowErrorCount dryRun userErrors { field code }
@@ -133,8 +133,10 @@ describe.skipIf(!server)("Admin GraphQL API: gateways' settlements (PAY-07, ADR-
     });
     expect(made.settlement).toMatchObject({
       gateway: 'safepay',
+      gatewayName: 'Safepay',
       reference: 'SP-2026-10-15',
       lineCount: 3,
+      issueCount: 2,
       fees: { amount: '110.00' },
       tax: { amount: '44.00' },
       net: { amount: '4246.00' },
@@ -151,6 +153,9 @@ describe.skipIf(!server)("Admin GraphQL API: gateways' settlements (PAY-07, ADR-
     });
     expect(elsewhere.userErrors).toEqual([{ field: ['accountId'], code: 'NOT_FOUND' }]);
 
+    expect(
+      await data(tokens.read, '{ paymentSettlementAccounts { id gateway gatewayName sandbox } }'),
+    ).toEqual([{ id: accountId, gateway: 'safepay', gatewayName: 'Safepay', sandbox: false }]);
     const listed = await data(tokens.read, '{ paymentSettlements { id reference lineCount } }');
     expect(listed).toEqual([{ id: made.settlement.id, reference: 'SP-2026-10-15', lineCount: 3 }]);
     const one = await data(

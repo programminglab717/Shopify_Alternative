@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-491 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-492 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -499,6 +499,7 @@
 | 489 | Metafields: custom data on products, variants and collections, as Shopify keeps it, typed by the shop's definitions and read by themes in Liquid | Accepted |
 | 490 | Custom data in the admin: the shop's fields defined in Settings, keyed from their names, and filled on a product's page by the kind of field their type takes | Accepted |
 | 491 | Gateway settlements: the statements gateways send imported as they come, each line matched to a payment by the gateway's reference, and the fees and tax withheld kept beside it | Accepted |
+| 492 | Gateway settlements in the admin: imported beside couriers' statements, checked before they are, and each opened on the lines to look into | Accepted |
 
 ---
 
@@ -18619,3 +18620,33 @@
     Every gateway sends a statement.
   * **Matching by amount and date:** two payments of one amount on a day are common. The
     gateway's reference is exact.
+
+## ADR-492 · Gateway settlements in the admin: imported beside couriers' statements, checked before they are, and each opened on the lines to look into
+
+* **Context:** Gateways' settlements were imported and read through the Admin API alone
+  (ADR-491). The accountants who reconcile couriers' cash need to reconcile gateways' payouts
+  the same way. Accountants cannot read the shop's gateway accounts, which are settings.
+* **Decision:**
+  * **The cash page links to "Gateways' settlements"**, a page for owners, managers and
+    accountants:
+    * the settlements imported, the newest first, each with what it paid over, its fees and tax,
+      and its lines to look into in red;
+    * an import of the statement for a gateway account chosen by name, a sandbox's said, checked
+      first. The check counts its lines by outcome, says what was paid over after fees and tax,
+      and lists rows it could not read. The import opens the settlement.
+  * **A settlement's page** shows what customers paid, the fees, the tax withheld and what was
+    paid over. Its lines open on those to look into when it has any. Each names its payment's
+    order, or its row, and for another amount what the payment was.
+  * **The core gives what the page needs:**
+    * `paymentSettlementAccounts`, the live accounts by name and sandbox alone, for those who
+      reconcile;
+    * a settlement's `issueCount`, counted from its lines;
+    * its `gatewayName`.
+* **Consequences:**
+  * Payouts across gateways and couriers on one page, and the tax withheld by both for the
+    shop's return (TAX-03), come next.
+* **Alternatives:**
+  * **Giving accountants `read_settings`:** they would see every setting, not only which
+    accounts exist.
+  * **A settlements tab on the cash page:** the cash page is about couriers' cash on delivery.
+    A page of its own keeps both short.

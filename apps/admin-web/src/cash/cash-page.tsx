@@ -1,5 +1,5 @@
 import { Link, useNavigate } from '@tanstack/react-router';
-import { FileUp, Wallet } from 'lucide-react';
+import { CreditCard, FileUp, Wallet } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { CashQuery, CashStatementImportMutation } from '../api/operations';
@@ -351,6 +351,7 @@ function ImportStatement({ couriers }: { couriers: string[] }) {
  */
 export function CashPage() {
   const { t } = useLocale();
+  const shopId = useShop().id;
   const query = useAdminQuery<CashData>(['cash'], CashQuery);
 
   if (query.isPending) return <Loading label={t('state.loading')} />;
@@ -376,6 +377,14 @@ export function CashPage() {
       <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
         {t('cash.title')}
       </h1>
+      <Link
+        to="/$shopId/settlements"
+        params={{ shopId }}
+        className="inline-flex min-h-10 items-center gap-2 self-start text-primary underline"
+      >
+        <CreditCard aria-hidden className="size-5" />
+        {t('cash.settlementsLink')}
+      </Link>
       {nothing ? (
         <Card>
           <EmptyState

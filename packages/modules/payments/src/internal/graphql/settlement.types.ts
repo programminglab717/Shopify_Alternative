@@ -17,6 +17,25 @@ registerEnumType(PaymentSettlementOutcome, {
     'REPEATED a payment settled before; REFUND money the gateway took back.',
 });
 
+@ObjectType({
+  description:
+    'A gateway account whose settlements the shop imports: what those who reconcile see of it, ' +
+    'without its settings.',
+})
+export class PaymentSettlementAccount {
+  @Field(() => ID)
+  id!: string;
+
+  @Field({ description: 'Such as safepay.' })
+  gateway!: string;
+
+  @Field({ description: 'Such as "Safepay".' })
+  gatewayName!: string;
+
+  @Field({ description: "Whether it is the gateway's sandbox." })
+  sandbox!: boolean;
+}
+
 @ObjectType({ description: "A line of a gateway's settlement: one payment it paid over." })
 export class PaymentSettlementLine {
   @Field(() => Int, { description: 'Its row in the file.' })
@@ -64,6 +83,9 @@ export class PaymentSettlement {
 
   @Field(() => Int)
   lineCount!: number;
+
+  @Field(() => Int, { description: 'Its lines to look into: those neither matched nor refunds.' })
+  issueCount!: number;
 
   @Field(() => Money, { description: 'What customers paid, less refunds taken back.' })
   gross!: Money;

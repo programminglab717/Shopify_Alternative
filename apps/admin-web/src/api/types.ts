@@ -1532,6 +1532,71 @@ export interface CashStatementImportData {
   };
 }
 
+export interface PaymentSettlementSummary {
+  id: string;
+  accountId: string;
+  gateway: string;
+  gatewayName: string;
+  reference: string | null;
+  createdAt: string;
+  lineCount: number;
+  issueCount: number;
+  gross: MoneyValue;
+  fees: MoneyValue;
+  tax: MoneyValue;
+  net: MoneyValue;
+}
+
+export interface PaymentSettlementAccountValue {
+  id: string;
+  gateway: string;
+  gatewayName: string;
+  sandbox: boolean;
+}
+
+export interface PaymentSettlementsData {
+  paymentSettlementAccounts: PaymentSettlementAccountValue[];
+  paymentSettlements: PaymentSettlementSummary[];
+}
+
+export type PaymentSettlementOutcome = 'MATCHED' | 'DIFFERS' | 'UNMATCHED' | 'REPEATED' | 'REFUND';
+
+export interface PaymentSettlementLineValue {
+  row: number;
+  transactionRef: string;
+  orderId: string | null;
+  outcome: PaymentSettlementOutcome;
+  gross: MoneyValue;
+  fees: MoneyValue;
+  tax: MoneyValue;
+  paid: MoneyValue | null;
+}
+
+export interface PaymentSettlementData {
+  paymentSettlement: (PaymentSettlementSummary & { lines: PaymentSettlementLineValue[] }) | null;
+}
+
+export type PaymentSettlementOutcomeCounts = Record<
+  'matched' | 'differs' | 'unmatched' | 'repeated' | 'refund',
+  number
+>;
+
+export interface PaymentSettlementImportData {
+  paymentSettlementImport: {
+    dryRun: boolean;
+    rows: number;
+    rowErrorCount: number;
+    rowErrors: { row: number; column: string | null; message: string }[];
+    outcomes: PaymentSettlementOutcomeCounts;
+    gross: MoneyValue;
+    fees: MoneyValue;
+    tax: MoneyValue;
+    net: MoneyValue;
+    settlement: { id: string } | null;
+    userErrors: UserError[];
+  };
+}
+
 export type FulfillmentClaimStatus = 'OPEN' | 'PAID' | 'REFUSED' | 'WITHDRAWN';
 
 export interface ParcelClaimValue {

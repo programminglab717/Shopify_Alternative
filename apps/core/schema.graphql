@@ -10168,9 +10168,15 @@ type PaymentSettlement {
   """The account's gateway, such as safepay."""
   gateway: String!
 
+  """Such as "Safepay"."""
+  gatewayName: String!
+
   """What customers paid, less refunds taken back."""
   gross: Money!
   id: ID!
+
+  """Its lines to look into: those neither matched nor refunds."""
+  issueCount: Int!
   lineCount: Int!
 
   """Its lines in the file's order; those of one outcome, if given."""
@@ -10182,6 +10188,21 @@ type PaymentSettlement {
 
   """The tax the gateway withheld."""
   tax: Money!
+}
+
+"""
+A gateway account whose settlements the shop imports: what those who reconcile see of it, without its settings.
+"""
+type PaymentSettlementAccount {
+  """Such as safepay."""
+  gateway: String!
+
+  """Such as "Safepay"."""
+  gatewayName: String!
+  id: ID!
+
+  """Whether it is the gateway's sandbox."""
+  sandbox: Boolean!
 }
 
 type PaymentSettlementImportPayload {
@@ -11997,6 +12018,11 @@ type Query {
   """
   paymentSessions(orderId: ID!): [PaymentSession!]!
   paymentSettlement(id: ID!): PaymentSettlement
+
+  """
+  The shop's live gateway accounts, whose settlements it imports, for those who reconcile them; paymentGatewayAccounts is for those who see the settings.
+  """
+  paymentSettlementAccounts: [PaymentSettlementAccount!]!
 
   """The gateways' settlements the shop imported, the newest first."""
   paymentSettlements(first: Int = 50): [PaymentSettlement!]!
