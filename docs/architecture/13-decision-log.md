@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-515 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-516 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -523,6 +523,7 @@
 | 513 | The merchant admin's edge headers: a content security policy that runs only the admin's own scripts and Google's and Facebook's sign-in, written to `_headers` by each build with HSTS, framing refused and the camera alone allowed | Accepted |
 | 514 | The admin keeps the shop's last data for use offline: Home, the orders and customers lists' first pages, the orders and customers opened and the account, in the browser's storage for the session that read them, shown offline with how old they are and forgotten on signing out | Accepted |
 | 515 | Automatic discounts: a percentage or an amount off the items, or free delivery, given without a code to every cart and checkout that qualifies; the one taking most off the items applies with free delivery beside it, and with a code only where each combines with codes, else whichever takes more | Accepted |
+| 516 | The admin's automatic discounts, on the discounts page below the codes: each with what it gives in a line and whether it runs; started with a title shoppers see, what it gives, a minimum, dates and whether codes go with it; ended at once or deleted | Accepted |
 
 ---
 
@@ -19670,3 +19671,38 @@
     covers what shops can make today, and the classes can grow from it.
   * **Every running automatic discount applying at once:** two sales the shop forgot to end would
     stack. The best one applying is what shoppers expect.
+
+## ADR-516 · The admin's automatic discounts, on the discounts page below the codes: each with what it gives in a line and whether it runs; started with a title shoppers see, what it gives, a minimum, dates and whether codes go with it; ended at once or deleted
+
+* **Context:** ADR-515 gave shops automatic discounts through the Admin API. Merchants run their
+  shops from the admin, whose discounts page held codes alone (ADR-276).
+* **Decision:**
+  * **Where:** below the codes on the same page, under "Automatic discounts". A line says that
+    every order that qualifies gets them in the cart without a code, and that the one taking most
+    off applies with free delivery beside it.
+  * **Each discount:**
+    * Its title as shoppers see it, its summary from the API ("10% off orders of Rs 3,000 or
+      more; with codes"), and whether it runs, starts later or has ended.
+    * When it starts or ends, in the shop's time zone.
+  * **Starting one:**
+    * A title, required.
+    * What it gives: a percentage off, an amount off or free delivery.
+    * A minimum, whether codes can be used with it, and the days it starts and ends, read as the
+      shop's days as codes' are.
+    * The API's problems are shown under the form by field.
+  * **Ending and deleting:** "End it now" sets its end to now. Delete asks first, saying orders
+    placed with it keep its title.
+  * **Who:** owners, managers and marketers, as for codes (`write_discounts`). The page is not in
+    the other roles' sections.
+  * In English and Urdu.
+* **Consequences:**
+  * A shop starts an Eid sale from a phone without making a code. The cart, checkout and order
+    say it by its title.
+  * Changing an automatic discount's value or minimum in place is through the API only for now.
+    Ending one and starting another does the same from the admin.
+* **Alternatives:**
+  * **A page of its own:** shops think of codes and sales together, and the rule between them
+    (ADR-515) reads best side by side.
+  * **Editing in place:** a discount that runs while its value changes would give carts opened
+    a minute apart different totals. Ending one and starting the next keeps each order's discount
+    plain, as Shopify suggests for running sales.

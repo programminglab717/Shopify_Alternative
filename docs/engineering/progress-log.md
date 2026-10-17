@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### The admin's automatic discounts
+
+* **The admin's discounts page starts, ends and deletes the shop's automatic discounts below its
+  codes, in English and Urdu** ([ADR-516](../architecture/13-decision-log.md#adr-516--the-admins-automatic-discounts-on-the-discounts-page-below-the-codes-each-with-what-it-gives-in-a-line-and-whether-it-runs-started-with-a-title-shoppers-see-what-it-gives-a-minimum-dates-and-whether-codes-go-with-it-ended-at-once-or-deleted), CHK-06).
+* 3216 tests, 6 more: starting one, ending and deleting, who may, and
+  the four new GraphQL documents checked against the core's schema.
+
 ### ee66450 · Automatic discounts
 
 * **Shops give automatic discounts without codes: the one taking most off the items applies with

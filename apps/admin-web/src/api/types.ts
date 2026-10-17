@@ -1226,6 +1226,27 @@ export interface DiscountCodePayloadData {
   userErrors: UserError[];
 }
 
+/** A discount given without a code to every order that qualifies (ADR-515). */
+export interface AutomaticDiscountValue {
+  id: string;
+  title: string;
+  kind: DiscountCodeKind;
+  summary: string;
+  status: 'ACTIVE' | 'SCHEDULED' | 'EXPIRED';
+  combinesWithCodes: boolean;
+  startsAt: string;
+  endsAt: string | null;
+}
+
+export interface AutomaticDiscountsData {
+  automaticDiscounts: AutomaticDiscountValue[];
+}
+
+export interface AutomaticDiscountPayloadData {
+  automaticDiscount: AutomaticDiscountValue | null;
+  userErrors: UserError[];
+}
+
 export type DraftSource = 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK' | 'MANUAL';
 
 export interface DraftListItem {

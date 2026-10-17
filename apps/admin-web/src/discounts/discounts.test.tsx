@@ -34,6 +34,7 @@ describe('Discount codes in the admin', () => {
     const codes: DiscountCodeValue[] = [];
     const core = fakeCore('marketer', (operation) => {
       if (operation === 'DiscountCodes') return { discountCodes: { nodes: codes } };
+      if (operation === 'AutomaticDiscounts') return { automaticDiscounts: [] };
       if (operation === 'DiscountCodeCreate') {
         const made = code({});
         codes.push(made);
@@ -91,6 +92,8 @@ describe('Discount codes in the admin', () => {
               ],
             },
           };
+        case 'AutomaticDiscounts':
+          return { automaticDiscounts: [] };
         case 'DiscountCodeUpdate':
           return { discountCodeUpdate: { discountCode: { id: 'dsc_1' }, userErrors: [] } };
         case 'DiscountCodeDelete':

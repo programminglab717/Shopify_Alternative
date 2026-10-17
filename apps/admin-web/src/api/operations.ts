@@ -2875,6 +2875,74 @@ export const DiscountCodeUpdateMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+const AUTOMATIC_DISCOUNT = /* GraphQL */ `
+  fragment Automatic on AutomaticDiscount {
+    id
+    title
+    kind
+    summary
+    status
+    combinesWithCodes
+    startsAt
+    endsAt
+  }
+`;
+
+/** The shop's automatic discounts, newest first (ADR-515). */
+export const AutomaticDiscountsQuery = /* GraphQL */ `
+  query AutomaticDiscounts {
+    automaticDiscounts {
+      ...Automatic
+    }
+  }
+  ${AUTOMATIC_DISCOUNT}
+`;
+
+/** An automatic discount made (ADR-515). */
+export const AutomaticDiscountCreateMutation = /* GraphQL */ `
+  mutation AutomaticDiscountCreate($automaticDiscount: AutomaticDiscountInput!) {
+    automaticDiscountCreate(automaticDiscount: $automaticDiscount) {
+      automaticDiscount {
+        ...Automatic
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${AUTOMATIC_DISCOUNT}
+  ${USER_ERRORS}
+`;
+
+/** An automatic discount changed: here, ended now. */
+export const AutomaticDiscountUpdateMutation = /* GraphQL */ `
+  mutation AutomaticDiscountUpdate($id: ID!, $automaticDiscount: AutomaticDiscountInput!) {
+    automaticDiscountUpdate(id: $id, automaticDiscount: $automaticDiscount) {
+      automaticDiscount {
+        id
+        status
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** An automatic discount deleted; orders placed with it keep its title. */
+export const AutomaticDiscountDeleteMutation = /* GraphQL */ `
+  mutation AutomaticDiscountDelete($id: ID!) {
+    automaticDiscountDelete(id: $id) {
+      deletedAutomaticDiscountId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** A discount code deleted; orders placed with it keep what it took off. */
 export const DiscountCodeDeleteMutation = /* GraphQL */ `
   mutation DiscountCodeDelete($id: ID!) {

@@ -26,6 +26,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { AutomaticDiscounts } from './automatic-discounts';
 
 /** The roles that make and end discount codes (the core's write_discounts). */
 export const MANAGES_DISCOUNTS: readonly StaffRole[] = ['owner', 'manager', 'marketer'];
@@ -316,7 +317,8 @@ function CodeRow({ code, edits }: { code: DiscountCodeValue; edits: boolean }) {
 /**
  * Discount codes (CHK-06, ADR-062): each with what it gives in a line, whether it works now, and
  * how often it was used; made for a percentage, an amount or free delivery, limited and dated;
- * ended at once, or deleted. Owners, managers and marketers make them.
+ * ended at once, or deleted. Below them, the shop's automatic discounts (ADR-515). Owners,
+ * managers and marketers make them.
  */
 export function DiscountsPage() {
   const { t } = useLocale();
@@ -383,6 +385,7 @@ export function DiscountsPage() {
           </ul>
         </Card>
       )}
+      <AutomaticDiscounts edits={edits} />
     </div>
   );
 }
