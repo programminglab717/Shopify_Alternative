@@ -4573,6 +4573,34 @@ export const MarketingCalendarQuery = /* GraphQL */ `
   }
 `;
 
+export const StoreSpeedQuery = /* GraphQL */ `
+  query StoreSpeed {
+    storeSpeed {
+      pageViews
+      devices {
+        device
+        pageViews
+        score
+        metrics {
+          metric
+          samples
+          p75
+          over
+          good
+          rating
+        }
+      }
+      fixes {
+        fix
+        device
+        kind
+        metric
+        rating
+      }
+    }
+  }
+`;
+
 export const ProductCategoriesQuery = /* GraphQL */ `
   query ProductCategories {
     productCategories

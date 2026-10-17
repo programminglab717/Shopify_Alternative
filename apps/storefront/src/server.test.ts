@@ -6,8 +6,10 @@ import {
   ShopDirectory,
   StorefrontActivity,
   StorefrontKeys,
+  StorefrontVitals,
   localDay,
   pathTag,
+  summarize,
   type ProductDoc,
   type ShopDoc,
   type StoreData,
@@ -3206,6 +3208,57 @@ describe.skipIf(!redisUrl)('The storefront server', () => {
     // Another shop's sessions are its own.
     expect((await activity.counts(bazaar, today)).sessions).toBe(0);
     await app.close();
+  });
+
+  it("counts how fast shoppers' pages were, by kind and device, as their script reports it (ADR-485)", async () => {
+    const served = server();
+    const app = {
+      inject: (request: InjectOptions) =>
+        served.inject({ ...request, remoteAddress: '203.0.113.185' }),
+    };
+    const vitals = new StorefrontVitals(redis, keys);
+    const today = localDay(new Date(), 'Asia/Karachi');
+    const shopper = {
+      host: 'zari.localhost',
+      cookie: 'hatti_session=AbCdEfGhIjKlMnOpQrStUv',
+      'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) Chrome/129.0.0.0 Mobile Safari/537.36',
+      'content-type': 'text/plain;charset=UTF-8',
+    };
+    // A product's page carries the script, saying its kind.
+    const handle = sampleStore().products[0]!.handle;
+    const page = await app.inject({ method: 'GET', url: `/products/${handle}`, headers: shopper });
+    expect(page.body).toContain('<script data-hatti-vitals data-template="product">');
+    expect(page.body).toContain(`navigator.sendBeacon('/.hatti/vitals'`);
+
+    const report = (payload: string, headers: Record<string, string> = shopper) =>
+      app.inject({ method: 'POST', url: '/.hatti/vitals', headers, payload });
+    const sent = await report(JSON.stringify({ t: 'product', lcp: 2210.4, cls: 0.02, inp: 72 }));
+    expect([sent.statusCode, sent.headers['cache-control']]).toEqual([204, 'no-store']);
+    // Not counted for a robot or without a session; refused when it is no report, or too long.
+    expect(
+      (await report('{"t":"index","lcp":900}', { ...shopper, 'user-agent': 'Googlebot/2.1' }))
+        .statusCode,
+    ).toBe(204);
+    expect((await report('{"t":"index","lcp":900}', { ...shopper, cookie: '' })).statusCode).toBe(
+      204,
+    );
+    expect((await report('lcp=900')).statusCode).toBe(400);
+    expect(
+      (await report(JSON.stringify({ t: 'index', lcp: 1, pad: 'x'.repeat(2000) }))).statusCode,
+    ).toBe(413);
+    expect((await report('{"lcp":900}', { ...shopper, host: 'nobody.localhost' })).statusCode).toBe(
+      404,
+    );
+
+    const { histograms, pageViews } = await vitals.histograms(zari, [today]);
+    expect(Object.fromEntries(pageViews)).toEqual({ 'mobile:product': 1 });
+    expect(summarize('lcp', histograms.get('mobile:product:lcp')!)).toMatchObject({
+      samples: 1,
+      p75: 2500,
+      rating: 'good',
+    });
+    expect((await vitals.histograms(bazaar, [today])).pageViews.size).toBe(0);
+    await served.close();
   });
 
   it("counts each tap on a shop's link page's links, a day at a time, but not a robot's (ADR-204)", async () => {

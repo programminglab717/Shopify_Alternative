@@ -3,7 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
 import { newId } from '@hatti/ids';
-import { StorefrontActivity, StorefrontKeys } from '@hatti/storefront-data';
+import {
+  StorefrontActivity,
+  StorefrontKeys,
+  StorefrontVitals,
+  vitalSampleOf,
+} from '@hatti/storefront-data';
 import { Redis } from 'ioredis';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -32,7 +37,7 @@ describe.skipIf(!server || !redisUrl)('Admin GraphQL API: storefront sessions (A
   const redis = new Redis(redisUrl ?? '', { lazyConnect: true });
   const keys = new StorefrontKeys();
   const [shopA, shopB] = [newId(), newId()];
-  const tokens = { a: '', b: '', products: '' };
+  const tokens = { a: '', b: '', products: '', themes: '' };
 
   async function issueToken(shopId: string, scopes: string[]): Promise<string> {
     const { token, hash, hint } = generateAccessToken();
@@ -71,6 +76,7 @@ describe.skipIf(!server || !redisUrl)('Admin GraphQL API: storefront sessions (A
     tokens.a = await issueToken(shopA, ['read_orders']);
     tokens.b = await issueToken(shopB, ['read_orders']);
     tokens.products = await issueToken(shopA, ['read_products']);
+    tokens.themes = await issueToken(shopA, ['read_themes']);
     api = await startTestApi(testDb, { redis });
   });
 
@@ -215,5 +221,59 @@ describe.skipIf(!server || !redisUrl)('Admin GraphQL API: storefront sessions (A
       const body = await gql(tokens.products, query);
       expect(body.errors?.[0]?.extensions?.code, query).toBe('ACCESS_DENIED');
     }
+  });
+
+  it("scores the online store's speed from shoppers' measurements, with fixes (ADR-485)", async () => {
+    const vitals = new StorefrontVitals(redis, keys);
+    const phone = 'Mozilla/5.0 (Linux; Android 14) Chrome/129 Mobile Safari/537.36';
+    // Thirty phone views of product pages, their main image late on a third of them.
+    for (let view = 0; view < 30; view++) {
+      await vitals.record(
+        shopA,
+        'Asia/Karachi',
+        vitalSampleOf(
+          { t: 'product', lcp: view % 3 === 0 ? 5200 : 1800, cls: 0.01, inp: 90, ttfb: 300 },
+          phone,
+        )!,
+      );
+    }
+    await vitals.record(shopA, 'Asia/Karachi', vitalSampleOf({ t: 'index', lcp: 900 }, 'Windows')!);
+    const speed = await call(
+      tokens.themes,
+      `{ storeSpeed { pageViews
+          devices { device pageViews score metrics { metric p75 good rating }
+                    pages { kind pageViews } }
+          fixes { fix device kind metric rating } } }`,
+    );
+    expect(speed.pageViews).toBe(31);
+    const [mobile, desktop] = speed.devices;
+    expect(mobile).toMatchObject({
+      device: 'MOBILE',
+      pageViews: 30,
+      // Largest paint good on two thirds, layout and taps on all.
+      score: 89,
+      pages: [{ kind: 'PRODUCT', pageViews: 30 }],
+    });
+    expect(mobile.metrics.find((each: Json) => each.metric === 'LCP')).toEqual({
+      metric: 'LCP',
+      p75: 6000,
+      good: 0.6667,
+      rating: 'POOR',
+    });
+    expect(mobile.metrics.find((each: Json) => each.metric === 'CLS').p75).toBe(0.025);
+    // Too few views on computers to score.
+    expect(desktop).toMatchObject({ device: 'DESKTOP', pageViews: 1, score: null });
+    expect(speed.fixes).toEqual([
+      {
+        fix: 'HEAVY_FIRST_IMAGE',
+        device: 'MOBILE',
+        kind: 'PRODUCT',
+        metric: 'LCP',
+        rating: 'POOR',
+      },
+    ]);
+    // It needs the themes' scope.
+    const other = await gql(tokens.products, '{ storeSpeed { pageViews } }');
+    expect(other.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
 });

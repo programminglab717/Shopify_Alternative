@@ -1918,6 +1918,51 @@ export interface ShopVerificationSubmitData {
 
 export type CopyLanguage = 'ENGLISH' | 'URDU' | 'ROMAN_URDU';
 
+/** A measurement of how fast a page was for a shopper (ADR-485). */
+export type WebVitalValue = 'LCP' | 'INP' | 'CLS' | 'FCP' | 'TTFB';
+
+/** Google's rating of a measurement's 75th percentile. */
+export type VitalRatingValue = 'GOOD' | 'NEEDS_IMPROVEMENT' | 'POOR';
+
+export type SpeedDeviceValue = 'MOBILE' | 'DESKTOP';
+
+/** A kind of the online store's pages, by its theme's template. */
+export type StorefrontPageKindValue =
+  'INDEX' | 'PRODUCT' | 'COLLECTION' | 'SEARCH' | 'CART' | 'PAGE' | 'BLOG' | 'ARTICLE' | 'OTHER';
+
+export type SpeedFixValue =
+  'HEAVY_FIRST_IMAGE' | 'LAYOUT_SHIFTS' | 'SLOW_TAPS' | 'SLOW_FIRST_PAINT' | 'SLOW_SERVER';
+
+/** What shoppers' browsers measured of one metric: milliseconds, or unitless layout shift. */
+export interface SpeedMetricValue {
+  metric: WebVitalValue;
+  samples: number;
+  p75: number | null;
+  over: boolean;
+  good: number;
+  rating: VitalRatingValue | null;
+}
+
+/** How fast the online store was over 28 days (OS-13, ADR-485). */
+export interface StoreSpeedData {
+  storeSpeed: {
+    pageViews: number;
+    devices: {
+      device: SpeedDeviceValue;
+      pageViews: number;
+      score: number | null;
+      metrics: SpeedMetricValue[];
+    }[];
+    fixes: {
+      fix: SpeedFixValue;
+      device: SpeedDeviceValue;
+      kind: StorefrontPageKindValue | null;
+      metric: WebVitalValue;
+      rating: VitalRatingValue;
+    }[];
+  };
+}
+
 /** A moment Pakistani shoppers buy for (MKT-16, ADR-484). */
 export type MarketingMomentValue =
   | 'RAMADAN'

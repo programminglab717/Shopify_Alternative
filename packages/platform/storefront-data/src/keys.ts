@@ -116,6 +116,14 @@ export class StorefrontKeys {
     return `${this.prefix}:{${shopId}}:an:${day}:taps`;
   }
 
+  /**
+   * A day's measurements of how fast the shop's storefront was for its shoppers, in its time
+   * zone: a hash of histograms' buckets and page views (ADR-485).
+   */
+  vitals(shopId: string, day: string): string {
+    return `${this.prefix}:{${shopId}}:an:${day}:vitals`;
+  }
+
   /** The shop's sessions by when each was last seen, in milliseconds: a sorted set. */
   live(shopId: string): string {
     return `${this.prefix}:{${shopId}}:an:live`;

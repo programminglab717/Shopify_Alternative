@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-484 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-485 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -492,6 +492,7 @@
 | 482 | Products from a WooCommerce export: productsImport reads WooCommerce's product CSV, its variable products' variations the variants, as Shopify's file would make them | Accepted |
 | 483 | Product taxonomy: a product's category in Google's product taxonomy and its condition, barcodes that are GTINs published as such, all three in the catalog feed | Accepted |
 | 484 | Pakistan's marketing calendar: the moments shoppers buy for, dated each year from Umm al-Qura a day later for the Islamic ones, each with a ready-made campaign | Accepted |
+| 485 | The store speed score: shoppers' own Core Web Vitals, counted by the storefront in histograms of 28 days, scored per device as Google judges them, with fixes | Accepted |
 
 ---
 
@@ -18313,3 +18314,54 @@
   * **A table of dates kept by hand:** right where the committee's announcements differ, but
     a chore each year that a missed update turns into a wrong date for every shop.
   * **The tabular Islamic calendar:** simpler, but further from the sighting than Umm al-Qura.
+
+## ADR-485 · The store speed score: shoppers' own Core Web Vitals, counted by the storefront in histograms of 28 days, scored per device as Google judges them, with fixes
+
+* **Context:**
+  * OS-13 asks for a store speed score from real users' Core Web Vitals, with fixes a merchant
+    can act on.
+  * Lab scores (Lighthouse) measure one device on one network. Google ranks pages by what
+    Chrome users actually saw over 28 days, at the 75th percentile, phones and computers
+    apart. Most Pakistani shoppers are on mid-range Android phones and mobile networks.
+  * Pages are cached at the edge and the same for every shopper (ADR-066), so measuring has to
+    run in the shopper's browser. Sessions are already counted that way (ADR-180).
+* **Decision:**
+  * **Each shopper's page measures itself.** A small classic script in the page's head, beside
+    the session's (not in staff previews), watches the browser's performance entries as
+    Google's web-vitals library does: largest contentful paint until the shopper acts, layout
+    shift as the worst window of shifts, interaction to next paint as the slowest tap, first
+    contentful paint and time to first byte. It reports them once, with the page's kind (its
+    theme's template), by `sendBeacon` to `/.hatti/vitals` when the page is hidden or left.
+    Browsers without these entries report nothing.
+  * **The storefront counts reports in histograms** (`StorefrontVitals`): a hash per shop per
+    day in its time zone, a bucket count for each device (phone or computer, from the user
+    agent), kind of page and metric, with Google's thresholds among the bucket edges, and page
+    views. Kept 30 days in Valkey; nothing about a shopper is kept. Reports from robots, from
+    browsers without a session cookie, from previews and over 1 KB are not counted, and an
+    address may send as many reports as pages a minute.
+  * **`storeSpeed`** (with `read_themes`) adds up the last 28 days to the shop's today. It
+    gives, for each device, each metric's 75th percentile (a bucket's upper edge, "at most"),
+    the share of good page views and Google's rating, for the whole store and each kind of
+    page. The score is the share of good page views, averaged over the three Core Web Vitals,
+    0 to 100, once a device has 20 page views.
+  * **Fixes are drawn from what is slow** where 20 page views or more say so:
+    * a main picture shown late on a kind of page (largest contentful paint);
+    * pages that jump (layout shift);
+    * slow taps (interaction to next paint);
+    * a slow answer from the storefront, which is Hatti's to fix (time to first byte);
+    * a blank page while it loads, once the answer is fast (first contentful paint).
+    The poorest come first, then the most viewed.
+  * **The admin's online store has a Speed tab**, for those who edit themes. It shows each
+    device's score, measurements and ratings, and the fixes, each with what to do.
+* **Consequences:**
+  * Percentiles are as fine as the buckets: 2.5 s and 4 s are exact for largest contentful
+    paint, and between them a 75th percentile reads "at most 3 s".
+  * Interaction to next paint is the page's slowest interaction, not the 98th percentile
+    Google takes on pages with very many. That is the same for nearly every shop page.
+  * 28 days in Valkey is the whole history. A trend over months would need the worker to keep
+    days in Postgres, as sessions are (ADR-180).
+* **Alternatives:**
+  * **Google's Chrome UX Report API:** only for origins with enough Chrome traffic, which most
+    new shops lack, and not by page kind.
+  * **Lighthouse runs from Hatti's servers:** a lab number, not what shoppers on Pakistani
+    networks saw.

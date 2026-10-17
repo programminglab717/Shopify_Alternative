@@ -14,6 +14,7 @@ import { MetaTab, SETS_META } from './meta';
 import { PagesList, WRITES_PAGES } from './pages';
 import { PoliciesList, SETS_POLICIES } from './policies';
 import { RedirectsTab } from './redirects';
+import { SpeedTab } from './speed';
 import { StorefrontPreferencesTab } from './storefront';
 import { EDITS_THEMES, ThemesTab } from './themes';
 
@@ -24,6 +25,7 @@ export const ONLINE_STORE_TABS = [
   'policies',
   'storefront',
   'themes',
+  'speed',
   'redirects',
   'links',
   'meta',
@@ -59,6 +61,7 @@ const TABS: Record<
     body: () => <StorefrontPreferencesTab />,
   },
   themes: { label: 'onlineStore.themes', roles: EDITS_THEMES, body: () => <ThemesTab /> },
+  speed: { label: 'onlineStore.speed', roles: EDITS_THEMES, body: () => <SpeedTab /> },
   redirects: { label: 'onlineStore.redirects', roles: EDITS_MENUS, body: () => <RedirectsTab /> },
   links: { label: 'onlineStore.linkPage', roles: EDITS_MENUS, body: () => <LinkPageTab /> },
   meta: { label: 'onlineStore.meta', roles: SETS_META, body: () => <MetaTab /> },
@@ -72,7 +75,8 @@ export const OPENS_ONLINE_STORE: readonly StaffRole[] = [
 
 /**
  * The online store (OS-02, OS-06, OS-07, OS-09, OS-15): the shop's pages, blogs, menus and policies,
- * its storefront's password, pause and home page for search engines, its themes, its redirects, its
+ * its storefront's password, pause and home page for search engines, its themes, its speed (OS-13), its
+ * redirects, its
  * link page, Meta and the catalog feed (MKT-10, MKT-11), and what is left to put in Urdu; a tab for
  * each part its role works in.
  */

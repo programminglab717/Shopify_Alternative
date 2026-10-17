@@ -47,6 +47,7 @@ import { StockWatchController } from './stock-watches.controller.js';
 import { ActivityResolver, EventActorInterceptor } from './activity.resolver.js';
 import { AuditResolver } from './audit.resolver.js';
 import { HomeResolver } from './home.resolver.js';
+import { StoreSpeedResolver } from './store-speed.resolver.js';
 import { StorefrontSessionsResolver } from './storefront-sessions.resolver.js';
 import { SetupChecklistService } from './setup-checklist.js';
 import { SetupResolver } from './setup.resolver.js';
@@ -258,6 +259,7 @@ export class ApiModule {
         InventoryFileResolver,
         HomeResolver,
         StorefrontSessionsResolver,
+        StoreSpeedResolver,
         SetupChecklistService,
         SetupResolver,
         { provide: APP_GUARD, useClass: ScopesGuard },

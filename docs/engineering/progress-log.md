@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### The store speed score
+
+* **Shoppers' own Core Web Vitals, measured by their browsers on each page and counted by the
+  storefront by device and kind of page for 28 days; a score per device, ratings and fixes on
+  the admin's online store Speed tab** ([ADR-485](../architecture/13-decision-log.md#adr-485--the-store-speed-score-shoppers-own-core-web-vitals-counted-by-the-storefront-in-histograms-of-28-days-scored-per-device-as-google-judges-them-with-fixes), OS-13).
+* 3048 tests, 13 more: the histograms, the script and its reports, the
+  score and fixes, and the admin's tab.
+
 ### c1e1d81 · Pakistan's marketing calendar
 
 * **Ramadan, the Eids, Pakistan Day, Mother's Day, 14 August, 11.11, White Friday, 12.12 and

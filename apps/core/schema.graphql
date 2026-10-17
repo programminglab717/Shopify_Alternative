@@ -11908,6 +11908,11 @@ type Query {
   storeExports: [StoreExport!]!
 
   """
+  How fast the online store was for its shoppers over the last 28 days, to today in the shop's time zone (OS-13, ADR-485): scores on phones and computers, each metric and kind of page, and fixes.
+  """
+  storeSpeed: StoreSpeed!
+
+  """
   Who is on the online store now, and today's sessions so far, from the storefronts' counts as they stand (ANL-02).
   """
   storefrontLiveView: StorefrontLiveView!
@@ -13087,6 +13092,94 @@ type SmsSenderWithdrawPayload {
   userErrors: [UserError!]!
 }
 
+"""Phones and tablets, or computers, as Google counts them apart."""
+enum SpeedDevice {
+  DESKTOP
+  MOBILE
+}
+
+"""Something to do about what is slow (ADR-485)."""
+enum SpeedFix {
+  """
+  The page's main content shows late: most often its first image or slideshow, too large, or text in a font that loads late.
+  """
+  HEAVY_FIRST_IMAGE
+
+  """
+  The page moves as it loads: images, banners, pop-ups or apps that push content down.
+  """
+  LAYOUT_SHIFTS
+
+  """
+  Nothing shows for a while after the storefront answers: fonts, styles or scripts.
+  """
+  SLOW_FIRST_PAINT
+
+  """The storefront is slow to answer: Hatti's to fix, and watched."""
+  SLOW_SERVER
+
+  """
+  Taps are slow to show: heavy scripts, from apps, pixels or custom code.
+  """
+  SLOW_TAPS
+}
+
+"""Something to do about what is slow, and where."""
+type SpeedFixFound {
+  device: SpeedDevice!
+  fix: SpeedFix!
+
+  """The kind of page it is slow on; null for the whole store."""
+  kind: StorefrontPageKind
+
+  """The measurement it is about."""
+  metric: WebVital!
+  rating: VitalRating!
+}
+
+"""What shoppers' browsers measured of one metric (ADR-485)."""
+type SpeedMetric {
+  """The share of page views good by Google, 0 to 1."""
+  good: Float!
+  metric: WebVital!
+
+  """Whether the 75th percentile is over `p75`, the most measured apart."""
+  over: Boolean!
+
+  """
+  The 75th percentile, at most this: milliseconds, or unitless for layout shift. Null without samples.
+  """
+  p75: Float
+  rating: VitalRating
+
+  """Page views that measured it."""
+  samples: Int!
+}
+
+"""The online store's speed on phones, or on computers."""
+type SpeedOnDevice {
+  device: SpeedDevice!
+  metrics: [SpeedMetric!]!
+
+  """Page views measured in the 28 days."""
+  pageViews: Int!
+
+  """Each kind of page measured, the most viewed first."""
+  pages: [SpeedPage!]!
+
+  """
+  The share of page views good by Google, 0 to 100, averaged over the Core Web Vitals (largest contentful paint, interaction to next paint, layout shift); null under 20 page views.
+  """
+  score: Int
+}
+
+"""A kind of page's speed on a device."""
+type SpeedPage {
+  kind: StorefrontPageKind!
+  metrics: [SpeedMetric!]!
+  pageViews: Int!
+}
+
 """
 An invitation to work in the shop, waiting for whoever holds its link to accept it, signed in, before it expires (ADR-101).
 """
@@ -13402,6 +13495,20 @@ enum StoreExportStatus {
 }
 
 """
+How fast the online store was for its shoppers over the last 28 days (OS-13, ADR-485): the Core Web Vitals their browsers measured, as Google's Chrome UX Report gathers them, with fixes for what is slow.
+"""
+type StoreSpeed {
+  """Phones first, then computers."""
+  devices: [SpeedOnDevice!]!
+
+  """The poorest first, then the most viewed."""
+  fixes: [SpeedFixFound!]!
+
+  """Page views measured in the 28 days."""
+  pageViews: Int!
+}
+
+"""
 Who is on the online store now, and its sessions today so far (ANL-02, ADR-180).
 """
 type StorefrontLiveView {
@@ -13412,6 +13519,19 @@ type StorefrontLiveView {
 
   """Sessions that saw a page in the last five minutes."""
   visitorsNow: Int!
+}
+
+"""A kind of the online store's pages, by its theme's template."""
+enum StorefrontPageKind {
+  ARTICLE
+  BLOG
+  CART
+  COLLECTION
+  INDEX
+  OTHER
+  PAGE
+  PRODUCT
+  SEARCH
 }
 
 """
@@ -14127,6 +14247,39 @@ type VideoSource {
 
   """In pixels, as shown."""
   width: Int!
+}
+
+"""Google's rating of a measurement's 75th percentile."""
+enum VitalRating {
+  GOOD
+  NEEDS_IMPROVEMENT
+  POOR
+}
+
+"""A measurement of how fast a page was for a shopper (ADR-485)."""
+enum WebVital {
+  """
+  Cumulative layout shift: how much it moved about as it loaded, unitless.
+  """
+  CLS
+
+  """First contentful paint: when anything first showed, in milliseconds."""
+  FCP
+
+  """
+  Interaction to next paint: how long its slowest tap took to show, in milliseconds.
+  """
+  INP
+
+  """
+  Largest contentful paint: when its main content showed, in milliseconds.
+  """
+  LCP
+
+  """
+  Time to first byte: when the storefront began answering, in milliseconds.
+  """
+  TTFB
 }
 
 """One event's post to an app, and how its tries went (ADR-397)."""

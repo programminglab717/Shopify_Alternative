@@ -39,6 +39,26 @@ export {
 } from './documents.js';
 export { TranslatedStore, translated, translatedProduct } from './translations.js';
 export { ACTIVITY, StorefrontActivity, localDay, type ActivityCounts } from './activity.js';
+export {
+  StorefrontVitals,
+  VITALS,
+  VITAL_DEVICES,
+  VITAL_METRICS,
+  VITAL_TEMPLATES,
+  VITAL_THRESHOLDS,
+  addHistograms,
+  deviceOf,
+  summarize,
+  vitalBucket,
+  vitalSampleOf,
+  type VitalDevice,
+  type VitalHistogram,
+  type VitalHistograms,
+  type VitalMetric,
+  type VitalSample,
+  type VitalSummary,
+  type VitalTemplate,
+} from './vitals.js';
 export { handleTag, imageTag, pathTag, shopTag } from './cache-tags.js';
 export { ShopDirectory } from './directory.js';
 export {

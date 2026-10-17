@@ -51,6 +51,7 @@ import { metaPixelScript, pixelProduct } from './pixels.js';
 import { suggestedProducts, type SuggestParams } from './suggest.js';
 import { SESSION_SCRIPT } from './sessions.js';
 import { VISITS_SCRIPT } from './visits.js';
+import { VITALS_SCRIPT, vitalTemplateOf } from './vitals.js';
 import {
   jsonTemplate,
   sectionGroup,
@@ -490,7 +491,8 @@ export class PageRenderer {
       });
     }
     // Shoppers' pages keep the visits that brought them (ADR-139), count their sessions
-    // (ADR-180) and load the shop's pixel (ADR-144); staff's previews do none of it.
+    // (ADR-180), measure how fast they were (ADR-485) and load the shop's pixel (ADR-144);
+    // staff's previews do none of it.
     const header =
       prepared.alternates +
       (styles ? `<style data-hatti-sections>${styles}</style>` : '') +
@@ -499,7 +501,9 @@ export class PageRenderer {
         : prepared.preview
           ? previewBar(prepared.preview.name, locale)
           : `<script data-hatti-visits>${VISITS_SCRIPT}</script>` +
-            `<script data-hatti-session>${SESSION_SCRIPT}</script>${prepared.pixel}`);
+            `<script data-hatti-session>${SESSION_SCRIPT}</script>` +
+            `<script data-hatti-vitals data-template="${vitalTemplateOf(templateFile)}">` +
+            `${VITALS_SCRIPT}</script>${prepared.pixel}`);
     const page = this.#run(
       { id: `layout/${layout}`, type: 'layout' },
       `layout/${layout}.liquid`,

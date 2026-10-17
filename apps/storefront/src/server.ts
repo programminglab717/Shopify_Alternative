@@ -9,11 +9,13 @@ import {
   StoreMissingError,
   StorefrontActivity,
   StorefrontKeys,
+  StorefrontVitals,
   handleTag,
   pathTag,
   pausedAt,
   redirectKey,
   shopTag,
+  vitalSampleOf,
   type ActivityStep,
   type ShopDoc,
   type StoreData,
@@ -81,6 +83,7 @@ import {
   takenDownPage,
 } from './report-page.js';
 import { VISIT_PATH, isRobot, sessionOf } from './sessions.js';
+import { VITALS_BODY_MAX, VITALS_PATH, vitalsReportOf } from './vitals.js';
 import { suggestJson, suggestParams, suggestWanted, suggestedProducts } from './suggest.js';
 import {
   VISITS_COOKIE,
@@ -148,6 +151,9 @@ const CART_CHANGES = { name: 'cart-changes', limit: 120, windowMs: 60_000 };
  * network's address, so many, but not a script's flood.
  */
 const VISITS = { name: 'visits', limit: 600, windowMs: 60_000 };
+
+/** Pages' speed reports an address may make a minute (ADR-485), as many as the pages it saw. */
+const VITALS_REPORTS = { name: 'vitals', limit: 600, windowMs: 60_000 };
 
 /** Taps on link pages' links an address counts a minute (ADR-204); past them, it is sent on all the same. */
 const LINK_TAPS = { name: 'link-taps', limit: 120, windowMs: 60_000 };
@@ -536,6 +542,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
   const limiter = redis ? new RateLimiter(redis, keys.rateLimits()) : null;
   // What shoppers do on each shop, counted as Shopify's analytics count it (ADR-180).
   const activity = redis ? new StorefrontActivity(redis, keys) : null;
+  // How fast each shop's pages are for its shoppers (ADR-485).
+  const vitals = redis ? new StorefrontVitals(redis, keys) : null;
   const core = options.core;
   const secure = options.secureCookies ?? false;
   const editorOrigins = options.editorOrigins ?? [];
@@ -671,6 +679,43 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       : true;
     if (!allowed) return reply.code(429).send();
     await counted(request, found, 'visited');
+    return reply.code(204).send();
+  });
+
+  /**
+   * A shopper's page's measurements of how fast it was, as its script reports them when the
+   * shopper leaves it (ADR-485): counted by its kind and the shopper's device. Not a robot's,
+   * staff's previews or the sample shop's, nor a session's that has no cookie. Answered with
+   * nothing, never kept.
+   */
+  app.post(VITALS_PATH, { bodyLimit: VITALS_BODY_MAX }, async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const found = await shopFor(request, reply);
+    if (!found) return reply.code(404).send();
+    const allowed = limiter
+      ? await limiter.hit(VITALS_REPORTS, request.ip).then(
+          (hit) => hit.allowed,
+          () => true,
+        )
+      : true;
+    if (!allowed) return reply.code(429).send();
+    const userAgent = request.headers['user-agent'];
+    const sample = vitalSampleOf(vitalsReportOf(request.body), userAgent);
+    if (!sample) return reply.code(400).send();
+    if (
+      vitals &&
+      !found.preview &&
+      found.store instanceof RedisStore &&
+      sessionOf(request.headers.cookie) &&
+      !isRobot(userAgent)
+    ) {
+      try {
+        const timezone = (await found.store.shop()).timezone ?? 'Asia/Karachi';
+        await vitals.record(found.shopId, timezone, sample);
+      } catch {
+        // A report missed is no reason to fail a shopper.
+      }
+    }
     return reply.code(204).send();
   });
 
