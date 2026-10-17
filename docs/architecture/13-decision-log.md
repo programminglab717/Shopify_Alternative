@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-559 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-560 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -567,6 +567,7 @@
 | 557 | An inventory item keeps its HS code, Shopify's harmonizedSystemCode, and FBR is sent each item's own PCT code from it, the shop's for those without | Accepted |
 | 558 | The admin connects a Tier-1 shop's POS to FBR on the sales tax page, lists what was reported and sends again what was not, and an order's page says how its invoice stands with FBR | Accepted |
 | 559 | The admin's product page takes each variant's HS code with its stock rules, saved as the field is left | Accepted |
+| 560 | What a shop's staff write to Hatti's support WhatsApp number is kept as a request of their shop, threaded, and Hatti's answer goes back on WhatsApp within the day | Accepted |
 
 ---
 
@@ -20981,3 +20982,33 @@
   each one's own heading.
 * **Alternatives:** **A field among a variant's price and SKU:** those are saved with the product,
   and the HS code is the inventory item's, as Shopify keeps it, saved as stock rules are.
+
+## ADR-560 · What a shop's staff write to Hatti's support WhatsApp number is kept as a request of their shop, threaded, and Hatti's answer goes back on WhatsApp within the day
+
+* **Context:** Plans from Starter reach Hatti's people on WhatsApp (ADR-508), but what was written
+  there was kept nowhere: Hatti's people answered from a phone, the shop's requests in the admin
+  did not show it, and nothing flagged one left unanswered (ADR-525).
+* **Decision:**
+  * **Hatti's support line** is its own WhatsApp number, set by the host
+    (`SUPPORT_WHATSAPP_PHONE_NUMBER_ID` and its token), apart from the shared notifications
+    number. WhatsApp's webhook gives what is written to it to billing, through a port the
+    messaging module defines, never to a shop's inbox or its opt-outs.
+  * **Who wrote:** the active account whose proved number wrote, and its active memberships, through
+    a function of identity's that tells billing no more; a number no account proved is not kept.
+  * **Where it goes:** to their open request last written about, in any of their shops, as a
+    message of its thread; else a new request, topic other, in the shop they last asked in, else
+    the one they joined first, at its plan's priority, in Urdu if they wrote Urdu letters, else in
+    their account's language. A shop with five open adds to its newest. A message WhatsApp sends
+    twice is kept once.
+  * **Answers:** Hatti's people answer from their command as before; for a request written about
+    on WhatsApp, the answer is also sent from the support line if they wrote within the last 24
+    hours, as WhatsApp allows, kept in the thread and followed to delivery as the webhook says;
+    the command says whether it went, could not, or failed and why.
+  * **In the API,** a request says where it was asked, `channel`, and gives its thread, `messages`,
+    the latest 50.
+* **Consequences:** What shops write on WhatsApp is answered in order of their plans, flagged when
+  late, and shown in the admin; a word after an answer opens a new request, as the answered one is
+  done.
+* **Alternatives:** **Finding the shop by asking the sender:** a menu on WhatsApp is a step
+  between staff and help, and most staff have one shop. **The shared number:** customers write to
+  it about orders, and a shop's staff are customers too.

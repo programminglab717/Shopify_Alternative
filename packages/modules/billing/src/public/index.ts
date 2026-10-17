@@ -63,14 +63,26 @@ export {
   SUPPORT_TOPICS,
   SupportService,
   supportDueAt,
+  type AnsweredSupportRequest,
   type OpenSupportRequest,
   type SupportChannel,
   type SupportContact,
+  type SupportMessageDirection,
+  type SupportMessageRecord,
+  type SupportMessageStatus,
   type SupportRecord,
+  type SupportRequestChannel,
   type SupportRequestRecord,
   type SupportTier,
   type SupportTopic,
+  type SupportWhatsAppOutcome,
 } from '../internal/support.service.js';
+export {
+  SUPPORT_WHATSAPP_SENDER,
+  cloudSupportSender,
+  type SupportWhatsAppSender,
+  type SupportWhatsAppSettings,
+} from '../internal/support-whatsapp.js';
 export {
   BILLING_TAX,
   SERVICE_TAX_RATES,

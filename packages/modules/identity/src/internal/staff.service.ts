@@ -134,6 +134,30 @@ export async function endExpiredMemberships(
   return Number(rows[0]?.ended ?? 0);
 }
 
+/** A shop whose staff a number is, as Hatti's support WhatsApp number finds them (ADR-560). */
+export interface StaffOfPhoneRecord {
+  userId: string;
+  shopId: string;
+  /** What Hatti's words to them are in (ADR-194). */
+  language: 'en' | 'ur';
+}
+
+/**
+ * The shops whose staff `phone`, E.164, is (ADR-560): those of the active account that proved it
+ * with a code, where its membership is active and has not ended, the earliest joined first; none
+ * for a number no account proved. Across shops, as WhatsApp's webhook knows none, through
+ * identity.staff_of_phone: never identity's tables.
+ */
+export async function staffOfPhone(
+  db: Pick<Db, 'execute'>,
+  phone: string,
+): Promise<StaffOfPhoneRecord[]> {
+  const { rows } = await db.execute<{ user_id: string; shop_id: string; language: 'en' | 'ur' }>(
+    sql`SELECT user_id, shop_id, language FROM identity.staff_of_phone(${phone})`,
+  );
+  return rows.map((row) => ({ userId: row.user_id, shopId: row.shop_id, language: row.language }));
+}
+
 /**
  * The shop's staff with the numbers Hatti tells them of their own work at (ADR-191): each one's
  * account's number, where they proved it with a code; none for an account disabled. Those who

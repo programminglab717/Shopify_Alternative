@@ -29,6 +29,7 @@ import { type Couriers, LogisticsModule } from '@hatti/logistics/public';
 import { MarketingModule } from '@hatti/marketing/public';
 import {
   MessagingModule,
+  type SupportLineSettings,
   type VapidKeys,
   type WhatsAppReplySettings,
   type WhatsAppSignupSettings,
@@ -139,6 +140,11 @@ export interface ApiModuleOptions {
   billingTax?: HattiTax | null;
   /** Hatti's own support lines (ADR-508); without them, shops send requests alone. */
   support?: SupportContact | null;
+  /**
+   * Hatti's support WhatsApp number (ADR-560); without it, nothing written to WhatsApp is kept as
+   * a support request.
+   */
+  supportLine?: SupportLineSettings | null;
 }
 
 /** Resources owned by the process entry point, shared with every module. */
@@ -261,6 +267,7 @@ export class ApiModule {
           signup: options.whatsAppSignup ?? null,
           push: options.push ?? null,
           replies: options.whatsAppReplies ?? null,
+          supportLine: options.supportLine ?? null,
         }),
         PaymentsModule.forRoot({ gateways: options.paymentGateways }),
         BillingModule.forRoot({

@@ -1,14 +1,21 @@
-import { SUPPORT_LIMITS, SupportService, type OpenSupportRequest } from '@hatti/billing/public';
+import {
+  SUPPORT_LIMITS,
+  SupportService,
+  type OpenSupportRequest,
+  type SupportWhatsAppOutcome,
+} from '@hatti/billing/public';
 import { Database } from '@hatti/db';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import { parseArgs } from 'node:util';
+import { supportSenderOf } from './billing.js';
 import { loadSupportRequestsConfig } from './config.js';
 
-// The requests shops sent Hatti's people from their admin (ADR-508): those waiting, the most
-// urgent then the oldest first, as the shops' plans set, each with when it is due (ADR-525); and
-// each answered, in the language the
-// shop asked in, which its admin shows. For Hatti's own people, by whoever runs Hatti, never
-// through the Admin API.
+// The requests shops sent Hatti's people from their admin (ADR-508), or their staff wrote to
+// Hatti's support WhatsApp number (ADR-560): those waiting, the most urgent then the oldest
+// first, as the shops' plans set, each with when it is due (ADR-525); and each answered, in the
+// language the shop asked in, which its admin shows, and which goes back on WhatsApp to those
+// who wrote there, within the day WhatsApp allows, where the support number is set up. For
+// Hatti's own people, by whoever runs Hatti, never through the Admin API.
 //
 //   pnpm --filter @hatti/core support-requests list
 //   pnpm --filter @hatti/core support-requests answer sreq_… --by Ayesha --text "PostEx fixed it"
@@ -36,7 +43,7 @@ const database = new Database({
   systemUrl: config.DATABASE_SYSTEM_URL,
   applicationName: 'support-requests',
 });
-const support = new SupportService(database);
+const support = new SupportService(database, null, supportSenderOf(config));
 try {
   if (parsed.command === 'list') {
     const waiting = await support.waiting();
@@ -46,6 +53,8 @@ try {
     const answered = await support.answer(parsed.request, parsed.text, parsed.by);
     if (answered.ok) {
       console.log(`Answered: ${answered.value.shopName} sees it in its admin.`);
+      const onWhatsApp = whatsAppLine(answered.value.whatsapp);
+      if (onWhatsApp) console.log(onWhatsApp);
     } else {
       console.error(`No request ${parsed.id} waits for an answer: see the list.`);
       process.exitCode = 1;
@@ -88,7 +97,8 @@ function parseCommand(
 
 /**
  * A request waiting, on one line: who, how urgent, when it is due, or LATE past its plan's time
- * (ADR-525), about what, and what they said.
+ * (ADR-525), where it was asked, about what, and what they said; and for one written about on
+ * WhatsApp, what they last wrote there (ADR-560).
  */
 function line(request: OpenSupportRequest): string {
   return [
@@ -98,9 +108,30 @@ function line(request: OpenSupportRequest): string {
     request.dueAt.getTime() <= Date.now() ? 'LATE' : `due ${request.dueAt.toISOString()}`,
     request.shopName,
     request.plan,
+    request.channel,
     request.topic,
     request.language,
     request.callBack ?? '-',
     request.message.replace(/\s+/g, ' '),
+    // What they wrote first is the message.
+    ...(request.lastInbound && request.lastInbound.text !== request.message
+      ? [`last on WhatsApp: ${request.lastInbound.text.replace(/\s+/g, ' ')}`]
+      : []),
   ].join('\t');
+}
+
+/** How an answer went on WhatsApp, in a line; none for a request no one wrote about there. */
+function whatsAppLine(outcome: SupportWhatsAppOutcome): string | null {
+  switch (outcome.kind) {
+    case 'sent':
+      return 'Sent on WhatsApp too.';
+    case 'window_closed':
+      return 'Not sent on WhatsApp: more than 24 hours since they last wrote.';
+    case 'unavailable':
+      return 'Not sent on WhatsApp: the support number is not set up here.';
+    case 'failed':
+      return `Not sent on WhatsApp: ${outcome.error}`;
+    case 'none':
+      return null;
+  }
 }

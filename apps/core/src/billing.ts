@@ -1,12 +1,15 @@
 import {
   SERVICE_TAX_RATES,
+  cloudSupportSender,
   type HattiBankAccount,
   type HattiGateway,
   type HattiTax,
   type SupportContact,
+  type SupportWhatsAppSender,
 } from '@hatti/billing/public';
+import type { SupportLineSettings } from '@hatti/messaging/public';
 import { SafepayGateway, TestGateway } from '@hatti/payments/public';
-import type { ApiConfig } from './config.js';
+import type { ApiConfig, SupportRequestsConfig } from './config.js';
 
 /**
  * Hatti's own account with a payment gateway, which shops pay their plans through (ADR-154):
@@ -89,6 +92,42 @@ export function supportContactOf(
         : null,
   };
   return Object.values(contact).some((value) => value !== null) ? contact : null;
+}
+
+/**
+ * Hatti's support WhatsApp number (ADR-560), where it is set: what shops' staff write to it is
+ * kept as their shops' support requests; none otherwise.
+ */
+export function supportLineOf(
+  config: Pick<ApiConfig, 'SUPPORT_WHATSAPP_PHONE_NUMBER_ID'>,
+): SupportLineSettings | null {
+  return config.SUPPORT_WHATSAPP_PHONE_NUMBER_ID
+    ? { phoneNumberId: config.SUPPORT_WHATSAPP_PHONE_NUMBER_ID }
+    : null;
+}
+
+/**
+ * How Hatti's people's answers go back on WhatsApp (ADR-560): from Hatti's support number, on
+ * Meta's Graph API, where it is set; none otherwise, so that answers are shown in the admin alone.
+ */
+export function supportSenderOf(
+  config: Pick<
+    SupportRequestsConfig,
+    | 'META_GRAPH_URL'
+    | 'META_GRAPH_VERSION'
+    | 'SUPPORT_WHATSAPP_PHONE_NUMBER_ID'
+    | 'SUPPORT_WHATSAPP_ACCESS_TOKEN'
+  >,
+): SupportWhatsAppSender | null {
+  if (!config.SUPPORT_WHATSAPP_PHONE_NUMBER_ID || !config.SUPPORT_WHATSAPP_ACCESS_TOKEN) {
+    return null;
+  }
+  return cloudSupportSender({
+    baseUrl: config.META_GRAPH_URL,
+    version: config.META_GRAPH_VERSION,
+    phoneNumberId: config.SUPPORT_WHATSAPP_PHONE_NUMBER_ID,
+    accessToken: config.SUPPORT_WHATSAPP_ACCESS_TOKEN,
+  });
 }
 
 /**

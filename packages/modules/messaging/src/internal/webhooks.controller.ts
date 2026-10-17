@@ -6,6 +6,7 @@ import {
   HttpCode,
   Inject,
   NotFoundException,
+  Optional,
   Post,
   Query,
   Req,
@@ -16,6 +17,12 @@ import {
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ConversationsService } from './conversations.service.js';
 import { MessagesService } from './messages.service.js';
+import {
+  SUPPORT_INBOX,
+  SUPPORT_LINE,
+  type SupportInbox,
+  type SupportLineSettings,
+} from './support-inbox.js';
 import { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
 import { asksToStop } from './templates.js';
 import { parseWhatsAppWebhook, signatureValid } from './whatsapp-webhook.js';
@@ -40,7 +47,9 @@ const EARLY_MS = 10 * 60_000;
  * WhatsApp's webhook (ADR-146): how the messages Hatti's shared number sent went, and what
  * customers wrote back, of which "STOP" or "band karo" stops the shop they answered, or else the
  * shop that last wrote to them, and a button pressed is an answer for the worker (ADR-147); each
- * is kept in the shop's inbox (ADR-545). The host keeps each request's raw body as `rawBody`,
+ * is kept in the shop's inbox (ADR-545). What a shop's staff write to Hatti's support number is
+ * theirs to Hatti's people alone, kept as a support request where the host binds an inbox for it,
+ * and ignored where it does not (ADR-560). The host keeps each request's raw body as `rawBody`,
  * which Meta's signature covers. Everything in it can be heard twice: Meta sends again what was not taken.
  */
 @Controller('webhooks/whatsapp')
@@ -50,6 +59,10 @@ export class WhatsAppWebhookController {
     private readonly messages: MessagesService,
     private readonly templates: WhatsAppTemplatesService,
     private readonly conversations: ConversationsService,
+    @Optional()
+    @Inject(SUPPORT_LINE)
+    private readonly supportLine: SupportLineSettings | null = null,
+    @Optional() @Inject(SUPPORT_INBOX) private readonly support: SupportInbox | null = null,
   ) {}
 
   /** Meta's check, as the webhook is set up: the token it was given, and a challenge to echo. */
@@ -80,10 +93,19 @@ export class WhatsAppWebhookController {
     const { statuses, inbound, templates } = parseWhatsAppWebhook(request.body);
     const { unmatched: notMessages } = await this.messages.recordStatuses(statuses);
     // Replies from the inbox (ADR-546), followed as messages are.
-    const unmatched = await this.conversations.recordStatuses(notMessages);
+    const notReplies = await this.conversations.recordStatuses(notMessages);
+    // Hatti's answers from its support number (ADR-560), likewise.
+    const unmatched = this.support?.recordStatuses
+      ? await this.support.recordStatuses(notReplies)
+      : notReplies;
     // What Meta decided of shops' own templates (ADR-420).
     await this.templates.recordStatuses(templates);
     for (const message of inbound) {
+      if (this.supportLine && message.to === this.supportLine.phoneNumberId) {
+        // Staff asking Hatti's people: no shop's customer, nor any shop's inbox (ADR-560).
+        await this.support?.recordWhatsApp(message);
+        continue;
+      }
       if (message.text && asksToStop(message.text)) {
         await this.messages.optOut('whatsapp', message.from, message.text, message.replyTo);
       } else if (message.replyTo && message.payload) {

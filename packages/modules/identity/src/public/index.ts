@@ -88,12 +88,14 @@ export {
   endExpiredMemberships,
   managedRoles,
   ownerEmailIn,
+  staffOfPhone,
   staffPhonesIn,
   type AccessRequestRecord,
   type InvitationPreview,
   type OwnerEmailRecord,
   type StaffInvitationRecord,
   type StaffMemberRecord,
+  type StaffOfPhoneRecord,
   type StaffPhoneRecord,
 } from '../internal/staff.service.js';
 export {

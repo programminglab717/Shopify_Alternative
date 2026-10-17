@@ -19,6 +19,7 @@ import { PUSH_SENDER, PushService } from './push.service.js';
 import { SmsSenderResolver } from './graphql/sms-sender.resolver.js';
 import { SmsSendersService } from './sms-senders.service.js';
 import { StopLinkController } from './stop.controller.js';
+import { SUPPORT_LINE, type SupportLineSettings } from './support-inbox.js';
 import { MessagingSettingsService } from './settings.service.js';
 import { WhatsAppAccountResolver } from './graphql/whatsapp-account.resolver.js';
 import { WhatsAppTemplateResolver } from './graphql/whatsapp-template.resolver.js';
@@ -37,7 +38,9 @@ import { WebPushSender, type VapidKeys } from './web-push.js';
  * each webhook request's raw body as `rawBody`. Without WhatsApp's settings, its webhook answers
  * 404; without Embedded Signup's, shops cannot connect numbers of their own (ADR-419); without
  * VAPID keys, nothing is pushed to staff's browsers (ADR-506); without Meta's Graph API for
- * replies, the inbox cannot answer customers (ADR-546).
+ * replies, the inbox cannot answer customers (ADR-546); without Hatti's support number, nothing
+ * written to WhatsApp is taken for Hatti's people, and with it, what is written to it goes to the
+ * SUPPORT_INBOX the host binds, if any (ADR-560).
  */
 @Module({})
 export class MessagingModule {
@@ -46,6 +49,7 @@ export class MessagingModule {
     signup?: WhatsAppSignupSettings | null;
     push?: VapidKeys | null;
     replies?: WhatsAppReplySettings | null;
+    supportLine?: SupportLineSettings | null;
   }): DynamicModule {
     return {
       module: MessagingModule,
@@ -55,6 +59,7 @@ export class MessagingModule {
         { provide: WHATSAPP_WEBHOOK, useValue: options.whatsapp },
         { provide: WHATSAPP_SIGNUP, useValue: options.signup ?? null },
         { provide: WHATSAPP_REPLIES, useValue: options.replies ?? null },
+        { provide: SUPPORT_LINE, useValue: options.supportLine ?? null },
         {
           provide: PUSH_SENDER,
           useValue: options.push ? new WebPushSender(options.push) : null,

@@ -121,6 +121,7 @@ export const ID_PREFIXES = {
   conversation: 'chat',
   conversationMessage: 'cmsg',
   fiscalInvoice: 'fbr',
+  supportRequestMessage: 'smsg',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

@@ -155,6 +155,29 @@ const WHATSAPP_PAIRED = {
   path: ['WHATSAPP_ACCESS_TOKEN'],
   message: 'Set both WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN, or neither',
 };
+/**
+ * Hatti's support WhatsApp number on WhatsApp's Cloud API (ADR-560), for the API, which keeps what
+ * shops' staff write to it as their shops' support requests, and Hatti's people's tool, which
+ * answers them from it: its ID, and a system user's token for it, both or neither. Without them,
+ * what is written to it is not kept, and answers are shown in the admin alone.
+ */
+const supportWhatsApp = {
+  SUPPORT_WHATSAPP_PHONE_NUMBER_ID: z
+    .string()
+    .regex(/^[0-9]{5,30}$/, 'Expected digits')
+    .optional(),
+  SUPPORT_WHATSAPP_ACCESS_TOKEN: env.secret(20).optional(),
+};
+
+const supportWhatsAppPaired = (config: z.output<z.ZodObject<typeof supportWhatsApp>>) =>
+  (config.SUPPORT_WHATSAPP_PHONE_NUMBER_ID === undefined) ===
+  (config.SUPPORT_WHATSAPP_ACCESS_TOKEN === undefined);
+const SUPPORT_WHATSAPP_PAIRED = {
+  path: ['SUPPORT_WHATSAPP_ACCESS_TOKEN'],
+  message:
+    'Set both SUPPORT_WHATSAPP_PHONE_NUMBER_ID and SUPPORT_WHATSAPP_ACCESS_TOKEN, or neither',
+};
+
 const smsPaired = (config: MessageSendingConfig) =>
   (config.SMS_GATEWAY_URL === undefined) === (config.SMS_GATEWAY_KEY === undefined);
 const SMS_PAIRED = {
@@ -375,6 +398,7 @@ const apiSchema = z
     SUPPORT_EMAIL: z.string().trim().email().max(200).optional(),
     SUPPORT_HOURS: z.string().trim().min(1).max(100).optional(),
     SUPPORT_HOURS_UR: z.string().trim().min(1).max(100).optional(),
+    ...supportWhatsApp,
     /**
      * The AI gateway (ADR-463): the model provider's API key and the model's ID, both or neither,
      * and the provider's address where it is not Anthropic's own, as for a proxy. No model is
@@ -441,6 +465,16 @@ const apiSchema = z
     {
       path: ['SUPPORT_HOURS_UR'],
       message: 'Set both SUPPORT_HOURS and SUPPORT_HOURS_UR, or neither',
+    },
+  )
+  .refine(supportWhatsAppPaired, SUPPORT_WHATSAPP_PAIRED)
+  .refine(
+    (config) =>
+      config.SUPPORT_WHATSAPP_PHONE_NUMBER_ID === undefined ||
+      config.SUPPORT_WHATSAPP_PHONE_NUMBER_ID !== config.WHATSAPP_PHONE_NUMBER_ID,
+    {
+      path: ['SUPPORT_WHATSAPP_PHONE_NUMBER_ID'],
+      message: "Must not be the shared notifications number: customers' replies come to it",
     },
   )
   .refine(
@@ -718,12 +752,18 @@ const billingTransfersSchema = z.object({
 
 /**
  * Hatti's people answer shops' support requests (ADR-508) with the app login and the system login,
- * which finds them across shops.
+ * which finds them across shops; and on WhatsApp, from Hatti's support number on Meta's Graph API,
+ * those its staff wrote about there (ADR-560), where it is set up.
  */
-const supportRequestsSchema = z.object({
-  DATABASE_URL: env.postgresUrl(),
-  DATABASE_SYSTEM_URL: env.postgresUrl(),
-});
+const supportRequestsSchema = z
+  .object({
+    DATABASE_URL: env.postgresUrl(),
+    DATABASE_SYSTEM_URL: env.postgresUrl(),
+    META_GRAPH_URL: messageSending.META_GRAPH_URL,
+    META_GRAPH_VERSION: messageSending.META_GRAPH_VERSION,
+    ...supportWhatsApp,
+  })
+  .refine(supportWhatsAppPaired, SUPPORT_WHATSAPP_PAIRED);
 
 /**
  * Hatti's people decide on shoppers' reports of stores (ADR-460) and shops' verifications (ADR-465),

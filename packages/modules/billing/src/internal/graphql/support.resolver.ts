@@ -1,4 +1,4 @@
-import { CurrentTenant, UserError, type TenantContext } from '@hatti/api';
+import { CurrentTenant, Loaders, RequestLoaders, UserError, type TenantContext } from '@hatti/api';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
 import {
   Args,
@@ -9,11 +9,18 @@ import {
   Int,
   Mutation,
   ObjectType,
+  Parent,
   Query,
+  ResolveField,
   Resolver,
   registerEnumType,
 } from '@nestjs/graphql';
-import { SUPPORT_LIMITS, SupportService, type SupportRequestRecord } from '../support.service.js';
+import {
+  SUPPORT_LIMITS,
+  SupportService,
+  type SupportMessageRecord,
+  type SupportRequestRecord,
+} from '../support.service.js';
 import { BillingPlanCode } from './billing.types.js';
 
 export enum SupportChannel {
@@ -58,10 +65,93 @@ export enum SupportLanguage {
 
 registerEnumType(SupportLanguage, { name: 'SupportLanguage' });
 
+export enum SupportRequestChannel {
+  ADMIN = 'ADMIN',
+  WHATSAPP = 'WHATSAPP',
+}
+
+registerEnumType(SupportRequestChannel, {
+  name: 'SupportRequestChannel',
+  description: "Where a request was asked (ADR-560): in the admin, or on Hatti's support WhatsApp.",
+  valuesMap: {
+    ADMIN: { description: 'From the admin’s Help page.' },
+    WHATSAPP: { description: 'Written to Hatti’s support WhatsApp number by a member of staff.' },
+  },
+});
+
+export enum SupportMessageDirection {
+  INBOUND = 'INBOUND',
+  OUTBOUND = 'OUTBOUND',
+}
+
+registerEnumType(SupportMessageDirection, {
+  name: 'SupportMessageDirection',
+  valuesMap: {
+    INBOUND: { description: 'The shop’s staff wrote it.' },
+    OUTBOUND: { description: 'Hatti’s people answered with it.' },
+  },
+});
+
+export enum SupportMessageStatus {
+  SENT = 'SENT',
+  DELIVERED = 'DELIVERED',
+  READ = 'READ',
+  FAILED = 'FAILED',
+}
+
+registerEnumType(SupportMessageStatus, {
+  name: 'SupportMessageStatus',
+  description: 'How an answer went on WhatsApp, as WhatsApp says (ADR-560).',
+});
+
+@ObjectType({
+  description:
+    'A message about a request on WhatsApp (ADR-560): what the shop’s staff wrote, or Hatti’s answer.',
+})
+export class SupportRequestMessage {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => SupportMessageDirection)
+  direction!: SupportMessageDirection;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'What was written; null for a photo or the like alone.',
+  })
+  body!: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'What else it held, as WhatsApp names it: "image", "audio". It is not kept: the phone ' +
+      'it was written on shows it.',
+  })
+  mediaKind!: string | null;
+
+  @Field(() => GraphQLISODateTime)
+  at!: Date;
+
+  @Field(() => SupportMessageStatus, {
+    nullable: true,
+    description: 'How an answer went; null for what staff wrote.',
+  })
+  status!: SupportMessageStatus | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Why WhatsApp did not take or deliver an answer.',
+  })
+  error!: string | null;
+}
+
 @ObjectType({ description: 'A request the shop sent Hatti’s people, and their answer.' })
 export class SupportRequest {
   @Field(() => ID)
   id!: string;
+
+  @Field(() => SupportRequestChannel)
+  channel!: SupportRequestChannel;
 
   @Field(() => SupportTopic)
   topic!: SupportTopic;
@@ -89,6 +179,9 @@ export class SupportRequest {
 
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;
+
+  /** Its UUID, for its messages; not in the schema. */
+  uuid!: string;
 }
 
 @ObjectType({ description: 'When Hatti’s people answer.' })
@@ -226,9 +319,46 @@ export class SupportResolver {
   }
 }
 
+/** A request's messages on WhatsApp (ADR-560), for each request the admin lists. */
+@Resolver(() => SupportRequest)
+export class SupportRequestResolver {
+  constructor(private readonly service: SupportService) {}
+
+  @ResolveField(() => [SupportRequestMessage], {
+    description:
+      `Its latest ${SUPPORT_LIMITS.messages} messages on WhatsApp, the oldest first: what the ` +
+      'shop’s staff wrote to Hatti’s support number, and the answers sent back there. None for ' +
+      'a request no one wrote about there.',
+  })
+  async messages(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() request: SupportRequest,
+  ): Promise<SupportRequestMessage[]> {
+    const loader = loaders.get<string, SupportMessageRecord[]>('billing.supportMessages', (ids) =>
+      this.service.messagesOf(tenant.shopId, ids),
+    );
+    return ((await loader.load(request.uuid)) ?? []).map(toMessage);
+  }
+}
+
+function toMessage(record: SupportMessageRecord): SupportRequestMessage {
+  return Object.assign(new SupportRequestMessage(), {
+    id: toPublicId('supportRequestMessage', record.id),
+    direction: record.direction.toUpperCase() as SupportMessageDirection,
+    body: record.body,
+    mediaKind: record.mediaKind,
+    at: record.at,
+    status: record.status && (record.status.toUpperCase() as SupportMessageStatus),
+    error: record.error,
+  });
+}
+
 function toRequest(record: SupportRequestRecord): SupportRequest {
   return Object.assign(new SupportRequest(), {
     id: toPublicId('supportRequest', record.id),
+    uuid: record.id,
+    channel: record.channel.toUpperCase() as SupportRequestChannel,
     topic: record.topic.toUpperCase() as SupportTopic,
     message: record.message,
     callBack: record.callBack,

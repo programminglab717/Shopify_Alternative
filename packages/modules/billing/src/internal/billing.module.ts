@@ -1,5 +1,5 @@
 import { AiCredits, PlanAllowance } from '@hatti/api';
-import { MessageCharges } from '@hatti/messaging/public';
+import { MessageCharges, SUPPORT_INBOX } from '@hatti/messaging/public';
 import { type DynamicModule, Global, Module } from '@nestjs/common';
 import { AiCreditsService } from './ai-credits.js';
 import { BillingPagesController, BillingWebhookController } from './billing.controller.js';
@@ -13,7 +13,7 @@ import {
 import { BILLING_TAX, type HattiTax } from './tax.js';
 import { MessageWallet } from './credits.js';
 import { BillingResolver } from './graphql/billing.resolver.js';
-import { SupportResolver } from './graphql/support.resolver.js';
+import { SupportRequestResolver, SupportResolver } from './graphql/support.resolver.js';
 import { SUPPORT_CONTACT, SupportService, type SupportContact } from './support.service.js';
 
 /**
@@ -24,7 +24,9 @@ import { SUPPORT_CONTACT, SupportService, type SupportContact } from './support.
  * account, without which invoices are not paid online here; and Hatti's own bank account, without
  * which they are not paid by transfer (ADR-254); Hatti's registration for sales tax on services,
  * without which invoices carry none (ADR-512); and Hatti's support lines, without which shops
- * reach Hatti's people by requests from the admin alone (ADR-508).
+ * reach Hatti's people by requests from the admin alone (ADR-508). It keeps what staff write to
+ * Hatti's support WhatsApp number as their shops' requests, as the messaging module's
+ * SUPPORT_INBOX (ADR-560).
  */
 @Global()
 @Module({})
@@ -53,7 +55,9 @@ export class BillingModule {
         { provide: AiCredits, useExisting: AiCreditsService },
         BillingResolver,
         SupportService,
+        { provide: SUPPORT_INBOX, useExisting: SupportService },
         SupportResolver,
+        SupportRequestResolver,
       ],
       exports: [
         BillingService,
@@ -63,6 +67,7 @@ export class BillingModule {
         AiCreditsService,
         AiCredits,
         SupportService,
+        SUPPORT_INBOX,
       ],
     };
   }

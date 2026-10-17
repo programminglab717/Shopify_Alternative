@@ -23,6 +23,7 @@
     "@hatti/db": "workspace:*",
     "@hatti/documents": "workspace:*",
     "@hatti/events": "workspace:*",
+    "@hatti/identity": "workspace:*",
     "@hatti/ids": "workspace:*",
     "@hatti/messaging": "workspace:*",
     "@hatti/money": "workspace:*",

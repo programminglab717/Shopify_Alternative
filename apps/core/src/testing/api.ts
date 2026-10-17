@@ -15,6 +15,7 @@ import { Database } from '@hatti/db';
 import type { TestDatabase } from '@hatti/db/testing';
 import { createLogger } from '@hatti/logger';
 import type {
+  SupportLineSettings,
   VapidKeys,
   WhatsAppReplySettings,
   WhatsAppSignupSettings,
@@ -81,6 +82,8 @@ export async function startTestApi(
     billingTax?: HattiTax | null;
     /** Hatti's own support lines (ADR-508); none unless given. */
     support?: SupportContact | null;
+    /** Hatti's support WhatsApp number (ADR-560); none unless given. */
+    supportLine?: SupportLineSettings;
     /** Where merchants' sign-in codes go (ADR-159); without it, no one signs in by phone. */
     phoneCodes?: PhoneCodeSender;
     /** Hatti's client IDs and Google's keys (ADR-164); without them, no one signs in with Google. */
@@ -139,6 +142,7 @@ export async function startTestApi(
         : options.billingBankAccount,
     billingTax: options.billingTax ?? null,
     support: options.support ?? null,
+    supportLine: options.supportLine ?? null,
   });
   await app.getHttpAdapter().getInstance().ready();
   return {

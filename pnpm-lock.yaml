@@ -534,6 +534,9 @@ importers:
       '@hatti/events':
         specifier: workspace:*
         version: link:../../platform/events
+      '@hatti/identity':
+        specifier: workspace:*
+        version: link:../identity
       '@hatti/ids':
         specifier: workspace:*
         version: link:../../platform/ids

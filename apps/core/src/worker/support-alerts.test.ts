@@ -8,6 +8,7 @@ const AT = new Date('2026-10-17T12:00:00Z');
 
 const late = (overrides: Partial<OpenSupportRequest> = {}): OpenSupportRequest => ({
   id: '0192d5a0-0000-7000-8000-000000000001',
+  channel: 'admin',
   topic: 'couriers',
   message: 'PostEx bookings fail\nfor Multan since this morning.',
   language: 'en',
@@ -22,6 +23,7 @@ const late = (overrides: Partial<OpenSupportRequest> = {}): OpenSupportRequest =
   shopName: 'Zari <Lahore>',
   plan: 'growth',
   dueAt: new Date('2026-10-17T09:00:00Z'),
+  lastInbound: null,
   ...overrides,
 });
 

@@ -1,6 +1,13 @@
 import { SecretBox } from '@hatti/crypto';
 import { describe, expect, it } from 'vitest';
-import { hattiBankAccountOf, hattiGatewayOf, hattiTaxOf, supportContactOf } from './billing.js';
+import {
+  hattiBankAccountOf,
+  hattiGatewayOf,
+  hattiTaxOf,
+  supportContactOf,
+  supportLineOf,
+  supportSenderOf,
+} from './billing.js';
 import {
   loadApiConfig,
   loadBillingTransfersConfig,
@@ -330,18 +337,72 @@ describe('API configuration', () => {
       'SUPPORT_HOURS_UR: Set both SUPPORT_HOURS and SUPPORT_HOURS_UR, or neither',
     );
   });
+
+  it("takes Hatti's support WhatsApp number with its token, or neither (ADR-560)", () => {
+    // Without it, nothing written to WhatsApp is kept as a support request.
+    expect(supportLineOf(loadApiConfig(env))).toBeNull();
+    const line = {
+      SUPPORT_WHATSAPP_PHONE_NUMBER_ID: '300000000000003',
+      SUPPORT_WHATSAPP_ACCESS_TOKEN: 'EAAQsupportToken'.padEnd(80, 'z'),
+    };
+    expect(supportLineOf(loadApiConfig({ ...env, ...line }))).toEqual({
+      phoneNumberId: '300000000000003',
+    });
+    expect(() =>
+      loadApiConfig({ ...env, SUPPORT_WHATSAPP_PHONE_NUMBER_ID: '300000000000003' }),
+    ).toThrow(
+      'SUPPORT_WHATSAPP_ACCESS_TOKEN: Set both SUPPORT_WHATSAPP_PHONE_NUMBER_ID and SUPPORT_WHATSAPP_ACCESS_TOKEN, or neither',
+    );
+    expect(() =>
+      loadApiConfig({ ...env, ...line, SUPPORT_WHATSAPP_PHONE_NUMBER_ID: '+92 300' }),
+    ).toThrow('SUPPORT_WHATSAPP_PHONE_NUMBER_ID: Expected digits');
+    // Customers' replies come to the shared number: it is no support line.
+    expect(() =>
+      loadApiConfig({
+        ...env,
+        ...line,
+        WHATSAPP_PHONE_NUMBER_ID: '300000000000003',
+        WHATSAPP_ACCESS_TOKEN: 'EAAQsharedToken'.padEnd(80, 'y'),
+      }),
+    ).toThrow('SUPPORT_WHATSAPP_PHONE_NUMBER_ID: Must not be the shared notifications number');
+  });
 });
 
 describe("Hatti's people's support requests tool (ADR-508)", () => {
+  const logins = {
+    DATABASE_URL: env.DATABASE_URL,
+    DATABASE_SYSTEM_URL: 'postgres://hatti_system:secret@localhost:5432/hatti',
+  };
+
   it('reads the app and system logins', () => {
-    const logins = {
-      DATABASE_URL: env.DATABASE_URL,
-      DATABASE_SYSTEM_URL: 'postgres://hatti_system:secret@localhost:5432/hatti',
-    };
-    expect(loadSupportRequestsConfig(logins)).toEqual(logins);
+    expect(loadSupportRequestsConfig(logins)).toEqual({
+      ...logins,
+      META_GRAPH_URL: 'https://graph.facebook.com',
+      META_GRAPH_VERSION: 'v26.0',
+    });
     expect(() => loadSupportRequestsConfig({ DATABASE_URL: env.DATABASE_URL })).toThrow(
       'DATABASE_SYSTEM_URL',
     );
+  });
+
+  it("answers on WhatsApp from Hatti's support number where it is set up, with its token (ADR-560)", () => {
+    expect(supportSenderOf(loadSupportRequestsConfig(logins))).toBeNull();
+    expect(
+      supportSenderOf(
+        loadSupportRequestsConfig({
+          ...logins,
+          SUPPORT_WHATSAPP_PHONE_NUMBER_ID: '300000000000003',
+          SUPPORT_WHATSAPP_ACCESS_TOKEN: 'EAAQsupportToken'.padEnd(80, 'z'),
+          META_GRAPH_VERSION: 'v25.0',
+        }),
+      ),
+    ).toEqual({ send: expect.any(Function) });
+    expect(() =>
+      loadSupportRequestsConfig({
+        ...logins,
+        SUPPORT_WHATSAPP_ACCESS_TOKEN: 'EAAQsupportToken'.padEnd(80, 'z'),
+      }),
+    ).toThrow('SUPPORT_WHATSAPP_ACCESS_TOKEN: Set both');
   });
 });
 

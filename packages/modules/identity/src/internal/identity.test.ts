@@ -52,6 +52,7 @@ import {
   StaffService,
   endExpiredMemberships,
   ownerEmailIn,
+  staffOfPhone,
   staffPhonesIn,
 } from './staff.service.js';
 import { SupportAccessService } from './support-access.service.js';
@@ -1086,6 +1087,45 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         .tenant(shopId, (tx) => tx.execute(sql`SELECT phone_e164 FROM identity.users`))
         .catch((error: unknown) => error);
       expect(pgError(denied)?.code).toBe('42501');
+    });
+
+    it("finds the shops whose staff a proved number is, across shops, for Hatti's support WhatsApp (ADR-560)", async () => {
+      const { shopId, owner } = await shopWithOwner('Gota');
+      const other = await shopWithOwner('Lawn');
+      await service.grantMembership({
+        userId: owner.userId,
+        shopId: other.shopId,
+        role: 'manager',
+      });
+      const phone = `+92301${String(randomInt(0, 10_000_000)).padStart(7, '0')}`;
+      // Not proved yet: no one's.
+      await admin.query('UPDATE identity.users SET phone_e164 = $2 WHERE id = $1', [
+        owner.userId,
+        phone,
+      ]);
+      expect(await staffOfPhone(appDb.app, phone)).toEqual([]);
+      await admin.query(
+        "UPDATE identity.users SET phone_verified_at = now(), language = 'ur' WHERE id = $1",
+        [owner.userId],
+      );
+      // As the webhook reads them: with the app's login, through identity's function.
+      expect(await staffOfPhone(appDb.app, phone)).toEqual([
+        { userId: owner.userId, shopId, language: 'ur' },
+        { userId: owner.userId, shopId: other.shopId, language: 'ur' },
+      ]);
+      // A collaborator's access past its end, a suspended shop and a disabled account count not.
+      await admin.query(
+        "UPDATE identity.memberships SET expires_at = now() - interval '1 minute' WHERE user_id = $1 AND shop_id = $2",
+        [owner.userId, other.shopId],
+      );
+      expect((await staffOfPhone(appDb.app, phone)).map((each) => each.shopId)).toEqual([shopId]);
+      await admin.query("UPDATE control.shops SET status = 'suspended' WHERE id = $1", [shopId]);
+      expect(await staffOfPhone(appDb.app, phone)).toEqual([]);
+      await admin.query("UPDATE control.shops SET status = 'active' WHERE id = $1", [shopId]);
+      await admin.query("UPDATE identity.users SET status = 'disabled' WHERE id = $1", [
+        owner.userId,
+      ]);
+      expect(await staffOfPhone(appDb.app, phone)).toEqual([]);
     });
 
     it('gives the shop its owner at the email they proved, in their language, to its own transactions alone (ADR-195)', async () => {

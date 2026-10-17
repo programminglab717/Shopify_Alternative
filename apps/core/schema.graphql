@@ -15378,6 +15378,22 @@ enum SupportLanguage {
   URDU
 }
 
+enum SupportMessageDirection {
+  """The shop’s staff wrote it."""
+  INBOUND
+
+  """Hatti’s people answered with it."""
+  OUTBOUND
+}
+
+"""How an answer went on WhatsApp, as WhatsApp says (ADR-560)."""
+enum SupportMessageStatus {
+  DELIVERED
+  FAILED
+  READ
+  SENT
+}
+
 """A request the shop sent Hatti’s people, and their answer."""
 type SupportRequest {
   answer: String
@@ -15388,11 +15404,28 @@ type SupportRequest {
 
   """The mobile to call back at, E.164; null for no call."""
   callBack: String
+  channel: SupportRequestChannel!
   createdAt: DateTime!
   id: ID!
   message: String!
+
+  """
+  Its latest 50 messages on WhatsApp, the oldest first: what the shop’s staff wrote to Hatti’s support number, and the answers sent back there. None for a request no one wrote about there.
+  """
+  messages: [SupportRequestMessage!]!
   status: SupportRequestStatus!
   topic: SupportTopic!
+}
+
+"""
+Where a request was asked (ADR-560): in the admin, or on Hatti's support WhatsApp.
+"""
+enum SupportRequestChannel {
+  """From the admin’s Help page."""
+  ADMIN
+
+  """Written to Hatti’s support WhatsApp number by a member of staff."""
+  WHATSAPP
 }
 
 input SupportRequestInput {
@@ -15407,6 +15440,29 @@ input SupportRequestInput {
   """What the shop needs, 10 to 2000 characters."""
   message: String!
   topic: SupportTopic!
+}
+
+"""
+A message about a request on WhatsApp (ADR-560): what the shop’s staff wrote, or Hatti’s answer.
+"""
+type SupportRequestMessage {
+  at: DateTime!
+
+  """What was written; null for a photo or the like alone."""
+  body: String
+  direction: SupportMessageDirection!
+
+  """Why WhatsApp did not take or deliver an answer."""
+  error: String
+  id: ID!
+
+  """
+  What else it held, as WhatsApp names it: "image", "audio". It is not kept: the phone it was written on shows it.
+  """
+  mediaKind: String
+
+  """How an answer went; null for what staff wrote."""
+  status: SupportMessageStatus
 }
 
 type SupportRequestPayload {

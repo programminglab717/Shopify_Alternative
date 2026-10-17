@@ -96,6 +96,12 @@ export {
   type PlatformMessageKind,
 } from '../internal/templates.js';
 export {
+  SUPPORT_INBOX,
+  SUPPORT_LINE,
+  type SupportInbox,
+  type SupportLineSettings,
+} from '../internal/support-inbox.js';
+export {
   WHATSAPP_WEBHOOK,
   WhatsAppWebhookController,
   type WhatsAppWebhookSettings,
