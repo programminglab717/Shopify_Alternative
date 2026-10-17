@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Credit notes
+### 94938ea · Credit notes
 
 * **Money refunded once an order's invoice is issued goes on a credit note in a series of its
   own, printed against the invoice** ([ADR-496](../architecture/13-decision-log.md#adr-496--credit-notes-money-refunded-on-an-order-whose-invoice-was-issued-goes-on-a-credit-note-numbered-in-a-series-of-its-own-printed-against-the-invoice-it-corrects), TAX-05 in part).
