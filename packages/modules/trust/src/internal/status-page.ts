@@ -1,6 +1,7 @@
 import { html, renderPage, say, type Html, type RenderedPage, type Words } from '@hatti/documents';
 import {
   INCIDENT_LIMITS,
+  type ComponentHistory,
   type ComponentState,
   type IncidentRecord,
   type IncidentStatus,
@@ -8,9 +9,10 @@ import {
   type StatusSnapshot,
 } from './incidents.service.js';
 
-// Hatti's status page (ADR-498): whether each of Hatti's parts works, what is going on and what
-// Hatti has said of it, maintenance to come, and what happened lately. In English and Urdu, in
-// Pakistan's time, for shops and their customers alike.
+// Hatti's status page (ADR-498): whether each of Hatti's parts works, and how it worked each of
+// the last 90 days (ADR-528), what is going on and what Hatti has said of it, maintenance to come,
+// and what happened lately. In English and Urdu, in Pakistan's time, for shops and their
+// customers alike.
 
 /** Pakistan's: the page's times are in it, and say so. */
 const TIME_ZONE = 'Asia/Karachi';
@@ -70,6 +72,10 @@ const WORDS = {
   until: { en: 'until', ur: 'تک' },
   ended: { en: 'Ended', ur: 'ختم' },
   times: { en: 'Times are Pakistan time (PKT).', ur: 'اوقات پاکستان کے وقت کے مطابق ہیں۔' },
+  uptime: {
+    en: `Up the last ${INCIDENT_LIMITS.historyDays} days, not counting maintenance posted ahead`,
+    ur: `پچھلے ${INCIDENT_LIMITS.historyDays} دن چالو رہا، پہلے سے بتائی گئی مرمت کے سوا`,
+  },
 } satisfies Record<string, Words>;
 
 /** "17 Oct, 2:30 pm", in Pakistan's time. */
@@ -101,11 +107,12 @@ export function statusPage(snapshot: StatusSnapshot): RenderedPage {
         ${snapshot.components.map(
           ({ component, state }) =>
             html`<p class="stack" data-component="${component}" data-state="${state}">
-              ${say('bilingual', COMPONENT_WORDS[component])} ·
-              <span class="${state === 'operational' ? 'muted' : 'strong'}"
-                >${say('bilingual', STATE_WORDS[state])}</span
-              >
-            </p>`,
+                ${say('bilingual', COMPONENT_WORDS[component])} ·
+                <span class="${state === 'operational' ? 'muted' : 'strong'}"
+                  >${say('bilingual', STATE_WORDS[state])}</span
+                >
+              </p>
+              ${historyBars(snapshot.history.find((each) => each.component === component))}`,
         )}
       </div>
       ${
@@ -133,6 +140,46 @@ export function statusPage(snapshot: StatusSnapshot): RenderedPage {
       <div class="small muted">${both(WORDS.times)}</div>
     `,
   });
+}
+
+/**
+ * A part's days as a row of bars, the earliest first, each coloured by the worst it was and
+ * saying so when pointed at, then its uptime.
+ */
+function historyBars(history: ComponentHistory | undefined): Html {
+  if (!history) return html``;
+  const label = `${history.uptime.toFixed(2)}% · ${WORDS.uptime.en}`;
+  return html`<div
+      class="bars"
+      role="img"
+      aria-label="${label}"
+      data-history="${history.component}"
+    >
+      ${history.days.map(
+        (day) =>
+          html`<span
+            data-state="${day.state}"
+            title="${dayTitle(day.date, day.state, day.downMinutes)}"
+          ></span>`,
+      )}
+    </div>
+    <p class="small muted">
+      <span class="strong" data-uptime="${history.component}">${history.uptime.toFixed(2)}%</span>
+      · ${say('bilingual', WORDS.uptime)}
+    </p>`;
+}
+
+/** "17 Oct: Down 42 minutes", or "17 Oct: Working". */
+function dayTitle(date: string, state: ComponentState, downMinutes: number): string {
+  const day = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(`${date}T00:00:00Z`));
+  // Down at all, the day's worst was down.
+  return downMinutes > 0
+    ? `${day}: Down ${downMinutes} ${downMinutes === 1 ? 'minute' : 'minutes'}`
+    : `${day}: ${STATE_WORDS[state].en}`;
 }
 
 function incidentBlock(incident: IncidentRecord): Html {
@@ -193,5 +240,6 @@ export function statusJson(snapshot: StatusSnapshot): object {
     active: snapshot.active.map(incident),
     upcoming: snapshot.upcoming.map(incident),
     recent: snapshot.recent.map(incident),
+    history: snapshot.history,
   };
 }

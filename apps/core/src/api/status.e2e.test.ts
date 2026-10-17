@@ -138,6 +138,14 @@ describe.skipIf(!server)("Hatti's status page and the admin's banner (BIL-06)", 
       upcoming: [{ title: 'Database upgrade' }, { title: 'Image service move' }],
       recent: [],
     });
+    // Each part's 90 days (ADR-528): slowness shows on today's bar, and is not counted as down.
+    const whatsapp = json
+      .json()
+      .history.find((each: { component: string }) => each.component === 'whatsapp');
+    expect(whatsapp.days).toHaveLength(90);
+    expect(whatsapp).toMatchObject({ uptime: 100 });
+    expect(whatsapp.days.at(-1)).toMatchObject({ state: 'degraded', downMinutes: 0 });
+    expect(page.body).toContain('data-history="whatsapp"');
 
     const banner = await gql(STATUS);
     expect(banner.errors).toBeUndefined();

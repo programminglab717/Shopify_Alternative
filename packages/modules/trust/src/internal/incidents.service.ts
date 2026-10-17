@@ -50,7 +50,14 @@ export const INCIDENT_LIMITS = {
   warnHours: 24,
   /** How far ahead maintenance may be posted. */
   aheadDays: 60,
+  /** How many days of each part's history the status page shows, today the last (ADR-528). */
+  historyDays: 90,
+  /** The most incidents the history reads, far more than 90 days have ever held. */
+  history: 2000,
 } as const;
+
+/** Pakistan's offset from UTC, the same all year: the history's days are Pakistan's. */
+const PKT_OFFSET_MS = 5 * 3_600_000;
 
 export interface IncidentUpdateRecord {
   id: string;
@@ -89,7 +96,36 @@ export interface StatusSnapshot {
   upcoming: IncidentRecord[];
   /** Ended in the last {@link INCIDENT_LIMITS.recentDays} days, the latest ended first. */
   recent: IncidentRecord[];
+  /** Each part's last {@link INCIDENT_LIMITS.historyDays} days, in the order of its components. */
+  history: ComponentHistory[];
 }
+
+/**
+ * A part's last {@link INCIDENT_LIMITS.historyDays} days (ADR-528). Down is the time incidents
+ * said it was down; maintenance posted ahead is not counted against it, nor is slowness.
+ */
+export interface ComponentHistory {
+  component: StatusComponent;
+  /** The share of the days, up to now, it was not down, in percent: rounded down, to two places. */
+  uptime: number;
+  /** Pakistan's days, the earliest first and today the last. */
+  days: ComponentDay[];
+}
+
+export interface ComponentDay {
+  /** "2026-10-17", in Pakistan's time. */
+  date: string;
+  /** The worst it was that day. */
+  state: ComponentState;
+  /** How long it was down that day, in whole minutes, rounded up. */
+  downMinutes: number;
+}
+
+/** What the history needs of an incident. */
+export type HistoryIncident = Pick<
+  IncidentRecord,
+  'kind' | 'impact' | 'components' | 'startsAt' | 'resolvedAt'
+>;
 
 export interface IncidentInput {
   kind: IncidentKind;
@@ -332,6 +368,7 @@ export class IncidentsService {
     const recent = incidents
       .filter((each) => each.resolvedAt !== null)
       .sort((a, b) => b.resolvedAt!.getTime() - a.resolvedAt!.getTime());
+    const history = await this.historyIncidents(now);
     const components = STATUS_COMPONENTS.map((component) => ({
       component,
       state: active
@@ -345,7 +382,33 @@ export class IncidentsService {
       active,
       upcoming,
       recent: recent.slice(0, INCIDENT_LIMITS.recent),
+      history: historyOf(history, now),
     };
+  }
+
+  /** The incidents begun before `now` that went on within the history's days. */
+  private async historyIncidents(now: Date): Promise<HistoryIncident[]> {
+    const since = historyStart(now);
+    const { rows } = await this.db.app.execute<{
+      kind: IncidentKind;
+      impact: IncidentImpact;
+      components: StatusComponent[];
+      starts_at: string | Date;
+      resolved_at: string | Date | null;
+    }>(sql`
+      SELECT kind, impact, components, starts_at, resolved_at
+        FROM trust.incidents
+       WHERE starts_at < ${now.toISOString()}
+         AND (resolved_at IS NULL OR resolved_at > ${since.toISOString()})
+       ORDER BY starts_at DESC, id
+       LIMIT ${INCIDENT_LIMITS.history}`);
+    return rows.map((row) => ({
+      kind: row.kind,
+      impact: row.impact,
+      components: row.components,
+      startsAt: date(row.starts_at),
+      resolvedAt: row.resolved_at === null ? null : date(row.resolved_at),
+    }));
   }
 
   /**
@@ -363,8 +426,71 @@ export class IncidentsService {
   }
 }
 
+/** When the history's first day began: Pakistan's midnight, {@link INCIDENT_LIMITS.historyDays} days back. */
+function historyStart(now: Date): Date {
+  const today = Math.floor((now.getTime() + PKT_OFFSET_MS) / 86_400_000) * 86_400_000;
+  return new Date(today - (INCIDENT_LIMITS.historyDays - 1) * 86_400_000 - PKT_OFFSET_MS);
+}
+
+/**
+ * Each part's history at `now` (ADR-528), from the incidents that went on in its days. An
+ * incident counts by the impact it has now, from when it began until it ended, or until now.
+ */
+export function historyOf(incidents: readonly HistoryIncident[], now: Date): ComponentHistory[] {
+  const start = historyStart(now).getTime();
+  const end = now.getTime();
+  const spans = incidents
+    .map((incident) => ({
+      incident,
+      from: Math.max(incident.startsAt.getTime(), start),
+      to: Math.min(incident.resolvedAt?.getTime() ?? end, end),
+    }))
+    .filter((span) => span.to > span.from);
+  return STATUS_COMPONENTS.map((component) => {
+    const touching = spans.filter((span) => span.incident.components.includes(component));
+    const down = merged(
+      touching
+        .filter((span) => span.incident.kind === 'incident' && span.incident.impact === 'outage')
+        .map((span): [number, number] => [span.from, span.to]),
+    );
+    const days = Array.from({ length: INCIDENT_LIMITS.historyDays }, (_, index): ComponentDay => {
+      const from = start + index * 86_400_000;
+      const to = Math.min(from + 86_400_000, end);
+      const downMs = down.reduce(
+        (sum, [a, b]) => sum + Math.max(0, Math.min(b, to) - Math.max(a, from)),
+        0,
+      );
+      return {
+        date: new Date(from + PKT_OFFSET_MS).toISOString().slice(0, 10),
+        state: touching
+          .filter((span) => span.from < to && span.to > from)
+          .map((span) => stateOf(span.incident))
+          .reduce<ComponentState>(worse, 'operational'),
+        downMinutes: Math.ceil(downMs / 60_000),
+      };
+    });
+    const downMs = down.reduce((sum, [a, b]) => sum + (b - a), 0);
+    return {
+      component,
+      uptime: Math.floor(10_000 * (1 - downMs / Math.max(1, end - start))) / 100,
+      days,
+    };
+  });
+}
+
+/** Time spans, those that overlap made one, the earliest first. */
+function merged(spans: [number, number][]): [number, number][] {
+  const out: [number, number][] = [];
+  for (const [from, to] of [...spans].sort((a, b) => a[0] - b[0])) {
+    const last = out.at(-1);
+    if (last && from <= last[1]) last[1] = Math.max(last[1], to);
+    else out.push([from, to]);
+  }
+  return out;
+}
+
 /** How a part an incident touches works while it goes on. */
-function stateOf(incident: IncidentRecord): ComponentState {
+function stateOf(incident: Pick<IncidentRecord, 'kind' | 'impact'>): ComponentState {
   return incident.kind === 'maintenance' && incident.impact === 'degraded'
     ? 'maintenance'
     : incident.impact;

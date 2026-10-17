@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-527 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-528 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -535,6 +535,7 @@
 | 525 | A shop's support request still open past its plan's time is flagged to Hatti's people once: the worker's sweep marks it, logs it and emails Hatti's support address the list, and the command says when each request is due | Accepted |
 | 526 | Every storefront says it is "Powered by Hatti", as Shopify's powered_by_link does; a shop on Starter or above may hide it, and one hidden before stays hidden on a smaller plan | Accepted |
 | 527 | The admin's storefront settings show or hide "Powered by Hatti" with a switch, saying the core's refusal on a plan without it, and the plan cards say which plans hide it | Accepted |
+| 528 | The status page shows each part's last 90 days: a bar a day by the worst it was, and its uptime, counting incidents that took it down and not maintenance posted ahead | Accepted |
 
 ---
 
@@ -20086,3 +20087,35 @@
 * **Alternatives:**
   * **Hiding the switch on Free:** the owner wouldn't know it can be hidden at all. Showing it,
     with the core's refusal naming the plan, says what to do.
+
+## ADR-528 · The status page shows each part's last 90 days: a bar a day by the worst it was, and its uptime, counting incidents that took it down and not maintenance posted ahead
+
+* **Context:** The status page says how each of Hatti's parts works now and lists the last 14
+  days' incidents (ADR-498). A shop choosing Hatti, or a monitor, asks how it has worked over
+  months, and the page couldn't say.
+* **Decision:**
+  * **The snapshot carries each part's history**, worked out from the incidents when the page is
+    asked for; nothing new is kept.
+    * Its days are Pakistan's, the last 90 with today the last, each with the worst the part was
+      that day and how many minutes it was down, rounded up.
+    * Its uptime is the share of the time since the first day's midnight it wasn't down, in
+      percent, rounded down to two places, so a minute down never shows as 100%.
+  * **Down is an incident's time down.** Incidents that took a part down count from when they
+    began until they ended, or until now; overlapping ones count each minute once.
+    * Maintenance posted ahead shows on its days and is not counted against uptime, as status
+      pages usually do. Slowness shows and isn't counted either.
+    * An incident counts by the impact it came to have, from its start: incidents keep no
+      history of their impact.
+  * **The page** shows under each part a row of bars, coloured by the day's worst, saying the
+    day and what happened when pointed at, then its uptime, in English and Urdu. The page's
+    shared styles gain the bars, light and dark.
+  * **`/status.json`** gains `history`: each part's uptime and days.
+* **Consequences:**
+  * Anyone sees how reliable each part has been, from what Hatti's people posted, cached at the
+    edge with the rest of the page.
+  * It's as true as the incidents posted. Probes that post incidents themselves remain to come.
+* **Alternatives:**
+  * **Keeping a row a day per part:** a second record of what the incidents already say, to keep
+    in step with them when one is corrected. 90 days of incidents are few to read.
+  * **Counting maintenance against uptime:** stricter, but unlike other status pages, and it
+    would punish telling shops ahead.

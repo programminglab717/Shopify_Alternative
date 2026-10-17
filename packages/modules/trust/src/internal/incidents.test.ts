@@ -226,8 +226,26 @@ describe.skipIf(!server)("Hatti's status page (BIL-06, ADR-498)", () => {
     snapshot = await incidents.snapshot(minutes(131));
     expect(snapshot.overall).toBe('operational');
     expect(statusPage(snapshot).html).toContain('Everything is working');
-    // Two weeks on, the page no longer lists them.
-    expect((await incidents.snapshot(minutes(60 * 24 * 15))).recent).toEqual([]);
+    // The parts' days keep what happened (ADR-528): checkout down 40 minutes, by the impact the
+    // incident came to have; the admin's maintenance shown, and not counted against it.
+    const day = (component: string, at = snapshot) =>
+      at.history.find((each) => each.component === component)!;
+    expect(day('checkout').days.at(-1)).toEqual({
+      date: '2026-10-17',
+      state: 'outage',
+      downMinutes: 40,
+    });
+    expect(day('checkout').uptime).toBe(99.96);
+    expect(day('admin')).toMatchObject({ uptime: 100 });
+    expect(day('admin').days.at(-1)).toMatchObject({ state: 'outage', downMinutes: 0 });
+    expect(day('sms').days.every((each) => each.state === 'operational')).toBe(true);
+    // Two weeks on, the page no longer lists them, and its history still has them.
+    const later = await incidents.snapshot(minutes(60 * 24 * 15));
+    expect(later.recent).toEqual([]);
+    expect(day('checkout', later).days.at(-16)).toMatchObject({
+      date: '2026-10-17',
+      downMinutes: 40,
+    });
     expect((await incidents.list()).length).toBe(0);
     expect((await incidents.list({ all: true })).map((each) => each.title)).toEqual([
       'Database upgrade',

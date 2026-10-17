@@ -106,6 +106,12 @@ td { padding: 4px 0; vertical-align: baseline; }
   background: #FFFBEB;
 }
 .banner.done { border-color: #15803D; background: #F0FDF4; }
+/* A status page part's days, a bar each, coloured by how it worked. */
+.bars { display: flex; gap: 1px; height: 24px; margin: 6px 0 2px; }
+.bars span { flex: 1; min-width: 1px; border-radius: 1px; background: #15803D; }
+.bars [data-state="maintenance"] { background: #1D4ED8; }
+.bars [data-state="degraded"] { background: #B45309; }
+.bars [data-state="outage"] { background: #B91C1C; }
 /* A parcel's way, the latest step first, by a dot in the shop's colour. */
 .steps { margin: 8px 0 0; padding: 0; list-style: none; }
 .steps li { position: relative; padding-inline-start: 20px; padding-bottom: 8px; }
@@ -229,6 +235,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px
   .due td { border-color: #E5E7EB; }
   .banner { border-color: #FBBF24; background: #1F2937; }
   .banner.done { border-color: #4ADE80; }
+  .bars span { background: #4ADE80; }
+  .bars [data-state="maintenance"] { background: #60A5FA; }
+  .bars [data-state="degraded"] { background: #FBBF24; }
+  .bars [data-state="outage"] { background: #F87171; }
   .button { background: #2DD4BF; color: #0B1220; }
   .button:focus-visible, a:focus-visible { outline-color: #2DD4BF; }
   .button.danger { background: #F87171; color: #0B1220; }
