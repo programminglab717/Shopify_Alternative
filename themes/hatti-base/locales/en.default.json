@@ -106,7 +106,15 @@
         "one": "{{ count }} product",
         "other": "{{ count }} products"
       },
-      "empty": "Nothing here yet. Check back soon."
+      "empty": "Nothing here yet. Check back soon.",
+      "filters": {
+        "title": "Filter",
+        "from": "From Rs",
+        "to": "To Rs",
+        "apply": "Show results",
+        "remove": "Remove {{ name }}",
+        "clear": "Clear all"
+      }
     },
     "not_found": {
       "title": "Page not found",

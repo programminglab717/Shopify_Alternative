@@ -321,6 +321,53 @@ input[type='number'] {
   padding: 0.5rem;
   text-align: center;
 }
+/* A collection's filters (ADR-478): a form that works without scripts. */
+.facets {
+  margin-block: 1rem;
+}
+.facets summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.facets__form {
+  display: grid;
+  gap: 1rem;
+  margin-block-start: 0.75rem;
+}
+.facets__filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  border: 1px solid var(--color-muted);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+.facets__filter legend {
+  font-weight: 600;
+}
+.facets__filter input[type='number'] {
+  inline-size: 7rem;
+}
+.facets__value--none {
+  opacity: 0.5;
+}
+.facets__count {
+  color: var(--color-muted);
+}
+.facets__active {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+.facets__active a {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--color-muted);
+  border-radius: 1rem;
+}
 .not-found {
   text-align: center;
 }

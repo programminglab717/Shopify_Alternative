@@ -61,6 +61,7 @@ import {
   type SettingSchema,
   type Theme,
 } from '@hatti/themes';
+import { filteredListing, type QueryParams } from './filters.js';
 import { policyByHandle, policyMarkup, policyTitle, type PolicyKind } from './policies.js';
 import { linkPageMarkup, type LinkPageShown } from './link-page.js';
 
@@ -68,6 +69,11 @@ export interface PageRequest {
   /** The path asked for: "/", "/products/lawn-3pc", "/collections/eid", "/pages/about-us". */
   path: string;
   query?: Readonly<Record<string, string>>;
+  /**
+   * The query's parameters each as often as given, as a collection's filters repeat theirs
+   * (SRC-03, ADR-478). The query's own where absent.
+   */
+  params?: QueryParams;
   /** "en" or "ur"; the theme's default when it has no such locale. */
   locale?: string;
   /**
@@ -331,6 +337,7 @@ export class PageRenderer {
       timezone: page.timezone,
       page: Number(page.query.page) || 1,
       query: page.query,
+      params: page.ctx.filters?.params ?? [],
       formErrors: page.formErrors,
       renderSection: () => Promise.resolve(''),
       renderGroup: () => Promise.resolve(''),
@@ -423,6 +430,7 @@ export class PageRenderer {
       timezone: prepared.timezone,
       page: Number(query.page) || 1,
       query,
+      params: ctx.filters?.params ?? [],
       formErrors: prepared.formErrors,
       renderSection: (section) =>
         limiter.waitFor(layoutParts.get(`section:${section}`) ?? Promise.resolve('')),
@@ -521,7 +529,17 @@ export class PageRenderer {
       request.locale ? new TranslatedStore(store, request.locale) : store,
     );
     const query = request.query ?? {};
-    const ctx: ObjectContext = { data, query, chunkSize: this.options.chunkSize ?? 12 };
+    const params = request.params ?? Object.entries(query);
+    const ctx: ObjectContext = {
+      data,
+      query,
+      chunkSize: this.options.chunkSize ?? 12,
+      filters: {
+        params,
+        path: request.locale === 'ur' ? `/ur${request.path}` : request.path,
+        locale: request.locale ?? 'en',
+      },
+    };
 
     const found = route(request.path);
     const cart = request.cart ?? null;
@@ -1049,9 +1067,15 @@ async function resourceOf(
   }
   if (found.name === 'collection' && found.handle) {
     const doc = await ctx.data.collection(found.handle);
-    return doc
-      ? { collection: collectionObject(doc, ctx), [SEO]: seoOf(doc.seo, doc.descriptionHtml) }
-      : null;
+    if (!doc) return null;
+    // Narrowed by the page's filters, and its filters counted (SRC-03, ADR-478).
+    const listing = ctx.filters
+      ? await filteredListing(doc, ctx.filters, (ids) => ctx.data.products(ids))
+      : undefined;
+    return {
+      collection: collectionObject(doc, ctx, listing),
+      [SEO]: seoOf(doc.seo, doc.descriptionHtml),
+    };
   }
   if (found.name === 'page' && found.handle) {
     const doc = await ctx.data.page(found.handle);

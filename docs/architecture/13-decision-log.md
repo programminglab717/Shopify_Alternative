@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-477 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-478 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -485,6 +485,7 @@
 | 475 | A rights complaint upheld takes its listings off sale and holds them there, copies too, marked with its number; the store's owner is told who complained and how to reach them | Accepted |
 | 476 | The store's owner answers a rights complaint once, sworn, through a link in the notice; Hatti's people refuse the answer with why, or let the listings go | Accepted |
 | 477 | A product says whether it comes stitched, its pieces, fabrics and season in Hatti's own words, in English and Urdu: kept by the catalog, set from its admin page, shown on its storefront page and given to themes | Accepted |
+| 478 | A collection's page filters its products by Shopify's filter parameters: availability, price, product type, brand, each option and the eastern-wear attributes, each value counted, as Shopify's collection.filters | Accepted |
 
 ---
 
@@ -18072,3 +18073,44 @@
   * **Free text, or tags:** what the shop already writes, which no filter can gather.
   * **Shopify's metafields, defined by each shop:** CAT-06's work, and each shop's definitions
     would differ again.
+
+## ADR-478 · A collection's page filters its products by Shopify's filter parameters: availability, price, product type, brand, each option and the eastern-wear attributes, each value counted, as Shopify's collection.filters
+
+* **Context:**
+  * Shoppers narrow a collection by size, colour, fabric, price and what is in stock (SRC-03,
+    V1). Shopify's themes do it with `collection.filters` and `filter.*` parameters, Dawn's
+    facets among them; Hatti's themes should work the same.
+  * The eastern-wear attributes (ADR-477) are Hatti's own words on every product, so a
+    collection can be filtered by them across shops' different titles.
+  * Storefront documents are in Valkey; there is no search index to count facets with.
+* **Decision:**
+  * **The storefront filters**, from the collection's product documents, fetched in one round
+    trip where it has at most 1,000 products; a larger one is shown unfiltered, with no
+    filters, as before.
+  * **Shopify's parameters:** `filter.v.availability` (1 or 0), `filter.v.price.gte` and
+    `.lte` in rupees, `filter.p.product_type`, `filter.p.vendor`, `filter.v.option.<name>`,
+    and `filter.p.m.hatti.stitching`, `.pieces`, `.fabric` and `.season`. A filter's values
+    are any of them, the filters all of them; a variant's filters (availability, price,
+    options) hold of one variant together, so "L in stock" is an L that is. Parameters the
+    page doesn't know are ignored.
+  * **Shopify's `collection.filters`:** each filter's `label`, `param_name`, `type` (list or
+    price_range), its `values` with `count`, `active`, `url_to_add` and `url_to_remove`,
+    `active_values`, and for price `min_value`, `max_value` and `range_max` in paisa, as money
+    prints them. A value counts the products the other filters leave. A filter whose products
+    all have one value is left out, unless the shopper chose it. Labels are in the page's
+    language; the eastern-wear values' too.
+  * **The page:** `collection.products` and `products_count` are those the filters leave,
+    `all_products_count` the collection's; its pages' links keep the filters, each as often as
+    given, and its canonical address has none.
+  * **Hatti Base** has a filter form that works without scripts: each filter's values ticked,
+    the price from and to, the filters chosen as links that take each away, and one to clear
+    them.
+* **Consequences:**
+  * A collection's page fetches all its products' documents, not a page of them: one round
+    trip, kept for the page's own products, and the page is kept at the edge per address.
+  * Option filters on Urdu pages go by the options' Urdu names where the shop gave them.
+* **Alternatives:**
+  * **Counts from the core's search:** a round trip to Postgres for every collection page,
+    where the documents are already at hand.
+  * **Filters each shop chooses, as Shopify's Search & Discovery app:** a later part; the
+    filters a collection's products have are shown meanwhile.

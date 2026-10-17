@@ -18,6 +18,7 @@ import type {
 import type { CartDiscountJson, CartJson, CartLineJson } from '@hatti/storefront-api';
 import { imageValue, isSafeLink, settingValue, type SettingSchema } from '@hatti/themes';
 import { isOnlyDefault, itemsDiscounted, lineTitle } from './cart.js';
+import type { FilteredListing, FilterRequest } from './filters.js';
 import { POLICIES, policyTitle } from './policies.js';
 
 // The objects templates see, made from read models as Shopify's are: `product`, `collection`,
@@ -120,6 +121,8 @@ export interface ObjectContext {
   query: Readonly<Record<string, string>>;
   /** How many products a list fetches at a time, when one of them is first touched. */
   chunkSize: number;
+  /** What a collection's page filters it by (SRC-03, ADR-478); none where absent. */
+  filters?: FilterRequest;
 }
 
 /** An image: prints as its address; `image_url` and `image_tag` size it. */
@@ -503,9 +506,12 @@ export interface Paginable {
 export function collectionObject(
   doc: CollectionDoc,
   ctx: ObjectContext,
+  listing?: FilteredListing,
 ): Record<string, unknown> & Paginable {
   let window = { offset: 0, limit: 50 };
   let products: ItemRef[] | null = null;
+  // Narrowed by the page's filters (SRC-03, ADR-478), where its page gave them.
+  const productIds = listing?.productIds ?? doc.productIds;
   return {
     id: doc.id,
     handle: doc.handle,
@@ -513,10 +519,11 @@ export function collectionObject(
     url: `/collections/${doc.handle}`,
     description: doc.descriptionHtml,
     image: doc.image ? new ImageDrop(doc.image) : null,
-    products_count: doc.productIds.length,
+    products_count: productIds.length,
     all_products_count: doc.productIds.length,
+    filters: listing?.filters ?? [],
     get products(): ItemRef[] {
-      const ids = doc.productIds.slice(window.offset, window.offset + window.limit);
+      const ids = productIds.slice(window.offset, window.offset + window.limit);
       return (products ??= lazyProducts(ids, ctx));
     },
     [PAGINATE](offset: number, limit: number) {

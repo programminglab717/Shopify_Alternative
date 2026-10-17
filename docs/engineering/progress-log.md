@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Collection filters
+
+* **A collection's page filters its products by Shopify's filter parameters: availability,
+  price, product type, brand, each option and the eastern-wear attributes, each value
+  counted, as Shopify's `collection.filters`** ([ADR-478](../architecture/13-decision-log.md#adr-478--a-collections-page-filters-its-products-by-shopifys-filter-parameters-availability-price-product-type-brand-each-option-and-the-eastern-wear-attributes-each-value-counted-as-shopifys-collectionfilters), SRC-03 in part, CAT-08).
+* 3001 tests, 9 more: the filters' counts, narrowing and links, and
+  Hatti Base's form in both languages.
+
 ### 0d075cc · Eastern-wear attributes
 
 * **A product says whether it comes stitched, its pieces, fabrics and season in Hatti's own

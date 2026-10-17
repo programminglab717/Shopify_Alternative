@@ -1,4 +1,5 @@
 import { formatMoney, money } from '@hatti/money';
+import { isFilterParam, type QueryParams } from './filters.js';
 import {
   Drop,
   Hash,
@@ -46,6 +47,8 @@ export interface PageState {
   page: number;
   /** The request's query, which `{% paginate %}`'s links keep, but for its page. */
   query: Readonly<Record<string, string>>;
+  /** The query's parameters each as often as given: a collection's filters, kept likewise. */
+  params: QueryParams;
   /** What a form posted to the page got wrong, by the form's type, as `form.errors` gives it. */
   formErrors: Readonly<Record<string, readonly string[]>>;
 }
@@ -705,6 +708,18 @@ interface PaginatePart {
   is_link: boolean;
 }
 
+/** The query a page of a list is at: the request's, its filters as often as given, but its page. */
+function pageQuery(state: PageState, page: number): URLSearchParams {
+  const params = new URLSearchParams();
+  const filters = state.params.filter(([name]) => isFilterParam(name));
+  for (const [name, value] of Object.entries(state.query)) {
+    if (name !== 'page' && !(filters.length > 0 && isFilterParam(name))) params.append(name, value);
+  }
+  for (const [name, value] of filters) params.append(name, value);
+  params.append('page', String(page));
+  return params;
+}
+
 function pagination(paginate: unknown): string {
   if (typeof paginate !== 'object' || paginate === null) return '';
   const { pages, parts, previous, next } = paginate as {
@@ -1001,7 +1016,7 @@ class PaginateTag extends Tag {
     if (pageable) owner[PAGINATE]((current - 1) * size, size);
     const part = (page: number, title: string): PaginatePart => ({
       title,
-      url: `?${new URLSearchParams({ ...state.query, page: String(page) })}`,
+      url: `?${pageQuery(state, page)}`,
       is_link: page !== current,
     });
     ctx.push({

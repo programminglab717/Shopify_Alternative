@@ -1141,6 +1141,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     const request: PageRequest = {
       path: urdu ? page.pathname.slice(3) || '/' : page.pathname,
       query: Object.fromEntries(page.searchParams),
+      // A collection's filters, each as often as given (ADR-478).
+      params: [...page.searchParams],
       locale: urdu ? 'ur' : 'en',
       cart,
       editor: editing ? { origins: editorOrigins } : null,
@@ -2262,7 +2264,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       const query = Object.fromEntries(url.searchParams);
       return await sendPage(
         reply,
-        { path, query, locale: urdu ? 'ur' : 'en' },
+        { path, query, params: [...url.searchParams], locale: urdu ? 'ur' : 'en' },
         found,
         undefined,
         request,

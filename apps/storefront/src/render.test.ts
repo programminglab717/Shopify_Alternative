@@ -579,8 +579,8 @@ describe('Storefront rendering', () => {
   it('fetches what a page shows in a few round trips, a list at a time', async () => {
     // The shop, two menus, three collections, and one chunk of products per collection.
     expect((await render({ path: '/' })).roundTrips).toBe(9);
-    // The shop, the collection, two menus, and 24 products in chunks of 12.
-    expect((await render({ path: '/collections/eid-lawn' })).roundTrips).toBe(6);
+    // The shop, the collection, two menus, and its 80 products at once, to count its filters by.
+    expect((await render({ path: '/collections/eid-lawn' })).roundTrips).toBe(5);
     expect((await render({ path: '/collections/eid-lawn' }, { chunkSize: 24 })).roundTrips).toBe(5);
     // The shop, the product and two menus: its related products come once the page asks for them.
     expect((await render({ path: '/products/bridal-lehenga-heavy' })).roundTrips).toBe(4);
@@ -608,17 +608,52 @@ describe('Storefront rendering', () => {
     expect(picked.html).toMatch(/value="Maroon"\s+checked/);
   });
 
-  it('paginates a collection, fetching only the page shown', async () => {
+  it('paginates a collection, its products fetched at once to count its filters by', async () => {
     const second = await render({ path: '/collections/eid-lawn', query: { page: '2' } });
     expect(second.html).toContain('80 products');
     expect(count(second.html, 'class="card"')).toBe(24);
     expect(second.html).toMatch(/Lawn \w+ 25</);
     expect(second.html).not.toMatch(/Lawn \w+ 24</);
     expect(second.html).toContain('<span class="page current" aria-current="page">2</span>');
-    expect(second.roundTrips).toBe(6);
+    expect(second.roundTrips).toBe(5);
     // Past the last page is the last page.
     const last = await render({ path: '/collections/eid-lawn', query: { page: '99' } });
     expect(count(last.html, 'class="card"')).toBe(8);
+  });
+
+  it("filters a collection by Shopify's filter parameters, in Hatti Base's form (ADR-478)", async () => {
+    const lawn = sampleStore().products.filter((each) => each.id.startsWith('p-eid-lawn-'));
+    const someSold = lawn.filter((each) => each.variants.some((variant) => !variant.available));
+    const unfiltered = await render({ path: '/collections/eid-lawn' });
+    expect(unfiltered.errors).toEqual([]);
+    expect(unfiltered.html).toContain('<details class="facets">');
+    expect(unfiltered.html).toContain('name="filter.v.availability" value="0"');
+    expect(unfiltered.html).toContain('name="filter.v.price.gte"');
+    expect(unfiltered.html).not.toContain('class="facets__active"');
+
+    const params: [string, string][] = [['filter.v.availability', '0']];
+    const page = await render({
+      path: '/collections/eid-lawn',
+      query: Object.fromEntries(params),
+      params,
+    });
+    expect(page.errors).toEqual([]);
+    expect(page.html).toContain(`${someSold.length} products`);
+    expect(page.html).toContain('<details class="facets" open>');
+    expect(page.html).toMatch(/name="filter\.v\.availability" value="0" checked/);
+    expect(page.html).toContain('<a href="/collections/eid-lawn" aria-label="Remove Out of stock"');
+    // Its pages' links keep the filter.
+    expect(page.html).toContain('href="?filter.v.availability=0&amp;page=2"');
+    // An Urdu page's links keep its language.
+    const urdu = await render({
+      path: '/collections/eid-lawn',
+      query: Object.fromEntries(params),
+      params,
+      locale: 'ur',
+    });
+    expect(urdu.html).toContain(
+      '<a href="/ur/collections/eid-lawn" aria-label="ختم ہو گیا ہٹائیں"',
+    );
   });
 
   it("renders Urdu pages right to left, in the theme's Urdu", async () => {
