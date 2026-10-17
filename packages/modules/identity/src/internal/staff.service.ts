@@ -12,7 +12,7 @@ import {
 import { secretToken, sha256 } from '@hatti/crypto';
 import type { Db, Tx as ShopTx } from '@hatti/db';
 import { newId, toPublicId } from '@hatti/ids';
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { invitationEmail, type AccountEmailLanguage } from './account-emails.js';
 import { suppressed } from './email-feedback.js';
 import { AuthError } from './errors.js';
@@ -46,6 +46,8 @@ export const STAFF_LIMITS = {
   note: 100,
   /** Invitations a shop has Hatti email in a day (ADR-167). */
   emailsPerDay: 20,
+  /** The most days a collaborator's access lasts (ADR-487). */
+  accessDays: 90,
 } as const;
 
 /**
@@ -72,6 +74,8 @@ export interface StaffMemberRecord {
   email: string | null;
   role: StaffRole;
   joinedAt: Date;
+  /** When a collaborator's access ends (ADR-487); null for staff for good. */
+  expiresAt: Date | null;
 }
 
 /**
@@ -87,6 +91,20 @@ export interface StaffPhoneRecord {
   language: 'en' | 'ur';
   /** Their role in the shop, which says what of its work is theirs (ADR-247). */
   role: StaffRole;
+}
+
+/**
+ * Ends up to `limit` collaborators' memberships past their end (ADR-487), across shops, through
+ * identity.end_expired_memberships, as the worker does it: never identity's tables. How many.
+ */
+export async function endExpiredMemberships(
+  db: Pick<Db, 'execute'>,
+  limit: number,
+): Promise<number> {
+  const { rows } = await db.execute<{ ended: number }>(
+    sql`SELECT identity.end_expired_memberships(${limit}) AS ended`,
+  );
+  return Number(rows[0]?.ended ?? 0);
 }
 
 /**
@@ -161,6 +179,8 @@ export interface StaffInvitationRecord {
   invitedBy: { userId: string; name: string };
   createdAt: Date;
   expiresAt: Date;
+  /** For a collaborator (ADR-487): the days the access it gives lasts; null for good. */
+  accessDays: number | null;
 }
 
 /** What an invitation's link says before it is accepted. */
@@ -169,6 +189,8 @@ export interface InvitationPreview {
   role: StaffRole;
   invitedBy: string;
   expiresAt: Date;
+  /** For a collaborator (ADR-487): the days the access lasts once accepted; null for good. */
+  accessDays: number | null;
 }
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -200,10 +222,13 @@ export class StaffService {
         email: users.email,
         role: memberships.role,
         joinedAt: memberships.createdAt,
+        expiresAt: memberships.expiresAt,
       })
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
-      .where(and(eq(memberships.shopId, shopId), eq(memberships.status, 'active')))
+      .where(
+        and(eq(memberships.shopId, shopId), eq(memberships.status, 'active'), current(this.now())),
+      )
       .orderBy(sql`${memberships.role} = 'owner' DESC`, asc(memberships.createdAt), asc(users.id));
     return rows.flatMap((row) => (isStaffRole(row.role) ? [{ ...row, role: row.role }] : []));
   }
@@ -251,12 +276,25 @@ export class StaffService {
       note?: string | null;
       email?: string | null;
       language?: AccountEmailLanguage | null;
+      /** For a collaborator (ADR-487): the days, 1 to 90, the access lasts; for good unless given. */
+      accessDays?: number | null;
     },
     client: ClientInfo = {},
     limit: PlanLimit | null = null,
   ): Promise<
     MutationResult<{ invitation: StaffInvitationRecord; token: string; emailed: boolean }>
   > {
+    const accessDays = input.accessDays ?? null;
+    if (
+      accessDays !== null &&
+      (!Number.isInteger(accessDays) || accessDays < 1 || accessDays > STAFF_LIMITS.accessDays)
+    ) {
+      return failOne(
+        ['accessDays'],
+        'INVALID',
+        `Access lasts 1 to ${STAFF_LIMITS.accessDays} days`,
+      );
+    }
     const note = input.note?.trim() || null;
     if (note && note.length > STAFF_LIMITS.note) {
       return failOne(['note'], 'TOO_LONG', `Note must be ${STAFF_LIMITS.note} characters or fewer`);
@@ -267,7 +305,17 @@ export class StaffService {
       if (!email) return failOne(['email'], 'INVALID', 'Enter a valid email address');
     }
     const created = await this.db.transaction(async (tx) => {
-      const made = await this.createInvitationIn(tx, actor, shopId, input.role, note, email, limit);
+      const made = await this.createInvitationIn(
+        tx,
+        actor,
+        shopId,
+        input.role,
+        note,
+        email,
+        limit,
+        null,
+        accessDays,
+      );
       if (made.ok) await this.recordEvent(tx, actor.userId, 'staff_invited', client);
       return made;
     });
@@ -333,6 +381,7 @@ export class StaffService {
           row.email,
           limit,
           field,
+          row.accessDays,
         );
         // Refused, the one before stands as it was.
         if (!made.ok) throw new UserErrorsRollback(made.errors);
@@ -402,6 +451,7 @@ export class StaffService {
     email: string | null,
     limit: PlanLimit | null,
     field: string[] | null = null,
+    accessDays: number | null = null,
   ): Promise<MutationResult<{ invitation: StaffInvitationRecord; token: string; shop: string }>> {
     const acting = await actingRole(tx, actor.userId, shopId);
     const denied = mayManage(acting, role, field ?? ['role']);
@@ -464,6 +514,7 @@ export class StaffService {
         invitedBy: actor.userId,
         createdAt: now,
         expiresAt: new Date(now.getTime() + STAFF_LIMITS.invitationMs),
+        accessDays,
       })
       .returning();
     const invitation = toInvitation(row!, await nameOf(tx, actor.userId));
@@ -550,6 +601,9 @@ export class StaffService {
       if (target.role !== 'manager') {
         return failOne(field, 'INVALID', 'The shop goes to a manager: make them one first');
       }
+      if (target.expiresAt) {
+        return failOne(field, 'INVALID', "A collaborator's access ends: the shop goes to staff");
+      }
       if (!(await hasSecondFactor(tx, userId))) {
         return failOne(
           field,
@@ -618,6 +672,7 @@ export class StaffService {
       role: row.invitation.role,
       invitedBy: row.inviter,
       expiresAt: row.invitation.expiresAt,
+      accessDays: row.invitation.accessDays,
     };
   }
 
@@ -652,7 +707,15 @@ export class StaffService {
       if (!shop) throw invalid;
       const joined = await tx
         .insert(memberships)
-        .values({ userId: auth.userId, shopId: invitation.shopId, role })
+        .values({
+          userId: auth.userId,
+          shopId: invitation.shopId,
+          role,
+          // A collaborator's access ends by itself (ADR-487).
+          expiresAt: invitation.accessDays
+            ? new Date(now.getTime() + invitation.accessDays * 24 * 3_600_000)
+            : null,
+        })
         .onConflictDoNothing()
         .returning({ userId: memberships.userId });
       if (joined.length === 0) {
@@ -680,10 +743,13 @@ export class StaffService {
         email: users.email,
         role: memberships.role,
         joinedAt: memberships.createdAt,
+        expiresAt: memberships.expiresAt,
       })
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
-      .where(and(eq(memberships.shopId, shopId), eq(memberships.status, 'active')));
+      .where(
+        and(eq(memberships.shopId, shopId), eq(memberships.status, 'active'), current(this.now())),
+      );
     return rows.flatMap((row) => (isStaffRole(row.role) ? [{ ...row, role: row.role }] : []));
   }
 
@@ -705,6 +771,11 @@ export class StaffService {
 }
 
 /** Neither accepted, taken back nor expired at `now`. */
+/** Memberships not past their end (ADR-487): staff for good, and collaborators still in time. */
+function current(now: Date) {
+  return or(isNull(memberships.expiresAt), gt(memberships.expiresAt, now));
+}
+
 function pending(now: Date) {
   return and(
     isNull(invitations.acceptedAt),
@@ -723,9 +794,9 @@ async function memberOf(
   tx: Tx,
   userId: string,
   shopId: string,
-): Promise<{ role: StaffRole } | null> {
+): Promise<{ role: StaffRole; expiresAt: Date | null } | null> {
   const [row] = await tx
-    .select({ role: memberships.role })
+    .select({ role: memberships.role, expiresAt: memberships.expiresAt })
     .from(memberships)
     .where(
       and(
@@ -735,7 +806,7 @@ async function memberOf(
       ),
     )
     .for('update');
-  return row && isStaffRole(row.role) ? { role: row.role } : null;
+  return row && isStaffRole(row.role) ? { role: row.role, expiresAt: row.expiresAt } : null;
 }
 
 /** Why `acting` may not manage `role`, at `field`; null when it may. */
@@ -790,5 +861,6 @@ function toInvitation(
     invitedBy: { userId: row.invitedBy, name: inviter },
     createdAt: row.createdAt,
     expiresAt: row.expiresAt,
+    accessDays: row.accessDays,
   };
 }

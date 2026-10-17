@@ -7750,6 +7750,11 @@ type Mutation {
   Invites someone to work in the shop in `role`, by a link the inviter sends them, good for 7 days and accepted once; with `email`, Hatti emails it there too, 20 a day for a shop at most (ADR-167). The owner invites any role but its own; managers, those below them. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   staffInvitationCreate(
+    """
+    For a collaborator, such as an agency's (ADM-07, ADR-487): the days, 1 to 90, the access lasts once accepted, after which their membership ends by itself; for good unless given.
+    """
+    accessDays: Int
+
     """Where Hatti emails the link too: the address of whom it is for."""
     email: String
 
@@ -13192,6 +13197,10 @@ type SpeedPage {
 An invitation to work in the shop, waiting for whoever holds its link to accept it, signed in, before it expires (ADR-101).
 """
 type StaffInvitation {
+  """
+  For a collaborator (ADR-487): the days the access it gives lasts once accepted; null for staff for good.
+  """
+  accessDays: Int
   createdAt: DateTime!
 
   """
@@ -13250,6 +13259,11 @@ type StaffInvitationRevokePayload {
 type StaffMember {
   """Their email; none for one who opened their account with a phone alone."""
   email: String
+
+  """
+  When a collaborator's access ends by itself (ADM-07, ADR-487); null for staff for good.
+  """
+  expiresAt: DateTime
 
   """Their account: usr_…"""
   id: ID!

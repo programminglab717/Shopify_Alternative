@@ -906,6 +906,8 @@ export interface StaffMember {
   email: string | null;
   role: StaffMemberRole;
   joinedAt: string;
+  /** When a collaborator's access ends; none for staff kept for good (ADR-487). */
+  expiresAt: string | null;
 }
 
 export interface StaffInvitation {
@@ -915,6 +917,7 @@ export interface StaffInvitation {
   email: string | null;
   invitedBy: string;
   expiresAt: string;
+  accessDays: number | null;
 }
 
 export interface StaffData {

@@ -497,6 +497,12 @@ const en = {
   'staff.email': 'Email (optional)',
   'staff.emailHint': 'Hatti emails them the link too.',
   'staff.inviteSubmit': 'Make the invitation',
+  'staff.access': 'Access for',
+  'staff.accessForGood': 'For good',
+  'staff.accessFor': '{days} days',
+  'staff.accessHint':
+    'For an agency or a freelancer: their access ends by itself after these days from joining.',
+  'staff.accessEnds': 'Access ends {date}',
   'staff.invited': 'Send them this link. It works for 7 days, once.',
   'staff.invitedEmailed':
     'Emailed to {email}. You can send them this link too; it works for 7 days, once.',
@@ -518,6 +524,7 @@ const en = {
   'invitation.title': 'You are invited',
   'invitation.body': '{inviter} invited you to work in {shop} as {role}.',
   'invitation.expires': 'The invitation ends {when}.',
+  'invitation.accessDays': 'Your access lasts {days} days from joining, then ends by itself.',
   'invitation.accept': 'Join {shop}',
   'invitation.signIn': 'Sign in to join',
   'invitation.signUp': 'New to Hatti? Open an account',
@@ -4720,6 +4727,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'staff.email': 'ای میل (اختیاری)',
   'staff.emailHint': 'ہٹی انہیں لنک ای میل بھی کر دے گا۔',
   'staff.inviteSubmit': 'دعوت نامہ بنائیں',
+  'staff.access': 'رسائی کب تک',
+  'staff.accessForGood': 'ہمیشہ کے لیے',
+  'staff.accessFor': '{days} دن',
+  'staff.accessHint':
+    'کسی ایجنسی یا فری لانسر کے لیے: شامل ہونے کے بعد ان دنوں پر ان کی رسائی خود ختم ہو جائے گی۔',
+  'staff.accessEnds': 'رسائی {date} کو ختم',
   'staff.invited': 'انہیں یہ لنک بھیجیں۔ یہ 7 دن تک، ایک بار کام کرتا ہے۔',
   'staff.invitedEmailed':
     '{email} پر ای میل کر دیا گیا۔ آپ یہ لنک بھی بھیج سکتے ہیں؛ یہ 7 دن تک، ایک بار کام کرتا ہے۔',
@@ -4742,6 +4755,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'invitation.title': 'آپ کو دعوت ہے',
   'invitation.body': '{inviter} نے آپ کو {shop} میں {role} کے طور پر کام کرنے کی دعوت دی ہے۔',
   'invitation.expires': 'دعوت نامہ {when} ختم ہوگا۔',
+  'invitation.accessDays': 'آپ کی رسائی شامل ہونے سے {days} دن تک رہے گی، پھر خود ختم ہو جائے گی۔',
   'invitation.accept': '{shop} میں شامل ہوں',
   'invitation.signIn': 'شامل ہونے کے لیے سائن ان کریں',
   'invitation.signUp': 'ہٹی پر نئے ہیں؟ اکاؤنٹ کھولیں',

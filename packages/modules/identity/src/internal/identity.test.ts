@@ -47,7 +47,13 @@ import * as schema from './schema.js';
 import { SHOP_LIMITS, handleFrom, handleProblem } from './shops.js';
 import { SIGN_IN_ALERT, describeDevice, pakistanTime } from './sign-in-alerts.js';
 import { StaffAccessResolver } from './staff-access.js';
-import { STAFF_LIMITS, StaffService, ownerEmailIn, staffPhonesIn } from './staff.service.js';
+import {
+  STAFF_LIMITS,
+  StaffService,
+  endExpiredMemberships,
+  ownerEmailIn,
+  staffPhonesIn,
+} from './staff.service.js';
 import { SupportAccessService } from './support-access.service.js';
 
 const server = testDatabaseServer();
@@ -1344,6 +1350,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
           invitedBy: { userId: manager.userId, name: 'Ayesha Khan' },
           createdAt: new Date(clock),
           expiresAt: new Date(clock + STAFF_LIMITS.invitationMs),
+          accessDays: null,
         },
         token: expect.stringMatching(/^hsi_/),
         emailed: true,
@@ -1418,6 +1425,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         invitedBy: { userId: owner.userId, name: 'Ayesha Khan' },
         createdAt: new Date(clock),
         expiresAt: new Date(clock + STAFF_LIMITS.invitationMs),
+        accessDays: null,
       });
       expect(await staff().invitationsOf(shopId)).toEqual([invitation]);
       expect(await staff().preview(token)).toEqual({
@@ -1425,6 +1433,7 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
         role: 'packer',
         invitedBy: 'Ayesha Khan',
         expiresAt: invitation.expiresAt,
+        accessDays: null,
       });
 
       const bilal = await signUp();
@@ -1455,6 +1464,60 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       expect((await authError(staff().accept(bilal, 'hsi_nonsense'))).code).toBe(
         'INVALID_INVITATION',
       );
+    });
+
+    it('invites a collaborator for some days, whose access then ends by itself (ADR-487)', async () => {
+      const { shopId, owner } = await shopWithOwner();
+      for (const accessDays of [0, 91, 2.5]) {
+        expect(
+          errorsOf(await staff().invite(owner, shopId, { role: 'marketer', accessDays })),
+        ).toEqual([['accessDays', 'INVALID']]);
+      }
+      const invited = await staff().invite(owner, shopId, {
+        role: 'manager',
+        note: 'Pixel agency',
+        accessDays: 30,
+      });
+      if (!invited.ok) throw new Error('expected an invitation');
+      expect(invited.value.invitation.accessDays).toBe(30);
+      expect((await staff().preview(invited.value.token))?.accessDays).toBe(30);
+      const agency = await signUp();
+      await staff().accept(agency, invited.value.token, client());
+      const member = (await staff().staffOf(shopId)).find((each) => each.userId === agency.userId);
+      expect(member).toMatchObject({
+        role: 'manager',
+        expiresAt: new Date(clock + 30 * 24 * 3_600_000),
+      });
+      // Staff for good have no end; and the shop never goes to someone whose access ends.
+      expect((await staff().staffOf(shopId))[0]!.expiresAt).toBeNull();
+      expect(messageOf(await staff().transferOwnership(owner, shopId, agency.userId))).toBe(
+        "A collaborator's access ends: the shop goes to staff",
+      );
+      const access = new StaffAccessResolver(appDb.app);
+      // A manager proves who they are with a second factor: the membership counts.
+      expect(await access.resolve(agency.tokens.accessToken, shopId)).toEqual({
+        ok: false,
+        reason: 'mfa_required',
+      });
+
+      // Past its end: no access, off the staff and off their shops, then ended by the sweep.
+      const ended = new Date(Math.min(clock, Date.now()) - 60_000);
+      await admin.query('UPDATE identity.memberships SET expires_at = $2 WHERE user_id = $1', [
+        agency.userId,
+        ended,
+      ]);
+      expect(await access.resolve(agency.tokens.accessToken, shopId)).toEqual({
+        ok: false,
+        reason: 'no_shop_access',
+      });
+      expect((await staff().staffOf(shopId)).map((each) => each.userId)).toEqual([owner.userId]);
+      expect((await service.me(await auth(agency.tokens.accessToken))).shops).toEqual([]);
+      expect(await endExpiredMemberships(appDb.app, 100)).toBeGreaterThanOrEqual(1);
+      const { rows } = await admin.query(
+        'SELECT count(*)::int AS left FROM identity.memberships WHERE user_id = $1',
+        [agency.userId],
+      );
+      expect(rows[0].left).toBe(0);
     });
 
     it("keeps the owner's powers and the managers' apart", async () => {

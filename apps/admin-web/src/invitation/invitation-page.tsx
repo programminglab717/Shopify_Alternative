@@ -36,6 +36,8 @@ interface Preview {
   role: string;
   invitedBy: string;
   expiresAt: string;
+  /** For a collaborator, the days their access lasts once they join (ADR-487). */
+  accessDays?: number | null;
 }
 
 /**
@@ -107,6 +109,9 @@ export function InvitationPage() {
                 role: t(roleLabel(preview.role.toUpperCase() as StaffMemberRole)),
               })}
             </p>
+            {preview.accessDays ? (
+              <p>{t('invitation.accessDays', { days: preview.accessDays })}</p>
+            ) : null}
             <p className="text-secondary">
               {t('invitation.expires', {
                 when: formatRelative(preview.expiresAt, 'Asia/Karachi', locale),

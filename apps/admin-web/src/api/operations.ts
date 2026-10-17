@@ -1977,6 +1977,7 @@ export const StaffQuery = /* GraphQL */ `
       email
       role
       joinedAt
+      expiresAt
     }
     staffInvitations {
       id
@@ -1985,6 +1986,7 @@ export const StaffQuery = /* GraphQL */ `
       email
       invitedBy
       expiresAt
+      accessDays
     }
   }
 `;
@@ -1996,8 +1998,15 @@ export const StaffInvitationCreateMutation = /* GraphQL */ `
     $note: String
     $email: String
     $language: EmailLanguage
+    $accessDays: Int
   ) {
-    staffInvitationCreate(role: $role, note: $note, email: $email, language: $language) {
+    staffInvitationCreate(
+      role: $role
+      note: $note
+      email: $email
+      language: $language
+      accessDays: $accessDays
+    ) {
       token
       emailed
       invitation {

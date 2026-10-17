@@ -95,6 +95,7 @@ import { DomainNotices } from './domain-notices.js';
 import { StoreExportNotices } from './store-export-notices.js';
 import { PlanOrders } from './plan-orders.js';
 import { ExpiredCheckouts } from './expired-checkouts.js';
+import { ExpiredMemberships } from './expired-memberships.js';
 import { StoreCreditExpiry } from './store-credit-expiry.js';
 import { StoreCreditNotices } from './store-credit-notices.js';
 import { GiftCardSales } from './gift-card-sales.js';
@@ -416,6 +417,11 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       config.SWEEP_INTERVAL_MS,
     );
     closers.push(() => credit.stop());
+    // Collaborators' memberships past their end taken away (ADR-487).
+    const collaborators = new ExpiredMemberships(database.app, logger).start(
+      config.SWEEP_INTERVAL_MS,
+    );
+    closers.push(() => collaborators.stop());
     // Each shop told each morning on WhatsApp how the day before went (ADR-386).
     const summaries = new DailySummaries(database, new MessagesService(database), logger).start(
       config.SWEEP_INTERVAL_MS,

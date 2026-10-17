@@ -441,6 +441,7 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
           role: 'packer',
           invitedBy: 'Sana Iqbal',
           expiresAt: invitation.expiresAt,
+          accessDays: null,
         },
       });
       const bilal = await signUp();
@@ -580,6 +581,62 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
           details: JSON.stringify({ role: 'MARKETER', replaced: first.invitation.id }),
         },
       ]);
+    });
+
+    it('invites a collaborator for some days, whose access then ends by itself (ADR-487)', async () => {
+      const shopD = newId();
+      await admin.query(`INSERT INTO control.shops (id, name) VALUES ($1, 'Shop D')`, [shopD]);
+      await admin.query(
+        `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+         VALUES ($1, 'growth', 'monthly', now(), now() + interval '1 month')`,
+        [shopD],
+      );
+      const owner = await signUp();
+      await grant(owner.userId, shopD, 'owner');
+      await enableTwoStep(owner.accessToken);
+      const as = (token: string, query: string) =>
+        graphql(token, shopD, query).then((response) => response.json() as Json);
+
+      const tooLong = await as(
+        owner.accessToken,
+        `mutation { staffInvitationCreate(role: MARKETER, accessDays: 0) {
+           invitation { id } userErrors { field code } } }`,
+      );
+      expect(tooLong.data.staffInvitationCreate).toEqual({
+        invitation: null,
+        userErrors: [{ field: ['accessDays'], code: 'INVALID' }],
+      });
+      const created = await as(
+        owner.accessToken,
+        `mutation { staffInvitationCreate(role: MARKETER, note: "Pixel agency", accessDays: 14) {
+           invitation { accessDays } token userErrors { field code } } }`,
+      );
+      const { invitation, token } = created.data.staffInvitationCreate;
+      expect(invitation).toEqual({ accessDays: 14 });
+      const preview = await post('/auth/invitations/preview', { token });
+      expect(preview.json().invitation.accessDays).toBe(14);
+
+      const agency = await signUp();
+      await post('/auth/invitations/accept', { token }, agency.accessToken);
+      const staff = await as(owner.accessToken, '{ staffMembers { role expiresAt } }');
+      const until = new Date(staff.data.staffMembers[1].expiresAt).getTime();
+      expect(staff.data.staffMembers[0]).toEqual({ role: 'OWNER', expiresAt: null });
+      expect(until - Date.now()).toBeGreaterThan(13.9 * 86_400_000);
+      expect(until - Date.now()).toBeLessThanOrEqual(14 * 86_400_000);
+      expect((await graphql(agency.accessToken, shopD, '{ shop { name } }')).statusCode).toBe(200);
+
+      // When its days are up, the shop is closed to it, though no sweep has run yet.
+      await admin.query(
+        `UPDATE identity.memberships SET expires_at = now() - interval '1 minute'
+         WHERE user_id = $1 AND shop_id = $2`,
+        [agency.userId, shopD],
+      );
+      const ended = await graphql(agency.accessToken, shopD, '{ shop { name } }');
+      expect(ended.statusCode).toBe(403);
+      expect(ended.json().errors[0].extensions.code).toBe('NO_SHOP_ACCESS');
+      expect((await as(owner.accessToken, '{ staffMembers { role } }')).data).toEqual({
+        staffMembers: [{ role: 'OWNER' }],
+      });
     });
 
     it('stops accepting a session as soon as it signs out', async () => {

@@ -2351,7 +2351,14 @@ export class IdentityService {
       .select({ shopId: memberships.shopId, role: memberships.role, name: shops.name })
       .from(memberships)
       .innerJoin(shops, and(eq(shops.id, memberships.shopId), eq(shops.status, 'active')))
-      .where(and(eq(memberships.userId, auth.userId), eq(memberships.status, 'active')))
+      .where(
+        and(
+          eq(memberships.userId, auth.userId),
+          eq(memberships.status, 'active'),
+          // A collaborator's shop goes from the list when their access ends (ADR-487).
+          or(isNull(memberships.expiresAt), gt(memberships.expiresAt, this.now())),
+        ),
+      )
       .orderBy(asc(shops.name));
     return {
       user,

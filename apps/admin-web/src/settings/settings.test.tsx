@@ -102,8 +102,16 @@ describe('Settings in the admin', () => {
                   email: 'sana@zari.pk',
                   role: 'OWNER',
                   joinedAt: LATER,
+                  expiresAt: null,
                 },
-                { id: 'usr_2', name: 'Bilal', email: null, role: 'PACKER', joinedAt: LATER },
+                {
+                  id: 'usr_2',
+                  name: 'Bilal',
+                  email: null,
+                  role: 'PACKER',
+                  joinedAt: LATER,
+                  expiresAt: null,
+                },
               ],
               staffInvitations: [],
             };
@@ -156,7 +164,72 @@ describe('Settings in the admin', () => {
       note: 'Ali, for packing',
       email: null,
       language: 'EN',
+      accessDays: null,
     });
+  });
+
+  it("invites an agency for 30 days, and says when a collaborator's access ends (ADR-487)", async () => {
+    const core = fakeCore('owner', (operation) => {
+      switch (operation) {
+        case 'Staff':
+          return {
+            staffMembers: [
+              {
+                id: 'usr_1',
+                name: 'Sana',
+                email: null,
+                role: 'OWNER',
+                joinedAt: LATER,
+                expiresAt: null,
+              },
+              {
+                id: 'usr_3',
+                name: 'Pixel agency',
+                email: null,
+                role: 'MARKETER',
+                joinedAt: LATER,
+                expiresAt: '2026-11-16T10:00:00Z',
+              },
+            ],
+            staffInvitations: [
+              {
+                id: 'inv_2',
+                role: 'MARKETER',
+                note: 'Ads freelancer',
+                email: null,
+                invitedBy: 'Sana',
+                expiresAt: LATER,
+                accessDays: 7,
+              },
+            ],
+          };
+        case 'StaffInvitationCreate':
+          return {
+            staffInvitationCreate: {
+              token: 'hsi_def',
+              emailed: false,
+              invitation: { id: 'inv_3' },
+              userErrors: [],
+            },
+          };
+        default:
+          throw new Error(`unexpected ${operation}`);
+      }
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/staff');
+
+    await screen.findByText('Pixel agency');
+    expect(screen.getByText(/Access ends 16 Nov 2026/)).toBeTruthy();
+    expect(screen.getByText(/7 days ·/)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'MARKETER' } });
+    fireEvent.change(screen.getByLabelText('Access for'), { target: { value: '30' } });
+    await press('Make the invitation');
+    await screen.findByText('Send them this link. It works for 7 days, once.');
+    expect(
+      core.sent.find((each) => each.operation === 'StaffInvitationCreate')?.variables,
+    ).toMatchObject({ role: 'MARKETER', accessDays: 30 });
   });
 
   it("opens an invitation's link signed in, and joins its shop", async () => {

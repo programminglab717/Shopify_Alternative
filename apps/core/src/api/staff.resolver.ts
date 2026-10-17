@@ -25,6 +25,7 @@ import {
   Field,
   GraphQLISODateTime,
   ID,
+  Int,
   Mutation,
   ObjectType,
   Query,
@@ -75,6 +76,13 @@ export class StaffMember {
 
   @Field(() => GraphQLISODateTime, { description: 'When they began working in the shop.' })
   joinedAt!: Date;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      "When a collaborator's access ends by itself (ADM-07, ADR-487); null for staff for good.",
+  })
+  expiresAt!: Date | null;
 }
 
 @ObjectType({
@@ -106,6 +114,14 @@ export class StaffInvitation {
 
   @Field(() => GraphQLISODateTime, { description: '7 days after it was made.' })
   expiresAt!: Date;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'For a collaborator (ADR-487): the days the access it gives lasts once accepted; null for ' +
+      'staff for good.',
+  })
+  accessDays!: number | null;
 }
 
 @ObjectType()
@@ -278,6 +294,15 @@ export class StaffResolver {
         "What the email says around the link; the inviter's own language unless given (ADR-194).",
     })
     language?: EmailLanguage | null,
+    @Args('accessDays', {
+      type: () => Int,
+      nullable: true,
+      description:
+        "For a collaborator, such as an agency's (ADM-07, ADR-487): the days, 1 to 90, the " +
+        'access lasts once accepted, after which their membership ends by itself; for good ' +
+        'unless given.',
+    })
+    accessDays?: number | null,
   ): Promise<StaffInvitationCreatePayload> {
     const actor = managingStaff(tenant);
     const limit = (await this.allowance?.limitOf(tenant.shopId, 'staff')) ?? null;
@@ -290,6 +315,7 @@ export class StaffResolver {
         email,
         // Unless given, the inviter's own, which the staff service reads (ADR-194).
         language: language ? (language === EmailLanguage.UR ? 'ur' : 'en') : null,
+        accessDays,
       },
       {},
       limit,
@@ -297,6 +323,7 @@ export class StaffResolver {
     if (result.ok) {
       await this.audit(tenant, 'staff.invited', 'staffInvitation', result.value.invitation.id, {
         role,
+        ...(accessDays !== null && accessDays !== undefined && { accessDays }),
       });
     }
     return Object.assign(new StaffInvitationCreatePayload(), {
@@ -533,6 +560,7 @@ function toStaffMember(record: StaffMemberRecord): StaffMember {
     email: record.email,
     role: ROLES[record.role],
     joinedAt: record.joinedAt,
+    expiresAt: record.expiresAt,
   });
 }
 
@@ -545,5 +573,6 @@ function toStaffInvitation(record: StaffInvitationRecord): StaffInvitation {
     invitedBy: record.invitedBy.name,
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
+    accessDays: record.accessDays,
   });
 }

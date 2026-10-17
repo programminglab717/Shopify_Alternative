@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-486 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-487 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -494,6 +494,7 @@
 | 484 | Pakistan's marketing calendar: the moments shoppers buy for, dated each year from Umm al-Qura a day later for the Islamic ones, each with a ready-made campaign | Accepted |
 | 485 | The store speed score: shoppers' own Core Web Vitals, counted by the storefront in histograms of 28 days, scored per device as Google judges them, with fixes | Accepted |
 | 486 | Vertical starter kits: what a kind of shop sells by, its smart collections, size charts and main menu links, set up in one go and safe to apply again | Accepted |
+| 487 | Collaborators: staff invited for 1 to 90 days, whose access ends by itself | Accepted |
 
 ---
 
@@ -18409,3 +18410,42 @@
     manual collections filled by hand.
   * **Kits chosen when a shop opens:** opening stays one step (ADR-145). A kit is offered where
     its collections show.
+
+## ADR-487 · Collaborators: staff invited for 1 to 90 days, whose access ends by itself
+
+* **Context:**
+  * ADM-07 asks for collaborator accounts: an agency running a shop's ads, or a freelancer
+    shooting its products, given access that is time-boxed and ends without anyone
+    remembering to take it back.
+  * Staff join by invitation (ADR-101) and stay until removed. A role limits what they do
+    (ADR-030), but nothing limits how long.
+* **Decision:**
+  * **An invitation may give access for 1 to 90 days** (`staffInvitationCreate(accessDays:)`).
+    The days count from joining, not from the invitation, so a link opened on its seventh day
+    still gives the days asked. The invitation's preview says them; sending it again keeps
+    them.
+  * **A membership keeps when it ends** (`identity.memberships.expires_at`, migration 0227),
+    set when such an invitation is accepted. The owner's membership never ends (a check
+    constraint), and a shop is not handed to a collaborator.
+  * **Access ends at that moment, not at a sweep**:
+    * `identity.resolve_staff_access` refuses a membership past its end, so every Admin API
+      request after it answers `NO_SHOP_ACCESS`;
+    * the staff list, the account's shops and the numbers and emails staff are told at leave
+      it out.
+  * **A worker sweep deletes ended memberships** every sweep interval, 200 at a time, through
+    `identity.end_expired_memberships`, a function owned by identity's role. So the shop's
+    staff count and room on its plan (ADR-154) come back.
+  * **The admin's invitation form asks "Access for"**: for good, 7, 30 or 90 days. Staff
+    show when a collaborator's access ends, and invitations their days.
+* **Consequences:**
+  * An agency asking for access itself, by the shop's handle, for the owner to approve, is the
+    second part of ADM-07.
+  * Extending a collaborator means inviting them again. The role can still be changed or the
+    member removed sooner as for any staff.
+  * A collaborator's actions are on the activity log under their own name, as any staff's.
+* **Alternatives:**
+  * **A separate collaborator role:** what an agency may do is a role's question; how long is
+    a separate one, so any role can be time-boxed.
+  * **Days from the invitation:** the agency would lose days to a link opened late.
+  * **Ending access only by the sweep:** access would last up to a sweep interval past its
+    end.

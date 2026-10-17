@@ -49,6 +49,10 @@ export function rolesManagedBy(role: StaffMemberRole): StaffMemberRole[] {
   return [];
 }
 
+/** How long an invited person's access lasts: for good, or days for a collaborator (ADR-487). */
+const ACCESS = ['forGood', '7', '30', '90'] as const;
+type Access = (typeof ACCESS)[number];
+
 /** The link an invitation opens: the admin's page for it, the token after the `#`. */
 export function invitationLink(token: string): string {
   return `${window.location.origin}/invitation#token=${token}`;
@@ -200,7 +204,13 @@ export function StaffPage() {
   const { run, panel } = useRecentAuthentication();
   const invite = useAdminMutation<
     StaffInvitationCreateData,
-    { role: StaffMemberRole; note: string | null; email: string | null; language: 'EN' | 'UR' }
+    {
+      role: StaffMemberRole;
+      note: string | null;
+      email: string | null;
+      language: 'EN' | 'UR';
+      accessDays: number | null;
+    }
   >(StaffInvitationCreateMutation);
   const revoke = useAdminMutation<
     { staffInvitationRevoke: { userErrors: UserError[] } },
@@ -223,6 +233,7 @@ export function StaffPage() {
   const roleField = useId();
   const [note, setNote] = useState('');
   const [email, setEmail] = useState('');
+  const [access, setAccess] = useState<Access>('forGood');
   const [invited, setInvited] = useState<{ token: string; emailed: string | null } | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -239,6 +250,7 @@ export function StaffPage() {
         note: note.trim() || null,
         email: email.trim() || null,
         language: locale === 'ur' ? 'UR' : 'EN',
+        accessDays: access === 'forGood' ? null : Number(access),
       });
       const failed = failedWith(staffInvitationCreate.userErrors, t);
       if (failed) setProblem(failed);
@@ -249,6 +261,7 @@ export function StaffPage() {
         });
         setNote('');
         setEmail('');
+        setAccess('forGood');
       }
     }, onError);
   };
@@ -351,6 +364,14 @@ export function StaffPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-secondary text-[length:var(--hatti-type-body-sm-size)]">
                   {t('staff.joined', { date: formatDate(member.joinedAt, timezone, locale) })}
+                  {member.expiresAt && (
+                    <span className="font-medium">
+                      ·{' '}
+                      {t('staff.accessEnds', {
+                        date: formatDate(member.expiresAt, timezone, locale),
+                      })}
+                    </span>
+                  )}
                   {changeable &&
                     (removing === member.id ? (
                       <>
@@ -396,6 +417,9 @@ export function StaffPage() {
                     </span>
                     <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
                       {t(roleLabel(invitation.role))} ·{' '}
+                      {invitation.accessDays !== null && (
+                        <>{t('staff.accessFor', { days: invitation.accessDays })} · </>
+                      )}
                       {t('staff.expires', {
                         when: formatRelative(invitation.expiresAt, timezone, locale),
                       })}
@@ -469,6 +493,23 @@ export function StaffPage() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
             />
+            <div className="flex flex-col gap-1">
+              <SelectField<Access>
+                label={t('staff.access')}
+                value={access}
+                options={ACCESS.map((value) => ({
+                  value,
+                  label:
+                    value === 'forGood'
+                      ? t('staff.accessForGood')
+                      : t('staff.accessFor', { days: Number(value) }),
+                }))}
+                onChange={setAccess}
+              />
+              <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                {t('staff.accessHint')}
+              </span>
+            </div>
             <Button type="submit" busy={invite.isPending} className="self-start">
               {t('staff.inviteSubmit')}
             </Button>

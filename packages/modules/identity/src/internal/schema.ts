@@ -225,6 +225,8 @@ export const invitations = identitySchema.table('invitations', {
   acceptedAt: at('accepted_at'),
   acceptedBy: uuid('accepted_by'),
   revokedAt: at('revoked_at'),
+  /** For a collaborator (ADR-487): the days the access it gives lasts; null for good. */
+  accessDays: integer('access_days'),
 });
 
 export const memberships = identitySchema.table(
@@ -236,6 +238,8 @@ export const memberships = identitySchema.table(
     status: text('status', { enum: ['active', 'suspended'] })
       .notNull()
       .default('active'),
+    /** When a collaborator's access ends (ADR-487); null for good. */
+    expiresAt: at('expires_at'),
     createdAt: at('created_at').notNull().defaultNow(),
     updatedAt: at('updated_at').notNull().defaultNow(),
   },

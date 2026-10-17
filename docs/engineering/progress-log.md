@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Collaborators
+
+* **Staff invited for 1 to 90 days from joining, for an agency or a freelancer, whose access
+  ends by itself: refused the moment it ends, the membership swept away after, and the admin's
+  "Access for" choice** ([ADR-487](../architecture/13-decision-log.md#adr-487--collaborators-staff-invited-for-1-to-90-days-whose-access-ends-by-itself), ADM-07 in part).
+* 3056 tests, 3 more: identity's collaborators, the Admin API's,
+  and the admin's staff page.
+
 ### 79428ce · Vertical starter kits
 
 * **Fashion, jewellery, beauty, electronics and grocery kits: smart collections filled by tags,
