@@ -1,10 +1,14 @@
 import type { Tx } from '@hatti/db';
+import { recordFiscalDocumentsIn, type FiscalDocument } from '@hatti/tax/public';
 import { sql } from 'drizzle-orm';
+import { fiscalCreditNoteOf, fiscalInvoiceOf } from './fiscal.js';
+import type { OrderRecord } from './records.js';
 
 // A shop's invoices in a series of their own (TAX-05, ADR-495): numbered from 1 each tax year,
 // which in Pakistan starts on 1 July, with no number skipped or given twice. An order's invoice
 // takes its number the first time it is printed, and keeps it. A refund on an order whose
-// invoice was issued takes a credit note's number, in a series of its own (ADR-496).
+// invoice was issued takes a credit note's number, in a series of its own (ADR-496). While the
+// shop's POS is connected to FBR, each is kept to be reported to FBR as it is issued (ADR-555).
 
 /** An order's invoice as issued. */
 export interface OrderInvoiceRecord {
@@ -96,12 +100,12 @@ export async function invoicesIn(
  * The invoices of orders `orders`, issuing the next numbers, in the order given, to those not
  * cancelled that have none; in the caller's transaction, so numbers come back if it rolls back.
  * A shop's invoices are issued one transaction at a time, so none is numbered twice and no
- * number is skipped.
+ * number is skipped. Those issued are kept to report to FBR, while the shop's POS is connected.
  */
 export async function issueInvoicesIn(
   tx: Tx,
   shopId: string,
-  orders: readonly { id: string; stage: string }[],
+  orders: readonly OrderRecord[],
   timeZone: string,
   now = new Date(),
 ): Promise<Map<string, OrderInvoiceRecord>> {
@@ -112,6 +116,7 @@ export async function issueInvoicesIn(
     orders.map((order) => order.id),
   );
   const taxYear = taxYearOf(now, timeZone);
+  const fiscal: FiscalDocument[] = [];
   for (const order of orders) {
     if (invoices.has(order.id) || order.stage === 'cancelled') continue;
     const number = await nextNumberIn(tx, shopId, 'invoice', taxYear);
@@ -119,33 +124,52 @@ export async function issueInvoicesIn(
       INSERT INTO orders.order_invoices (shop_id, order_id, tax_year, number, issued_at)
       VALUES (${shopId}, ${order.id}, ${taxYear}, ${number}, ${now.toISOString()})
       RETURNING order_id, tax_year, number, issued_at`);
-    invoices.set(order.id, toRecord(issued[0]!));
+    const invoice = toRecord(issued[0]!);
+    invoices.set(order.id, invoice);
+    fiscal.push(fiscalInvoiceOf(order, invoice.name, invoice.issuedAt));
   }
+  await recordFiscalDocumentsIn(tx, shopId, fiscal, timeZone);
   return invoices;
 }
 
 /**
- * A credit note for refund `refundId` of order `orderId`, if the order's invoice was issued: the
- * next number of the shop's credit notes, in the caller's transaction. Null if it has no invoice:
- * the invoice says what was refunded before it was printed.
+ * A credit note for `refund` of `order`, if the order's invoice was issued: the next number of
+ * the shop's credit notes, in the caller's transaction, kept to report to FBR while the shop's POS
+ * is connected. Null if it has no invoice: the invoice says what was refunded before it was
+ * printed.
  */
 export async function issueCreditNoteIn(
   tx: Tx,
   shopId: string,
-  orderId: string,
-  refundId: string,
+  order: Pick<OrderRecord, 'id' | 'taxRate' | 'paymentMethod'>,
+  refund: { id: string; amount: bigint; tax: bigint },
   timeZone: string,
   now = new Date(),
 ): Promise<{ taxYear: number; number: number } | null> {
   // Asked before the series' lock: a print holding it never waits on an order that has its
   // invoice, as the caller's refund holds this one, so the two never wait on each other.
-  if (!(await invoicesIn(tx, shopId, [orderId])).has(orderId)) return null;
+  const invoice = (await invoicesIn(tx, shopId, [order.id])).get(order.id);
+  if (!invoice) return null;
   await lockSeriesIn(tx, shopId);
   const taxYear = taxYearOf(now, timeZone);
   const number = await nextNumberIn(tx, shopId, 'credit_note', taxYear);
   await tx.execute(sql`
     INSERT INTO orders.refund_credit_notes (shop_id, refund_id, order_id, tax_year, number,
                                             issued_at)
-    VALUES (${shopId}, ${refundId}, ${orderId}, ${taxYear}, ${number}, ${now.toISOString()})`);
+    VALUES (${shopId}, ${refund.id}, ${order.id}, ${taxYear}, ${number}, ${now.toISOString()})`);
+  await recordFiscalDocumentsIn(
+    tx,
+    shopId,
+    [
+      fiscalCreditNoteOf(order, {
+        usin: creditNoteName(taxYear, number),
+        invoiceUsin: invoice.name,
+        amount: refund.amount,
+        tax: refund.tax,
+        issuedAt: now,
+      }),
+    ],
+    timeZone,
+  );
   return { taxYear, number };
 }

@@ -20,8 +20,10 @@
   },
   "dependencies": {
     "@hatti/api": "workspace:*",
+    "@hatti/crypto": "workspace:*",
     "@hatti/db": "workspace:*",
     "@hatti/events": "workspace:*",
+    "@hatti/ids": "workspace:*",
     "@hatti/money": "workspace:*",
     "drizzle-orm": "catalog:"
   },
@@ -32,7 +34,6 @@
     "reflect-metadata": "catalog:"
   },
   "devDependencies": {
-    "@hatti/ids": "workspace:*",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
     "@nestjs/graphql": "catalog:",

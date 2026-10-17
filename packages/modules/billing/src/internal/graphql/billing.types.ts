@@ -193,6 +193,13 @@ export class BillingPlan {
   })
   pixels!: boolean;
 
+  @Field({
+    description:
+      'Whether the shop may connect its POS to FBR, to report its invoices as a Tier-1 ' +
+      'retailer (ADR-555).',
+  })
+  fiscalReporting!: boolean;
+
   @Field(() => Int, {
     description: 'AI credits it includes a month, each a draft the AI gives (ADR-533).',
   })

@@ -324,6 +324,81 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     expect(errorsOf(await print([notInvoiced.id], 'credit_note'))).toEqual([['ids', 'INVALID']]);
   });
 
+  it("keeps invoices and credit notes for FBR as they are issued, while the shop's POS is connected (ADR-555)", async () => {
+    const year = taxYearOf(new Date(), 'Asia/Karachi');
+    await f.admin.query(
+      `INSERT INTO tax.settings (shop_id, rate, tax_delivery) VALUES ($1, 1800, true)`,
+      [f.a.shopId],
+    );
+    const print = (ids: string[], kind: 'invoice' | 'credit_note' = 'invoice') =>
+      f.documents.render(f.a, ids, { kind, paper: 'a4', language: 'english' });
+    const kept = async () =>
+      (
+        await f.admin.query<{ usin: string; kind: string; payload: Record<string, unknown> }>(
+          `SELECT usin, kind, payload FROM tax.fiscal_invoices WHERE shop_id = $1 ORDER BY usin`,
+          [f.a.shopId],
+        )
+      ).rows;
+
+    // Before the POS is connected, nothing is kept.
+    const before = await f.order(f.a, [kurta]);
+    unwrap(await print([before.id]));
+    expect(await kept()).toEqual([]);
+
+    await f.admin.query(
+      `INSERT INTO tax.fbr_pos (shop_id, pos_id, access_token, token_hint, environment, pct_code)
+       VALUES ($1, 123456, 'sealed', 'f818', 'production', '62044200')`,
+      [f.a.shopId],
+    );
+    const order = await f.order(f.a, [kurta, size8], {
+      shippingPrice: '250',
+      discount: '500',
+      advancePaid: '1000',
+    });
+    unwrap(await print([order.id, before.id]));
+    // Printed again, it is not kept again; the invoice issued before is not reported late.
+    unwrap(await print([order.id]));
+    const [invoice] = await kept();
+    expect(await kept()).toHaveLength(1);
+    expect(invoice!.usin).toBe(invoiceName(year, 2));
+    const body = invoice!.payload as {
+      TotalBillAmount: number;
+      TotalTaxCharged: number;
+      TotalSaleValue: number;
+      Discount: number;
+      PaymentMode: number;
+      Items: { ItemName: string; TotalAmount: number; TaxCharged: number; Discount: number }[];
+    };
+    // Its items add up to the order, its tax to the order's tax, as the invoice prints them.
+    const rupees = (amount: bigint) => Number(amount) / 100;
+    expect(body.TotalBillAmount).toBe(rupees(order.total));
+    expect(body.TotalTaxCharged).toBe(rupees(order.totalTax));
+    expect(body.Discount).toBe(500);
+    expect(body.PaymentMode).toBe(1);
+    expect(body.Items.map((item) => item.ItemName)).toEqual([
+      'Kurta',
+      expect.stringContaining('Peshawari Chappal'),
+      'Delivery',
+    ]);
+    const sum = (of: (item: (typeof body.Items)[number]) => number) =>
+      Math.round(body.Items.reduce((total, item) => total + of(item), 0) * 100) / 100;
+    expect(sum((item) => item.TotalAmount)).toBe(body.TotalBillAmount);
+    expect(sum((item) => item.TaxCharged)).toBe(body.TotalTaxCharged);
+    expect(sum((item) => item.Discount)).toBe(500);
+    expect(body.Items[2]).toMatchObject({ TotalAmount: 250, TaxCharged: 38.14 });
+
+    // A refund on it is a credit note for FBR, naming the invoice it corrects.
+    unwrap(await f.refunds.refund(f.a, order.id, { amount: '200', method: 'cash' }));
+    const note = (await kept()).find((each) => each.kind === 'credit_note')!;
+    expect(note.usin).toBe(creditNoteName(year, 1));
+    expect(note.payload).toMatchObject({
+      InvoiceType: 3,
+      RefUSIN: invoiceName(year, 2),
+      TotalBillAmount: 200,
+      TotalTaxCharged: 30.51,
+    });
+  });
+
   it('prints the gift message on the packing slip, escaped, and none once its customer is erased (ADR-413)', async () => {
     const order = await f.order(f.a, [kurta], { giftMessage: '  Eid Mubarak <3 Ammi  ' });
     expect(order.giftMessage).toBe('Eid Mubarak <3 Ammi');

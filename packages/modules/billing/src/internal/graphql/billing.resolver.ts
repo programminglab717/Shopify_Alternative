@@ -314,6 +314,7 @@ function toPlan(plan: Plan): BillingPlan {
     removeBranding: plan.removeBranding,
     trueProfit: plan.trueProfit,
     pixels: plan.pixels,
+    fiscalReporting: plan.fiscalReporting,
     aiCredits: plan.aiCredits,
   });
 }

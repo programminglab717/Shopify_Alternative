@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-554 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-555 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -562,6 +562,7 @@
 | 552 | The admin's storefront preferences turn the consent banner on and off, saying what each choice means for the shop's pixels and its orders | Accepted |
 | 553 | A shop records what it spends on its ads, day by day, by platform and campaign, and the sales report takes it off the orders' profit and sets their sales against it | Accepted |
 | 554 | The admin records ad spend a day at a time under Marketing, and analytics shows the spend and the sales each rupee of it brought, beside true profit | Accepted |
+| 555 | A Tier-1 shop connects its POS to FBR, and each invoice and credit note it issues is reported to FBR's IMS as it is issued, tried again while FBR cannot be reached | Accepted |
 
 ---
 
@@ -20853,3 +20854,45 @@
 * **Alternatives:** **A grid of days by platform:** most shops pay one or two platforms, and an
   entry at a time also fits a phone. **Spend shown without true profit:** it is part of what
   profit takes off, so it shows where that does.
+
+## ADR-555 · A Tier-1 shop connects its POS to FBR, and each invoice and credit note it issues is reported to FBR's IMS as it is issued, tried again while FBR cannot be reached
+
+* **Context:** A Tier-1 retailer must report each sale to FBR as it makes it, from a POS FBR has
+  registered, and print the number FBR gives it, with its QR code, on the customer's invoice
+  (POS-04, TAX-04). A shop issues its invoices on first print (ADR-495) and its credit notes with
+  refunds (ADR-496), and keeps its Tier-1 status with its tax settings (ADR-500), but nothing
+  reached FBR.
+* **Decision:**
+  * **The connection.** The tax module keeps the shop's POS as FBR registered it: the POS ID, the
+    access token FBR gave for it, sealed for the shop alone and never shown again, FBR's sandbox or
+    the real service, and one PCT code its items are reported under until variants have codes of
+    their own (CAT-19). Connecting needs all four, and Pro, whose plan includes FBR's connectors;
+    changes are audited, the token never. `fbrPos`, `fbrPosUpdate` (staff confirm who they are
+    first, as for the ad platforms' tokens) and `fbrPosDelete`, under the settings scopes.
+  * **What is kept.** While connected, each invoice the orders module issues, and each credit note,
+    is kept in the same transaction as FBR's IMS takes it: its USIN the shop's own number, its time
+    in the shop's zone, each line at what was paid for it after its share of the discount with its
+    tax as the order worked it out, the delivery charge and fee for paying on delivery as one line
+    more, and its totals added up from its lines, so they always match the invoice. A credit note
+    is FBR's credit invoice, naming the invoice it corrects, with the refund as its one line. Cash
+    on delivery is cash; whatever was paid ahead goes as card, FBR's modes having no transfer.
+    Nothing of the customer goes: FBR asks none of a retail sale. The POS ID and PCT code go in as
+    each is sent, so a code put right applies to those sent again. Invoices issued before
+    connecting are not reported late.
+  * **Reporting.** The worker reports those due, the oldest first, each in a request of its own
+    with the POS's token. FBR's number settles it; a refusal fails it, saying why; FBR unreachable,
+    busy or refusing the token leaves it pending, tried again after a minute, doubling to six
+    hours, for a week, and then failed. A new token or POS sends those waiting at once.
+  * **The shop's view.** `fiscalInvoices` lists them, the latest first, by status, with FBR's
+    number or why not; `fiscalInvoiceRetry` sends again one refused, or one disconnecting left
+    unsent, once the POS is connected. Disconnecting forgets the token and leaves what waits
+    unsent.
+* **Consequences:** A Tier-1 shop's invoices reach FBR without a POS vendor of its own. FBR's
+  number is not yet printed on the invoice, nor its QR code, and the admin has no FBR page; FBR's
+  Rs 1 POS service fee is not charged; and FBR's digital invoicing for sales-tax-registered
+  sellers, through a licensed integrator, remains (TAX-04).
+* **Alternatives:** **Reporting while the invoice prints:** FBR answering slowly would hold the
+  series' lock and every print behind it; kept in the transaction and sent after, an invoice is
+  never issued without being kept, nor kept without being issued. **The customer's name and
+  number:** FBR asks none, and none kept is none to erase. **A PCT code each variant:** waits for
+  the catalog's FBR fields (CAT-19).

@@ -790,6 +790,11 @@ type BillingPlan {
   """Whether the shop may connect a domain of its own (ADR-264)."""
   customDomains: Boolean!
 
+  """
+  Whether the shop may connect its POS to FBR, to report its invoices as a Tier-1 retailer (ADR-555).
+  """
+  fiscalReporting: Boolean!
+
   """Locations it has room for."""
   locationLimit: Int!
 
@@ -4509,6 +4514,59 @@ enum Fabric {
   WOOL
 }
 
+"""FBR's sandbox, to try a POS on, or the real one, where invoices count."""
+enum FbrEnvironment {
+  PRODUCTION
+  SANDBOX
+}
+
+"""
+The shop's POS as FBR registered it (POS-04, TAX-04, ADR-555): while it is connected, each invoice and credit note the shop issues is reported to FBR, which gives it a number of its own.
+"""
+type FbrPos {
+  """The last four characters of its access token, never shown again."""
+  accessTokenHint: String!
+  environment: FbrEnvironment!
+
+  """
+  The PCT code, 8 digits, that items are reported under, until variants have codes of their own.
+  """
+  pctCode: String!
+
+  """The POS ID FBR gave the POS when it registered it."""
+  posId: Int!
+  updatedAt: DateTime!
+}
+
+type FbrPosDeletePayload {
+  """The POS ID that was connected; null when none was."""
+  deletedPosId: Int
+  userErrors: [UserError!]!
+}
+
+input FbrPosInput {
+  """
+  The access token FBR gave for the POS: needed to connect, kept sealed, and never shown again.
+  """
+  accessToken: String
+
+  """Needed to connect."""
+  environment: FbrEnvironment
+
+  """
+  A PCT code from FBR's tariff, "6204.4200" or its 8 digits: needed to connect.
+  """
+  pctCode: String
+
+  """The POS ID FBR gave the POS: needed to connect."""
+  posId: Int
+}
+
+type FbrPosUpdatePayload {
+  fbrPos: FbrPos
+  userErrors: [UserError!]!
+}
+
 """
 A file the shop uploaded, such as an image for its pages or the logo on its checkout (ADR-079): kept in the platform's storage, and shown only through short-lived URLs.
 """
@@ -4572,6 +4630,54 @@ enum FilerStatus {
   ACTIVE
   INACTIVE
   UNKNOWN
+}
+
+"""
+An invoice or credit note the shop issued while its POS was connected, and how reporting it to FBR went.
+"""
+type FiscalInvoice {
+  """How many times it was sent."""
+  attempts: Int!
+
+  """When it was issued."""
+  createdAt: DateTime!
+
+  """Why it is not reported yet, or what FBR said refusing it."""
+  error: String
+
+  """The number FBR gave it, once reported, which its printed copy shows."""
+  fbrInvoiceNumber: String
+  id: ID!
+  kind: FiscalInvoiceKind!
+
+  """The order it is of."""
+  orderId: ID!
+  reportedAt: DateTime
+  status: FiscalInvoiceStatus!
+
+  """The shop's own number for it, FBR's USIN: "INV/2026-27/00001"."""
+  usin: String!
+}
+
+"""An invoice, or a credit note correcting one (ADR-496)."""
+enum FiscalInvoiceKind {
+  CREDIT_NOTE
+  INVOICE
+}
+
+type FiscalInvoiceRetryPayload {
+  fiscalInvoice: FiscalInvoice
+  userErrors: [UserError!]!
+}
+
+"""
+PENDING until FBR takes it, tried again while FBR cannot be reached; REPORTED with the number FBR gave it; FAILED when FBR refused it, saying why; SKIPPED when the shop disconnected FBR before it went.
+"""
+enum FiscalInvoiceStatus {
+  FAILED
+  PENDING
+  REPORTED
+  SKIPPED
 }
 
 """
@@ -7719,12 +7825,27 @@ type Mutation {
   draftOrderUpdate(id: ID!, input: DraftOrderInput!): DraftOrderUpdatePayload!
 
   """
+  Disconnects the shop's POS from FBR: its token is forgotten, and invoices are not reported from now on, those still waiting among them.
+  """
+  fbrPosDelete: FbrPosDeletePayload!
+
+  """
+  Connects the shop's POS to FBR, or changes what it gave (POS-04, ADR-555): from then on, each invoice and credit note it issues is reported to FBR as it is issued. Audited, the token never. Staff confirm who they are first when they signed in over 15 minutes ago.
+  """
+  fbrPosUpdate(input: FbrPosInput!): FbrPosUpdatePayload!
+
+  """
   Makes files of uploads, by their resourceUrls, once each is in, of the size and type it was staged as. An upload that is not what it said it was is removed.
   """
   fileCreate(files: [FileCreateInput!]!): FileCreatePayload!
 
   """Deletes files, up to 10 at a time, and what storage keeps of them."""
   fileDelete(fileIds: [ID!]!): FileDeletePayload!
+
+  """
+  Reports again one FBR refused, or one that disconnecting left unsent, once the shop has put right why, while its POS is connected.
+  """
+  fiscalInvoiceRetry(id: ID!): FiscalInvoiceRetryPayload!
 
   """
   Claims a lost parcel's worth from the courier that lost it, or what of a parcel that came back was written off as damaged, or `amount`: the claim is the parcel's, OPEN until the courier pays it, in a statement codRemittanceImport takes (for lost parcels) or otherwise, or refuses it, or the shop withdraws it (fulfillmentClaimSettle). A parcel has one claim, though one withdrawn may be filed again. Staff need to be an owner, a manager or an accountant.
@@ -12669,6 +12790,9 @@ type Query {
     query: String
     status: DraftOrderStatus
   ): DraftOrderConnection!
+
+  """The shop's POS as FBR registered it; null while it has none connected."""
+  fbrPos: FbrPos
   file(id: ID!): File
 
   """The shop's files, newest first."""
@@ -12678,6 +12802,17 @@ type Query {
     """1 to 250; default 50."""
     first: Int
   ): FileConnection!
+
+  """
+  The invoices and credit notes the shop issued while its POS was connected, the latest first, with how reporting each to FBR went.
+  """
+  fiscalInvoices(
+    """At most 100; 50 unless given."""
+    first: Int
+
+    """Those of this status alone."""
+    status: FiscalInvoiceStatus
+  ): [FiscalInvoice!]!
 
   """A gift card by ID, or null."""
   giftCard(id: ID!): GiftCard

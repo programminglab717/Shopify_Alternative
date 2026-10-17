@@ -338,6 +338,8 @@ export async function ordersFixture(
         DELETE FROM files.brands;
         DELETE FROM files.files;
         DELETE FROM tax.settings;
+        DELETE FROM tax.fiscal_invoices;
+        DELETE FROM tax.fbr_pos;
         DELETE FROM platform.outbox_events;`);
     },
     async close() {

@@ -45,6 +45,8 @@ export interface Plan {
   trueProfit: boolean;
   /** Whether it may load the Meta pixel on its storefront, without the conversions API (ADR-531). */
   pixels: boolean;
+  /** Whether it may connect its POS to FBR, to report its invoices as a Tier-1 retailer (ADR-555). */
+  fiscalReporting: boolean;
   /** AI credits it includes a month, each a draft the AI gives (ADR-533). */
   aiCredits: number;
 }
@@ -66,6 +68,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     removeBranding: false,
     trueProfit: false,
     pixels: false,
+    fiscalReporting: false,
     aiCredits: 10,
   },
   starter: {
@@ -84,6 +87,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     removeBranding: true,
     trueProfit: false,
     pixels: true,
+    fiscalReporting: false,
     aiCredits: 50,
   },
   growth: {
@@ -102,6 +106,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     removeBranding: true,
     trueProfit: true,
     pixels: true,
+    fiscalReporting: false,
     aiCredits: 150,
   },
   pro: {
@@ -120,6 +125,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     removeBranding: true,
     trueProfit: true,
     pixels: true,
+    fiscalReporting: true,
     aiCredits: 600,
   },
 };

@@ -96,7 +96,9 @@ import { CheckoutReminders } from './checkout-reminders.js';
 import { ReviewRequests } from './review-requests.js';
 import { WebhookDeliveries, WebhookFanOut } from './webhooks.js';
 import { ConfirmationReminders } from './confirmation-reminders.js';
+import { FbrPosClient, FbrPosService, FiscalInvoicesService } from '@hatti/tax/public';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
+import { FiscalReporter } from './fiscal-reports.js';
 import { CourierBookings } from './courier-bookings.js';
 import { CustomerErasures, workerCustomerData } from './customer-erasures.js';
 import { DailySummaries } from './daily-summaries.js';
@@ -639,6 +641,17 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         logger,
       }).start(config.CONVERSIONS_INTERVAL_MS);
       closers.push(() => conversions.stop());
+      // Tier-1 shops' invoices reported to FBR from the POS each connected (ADR-555).
+      const fiscal = new FiscalReporter({
+        fiscal: new FiscalInvoicesService(database),
+        pos: new FbrPosService(database, config.ENCRYPTION_KEYS),
+        client: new FbrPosClient({
+          productionUrl: config.FBR_POS_URL,
+          sandboxUrl: config.FBR_POS_SANDBOX_URL,
+        }),
+        logger,
+      }).start(config.FISCAL_INTERVAL_MS);
+      closers.push(() => fiscal.stop());
       const couriers = couriersOf({
         production: config.NODE_ENV === 'production',
         postexUrl: config.POSTEX_URL,
@@ -683,8 +696,9 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       closers.push(() => winBacks.stop());
     } else {
       logger.warn(
-        'ENCRYPTION_KEYS is not set: no conversions go to the ad platforms, no orders are ' +
-          'booked with couriers, no payments are asked after, and no broadcasts are sent',
+        'ENCRYPTION_KEYS is not set: no conversions go to the ad platforms, no invoices to FBR, ' +
+          'no orders are booked with couriers, no payments are asked after, and no broadcasts ' +
+          'are sent',
       );
     }
     // Each message is paid for from its shop's credit as it goes (ADR-155).

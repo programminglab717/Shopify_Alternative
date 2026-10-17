@@ -421,6 +421,10 @@ describe('Worker configuration', () => {
       META_GRAPH_URL: 'https://graph.facebook.com',
       META_GRAPH_VERSION: 'v26.0',
       CONVERSIONS_INTERVAL_MS: 15_000,
+      // Tier-1 shops' invoices go to FBR's IMS, or its sandbox (ADR-555).
+      FBR_POS_URL: 'https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData',
+      FBR_POS_SANDBOX_URL: 'https://esp.fbr.gov.pk:8244/FBR/v1/api/Live/PostData',
+      FISCAL_INTERVAL_MS: 15_000,
     });
     // Without the keys, no conversions are sent.
     expect(loadWorkerConfig(worker).ENCRYPTION_KEYS).toBeUndefined();

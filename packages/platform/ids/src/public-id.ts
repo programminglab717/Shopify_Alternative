@@ -120,6 +120,7 @@ export const ID_PREFIXES = {
   supportRequest: 'sreq',
   conversation: 'chat',
   conversationMessage: 'cmsg',
+  fiscalInvoice: 'fbr',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

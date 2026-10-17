@@ -607,6 +607,14 @@ const workerSchema = z
     GOOGLE_ANALYTICS_URL: env.httpUrl().default('https://www.google-analytics.com'),
     /** How often the moments of orders due go to the ad platforms. */
     CONVERSIONS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(15_000),
+    /** FBR's IMS, which Tier-1 shops' POS report their invoices to (ADR-555). */
+    FBR_POS_URL: env.httpUrl().default('https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData'),
+    /** FBR's sandbox of it, for shops trying their POS. */
+    FBR_POS_SANDBOX_URL: env
+      .httpUrl()
+      .default('https://esp.fbr.gov.pk:8244/FBR/v1/api/Live/PostData'),
+    /** How often invoices due go to FBR. */
+    FISCAL_INTERVAL_MS: z.coerce.number().int().min(1_000).default(15_000),
     /** How often messages due go out. */
     MESSAGES_INTERVAL_MS: z.coerce.number().int().min(500).default(5_000),
     /** PostEx's merchant API, which its bookings go to (ADR-149). */

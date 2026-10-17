@@ -394,7 +394,7 @@ export async function writeRefund(
   });
   // Money given back on an invoiced order goes on a credit note (ADR-496).
   const { timezone } = await shopProfile(tx, tenant.shopId);
-  await issueCreditNoteIn(tx, tenant.shopId, orderId, refundId, timezone);
+  await issueCreditNoteIn(tx, tenant.shopId, order, { id: refundId, amount, tax }, timezone);
   const amountRefunded = order.amountRefunded + amount;
   const updated = await updateOrder(tx, tenant.shopId, order, {
     amountRefunded,

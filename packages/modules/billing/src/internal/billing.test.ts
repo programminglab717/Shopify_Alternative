@@ -66,7 +66,8 @@ describe.skipIf(!server)('Billing', () => {
     expect(await f.billing.excludes(f.a.shopId, 'customDomains')).toBe('Free');
     expect(await f.billing.excludes(f.a.shopId, 'onlineGateways')).toBe('Free');
     // Nor custom apps, automations, cashback or Meta's conversions API (ADR-523), nor hiding
-    // "Powered by Hatti" (ADR-526), nor true profit (ADR-529), nor the Meta pixel (ADR-531).
+    // "Powered by Hatti" (ADR-526), nor true profit (ADR-529), nor the Meta pixel (ADR-531), nor
+    // FBR's POS integration (ADR-555).
     for (const feature of [
       'customApps',
       'automations',
@@ -75,6 +76,7 @@ describe.skipIf(!server)('Billing', () => {
       'removeBranding',
       'trueProfit',
       'pixels',
+      'fiscalReporting',
     ] as const) {
       expect(await f.billing.excludes(f.a.shopId, feature)).toBe('Free');
     }
@@ -170,6 +172,8 @@ describe.skipIf(!server)('Billing', () => {
     ] as const) {
       expect(await f.billing.excludes(f.a.shopId, feature)).toBeNull();
     }
+    // FBR's POS integration is Pro's (ADR-555).
+    expect(await f.billing.excludes(f.a.shopId, 'fiscalReporting')).toBe('Growth');
     // Reloaded, nothing changes; and a paid invoice is not paid again.
     await f.billing.returned(publicId(invoice.id), f.formOf(started.url));
     expect(errorsOf(await f.billing.pay(f.a, invoice.id))).toEqual([['id', 'INVALID']]);

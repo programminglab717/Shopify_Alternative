@@ -1,5 +1,41 @@
 // The tax module's public surface. Everything under src/internal is private to this module.
-export { TaxEvents, type TaxSettingsUpdatedPayload } from '../internal/events.js';
+export {
+  TaxEvents,
+  type FbrPosDeletedPayload,
+  type FbrPosUpdatedPayload,
+  type TaxSettingsUpdatedPayload,
+} from '../internal/events.js';
+export {
+  FbrPosClient,
+  type FbrPosConnection,
+  type FbrPosOptions,
+  type FbrReportResult,
+} from '../internal/fbr-client.js';
+export {
+  FbrPosService,
+  FiscalInvoicesService,
+  fiscalInvoicesIn,
+  recordFiscalDocumentsIn,
+  type ClaimedFiscalInvoice,
+  type FbrPosInput,
+  type FbrPosRecord,
+  type FiscalInvoiceRecord,
+  type FiscalOutcome,
+} from '../internal/fbr-pos.service.js';
+export {
+  FBR_ENVIRONMENTS,
+  fbrDateTime,
+  fbrInvoiceBody,
+  fbrInvoiceRequest,
+  type FbrEnvironment,
+  type FbrInvoiceBody,
+  type FbrInvoiceRequest,
+  type FiscalDocument,
+  type FiscalItem,
+  type FiscalKind,
+  type FiscalPaymentMode,
+  type FiscalStatus,
+} from '../internal/fbr.js';
 export { TaxCategory, TaxLine, TaxSettings, toTaxLine } from '../internal/graphql/tax.types.js';
 export {
   TaxSettingsService,
@@ -20,6 +56,7 @@ export {
   type TaxProvince,
   TAX_CODE,
   TAX_LIMITS,
+  discountShares,
   includedTax,
   lineRateOf,
   orderTaxOf,

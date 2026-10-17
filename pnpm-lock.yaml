@@ -1568,12 +1568,18 @@ importers:
       '@hatti/api':
         specifier: workspace:*
         version: link:../../platform/api
+      '@hatti/crypto':
+        specifier: workspace:*
+        version: link:../../platform/crypto
       '@hatti/db':
         specifier: workspace:*
         version: link:../../platform/db
       '@hatti/events':
         specifier: workspace:*
         version: link:../../platform/events
+      '@hatti/ids':
+        specifier: workspace:*
+        version: link:../../platform/ids
       '@hatti/money':
         specifier: workspace:*
         version: link:../../platform/money
@@ -1581,9 +1587,6 @@ importers:
         specifier: 'catalog:'
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.0)
     devDependencies:
-      '@hatti/ids':
-        specifier: workspace:*
-        version: link:../../platform/ids
       '@nestjs/common':
         specifier: 'catalog:'
         version: 12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2)

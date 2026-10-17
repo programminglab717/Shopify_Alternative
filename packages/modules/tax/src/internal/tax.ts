@@ -192,8 +192,11 @@ export function taxesByRate(
   return new Map([...byRate].filter(([, tax]) => tax > 0n).sort(([a], [b]) => a - b));
 }
 
-/** `discount` shared across lines of `totals` in proportion, by the largest remainder. */
-function discountShares(totals: readonly bigint[], discount: bigint): bigint[] {
+/**
+ * `discount` shared across lines of `totals` in proportion, by the largest remainder: each line's
+ * share, as {@link orderTaxOf} takes it off before taxing the line.
+ */
+export function discountShares(totals: readonly bigint[], discount: bigint): bigint[] {
   if (discount <= 0n || totals.every((total) => total <= 0n)) return totals.map(() => 0n);
   // The parts are minor units of whatever currency: a share has no currency of its own.
   return allocate(money(discount, 'PKR'), totals).map((part) => part.amount);

@@ -10,8 +10,8 @@ export type PlanLimitKind = 'staff' | 'locations' | 'ordersPerMonth';
  * What a shop's plan with Hatti includes or leaves out (BIL-01, ADR-264): a domain of the shop's
  * own, and its accounts with payment gateways; custom apps, automations and the abandoned
  * checkout reminder, cashback, and Meta's conversions API (ADR-523); hiding "Powered by
- * Hatti" from its storefront (ADR-526); true profit in the sales report (ADR-529); and the Meta
- * pixel on its storefront (ADR-531).
+ * Hatti" from its storefront (ADR-526); true profit in the sales report (ADR-529); the Meta
+ * pixel on its storefront (ADR-531); and FBR's POS integration (ADR-555).
  */
 export type PlanFeature =
   | 'customDomains'
@@ -22,7 +22,8 @@ export type PlanFeature =
   | 'conversionsApi'
   | 'removeBranding'
   | 'trueProfit'
-  | 'pixels';
+  | 'pixels'
+  | 'fiscalReporting';
 
 /** A limit of the shop's plan. */
 export interface PlanLimit {
