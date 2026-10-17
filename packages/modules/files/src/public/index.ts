@@ -28,7 +28,7 @@ export {
   type FileCreateInput,
   type StagedUploadInput,
 } from '../internal/file.service.js';
-export { FILE_TYPES, type FileTypeValue } from '../internal/file-types.js';
+export { FILE_TYPES, shownFilePrefixOf, type FileTypeValue } from '../internal/file-types.js';
 export { FilesModule } from '../internal/files.module.js';
 export { toShopBrand } from '../internal/graphql/brand.resolver.js';
 export { ShopBrand } from '../internal/graphql/file.types.js';

@@ -1,8 +1,8 @@
 import type { Database } from '@hatti/db';
 import { shopLogoOf, type BrandImageValue, type ShopLogo } from '@hatti/files/public';
 import { isUuid } from '@hatti/ids';
-import type { ObjectStorage } from '@hatti/storage';
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FileImages } from './file-images.js';
 
 /**
  * Where the API serves each shop's logo (ADR-198): /logos/{shop}; and its square logo
@@ -24,12 +24,10 @@ export function logoPathOf(shopId: string, which: BrandImageValue, logo: ShopLog
  * are read long after a signed address of it would lapse, and its square logo at
  * /logos/{shop}/square, for its link page (ADR-205): the one the shop has now, read as the shop.
  * Its storage stays private: only its logos are served here, and nothing for a shop with none.
+ * Each is sized and in the format the browser takes, as `?width=` and its Accept header ask
+ * (ADR-538).
  */
-export function serveLogos(
-  fastify: FastifyInstance,
-  database: Database,
-  storage: ObjectStorage,
-): void {
+export function serveLogos(fastify: FastifyInstance, database: Database, images: FileImages): void {
   const routes: [string, BrandImageValue][] = [
     [`/${LOGOS_PATH}/:shop`, 'logo'],
     [`/${LOGOS_PATH}/:shop/square`, 'squareLogo'],
@@ -40,11 +38,15 @@ export function serveLogos(
       const logo = isUuid(shop)
         ? await database.tenant(shop, (tx) => shopLogoOf(tx, shop, which))
         : null;
-      const file = logo ? await storage.read(logo.key) : null;
-      if (!logo || !file) return notFound(reply);
+      const { width } = request.query as { width?: string };
+      const file = logo
+        ? await images.shown(logo, width, request.headers.accept, request.log)
+        : null;
+      if (!file) return notFound(reply);
       return reply
-        .header('content-type', logo.contentType)
+        .header('content-type', file.contentType)
         .header('cache-control', AN_HOUR)
+        .header('vary', 'Accept')
         .header('x-content-type-options', 'nosniff')
         .header('cross-origin-resource-policy', 'cross-origin')
         .send(file.body);

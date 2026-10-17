@@ -4,6 +4,7 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import { fromPublicId, newId } from '@hatti/ids';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
+import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ADMIN_GRAPHQL_PATH } from './constants.js';
 import { TEST_STOREFRONT_KEY, startTestApi, type TestApi } from '../testing/api.js';
@@ -260,6 +261,80 @@ describe.skipIf(!server)('Admin GraphQL API: files', () => {
       '/logos/zari',
     ]) {
       expect((await call('GET', path)).statusCode, path).toBe(404);
+    }
+  });
+
+  it("serves the shop's own images at the widths and in the formats browsers take, and removes them with the file (ADR-538)", async () => {
+    const photo = await sharp({
+      create: { width: 800, height: 400, channels: 3, background: '#7a1f3d' },
+    })
+      .png()
+      .toBuffer();
+    const staged = await gql(tokens.owner, STAGE, {
+      input: [{ filename: 'Zari logo.png', mimeType: 'image/png', fileSize: String(photo.length) }],
+    });
+    const [target] = staged.data!.stagedUploadsCreate.stagedTargets;
+    expect((await call('PUT', target.url, photo, 'image/png')).statusCode).toBe(200);
+    const logo = (
+      await gql(tokens.owner, CREATE, { files: [{ originalSource: target.resourceUrl }] })
+    ).data!.fileCreate.files[0].id as string;
+    const BRAND = `mutation ($input: ShopBrandInput!) {
+      shopBrandUpdate(input: $input) { userErrors { message } }
+    }`;
+    expect((await gql(tokens.owner, BRAND, { input: { logo } })).data).toEqual({
+      shopBrandUpdate: { userErrors: [] },
+    });
+    const { rows } = await admin.query<{ key: string }>(
+      'SELECT key FROM files.files WHERE shop_id = $1 AND id = $2',
+      [shop, fromPublicId(logo, 'file')],
+    );
+    const shown = `${rows[0]!.key.slice(0, rows[0]!.key.lastIndexOf('/') + 1)}shown/`;
+    const fetchLogo = (query: string, accept?: string) =>
+      app.inject({
+        method: 'GET',
+        url: `/logos/${shop}${query}`,
+        headers: accept ? { accept } : {},
+      });
+
+    // A browser asking for a width gets it, in the smallest format it takes, kept for the next.
+    const small = await fetchLogo('?width=200', 'image/avif,image/webp,*/*');
+    expect([small.statusCode, small.headers['content-type'], small.headers.vary]).toEqual([
+      200,
+      'image/avif',
+      'Accept',
+    ]);
+    expect((await sharp(small.rawPayload).metadata()).width).toBe(360);
+    expect(await api.storage.head(`${shown}360.avif`)).not.toBeNull();
+    expect((await fetchLogo('?width=200', 'image/avif')).rawPayload.equals(small.rawPayload)).toBe(
+      true,
+    );
+    // Its whole width in WebP for one that takes that; never wider than the image.
+    const webp = await fetchLogo('', 'image/webp,*/*');
+    expect(webp.headers['content-type']).toBe('image/webp');
+    expect((await sharp(webp.rawPayload).metadata()).width).toBe(800);
+    expect((await sharp((await fetchLogo('?width=2000')).rawPayload).metadata()).width).toBe(800);
+    // Nothing asked, as an email's reader may: the file as it was uploaded.
+    const plain = await fetchLogo('');
+    expect([plain.headers['content-type'], plain.rawPayload.equals(photo)]).toEqual([
+      'image/png',
+      true,
+    ]);
+    const narrow = await fetchLogo('?width=90');
+    expect([
+      narrow.headers['content-type'],
+      (await sharp(narrow.rawPayload).metadata()).width,
+    ]).toEqual(['image/png', 96]);
+
+    // The file deleted, what was made of it goes too.
+    await gql(tokens.owner, BRAND, { input: { logo: null } });
+    const deleted = await gql(
+      tokens.owner,
+      `mutation ($ids: [ID!]!) { fileDelete(fileIds: $ids) { deletedFileIds } }`,
+      { ids: [logo] },
+    );
+    expect(deleted.data?.fileDelete).toEqual({ deletedFileIds: [logo] });
+    for (const made of ['360.avif', 'full.webp', '96.png']) {
+      expect(await api.storage.head(`${shown}${made}`), made).toBeNull();
     }
   });
 

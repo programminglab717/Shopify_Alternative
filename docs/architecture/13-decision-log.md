@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-537 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-538 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -545,6 +545,7 @@
 | 535 | Anyone may ask on the status page to be emailed its updates: a link to confirm first, a link to stop in every email, and the worker sending both, each once | Accepted |
 | 536 | The worker checks addresses given for Hatti's parts, posts an outage on the status page after three failed checks in a row, and resolves it when the part answers again | Accepted |
 | 537 | Hatti's order templates go to each shop's own WhatsApp account for approval, and a shop's customers' order news goes from its own number for each one Meta approves there | Accepted |
+| 538 | A shop's own images are served at the widths and in the formats browsers take, each made once and kept beside its file, and removed with it | Accepted |
 
 ---
 
@@ -20366,3 +20367,35 @@
     or twice, which Meta may refuse.
   * **Moving all the news at once when all 34 are approved:** one refused template would keep the
     other 33 on Hatti's number.
+
+## ADR-538 · A shop's own images are served at the widths and in the formats browsers take, each made once and kept beside its file, and removed with it
+
+* **Context:** Products' images are served at nine widths, in AVIF or WebP where browsers take
+  them (ADR-158). A shop's own images were served as uploaded: its logos (ADR-198, ADR-205),
+  articles' images (ADR-213), its sharing image (ADR-243) and its themes' pictures (ADR-326).
+  A phone's photo chosen as a banner reached every shopper at full size, and a theme's
+  `image_url` asked for widths that nothing made.
+* **Decision:**
+  * **Asking:** each of those addresses takes `?width=`, made at the next of products' widths and
+    never wider than the image, and the browser's Accept header, which gives AVIF, else WebP. A
+    browser that takes neither gets the image's own format, and PNG for WebP.
+  * **Making and keeping:** each size and format is made the first time it is asked for, two at
+    a time, and kept in storage under the file's own folder, in `shown/`. Removing the file
+    removes that folder too.
+  * **Left as they are:**
+    * an image asked for at no width, in a format it already has, as an email's reader may ask;
+    * a GIF, which may move;
+    * an image the decoder cannot read.
+  * **What is made has no metadata:** an image is encoded anew without the camera's data, and a
+    browser asking for AVIF or WebP always gets one made this way.
+  * **Caching:** answers vary by Accept, cached as they were.
+  * **Theme pictures:** the storefront passes the width a theme asked for, and its browser's
+    Accept, on to the core, so a theme's `image_url` gets the size it asks for.
+* **Consequences:**
+  * Shoppers get banners and logos at the sizes their screens need, in AVIF or WebP.
+  * Each size is encoded once.
+* **Alternatives:**
+  * **Cleaning each file on upload, as products' images are:** the files module would need the
+    worker's image pipeline, and PDFs and videos share it. Making sizes when asked costs nothing
+    for files never shown.
+  * **Making each answer anew, kept by the edge alone:** every edge miss would encode again.

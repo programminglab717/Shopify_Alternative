@@ -17,6 +17,7 @@ import { serveImages } from './images.js';
 import { serveVideos } from './videos.js';
 import { serveLocalStorage } from './local-storage.js';
 import { serveArticleImages } from './article-images.js';
+import { FileImages } from './file-images.js';
 import { serveLogos } from './logos.js';
 import { serveSharingImages } from './sharing-images.js';
 import { serveThemeImages } from './theme-images.js';
@@ -106,14 +107,16 @@ export async function createApi(options: CreateApiOptions): Promise<NestFastifyA
   serveImages(fastify, options.storage);
   // And their videos, a range at a time as browsers play them (ADR-258).
   serveVideos(fastify, options.storage);
+  // Shops' own images, sized and in the formats browsers take (ADR-538).
+  const fileImages = new FileImages(options.storage);
   // Shops' logos, for their orders' emails (ADR-198).
-  serveLogos(fastify, options.database, options.storage);
+  serveLogos(fastify, options.database, fileImages);
   // Published articles' images, for their storefronts' pages (ADR-213).
-  serveArticleImages(fastify, options.database, options.storage);
+  serveArticleImages(fastify, options.database, fileImages);
   // Shops' social sharing images, for their pages' link previews (ADR-243).
-  serveSharingImages(fastify, options.database, options.storage);
+  serveSharingImages(fastify, options.database, fileImages);
   // The pictures shops chose for their themes, for their storefronts to serve (ADR-326).
-  serveThemeImages(fastify, options.database, options.storage);
+  serveThemeImages(fastify, options.database, fileImages);
 
   const app = await NestFactory.create<NestFastifyApplication>(
     ApiModule.forRoot(hearingEmailEvents(options)),

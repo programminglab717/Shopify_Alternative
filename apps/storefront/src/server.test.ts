@@ -418,10 +418,27 @@ class FakeCore {
    */
   readonly themeImages = new Map<string, ThemeImage>();
   readonly otherImages = new Map<string, ThemeImage>();
-  readonly themeImagesAsked: { shopId: string; file: string; preview: boolean }[] = [];
+  readonly themeImagesAsked: {
+    shopId: string;
+    file: string;
+    preview: boolean;
+    width?: number | null;
+    accept?: string;
+  }[] = [];
 
-  async themeImage(shopId: string, file: string, preview: boolean): Promise<ThemeImage | null> {
-    this.themeImagesAsked.push({ shopId, file, preview });
+  async themeImage(
+    shopId: string,
+    file: string,
+    preview: boolean,
+    asked: { width?: number | null; accept?: string } = {},
+  ): Promise<ThemeImage | null> {
+    this.themeImagesAsked.push({
+      shopId,
+      file,
+      preview,
+      ...(asked.width && { width: asked.width }),
+      ...(asked.accept && { accept: asked.accept }),
+    });
     const key = `${shopId} ${file}`;
     return this.themeImages.get(key) ?? (preview ? (this.otherImages.get(key) ?? null) : null);
   }
@@ -1751,6 +1768,25 @@ describe('Carts', () => {
       expect((await get(url)).statusCode, url).toBe(404);
     }
     expect(core.themeImagesAsked).toHaveLength(4);
+    // The width a theme's image_url asks for, and the formats the browser takes, go on to the
+    // core, which makes it so (ADR-538); a width that is no width does not.
+    const sized = await app.inject({
+      method: 'GET',
+      url: `/theme-images/${SHOWN}/Eid-banner.jpg?width=360`,
+      headers: { host: 'localhost', accept: 'image/avif,image/webp,*/*' },
+    });
+    expect([sized.statusCode, sized.headers.vary]).toEqual([200, 'Accept']);
+    await get(`/theme-images/${SHOWN}/Eid-banner.jpg?width=wide`);
+    expect(core.themeImagesAsked.slice(4)).toEqual([
+      {
+        shopId: 'sample',
+        file: SHOWN,
+        preview: false,
+        width: 360,
+        accept: 'image/avif,image/webp,*/*',
+      },
+      { shopId: 'sample', file: SHOWN, preview: false },
+    ]);
     await app.close();
   });
 

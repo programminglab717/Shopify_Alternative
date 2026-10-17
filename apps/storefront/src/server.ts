@@ -1267,7 +1267,9 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
    * The pictures a shop chose for its themes (ADR-326), at /theme-images/{file}/{name} on its own
    * address, as Shopify serves a shop's files on its domain: from the core, which gives those one
    * of the shop's themes shows and, to a page in a preview, any of its pictures, so the theme
-   * editor's choice shows before it is saved. The name is for people, and any will do.
+   * editor's choice shows before it is saved. The name is for people, and any will do. A theme's
+   * `image_url` asks for a width, which the core makes it at, in the best format the browser
+   * takes (ADR-538).
    */
   const themeImage = async (request: FastifyRequest, reply: FastifyReply) => {
     const { file } = request.params as { file: string };
@@ -1277,7 +1279,11 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     }
     let image;
     try {
-      image = await core.themeImage(found.shopId, file, found.preview !== null);
+      const asked = Number((request.query as Record<string, unknown>).width);
+      image = await core.themeImage(found.shopId, file, found.preview !== null, {
+        width: Number.isInteger(asked) && asked > 0 && asked <= 10_000 ? asked : null,
+        accept: request.headers.accept,
+      });
     } catch (error) {
       if (!unreachable(request, error)) throw error;
       return reply.code(503).header('cache-control', 'no-store').send();
@@ -1286,6 +1292,7 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
     return reply
       .type(image.contentType)
       .header('cache-control', found.preview ? PREVIEWED : THEME_IMAGE_CACHE)
+      .header('vary', 'Accept')
       .header('x-content-type-options', 'nosniff')
       .send(Buffer.from(image.body));
   };

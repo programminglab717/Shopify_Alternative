@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### The shop's own images sized
+
+* **A shop's own images are served at the widths and in the formats browsers take, each made once
+  and kept beside its file, and removed with it** ([ADR-538](../architecture/13-decision-log.md#adr-538--a-shops-own-images-are-served-at-the-widths-and-in-the-formats-browsers-take-each-made-once-and-kept-beside-its-file-and-removed-with-it)).
+* 3273 tests, 1 more: the sizes and formats made, kept and removed.
+
 ### 6295e6f · Order updates from shops' own numbers
 
 * **Hatti's order templates go to each shop's own WhatsApp account for approval, and a shop's

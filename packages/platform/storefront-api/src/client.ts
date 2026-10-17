@@ -343,10 +343,22 @@ export class StorefrontApiClient {
 
   /**
    * A picture of the shop's that one of its themes shows (ADR-326), or, for a page in a preview,
-   * any of its pictures; null when there is none to show.
+   * any of its pictures; null when there is none to show. At `width`, in the best format the
+   * browser's `accept` names, where they are given (ADR-538).
    */
-  async themeImage(shopId: string, fileId: string, preview: boolean): Promise<ThemeImage | null> {
-    const response = await this.#request('GET', themeImagePath(shopId, fileId, preview), null);
+  async themeImage(
+    shopId: string,
+    fileId: string,
+    preview: boolean,
+    asked: { width?: number | null; accept?: string } = {},
+  ): Promise<ThemeImage | null> {
+    const response = await this.#request(
+      'GET',
+      themeImagePath(shopId, fileId, preview, asked.width ?? null),
+      null,
+      undefined,
+      asked.accept ? { accept: asked.accept } : {},
+    );
     if (response.status === 404) return null;
     if (response.status !== 200) {
       throw new StorefrontApiError(response.status, await response.text());

@@ -32,8 +32,17 @@ export interface ThemePreviewResponse {
  * `preview`, for a page in a preview, any of its pictures, so a choice not yet saved shows. 404
  * when there is none to show.
  */
-export function themeImagePath(shopId: string, fileId: string, preview: boolean): string {
-  return `${STOREFRONT_API_PREFIX}shops/${shopId}/theme-images/${fileId}${preview ? '?preview=1' : ''}`;
+export function themeImagePath(
+  shopId: string,
+  fileId: string,
+  preview: boolean,
+  width: number | null = null,
+): string {
+  const query = new URLSearchParams();
+  if (preview) query.set('preview', '1');
+  if (width !== null) query.set('width', String(width));
+  const search = query.toString();
+  return `${STOREFRONT_API_PREFIX}shops/${shopId}/theme-images/${fileId}${search ? `?${search}` : ''}`;
 }
 
 /** A picture of a shop's, as the core sends it to the shop's storefront. */

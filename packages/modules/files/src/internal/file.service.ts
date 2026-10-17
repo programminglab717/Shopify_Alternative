@@ -18,6 +18,7 @@ import {
   isFileType,
   keyName,
   looksLike,
+  shownFilePrefixOf,
   type FileTypeValue,
 } from './file-types.js';
 import type { FileRecord, Page, StagedUpload } from './records.js';
@@ -270,9 +271,17 @@ export class FileService {
     return null;
   }
 
-  /** Removes what storage keeps under `keys`; a failure leaves it for the next sweep's. */
+  /**
+   * Removes what storage keeps under `keys`, with the sizes made of each (ADR-538); a failure
+   * leaves it for the next sweep's.
+   */
   async #remove(keys: string[]): Promise<void> {
-    await Promise.all(keys.map((key) => this.storage.delete(key).catch(() => undefined)));
+    await Promise.all(
+      keys.flatMap((key) => [
+        this.storage.delete(key).catch(() => undefined),
+        this.storage.deletePrefix(shownFilePrefixOf(key)).catch(() => undefined),
+      ]),
+    );
   }
 }
 

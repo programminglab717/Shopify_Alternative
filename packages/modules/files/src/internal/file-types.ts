@@ -38,3 +38,11 @@ export function keyName(filename: string, type: FileTypeValue): string {
     .slice(0, 80);
   return `${base || 'file'}.${extensionOf(type)}`;
 }
+
+/**
+ * Where the sizes and formats the API makes of the image kept at `key` are kept (ADR-538): beside
+ * it, under its own folder, so that removing the file removes them.
+ */
+export function shownFilePrefixOf(key: string): string {
+  return `${key.slice(0, key.lastIndexOf('/') + 1)}shown/`;
+}

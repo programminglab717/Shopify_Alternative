@@ -68,7 +68,7 @@ function notFound(reply: FastifyReply) {
 }
 
 /** Lets `size` tasks run at once; the rest wait, first come, first served. */
-class Turns {
+export class Turns {
   #running = 0;
   readonly #waiting: (() => void)[] = [];
 
