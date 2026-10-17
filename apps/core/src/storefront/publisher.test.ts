@@ -1101,6 +1101,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     // Its file deleted, the article is shown without one.
     const files = new FileService(database, {
       delete: () => Promise.resolve(),
+      deletePrefix: () => Promise.resolve(),
     } as unknown as ObjectStorage);
     unwrap(await files.delete(tenant, [photo]));
     expect(await deliver()).toEqual(['file.deleted']);
@@ -2082,6 +2083,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     // Its file deleted, it has none; taken away, nor the title and description.
     const files = new FileService(database, {
       delete: () => Promise.resolve(),
+      deletePrefix: () => Promise.resolve(),
     } as unknown as ObjectStorage);
     unwrap(await files.delete(tenant, [image]));
     expect(await deliver()).toEqual(['file.deleted']);
