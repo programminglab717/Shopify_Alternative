@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### The status page's 90 days
+### 302b360 · The status page's 90 days
 
 * **The status page shows each part's last 90 days: a bar a day by the worst it was, and its
   uptime, counting incidents that took it down and not maintenance posted ahead** ([ADR-528](../architecture/13-decision-log.md#adr-528--the-status-page-shows-each-parts-last-90-days-a-bar-a-day-by-the-worst-it-was-and-its-uptime-counting-incidents-that-took-it-down-and-not-maintenance-posted-ahead),
