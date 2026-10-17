@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### A commerce lexicon for search
+### bf961db · A commerce lexicon for search
 
 * **A storefront's search finds what a word means in English, Roman Urdu or Urdu, "juta" the
   shop's shoes, after what holds the word as typed** ([ADR-481](../architecture/13-decision-log.md#adr-481--a-commerce-lexicon-a-storefronts-search-finds-what-a-word-means-in-english-roman-urdu-or-urdu-juta-the-shops-shoes-after-what-holds-the-word-as-typed), SRC-02).
