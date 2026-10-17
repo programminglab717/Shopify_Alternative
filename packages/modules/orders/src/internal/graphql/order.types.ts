@@ -147,6 +147,19 @@ registerEnumType(RefundMethod, {
   },
 });
 
+@ObjectType({
+  description:
+    "A refund's credit note (TAX-05, ADR-496): money given back on an order whose invoice was " +
+    'issued, numbered in a series of its own.',
+})
+export class CreditNote {
+  @Field({ description: '"CN/2026-27/00001".' })
+  number!: string;
+
+  @Field(() => GraphQLISODateTime)
+  issuedAt!: Date;
+}
+
 @ObjectType({ description: 'Money given back on an order, as staff recorded it.' })
 export class Refund {
   @Field(() => ID)
@@ -184,6 +197,12 @@ export class Refund {
       "customer's data is erased.",
   })
   receipt!: RefundReceipt | null;
+
+  @Field(() => CreditNote, {
+    nullable: true,
+    description: "Its credit note, if the order's invoice was issued before it (ADR-496).",
+  })
+  creditNote!: CreditNote | null;
 
   @Field(() => GraphQLISODateTime)
   createdAt!: Date;

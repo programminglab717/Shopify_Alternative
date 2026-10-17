@@ -20,8 +20,11 @@ import type { OrderLineRecord, OrderRecord } from './records.js';
 import { orderName } from './rules.js';
 import type { StoredAddressValue } from './schema.js';
 
-/** Documents printed for orders: a packing slip to go in the parcel, or an invoice. */
-export const DOCUMENT_KINDS = ['packing_slip', 'invoice'] as const;
+/**
+ * Documents printed for orders: a packing slip to go in the parcel, an invoice, or the credit
+ * notes of what was refunded once it was issued (ADR-496).
+ */
+export const DOCUMENT_KINDS = ['packing_slip', 'invoice', 'credit_note'] as const;
 export type DocumentKindValue = (typeof DOCUMENT_KINDS)[number];
 
 /** What a document needs besides the order. */
@@ -47,6 +50,9 @@ const WORDS = {
   invoice: { en: 'Invoice', ur: 'انوائس' },
   taxInvoice: { en: 'Sales tax invoice', ur: 'سیلز ٹیکس انوائس' },
   invoiceNumber: { en: 'Invoice no.', ur: 'انوائس نمبر' },
+  creditNote: { en: 'Credit note', ur: 'کریڈٹ نوٹ' },
+  creditNoteNumber: { en: 'Credit note no.', ur: 'کریڈٹ نوٹ نمبر' },
+  taxRefunded: { en: 'Of which sales tax', ur: 'جس میں سیلز ٹیکس' },
   shipTo: { en: 'Ship to', ur: 'ترسیل کا پتہ' },
   billTo: { en: 'Bill to', ur: 'خریدار' },
   payment: { en: 'Payment', ur: 'ادائیگی' },
@@ -274,8 +280,11 @@ export function documentName(
   kind: DocumentKindValue,
   numbers: readonly number[],
 ): { title: string; fileName: string } {
-  const [one, many] =
-    kind === 'invoice' ? ['Invoice', 'Invoices'] : ['Packing slip', 'Packing slips'];
+  const [one, many] = {
+    invoice: ['Invoice', 'Invoices'],
+    credit_note: ['Credit note', 'Credit notes'],
+    packing_slip: ['Packing slip', 'Packing slips'],
+  }[kind] as [string, string];
   const slug = (words: string) => words.toLowerCase().replaceAll(' ', '-');
   if (numbers.length === 1) {
     const [number] = numbers as [number];
@@ -286,6 +295,59 @@ export function documentName(
     title: `${many}: ${numbers.length} orders`,
     fileName: `${slug(many)}${range}.html`,
   };
+}
+
+/**
+ * An order's credit notes (ADR-496), a page each: the money a refund gave back once its invoice
+ * was issued, the tax of it, and, on a sales tax invoice's, its value without the tax; under the
+ * shop, the order and the invoice it corrects.
+ */
+export function creditNotes(order: OrderRecord, context: DocumentContext): Html[] {
+  const t = (words: Words) => say(context.language, words);
+  const price = (value: bigint) => ltr(amount(order, value));
+  return order.refunds.flatMap((refund) => {
+    const note = refund.creditNote;
+    if (!note) return [];
+    return [
+      html`
+        ${header(order, context, WORDS.creditNote, true)}
+        <section class="columns">
+          <div>
+            <p class="label">${t(WORDS.billTo)}</p>
+            ${recipient(order, context)}
+          </div>
+          <div>
+            <p class="label">${t(WORDS.creditNoteNumber)}</p>
+            <p class="big">${ltr(note.name)}</p>
+            <p>${ltr(formatDay(note.issuedAt, context.shop.timezone))}</p>
+          </div>
+        </section>
+        <table class="totals">
+          <tbody>
+            <tr class="grand">
+              <td>${t(WORDS.refunded)}</td>
+              <td class="num">${price(refund.amount)}</td>
+            </tr>
+            ${
+              refund.tax > 0n &&
+              html`<tr>
+                <td>${t(WORDS.taxRefunded)}</td>
+                <td class="num">${price(refund.tax)}</td>
+              </tr>`
+            }
+            ${
+              context.registration.strn &&
+              html`<tr>
+                <td>${t(WORDS.withoutTax)}</td>
+                <td class="num">${price(refund.amount - refund.tax)}</td>
+              </tr>`
+            }
+          </tbody>
+        </table>
+        ${refund.note && html`<p dir="auto">${text(refund.note)}</p>`}
+      `,
+    ];
+  });
 }
 
 /**

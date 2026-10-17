@@ -5,6 +5,7 @@ import type { CurrencyCode } from '@hatti/money';
 import { searchKey } from '@hatti/pk';
 import { and, eq, sql, type SQL } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
+import { creditNoteName } from './invoice-series.js';
 import { ESTIMATED_CHARGE } from './parcel-estimates.js';
 import type {
   FulfillmentRecord,
@@ -158,6 +159,9 @@ interface OrderJsonRow extends Record<string, unknown> {
     receipt_key: string | null;
     receipt_content_type: string | null;
     receipt_size: number | null;
+    credit_note_year: number | null;
+    credit_note_number: number | null;
+    credit_note_issued_at: string | null;
     actor_kind: RefundRecord['actorKind'];
     actor_id: string;
     created_at: string;
@@ -349,6 +353,13 @@ function toOrderRecord(row: OrderJsonRow): OrderRecord {
               contentType: refund.receipt_content_type!,
               size: refund.receipt_size!,
             },
+      creditNote:
+        refund.credit_note_number === null
+          ? null
+          : {
+              name: creditNoteName(refund.credit_note_year!, refund.credit_note_number),
+              issuedAt: toDate(refund.credit_note_issued_at!),
+            },
       actorKind: refund.actor_kind,
       actorId: refund.actor_id,
       createdAt: toDate(refund.created_at),
@@ -467,8 +478,12 @@ export async function loadOrders(
                       'reference', r.reference, 'note', r.note, 'actor_kind', r.actor_kind,
                       'receipt_key', r.receipt_key, 'receipt_content_type', r.receipt_content_type,
                       'receipt_size', r.receipt_size,
+                      'credit_note_year', cn.tax_year, 'credit_note_number', cn.number,
+                      'credit_note_issued_at', cn.issued_at,
                       'actor_id', r.actor_id, 'created_at', r.created_at) ORDER BY r.id)
                FROM orders.refunds r
+               LEFT JOIN orders.refund_credit_notes cn
+                 ON cn.shop_id = r.shop_id AND cn.refund_id = r.id
               WHERE r.shop_id = o.shop_id AND r.order_id = o.id), '[]') AS refunds,
            coalesce((
              SELECT json_agg(json_build_object(

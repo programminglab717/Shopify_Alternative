@@ -4,7 +4,7 @@ import { testDatabaseServer } from '@hatti/db/testing';
 import { formatDay } from '@hatti/documents';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { invoiceName, taxYearOf } from './invoice-series.js';
+import { creditNoteName, invoiceName, taxYearOf } from './invoice-series.js';
 import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -275,6 +275,53 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     expect(taxYearOf(new Date('2026-06-30T18:59:00Z'), 'Asia/Karachi')).toBe(2025);
     expect(taxYearOf(new Date('2026-06-30T19:00:00Z'), 'Asia/Karachi')).toBe(2026);
     expect(invoiceName(2099, 12)).toBe('INV/2099-00/00012');
+  });
+
+  it('puts what is refunded once an invoice is issued on credit notes of their own, and prints them (ADR-496)', async () => {
+    const year = taxYearOf(new Date(), 'Asia/Karachi');
+    const invoiced = await f.order(f.a, [kurta], { advancePaid: '1000' });
+    const notInvoiced = await f.order(f.a, [kurta], { advancePaid: '1000' });
+    const print = (ids: string[], kind: 'invoice' | 'credit_note') =>
+      f.documents.render(f.a, ids, { kind, paper: 'a4', language: 'english' });
+
+    // Refunded before its invoice is printed, an order's refund is on the invoice instead.
+    const early = unwrap(
+      await f.refunds.refund(f.a, invoiced.id, { amount: '100', method: 'cash' }),
+    );
+    expect(early.refund.creditNote).toBeNull();
+    unwrap(await print([invoiced.id], 'invoice'));
+
+    const first = unwrap(
+      await f.refunds.refund(f.a, invoiced.id, {
+        amount: '200',
+        method: 'cash',
+        note: 'One kurta came back',
+      }),
+    );
+    const second = unwrap(
+      await f.refunds.refund(f.a, invoiced.id, { amount: '50', method: 'cash' }),
+    );
+    expect([first.refund.creditNote?.name, second.refund.creditNote?.name]).toEqual([
+      creditNoteName(year, 1),
+      creditNoteName(year, 2),
+    ]);
+    const other = unwrap(
+      await f.refunds.refund(f.a, notInvoiced.id, { amount: '100', method: 'cash' }),
+    );
+    expect(other.refund.creditNote).toBeNull();
+
+    // A page for each credit note, under the invoice it corrects.
+    const document = unwrap(await print([invoiced.id, notInvoiced.id], 'credit_note'));
+    expect(document.title).toBe('Credit notes: 2 orders');
+    const pages = pagesOf(document.html);
+    expect(pages).toHaveLength(2);
+    expect(pages[0]).toContain(`Credit note #${invoiced.number}`);
+    expect(pages[0]).toContain(`Invoice no. ${invoiceName(year, 1)}`);
+    expect(pages[0]).toContain(`Credit note no. ${creditNoteName(year, 1)}`);
+    expect(pages[0]).toContain('Refunded Rs 200');
+    expect(pages[0]).toContain('One kurta came back');
+    expect(pages[1]).toContain('Refunded Rs 50');
+    expect(errorsOf(await print([notInvoiced.id], 'credit_note'))).toEqual([['ids', 'INVALID']]);
   });
 
   it('prints the gift message on the packing slip, escaped, and none once its customer is erased (ADR-413)', async () => {

@@ -4,6 +4,7 @@ import { Order } from './order.types.js';
 export enum OrderDocumentKind {
   PACKING_SLIP = 'PACKING_SLIP',
   INVOICE = 'INVOICE',
+  CREDIT_NOTE = 'CREDIT_NOTE',
 }
 
 registerEnumType(OrderDocumentKind, {
@@ -17,7 +18,14 @@ registerEnumType(OrderDocumentKind, {
         'or already shipped.',
     },
     INVOICE: {
-      description: 'What was bought at what price, what was paid and what is left to pay.',
+      description:
+        'What was bought at what price, what was paid and what is left to pay. Printed, it is ' +
+        "issued: numbered in the shop's series the first time (ADR-495).",
+    },
+    CREDIT_NOTE: {
+      description:
+        'A page for each credit note of the orders: money refunded once their invoices were ' +
+        'issued, numbered in a series of their own (ADR-496).',
     },
   },
 });

@@ -3015,6 +3015,16 @@ input CreateMediaInput {
   previewImageSource: String
 }
 
+"""
+A refund's credit note (TAX-05, ADR-496): money given back on an order whose invoice was issued, numbered in a series of its own.
+"""
+type CreditNote {
+  issuedAt: DateTime!
+
+  """"CN/2026-27/00001"."""
+  number: String!
+}
+
 """ISO 4217 currency code."""
 enum CurrencyCode {
   AED
@@ -8882,7 +8892,14 @@ type OrderDocument {
 
 """What to print for an order."""
 enum OrderDocumentKind {
-  """What was bought at what price, what was paid and what is left to pay."""
+  """
+  A page for each credit note of the orders: money refunded once their invoices were issued, numbered in a series of their own (ADR-496).
+  """
+  CREDIT_NOTE
+
+  """
+  What was bought at what price, what was paid and what is left to pay. Printed, it is issued: numbered in the shop's series the first time (ADR-495).
+  """
   INVOICE
 
   """
@@ -12497,6 +12514,11 @@ type Query {
 type Refund {
   amount: Money!
   createdAt: DateTime!
+
+  """
+  Its credit note, if the order's invoice was issued before it (ADR-496).
+  """
+  creditNote: CreditNote
   id: ID!
   method: RefundMethod!
 

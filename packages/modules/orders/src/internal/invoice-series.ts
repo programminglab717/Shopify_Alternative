@@ -3,7 +3,8 @@ import { sql } from 'drizzle-orm';
 
 // A shop's invoices in a series of their own (TAX-05, ADR-495): numbered from 1 each tax year,
 // which in Pakistan starts on 1 July, with no number skipped or given twice. An order's invoice
-// takes its number the first time it is printed, and keeps it.
+// takes its number the first time it is printed, and keeps it. A refund on an order whose
+// invoice was issued takes a credit note's number, in a series of its own (ADR-496).
 
 /** An order's invoice as issued. */
 export interface OrderInvoiceRecord {
@@ -29,10 +30,41 @@ export function taxYearOf(at: Date, timeZone: string): number {
   return month >= 7 ? year : year - 1;
 }
 
+/** A number in a series as it is printed: "INV/2026-27/00001", or "CN/" for credit notes. */
+function seriesName(prefix: 'INV' | 'CN', taxYear: number, number: number): string {
+  const ends = String((taxYear + 1) % 100).padStart(2, '0');
+  return `${prefix}/${taxYear}-${ends}/${String(number).padStart(5, '0')}`;
+}
+
 /** An invoice's number as it is printed: "INV/2026-27/00001". */
 export function invoiceName(taxYear: number, number: number): string {
-  const ends = String((taxYear + 1) % 100).padStart(2, '0');
-  return `INV/${taxYear}-${ends}/${String(number).padStart(5, '0')}`;
+  return seriesName('INV', taxYear, number);
+}
+
+/** A credit note's number as it is printed: "CN/2026-27/00001". */
+export function creditNoteName(taxYear: number, number: number): string {
+  return seriesName('CN', taxYear, number);
+}
+
+/** The next number of a shop's series, taken under its counter's lock in the caller's transaction. */
+async function nextNumberIn(
+  tx: Tx,
+  shopId: string,
+  kind: 'invoice' | 'credit_note',
+  taxYear: number,
+): Promise<number> {
+  const { rows } = await tx.execute<{ last_number: number }>(sql`
+    INSERT INTO orders.document_counters (shop_id, kind, tax_year, last_number)
+    VALUES (${shopId}, ${kind}, ${taxYear}, 1)
+    ON CONFLICT (shop_id, kind, tax_year)
+      DO UPDATE SET last_number = orders.document_counters.last_number + 1
+    RETURNING last_number`);
+  return rows[0]!.last_number;
+}
+
+/** A shop's series are issued from one transaction at a time, so they have no gaps. */
+async function lockSeriesIn(tx: Tx, shopId: string): Promise<void> {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`invoices:${shopId}`}, 0))`);
 }
 
 type InvoiceRow = { order_id: string; tax_year: number; number: number; issued_at: string | Date };
@@ -73,7 +105,7 @@ export async function issueInvoicesIn(
   timeZone: string,
   now = new Date(),
 ): Promise<Map<string, OrderInvoiceRecord>> {
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`invoices:${shopId}`}, 0))`);
+  await lockSeriesIn(tx, shopId);
   const invoices = await invoicesIn(
     tx,
     shopId,
@@ -82,17 +114,38 @@ export async function issueInvoicesIn(
   const taxYear = taxYearOf(now, timeZone);
   for (const order of orders) {
     if (invoices.has(order.id) || order.stage === 'cancelled') continue;
-    const { rows } = await tx.execute<{ last_number: number }>(sql`
-      INSERT INTO orders.document_counters (shop_id, kind, tax_year, last_number)
-      VALUES (${shopId}, 'invoice', ${taxYear}, 1)
-      ON CONFLICT (shop_id, kind, tax_year)
-        DO UPDATE SET last_number = orders.document_counters.last_number + 1
-      RETURNING last_number`);
+    const number = await nextNumberIn(tx, shopId, 'invoice', taxYear);
     const { rows: issued } = await tx.execute<InvoiceRow>(sql`
       INSERT INTO orders.order_invoices (shop_id, order_id, tax_year, number, issued_at)
-      VALUES (${shopId}, ${order.id}, ${taxYear}, ${rows[0]!.last_number}, ${now.toISOString()})
+      VALUES (${shopId}, ${order.id}, ${taxYear}, ${number}, ${now.toISOString()})
       RETURNING order_id, tax_year, number, issued_at`);
     invoices.set(order.id, toRecord(issued[0]!));
   }
   return invoices;
+}
+
+/**
+ * A credit note for refund `refundId` of order `orderId`, if the order's invoice was issued: the
+ * next number of the shop's credit notes, in the caller's transaction. Null if it has no invoice:
+ * the invoice says what was refunded before it was printed.
+ */
+export async function issueCreditNoteIn(
+  tx: Tx,
+  shopId: string,
+  orderId: string,
+  refundId: string,
+  timeZone: string,
+  now = new Date(),
+): Promise<{ taxYear: number; number: number } | null> {
+  // Asked before the series' lock: a print holding it never waits on an order that has its
+  // invoice, as the caller's refund holds this one, so the two never wait on each other.
+  if (!(await invoicesIn(tx, shopId, [orderId])).has(orderId)) return null;
+  await lockSeriesIn(tx, shopId);
+  const taxYear = taxYearOf(now, timeZone);
+  const number = await nextNumberIn(tx, shopId, 'credit_note', taxYear);
+  await tx.execute(sql`
+    INSERT INTO orders.refund_credit_notes (shop_id, refund_id, order_id, tax_year, number,
+                                            issued_at)
+    VALUES (${shopId}, ${refundId}, ${orderId}, ${taxYear}, ${number}, ${now.toISOString()})`);
+  return { taxYear, number };
 }

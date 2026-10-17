@@ -50,6 +50,7 @@ import {
   DraftOrderStatus,
 } from './draft-order.types.js';
 import {
+  CreditNote,
   CustomerJourneySummary,
   CustomerVisit,
   Fulfillment,
@@ -543,6 +544,12 @@ export function toRefund(
         record: record.receipt,
         orderNumber,
         position,
+      }),
+    creditNote:
+      record.creditNote &&
+      Object.assign(new CreditNote(), {
+        number: record.creditNote.name,
+        issuedAt: record.creditNote.issuedAt,
       }),
     createdAt: record.createdAt,
   });

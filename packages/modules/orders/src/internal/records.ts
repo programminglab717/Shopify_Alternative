@@ -150,6 +150,8 @@ export interface RefundRecord {
   note: string;
   /** The receipt staff kept of the money they sent (ADR-242); null without one, or once erased. */
   receipt: RefundReceiptRecord | null;
+  /** Its credit note, given back on an invoiced order (ADR-496): "CN/2026-27/00001". */
+  creditNote: { name: string; issuedAt: Date } | null;
   actorKind: 'app' | 'staff';
   actorId: string;
   createdAt: Date;

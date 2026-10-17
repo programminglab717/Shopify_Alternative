@@ -12,7 +12,13 @@ import { maskPkMobile, parsePkMobile } from '@hatti/pk';
 import { taxSettingsIn } from '@hatti/tax/public';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
-import { documentName, invoice, packingSlip, type DocumentKindValue } from './documents.js';
+import {
+  creditNotes,
+  documentName,
+  invoice,
+  packingSlip,
+  type DocumentKindValue,
+} from './documents.js';
 import { invoicesIn, issueInvoicesIn, type OrderInvoiceRecord } from './invoice-series.js';
 import { loadOrders } from './order-store.js';
 import type { OrderRecord } from './records.js';
@@ -70,10 +76,14 @@ export class OrderDocumentService {
         // An invoice printed is issued (ADR-495): those of orders without one take the next
         // numbers, unless an order in the batch is past the plan's limit and nothing prints.
         const printable = orders.every((order) => order.overLimitAt === null);
-        const invoices: Map<string, OrderInvoiceRecord> =
-          request.kind === 'invoice' && printable
+        const ids = orders.map((order) => order.id);
+        const invoices: Map<string, OrderInvoiceRecord> = !printable
+          ? new Map()
+          : request.kind === 'invoice'
             ? await issueInvoicesIn(tx, tenant.shopId, orders, shop.timezone)
-            : new Map();
+            : request.kind === 'credit_note'
+              ? await invoicesIn(tx, tenant.shopId, ids)
+              : new Map();
         return {
           shop,
           registration: await taxSettingsIn(tx, tenant.shopId),
@@ -90,17 +100,21 @@ export class OrderDocumentService {
       const names = over.map((order) => orderName(order.number)).join(', ');
       return failOne(['ids'], 'INVALID', `${names}: ${OVER_LIMIT_MESSAGE}`);
     }
-    const template = request.kind === 'invoice' ? invoice : packingSlip;
-    const pages = orders.map((order) =>
-      template(order, {
+    const pages = orders.flatMap((order) => {
+      const context = {
         language: request.language,
         shop,
         from: locations.get(order.locationId) ?? null,
         phone: shownNumber(tenant, order.phone),
         registration,
         invoice: invoices.get(order.id) ?? null,
-      }),
-    );
+      };
+      if (request.kind === 'credit_note') return creditNotes(order, context);
+      return [(request.kind === 'invoice' ? invoice : packingSlip)(order, context)];
+    });
+    if (request.kind === 'credit_note' && pages.length === 0 && orders.length > 0) {
+      return failOne(['ids'], 'INVALID', 'No credit note has been issued for these orders');
+    }
     const { title, fileName } = documentName(
       request.kind,
       orders.map((order) => order.number),

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-495 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-496 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -503,6 +503,7 @@
 | 493 | Payouts and tax withheld: gateways' and couriers' statements over a period, by who paid and by month, and each that withheld tax for the shop's tax credit | Accepted |
 | 494 | Payouts and tax withheld in the admin: a month or Pakistan's tax year, who paid, and the statements that withheld tax to download for the shop's return | Accepted |
 | 495 | Invoice series: an order's invoice numbered in the shop's own series when first printed, counted afresh each tax year from 1 July, with no number skipped or given twice | Accepted |
+| 496 | Credit notes: money refunded on an order whose invoice was issued goes on a credit note numbered in a series of its own, printed against the invoice it corrects | Accepted |
 
 ---
 
@@ -18742,3 +18743,36 @@
     are never invoiced, and confirmed orders are often cancelled. Numbering on print keeps the
     series to the invoices the shop actually gives.
   * **A Postgres sequence:** sequences skip numbers when a transaction rolls back.
+
+## ADR-496 · Credit notes: money refunded on an order whose invoice was issued goes on a credit note numbered in a series of its own, printed against the invoice it corrects
+
+* **Context:** Once an invoice is issued (ADR-495), it can't be changed. Money given back later
+  has to go on a credit note: numbered in a series, naming the invoice it corrects, with the
+  sales tax it takes back. Section 39 of the Sales Tax Act asks registered sellers for just
+  this (TAX-05).
+* **Decision:**
+  * **A refund recorded on an order whose invoice was issued takes the next credit note number,**
+    `CN/2026-27/00001`. It is numbered in the same transaction as the refund, by hand or through
+    a gateway, under the shop's series lock. The series counts afresh each tax year, as
+    invoices do.
+  * **A refund before the invoice is printed gets no credit note:** the invoice, once printed,
+    says what was refunded.
+  * **Lock order:** the refund asks whether the order has an invoice before taking the series
+    lock. A print holding that lock never waits on an order that already has its invoice, so a
+    refund holding its order's row and a print never wait on each other.
+  * `Refund.creditNote` gives the number and when it was issued.
+  * **The CREDIT_NOTE document prints a page for each credit note of the orders asked for**, under
+    the shop, the order and the invoice it corrects:
+    * what was refunded;
+    * the sales tax of it;
+    * its value without the tax, for a shop with an STRN;
+    * the refund's note.
+    Orders without credit notes are refused.
+* **Consequences:**
+  * Debit notes, for invoiced orders whose totals rise in an edit, come later.
+  * The admin's order page doesn't show the numbers, or print credit notes, yet.
+* **Alternatives:**
+  * **A credit note for every refund:** a refund before any invoice corrects nothing that was
+    issued.
+  * **A credit note made when printed, as invoices are:** a refund on an invoiced order always
+    needs one, and numbering it with the refund keeps the series in the order money went back.

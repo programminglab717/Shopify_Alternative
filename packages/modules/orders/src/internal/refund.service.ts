@@ -4,6 +4,7 @@ import {
   actorColumnsOf,
   failOne,
   rollbackResult,
+  shopProfile,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
@@ -22,6 +23,7 @@ import { refundTaxOf } from './order-tax.js';
 import type { OrderRecord, RefundRecord } from './records.js';
 import { LIMITS } from './rules.js';
 import { refunds, type OrderRow, type RefundMethodValue } from './schema.js';
+import { issueCreditNoteIn } from './invoice-series.js';
 import { TransferReceiptService, type StoredReceipt } from './transfer-receipt.service.js';
 
 export interface RefundInput {
@@ -390,6 +392,9 @@ export async function writeRefund(
     actorKind: actor.actorKind,
     actorId: actor.actorId,
   });
+  // Money given back on an invoiced order goes on a credit note (ADR-496).
+  const { timezone } = await shopProfile(tx, tenant.shopId);
+  await issueCreditNoteIn(tx, tenant.shopId, orderId, refundId, timezone);
   const amountRefunded = order.amountRefunded + amount;
   const updated = await updateOrder(tx, tenant.shopId, order, {
     amountRefunded,

@@ -1988,6 +1988,44 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(denied.errors?.[0]?.message).toContain('read_orders');
   });
 
+  it("puts refunds on credit notes once the order's invoice is printed (ADR-496)", async () => {
+    const [size] = await stockedVariants(tokens.a, 'Lawn Suit', ['Free'], 3);
+    const created = await mutate(tokens.a, ORDER_CREATE, {
+      input: {
+        lineItems: [{ variantId: size, quantity: 1 }],
+        shippingAddress: ADDRESS,
+        paymentMethod: 'PREPAID',
+      },
+    });
+    const id = created.order.id as string;
+    const REFUND = `
+      mutation ($id: ID!, $input: OrderRefundInput!) {
+        orderRefund(id: $id, input: $input) {
+          refund { id creditNote { number issuedAt } }
+          userErrors { field code message }
+        }
+      }`;
+    const before = await mutate(tokens.a, REFUND, { id, input: { amount: '100', method: 'CASH' } });
+    expect(before.refund.creditNote).toBeNull();
+    const printed = await gql(
+      tokens.a,
+      `query ($ids: [ID!]!) { orderDocument(ids: $ids, kind: INVOICE) { title } }`,
+      { ids: [id] },
+    );
+    expect(printed.errors).toBeUndefined();
+    const after = await mutate(tokens.a, REFUND, { id, input: { amount: '200', method: 'CASH' } });
+    expect(after.refund.creditNote).toEqual({
+      number: expect.stringMatching(/^CN\/\d{4}-\d{2}\/\d{5}$/),
+      issuedAt: expect.any(String),
+    });
+    const document = await gql(
+      tokens.a,
+      `query ($ids: [ID!]!) { orderDocument(ids: $ids, kind: CREDIT_NOTE) { html } }`,
+      { ids: [id] },
+    );
+    expect(document.data?.orderDocument.html).toContain(after.refund.creditNote.number);
+  });
+
   it('records refunds, up to what was paid', async () => {
     const [size] = await stockedVariants(tokens.a, 'Silk Dupatta', ['Free'], 3);
     const created = await mutate(tokens.a, ORDER_CREATE, {
