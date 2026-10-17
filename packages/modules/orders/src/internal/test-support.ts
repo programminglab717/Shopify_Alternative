@@ -316,6 +316,8 @@ export async function ordersFixture(
     async reset() {
       await admin.query(`
         DELETE FROM orders.draft_orders;
+        DELETE FROM pricing.discount_redemptions;
+        DELETE FROM pricing.discount_codes;
         DELETE FROM orders.orders;
         DELETE FROM orders.counters;
         DELETE FROM orders.document_counters;

@@ -112,6 +112,12 @@ export class DraftOrder {
   @Field(() => Money)
   totalDiscounts!: Money;
 
+  @Field(() => String, {
+    nullable: true,
+    description: "The shop's discount code that sets totalDiscounts, as the shop wrote it.",
+  })
+  discountCode!: string | null;
+
   @Field(() => Money)
   totalShippingPrice!: Money;
 
@@ -279,6 +285,15 @@ export class DraftOrderInput {
 
   @Field(() => String, { nullable: true, description: 'Taken off the items, as an amount.' })
   discount?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "One of the shop's discount codes, which sets what comes off, or makes delivery free, " +
+      "checked against the items as checkout checks a cart's; counted as a use when the draft " +
+      'becomes an order. Null removes it. Not beside discount.',
+  })
+  discountCode?: string | null;
 
   @Field(() => ID, {
     nullable: true,

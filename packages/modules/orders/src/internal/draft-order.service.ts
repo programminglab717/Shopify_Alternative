@@ -17,11 +17,13 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { LocationService } from '@hatti/inventory/public';
 import type { CurrencyCode } from '@hatti/money';
+import { redeemDiscountIn } from '@hatti/pricing/public';
 import { ObjectStorage } from '@hatti/storage';
 import { taxSettingsIn } from '@hatti/tax/public';
 import { Injectable, Optional } from '@nestjs/common';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { checkAddress, type AddressInput } from './address.js';
+import { codeRefusalText, draftCodeIn } from './draft-codes.js';
 import { draftSearchConditions, draftSearchText } from './draft-filter.js';
 import { bankTransferSettingsIn } from './bank-transfer.service.js';
 import { linkShopIn, linkTermsIn } from './link-shop.js';
@@ -104,7 +106,13 @@ export interface DraftOrderInput {
    */
   advanceDue?: string | null;
   shippingPrice?: string | null;
+  /** An amount off the items, in place of a code. */
   discount?: string | null;
+  /**
+   * One of the shop's discount codes, which sets what comes off (ADR-521), checked against the
+   * items as checkout checks a cart's; null removes it. Not beside `discount`.
+   */
+  discountCode?: string | null;
   /** Where the order will ship from; chosen when it is placed (ADR-355), if left out. */
   locationId?: string | null;
   /**
@@ -184,6 +192,7 @@ interface CheckedDraft {
   advanceDue?: bigint;
   shipping?: bigint;
   discount?: bigint;
+  discountCode?: string | null;
   locationId?: string | null;
   deliveryMethod?: DeliveryMethodValue;
   note?: string;
@@ -657,6 +666,48 @@ export class DraftOrderService {
     if (!draft.shippingAddress) {
       return failOne(['id'], 'INVALID', "Add the customer's address first");
     }
+    const currency = draft.currency as CurrencyCode;
+    // Its code as it is now: its dates and uses may have moved since it was given (ADR-521).
+    const code = draft.discountCode
+      ? await draftCodeIn(tx, draft.shopId, draft.discountCode, draft.lines, draft.shipping)
+      : null;
+    if (code && !code.ok) {
+      return failOne(
+        ['id'],
+        'INVALID',
+        codeRefusalText(draft.discountCode!, code.refusal, currency),
+      );
+    }
+    try {
+      // Placed and its code's use counted together, or neither: the use is refused once the
+      // order has its customer, who may have used a code for one order each already.
+      return await tx.transaction(async (savepoint) => {
+        const placed = await this.#placeIn(savepoint, draft, placement, agreement);
+        if (!placed.ok || !code?.ok) return placed;
+        const redeemed = await redeemDiscountIn(savepoint, draft.shopId, {
+          codeId: code.code.id,
+          orderId: placed.value.id,
+          customerId: placed.value.customerId,
+          amount: draft.discount,
+        });
+        if (!redeemed.ok) {
+          throw new CodeRefused(codeRefusalText(code.code.code, redeemed.refusal, currency));
+        }
+        return placed;
+      });
+    } catch (error) {
+      if (error instanceof CodeRefused) return failOne(['id'], 'INVALID', error.message);
+      throw error;
+    }
+  }
+
+  /** Places the draft in `tx`, as {@link #place} has checked it. */
+  async #placeIn(
+    tx: Tx,
+    draft: DraftOrderRow,
+    placement: Pick<Placement, 'actor' | 'how' | 'confirmedByCustomer'>,
+    agreement: OrderAgreementInput | null,
+  ): Promise<MutationResult<OrderRecord>> {
     return this.orders.placeIn(
       tx,
       {
@@ -672,11 +723,13 @@ export class DraftOrderService {
           quantity: line.quantity,
           price: BigInt(line.unitPrice),
         })),
-        address: draft.shippingAddress,
+        // #place checked it has one.
+        address: draft.shippingAddress!,
         email: draft.email,
         paymentMethod: draft.paymentMethod,
         shipping: draft.shipping,
         discount: draft.discount,
+        discountCodes: draft.discountCode ? [draft.discountCode] : [],
         advance: draft.advancePaid,
         advanceDue: draft.advanceDue,
         locationId: draft.locationId,
@@ -787,11 +840,35 @@ export class DraftOrderService {
       advanceDue: checked.advanceDue ?? current?.advanceDue ?? 0n,
       shipping: checked.shipping ?? current?.shipping ?? 0n,
       discount: checked.discount ?? current?.discount ?? 0n,
+      // A code given stays until removed, or an amount off is given in its place (ADR-521).
+      discountCode:
+        checked.discountCode !== undefined
+          ? checked.discountCode
+          : checked.discount !== undefined
+            ? null
+            : (current?.discountCode ?? null),
       locationId: pick(checked.locationId, current?.locationId ?? null),
       deliveryMethod: checked.deliveryMethod ?? current?.deliveryMethod ?? 'shipping',
       note: checked.note ?? current?.note ?? '',
       tags: checked.tags ?? current?.tags ?? [],
     };
+    // The code sets what comes off the items, as they are now, or makes delivery free.
+    if (next.discountCode !== null) {
+      const applied = await draftCodeIn(tx, shopId, next.discountCode, next.lines, next.shipping);
+      if (!applied.ok) {
+        const currency = (current?.currency ?? tenant.currency) as CurrencyCode;
+        return failOne(
+          ['input', 'discountCode'],
+          'INVALID',
+          codeRefusalText(next.discountCode, applied.refusal, currency),
+        );
+      }
+      next.discountCode = applied.code.code;
+      next.discount = applied.amounts.items;
+      if (applied.code.kind === 'free_shipping') next.shipping = 0n;
+    } else if (checked.discountCode === null) {
+      next.discount = checked.discount ?? 0n;
+    }
     // Picked up: at a location that offers it, with nothing to deliver (ADR-390).
     if (next.deliveryMethod === 'pickup') {
       if (next.shipping > 0n) {
@@ -933,6 +1010,7 @@ const CHANGES = [
   ['advanceDue', 'advanceDue'],
   ['shippingPrice', 'shipping'],
   ['discount', 'discount'],
+  ['discountCode', 'discountCode'],
   ['location', 'locationId'],
   ['deliveryMethod', 'deliveryMethod'],
   ['note', 'note'],
@@ -1005,6 +1083,16 @@ function checkDraft(
   checked.advanceDue = amount('advanceDue');
   checked.shipping = amount('shippingPrice');
   checked.discount = amount('discount');
+  if (input.discountCode !== undefined) {
+    const code = input.discountCode?.trim() || null;
+    if (code !== null && checked.discount !== undefined && checked.discount > 0n) {
+      check.addMessage(
+        ['input', 'discountCode'],
+        'INVALID',
+        'Give a discount code or an amount off, not both',
+      );
+    } else checked.discountCode = code;
+  }
   if (input.locationId !== undefined) checked.locationId = input.locationId || null;
   if (input.deliveryMethod) checked.deliveryMethod = input.deliveryMethod;
   if (input.note !== undefined) {
@@ -1143,6 +1231,7 @@ export function toDraftRecord(row: DraftOrderRow): DraftOrderRecord {
     lines,
     subtotal: row.subtotal,
     discount: row.discount,
+    discountCode: row.discountCode,
     shipping: row.shipping,
     total: row.total,
     advancePaid: row.advancePaid,
@@ -1181,4 +1270,12 @@ function canonicalJson(value: unknown): string {
     return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`).join(',')}}`;
   }
   return JSON.stringify(value ?? null);
+}
+
+/** A draft's code refused as its order was placed, which undoes the order. */
+class CodeRefused extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CodeRefused';
+  }
 }

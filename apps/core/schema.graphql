@@ -4007,6 +4007,11 @@ type DraftOrder {
   SHIPPING, or PICKUP: its order collected at its location, or the only one offering local pickup when none is named, with no delivery charge.
   """
   deliveryMethod: OrderDeliveryMethod!
+
+  """
+  The shop's discount code that sets totalDiscounts, as the shop wrote it.
+  """
+  discountCode: String
   email: String
   id: ID!
   lineItems: [DraftOrderLineItem!]!
@@ -4115,6 +4120,11 @@ input DraftOrderInput {
 
   """Taken off the items, as an amount."""
   discount: String
+
+  """
+  One of the shop's discount codes, which sets what comes off, or makes delivery free, checked against the items as checkout checks a cart's; counted as a use when the draft becomes an order. Null removes it. Not beside discount.
+  """
+  discountCode: String
   email: String
 
   """

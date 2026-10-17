@@ -744,6 +744,8 @@ export const draftOrders = ordersSchema.table(
     lines: jsonb('lines').$type<DraftLineValue[]>().notNull(),
     subtotal: money('subtotal').notNull(),
     discount: money('discount').notNull(),
+    /** The shop's discount code that sets `discount`, as the shop wrote it (ADR-521). */
+    discountCode: text('discount_code'),
     shipping: money('shipping').notNull(),
     total: money('total').notNull(),
     advancePaid: money('advance_paid').notNull(),

@@ -417,6 +417,8 @@ export interface DraftOrderRecord {
   /** Minor units. total = subtotal − discount + shipping. */
   subtotal: bigint;
   discount: bigint;
+  /** The shop's discount code that set `discount`, if one did (ADR-521). */
+  discountCode: string | null;
   shipping: bigint;
   total: bigint;
   /** Paid in advance on a cash-on-delivery order. */

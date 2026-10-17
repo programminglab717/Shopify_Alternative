@@ -864,4 +864,79 @@ describe.skipIf(!server)('Draft orders', () => {
     expect(await f.drafts.get(f.a, emailed.id)).toBeNull();
     expect((await f.orders.get(f.a, order.id))?.customerErasedAt).toBeInstanceOf(Date);
   });
+  it("takes one of the shop's discount codes, sets what comes off by it, and counts its use when placed (ADR-521)", async () => {
+    const code = async (values: string) =>
+      f.admin.query(
+        `INSERT INTO pricing.discount_codes
+           (shop_id, id, code, title, kind, percentage_bps, amount, usage_limit, once_per_customer)
+         VALUES ($1, gen_random_uuid(), ${values})`,
+        [f.a.shopId],
+      );
+    await code(`'EID10', 'EID10', 'percentage', 1000, NULL, NULL, false`);
+    await code(`'FREEDEL', 'FREEDEL', 'free_shipping', NULL, NULL, NULL, false`);
+    await code(`'ONCE500', 'ONCE500', 'fixed_amount', NULL, 50000, NULL, true`);
+
+    // Rs 7,099 of items: 10% off, as the shop wrote the code, whatever its case here.
+    const eid = await draft({ discountCode: ' eid10 ' });
+    expect(eid).toMatchObject({ discountCode: 'EID10', discount: 70_990n, shipping: 25_000n });
+    expect(
+      errorsOf(
+        await f.drafts.create(f.a, {
+          lineItems: [{ variantId: kurta, quantity: 1 }],
+          discountCode: 'NOPE',
+        }),
+      ),
+    ).toEqual([['input.discountCode', 'INVALID']]);
+    expect(
+      errorsOf(
+        await f.drafts.create(f.a, {
+          lineItems: [{ variantId: kurta, quantity: 1 }],
+          discountCode: 'EID10',
+          discount: '100',
+        }),
+      ),
+    ).toEqual([['input.discountCode', 'INVALID']]);
+
+    // The items change: what comes off follows them. Removed: nothing comes off.
+    const fewer = unwrap(
+      await f.drafts.update(f.a, eid.id, { lineItems: [{ variantId: kurta, quantity: 1 }] }),
+    );
+    expect(fewer).toMatchObject({ discountCode: 'EID10', discount: 20_000n });
+    expect(unwrap(await f.drafts.update(f.a, eid.id, { discountCode: null }))).toMatchObject({
+      discountCode: null,
+      discount: 0n,
+    });
+    // A free-delivery code makes delivery free.
+    expect(await draft({ discountCode: 'freedel' })).toMatchObject({
+      discountCode: 'FREEDEL',
+      discount: 0n,
+      shipping: 0n,
+    });
+
+    // Placed: the order keeps the code, and its use is counted with the order.
+    const once = await draft({ discountCode: 'ONCE500' });
+    const placed = unwrap(await f.drafts.complete(f.a, once.id));
+    const order = (await f.orders.get(f.a, placed.orderId!))!;
+    expect(order).toMatchObject({ discount: 50_000n, discountCodes: ['ONCE500'] });
+    const { rows } = await f.admin.query<{ used: number; uses: number }>(
+      `SELECT used, (SELECT count(*)::int FROM pricing.discount_redemptions) AS uses
+         FROM pricing.discount_codes WHERE code = 'ONCE500'`,
+    );
+    expect(rows).toEqual([{ used: 1, uses: 1 }]);
+
+    // The same customer again, with a code for one order each: refused, and no order placed.
+    const again = await draft({ discountCode: 'ONCE500' });
+    const before = await orderCount();
+    expect(await f.drafts.complete(f.a, again.id)).toEqual({
+      ok: false,
+      errors: [
+        expect.objectContaining({
+          code: 'INVALID',
+          message: 'The customer has used ONCE500 before, and it is for one order each',
+        }),
+      ],
+    });
+    expect(await orderCount()).toBe(before);
+    expect((await f.drafts.get(f.a, again.id))?.status).toBe('open');
+  });
 });

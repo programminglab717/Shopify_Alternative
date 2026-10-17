@@ -1367,6 +1367,9 @@ importers:
       '@hatti/pk':
         specifier: workspace:*
         version: link:../../platform/pk
+      '@hatti/pricing':
+        specifier: workspace:*
+        version: link:../pricing
       '@hatti/storage':
         specifier: workspace:*
         version: link:../../platform/storage

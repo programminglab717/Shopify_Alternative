@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Codes on drafts
+
+* **A draft order takes one of the shop's discount codes, checked against its items as checkout
+  checks a cart's, and counted as a use when the draft becomes an order, in the same
+  transaction** ([ADR-521](../architecture/13-decision-log.md#adr-521--a-draft-order-takes-one-of-the-shops-discount-codes-checked-against-its-items-as-checkout-checks-a-carts-setting-what-comes-off-or-making-delivery-free-followed-as-the-items-change-and-counted-as-a-use-when-the-draft-becomes-an-order-in-the-same-transaction), CHK-06, ORD-03). Migration 0246.
+* 3234 tests, 1 more: a draft through its code's life, from typing it to
+  its order.
+
 ### 4ed6262 · The admin's buy X get Y
 
 * **The admin's forms for codes and automatic discounts make buy X get Y, two for one and free

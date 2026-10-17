@@ -33,6 +33,7 @@
     "@hatti/money": "workspace:*",
     "@hatti/online-store": "workspace:*",
     "@hatti/pk": "workspace:*",
+    "@hatti/pricing": "workspace:*",
     "@hatti/storage": "workspace:*",
     "@hatti/tax": "workspace:*",
     "@hatti/xlsx": "workspace:*",

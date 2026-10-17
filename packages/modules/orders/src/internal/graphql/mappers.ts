@@ -587,6 +587,7 @@ export function toDraftOrder(record: DraftOrderRecord, tenant: TenantContext): D
     shippingAddress: record.shippingAddress ? toAddress(record.shippingAddress, hidePhone) : null,
     subtotalPrice: amount(record.subtotal),
     totalDiscounts: amount(record.discount),
+    discountCode: record.discountCode,
     totalShippingPrice: amount(record.shipping),
     totalPrice: amount(record.total),
     taxesIncluded: true,

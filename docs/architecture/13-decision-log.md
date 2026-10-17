@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-520 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-521 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -528,6 +528,7 @@
 | 518 | The admin's discounts for some products or collections: a new code or automatic discount applies to the whole order or to products found by name and collections chosen from the shop's, shown as chips taken off with a tap; free delivery has no such choice | Accepted |
 | 519 | Buy X get Y: a code or an automatic discount gives, in each full group of X + Y of its items, the Y cheapest at a percentage off, free unless it says less; spending tiers are automatic discounts with rising minimums | Accepted |
 | 520 | The admin's buy X get Y: both discount forms offer items for others bought, with items bought and given, two for one unless changed, and how much off those given, free unless changed; for the whole order or some products and collections | Accepted |
+| 521 | A draft order takes one of the shop's discount codes: checked against its items as checkout checks a cart's, setting what comes off or making delivery free, followed as the items change, and counted as a use when the draft becomes an order, in the same transaction | Accepted |
 
 ---
 
@@ -19865,3 +19866,41 @@
     code, its limits with the others. One form with one more choice keeps them together.
   * **Presets ("Buy 1 get 1", "Buy 2 get 1"):** two plain fields cover every case and read just
     as clearly.
+
+## ADR-521 · A draft order takes one of the shop's discount codes: checked against its items as checkout checks a cart's, setting what comes off or making delivery free, followed as the items change, and counted as a use when the draft becomes an order, in the same transaction
+
+* **Context:**
+  * Staff take orders in WhatsApp and Instagram chats as drafts (ADR-031). A draft took an
+    amount off typed by hand.
+  * Shops advertise codes in those same chats: "use EID10". The staff member then had to work
+    out 10% of the items, and the code's limits never knew.
+* **Decision:**
+  * **On the draft:** `discountCode` on its input and on `DraftOrder`, one code at a time, as the
+    shop wrote it. It replaces an amount off typed by hand, and giving both is refused.
+  * **Checked:**
+    * Against the draft's items, through the pricing module's facade, as checkout checks a cart
+      (ADR-063, ADR-517, ADR-519): its dates, minimum, uses, items and groups.
+    * Its collections are asked of the catalog's facade.
+    * A code that takes nothing is refused with why, on the input's `discountCode`.
+  * **What it sets:** the draft's discount, or its delivery charge to nothing for a free-delivery
+    code. When the items change, the discount follows them. Removing the code takes the discount
+    off.
+  * **Placed:**
+    * When the draft becomes an order, whether staff complete it or the customer confirms it
+      through its link (ADR-114), the code is checked again. Its dates or uses may have changed.
+    * The order is placed with the code, and the code's use is counted in the same transaction,
+      inside a savepoint.
+    * Its uses may have run out meanwhile, or the customer, known now by their number, may have
+      used a code that is once a customer already. Then the order is undone, the draft stays
+      open, and staff are told why.
+  * **Orders placed by staff without a draft** keep their amount off, as before. A draft is how
+    staff take an order with a code.
+* **Consequences:**
+  * "EID10" works in a chat as on the storefront, and counts against the same limits.
+  * The orders module now depends on the pricing module's facade, as checkout does.
+  * The admin's draft page doesn't yet take a code; ADR-522 will.
+* **Alternatives:**
+  * **Counting the use when the code is typed on the draft:** a draft that is never placed would
+    use the code up. Counting with the order is what checkout does.
+  * **Codes on orderCreate as well:** staff placing an order directly agree its price there and
+    then. A draft is where a chat's code belongs, and it is one step away.
