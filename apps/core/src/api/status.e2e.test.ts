@@ -187,4 +187,34 @@ describe.skipIf(!server)("Hatti's status page and the admin's banner (BIL-06)", 
       recent: [{ title: 'WhatsApp messages delayed', status: 'resolved' }],
     });
   });
+
+  it('takes an address from the status page, and confirms or stops it by its link (ADR-535)', async () => {
+    const form = (payload: string, url = '/status/subscribe') =>
+      app.inject({
+        method: 'POST',
+        url,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload,
+      });
+    const asked = await form('email=Ayesha%40Example.pk');
+    expect(asked.statusCode).toBe(200);
+    expect(asked.headers['cache-control']).toBe('no-store');
+    expect(asked.body).toContain('a link to confirm is on its way');
+    expect((await form('email=ayesha')).statusCode).toBe(422);
+
+    const { rows } = await admin.query<{ token: string }>(
+      `SELECT token FROM trust.status_subscribers WHERE email = 'ayesha@example.pk'`,
+    );
+    const link = `/status/subscription/${rows[0]!.token}`;
+    // Opening the link changes nothing: a button confirms.
+    const opened = await app.inject({ method: 'GET', url: link });
+    expect(opened.statusCode).toBe(200);
+    expect(opened.body).toContain('value="confirm"');
+    expect(opened.headers['referrer-policy']).toBe('no-referrer');
+    const confirmed = await form('action=confirm', link);
+    expect(confirmed.body).toContain('value="stop"');
+    const stopped = await form('action=stop', link);
+    expect(stopped.body).toContain('Stopped');
+    expect((await app.inject({ method: 'GET', url: link })).statusCode).toBe(404);
+  });
 });

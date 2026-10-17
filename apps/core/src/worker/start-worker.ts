@@ -120,6 +120,8 @@ import { ScheduledExports } from './scheduled-exports.js';
 import { StoreExports } from './store-exports.js';
 import { StaffAlerts } from './staff-alerts.js';
 import { SupportAlerts } from './support-alerts.js';
+import { StatusMail } from './status-mail.js';
+import { StatusSubscriptionsService } from '@hatti/trust/public';
 import { StorefrontSessions } from './storefront-sessions.js';
 import { StorefrontSweep } from './storefront-sweep.js';
 import { UnpaidOrders } from './unpaid-orders.js';
@@ -583,6 +585,14 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => supportAlerts.stop());
+    // The status page's emails: links to confirm, and incidents' updates (ADR-535).
+    const statusMail = new StatusMail(
+      new StatusSubscriptionsService(database),
+      hattiEmailsOf(config, logger),
+      new PublicSite(config.PUBLIC_URL ?? 'http://localhost:4000'),
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => statusMail.stop());
     if (config.ENCRYPTION_KEYS) {
       const conversions = new ConversionsSender({
         database,

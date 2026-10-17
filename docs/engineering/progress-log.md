@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### The status page's emails
+
+* **Anyone may ask on the status page to be emailed its updates: a link to confirm first, a link
+  to stop in every email, and the worker sending both, each once** ([ADR-535](../architecture/13-decision-log.md#adr-535--anyone-may-ask-on-the-status-page-to-be-emailed-its-updates-a-link-to-confirm-first-a-link-to-stop-in-every-email-and-the-worker-sending-both-each-once), BIL-06). Migration
+  0251.
+* 3263 tests, 6 more: asking, confirming and stopping, what is taken
+  once, the emails, and the pages through the core.
+
 ### 0f70377 · AI credits in the admin
 
 * **The admin's AI drafts say the plan's AI credits left this month, and draft none once they

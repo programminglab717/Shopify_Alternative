@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-534 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-535 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -542,6 +542,7 @@
 | 532 | The admin's Meta settings connect the pixel without a token, saying orders then go to no conversions API, and the plan cards say which plans have the pixel | Accepted |
 | 533 | Each plan includes AI credits a month, kept by billing: each draft the AI gives, of a product's copy or of translations, spends one, and none are drafted past them until the month in Pakistan's time turns | Accepted |
 | 534 | The admin's AI drafts say the plan's AI credits left this month, and draft none once they are used; the plan cards say each plan's | Accepted |
+| 535 | Anyone may ask on the status page to be emailed its updates: a link to confirm first, a link to stop in every email, and the worker sending both, each once | Accepted |
 
 ---
 
@@ -20248,3 +20249,33 @@
 * **Alternatives:**
   * **Showing the balance on the billing page alone:** owners draft on the product's form and
     the Urdu pages, and would learn there only from a refusal.
+
+## ADR-535 · Anyone may ask on the status page to be emailed its updates: a link to confirm first, a link to stop in every email, and the worker sending both, each once
+
+* **Context:** The status page shows what goes on (ADR-498) to those who look. Shops and their
+  people want to be told without looking, as status pages let them subscribe.
+* **Decision:**
+  * **Asking:** the page has a form for an email address, posting to `/status/subscribe`. Its
+    answer is the same whatever came of it, so no one learns who is subscribed.
+  * **Confirming first:** migration 0251's `trust.status_subscribers` keeps each address in
+    lower case with a link's secret. The worker emails the link to confirm, again an hour on at
+    most if asked again, 50 a sweep at most; nothing else goes to an address until it is
+    confirmed.
+  * **The link, `/status/subscription/<token>`,** opens a page with a button to confirm, or to
+    stop once confirmed; opening it changes nothing, as mail scanners open links. Stopping
+    forgets the address. The pages are never cached, and send no referrer.
+  * **Updates:** each update posted is taken once by the worker, `incident_updates.mailed_at`
+    marking it, and emailed to every confirmed address with its link to stop: the title, the
+    status, what it touches and what Hatti said, in English and Urdu, with the page's address.
+    Updates missed for over a day are not sent late; those posted before are marked sent.
+  * **The secret is kept as is,** for the worker to put in each email: it can only confirm or
+    stop one address's emails.
+  * The core's pages use the application's login, which now writes the table; the worker's
+    sweeps the system's. Without SES, the worker takes nothing, to send once it is set up.
+* **Consequences:**
+  * Shops hear of incidents and maintenance as they're posted, without signing in.
+* **Alternatives:**
+  * **Emailing every shop's owner:** many don't want it, and the people who do aren't always
+    owners. Asking keeps it to those who want it.
+  * **Sending the link from the request itself:** the API process would need the email sender,
+    and a slow SES would slow the page; the worker's next sweep is within a minute.

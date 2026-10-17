@@ -98,3 +98,13 @@ export {
   type StatusComponent,
   type StatusSnapshot,
 } from '../internal/incidents.service.js';
+export {
+  STATUS_SUBSCRIPTION_LIMITS,
+  STATUS_SUBSCRIPTION_PATH,
+  StatusSubscriptionsService,
+  subscriberEmail,
+  type StatusRecipient,
+  type StatusSubscriptionView,
+  type StatusUpdateToMail,
+} from '../internal/status-subscriptions.service.js';
+export { COMPONENT_WORDS, STATUS_WORDS } from '../internal/status-page.js';
