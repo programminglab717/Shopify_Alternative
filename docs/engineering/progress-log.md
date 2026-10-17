@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### The admin's edge headers
+### 3e00218 · The admin's edge headers
 
 * **The merchant admin's builds write the edge's headers to `_headers`: a content security
   policy that runs only its own scripts and Google's and Facebook's sign-in, with HSTS, framing
