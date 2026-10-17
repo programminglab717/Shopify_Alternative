@@ -51,6 +51,7 @@ export default defineConfig(
       '**/src/email-suppression.ts',
       '**/src/billing-transfers.ts',
       '**/src/courier-cities.ts',
+      '**/src/status-incidents.ts',
       '**/src/trust-reports.ts',
       'scripts/**',
     ],

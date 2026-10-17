@@ -582,6 +582,15 @@ const courierCitiesSchema = z.object({
 });
 
 /**
+ * Hatti's people post incidents and maintenance to Hatti's status page (ADR-498) with the system
+ * login, the only one that writes them.
+ */
+const statusIncidentsSchema = z.object({
+  DATABASE_URL: env.postgresUrl(),
+  DATABASE_SYSTEM_URL: env.postgresUrl(),
+});
+
+/**
  * Hatti's operators see and lift suppressed addresses with the identity login, and SES's keys
  * where SES is set up, to keep its own list in step (ADR-200).
  */
@@ -604,6 +613,7 @@ export type EmailSuppressionConfig = z.output<typeof emailSuppressionSchema>;
 export type BillingTransfersConfig = z.output<typeof billingTransfersSchema>;
 export type CourierCitiesConfig = z.output<typeof courierCitiesSchema>;
 export type TrustReportsConfig = z.output<typeof trustReportsSchema>;
+export type StatusIncidentsConfig = z.output<typeof statusIncidentsSchema>;
 
 export const loadApiConfig = (source?: Env): ApiConfig => parseEnv(apiSchema, source);
 export const loadWorkerConfig = (source?: Env): WorkerConfig => parseEnv(workerSchema, source);
@@ -618,3 +628,5 @@ export const loadCourierCitiesConfig = (source?: Env): CourierCitiesConfig =>
   parseEnv(courierCitiesSchema, source);
 export const loadTrustReportsConfig = (source?: Env): TrustReportsConfig =>
   parseEnv(trustReportsSchema, source);
+export const loadStatusIncidentsConfig = (source?: Env): StatusIncidentsConfig =>
+  parseEnv(statusIncidentsSchema, source);

@@ -2,7 +2,7 @@
   "name": "@hatti/trust",
   "version": "0.0.0",
   "private": true,
-  "description": "Trust module: shoppers' reports of stores, from the link in every store's footer, each due a decision from Hatti's people within 48 hours (TNS-01), and shops verified by Hatti (ONB-11). Other code imports only @hatti/trust/public.",
+  "description": "Trust module: shoppers' reports of stores, from the link in every store's footer, each due a decision from Hatti's people within 48 hours (TNS-01), shops verified by Hatti (ONB-11), and Hatti's status page (BIL-06). Other code imports only @hatti/trust/public.",
   "type": "module",
   "exports": {
     "./public": {

@@ -15,6 +15,7 @@
     "email-suppression": "node --env-file-if-exists=../../.env --enable-source-maps dist/email-suppression.js",
     "billing-transfers": "node --env-file-if-exists=../../.env --enable-source-maps dist/billing-transfers.js",
     "courier-cities": "node --env-file-if-exists=../../.env --enable-source-maps dist/courier-cities.js",
+    "status-incidents": "node --env-file-if-exists=../../.env --enable-source-maps dist/status-incidents.js",
     "trust-reports": "node --env-file-if-exists=../../.env --enable-source-maps dist/trust-reports.js"
   },
   "dependencies": {

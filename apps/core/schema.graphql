@@ -10409,6 +10409,90 @@ type PayoutsReport {
   withholdings: [PayoutStatement!]!
 }
 
+"""Hatti's parts, as its status page lists them."""
+enum PlatformComponent {
+  ADMIN
+  CHECKOUT
+  COURIERS
+  EMAIL
+  PAYMENTS
+  SMS
+  STOREFRONTS
+  WHATSAPP
+}
+
+"""An incident at Hatti, or maintenance, going on or soon (ADR-498)."""
+type PlatformIncident {
+  components: [PlatformComponent!]!
+
+  """When maintenance is to end."""
+  endsAt: DateTime
+  id: ID!
+  impact: PlatformIncidentImpact!
+  kind: PlatformIncidentKind!
+
+  """What Hatti said last."""
+  latestUpdate: PlatformIncidentUpdate!
+
+  """When it began, or when maintenance is to begin."""
+  startsAt: DateTime!
+  status: PlatformIncidentStatus!
+  title: String!
+
+  """The same in Urdu, if Hatti gave it."""
+  titleUr: String
+}
+
+"""
+How badly what it touches works while it lasts: slow or partly down, or down.
+"""
+enum PlatformIncidentImpact {
+  DEGRADED
+  OUTAGE
+}
+
+"""
+Something gone wrong at Hatti, or maintenance Hatti planned (BIL-06, ADR-498).
+"""
+enum PlatformIncidentKind {
+  INCIDENT
+  MAINTENANCE
+}
+
+"""
+An incident's: INVESTIGATING, IDENTIFIED (its cause found), MONITORING (fixed, watched), RESOLVED. Maintenance's: SCHEDULED, IN_PROGRESS, COMPLETED.
+"""
+enum PlatformIncidentStatus {
+  COMPLETED
+  IDENTIFIED
+  INVESTIGATING
+  IN_PROGRESS
+  MONITORING
+  RESOLVED
+  SCHEDULED
+}
+
+"""What Hatti said of an incident, at a time."""
+type PlatformIncidentUpdate {
+  body: String!
+
+  """The same in Urdu, if Hatti gave it."""
+  bodyUr: String
+  postedAt: DateTime!
+  status: PlatformIncidentStatus!
+}
+
+"""Hatti's own status, for the banner in every shop's admin."""
+type PlatformStatus {
+  """
+  Incidents going on, and maintenance going on or beginning within a day, the latest first.
+  """
+  incidents: [PlatformIncident!]!
+
+  """Hatti's public status page."""
+  statusPageUrl: String!
+}
+
 """
 A percentage off the shop's chosen products from a time to a time (CAT-17, ADR-443): when it starts, each variant's price is cut to a whole unit and its old price shown as the compare-at price; when it ends, both come back, unless the price was changed by hand meanwhile.
 """
@@ -12169,6 +12253,11 @@ type Query {
     """Statements imported at or after this."""
     from: DateTime!
   ): PayoutsReport!
+
+  """
+  What is wrong at Hatti now, or planned soon (BIL-06, ADR-498): for every member of a shop's staff, whatever their role.
+  """
+  platformStatus: PlatformStatus!
   priceSale(id: ID!): PriceSale
 
   """The shop's sales, those starting latest first; the newest hundred."""

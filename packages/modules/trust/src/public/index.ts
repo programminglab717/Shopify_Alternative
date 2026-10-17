@@ -77,3 +77,21 @@ export { RightsComplaintsController } from '../internal/rights.controller.js';
 export { RightsLinkController } from '../internal/rights-link.controller.js';
 export { rightsPage } from '../internal/rights-page.js';
 export { TrustModule } from '../internal/trust.module.js';
+export {
+  INCIDENT_IMPACTS,
+  INCIDENT_KINDS,
+  INCIDENT_LIMITS,
+  INCIDENT_STATUSES,
+  IncidentsService,
+  STATUS_COMPONENTS,
+  type ComponentState,
+  type IncidentImpact,
+  type IncidentInput,
+  type IncidentKind,
+  type IncidentRecord,
+  type IncidentResult,
+  type IncidentStatus,
+  type IncidentUpdateInput,
+  type StatusComponent,
+  type StatusSnapshot,
+} from '../internal/incidents.service.js';

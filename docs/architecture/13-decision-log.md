@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-497 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-498 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -505,6 +505,7 @@
 | 495 | Invoice series: an order's invoice numbered in the shop's own series when first printed, counted afresh each tax year from 1 July, with no number skipped or given twice | Accepted |
 | 496 | Credit notes: money refunded on an order whose invoice was issued goes on a credit note numbered in a series of its own, printed against the invoice it corrects | Accepted |
 | 497 | Invoices and credit notes in the admin: an order's invoice number and its refunds' credit notes on its page, and credit notes printed beside slips and invoices | Accepted |
+| 498 | Hatti's status page: Hatti's people post incidents and maintenance with a command, and the core serves them at /status, as JSON and to every shop's admin | Accepted |
 
 ---
 
@@ -18794,3 +18795,52 @@
 * **Alternatives:**
   * **A tab of invoices and credit notes on the order:** a line under the order's date and one on
     each refund say all there is, without another place to look.
+
+## ADR-498 · Hatti's status page: Hatti's people post incidents and maintenance with a command, and the core serves them at /status, as JSON and to every shop's admin
+
+* **Context:** When checkout, a courier or WhatsApp breaks, shops need to know it's Hatti's
+  problem, that Hatti knows, and when it will be fixed. Otherwise every shop rings support at
+  once. Planned downtime needs to be announced ahead. The launch checklist calls for a public
+  status page (BIL-06).
+* **Decision:**
+  * **Incidents are kept by the trust module, which already holds what Hatti's people decide**
+    (ADR-460). An incident belongs to no shop, so the application login only reads it, and only
+    the system login, through Hatti's people's command, writes it.
+  * **An incident says which of Hatti's parts it touches and how badly.** The parts are:
+    storefronts, checkout, admin, online payments, couriers, WhatsApp, SMS and email. The
+    impact is degraded or outage.
+  * **Updates follow it until it ends.**
+    * An incident goes investigating, identified, monitoring, resolved.
+    * Maintenance goes scheduled, in progress, completed. Maintenance begun early begins then.
+    * The last status ends it, and an ended incident takes no more updates.
+    * An update may change the impact or the parts.
+    * Titles and updates may come in Urdu too.
+  * **The command is `pnpm --filter @hatti/core status-incidents`,** with `list`, `open` and
+    `update`. Incidents begin as they are posted. Maintenance may be posted up to 60 days
+    ahead.
+  * **The core serves the page at `/status`, in English and Urdu, in Pakistan's time.** It shows:
+    * the worst state overall;
+    * each part's state, the worst of what goes on and touches it;
+    * what goes on now, with every update, the latest first;
+    * maintenance to come;
+    * what ended in the last 14 days.
+    Who posted an update isn't shown.
+  * **`/status.json` has the same,** open to any origin, for monitors.
+  * **Both stay up when the core is down.** The edge may keep them for 30 seconds, and serve them
+    for a day after the core stops answering.
+  * **`platformStatus` gives every member of a shop's staff, whatever their role:**
+    * incidents going on;
+    * maintenance going on or beginning within a day;
+    * the status page's address.
+    It is for the admin's banner.
+* **Consequences:**
+  * No probe posts or changes an incident yet. The page says only what Hatti's people post.
+  * Shops aren't told on WhatsApp or by email. Telling every shop at once would cost more
+    than a banner they see as they work.
+  * There's no subscribing to updates, and no uptime history yet.
+* **Alternatives:**
+  * **A hosted status service:** another vendor and login, and its page wouldn't be in Urdu
+    or in Pakistan's time.
+  * **A static page written to storage on each change:** it would stay up without the edge,
+    but it would need writes to the bucket from the command, and the admin would still need
+    the API.
