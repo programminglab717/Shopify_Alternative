@@ -2831,6 +2831,10 @@ const en = {
   'stockRules.continue': 'Keep selling when out of stock',
   'stockRules.continueOf': 'Keep selling {title} when out of stock',
   'stockRules.continueHint': 'For what you make to order: its stock goes below zero.',
+  'stockRules.hsCode': 'HS code',
+  'stockRules.hsCodeOf': 'HS code of {title}',
+  'stockRules.hsHint':
+    'For customs, and the PCT code FBR is told of, like 6204.42.00. It is saved when you leave it.',
   'photos.altAdd': 'Describe photo {position}',
   'photos.altChange': 'Change the description of photo {position}',
   'photos.altOf': 'What photo {position} shows',
@@ -7710,6 +7714,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'stockRules.continue': 'اسٹاک ختم ہونے پر بھی بیچتے رہیں',
   'stockRules.continueOf': 'اسٹاک ختم ہونے پر بھی {title} بیچتے رہیں',
   'stockRules.continueHint': 'جو آپ آرڈر پر بناتے ہیں: اس کا اسٹاک صفر سے نیچے جاتا ہے۔',
+  'stockRules.hsCode': 'HS کوڈ',
+  'stockRules.hsCodeOf': '{title} کا HS کوڈ',
+  'stockRules.hsHint':
+    'کسٹمز کے لیے، اور FBR کو بتایا جانے والا PCT کوڈ، جیسے 6204.42.00۔ خانہ چھوڑنے پر یہ محفوظ ہو جاتا ہے۔',
   'photos.altAdd': 'تصویر {position} کی تفصیل لکھیں',
   'photos.altChange': 'تصویر {position} کی تفصیل بدلیں',
   'photos.altOf': 'تصویر {position} میں کیا ہے',

@@ -6,16 +6,32 @@ import { useLocale } from '../i18n/locale';
 import { CheckField } from '../settings/settings-form';
 import { useAdminMutation } from '../shell/shop-context';
 import { Alert } from '../ui/feedback';
+import { TextField } from '../ui/field';
 import { FormSection, problemText } from './product-form';
 
 type Variant = ProductDetail['variants'][number];
-type Input = { tracked?: boolean; inventoryPolicy?: 'CONTINUE' | 'DENY' };
+type Input = {
+  tracked?: boolean;
+  inventoryPolicy?: 'CONTINUE' | 'DENY';
+  harmonizedSystemCode?: string;
+};
 
-/** One variant's rules: its stock counted or not, and sold or not once none is left. */
+/** An HS code as typed, its dots and spaces aside, as the core keeps it. */
+const hsDigits = (typed: string) => typed.replace(/[\s.]/g, '');
+
+/**
+ * One variant's rules: its stock counted or not, sold or not once none is left, and its HS code,
+ * saved when the field is left.
+ */
 function VariantRules({ variant, named }: { variant: Variant; named: boolean }) {
   const { t } = useLocale();
   const update = useAdminMutation<
-    { inventoryItemUpdate: { userErrors: UserError[] } },
+    {
+      inventoryItemUpdate: {
+        inventoryItem: { harmonizedSystemCode: string | null } | null;
+        userErrors: UserError[];
+      };
+    },
     { id: string; input: Input }
   >(InventoryItemUpdateMutation);
   const [problem, setProblem] = useState<string | null>(null);
@@ -23,6 +39,24 @@ function VariantRules({ variant, named }: { variant: Variant; named: boolean }) 
   // Shown as chosen at once, and put back if the core refuses.
   const [rules, setRules] = useState({ tracked: item.tracked, policy: item.inventoryPolicy });
   const selling = rules.policy === 'CONTINUE';
+  const kept = item.harmonizedSystemCode ?? '';
+  const [hsCode, setHsCode] = useState(kept);
+  const [hsProblem, setHsProblem] = useState<string | null>(null);
+
+  const saveHsCode = async () => {
+    if (hsDigits(hsCode) === kept) return;
+    setHsProblem(null);
+    try {
+      const result = (
+        await update.mutateAsync({ id: item.id, input: { harmonizedSystemCode: hsCode.trim() } })
+      ).inventoryItemUpdate;
+      const error = result.userErrors[0];
+      if (error) setHsProblem(error.message);
+      else setHsCode(result.inventoryItem?.harmonizedSystemCode ?? '');
+    } catch (failure) {
+      setHsProblem(errorText(failure, t));
+    }
+  };
 
   const change = async (input: Input) => {
     const before = rules;
@@ -63,6 +97,17 @@ function VariantRules({ variant, named }: { variant: Variant; named: boolean }) 
         />
       )}
       {problem && <Alert tone="danger">{problem}</Alert>}
+      <TextField
+        label={named ? t('stockRules.hsCodeOf', { title: variant.title }) : t('stockRules.hsCode')}
+        hint={t('stockRules.hsHint')}
+        error={hsProblem}
+        ltr
+        inputMode="decimal"
+        maxLength={20}
+        value={hsCode}
+        onChange={(event) => setHsCode(event.target.value)}
+        onBlur={() => void saveHsCode()}
+      />
     </>
   );
   if (!named) return <div className="flex flex-col gap-2">{fields}</div>;
@@ -78,12 +123,18 @@ function VariantRules({ variant, named }: { variant: Variant; named: boolean }) 
 
 /** A variant's rules as the core has them: shown afresh when they change. */
 const keyOf = (variant: Variant) =>
-  `${variant.id}-${variant.inventoryItem.tracked}-${variant.inventoryItem.inventoryPolicy}`;
+  [
+    variant.id,
+    variant.inventoryItem.tracked,
+    variant.inventoryItem.inventoryPolicy,
+    variant.inventoryItem.harmonizedSystemCode ?? '',
+  ].join('-');
 
 /**
  * Stock rules (INV-01): whether each variant's stock is counted, so that sales are checked
  * against it, and whether it goes on selling once none is available, as for made-to-order suits,
- * its stock going below zero. Each change is saved at once.
+ * its stock going below zero; and its HS code, which FBR is told as its PCT code (CAT-19,
+ * ADR-557). Each change is saved at once.
  */
 export function StockRules({ product }: { product: ProductDetail }) {
   const { t } = useLocale();

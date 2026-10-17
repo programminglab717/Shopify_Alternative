@@ -476,6 +476,8 @@ export interface ProductVariantDetail {
     tracked: boolean;
     /** Whether it is sold once none is available: CONTINUE keeps selling, DENY stops. */
     inventoryPolicy: 'CONTINUE' | 'DENY';
+    /** Its HS code, as digits, for customs and FBR's PCT codes (CAT-19); null without one. */
+    harmonizedSystemCode?: string | null;
     inventoryLevels: { available: number; location: { id: string } }[];
   };
 }

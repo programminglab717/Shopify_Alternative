@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffRole } from '../auth/session';
 import { fakeCore, renderAdmin, signedIn } from '../test-support';
@@ -9,7 +9,10 @@ interface Item {
   id: string;
   tracked: boolean;
   inventoryPolicy: 'CONTINUE' | 'DENY';
+  harmonizedSystemCode?: string | null;
 }
+
+const NOT_HS = 'must be an HS code of 6 to 13 digits, as "6204.42.00"';
 
 function variant(id: string, title: string, item: Item) {
   return {
@@ -35,7 +38,12 @@ function variant(id: string, title: string, item: Item) {
 function core(role: StaffRole, sizes: boolean) {
   let items: Record<string, Item> = sizes
     ? {
-        var_s: { id: 'item_s', tracked: true, inventoryPolicy: 'DENY' },
+        var_s: {
+          id: 'item_s',
+          tracked: true,
+          inventoryPolicy: 'DENY',
+          harmonizedSystemCode: '62034200',
+        },
         var_m: { id: 'item_m', tracked: true, inventoryPolicy: 'DENY' },
       }
     : { var_1: { id: 'item_1', tracked: false, inventoryPolicy: 'DENY' } };
@@ -74,7 +82,23 @@ function core(role: StaffRole, sizes: boolean) {
           },
         };
       case 'InventoryItemUpdate': {
-        const input = variables.input as Partial<Item>;
+        // A copy: the variables sent are kept as they were.
+        const input = { ...(variables.input as Partial<Item>) };
+        if (input.harmonizedSystemCode !== undefined) {
+          // As the core keeps it: digits, or none.
+          const digits = (input.harmonizedSystemCode ?? '').replace(/[\s.]/g, '');
+          if (digits && !/^[0-9]{6,13}$/.test(digits)) {
+            return {
+              inventoryItemUpdate: {
+                inventoryItem: null,
+                userErrors: [
+                  { field: ['input', 'harmonizedSystemCode'], code: 'INVALID', message: NOT_HS },
+                ],
+              },
+            };
+          }
+          input.harmonizedSystemCode = digits || null;
+        }
         if (input.inventoryPolicy === 'CONTINUE' && variables.id === 'item_m') {
           return {
             inventoryItemUpdate: {
@@ -91,7 +115,13 @@ function core(role: StaffRole, sizes: boolean) {
             item.id === variables.id ? { ...item, ...input } : item,
           ]),
         );
-        return { inventoryItemUpdate: { inventoryItem: null, userErrors: [] } };
+        const kept = Object.values(items).find((item) => item.id === variables.id);
+        return {
+          inventoryItemUpdate: {
+            inventoryItem: { harmonizedSystemCode: kept?.harmonizedSystemCode ?? null },
+            userErrors: [],
+          },
+        };
       }
       default:
         throw new Error(`unexpected ${operation}`);
@@ -159,6 +189,48 @@ describe("A product's stock rules", () => {
     expect(sentOf(fake, 'InventoryItemUpdate')).toEqual([
       { id: 'item_1', input: { tracked: true } },
     ]);
+  });
+
+  it("keeps each size's HS code as digits, names one that is not, and clears one (ADR-559)", async () => {
+    const fake = core('owner', true);
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/products/prod_1');
+
+    const rules = await screen.findByRole('region', { name: 'Stock rules' });
+    const field = (size: string) =>
+      within(rules).getByLabelText(`HS code of ${size}`) as HTMLInputElement;
+    expect(field('S').value).toBe('62034200');
+    expect(field('M').value).toBe('');
+    // Left as it was, nothing is sent.
+    fireEvent.blur(field('S'));
+
+    fireEvent.change(field('M'), { target: { value: 'cotton' } });
+    fireEvent.blur(field('M'));
+    expect(await within(rules).findByText(NOT_HS)).toBeTruthy();
+    expect(field('M').getAttribute('aria-invalid')).toBe('true');
+
+    fireEvent.change(field('M'), { target: { value: '6204.42.00' } });
+    fireEvent.blur(field('M'));
+    await waitFor(() => expect(field('M').value).toBe('62044200'));
+    expect(within(rules).queryByText(NOT_HS)).toBeNull();
+
+    fireEvent.change(field('S'), { target: { value: '' } });
+    fireEvent.blur(field('S'));
+    await waitFor(() =>
+      expect(sentOf(fake, 'InventoryItemUpdate')).toEqual([
+        { id: 'item_m', input: { harmonizedSystemCode: 'cotton' } },
+        { id: 'item_m', input: { harmonizedSystemCode: '6204.42.00' } },
+        { id: 'item_s', input: { harmonizedSystemCode: '' } },
+      ]),
+    );
+    await waitFor(() => expect(field('S').value).toBe(''));
+  });
+
+  it('asks a product without sizes for its HS code', async () => {
+    vi.stubGlobal('fetch', core('manager', false).fetcher);
+    renderAdmin('/shop_1/products/prod_1');
+    const rules = await screen.findByRole('region', { name: 'Stock rules' });
+    expect((within(rules).getByLabelText('HS code') as HTMLInputElement).value).toBe('');
   });
 
   it('is not there for a packer', async () => {

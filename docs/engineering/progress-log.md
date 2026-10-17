@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### HS codes in the admin
+
+* **The admin's product page takes each variant's HS code with its stock rules, saved as the
+  field is left** ([ADR-559](../architecture/13-decision-log.md#adr-559--the-admins-product-page-takes-each-variants-hs-code-with-its-stock-rules-saved-as-the-field-is-left), CAT-19).
+* 3401 tests, 2 more: HS codes shown, refused, kept and cleared, for a
+  product with sizes and one without.
+
 ### e2f545c · FBR in the admin
 
 * **The admin connects a Tier-1 shop's POS to FBR on the sales tax page, lists what was reported

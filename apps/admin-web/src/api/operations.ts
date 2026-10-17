@@ -991,6 +991,7 @@ const PRODUCT = /* GraphQL */ `
         id
         tracked
         inventoryPolicy
+        harmonizedSystemCode
         inventoryLevels {
           available
           location {
@@ -1221,7 +1222,10 @@ export const ProductVariantsBulkDeleteMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
-/** A variant's stock tracked or not, and sold or not once none is available (INV-01). */
+/**
+ * A variant's stock tracked or not, and sold or not once none is available (INV-01), and its HS
+ * code (CAT-19).
+ */
 export const InventoryItemUpdateMutation = /* GraphQL */ `
   mutation InventoryItemUpdate($id: ID!, $input: InventoryItemInput!) {
     inventoryItemUpdate(id: $id, input: $input) {
@@ -1229,6 +1233,7 @@ export const InventoryItemUpdateMutation = /* GraphQL */ `
         id
         tracked
         inventoryPolicy
+        harmonizedSystemCode
       }
       userErrors {
         ...Problems

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-558 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-559 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -566,6 +566,7 @@
 | 556 | A Tier-1 shop's invoices and credit notes print FBR's number and its QR code once FBR has numbered them, and say they await FBR until then | Accepted |
 | 557 | An inventory item keeps its HS code, Shopify's harmonizedSystemCode, and FBR is sent each item's own PCT code from it, the shop's for those without | Accepted |
 | 558 | The admin connects a Tier-1 shop's POS to FBR on the sales tax page, lists what was reported and sends again what was not, and an order's page says how its invoice stands with FBR | Accepted |
+| 559 | The admin's product page takes each variant's HS code with its stock rules, saved as the field is left | Accepted |
 
 ---
 
@@ -20966,3 +20967,17 @@
 * **Alternatives:** **A page of its own under Settings:** FBR's POS is part of the shop's sales
   tax, and its Tier-1 status is set on the same page. **Production by default:** a shop trying a
   POS out would report real invoices.
+
+## ADR-559 · The admin's product page takes each variant's HS code with its stock rules, saved as the field is left
+
+* **Context:** An inventory item keeps its HS code, which FBR is sent as the item's PCT code
+  (ADR-557), but only the API and Shopify's import set it.
+* **Decision:** Each variant's HS code is a field in the product page's stock rules, beside
+  whether its stock is counted and sold when none is left, for those who see them. It shows the
+  code as kept, takes it with its dots and spaces, and is saved when the field is left, as the
+  card's other rules are saved at once; a code that is not one says why under the field, and an
+  empty field clears it. English and Urdu.
+* **Consequences:** A shop gives its products their HS codes without the API, and FBR is told
+  each one's own heading.
+* **Alternatives:** **A field among a variant's price and SKU:** those are saved with the product,
+  and the HS code is the inventory item's, as Shopify keeps it, saved as stock rules are.
