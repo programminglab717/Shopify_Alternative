@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Vertical starter kits
+### 79428ce · Vertical starter kits
 
 * **Fashion, jewellery, beauty, electronics and grocery kits: smart collections filled by tags,
   fashion's size charts and main menu links, applied in a tap from the admin's collections page
