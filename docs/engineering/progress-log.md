@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Humane dunning
+### 187b3cf · Humane dunning
 
 * **An overdue period's owner is reminded the day it ends, with three days left and with one,
   and the admin says by when the invoice keeps the plan; the store stays open throughout**
