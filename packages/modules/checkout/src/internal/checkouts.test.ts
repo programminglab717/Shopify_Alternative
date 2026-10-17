@@ -447,6 +447,110 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect((await f.outbox()).map((event) => event.event_type)).toContain('discount_code.redeemed');
   });
 
+  it("takes the shop's automatic discounts without a code, and keeps their titles on the order (ADR-515)", async () => {
+    unwrap(await f.delivery.update(f.a, { charge: '250' }));
+    const eid = unwrap(
+      await f.automatic.create(f.a, {
+        title: 'Eid sale',
+        percentage: 10,
+        minimumSubtotal: '10,000',
+      }),
+    );
+    unwrap(await f.automatic.create(f.a, { title: 'Free delivery', freeShipping: true }));
+    // Another shop's applies to none of this one's carts.
+    unwrap(await f.automatic.create(f.b, { title: 'Theirs', percentage: 50 }));
+    const { token } = await lawnCart();
+    const { secret } = await started(token);
+    const page = open(await f.checkouts.view(secret));
+    expect(page.discount).toBeNull();
+    expect(page.discounts).toMatchObject({
+      code: null,
+      items: 1_350_00n,
+      byAutomatic: 1_350_00n,
+      freeDelivery: true,
+    });
+    expect(page.discounts.automatic.map((discount) => discount.title)).toEqual([
+      'Eid sale',
+      'Free delivery',
+    ]);
+    expect(page.shown).toBe(
+      shownOf(
+        page.cart,
+        page.delivery,
+        page.shop.policies,
+        null,
+        undefined,
+        undefined,
+        page.discounts,
+      ),
+    );
+    // The digest changes with the automatic discounts: one changed since, the page is shown again.
+    expect(page.shown).not.toBe(shownOf(page.cart, page.delivery, page.shop.policies));
+    unwrap(await f.automatic.update(f.a, eid.id, { percentage: 20 }));
+    expect(open(await f.checkouts.place(secret, page.shown, FORM)).problem).toEqual({
+      kind: 'changed',
+    });
+
+    const again = open(await f.checkouts.view(secret));
+    const order = placedOrder(await f.checkouts.place(secret, again.shown, FORM));
+    // Rs 13,500 less 20%, delivered free.
+    expect(order).toMatchObject({
+      subtotal: 13_500_00n,
+      discount: 2_700_00n,
+      shipping: 0n,
+      total: 10_800_00n,
+      discountCodes: [],
+      automaticDiscounts: ['Eid sale', 'Free delivery'],
+    });
+  });
+
+  it('sets a code aside for automatic discounts that take more off and do not combine, or adds it where they do', async () => {
+    const tenth = unwrap(await f.automatic.create(f.a, { title: 'Eid sale', percentage: 10 }));
+    const small = unwrap(await f.codes.create(f.a, { code: 'SAVE500', amount: '500' }));
+    const { token, small: s, medium: m } = await lawnCart();
+    const { secret } = await started(token);
+    // Rs 1,350 off beats the code's Rs 500: the code is kept, but takes nothing.
+    const asideView = open(await f.checkouts.applyDiscount(secret, 'save500'));
+    expect(asideView.problem).toBeNull();
+    expect(asideView.discount).toMatchObject({ code: 'SAVE500', record: { id: small.id } });
+    expect(asideView.discounts).toMatchObject({
+      code: null,
+      setAside: { id: small.id },
+      items: 1_350_00n,
+    });
+    const aside = placedOrder(await f.checkouts.place(secret, asideView.shown, FORM));
+    expect(aside).toMatchObject({
+      discount: 1_350_00n,
+      discountCodes: [],
+      automaticDiscounts: ['Eid sale'],
+    });
+    // Not used, so not counted.
+    expect((await f.codes.get(f.a, small.id))?.used).toBe(0);
+
+    // Combining with codes, both take their part.
+    unwrap(await f.automatic.update(f.a, tenth.id, { combinesWithCodes: true }));
+    const next = await act(f.a, null, 'add', {
+      items: [
+        { variantId: s, quantity: 2 },
+        { variantId: m, quantity: 1 },
+      ],
+    });
+    const second = await started(next);
+    const both = open(await f.checkouts.applyDiscount(second.secret, 'SAVE500'));
+    const order = placedOrder(await f.checkouts.place(second.secret, both.shown, FORM));
+    expect(order).toMatchObject({
+      discount: 1_850_00n,
+      discountCodes: ['SAVE500'],
+      automaticDiscounts: ['Eid sale'],
+    });
+    const { rows } = await f.admin.query<{ amount: string }>(
+      'SELECT amount::text FROM pricing.discount_redemptions WHERE code_id = $1',
+      [small.id],
+    );
+    // The code's own part.
+    expect(rows).toEqual([{ amount: '50000' }]);
+  });
+
   it('makes delivery free with a free-delivery code, wherever it goes', async () => {
     unwrap(await f.delivery.update(f.a, { charge: '250' }));
     const free = unwrap(await f.codes.create(f.a, { code: 'FREEDEL', freeShipping: true }));

@@ -22,7 +22,7 @@ import {
   type PrepaidDiscountValue,
 } from '@hatti/orders/public';
 import type { Tx } from '@hatti/db';
-import { DiscountCodeService } from '@hatti/pricing/public';
+import { AutomaticDiscountService, DiscountCodeService } from '@hatti/pricing/public';
 import { LocalStorage } from '@hatti/storage';
 import pg from 'pg';
 import { CartService } from './cart.service.js';
@@ -136,6 +136,7 @@ export interface CheckoutFixture {
   bankTransfer: BankTransferService;
   /** The pricing module's discount codes. */
   codes: DiscountCodeService;
+  automatic: AutomaticDiscountService;
   blocklist: BlocklistService;
   products: ProductService;
   /** The shop's locations, some of which customers may pick orders up at (ADR-391). */
@@ -249,6 +250,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
     fulfillments: new FulfillmentService(db, stock),
     bankTransfer: new BankTransferService(db),
     codes: new DiscountCodeService(db),
+    automatic: new AutomaticDiscountService(db),
     blocklist,
     products,
     locations,
@@ -303,6 +305,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM online_store.preferences;
         DELETE FROM pricing.discount_redemptions;
         DELETE FROM pricing.discount_codes;
+        DELETE FROM pricing.automatic_discounts;
         DELETE FROM orders.orders;
         DELETE FROM orders.counters;
         DELETE FROM orders.bank_transfer_settings;

@@ -3,8 +3,19 @@ import { secretToken, sha256 } from '@hatti/crypto';
 import { Database, runPrepared, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
 import { InventoryService, preordersIn } from '@hatti/inventory/public';
-import { discountCodeIn, discountFor } from '@hatti/pricing/public';
-import type { CartDiscountJson, CartError, CartJson } from '@hatti/storefront-api';
+import {
+  chooseDiscounts,
+  discountCodeIn,
+  discountFor,
+  runningAutomaticDiscountsIn,
+  type DiscountCodeRecord,
+} from '@hatti/pricing/public';
+import type {
+  CartAutomaticDiscountJson,
+  CartDiscountJson,
+  CartError,
+  CartJson,
+} from '@hatti/storefront-api';
 import { Injectable } from '@nestjs/common';
 import { and, eq, gt, sql } from 'drizzle-orm';
 import {
@@ -249,9 +260,11 @@ export class CartService {
 }
 
 /**
- * `cart` with its discount code, `codes` being what the cart keeps: what it takes off the items
- * now, or only that it does not apply, as Shopify's cart says. Why not is checkout's to say, which
- * counts the codes tried there; a code the shop has and one it lacks look the same here.
+ * `cart` with its discounts (ADR-063, ADR-515): the shop's automatic discounts it takes now, and
+ * its code, `codes` being what the cart keeps, with what it takes off the items now or only that
+ * it does not apply, as Shopify's cart says. Why not is checkout's to say, which counts the codes
+ * tried there; a code the shop has and one it lacks look the same here, as does one set aside for
+ * automatic discounts that take more off and don't combine with codes.
  */
 async function withDiscount(
   tx: Tx,
@@ -259,25 +272,39 @@ async function withDiscount(
   cart: CartJson,
   codes: readonly string[],
 ): Promise<CartJson> {
+  const subtotal = BigInt(cart.subtotal);
+  const automatics = await runningAutomaticDiscountsIn(tx, shopId);
   const [typed] = codes;
-  if (typed === undefined) return cart;
-  const record = await discountCodeIn(tx, shopId, typed);
-  const applied = record && discountFor(record, { subtotal: BigInt(cart.subtotal), shipping: 0n });
-  if (!record || !applied?.ok) {
-    const discount = { code: typed, applicable: false, kind: null, value: 0, amount: 0 };
-    return { ...cart, discount, totalDiscount: 0 };
-  }
-  const discount: CartDiscountJson = {
-    code: record.code,
-    applicable: true,
-    kind: record.kind,
-    value:
-      record.kind === 'percentage'
-        ? (record.percentageBps ?? 0) / 100
-        : Number(record.amount ?? 0n),
-    amount: Number(applied.amounts.items),
-  };
-  return { ...cart, discount, totalDiscount: discount.amount };
+  if (typed === undefined && automatics.length === 0) return cart;
+  const record = typed === undefined ? null : await discountCodeIn(tx, shopId, typed);
+  const works = record && discountFor(record, { subtotal, shipping: 0n }).ok ? record : null;
+  const chosen = chooseDiscounts(subtotal, works, automatics);
+  const automaticDiscounts: CartAutomaticDiscountJson[] = chosen.automatic.map((automatic) => ({
+    title: automatic.title,
+    kind: automatic.kind,
+    value: valueOf(automatic),
+    amount: automatic.kind === 'free_shipping' ? 0 : Number(chosen.byAutomatic),
+  }));
+  const code = chosen.code;
+  const discount: CartDiscountJson | null =
+    typed === undefined
+      ? null
+      : code
+        ? {
+            code: code.code,
+            applicable: true,
+            kind: code.kind,
+            value: valueOf(code),
+            amount: Number(chosen.byCode),
+          }
+        : { code: typed, applicable: false, kind: null, value: 0, amount: 0 };
+  return { ...cart, discount, automaticDiscounts, totalDiscount: Number(chosen.items) };
+}
+
+/** The percentage off, such as 12.5, or the amount off in paisa; 0 for free delivery. */
+function valueOf(discount: Pick<DiscountCodeRecord, 'kind' | 'percentageBps' | 'amount'>): number {
+  if (discount.kind === 'percentage') return (discount.percentageBps ?? 0) / 100;
+  return Number(discount.amount ?? 0n);
 }
 
 /** What a cart keeps, as read. */

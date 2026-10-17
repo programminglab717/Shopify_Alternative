@@ -297,6 +297,8 @@ export interface OrderRecord {
   total: bigint;
   /** The discount codes it was placed with, as the shop wrote them. */
   discountCodes: string[];
+  /** The automatic discounts it was placed with, by their titles then (ADR-515). */
+  automaticDiscounts: string[];
   amountPaid: bigint;
   /** Given back since, in refunds; never more than was paid. */
   amountRefunded: bigint;

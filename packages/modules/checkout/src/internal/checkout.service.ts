@@ -52,9 +52,12 @@ import {
 } from '@hatti/orders/public';
 import {
   applyDiscountIn,
+  chooseDiscounts,
   discountCodeIn,
   discountFor,
   redeemDiscountIn,
+  runningAutomaticDiscountsIn,
+  type ChosenDiscounts,
   type DiscountCodeRecord,
   type DiscountRefusal,
 } from '@hatti/pricing/public';
@@ -447,6 +450,11 @@ export type CheckoutView =
       delivery: DeliverySettingsRecord;
       /** The code the shopper applied, if any. */
       discount: CheckoutDiscount | null;
+      /**
+       * The discounts the order takes: the shop's automatic discounts and the code, as they
+       * combine (ADR-515).
+       */
+      discounts: ChosenDiscounts;
       payments: CheckoutPayments;
       /** The shop's sales tax, which the page says its total includes (ADR-096). */
       tax: TaxSettingsRecord;
@@ -879,8 +887,14 @@ export class CheckoutService {
         return { ...view, problem: { kind: 'too_many', by: 'address' } };
       }
       const profile = await shopProfile(tx, found.shopId);
-      const code = view.discount?.record ?? null;
-      const totals = checkoutTotals(BigInt(view.cart.subtotal), view.delivery, address.city, code);
+      const discounts = view.discounts;
+      const code = discounts.code;
+      const totals = checkoutTotals(
+        BigInt(view.cart.subtotal),
+        view.delivery,
+        address.city,
+        discounts,
+      );
       // Known once the city is; nothing for an order picked up.
       const delivery = pickupAt ? 0n : totals.delivery!;
       const shipping = totals.freeDelivery ? 0n : delivery;
@@ -1019,6 +1033,7 @@ export class CheckoutService {
           transferDiscount,
           onlineDiscount,
           discountCodes: code ? [code.code] : [],
+          automaticDiscounts: discounts.automatic.map((automatic) => automatic.title),
           advance: 0n,
           // The shop's fee for paying at the door, which the page stated (CHK-08).
           codFee: paymentMethod === 'cash_on_delivery' ? view.payments.codRules.fee : 0n,
@@ -1077,7 +1092,8 @@ export class CheckoutService {
           codeId: code.id,
           orderId: placed.value.id,
           customerId: placed.value.customerId,
-          amount: totals.discount + (totals.freeDelivery ? delivery : 0n),
+          // What the code took: its part of the items, or delivery where it made it free.
+          amount: discounts.byCode + (code.kind === 'free_shipping' ? delivery : 0n),
         });
         if (!redeemed.ok) throw new DiscountRefused(code.code, redeemed.refusal);
       }
@@ -1215,12 +1231,14 @@ export class CheckoutService {
     const [typed] = cart.discountCodes;
     const discount =
       typed === undefined ? null : await discountOn(tx, shopId, typed, BigInt(priced.subtotal));
-    const totals = checkoutTotals(
+    // With the shop's automatic discounts that run, as they combine with the code (ADR-515).
+    const automatics = await runningAutomaticDiscountsIn(tx, shopId);
+    const discounts = chooseDiscounts(
       BigInt(priced.subtotal),
-      delivery,
-      null,
       discount?.record ?? null,
+      automatics,
     );
+    const totals = checkoutTotals(BigInt(priced.subtotal), delivery, null, discounts);
     // Items that alone come to more than cash on delivery may collect, by law or by the shop's
     // rules, or hold a product the shop takes it for none of, are paid by transfer, or cannot be
     // ordered here.
@@ -1291,9 +1309,10 @@ export class CheckoutService {
       cart: priced,
       delivery,
       discount,
+      discounts,
       payments,
       tax,
-      shown: shownOf(priced, delivery, shop.policies, discount, payments, tax),
+      shown: shownOf(priced, delivery, shop.policies, discount, payments, tax, discounts),
       form,
       attribution: checkout.attribution,
       storeCredit: await shopGivesStoreCreditIn(tx, shopId),
@@ -1612,6 +1631,7 @@ export function shownOf(
     transferDiscount: null,
   },
   tax: TaxRates = NO_TAX,
+  discounts: Pick<ChosenDiscounts, 'automatic'> = { automatic: [] },
 ): string {
   const { maxOrderTotal, unavailableCities, fee } = payments.codRules;
   const off = payments.bankTransfer ? payments.transferDiscount : null;
@@ -1630,6 +1650,10 @@ export function shownOf(
       discount.record ? [discount.record.id, discount.record.version] : discount.refusal.reason,
     ],
     // Each left out while there is none, so that what pages without it showed stays as it was.
+    // The automatic discounts the order takes (ADR-515), as they were.
+    ...(discounts.automatic.length > 0 && {
+      automatic: discounts.automatic.map((automatic) => [automatic.id, automatic.version]),
+    }),
     ...(payments.bankTransfer && { bankTransfer: payments.bankTransfer.bankName }),
     ...(off && { transferDiscount: prepaidDiscountKeyOf(off) }),
     ...((maxOrderTotal !== null || unavailableCities.length > 0) && {

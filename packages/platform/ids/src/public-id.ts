@@ -47,6 +47,7 @@ export const ID_PREFIXES = {
   shopPolicy: 'pol',
   shopPolicyVersion: 'plv',
   discountCode: 'dsc',
+  automaticDiscount: 'dsa',
   location: 'loc',
   inventoryItem: 'invi',
   inventoryLevel: 'invl',

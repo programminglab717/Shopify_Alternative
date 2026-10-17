@@ -368,6 +368,7 @@ export const orders = ordersSchema.table(
     agreedAt: timestamp('agreed_at', { withTimezone: true }),
     /** The discount codes it was placed with, as the shop wrote them. */
     discountCodes: text('discount_codes').array().notNull().default([]),
+    automaticDiscounts: text('automatic_discounts').array().notNull().default([]),
     /** Where its customer placed it from; null once their data is erased. */
     clientIp: inet('client_ip'),
     clientUserAgent: text('client_user_agent'),

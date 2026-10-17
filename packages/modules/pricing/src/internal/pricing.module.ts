@@ -1,7 +1,9 @@
 import { CustomersModule } from '@hatti/customers/public';
 import { Module } from '@nestjs/common';
+import { AutomaticDiscountService } from './automatic-discount.service.js';
 import { DiscountCustomerData } from './customer-data.js';
 import { DiscountCodeService } from './discount-code.service.js';
+import { AutomaticDiscountResolver } from './graphql/automatic-discount.resolver.js';
 import { DiscountCodeResolver } from './graphql/discount-code.resolver.js';
 
 /**
@@ -10,7 +12,13 @@ import { DiscountCodeResolver } from './graphql/discount-code.resolver.js';
  */
 @Module({
   imports: [CustomersModule],
-  providers: [DiscountCodeService, DiscountCodeResolver, DiscountCustomerData],
-  exports: [DiscountCodeService],
+  providers: [
+    DiscountCodeService,
+    DiscountCodeResolver,
+    AutomaticDiscountService,
+    AutomaticDiscountResolver,
+    DiscountCustomerData,
+  ],
+  exports: [DiscountCodeService, AutomaticDiscountService],
 })
 export class PricingModule {}

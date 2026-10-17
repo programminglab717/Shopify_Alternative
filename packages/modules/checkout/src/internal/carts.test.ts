@@ -362,4 +362,52 @@ describe.skipIf(!server)('CartService', () => {
     );
     expect(parseAction('update', { discount: 5 })).toMatchObject({ code: 'INVALID' });
   });
+
+  it("says the shop's automatic discounts it takes, beside its code where they combine (ADR-515)", async () => {
+    const [lawn] = await f.variantsOf(f.a, 'Lawn 3-piece', { price: '4,000' });
+    await f.stock(f.a, lawn!, 5);
+    const eid = unwrap(
+      await f.automatic.create(f.a, {
+        title: 'Eid sale',
+        percentage: 10,
+        minimumSubtotal: '5,000',
+      }),
+    );
+    unwrap(await f.automatic.create(f.a, { title: 'Free delivery', freeShipping: true }));
+    const { token } = done(await act(f.a, null, 'add', { items: [{ variantId: lawn }] }));
+    // Rs 4,000: under the sale's minimum, delivery alone.
+    const one = (await f.carts.cart(f.a.shopId, token!))!;
+    expect([one.automaticDiscounts, one.totalDiscount, one.discount]).toEqual([
+      [{ title: 'Free delivery', kind: 'free_shipping', value: 0, amount: 0 }],
+      0,
+      null,
+    ]);
+    const two = done(await act(f.a, token, 'add', { items: [{ variantId: lawn }] })).cart;
+    expect([two.automaticDiscounts, two.totalDiscount]).toEqual([
+      [
+        { title: 'Eid sale', kind: 'percentage', value: 10, amount: 800_00 },
+        { title: 'Free delivery', kind: 'free_shipping', value: 0, amount: 0 },
+      ],
+      800_00,
+    ]);
+
+    // A Rs 500 code takes less: set aside, said not to apply.
+    unwrap(await f.codes.create(f.a, { code: 'SAVE500', amount: '500' }));
+    const aside = done(await act(f.a, token, 'update', { discount: 'SAVE500' })).cart;
+    expect([aside.discount?.applicable, aside.totalDiscount]).toEqual([false, 800_00]);
+    // Combining with codes, both.
+    unwrap(await f.automatic.update(f.a, eid.id, { combinesWithCodes: true }));
+    unwrap(
+      await f.automatic.update(
+        f.a,
+        (await f.automatic.list(f.a)).find((discount) => discount.kind === 'free_shipping')!.id,
+        { combinesWithCodes: true },
+      ),
+    );
+    const both = (await f.carts.cart(f.a.shopId, token!))!;
+    expect([both.discount, both.totalDiscount]).toEqual([
+      { code: 'SAVE500', applicable: true, kind: 'fixed_amount', value: 500_00, amount: 500_00 },
+      1_300_00,
+    ]);
+  });
 });

@@ -58,3 +58,27 @@ export const discountRedemptions = pricingSchema.table(
   },
   (table) => [primaryKey({ columns: [table.shopId, table.codeId, table.orderId] })],
 );
+
+/** Discounts given without a code, to every order that qualifies while they run (ADR-515). */
+export const automaticDiscounts = pricingSchema.table(
+  'automatic_discounts',
+  {
+    shopId: uuid('shop_id').notNull(),
+    id: uuid('id').notNull(),
+    title: text('title').notNull(),
+    kind: text('kind', { enum: DISCOUNT_KINDS }).notNull(),
+    /** Hundredths of a percent: 1050 is 10.5%. */
+    percentageBps: integer('percentage_bps'),
+    amount: money('amount'),
+    minimumSubtotal: money('minimum_subtotal'),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull().defaultNow(),
+    endsAt: timestamp('ends_at', { withTimezone: true }),
+    combinesWithCodes: boolean('combines_with_codes').notNull().default(false),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.shopId, table.id] })],
+);
+
+export type AutomaticDiscountRow = typeof automaticDiscounts.$inferSelect;

@@ -16,7 +16,12 @@ import type {
   VariantDoc,
   VideoSourceDoc,
 } from '@hatti/storefront-data';
-import type { CartDiscountJson, CartJson, CartLineJson } from '@hatti/storefront-api';
+import type {
+  CartAutomaticDiscountJson,
+  CartDiscountJson,
+  CartJson,
+  CartLineJson,
+} from '@hatti/storefront-api';
 import { imageValue, isSafeLink, settingValue, type SettingSchema } from '@hatti/themes';
 import { isOnlyDefault, itemsDiscounted, lineTitle } from './cart.js';
 import type { FilteredListing, FilterRequest } from './filters.js';
@@ -1279,7 +1284,11 @@ export function cartObject(
   const subtotal = cart?.subtotal ?? 0;
   const total = subtotal - (cart?.totalDiscount ?? 0);
   const discount = cart?.discount ?? null;
-  const applications = discountApplications(discount);
+  // The shop's automatic discounts first, then the code (ADR-515).
+  const applications = [
+    ...(cart?.automaticDiscounts ?? []).flatMap(automaticApplication),
+    ...discountApplications(discount),
+  ];
   return {
     item_count: cart?.itemCount ?? 0,
     items,
@@ -1336,6 +1345,39 @@ function discountApplications(
       allocation_method: 'across',
       target_type: 'line_item',
       total_allocated_amount: discount.amount,
+    },
+  ];
+}
+
+/**
+ * An automatic discount the cart takes as Liquid's `discount_application` of type "automatic"
+ * (ADR-515), titled as the shop titles it: across the items, or aimed at delivery.
+ */
+function automaticApplication(
+  automatic: CartAutomaticDiscountJson,
+): { target_type: string; [field: string]: unknown }[] {
+  const common = { type: 'automatic', title: automatic.title, target_selection: 'all' };
+  if (automatic.kind === 'free_shipping') {
+    return [
+      {
+        ...common,
+        value: 100,
+        value_type: 'percentage',
+        allocation_method: 'each',
+        target_type: 'shipping_line',
+        total_allocated_amount: 0,
+      },
+    ];
+  }
+  if (automatic.amount <= 0) return [];
+  return [
+    {
+      ...common,
+      value: automatic.value,
+      value_type: automatic.kind === 'percentage' ? 'percentage' : 'fixed_amount',
+      allocation_method: 'across',
+      target_type: 'line_item',
+      total_allocated_amount: automatic.amount,
     },
   ];
 }

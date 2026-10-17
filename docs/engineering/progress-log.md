@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Automatic discounts
+
+* **Shops give automatic discounts without codes: the one taking most off the items applies with
+  free delivery beside it, with a code where they combine and else whichever takes more** ([ADR-515](../architecture/13-decision-log.md#adr-515--automatic-discounts-a-percentage-or-an-amount-off-the-items-or-free-delivery-given-without-a-code-to-every-cart-and-checkout-that-qualifies-the-one-taking-most-off-the-items-applies-with-free-delivery-beside-it-and-with-a-code-only-where-each-combines-with-codes-else-whichever-takes-more),
+  CHK-06). Carts, Liquid and the checkout show them; orders keep their titles.
+* 3210 tests, 15 more: the choosing rule, the service, the cart, the
+  checkout and its page, the storefront's cart, and the Admin API.
+
 ### 890f11b · The shop's last data kept for offline use
 
 * **Offline, the merchant admin shows what the session last saw of Home, the orders and

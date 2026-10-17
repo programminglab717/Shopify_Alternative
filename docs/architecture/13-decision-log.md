@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-514 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-515 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -522,6 +522,7 @@
 | 512 | Sales tax on Hatti's invoices: provincial sales tax on services at Hatti's registration, kept on each invoice with its authority, rate and number, and paid on top of the price | Accepted |
 | 513 | The merchant admin's edge headers: a content security policy that runs only the admin's own scripts and Google's and Facebook's sign-in, written to `_headers` by each build with HSTS, framing refused and the camera alone allowed | Accepted |
 | 514 | The admin keeps the shop's last data for use offline: Home, the orders and customers lists' first pages, the orders and customers opened and the account, in the browser's storage for the session that read them, shown offline with how old they are and forgotten on signing out | Accepted |
+| 515 | Automatic discounts: a percentage or an amount off the items, or free delivery, given without a code to every cart and checkout that qualifies; the one taking most off the items applies with free delivery beside it, and with a code only where each combines with codes, else whichever takes more | Accepted |
 
 ---
 
@@ -19609,3 +19610,63 @@
   * **The service worker caching the API's answers:** the Admin API is GraphQL over POST, which
     the Cache API does not keep. The worker would also have to know which session a response
     belongs to. ADR-295 keeps the worker out of the shop's data.
+
+## ADR-515 · Automatic discounts: a percentage or an amount off the items, or free delivery, given without a code to every cart and checkout that qualifies; the one taking most off the items applies with free delivery beside it, and with a code only where each combines with codes, else whichever takes more
+
+* **Context:**
+  * Codes (ADR-062) need the shopper to know and type one. A shop running an Eid sale wants it
+    taken at the cart by everyone, as Shopify's automatic discounts are.
+  * The feature catalog plans automatic discounts, buy X get Y, tiers and combinations for V1
+    (CHK-06).
+  * Until now a cart and a checkout held one code at most, and nothing else took anything off.
+* **Decision:**
+  * **What they are** (`pricing.automatic_discounts`, migration 0243):
+    * A title shoppers see ("Eid sale").
+    * What it gives: a percentage or an amount off the order's items, or free delivery, checked
+      as codes' offers are.
+    * An optional minimum for the items, and the dates it runs between.
+    * Whether a code may be used with it.
+    * A shop keeps 25 at most, running, scheduled or ended.
+    * The Admin API makes, lists, changes and deletes them under the discount scopes.
+  * **Which apply** (`chooseDiscounts`, a pure function in pricing). Of those that run and whose
+    minimum the items reach:
+    * The one taking most off the items applies, the oldest of equals.
+    * The oldest that gives free delivery applies beside it.
+  * **With a code:**
+    * The code is checked as before.
+    * It applies beside the automatic discounts where every one applied combines with codes.
+    * Where one doesn't, the code applies alone, unless the automatic discounts take more off
+      the items. On a tie the code wins, because the shopper chose it.
+    * A code set aside stays in the cart. Shopify's cart marks it as not applicable. The checkout
+      says it can't be used with the automatic discount, which takes more off.
+    * Each takes its share of the items as they come before any discount. Together they take no
+      more than the items.
+  * **Cart and checkout:**
+    * The cart's JSON gains `automaticDiscounts`, each with its title, kind, value and amount.
+      `totalDiscount` counts the code and the automatic discounts together. The storefront gives
+      them to Liquid as Shopify's `discount_application`s of type `automatic`.
+    * Hatti Base lists them with what they take off. Free delivery by an automatic discount reads
+      "delivered free", not "with the code".
+    * The checkout page shows the automatic discount's row beside the code's. Its digest changes
+      when an automatic discount applied changes, so a page shown before is shown again.
+  * **Orders:**
+    * Placing an order recomputes the discounts in its own transaction.
+    * The order keeps the titles of the automatic discounts it was placed with
+      (`orders.automatic_discounts`) beside its codes.
+    * Only a code applied has its use counted. Automatic discounts have no limit on uses.
+* **Consequences:**
+  * A shop runs a sale without handing out codes. Shoppers see it in the cart, on the checkout
+    page and on the order's page.
+  * Every cart read asks for the shop's running automatic discounts: one indexed query on a
+    small table.
+  * Discounts still apply to the whole order. Products or collections, buy X get Y and tiers need
+    each line's share kept, and come next with their own ADR. The admin's screen for automatic
+    discounts is the next slice.
+* **Alternatives:**
+  * **Codes marked automatic in `pricing.discount_codes`:** an automatic discount has no code, no
+    limit on uses and no once a customer. A table of its own keeps both kinds' rules plain.
+  * **Shopify's combination classes (order, product and shipping discounts, each choosing what
+    it combines with):** product discounts don't exist yet. One flag, "combines with codes",
+    covers what shops can make today, and the classes can grow from it.
+  * **Every running automatic discount applying at once:** two sales the shop forgot to end would
+    stack. The best one applying is what shoppers expect.

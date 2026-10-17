@@ -1,6 +1,7 @@
 {%- comment -%}
-  The cart's subtotal; what its discount code takes off, and the total after it; and what delivery
-  will add: nothing with a free-delivery code, or above the shop's free delivery subtotal, which
+  The cart's subtotal; what the shop's automatic discounts and its discount code take off, and the
+  total after them (ADR-515); and what delivery will add: nothing with a free-delivery code or
+  automatic discount, or above the shop's free delivery subtotal, which
   the items must reach after their discount, as at checkout; else what is left to reach it. How
   many working days delivery takes, wherever it goes, where the shop says (ADR-235): checkout says
   it for the shopper's city. A code that does not apply yet is named: checkout says why. Past the
@@ -37,8 +38,10 @@
     <p class="cart__delivery">{{ 'sections.cart.discount_not_applicable_html' | t: code: discount_code.code }}</p>
   {%- endunless -%}
 {%- endfor -%}
-{%- if free_delivery_code -%}
+{%- if free_delivery_code.type == 'discount_code' -%}
   <p class="cart__delivery">{{ 'sections.cart.free_delivery_code_html' | t: code: free_delivery_code.title }}</p>
+{%- elsif free_delivery_code -%}
+  <p class="cart__delivery">{{ 'sections.cart.free_delivery' | t }}</p>
 {%- elsif delivery.free_above and cart.total_price >= delivery.free_above -%}
   <p class="cart__delivery">{{ 'sections.cart.free_delivery' | t }}</p>
 {%- else -%}

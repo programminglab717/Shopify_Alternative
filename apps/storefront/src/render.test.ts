@@ -2999,4 +2999,47 @@ describe('Storefront rendering', () => {
     });
     expect(urdu.html).toContain('<span>رعایت (<bdi>EID10</bdi>)</span>');
   });
+
+  it("shows what the shop's automatic discounts take off, and free delivery by one (ADR-515)", async () => {
+    const cart: CartJson = {
+      note: '',
+      attributes: {},
+      items: [
+        {
+          key: 'kurta:0123456789abcdef0123456789abcdef',
+          variantId: 'kurta',
+          productId: 'kurta-product',
+          quantity: 1,
+          properties: {},
+          price: 600_000,
+          linePrice: 600_000,
+          title: 'Chikankari Kurta',
+          variantTitle: 'M',
+          sku: null,
+          grams: 0,
+          taxable: true,
+          taxCode: null,
+          maxQuantity: null,
+        },
+      ],
+      itemCount: 1,
+      subtotal: 600_000,
+      totalWeightGrams: 0,
+      discount: null,
+      automaticDiscounts: [
+        { title: 'Eid sale', kind: 'percentage', value: 10, amount: 60_000 },
+        { title: 'Free delivery', kind: 'free_shipping', value: 0, amount: 0 },
+      ],
+      totalDiscount: 60_000,
+    };
+    const page = await render({ path: '/cart', cart });
+    expect(page.errors).toEqual([]);
+    expect(page.html.replace(/\s+/g, ' ')).toContain(
+      '<p class="cart__line cart__discount"> <span>Discount (<bdi>Eid sale</bdi>)</span> ' +
+        '<strong dir="ltr">−Rs 600</strong> </p>' +
+        '<p class="cart__subtotal"> <span>Total</span> <strong>Rs 5,400</strong> </p>' +
+        '<p class="cart__delivery">Your order is delivered free.</p>',
+    );
+    expect(page.html).not.toContain('with the code');
+  });
 });

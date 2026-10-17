@@ -1,5 +1,5 @@
 import { LOCATION_SCRIPT, type AddressValue, type OrderRecord } from '@hatti/orders/public';
-import type { DiscountCodeRecord } from '@hatti/pricing/public';
+import { chooseDiscounts, type DiscountCodeRecord } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
 import { NO_TAX } from '@hatti/tax/public';
 import { describe, expect, it } from 'vitest';
@@ -89,6 +89,7 @@ const ORDER = {
   transferDiscount: 0n,
   onlineDiscount: 0n,
   discountCodes: [],
+  automaticDiscounts: [],
   shipping: 150_00n,
   total: 4_150_00n,
   codAmount: 4_150_00n,
@@ -130,7 +131,10 @@ const ACCOUNT = {
 function openView(
   changes: Partial<Extract<CheckoutView, { kind: 'open' }>> = {},
 ): Extract<CheckoutView, { kind: 'open' }> {
+  const cart = changes.cart ?? CART;
   return {
+    // The code applied, and no automatic discounts unless given.
+    discounts: chooseDiscounts(BigInt(cart.subtotal), changes.discount?.record ?? null, []),
     kind: 'open',
     shop: SHOP,
     cartId: 'c1',
@@ -1457,6 +1461,41 @@ describe('checkoutPage', () => {
     }
   });
 
+  it("shows the shop's automatic discount in the order's summary, and a code set aside for it (ADR-515)", () => {
+    const sale = {
+      id: 'auto-1',
+      title: 'Eid sale',
+      kind: 'percentage' as const,
+      percentageBps: 2_000,
+      amount: null,
+      minimumSubtotal: null,
+      startsAt: new Date('2026-10-01T00:00:00+05:00'),
+      endsAt: null,
+      combinesWithCodes: false,
+      version: 1,
+      createdAt: new Date('2026-10-01T00:00:00+05:00'),
+      updatedAt: new Date('2026-10-01T00:00:00+05:00'),
+    };
+    const subtotal = BigInt(CART.subtotal);
+    const html = checkoutPage(
+      openView({ discounts: chooseDiscounts(subtotal, null, [sale]) }),
+    ).html;
+    expect(html).toContain('Eid sale');
+    // 20% off the items.
+    expect(html).toContain(`−Rs ${(Number(subtotal / 5n) / 100).toLocaleString('en')}`);
+
+    const coded = { code: 'EID25', record: EID25, refusal: null } as const;
+    const aside = checkoutPage(
+      // A third off beats the code's quarter.
+      openView({
+        discount: coded,
+        discounts: chooseDiscounts(subtotal, EID25, [{ ...sale, percentageBps: 3_300 }]),
+      }),
+    ).html;
+    expect(aside).toMatch(/can't be used with\s+<bdi>Eid sale<\/bdi>, which takes more off\./);
+    expect(aside).not.toContain('Discount (EID25)');
+  });
+
   it('shows the discount the order was placed with', () => {
     const html = checkoutPage({
       kind: 'placed',
@@ -1465,6 +1504,7 @@ describe('checkoutPage', () => {
         ...ORDER,
         discount: 1_000_00n,
         discountCodes: ['EID25'],
+        automaticDiscounts: ['Eid sale'],
         total: 3_150_00n,
         codAmount: 3_150_00n,
       },
@@ -1474,7 +1514,7 @@ describe('checkoutPage', () => {
       giftCards: [],
       pickup: null,
     }).html;
-    expect(html).toContain('Discount (EID25)');
+    expect(html).toContain('Discount (Eid sale, EID25)');
     expect(html).toContain('−Rs 1,000');
     expect(html).toContain('You pay Rs 3,150 when it arrives.');
   });

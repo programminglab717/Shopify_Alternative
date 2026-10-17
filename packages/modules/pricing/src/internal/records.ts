@@ -27,6 +27,27 @@ export interface DiscountCodeRecord {
   updatedAt: Date;
 }
 
+/** A discount given without a code to every order that qualifies while it runs (ADR-515). */
+export interface AutomaticDiscountRecord {
+  id: string;
+  /** What shoppers see beside what it takes off: "Eid sale". */
+  title: string;
+  kind: DiscountKindValue;
+  /** Hundredths of a percent off the order's items. Percentage discounts only. */
+  percentageBps: number | null;
+  /** Off the order's items, in minor units. Fixed-amount discounts only. */
+  amount: bigint | null;
+  /** What the order's items must come to for it to apply. */
+  minimumSubtotal: bigint | null;
+  startsAt: Date;
+  endsAt: Date | null;
+  /** Whether a discount code may be used with it. */
+  combinesWithCodes: boolean;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /** Whether a code works now, by its dates alone. */
 export type DiscountStatusValue = 'scheduled' | 'active' | 'expired';
 

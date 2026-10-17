@@ -40,7 +40,7 @@ import {
   maskPkMobile,
   type PkProvinceCode,
 } from '@hatti/pk';
-import type { DiscountCodeRecord, DiscountRefusal } from '@hatti/pricing/public';
+import type { ChosenDiscounts, DiscountRefusal } from '@hatti/pricing/public';
 import type { CartJson } from '@hatti/storefront-api';
 import { orderTaxOf, taxIncludedWords, taxesByRate, type TaxRates } from '@hatti/tax/public';
 import {
@@ -297,11 +297,12 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
   const codOffered = orderable && payments.codRefusal === null;
   const byTransfer = orderable && ways.transfer && !ways.online && payments.codRefusal !== null;
   const onlineAlone = orderable && ways.online && !ways.transfer && payments.codRefusal !== null;
-  const code = discount?.record ?? null;
+  // The code and the shop's automatic discounts, as they combine (ADR-515).
+  const { discounts } = view;
   // Picked up where the shopper chose (ADR-391): nothing to deliver.
   const pickupAt = view.pickup.find((point) => point.id === form.pickup) ?? null;
   const charges = pickupAt ? NO_DELIVERY : delivery;
-  const totals = checkoutTotals(BigInt(cart.subtotal), charges, form.city, code);
+  const totals = checkoutTotals(BigInt(cart.subtotal), charges, form.city, discounts);
   // What paying by transfer takes off the items, after the code (ADR-077), and paying online
   // (ADR-222).
   const transferOff = payments.bankTransfer
@@ -346,7 +347,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
         cart,
         charges,
         form.city,
-        code,
+        discounts,
         {
           onDelivery,
           fee: onDelivery ? codRules.fee : 0n,
@@ -363,7 +364,7 @@ function openPage(view: Extract<CheckoutView, { kind: 'open' }>): CheckoutPage {
         },
         view.tax,
       ),
-      discountSection(discount, problem?.kind === 'discount' ? problem : null),
+      discountSection(discount, problem?.kind === 'discount' ? problem : null, discounts),
       orderable && giftCardSection(view.giftCard, problem?.kind === 'gift_card' ? problem : null),
       orderable && giftWrapSection(view.gift),
       orderable && recallSection(form.phone, problem?.kind === 'recall' ? problem : null),
@@ -949,12 +950,13 @@ function placedPage(view: Extract<CheckoutView, { kind: 'placed' }>): CheckoutPa
         <table>
           ${row(LABELS.subtotal, rs(order.subtotal))}
           ${
-            // The code's, then what paying by transfer or online took off (ADR-077, ADR-222).
+            // The code's and the automatic discounts' (ADR-515), then what paying by transfer or
+            // online took off (ADR-077, ADR-222).
             order.discount > order.transferDiscount + order.onlineDiscount &&
             row(
-              order.discountCodes.length > 0
+              order.discountCodes.length + order.automaticDiscounts.length > 0
                 ? {
-                    en: `${LABELS.discount.en} (${order.discountCodes.join(', ')})`,
+                    en: `${LABELS.discount.en} (${[...order.automaticDiscounts, ...order.discountCodes].join(', ')})`,
                     ur: LABELS.discount.ur,
                   }
                 : LABELS.discount,
@@ -1025,7 +1027,7 @@ function cartSummary(
   cart: CartJson,
   delivery: DeliverySettingsRecord,
   city: string,
-  code: DiscountCodeRecord | null,
+  discounts: ChosenDiscounts,
   pay: {
     onDelivery: boolean;
     fee: bigint;
@@ -1038,7 +1040,7 @@ function cartSummary(
   },
   tax: TaxRates,
 ): Html {
-  const totals = checkoutTotals(BigInt(cart.subtotal), delivery, city, code);
+  const totals = checkoutTotals(BigInt(cart.subtotal), delivery, city, discounts);
   const charge = totals.delivery;
   // How long delivery takes to the city typed, or wherever it goes until one is (ADR-235).
   const days = deliveryDays(delivery, city.trim() === '' ? null : city);
@@ -1058,10 +1060,14 @@ function cartSummary(
           charges: (totals.freeDelivery ? 0n : (charge ?? 0n)) + fee,
         });
   // The code once, beside the English: a bilingual label says it twice otherwise.
+  const { code } = discounts;
   const discountLabel = code && {
     en: `${LABELS.discount.en} (${code.code})`,
     ur: LABELS.discount.ur,
   };
+  // The automatic discount off the items, by the shop's title for it (ADR-515).
+  const automatic = discounts.automatic.find((discount) => discount.kind !== 'free_shipping');
+  const automaticLabel = automatic && { en: automatic.title, ur: LABELS.discount.ur };
   return html`<section class="section">
     <h2 class="label">${say('bilingual', LABELS.yourOrder)}</h2>
     <table>
@@ -1077,7 +1083,12 @@ function cartSummary(
     </table>
     <table>
       ${row(LABELS.subtotal, amount(totals.subtotal))}
-      ${discountLabel && totals.discount > 0n && row(discountLabel, `−${amount(totals.discount)}`)}
+      ${
+        automaticLabel &&
+        discounts.byAutomatic > 0n &&
+        row(automaticLabel, `−${amount(discounts.byAutomatic)}`)
+      }
+      ${discountLabel && discounts.byCode > 0n && row(discountLabel, `−${amount(discounts.byCode)}`)}
       ${
         off > 0n &&
         row(
@@ -1653,19 +1664,32 @@ ${form.giftMessage ?? ''}</textarea>
 function discountSection(
   discount: CheckoutDiscount | null,
   problem: Extract<CheckoutProblem, { kind: 'discount' }> | null,
+  discounts: ChosenDiscounts,
 ): Html {
   const said =
     problem && html`<div id="discount-error">${paragraphs(problemWords(problem), 'error')}</div>`;
   if (discount) {
+    // Set aside for the shop's automatic discount, which takes more off and doesn't combine with
+    // codes (ADR-515).
+    const better = discounts.setAside
+      ? discounts.automatic.find((automatic) => automatic.kind !== 'free_shipping')
+      : undefined;
     return html`<section class="section">
       <h2 class="label">${say('bilingual', LABELS.discountCode)}</h2>
       ${paragraphs(
-        discount.record
+        better
           ? {
-              en: html`<strong dir="ltr">${discount.code}</strong> is applied.`,
-              ur: html`${ltr(discount.code)} لاگو ہو گیا ہے۔`,
+              en: html`<strong dir="ltr">${discount.code}</strong> can't be used with
+                ${text(better.title)}, which takes more off.`,
+              ur: html`${ltr(discount.code)} ${text(better.title)} کے ساتھ استعمال نہیں ہو سکتا، جو
+              زیادہ رعایت دیتی ہے۔`,
             }
-          : refusalWords(discount.code, discount.refusal),
+          : discount.record
+            ? {
+                en: html`<strong dir="ltr">${discount.code}</strong> is applied.`,
+                ur: html`${ltr(discount.code)} لاگو ہو گیا ہے۔`,
+              }
+            : refusalWords(discount.code, discount.refusal),
         discount.record ? '' : 'error',
       )}
       ${said}

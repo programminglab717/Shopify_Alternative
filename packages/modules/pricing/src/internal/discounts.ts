@@ -1,5 +1,9 @@
 import { divideRounded, formatMoney, money, type CurrencyCode } from '@hatti/money';
-import type { DiscountCodeRecord, DiscountStatusValue } from './records.js';
+import type {
+  AutomaticDiscountRecord,
+  DiscountCodeRecord,
+  DiscountStatusValue,
+} from './records.js';
 
 /** How codes are written: letters, digits, hyphens and underscores, up to 64. */
 export const DISCOUNT_CODE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -74,32 +78,54 @@ export function discountValueText(
   return null;
 }
 
-/**
- * What a code gives, in a line for staff: "10% off orders of Rs 3,000 or more; one use a
- * customer".
- */
-export function discountSummary(code: DiscountCodeRecord, currency: CurrencyCode): string {
+/** What a discount gives, with its minimum: "10% off orders of Rs 3,000 or more". */
+function offerText(
+  discount: Pick<DiscountCodeRecord, 'kind' | 'percentageBps' | 'amount' | 'minimumSubtotal'>,
+  currency: CurrencyCode,
+): string {
   const rs = (amount: bigint) => formatMoney(money(amount, currency));
-  const minimum = code.minimumSubtotal === null ? null : rs(code.minimumSubtotal);
+  const minimum = discount.minimumSubtotal === null ? null : rs(discount.minimumSubtotal);
   const what =
-    code.kind === 'percentage'
-      ? `${percentText(code.percentageBps ?? 0)} off`
-      : code.kind === 'fixed_amount'
-        ? `${rs(code.amount ?? 0n)} off`
+    discount.kind === 'percentage'
+      ? `${percentText(discount.percentageBps ?? 0)} off`
+      : discount.kind === 'fixed_amount'
+        ? `${rs(discount.amount ?? 0n)} off`
         : 'Free delivery';
   const which =
-    code.kind === 'free_shipping'
+    discount.kind === 'free_shipping'
       ? minimum
         ? ` on orders of ${minimum} or more`
         : ''
       : minimum
         ? ` orders of ${minimum} or more`
         : ' the order';
+  return `${what}${which}`;
+}
+
+/**
+ * What a code gives, in a line for staff: "10% off orders of Rs 3,000 or more; one use a
+ * customer".
+ */
+export function discountSummary(code: DiscountCodeRecord, currency: CurrencyCode): string {
   const limits = [
     code.oncePerCustomer ? 'one use a customer' : null,
     code.usageLimit === null
       ? null
       : `${code.usageLimit.toLocaleString('en')} ${code.usageLimit === 1 ? 'use' : 'uses'} in all`,
   ].filter((limit) => limit !== null);
-  return `${what}${which}${limits.length > 0 ? `; ${limits.join(', ')}` : ''}`;
+  return `${offerText(code, currency)}${limits.length > 0 ? `; ${limits.join(', ')}` : ''}`;
+}
+
+/**
+ * What an automatic discount gives, in a line for staff: "10% off orders of Rs 3,000 or more;
+ * with codes" (ADR-515).
+ */
+export function automaticSummary(
+  discount: Pick<
+    AutomaticDiscountRecord,
+    'kind' | 'percentageBps' | 'amount' | 'minimumSubtotal' | 'combinesWithCodes'
+  >,
+  currency: CurrencyCode,
+): string {
+  return `${offerText(discount, currency)}${discount.combinesWithCodes ? '; with codes' : ''}`;
 }

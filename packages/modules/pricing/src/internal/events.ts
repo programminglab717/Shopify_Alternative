@@ -7,7 +7,17 @@ export const PricingEvents = {
   DiscountCodeDeleted: 'discount_code.deleted',
   /** An order was placed with the code. */
   DiscountCodeRedeemed: 'discount_code.redeemed',
+  AutomaticDiscountCreated: 'automatic_discount.created',
+  AutomaticDiscountUpdated: 'automatic_discount.updated',
+  AutomaticDiscountDeleted: 'automatic_discount.deleted',
 } as const;
+
+/** An automatic discount made, changed or deleted. */
+export interface AutomaticDiscountChangedPayload {
+  title: string;
+  kind: DiscountKindValue;
+  version: number;
+}
 
 /** A discount code made, changed or deleted. */
 export interface DiscountCodeChangedPayload {

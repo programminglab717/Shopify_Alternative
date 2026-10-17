@@ -367,6 +367,7 @@ describe.skipIf(!server)('Orders when customers merge, are erased or have their 
         subtotal: '2000.00',
         discount: '0.00',
         discountCodes: [],
+        automaticDiscounts: [],
         shipping: '0.00',
         codFee: '0.00',
         tax: '0.00',

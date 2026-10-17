@@ -264,22 +264,40 @@ export function ajaxCart(
     requires_shipping: items.length > 0,
     currency: 'PKR',
     items_subtotal_price: subtotal,
-    cart_level_discount_applications: itemsDiscounted(discount)
-      ? [
-          {
-            type: 'discount_code',
-            title: discount.code,
-            description: null,
-            // As Shopify's scripts get it: "10.0" percent, or rupees.
-            value: decimal(discount.kind === 'percentage' ? discount.value : discount.value / 100),
-            value_type: discount.kind === 'percentage' ? 'percentage' : 'fixed_amount',
-            allocation_method: 'across',
-            target_selection: 'all',
-            target_type: 'line_item',
-            total_allocated_amount: discount.amount,
-          },
-        ]
-      : [],
+    cart_level_discount_applications: [
+      // The shop's automatic discounts off the items (ADR-515), then the code's.
+      ...(cart?.automaticDiscounts ?? [])
+        .filter((automatic) => automatic.kind !== 'free_shipping' && automatic.amount > 0)
+        .map((automatic) => ({
+          type: 'automatic',
+          title: automatic.title,
+          description: null,
+          value: decimal(automatic.kind === 'percentage' ? automatic.value : automatic.value / 100),
+          value_type: automatic.kind === 'percentage' ? 'percentage' : 'fixed_amount',
+          allocation_method: 'across',
+          target_selection: 'all',
+          target_type: 'line_item',
+          total_allocated_amount: automatic.amount,
+        })),
+      ...(itemsDiscounted(discount)
+        ? [
+            {
+              type: 'discount_code',
+              title: discount.code,
+              description: null,
+              // As Shopify's scripts get it: "10.0" percent, or rupees.
+              value: decimal(
+                discount.kind === 'percentage' ? discount.value : discount.value / 100,
+              ),
+              value_type: discount.kind === 'percentage' ? 'percentage' : 'fixed_amount',
+              allocation_method: 'across',
+              target_selection: 'all',
+              target_type: 'line_item',
+              total_allocated_amount: discount.amount,
+            },
+          ]
+        : []),
+    ],
     discount_codes: discount ? [{ code: discount.code, applicable: discount.applicable }] : [],
   };
 }

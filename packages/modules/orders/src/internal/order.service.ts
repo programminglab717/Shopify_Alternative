@@ -229,6 +229,8 @@ export interface OrderToPlace {
    * counting their uses is the caller's.
    */
   discountCodes?: string[];
+  /** The automatic discounts `discount` takes account of, by their titles (ADR-515). */
+  automaticDiscounts?: string[];
   /**
    * Where its customer came to the online store from before placing it, as checkout kept it
    * (ADR-139), checked by `attributionOf`.
@@ -812,6 +814,7 @@ export class OrderService {
         tags: order.tags,
         searchText: searchTextOf(address, email),
         discountCodes: order.discountCodes ?? [],
+        automaticDiscounts: order.automaticDiscounts ?? [],
         confirmedAt: confirmationStatus === 'confirmed' ? sql`now()` : null,
         paidAt: amountPaid === total ? sql`now()` : null,
         ...agreementColumns(order.agreement ?? null),

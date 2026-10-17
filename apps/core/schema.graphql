@@ -335,6 +335,81 @@ input AuthorInput {
 }
 
 """
+A discount given without a code to every cart and checkout that qualifies while it runs, as Shopify's automatic discounts are (CHK-06): a percentage or an amount off the order's items, or free delivery. The one that takes most off the items applies, with free delivery beside it; with a code only where every one applied combines with codes.
+"""
+type AutomaticDiscount {
+  """
+  Off the order's items, for FIXED_AMOUNT discounts, never more than they come to.
+  """
+  amount: Money
+
+  """Whether a discount code may be used with it."""
+  combinesWithCodes: Boolean!
+  createdAt: DateTime!
+  endsAt: DateTime
+  id: ID!
+  kind: DiscountCodeKind!
+
+  """What the order's items must come to for it to apply."""
+  minimumSubtotal: Money
+
+  """
+  Percent off the order's items, for PERCENTAGE discounts: 12.5 is 12.5%.
+  """
+  percentage: Float
+  startsAt: DateTime!
+  status: DiscountStatus!
+
+  """What it gives, in a line: "10% off orders of Rs 3,000 or more"."""
+  summary: String!
+
+  """What shoppers see beside what it takes off: "Eid sale"."""
+  title: String!
+  updatedAt: DateTime!
+}
+
+type AutomaticDiscountDeletePayload {
+  deletedAutomaticDiscountId: ID
+  userErrors: [UserError!]!
+}
+
+"""
+An automatic discount, or what changes of one: left out, a field stays as it is, and null clears one that may be empty. One of percentage, amount and freeShipping says what it gives; giving another changes it.
+"""
+input AutomaticDiscountInput {
+  """An amount off the order's items, in the shop currency: "500"."""
+  amount: String
+
+  """Whether a discount code may be used with it; not unless given."""
+  combinesWithCodes: Boolean
+
+  """Null for no end."""
+  endsAt: DateTime
+
+  """Free delivery."""
+  freeShipping: Boolean
+
+  """What the order's items must come to for it to apply: "3,000"."""
+  minimumSubtotal: String
+
+  """Percent off the order's items, 0.01 to 100."""
+  percentage: Float
+
+  """Now unless given."""
+  startsAt: DateTime
+
+  """
+  What shoppers see beside what it takes off, up to 255 characters. Needed.
+  """
+  title: String
+}
+
+type AutomaticDiscountPayload {
+  automaticDiscount: AutomaticDiscount
+  userErrors: [UserError!]!
+}
+
+"""
 A bank account customers pay into by transfer, with what they're told besides (ADR-074).
 """
 type BankAccount {
@@ -6877,6 +6952,19 @@ type Mutation {
   articleUpdate(article: ArticleUpdateInput!, id: ID!): ArticleUpdatePayload!
 
   """
+  An automatic discount, which carts and checkouts take from its start until its end.
+  """
+  automaticDiscountCreate(automaticDiscount: AutomaticDiscountInput!): AutomaticDiscountPayload!
+
+  """Deletes it; orders placed with it keep its title."""
+  automaticDiscountDelete(id: ID!): AutomaticDiscountDeletePayload!
+
+  """
+  Changes what is given of it; the rest stays. Orders placed with it keep what it took off them. Ending it now stops it.
+  """
+  automaticDiscountUpdate(automaticDiscount: AutomaticDiscountInput!, id: ID!): AutomaticDiscountPayload!
+
+  """
   Changes the shop's bank account for transfers, turns bank transfer on or off, or changes what paying so takes off, for orders placed from now on: orders placed before keep the account they were given, and what was taken off them. Audited with the account and the discount before and after. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   bankTransferSettingsUpdate(input: BankTransferSettingsInput!): BankTransferSettingsUpdatePayload!
@@ -8618,6 +8706,9 @@ type Order {
   The member of staff it is given to, to see it through; null while no one has it, and once they leave the shop.
   """
   assignee: OrderAssignee
+
+  """The automatic discounts it was placed with, by their titles then."""
+  automaticDiscounts: [String!]!
 
   """
   The account a bank-transfer order's customer was told to pay into, as it was when it was placed; null for other orders, and when the shop had none.
@@ -11729,6 +11820,12 @@ type Query {
     """Only what was done to this customer or order."""
     subjectId: ID
   ): AuditEntryConnection!
+  automaticDiscount(id: ID!): AutomaticDiscount
+
+  """
+  The shop's automatic discounts, running, ahead or ended, newest first: 25 at most.
+  """
+  automaticDiscounts: [AutomaticDiscount!]!
 
   """
   The shop's bank account for transfers, whether checkout offers them, and what paying so takes off.

@@ -1254,6 +1254,11 @@ export class Order {
   })
   discountCodes!: string[];
 
+  @Field(() => [String], {
+    description: 'The automatic discounts it was placed with, by their titles then.',
+  })
+  automaticDiscounts!: string[];
+
   @Field(() => Money, {
     description:
       'Of totalDiscounts, what checkout took off for paying by bank transfer, where the shop ' +

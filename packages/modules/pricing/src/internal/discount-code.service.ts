@@ -272,6 +272,51 @@ function checkCode(
     else if (current) value.title = value.code ?? current.code;
   }
 
+  checkOffer(check, tenant, input, current, value, 'code');
+  if (input.usageLimit !== undefined) {
+    value.usageLimit =
+      input.usageLimit === null
+        ? null
+        : check.integer(['usageLimit'], input.usageLimit, { min: 1, max: USAGE_LIMIT_MAX });
+  }
+  if (present(input.oncePerCustomer)) value.oncePerCustomer = input.oncePerCustomer;
+  return check.ok ? { ok: true, value } : fail(check.errors);
+}
+
+/** What a discount gives, with its minimum and dates, as codes and automatic discounts take it. */
+export interface OfferInput {
+  percentage?: number | null;
+  amount?: string | null;
+  freeShipping?: boolean | null;
+  minimumSubtotal?: string | null;
+  startsAt?: Date | null;
+  endsAt?: Date | null;
+}
+
+/** The columns of what a discount gives that an input sets. */
+export interface CheckedOffer {
+  kind?: DiscountKindValue;
+  percentageBps?: number | null;
+  amount?: bigint | null;
+  minimumSubtotal?: bigint | null;
+  startsAt?: Date;
+  endsAt?: Date | null;
+}
+
+/**
+ * Checks what `input` says a discount gives, its minimum and dates, into `value`: for a new one
+ * (`current` null), or over `current`, whose dates the new ones must still fit. `noun` names it in
+ * messages: a code, or a discount.
+ */
+export function checkOffer(
+  check: InputChecker,
+  tenant: TenantContext,
+  input: OfferInput,
+  current: { startsAt: Date; endsAt: Date | null } | null,
+  value: CheckedOffer,
+  noun: 'code' | 'discount',
+): void {
+  const creating = current === null;
   const given = [
     present(input.percentage) && 'percentage',
     present(input.amount) && 'amount',
@@ -281,13 +326,13 @@ function checkCode(
     check.addMessage(
       [given[1]!],
       'INVALID',
-      'A code gives one thing: a percentage off, an amount off, or free delivery',
+      `A ${noun} gives one thing: a percentage off, an amount off, or free delivery`,
     );
   } else if (given.length === 0 && creating) {
     check.addMessage(
       ['percentage'],
       'BLANK',
-      'Say what the code gives: a percentage off, an amount off, or free delivery',
+      `Say what the ${noun} gives: a percentage off, an amount off, or free delivery`,
     );
   } else if (given[0] === 'percentage') {
     const bps = Math.round(input.percentage! * 100);
@@ -318,14 +363,6 @@ function checkCode(
   if (endsAt !== null && endsAt <= startsAt) {
     check.addMessage(['endsAt'], 'INVALID', 'Ends at must be later than starts at');
   }
-  if (input.usageLimit !== undefined) {
-    value.usageLimit =
-      input.usageLimit === null
-        ? null
-        : check.integer(['usageLimit'], input.usageLimit, { min: 1, max: USAGE_LIMIT_MAX });
-  }
-  if (present(input.oncePerCustomer)) value.oncePerCustomer = input.oncePerCustomer;
-  return check.ok ? { ok: true, value } : fail(check.errors);
 }
 
 /** Given, and not null. */

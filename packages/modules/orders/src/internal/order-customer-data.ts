@@ -312,6 +312,7 @@ function exportedOrder(
     subtotal: amount(order.subtotal),
     discount: amount(order.discount),
     discountCodes: order.discountCodes,
+    automaticDiscounts: order.automaticDiscounts,
     shipping: amount(order.shipping),
     codFee: amount(order.codFee),
     tax: amount(order.totalTax),

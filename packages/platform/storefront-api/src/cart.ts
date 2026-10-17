@@ -249,8 +249,24 @@ export interface CartJson {
   totalWeightGrams: number;
   /** The discount code the shopper applied, if any. */
   discount: CartDiscountJson | null;
-  /** What the code takes off the items now; delivery's part is checkout's. */
+  /**
+   * The shop's automatic discounts the cart takes now (ADR-515). Left out by a core from before
+   * them: none.
+   */
+  automaticDiscounts?: CartAutomaticDiscountJson[];
+  /** What the code and the automatic discounts take off the items now; delivery's is checkout's. */
   totalDiscount: number;
+}
+
+/** An automatic discount a cart takes, and what it takes off the items now (ADR-515). */
+export interface CartAutomaticDiscountJson {
+  /** What the shop calls it for shoppers: "Eid sale". */
+  title: string;
+  kind: 'percentage' | 'fixed_amount' | 'free_shipping';
+  /** The percentage off, such as 12.5, or the amount off in paisa; 0 for free delivery. */
+  value: number;
+  /** Off the items now, in paisa; 0 for free delivery, which checkout takes off. */
+  amount: number;
 }
 
 /**
@@ -261,7 +277,10 @@ export interface CartJson {
 export interface CartDiscountJson {
   /** As the shop wrote it, when it applies; else as typed. */
   code: string;
-  /** Whether the code applies to the cart as it is now. */
+  /**
+   * Whether the code applies to the cart as it is now: not where it is set aside for automatic
+   * discounts that take more off and don't combine with codes (ADR-515).
+   */
   applicable: boolean;
   /** What the code gives, when it applies. */
   kind: 'percentage' | 'fixed_amount' | 'free_shipping' | null;

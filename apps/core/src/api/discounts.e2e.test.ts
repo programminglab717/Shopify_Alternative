@@ -176,4 +176,83 @@ describe.skipIf(!server)('Admin GraphQL API: discount codes', () => {
     const bad = await gql(tokens.read, `{ discountCode(id: "ord_01") { id } }`);
     expect(bad.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
   });
+
+  it('makes, lists, changes and deletes automatic discounts, with the discount scopes (ADR-515)', async () => {
+    const AUTOMATIC = `id title kind percentage amount { amount } minimumSubtotal { amount }
+      status combinesWithCodes summary`;
+    const made = await gql(
+      tokens.write,
+      `mutation ($automaticDiscount: AutomaticDiscountInput!) {
+        automaticDiscountCreate(automaticDiscount: $automaticDiscount) {
+          automaticDiscount { ${AUTOMATIC} } userErrors { field code message }
+        }
+      }`,
+      { automaticDiscount: { title: 'Eid sale', percentage: 10, minimumSubtotal: '3,000' } },
+    );
+    const eid = made.data?.automaticDiscountCreate.automaticDiscount;
+    expect(eid).toMatchObject({
+      id: expect.stringMatching(/^dsa_/),
+      title: 'Eid sale',
+      kind: 'PERCENTAGE',
+      percentage: 10,
+      amount: null,
+      minimumSubtotal: { amount: '3000.00' },
+      status: 'ACTIVE',
+      combinesWithCodes: false,
+      summary: '10% off orders of Rs 3,000 or more',
+    });
+    const blank = await gql(
+      tokens.write,
+      `mutation { automaticDiscountCreate(automaticDiscount: { percentage: 5 }) {
+        automaticDiscount { id } userErrors { field code }
+      } }`,
+    );
+    expect(blank.data?.automaticDiscountCreate.userErrors).toEqual([
+      { field: ['automaticDiscount', 'title'], code: 'BLANK' },
+    ]);
+
+    const changed = await gql(
+      tokens.write,
+      `mutation ($id: ID!) {
+        automaticDiscountUpdate(id: $id, automaticDiscount: { combinesWithCodes: true }) {
+          automaticDiscount { combinesWithCodes summary } userErrors { code }
+        }
+      }`,
+      { id: eid.id },
+    );
+    expect(changed.data?.automaticDiscountUpdate.automaticDiscount).toEqual({
+      combinesWithCodes: true,
+      summary: '10% off orders of Rs 3,000 or more; with codes',
+    });
+    const listed = await gql(tokens.read, `{ automaticDiscounts { id title } }`);
+    expect(listed.data?.automaticDiscounts).toEqual([{ id: eid.id, title: 'Eid sale' }]);
+
+    expect(
+      (
+        await gql(
+          tokens.read,
+          `mutation { automaticDiscountCreate(automaticDiscount: { title: "x", percentage: 5 }) {
+            automaticDiscount { id }
+          } }`,
+        )
+      ).errors?.[0]?.extensions?.code,
+    ).toBe('ACCESS_DENIED');
+    expect(
+      (await gql(tokens.orders, `{ automaticDiscounts { id } }`)).errors?.[0]?.extensions?.code,
+    ).toBe('ACCESS_DENIED');
+
+    const deleted = await gql(
+      tokens.write,
+      `mutation ($id: ID!) { automaticDiscountDelete(id: $id) { deletedAutomaticDiscountId } }`,
+      { id: eid.id },
+    );
+    expect(deleted.data?.automaticDiscountDelete.deletedAutomaticDiscountId).toBe(eid.id);
+    expect(
+      (
+        await gql(tokens.read, `query ($id: ID!) { automaticDiscount(id: $id) { id } }`, {
+          id: eid.id,
+        })
+      ).data?.automaticDiscount,
+    ).toBeNull();
+  });
 });
