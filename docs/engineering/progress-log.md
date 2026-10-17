@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### The inbox answers customers
+### 8c80ced · The inbox answers customers
 
 * **The inbox's staff answer a customer in their own words within the day WhatsApp allows, sent at
   once from the number the customer wrote to, and followed to delivery** ([ADR-546](../architecture/13-decision-log.md#adr-546--the-inboxs-staff-answer-a-customer-in-their-own-words-within-the-day-whatsapp-allows-after-the-customer-last-wrote-sent-at-once-from-the-number-the-customer-wrote-to-and-followed-to-delivery-as-the-webhook-says), MSG-05).
