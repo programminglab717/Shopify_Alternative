@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### AI credits in the admin
+### 0f70377 · AI credits in the admin
 
 * **The admin's AI drafts say the plan's AI credits left this month, and draft none once they
   are used; the plan cards say each plan's** ([ADR-534](../architecture/13-decision-log.md#adr-534--the-admins-ai-drafts-say-the-plans-ai-credits-left-this-month-and-draft-none-once-they-are-used-the-plan-cards-say-each-plans), BIL-01).
