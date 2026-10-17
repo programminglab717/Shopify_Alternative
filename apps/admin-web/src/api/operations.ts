@@ -4555,6 +4555,24 @@ export const ShopVerificationSubmitMutation = /* GraphQL */ `
 
 /** Whether AI drafts the shop's Urdu here, and how many of the day's it asked for (CAT-07). */
 /** Whether this Hatti writes products' copy with AI, and how many of the day's drafts are used. */
+export const MarketingCalendarQuery = /* GraphQL */ `
+  query MarketingCalendar {
+    marketingCalendar {
+      moment
+      startsOn
+      endsOn
+      promoteFrom
+      expected
+      kit {
+        code
+        percentage
+        messageEnglish
+        messageUrdu
+      }
+    }
+  }
+`;
+
 export const ProductCategoriesQuery = /* GraphQL */ `
   query ProductCategories {
     productCategories

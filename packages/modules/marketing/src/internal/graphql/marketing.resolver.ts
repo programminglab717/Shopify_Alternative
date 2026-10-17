@@ -11,7 +11,9 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { isUuid, toPublicId, tryFromPublicId } from '@hatti/ids';
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { CALENDAR_DAYS_MAX, type MarketingDate as CalendarDate } from '../calendar.js';
+import { MarketingCalendarService } from '../calendar.service.js';
 import { ConversionsService, type ConversionRecord } from '../conversions.service.js';
 import type { ConversionMomentValue, ConversionStatusValue } from '../meta.js';
 import { MetaConversionsService, type MetaConversionsRecord } from '../meta-settings.service.js';
@@ -27,6 +29,8 @@ import {
   MetaConversionsDeletePayload,
   MetaConversionsInput,
   MetaConversionsUpdatePayload,
+  MarketingDate,
+  MarketingMoment,
 } from './marketing.types.js';
 
 @Resolver()
@@ -34,7 +38,31 @@ export class MarketingResolver {
   constructor(
     private readonly meta: MetaConversionsService,
     private readonly conversions: ConversionsService,
+    private readonly calendar: MarketingCalendarService,
   ) {}
+
+  @Query(() => [MarketingDate], {
+    description:
+      "Pakistan's marketing calendar (MKT-16, ADR-484): Ramadan, the Eids, Pakistan Day, " +
+      "Mother's Day, 14 August, 11.11, White Friday, 12.12, and the lawn, winter and wedding " +
+      "seasons, those to promote for from the shop's today through `days` ahead, soonest " +
+      'first, each with a ready-made campaign.',
+  })
+  @RequireScopes('read_marketing_events')
+  async marketingCalendar(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('days', {
+      type: () => Int,
+      nullable: true,
+      description: `0 to ${CALENDAR_DAYS_MAX}; default 365.`,
+    })
+    days?: number | null,
+  ): Promise<MarketingDate[]> {
+    if (days !== null && days !== undefined && (days < 0 || days > CALENDAR_DAYS_MAX)) {
+      throw badUserInput(`days must be 0 to ${CALENDAR_DAYS_MAX}`);
+    }
+    return (await this.calendar.calendar(tenant, days ?? 365)).map(toMarketingDate);
+  }
 
   @Query(() => MetaConversions, {
     nullable: true,
@@ -155,5 +183,21 @@ function toConversionEvent(record: ConversionRecord): ConversionEvent {
     error: record.error,
     traceId: record.traceId,
     createdAt: record.createdAt,
+  });
+}
+
+function toMarketingDate(date: CalendarDate): MarketingDate {
+  return Object.assign(new MarketingDate(), {
+    moment: date.moment as MarketingMoment,
+    startsOn: date.startsOn,
+    endsOn: date.endsOn,
+    promoteFrom: date.promoteFrom,
+    expected: date.expected,
+    kit: {
+      code: date.kit.code,
+      percentage: date.kit.percentage,
+      messageEnglish: date.kit.message.en,
+      messageUrdu: date.kit.message.ur,
+    },
   });
 }

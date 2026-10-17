@@ -80,6 +80,7 @@ import { AppsPage } from './settings/apps-page';
 import { WhatsAppPage } from './settings/whatsapp-page';
 import { AutomationsPage } from './marketing/automations-page';
 import { BroadcastsPage } from './marketing/broadcasts-page';
+import { CalendarPage } from './marketing/calendar-page';
 import { TemplatesPage } from './marketing/templates-page';
 import { TaxPage } from './settings/tax-page';
 import { MessagesPage } from './settings/messages-page';
@@ -708,6 +709,12 @@ const marketingAutomations = createRoute({
   component: AutomationsPage,
 });
 
+const marketingCalendar = createRoute({
+  getParentRoute: () => shop,
+  path: 'marketing/calendar',
+  component: CalendarPage,
+});
+
 const settingsTax = createRoute({
   getParentRoute: () => shop,
   path: 'settings/tax',
@@ -911,6 +918,7 @@ export const routeTree = root.addChildren([
     marketing,
     marketingTemplates,
     marketingAutomations,
+    marketingCalendar,
     settingsTax,
     settingsMessages,
     settingsOrders,

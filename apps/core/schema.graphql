@@ -5855,6 +5855,81 @@ input MarketingConsentInput {
   wording: String
 }
 
+"""A moment's dates in a year, with its kit (MKT-16, ADR-484)."""
+type MarketingDate {
+  """Its last day, YYYY-MM-DD: the first for a day of its own."""
+  endsOn: String!
+
+  """
+  Whether its dates wait on the moon's sighting: Islamic moments are expected a day after the Umm al-Qura calendar's, as Pakistan's sighting usually is.
+  """
+  expected: Boolean!
+  kit: MarketingKit!
+  moment: MarketingMoment!
+
+  """When to begin promoting for it, YYYY-MM-DD: what its code starts on."""
+  promoteFrom: String!
+
+  """Its first day, YYYY-MM-DD in the shop's time zone."""
+  startsOn: String!
+}
+
+"""A moment's ready-made campaign (ADR-484)."""
+type MarketingKit {
+  """A discount code to make, its year's last two digits after it: EID26."""
+  code: String!
+
+  """
+  A broadcast's words in English, naming the code: short enough for one SMS.
+  """
+  messageEnglish: String!
+
+  """A broadcast's words in Urdu, naming the code."""
+  messageUrdu: String!
+
+  """The percentage off to suggest."""
+  percentage: Int!
+}
+
+"""A moment Pakistani shoppers buy for (MKT-16)."""
+enum MarketingMoment {
+  """Eid ul Adha, its three days."""
+  EID_UL_ADHA
+
+  """Eid ul Fitr, its three days; Chand Raat is the night before."""
+  EID_UL_FITR
+
+  """The 11.11 sale, 11 November."""
+  ELEVEN_ELEVEN
+
+  """Independence Day, 14 August."""
+  INDEPENDENCE_DAY
+
+  """Mother's Day, the second Sunday of May."""
+  MOTHERS_DAY
+
+  """Pakistan Day, 23 March."""
+  PAKISTAN_DAY
+
+  """The month of Ramadan."""
+  RAMADAN
+
+  """Lawn's season: new summer collections, mid-February to April."""
+  SUMMER_LAWN
+
+  """The 12.12 sale, 12 December."""
+  TWELVE_TWELVE
+
+  """The wedding season, November to February."""
+  WEDDING_SEASON
+
+  """White Friday, the last Friday of November, to the Monday after."""
+  WHITE_FRIDAY
+
+  """Winter collections, October and November."""
+  WINTER_COLLECTION
+}
+
 enum MarketingState {
   """Never asked, or the number or address has changed since."""
   NOT_SUBSCRIBED
@@ -11449,6 +11524,14 @@ type Query {
 
   """The shop's automations, each as set, or off where it never was."""
   marketingAutomations: [MarketingAutomation!]!
+
+  """
+  Pakistan's marketing calendar (MKT-16, ADR-484): Ramadan, the Eids, Pakistan Day, Mother's Day, 14 August, 11.11, White Friday, 12.12, and the lawn, winter and wedding seasons, those to promote for from the shop's today through `days` ahead, soonest first, each with a ready-made campaign.
+  """
+  marketingCalendar(
+    """0 to 731; default 365."""
+    days: Int
+  ): [MarketingDate!]!
   menu(id: ID!): Menu
 
   """

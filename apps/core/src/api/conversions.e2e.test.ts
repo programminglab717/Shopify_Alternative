@@ -39,7 +39,7 @@ describe.skipIf(!server)("Admin GraphQL API: Meta's conversions API", () => {
   let app: NestFastifyApplication;
   const shop = newId();
   const other = newId();
-  const tokens = { owner: '', reader: '', orders: '', other: '' };
+  const tokens = { owner: '', reader: '', orders: '', other: '', marketer: '' };
 
   async function issueToken(shopId: string, scopes: string[]): Promise<string> {
     const { token, hash, hint } = generateAccessToken();
@@ -79,6 +79,7 @@ describe.skipIf(!server)("Admin GraphQL API: Meta's conversions API", () => {
     tokens.reader = await issueToken(shop, ['read_pixels']);
     tokens.orders = await issueToken(shop, ['write_orders']);
     tokens.other = await issueToken(other, ['write_pixels']);
+    tokens.marketer = await issueToken(shop, ['read_marketing_events']);
     api = await startTestApi(testDb);
     app = api.app;
   });
@@ -227,5 +228,50 @@ describe.skipIf(!server)("Admin GraphQL API: Meta's conversions API", () => {
     expect((await data(tokens.other, EVENTS, {})).nodes).toHaveLength(1);
     const wrong = await gql(tokens.reader, EVENTS, { orderId: 'prod_1' });
     expect(wrong.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
+  });
+
+  it("lists Pakistan's marketing calendar from the shop's today, each moment with its kit (ADR-484)", async () => {
+    const CALENDAR = `query ($days: Int) {
+      marketingCalendar(days: $days) {
+        moment startsOn endsOn promoteFrom expected
+        kit { code percentage messageEnglish messageUrdu }
+      }
+    }`;
+    const calendar = (await data(tokens.marketer, CALENDAR, { days: 400 })) as Json[];
+    // A year and more holds every moment's promoting.
+    expect(new Set(calendar.map((date) => date.moment))).toEqual(
+      new Set([
+        'RAMADAN',
+        'EID_UL_FITR',
+        'EID_UL_ADHA',
+        'PAKISTAN_DAY',
+        'MOTHERS_DAY',
+        'INDEPENDENCE_DAY',
+        'ELEVEN_ELEVEN',
+        'WHITE_FRIDAY',
+        'TWELVE_TWELVE',
+        'SUMMER_LAWN',
+        'WINTER_COLLECTION',
+        'WEDDING_SEASON',
+      ]),
+    );
+    const starts = calendar.map((date) => date.startsOn as string);
+    expect(starts).toEqual([...starts].sort());
+    const eid = calendar.find((date) => date.moment === 'EID_UL_FITR');
+    expect(eid).toMatchObject({ expected: true, kit: { percentage: 15 } });
+    expect(eid.kit.code).toBe(`EID${(eid.startsOn as string).slice(2, 4)}`);
+    expect(eid.kit.messageEnglish).toContain(eid.kit.code);
+    expect(eid.kit.messageUrdu).toContain(eid.kit.code);
+    expect(calendar.find((date) => date.moment === 'INDEPENDENCE_DAY')).toMatchObject({
+      expected: false,
+      kit: { percentage: 14 },
+    });
+
+    const tooFar = await gql(tokens.marketer, CALENDAR, { days: 1000 });
+    expect(tooFar.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
+    // Its own scope.
+    expect((await gql(tokens.orders, CALENDAR)).errors?.[0]?.extensions?.code).toBe(
+      'ACCESS_DENIED',
+    );
   });
 });

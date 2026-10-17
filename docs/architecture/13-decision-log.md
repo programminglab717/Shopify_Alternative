@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-483 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-484 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -491,6 +491,7 @@
 | 481 | A commerce lexicon: a storefront's search finds what a word means in English, Roman Urdu or Urdu, "juta" the shop's shoes, after what holds the word as typed | Accepted |
 | 482 | Products from a WooCommerce export: productsImport reads WooCommerce's product CSV, its variable products' variations the variants, as Shopify's file would make them | Accepted |
 | 483 | Product taxonomy: a product's category in Google's product taxonomy and its condition, barcodes that are GTINs published as such, all three in the catalog feed | Accepted |
+| 484 | Pakistan's marketing calendar: the moments shoppers buy for, dated each year from Umm al-Qura a day later for the Islamic ones, each with a ready-made campaign | Accepted |
 
 ---
 
@@ -18267,3 +18268,48 @@
     carries and what a merchant reads; Google takes either.
   * **A GTIN field of its own on variants:** barcodes already hold them, and a second field
     would be one more to fill in.
+
+## ADR-484 · Pakistan's marketing calendar: the moments shoppers buy for, dated each year from Umm al-Qura a day later for the Islamic ones, each with a ready-made campaign
+
+* **Context:**
+  * MKT-16 asks for a Pakistani marketing calendar: Ramadan, Eid, 14 August, White Friday and
+    the lawn seasons, with ready-made campaign kits.
+  * Most of a Pakistani shop's year turns on these moments, and the Islamic ones move about
+    eleven days earlier each year. Shops miss them by starting late: Eid's shopping starts in
+    Ramadan's first weeks, and parcels take days.
+  * Pakistan fixes Ramadan and the Eids by its own moon sighting (the Ruet-e-Hilal committee),
+    usually a day after Saudi Arabia's Umm al-Qura calendar.
+* **Decision:**
+  * **The marketing module dates twelve moments for any year** (`marketingDatesOf`), with no
+    table to keep up:
+    * Ramadan, Eid ul Fitr (three days) and Eid ul Adha (three days) from the Umm al-Qura
+      calendar, which ICU's data in Node has (`Intl`'s `islamic-umalqura`), a day later; said
+      to be expected, since the sighting decides. Ramadan runs to the day before Eid, and can
+      come twice in a Gregorian year.
+    * Pakistan Day (23 March), Mother's Day (the second Sunday of May), Independence Day
+      (14 August), 11.11, White Friday (the last Friday of November, to the Monday after) and
+      12.12.
+    * Seasons: lawn (15 February to April), winter collections (October and November) and
+      weddings (November to the end of February).
+  * **Each has a lead**, the days before it to start promoting: three weeks for Eid ul Fitr,
+    two for most, one for the one-day sales.
+  * **Each has a kit**: a discount code (EID26, AZADI26 and the like, the year's last two
+    digits after a word), a percentage customers expect (14% for 14 August, 23% for
+    23 March, 30% for White Friday), and a broadcast's words in English and Urdu naming both,
+    short enough for one SMS campaign (ADR-458).
+  * **`marketingCalendar(days)`** lists the moments to promote for from the shop's today, in
+    its time zone, through `days` ahead (365 by default, at most 731): those not over whose
+    promoting begins by then, soonest first. It needs `read_marketing_events`.
+  * **The admin's Marketing calendar page** (linked from Marketing) shows each moment's dates,
+    whether they are expected, what sells, and its kit; a tap makes its discount code, from
+    its promoting's first day to its last day in the shop's time zone, through
+    `discountCodeCreate`.
+* **Consequences:**
+  * A year when Pakistan's sighting matches Saudi Arabia's (Eid ul Fitr 2024) is a day off
+    until the shop adjusts its code's dates; the page says the dates are expected.
+  * Kits are suggestions: nothing is sent or made until the shop chooses. Broadcasts are
+    written from the kit's words on the broadcasts page; WhatsApp needs an approved template.
+* **Alternatives:**
+  * **A table of dates kept by hand:** right where the committee's announcements differ, but
+    a chore each year that a missed update turns into a wrong date for every shop.
+  * **The tabular Islamic calendar:** simpler, but further from the sighting than Umm al-Qura.

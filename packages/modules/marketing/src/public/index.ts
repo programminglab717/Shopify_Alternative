@@ -6,6 +6,16 @@ export {
   type ConversionRecord,
 } from '../internal/conversions.service.js';
 export {
+  CALENDAR_DAYS_MAX,
+  MARKETING_MOMENTS,
+  marketingCalendar,
+  marketingDatesOf,
+  type CampaignKit,
+  type MarketingDate,
+  type MarketingMomentValue,
+} from '../internal/calendar.js';
+export { MarketingCalendarService } from '../internal/calendar.service.js';
+export {
   MarketingEvents,
   type MetaConversionsDeletedPayload,
   type MetaConversionsUpdatedPayload,

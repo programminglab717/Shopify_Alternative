@@ -1918,6 +1918,35 @@ export interface ShopVerificationSubmitData {
 
 export type CopyLanguage = 'ENGLISH' | 'URDU' | 'ROMAN_URDU';
 
+/** A moment Pakistani shoppers buy for (MKT-16, ADR-484). */
+export type MarketingMomentValue =
+  | 'RAMADAN'
+  | 'EID_UL_FITR'
+  | 'EID_UL_ADHA'
+  | 'PAKISTAN_DAY'
+  | 'MOTHERS_DAY'
+  | 'INDEPENDENCE_DAY'
+  | 'ELEVEN_ELEVEN'
+  | 'WHITE_FRIDAY'
+  | 'TWELVE_TWELVE'
+  | 'SUMMER_LAWN'
+  | 'WINTER_COLLECTION'
+  | 'WEDDING_SEASON';
+
+/** A moment's dates in a year, YYYY-MM-DD, with its ready-made campaign (ADR-484). */
+export interface MarketingDateValue {
+  moment: MarketingMomentValue;
+  startsOn: string;
+  endsOn: string;
+  promoteFrom: string;
+  expected: boolean;
+  kit: { code: string; percentage: number; messageEnglish: string; messageUrdu: string };
+}
+
+export interface MarketingCalendarData {
+  marketingCalendar: MarketingDateValue[];
+}
+
 /** Whether a product is new, refurbished or used (ADR-483). */
 export type ProductConditionValue = 'NEW' | 'REFURBISHED' | 'USED';
 

@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import {
+  CalendarDays,
   ChevronRight,
   CircleAlert,
   CircleCheck,
@@ -458,7 +459,7 @@ function BroadcastRow({ broadcast }: { broadcast: Broadcast }) {
 /**
  * Marketing (MKT-01): the shop's broadcasts on WhatsApp, and by SMS (MKT-02, ADR-459), a new one
  * estimated as it is chosen and scheduled (ADR-421), and those made, the latest first, with how their messages went; and the
- * way to its templates and its automations (ADR-428).
+ * way to its templates, its automations (ADR-428) and Pakistan's marketing calendar (ADR-484).
  */
 export function BroadcastsPage() {
   const { t } = useLocale();
@@ -503,6 +504,20 @@ export function BroadcastsPage() {
             <span className="font-medium">{t('automations.title')}</span>
             <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
               {t('automations.linkHint')}
+            </span>
+          </span>
+          <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />
+        </Link>
+        <Link
+          to="/$shopId/marketing/calendar"
+          params={{ shopId }}
+          className="flex min-h-16 items-center gap-3 border-t border-line px-4 py-3"
+        >
+          <CalendarDays aria-hidden className="size-6 shrink-0 text-secondary" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="font-medium">{t('calendar.title')}</span>
+            <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+              {t('calendar.linkHint')}
             </span>
           </span>
           <ChevronRight aria-hidden className="size-5 text-secondary rtl:rotate-180" />

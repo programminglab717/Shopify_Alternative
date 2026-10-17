@@ -3714,6 +3714,54 @@ const en = {
   'whatsapp.connect': 'Connect with Facebook',
   'templates.title': 'WhatsApp templates',
   'templates.linkHint': 'The messages Meta approves for your broadcasts',
+  'calendar.title': 'Marketing calendar',
+  'calendar.linkHint':
+    'Ramadan, Eid, 14 August, White Friday and the seasons, with campaigns ready',
+  'calendar.intro':
+    'The moments your customers buy for in the year ahead, soonest first. Each has when to start promoting and a ready campaign: a discount code to make, and words for a broadcast.',
+  'calendar.none': 'Nothing to promote for in the year ahead.',
+  'calendar.expected': "Expected: the moon's sighting sets it",
+  'calendar.dates': '{from} to {to}',
+  'calendar.promoteFrom': 'promote from {date}',
+  'calendar.kit': '{percentage}% off with {code}',
+  'calendar.english': 'English:',
+  'calendar.urdu': 'Urdu:',
+  'calendar.makeCode': 'Make code {code}',
+  'calendar.made': '{code} is made: it works from {from} to {to}.',
+  'calendar.writeBroadcast': 'Write a broadcast',
+  'calendar.moment.RAMADAN': 'Ramadan',
+  'calendar.moment.EID_UL_FITR': 'Eid ul Fitr',
+  'calendar.moment.EID_UL_ADHA': 'Eid ul Adha',
+  'calendar.moment.PAKISTAN_DAY': 'Pakistan Day',
+  'calendar.moment.MOTHERS_DAY': "Mother's Day",
+  'calendar.moment.INDEPENDENCE_DAY': 'Independence Day',
+  'calendar.moment.ELEVEN_ELEVEN': '11.11 sale',
+  'calendar.moment.WHITE_FRIDAY': 'White Friday',
+  'calendar.moment.TWELVE_TWELVE': '12.12 sale',
+  'calendar.moment.SUMMER_LAWN': 'Lawn season',
+  'calendar.moment.WINTER_COLLECTION': 'Winter collection',
+  'calendar.moment.WEDDING_SEASON': 'Wedding season',
+  'calendar.idea.RAMADAN':
+    'Sehri and iftar essentials, prayer mats, modest wear, and Eid gifts bought early.',
+  'calendar.idea.EID_UL_FITR':
+    "The year's biggest shopping: new clothes, shoes, bangles, mehndi and Eidi gifts. Orders stop arriving in time days before Chand Raat.",
+  'calendar.idea.EID_UL_ADHA':
+    'New clothes again, and the kitchen: choppers, knives, freezers and barbecue.',
+  'calendar.idea.PAKISTAN_DAY': 'Green and white, and a 23% offer customers expect.',
+  'calendar.idea.MOTHERS_DAY': 'Gifts: jewellery, perfume, shawls and hampers.',
+  'calendar.idea.INDEPENDENCE_DAY':
+    'Green and white clothes, flags and badges for children, and a 14% offer.',
+  'calendar.idea.ELEVEN_ELEVEN':
+    "The marketplaces' one-day sale: shoppers compare prices, so a clear offer wins.",
+  'calendar.idea.WHITE_FRIDAY':
+    "Pakistan's Black Friday: the deepest discounts of the year, Friday to Monday.",
+  'calendar.idea.TWELVE_TWELVE': "The year's last big sale day, as winter and weddings peak.",
+  'calendar.idea.SUMMER_LAWN':
+    'New summer lawn collections: launch early, before the big brands sell out.',
+  'calendar.idea.WINTER_COLLECTION':
+    'Khaddar, karandi, velvet and shawls, and warm clothes for children.',
+  'calendar.idea.WEDDING_SEASON':
+    'Formal and bridal wear, jewellery, gifts and decor, from mehndi to walima.',
   'automations.title': 'Automations',
   'automations.linkHint': 'A welcome and a win-back, sent on their own',
   'automations.intro':
@@ -7818,6 +7866,52 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'whatsapp.connect': 'فیس بک سے جوڑیں',
   'templates.title': 'واٹس ایپ ٹیمپلیٹ',
   'templates.linkHint': 'وہ میسج جو Meta آپ کے براڈکاسٹ کے لیے منظور کرتا ہے',
+  'calendar.title': 'مارکیٹنگ کیلنڈر',
+  'calendar.linkHint': 'رمضان، عید، 14 اگست، وائٹ فرائیڈے اور موسم، تیار مہمات کے ساتھ',
+  'calendar.intro':
+    'آنے والے سال میں وہ مواقع جن کے لیے آپ کے گاہک خریداری کرتے ہیں، قریب ترین پہلے۔ ہر ایک کے ساتھ تشہیر شروع کرنے کا وقت اور تیار مہم: بنانے کے لیے ڈسکاؤنٹ کوڈ، اور براڈکاسٹ کے الفاظ۔',
+  'calendar.none': 'آنے والے سال میں تشہیر کے لیے کچھ نہیں۔',
+  'calendar.expected': 'متوقع: چاند نظر آنے پر طے ہوگا',
+  'calendar.dates': '{from} سے {to} تک',
+  'calendar.promoteFrom': '{date} سے تشہیر کریں',
+  'calendar.kit': 'کوڈ {code} کے ساتھ {percentage}% رعایت',
+  'calendar.english': 'انگریزی:',
+  'calendar.urdu': 'اردو:',
+  'calendar.makeCode': 'کوڈ {code} بنائیں',
+  'calendar.made': '{code} بن گیا: یہ {from} سے {to} تک چلے گا۔',
+  'calendar.writeBroadcast': 'براڈکاسٹ لکھیں',
+  'calendar.moment.RAMADAN': 'رمضان',
+  'calendar.moment.EID_UL_FITR': 'عید الفطر',
+  'calendar.moment.EID_UL_ADHA': 'عید الاضحیٰ',
+  'calendar.moment.PAKISTAN_DAY': 'یومِ پاکستان',
+  'calendar.moment.MOTHERS_DAY': 'ماں کا دن',
+  'calendar.moment.INDEPENDENCE_DAY': 'یومِ آزادی',
+  'calendar.moment.ELEVEN_ELEVEN': '11.11 سیل',
+  'calendar.moment.WHITE_FRIDAY': 'وائٹ فرائیڈے',
+  'calendar.moment.TWELVE_TWELVE': '12.12 سیل',
+  'calendar.moment.SUMMER_LAWN': 'لان کا موسم',
+  'calendar.moment.WINTER_COLLECTION': 'سردیوں کی کلیکشن',
+  'calendar.moment.WEDDING_SEASON': 'شادیوں کا موسم',
+  'calendar.idea.RAMADAN':
+    'سحری و افطاری کا سامان، جائے نماز، باپردہ لباس، اور عید کے تحفے جو پہلے خریدے جاتے ہیں۔',
+  'calendar.idea.EID_UL_FITR':
+    'سال کی سب سے بڑی خریداری: نئے کپڑے، جوتے، چوڑیاں، مہندی اور عیدی کے تحفے۔ چاند رات سے کچھ دن پہلے آرڈر وقت پر پہنچنا بند ہو جاتے ہیں۔',
+  'calendar.idea.EID_UL_ADHA':
+    'پھر سے نئے کپڑے، اور باورچی خانہ: چاپر، چھریاں، فریزر اور باربی کیو۔',
+  'calendar.idea.PAKISTAN_DAY': 'سبز اور سفید، اور 23% کی پیشکش جس کی گاہک توقع کرتے ہیں۔',
+  'calendar.idea.MOTHERS_DAY': 'تحفے: زیورات، خوشبو، شالیں اور تحائف کی ٹوکریاں۔',
+  'calendar.idea.INDEPENDENCE_DAY':
+    'سبز اور سفید کپڑے، بچوں کے لیے جھنڈے اور بیج، اور 14% کی پیشکش۔',
+  'calendar.idea.ELEVEN_ELEVEN':
+    'مارکیٹ پلیسز کی ایک دن کی سیل: خریدار قیمتیں ملاتے ہیں، اس لیے واضح پیشکش جیتتی ہے۔',
+  'calendar.idea.WHITE_FRIDAY':
+    'پاکستان کا بلیک فرائیڈے: سال کی سب سے بڑی رعایتیں، جمعہ سے پیر تک۔',
+  'calendar.idea.TWELVE_TWELVE': 'سال کا آخری بڑا سیل کا دن، جب سردی اور شادیاں عروج پر ہوتی ہیں۔',
+  'calendar.idea.SUMMER_LAWN':
+    'گرمیوں کی نئی لان کلیکشنز: جلد لانچ کریں، بڑے برانڈز کے ختم ہونے سے پہلے۔',
+  'calendar.idea.WINTER_COLLECTION': 'کھدر، کرنڈی، ویلویٹ اور شالیں، اور بچوں کے گرم کپڑے۔',
+  'calendar.idea.WEDDING_SEASON':
+    'فارمل اور دلہن کے کپڑے، زیورات، تحفے اور سجاوٹ، مہندی سے ولیمے تک۔',
   'automations.title': 'خودکار پیغامات',
   'automations.linkHint': 'خوش آمدید اور واپسی کے پیغام، جو خود جاتے ہیں',
   'automations.intro':

@@ -233,3 +233,81 @@ export class ConversionEventsArgs {
   @Field(() => ID, { nullable: true, description: "This order's alone." })
   orderId?: string | null;
 }
+
+export enum MarketingMoment {
+  RAMADAN = 'ramadan',
+  EID_UL_FITR = 'eid_ul_fitr',
+  EID_UL_ADHA = 'eid_ul_adha',
+  PAKISTAN_DAY = 'pakistan_day',
+  MOTHERS_DAY = 'mothers_day',
+  INDEPENDENCE_DAY = 'independence_day',
+  ELEVEN_ELEVEN = 'eleven_eleven',
+  WHITE_FRIDAY = 'white_friday',
+  TWELVE_TWELVE = 'twelve_twelve',
+  SUMMER_LAWN = 'summer_lawn',
+  WINTER_COLLECTION = 'winter_collection',
+  WEDDING_SEASON = 'wedding_season',
+}
+
+registerEnumType(MarketingMoment, {
+  name: 'MarketingMoment',
+  description: 'A moment Pakistani shoppers buy for (MKT-16).',
+  valuesMap: {
+    RAMADAN: { description: 'The month of Ramadan.' },
+    EID_UL_FITR: { description: 'Eid ul Fitr, its three days; Chand Raat is the night before.' },
+    EID_UL_ADHA: { description: 'Eid ul Adha, its three days.' },
+    PAKISTAN_DAY: { description: 'Pakistan Day, 23 March.' },
+    MOTHERS_DAY: { description: "Mother's Day, the second Sunday of May." },
+    INDEPENDENCE_DAY: { description: 'Independence Day, 14 August.' },
+    ELEVEN_ELEVEN: { description: 'The 11.11 sale, 11 November.' },
+    WHITE_FRIDAY: {
+      description: 'White Friday, the last Friday of November, to the Monday after.',
+    },
+    TWELVE_TWELVE: { description: 'The 12.12 sale, 12 December.' },
+    SUMMER_LAWN: { description: "Lawn's season: new summer collections, mid-February to April." },
+    WINTER_COLLECTION: { description: 'Winter collections, October and November.' },
+    WEDDING_SEASON: { description: 'The wedding season, November to February.' },
+  },
+});
+
+@ObjectType({ description: "A moment's ready-made campaign (ADR-484)." })
+export class MarketingKit {
+  @Field({ description: "A discount code to make, its year's last two digits after it: EID26." })
+  code!: string;
+
+  @Field(() => Int, { description: 'The percentage off to suggest.' })
+  percentage!: number;
+
+  @Field({
+    description: "A broadcast's words in English, naming the code: short enough for one SMS.",
+  })
+  messageEnglish!: string;
+
+  @Field({ description: "A broadcast's words in Urdu, naming the code." })
+  messageUrdu!: string;
+}
+
+@ObjectType({ description: "A moment's dates in a year, with its kit (MKT-16, ADR-484)." })
+export class MarketingDate {
+  @Field(() => MarketingMoment)
+  moment!: MarketingMoment;
+
+  @Field({ description: "Its first day, YYYY-MM-DD in the shop's time zone." })
+  startsOn!: string;
+
+  @Field({ description: 'Its last day, YYYY-MM-DD: the first for a day of its own.' })
+  endsOn!: string;
+
+  @Field({ description: 'When to begin promoting for it, YYYY-MM-DD: what its code starts on.' })
+  promoteFrom!: string;
+
+  @Field({
+    description:
+      "Whether its dates wait on the moon's sighting: Islamic moments are expected a day after " +
+      "the Umm al-Qura calendar's, as Pakistan's sighting usually is.",
+  })
+  expected!: boolean;
+
+  @Field(() => MarketingKit)
+  kit!: MarketingKit;
+}
