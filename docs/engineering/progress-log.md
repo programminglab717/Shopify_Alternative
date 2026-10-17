@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Collaborators
+### 1e34654 · Collaborators
 
 * **Staff invited for 1 to 90 days from joining, for an agency or a freelancer, whose access
   ends by itself: refused the moment it ends, the membership swept away after, and the admin's
