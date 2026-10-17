@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Google's tag on the storefront
+### f806c9c · Google's tag on the storefront
 
 * **The storefront loads the shop's Google tag while it has Google Analytics connected, and
   checkout passes the `_ga` cookie on, so an order's server events are the visit's that came from
