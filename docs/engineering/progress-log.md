@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Google's tab in the admin
+
+* **The admin's online store has a Google tab: the web stream connected with its measurement ID and
+  API secret, its purchase moment chosen, disconnected once asked, and the moments sent to Google
+  listed apart** ([ADR-550](../architecture/13-decision-log.md#adr-550--the-admins-online-store-has-a-google-tab-the-web-stream-connected-with-its-measurement-id-and-api-secret-its-purchase-moment-chosen-disconnected-once-asked-and-the-moments-sent-to-google-listed-apart), MKT-10).
+* 3352 tests, 6 more: connecting, changing and disconnecting, and the
+  moments listed, and its three operations checked against the API's schema.
+
 ### f771c0d · The admin's inbox
 
 * **The admin's inbox lists a shop's WhatsApp conversations open, unread or closed, and a

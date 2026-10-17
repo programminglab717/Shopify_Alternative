@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-549 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-550 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -557,6 +557,7 @@
 | 547 | Orders placed through checkout go to Google Analytics' Measurement Protocol from the worker beside Meta's and TikTok's, the shop connecting its web stream with an API secret, for Google Ads to import its purchase as a conversion | Accepted |
 | 548 | The storefront loads the shop's Google tag while it has Google Analytics connected, tracking the same steps as Meta's and TikTok's pixels, and checkout passes the `_ga` cookie on so that an order's server events are the browser's that came from the ad | Accepted |
 | 549 | The admin's inbox lists a shop's WhatsApp conversations open, unread or closed, and a conversation's page reads it as it opens, closes and reopens it, and answers within the day WhatsApp allows, for those who work it; marketers read it alone | Accepted |
+| 550 | The admin's online store has a Google tab: the web stream connected with its measurement ID and API secret, its purchase moment chosen, disconnected once asked, and the moments sent to Google listed apart | Accepted |
 
 ---
 
@@ -20726,3 +20727,27 @@
 * **Alternatives:**
   * **The inbox inside the Confirmation Desk:** the desk is a queue of orders, and most
     conversations are about none.
+
+## ADR-550 · The admin's online store has a Google tab: the web stream connected with its measurement ID and API secret, its purchase moment chosen, disconnected once asked, and the moments sent to Google listed apart
+
+* **Context:** A shop's orders go to Google Analytics and its storefront loads the Google tag once
+  the shop connects its web stream (ADR-547, ADR-548), but the stream connected only through the
+  API, while Meta's and TikTok's have their tabs (ADR-542).
+* **Decision:**
+  * **A Google tab** in the online store, for owners, managers and marketers, as Meta's and
+    TikTok's.
+  * **Connecting:** the stream's measurement ID and a Measurement Protocol API secret, both needed
+    the first time, and which moment of an order is Google's purchase, each moment's hint saying
+    what Google learns from it; saved once the member confirms who they are, only what changed
+    sent. The secret is never shown again: its last four characters say which one is kept, and
+    leaving it blank keeps it.
+  * **Once connected,** the tab says to import the purchase into Google Ads as a conversion, and
+    lists the latest moments sent to Google, all or those of one status, apart from Meta's and
+    TikTok's; Google gives no trace of a request, so none is shown.
+  * **Disconnecting** asks first, saying the storefront stops loading the tag and the moments
+    waiting are not sent.
+* **Consequences:**
+  * A shop advertising on Google connects it as it does Meta and TikTok, without the API.
+* **Alternatives:**
+  * **Signing in with Google to pick the stream:** saves copying two values, but needs Hatti to
+    hold each shop's Google access, as ADR-547 chose not to.

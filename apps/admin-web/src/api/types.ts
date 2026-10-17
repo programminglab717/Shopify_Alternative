@@ -2835,8 +2835,8 @@ export interface MetaConversionsDeleteData {
   metaConversionsDelete: { deletedPixelId: string | null; userErrors: UserError[] };
 }
 
-/** The ad platforms a shop's orders go to (ADR-143, ADR-541). */
-export type ConversionPlatform = 'META' | 'TIKTOK';
+/** The ad platforms a shop's orders go to (ADR-143, ADR-541, ADR-547). */
+export type ConversionPlatform = 'META' | 'TIKTOK' | 'GOOGLE';
 
 export interface ConversionEvent {
   id: string;
@@ -2871,6 +2871,26 @@ export interface TikTokEventsUpdateData {
 
 export interface TikTokEventsDeleteData {
   tiktokEventsDelete: { deletedPixelCode: string | null; userErrors: UserError[] };
+}
+
+/** The shop's Google Analytics web stream (ADR-547): its secret never shown, its last four characters alone. */
+export interface GoogleAnalytics {
+  measurementId: string;
+  apiSecretHint: string;
+  purchaseAt: ConversionMoment;
+  updatedAt: string;
+}
+
+export interface GoogleAnalyticsData {
+  googleAnalytics: GoogleAnalytics | null;
+}
+
+export interface GoogleAnalyticsUpdateData {
+  googleAnalyticsUpdate: { googleAnalytics: GoogleAnalytics | null; userErrors: UserError[] };
+}
+
+export interface GoogleAnalyticsDeleteData {
+  googleAnalyticsDelete: { deletedMeasurementId: string | null; userErrors: UserError[] };
 }
 
 export interface ConversionEventsData {

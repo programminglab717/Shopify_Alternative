@@ -275,6 +275,13 @@ const PLATFORM_TEXT: Record<
     none: 'tiktok.noEvents',
     trace: 'request_id',
   },
+  GOOGLE: {
+    title: 'google.events',
+    hint: 'google.eventsHint',
+    none: 'google.noEvents',
+    // Google answers every request alike, so no trace is kept.
+    trace: '',
+  },
 };
 
 /** One moment of an order sent, or to be sent, to an ad platform, and how it went. */

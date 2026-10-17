@@ -2375,6 +2375,37 @@ const en = {
     'The latest moments of your orders, and how sending each went. TikTok takes them up to seven days late.',
   'tiktok.noEvents':
     'Nothing yet. Orders placed through your checkout appear here as they go to TikTok.',
+  'onlineStore.google': 'Google',
+  'google.title': 'Google Analytics',
+  'google.hint':
+    "Your storefront loads your Google tag, and orders placed through your checkout go to your Google Analytics web stream as they are placed, confirmed and delivered, from Hatti's servers. Import the purchase into Google Ads as a conversion, so its ads learn from the orders that turned out. Customers' details go hashed. On Growth and bigger plans.",
+  'google.connected': 'Connected to web stream {measurementId}.',
+  'google.measurementId': 'Measurement ID',
+  'google.measurementIdHint':
+    'As Google Analytics shows it under Admin, Data streams, your web stream: G- and letters and digits.',
+  'google.apiSecret': 'API secret',
+  'google.newApiSecret': 'New API secret',
+  'google.apiSecretHint':
+    'Made in Google Analytics: your web stream, then Measurement Protocol API secrets, then Create.',
+  'google.purchaseAt': 'Tell Google of a purchase',
+  'google.purchaseHint.PLACED':
+    'With cash on delivery, Google also learns from orders refused at the door.',
+  'google.purchaseHint.CONFIRMED':
+    'Once the customer or your staff confirm it, or its payment comes in. Google learns from fewer fake orders.',
+  'google.purchaseHint.DELIVERED':
+    'Only the parcels customers took count as purchases, so Google finds people who pay. They reach Google days after the order.',
+  'google.adsHint':
+    'In Google Ads, under Goals, import purchase from Google Analytics as a conversion.',
+  'google.connect': 'Connect Google',
+  'google.saved': 'Saved. Orders placed from now on go to Google like this.',
+  'google.disconnect': 'Disconnect Google',
+  'google.disconnectAsk':
+    'Disconnect web stream {measurementId}? Your storefront stops loading its tag, Hatti forgets its API secret, and moments still waiting are not sent.',
+  'google.events': 'Sent to Google',
+  'google.eventsHint':
+    'The latest moments of your orders, and how sending each went. Google takes them up to three days late.',
+  'google.noEvents':
+    'Nothing yet. Orders placed through your checkout appear here as they go to Google.',
   'settings.messages': 'Customer messages',
   'settings.messagesHint': 'WhatsApp or SMS, which messages go, and alerts to you',
   'settings.whatsapp': 'Your WhatsApp number',
@@ -7143,6 +7174,36 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'آپ کے آرڈرز کے تازہ ترین لمحے، اور ہر ایک کا بھیجنا کیسا رہا۔ ٹک ٹاک انہیں سات دن تک دیر سے لیتا ہے۔',
   'tiktok.noEvents':
     'ابھی کچھ نہیں۔ آپ کے چیک آؤٹ سے آنے والے آرڈر ٹک ٹاک کو جاتے ہی یہاں دکھیں گے۔',
+  'onlineStore.google': 'گوگل',
+  'google.title': 'گوگل اینالیٹکس',
+  'google.hint':
+    'آپ کا اسٹور فرنٹ آپ کا گوگل ٹیگ لوڈ کرتا ہے، اور آپ کے چیک آؤٹ سے آنے والے آرڈر ہٹی کے سرورز سے آپ کی گوگل اینالیٹکس ویب اسٹریم کو جاتے ہیں جب وہ آئیں، کنفرم ہوں اور ڈیلیور ہوں۔ خریداری کو گوگل ایڈز میں کنورژن کے طور پر امپورٹ کریں، تاکہ اس کے اشتہار ان آرڈرز سے سیکھیں جو پورے ہوئے۔ کسٹمرز کی تفصیلات ہیش ہو کر جاتی ہیں۔ گروتھ اور بڑے پلانز پر۔',
+  'google.connected': 'ویب اسٹریم {measurementId} سے منسلک۔',
+  'google.measurementId': 'میژرمنٹ ID',
+  'google.measurementIdHint':
+    'جیسے گوگل اینالیٹکس میں Admin، Data streams، آپ کی ویب اسٹریم کے نیچے دکھتا ہے: G- اور حروف اور ہندسے۔',
+  'google.apiSecret': 'API سیکرٹ',
+  'google.newApiSecret': 'نیا API سیکرٹ',
+  'google.apiSecretHint':
+    'گوگل اینالیٹکس میں بنتا ہے: آپ کی ویب اسٹریم، پھر Measurement Protocol API secrets، پھر Create۔',
+  'google.purchaseAt': 'گوگل کو خریداری کب بتائیں',
+  'google.purchaseHint.PLACED':
+    'کیش آن ڈیلیوری میں گوگل دروازے پر انکار ہونے والے آرڈرز سے بھی سیکھتا ہے۔',
+  'google.purchaseHint.CONFIRMED':
+    'جب کسٹمر یا آپ کا اسٹاف کنفرم کرے، یا ادائیگی آ جائے۔ گوگل کم جعلی آرڈرز سے سیکھتا ہے۔',
+  'google.purchaseHint.DELIVERED':
+    'صرف وہ پارسل خریداری گنے جاتے ہیں جو کسٹمرز نے لیے، تاکہ گوگل ادائیگی کرنے والے لوگ ڈھونڈے۔ یہ گوگل تک آرڈر کے کچھ دن بعد پہنچتے ہیں۔',
+  'google.adsHint':
+    'گوگل ایڈز میں Goals کے نیچے، گوگل اینالیٹکس سے purchase کو کنورژن کے طور پر امپورٹ کریں۔',
+  'google.connect': 'گوگل منسلک کریں',
+  'google.saved': 'محفوظ ہو گیا۔ اب سے آنے والے آرڈر اسی طرح گوگل کو جائیں گے۔',
+  'google.disconnect': 'گوگل الگ کریں',
+  'google.disconnectAsk':
+    'ویب اسٹریم {measurementId} الگ کریں؟ آپ کا اسٹور فرنٹ اس کا ٹیگ لوڈ کرنا بند کر دے گا، ہٹی اس کا API سیکرٹ بھول جائے گا، اور انتظار میں موجود لمحے نہیں بھیجے جائیں گے۔',
+  'google.events': 'گوگل کو بھیجے گئے',
+  'google.eventsHint':
+    'آپ کے آرڈرز کے تازہ ترین لمحے، اور ہر ایک کا بھیجنا کیسا رہا۔ گوگل انہیں تین دن تک دیر سے لیتا ہے۔',
+  'google.noEvents': 'ابھی کچھ نہیں۔ آپ کے چیک آؤٹ سے آنے والے آرڈر گوگل کو جاتے ہی یہاں دکھیں گے۔',
   'settings.messages': 'کسٹمر میسجز',
   'settings.messagesHint': 'واٹس ایپ یا SMS، کون سے میسج جائیں، اور آپ کو الرٹس',
   'settings.whatsapp': 'آپ کا واٹس ایپ نمبر',

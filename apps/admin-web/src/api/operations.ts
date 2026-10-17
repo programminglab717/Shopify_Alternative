@@ -6258,6 +6258,54 @@ export const TikTokEventsDeleteMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+const GOOGLE_ANALYTICS = /* GraphQL */ `
+  fragment GoogleAnalyticsParts on GoogleAnalytics {
+    measurementId
+    apiSecretHint
+    purchaseAt
+    updatedAt
+  }
+`;
+
+/** The shop's Google Analytics web stream, if it connected one (ADR-547). */
+export const GoogleAnalyticsQuery = /* GraphQL */ `
+  query GoogleAnalytics {
+    googleAnalytics {
+      ...GoogleAnalyticsParts
+    }
+  }
+  ${GOOGLE_ANALYTICS}
+`;
+
+/** The shop's Google Analytics web stream connected, or how its orders go to it changed. */
+export const GoogleAnalyticsUpdateMutation = /* GraphQL */ `
+  mutation GoogleAnalyticsUpdate($input: GoogleAnalyticsInput!) {
+    googleAnalyticsUpdate(input: $input) {
+      googleAnalytics {
+        ...GoogleAnalyticsParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${GOOGLE_ANALYTICS}
+  ${USER_ERRORS}
+`;
+
+/** The shop's web stream disconnected: its secret forgotten, moments waiting not sent. */
+export const GoogleAnalyticsDeleteMutation = /* GraphQL */ `
+  mutation GoogleAnalyticsDelete {
+    googleAnalyticsDelete {
+      deletedMeasurementId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /**
  * The latest moments of the shop's orders sent, or to be sent, to one ad platform, and how each
  * went.
