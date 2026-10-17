@@ -2696,6 +2696,7 @@ export const BillingQuery = /* GraphQL */ `
       interval
       periodEnd
       pastDue
+      freeAt
       nextPlan {
         name
       }

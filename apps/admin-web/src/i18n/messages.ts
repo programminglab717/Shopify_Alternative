@@ -733,6 +733,8 @@ const en = {
   'billing.nextPlan': 'Changes to {plan} on {date}.',
   'billing.pastDue':
     'The last period ended unpaid. Your plan stays for a week, then your shop is on Free until its invoice is paid.',
+  'billing.pastDueUntil':
+    'The last period ended unpaid. Pay its invoice by {date} to keep your plan; after that your shop is on Free, and its store stays open either way.',
   'billing.ownerChanges': "The shop's owner changes its plan and pays its invoices.",
   'billing.ownerPays': "The shop's owner pays it.",
   'billing.toPay': '{name}: {amount} to pay',
@@ -5335,6 +5337,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'billing.nextPlan': '{date} کو {plan} میں بدل جائے گا۔',
   'billing.pastDue':
     'پچھلا دورانیہ بغیر ادائیگی کے ختم ہوا۔ آپ کا پلان ایک ہفتہ رہے گا، پھر انوائس ادا ہونے تک آپ کی دکان فری پر ہوگی۔',
+  'billing.pastDueUntil':
+    'پچھلی مدت بغیر ادائیگی کے ختم ہوئی۔ اپنا پلان برقرار رکھنے کے لیے {date} تک اس کی انوائس ادا کریں؛ اس کے بعد آپ کی دکان فری پلان پر ہوگی، اور اس کا اسٹور ہر صورت کھلا رہے گا۔',
   'billing.ownerChanges': 'دکان کا مالک اس کا پلان بدلتا اور اس کے انوائس ادا کرتا ہے۔',
   'billing.ownerPays': 'دکان کا مالک اسے ادا کرتا ہے۔',
   'billing.toPay': '{name}: {amount} ادا کرنے ہیں',

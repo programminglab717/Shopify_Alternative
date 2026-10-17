@@ -44,6 +44,7 @@ export const MESSAGE_KINDS = [
   'order_mentioned',
   'order_receipt_sent',
   'invoice_due',
+  'payment_overdue',
   'plan_ended',
   'credit_low',
   'transfer_confirmed',
@@ -113,6 +114,7 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   // What the customer bought: the gift card's code, which no one else has (ADR-451).
   'gift_card',
   'invoice_due',
+  'payment_overdue',
   'plan_ended',
   'credit_low',
   'transfer_confirmed',
@@ -162,6 +164,7 @@ export const TO_THE_SHOP_KINDS: readonly MessageKind[] = [
   'order_mentioned',
   'order_receipt_sent',
   'invoice_due',
+  'payment_overdue',
   'plan_ended',
   'credit_low',
   'transfer_confirmed',
@@ -241,6 +244,8 @@ export interface MessageVariables {
   invoice?: string;
   amount?: string;
   plan?: string;
+  /** For a period overdue (ADR-511): whole days left before the shop is on Free, "3". */
+  days?: string;
   /**
    * For COD to prepaid (ADR-432): the store credit offered for paying the order online, its
    * `amount` what is left to pay.
@@ -827,6 +832,20 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: 'Invoice {invoice} for {shop} waits for payment',
       ur: '{shop} کی انوائس {invoice} ادائیگی کی منتظر ہے',
+    },
+  },
+  payment_overdue: {
+    whatsapp: 'hatti_payment_overdue',
+    category: 'utility',
+    parameters: ['shop', 'invoice', 'plan', 'amount', 'days'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: {shop}'s {plan} period has ended and invoice {invoice}, {amount}, is unpaid. Days left before the shop moves to Free: {days}. Its store stays open either way. Pay from Hatti's admin to keep the plan.",
+      ur: 'ہٹی: {shop} کے {plan} پلان کی مدت ختم ہو گئی ہے اور انوائس {invoice}، {amount}، ادا نہیں ہوئی۔ دکان کے فری پلان پر جانے میں باقی دن: {days}۔ آپ کا اسٹور ہر صورت کھلا رہے گا۔ پلان جاری رکھنے کے لیے ہٹی کے ایڈمن سے ادا کریں۔',
+    },
+    subject: {
+      en: '{shop}: invoice {invoice} is overdue, {days} days to pay',
+      ur: '{shop}: انوائس {invoice} کی ادائیگی باقی ہے، {days} دن باقی',
     },
   },
   plan_ended: {

@@ -320,6 +320,7 @@ function toSubscription(record: SubscriptionRecord): BillingSubscription {
     periodStart: record.periodStart,
     periodEnd: record.periodEnd,
     pastDue: record.pastDue,
+    freeAt: record.freeAt,
     nextPlan: record.nextPlan && toPlan(record.nextPlan),
     nextInterval: record.nextInterval && (record.nextInterval.toUpperCase() as BillingInterval),
     openInvoice: record.openInvoice && toInvoice(record.openInvoice),

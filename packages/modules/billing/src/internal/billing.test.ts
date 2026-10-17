@@ -247,8 +247,8 @@ describe.skipIf(!server)('Billing', () => {
       start: new Date(now - 10 * DAY),
       end: new Date(now + 20 * DAY),
     });
-    expect(await f.billing.sweep()).toEqual({ invoiced: 1, ended: 0, failed: 0 });
-    expect(await f.billing.sweep()).toEqual({ invoiced: 0, ended: 0, failed: 0 });
+    expect(await f.billing.sweep()).toEqual({ invoiced: 1, reminded: 0, ended: 0, failed: 0 });
+    expect(await f.billing.sweep()).toEqual({ invoiced: 0, reminded: 0, ended: 0, failed: 0 });
     const [renewal] = await f.billing.invoicesOf(f.a.shopId);
     expect(renewal).toMatchObject({
       reason: 'renewal',
@@ -268,7 +268,7 @@ describe.skipIf(!server)('Billing', () => {
     // Unpaid past its end: the plan stays a week, then the shop is on Free.
     const ended = new Date(now - 2 * DAY);
     await f.subscribe(f.b, 'growth', 'monthly', { start: new Date(now - 32 * DAY), end: ended });
-    expect(await f.billing.sweep()).toEqual({ invoiced: 1, ended: 0, failed: 0 });
+    expect(await f.billing.sweep()).toEqual({ invoiced: 1, reminded: 1, ended: 0, failed: 0 });
     expect(await f.billing.subscriptionOf(f.b.shopId)).toMatchObject({
       plan: { code: 'growth' },
       pastDue: true,
@@ -276,6 +276,7 @@ describe.skipIf(!server)('Billing', () => {
     });
     expect(await f.billing.sweep(new Date(now + 6 * DAY))).toEqual({
       invoiced: 0,
+      reminded: 0,
       ended: 1,
       failed: 0,
     });
@@ -296,7 +297,7 @@ describe.skipIf(!server)('Billing', () => {
       { start: new Date(now - 31 * DAY), end: new Date(now - 3_600_000) },
       { plan: 'free', interval: null },
     );
-    expect(await f.billing.sweep()).toEqual({ invoiced: 0, ended: 1, failed: 0 });
+    expect(await f.billing.sweep()).toEqual({ invoiced: 0, reminded: 0, ended: 1, failed: 0 });
     expect(await f.billing.subscriptionOf(f.a.shopId)).toMatchObject({
       plan: { code: 'free' },
       nextPlan: null,
@@ -309,9 +310,10 @@ describe.skipIf(!server)('Billing', () => {
       { start: new Date(now - 27 * DAY), end: new Date(now + 3 * DAY) },
       { plan: 'starter', interval: 'monthly' },
     );
-    expect(await f.billing.sweep()).toEqual({ invoiced: 0, ended: 0, failed: 0 });
+    expect(await f.billing.sweep()).toEqual({ invoiced: 0, reminded: 0, ended: 0, failed: 0 });
     expect(await f.billing.sweep(new Date(now + 3 * DAY + 3_600_000))).toEqual({
       invoiced: 1,
+      reminded: 1,
       ended: 0,
       failed: 0,
     });
@@ -324,6 +326,62 @@ describe.skipIf(!server)('Billing', () => {
         .filter((event) => event.event_type === 'billing_subscription.changed')
         .map((event) => event.payload.reason),
     ).toEqual(['paid', 'lapsed', 'paid', 'ended']);
+  });
+
+  it('reminds the owner of an overdue period the day it ends, with three days left and with one (BIL-04, ADR-511)', async () => {
+    const now = Date.now();
+    const end = new Date(now - 3_600_000);
+    await f.subscribe(f.a, 'growth', 'monthly', { start: new Date(now - 31 * DAY), end });
+    expect((await f.billing.subscriptionOf(f.a.shopId)).freeAt).toEqual(
+      new Date(end.getTime() + 7 * DAY),
+    );
+    const sweep = (days: number) => f.billing.sweep(new Date(now + days * DAY));
+    expect(await sweep(0)).toEqual({ invoiced: 1, reminded: 1, ended: 0, failed: 0 });
+    expect(await sweep(0)).toMatchObject({ reminded: 0 });
+    expect(await sweep(2)).toMatchObject({ reminded: 0 });
+    expect(await sweep(4)).toMatchObject({ reminded: 1 });
+    expect(await sweep(4.5)).toMatchObject({ reminded: 0 });
+    expect(await sweep(6)).toMatchObject({ reminded: 1 });
+    expect(await sweep(6.5)).toMatchObject({ reminded: 0, ended: 0 });
+    const overdue = (await f.outbox()).filter(
+      (event) => event.event_type === 'billing_invoice.overdue',
+    );
+    const [invoice] = await f.billing.invoicesOf(f.a.shopId);
+    expect(overdue.map((event) => event.payload)).toEqual(
+      [7, 3, 1].map((daysLeft) => ({
+        number: invoice!.name,
+        plan: 'growth',
+        amount: invoice!.amount.toString(),
+        daysLeft,
+        freeAt: new Date(end.getTime() + 7 * DAY).toISOString(),
+      })),
+    );
+
+    // A worker that missed days sends one reminder for them all; paid, a new period starts the
+    // count again, and nothing is overdue.
+    await f.subscribe(f.b, 'starter', 'monthly', {
+      start: new Date(now - 35 * DAY),
+      end: new Date(now - 5 * DAY),
+    });
+    expect(await f.billing.sweep()).toEqual({ invoiced: 1, reminded: 1, ended: 0, failed: 0 });
+    expect(await f.billing.sweep()).toMatchObject({ reminded: 0 });
+    const [renewal] = await f.billing.invoicesOf(f.b.shopId);
+    const late = (await f.outbox()).filter(
+      (event) =>
+        event.event_type === 'billing_invoice.overdue' && event.aggregate_id === renewal!.id,
+    );
+    expect(late.map((event) => event.payload.daysLeft)).toEqual([2]);
+    const started = unwrap(await f.billing.pay(f.b, renewal!.id));
+    await f.billing.returned(publicId(renewal!.id), f.formOf(started.url));
+    expect(await f.billing.subscriptionOf(f.b.shopId)).toMatchObject({
+      pastDue: false,
+      freeAt: null,
+    });
+    const { rows } = await f.admin.query(
+      'SELECT overdue_reminders FROM billing.subscriptions WHERE shop_id = $1',
+      [f.b.shopId],
+    );
+    expect(rows[0].overdue_reminders).toBe(0);
   });
 
   it("pays an invoice from Hatti's webhook once, even one set aside meanwhile", async () => {
@@ -651,7 +709,7 @@ describe.skipIf(!server)('Billing', () => {
       openInvoice: { id: plan.id, status: 'open' },
     });
     // Renewals leave credit alone.
-    expect(await f.billing.sweep()).toEqual({ invoiced: 0, ended: 0, failed: 0 });
+    expect(await f.billing.sweep()).toEqual({ invoiced: 0, reminded: 0, ended: 0, failed: 0 });
     const events = await f.outbox();
     expect(events.map((event) => event.event_type)).toEqual([
       'billing_invoice.created',

@@ -1543,11 +1543,29 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       { shop: 'Zari Fashions', invoice: renewal!.name, plan: 'Starter', amount: 'Rs 2,499' },
     ];
     expect(await notices()).toEqual([low, due]);
+    // Its period ended unpaid: told the days left before it is on Free (ADR-511), once.
+    expect(await billing.sweep(new Date(now + 3 * DAY + 3_600_000))).toMatchObject({
+      reminded: 1,
+    });
+    await dispatch(2);
+    const overdue = [
+      'payment_overdue',
+      'whatsapp',
+      OWNER,
+      {
+        shop: 'Zari Fashions',
+        invoice: renewal!.name,
+        plan: 'Starter',
+        amount: 'Rs 2,499',
+        days: '7',
+      },
+    ];
+    expect(await notices()).toEqual([low, due, overdue]);
     // Unpaid a week past its end: on Free, and told so.
     expect(await billing.sweep(new Date(now + 11 * DAY))).toMatchObject({ ended: 1 });
     await dispatch(2);
     const ended = ['plan_ended', 'whatsapp', OWNER, { shop: 'Zari Fashions' }];
-    expect(await notices()).toEqual([low, due, ended]);
+    expect(await notices()).toEqual([low, due, overdue, ended]);
 
     // Hatti pays for them, never the shop's credit: they go even with it below nothing.
     await charge(21);
@@ -1557,12 +1575,22 @@ describe.skipIf(!server)("What a shop's customers are told about their orders", 
       providers: { whatsapp: whatsapp(), sms: sms() },
       charges: wallet,
     });
-    expect(await paying.sweep(soon())).toBe(3);
+    expect(await paying.sweep(soon())).toBe(4);
     expect(
       requests.map((request) => (request.body.template as { name: string }).name).sort(),
-    ).toEqual(['hatti_credit_low', 'hatti_invoice_due', 'hatti_plan_ended']);
+    ).toEqual([
+      'hatti_credit_low',
+      'hatti_invoice_due',
+      'hatti_payment_overdue',
+      'hatti_plan_ended',
+    ]);
     expect(await wallet.balanceOf(shopId)).toBe(-4_50n);
-    expect((await queued()).map((message) => message.status)).toEqual(['sent', 'sent', 'sent']);
+    expect((await queued()).map((message) => message.status)).toEqual([
+      'sent',
+      'sent',
+      'sent',
+      'sent',
+    ]);
   });
 
   it("emails the shop's owner of its bills too, at the email they proved, in their own language (ADR-195)", async () => {

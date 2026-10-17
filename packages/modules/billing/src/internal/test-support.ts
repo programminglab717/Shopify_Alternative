@@ -112,7 +112,8 @@ export async function billingFixture(server: string): Promise<BillingFixture> {
          ON CONFLICT (shop_id) DO UPDATE
             SET plan = EXCLUDED.plan, billing_interval = EXCLUDED.billing_interval,
                 period_start = EXCLUDED.period_start, period_end = EXCLUDED.period_end,
-                next_plan = EXCLUDED.next_plan, next_interval = EXCLUDED.next_interval`,
+                next_plan = EXCLUDED.next_plan, next_interval = EXCLUDED.next_interval,
+                overdue_reminders = 0`,
         [
           tenant.shopId,
           plan,

@@ -618,6 +618,11 @@ enum BillingPlanCode {
 
 """The plan the shop pays Hatti for; Free until it chooses another."""
 type BillingSubscription {
+  """
+  When an overdue shop is on Free unless its invoice is paid (BIL-04): its storefront stays open either way. Null when nothing is overdue.
+  """
+  freeAt: DateTime
+
   """Null on Free."""
   interval: BillingInterval
   nextInterval: BillingInterval
@@ -6471,6 +6476,11 @@ enum MessageKind {
   A parcel of theirs left with its courier: its tracking, and the order's page.
   """
   ORDER_SHIPPED
+
+  """
+  For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: its plan's period ended unpaid, with the days left before it is on Free; sent the day it ends, with three days left and with one (BIL-04, ADR-511).
+  """
+  PAYMENT_OVERDUE
 
   """
   For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: its plan ended, its invoice unpaid, and it is on Free (ADR-169, ADR-195).

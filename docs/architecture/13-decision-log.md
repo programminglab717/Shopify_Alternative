@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-510 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-511 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -518,6 +518,7 @@
 | 508 | Local support: each plan's way to reach Hatti's people, requests from the admin kept for them and answered with a command, and a help centre in English and Urdu | Accepted |
 | 509 | TCS, the third courier: bookings, tracking, cancellations and cities through its COD API, with the shop's own account and the city it ships from | Accepted |
 | 510 | Trax, the fourth courier: bookings by Trax's city IDs from the shop's pickup address, tracking, cancellations and cities through its merchant API | Accepted |
+| 511 | Humane dunning: an overdue period's owner reminded the day it ends, with three days left and with one, each once, and the admin saying by when, the store open throughout | Accepted |
 
 ---
 
@@ -19403,3 +19404,43 @@
     the booking flow has nowhere to ask. A shop wanting another mode books it in Trax's portal.
   * **Naming the city by text, as PostEx takes it:** Trax books by its own city IDs. Its list,
     kept a day, is also what ADR-233 matches parcels' cities against.
+
+## ADR-511 · Humane dunning: an overdue period's owner reminded the day it ends, with three days left and with one, each once, and the admin saying by when, the store open throughout
+
+* **Context:** A paid plan whose period ends unpaid stays a week, then the shop is on Free
+  (ADR-154), and its owner hears once the plan has ended (ADR-169). BIL-04 asks for a grace period
+  in which the storefront never goes dark abruptly. The week of grace existed, and Free keeps the
+  store open. But nothing told the owner during that week: the first word after the renewal's
+  invoice was that the plan had gone.
+* **Decision:**
+  * **Three reminders while a period is overdue:** the billing sweep reminds the owner on the day
+    the period ends, on the fourth day after (three days left) and on the sixth (one day left).
+    The days are `BILLING_LIMITS.overdueReminderDays`.
+    * Each is sent once. `billing.subscriptions.overdue_reminders` (migration 0241) counts those
+      the period has had. A paid invoice's new period, or Free, sets it back to none.
+    * A sweep that comes late, after a worker was down, sends one reminder for the days it
+      missed, never a burst.
+    * A reminder needs the renewal's open invoice. Free chosen for the period's end is no
+      overdue period and is not reminded.
+  * **`billing_invoice.overdue`** carries the invoice's name, the plan, the amount, the whole days
+    left before Free and when that is. The worker tells the owner on WhatsApp at the shop's
+    alerts number and by email, in their languages, at Hatti's cost, as for the other bills
+    (ADR-169, ADR-195). The new `payment_overdue` message says the days left and that the store
+    stays open either way. Its dedupe key is the invoice and the days left.
+  * **The admin's billing page says by when:** `BillingSubscription.freeAt` is the period's end
+    and the week of grace. The overdue banner reads "Pay its invoice by {date} to keep your plan;
+    after that your shop is on Free, and its store stays open either way."
+* **Consequences:**
+  * An owner who missed the renewal's invoice hears up to four times before the plan goes: the
+    invoice, then three reminders. The plan's end is never a surprise.
+  * The storefront stays open through it all. Lapsing to Free locks only what Free does not
+    include (ADR-263, ADR-264), as before.
+  * The WhatsApp template `hatti_payment_overdue` must be approved by Meta like the other bill
+    templates. Until then the email carries the reminder.
+* **Alternatives:**
+  * **A reminder every day of the week:** too many for an owner who means to pay on payday. Three
+    spaced ones say the same with less noise.
+  * **Retrying a card on file:** Hatti keeps no cards. Auto-debit by wallets (BIL-01's remainder)
+    would make reminders rarer, not unnecessary.
+  * **A longer grace:** a week matches how Pakistani merchants are paid and pay. The reminders
+    make the week enough, and paying after Free still brings the plan back (ADR-154).

@@ -1182,6 +1182,8 @@ export interface BillingData {
     interval: BillingInterval | null;
     periodEnd: string | null;
     pastDue: boolean;
+    /** When an overdue shop is on Free unless its invoice is paid (BIL-04). */
+    freeAt: string | null;
     nextPlan: { name: string } | null;
     openInvoice: BillingInvoiceValue | null;
   };

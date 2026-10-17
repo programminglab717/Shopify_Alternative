@@ -14,6 +14,7 @@ export {
   type CreditLowPayload,
   type InvoicePayload,
   type InvoiceTransferPayload,
+  type PaymentOverduePayload,
   type SubscriptionChangedPayload,
 } from '../internal/events.js';
 export {

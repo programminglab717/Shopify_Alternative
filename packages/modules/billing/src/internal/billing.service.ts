@@ -38,6 +38,7 @@ import {
   BillingEvents,
   type InvoicePayload,
   type InvoiceTransferPayload,
+  type PaymentOverduePayload,
   type SubscriptionChangedPayload,
 } from './events.js';
 import {
@@ -172,6 +173,8 @@ export interface SubscriptionRecord {
   periodEnd: Date | null;
   /** The period ended unpaid: the plan stays for a week, then the shop is on Free. */
   pastDue: boolean;
+  /** When an overdue shop is on Free unless its invoice is paid; null when nothing is overdue. */
+  freeAt: Date | null;
   /** A smaller plan, or Free, chosen to begin when the period ends. */
   nextPlan: Plan | null;
   nextInterval: BillingIntervalValue | null;
@@ -212,6 +215,7 @@ type SubscriptionRow = {
   period_end: string | Date | null;
   next_plan: PlanCode | null;
   next_interval: BillingIntervalValue | null;
+  overdue_reminders: number;
 };
 
 type InvoiceRow = {
@@ -912,10 +916,13 @@ export class BillingService extends PlanAllowance {
   /**
    * One round of renewals, for the worker: each paid plan whose period ends within a week has its
    * next period invoiced, once; a smaller plan chosen for later, once the period has ended. A
-   * period that ended with Free chosen next, or a week unpaid, leaves the shop on Free. What it
-   * did; a shop that failed is tried again next round.
+   * period that ended with Free chosen next, or a week unpaid, leaves the shop on Free; one that
+   * ended unpaid has its owner reminded the day it ends, with three days left and with one, each
+   * once (ADR-511). What it did; a shop that failed is tried again next round.
    */
-  async sweep(at: Date = new Date()): Promise<{ invoiced: number; ended: number; failed: number }> {
+  async sweep(
+    at: Date = new Date(),
+  ): Promise<{ invoiced: number; reminded: number; ended: number; failed: number }> {
     const horizon = new Date(at.getTime() + BILLING_LIMITS.renewalDays * DAY_MS);
     const { rows: due } = await this.db.system((tx) =>
       tx.execute<{ shop_id: string }>(sql`
@@ -924,9 +931,7 @@ export class BillingService extends PlanAllowance {
          ORDER BY period_end
          LIMIT 200`),
     );
-    let invoiced = 0;
-    let ended = 0;
-    let failed = 0;
+    const done = { invoiced: 0, reminded: 0, ended: 0, failed: 0 };
     for (const { shop_id: shopId } of due) {
       const outcome = await this.db
         .tenant(shopId, async (tx) => {
@@ -936,37 +941,94 @@ export class BillingService extends PlanAllowance {
           if (end <= at.getTime() && row.next_plan === 'free') {
             await voidOpenInvoices(tx, shopId);
             await this.#toFree(tx, shopId, 'ended');
-            return 'ended';
+            return 'ended' as const;
           }
           if (end + BILLING_LIMITS.graceDays * DAY_MS <= at.getTime()) {
             // Its renewal's invoice stays open: paying it later begins the plan again.
             await this.#toFree(tx, shopId, 'lapsed');
-            return 'ended';
+            return 'ended' as const;
           }
-          // A smaller plan chosen for later is invoiced once the period ends, so that paying it
-          // early never cuts short the plan paid for.
-          if (row.next_plan !== null && end > at.getTime()) return null;
-          const { rows: open } = await tx.execute<{ id: string }>(sql`
-          SELECT id FROM billing.invoices
-           WHERE shop_id = ${shopId} AND status = 'open' AND reason <> 'credits'`);
-          if (open.length > 0 || row.next_plan === 'free') return null;
-          const plan = (row.next_plan ?? row.plan) as Exclude<PlanCode, 'free'>;
-          const interval = row.next_interval ?? row.billing_interval!;
-          await insertInvoice(tx, shopId, {
-            reason: 'renewal',
-            plan,
-            interval,
-            price: PLANS[plan].prices[interval],
-            credit: 0n,
-          });
-          return 'invoiced';
+          const invoiced = await this.#renew(tx, shopId, row, end, at);
+          const reminded = end <= at.getTime() && (await this.#remind(tx, shopId, row, end, at));
+          return { invoiced, reminded };
         })
         .catch(() => 'failed' as const);
-      if (outcome === 'invoiced') invoiced++;
-      if (outcome === 'ended') ended++;
-      if (outcome === 'failed') failed++;
+      if (outcome === 'ended') done.ended++;
+      else if (outcome === 'failed') done.failed++;
+      else if (outcome) {
+        if (outcome.invoiced) done.invoiced++;
+        if (outcome.reminded) done.reminded++;
+      }
     }
-    return { invoiced, ended, failed };
+    return done;
+  }
+
+  /** Invoices the plan's next period, once, unless Free or a smaller plan waits. */
+  async #renew(
+    tx: Tx,
+    shopId: string,
+    row: SubscriptionRow,
+    end: number,
+    at: Date,
+  ): Promise<boolean> {
+    // A smaller plan chosen for later is invoiced once the period ends, so that paying it early
+    // never cuts short the plan paid for.
+    if (row.next_plan !== null && end > at.getTime()) return false;
+    const { rows: open } = await tx.execute<{ id: string }>(sql`
+      SELECT id FROM billing.invoices
+       WHERE shop_id = ${shopId} AND status = 'open' AND reason <> 'credits'`);
+    if (open.length > 0 || row.next_plan === 'free') return false;
+    const plan = (row.next_plan ?? row.plan) as Exclude<PlanCode, 'free'>;
+    const interval = row.next_interval ?? row.billing_interval!;
+    await insertInvoice(tx, shopId, {
+      reason: 'renewal',
+      plan,
+      interval,
+      price: PLANS[plan].prices[interval],
+      credit: 0n,
+    });
+    return true;
+  }
+
+  /**
+   * Reminds the owner of an overdue period's renewal (ADR-511), when one of the reminder days has
+   * come that the period has not had: one reminder however many came at once, as late as the
+   * worker was.
+   */
+  async #remind(
+    tx: Tx,
+    shopId: string,
+    row: SubscriptionRow,
+    end: number,
+    at: Date,
+  ): Promise<boolean> {
+    const past = Math.floor((at.getTime() - end) / DAY_MS);
+    const due = BILLING_LIMITS.overdueReminderDays.filter((day) => day <= past).length;
+    if (due <= Number(row.overdue_reminders)) return false;
+    const { rows } = await tx.execute<InvoiceRow>(sql`
+      SELECT ${INVOICE_COLUMNS} FROM billing.invoices
+       WHERE shop_id = ${shopId} AND status = 'open' AND reason = 'renewal'
+       ORDER BY created_at DESC
+       LIMIT 1`);
+    if (!rows[0]) return false;
+    const invoice = toInvoiceRecord(rows[0]);
+    await tx.execute(sql`
+      UPDATE billing.subscriptions SET overdue_reminders = ${due}, updated_at = now()
+       WHERE shop_id = ${shopId}`);
+    const freeAt = end + BILLING_LIMITS.graceDays * DAY_MS;
+    await appendEvent<PaymentOverduePayload>(tx, shopId, {
+      type: BillingEvents.PaymentOverdue,
+      aggregateType: 'billing_invoice',
+      aggregateId: invoice.id,
+      payload: {
+        number: invoice.name,
+        plan: invoice.plan?.code ?? row.plan,
+        amount: invoice.amount.toString(),
+        daysLeft: Math.max(1, Math.ceil((freeAt - at.getTime()) / DAY_MS)),
+        freeAt: new Date(freeAt).toISOString(),
+      },
+    });
+    return true;
   }
 
   /**
@@ -1043,7 +1105,7 @@ export class BillingService extends PlanAllowance {
       ON CONFLICT (shop_id) DO UPDATE
          SET plan = EXCLUDED.plan, billing_interval = EXCLUDED.billing_interval,
              period_start = EXCLUDED.period_start, period_end = EXCLUDED.period_end,
-             next_plan = NULL, next_interval = NULL,
+             next_plan = NULL, next_interval = NULL, overdue_reminders = 0,
              version = billing.subscriptions.version + 1, updated_at = now()`);
     await paid();
     await appendEvent<SubscriptionChangedPayload>(tx, shopId, {
@@ -1093,7 +1155,8 @@ export class BillingService extends PlanAllowance {
     await tx.execute(sql`
       UPDATE billing.subscriptions
          SET plan = 'free', billing_interval = NULL, period_start = NULL, period_end = NULL,
-             next_plan = NULL, next_interval = NULL, version = version + 1, updated_at = now()
+             next_plan = NULL, next_interval = NULL, overdue_reminders = 0,
+             version = version + 1, updated_at = now()
        WHERE shop_id = ${shopId}`);
     await appendEvent<SubscriptionChangedPayload>(tx, shopId, {
       type: BillingEvents.SubscriptionChanged,
@@ -1115,6 +1178,10 @@ export class BillingService extends PlanAllowance {
       periodStart: row?.period_start ? toDate(row.period_start) : null,
       periodEnd,
       pastDue: periodEnd !== null && periodEnd.getTime() <= Date.now(),
+      freeAt:
+        periodEnd !== null && periodEnd.getTime() <= Date.now() && row?.next_plan !== 'free'
+          ? new Date(periodEnd.getTime() + BILLING_LIMITS.graceDays * DAY_MS)
+          : null,
       nextPlan: row?.next_plan ? PLANS[row.next_plan] : null,
       nextInterval: row?.next_interval ?? null,
       openInvoice: open[0] ? toInvoiceRecord(open[0]) : null,
@@ -1242,7 +1309,8 @@ async function subscriptionIn(
   lock: boolean,
 ): Promise<SubscriptionRow | null> {
   const { rows } = await tx.execute<SubscriptionRow>(sql`
-    SELECT plan, billing_interval, period_start, period_end, next_plan, next_interval
+    SELECT plan, billing_interval, period_start, period_end, next_plan, next_interval,
+           overdue_reminders
       FROM billing.subscriptions
      WHERE shop_id = ${shopId}
      ${lock ? sql`FOR UPDATE` : sql``}`);

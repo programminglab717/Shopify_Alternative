@@ -393,6 +393,15 @@ describe("Messages' words", () => {
     ]);
     expect(messageText('invoice_due', 'ur', due)).toContain('HT-1042');
     expect(templateParameters('plan_ended', { shop: 'Zari Fashions' })).toEqual(['Zari Fashions']);
+    expect(
+      templateParameters('payment_overdue', {
+        shop: 'Zari Fashions',
+        invoice: 'HT-000102',
+        plan: 'Growth',
+        amount: 'Rs 5,999',
+        days: '3',
+      }),
+    ).toEqual(['Zari Fashions', 'HT-000102', 'Growth', 'Rs 5,999', '3']);
     const low = { shop: 'Zari Fashions', balance: 'Rs 95.76' };
     expect(messageText('credit_low', 'en', low)).toBe(
       "Hatti: Zari Fashions's message credit is down to Rs 95.76. Messages to customers wait " +
@@ -518,6 +527,7 @@ describe("Messages' words", () => {
     // Never from the shop's credit, which may be what the notice is about; always sent.
     expect(MESSAGE_KINDS.filter((kind) => !paidByShop(kind))).toEqual([
       'invoice_due',
+      'payment_overdue',
       'plan_ended',
       'credit_low',
       'transfer_confirmed',
@@ -554,6 +564,7 @@ describe("Messages' words", () => {
       // What the customer bought: the card's code (ADR-451).
       'gift_card',
       'invoice_due',
+      'payment_overdue',
       'plan_ended',
       'credit_low',
       'transfer_confirmed',
@@ -702,6 +713,7 @@ describe("Messages' words", () => {
       'order_payment_reminder',
       'order_confirmation_reminder',
       'invoice_due',
+      'payment_overdue',
       'plan_ended',
       'credit_low',
       'transfer_confirmed',

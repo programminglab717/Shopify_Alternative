@@ -42,6 +42,7 @@ export enum MessageKind {
   ORDER_MENTIONED = 'ORDER_MENTIONED',
   ORDER_RECEIPT_SENT = 'ORDER_RECEIPT_SENT',
   INVOICE_DUE = 'INVOICE_DUE',
+  PAYMENT_OVERDUE = 'PAYMENT_OVERDUE',
   PLAN_ENDED = 'PLAN_ENDED',
   CREDIT_LOW = 'CREDIT_LOW',
   TRANSFER_CONFIRMED = 'TRANSFER_CONFIRMED',
@@ -210,6 +211,12 @@ registerEnumType(MessageKind, {
       description:
         "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
         "its plan's next period is invoiced and waits for payment (ADR-169, ADR-195).",
+    },
+    PAYMENT_OVERDUE: {
+      description:
+        "For the shop, from Hatti and paid by Hatti, at its alerts number and its owner's email: " +
+        "its plan's period ended unpaid, with the days left before it is on Free; sent the day " +
+        'it ends, with three days left and with one (BIL-04, ADR-511).',
     },
     PLAN_ENDED: {
       description:

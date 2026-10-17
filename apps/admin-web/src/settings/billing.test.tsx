@@ -77,7 +77,11 @@ const entry = (
 /** The core's billing for a shop on Free, as each mutation leaves it; and its credit's changes. */
 function billingCore(
   role: 'owner' | 'manager',
-  state: { open: BillingInvoiceValue | null; entries?: BillingWalletEntryValue[] },
+  state: {
+    open: BillingInvoiceValue | null;
+    entries?: BillingWalletEntryValue[];
+    subscription?: object;
+  },
   confirmed = { value: true },
 ) {
   return fakeCore(
@@ -91,8 +95,10 @@ function billingCore(
               interval: null,
               periodEnd: null,
               pastDue: false,
+              freeAt: null,
               nextPlan: null,
               openInvoice: state.open,
+              ...state.subscription,
             },
             billingPlans: [FREE, GROWTH],
             billingWallet: { balance: rupees('120.50'), openInvoice: null },
@@ -275,6 +281,28 @@ describe('Plan and billing in the admin', () => {
 
     await screen.findByText('Nothing yet: credit bought and the messages it pays for show here.');
     expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
+  });
+
+  it('says by when an overdue invoice keeps the plan, and that the store stays open (BIL-04)', async () => {
+    signedIn();
+    const core = billingCore('owner', {
+      open: invoice(),
+      subscription: {
+        plan: GROWTH,
+        interval: 'MONTHLY',
+        periodEnd: '2026-10-16T19:00:00Z',
+        pastDue: true,
+        freeAt: '2026-10-23T19:00:00Z',
+      },
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/billing');
+
+    expect(
+      await screen.findByText(
+        /Pay its invoice by 24 Oct 2026 to keep your plan; after that your shop is on Free, and its store stays open either way\./,
+      ),
+    ).toBeTruthy();
   });
 
   it('shows a manager the plan and invoices, which the owner alone changes and pays', async () => {

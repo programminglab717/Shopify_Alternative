@@ -471,7 +471,13 @@ export function BillingPage() {
       </h1>
       {panel}
       <FormSection title={t('billing.yourPlanTitle', { plan: subscription.plan.name })}>
-        {subscription.pastDue && <Alert tone="danger">{t('billing.pastDue')}</Alert>}
+        {subscription.pastDue && (
+          <Alert tone="danger">
+            {subscription.freeAt
+              ? t('billing.pastDueUntil', { date: date(subscription.freeAt) })
+              : t('billing.pastDue')}
+          </Alert>
+        )}
         {subscription.periodEnd && (
           <p>
             {t(

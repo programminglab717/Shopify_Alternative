@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Humane dunning
+
+* **An overdue period's owner is reminded the day it ends, with three days left and with one,
+  and the admin says by when the invoice keeps the plan; the store stays open throughout**
+  ([ADR-511](../architecture/13-decision-log.md#adr-511--humane-dunning-an-overdue-periods-owner-reminded-the-day-it-ends-with-three-days-left-and-with-one-each-once-and-the-admin-saying-by-when-the-store-open-throughout), BIL-04).
+* 3185 tests, 2 more: reminders in billing and the admin's banner; the
+  worker's bills test now follows a reminder to the owner.
+
 ### fd3b66a · Trax
 
 * **Shops book, track and cancel Trax parcels from Hatti with their own Trax account: the four

@@ -81,6 +81,8 @@ export const BILLING_LIMITS = {
   renewalDays: 7,
   /** A plan whose period ended unpaid stays this many days before the shop is on Free. */
   graceDays: 7,
+  /** Days after the period's end that its owner is reminded, while it is unpaid (ADR-511). */
+  overdueReminderDays: [0, 4, 6],
   /** A payment's page is offered again for this long, rather than a new one started. */
   reuseMinutes: 30,
   /** Payments an invoice starts at most, those the gateway refused included. */

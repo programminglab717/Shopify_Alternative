@@ -298,6 +298,14 @@ export class BillingSubscription {
   })
   pastDue!: boolean;
 
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description:
+      'When an overdue shop is on Free unless its invoice is paid (BIL-04): its storefront stays ' +
+      'open either way. Null when nothing is overdue.',
+  })
+  freeAt!: Date | null;
+
   @Field(() => BillingPlan, {
     nullable: true,
     description: 'A smaller plan, or Free, chosen to begin when the period ends.',

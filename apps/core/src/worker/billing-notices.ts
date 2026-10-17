@@ -6,6 +6,7 @@ import {
   type CreditLowPayload,
   type InvoicePayload,
   type InvoiceTransferPayload,
+  type PaymentOverduePayload,
   type Plan,
   type PlanCode,
   type SubscriptionChangedPayload,
@@ -18,7 +19,8 @@ import { tellShop } from './shop-notices.js';
 
 /**
  * Tells a shop of its bills with Hatti (BIL-01, BIL-03, ADR-169), as billing's events are heard:
- * its plan's next period invoiced, its plan ended unpaid, its message credit fallen below Rs 100,
+ * its plan's next period invoiced, its period overdue with the days left (BIL-04, ADR-511), its
+ * plan ended unpaid, its message credit fallen below Rs 100,
  * and what Hatti's people found of a transfer it said it made (ADR-254): one that paid its
  * invoice, or one not found, and why. On WhatsApp at the shop's alerts number, in the shop's language, where it gives one; and
  * by email to its owner, at the address their account proved, in their own language (ADR-195),
@@ -28,6 +30,7 @@ export class BillingNotices {
   /** The events {@link handle} reads. */
   static readonly EVENTS: readonly string[] = [
     BillingEvents.InvoiceCreated,
+    BillingEvents.PaymentOverdue,
     BillingEvents.SubscriptionChanged,
     BillingEvents.CreditLow,
     BillingEvents.InvoiceTransferConfirmed,
@@ -73,6 +76,22 @@ function noticeOf(event: DomainEvent): Notice | null {
         kind: 'invoice_due',
         dedupeKey: `invoice_due:${event.aggregateId}`,
         variables: { invoice: invoice.number, plan: plan.name, amount: rupees(invoice.amount) },
+      };
+    }
+    case BillingEvents.PaymentOverdue: {
+      const overdue = event.payload as Partial<PaymentOverduePayload>;
+      const plan: Plan | undefined = PLANS[overdue.plan as PlanCode];
+      if (!plan || !overdue.number || !overdue.amount || !overdue.daysLeft) return null;
+      return {
+        kind: 'payment_overdue',
+        // Each reminder once: the period's invoice and the days left say which.
+        dedupeKey: `payment_overdue:${event.aggregateId}:${overdue.daysLeft}`,
+        variables: {
+          invoice: overdue.number,
+          plan: plan.name,
+          amount: rupees(overdue.amount),
+          days: String(overdue.daysLeft),
+        },
       };
     }
     case BillingEvents.SubscriptionChanged: {
