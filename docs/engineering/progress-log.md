@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Support on WhatsApp
+### 4c35ed2 · Support on WhatsApp
 
 * **What a shop's staff write to Hatti's support WhatsApp number is kept as a request of their
   shop, threaded, and Hatti's answer goes back on WhatsApp within the day** ([ADR-560](../architecture/13-decision-log.md#adr-560--what-a-shops-staff-write-to-hattis-support-whatsapp-number-is-kept-as-a-request-of-their-shop-threaded-and-hattis-answer-goes-back-on-whatsapp-within-the-day), BIL-05).
