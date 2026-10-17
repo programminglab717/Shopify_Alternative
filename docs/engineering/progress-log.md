@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Requests for access
+### 65a6cf8 · Requests for access
 
 * **Agencies and freelancers ask a shop for access by its address, for a role and 1 to 90
   days; its owner, emailed of it, approves or declines it on the staff page, and the access
