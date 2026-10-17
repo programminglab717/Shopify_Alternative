@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Products from a WooCommerce export
+
+* **productsImport reads WooCommerce's product CSV, its variable products' variations the
+  variants, as Shopify's file would make them; the admin's import card asks where the file is
+  from** ([ADR-482](../architecture/13-decision-log.md#adr-482--products-from-a-woocommerce-export-productsimport-reads-woocommerces-product-csv-its-variable-products-variations-the-variants-as-shopifys-file-would-make-them), ONB-06 in part).
+* 3018 tests, 6 more: the reader, the import through the catalog
+  and the Admin API, and the admin's card.
+
 ### bf961db · A commerce lexicon for search
 
 * **A storefront's search finds what a word means in English, Roman Urdu or Urdu, "juta" the

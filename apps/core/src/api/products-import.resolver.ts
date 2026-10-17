@@ -1,13 +1,49 @@
 import { CurrentTenant, RequireScopes, UserError, type TenantContext } from '@hatti/api';
 import { ProductImportService, type ImportedStock } from '@hatti/catalog/public';
 import { InventoryService, LocationService } from '@hatti/inventory/public';
-import { Args, Field, Int, Mutation, ObjectType, Resolver } from '@nestjs/graphql';
+import {
+  Args,
+  Field,
+  Int,
+  Mutation,
+  ObjectType,
+  Resolver,
+  registerEnumType,
+} from '@nestjs/graphql';
 
 /** Variants given their stock in one change, as `inventorySetQuantities` takes them. */
 const STOCK_BATCH = 250;
 
-/** Where stock set by an import says it came from, in the stock history. */
-const IMPORT_REFERENCE = 'hatti://imports/shopify-products';
+/** Whose product export a file is (ADR-482). */
+export enum ProductImportFormat {
+  SHOPIFY = 'shopify',
+  WOOCOMMERCE = 'woocommerce',
+}
+
+registerEnumType(ProductImportFormat, {
+  name: 'ProductImportFormat',
+  description: "Whose product export an import's file is.",
+  valuesMap: {
+    SHOPIFY: { description: "Shopify's product CSV, rows grouped by Handle (ONB-05)." },
+    WOOCOMMERCE: {
+      description:
+        "WooCommerce's product CSV, as Products > Export writes it: a row for each simple or " +
+        'variable product, and one for each variation naming its product in Parent (ONB-06).',
+    },
+  },
+});
+
+/** Where stock set by an import says it came from, in the stock history, and its column. */
+const IMPORTED: Record<ProductImportFormat, { reference: string; column: string }> = {
+  [ProductImportFormat.SHOPIFY]: {
+    reference: 'hatti://imports/shopify-products',
+    column: 'Variant Inventory Qty',
+  },
+  [ProductImportFormat.WOOCOMMERCE]: {
+    reference: 'hatti://imports/woocommerce-products',
+    column: 'Stock',
+  },
+};
 
 @ObjectType({ description: "A row of an import's file that did not go in as it was, and why." })
 export class ProductImportRowError {
@@ -52,7 +88,7 @@ export class ProductsImportPayload {
   skipped!: number;
 
   @Field(() => Int, {
-    description: 'Variants given the stock Shopify tracked for them, at the primary location.',
+    description: 'Variants given the stock the file tracked for them, at the primary location.',
   })
   stocked!: number;
 
@@ -70,9 +106,9 @@ export class ProductsImportPayload {
 }
 
 /**
- * Products from a Shopify store's product export (ONB-05). The catalog makes the products and
- * their images; the core then gives them the stock Shopify tracked, through the inventory module,
- * which the catalog cannot reach.
+ * Products from a Shopify store's product export (ONB-05), or a WooCommerce store's (ONB-06,
+ * ADR-482). The catalog makes the products and their images; the core then gives them the stock
+ * the file tracked, through the inventory module, which the catalog cannot reach.
  */
 @Resolver()
 export class ProductsImportResolver {
@@ -84,9 +120,10 @@ export class ProductsImportResolver {
 
   @Mutation(() => ProductsImportPayload, {
     description:
-      'Imports products from a Shopify product export, as CSV: rows grouped by Handle into ' +
+      'Imports products from a Shopify product export, as CSV, or with format WOOCOMMERCE from a ' +
+      "WooCommerce one, made as Shopify's file would make them: rows grouped by Handle into " +
       'products with their options, variants, prices, SKUs, weights, tags, status and images ' +
-      '(by address, https only), each keeping its handle, and the stock Shopify tracked at the ' +
+      '(by address, https only), each keeping its handle, and the stock the store tracked at the ' +
       'primary location. Products whose handles the shop has are left as they are, or with ' +
       "overwrite updated from the file: their fields from the file's columns, a blank cell " +
       'clearing an optional one; their variants matched by option values, new combinations ' +
@@ -105,10 +142,18 @@ export class ProductsImportResolver {
         'options must be the same. Default false.',
     })
     overwrite?: boolean,
+    @Args('format', {
+      type: () => ProductImportFormat,
+      nullable: true,
+      description: 'Whose export the file is. Default SHOPIFY.',
+    })
+    format?: ProductImportFormat,
   ): Promise<ProductsImportPayload> {
+    const from = format ?? ProductImportFormat.SHOPIFY;
     const result = await this.imports.import(tenant, csv, {
       dryRun: dryRun ?? false,
       overwrite: overwrite ?? false,
+      format: from,
     });
     if (!result.ok) {
       return Object.assign(new ProductsImportPayload(), {
@@ -126,7 +171,7 @@ export class ProductsImportResolver {
       });
     }
     const { stock, rowErrors, rowErrorCount, ...counts } = result.value;
-    const stockErrors = await this.#stock(tenant, stock);
+    const stockErrors = await this.#stock(tenant, stock, IMPORTED[from]);
     const errors = [...rowErrors, ...stockErrors].sort((a, b) => a.row - b.row);
     return Object.assign(new ProductsImportPayload(), {
       ...counts,
@@ -140,12 +185,13 @@ export class ProductsImportResolver {
   }
 
   /**
-   * Sets the stock Shopify tracked, on hand at the primary location, a batch at a time; and
-   * keeps selling what Shopify sold when out of stock. What could not be set, by its row.
+   * Sets the stock the file tracked, on hand at the primary location, a batch at a time; and
+   * keeps selling what the store sold when out of stock. What could not be set, by its row.
    */
   async #stock(
     tenant: TenantContext,
     stock: ImportedStock[],
+    imported: { reference: string; column: string },
   ): Promise<{ row: number; column: string; message: string }[]> {
     if (stock.length === 0) return [];
     const location = await this.locations.primary(tenant);
@@ -155,7 +201,7 @@ export class ProductsImportResolver {
       const set = await this.inventory.setQuantities(tenant, {
         name: 'on_hand',
         reason: 'correction',
-        referenceDocumentUri: IMPORT_REFERENCE,
+        referenceDocumentUri: imported.reference,
         quantities: batch.map((entry) => ({
           inventoryItemId: entry.variantId,
           locationId: location.id,
@@ -165,7 +211,7 @@ export class ProductsImportResolver {
       if (!set.ok) {
         const message = set.errors[0]?.message ?? 'Stock could not be set';
         errors.push(
-          ...batch.map((entry) => ({ row: entry.row, column: 'Variant Inventory Qty', message })),
+          ...batch.map((entry) => ({ row: entry.row, column: imported.column, message })),
         );
         continue;
       }

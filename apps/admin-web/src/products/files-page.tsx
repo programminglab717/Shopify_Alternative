@@ -72,8 +72,12 @@ function useChosenFile(onChosen: (file: { name: string; csv: string }) => void) 
   return { input, onChange, choose: () => input.current?.click() };
 }
 
+/** Whose product export a file is (ADR-482). */
+type ImportFormat = 'SHOPIFY' | 'WOOCOMMERCE';
+
 /**
- * Products from Shopify's product CSV (ONB-05, CAT-05): checked first, saying what it would make,
+ * Products from Shopify's or WooCommerce's product CSV (ONB-05, ONB-06, CAT-05): checked first,
+ * saying what it would make,
  * update and leave and what it could not read; then taken in at a tap. Products the shop has
  * already are left as they are unless staff ask to update them from the file.
  */
@@ -81,33 +85,52 @@ function ImportProducts() {
   const { t } = useLocale();
   const run = useAdminMutation<
     ProductsImportData,
-    { csv: string; dryRun: boolean; overwrite: boolean }
+    { csv: string; dryRun: boolean; overwrite: boolean; format: ImportFormat }
   >(ProductsImportMutation);
   const { problem, attempt } = useAttempt();
   const [overwrite, setOverwrite] = useState(false);
+  const [format, setFormat] = useState<ImportFormat>('SHOPIFY');
   const [file, setFile] = useState<{ name: string; csv: string } | null>(null);
   const [checked, setChecked] = useState<ProductsImportResult | null>(null);
   const [done, setDone] = useState<ProductsImportResult | null>(null);
 
-  const send = async (csv: string, dryRun: boolean, update: boolean) => {
+  const send = async (csv: string, dryRun: boolean, update: boolean, from = format) => {
     const answer: { value?: ProductsImportResult } = {};
     const ok = await attempt(async () => {
-      answer.value = (await run.mutateAsync({ csv, dryRun, overwrite: update })).productsImport;
+      answer.value = (
+        await run.mutateAsync({ csv, dryRun, overwrite: update, format: from })
+      ).productsImport;
       return answer.value;
     });
     return ok ? answer.value! : null;
   };
 
-  const check = async (chosen: { name: string; csv: string }, update: boolean) => {
+  const check = async (
+    chosen: { name: string; csv: string },
+    update: boolean,
+    from: ImportFormat = format,
+  ) => {
     setDone(null);
     setChecked(null);
     setFile(chosen);
-    setChecked(await send(chosen.csv, true, update));
+    setChecked(await send(chosen.csv, true, update, from));
   };
   const picker = useChosenFile((chosen) => void check(chosen, overwrite));
 
   return (
     <FormSection title={t('files.importProducts')} hint={t('files.importProductsHint')}>
+      <SelectField<ImportFormat>
+        label={t('files.importFrom')}
+        value={format}
+        options={[
+          { value: 'SHOPIFY', label: t('files.fromShopify') },
+          { value: 'WOOCOMMERCE', label: t('files.fromWooCommerce') },
+        ]}
+        onChange={(next) => {
+          setFormat(next);
+          if (file && !done) void check(file, overwrite, next);
+        }}
+      />
       <CheckField
         label={t('files.overwrite')}
         hint={t('files.overwriteHint')}

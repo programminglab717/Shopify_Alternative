@@ -6081,10 +6081,15 @@ export const ProductsExportQuery = /* GraphQL */ `
   }
 `;
 
-/** Products from Shopify's product CSV, checked first in a dry run. */
+/** Products from Shopify's or WooCommerce's product CSV, checked first in a dry run. */
 export const ProductsImportMutation = /* GraphQL */ `
-  mutation ProductsImport($csv: String!, $dryRun: Boolean, $overwrite: Boolean) {
-    productsImport(csv: $csv, dryRun: $dryRun, overwrite: $overwrite) {
+  mutation ProductsImport(
+    $csv: String!
+    $dryRun: Boolean
+    $overwrite: Boolean
+    $format: ProductImportFormat
+  ) {
+    productsImport(csv: $csv, dryRun: $dryRun, overwrite: $overwrite, format: $format) {
       dryRun
       rows
       created

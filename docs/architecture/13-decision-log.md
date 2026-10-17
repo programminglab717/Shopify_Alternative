@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-481 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-482 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -489,6 +489,7 @@
 | 479 | A collection's page is put in the order a shopper asks for, by Shopify's sort_by, and the search page's products are filtered and ordered as a collection's are | Accepted |
 | 480 | Frequently bought together: the products a shop's customers bought in the same orders, recommended as complementary where the shop paired none with a product | Accepted |
 | 481 | A commerce lexicon: a storefront's search finds what a word means in English, Roman Urdu or Urdu, "juta" the shop's shoes, after what holds the word as typed | Accepted |
+| 482 | Products from a WooCommerce export: productsImport reads WooCommerce's product CSV, its variable products' variations the variants, as Shopify's file would make them | Accepted |
 
 ---
 
@@ -18195,3 +18196,37 @@
   * **Translating the shopper's words with AI:** a call per search, and its answers vary.
   * **Synonyms in the search text kept with each product:** every product rewritten whenever the
     lexicon grows.
+
+## ADR-482 · Products from a WooCommerce export: productsImport reads WooCommerce's product CSV, its variable products' variations the variants, as Shopify's file would make them
+
+* **Context:**
+  * ONB-06 asks for importers from WooCommerce, Daraz and spreadsheets. Many Pakistani shops
+    moving to Hatti run WooCommerce. ADR-120 imports Shopify's product CSV; ADR-130 updates
+    products from it.
+  * WooCommerce's exporter (Products > Export) writes a row for each simple or variable product
+    and a row for each variation, naming its product in Parent by ID or SKU. Variations carry
+    their attributes' values, prices, SKUs and stock.
+* **Decision:**
+  * **The catalog reads WooCommerce's file into what Shopify's file would have made**
+    (`readWooCommerceProducts`), so the import (ADR-120), its updates (ADR-130), images by
+    address and stock go on as they do for Shopify's.
+    * Simple products have one variant; variable products a variant for each variation, their
+      options the attributes the variations name, at most three. A variation for any value of
+      an attribute is left out, said by its row: Hatti's variants have values.
+    * The price is the sale price, the regular price the price compared at; else the regular
+      price. Weight in kg, g, lbs or oz becomes grams. Tax status none is untaxed.
+    * The first category's last part is the product type; the others and the tags its tags.
+      Published is on sale; drafts and private products are drafts. A handle is made from the
+      name, `-2` and on where names repeat.
+    * Stock is set where WooCommerce managed it; backorders allowed sells on at nothing.
+    * Grouped and external products, and variations without their product, are said by row and
+      left out.
+  * **`productsImport` takes `format: WOOCOMMERCE`** (SHOPIFY by default); stock it sets says
+    it came from WooCommerce's export in the stock history.
+  * **The admin's import card** asks where the file is from.
+* **Consequences:**
+  * Daraz's seller exports, and the spreadsheet templates, are later parts of ONB-06.
+  * WooCommerce's attributes that no variation varies by are left; they are not options.
+* **Alternatives:**
+  * **WooCommerce's REST API with the shop's keys:** a connection for a one-time move, and the
+    file is what the shop already knows how to make.

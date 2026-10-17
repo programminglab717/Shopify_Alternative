@@ -2502,7 +2502,10 @@ const en = {
   'files.countByFile': 'Count by file',
   'files.importProducts': 'Import products',
   'files.importProductsHint':
-    "From Shopify's product export, as CSV: products with their options, variants, prices, SKUs, tags, images by address and stock. We check the file first and say what it would do.",
+    "From Shopify's or WooCommerce's product export, as CSV: products with their options, variants, prices, SKUs, tags, images by address and stock. We check the file first and say what it would do.",
+  'files.importFrom': 'The file is from',
+  'files.fromShopify': "Shopify's product export",
+  'files.fromWooCommerce': "WooCommerce's product export (Products > Export)",
   'files.overwrite': 'Update products I have already',
   'files.overwriteHint':
     'Products whose handles you have are updated from the file, their options the same; otherwise they are left as they are.',
@@ -6600,7 +6603,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'files.countByFile': 'فائل سے گنتی',
   'files.importProducts': 'پروڈکٹس امپورٹ کریں',
   'files.importProductsHint':
-    'شاپیفائی کے پروڈکٹ ایکسپورٹ سے، CSV میں: پروڈکٹس اپنے آپشنز، اقسام، قیمتوں، SKU، ٹیگز، ایڈریس سے تصاویر اور اسٹاک کے ساتھ۔ ہم پہلے فائل جانچ کر بتاتے ہیں کہ یہ کیا کرے گی۔',
+    'شاپیفائی یا ووکامرس کے پروڈکٹ ایکسپورٹ سے، CSV میں: پروڈکٹس اپنے آپشنز، اقسام، قیمتوں، SKU، ٹیگز، ایڈریس سے تصاویر اور اسٹاک کے ساتھ۔ ہم پہلے فائل جانچ کر بتاتے ہیں کہ یہ کیا کرے گی۔',
+  'files.importFrom': 'فائل کہاں سے ہے',
+  'files.fromShopify': 'شاپیفائی کا پروڈکٹ ایکسپورٹ',
+  'files.fromWooCommerce': 'ووکامرس کا پروڈکٹ ایکسپورٹ (Products > Export)',
   'files.overwrite': 'میرے پاس پہلے سے موجود پروڈکٹس اپ ڈیٹ کریں',
   'files.overwriteHint':
     'جن پروڈکٹس کے ہینڈل آپ کے پاس ہیں وہ فائل سے اپ ڈیٹ ہوتے ہیں، ان کے آپشنز وہی رہیں؛ ورنہ ویسے ہی چھوڑ دیے جاتے ہیں۔',

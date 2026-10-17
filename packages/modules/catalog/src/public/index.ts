@@ -66,6 +66,7 @@ export { CopiedVariantStock, type VariantCopy } from '../internal/product-copy.j
 export {
   ProductImportService,
   type ImportedStock,
+  type ProductImportFormat,
   type ProductImportResult,
 } from '../internal/product-import.service.js';
 export {

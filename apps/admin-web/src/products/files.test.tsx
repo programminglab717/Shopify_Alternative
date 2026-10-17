@@ -107,10 +107,30 @@ describe('Products and stock by file', () => {
       ),
     ).toBeTruthy();
     expect(sentOf(fake, 'ProductsImport')).toEqual([
-      { csv: PRODUCTS, dryRun: true, overwrite: false },
-      { csv: PRODUCTS, dryRun: true, overwrite: true },
-      { csv: PRODUCTS, dryRun: false, overwrite: true },
+      { csv: PRODUCTS, dryRun: true, overwrite: false, format: 'SHOPIFY' },
+      { csv: PRODUCTS, dryRun: true, overwrite: true, format: 'SHOPIFY' },
+      { csv: PRODUCTS, dryRun: false, overwrite: true, format: 'SHOPIFY' },
     ]);
+  });
+
+  it("checks a WooCommerce export as WooCommerce's when told the file is from it (ADR-482)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/products');
+
+    fireEvent.click(await screen.findByRole('link', { name: 'Import and export' }));
+    await choose('Products file', 'wc-product-export.csv', PRODUCTS);
+    await screen.findByText(/wc-product-export\.csv, rows: 6\./);
+    fireEvent.change(screen.getByLabelText('The file is from'), {
+      target: { value: 'WOOCOMMERCE' },
+    });
+    await waitFor(() => expect(sentOf(fake, 'ProductsImport')).toHaveLength(2));
+    expect(sentOf(fake, 'ProductsImport')[1]).toEqual({
+      csv: PRODUCTS,
+      dryRun: true,
+      overwrite: false,
+      format: 'WOOCOMMERCE',
+    });
   });
 
   it("downloads products a search finds, and one location's stock, then counts a filled-in file", async () => {

@@ -22,6 +22,14 @@ const IMPORT = `mutation ($csv: String!, $dryRun: Boolean, $overwrite: Boolean) 
   }
 }`;
 
+const IMPORT_FROM = `mutation ($csv: String!, $format: ProductImportFormat) {
+  productsImport(csv: $csv, format: $format) {
+    rows created variants stocked rowErrorCount
+    rowErrors { row column message }
+    userErrors { field code message }
+  }
+}`;
+
 /** Two products as Shopify exports them: a kurta in two sizes, stock tracked, and a mug. */
 const CSV = [
   'Handle,Title,Body (HTML),Vendor,Type,Tags,Published,Option1 Name,Option1 Value,' +
@@ -265,6 +273,59 @@ describe.skipIf(!server)('Admin GraphQL API: products from a Shopify export', ()
         ],
       },
     ]);
+  });
+
+  it('makes products from a WooCommerce export with format WOOCOMMERCE (ADR-482)', async () => {
+    const woo = [
+      'ID,Type,SKU,Name,Published,Description,Stock,Backorders allowed?,Regular price,' +
+        'Sale price,Categories,Parent,Attribute 1 name,Attribute 1 value(s)',
+      '90,variable,SHAWL,Pashmina Shawl,1,<p>Warm.</p>,,,,,Winter > Shawls,,Colour,"Grey, Rust"',
+      '91,variation,SHAWL-G,Pashmina Shawl - Grey,1,,4,0,6500,5900,,id:90,Colour,Grey',
+      '92,variation,SHAWL-R,Pashmina Shawl - Rust,1,,0,notify,6500,,,id:90,Colour,Rust',
+    ].join('\r\n');
+    const imported = await gql(tokens.other, IMPORT_FROM, { csv: woo, format: 'WOOCOMMERCE' });
+    expect(imported.data?.productsImport).toMatchObject({
+      rows: 3,
+      created: 1,
+      variants: 2,
+      stocked: 2,
+      rowErrorCount: 0,
+      userErrors: [],
+    });
+    const { data } = await gql(
+      tokens.other,
+      `{ products(first: 10, query: "handle:pashmina-shawl") { nodes {
+          title productType description
+          variants {
+            sku price { amount } compareAtPrice { amount }
+            inventoryItem { inventoryPolicy inventoryLevels { onHand } }
+          }
+        } } }`,
+    );
+    expect(data?.products.nodes).toEqual([
+      {
+        title: 'Pashmina Shawl',
+        productType: 'Shawls',
+        description: 'Warm.',
+        variants: [
+          {
+            sku: 'SHAWL-G',
+            price: { amount: '5900.00' },
+            compareAtPrice: { amount: '6500.00' },
+            inventoryItem: { inventoryPolicy: 'DENY', inventoryLevels: [{ onHand: 4 }] },
+          },
+          {
+            sku: 'SHAWL-R',
+            price: { amount: '6500.00' },
+            compareAtPrice: null,
+            inventoryItem: { inventoryPolicy: 'CONTINUE', inventoryLevels: [{ onHand: 0 }] },
+          },
+        ],
+      },
+    ]);
+    // A Shopify file is not a WooCommerce one.
+    const wrong = await gql(tokens.other, IMPORT_FROM, { csv: CSV, format: 'WOOCOMMERCE' });
+    expect(wrong.data?.productsImport.userErrors[0]).toMatchObject({ code: 'INVALID' });
   });
 
   it('needs the products and inventory scopes, and says what is wrong with a file', async () => {
