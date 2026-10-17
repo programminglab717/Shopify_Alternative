@@ -59,8 +59,10 @@ import { ShopEvents } from '@hatti/identity/public';
 import { boughtTogetherIn } from '@hatti/orders/public';
 import {
   MarketingEvents,
+  googleMeasurementIdIn,
   metaPixelIdIn,
   tiktokPixelCodeIn,
+  type GoogleAnalyticsUpdatedPayload,
   type MetaConversionsUpdatedPayload,
   type TikTokEventsUpdatedPayload,
 } from '@hatti/marketing/public';
@@ -394,6 +396,15 @@ export function itemsFor(event: DomainEvent): string[] {
         : [];
     case MarketingEvents.TikTokEventsDeleted:
       return [Items.shop];
+    // Its pages load Google's tag for the measurement ID the shop's document names (ADR-548).
+    case MarketingEvents.GoogleAnalyticsUpdated:
+      return (event.payload as unknown as GoogleAnalyticsUpdatedPayload).changed.includes(
+        'measurementId',
+      )
+        ? [Items.shop]
+        : [];
+    case MarketingEvents.GoogleAnalyticsDeleted:
+      return [Items.shop];
     // Its document names its logos (ADR-205).
     case FileEvents.ShopBrandUpdated:
       return [Items.shop];
@@ -468,6 +479,8 @@ export const PUBLISHED_EVENTS = [
   MarketingEvents.MetaConversionsDeleted,
   MarketingEvents.TikTokEventsUpdated,
   MarketingEvents.TikTokEventsDeleted,
+  MarketingEvents.GoogleAnalyticsUpdated,
+  MarketingEvents.GoogleAnalyticsDeleted,
   FileEvents.ShopBrandUpdated,
   FileEvents.FileDeleted,
   ShopEvents.ShopOpened,
@@ -593,10 +606,14 @@ export interface PublisherServices {
       shopId: string,
     ): Promise<{ type: string; body: string; translations?: Partial<Record<string, string>> }[]>;
   };
-  /** The shop's Meta pixel, and its TikTok pixel, while it has them connected (ADR-144, ADR-543). */
+  /**
+   * The shop's Meta pixel, its TikTok pixel and its Google tag's measurement ID, while it has them
+   * connected (ADR-144, ADR-543, ADR-548).
+   */
   pixels: {
     metaPixelIdOf(tx: Tx, shopId: string): Promise<string | null>;
     tiktokPixelCodeOf(tx: Tx, shopId: string): Promise<string | null>;
+    googleMeasurementIdOf(tx: Tx, shopId: string): Promise<string | null>;
   };
   /** The shop's logo and square logo, while it has them (ADR-205). */
   brand: { logoOf(tx: Tx, shopId: string, which: BrandImageValue): Promise<ShopLogo | null> };
@@ -856,6 +873,7 @@ export class StorefrontPublisher {
     );
     const metaPixelId = await this.services.pixels.metaPixelIdOf(tx, shopId);
     const tiktokPixelCode = await this.services.pixels.tiktokPixelCodeOf(tx, shopId);
+    const googleMeasurementId = await this.services.pixels.googleMeasurementIdOf(tx, shopId);
     // Its logos where the API serves them, each address naming its image (ADR-205).
     const images = this.options.images ?? LOCAL_IMAGES;
     const logoUrl = async (which: BrandImageValue) => {
@@ -892,6 +910,7 @@ export class StorefrontPublisher {
       await automationOnIn(tx, shopId, 'back_in_stock'),
       await verifiedLevelIn(tx, shopId),
       tiktokPixelCode,
+      googleMeasurementId,
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];
@@ -1389,7 +1408,11 @@ export function createStorefrontPublisher(
       domains: { domainsOf: shopDomainsOf },
       redirects: { redirectsOf: shopRedirectsOf },
       policies: { policiesOf: shopPoliciesOf },
-      pixels: { metaPixelIdOf: metaPixelIdIn, tiktokPixelCodeOf: tiktokPixelCodeIn },
+      pixels: {
+        metaPixelIdOf: metaPixelIdIn,
+        tiktokPixelCodeOf: tiktokPixelCodeIn,
+        googleMeasurementIdOf: googleMeasurementIdIn,
+      },
       brand: { logoOf: shopLogoOf },
       files: { readyImagesIn },
       translations: { translationsOf: shopTranslationsOf },

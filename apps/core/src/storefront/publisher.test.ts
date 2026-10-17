@@ -38,8 +38,10 @@ import {
   preordersIn,
 } from '@hatti/inventory/public';
 import {
+  GoogleAnalyticsService,
   MetaConversionsService,
   TikTokEventsService,
+  googleMeasurementIdIn,
   metaPixelIdIn,
   tiktokPixelCodeIn,
 } from '@hatti/marketing/public';
@@ -483,7 +485,11 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         domains: { domainsOf: shopDomainsOf },
         redirects: { redirectsOf: shopRedirectsOf },
         policies: { policiesOf: shopPoliciesOf },
-        pixels: { metaPixelIdOf: metaPixelIdIn, tiktokPixelCodeOf: tiktokPixelCodeIn },
+        pixels: {
+          metaPixelIdOf: metaPixelIdIn,
+          tiktokPixelCodeOf: tiktokPixelCodeIn,
+          googleMeasurementIdOf: googleMeasurementIdIn,
+        },
         brand: { logoOf: shopLogoOf },
         files: { readyImagesIn },
         translations: { translationsOf: shopTranslationsOf },
@@ -2046,6 +2052,30 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await tiktok.delete(tenant)).toBe('CABC123DEF456GHI789J');
     expect(await deliver()).toEqual(['tiktok_events.deleted']);
     expect(Object.keys(await store().shop())).not.toContain('tiktokPixelCode');
+    expect(forgotten.flat()).toContain(shopTag(shopId));
+  });
+
+  it("publishes the shop's Google tag while it has Google connected, for its pages to load (ADR-548)", async () => {
+    const google = new GoogleAnalyticsService(
+      database,
+      new SecretBox([{ id: 'test', key: Buffer.alloc(32, 4) }]),
+    );
+    expect(Object.keys(await store().shop())).not.toContain('googleMeasurementId');
+    forgotten.length = 0;
+    unwrap(
+      await google.update(tenant, { measurementId: 'G-AB12CD34EF', apiSecret: 'Xy9_kq2LmN0pQr' }),
+    );
+    expect(await deliver()).toEqual(['google_analytics.updated']);
+    expect((await store().shop()).googleMeasurementId).toBe('G-AB12CD34EF');
+    expect(forgotten.flat()).toContain(shopTag(shopId));
+    // What its pages do not show changes nothing of theirs.
+    forgotten.length = 0;
+    unwrap(await google.update(tenant, { purchaseAt: 'delivered' }));
+    await deliver();
+    expect(forgotten).toEqual([]);
+    expect(await google.delete(tenant)).toBe('G-AB12CD34EF');
+    expect(await deliver()).toEqual(['google_analytics.deleted']);
+    expect(Object.keys(await store().shop())).not.toContain('googleMeasurementId');
     expect(forgotten.flat()).toContain(shopTag(shopId));
   });
 

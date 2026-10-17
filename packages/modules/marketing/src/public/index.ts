@@ -33,6 +33,7 @@ export {
 export {
   GOOGLE_LIMITS,
   GoogleAnalyticsService,
+  googleMeasurementIdIn,
   type GoogleAnalyticsInput,
   type GoogleAnalyticsRecord,
   type GoogleStreamSettings,

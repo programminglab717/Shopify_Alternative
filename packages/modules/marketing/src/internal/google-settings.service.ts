@@ -218,6 +218,16 @@ export class GoogleAnalyticsService {
   }
 }
 
+/**
+ * The shop's Google Analytics measurement ID while it has Google connected, for its storefront's
+ * pages to load Google's tag (ADR-548), in the caller's transaction; null while it has none.
+ */
+export async function googleMeasurementIdIn(tx: Tx, shopId: string): Promise<string | null> {
+  const { rows } = await tx.execute<{ measurement_id: string }>(sql`
+    SELECT measurement_id FROM marketing.google_settings WHERE shop_id = ${shopId}`);
+  return rows[0]?.measurement_id ?? null;
+}
+
 async function settingsIn(
   tx: Tx,
   shopId: string,

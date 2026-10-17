@@ -47,7 +47,13 @@ import {
   type ObjectContext,
   type SearchFound,
 } from './objects.js';
-import { metaPixelScript, pixelProduct, tiktokPixelScript, type PixelProduct } from './pixels.js';
+import {
+  googleTagScript,
+  metaPixelScript,
+  pixelProduct,
+  tiktokPixelScript,
+  type PixelProduct,
+} from './pixels.js';
 import { suggestedProducts, type SuggestParams } from './suggest.js';
 import { SESSION_SCRIPT } from './sessions.js';
 import { VISITS_SCRIPT } from './visits.js';
@@ -730,8 +736,8 @@ export class PageRenderer {
         origin && status === 200 && theme.locales.size > 1 && !request.preview && !request.editor
           ? alternateLinks([...theme.locales.keys()], theme.defaultLocale, addressIn)
           : '',
-      // The shop's pixels, Meta's and TikTok's, while it has them (ADR-144, ADR-543): shoppers'
-      // pages alone.
+      // The shop's pixels, Meta's and TikTok's, and Google's tag, while it has them (ADR-144,
+      // ADR-543, ADR-548): shoppers' pages alone.
       pixel:
         request.preview || request.editor
           ? ''
@@ -967,6 +973,7 @@ function pixelTags(shop: ShopDoc, product: PixelProduct | null): string {
   return [
     shop.metaPixelId && metaPixelScript(shop.metaPixelId, product),
     shop.tiktokPixelCode && tiktokPixelScript(shop.tiktokPixelCode, product),
+    shop.googleMeasurementId && googleTagScript(shop.googleMeasurementId, product),
   ]
     .filter((script): script is string => Boolean(script))
     .map((script) => `<script data-hatti-pixel>${script}</script>`)

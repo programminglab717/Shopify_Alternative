@@ -534,7 +534,8 @@ describe.skipIf(!server)('Checkouts', () => {
         'x-hatti-client-ip': '203.0.113.7',
         'x-hatti-client-user-agent': 'Mozilla/5.0 (Linux; Android 14)',
         'x-hatti-client-browser-ids':
-          'fbp=fb.1.1727856000000.1116446470&fbc=%3Cjunk%3E&x=1&ttp=2RjN8g3hW6yFZ8JQ0Gk6p1Lq5Xv',
+          'fbp=fb.1.1727856000000.1116446470&fbc=%3Cjunk%3E&x=1&ttp=2RjN8g3hW6yFZ8JQ0Gk6p1Lq5Xv' +
+          '&ga=GA1.1.1903423857.1760680000',
       },
       payload: { ...FORM, shown: shownIn(page.html) },
     });
@@ -545,7 +546,14 @@ describe.skipIf(!server)('Checkouts', () => {
       [shopA],
     );
     expect(browsers).toEqual([
-      { browser_ids: { fbp: 'fb.1.1727856000000.1116446470', ttp: '2RjN8g3hW6yFZ8JQ0Gk6p1Lq5Xv' } },
+      {
+        browser_ids: {
+          fbp: 'fb.1.1727856000000.1116446470',
+          ttp: '2RjN8g3hW6yFZ8JQ0Gk6p1Lq5Xv',
+          // Google's tag's too (ADR-548).
+          ga: 'GA1.1.1903423857.1760680000',
+        },
+      },
     ]);
 
     // The policy changes after the order: the order shows what its customer agreed to.

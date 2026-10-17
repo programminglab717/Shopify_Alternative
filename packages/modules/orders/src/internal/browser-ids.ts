@@ -1,6 +1,7 @@
 // The IDs ad platforms' pixels give a shopper's browser, in cookies on the shop's address (MKT-10,
 // ADR-144): Meta's browser ID, from its `_fbp` cookie, and the click on one of its ads that
-// brought them, from `_fbc`; and TikTok's browser ID, from its `_ttp` (ADR-541). The storefront
+// brought them, from `_fbc`; TikTok's browser ID, from its `_ttp` (ADR-541); and Google's tag's,
+// its `_ga` cookie as it is (ADR-548). The storefront
 // passes them as the order is placed through checkout, and the order keeps them for its
 // conversions to name the same browser the pixel's events did.
 
@@ -15,6 +16,8 @@ export type BrowserIdsValue = {
   fbc?: string;
   /** TikTok's browser ID, from its `_ttp` cookie. */
   ttp?: string;
+  /** Google's tag's cookie, `_ga`: `GA1.1.<random>.<first visit>`. */
+  ga?: string;
 };
 
 /** Meta's format, its last part as long as a cookie's value may be, without spaces. */
@@ -23,7 +26,10 @@ const META_ID = /^fb\.[0-9]\.[0-9]{1,16}\.[!-~]+$/;
 /** TikTok's: letters, digits and a few marks. */
 const TIKTOK_ID = /^[A-Za-z0-9._-]{10,100}$/;
 
-const FORMS = { fbp: META_ID, fbc: META_ID, ttp: TIKTOK_ID } as const;
+/** Google's: `GA1.`, the domain's parts, and two numbers. */
+const GOOGLE_ID = /^GA1\.[0-9]\.[0-9]{1,20}\.[0-9]{1,20}$/;
+
+const FORMS = { fbp: META_ID, fbc: META_ID, ttp: TIKTOK_ID, ga: GOOGLE_ID } as const;
 
 /** The IDs of `given` in their platform's format and not too long; null when none is. */
 export function browserIdsOf(

@@ -5,9 +5,11 @@ import { loadTheme, readThemeDir, type Theme } from '@hatti/themes';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { sampleStore } from './fixtures.js';
 import {
+  GOOGLE_TAG_SCRIPT,
   META_PIXEL_SCRIPT,
   TIKTOK_PIXEL_SCRIPT,
   browserIdsOf,
+  googleTagScript,
   metaPixelScript,
   pixelProduct,
   tiktokPixelScript,
@@ -42,7 +44,7 @@ const formTo = (action: string, fields: Record<string, string> = {}) => ({
  * A page of the shop's loaded in a browser, its head's pixel script run: the pixel's calls so
  * far, the scripts the page added, and what a shopper does on it.
  */
-function load(script: string, options: { fbq?: unknown; ttq?: unknown } = {}) {
+function load(script: string, options: { fbq?: unknown; ttq?: unknown; gtag?: unknown } = {}) {
   const listeners: Record<string, ((event: object) => void)[]> = {};
   const added: { src: string; async: boolean }[] = [];
   const window: Record<string, unknown> = {
@@ -67,17 +69,21 @@ function load(script: string, options: { fbq?: unknown; ttq?: unknown } = {}) {
   window.window = window;
   if (options.fbq) window.fbq = options.fbq;
   if (options.ttq) window.ttq = options.ttq;
+  if (options.gtag) window.gtag = options.gtag;
   runInNewContext(script, window);
   const fbq = window.fbq as { queue: ArrayLike<unknown>[] } | undefined;
+  const dataLayer = window.dataLayer as ArrayLike<unknown>[] | undefined;
   return {
     added,
-    /** The pixel's calls, waiting for its script: Meta's queue, else TikTok's. */
+    /** The pixel's calls, waiting for its script: Meta's queue, Google's data layer, else TikTok's. */
     calls: () =>
       JSON.parse(
         JSON.stringify(
           fbq
             ? fbq.queue.map((call) => Array.from(call))
-            : Array.from(window.ttq as ArrayLike<unknown>),
+            : dataLayer
+              ? Array.from(dataLayer, (call) => Array.from(call))
+              : Array.from(window.ttq as ArrayLike<unknown>),
         ),
       ) as unknown[],
     submit: (form: ReturnType<typeof formTo>, submitter?: { name: string }) =>
@@ -191,6 +197,11 @@ describe("The shop's Meta pixel", () => {
       ttp: '2RjN8g3hW6yFZ8JQ0Gk6p1Lq5Xv',
     });
     expect(browserIdsOf('_ttp=<script>alert(1)</script>')).toBeUndefined();
+    // And Google's tag's (ADR-548), its cookie as it is.
+    expect(browserIdsOf('_ga=GA1.1.1903423857.1760680000; _ga_AB12CD34EF=GS2.1.s1')).toEqual({
+      ga: 'GA1.1.1903423857.1760680000',
+    });
+    expect(browserIdsOf('_ga=GA1.1.x.<y>')).toBeUndefined();
     expect(browserIdsOf(undefined)).toBeUndefined();
   });
 
@@ -200,11 +211,16 @@ describe("The shop's Meta pixel", () => {
       theme = loadTheme(await readThemeDir(THEME_DIR));
     });
 
-    const render = async (request: PageRequest, metaPixelId?: string, tiktokPixelCode?: string) => {
+    const render = async (
+      request: PageRequest,
+      metaPixelId?: string,
+      tiktokPixelCode?: string,
+      googleMeasurementId?: string,
+    ) => {
       const sample = sampleStore();
       const store = new MemoryStore({
         ...sample,
-        shop: { ...sample.shop, metaPixelId, tiktokPixelCode },
+        shop: { ...sample.shop, metaPixelId, tiktokPixelCode, googleMeasurementId },
       });
       const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
       return (await renderer.render(request, store.fresh(0))).html;
@@ -240,6 +256,25 @@ describe("The shop's Meta pixel", () => {
       expect(alone).not.toContain('fbevents');
       expect(
         await render({ path: '/', preview: { name: 'Winter' } }, undefined, 'CABC123DEF456GHI789J'),
+      ).not.toContain('data-hatti-pixel');
+    });
+
+    it("loads Google's tag beside the pixels, or alone, while the shop has Google (ADR-548)", async () => {
+      const all = head(
+        await render({ path: '/' }, '1234567890', 'CABC123DEF456GHI789J', 'G-AB12CD34EF'),
+      );
+      expect(all.split('<script data-hatti-pixel>')).toHaveLength(4);
+      expect(all).toContain('"G-AB12CD34EF"');
+      const alone = head(await render({ path: '/' }, undefined, undefined, 'G-AB12CD34EF'));
+      expect(alone.split('<script data-hatti-pixel>')).toHaveLength(2);
+      expect(alone).toContain('googletagmanager');
+      expect(
+        await render(
+          { path: '/', editor: { origins: ['https://admin.hatti.pk'] } },
+          undefined,
+          undefined,
+          'G-AB12CD34EF',
+        ),
       ).not.toContain('data-hatti-pixel');
     });
   });
@@ -294,6 +329,46 @@ describe("The shop's TikTok pixel (ADR-543)", () => {
         { contents: [{ content_id: 'v-other', quantity: 1 }], content_type: 'product' },
       ],
       ['track', 'InitiateCheckout'],
+    ]);
+  });
+});
+
+describe("The shop's Google tag (ADR-548)", () => {
+  it("loads Google's script once, configured for the stream, and tracks the page's product", () => {
+    const page = load(googleTagScript('G-AB12CD34EF', KURTA));
+    expect(page.added).toEqual([{ src: `${GOOGLE_TAG_SCRIPT}?id=G-AB12CD34EF`, async: true }]);
+    expect(page.calls()).toEqual([
+      ['js', expect.any(String)],
+      ['config', 'G-AB12CD34EF'],
+      [
+        'event',
+        'view_item',
+        {
+          currency: 'PKR',
+          value: 4990,
+          items: [{ item_id: 'p-kurta', item_name: 'Chikankari Kurta <Eid>' }],
+        },
+      ],
+    ]);
+    // Google's tag there already, the page's calls go to it.
+    const calls: unknown[] = [];
+    const again = load(googleTagScript('G-AB12CD34EF', null), {
+      gtag: (...args: unknown[]) => calls.push(args[0]),
+    });
+    expect([again.added, calls]).toEqual([[], ['config']]);
+  });
+
+  it("tracks adding to the cart and leaving for checkout by Google's names", () => {
+    const page = load(googleTagScript('G-AB12CD34EF', KURTA));
+    page.submit(formTo('/ur/cart/add', { id: 'v-large', quantity: '2' }));
+    page.submit(formTo('/cart', {}), { name: 'checkout' });
+    expect(page.calls().slice(3)).toEqual([
+      [
+        'event',
+        'add_to_cart',
+        { items: [{ item_id: 'v-large', quantity: 2 }], currency: 'PKR', value: 10381 },
+      ],
+      ['event', 'begin_checkout'],
     ]);
   });
 });

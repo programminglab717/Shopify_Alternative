@@ -530,6 +530,11 @@ export interface ShopDoc {
    */
   tiktokPixelCode?: string | null;
   /**
+   * Its Google Analytics measurement ID, while it has Google connected (MKT-10, ADR-548): its pages
+   * load Google's tag for its shoppers. Absent or null for none.
+   */
+  googleMeasurementId?: string | null;
+  /**
    * Its link-in-bio page, at /links (CH-07, ADR-161): what it says of itself, its own links, and
    * the products it shows, by ID, in their order. Absent while it set none, as in documents
    * written before shops had them.

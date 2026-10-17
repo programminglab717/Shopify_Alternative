@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-547 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-548 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -555,6 +555,7 @@
 | 545 | What customers write to a shop on WhatsApp is kept as a conversation for each customer's number, the shop found by the number written to, the message answered or the last shop to write, for its staff to read, mark read and close | Accepted |
 | 546 | The inbox's staff answer a customer in their own words within the day WhatsApp allows after the customer last wrote, sent at once from the number the customer wrote to, and followed to delivery as the webhook says | Accepted |
 | 547 | Orders placed through checkout go to Google Analytics' Measurement Protocol from the worker beside Meta's and TikTok's, the shop connecting its web stream with an API secret, for Google Ads to import its purchase as a conversion | Accepted |
+| 548 | The storefront loads the shop's Google tag while it has Google Analytics connected, tracking the same steps as Meta's and TikTok's pixels, and checkout passes the `_ga` cookie on so that an order's server events are the browser's that came from the ad | Accepted |
 
 ---
 
@@ -20670,3 +20671,28 @@
     shop to sign Hatti into its Google Ads account and Hatti to hold a developer token.
   * **Google's tag in the browser only:** ad blockers and checkout's scriptless page lose the
     orders that matter most.
+
+## ADR-548 · The storefront loads the shop's Google tag while it has Google Analytics connected, tracking the same steps as Meta's and TikTok's pixels, and checkout passes the `_ga` cookie on so that an order's server events are the browser's that came from the ad
+
+* **Context:** Orders go to Google Analytics from the server (ADR-547), but as a visitor of their
+  own: the customer's ID shortened stands in for the browser, so Google cannot tie an order to the
+  ad click and the visit that brought it. Meta's and TikTok's pixels are on the storefront, and
+  their browser IDs go with the order (ADR-144, ADR-542); Google's tag was not.
+* **Decision:**
+  * **The storefront loads the shop's Google tag** (`gtag.js` with its measurement ID) on every
+    page while the shop has its web stream connected, the ID published with the shop's document;
+    connecting, changing the ID and disconnecting republish it. The secret never leaves the core.
+  * **The same steps:** a product's page sends `view_item`, adding to the cart `add_to_cart` and
+    going to checkout `begin_checkout`, each with the variant, its price and the shop's currency, as
+    the other pixels track them; the purchase is the server's alone, so it is counted once.
+  * **The browser's ID goes with the order:** checkout passes the `_ga` cookie on with Meta's and
+    TikTok's, kept only when it reads as Google's (`GA1.n.<number>.<number>`); the worker sends the
+    order's moments with the client ID it holds, the customer's shortened ID still where there is
+    none.
+* **Consequences:**
+  * An order's purchase is the visit's that came from the ad, so Google Ads credits the campaign that
+    brought it, and the shop sees its visitors' steps in Google Analytics.
+  * Like the other pixels, the tag loads without a consent banner yet.
+* **Alternatives:**
+  * **Google Tag Manager's container:** lets a shop add any tag, Hatti's checkout no longer knowing
+    what runs on its pages.

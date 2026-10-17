@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Google's tag on the storefront
+
+* **The storefront loads the shop's Google tag while it has Google Analytics connected, and
+  checkout passes the `_ga` cookie on, so an order's server events are the visit's that came from
+  the ad** ([ADR-548](../architecture/13-decision-log.md#adr-548--the-storefront-loads-the-shops-google-tag-while-it-has-google-analytics-connected-tracking-the-same-steps-as-metas-and-tiktoks-pixels-and-checkout-passes-the-_ga-cookie-on-so-that-an-orders-server-events-are-the-browsers-that-came-from-the-ad), MKT-10).
+* 3327 tests, 4 more: the tag and its steps, its publishing, and the
+  client ID from the cookie.
+
 ### 369b1c8 · Orders sent to Google
 
 * **Orders placed through checkout go to Google Analytics' Measurement Protocol from the worker

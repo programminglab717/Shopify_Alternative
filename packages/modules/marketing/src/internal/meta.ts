@@ -64,10 +64,10 @@ export interface ConversionOrder {
   visits: readonly { at: Date; landingPage: string | null }[];
   /**
    * The IDs the shop's Meta pixel gave its customer's browser, from its cookies (ADR-144): its
-   * browser ID, `fbp`, and the click on an ad that brought it, `fbc`; and TikTok's pixel's
-   * browser ID, `ttp` (ADR-541).
+   * browser ID, `fbp`, and the click on an ad that brought it, `fbc`; TikTok's pixel's browser
+   * ID, `ttp` (ADR-541); and Google's tag's, `ga`, its `_ga` cookie (ADR-548).
    */
-  browserIds: { fbp?: string; fbc?: string; ttp?: string } | null;
+  browserIds: { fbp?: string; fbc?: string; ttp?: string; ga?: string } | null;
   lines: readonly { variantId: string; quantity: number; unitPrice: bigint }[];
 }
 

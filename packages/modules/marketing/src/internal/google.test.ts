@@ -67,6 +67,13 @@ describe("Google Analytics' Measurement Protocol: events", () => {
       ],
     });
     expect(googleClientId(order)).toHaveLength(32);
+    // The browser Google's tag named, where the order kept its cookie (ADR-548).
+    expect(googleClientId({ ...order, browserIds: { ga: 'GA1.1.1903423857.1760680000' } })).toBe(
+      '1903423857.1760680000',
+    );
+    expect(googleClientId({ ...order, browserIds: { ga: 'GA1.1.x' } })).toBe(
+      sha256(order.customerId).slice(0, 32),
+    );
     // Without a number or an email, no user data goes.
     expect(googleUserData({ ...order, phone: null, email: null })).toBeNull();
     expect(

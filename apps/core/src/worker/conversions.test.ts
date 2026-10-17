@@ -712,7 +712,7 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
         purchaseAt: 'confirmed',
       }),
     );
-    const order = await placeOnline();
+    const order = await placeOnline({ browserIds: { ga: 'GA1.1.1903423857.1760680000' } });
     unwrap(await orders().confirm(tenant, order.id));
     await dispatch();
     const platforms = async () =>
@@ -738,7 +738,8 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
     const [placed, confirmed] = googleRequests.splice(0).map((request) => request.body);
     const customer = sha256(order.customerId);
     expect(placed).toEqual({
-      client_id: customer.slice(0, 32),
+      // The browser Google's tag named (ADR-548).
+      client_id: '1903423857.1760680000',
       user_id: customer,
       timestamp_micros: expect.any(Number) as number,
       user_data: {

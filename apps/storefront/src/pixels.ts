@@ -10,7 +10,9 @@ import { scriptJson } from './liquid.js';
 // orders themselves go from the server, through the conversions API (ADR-143); the pixel's
 // cookies, which name the shopper's browser, go with the order placed, for them to name the same.
 // TikTok's pixel loads beside it while the shop has TikTok connected (ADR-543), tracking the same
-// steps, and its browser cookie goes with the order for TikTok's Events API (ADR-541).
+// steps, and its browser cookie goes with the order for TikTok's Events API (ADR-541); and Google's
+// tag while the shop has Google connected (ADR-548), its cookie going with the order for the
+// Measurement Protocol's events (ADR-547) to name the same browser.
 
 /** Where Meta serves its pixel's script. */
 export const META_PIXEL_SCRIPT = 'https://connect.facebook.net/en_US/fbevents.js';
@@ -18,20 +20,27 @@ export const META_PIXEL_SCRIPT = 'https://connect.facebook.net/en_US/fbevents.js
 /** Where TikTok serves its pixel's script. */
 export const TIKTOK_PIXEL_SCRIPT = 'https://analytics.tiktok.com/i18n/pixel/events.js';
 
+/** Where Google serves its tag's script. */
+export const GOOGLE_TAG_SCRIPT = 'https://www.googletagmanager.com/gtag/js';
+
 /** Meta's format: `fb.<subdomain index>.<when, in ms>.<random or click ID>`. */
 const META_ID = /^fb\.[0-9]\.[0-9]{1,16}\.[!-~]{1,450}$/;
 
 /** TikTok's browser ID: letters, digits and a few marks. */
 const TIKTOK_ID = /^[A-Za-z0-9._-]{10,100}$/;
 
+/** Google's tag's: `GA1.<domain's parts>.<random>.<first visit, in seconds>`. */
+const GOOGLE_ID = /^GA1\.[0-9]\.[0-9]{1,20}\.[0-9]{1,20}$/;
+
 /**
  * The cookies the pixels keep on the shop's address, and the form of each: Meta's browser ID and
- * an ad's click, and TikTok's browser ID.
+ * an ad's click, TikTok's browser ID and Google's tag's.
  */
 const PIXEL_COOKIES = {
   fbp: ['_fbp', META_ID],
   fbc: ['_fbc', META_ID],
   ttp: ['_ttp', TIKTOK_ID],
+  ga: ['_ga', GOOGLE_ID],
 } as const;
 
 /** The IDs the shop's pixels gave the browser, from the request's cookies, for the order. */
@@ -244,6 +253,56 @@ export function tiktokPixelScript(pixelCode: string, product: PixelProduct | nul
     };
     var leaving = function () {
       ttq.track('InitiateCheckout');
+    };
+${shopperActions()}
+  } catch (error) {}
+})();`;
+}
+
+/**
+ * The script a page's head carries for the shop's Google Analytics stream `measurementId`
+ * (ADR-548): Google's tag, its data layer until its script loads, configured for the stream, which
+ * counts the page; then `view_item` for `product`, and, as shoppers send them, `add_to_cart` and
+ * `begin_checkout`, Google's names for the steps Meta's pixel tracks. Classic, and silent when
+ * anything fails.
+ */
+export function googleTagScript(measurementId: string, product: PixelProduct | null): string {
+  return `(function () {
+  try {
+    var id = ${scriptJson(measurementId)};
+    window.dataLayer = window.dataLayer || [];
+    var gtag = window.gtag;
+    if (!gtag) {
+      gtag = window.gtag = function () {
+        window.dataLayer.push(arguments);
+      };
+      var script = document.createElement('script');
+      script.async = true;
+      script.src = ${scriptJson(GOOGLE_TAG_SCRIPT)} + '?id=' + encodeURIComponent(id);
+      document.head.appendChild(script);
+      gtag('js', new Date());
+    }
+    gtag('config', id);
+    var product = ${scriptJson(product)};
+    if (product) {
+      gtag('event', 'view_item', {
+        currency: product.view.currency,
+        value: product.view.value,
+        items: product.view.content_ids.map(function (item) {
+          return { item_id: item, item_name: product.view.content_name };
+        })
+      });
+    }
+    var added = function (item, quantity, value) {
+      var event = { items: [{ item_id: item, quantity: quantity }] };
+      if (typeof value === 'number') {
+        event.currency = 'PKR';
+        event.value = value;
+      }
+      gtag('event', 'add_to_cart', event);
+    };
+    var leaving = function () {
+      gtag('event', 'begin_checkout');
     };
 ${shopperActions()}
   } catch (error) {}

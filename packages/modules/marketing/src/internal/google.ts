@@ -86,12 +86,17 @@ export function googleEvent(
   return payload;
 }
 
+/** Google's tag's cookie: `GA1.<domain's parts>.<random>.<first visit, in seconds>`. */
+const GA_COOKIE = /^GA1\.[0-9]\.([0-9]{1,20}\.[0-9]{1,20})$/;
+
 /**
- * The browser the events are of: the customer's own ID with the shop, hashed, so that one
- * customer's orders read as one visitor's.
+ * The browser the events are of: the one Google's tag named in its `_ga` cookie when the order
+ * was placed (ADR-548), so that its events join the visit's; else the customer's own ID with the
+ * shop, hashed, so that one customer's orders read as one visitor's.
  */
 export function googleClientId(order: ConversionOrder): string {
-  return hashed(order.customerId).slice(0, 32);
+  const tagged = order.browserIds?.ga && GA_COOKIE.exec(order.browserIds.ga);
+  return tagged ? tagged[1]! : hashed(order.customerId).slice(0, 32);
 }
 
 /**
