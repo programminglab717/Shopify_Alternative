@@ -930,19 +930,260 @@ export class TcsCourier implements CourierAdapter {
   }
 }
 
-/** The latest status of a parcel's history: by its time where each says one, else the first. */
+/**
+ * The latest status of a parcel's history: by its time where each says one, as TCS (`dateTime`)
+ * or Trax (`date_time`) writes it, else the first.
+ */
 function latest(
-  events: { status?: string; dateTime?: string }[] | null | undefined,
+  events: { status?: string; dateTime?: string; date_time?: string }[] | null | undefined,
 ): string | null {
   const said = (events ?? []).filter(
     (each) => typeof each.status === 'string' && each.status.trim() !== '',
   );
   if (said.length === 0) return null;
-  const timed = said.map((each) => ({ each, at: Date.parse(each.dateTime ?? '') }));
+  const timed = said.map((each) => ({
+    each,
+    at: Date.parse(each.dateTime ?? each.date_time ?? ''),
+  }));
   const newest = timed.every((one) => !Number.isNaN(one.at))
     ? timed.reduce((a, b) => (b.at > a.at ? b : a)).each
     : said[0]!;
   return newest.status!.trim();
+}
+
+/** Trax's merchant API. */
+export const TRAX_API_URL = 'https://sonic.pk/api';
+
+export interface TraxOptions {
+  /** {@link TRAX_API_URL}, unless a test says otherwise. */
+  baseUrl?: string;
+  /** How long a request may take; fifteen seconds unless given. */
+  timeoutMs?: number;
+  /** How long Trax's list of cities is kept before it is asked for again: a day unless given. */
+  citiesTtlMs?: number;
+  /** The day a parcel is booked for pickup; today in Pakistan unless a test says. */
+  today?: () => string;
+}
+
+/** What Trax answers every request with: `status` 0 when it did what was asked. */
+interface TraxAnswer {
+  status?: number | string;
+  message?: string;
+  errors?: unknown;
+  tracking_number?: string | number;
+  details?: {
+    tracking_history?: { status?: string; date_time?: string }[] | null;
+  } | null;
+  cities?: { id?: number | string; name?: string }[] | null;
+}
+
+/** What a parcel without a weight is booked as: Trax's first half kilo. */
+const TRAX_DEFAULT_GRAMS = 500;
+
+/** Today in Pakistan, as Trax takes a pickup date: 2026-10-17. */
+function pakistanToday(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date());
+}
+
+/**
+ * Trax (https://sonic.pk): the account's API key goes in the Authorization header, never in an
+ * address. A booking names its city by Trax's ID for it, from Trax's list of cities, kept a day,
+ * and is picked up from the account's pickup address, or the one given as the pickup code, the
+ * day it is booked. Tracking asks for each parcel in turn, and Trax's API takes no load sheets.
+ */
+export class TraxCourier implements CourierAdapter {
+  readonly info: CourierInfo = {
+    courier: 'trax',
+    name: 'Trax',
+    credentials: [
+      { key: 'apiKey', label: 'API key' },
+      { key: 'pickupAddressId', label: 'Pickup address ID' },
+    ],
+    pickupCode: 'Pickup address ID',
+    pickups: null,
+    test: false,
+  };
+
+  /** Trax's cities, their names and IDs by {@link cityKey}, with when they were asked for. */
+  #cities: {
+    at: number;
+    byKey: ReadonlyMap<string, { name: string; id: number | string }>;
+  } | null = null;
+
+  constructor(private readonly options: TraxOptions = {}) {}
+
+  /** The cities Trax delivers to, as its list names them (ADR-233). */
+  async cities(credentials: CourierCredentials): Promise<CourierResult<string[]>> {
+    const listed = await this.#cityList(credentials);
+    return listed.ok
+      ? { ok: true, value: [...listed.value.values()].map((city) => city.name) }
+      : listed;
+  }
+
+  async book(
+    credentials: CourierCredentials,
+    shipment: CourierShipment,
+  ): Promise<CourierResult<{ trackingNumber: string }>> {
+    const city = await this.#cityId(credentials, shipment.city);
+    if (!city.ok) return city;
+    const grams =
+      shipment.weightGrams !== null && shipment.weightGrams > 0
+        ? shipment.weightGrams
+        : TRAX_DEFAULT_GRAMS;
+    const pickup = shipment.pickupCode?.trim() || (credentials.pickupAddressId ?? '');
+    const cash = (shipment.codAmount + 99n) / 100n;
+    const { answer } = await this.#call(credentials, 'POST', 'shipment/book', {
+      // Trax's regular service, the shipper's details shown on the airway bill.
+      service_type_id: 1,
+      pickup_address_id: /^\d+$/.test(pickup) ? Number(pickup) : pickup,
+      information_display: 1,
+      consignee_city_id: city.value,
+      consignee_name: shipment.customerName,
+      consignee_address: shipment.address,
+      consignee_phone_number_1: shipment.customerPhone,
+      consignee_email_address: '',
+      order_id: shipment.reference,
+      item_product_type_id: 1,
+      item_description: shipment.contents,
+      item_quantity: shipment.pieces,
+      item_insurance: 0,
+      pickup_date: (this.options.today ?? pakistanToday)(),
+      // Kilograms, to the gram.
+      estimated_weight: Math.ceil(grams) / 1_000,
+      // Rush, Trax's next-day mode.
+      shipping_mode_id: 1,
+      // Whole rupees, as riders collect them: paisa round up.
+      amount: Number(cash),
+      // Cash on delivery, or nothing to collect on an order paid ahead.
+      payment_mode_id: cash > 0n ? 1 : 4,
+      charges_mode_id: 4,
+    });
+    if (!answer.ok) return answer;
+    const trackingNumber = String(answer.value.tracking_number ?? '').trim();
+    if (trackingNumber === '') {
+      return {
+        ok: false,
+        retry: false,
+        message: 'Trax booked the parcel without a tracking number',
+      };
+    }
+    return { ok: true, value: { trackingNumber } };
+  }
+
+  async track(
+    credentials: CourierCredentials,
+    trackingNumbers: readonly string[],
+  ): Promise<CourierResult<CourierTracking[]>> {
+    const tracked: CourierTracking[] = [];
+    for (const trackingNumber of trackingNumbers) {
+      const { answer, status } = await this.#call(
+        credentials,
+        'GET',
+        `shipment/track?tracking_number=${encodeURIComponent(trackingNumber)}&type=0`,
+      );
+      if (!answer.ok) {
+        // Trax not answering, or refusing the account, stops the round; a parcel it does not
+        // know is left out.
+        if (answer.retry || status === 401 || status === 403) return answer;
+        continue;
+      }
+      const said = latest(answer.value.details?.tracking_history);
+      if (said) tracked.push({ trackingNumber, status: said.slice(0, 200) });
+    }
+    return { ok: true, value: tracked };
+  }
+
+  async cancel(
+    credentials: CourierCredentials,
+    trackingNumber: string,
+  ): Promise<CourierResult<null>> {
+    const { answer } = await this.#call(credentials, 'POST', 'shipment/cancel', {
+      tracking_number: trackingNumber,
+    });
+    return answer.ok ? { ok: true, value: null } : answer;
+  }
+
+  /** Trax's ID for `city`, from its list of cities, which is asked for once a day. */
+  async #cityId(
+    credentials: CourierCredentials,
+    city: string,
+  ): Promise<CourierResult<number | string>> {
+    const listed = await this.#cityList(credentials);
+    if (!listed.ok) return listed;
+    const found = listed.value.get(cityKey(city));
+    return found === undefined
+      ? { ok: false, retry: false, message: `Trax does not deliver to ${city}` }
+      : { ok: true, value: found.id };
+  }
+
+  /** Trax's cities, by {@link cityKey}: its list, asked for once a day. */
+  async #cityList(
+    credentials: CourierCredentials,
+  ): Promise<CourierResult<ReadonlyMap<string, { name: string; id: number | string }>>> {
+    const ttl = this.options.citiesTtlMs ?? COURIER_CITIES_TTL_MS;
+    if (!this.#cities || Date.now() - this.#cities.at > ttl) {
+      const { answer } = await this.#call(credentials, 'GET', 'cities');
+      if (!answer.ok) return answer;
+      const byKey = new Map<string, { name: string; id: number | string }>();
+      for (const each of answer.value.cities ?? []) {
+        const name = (each.name ?? '').trim();
+        const key = cityKey(name);
+        if (key !== '' && each.id !== undefined && !byKey.has(key)) {
+          byKey.set(key, { name, id: each.id });
+        }
+      }
+      if (byKey.size === 0) {
+        return { ok: false, retry: true, message: 'Trax gave no cities to deliver to' };
+      }
+      this.#cities = { at: Date.now(), byKey };
+    }
+    return { ok: true, value: this.#cities.byKey };
+  }
+
+  async #call(
+    credentials: CourierCredentials,
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+  ): Promise<{ answer: CourierResult<TraxAnswer>; status: number }> {
+    const base = (this.options.baseUrl ?? TRAX_API_URL).replace(/\/+$/, '');
+    let response: Response;
+    try {
+      response = await fetch(`${base}/${path}`, {
+        method,
+        headers: {
+          authorization: credentials.apiKey ?? '',
+          accept: 'application/json',
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+      });
+    } catch (error) {
+      return {
+        answer: {
+          ok: false,
+          retry: true,
+          message: `Trax could not be reached: ${(error as Error).message}`.slice(0, 1_000),
+        },
+        status: 0,
+      };
+    }
+    const json = (await response.json().catch(() => null)) as TraxAnswer | null;
+    // Trax says how a request went in its answer too: 0 for done, 1 for refused.
+    if (response.ok && json !== null && Number(json.status) === 0) {
+      return { answer: { ok: true, value: json }, status: response.status };
+    }
+    const said = errorText(json?.errors) || (typeof json?.message === 'string' ? json.message : '');
+    return {
+      answer: {
+        ok: false,
+        retry: response.status >= 500 || response.status === 429 || (response.ok && json === null),
+        message: `Trax: ${said.trim() || `it answered ${response.status}`}`.slice(0, 1_000),
+      },
+      status: response.status,
+    };
+  }
 }
 
 /**

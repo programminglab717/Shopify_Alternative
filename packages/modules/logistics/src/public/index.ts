@@ -77,6 +77,8 @@ export {
   PostExCourier,
   TCS_API_URL,
   TcsCourier,
+  TRAX_API_URL,
+  TraxCourier,
   TestCourier,
   plainStatusOf,
   type CourierAdapter,

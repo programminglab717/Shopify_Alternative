@@ -565,6 +565,8 @@ const workerSchema = z
     LEOPARDS_URL: env.httpUrl().default('https://merchantapi.leopardscourier.com/api'),
     /** TCS's COD API, which its bookings go to (ADR-509); its sandbox in tests. */
     TCS_URL: env.httpUrl().default('https://api.tcscourier.com/production/v1/cod'),
+    /** Trax's merchant API, which its bookings go to (ADR-510). */
+    TRAX_URL: env.httpUrl().default('https://sonic.pk/api'),
     /** How often bookings due are booked with couriers, and parcels due are asked about. */
     COURIER_BOOKINGS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(30_000),
     /** How often products' images due are made ready, and those of media gone removed. */

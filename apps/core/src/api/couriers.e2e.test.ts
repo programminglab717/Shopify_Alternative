@@ -166,6 +166,16 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
         pickupCode: null,
         test: true,
       },
+      {
+        courier: 'trax',
+        name: 'Trax',
+        credentials: [
+          { key: 'apiKey', label: 'API key' },
+          { key: 'pickupAddressId', label: 'Pickup address ID' },
+        ],
+        pickupCode: 'Pickup address ID',
+        test: false,
+      },
     ]);
     expect(
       (await gql(tokens.catalog, '{ couriers { courier } }')).errors?.[0].extensions.code,

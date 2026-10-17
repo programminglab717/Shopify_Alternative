@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-509 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-510 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -517,6 +517,7 @@
 | 507 | Camera-first products: a product added from a photo, its copy drafted by the AI from the photos themselves, made small for the model, and squared to the product | Accepted |
 | 508 | Local support: each plan's way to reach Hatti's people, requests from the admin kept for them and answered with a command, and a help centre in English and Urdu | Accepted |
 | 509 | TCS, the third courier: bookings, tracking, cancellations and cities through its COD API, with the shop's own account and the city it ships from | Accepted |
+| 510 | Trax, the fourth courier: bookings by Trax's city IDs from the shop's pickup address, tracking, cancellations and cities through its merchant API | Accepted |
 
 ---
 
@@ -19365,3 +19366,40 @@
     change behind the same interface.
   * **Trax in the same change:** Trax's API is a different shape, and one courier per change
     keeps each reviewable. Trax follows.
+
+## ADR-510 · Trax, the fourth courier: bookings by Trax's city IDs from the shop's pickup address, tracking, cancellations and cities through its merchant API
+
+* **Context:** Trax is the last of the four couriers SHP-01 names for the MVP. PostEx
+  (ADR-149), Leopards (ADR-162) and TCS (ADR-509) were already behind the courier adapter
+  interface.
+* **Decision:**
+  * **`TraxCourier` implements the adapter interface** against Trax's merchant API
+    (`sonic.pk/api`, `TRAX_URL` to point elsewhere):
+    * Shops connect their own account with its API key and the ID of the pickup address they
+      registered with Trax. The key goes in the Authorization header, never in an address.
+    * A booking names the parcel's city by Trax's ID for it, from Trax's list of cities, kept a
+      day; a city Trax does not list is refused before anything is booked.
+    * The parcel is picked up from the account's pickup address, or another given as the pickup
+      code, on the day it is booked in Pakistan.
+    * It is booked by Trax's regular service in its Rush mode, with the weight in kilograms
+      (half a kilo where none is known). Cash on delivery is in whole rupees, paisa rounded up,
+      and an order paid ahead is booked as one with nothing to collect.
+    * Trax answers `status` 0 for done. Its field errors are said as its own words.
+    * Tracking asks about each parcel in turn and takes the latest status of its history, by its
+      time. A parcel Trax does not know is left out, and Trax refusing the account stops the
+      round. Cancelling uses `shipment/cancel`.
+  * **Trax's statuses map to Hatti's** through `logistics.courier_statuses` (migration 0240).
+    The parcel history helper reads Trax's and TCS's timestamps alike.
+  * **No pickups or load sheets through the API:** `pickups` is null, as for TCS.
+* **Consequences:**
+  * The four couriers of SHP-01's MVP are bookable from Hatti with the shop's own accounts.
+    Courier rules (ADR-382) and rate cards (ADR-383) take Trax accounts like any other.
+  * As with TCS, the adapter follows Trax's published documentation against a stand-in. It
+    must be tried on a real account before shops rely on it. Trax's service and mode IDs are
+    fixed to its regular next-day service for now.
+  * Couriers' own airway bills are still not fetched: Hatti prints its own labels (ADR-150).
+* **Alternatives:**
+  * **Choosing Trax's service and mode per booking:** no other adapter offers a choice yet, and
+    the booking flow has nowhere to ask. A shop wanting another mode books it in Trax's portal.
+  * **Naming the city by text, as PostEx takes it:** Trax books by its own city IDs. Its list,
+    kept a day, is also what ADR-233 matches parcels' cities against.
