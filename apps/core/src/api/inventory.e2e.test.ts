@@ -423,13 +423,20 @@ describe.skipIf(!server)('Admin GraphQL API: inventory', () => {
     const updated = await mutate(
       tokens.a,
       `mutation ($id: ID!) {
-         inventoryItemUpdate(id: $id, input: { inventoryPolicy: CONTINUE }) {
-           inventoryItem { inventoryPolicy tracked } userErrors { code }
+         inventoryItemUpdate(
+           id: $id
+           input: { inventoryPolicy: CONTINUE, harmonizedSystemCode: "6403.99.00" }
+         ) {
+           inventoryItem { inventoryPolicy tracked harmonizedSystemCode } userErrors { code }
          }
        }`,
       { id: size9 },
     );
-    expect(updated.inventoryItem).toEqual({ inventoryPolicy: 'CONTINUE', tracked: true });
+    expect(updated.inventoryItem).toEqual({
+      inventoryPolicy: 'CONTINUE',
+      tracked: true,
+      harmonizedSystemCode: '64039900',
+    });
     const history = await gql(
       tokens.aStockReader,
       `query ($id: ID!, $location: ID!) {

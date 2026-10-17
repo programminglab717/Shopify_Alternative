@@ -96,3 +96,20 @@ export async function loadItems(
   }
   return items;
 }
+
+/**
+ * The HS codes of those of `variantIds` that have one (CAT-19, ADR-557), by variant, in the
+ * caller's transaction: for the documents and reports that name them.
+ */
+export async function harmonizedSystemCodesIn(
+  tx: Tx,
+  shopId: string,
+  variantIds: readonly string[],
+): Promise<Map<string, string>> {
+  if (variantIds.length === 0) return new Map();
+  const { rows } = await tx.execute<{ variant_id: string; code: string }>(sql`
+    SELECT variant_id, harmonized_system_code AS code FROM inventory.items
+     WHERE shop_id = ${shopId} AND harmonized_system_code IS NOT NULL
+       AND variant_id = ANY(${sql.param([...new Set(variantIds)])}::uuid[])`);
+  return new Map(rows.map((row) => [row.variant_id, row.code]));
+}

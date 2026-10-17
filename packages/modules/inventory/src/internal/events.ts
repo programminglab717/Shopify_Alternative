@@ -54,9 +54,11 @@ export interface LocationDeletedPayload {
 /** The aggregate is the variant: an item is the stock side of one variant. */
 export interface InventoryItemUpdatedPayload {
   productId: string;
-  changed: ('tracked' | 'inventoryPolicy')[];
+  changed: ('tracked' | 'inventoryPolicy' | 'harmonizedSystemCode')[];
   tracked: boolean;
   inventoryPolicy: InventoryPolicyValue;
+  /** Its HS code now (ADR-557), null for none; left out where stock recorded started tracking it. */
+  harmonizedSystemCode?: string | null;
   version: number;
 }
 

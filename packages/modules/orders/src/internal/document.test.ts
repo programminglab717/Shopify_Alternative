@@ -350,6 +350,11 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
        VALUES ($1, 123456, 'sealed', 'f818', 'production', '62044200')`,
       [f.a.shopId],
     );
+    // The kurta has a PCT code of its own (ADR-557); the chappal goes under the shop's.
+    await f.admin.query(
+      `UPDATE inventory.items SET harmonized_system_code = '62034200' WHERE variant_id = $1`,
+      [kurta],
+    );
     const order = await f.order(f.a, [kurta, size8], {
       shippingPrice: '250',
       discount: '500',
@@ -386,6 +391,11 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     expect(sum((item) => item.TaxCharged)).toBe(body.TotalTaxCharged);
     expect(sum((item) => item.Discount)).toBe(500);
     expect(body.Items[2]).toMatchObject({ TotalAmount: 250, TaxCharged: 38.14 });
+    expect(body.Items.map((item) => (item as { PCTCode?: string }).PCTCode)).toEqual([
+      '62034200',
+      undefined,
+      undefined,
+    ]);
 
     // A refund on it is a credit note for FBR, naming the invoice it corrects.
     unwrap(await f.refunds.refund(f.a, order.id, { amount: '200', method: 'cash' }));

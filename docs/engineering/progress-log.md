@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### HS codes as FBR's PCT codes
+
+* **An inventory item keeps its HS code, Shopify's harmonizedSystemCode, and FBR is sent each
+  item's own PCT code from it, the shop's for those without** ([ADR-557](../architecture/13-decision-log.md#adr-557--an-inventory-item-keeps-its-hs-code-shopifys-harmonizedsystemcode-and-fbr-is-sent-each-items-own-pct-code-from-it-the-shops-for-those-without), CAT-19, POS-04).
+* 3388 tests, 1 more: HS codes kept, refused and cleared, and an
+  invoice's items reported under their own codes.
+
 ### 796ed49 · FBR's number and QR code on invoices
 
 * **A Tier-1 shop's invoices and credit notes print FBR's number and its QR code once FBR has

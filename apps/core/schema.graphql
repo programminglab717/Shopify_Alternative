@@ -5513,6 +5513,11 @@ type InventoryItem {
     """Only changes at this location."""
     locationId: ID
   ): InventoryChangeConnection!
+
+  """
+  Its harmonized system code, as Shopify's: the tariff code customs and FBR know its goods by, its digits alone; FBR is sent its 8 digits as the item's PCT code (ADR-557).
+  """
+  harmonizedSystemCode: String
   id: ID!
 
   """
@@ -5531,6 +5536,10 @@ type InventoryItem {
 }
 
 input InventoryItemInput {
+  """
+  Its harmonized system code, 6 to 13 digits, dots and spaces as typed: "6204.42.00". Blank clears it; null leaves it.
+  """
+  harmonizedSystemCode: String
   inventoryPolicy: InventoryPolicy
   tracked: Boolean
 }
@@ -7961,7 +7970,9 @@ type Mutation {
     dryRun: Boolean
   ): InventoryImportPayload!
 
-  """Turns tracking on or off, or changes what happens at zero available."""
+  """
+  Turns tracking on or off, changes what happens at zero available, or sets its HS code.
+  """
   inventoryItemUpdate(id: ID!, input: InventoryItemInput!): InventoryItemUpdatePayload!
 
   """

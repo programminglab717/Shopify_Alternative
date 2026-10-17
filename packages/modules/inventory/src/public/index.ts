@@ -29,6 +29,7 @@ export {
 } from '../internal/low-stock.service.js';
 export {
   InventoryService,
+  harmonizedSystemCodeOf,
   type AdjustQuantitiesInput,
   type HistoryOptions,
   type InventoryChangeInput,
@@ -36,7 +37,11 @@ export {
   type InventoryQuantityInput,
   type SetQuantitiesInput,
 } from '../internal/inventory.service.js';
-export { availableForSale, sellableQuantity } from '../internal/item-store.js';
+export {
+  availableForSale,
+  harmonizedSystemCodesIn,
+  sellableQuantity,
+} from '../internal/item-store.js';
 // Pre-orders (CAT-14, ADR-403): the day each product on pre-order ships by, for orders' lines and
 // the storefront's documents.
 export {

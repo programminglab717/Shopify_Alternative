@@ -5,6 +5,11 @@ import type { OrderRecord } from './records.js';
 // What FBR is sent of a shop's invoices and credit notes while its POS is connected (POS-04,
 // ADR-555): the tax module reports them, the orders module says what they hold.
 
+/** Pakistan's PCT codes are an HS code's 8 digits; null for an HS code of any other length. */
+function pctCodeOf(hsCode: string | undefined): string | null {
+  return hsCode && hsCode.length === 8 ? hsCode : null;
+}
+
 /** Cash at the door is cash; whatever was paid ahead went by card, transfer or wallet. */
 function paymentModeOf(order: Pick<OrderRecord, 'paymentMethod'>): FiscalDocument['paymentMode'] {
   return order.paymentMethod === 'cash_on_delivery' ? 'cash' : 'card';
@@ -14,7 +19,8 @@ function paymentModeOf(order: Pick<OrderRecord, 'paymentMethod'>): FiscalDocumen
  * An order's invoice `usin`, issued at `issuedAt`, as FBR is sent it: a line each, at what was
  * paid for it after its share of the discount, as its tax was worked out (ADR-096), and its
  * delivery charge and fee for paying on delivery as one line more. The items add up to the
- * order's total, and their tax to its tax.
+ * order's total, and their tax to its tax. Lines go under their variants' PCT codes, from
+ * `hsCodes` by variant, where they have them.
  */
 export function fiscalInvoiceOf(
   order: Pick<
@@ -30,6 +36,7 @@ export function fiscalInvoiceOf(
   >,
   usin: string,
   issuedAt: Date,
+  hsCodes: ReadonlyMap<string, string> = new Map(),
 ): FiscalDocument {
   const shares = discountShares(
     order.lines.map((line) => line.total),
@@ -47,6 +54,8 @@ export function fiscalInvoiceOf(
     tax: line.tax,
     rate: line.taxRate,
     discount: shares[index]!,
+    // An HS code of 8 digits is its PCT code (ADR-557); others are the shop's default's.
+    pctCode: pctCodeOf(hsCodes.get(line.variantId)),
   }));
   const charges = order.shipping + order.codFee;
   if (charges > 0n) {

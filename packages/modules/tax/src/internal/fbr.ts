@@ -43,6 +43,8 @@ export interface FiscalItem {
   rate: number | null;
   /** What came off it. */
   discount: bigint;
+  /** Its own PCT code, 8 digits (ADR-557); the shop's is used for those without. */
+  pctCode?: string | null;
 }
 
 /** An invoice or credit note the shop issued, as the orders module gives it to report. */
@@ -58,9 +60,10 @@ export interface FiscalDocument {
   items: readonly FiscalItem[];
 }
 
-/** An item as FBR takes it, but its PCT code, which is the shop's as it reports it. */
+/** An item as FBR takes it; without a PCT code of its own, the shop's goes as it reports it. */
 export interface FbrItemBody {
   ItemCode: string;
+  PCTCode?: string;
   ItemName: string;
   Quantity: number;
   TaxRate: number;
@@ -90,7 +93,7 @@ export interface FbrInvoiceBody {
   Items: FbrItemBody[];
 }
 
-/** An invoice as FBR is sent it: the shop's POS ID and PCT code put in. */
+/** An invoice as FBR is sent it: the shop's POS ID, and its PCT code where an item has none. */
 export type FbrInvoiceRequest = Omit<FbrInvoiceBody, 'Items'> & {
   POSID: number;
   Items: (FbrItemBody & { PCTCode: string })[];
@@ -145,6 +148,7 @@ export function fbrInvoiceBody(document: FiscalDocument, timeZone: string): FbrI
     RefUSIN: document.refUsin,
     Items: document.items.map((item) => ({
       ItemCode: item.code.slice(0, FBR_LIMITS.itemCode),
+      ...(item.pctCode && { PCTCode: item.pctCode }),
       ItemName: item.name.slice(0, FBR_LIMITS.itemName),
       Quantity: item.quantity,
       TaxRate: item.rate === null ? 0 : item.rate / 100,
@@ -159,7 +163,7 @@ export function fbrInvoiceBody(document: FiscalDocument, timeZone: string): FbrI
   };
 }
 
-/** `body` as the shop's POS `posId` reports it, its items under PCT code `pctCode`. */
+/** `body` as the shop's POS `posId` reports it, its items without codes of their own under `pctCode`. */
 export function fbrInvoiceRequest(
   body: FbrInvoiceBody,
   posId: number,
@@ -168,7 +172,7 @@ export function fbrInvoiceRequest(
   return {
     ...body,
     POSID: posId,
-    Items: body.Items.map((item) => ({ ...item, PCTCode: pctCode })),
+    Items: body.Items.map((item) => ({ ...item, PCTCode: item.PCTCode ?? pctCode })),
   };
 }
 

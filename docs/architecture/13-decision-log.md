@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-556 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-557 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -564,6 +564,7 @@
 | 554 | The admin records ad spend a day at a time under Marketing, and analytics shows the spend and the sales each rupee of it brought, beside true profit | Accepted |
 | 555 | A Tier-1 shop connects its POS to FBR, and each invoice and credit note it issues is reported to FBR's IMS as it is issued, tried again while FBR cannot be reached | Accepted |
 | 556 | A Tier-1 shop's invoices and credit notes print FBR's number and its QR code once FBR has numbered them, and say they await FBR until then | Accepted |
+| 557 | An inventory item keeps its HS code, Shopify's harmonizedSystemCode, and FBR is sent each item's own PCT code from it, the shop's for those without | Accepted |
 
 ---
 
@@ -20922,3 +20923,24 @@
 * **Alternatives:** **Reporting before the first print:** FBR answering slowly would hold the
   invoice series' lock and every print behind it (ADR-555). **A library for QR codes:** the
   package keeps no dependencies, and the encoder is a few hundred lines checked against one.
+
+## ADR-557 · An inventory item keeps its HS code, Shopify's harmonizedSystemCode, and FBR is sent each item's own PCT code from it, the shop's for those without
+
+* **Context:** FBR asks each item a POS reports to name its PCT code, the 8-digit heading of
+  Pakistan's customs tariff. ADR-555 sent the one code the shop gave with its POS for every item,
+  which is right only for a shop selling one kind of thing. Shopify keeps an HS code on each
+  inventory item, `harmonizedSystemCode`, for customs, and Pakistan's PCT codes are HS codes to
+  eight digits.
+* **Decision:**
+  * **Kept on the inventory item:** `harmonizedSystemCode`, 6 to 13 digits, as Shopify's, typed
+    with or without its dots and spaces ("6204.42.00") and kept as digits; set, changed and cleared
+    with the item's other settings, and recorded in its change event. CAT-19.
+  * **Sent to FBR:** an invoice's or credit note's items name the PCT code of their variant's
+    item, when it has 8 digits; others, and its delivery, go under the shop's code, as before. The
+    codes are read through the inventory module's facade as the invoice is issued, and kept with
+    it, so a code changed later does not change what was issued.
+* **Consequences:** A shop selling clothes and shoes reports each under its own heading; one
+  importing products from Shopify keeps the codes it had there.
+* **Alternatives:** **Codes on products:** a product's variants can be different goods, and
+  Shopify keeps them on the item. **Taking 6-digit codes as PCT codes:** FBR takes 8 digits, and
+  padding a 6-digit heading guesses the subheading.

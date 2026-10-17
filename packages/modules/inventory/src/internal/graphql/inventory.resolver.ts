@@ -79,6 +79,23 @@ export class InventoryItemResolver {
     return item.inventoryLevels.find((level) => level.location.id === id) ?? null;
   }
 
+  @ResolveField(() => String, {
+    nullable: true,
+    description:
+      "Its harmonized system code, as Shopify's: the tariff code customs and FBR know its goods " +
+      "by, its digits alone; FBR is sent its 8 digits as the item's PCT code (ADR-557).",
+  })
+  async harmonizedSystemCode(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() item: InventoryItem,
+  ): Promise<string | null> {
+    const loader = loaders.get<string, string>('inventory.hsCodes', (variantIds) =>
+      this.service.harmonizedSystemCodesOf(tenant, variantIds),
+    );
+    return (await loader.load(item.variantId)) ?? null;
+  }
+
   @ResolveField(() => InventoryChangeConnection, {
     description: 'Changes to its quantities, newest first.',
   })
@@ -96,7 +113,8 @@ export class InventoryItemResolver {
   }
 
   @Mutation(() => InventoryItemUpdatePayload, {
-    description: 'Turns tracking on or off, or changes what happens at zero available.',
+    description:
+      'Turns tracking on or off, changes what happens at zero available, or sets its HS code.',
   })
   @RequireScopes('write_inventory')
   async inventoryItemUpdate(
@@ -107,6 +125,7 @@ export class InventoryItemResolver {
     const result = await this.service.updateItem(tenant, uuidOf('inventoryItem', id), {
       tracked: input.tracked,
       inventoryPolicy: input.inventoryPolicy ? toPolicyValue(input.inventoryPolicy) : null,
+      harmonizedSystemCode: input.harmonizedSystemCode,
     });
     return Object.assign(new InventoryItemUpdatePayload(), {
       inventoryItem: result.ok ? toInventoryItem(result.value) : null,

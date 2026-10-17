@@ -67,6 +67,8 @@ export const items = inventorySchema.table(
     inventoryPolicy: text('inventory_policy', { enum: INVENTORY_POLICIES })
       .notNull()
       .default('deny'),
+    /** Its harmonized system code, 6 to 13 digits (CAT-19, ADR-557); null for none. */
+    harmonizedSystemCode: text('harmonized_system_code'),
     version: integer('version').notNull().default(1),
     ...timestamps,
   },

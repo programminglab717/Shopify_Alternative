@@ -1,5 +1,6 @@
 import type { Tx } from '@hatti/db';
-import { recordFiscalDocumentsIn, type FiscalDocument } from '@hatti/tax/public';
+import { harmonizedSystemCodesIn } from '@hatti/inventory/public';
+import { recordFiscalDocumentsIn } from '@hatti/tax/public';
 import { sql } from 'drizzle-orm';
 import { fiscalCreditNoteOf, fiscalInvoiceOf } from './fiscal.js';
 import type { OrderRecord } from './records.js';
@@ -116,7 +117,7 @@ export async function issueInvoicesIn(
     orders.map((order) => order.id),
   );
   const taxYear = taxYearOf(now, timeZone);
-  const fiscal: FiscalDocument[] = [];
+  const fiscal: { order: OrderRecord; invoice: OrderInvoiceRecord }[] = [];
   for (const order of orders) {
     if (invoices.has(order.id) || order.stage === 'cancelled') continue;
     const number = await nextNumberIn(tx, shopId, 'invoice', taxYear);
@@ -126,9 +127,23 @@ export async function issueInvoicesIn(
       RETURNING order_id, tax_year, number, issued_at`);
     const invoice = toRecord(issued[0]!);
     invoices.set(order.id, invoice);
-    fiscal.push(fiscalInvoiceOf(order, invoice.name, invoice.issuedAt));
+    fiscal.push({ order, invoice });
   }
-  await recordFiscalDocumentsIn(tx, shopId, fiscal, timeZone);
+  if (fiscal.length > 0) {
+    const hsCodes = await harmonizedSystemCodesIn(
+      tx,
+      shopId,
+      fiscal.flatMap(({ order }) => order.lines.map((line) => line.variantId)),
+    );
+    await recordFiscalDocumentsIn(
+      tx,
+      shopId,
+      fiscal.map(({ order, invoice }) =>
+        fiscalInvoiceOf(order, invoice.name, invoice.issuedAt, hsCodes),
+      ),
+      timeZone,
+    );
+  }
   return invoices;
 }
 

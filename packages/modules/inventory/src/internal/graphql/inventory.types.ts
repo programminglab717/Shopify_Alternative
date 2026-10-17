@@ -176,6 +176,14 @@ export class InventoryItemInput {
 
   @Field(() => InventoryPolicy, { nullable: true })
   inventoryPolicy?: InventoryPolicy | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'Its harmonized system code, 6 to 13 digits, dots and spaces as typed: "6204.42.00". ' +
+      'Blank clears it; null leaves it.',
+  })
+  harmonizedSystemCode?: string | null;
 }
 
 @InputType()

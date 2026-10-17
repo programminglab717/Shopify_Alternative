@@ -106,6 +106,16 @@ describe('What FBR is sent of an invoice (POS-04, ADR-555)', () => {
     const request = fbrInvoiceRequest(body, 123456, '62044200');
     expect(request.POSID).toBe(123456);
     expect(request.Items.map((item) => item.PCTCode)).toEqual(['62044200', '62044200']);
+    // An item with a PCT code of its own keeps it (ADR-557).
+    const own = fbrInvoiceBody(
+      { ...INVOICE, items: [{ ...INVOICE.items[0]!, pctCode: '62034200' }, INVOICE.items[1]!] },
+      'Asia/Karachi',
+    );
+    expect(own.Items[0]!.PCTCode).toBe('62034200');
+    expect(fbrInvoiceRequest(own, 123456, '62044200').Items.map((item) => item.PCTCode)).toEqual([
+      '62034200',
+      '62044200',
+    ]);
     expect(fbrDateTime(new Date('2026-12-31T19:30:00Z'), 'Asia/Karachi')).toBe(
       '2027-01-01 00:30:00',
     );

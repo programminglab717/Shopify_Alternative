@@ -9,7 +9,12 @@ import type {
   InventoryMoveInput,
   SetQuantitiesInput,
 } from './inventory.service.js';
-import { availableForSale, sellableQuantity, untrackedItem } from './item-store.js';
+import {
+  availableForSale,
+  harmonizedSystemCodesIn,
+  sellableQuantity,
+  untrackedItem,
+} from './item-store.js';
 import type { LocationRecord } from './records.js';
 import { LIMITS } from './rules.js';
 import { adjustments, items, levels, locations, movements } from './schema.js';
@@ -407,6 +412,40 @@ describe.skipIf(!server)('InventoryService', () => {
     );
     expect(availableForSale(continuing)).toBe(true);
     expect((await available()).get(variants[0]!)).toBe(true);
+  });
+
+  it("keeps an item's HS code, its digits alone, and clears it when blank (ADR-557)", async () => {
+    const codes = () =>
+      f.db.tenant(f.a.shopId, (tx) => harmonizedSystemCodesIn(tx, f.a.shopId, variants));
+    unwrap(
+      await f.inventory.updateItem(f.a, variants[0]!, { harmonizedSystemCode: ' 6204.42.00 ' }),
+    );
+    unwrap(await f.inventory.updateItem(f.a, variants[1]!, { harmonizedSystemCode: '620442' }));
+    expect([...(await codes())]).toEqual(
+      expect.arrayContaining([
+        [variants[0], '62044200'],
+        [variants[1], '620442'],
+      ]),
+    );
+    expect(await f.inventory.harmonizedSystemCodesOf(f.a, [variants[2]!])).toEqual(new Map());
+    for (const typed of ['62044', '6204-42-00', 'x'.repeat(8), '1'.repeat(14)]) {
+      expect(
+        errorsOf(await f.inventory.updateItem(f.a, variants[0]!, { harmonizedSystemCode: typed })),
+      ).toEqual([['input.harmonizedSystemCode', 'INVALID']]);
+    }
+    // Left out, it stays; blank clears it; each change is recorded.
+    unwrap(await f.inventory.updateItem(f.a, variants[0]!, { tracked: true }));
+    unwrap(await f.inventory.updateItem(f.a, variants[0]!, { harmonizedSystemCode: '' }));
+    expect([...(await codes()).keys()]).toEqual([variants[1]]);
+    expect(
+      (await f.outbox())
+        .filter((event) => event.aggregate_id === variants[0])
+        .map((event) => [event.payload.changed, event.payload.harmonizedSystemCode]),
+    ).toEqual([
+      [['harmonizedSystemCode'], '62044200'],
+      [['tracked'], '62044200'],
+      [['harmonizedSystemCode'], null],
+    ]);
   });
 
   it('updates item settings, recording what changed', async () => {

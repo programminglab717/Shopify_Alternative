@@ -15,6 +15,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { InventoryEvents, type InventoryItemUpdatedPayload } from './events.js';
 import {
   availableForSale,
+  harmonizedSystemCodesIn,
   loadItems,
   sellableQuantity,
   sellsWithoutLimit,
@@ -103,6 +104,15 @@ export interface MoveQuantitiesInput {
 export interface InventoryItemUpdateInput {
   tracked?: boolean | null;
   inventoryPolicy?: InventoryPolicyValue | null;
+  /** 6 to 13 digits, dots and spaces as typed (ADR-557); blank clears it, null leaves it. */
+  harmonizedSystemCode?: string | null;
+}
+
+/** An HS code as typed, "6204.42.00", as its digits; undefined when it is not one. */
+export function harmonizedSystemCodeOf(typed: string): string | null | undefined {
+  const digits = typed.replace(/[\s.]/g, '');
+  if (digits === '') return null;
+  return /^[0-9]{6,13}$/.test(digits) ? digits : undefined;
 }
 
 export interface HistoryOptions {
@@ -239,6 +249,16 @@ export class InventoryService {
     private readonly variants: VariantService,
   ) {}
 
+  /** The HS codes of those of `variantIds` that have one (ADR-557); for batch loaders. */
+  harmonizedSystemCodesOf(
+    tenant: TenantContext,
+    variantIds: readonly string[],
+  ): Promise<Map<string, string>> {
+    return this.db.tenant(tenant.shopId, (tx) =>
+      harmonizedSystemCodesIn(tx, tenant.shopId, variantIds),
+    );
+  }
+
   /** The items of those of `variantIds` whose stock was ever recorded; for batch loaders. */
   itemsOf(tenant: TenantContext, variantIds: readonly string[]) {
     if (variantIds.length === 0) return Promise.resolve(new Map<string, InventoryItemRecord>());
@@ -290,12 +310,26 @@ export class InventoryService {
     });
   }
 
-  /** Turns tracking on or off, or changes what happens at zero available. */
+  /**
+   * Turns tracking on or off, changes what happens at zero available, or sets its HS code
+   * (ADR-557).
+   */
   async updateItem(
     tenant: TenantContext,
     variantId: string,
     input: InventoryItemUpdateInput,
   ): Promise<MutationResult<InventoryItemRecord>> {
+    const hsCode =
+      input.harmonizedSystemCode === undefined || input.harmonizedSystemCode === null
+        ? undefined
+        : harmonizedSystemCodeOf(input.harmonizedSystemCode);
+    if (hsCode === undefined && input.harmonizedSystemCode) {
+      return failOne(
+        ['input', 'harmonizedSystemCode'],
+        'INVALID',
+        'must be an HS code of 6 to 13 digits, as "6204.42.00"',
+      );
+    }
     return this.db.tenant(tenant.shopId, async (tx) => {
       const products = await this.variants.productIdsOf(tx, tenant.shopId, [variantId]);
       const productId = products.get(variantId);
@@ -306,12 +340,21 @@ export class InventoryService {
         .from(items)
         .where(and(eq(items.shopId, tenant.shopId), eq(items.variantId, variantId)))
         .for('update');
-      const before = existing ?? { tracked: false, inventoryPolicy: 'deny' as const, version: 0 };
+      const before = existing ?? {
+        tracked: false,
+        inventoryPolicy: 'deny' as const,
+        harmonizedSystemCode: null,
+        version: 0,
+      };
       const tracked = input.tracked ?? before.tracked;
       const inventoryPolicy = input.inventoryPolicy ?? before.inventoryPolicy;
+      const harmonizedSystemCode = hsCode === undefined ? before.harmonizedSystemCode : hsCode;
       const changed: InventoryItemUpdatedPayload['changed'] = [];
       if (tracked !== before.tracked) changed.push('tracked');
       if (inventoryPolicy !== before.inventoryPolicy) changed.push('inventoryPolicy');
+      if (harmonizedSystemCode !== before.harmonizedSystemCode) {
+        changed.push('harmonizedSystemCode');
+      }
 
       if (changed.length > 0) {
         const [written] = existing
@@ -320,6 +363,7 @@ export class InventoryService {
               .set({
                 tracked,
                 inventoryPolicy,
+                harmonizedSystemCode,
                 version: sql`${items.version} + 1`,
                 updatedAt: sql`now()`,
               })
@@ -327,13 +371,27 @@ export class InventoryService {
               .returning({ version: items.version })
           : await tx
               .insert(items)
-              .values({ shopId: tenant.shopId, variantId, productId, tracked, inventoryPolicy })
+              .values({
+                shopId: tenant.shopId,
+                variantId,
+                productId,
+                tracked,
+                inventoryPolicy,
+                harmonizedSystemCode,
+              })
               .returning({ version: items.version });
         await appendEvent<InventoryItemUpdatedPayload>(tx, tenant.shopId, {
           type: InventoryEvents.InventoryItemUpdated,
           aggregateType: 'inventory_item',
           aggregateId: variantId,
-          payload: { productId, changed, tracked, inventoryPolicy, version: written!.version },
+          payload: {
+            productId,
+            changed,
+            tracked,
+            inventoryPolicy,
+            harmonizedSystemCode,
+            version: written!.version,
+          },
         });
       }
       const loaded = await loadItems(tx, tenant.shopId, [variantId]);
