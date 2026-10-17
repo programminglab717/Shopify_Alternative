@@ -5436,6 +5436,7 @@ const STOREFRONT_PREFERENCES = /* GraphQL */ `
     returnDays
     returnExchangesOnly
     hidePoweredBy
+    consentBanner
   }
 `;
 

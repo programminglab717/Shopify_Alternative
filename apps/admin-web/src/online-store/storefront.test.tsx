@@ -14,6 +14,7 @@ const PREFERENCES = {
   returnDays: null,
   returnExchangesOnly: false,
   hidePoweredBy: false,
+  consentBanner: false,
 };
 
 const CHECKED = {
@@ -222,6 +223,29 @@ describe("The storefront's preferences and redirects", () => {
         'The Free plan doesn\'t include hiding "Powered by Hatti": choose a bigger plan to hide it',
       ),
     ).toBeTruthy();
+  });
+
+  it('asks shoppers before the pixels load, once turned on (ADR-552)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=storefront');
+
+    const consent = await screen.findByRole('region', { name: 'Cookie consent' });
+    const save = within(consent).getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+    const asks = within(consent).getByLabelText(/Ask shoppers first/) as HTMLInputElement;
+    expect(asks.checked).toBe(false);
+    expect(
+      within(consent).getByText('Your pixels load on every page, as they do now.'),
+    ).toBeTruthy();
+    expect(save.disabled).toBe(true);
+    fireEvent.click(asks);
+    expect(within(consent).getByText(/^A banner asks each shopper/)).toBeTruthy();
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(sentOf(fake, 'StorefrontPreferencesUpdate').at(-1)).toEqual({
+        input: { consentBanner: true },
+      }),
+    );
   });
 
   it('changes a redirect in place, and says what the core refuses', async () => {

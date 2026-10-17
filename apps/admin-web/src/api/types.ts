@@ -2400,6 +2400,8 @@ export interface StorefrontPreferences {
   returnDays: number | null;
   returnExchangesOnly: boolean;
   hidePoweredBy: boolean;
+  /** Whether the storefront asks shoppers before the ad platforms' pixels load (ADR-551). */
+  consentBanner: boolean;
 }
 
 export interface StorefrontPreferencesData {

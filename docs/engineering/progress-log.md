@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### The consent banner in the admin
+
+* **The admin's storefront preferences turn the consent banner on and off, saying what each choice
+  means for the shop's pixels and its orders** ([ADR-552](../architecture/13-decision-log.md#adr-552--the-admins-storefront-preferences-turn-the-consent-banner-on-and-off-saying-what-each-choice-means-for-the-shops-pixels-and-its-orders), MKT-10).
+* 3361 tests, 1 more: the setting turned on and saved.
+
 ### b4e39e7 · A consent banner
 
 * **A shop may ask its shoppers before its ad platforms' pixels load: a banner until they accept or

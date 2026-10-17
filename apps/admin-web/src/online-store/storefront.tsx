@@ -262,9 +262,33 @@ function BrandingForm({ preferences }: { preferences: StorefrontPreferences }) {
 }
 
 /**
+ * Asking shoppers before the ad platforms' pixels load (ADR-551, ADR-552): a banner on the
+ * storefront until they accept or decline, the pixels waiting for the answer.
+ */
+function ConsentForm({ preferences }: { preferences: StorefrontPreferences }) {
+  const { t } = useLocale();
+  const [asks, setAsks] = useState(preferences.consentBanner);
+  const input = asks === preferences.consentBanner ? {} : { consentBanner: asks };
+  return (
+    <PreferencesForm
+      title={t('storefront.consent')}
+      hint={t('storefront.consentHint')}
+      input={input}
+    >
+      <CheckField
+        label={t('storefront.consentBanner')}
+        hint={t(asks ? 'storefront.consentOn' : 'storefront.consentOff')}
+        checked={asks}
+        onChange={setAsks}
+      />
+    </PreferencesForm>
+  );
+}
+
+/**
  * The storefront's preferences (OS-09, OS-11, OS-15), for owners and managers: its password while
  * the shop gets ready, a pause while it is open, its home page for search engines, its return
- * window, and whether it says "Powered by Hatti".
+ * window, whether it says "Powered by Hatti", and whether it asks shoppers before its pixels load.
  */
 export function StorefrontPreferencesTab() {
   const { t } = useLocale();
@@ -289,6 +313,7 @@ export function StorefrontPreferencesTab() {
       <SearchForm preferences={preferences} />
       <ReturnsForm preferences={preferences} />
       <BrandingForm preferences={preferences} />
+      <ConsentForm preferences={preferences} />
       <HomeUrduCard />
     </div>
   );

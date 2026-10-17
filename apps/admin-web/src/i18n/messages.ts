@@ -1842,6 +1842,13 @@ const en = {
   'storefront.poweredBy': 'Show "Powered by Hatti"',
   'storefront.poweredByOn': 'Shoppers see a link to Hatti at the foot of every page.',
   'storefront.poweredByOff': 'Your storefront says nothing of Hatti.',
+  'storefront.consent': 'Cookie consent',
+  'storefront.consentHint':
+    'Ask shoppers before your Meta, TikTok and Google pixels load, as the law asks in some countries you may sell to.',
+  'storefront.consentBanner': 'Ask shoppers first',
+  'storefront.consentOn':
+    'A banner asks each shopper until they accept or decline. Pixels load only once they accept, and orders of those who did not go to no ad platform.',
+  'storefront.consentOff': 'Your pixels load on every page, as they do now.',
   'redirects.intro':
     "Send old addresses, such as your Shopify store's, on to where their pages are now, so links shared before still work.",
   'redirects.search': 'Find a redirect',
@@ -6642,6 +6649,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'storefront.poweredBy': '"ہٹی کے ذریعے" دکھائیں',
   'storefront.poweredByOn': 'خریداروں کو ہر صفحے کے آخر میں ہٹی کا لنک نظر آتا ہے۔',
   'storefront.poweredByOff': 'آپ کا اسٹور فرنٹ ہٹی کا ذکر نہیں کرتا۔',
+  'storefront.consent': 'کوکیز کی اجازت',
+  'storefront.consentHint':
+    'اپنے میٹا، ٹک ٹاک اور گوگل پکسلز لوڈ ہونے سے پہلے خریداروں سے پوچھیں، جیسا کہ کچھ ملکوں کا قانون کہتا ہے جہاں آپ بیچ سکتے ہیں۔',
+  'storefront.consentBanner': 'پہلے خریداروں سے پوچھیں',
+  'storefront.consentOn':
+    'ایک بینر ہر خریدار سے پوچھتا ہے جب تک وہ قبول یا انکار نہ کرے۔ پکسلز صرف قبول کرنے پر لوڈ ہوتے ہیں، اور انکار کرنے والوں کے آرڈر کسی اشتہاری پلیٹ فارم کو نہیں جاتے۔',
+  'storefront.consentOff': 'آپ کے پکسلز ہر صفحے پر لوڈ ہوتے ہیں، جیسے ابھی ہوتے ہیں۔',
   'redirects.intro':
     'پرانے ایڈریس، جیسے آپ کے شاپیفائی اسٹور کے، وہاں بھیجیں جہاں ان کے صفحے اب ہیں، تاکہ پہلے شیئر کیے گئے لنک چلتے رہیں۔',
   'redirects.search': 'ری ڈائریکٹ تلاش کریں',

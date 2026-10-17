@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-551 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-552 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -559,6 +559,7 @@
 | 549 | The admin's inbox lists a shop's WhatsApp conversations open, unread or closed, and a conversation's page reads it as it opens, closes and reopens it, and answers within the day WhatsApp allows, for those who work it; marketers read it alone | Accepted |
 | 550 | The admin's online store has a Google tab: the web stream connected with its measurement ID and API secret, its purchase moment chosen, disconnected once asked, and the moments sent to Google listed apart | Accepted |
 | 551 | A shop may ask its shoppers before its ad platforms' pixels load: a banner until they accept or decline, kept in a cookie of the shop's, the pixels waiting for the answer, and an order placed by one who did not accept sent to no ad platform | Accepted |
+| 552 | The admin's storefront preferences turn the consent banner on and off, saying what each choice means for the shop's pixels and its orders | Accepted |
 
 ---
 
@@ -20783,3 +20784,17 @@
   * **Google's and Meta's consent modes, the pixels loaded but told to hold back:** they still
     load the platforms' scripts before the shopper answers.
   * **A banner the theme renders:** every theme would need one, and the pixels are the platform's.
+
+## ADR-552 · The admin's storefront preferences turn the consent banner on and off, saying what each choice means for the shop's pixels and its orders
+
+* **Context:** A shop may ask its shoppers before its pixels load (ADR-551), but only through the
+  API.
+* **Decision:** **Cookie consent** in the online store's storefront tab, for owners and managers as
+  the tab's other preferences, a box to ask shoppers first, its hint saying what each choice does:
+  asking, a banner until each shopper answers, pixels loading only once they accept, and orders of
+  those who did not going to no ad platform; not asking, the pixels on every page as before. Saved
+  on its own, as the tab's other forms are.
+* **Consequences:** A shop turns the banner on where it sells into countries that ask for it,
+  without the API.
+* **Alternatives:** **Beside each platform's tab:** the banner holds back every platform alike, so
+  it is the storefront's.
