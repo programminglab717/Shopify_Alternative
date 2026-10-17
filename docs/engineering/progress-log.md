@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### The inbox keeps what customers write
+### 56243f8 · The inbox keeps what customers write
 
 * **What customers write to a shop on WhatsApp is kept as a conversation for each customer's
   number, for its staff to read, mark read and close** ([ADR-545](../architecture/13-decision-log.md#adr-545--what-customers-write-to-a-shop-on-whatsapp-is-kept-as-a-conversation-for-each-customers-number-the-shop-found-by-the-number-written-to-the-message-answered-or-the-last-shop-to-write-for-its-staff-to-read-mark-read-and-close), MSG-05). The shop is found by the
