@@ -17,6 +17,8 @@ export const STATUS_SUBSCRIPTION_LIMITS = {
   confirmationsPerSweep: 50,
   /** Updates are emailed while this fresh; older ones, missed while the worker was down, never. */
   freshHours: 24,
+  /** Shops are told of an outage on WhatsApp while its update is this fresh (ADR-544). */
+  shopNoticeFreshHours: 6,
 } as const;
 
 /** The link's path on the core's address: /status/subscription/<token>. */
@@ -44,6 +46,21 @@ export interface StatusUpdateToMail {
   status: IncidentStatus;
   body: string;
   bodyUr: string | null;
+  postedAt: Date;
+}
+
+/**
+ * An outage's update to tell every shop on WhatsApp (ADR-544): the one that opened it, or the one
+ * that ended it.
+ */
+export interface StatusShopNotice {
+  updateId: string;
+  incidentId: string;
+  kind: IncidentKind;
+  title: string;
+  titleUr: string | null;
+  components: StatusComponent[];
+  status: IncidentStatus;
   postedAt: Date;
 }
 
@@ -188,5 +205,68 @@ export class StatusSubscriptionsService {
         recipients: recipients.rows,
       };
     });
+  }
+
+  /**
+   * The outages' updates to tell shops of on WhatsApp at `now`, the first posted first (ADR-544):
+   * of an incident or maintenance putting a part out of service, the update that opened it and
+   * the one that ended it, while six hours fresh. Every other update is put aside for good here,
+   * so a slow or partial trouble, and what Hatti says while it lasts, reach shops only by the
+   * status page and its emails. Each given is given again until {@link shopNoticeSent}.
+   */
+  async shopNoticesDue(now: Date = new Date()): Promise<StatusShopNotice[]> {
+    const fresh = new Date(
+      now.getTime() - STATUS_SUBSCRIPTION_LIMITS.shopNoticeFreshHours * 3_600_000,
+    );
+    const told = sql`
+      i.impact = 'outage'
+      AND u.posted_at >= ${fresh.toISOString()}
+      AND (u.status IN ('resolved', 'completed')
+           OR u.id = (SELECT first.id FROM trust.incident_updates first
+                       WHERE first.incident_id = u.incident_id
+                       ORDER BY first.posted_at, first.id LIMIT 1))`;
+    return this.db.system(async (tx) => {
+      await tx.execute(sql`
+        UPDATE trust.incident_updates u
+           SET shops_told_at = ${now.toISOString()}
+          FROM trust.incidents i
+         WHERE i.id = u.incident_id AND u.shops_told_at IS NULL
+           AND u.posted_at <= ${now.toISOString()}
+           AND NOT (${told})`);
+      const { rows } = await tx.execute<{
+        id: string;
+        incident_id: string;
+        kind: IncidentKind;
+        title: string;
+        title_ur: string | null;
+        components: StatusComponent[];
+        status: IncidentStatus;
+        posted_at: string | Date;
+      }>(sql`
+        SELECT u.id, u.incident_id, i.kind, i.title, i.title_ur, i.components, u.status,
+               u.posted_at
+          FROM trust.incident_updates u JOIN trust.incidents i ON i.id = u.incident_id
+         WHERE u.shops_told_at IS NULL AND u.posted_at <= ${now.toISOString()} AND ${told}
+         ORDER BY u.posted_at, u.id`);
+      return rows.map((row) => ({
+        updateId: row.id,
+        incidentId: row.incident_id,
+        kind: row.kind,
+        title: row.title,
+        titleUr: row.title_ur,
+        components: row.components,
+        status: row.status,
+        postedAt: new Date(row.posted_at),
+      }));
+    });
+  }
+
+  /** Marks the update `updateId` told to every shop, at `now`. */
+  async shopNoticeSent(updateId: string, now: Date = new Date()): Promise<void> {
+    await this.db.system((tx) =>
+      tx.execute(sql`
+        UPDATE trust.incident_updates SET shops_told_at = ${now.toISOString()}
+         WHERE id = ${updateId} AND shops_told_at IS NULL`),
+    );
   }
 }

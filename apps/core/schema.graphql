@@ -6771,6 +6771,11 @@ enum MessageKind {
   SMS_SENDER_REVOKED
 
   """
+  For the shop, from Hatti and paid by Hatti, at its alerts number: an outage of Hatti's begun, or maintenance putting a part out of service set, and its ending (ADR-544).
+  """
+  STATUS_UPDATE
+
+  """
   For the shop: a variant fell to its low-stock threshold for sale online (INV-01), once a spell, until it is stocked above it again.
   """
   STOCK_LOW

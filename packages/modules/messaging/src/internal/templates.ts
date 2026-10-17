@@ -65,6 +65,7 @@ export const MESSAGE_KINDS = [
   'listings_taken_down',
   'rights_counter_refused',
   'listings_released',
+  'status_update',
   'broadcast',
   'automation',
   'sms_broadcast',
@@ -139,6 +140,8 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'listings_taken_down',
   'rights_counter_refused',
   'listings_released',
+  // Hatti's outages, when they begin and end (ADR-544).
+  'status_update',
   // The shop's own, which it schedules itself (ADR-421, ADR-458), or sets going (ADR-425).
   'broadcast',
   'automation',
@@ -185,6 +188,7 @@ export const TO_THE_SHOP_KINDS: readonly MessageKind[] = [
   'listings_taken_down',
   'rights_counter_refused',
   'listings_released',
+  'status_update',
 ];
 
 /**
@@ -330,6 +334,14 @@ export interface MessageVariables {
    */
   discount?: string;
   offer?: string;
+  /**
+   * For Hatti's outages (ADR-544): what Hatti called it, in the shop's language where it said it
+   * in Urdu too, "WhatsApp messages delayed"; where it stands, "Resolved"; and the parts it
+   * touches, "WhatsApp messages, SMS". In `url`, the status page.
+   */
+  title?: string;
+  status?: string;
+  touches?: string;
 }
 
 /**
@@ -1156,6 +1168,16 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     subject: {
       en: "{shop}'s listings are let go",
       ur: '{shop} کی اشیاء بحال کر دی گئی ہیں',
+    },
+  },
+  status_update: {
+    whatsapp: 'hatti_status_update',
+    category: 'utility',
+    parameters: ['shop', 'title', 'status', 'touches', 'url'],
+    hattiPays: true,
+    text: {
+      en: 'Hatti status for {shop}: {title}. {status}. Touches: {touches}. See {url} for what Hatti says as it goes.',
+      ur: 'ہٹی کی صورتحال، {shop} کے لیے: {title}۔ {status}۔ متاثرہ حصے: {touches}۔ ہٹی کی تازہ معلومات {url} پر دیکھیں۔',
     },
   },
 };

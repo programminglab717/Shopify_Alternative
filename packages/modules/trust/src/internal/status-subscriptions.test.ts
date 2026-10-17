@@ -146,5 +146,89 @@ describe("The status page's emails (BIL-06, ADR-535)", () => {
       );
       expect(rows).toEqual([{ email: 'bilal@example.pk' }]);
     });
+
+    it("gives shops an outage's opening and ending to hear on WhatsApp, each until sent, and nothing else (ADR-544)", async () => {
+      // A slow part, and what was said of it, reach shops by the page and its emails alone.
+      const slow = await incidents.open(
+        {
+          kind: 'incident',
+          impact: 'degraded',
+          components: ['sms'],
+          title: 'SMS slow',
+          body: 'Slow.',
+          by: 'Hamza',
+        },
+        minutes(300),
+      );
+      if (!slow.ok) throw new Error(slow.problem);
+      const down = await incidents.open(
+        {
+          kind: 'incident',
+          impact: 'outage',
+          components: ['checkout', 'payments'],
+          title: 'Checkout down',
+          titleUr: 'چیک آؤٹ بند',
+          body: 'Orders cannot be placed.',
+          by: 'Hamza',
+        },
+        minutes(301),
+      );
+      if (!down.ok) throw new Error(down.problem);
+      const due = await subscriptions.shopNoticesDue(minutes(302));
+      expect(due).toEqual([
+        expect.objectContaining({
+          incidentId: down.value.id,
+          kind: 'incident',
+          title: 'Checkout down',
+          titleUr: 'چیک آؤٹ بند',
+          components: ['checkout', 'payments'],
+          status: 'investigating',
+        }),
+      ]);
+      // Given again until it is sent.
+      expect(await subscriptions.shopNoticesDue(minutes(303))).toEqual(due);
+      await subscriptions.shopNoticeSent(due[0]!.updateId, minutes(303));
+      expect(await subscriptions.shopNoticesDue(minutes(304))).toEqual([]);
+
+      // What is said while it lasts is not sent; its ending is.
+      for (const [status, at] of [
+        ['identified', 310],
+        ['resolved', 320],
+      ] as const) {
+        await incidents.update(down.value.id, { status, body: status, by: 'Hamza' }, minutes(at));
+      }
+      const ended = await subscriptions.shopNoticesDue(minutes(321));
+      expect(ended.map((notice) => notice.status)).toEqual(['resolved']);
+      await subscriptions.shopNoticeSent(ended[0]!.updateId, minutes(321));
+
+      // Maintenance putting a part out of service: its setting, and its completion, while fresh.
+      const planned = await incidents.open(
+        {
+          kind: 'maintenance',
+          impact: 'outage',
+          components: ['admin'],
+          title: 'Admin upgrade',
+          body: 'The admin is down for an hour.',
+          startsAt: minutes(2000),
+          endsAt: minutes(2060),
+          by: 'Hamza',
+        },
+        minutes(330),
+      );
+      if (!planned.ok) throw new Error(planned.problem);
+      // Missed for over six hours: put aside, never sent.
+      expect(await subscriptions.shopNoticesDue(minutes(330 + 7 * 60))).toEqual([]);
+      await incidents.update(
+        planned.value.id,
+        { status: 'completed', body: 'Done.', by: 'Hamza' },
+        minutes(2061),
+      );
+      expect(
+        (await subscriptions.shopNoticesDue(minutes(2062))).map((notice) => [
+          notice.kind,
+          notice.status,
+        ]),
+      ).toEqual([['maintenance', 'completed']]);
+    });
   });
 });

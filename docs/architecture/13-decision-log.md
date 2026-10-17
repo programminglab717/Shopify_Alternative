@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-543 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-544 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -551,6 +551,7 @@
 | 541 | Orders placed through checkout go to TikTok's Events API from the worker beside Meta's, the shop connecting its TikTok pixel with a token, each moment waiting in Postgres as Meta's do | Accepted |
 | 542 | The admin's online store has a TikTok tab: the pixel connected, changed and disconnected, and the moments sent to TikTok listed apart from Meta's | Accepted |
 | 543 | A shop's storefront loads its TikTok pixel while TikTok is connected, beside Meta's, for the steps shoppers take before checkout, and the order keeps the pixel's browser ID for the Events API | Accepted |
+| 544 | Every shop hears on WhatsApp when an outage of Hatti's begins and ends, at its alerts number and at Hatti's cost, each update once | Accepted |
 
 ---
 
@@ -20528,3 +20529,29 @@
 * **Alternatives:**
   * **The shop pasting TikTok's code into its theme:** no pixel code in the theme to keep in step
     with the connected one, and its order events would name no browser.
+
+## ADR-544 · Every shop hears on WhatsApp when an outage of Hatti's begins and ends, at its alerts number and at Hatti's cost, each update once
+
+* **Context:** Hatti's status page (ADR-498) shows outages, the admin carries a banner, and anyone
+  may be emailed its updates (ADR-535). A shop owner away from the admin, whose checkout is down
+  in the middle of a sale, hears of it from customers first.
+* **Decision:**
+  * **What is sent:** of an incident or maintenance that puts a part out of service (impact
+    `outage`), the update that opened it (or set the maintenance ahead) and the one that ended it.
+    What is said while it lasts, and slow or partial trouble (`degraded`), reach shops by the page,
+    the banner and the emails alone.
+  * **To whom:** every shop with an alerts number, on WhatsApp from Hatti's number, a notice the
+    shop cannot turn off and Hatti pays for (`status_update`), as its bills' notices are
+    (ADR-169). It names the shop, what Hatti called the trouble, where it stands and the parts it
+    touches, in the shop's language (Urdu where Hatti wrote the title in Urdu too), and links to
+    the status page.
+  * **Once each:** an update is marked told once every shop has it queued, each queued with a key
+    of its own, so a shop that failed is tried again next sweep and none hears it twice. An update
+    missed for six hours, as while the worker was down, is put aside and never sent.
+  * Updates posted before this are not sent.
+* **Consequences:**
+  * An owner hears of an outage, and of its end, where they read their alerts.
+  * At most two messages for each outage and shop, at Hatti's cost.
+* **Alternatives:**
+  * **Every update to every shop:** an outage of hours would send each shop several messages.
+  * **Only shops that ask:** the shops least in the admin, who most need it, would not.

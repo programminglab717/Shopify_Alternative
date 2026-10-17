@@ -105,6 +105,7 @@ export {
   subscriberEmail,
   type StatusRecipient,
   type StatusSubscriptionView,
+  type StatusShopNotice,
   type StatusUpdateToMail,
 } from '../internal/status-subscriptions.service.js';
 export { COMPONENT_WORDS, STATUS_WORDS } from '../internal/status-page.js';

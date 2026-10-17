@@ -548,6 +548,23 @@ describe("Messages' words", () => {
       'listings_taken_down',
       'rights_counter_refused',
       'listings_released',
+      'status_update',
+    ]);
+    // Hatti's outages, in the shop's words for its status (ADR-544).
+    expect(
+      templateParameters('status_update', {
+        shop: 'Zari Fashions',
+        title: 'Checkout down',
+        status: 'Resolved',
+        touches: 'Checkout, Online payments',
+        url: 'https://hatti.pk/status',
+      }),
+    ).toEqual([
+      'Zari Fashions',
+      'Checkout down',
+      'Resolved',
+      'Checkout, Online payments',
+      'https://hatti.pk/status',
     ]);
     expect(ALWAYS_SENT).toEqual([
       'one_time_code',
@@ -587,6 +604,8 @@ describe("Messages' words", () => {
       'listings_taken_down',
       'rights_counter_refused',
       'listings_released',
+      // Hatti's outages (ADR-544).
+      'status_update',
       'broadcast',
       'automation',
       // The shop's SMS campaign, which its customer can stop by its link (ADR-458).
