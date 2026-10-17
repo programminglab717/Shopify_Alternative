@@ -315,10 +315,10 @@ const en = {
     'Give a title, or say what it is in the description, for the AI to write from.',
   'copyDraft.left': '{count} AI drafts left today. The AI writes only from what the form says.',
   'copyDraft.credits':
-    "{count} of your plan's {perMonth} AI credits left this month. The AI writes only from what the form says.",
-  'ai.creditsLeft': "{left} of your plan's {perMonth} AI credits left this month.",
+    '{count} AI credits left; your plan gives {perMonth} a month. The AI writes only from what the form says.',
+  'ai.creditsLeft': '{left} AI credits left; your plan gives {perMonth} a month.',
   'ai.noCredits':
-    "Your plan's AI credits for this month are used: they come back on the 1st, or choose a bigger plan for more.",
+    "Your AI credits are used: your plan's come back on the 1st, or buy more in Settings → Billing.",
   'copyDraft.drafted':
     'Written by AI from what you gave. Check every word, the fabric and sizes above all, before you save.',
   'product.titleLabel': 'Title',
@@ -793,6 +793,12 @@ const en = {
   'billing.choose': 'Choose {plan}',
   'billing.keep': 'Keep {plan}',
   'billing.credit': 'Message credit',
+  'billing.aiCreditsTitle': 'AI credits',
+  'billing.aiCreditsHint':
+    "Each draft the AI writes for you, a product's words or a translation, spends one.",
+  'billing.aiCreditsMonth': "{left} of this month's {perMonth} left. They come back on {date}.",
+  'billing.aiCreditsBought': '{count} bought, kept until you use them.',
+  'billing.aiCreditsBuy': 'Buy {count} more for {price} from your message credit',
   'billing.creditHint': 'WhatsApp and SMS messages to your customers are paid from it.',
   'billing.buyAmount': 'Credit to buy, in rupees',
   'billing.buyAmountHint': 'From Rs 500 to Rs 100,000.',
@@ -3189,6 +3195,8 @@ const en = {
   'wallet.more': 'Show more',
   'wallet.after': 'Balance after: {amount}',
   'wallet.kind.TOP_UP': 'Credit bought',
+  'wallet.kind.AI_CREDITS': 'AI credits bought',
+  'wallet.kind.AI_CREDITS_NOTE': 'Bought: {note}',
   'wallet.kind.GRANT': 'Given by Hatti',
   'wallet.kind.GRANT_NOTE': 'Given by Hatti: {note}',
   'wallet.kind.MESSAGE': '{channel}: {what}',
@@ -4997,10 +5005,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'copyDraft.blank': 'AI کے لکھنے کے لیے عنوان دیں، یا تفصیل میں بتائیں کہ یہ کیا ہے۔',
   'copyDraft.left': 'آج {count} AI ڈرافٹ باقی ہیں۔ AI صرف وہی لکھتا ہے جو فارم میں ہے۔',
   'copyDraft.credits':
-    'اس مہینے آپ کے پلان کے {perMonth} میں سے {count} AI کریڈٹ باقی ہیں۔ AI صرف وہی لکھتا ہے جو فارم میں ہے۔',
-  'ai.creditsLeft': 'اس مہینے آپ کے پلان کے {perMonth} میں سے {left} AI کریڈٹ باقی ہیں۔',
+    '{count} AI کریڈٹ باقی ہیں؛ آپ کا پلان ہر مہینے {perMonth} دیتا ہے۔ AI صرف وہی لکھتا ہے جو فارم میں ہے۔',
+  'ai.creditsLeft': '{left} AI کریڈٹ باقی ہیں؛ آپ کا پلان ہر مہینے {perMonth} دیتا ہے۔',
   'ai.noCredits':
-    'اس مہینے آپ کے پلان کے AI کریڈٹ ختم ہو گئے: یہ یکم کو واپس آئیں گے، یا زیادہ کے لیے بڑا پلان چنیں۔',
+    'آپ کے AI کریڈٹ ختم ہو گئے: پلان کے کریڈٹ یکم کو واپس آئیں گے، یا سیٹنگز ← بلنگ میں مزید خریدیں۔',
   'copyDraft.drafted':
     'یہ AI نے آپ کی دی گئی معلومات سے لکھا ہے۔ محفوظ کرنے سے پہلے ہر لفظ، خاص طور پر کپڑا اور سائز، دیکھ لیں۔',
   'product.titleLabel': 'نام',
@@ -5473,6 +5481,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'billing.choose': '{plan} چنیں',
   'billing.keep': '{plan} رکھیں',
   'billing.credit': 'میسج کریڈٹ',
+  'billing.aiCreditsTitle': 'اے آئی کریڈٹ',
+  'billing.aiCreditsHint':
+    'اے آئی کا لکھا ہر ڈرافٹ، کسی پروڈکٹ کے الفاظ ہوں یا ترجمہ، ایک کریڈٹ خرچ کرتا ہے۔',
+  'billing.aiCreditsMonth':
+    'اس مہینے کے {perMonth} میں سے {left} باقی ہیں۔ یہ {date} کو واپس آئیں گے۔',
+  'billing.aiCreditsBought': '{count} خریدے ہوئے، استعمال ہونے تک رہیں گے۔',
+  'billing.aiCreditsBuy': 'اپنے میسج کریڈٹ سے {price} میں مزید {count} خریدیں',
   'billing.creditHint': 'آپ کے کسٹمرز کو واٹس ایپ اور ایس ایم ایس میسجز اسی سے ادا ہوتے ہیں۔',
   'billing.buyAmount': 'خریدنے کا کریڈٹ، روپوں میں',
   'billing.buyAmountHint': '500 روپے سے 100,000 روپے تک۔',
@@ -7862,6 +7877,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'wallet.more': 'مزید دکھائیں',
   'wallet.after': 'اس کے بعد بیلنس: {amount}',
   'wallet.kind.TOP_UP': 'کریڈٹ خریدا گیا',
+  'wallet.kind.AI_CREDITS': 'اے آئی کریڈٹ خریدے گئے',
+  'wallet.kind.AI_CREDITS_NOTE': 'خریدے گئے: {note}',
   'wallet.kind.GRANT': 'ہٹی کی طرف سے دیا گیا',
   'wallet.kind.GRANT_NOTE': 'ہٹی کی طرف سے دیا گیا: {note}',
   'wallet.kind.MESSAGE': '{channel}: {what}',

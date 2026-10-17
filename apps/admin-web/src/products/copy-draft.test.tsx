@@ -103,7 +103,7 @@ describe("A product's copy written with AI (CAT-20, ADR-472)", () => {
     type('Title', 'Lawn suit');
     expect(
       screen.getByText(
-        "4 of your plan's 10 AI credits left this month. The AI writes only from what the form says.",
+        '4 AI credits left; your plan gives 10 a month. The AI writes only from what the form says.',
       ),
     ).toBeTruthy();
     cleanup();
@@ -117,7 +117,7 @@ describe("A product's copy written with AI (CAT-20, ADR-472)", () => {
     expect(write.disabled).toBe(true);
     expect(
       screen.getByText(
-        "Your plan's AI credits for this month are used: they come back on the 1st, or choose a bigger plan for more.",
+        "Your AI credits are used: your plan's come back on the 1st, or buy more in Settings → Billing.",
       ),
     ).toBeTruthy();
   });

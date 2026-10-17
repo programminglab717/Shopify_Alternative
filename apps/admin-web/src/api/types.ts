@@ -1172,7 +1172,8 @@ export interface BillingInvoiceValue {
   }[];
 }
 
-export type BillingWalletEntryKind = 'GRANT' | 'MESSAGE' | 'MESSAGE_REFUND' | 'TOP_UP';
+export type BillingWalletEntryKind =
+  'AI_CREDITS' | 'GRANT' | 'MESSAGE' | 'MESSAGE_REFUND' | 'TOP_UP';
 
 /** A change to the shop's message credit: bought, given, or taken for a message (BIL-03). */
 export interface BillingWalletEntryValue {
@@ -1191,6 +1192,17 @@ export interface BillingWalletEntriesData {
   billingWalletEntries: BillingWalletEntryValue[];
 }
 
+/** The shop's AI credits: the month's own and those it bought (ADR-539). */
+export interface BillingAiCreditsValue {
+  perMonth: number;
+  used: number;
+  bought: number;
+  left: number;
+  renewsAt: string;
+  packCredits: number;
+  packPrice: MoneyValue;
+}
+
 export interface BillingData {
   billingSubscription: {
     plan: BillingPlanValue;
@@ -1204,6 +1216,8 @@ export interface BillingData {
   };
   billingPlans: BillingPlanValue[];
   billingWallet: { balance: MoneyValue; openInvoice: BillingInvoiceValue | null };
+  /** The month's AI credits and those bought (ADR-533, ADR-539); missing from older answers. */
+  billingAiCredits?: BillingAiCreditsValue;
   billingInvoices: BillingInvoiceValue[];
   billingBankAccount: {
     bankName: string;

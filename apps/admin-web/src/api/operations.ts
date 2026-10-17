@@ -2737,6 +2737,17 @@ export const BillingQuery = /* GraphQL */ `
       iban
       raastId
     }
+    billingAiCredits {
+      perMonth
+      used
+      bought
+      left
+      renewsAt
+      packCredits
+      packPrice {
+        ...Money
+      }
+    }
   }
   ${BILLING_PLAN}
   ${BILLING_INVOICE}
@@ -2800,6 +2811,22 @@ export const BillingInvoiceTransferReportMutation = /* GraphQL */ `
       transfer {
         id
         status
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** AI credits bought from the shop's message credit, a pack at a time (ADR-540). */
+export const BillingAiCreditsBuyMutation = /* GraphQL */ `
+  mutation BillingAiCreditsBuy($packs: Int!) {
+    billingAiCreditsBuy(packs: $packs) {
+      aiCredits {
+        bought
+        left
       }
       userErrors {
         ...Problems

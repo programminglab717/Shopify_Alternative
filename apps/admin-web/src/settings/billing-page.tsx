@@ -1,7 +1,17 @@
-import { Ban, Check, CircleCheck, Clock, CreditCard, Landmark, Wallet } from 'lucide-react';
+import {
+  Ban,
+  Check,
+  CircleCheck,
+  Clock,
+  CreditCard,
+  Landmark,
+  Sparkles,
+  Wallet,
+} from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  BillingAiCreditsBuyMutation,
   BillingCreditsBuyMutation,
   BillingInvoicePayMutation,
   BillingInvoiceTransferReportMutation,
@@ -10,6 +20,7 @@ import {
   BillingWalletEntriesQuery,
 } from '../api/operations';
 import type {
+  BillingAiCreditsValue,
   BillingData,
   BillingInterval,
   BillingInvoiceValue,
@@ -312,6 +323,10 @@ function entryText(entry: BillingWalletEntryValue, t: Translate): string {
         : t('wallet.kind.GRANT');
     case 'MESSAGE_REFUND':
       return t('wallet.kind.MESSAGE_REFUND', { channel });
+    case 'AI_CREDITS':
+      return entry.note
+        ? t('wallet.kind.AI_CREDITS_NOTE', { note: entry.note })
+        : t('wallet.kind.AI_CREDITS');
     case 'MESSAGE': {
       const what = entry.category
         ? t(`wallet.category.${entry.category}` as MessageKey)
@@ -447,6 +462,69 @@ function Credit({ data, owner, run }: { data: BillingData; owner: boolean; run: 
   );
 }
 
+/**
+ * The shop's AI credits (ADR-533, ADR-540): the month's own left and when they come back, those it
+ * bought, which last until spent, and for the owner a pack more, paid from the message credit.
+ */
+function AiCredits({
+  credits,
+  owner,
+  run,
+}: {
+  credits: BillingAiCreditsValue;
+  owner: boolean;
+  run: Recent;
+}) {
+  const { t, locale } = useLocale();
+  const timezone = useShopTimezone();
+  const buy = useAdminMutation<
+    { billingAiCreditsBuy: { userErrors: UserError[] } },
+    { packs: number }
+  >(BillingAiCreditsBuyMutation);
+  const [problems, setProblems] = useState<string[]>([]);
+  const monthLeft = Math.max(0, credits.perMonth - credits.used);
+
+  const onBuy = () => {
+    setProblems([]);
+    void run(
+      async () => {
+        const { billingAiCreditsBuy } = await buy.mutateAsync({ packs: 1 });
+        setProblems(billingAiCreditsBuy.userErrors.map((error) => problemText(error, t)));
+      },
+      (failure) => setProblems([errorText(failure, t)]),
+    );
+  };
+
+  return (
+    <FormSection title={t('billing.aiCreditsTitle')} hint={t('billing.aiCreditsHint')}>
+      <p className="flex items-center gap-2">
+        <Sparkles aria-hidden className="size-5 text-secondary" />
+        <span>
+          {t('billing.aiCreditsMonth', {
+            left: String(monthLeft),
+            perMonth: String(credits.perMonth),
+            date: formatDate(credits.renewsAt, timezone, locale),
+          })}
+        </span>
+      </p>
+      {credits.bought > 0 && (
+        <p data-testid="ai-credits-bought">
+          {t('billing.aiCreditsBought', { count: String(credits.bought) })}
+        </p>
+      )}
+      {owner && (
+        <Button variant="secondary" className="self-start" busy={buy.isPending} onClick={onBuy}>
+          {t('billing.aiCreditsBuy', {
+            count: String(credits.packCredits),
+            price: formatMoney(credits.packPrice.amount),
+          })}
+        </Button>
+      )}
+      <Problems problems={problems} />
+    </FormSection>
+  );
+}
+
 const INVOICE_BADGES = {
   OPEN: { colour: 'needsConfirmation', icon: Clock },
   PAID: { colour: 'delivered', icon: CircleCheck },
@@ -523,6 +601,9 @@ export function BillingPage() {
       </FormSection>
       <Plans data={data} owner={owner} run={run} />
       <Credit data={data} owner={owner} run={run} />
+      {data.billingAiCredits && (
+        <AiCredits credits={data.billingAiCredits} owner={owner} run={run} />
+      )}
       {data.billingInvoices.length > 0 && (
         <FormSection title={t('billing.invoices')}>
           <ul className="divide-y divide-line">

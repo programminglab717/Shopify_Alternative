@@ -92,6 +92,7 @@ function billingCore(
     open: BillingInvoiceValue | null;
     entries?: BillingWalletEntryValue[];
     subscription?: object;
+    aiCredits?: { perMonth: number; used: number; bought: number; left: number };
   },
   confirmed = { value: true },
 ) {
@@ -115,6 +116,14 @@ function billingCore(
             billingWallet: { balance: rupees('120.50'), openInvoice: null },
             billingInvoices: state.open ? [state.open] : [],
             billingBankAccount: BANK,
+            ...(state.aiCredits && {
+              billingAiCredits: {
+                ...state.aiCredits,
+                renewsAt: '2026-10-31T19:00:00Z',
+                packCredits: 100,
+                packPrice: rupees('500.00'),
+              },
+            }),
           };
         case 'BillingPlanChange':
           if (!confirmed.value) return REAUTHENTICATE;
@@ -139,6 +148,19 @@ function billingCore(
           return {
             billingInvoiceTransferReport: {
               transfer: { id: 'btr_1', status: 'WAITING' },
+              userErrors: [],
+            },
+          };
+        case 'BillingAiCreditsBuy':
+          if (!state.aiCredits) throw new Error('no AI credits');
+          state.aiCredits = {
+            ...state.aiCredits,
+            bought: state.aiCredits.bought + 100,
+            left: state.aiCredits.left + 100,
+          };
+          return {
+            billingAiCreditsBuy: {
+              aiCredits: { bought: state.aiCredits.bought, left: state.aiCredits.left },
               userErrors: [],
             },
           };
@@ -244,6 +266,30 @@ describe('Plan and billing in the admin', () => {
       expect(core.sent.find((each) => each.operation === 'BillingCreditsBuy')?.variables).toEqual({
         input: { amount: '2000' },
       }),
+    );
+  });
+
+  it('buys AI credits for the owner from the message credit, which last until used (ADR-540)', async () => {
+    signedIn();
+    const core = billingCore('owner', {
+      open: null,
+      aiCredits: { perMonth: 10, used: 10, bought: 0, left: 0 },
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/billing');
+
+    expect(
+      await screen.findByText("0 of this month's 10 left. They come back on 1 Nov 2026."),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('ai-credits-bought')).toBeNull();
+    await press('Buy 100 more for Rs 500 from your message credit');
+    await waitFor(() =>
+      expect(core.sent.find((each) => each.operation === 'BillingAiCreditsBuy')?.variables).toEqual(
+        { packs: 1 },
+      ),
+    );
+    expect((await screen.findByTestId('ai-credits-bought')).textContent).toBe(
+      '100 bought, kept until you use them.',
     );
   });
 
