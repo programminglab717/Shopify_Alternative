@@ -10277,6 +10277,108 @@ type PaymentSettlementRowError {
   row: Int!
 }
 
+"""A month in the shop's time zone, and what its statements came to."""
+type PayoutMonth {
+  """Gateways' fees and couriers' charges."""
+  fees: Money!
+
+  """What customers paid, or couriers collected, on the statements' lines."""
+  gross: Money!
+
+  """Its year and month: "2026-10"."""
+  month: String!
+
+  """What was paid over to the shop."""
+  net: Money!
+  statements: Int!
+
+  """The tax withheld from what was paid over."""
+  tax: Money!
+}
+
+"""One gateway or courier, and what its statements came to."""
+type PayoutSource {
+  """Gateways' fees and couriers' charges."""
+  fees: Money!
+
+  """What customers paid, or couriers collected, on the statements' lines."""
+  gross: Money!
+  kind: PayoutSourceKind!
+
+  """The gateway's name, or the courier as staff named it: "Safepay"."""
+  name: String!
+
+  """What was paid over to the shop."""
+  net: Money!
+  statements: Int!
+
+  """The tax withheld from what was paid over."""
+  tax: Money!
+}
+
+"""
+Who paid the shop: a payment gateway, for payments online, or a courier, for cash it collected on delivery.
+"""
+enum PayoutSourceKind {
+  COURIER
+  GATEWAY
+}
+
+"""A gateway's settlement or a courier's remittance statement."""
+type PayoutStatement {
+  fees: Money!
+  gross: Money!
+
+  """A PaymentSettlement or a CodRemittance."""
+  id: ID!
+  importedAt: DateTime!
+  kind: PayoutSourceKind!
+  name: String!
+  net: Money!
+
+  """The statement's own reference."""
+  reference: String
+  tax: Money!
+}
+
+"""What statements came to: paid by customers, deducted, paid over."""
+type PayoutTotals {
+  """Gateways' fees and couriers' charges."""
+  fees: Money!
+
+  """What customers paid, or couriers collected, on the statements' lines."""
+  gross: Money!
+
+  """What was paid over to the shop."""
+  net: Money!
+  statements: Int!
+
+  """The tax withheld from what was paid over."""
+  tax: Money!
+}
+
+type PayoutsReport {
+  before: DateTime!
+  from: DateTime!
+
+  """The months with statements, in order."""
+  months: [PayoutMonth!]!
+
+  """Who paid, the most paid over first."""
+  sources: [PayoutSource!]!
+  totals: PayoutTotals!
+
+  """
+  Whether more than 2000 statements of a kind fell in the period, and the report counts only the first.
+  """
+  truncated: Boolean!
+
+  """
+  The statements that withheld tax, in the order they were imported: the tax credit the shop claims in its return, each with the statement's reference to show for it.
+  """
+  withholdings: [PayoutStatement!]!
+}
+
 """
 A percentage off the shop's chosen products from a time to a time (CAT-17, ADR-443): when it starts, each variant's price is cut to a whole unit and its old price shown as the compare-at price; when it ends, both come back, unless the price was changed by hand meanwhile.
 """
@@ -12026,6 +12128,17 @@ type Query {
 
   """The gateways' settlements the shop imported, the newest first."""
   paymentSettlements(first: Int = 50): [PaymentSettlement!]!
+
+  """
+  Payouts and tax withheld (ANL-09, TAX-03): what gateways and couriers paid the shop over a period, as the statements it imported say, less their fees and the tax they withheld; by who paid, by month in the shop's time zone, and each statement that withheld tax. Staff need to be an owner, a manager or an accountant.
+  """
+  payoutsReport(
+    """Statements imported before this; at most 400 days after from."""
+    before: DateTime!
+
+    """Statements imported at or after this."""
+    from: DateTime!
+  ): PayoutsReport!
   priceSale(id: ID!): PriceSale
 
   """The shop's sales, those starting latest first; the newest hundred."""

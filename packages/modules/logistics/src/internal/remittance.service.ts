@@ -12,7 +12,7 @@ import {
   receiveCodIn,
 } from '@hatti/orders/public';
 import { Injectable } from '@nestjs/common';
-import { and, desc, eq, gt, inArray, lt, notInArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lt, notInArray, sql } from 'drizzle-orm';
 import { LogisticsEvents, type CodRemittanceImportedPayload } from './events.js';
 import { parcelFor, reconcile } from './reconcile.js';
 import {
@@ -312,6 +312,31 @@ export class CodRemittanceService {
           .map((row) => ({ ...toRecord(row), issueCount: row.issueCount })),
         hasNextPage: rows.length > options.first,
       };
+    });
+  }
+
+  /**
+   * The shop's statements imported at or after `from` and before `before`, the oldest first,
+   * `limit` at most: what couriers paid over in a period, for the payouts report (ANL-09, TAX-03).
+   */
+  async importedBetween(
+    tenant: TenantContext,
+    period: { from: Date; before: Date; limit: number },
+  ): Promise<CodRemittanceRecord[]> {
+    return this.db.tenant(tenant.shopId, async (tx) => {
+      const rows = await tx
+        .select({ ...REMITTANCE, issueCount: issueCountOf() })
+        .from(codRemittances)
+        .where(
+          and(
+            eq(codRemittances.shopId, tenant.shopId),
+            gte(codRemittances.createdAt, period.from),
+            lt(codRemittances.createdAt, period.before),
+          ),
+        )
+        .orderBy(asc(codRemittances.createdAt), asc(codRemittances.id))
+        .limit(period.limit);
+      return rows.map((row) => ({ ...toRecord(row), issueCount: row.issueCount }));
     });
   }
 

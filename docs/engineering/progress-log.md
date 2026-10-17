@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Payouts and tax withheld
+
+* **What gateways and couriers paid the shop over a period, less their fees and the tax they
+  withheld, by who paid and by month, with each statement that withheld tax** ([ADR-493](../architecture/13-decision-log.md#adr-493--payouts-and-tax-withheld-gateways-and-couriers-statements-over-a-period-by-who-paid-and-by-month-and-each-that-withheld-tax-for-the-shops-tax-credit), ANL-09
+  and TAX-03 in part).
+* 3092 tests, 2 more: the months in the shop's time zone, and the
+  report through the Admin API.
+
 ### 12e0ee8 · Gateway settlements in the admin
 
 * **Gateways' settlements have a page beside the cash page: imported once checked, and each

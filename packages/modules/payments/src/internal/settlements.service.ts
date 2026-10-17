@@ -318,6 +318,29 @@ export class PaymentSettlementService {
     return rows.map(toSettlement);
   }
 
+  /**
+   * The shop's settlements imported at or after `from` and before `before`, the oldest first,
+   * `limit` at most: what gateways paid over in a period, for the payouts report (ANL-09, TAX-03).
+   */
+  async importedBetween(
+    tenant: TenantContext,
+    period: { from: Date; before: Date; limit: number },
+  ): Promise<SettlementRecord[]> {
+    const { rows } = await this.db.tenant(tenant.shopId, (tx) =>
+      tx.execute<SettlementRow>(sql`
+        SELECT s.id, s.account_id, a.gateway, s.reference, s.line_count, ${ISSUE_COUNT},
+               s.gross, s.fees, s.tax, s.net, s.created_at
+          FROM payments.settlements s
+          JOIN payments.gateway_accounts a ON a.shop_id = s.shop_id AND a.id = s.account_id
+         WHERE s.shop_id = ${tenant.shopId}
+           AND s.created_at >= ${period.from.toISOString()}::timestamptz
+           AND s.created_at < ${period.before.toISOString()}::timestamptz
+         ORDER BY s.created_at, s.id
+         LIMIT ${period.limit}`),
+    );
+    return rows.map(toSettlement);
+  }
+
   async get(tenant: TenantContext, id: string): Promise<SettlementRecord | null> {
     return this.db.tenant(tenant.shopId, (tx) => this.load(tx, tenant.shopId, id));
   }

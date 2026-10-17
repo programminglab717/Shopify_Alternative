@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-492 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-493 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -500,6 +500,7 @@
 | 490 | Custom data in the admin: the shop's fields defined in Settings, keyed from their names, and filled on a product's page by the kind of field their type takes | Accepted |
 | 491 | Gateway settlements: the statements gateways send imported as they come, each line matched to a payment by the gateway's reference, and the fees and tax withheld kept beside it | Accepted |
 | 492 | Gateway settlements in the admin: imported beside couriers' statements, checked before they are, and each opened on the lines to look into | Accepted |
+| 493 | Payouts and tax withheld: gateways' and couriers' statements over a period, by who paid and by month, and each that withheld tax for the shop's tax credit | Accepted |
 
 ---
 
@@ -18650,3 +18651,33 @@
     accounts exist.
   * **A settlements tab on the cash page:** the cash page is about couriers' cash on delivery.
     A page of its own keeps both short.
+
+## ADR-493 · Payouts and tax withheld: gateways' and couriers' statements over a period, by who paid and by month, and each that withheld tax for the shop's tax credit
+
+* **Context:** Gateways (ADR-491) and couriers (ADR-067) pay the shop less their fees and the
+  income tax they withhold. The tax is the shop's credit against its own income tax, claimed in
+  its return with the certificates the payers give. The shop needs what it was paid in a period,
+  what that cost, and the tax withheld from it, with each statement to show for it.
+* **Decision:**
+  * **`payoutsReport(from, before)`** in the core adds up the statements imported in a period of
+    at most 400 days. It reads them through each module's facade:
+    * the payments module's settlements;
+    * the logistics module's remittances, a courier's collected, charges and paid counted as
+      gross, fees and net.
+  * It reports:
+    * the totals: statements, gross, fees, tax withheld and net;
+    * each source, a gateway by its name or a courier as staff named it in any case, the most
+      paid over first;
+    * each month in the shop's time zone;
+    * each statement that withheld tax, with its reference, in the order imported.
+  * It reads 2,000 statements of each kind at most and says when a period has more. Owners,
+    managers and accountants see it; apps need `read_orders`.
+* **Consequences:**
+  * Statements are dated by when they were imported, not by the payout's own date, which
+    statements write in many ways. Imported promptly, they fall in the right month.
+  * Sales tax withheld (TAX-03's second half) is not kept apart from income tax: no statement
+    seen so far writes it apart.
+  * The admin's page for the report comes next.
+* **Alternatives:**
+  * **A table of payouts kept as statements are imported:** a second copy to keep in step. Both
+    modules' statements are few, so adding them up when asked is cheap.

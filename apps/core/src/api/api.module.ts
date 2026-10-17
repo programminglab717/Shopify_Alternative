@@ -49,6 +49,7 @@ import { AuditResolver } from './audit.resolver.js';
 import { HomeResolver } from './home.resolver.js';
 import { StarterKitService } from './starter-kits.js';
 import { StarterKitsResolver } from './starter-kits.resolver.js';
+import { PayoutsResolver } from './payouts.resolver.js';
 import { StoreSpeedResolver } from './store-speed.resolver.js';
 import { StorefrontSessionsResolver } from './storefront-sessions.resolver.js';
 import { SetupChecklistService } from './setup-checklist.js';
@@ -261,6 +262,7 @@ export class ApiModule {
         InventoryFileResolver,
         HomeResolver,
         StorefrontSessionsResolver,
+        PayoutsResolver,
         StoreSpeedResolver,
         StarterKitService,
         StarterKitsResolver,
