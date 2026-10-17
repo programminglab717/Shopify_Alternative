@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-480 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-481 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -488,6 +488,7 @@
 | 478 | A collection's page filters its products by Shopify's filter parameters: availability, price, product type, brand, each option and the eastern-wear attributes, each value counted, as Shopify's collection.filters | Accepted |
 | 479 | A collection's page is put in the order a shopper asks for, by Shopify's sort_by, and the search page's products are filtered and ordered as a collection's are | Accepted |
 | 480 | Frequently bought together: the products a shop's customers bought in the same orders, recommended as complementary where the shop paired none with a product | Accepted |
+| 481 | A commerce lexicon: a storefront's search finds what a word means in English, Roman Urdu or Urdu, "juta" the shop's shoes, after what holds the word as typed | Accepted |
 
 ---
 
@@ -18169,3 +18170,28 @@
   * **Mixed into related products:** related ones are alike (the same collection, type or
     brand); bought together are what goes with it, which is what complementary means.
   * **A nightly job over every shop's orders:** documents already rebuild as products sell.
+
+## ADR-481 · A commerce lexicon: a storefront's search finds what a word means in English, Roman Urdu or Urdu, "juta" the shop's shoes, after what holds the word as typed
+
+* **Context:**
+  * SRC-02 asks for search in Roman Urdu and Urdu with phonetic folding, script normalisation
+    and a commerce lexicon. ADR-046 and ADR-240 fold Roman Urdu spellings and Urdu letters, so
+    "qameez" finds "kameez". A shopper who types "juta" still finds nothing in a shop that
+    wrote "shoes", nor one who types "لال" a "red" dupatta.
+* **Decision:**
+  * **`@hatti/pk` keeps a commerce lexicon:** groups of words that mean the same in English,
+    Roman Urdu and Urdu script (clothes, shoes, jewellery and bags, fabrics, who and when it is
+    for, colours), folded as searched words are. A kind of a thing is not the thing: khussas are
+    shoes, but not every shopper asking for shoes wants them, so they are apart, as are kurtas
+    and kurtis. Each word means one thing alone.
+  * **A storefront's search** (the search page and predictive search) finds a product by each
+    word as typed or by a word meaning the same, that one as a whole word: "lal" finds "red",
+    but "red" in "embroidered" does not count. Every word must still be there. Products holding
+    the first word as typed come first, then those holding only a word meaning the same, the
+    newest first. Typos are forgiven as before where nothing matches.
+* **Consequences:**
+  * The lexicon is Hatti's, for every shop; a shop's own synonyms are a later part.
+* **Alternatives:**
+  * **Translating the shopper's words with AI:** a call per search, and its answers vary.
+  * **Synonyms in the search text kept with each product:** every product rewritten whenever the
+    lexicon grows.

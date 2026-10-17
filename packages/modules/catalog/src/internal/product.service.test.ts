@@ -491,6 +491,29 @@ describe.skipIf(!server)('ProductService', () => {
     expect(await typing('peshawa')).toEqual([shoes.id]);
   });
 
+  it('finds what a word means in English, Roman Urdu or Urdu, as typed first (ADR-481)', async () => {
+    const shoes = await create('Leather Shoes', { status: 'active' });
+    const juta = await create('Juta for men', { status: 'active' });
+    const urdu = await create('دوپٹہ', { status: 'active', tags: ['lal'] });
+    const dupatta = await create('Chiffon Dupatta', { status: 'active', tags: ['red'] });
+    const embroidered = await create('Embroidered kurta', { status: 'active' });
+    await f.products.create(f.b, { title: 'Shoes', status: 'active' });
+    const search = (terms: string) =>
+      f.db.tenant(f.a.shopId, (tx) => f.products.searchIdsOf(tx, f.a.shopId, terms, 10));
+
+    // Shoes, as the shopper typed it, before the juta that means the same.
+    expect(await search('shoes')).toEqual([shoes.id, juta.id]);
+    // Neither holds it as typed: the newest first.
+    expect(await search('جوتا')).toEqual([juta.id, shoes.id]);
+    expect(await search('qameez')).toEqual([]);
+    // Every word still counts, each as itself or a word meaning the same.
+    expect(await search('red dupatta')).toEqual([dupatta.id, urdu.id]);
+    expect(await search('shoes men')).toEqual([juta.id]);
+    // A word meaning the same is a whole word: "red" is not in "embroidered".
+    expect(await search('lal')).toEqual([urdu.id, dupatta.id]);
+    expect(await search('laal')).not.toContain(embroidered.id);
+  });
+
   it('forgives a typo or two where nothing matches as typed, the fewest typos first (ADR-234)', async () => {
     const shoes = await create('Peshawari Chappal', { status: 'active', tags: ['red'] });
     const kurta = await create('Embroidered Kurta', { status: 'active', tags: ['red'] });

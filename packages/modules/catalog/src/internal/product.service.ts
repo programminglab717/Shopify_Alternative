@@ -10,7 +10,14 @@ import {
 import { Database, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { isUuid, newId } from '@hatti/ids';
-import { correctionsOf, prefixKey, searchKey, typosAllowed, type Correction } from '@hatti/pk';
+import {
+  correctionsOf,
+  prefixKey,
+  searchKey,
+  synonymsOf,
+  typosAllowed,
+  type Correction,
+} from '@hatti/pk';
 import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, inArray, isNotNull, lte, ne, sql } from 'drizzle-orm';
 import { refreshMemberships } from './collection-store.js';
@@ -1036,7 +1043,8 @@ export class ProductService {
 
   /**
    * The IDs of the shop's active products with every word of `terms`, as the admin's search
-   * matches them (Roman Urdu spellings folded), best first: those with the first word earliest,
+   * matches them (Roman Urdu spellings folded), or a word meaning the same in English, Roman Urdu
+   * or Urdu (ADR-481), best first: those with the first word as typed earliest,
    * which puts titles before vendors, types and tags, then the newest. At most `limit`. With
    * `prefix`, the last word may be cut short, as it is while a shopper types. Where none has
    * every word as typed, the words none of the shop's products holds are read as the shop's own
@@ -1052,13 +1060,25 @@ export class ProductService {
   ): Promise<string[]> {
     const tokens = searchKey(terms).split(' ').filter(Boolean).slice(0, SEARCH_WORDS);
     if (tokens.length === 0) return [];
+    // Words that mean the same in English, Roman Urdu and Urdu, each a whole word (ADR-481).
+    const synonyms = tokens.map((token) => synonymsOf(token));
     if (options.prefix) tokens.push(prefixKey(tokens.pop()!));
     // Tokens hold only letters and digits, so no LIKE escaping.
-    const all = tokens.map((token) => sql`${SEARCHED} LIKE ${`%${token}%`}`);
+    const all = tokens.map((token, at) => {
+      const typed = sql`${SEARCHED} LIKE ${`%${token}%`}`;
+      const same = synonyms[at]!;
+      return same.length === 0
+        ? typed
+        : sql`(${typed} OR ' ' || ${SEARCHED} || ' ' LIKE ANY(${sql.param(
+            same.map((word) => `% ${word} %`),
+          )}::text[]))`;
+    });
+    // What holds the first word as typed comes before what holds only a word meaning the same.
     const { rows } = await tx.execute<{ id: string }>(sql`
       SELECT id FROM catalog.products
        WHERE shop_id = ${shopId} AND status = 'active' AND ${sql.join(all, sql` AND `)}
-       ORDER BY position(${tokens[0]!} IN ${SEARCHED}), id DESC
+       ORDER BY position(${tokens[0]!} IN ${SEARCHED}) = 0,
+                position(${tokens[0]!} IN ${SEARCHED}), id DESC
        LIMIT ${limit}`);
     if (rows.length > 0 || !tokens.some((token) => typosAllowed(token) > 0)) {
       return rows.map((row) => row.id);

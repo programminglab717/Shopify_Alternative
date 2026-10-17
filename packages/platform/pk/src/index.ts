@@ -19,6 +19,7 @@ export {
   parseDegrees,
   type MapPoint,
 } from './location.js';
+export { COMMERCE_LEXICON, synonymsOf } from './lexicon.js';
 export { isPkMobile, maskPkMobile, parsePkMobile, type PkMobileNumber } from './phone.js';
 export {
   CORRECTIONS,
