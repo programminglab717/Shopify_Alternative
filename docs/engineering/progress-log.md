@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### True profit on Growth
+### d95198a · True profit on Growth
 
 * **The sales report's true profit lines are on Growth and bigger plans: smaller plans get them
   null, with the report saying so, and gross profit stays on every plan** ([ADR-529](../architecture/13-decision-log.md#adr-529--the-sales-reports-true-profit-lines-are-on-growth-and-bigger-plans-smaller-plans-get-them-null-with-the-report-saying-so-and-gross-profit-stays-on-every-plan), BIL-01,
