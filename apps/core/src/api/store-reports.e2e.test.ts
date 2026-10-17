@@ -15,7 +15,7 @@ import {
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { upholdRights } from '../rights.js';
+import { refuseRightsCounter, releaseRights, upholdRights } from '../rights.js';
 import { refuseAppeal, restoreStore, takeDown } from '../takedowns.js';
 import { TEST_STOREFRONT_KEY, startTestApi, type TestApi } from '../testing/api.js';
 
@@ -176,7 +176,8 @@ describe.skipIf(!server)("Reports of stores, from storefronts to Hatti's people 
     const messages = new MessagesService(database);
     const note = 'the label copies Gul Ahmed’s mark';
 
-    const upheld = await upholdRights(database, rights, products, messages, taken.value.id, {
+    const site = new PublicSite(await app.getUrl());
+    const upheld = await upholdRights(database, rights, products, messages, site, taken.value.id, {
       by: 'Ayesha',
       note,
     });
@@ -193,34 +194,124 @@ describe.skipIf(!server)("Reports of stores, from storefronts to Hatti's people 
       [lawn.id],
     );
     expect(rows).toEqual([{ status: 'draft', held_by: reference }]);
-    const told = await admin.query<{ kind: string; recipient: string; variables: object }>(
-      `SELECT kind, recipient, variables FROM messaging.messages
-        WHERE shop_id = $1 AND kind = 'listings_taken_down'`,
-      [shopId],
-    );
-    expect(told.rows).toEqual([
-      {
-        kind: 'listings_taken_down',
-        recipient: '+923335550009',
-        variables: {
-          shop: 'Zari',
-          product: '"Gul lawn"',
-          name: 'Sana Iqbal for Gul Ahmed',
-          reference,
-          note,
-          email: 'legal@example.pk',
-        },
+    const told = async (kind: string) =>
+      (
+        await admin.query<{ kind: string; recipient: string; variables: Record<string, string> }>(
+          `SELECT kind, recipient, variables FROM messaging.messages
+            WHERE shop_id = $1 AND kind = $2`,
+          [shopId, kind],
+        )
+      ).rows;
+    const [notice] = await told('listings_taken_down');
+    expect(notice).toEqual({
+      kind: 'listings_taken_down',
+      recipient: '+923335550009',
+      variables: {
+        shop: 'Zari',
+        product: '"Gul lawn"',
+        name: 'Sana Iqbal for Gul Ahmed',
+        reference,
+        note,
+        email: 'legal@example.pk',
+        url: expect.stringMatching(/\/rights\/[A-Za-z0-9_-]{32}$/),
       },
-    ]);
+    });
     // Once; the shop can't put it on sale again.
     expect(
-      await upholdRights(database, rights, products, messages, taken.value.id, { by: 'A', note }),
+      await upholdRights(database, rights, products, messages, site, taken.value.id, {
+        by: 'A',
+        note,
+      }),
     ).toBe('decided');
     expect(
-      await upholdRights(database, rights, products, messages, newId(), { by: 'A', note }),
+      await upholdRights(database, rights, products, messages, site, newId(), { by: 'A', note }),
     ).toBe('not_found');
     const again = await products.update(tenant, { id: lawn.id, status: 'active' });
     expect(again.ok || again.errors[0]!.code).toBe('HELD');
+
+    // The owner's page, by the notice's link: the complaint, and their answer, sworn, once.
+    const link = new URL(notice!.variables.url!).pathname;
+    const page = await app.inject({ method: 'GET', url: link });
+    expect([page.statusCode, page.headers['cache-control'], page.headers['x-robots-tag']]).toEqual([
+      200,
+      'no-store',
+      'noindex, nofollow',
+    ]);
+    expect(page.body).toContain('Listings taken down after a rights complaint');
+    expect(page.body).toContain('Gul Ahmed');
+    expect(page.body).toContain('legal@example.pk');
+    expect(page.body).toContain(note);
+    const post = (fields: Record<string, string>) =>
+      app.inject({
+        method: 'POST',
+        url: link,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: new URLSearchParams(fields).toString(),
+      });
+    const answer = { words: 'Our own label, woven in Faisalabad.', signature: 'Bilal' };
+    const unsworn = await post(answer);
+    expect(unsworn.statusCode).toBe(422);
+    expect(unsworn.body).toContain('Tick the statement to send your answer.');
+    expect(unsworn.body).toContain('Our own label, woven in Faisalabad.</textarea');
+    const sent = await post({ ...answer, sworn: '1' });
+    expect(sent.statusCode).toBe(200);
+    expect(sent.body).toContain('Hatti has your answer');
+    expect((await post({ ...answer, sworn: '1' })).body).toContain(
+      'You have answered this complaint already.',
+    );
+    expect((await app.inject({ method: 'GET', url: '/rights/nothing' })).statusCode).toBe(404);
+
+    // Hatti's people see it, refuse it with why, and the owner is told; it stays held.
+    const [waiting] = await rights.counters();
+    expect(waiting).toMatchObject({
+      id: taken.value.id,
+      counterWords: answer.words,
+      counterSignature: 'Bilal',
+      counterStatus: 'open',
+    });
+    const refused = await refuseRightsCounter(database, rights, messages, taken.value.id, {
+      by: 'Ayesha',
+      answer: 'The label shows Gul Ahmed’s mark',
+    });
+    expect(refused).toMatchObject({ counterStatus: 'refused', counterAnsweredBy: 'Ayesha' });
+    expect(
+      await refuseRightsCounter(database, rights, messages, taken.value.id, {
+        by: 'A',
+        answer: 'x',
+      }),
+    ).toBe('answered');
+    expect((await told('rights_counter_refused'))[0]!.variables).toEqual({
+      shop: 'Zari',
+      reference,
+      note: 'The label shows Gul Ahmed’s mark',
+    });
+    expect((await app.inject({ method: 'GET', url: link })).body).toContain(
+      'The label shows Gul Ahmed’s mark',
+    );
+
+    // Settled: let go, the owner told, and the shop puts it on sale again.
+    const released = await releaseRights(database, rights, products, messages, taken.value.id, {
+      by: 'Ayesha',
+      note: 'Gul Ahmed withdrew the complaint',
+    });
+    if (typeof released === 'string') throw new Error(released);
+    expect(released.released).toBe(1);
+    expect(
+      await releaseRights(database, rights, products, messages, taken.value.id, {
+        by: 'A',
+        note: 'x',
+      }),
+    ).toBe('answered');
+    expect((await told('listings_released'))[0]!.variables).toEqual({
+      shop: 'Zari',
+      reference,
+      note: 'Gul Ahmed withdrew the complaint',
+    });
+    const onSale = await products.update(tenant, { id: lawn.id, status: 'active' });
+    expect(onSale.ok).toBe(true);
+    expect((await app.inject({ method: 'GET', url: link })).body).toContain(
+      'Your listings are let go',
+    );
   });
 
   it('takes the store down once, its owner told why with the link to appeal by, and restores it, told again (ADR-461, ADR-462)', async () => {

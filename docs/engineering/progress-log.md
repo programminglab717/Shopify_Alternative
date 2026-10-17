@@ -14,6 +14,15 @@ TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
+## 2026-10-17
+
+### Answers to rights complaints
+
+* **The store's owner answers a rights complaint once, sworn, through a link in the notice;
+  Hatti's people refuse the answer with why, or let the listings go** ([ADR-476](../architecture/13-decision-log.md#adr-476--the-stores-owner-answers-a-rights-complaint-once-sworn-through-a-link-in-the-notice-hattis-people-refuse-the-answer-with-why-or-let-the-listings-go), TNS-04 whole).
+* 2988 tests, 1 more: the link's page, answers refused for what they
+  lack and taken once, and the listings let go, the owner told each time.
+
 ## 2026-10-16
 
 ### 3a01356 · Listings taken down for rights complaints

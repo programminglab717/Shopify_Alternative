@@ -4,7 +4,11 @@ import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatt
 import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { RightsComplaintsService, type RightsComplaintInput } from './rights.service.js';
+import {
+  RightsComplaintsService,
+  rightsLinkToken,
+  type RightsComplaintInput,
+} from './rights.service.js';
 
 const server = testDatabaseServer();
 const NOW = new Date('2026-10-16T08:00:00.000Z');
@@ -144,5 +148,71 @@ describe.skipIf(!server)('Rights complaints (TNS-04, ADR-474)', () => {
     );
     expect((await rights.list()).some((each) => each.id === taken.value.id)).toBe(false);
     expect((await rights.get(taken.value.id))?.decision).toMatch(/own label/);
+  });
+
+  it("takes the owner's counter-notice once, by an upheld complaint's link, and lets go upholding it", async () => {
+    const taken = await rights.complain(zari, complaint({ client: null }), NOW);
+    if (!taken.ok) throw new Error('not taken');
+    const token = rightsLinkToken();
+    // A dismissed complaint has no link; an upheld one has its own.
+    const dismissed = await rights.complain(zari, complaint({ client: null }), NOW);
+    if (!dismissed.ok) throw new Error('not taken');
+    await rights.decide(dismissed.value.id, {
+      status: 'dismissed',
+      by: 'A',
+      note: 'n',
+      linkToken: rightsLinkToken(),
+    });
+    expect(
+      (
+        await admin.query('SELECT link_digest FROM trust.rights_complaints WHERE id = $1', [
+          dismissed.value.id,
+        ])
+      ).rows[0].link_digest,
+    ).toBeNull();
+    await rights.decide(taken.value.id, {
+      status: 'upheld',
+      by: 'Ayesha',
+      note: 'Copies of the mark',
+      linkToken: token,
+    });
+    expect(await rights.view('x'.repeat(32))).toBeNull();
+    expect(await rights.view(token)).toMatchObject({
+      shopName: 'Zari',
+      rightsOwner: 'Gul Ahmed Textile Mills',
+      decision: 'Copies of the mark',
+      counter: null,
+      canCounter: true,
+    });
+
+    const answer = { words: 'Our own label', signature: 'Bilal', sworn: true };
+    const problem = async (changes: Partial<typeof answer>) => {
+      const result = await rights.counter(token, { ...answer, ...changes }, NOW);
+      return result && !result.ok ? result.problem : result?.ok;
+    };
+    expect(await problem({ words: ' ' })).toBe('blank');
+    expect(await problem({ words: 'x'.repeat(2001) })).toBe('too_long');
+    expect(await problem({ sworn: false })).toBe('unsworn');
+    expect(await problem({ signature: ' ' })).toBe('unsigned');
+    expect(await problem({})).toBe(true);
+    expect(await problem({})).toBe('countered');
+    expect(await rights.counter('y'.repeat(32), answer, NOW)).toBeNull();
+
+    // Letting go answers the counter-notice waiting, with its words; once.
+    const [waiting] = await rights.counters();
+    expect(waiting).toMatchObject({ id: taken.value.id, counterStatus: 'open' });
+    const released = await rights.release(taken.value.id, { by: 'Ayesha', note: 'Settled' });
+    expect(released).toMatchObject({
+      releasedBy: 'Ayesha',
+      releaseNote: 'Settled',
+      counterStatus: 'upheld',
+      counterAnswer: 'Settled',
+    });
+    expect(await rights.release(taken.value.id, { by: 'A', note: 'n' })).toBe('answered');
+    expect(await rights.release(dismissed.value.id, { by: 'A', note: 'n' })).toBe('not_upheld');
+    expect(await rights.refuseCounter(taken.value.id, { by: 'A', answer: 'n' })).toBe('answered');
+    expect(await rights.counters()).toEqual([]);
+    expect((await rights.counters({ all: true })).map((each) => each.id)).toEqual([taken.value.id]);
+    expect(await rights.view(token)).toMatchObject({ canCounter: false, releaseNote: 'Settled' });
   });
 });

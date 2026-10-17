@@ -60,6 +60,8 @@ export enum MessageKind {
   SMS_SENDER_REFUSED = 'SMS_SENDER_REFUSED',
   SMS_SENDER_REVOKED = 'SMS_SENDER_REVOKED',
   LISTINGS_TAKEN_DOWN = 'LISTINGS_TAKEN_DOWN',
+  RIGHTS_COUNTER_REFUSED = 'RIGHTS_COUNTER_REFUSED',
+  LISTINGS_RELEASED = 'LISTINGS_RELEASED',
   BROADCAST = 'BROADCAST',
   AUTOMATION = 'AUTOMATION',
   SMS_BROADCAST = 'SMS_BROADCAST',
@@ -302,6 +304,16 @@ registerEnumType(MessageKind, {
       description:
         'For the shop, from Hatti and paid by Hatti, at its alerts number: listings taken off ' +
         'sale after a rights complaint Hatti upheld, who complained and how to reach them (ADR-475).',
+    },
+    RIGHTS_COUNTER_REFUSED: {
+      description:
+        'For the shop, from Hatti and paid by Hatti, at its alerts number: its answer to a ' +
+        'rights complaint refused, and why; the listings stay held (ADR-476).',
+    },
+    LISTINGS_RELEASED: {
+      description:
+        'For the shop, from Hatti and paid by Hatti, at its alerts number: listings held for a ' +
+        'rights complaint let go, and why (ADR-476).',
     },
     BROADCAST: {
       description:

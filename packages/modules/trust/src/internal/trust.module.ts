@@ -4,6 +4,7 @@ import { AppealsService } from './appeals.service.js';
 import { ReportsController } from './reports.controller.js';
 import { ReportsService } from './reports.service.js';
 import { RightsComplaintsController } from './rights.controller.js';
+import { RightsLinkController } from './rights-link.controller.js';
 import { RightsComplaintsService } from './rights.service.js';
 import { TakedownsService } from './takedowns.service.js';
 import { VerificationResolver } from './graphql/verification.resolver.js';
@@ -16,7 +17,12 @@ import { VerificationsService } from './verifications.service.js';
  * host application.
  */
 @Module({
-  controllers: [ReportsController, RightsComplaintsController, AppealController],
+  controllers: [
+    ReportsController,
+    RightsComplaintsController,
+    AppealController,
+    RightsLinkController,
+  ],
   providers: [
     ReportsService,
     RightsComplaintsService,

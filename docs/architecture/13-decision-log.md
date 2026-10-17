@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-475 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-476 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -483,6 +483,7 @@
 | 473 | A product whose words name goods Hatti does not allow selling stays a draft: never on sale until its words change or Hatti's people clear them | Accepted |
 | 474 | Owners of a trademark or copyright complain of a store's listings from its rights page, naming them by their addresses and swearing to it; Hatti's people decide within 48 hours | Accepted |
 | 475 | A rights complaint upheld takes its listings off sale and holds them there, copies too, marked with its number; the store's owner is told who complained and how to reach them | Accepted |
+| 476 | The store's owner answers a rights complaint once, sworn, through a link in the notice; Hatti's people refuse the answer with why, or let the listings go | Accepted |
 
 ---
 
@@ -18007,3 +18008,34 @@
     nothing says why it went.
   * **Deleting them:** the seller loses its work, and nothing is left to restore if the
     complaint was wrong.
+
+## ADR-476 · The store's owner answers a rights complaint once, sworn, through a link in the notice; Hatti's people refuse the answer with why, or let the listings go
+
+* **Context:**
+  * An upheld rights complaint holds the store's listings off sale (ADR-475). Notice and
+    takedown is fair only if the seller can answer: their own label, a licence, or a complaint
+    about someone else's goods. Their admin works, but no Admin API reads complaints (ADR-460),
+    and the answer belongs with the complaint.
+* **Decision:**
+  * **The notice carries a link**, `/rights/<secret>` on the core's public address: 24 random
+    bytes, kept only as their SHA-256 digest on the complaint, found through a database function
+    as appeals' links are (ADR-462). Only an upheld complaint has one.
+  * **Its page**, in English and Urdu, never kept, indexed or framed, shows the complaint: the
+    right, whose, the listings, the complainant's words and email, and Hatti's decision. It takes
+    the owner's answer once, up to 2,000 characters, sworn in good faith by ticking a statement
+    and typing their name, and shows Hatti's answer.
+  * **Hatti's people** list the answers waiting, the oldest first, with `trust-reports
+    counters`. `refuse-counter` answers one with why: the page shows it and the owner is told on
+    WhatsApp; the listings stay held. `release-rights` lets the listings go, with why, once the
+    complaint is withdrawn or settled or the answer holds: the catalog's hold is lifted from them
+    and their copies, an answer waiting is upheld with the same words, and the owner is told to
+    put them on sale again.
+* **Consequences:**
+  * TNS-04 is whole: a rights owner's sworn complaint, Hatti's decision within 48 hours, the
+    listings held off sale, the seller's sworn answer, and the listings let go or kept down.
+  * The complainant hears of the answer from Hatti's people, who have their email in the list.
+* **Alternatives:**
+  * **Answering from the admin:** it would need an Admin API for complaints, which shows the
+    shop more than its own answer needs.
+  * **Letting the listings go on any answer, as the US DMCA's counter-notice does after ten
+    days:** Pakistani law sets no such clock for platforms, and Hatti's people judge each.

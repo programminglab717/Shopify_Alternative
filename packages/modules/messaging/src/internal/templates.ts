@@ -62,6 +62,8 @@ export const MESSAGE_KINDS = [
   'sms_sender_refused',
   'sms_sender_revoked',
   'listings_taken_down',
+  'rights_counter_refused',
+  'listings_released',
   'broadcast',
   'automation',
   'sms_broadcast',
@@ -133,6 +135,8 @@ export const ALWAYS_SENT: readonly MessageKind[] = [
   'sms_sender_revoked',
   // Its listings taken off sale after a rights complaint Hatti upheld (ADR-475).
   'listings_taken_down',
+  'rights_counter_refused',
+  'listings_released',
   // The shop's own, which it schedules itself (ADR-421, ADR-458), or sets going (ADR-425).
   'broadcast',
   'automation',
@@ -176,6 +180,8 @@ export const TO_THE_SHOP_KINDS: readonly MessageKind[] = [
   'sms_sender_refused',
   'sms_sender_revoked',
   'listings_taken_down',
+  'rights_counter_refused',
+  'listings_released',
 ];
 
 /**
@@ -1094,15 +1100,43 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
   listings_taken_down: {
     whatsapp: 'hatti_listings_taken_down',
     category: 'utility',
-    parameters: ['shop', 'product', 'name', 'reference', 'note', 'email'],
+    parameters: ['shop', 'product', 'name', 'reference', 'note', 'email', 'url'],
     hattiPays: true,
     text: {
-      en: "Hatti: we have taken {product} off sale on {shop} after {name} complained that it infringes their rights ({reference}): {note}. It stays a draft until the complaint is settled. You can reach them at {email}, or write to Hatti's support quoting {reference}.",
-      ur: 'ہٹی: {name} کی شکایت پر کہ یہ ان کے حقوق کی خلاف ورزی ہے ({reference})، ہم نے {shop} پر {product} کی فروخت روک دی ہے: {note}۔ شکایت طے ہونے تک یہ ڈرافٹ رہے گی۔ آپ ان سے {email} پر رابطہ کر سکتے ہیں، یا {reference} کے حوالے سے ہٹی کی سپورٹ کو لکھ سکتے ہیں۔',
+      en: 'Hatti: we have taken {product} off sale on {shop} after {name} complained that it infringes their rights ({reference}): {note}. It stays a draft until the complaint is settled. You can reach them at {email}, or answer the complaint through Hatti here:',
+      ur: 'ہٹی: {name} کی شکایت پر کہ یہ ان کے حقوق کی خلاف ورزی ہے ({reference})، ہم نے {shop} پر {product} کی فروخت روک دی ہے: {note}۔ شکایت طے ہونے تک یہ ڈرافٹ رہے گی۔ آپ ان سے {email} پر رابطہ کر سکتے ہیں، یا یہاں ہٹی کے ذریعے شکایت کا جواب دے سکتے ہیں:',
     },
     subject: {
       en: 'Hatti has taken listings on {shop} off sale',
       ur: 'ہٹی نے {shop} پر کچھ اشیاء کی فروخت روک دی ہے',
+    },
+  },
+  rights_counter_refused: {
+    whatsapp: 'hatti_rights_counter_refused',
+    category: 'utility',
+    parameters: ['shop', 'reference', 'note'],
+    hattiPays: true,
+    text: {
+      en: "Hatti: we have refused {shop}'s answer to the rights complaint {reference}: {note}. Its listings stay drafts. The link we sent shows our answer.",
+      ur: 'ہٹی: ہم نے حقوق کی شکایت {reference} پر {shop} کا جواب مسترد کر دیا ہے: {note}۔ اس کی اشیاء ڈرافٹ رہیں گی۔ ہمارا بھیجا گیا لنک ہمارا جواب دکھاتا ہے۔',
+    },
+    subject: {
+      en: "Hatti has refused {shop}'s answer to a rights complaint",
+      ur: 'ہٹی نے حقوق کی شکایت پر {shop} کا جواب مسترد کر دیا ہے',
+    },
+  },
+  listings_released: {
+    whatsapp: 'hatti_listings_released',
+    category: 'utility',
+    parameters: ['shop', 'reference', 'note'],
+    hattiPays: true,
+    text: {
+      en: '{shop}: Hatti has let go the listings it took down for the rights complaint {reference}: {note}. Put them on sale again from your admin.',
+      ur: '{shop}: ہٹی نے حقوق کی شکایت {reference} پر روکی گئی اشیاء بحال کر دی ہیں: {note}۔ اپنے ایڈمن سے انہیں دوبارہ فروخت پر لگائیں۔',
+    },
+    subject: {
+      en: "{shop}'s listings are let go",
+      ur: '{shop} کی اشیاء بحال کر دی گئی ہیں',
     },
   },
 };

@@ -6174,6 +6174,11 @@ enum MessageKind {
   INVOICE_DUE
 
   """
+  For the shop, from Hatti and paid by Hatti, at its alerts number: listings held for a rights complaint let go, and why (ADR-476).
+  """
+  LISTINGS_RELEASED
+
+  """
   For the shop, from Hatti and paid by Hatti, at its alerts number: listings taken off sale after a rights complaint Hatti upheld, who complained and how to reach them (ADR-475).
   """
   LISTINGS_TAKEN_DOWN
@@ -6277,6 +6282,11 @@ enum MessageKind {
   A delivered order's customer asked once to rate what it brought, with its page's link (MKT-05, ADR-400): sent as many days after delivery as the shop's review settings say, which turn it on and off, not here.
   """
   REVIEW_REQUEST
+
+  """
+  For the shop, from Hatti and paid by Hatti, at its alerts number: its answer to a rights complaint refused, and why; the listings stay held (ADR-476).
+  """
+  RIGHTS_COUNTER_REFUSED
 
   """
   For the shop, from Hatti and paid by Hatti, at its alerts number: Hatti could not verify it, and why (ADR-465).

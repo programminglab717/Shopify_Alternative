@@ -53,12 +53,19 @@ export {
   RIGHTS_ACTING_AS,
   RIGHTS_KINDS,
   RIGHTS_LIMITS,
+  RIGHTS_LINK_PATH,
   RIGHTS_STATUSES,
   RightsComplaintsService,
+  rightsLinkToken,
   type RightsActingAs,
+  type RightsAnswered,
   type RightsComplaintInput,
   type RightsComplaintRecord,
+  type RightsCounterProblem,
+  type RightsCounterResult,
+  type RightsCounterStatus,
   type RightsDecided,
+  type RightsView,
   type RightsKind,
   type RightsListing,
   type RightsStatus,
@@ -67,4 +74,6 @@ export { appealPage } from '../internal/appeal-page.js';
 export { AppealController } from '../internal/appeal.controller.js';
 export { ReportsController } from '../internal/reports.controller.js';
 export { RightsComplaintsController } from '../internal/rights.controller.js';
+export { RightsLinkController } from '../internal/rights-link.controller.js';
+export { rightsPage } from '../internal/rights-page.js';
 export { TrustModule } from '../internal/trust.module.js';

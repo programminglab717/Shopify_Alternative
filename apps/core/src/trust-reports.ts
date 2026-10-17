@@ -19,7 +19,7 @@ import {
 } from '@hatti/trust/public';
 import { parseArgs } from 'node:util';
 import { loadTrustReportsConfig } from './config.js';
-import { upholdRights } from './rights.js';
+import { refuseRightsCounter, releaseRights, upholdRights } from './rights.js';
 import { approveSmsSender, refuseSmsSender, revokeSmsSender } from './sms-senders.js';
 import { createStorage } from './storage.js';
 import { refuseAppeal, restoreStore, takeDown } from './takedowns.js';
@@ -79,6 +79,13 @@ import { approveVerification, refuseVerification, revokeVerification } from './v
 //   pnpm --filter @hatti/core trust-reports rights [--all]
 //   pnpm --filter @hatti/core trust-reports dismiss-rights ipc_… --by Ayesha --note "Its own label"
 //   pnpm --filter @hatti/core trust-reports uphold-rights ipc_… --by Ayesha --note "Sold as Gul Ahmed's"
+//
+// The notice links to a page where the owner answers the complaint once, sworn (ADR-476); the
+// answer is refused with why, or the listings let go, which upholds it; the owner told each time:
+//
+//   pnpm --filter @hatti/core trust-reports counters [--all]
+//   pnpm --filter @hatti/core trust-reports refuse-counter ipc_… --by Ayesha --note "…"
+//   pnpm --filter @hatti/core trust-reports release-rights ipc_… --by Ayesha --note "Withdrawn"
 
 const USAGE =
   'Usage: trust-reports list [--all]\n' +
@@ -100,7 +107,10 @@ const USAGE =
   '       trust-reports clear-listing <product> --by <who>\n' +
   '       trust-reports rights [--all]\n' +
   '       trust-reports dismiss-rights <complaint> --by <who> --note <why>\n' +
-  '       trust-reports uphold-rights <complaint> --by <who> --note <why, as the owner is told>';
+  '       trust-reports uphold-rights <complaint> --by <who> --note <why, as the owner is told>\n' +
+  '       trust-reports counters [--all]\n' +
+  '       trust-reports refuse-counter <complaint> --by <who> --note <why, as the owner is told>\n' +
+  '       trust-reports release-rights <complaint> --by <who> --note <why, as the owner is told>';
 
 function usage(problem?: string): never {
   if (problem) console.error(problem);
@@ -117,6 +127,9 @@ type Command =
   | { command: 'rights'; all: boolean }
   | { command: 'dismiss-rights'; id: string; complaint: string; by: string; note: string }
   | { command: 'uphold-rights'; id: string; complaint: string; by: string; note: string }
+  | { command: 'counters'; all: boolean }
+  | { command: 'refuse-counter'; id: string; complaint: string; by: string; note: string }
+  | { command: 'release-rights'; id: string; complaint: string; by: string; note: string }
   | { command: 'approve-sender'; id: string; request: string; by: string; note: string }
   | { command: 'refuse-sender'; id: string; request: string; by: string; note: string }
   | { command: 'revoke-sender'; shop: string; by: string; note: string }
@@ -160,12 +173,58 @@ try {
     }
     const now = Date.now();
     for (const complaint of found) console.log(rightsLines(complaint, now));
+  } else if (parsed.command === 'counters') {
+    const found = await rights.counters({ all: parsed.all });
+    if (found.length === 0) {
+      console.log(parsed.all ? 'No answer to a rights complaint yet.' : 'No answer is waiting.');
+    }
+    for (const complaint of found) console.log(counterLine(complaint));
+  } else if (parsed.command === 'refuse-counter' || parsed.command === 'release-rights') {
+    const done =
+      parsed.command === 'refuse-counter'
+        ? await refuseRightsCounter(database, rights, messages, parsed.complaint, {
+            by: parsed.by,
+            answer: parsed.note,
+          })
+        : await releaseRights(
+            database,
+            rights,
+            new ProductService(database),
+            messages,
+            parsed.complaint,
+            { by: parsed.by, note: parsed.note },
+          );
+    if (done === 'not_found') {
+      console.error(`No rights complaint ${parsed.id}: see the list.`);
+      process.exitCode = 1;
+    } else if (done === 'not_upheld') {
+      console.error(`Rights complaint ${parsed.id} was not upheld: nothing is held for it.`);
+      process.exitCode = 1;
+    } else if (done === 'answered') {
+      console.error(
+        parsed.command === 'refuse-counter'
+          ? `No answer to ${parsed.id} is waiting.`
+          : `The listings of ${parsed.id} were let go already.`,
+      );
+      process.exitCode = 1;
+    } else if ('released' in done) {
+      console.log(
+        `${done.released} listing(s) of ${done.complaint.shopName} let go; its owner is told, ` +
+          `and ${done.complaint.complainant} may be written to at ${done.complaint.email}.`,
+      );
+    } else {
+      console.log(`${done.shopName}'s answer is refused; its owner is told.`);
+    }
   } else if (parsed.command === 'uphold-rights') {
+    if (!config.PUBLIC_URL) {
+      usage('Set PUBLIC_URL: the notice links to the page its owner answers on there.');
+    }
     const upheld = await upholdRights(
       database,
       rights,
       new ProductService(database),
       messages,
+      new PublicSite(config.PUBLIC_URL),
       parsed.complaint,
       { by: parsed.by, note: parsed.note },
     );
@@ -416,6 +475,19 @@ function rightsLines(complaint: RightsComplaintRecord, now: number): string {
   ].join('\n');
 }
 
+/** A store owner's answer to a rights complaint on one line, tab-separated. */
+function counterLine(complaint: RightsComplaintRecord): string {
+  return [
+    toPublicId('rightsComplaint', complaint.id),
+    complaint.counterStatus ?? '-',
+    `answered ${complaint.counteredAt?.toISOString() ?? '-'}`,
+    `${complaint.shopName} (${complaint.shopHandle})`,
+    `${complaint.rightsOwner}: ${complaint.complainant} <${complaint.email}>`,
+    `signed ${complaint.counterSignature ?? '-'}`,
+    (complaint.counterWords ?? '').replace(/\s+/g, ' '),
+  ].join('\t');
+}
+
 /** A report on one line, tab-separated: overdue ones say so first. */
 function line(report: ReportRecord, now: number): string {
   const overdue = report.status === 'open' && report.dueAt.getTime() < now;
@@ -507,7 +579,8 @@ function parseCommand(args: string[]): Command {
     command === 'appeals' ||
     command === 'verifications' ||
     command === 'senders' ||
-    command === 'rights'
+    command === 'rights' ||
+    command === 'counters'
   ) {
     if (id) throw new Error(`Unexpected: ${id}`);
     return { command, all: values.all ?? false };
@@ -526,7 +599,9 @@ function parseCommand(args: string[]): Command {
     command !== 'revoke-sender' &&
     command !== 'clear-listing' &&
     command !== 'dismiss-rights' &&
-    command !== 'uphold-rights'
+    command !== 'uphold-rights' &&
+    command !== 'refuse-counter' &&
+    command !== 'release-rights'
   ) {
     throw new Error('Say what to do');
   }
@@ -539,7 +614,10 @@ function parseCommand(args: string[]): Command {
         ? 'Name the shop, by its handle'
         : command === 'clear-listing'
           ? "Name the product, by its ID as the shop's admin shows it"
-          : command === 'dismiss-rights' || command === 'uphold-rights'
+          : command === 'dismiss-rights' ||
+              command === 'uphold-rights' ||
+              command === 'refuse-counter' ||
+              command === 'release-rights'
             ? 'Name the complaint, as the list of rights complaints shows it'
             : command === 'approve-sender' || command === 'refuse-sender'
               ? 'Name the request, as the list of senders shows it'
@@ -579,7 +657,12 @@ function parseCommand(args: string[]): Command {
     }
     return { command, shop: id, level, by, note };
   }
-  if (command === 'dismiss-rights' || command === 'uphold-rights') {
+  if (
+    command === 'dismiss-rights' ||
+    command === 'uphold-rights' ||
+    command === 'refuse-counter' ||
+    command === 'release-rights'
+  ) {
     return { command, id, complaint: tryFromPublicId(id, 'rightsComplaint') ?? id, by, note };
   }
   if (command === 'refuse') {
