@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-533 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-534 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -541,6 +541,7 @@
 | 531 | A shop on Starter connects its Meta pixel alone, without the conversions API's token, and its storefront loads it while orders go to no conversions API; Free connects neither | Accepted |
 | 532 | The admin's Meta settings connect the pixel without a token, saying orders then go to no conversions API, and the plan cards say which plans have the pixel | Accepted |
 | 533 | Each plan includes AI credits a month, kept by billing: each draft the AI gives, of a product's copy or of translations, spends one, and none are drafted past them until the month in Pakistan's time turns | Accepted |
+| 534 | The admin's AI drafts say the plan's AI credits left this month, and draft none once they are used; the plan cards say each plan's | Accepted |
 
 ---
 
@@ -20229,3 +20230,21 @@
   * **Counting each module's own drafts:** modules don't read each other's tables, and a shop's
     credits are one balance whatever they're spent on.
   * **The shop's billing period:** Free has none, and a calendar month is easier to say.
+
+## ADR-534 · The admin's AI drafts say the plan's AI credits left this month, and draft none once they are used; the plan cards say each plan's
+
+* **Context:** AI drafts spend the plan's AI credits a month (ADR-533). The admin said only the
+  day's drafts left.
+* **Decision:**
+  * **Write with AI** on a product's form says the credits left of the plan's month's, where
+    they are counted, instead of the day's drafts; with none left, its button is off and it
+    says they come back on the 1st, or a bigger plan gives more.
+  * **Draft with AI** on the Urdu pages adds the same to its hint, and is off with none left.
+  * **Add from a photo** drafts nothing with none left, as it does past the day's.
+  * **The plan cards** add a line: "150 AI credits a month" (ADR-524).
+  * English and Urdu.
+* **Consequences:**
+  * Owners see what they have left before asking, not after a refusal.
+* **Alternatives:**
+  * **Showing the balance on the billing page alone:** owners draft on the product's form and
+    the Urdu pages, and would learn there only from a refusal.

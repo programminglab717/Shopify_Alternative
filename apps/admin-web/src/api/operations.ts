@@ -2665,6 +2665,7 @@ const BILLING_PLAN = /* GraphQL */ `
     removeBranding
     trueProfit
     pixels
+    aiCredits
   }
 `;
 
@@ -5087,6 +5088,8 @@ export const ProductCopyDraftingQuery = /* GraphQL */ `
       available
       usedToday
       limitPerDay
+      creditsLeft
+      creditsPerMonth
     }
   }
 `;
@@ -5115,6 +5118,8 @@ export const TranslationDraftingQuery = /* GraphQL */ `
       available
       usedToday
       limitPerDay
+      creditsLeft
+      creditsPerMonth
     }
   }
 `;

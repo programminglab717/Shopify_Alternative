@@ -52,6 +52,7 @@ function planLines(plan: BillingPlanValue, t: ReturnType<typeof useLocale>['t'])
     t(plan.customApps ? 'billing.appsYes' : 'billing.appsNo'),
     t(plan.removeBranding ? 'billing.brandingYes' : 'billing.brandingNo'),
     t(plan.trueProfit ? 'billing.profitYes' : 'billing.profitNo'),
+    t('billing.aiCredits', { count: plan.aiCredits }),
   ];
 }
 

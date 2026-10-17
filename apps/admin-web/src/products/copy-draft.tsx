@@ -63,7 +63,9 @@ export function CopyDraft({
 
   const state = drafting.data?.productCopyDrafting;
   if (!state?.available) return null;
-  const left = state.limitPerDay - state.usedToday;
+  // The day's drafts, and the plan's AI credits this month where they are counted (ADR-533).
+  const credits = state.creditsLeft ?? null;
+  const left = Math.min(state.limitPerDay - state.usedToday, credits ?? Number.POSITIVE_INFINITY);
   const blank = !details.title.trim() && !details.description.trim();
 
   const onDraft = async () => {
@@ -120,7 +122,13 @@ export function CopyDraft({
         </Button>
       </div>
       <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-        {blank ? t('copyDraft.blank') : t('copyDraft.left', { count: Math.max(left, 0) })}
+        {blank
+          ? t('copyDraft.blank')
+          : credits === 0
+            ? t('ai.noCredits')
+            : credits !== null
+              ? t('copyDraft.credits', { count: credits, perMonth: state.creditsPerMonth ?? 0 })
+              : t('copyDraft.left', { count: Math.max(left, 0) })}
       </p>
       {drafted && <Alert tone="info">{t('copyDraft.drafted')}</Alert>}
       {problem && <Alert tone="danger">{problem}</Alert>}

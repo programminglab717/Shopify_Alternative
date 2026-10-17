@@ -5,13 +5,21 @@ import { plainTextOf } from './copy-draft';
 
 const LOCATION = { id: 'loc_1', name: 'Shop', isPrimary: true };
 
-function core(available: boolean) {
+function core(available: boolean, creditsLeft: number | null = null) {
   return fakeCore('owner', (operation) => {
     switch (operation) {
       case 'PrimaryLocation':
         return { location: LOCATION };
       case 'ProductCopyDrafting':
-        return { productCopyDrafting: { available, usedToday: 3, limitPerDay: 100 } };
+        return {
+          productCopyDrafting: {
+            available,
+            usedToday: 3,
+            limitPerDay: 100,
+            creditsLeft,
+            creditsPerMonth: creditsLeft === null ? null : 10,
+          },
+        };
       case 'ProductCopyDraft':
         return {
           productCopyDraft: {
@@ -86,6 +94,32 @@ describe("A product's copy written with AI (CAT-20, ADR-472)", () => {
     });
     // Nothing is saved until the shop saves the product.
     expect(fake.sent.some((each) => each.operation === 'ProductCreate')).toBe(false);
+  });
+
+  it("says the plan's AI credits left this month, and drafts none once they are used (ADR-534)", async () => {
+    vi.stubGlobal('fetch', core(true, 4).fetcher);
+    renderAdmin('/shop_1/products/new');
+    await screen.findByRole('button', { name: 'Write with AI' });
+    type('Title', 'Lawn suit');
+    expect(
+      screen.getByText(
+        "4 of your plan's 10 AI credits left this month. The AI writes only from what the form says.",
+      ),
+    ).toBeTruthy();
+    cleanup();
+
+    vi.stubGlobal('fetch', core(true, 0).fetcher);
+    renderAdmin('/shop_1/products/new');
+    const write = (await screen.findByRole('button', {
+      name: 'Write with AI',
+    })) as HTMLButtonElement;
+    type('Title', 'Lawn suit');
+    expect(write.disabled).toBe(true);
+    expect(
+      screen.getByText(
+        "Your plan's AI credits for this month are used: they come back on the 1st, or choose a bigger plan for more.",
+      ),
+    ).toBeTruthy();
   });
 
   it('shows nothing of AI where this Hatti does not write with it', async () => {

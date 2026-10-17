@@ -509,7 +509,12 @@ function UrduForm({
           <Button
             variant="secondary"
             busy={drafting}
-            disabled={busy || toDraft.length === 0 || allowance.usedToday >= allowance.limitPerDay}
+            disabled={
+              busy ||
+              toDraft.length === 0 ||
+              allowance.usedToday >= allowance.limitPerDay ||
+              allowance.creditsLeft === 0
+            }
             icon={<Sparkles aria-hidden className="size-5" />}
             onClick={() => void onDraft()}
           >
@@ -517,6 +522,11 @@ function UrduForm({
           </Button>
           <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
             {t('urdu.draftHint', { used: allowance.usedToday, limit: allowance.limitPerDay })}
+            {allowance.creditsLeft === 0
+              ? ` ${t('ai.noCredits')}`
+              : typeof allowance.creditsLeft === 'number'
+                ? ` ${t('ai.creditsLeft', { left: allowance.creditsLeft, perMonth: allowance.creditsPerMonth ?? 0 })}`
+                : ''}
           </p>
           {note && <Alert tone="info">{note}</Alert>}
         </div>

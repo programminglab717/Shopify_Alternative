@@ -1145,6 +1145,8 @@ export interface BillingPlanValue {
   trueProfit: boolean;
   /** Whether its storefront may load the Meta pixel (ADR-531). */
   pixels: boolean;
+  /** AI credits it includes a month (ADR-533). */
+  aiCredits: number;
 }
 
 export interface BillingInvoiceValue {
@@ -2237,7 +2239,14 @@ export interface ProductCategoriesData {
 }
 
 export interface ProductCopyDraftingData {
-  productCopyDrafting: { available: boolean; usedToday: number; limitPerDay: number };
+  productCopyDrafting: {
+    available: boolean;
+    usedToday: number;
+    limitPerDay: number;
+    /** The plan's AI credits left this month, and its month's (ADR-533); null where uncounted. */
+    creditsLeft?: number | null;
+    creditsPerMonth?: number | null;
+  };
 }
 
 export interface ProductCopyDraftData {
@@ -2253,7 +2262,14 @@ export interface ProductCopyDraftData {
 }
 
 export interface TranslationDraftingData {
-  translationDrafting: { available: boolean; usedToday: number; limitPerDay: number };
+  translationDrafting: {
+    available: boolean;
+    usedToday: number;
+    limitPerDay: number;
+    /** The plan's AI credits left this month, and its month's (ADR-533); null where uncounted. */
+    creditsLeft?: number | null;
+    creditsPerMonth?: number | null;
+  };
 }
 
 export interface TranslationsDraftData {

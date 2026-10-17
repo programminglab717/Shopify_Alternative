@@ -84,7 +84,7 @@ export function SnapProductPage() {
 
   if (!EDITS_PRODUCTS.includes(shop.role)) return <EmptyState title={t('product.cannotEdit')} />;
   const ai = drafting.data?.productCopyDrafting;
-  const aiReady = Boolean(ai?.available && ai.usedToday < ai.limitPerDay);
+  const aiReady = Boolean(ai?.available && ai.usedToday < ai.limitPerDay && ai.creditsLeft !== 0);
 
   const onChosen = (event: ChangeEvent<HTMLInputElement>) => {
     const chosen = [...(event.target.files ?? [])];

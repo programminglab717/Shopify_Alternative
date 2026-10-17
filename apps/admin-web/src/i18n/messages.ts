@@ -314,6 +314,11 @@ const en = {
   'copyDraft.blank':
     'Give a title, or say what it is in the description, for the AI to write from.',
   'copyDraft.left': '{count} AI drafts left today. The AI writes only from what the form says.',
+  'copyDraft.credits':
+    "{count} of your plan's {perMonth} AI credits left this month. The AI writes only from what the form says.",
+  'ai.creditsLeft': "{left} of your plan's {perMonth} AI credits left this month.",
+  'ai.noCredits':
+    "Your plan's AI credits for this month are used: they come back on the 1st, or choose a bigger plan for more.",
   'copyDraft.drafted':
     'Written by AI from what you gave. Check every word, the fabric and sizes above all, before you save.',
   'product.titleLabel': 'Title',
@@ -773,6 +778,7 @@ const en = {
   'billing.automationsNo': 'No automations',
   'billing.cashbackYes': 'Cashback',
   'billing.cashbackNo': 'No cashback',
+  'billing.aiCredits': '{count} AI credits a month',
   'billing.pixelYes': 'The Meta pixel on your storefront',
   'billing.pixelNo': 'No Meta pixel',
   'billing.conversionsYes': "Meta's conversions API",
@@ -4981,6 +4987,11 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'copyDraft.write': 'AI سے لکھوائیں',
   'copyDraft.blank': 'AI کے لکھنے کے لیے عنوان دیں، یا تفصیل میں بتائیں کہ یہ کیا ہے۔',
   'copyDraft.left': 'آج {count} AI ڈرافٹ باقی ہیں۔ AI صرف وہی لکھتا ہے جو فارم میں ہے۔',
+  'copyDraft.credits':
+    'اس مہینے آپ کے پلان کے {perMonth} میں سے {count} AI کریڈٹ باقی ہیں۔ AI صرف وہی لکھتا ہے جو فارم میں ہے۔',
+  'ai.creditsLeft': 'اس مہینے آپ کے پلان کے {perMonth} میں سے {left} AI کریڈٹ باقی ہیں۔',
+  'ai.noCredits':
+    'اس مہینے آپ کے پلان کے AI کریڈٹ ختم ہو گئے: یہ یکم کو واپس آئیں گے، یا زیادہ کے لیے بڑا پلان چنیں۔',
   'copyDraft.drafted':
     'یہ AI نے آپ کی دی گئی معلومات سے لکھا ہے۔ محفوظ کرنے سے پہلے ہر لفظ، خاص طور پر کپڑا اور سائز، دیکھ لیں۔',
   'product.titleLabel': 'نام',
@@ -5438,6 +5449,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'billing.automationsNo': 'آٹومیشنز نہیں',
   'billing.cashbackYes': 'کیش بیک',
   'billing.cashbackNo': 'کیش بیک نہیں',
+  'billing.aiCredits': 'ہر مہینے {count} AI کریڈٹ',
   'billing.pixelYes': 'اسٹور فرنٹ پر میٹا پکسل',
   'billing.pixelNo': 'میٹا پکسل نہیں',
   'billing.conversionsYes': 'میٹا کی کنورژنز API',
