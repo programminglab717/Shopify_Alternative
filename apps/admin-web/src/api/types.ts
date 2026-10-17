@@ -1141,6 +1141,8 @@ export interface BillingPlanValue {
   loyalty: boolean;
   conversionsApi: boolean;
   removeBranding: boolean;
+  /** Whether its sales report gives true profit (ADR-529). */
+  trueProfit: boolean;
 }
 
 export interface BillingInvoiceValue {
@@ -1374,9 +1376,11 @@ export interface SalesTotalsValue {
   totalSales: MoneyValue;
   averageOrderValue: MoneyValue | null;
   returns: MoneyValue;
-  profit: MoneyValue;
+  grossProfit?: MoneyValue;
+  /** Null on a plan without true profit (ADR-529). */
+  profit: MoneyValue | null;
   /** Of couriers' charges in profit, what rate cards estimate, no statement saying (ADR-383). */
-  shippingCostsEstimated?: MoneyValue;
+  shippingCostsEstimated?: MoneyValue | null;
 }
 
 export interface SalesData {
@@ -1386,6 +1390,8 @@ export interface SalesData {
     periods: { start: string; sales: { orders: number; netSales: MoneyValue } }[];
     topProducts: { productId: string; title: string; unitsSold: number; grossSales: MoneyValue }[];
     rows: { key: string | null; title: string; sales: { orders: number; netSales: MoneyValue } }[];
+    /** Whether the shop's plan includes true profit (ADR-529); without it, profit is null. */
+    trueProfit?: boolean;
   };
 }
 

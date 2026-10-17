@@ -2663,6 +2663,7 @@ const BILLING_PLAN = /* GraphQL */ `
     loyalty
     conversionsApi
     removeBranding
+    trueProfit
   }
 `;
 
@@ -3225,6 +3226,9 @@ const SALES_TOTALS = /* GraphQL */ `
     returns {
       ...Money
     }
+    grossProfit {
+      ...Money
+    }
     profit {
       ...Money
     }
@@ -3279,6 +3283,7 @@ export const SalesQuery = /* GraphQL */ `
           }
         }
       }
+      trueProfit
     }
   }
   ${SALES_TOTALS}

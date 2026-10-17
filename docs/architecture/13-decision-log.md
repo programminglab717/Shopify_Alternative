@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-529 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-530 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -537,6 +537,7 @@
 | 527 | The admin's storefront settings show or hide "Powered by Hatti" with a switch, saying the core's refusal on a plan without it, and the plan cards say which plans hide it | Accepted |
 | 528 | The status page shows each part's last 90 days: a bar a day by the worst it was, and its uptime, counting incidents that took it down and not maintenance posted ahead | Accepted |
 | 529 | The sales report's true profit lines are on Growth and bigger plans: smaller plans get them null, with the report saying so, and gross profit stays on every plan | Accepted |
+| 530 | The admin's analytics show gross profit where the plan leaves true profit out, saying which plans give it, and the plan cards say which plans do | Accepted |
 
 ---
 
@@ -20141,3 +20142,19 @@
 * **Alternatives:**
   * **Refusing the whole report on smaller plans:** sales over time are on every plan.
   * **Computing the lines and hiding them in the admin:** the API would still give them.
+
+## ADR-530 · The admin's analytics show gross profit where the plan leaves true profit out, saying which plans give it, and the plan cards say which plans do
+
+* **Context:** The sales report gives profit null on plans without true profit (ADR-529). The
+  analytics page's profit figure read it as always there.
+* **Decision:**
+  * **Analytics** shows, where profit is null, a gross profit figure against the period before,
+    saying under it that profit after couriers and returns is on Growth and bigger plans.
+  * **The plan cards** add a line: "True profit, after couriers and returns", or "Gross profit
+    alone" (ADR-524).
+  * English and Urdu.
+* **Consequences:**
+  * An owner on a smaller plan still sees what the orders made before couriers and returns, and
+    learns which plan gives the rest.
+* **Alternatives:**
+  * **Hiding the figure:** the owner wouldn't know true profit exists.

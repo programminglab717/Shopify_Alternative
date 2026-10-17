@@ -90,6 +90,35 @@ describe('Analytics in the admin', () => {
     vi.unstubAllGlobals();
   });
 
+  it('shows gross profit on a plan without true profit, saying which plans give it (ADR-529)', async () => {
+    const core = fakeCore('owner', (operation) => {
+      if (operation in NO_VISITS) return NO_VISITS[operation];
+      if (operation === 'CodHealth') return { codHealth: COD_HEALTH };
+      if (operation !== 'Sales') return {};
+      return {
+        salesReport: {
+          totals: { ...totals('60000', 20), grossProfit: rupees('21000'), profit: null },
+          previous: {
+            totals: { ...totals('48000', 25), grossProfit: rupees('16800'), profit: null },
+          },
+          periods: [],
+          topProducts: [],
+          rows: [],
+          trueProfit: false,
+        },
+      };
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/analytics');
+
+    await screen.findByText('Rs 21,000');
+    expect(screen.getByText('Gross profit')).toBeTruthy();
+    expect(
+      screen.getByText('Profit after couriers and returns is on Growth and bigger plans'),
+    ).toBeTruthy();
+    expect(screen.queryByText('Profit')).toBeNull();
+  });
+
   it('shows sales against the period before, by day, with what sold most and from where', async () => {
     const core = fakeCore('marketer', (operation) => {
       if (operation in NO_VISITS) return NO_VISITS[operation];

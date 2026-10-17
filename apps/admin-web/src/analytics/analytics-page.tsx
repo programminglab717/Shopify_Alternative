@@ -48,19 +48,30 @@ function Totals({ now, before }: { now: SalesTotalsValue; before: SalesTotalsVal
         before={amount(before.averageOrderValue)}
         shown={now.averageOrderValue ? formatMoney(now.averageOrderValue.amount) : '–'}
       />
-      <Figure
-        label="analytics.profit"
-        now={amount(now.profit)}
-        before={amount(before.profit)}
-        shown={formatMoney(now.profit.amount)}
-        note={
-          estimated > 0
-            ? t('analytics.profitEstimated', {
-                amount: formatMoney(now.shippingCostsEstimated!.amount),
-              })
-            : null
-        }
-      />
+      {now.profit ? (
+        <Figure
+          label="analytics.profit"
+          now={amount(now.profit)}
+          before={amount(before.profit)}
+          shown={formatMoney(now.profit.amount)}
+          note={
+            estimated > 0
+              ? t('analytics.profitEstimated', {
+                  amount: formatMoney(now.shippingCostsEstimated!.amount),
+                })
+              : null
+          }
+        />
+      ) : (
+        // A plan without true profit (ADR-529): gross profit, saying which plans give the rest.
+        <Figure
+          label="analytics.grossProfit"
+          now={amount(now.grossProfit ?? null)}
+          before={amount(before.grossProfit ?? null)}
+          shown={formatMoney(now.grossProfit?.amount ?? '0')}
+          note={t('analytics.trueProfitPlan')}
+        />
+      )}
     </div>
   );
 }
