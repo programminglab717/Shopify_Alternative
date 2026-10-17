@@ -8,6 +8,7 @@ import type {
   CollectionRule,
   CollectionSortOrder,
   CollectionsData,
+  StarterKitApplied,
 } from '../api/types';
 import { errorText } from '../i18n/errors';
 import { formatCount } from '../i18n/format';
@@ -22,6 +23,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { NEW_RULE, RulesEditor, ruleInput, rulesComplete, sortOrders } from './collection-form';
+import { KitApplied, StarterKitCard } from './starter-kits';
 
 /** Back to the products, which collections group. */
 export function BackToProducts({ to = 'products' }: { to?: 'products' | 'collections' }) {
@@ -52,6 +54,10 @@ export function CollectionsPage() {
     query: searched || null,
   });
   const edits = EDITS_PRODUCTS.includes(shop.role);
+  const [applied, setApplied] = useState<StarterKitApplied | null>(null);
+  // A shop with few collections yet is offered a kit for what it sells (ADR-486).
+  const offersKit =
+    edits && !searched && !applied && (query.data?.collections.nodes.length ?? 3) < 3;
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -92,6 +98,8 @@ export function CollectionsPage() {
           className="min-h-12 w-full rounded-control border border-line bg-surface ps-10 pe-3 md:min-h-10"
         />
       </form>
+      {applied && <KitApplied applied={applied} />}
+      {offersKit && <StarterKitCard onApplied={setApplied} />}
       {query.isPending ? (
         <Loading label={t('state.loading')} />
       ) : query.isError ? (

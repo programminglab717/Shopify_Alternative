@@ -165,6 +165,7 @@ export {
   shownSizeChartsIn,
   type ShownSizeChart,
   type SizeChartChangedPayload,
+  type SizeChartInput,
   type SizeChartRecord,
   type SizeChartRow,
   type SizeChartUnitValue,

@@ -4601,6 +4601,31 @@ export const StoreSpeedQuery = /* GraphQL */ `
   }
 `;
 
+export const StarterKitsQuery = /* GraphQL */ `
+  query StarterKits {
+    starterKits {
+      kit
+      collections {
+        title
+        handle
+        tag
+      }
+      sizeCharts
+    }
+  }
+`;
+
+export const StarterKitApplyMutation = /* GraphQL */ `
+  mutation StarterKitApply($kit: StarterKit!) {
+    starterKitApply(kit: $kit) {
+      collectionsMade
+      collectionsKept
+      sizeChartsMade
+      menuLinksAdded
+    }
+  }
+`;
+
 export const ProductCategoriesQuery = /* GraphQL */ `
   query ProductCategories {
     productCategories

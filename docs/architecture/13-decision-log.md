@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-485 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-486 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -493,6 +493,7 @@
 | 483 | Product taxonomy: a product's category in Google's product taxonomy and its condition, barcodes that are GTINs published as such, all three in the catalog feed | Accepted |
 | 484 | Pakistan's marketing calendar: the moments shoppers buy for, dated each year from Umm al-Qura a day later for the Islamic ones, each with a ready-made campaign | Accepted |
 | 485 | The store speed score: shoppers' own Core Web Vitals, counted by the storefront in histograms of 28 days, scored per device as Google judges them, with fixes | Accepted |
+| 486 | Vertical starter kits: what a kind of shop sells by, its smart collections, size charts and main menu links, set up in one go and safe to apply again | Accepted |
 
 ---
 
@@ -18365,3 +18366,46 @@
     new shops lack, and not by page kind.
   * **Lighthouse runs from Hatti's servers:** a lab number, not what shoppers on Pakistani
     networks saw.
+
+## ADR-486 · Vertical starter kits: what a kind of shop sells by, its smart collections, size charts and main menu links, set up in one go and safe to apply again
+
+* **Context:**
+  * ONB-13 asks for vertical starter kits: fashion (stitched and unstitched), jewellery, beauty,
+    electronics, bakery and grocery.
+  * A new shop opens empty (ADR-145). Its owner has to work out collections, a menu and size
+    charts before adding products, and many stop there.
+* **Decision:**
+  * **Five kits, as data in the core** (`apps/core/src/api/starter-kits.ts`):
+    * Fashion: Unstitched, Ready to wear, Lawn, Formal and Eid collection, with kameez and
+      kurta size charts in inches.
+    * Jewellery: Earrings, Necklaces, Bangles, Rings and Bridal sets.
+    * Beauty: Skin care, Makeup, Hair care and Fragrance.
+    * Electronics: Mobile accessories, Audio, Smart watches and Home appliances.
+    * Grocery: Bakery, Mithai, Dry fruits, Spices and Deals.
+    * Each also has New arrivals (everything priced, newest first) and a Sale of what is
+      priced below its compare-at price.
+  * **Collections are smart, filled by a tag** (`lawn`, `bridal`, `skin-care`), so a product
+    is in its collection by being tagged, as Shopify shops do, and nothing has to be picked by
+    hand.
+  * **`starterKitApply(kit)`** (with `write_products` and `write_online_store_navigation`):
+    * makes, through the catalog's and the online store's facades, the kit's collections the
+      shop has no collection of that handle for, and the size charts it has none of that name
+      for;
+    * adds to the main menu a link to each of the kit's collections it does not link yet,
+      after what is there;
+    * says what it made and what it kept.
+    So a kit can be applied again, or another after it: they share New arrivals and Sale.
+    `starterKits` lists what each kit sets up.
+  * **The admin's collections page offers a kit** while a shop has fewer than three
+    collections. It shows what the chosen kit sets up, applies it in a tap, and says to tag
+    products to fill the collections.
+* **Consequences:**
+  * Kits make no products, theme or policies. Policies have drafts of their own (ADR-056), and
+    a theme preset per kind of shop is a later part of ONB-13.
+  * The kits' names are English, as collections' titles are; shops put them in Urdu on the
+    Urdu pages (ADR-238).
+* **Alternatives:**
+  * **Manual collections with sample products:** sample products have to be deleted, and
+    manual collections filled by hand.
+  * **Kits chosen when a shop opens:** opening stays one step (ADR-145). A kit is offered where
+    its collections show.

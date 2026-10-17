@@ -1918,6 +1918,29 @@ export interface ShopVerificationSubmitData {
 
 export type CopyLanguage = 'ENGLISH' | 'URDU' | 'ROMAN_URDU';
 
+/** What a shop sells, set up in one go (ONB-13, ADR-486). */
+export type StarterKitValue = 'FASHION' | 'JEWELLERY' | 'BEAUTY' | 'ELECTRONICS' | 'GROCERY';
+
+export interface StarterKitsData {
+  starterKits: {
+    kit: StarterKitValue;
+    collections: { title: string; handle: string; tag: string | null }[];
+    sizeCharts: string[];
+  }[];
+}
+
+/** What applying a kit made, and what the shop had already. */
+export interface StarterKitApplied {
+  collectionsMade: number;
+  collectionsKept: number;
+  sizeChartsMade: number;
+  menuLinksAdded: number;
+}
+
+export interface StarterKitApplyData {
+  starterKitApply: StarterKitApplied;
+}
+
 /** A measurement of how fast a page was for a shopper (ADR-485). */
 export type WebVitalValue = 'LCP' | 'INP' | 'CLS' | 'FCP' | 'TTFB';
 

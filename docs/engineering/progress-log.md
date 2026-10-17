@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Vertical starter kits
+
+* **Fashion, jewellery, beauty, electronics and grocery kits: smart collections filled by tags,
+  fashion's size charts and main menu links, applied in a tap from the admin's collections page
+  and safe to apply again** ([ADR-486](../architecture/13-decision-log.md#adr-486--vertical-starter-kits-what-a-kind-of-shop-sells-by-its-smart-collections-size-charts-and-main-menu-links-set-up-in-one-go-and-safe-to-apply-again), ONB-13 in part).
+* 3053 tests, 5 more: the kits through the Admin API, and the
+  admin's card.
+
 ### 3346981 · The store speed score
 
 * **Shoppers' own Core Web Vitals, measured by their browsers on each page and counted by the

@@ -3813,6 +3813,21 @@ const en = {
     "Fonts and scripts added to your theme hold the page back. Use the theme's own fonts, and fewer custom scripts.",
   'speed.fixHint.SLOW_SERVER':
     'This one is ours: Hatti watches how fast stores answer and is working on it.',
+  'starterKits.title': 'Start with a kit for what you sell',
+  'starterKits.hint':
+    'Collections your products fill by their tags, the size charts your clothes need, and links to them in your main menu, set up in one go. What you have already stays as it is.',
+  'starterKits.kit': 'You sell',
+  'starterKits.kit.FASHION': 'Clothes, stitched and unstitched',
+  'starterKits.kit.JEWELLERY': 'Jewellery',
+  'starterKits.kit.BEAUTY': 'Beauty and fragrance',
+  'starterKits.kit.ELECTRONICS': 'Electronics and accessories',
+  'starterKits.kit.GROCERY': 'Bakery and grocery',
+  'starterKits.makes': 'It sets up:',
+  'starterKits.sizeChart': '{name} size chart',
+  'starterKits.apply': 'Set it up',
+  'starterKits.applied':
+    'Made {collections} collections and {charts} size charts, and added {links} links to your main menu.',
+  'starterKits.tagHint': 'Tag your products, such as lawn or bridal, to fill the collections.',
   'automations.title': 'Automations',
   'automations.linkHint': 'A welcome and a win-back, sent on their own',
   'automations.intro':
@@ -8014,6 +8029,21 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'تھیم میں شامل فونٹس اور اسکرپٹس صفحے کو روکتے ہیں۔ تھیم کے اپنے فونٹس اور کم کسٹم اسکرپٹس استعمال کریں۔',
   'speed.fixHint.SLOW_SERVER':
     'یہ ہمارا کام ہے: ہٹی دیکھتا ہے کہ اسٹور کتنی جلدی جواب دیتے ہیں اور اس پر کام کر رہا ہے۔',
+  'starterKits.title': 'جو آپ بیچتے ہیں اس کی کٹ سے شروع کریں',
+  'starterKits.hint':
+    'کلیکشنز جنہیں آپ کی پروڈکٹس اپنے ٹیگز سے بھرتی ہیں، آپ کے کپڑوں کے سائز چارٹ، اور مین مینو میں ان کے لنکس، ایک ہی بار میں۔ جو پہلے سے ہے وہ ویسا ہی رہتا ہے۔',
+  'starterKits.kit': 'آپ بیچتے ہیں',
+  'starterKits.kit.FASHION': 'کپڑے، سلے اور ان سلے',
+  'starterKits.kit.JEWELLERY': 'زیورات',
+  'starterKits.kit.BEAUTY': 'بیوٹی اور خوشبو',
+  'starterKits.kit.ELECTRONICS': 'الیکٹرانکس اور ایکسیسریز',
+  'starterKits.kit.GROCERY': 'بیکری اور گروسری',
+  'starterKits.makes': 'یہ بناتی ہے:',
+  'starterKits.sizeChart': '{name} سائز چارٹ',
+  'starterKits.apply': 'سیٹ اپ کریں',
+  'starterKits.applied':
+    '{collections} کلیکشنز اور {charts} سائز چارٹ بنائے، اور مین مینو میں {links} لنکس شامل کیے۔',
+  'starterKits.tagHint': 'کلیکشنز بھرنے کے لیے اپنی پروڈکٹس کو ٹیگ کریں، جیسے lawn یا bridal۔',
   'automations.title': 'خودکار پیغامات',
   'automations.linkHint': 'خوش آمدید اور واپسی کے پیغام، جو خود جاتے ہیں',
   'automations.intro':

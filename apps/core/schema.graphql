@@ -7796,6 +7796,11 @@ type Mutation {
   stagedUploadsCreate(input: [StagedUploadInput!]!): StagedUploadsCreatePayload!
 
   """
+  Sets up what a kind of shop sells by (ONB-13, ADR-486): the kit's smart collections, filled by tags, its size charts, and links to its collections in the main menu. What the shop has already, by handle or name, is left as it is, so a kit may be applied again.
+  """
+  starterKitApply(kit: StarterKit!): StarterKitApplyPayload!
+
+  """
   Credits a store credit account, as Shopify's storeCreditAccountCredit: `id` is the account's, or a customer's, whose account in the shop's currency is opened if they have none. An account holds at most Rs 1,000,000. Audited. Needs an Idempotency-Key header.
   """
   storeCreditAccountCredit(creditInput: StoreCreditAccountCreditInput!, id: ID!): StoreCreditAccountCreditPayload!
@@ -11899,6 +11904,9 @@ type Query {
   """
   staffMembers: [StaffMember!]!
 
+  """The starter kits a shop may apply (ONB-13), and what each sets up."""
+  starterKits: [StarterKitPreview!]!
+
   """A store credit account by ID, or null if not found."""
   storeCreditAccount(id: ID!): StoreCreditAccount
 
@@ -13310,6 +13318,54 @@ type StagedUploadParameter {
 type StagedUploadsCreatePayload {
   stagedTargets: [StagedMediaUploadTarget!]
   userErrors: [UserError!]!
+}
+
+"""What a shop sells, set up in one go (ONB-13, ADR-486)."""
+enum StarterKit {
+  """Beauty and fragrance."""
+  BEAUTY
+
+  """Electronics and accessories."""
+  ELECTRONICS
+
+  """Clothes, stitched and unstitched."""
+  FASHION
+
+  """Bakery and grocery."""
+  GROCERY
+
+  """Jewellery."""
+  JEWELLERY
+}
+
+type StarterKitApplyPayload {
+  """Collections the shop had already, by handle, left as they are."""
+  collectionsKept: Int!
+
+  """Collections made."""
+  collectionsMade: Int!
+
+  """Links to its collections added to the main menu."""
+  menuLinksAdded: Int!
+  sizeChartsMade: Int!
+}
+
+"""A collection a kit makes: smart, filled by its products' tag."""
+type StarterKitCollection {
+  handle: String!
+
+  """The tag that puts a product in it; null for new arrivals and the sale."""
+  tag: String
+  title: String!
+}
+
+"""A starter kit, as applying it would set it up."""
+type StarterKitPreview {
+  collections: [StarterKitCollection!]!
+  kit: StarterKit!
+
+  """The size charts it makes, by name."""
+  sizeCharts: [String!]!
 }
 
 """Whether a suit comes stitched (ADR-477)."""
