@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-548 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-549 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -556,6 +556,7 @@
 | 546 | The inbox's staff answer a customer in their own words within the day WhatsApp allows after the customer last wrote, sent at once from the number the customer wrote to, and followed to delivery as the webhook says | Accepted |
 | 547 | Orders placed through checkout go to Google Analytics' Measurement Protocol from the worker beside Meta's and TikTok's, the shop connecting its web stream with an API secret, for Google Ads to import its purchase as a conversion | Accepted |
 | 548 | The storefront loads the shop's Google tag while it has Google Analytics connected, tracking the same steps as Meta's and TikTok's pixels, and checkout passes the `_ga` cookie on so that an order's server events are the browser's that came from the ad | Accepted |
+| 549 | The admin's inbox lists a shop's WhatsApp conversations open, unread or closed, and a conversation's page reads it as it opens, closes and reopens it, and answers within the day WhatsApp allows, for those who work it; marketers read it alone | Accepted |
 
 ---
 
@@ -20696,3 +20697,32 @@
 * **Alternatives:**
   * **Google Tag Manager's container:** lets a shop add any tag, Hatti's checkout no longer knowing
     what runs on its pages.
+
+## ADR-549 · The admin's inbox lists a shop's WhatsApp conversations open, unread or closed, and a conversation's page reads it as it opens, closes and reopens it, and answers within the day WhatsApp allows, for those who work it; marketers read it alone
+
+* **Context:** The core keeps what customers write to a shop on WhatsApp as conversations
+  (ADR-545) and sends the shop's replies within the day WhatsApp allows (ADR-546), but only through
+  the API: no one in a shop could see or answer them.
+* **Decision:**
+  * **Inbox in the admin's navigation,** beside the Confirmation Desk, for owners, managers,
+    confirmation agents and marketers, as the API's scopes allow; packers and accountants see none.
+  * **The list:** the latest first, a page at a time, in three tabs, open, unread and closed, each
+    conversation with the customer's number as the API shows it to the one reading, its last
+    message (or what it carried, a photo or a voice note, which stays on the customer's phone), who
+    wrote it, and its unread messages counted; the heading counts the conversations unread.
+  * **A conversation's page:** its messages oldest at the top, older ones a page at a time, each
+    reply with how far WhatsApp took it, and which number the customer wrote to, the shop's own or
+    Hatti's.
+  * **Those who work the inbox** (owners, managers and confirmation agents) read it as it opens,
+    close it or open it again, and answer in their own words, up to WhatsApp's 4,096 characters,
+    until the day after the customer last wrote, the page saying until when; once it has passed, a
+    note says the customer must write again. Why WhatsApp would not take a reply is said in words,
+    whether to try again among them. A marketer reads the conversation, leaving it unread for those
+    who answer.
+* **Consequences:**
+  * A shop answers its customers' questions where it confirms and ships their orders, and each
+    reply is kept with who wrote it.
+  * The list does not refresh by itself yet, nor does a phone hear of a new message.
+* **Alternatives:**
+  * **The inbox inside the Confirmation Desk:** the desk is a queue of orders, and most
+    conversations are about none.

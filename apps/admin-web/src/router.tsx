@@ -24,6 +24,8 @@ import { ErasuresPage } from './customers/care';
 import { NewCustomerPage } from './customers/new-customer-page';
 import { AgentsPage } from './desk/agents-page';
 import { DeskPage } from './desk/desk-page';
+import { ConversationPage } from './inbox/conversation-page';
+import { InboxPage, validateInboxSearch } from './inbox/inbox-page';
 import {
   ChangeEmailPage,
   ForgotPasswordPage,
@@ -262,6 +264,19 @@ const deskAgents = createRoute({
   getParentRoute: () => shop,
   path: 'desk/agents',
   component: AgentsPage,
+});
+
+const inbox = createRoute({
+  getParentRoute: () => shop,
+  path: 'inbox',
+  validateSearch: validateInboxSearch,
+  component: InboxPage,
+});
+
+const conversation = createRoute({
+  getParentRoute: () => shop,
+  path: 'inbox/$conversationId',
+  component: ConversationPage,
 });
 
 const ordersPackers = createRoute({
@@ -899,6 +914,8 @@ export const routeTree = root.addChildren([
     order,
     desk,
     deskAgents,
+    inbox,
+    conversation,
     products,
     newProduct,
     snapProduct,

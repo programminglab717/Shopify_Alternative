@@ -1,4 +1,5 @@
 import { ApiError } from '../api/client';
+import type { UserError } from '../api/types';
 import type { Translate } from './locale';
 import { messages, type MessageKey } from './messages';
 
@@ -16,4 +17,13 @@ export function errorText(error: unknown, t: Translate): string {
     if (error.status >= 400 && error.status < 500 && error.message) return error.message;
   }
   return t('state.error');
+}
+
+/**
+ * What to tell the merchant of one of a mutation's `userErrors`: in their language where the admin
+ * knows its code, the API's words standing for any `{reason}`; the API's words alone otherwise.
+ */
+export function userErrorText(error: UserError, t: Translate): string {
+  const key = `error.${error.code}`;
+  return key in messages.en ? t(key as MessageKey, { reason: error.message }) : error.message;
 }

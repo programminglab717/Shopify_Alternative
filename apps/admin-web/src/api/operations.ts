@@ -8949,3 +8949,128 @@ export const SupportRequestCloseMutation = /* GraphQL */ `
   ${SUPPORT_REQUEST}
   ${USER_ERRORS}
 `;
+
+const CONVERSATION_MESSAGE = /* GraphQL */ `
+  fragment ConversationMessageFields on ConversationMessage {
+    id
+    direction
+    body
+    mediaKind
+    at
+    status
+    error
+  }
+`;
+
+const CONVERSATION = /* GraphQL */ `
+  fragment ConversationFields on Conversation {
+    id
+    customerPhone
+    viaOwnNumber
+    status
+    unread
+    lastMessageAt
+    lastInboundAt
+    replyableUntil
+    lastMessage {
+      ...ConversationMessageFields
+    }
+    createdAt
+  }
+  ${CONVERSATION_MESSAGE}
+`;
+
+/**
+ * The shop's WhatsApp conversations (MSG-05, ADR-545), the latest written first, and how many have
+ * messages unread.
+ */
+export const ConversationsQuery = /* GraphQL */ `
+  query Conversations($first: Int, $after: String, $unread: Boolean, $status: ConversationStatus) {
+    conversations(first: $first, after: $after, unread: $unread, status: $status) {
+      nodes {
+        ...ConversationFields
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+    conversationsUnreadCount
+  }
+  ${CONVERSATION}
+`;
+
+export const ConversationQuery = /* GraphQL */ `
+  query Conversation($id: ID!) {
+    conversation(id: $id) {
+      ...ConversationFields
+    }
+  }
+  ${CONVERSATION}
+`;
+
+/** A conversation's messages, the latest first: those before `before`, a page at a time. */
+export const ConversationMessagesQuery = /* GraphQL */ `
+  query ConversationMessages($conversationId: ID!, $first: Int, $before: ID) {
+    conversationMessages(conversationId: $conversationId, first: $first, before: $before) {
+      nodes {
+        ...ConversationMessageFields
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+  ${CONVERSATION_MESSAGE}
+`;
+
+export const ConversationMarkReadMutation = /* GraphQL */ `
+  mutation ConversationMarkRead($id: ID!) {
+    conversationMarkRead(id: $id) {
+      conversation {
+        ...ConversationFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CONVERSATION}
+  ${USER_ERRORS}
+`;
+
+/** A conversation closed, and read, or opened again. */
+export const ConversationUpdateStatusMutation = /* GraphQL */ `
+  mutation ConversationUpdateStatus($id: ID!, $status: ConversationStatus!) {
+    conversationUpdateStatus(id: $id, status: $status) {
+      conversation {
+        ...ConversationFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CONVERSATION}
+  ${USER_ERRORS}
+`;
+
+/** The shop's answer in its own words, within the day WhatsApp allows (ADR-546). */
+export const ConversationReplyMutation = /* GraphQL */ `
+  mutation ConversationReply($id: ID!, $body: String!) {
+    conversationReply(id: $id, body: $body) {
+      conversation {
+        ...ConversationFields
+      }
+      message {
+        ...ConversationMessageFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CONVERSATION}
+  ${USER_ERRORS}
+`;

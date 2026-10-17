@@ -10,6 +10,7 @@ import {
   LogOut,
   Megaphone,
   Menu,
+  MessagesSquare,
   Package,
   ReceiptText,
   Settings,
@@ -28,6 +29,7 @@ import { READS_ANALYTICS } from '../analytics/analytics-page';
 import { RECONCILES_CASH } from '../cash/cash-page';
 import { OPENS_ONLINE_STORE } from '../online-store/online-store-page';
 import { READS_CUSTOMERS } from '../customers/customers-page';
+import { READS_INBOX } from '../inbox/inbox-page';
 import { MANAGES_DISCOUNTS } from '../discounts/discounts-page';
 import { MARKETS } from '../marketing/broadcasts-page';
 import { MAKES_PAYMENT_LINKS } from '../payment-links/payment-links-page';
@@ -48,6 +50,7 @@ interface NavItem {
     | '/$shopId'
     | '/$shopId/orders'
     | '/$shopId/desk'
+    | '/$shopId/inbox'
     | '/$shopId/products'
     | '/$shopId/stock'
     | '/$shopId/customers'
@@ -88,6 +91,7 @@ export const NAV: readonly NavItem[] = [
     roles: ['owner', 'manager', 'confirmation_agent'],
     primary: true,
   },
+  { to: '/$shopId/inbox', label: 'nav.inbox', icon: MessagesSquare, roles: READS_INBOX },
   {
     to: '/$shopId/shipping',
     label: 'nav.shipping',

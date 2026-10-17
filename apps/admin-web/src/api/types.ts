@@ -4181,3 +4181,59 @@ export interface SupportRequestPayload {
   request: SupportRequestValue | null;
   userErrors: UserError[];
 }
+
+/** A WhatsApp conversation with a customer (MSG-05, ADR-545). */
+export type ConversationStatus = 'OPEN' | 'CLOSED';
+export type ConversationReplyStatus = 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
+
+export interface ConversationMessageValue {
+  id: string;
+  direction: 'INBOUND' | 'OUTBOUND';
+  body: string | null;
+  /** What else the customer sent, as WhatsApp names it: "image", "audio", "location". */
+  mediaKind: string | null;
+  at: string;
+  status: ConversationReplyStatus | null;
+  error: string | null;
+}
+
+export interface ConversationValue {
+  id: string;
+  customerPhone: string;
+  viaOwnNumber: boolean;
+  status: ConversationStatus;
+  unread: number;
+  lastMessageAt: string;
+  lastInboundAt: string | null;
+  replyableUntil: string | null;
+  lastMessage: ConversationMessageValue | null;
+  createdAt: string;
+}
+
+export interface ConversationsData {
+  conversations: {
+    nodes: ConversationValue[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+  conversationsUnreadCount: number;
+}
+
+export interface ConversationData {
+  conversation: ConversationValue | null;
+}
+
+export interface ConversationMessagesData {
+  conversationMessages: {
+    nodes: ConversationMessageValue[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+}
+
+export interface ConversationUpdatePayload {
+  conversation: ConversationValue | null;
+  userErrors: UserError[];
+}
+
+export interface ConversationReplyData {
+  conversationReply: ConversationUpdatePayload & { message: ConversationMessageValue | null };
+}

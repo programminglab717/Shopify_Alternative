@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### The admin's inbox
+
+* **The admin's inbox lists a shop's WhatsApp conversations open, unread or closed, and a
+  conversation's page reads, closes and reopens it, and answers within the day WhatsApp allows**
+  ([ADR-549](../architecture/13-decision-log.md#adr-549--the-admins-inbox-lists-a-shops-whatsapp-conversations-open-unread-or-closed-and-a-conversations-page-reads-it-as-it-opens-closes-and-reopens-it-and-answers-within-the-day-whatsapp-allows-for-those-who-work-it-marketers-read-it-alone), MSG-05). Marketers read it alone.
+* 3346 tests, 19 more: the inbox's 9, and the admin's count caught up with
+  the 10 it ran uncounted.
+
 ### f806c9c · Google's tag on the storefront
 
 * **The storefront loads the shop's Google tag while it has Google Analytics connected, and
