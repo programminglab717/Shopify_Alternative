@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Google's tab in the admin
+### f843fe5 · Google's tab in the admin
 
 * **The admin's online store has a Google tab: the web stream connected with its measurement ID and
   API secret, its purchase moment chosen, disconnected once asked, and the moments sent to Google
