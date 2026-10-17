@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { ChevronRight, Store } from 'lucide-react';
+import { ChevronRight, Handshake, Store } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { AuthLayout } from '../auth/auth-layout';
@@ -59,6 +59,20 @@ function OpenShopForm({ first }: { first: boolean }) {
   );
 }
 
+/** For an agency or a freelancer: asking a shop for access instead (ADR-488). */
+function AskAccessLink() {
+  const { t } = useLocale();
+  return (
+    <Link
+      to="/access"
+      className="mt-4 inline-flex min-h-10 items-center gap-2 self-center text-secondary underline"
+    >
+      <Handshake aria-hidden className="size-5" />
+      {t('shops.askAccess')}
+    </Link>
+  );
+}
+
 /**
  * The shops the account works in, each with its role there: one alone opens at once; none asks
  * for the merchant's first.
@@ -102,6 +116,7 @@ export function ShopsPage() {
     return (
       <AuthLayout title={t('shops.openTitle')}>
         <OpenShopForm first />
+        <AskAccessLink />
       </AuthLayout>
     );
   }
@@ -134,6 +149,7 @@ export function ShopsPage() {
           <Button variant="secondary" onClick={() => setOpening(true)}>
             {t('shops.open')}
           </Button>
+          <AskAccessLink />
         </div>
       )}
     </AuthLayout>

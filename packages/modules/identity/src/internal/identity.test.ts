@@ -1520,6 +1520,132 @@ describe.skipIf(!server || !redisUrl)('IdentityService', () => {
       expect(rows[0].left).toBe(0);
     });
 
+    it('lets an agency ask a shop for access by its handle, which its owner approves or declines (ADR-488)', async () => {
+      const { shopId, owner } = await shopWithOwner('Zari Lawn');
+      await admin.query("UPDATE control.shops SET handle = 'zari-lawn' WHERE id = $1", [shopId]);
+      await admin.query('UPDATE identity.users SET email_verified_at = now() WHERE id = $1', [
+        owner.userId,
+      ]);
+      const sent: AccountEmail[] = [];
+      class Outbox extends AccountEmailSender {
+        async send(email: AccountEmail): Promise<boolean> {
+          sent.push(email);
+          return true;
+        }
+      }
+      const s = new StaffService({
+        db: identityDb.app,
+        now: () => new Date(clock),
+        emails: { sender: new Outbox(), adminUrl: 'https://admin.hatti.pk/' },
+      });
+      const agency = await signUp();
+      const ask = (input: Partial<Parameters<StaffService['requestAccess']>[1]>) =>
+        s.requestAccess(
+          agency,
+          { shop: 'Zari-Lawn ', role: 'marketer', accessDays: 30, ...input },
+          client(),
+        );
+      for (const [input, code] of [
+        [{ role: 'owner' }, 'INVALID_REQUEST'],
+        [{ accessDays: 91 }, 'INVALID_REQUEST'],
+        [{ message: 'x'.repeat(301) }, 'INVALID_REQUEST'],
+        [{ shop: 'nowhere' }, 'SHOP_NOT_FOUND'],
+      ] as const) {
+        expect((await authError(ask(input))).code).toBe(code);
+      }
+      expect(
+        (
+          await authError(
+            s.requestAccess(owner, { shop: 'zari-lawn', role: 'packer', accessDays: 7 }),
+          )
+        ).code,
+      ).toBe('ALREADY_MEMBER');
+
+      const request = await ask({ message: ' Pixel Media, for your Meta ads ' });
+      expect(request).toMatchObject({
+        shop: { id: shopId, name: 'Zari Lawn' },
+        requester: { userId: agency.userId, name: 'Ayesha Khan' },
+        role: 'marketer',
+        accessDays: 30,
+        message: 'Pixel Media, for your Meta ads',
+        status: 'pending',
+        expiresAt: new Date(clock + 7 * 24 * 3_600_000),
+      });
+      // Its owner is emailed, with the staff page's link; one request waits at a time.
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({
+        subject: 'Ayesha Khan asks for access to Zari Lawn on Hatti',
+        text: expect.stringContaining(
+          `https://admin.hatti.pk/${toPublicId('shop', shopId)}/settings/staff`,
+        ),
+      });
+      expect(await authError(ask({})).then((error) => error.code)).toBe('REQUEST_WAITING');
+      expect((await s.accessRequestsOf(shopId)).map((each) => each.id)).toEqual([request.id]);
+
+      // A packer decides nothing, nor a manager a manager's request; the owner may change it.
+      const packer = await signUp();
+      await service.grantMembership({ userId: packer.userId, shopId, role: 'packer' });
+      expect(errorsOf(await s.approveAccessRequest(packer, shopId, request.id))).toEqual([
+        ['id', 'INVALID'],
+      ]);
+      expect(
+        errorsOf(await s.approveAccessRequest(owner, shopId, request.id, { accessDays: 0 })),
+      ).toEqual([['accessDays', 'INVALID']]);
+      const approved = await s.approveAccessRequest(
+        owner,
+        shopId,
+        request.id,
+        { accessDays: 14 },
+        client(),
+      );
+      expect(approved).toMatchObject({
+        ok: true,
+        value: {
+          request: { status: 'approved', accessDays: 14 },
+          member: {
+            userId: agency.userId,
+            role: 'marketer',
+            expiresAt: new Date(clock + 14 * 24 * 3_600_000),
+          },
+        },
+      });
+      expect(errorsOf(await s.declineAccessRequest(owner, shopId, request.id))).toEqual([
+        ['id', 'INVALID'],
+      ]);
+      expect(await s.accessRequestsOf(shopId)).toEqual([]);
+
+      // Once their days are up, they ask again; declined, it is theirs to see.
+      await admin.query('UPDATE identity.memberships SET expires_at = $2 WHERE user_id = $1', [
+        agency.userId,
+        new Date(clock - 60_000),
+      ]);
+      const again = await ask({ role: 'manager', accessDays: 7 });
+      expect(errorsOf(await s.declineAccessRequest(packer, shopId, again.id))).toEqual([
+        ['id', 'INVALID'],
+      ]);
+      expect(await s.declineAccessRequest(owner, shopId, again.id, client())).toMatchObject({
+        ok: true,
+        value: { status: 'declined' },
+      });
+      expect((await s.accessRequestsBy(agency)).map((each) => each.status)).toEqual([
+        'declined',
+        'approved',
+      ]);
+
+      // A request no one decides in 7 days expires, and another may be made.
+      const third = await ask({});
+      clock += 7 * 24 * 3_600_000 + 1;
+      expect(errorsOf(await s.approveAccessRequest(owner, shopId, third.id))).toEqual([
+        ['id', 'INVALID'],
+      ]);
+      expect((await s.accessRequestsBy(agency))[0]!.status).toBe('expired');
+      expect(await s.accessRequestsOf(shopId)).toEqual([]);
+      const fourth = await ask({});
+      const joined = await s.approveAccessRequest(owner, shopId, fourth.id);
+      // An ended membership not swept yet is no bar to joining again.
+      expect(joined.ok).toBe(true);
+    });
+
     it("keeps the owner's powers and the managers' apart", async () => {
       const { shopId, owner } = await shopWithOwner();
       const join = async (role: StaffRole) => {

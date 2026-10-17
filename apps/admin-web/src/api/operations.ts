@@ -1991,6 +1991,50 @@ export const StaffQuery = /* GraphQL */ `
   }
 `;
 
+/** Accounts asking to work in the shop for some days, waiting to be decided (ADR-488). */
+export const StaffAccessRequestsQuery = /* GraphQL */ `
+  query StaffAccessRequests {
+    staffAccessRequests {
+      id
+      name
+      email
+      role
+      accessDays
+      message
+      createdAt
+      expiresAt
+    }
+  }
+`;
+
+/** A request for access approved: its account works in the shop until its days are up. */
+export const StaffAccessRequestApproveMutation = /* GraphQL */ `
+  mutation StaffAccessRequestApprove($id: ID!) {
+    staffAccessRequestApprove(id: $id) {
+      staffMember {
+        id
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A request for access declined. */
+export const StaffAccessRequestDeclineMutation = /* GraphQL */ `
+  mutation StaffAccessRequestDecline($id: ID!) {
+    staffAccessRequestDecline(id: $id) {
+      declinedAccessRequestId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** Someone invited to work in the shop by a link, emailed too where an address is given. */
 export const StaffInvitationCreateMutation = /* GraphQL */ `
   mutation StaffInvitationCreate(

@@ -7747,6 +7747,16 @@ type Mutation {
   smsSenderWithdraw: SmsSenderWithdrawPayload!
 
   """
+  Approves a request for access waiting on the shop (ADR-488): its account works in the shop from now until its days are up, in `role` and for `accessDays` where given in place of what it asked. Within the plan's staff (ADR-154). The owner approves any role but its own; managers, those below them. Staff confirm who they are first when they signed in over 15 minutes ago.
+  """
+  staffAccessRequestApprove(accessDays: Int, id: ID!, role: StaffMemberRole): StaffAccessRequestApprovePayload!
+
+  """
+  Declines a request for access waiting on the shop (ADR-488), of a role the acting member manages; its account sees it was declined.
+  """
+  staffAccessRequestDecline(id: ID!): StaffAccessRequestDeclinePayload!
+
+  """
   Invites someone to work in the shop in `role`, by a link the inviter sends them, good for 7 days and accepted once; with `email`, Hatti emails it there too, 20 a day for a shop at most (ADR-167). The owner invites any role but its own; managers, those below them. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   staffInvitationCreate(
@@ -11900,6 +11910,11 @@ type Query {
   smsSender: SmsSender!
 
   """
+  Requests for access waiting on the shop, the oldest first (ADR-488). Staff need to be the owner or a manager.
+  """
+  staffAccessRequests: [StaffAccessRequest!]!
+
+  """
   Invitations neither accepted, taken back nor expired, the newest first. Staff need to be the owner or a manager.
   """
   staffInvitations: [StaffInvitation!]!
@@ -13191,6 +13206,40 @@ type SpeedPage {
   kind: StorefrontPageKind!
   metrics: [SpeedMetric!]!
   pageViews: Int!
+}
+
+"""
+An account asking to work in the shop for some days, as an agency or a freelancer does, waiting for the owner or a manager to approve or decline it (ADR-488).
+"""
+type StaffAccessRequest {
+  """The days, 1 to 90, the access would last once approved."""
+  accessDays: Int!
+  createdAt: DateTime!
+
+  """The asking account's email."""
+  email: String
+
+  """Until when it waits to be decided."""
+  expiresAt: DateTime!
+  id: ID!
+
+  """Who asks and what for, as they put it."""
+  message: String
+
+  """The asking account's name."""
+  name: String!
+  role: StaffMemberRole!
+}
+
+type StaffAccessRequestApprovePayload {
+  """Who works in the shop now."""
+  staffMember: StaffMember
+  userErrors: [UserError!]!
+}
+
+type StaffAccessRequestDeclinePayload {
+  declinedAccessRequestId: ID
+  userErrors: [UserError!]!
 }
 
 """

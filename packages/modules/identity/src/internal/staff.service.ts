@@ -12,8 +12,25 @@ import {
 import { secretToken, sha256 } from '@hatti/crypto';
 import type { Db, Tx as ShopTx } from '@hatti/db';
 import { newId, toPublicId } from '@hatti/ids';
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
-import { invitationEmail, type AccountEmailLanguage } from './account-emails.js';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
+import {
+  accessRequestEmail,
+  invitationEmail,
+  type AccountEmailLanguage,
+} from './account-emails.js';
 import { suppressed } from './email-feedback.js';
 import { AuthError } from './errors.js';
 import {
@@ -25,6 +42,7 @@ import {
   type ShopAccess,
 } from './identity.service.js';
 import {
+  accessRequests,
   authEvents,
   invitations,
   memberships,
@@ -48,6 +66,14 @@ export const STAFF_LIMITS = {
   emailsPerDay: 20,
   /** The most days a collaborator's access lasts (ADR-487). */
   accessDays: 90,
+  /** How long a request for access waits to be decided (ADR-488). */
+  accessRequestMs: 7 * 24 * 3_600_000,
+  /** Characters in what a request for access says of who asks and what for. */
+  requestMessage: 300,
+  /** Requests for access an account makes in a day, to any shops. */
+  requestsPerDay: 10,
+  /** Requests for access a shop has waiting at once. */
+  waitingRequests: 20,
 } as const;
 
 /**
@@ -191,6 +217,21 @@ export interface InvitationPreview {
   expiresAt: Date;
   /** For a collaborator (ADR-487): the days the access lasts once accepted; null for good. */
   accessDays: number | null;
+}
+
+/** An account's request to work in a shop for some days (ADR-488). */
+export interface AccessRequestRecord {
+  id: string;
+  shop: { id: string; name: string };
+  requester: { userId: string; name: string; email: string | null };
+  role: StaffRole;
+  accessDays: number;
+  /** Who asks and what for, as they put it. */
+  message: string | null;
+  status: 'pending' | 'approved' | 'declined' | 'expired';
+  createdAt: Date;
+  /** Until when it waits to be decided. */
+  expiresAt: Date;
 }
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -705,6 +746,7 @@ export class StaffService {
         .from(shops)
         .where(and(eq(shops.id, invitation.shopId), eq(shops.status, 'active')));
       if (!shop) throw invalid;
+      await endedMembershipCleared(tx, auth.userId, invitation.shopId, now);
       const joined = await tx
         .insert(memberships)
         .values({
@@ -733,6 +775,331 @@ export class StaffService {
         mfaRequired: MFA_REQUIRED_ROLES.has(role),
       };
     });
+  }
+
+  /**
+   * Asks the shop at `input.shop`, its handle, for access in a role for 1 to 90 days, for the
+   * signed-in account, as an agency or a freelancer does (ADR-488). The request waits 7 days for
+   * the shop's owner, or a manager for the roles below them, to approve or decline; the owner is
+   * emailed of it. An account asks 10 a day at most, one at a time of a shop, and a shop has 20
+   * waiting at most.
+   */
+  async requestAccess(
+    auth: { userId: string },
+    input: { shop: string; role: string; accessDays: number; message?: string | null },
+    client: ClientInfo = {},
+  ): Promise<AccessRequestRecord> {
+    const role = input.role;
+    if (!isStaffRole(role) || role === 'owner') {
+      throw new AuthError('INVALID_REQUEST', 400, 'Ask for a role other than the owner');
+    }
+    const days = input.accessDays;
+    if (!Number.isInteger(days) || days < 1 || days > STAFF_LIMITS.accessDays) {
+      throw new AuthError(
+        'INVALID_REQUEST',
+        400,
+        `Access lasts 1 to ${STAFF_LIMITS.accessDays} days`,
+      );
+    }
+    const message = input.message?.trim() || null;
+    if (message && message.length > STAFF_LIMITS.requestMessage) {
+      throw new AuthError(
+        'INVALID_REQUEST',
+        400,
+        `Say it in ${STAFF_LIMITS.requestMessage} characters or fewer`,
+      );
+    }
+    const handle = input.shop.trim().toLowerCase();
+    const request = await this.db.transaction(async (tx) => {
+      const now = this.now();
+      const [shop] = await tx
+        .select({ id: shops.id, name: shops.name })
+        .from(shops)
+        .where(and(eq(shops.handle, handle), eq(shops.status, 'active')));
+      if (!shop) throw new AuthError('SHOP_NOT_FOUND', 404, 'No shop on Hatti has that address');
+      const [member] = await tx
+        .select({ role: memberships.role })
+        .from(memberships)
+        .where(
+          and(eq(memberships.userId, auth.userId), eq(memberships.shopId, shop.id), current(now)),
+        );
+      if (member) throw new AuthError('ALREADY_MEMBER', 409, 'You work in this shop already');
+      const [asked] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(accessRequests)
+        .where(
+          and(
+            eq(accessRequests.userId, auth.userId),
+            gt(accessRequests.createdAt, new Date(now.getTime() - 24 * 3_600_000)),
+          ),
+        );
+      if ((asked?.count ?? 0) >= STAFF_LIMITS.requestsPerDay) {
+        throw new AuthError('TOO_MANY_REQUESTS', 429, 'Too many requests today. Try tomorrow');
+      }
+      await expireRequests(tx, now, eq(accessRequests.shopId, shop.id));
+      const [waiting] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(accessRequests)
+        .where(and(eq(accessRequests.shopId, shop.id), eq(accessRequests.status, 'pending')));
+      if ((waiting?.count ?? 0) >= STAFF_LIMITS.waitingRequests) {
+        throw new AuthError(
+          'TOO_MANY_REQUESTS',
+          429,
+          'This shop has too many requests waiting. Ask its owner to invite you',
+        );
+      }
+      const [row] = await tx
+        .insert(accessRequests)
+        .values({
+          id: newId(),
+          shopId: shop.id,
+          userId: auth.userId,
+          role,
+          accessDays: days,
+          message,
+          createdAt: now,
+          expiresAt: new Date(now.getTime() + STAFF_LIMITS.accessRequestMs),
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (!row) {
+        throw new AuthError(
+          'REQUEST_WAITING',
+          409,
+          'You asked this shop already: wait for its owner to decide',
+        );
+      }
+      await this.recordEvent(tx, auth.userId, 'access_requested', client);
+      const [requester] = await tx
+        .select({ name: users.name, email: users.email })
+        .from(users)
+        .where(eq(users.id, auth.userId));
+      return toRequest(row, shop.name, auth.userId, requester ?? { name: '', email: null })!;
+    });
+    await this.emailOwnerOf(request);
+    return request;
+  }
+
+  /** The signed-in account's own requests for access of the last 30 days, the newest first. */
+  async accessRequestsBy(auth: { userId: string }): Promise<AccessRequestRecord[]> {
+    const now = this.now();
+    const rows = await this.db
+      .select({ request: accessRequests, shop: shops.name, name: users.name, email: users.email })
+      .from(accessRequests)
+      .innerJoin(shops, eq(shops.id, accessRequests.shopId))
+      .innerJoin(users, eq(users.id, accessRequests.userId))
+      .where(
+        and(
+          eq(accessRequests.userId, auth.userId),
+          gt(accessRequests.createdAt, new Date(now.getTime() - 30 * 24 * 3_600_000)),
+        ),
+      )
+      .orderBy(desc(accessRequests.createdAt), desc(accessRequests.id))
+      .limit(50);
+    return rows.flatMap((row) => {
+      const request = toRequest(lapsed(row.request, now), row.shop, row.request.userId, row);
+      return request ? [request] : [];
+    });
+  }
+
+  /** The requests for access waiting on the shop, the oldest first (ADR-488). */
+  async accessRequestsOf(shopId: string): Promise<AccessRequestRecord[]> {
+    const rows = await this.db
+      .select({ request: accessRequests, shop: shops.name, name: users.name, email: users.email })
+      .from(accessRequests)
+      .innerJoin(shops, eq(shops.id, accessRequests.shopId))
+      .innerJoin(users, eq(users.id, accessRequests.userId))
+      .where(
+        and(
+          eq(accessRequests.shopId, shopId),
+          eq(accessRequests.status, 'pending'),
+          gt(accessRequests.expiresAt, this.now()),
+        ),
+      )
+      .orderBy(asc(accessRequests.createdAt), asc(accessRequests.id));
+    return rows.flatMap((row) => {
+      const request = toRequest(row.request, row.shop, row.request.userId, row);
+      return request ? [request] : [];
+    });
+  }
+
+  /**
+   * Approves a request for access waiting on the shop, of a role the acting member manages, as
+   * asked or in `role` and for `accessDays` given in its place: the account works in the shop
+   * from now until those days are up (ADR-487). With `limit`, within the plan's staff (ADR-154).
+   */
+  async approveAccessRequest(
+    actor: { userId: string },
+    shopId: string,
+    requestId: string,
+    input: { role?: string | null; accessDays?: number | null } = {},
+    client: ClientInfo = {},
+    limit: PlanLimit | null = null,
+  ): Promise<MutationResult<{ request: AccessRequestRecord; member: StaffMemberRecord }>> {
+    type Result = MutationResult<{ request: AccessRequestRecord; member: StaffMemberRecord }>;
+    const days = input.accessDays ?? null;
+    if (days !== null && (!Number.isInteger(days) || days < 1 || days > STAFF_LIMITS.accessDays)) {
+      return failOne(
+        ['accessDays'],
+        'INVALID',
+        `Access lasts 1 to ${STAFF_LIMITS.accessDays} days`,
+      );
+    }
+    return this.db.transaction(async (tx): Promise<Result> => {
+      const now = this.now();
+      const row = await this.waitingRequest(tx, shopId, requestId, now);
+      if (!row.ok) return row;
+      const request = row.value;
+      const role = input.role ?? request.role;
+      const acting = await actingRole(tx, actor.userId, shopId);
+      const denied = mayManage(acting, request.role, ['id']) ?? mayManage(acting, role, ['role']);
+      if (denied) return denied;
+      if (limit) {
+        const [members] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(memberships)
+          .where(
+            and(eq(memberships.shopId, shopId), eq(memberships.status, 'active'), current(now)),
+          );
+        const [waiting] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(invitations)
+          .where(and(eq(invitations.shopId, shopId), pending(now)));
+        if ((members?.count ?? 0) + (waiting?.count ?? 0) >= limit.limit) {
+          return failOne(
+            ['id'],
+            'TOO_MANY',
+            planLimitMessage(limit, 'member of staff', 'members of staff'),
+          );
+        }
+      }
+      await endedMembershipCleared(tx, request.userId, shopId, now);
+      const accessDays = days ?? request.accessDays;
+      const joined = await tx
+        .insert(memberships)
+        .values({
+          userId: request.userId,
+          shopId,
+          role,
+          expiresAt: new Date(now.getTime() + accessDays * 24 * 3_600_000),
+        })
+        .onConflictDoNothing()
+        .returning({ userId: memberships.userId });
+      if (joined.length === 0) {
+        return failOne(['id'], 'INVALID', 'They work in the shop already');
+      }
+      const [decided] = await tx
+        .update(accessRequests)
+        .set({ status: 'approved', role, accessDays, decidedAt: now, decidedBy: actor.userId })
+        .where(eq(accessRequests.id, request.id))
+        .returning();
+      await this.recordEvent(tx, actor.userId, 'access_request_approved', client);
+      const [member] = (await this.staffIn(tx, shopId)).filter(
+        (each) => each.userId === request.userId,
+      );
+      const [shop] = await tx.select({ name: shops.name }).from(shops).where(eq(shops.id, shopId));
+      const [requester] = await tx
+        .select({ name: users.name, email: users.email })
+        .from(users)
+        .where(eq(users.id, request.userId));
+      return {
+        ok: true,
+        value: {
+          request: toRequest(decided!, shop?.name ?? '', request.userId, requester!)!,
+          member: member!,
+        },
+      };
+    });
+  }
+
+  /** Declines a request for access waiting on the shop, of a role the acting member manages. */
+  async declineAccessRequest(
+    actor: { userId: string },
+    shopId: string,
+    requestId: string,
+    client: ClientInfo = {},
+  ): Promise<MutationResult<AccessRequestRecord>> {
+    return this.db.transaction(async (tx): Promise<MutationResult<AccessRequestRecord>> => {
+      const now = this.now();
+      const row = await this.waitingRequest(tx, shopId, requestId, now);
+      if (!row.ok) return row;
+      const denied = mayManage(await actingRole(tx, actor.userId, shopId), row.value.role, ['id']);
+      if (denied) return denied;
+      const [decided] = await tx
+        .update(accessRequests)
+        .set({ status: 'declined', decidedAt: now, decidedBy: actor.userId })
+        .where(eq(accessRequests.id, row.value.id))
+        .returning();
+      await this.recordEvent(tx, actor.userId, 'access_request_declined', client);
+      const [shop] = await tx.select({ name: shops.name }).from(shops).where(eq(shops.id, shopId));
+      const [requester] = await tx
+        .select({ name: users.name, email: users.email })
+        .from(users)
+        .where(eq(users.id, row.value.userId));
+      return {
+        ok: true,
+        value: toRequest(decided!, shop?.name ?? '', row.value.userId, requester!)!,
+      };
+    });
+  }
+
+  /** The shop's request still waiting, locked; refused as not found otherwise. */
+  private async waitingRequest(
+    tx: Tx,
+    shopId: string,
+    requestId: string,
+    now: Date,
+  ): Promise<MutationResult<typeof accessRequests.$inferSelect>> {
+    const [row] = await tx
+      .select()
+      .from(accessRequests)
+      .where(and(eq(accessRequests.id, requestId), eq(accessRequests.shopId, shopId)))
+      .for('update');
+    if (!row) return failOne(['id'], 'NOT_FOUND', 'Request not found');
+    if (row.status !== 'pending') return failOne(['id'], 'INVALID', 'It was decided already');
+    if (row.expiresAt <= now) {
+      return failOne(['id'], 'INVALID', 'It has expired: they can ask again, or invite them');
+    }
+    return { ok: true, value: row };
+  }
+
+  /**
+   * Emails the shop's owner of a request for access (ADR-488), at the email their account proved
+   * where Hatti may send to it, in their language, with the staff page's link. After the request
+   * commits: one that could not go leaves it standing.
+   */
+  private async emailOwnerOf(request: AccessRequestRecord): Promise<void> {
+    if (!this.emails) return;
+    const [owner] = await this.db
+      .select({ email: users.email, language: users.language })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(
+        and(
+          eq(memberships.shopId, request.shop.id),
+          eq(memberships.role, 'owner'),
+          eq(memberships.status, 'active'),
+          eq(users.status, 'active'),
+          isNotNull(users.emailVerifiedAt),
+        ),
+      );
+    if (!owner?.email || (await suppressed(this.db, owner.email))) return;
+    const link =
+      `${this.emails.adminUrl.replace(/\/+$/, '')}/` +
+      `${toPublicId('shop', request.shop.id)}/settings/staff`;
+    await this.emails.sender
+      .send(
+        accessRequestEmail({
+          to: owner.email,
+          requester: request.requester.name,
+          shop: request.shop.name,
+          role: request.role,
+          days: request.accessDays,
+          link,
+          language: owner.language,
+        }),
+      )
+      .catch(() => false);
   }
 
   private async staffIn(tx: Executor, shopId: string): Promise<StaffMemberRecord[]> {
@@ -770,12 +1137,70 @@ export class StaffService {
   }
 }
 
-/** Neither accepted, taken back nor expired at `now`. */
 /** Memberships not past their end (ADR-487): staff for good, and collaborators still in time. */
 function current(now: Date) {
   return or(isNull(memberships.expiresAt), gt(memberships.expiresAt, now));
 }
 
+/**
+ * Deletes the account's membership of the shop if it ended (ADR-487), not swept yet, so that it
+ * joins again rather than being taken for one who works there.
+ */
+async function endedMembershipCleared(
+  tx: Tx,
+  userId: string,
+  shopId: string,
+  now: Date,
+): Promise<void> {
+  await tx
+    .delete(memberships)
+    .where(
+      and(
+        eq(memberships.userId, userId),
+        eq(memberships.shopId, shopId),
+        isNotNull(memberships.expiresAt),
+        lte(memberships.expiresAt, now),
+      ),
+    );
+}
+
+/** Marks the requests waiting past their 7 days, of those `where` picks, as expired (ADR-488). */
+async function expireRequests(tx: Tx, now: Date, where: SQL | undefined): Promise<void> {
+  await tx
+    .update(accessRequests)
+    .set({ status: 'expired', decidedAt: now })
+    .where(and(where, eq(accessRequests.status, 'pending'), lte(accessRequests.expiresAt, now)));
+}
+
+/** A request as it stands at `now`: one waiting past its 7 days reads as expired. */
+function lapsed(
+  row: typeof accessRequests.$inferSelect,
+  now: Date,
+): typeof accessRequests.$inferSelect {
+  return row.status === 'pending' && row.expiresAt <= now ? { ...row, status: 'expired' } : row;
+}
+
+function toRequest(
+  row: typeof accessRequests.$inferSelect,
+  shop: string,
+  userId: string,
+  requester: { name: string; email: string | null },
+): AccessRequestRecord | null {
+  if (!isStaffRole(row.role)) return null;
+  return {
+    id: row.id,
+    shop: { id: row.shopId, name: shop },
+    requester: { userId, name: requester.name, email: requester.email },
+    role: row.role,
+    accessDays: row.accessDays,
+    message: row.message,
+    status: row.status,
+    createdAt: row.createdAt,
+    expiresAt: row.expiresAt,
+  };
+}
+
+/** Neither accepted, taken back nor expired at `now`. */
 function pending(now: Date) {
   return and(
     isNull(invitations.acceptedAt),

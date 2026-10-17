@@ -79,6 +79,7 @@ export {
   managedRoles,
   ownerEmailIn,
   staffPhonesIn,
+  type AccessRequestRecord,
   type InvitationPreview,
   type OwnerEmailRecord,
   type StaffInvitationRecord,

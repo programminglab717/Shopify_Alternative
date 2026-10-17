@@ -639,6 +639,78 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       });
     });
 
+    it('lets an agency ask a shop for access by its handle, for the owner to approve (ADR-488)', async () => {
+      const shopE = newId();
+      await admin.query(
+        `INSERT INTO control.shops (id, name, handle) VALUES ($1, 'Shop E', 'shop-e-lawn')`,
+        [shopE],
+      );
+      await admin.query(
+        `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+         VALUES ($1, 'growth', 'monthly', now(), now() + interval '1 month')`,
+        [shopE],
+      );
+      const owner = await signUp();
+      await grant(owner.userId, shopE, 'owner');
+      await enableTwoStep(owner.accessToken);
+      const as = (token: string, query: string) =>
+        graphql(token, shopE, query).then((response) => response.json() as Json);
+
+      const agency = await signUp();
+      const ask = { shop: 'shop-e-lawn', role: 'marketer', accessDays: 30, message: 'Pixel Media' };
+      expect((await post('/auth/access-requests', ask)).statusCode).toBe(401);
+      const asked = await post('/auth/access-requests', ask, agency.accessToken);
+      expect(asked.statusCode).toBe(201);
+      expect(asked.json().request).toMatchObject({
+        id: expect.stringMatching(/^acr_/),
+        shop: { name: 'Shop E' },
+        role: 'marketer',
+        accessDays: 30,
+        status: 'pending',
+      });
+      const again = await post('/auth/access-requests', ask, agency.accessToken);
+      expect([again.statusCode, again.json().error.code]).toEqual([409, 'REQUEST_WAITING']);
+      expect((await graphql(agency.accessToken, shopE, '{ shop { name } }')).statusCode).toBe(403);
+
+      const waiting = await as(
+        owner.accessToken,
+        '{ staffAccessRequests { id name role accessDays message } }',
+      );
+      expect(waiting.data.staffAccessRequests).toEqual([
+        {
+          id: asked.json().request.id,
+          name: 'Sana Iqbal',
+          role: 'MARKETER',
+          accessDays: 30,
+          message: 'Pixel Media',
+        },
+      ]);
+      const approved = await as(
+        owner.accessToken,
+        `mutation { staffAccessRequestApprove(id: "${asked.json().request.id}", accessDays: 7) {
+           staffMember { role expiresAt } userErrors { field code } } }`,
+      );
+      expect(approved.data.staffAccessRequestApprove.userErrors).toEqual([]);
+      expect(approved.data.staffAccessRequestApprove.staffMember.role).toBe('MARKETER');
+      const until = new Date(approved.data.staffAccessRequestApprove.staffMember.expiresAt);
+      expect(until.getTime() - Date.now()).toBeGreaterThan(6.9 * 86_400_000);
+      expect((await graphql(agency.accessToken, shopE, '{ shop { name } }')).statusCode).toBe(200);
+      const mine = await get('/auth/access-requests', agency.accessToken);
+      expect(mine.json().requests.map((each: Json) => [each.status, each.accessDays])).toEqual([
+        ['approved', 7],
+      ]);
+      const log = await as(
+        owner.accessToken,
+        '{ auditLog(first: 1) { nodes { action details } } }',
+      );
+      expect(log.data.auditLog.nodes).toEqual([
+        {
+          action: 'staff.access_approved',
+          details: JSON.stringify({ role: 'MARKETER', accessDays: 7 }),
+        },
+      ]);
+    });
+
     it('stops accepting a session as soon as it signs out', async () => {
       const { userId, accessToken } = await signUp();
       await grant(userId, shopA, 'marketer');

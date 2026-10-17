@@ -1,8 +1,9 @@
 // Hatti's own emails about accounts (ONB-01, ADR-165): a link that proves an account's email, one
 // that resets its password, one that proves the email an account changes to and a notice to the
-// one it had (ADR-172), one inviting someone to work in a shop (ADR-167), and an alert of a sign-in
-// from a device new to an account (ADR-179), in English or Urdu. Each link carries a token of its
-// own; only a digest of it is kept.
+// one it had (ADR-172), one inviting someone to work in a shop (ADR-167), an alert of a sign-in
+// from a device new to an account (ADR-179), and one telling an owner someone asks for access to
+// their shop (ADR-488), in English or Urdu. Each link carries a token of its own; only a digest of
+// it is kept.
 
 import type { StaffRole } from '@hatti/api';
 
@@ -235,6 +236,43 @@ export function invitationEmail(input: {
           lead: `${inviter} invited you to work in ${shop} on Hatti, as ${role}. Sign in, or open an account, and accept the invitation.`,
           button: 'Accept the invitation',
           after: "The link works once, for 7 days. If you weren't expecting it, ignore this email.",
+        };
+  return compose(words, input.to, input.link, input.language);
+}
+
+/**
+ * The email telling a shop's owner at `to` that `requester` asks to work in `shop` in `role` for
+ * `days` days (ADR-488), with the staff page's `link` to approve or decline it.
+ */
+export function accessRequestEmail(input: {
+  to: string;
+  requester: string;
+  shop: string;
+  role: StaffRole;
+  days: number;
+  link: string;
+  language: AccountEmailLanguage;
+}): AccountEmail {
+  const requester = oneLine(input.requester);
+  const shop = oneLine(input.shop);
+  const role = ROLE_NAMES[input.role][input.language];
+  const words: Omit<Words, 'greeting'> & { greeting: string } =
+    input.language === 'ur'
+      ? {
+          subject: `${requester} ہٹی پر ${shop} تک رسائی مانگ رہے ہیں`,
+          greeting: 'السلام علیکم،',
+          lead: `${requester} نے ${input.days} دن کے لیے ${shop} میں بطور ${role} کام کرنے کی رسائی مانگی ہے۔ ان دنوں کے بعد ان کی رسائی خود ختم ہو جائے گی۔`,
+          button: 'درخواست دیکھیں',
+          after:
+            'آپ یا آپ کے مینیجر اسے 7 دن کے اندر منظور یا رد کر سکتے ہیں۔ اگر آپ انہیں نہیں جانتے تو اسے رد کر دیں۔',
+        }
+      : {
+          subject: `${requester} asks for access to ${shop} on Hatti`,
+          greeting: 'Assalam o alaikum,',
+          lead: `${requester} asks to work in ${shop} as ${role} for ${input.days} days. Their access would end by itself after those days.`,
+          button: 'See the request',
+          after:
+            "You or your managers can approve or decline it within 7 days. If you don't know them, decline it.",
         };
   return compose(words, input.to, input.link, input.language);
 }

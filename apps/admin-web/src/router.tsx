@@ -106,6 +106,7 @@ import { ShopPage } from './settings/shop-page';
 import { StaffPage } from './settings/staff-page';
 import { MorePage, Shell } from './shell/shell';
 import { ShippingPage, validateShippingSearch } from './shipping/shipping-page';
+import { AccessRequestPage } from './shops/access-request-page';
 import { ShopsPage } from './shops/shops-page';
 import { NewTransferPage, validateNewTransferSearch } from './transfers/new-transfer-page';
 import { TransferPage } from './transfers/transfer-page';
@@ -208,6 +209,13 @@ const shops = createRoute({
   path: '/shops',
   beforeLoad: requireSignedIn,
   component: ShopsPage,
+});
+
+const askAccess = createRoute({
+  getParentRoute: () => root,
+  path: '/access',
+  beforeLoad: requireSignedIn,
+  component: AccessRequestPage,
 });
 
 const shop = createRoute({
@@ -826,6 +834,7 @@ export const routeTree = root.addChildren([
   signUp,
   twoStep,
   shops,
+  askAccess,
   invitation,
   forgotPassword,
   resetPassword,

@@ -136,7 +136,9 @@ export function fakeCore(
                     'Apparel & Accessories > Shoes',
                   ],
                 })
-              : answer(operation, variables);
+              : operation === 'StaffAccessRequests'
+                ? orElse(() => answer(operation, variables), { staffAccessRequests: [] })
+                : answer(operation, variables);
     if (data instanceof GraphQLErrors) return json({ data: null, errors: data.errors });
     return json({ data });
   });

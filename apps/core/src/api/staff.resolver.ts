@@ -15,6 +15,7 @@ import { recordAudit } from '@hatti/events';
 import { tryFromPublicId, toPublicId } from '@hatti/ids';
 import {
   StaffService,
+  type AccessRequestRecord,
   type StaffInvitationRecord,
   type StaffMemberRecord,
 } from '@hatti/identity/public';
@@ -217,6 +218,55 @@ export class StaffMemberRemovePayload {
   userErrors!: UserError[];
 }
 
+@ObjectType({
+  description:
+    'An account asking to work in the shop for some days, as an agency or a freelancer does, ' +
+    'waiting for the owner or a manager to approve or decline it (ADR-488).',
+})
+export class StaffAccessRequest {
+  @Field(() => ID)
+  id!: string;
+
+  @Field({ description: "The asking account's name." })
+  name!: string;
+
+  @Field(() => String, { nullable: true, description: "The asking account's email." })
+  email!: string | null;
+
+  @Field(() => StaffMemberRole)
+  role!: StaffMemberRole;
+
+  @Field(() => Int, { description: 'The days, 1 to 90, the access would last once approved.' })
+  accessDays!: number;
+
+  @Field(() => String, { nullable: true, description: 'Who asks and what for, as they put it.' })
+  message!: string | null;
+
+  @Field(() => GraphQLISODateTime)
+  createdAt!: Date;
+
+  @Field(() => GraphQLISODateTime, { description: 'Until when it waits to be decided.' })
+  expiresAt!: Date;
+}
+
+@ObjectType()
+export class StaffAccessRequestApprovePayload {
+  @Field(() => StaffMember, { nullable: true, description: 'Who works in the shop now.' })
+  staffMember!: StaffMember | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class StaffAccessRequestDeclinePayload {
+  @Field(() => ID, { nullable: true })
+  declinedAccessRequestId!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
 const ROLES = {
   owner: StaffMemberRole.OWNER,
   manager: StaffMemberRole.MANAGER,
@@ -261,6 +311,85 @@ export class StaffResolver {
   async staffInvitations(@CurrentTenant() tenant: TenantContext): Promise<StaffInvitation[]> {
     managingStaff(tenant);
     return (await this.staff.invitationsOf(tenant.shopId)).map(toStaffInvitation);
+  }
+
+  @Query(() => [StaffAccessRequest], {
+    description:
+      'Requests for access waiting on the shop, the oldest first (ADR-488). Staff need to be ' +
+      'the owner or a manager.',
+  })
+  @RequireScopes('read_settings')
+  async staffAccessRequests(@CurrentTenant() tenant: TenantContext): Promise<StaffAccessRequest[]> {
+    managingStaff(tenant);
+    return (await this.staff.accessRequestsOf(tenant.shopId)).map(toStaffAccessRequest);
+  }
+
+  @Mutation(() => StaffAccessRequestApprovePayload, {
+    description:
+      'Approves a request for access waiting on the shop (ADR-488): its account works in the ' +
+      'shop from now until its days are up, in `role` and for `accessDays` where given in place ' +
+      "of what it asked. Within the plan's staff (ADR-154). The owner approves any role but its " +
+      'own; managers, those below them. Staff confirm who they are first when they signed in ' +
+      'over 15 minutes ago.',
+  })
+  @RequireScopes('write_settings')
+  @RequireRecentAuthentication()
+  async staffAccessRequestApprove(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('role', { type: () => StaffMemberRole, nullable: true }) role?: StaffMemberRole | null,
+    @Args('accessDays', { type: () => Int, nullable: true }) accessDays?: number | null,
+  ): Promise<StaffAccessRequestApprovePayload> {
+    const actor = managingStaff(tenant);
+    const requestId = tryFromPublicId(id, 'accessRequest');
+    const limit = (await this.allowance?.limitOf(tenant.shopId, 'staff')) ?? null;
+    const result = requestId
+      ? await this.staff.approveAccessRequest(
+          actor,
+          tenant.shopId,
+          requestId,
+          { role: role ? roleOf(role) : null, accessDays: accessDays ?? null },
+          {},
+          limit,
+        )
+      : notFound('Request not found');
+    if (result.ok) {
+      await this.audit(tenant, 'staff.access_approved', 'user', result.value.member.userId, {
+        role: ROLES[result.value.member.role],
+        accessDays: result.value.request.accessDays,
+      });
+    }
+    return Object.assign(new StaffAccessRequestApprovePayload(), {
+      staffMember: result.ok ? toStaffMember(result.value.member) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => StaffAccessRequestDeclinePayload, {
+    description:
+      'Declines a request for access waiting on the shop (ADR-488), of a role the acting member ' +
+      'manages; its account sees it was declined.',
+  })
+  @RequireScopes('write_settings')
+  async staffAccessRequestDecline(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('id', { type: () => ID }) id: string,
+  ): Promise<StaffAccessRequestDeclinePayload> {
+    const actor = managingStaff(tenant);
+    const requestId = tryFromPublicId(id, 'accessRequest');
+    const result = requestId
+      ? await this.staff.declineAccessRequest(actor, tenant.shopId, requestId)
+      : notFound('Request not found');
+    if (result.ok) {
+      await this.audit(tenant, 'staff.access_declined', 'user', result.value.requester.userId, {
+        role: ROLES[result.value.role],
+        accessDays: result.value.accessDays,
+      });
+    }
+    return Object.assign(new StaffAccessRequestDeclinePayload(), {
+      declinedAccessRequestId: result.ok ? toPublicId('accessRequest', result.value.id) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
   }
 
   @Mutation(() => StaffInvitationCreatePayload, {
@@ -574,5 +703,18 @@ function toStaffInvitation(record: StaffInvitationRecord): StaffInvitation {
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
     accessDays: record.accessDays,
+  });
+}
+
+function toStaffAccessRequest(record: AccessRequestRecord): StaffAccessRequest {
+  return Object.assign(new StaffAccessRequest(), {
+    id: toPublicId('accessRequest', record.id),
+    name: record.requester.name,
+    email: record.requester.email,
+    role: ROLES[record.role],
+    accessDays: record.accessDays,
+    message: record.message,
+    createdAt: record.createdAt,
+    expiresAt: record.expiresAt,
   });
 }

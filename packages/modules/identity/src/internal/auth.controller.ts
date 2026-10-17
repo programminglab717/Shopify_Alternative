@@ -31,7 +31,7 @@ import {
   type PasskeyAuthenticationResponse,
 } from './passkeys.js';
 import { DEVICE_HEADER } from './sign-in-alerts.js';
-import { StaffService } from './staff.service.js';
+import { StaffService, type AccessRequestRecord } from './staff.service.js';
 import { SupportAccessService } from './support-access.service.js';
 
 /** Sends {@link AuthError}s as `{ error: { code, message, fields? } }` with their status. */
@@ -99,6 +99,12 @@ const verifyBody = z
   });
 const passkeySignInBody = z.object({ response: authenticationResponseSchema });
 const invitationBody = z.object({ token: z.string().max(100) });
+const accessRequestBody = z.object({
+  shop: z.string().min(1).max(100),
+  role: z.string().max(40),
+  accessDays: z.number().int(),
+  message: z.string().max(1000).nullish(),
+});
 const passkeyBody = z.object({
   response: registrationResponseSchema,
   name: z.string().max(200).nullish(),
@@ -177,6 +183,20 @@ function signInJson(result: SignInResult) {
  * Staff sign-in over JSON. Tokens are returned in the body for the admin web app and the merchant
  * app to keep; responses are never cached.
  */
+/** A request for access as its asker sees it (ADR-488): which shop, as what, and its status. */
+function accessRequestJson(request: AccessRequestRecord) {
+  return {
+    id: toPublicId('accessRequest', request.id),
+    shop: { name: request.shop.name },
+    role: request.role,
+    accessDays: request.accessDays,
+    message: request.message,
+    status: request.status,
+    createdAt: request.createdAt.toISOString(),
+    expiresAt: request.expiresAt.toISOString(),
+  };
+}
+
 @Controller('auth')
 @UseFilters(AuthErrorFilter)
 export class AuthController {
@@ -736,6 +756,38 @@ export class AuthController {
       clientOf(request),
     );
     return { shop };
+  }
+
+  /**
+   * Asks a shop, by its handle, for access in a role for 1 to 90 days, for the signed-in account
+   * (ADR-488): an agency's or a freelancer's. Its owner, or a manager, approves or declines it in
+   * the Admin API.
+   */
+  @Post('access-requests')
+  @HttpCode(201)
+  async requestAccess(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const made = await this.staff.requestAccess(
+      await this.session(request),
+      parse(accessRequestBody, body),
+      clientOf(request),
+    );
+    return { request: accessRequestJson(made) };
+  }
+
+  /** The signed-in account's own requests for access of the last 30 days, and what became of each. */
+  @Get('access-requests')
+  async accessRequests(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const requests = await this.staff.accessRequestsBy(await this.session(request));
+    return { requests: requests.map(accessRequestJson) };
   }
 
   /**

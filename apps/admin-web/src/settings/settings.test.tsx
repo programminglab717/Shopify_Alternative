@@ -232,6 +232,77 @@ describe('Settings in the admin', () => {
     ).toMatchObject({ role: 'MARKETER', accessDays: 30 });
   });
 
+  it('approves and declines requests for access from agencies (ADR-488)', async () => {
+    const core = fakeCore('owner', (operation) => {
+      switch (operation) {
+        case 'Staff':
+          return {
+            staffMembers: [
+              {
+                id: 'usr_1',
+                name: 'Sana',
+                email: null,
+                role: 'OWNER',
+                joinedAt: LATER,
+                expiresAt: null,
+              },
+            ],
+            staffInvitations: [],
+          };
+        case 'StaffAccessRequests':
+          return {
+            staffAccessRequests: [
+              {
+                id: 'acr_1',
+                name: 'Pixel Media',
+                email: 'team@pixel.pk',
+                role: 'MARKETER',
+                accessDays: 30,
+                message: 'Running your Meta ads',
+                createdAt: LATER,
+                expiresAt: LATER,
+              },
+              {
+                id: 'acr_2',
+                name: 'Unknown agency',
+                email: null,
+                role: 'MANAGER',
+                accessDays: 90,
+                message: null,
+                createdAt: LATER,
+                expiresAt: LATER,
+              },
+            ],
+          };
+        case 'StaffAccessRequestApprove':
+          return { staffAccessRequestApprove: { staffMember: { id: 'usr_3' }, userErrors: [] } };
+        case 'StaffAccessRequestDecline':
+          return {
+            staffAccessRequestDecline: { declinedAccessRequestId: 'acr_2', userErrors: [] },
+          };
+        default:
+          throw new Error(`unexpected ${operation}`);
+      }
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/settings/staff');
+
+    await screen.findByText('Running your Meta ads');
+    expect(screen.getByText(/Asks to be Marketer for 30 days/)).toBeTruthy();
+    await press('Approve Pixel Media');
+    await screen.findByText('Pixel Media works in the shop now, for 30 days.');
+    await press('Decline Unknown agency');
+    await screen.findByText("Unknown agency's request is declined.");
+    expect(
+      core.sent
+        .filter((each) => each.operation.startsWith('StaffAccessRequest') && each.variables?.id)
+        .map((each) => [each.operation, each.variables.id]),
+    ).toEqual([
+      ['StaffAccessRequestApprove', 'acr_1'],
+      ['StaffAccessRequestDecline', 'acr_2'],
+    ]);
+  });
+
   it("opens an invitation's link signed in, and joins its shop", async () => {
     const core = fakeCore(
       'owner',

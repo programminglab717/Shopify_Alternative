@@ -229,6 +229,23 @@ export const invitations = identitySchema.table('invitations', {
   accessDays: integer('access_days'),
 });
 
+/** An account's request to work in a shop for some days (ADR-488). */
+export const accessRequests = identitySchema.table('access_requests', {
+  id: uuid('id').primaryKey(),
+  shopId: uuid('shop_id').notNull(),
+  userId: uuid('user_id').notNull(),
+  role: text('role').notNull(),
+  accessDays: integer('access_days').notNull(),
+  message: text('message'),
+  status: text('status', { enum: ['pending', 'approved', 'declined', 'expired'] })
+    .notNull()
+    .default('pending'),
+  createdAt: at('created_at').notNull().defaultNow(),
+  expiresAt: at('expires_at').notNull(),
+  decidedAt: at('decided_at'),
+  decidedBy: uuid('decided_by'),
+});
+
 export const memberships = identitySchema.table(
   'memberships',
   {

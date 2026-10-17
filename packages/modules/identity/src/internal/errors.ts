@@ -48,7 +48,11 @@ export type AuthErrorCode =
   | 'TOO_MANY_EMAILS'
   | 'NO_EMAIL'
   | 'EMAIL_ALREADY_VERIFIED'
-  | 'INVALID_EMAIL_LINK';
+  | 'INVALID_EMAIL_LINK'
+  | 'INVALID_REQUEST'
+  | 'SHOP_NOT_FOUND'
+  | 'TOO_MANY_REQUESTS'
+  | 'REQUEST_WAITING';
 
 /** An expected failure with an HTTP status and a stable code for clients. */
 export class AuthError extends Error {

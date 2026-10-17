@@ -920,6 +920,22 @@ export interface StaffInvitation {
   accessDays: number | null;
 }
 
+/** An account asking to work in the shop for some days (ADR-488). */
+export interface StaffAccessRequest {
+  id: string;
+  name: string;
+  email: string | null;
+  role: StaffMemberRole;
+  accessDays: number;
+  message: string | null;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface StaffAccessRequestsData {
+  staffAccessRequests: StaffAccessRequest[];
+}
+
 export interface StaffData {
   staffMembers: StaffMember[];
   staffInvitations: StaffInvitation[];

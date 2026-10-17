@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-487 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-488 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -495,6 +495,7 @@
 | 485 | The store speed score: shoppers' own Core Web Vitals, counted by the storefront in histograms of 28 days, scored per device as Google judges them, with fixes | Accepted |
 | 486 | Vertical starter kits: what a kind of shop sells by, its smart collections, size charts and main menu links, set up in one go and safe to apply again | Accepted |
 | 487 | Collaborators: staff invited for 1 to 90 days, whose access ends by itself | Accepted |
+| 488 | Requests for access: an agency asks a shop by its address, its owner approves or declines | Accepted |
 
 ---
 
@@ -18449,3 +18450,49 @@
   * **Days from the invitation:** the agency would lose days to a link opened late.
   * **Ending access only by the sweep:** access would last up to a sweep interval past its
     end.
+
+## ADR-488 · Requests for access: an agency asks a shop by its address, its owner approves or declines
+
+* **Context:**
+  * ADM-07 asks for collaborator access that agencies request and owners approve, time-boxed.
+    ADR-487 made the time box: invited staff whose access ends by itself.
+  * An agency working for many shops would otherwise need each owner to find the invitation
+    form, pick the role and send a link.
+* **Decision:**
+  * **An account asks a shop for access by its address** (`POST /auth/access-requests`, signed
+    in): the shop's handle, a role other than the owner's, 1 to 90 days, and who they are and
+    what for, in 300 characters. A link to the store is read as its handle in the admin.
+    Requests are always collaborators': their access always ends.
+  * **Kept by identity** (`identity.access_requests`, migration 0228). A request waits 7 days,
+    then reads as expired.
+  * **Limits:**
+    * an account asks 10 a day, and one at a time of a shop (a unique index on those waiting);
+    * a shop has 20 waiting at most;
+    * no one asks a shop they work in.
+  * **The owner is emailed** at the email their account proved, in their language, with a link
+    to the staff page. The request stands if the email fails.
+  * **The owner, or a manager for the roles below them, decides** in the Admin API:
+    * `staffAccessRequests` lists those waiting;
+    * `staffAccessRequestApprove(id, role, accessDays)` makes the membership, ending that many
+      days from approval (ADR-487), within the plan's staff (ADR-154). The approver may give
+      another role or fewer days. A member must have confirmed who they are recently;
+    * `staffAccessRequestDecline(id)` declines it.
+    Each goes on the audit log.
+  * **The asker sees what became of their requests** (`GET /auth/access-requests`, the last 30
+    days).
+  * **An ended membership the sweep has not taken yet is cleared on joining again**, by request
+    or by invitation, so a returning agency is not refused as one already working there.
+  * **In the admin:**
+    * the shops page links "Work for a shop? Ask it for access" to the form and to the asker's
+      requests;
+    * the staff page shows requests waiting, each approved or declined in a tap.
+* **Consequences:**
+  * Shop handles are public (each is the storefront's own address), so asking by one reveals
+    nothing new. A request tells the owner only the asker's name and email.
+  * An agency is not told by email when it is approved; it sees the shop on its next sign-in
+    and on its requests.
+* **Alternatives:**
+  * **Asking by the owner's email or phone:** this would reveal whose shop is whose, and the
+    handle is what agencies already know.
+  * **Approval with no time box:** an agency's access would last until someone took it back.
+    Approved requests always end, as ADM-07 asks.

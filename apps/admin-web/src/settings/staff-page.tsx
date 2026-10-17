@@ -29,6 +29,7 @@ import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../sh
 import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { AccessRequests } from './access-requests';
 import { SelectField } from './settings-form';
 import { apiRole, BackToSettings, roleLabel } from './settings-page';
 
@@ -401,6 +402,8 @@ export function StaffPage() {
           })}
         </ul>
       </Card>
+
+      {managed.length > 0 && <AccessRequests run={run} />}
 
       {invitations.length > 0 && (
         <section aria-labelledby="staff-invitations" className="flex flex-col gap-2">

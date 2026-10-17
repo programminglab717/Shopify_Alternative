@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Requests for access
+
+* **Agencies and freelancers ask a shop for access by its address, for a role and 1 to 90
+  days; its owner, emailed of it, approves or declines it on the staff page, and the access
+  ends by itself** ([ADR-488](../architecture/13-decision-log.md#adr-488--requests-for-access-an-agency-asks-a-shop-by-its-address-its-owner-approves-or-declines), ADM-07).
+* 3064 tests, 8 more: identity's requests, the Admin API's, and the
+  admin's two sides.
+
 ### 1e34654 · Collaborators
 
 * **Staff invited for 1 to 90 days from joining, for an agency or a freelancer, whose access
