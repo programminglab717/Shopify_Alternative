@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Support requests past their time
+### 029438e · Support requests past their time
 
 * **A shop's support request still open past its plan's time is flagged to Hatti's people once:
   logged, and emailed to Hatti's support address with the others late, the command saying when
