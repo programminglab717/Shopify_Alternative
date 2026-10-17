@@ -73,10 +73,11 @@ function useChosenFile(onChosen: (file: { name: string; csv: string }) => void) 
 }
 
 /** Whose product export a file is (ADR-482). */
-type ImportFormat = 'SHOPIFY' | 'WOOCOMMERCE';
+type ImportFormat = 'SHOPIFY' | 'WOOCOMMERCE' | 'INSTAGRAM';
 
 /**
- * Products from Shopify's or WooCommerce's product CSV (ONB-05, ONB-06, CAT-05): checked first,
+ * Products from Shopify's or WooCommerce's product CSV (ONB-05, ONB-06, CAT-05), or a shop's
+ * Instagram posts as drafts (ONB-04, ADR-501): checked first,
  * saying what it would make,
  * update and leave and what it could not read; then taken in at a tap. Products the shop has
  * already are left as they are unless staff ask to update them from the file.
@@ -125,12 +126,16 @@ function ImportProducts() {
         options={[
           { value: 'SHOPIFY', label: t('files.fromShopify') },
           { value: 'WOOCOMMERCE', label: t('files.fromWooCommerce') },
+          { value: 'INSTAGRAM', label: t('files.fromInstagram') },
         ]}
         onChange={(next) => {
           setFormat(next);
           if (file && !done) void check(file, overwrite, next);
         }}
       />
+      {format === 'INSTAGRAM' && (
+        <p className="text-sm text-secondary">{t('files.instagramHint')}</p>
+      )}
       <CheckField
         label={t('files.overwrite')}
         hint={t('files.overwriteHint')}
@@ -152,7 +157,7 @@ function ImportProducts() {
       <input
         ref={picker.input}
         type="file"
-        accept=".csv,text/csv"
+        accept={format === 'INSTAGRAM' ? '.json,application/json' : '.csv,text/csv'}
         className="hidden"
         aria-label={t('files.productsFile')}
         onChange={picker.onChange}

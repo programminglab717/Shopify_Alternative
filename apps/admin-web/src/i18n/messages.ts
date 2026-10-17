@@ -2537,6 +2537,9 @@ const en = {
   'files.importFrom': 'The file is from',
   'files.fromShopify': "Shopify's product export",
   'files.fromWooCommerce': "WooCommerce's product export (Products > Export)",
+  'files.fromInstagram': 'Your Instagram posts',
+  'files.instagramHint':
+    "The posts_1.json in Instagram's download of your information, or your posts from Instagram's API. Each post becomes a draft product: its first line the title, the price after Rs or before /-, the sizes and colours from lines saying so, the hashtags its tags. Check each before putting it on sale; photos in Instagram's download are added by hand.",
   'files.overwrite': 'Update products I have already',
   'files.overwriteHint':
     'Products whose handles you have are updated from the file, their options the same; otherwise they are left as they are.',
@@ -6972,6 +6975,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'files.importFrom': 'فائل کہاں سے ہے',
   'files.fromShopify': 'شاپیفائی کا پروڈکٹ ایکسپورٹ',
   'files.fromWooCommerce': 'ووکامرس کا پروڈکٹ ایکسپورٹ (Products > Export)',
+  'files.fromInstagram': 'آپ کی انسٹاگرام پوسٹس',
+  'files.instagramHint':
+    'انسٹاگرام کی معلومات کے ڈاؤن لوڈ میں posts_1.json، یا انسٹاگرام کے API سے آپ کی پوسٹس۔ ہر پوسٹ ایک ڈرافٹ پروڈکٹ بنتی ہے: پہلی سطر نام، Rs کے بعد یا /- سے پہلے قیمت، سائز اور رنگ ان کی سطروں سے، اور ہیش ٹیگ اس کے ٹیگ۔ بیچنے سے پہلے ہر ایک دیکھ لیں؛ انسٹاگرام کے ڈاؤن لوڈ کی تصاویر ہاتھ سے لگائیں۔',
   'files.overwrite': 'میرے پاس پہلے سے موجود پروڈکٹس اپ ڈیٹ کریں',
   'files.overwriteHint':
     'جن پروڈکٹس کے ہینڈل آپ کے پاس ہیں وہ فائل سے اپ ڈیٹ ہوتے ہیں، ان کے آپشنز وہی رہیں؛ ورنہ ویسے ہی چھوڑ دیے جاتے ہیں۔',

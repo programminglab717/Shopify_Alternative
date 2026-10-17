@@ -18,6 +18,7 @@ const STOCK_BATCH = 250;
 export enum ProductImportFormat {
   SHOPIFY = 'shopify',
   WOOCOMMERCE = 'woocommerce',
+  INSTAGRAM = 'instagram',
 }
 
 registerEnumType(ProductImportFormat, {
@@ -29,6 +30,13 @@ registerEnumType(ProductImportFormat, {
       description:
         "WooCommerce's product CSV, as Products > Export writes it: a row for each simple or " +
         'variable product, and one for each variation naming its product in Parent (ONB-06).',
+    },
+    INSTAGRAM: {
+      description:
+        "A shop's Instagram posts, as JSON: its API's media list, or posts_1.json from " +
+        "Instagram's own download. Each post with a caption is a draft product, its title, " +
+        'price, sizes, colours, hashtags and eastern wear read from the caption, its photos by ' +
+        'address (ONB-04, ADR-501).',
     },
   },
 });
@@ -42,6 +50,11 @@ const IMPORTED: Record<ProductImportFormat, { reference: string; column: string 
   [ProductImportFormat.WOOCOMMERCE]: {
     reference: 'hatti://imports/woocommerce-products',
     column: 'Stock',
+  },
+  // Posts say no stock: none is ever set from them.
+  [ProductImportFormat.INSTAGRAM]: {
+    reference: 'hatti://imports/instagram-posts',
+    column: 'caption',
   },
 };
 
@@ -120,8 +133,8 @@ export class ProductsImportResolver {
 
   @Mutation(() => ProductsImportPayload, {
     description:
-      'Imports products from a Shopify product export, as CSV, or with format WOOCOMMERCE from a ' +
-      "WooCommerce one, made as Shopify's file would make them: rows grouped by Handle into " +
+      'Imports products from a Shopify product export, as CSV, with format WOOCOMMERCE from a ' +
+      "WooCommerce one, or with INSTAGRAM from a shop's Instagram posts as drafts, made as Shopify's file would make them: rows grouped by Handle into " +
       'products with their options, variants, prices, SKUs, weights, tags, status and images ' +
       '(by address, https only), each keeping its handle, and the stock the store tracked at the ' +
       'primary location. Products whose handles the shop has are left as they are, or with ' +

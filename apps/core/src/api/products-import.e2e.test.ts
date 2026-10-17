@@ -328,6 +328,47 @@ describe.skipIf(!server)('Admin GraphQL API: products from a Shopify export', ()
     expect(wrong.data?.productsImport.userErrors[0]).toMatchObject({ code: 'INVALID' });
   });
 
+  it("makes draft products from a shop's Instagram posts with format INSTAGRAM (ADR-501)", async () => {
+    const posts = JSON.stringify({
+      data: [
+        {
+          id: '17',
+          media_type: 'IMAGE',
+          media_url: 'https://cdn.example.com/karandi.jpg',
+          caption: 'Karandi Shawl\nColours: Grey, Rust\nRs 6,500/-\n#winter #shawls',
+        },
+      ],
+    });
+    const imported = await gql(tokens.other, IMPORT_FROM, { csv: posts, format: 'INSTAGRAM' });
+    expect(imported.data?.productsImport).toMatchObject({
+      rows: 1,
+      created: 1,
+      variants: 2,
+      stocked: 0,
+      rowErrorCount: 0,
+      userErrors: [],
+    });
+    const { data } = await gql(
+      tokens.other,
+      `{ products(first: 10, query: "handle:karandi-shawl") { nodes {
+          title status tags easternWear { fabrics season }
+          variants { title price { amount } }
+        } } }`,
+    );
+    expect(data?.products.nodes).toEqual([
+      {
+        title: 'Karandi Shawl',
+        status: 'DRAFT',
+        tags: ['winter', 'shawls'],
+        easternWear: { fabrics: ['KARANDI'], season: 'WINTER' },
+        variants: [
+          { title: 'Grey', price: { amount: '6500.00' } },
+          { title: 'Rust', price: { amount: '6500.00' } },
+        ],
+      },
+    ]);
+  });
+
   it('needs the products and inventory scopes, and says what is wrong with a file', async () => {
     const denied = await gql(tokens.productsOnly, IMPORT, { csv: CSV });
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');

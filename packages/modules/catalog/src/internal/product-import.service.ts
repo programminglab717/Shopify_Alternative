@@ -22,6 +22,7 @@ import {
   type ShopifyRowProblem,
 } from './shopify-csv.js';
 import { checkVariantFields, type VariantFieldsInput } from './variant-input.js';
+import { readInstagramPosts } from './instagram-posts.js';
 import { readWooCommerceProducts } from './woocommerce-csv.js';
 import {
   VariantService,
@@ -30,8 +31,11 @@ import {
 } from './variant.service.js';
 
 /** Stock Shopify tracked for a variant the import made, for the inventory module to set. */
-/** Whose product export a file is: Shopify's (ONB-05), or WooCommerce's (ONB-06, ADR-482). */
-export type ProductImportFormat = 'shopify' | 'woocommerce';
+/**
+ * Whose product export a file is: Shopify's (ONB-05), WooCommerce's (ONB-06, ADR-482), or a
+ * shop's Instagram posts (ONB-04, ADR-501).
+ */
+export type ProductImportFormat = 'shopify' | 'woocommerce' | 'instagram';
 
 export interface ImportedStock {
   variantId: string;
@@ -104,7 +108,11 @@ export class ProductImportService {
     options: { dryRun?: boolean; overwrite?: boolean; format?: ProductImportFormat } = {},
   ): Promise<MutationResult<ProductImportResult>> {
     const file =
-      options.format === 'woocommerce' ? readWooCommerceProducts(csv) : readShopifyProducts(csv);
+      options.format === 'woocommerce'
+        ? readWooCommerceProducts(csv)
+        : options.format === 'instagram'
+          ? readInstagramPosts(csv)
+          : readShopifyProducts(csv);
     if (!file.ok) return failOne(['csv'], file.code, file.message);
     const existing = await this.db.tenant(tenant.shopId, (tx) =>
       productIdsOf(

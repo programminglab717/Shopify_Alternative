@@ -133,6 +133,27 @@ describe('Products and stock by file', () => {
     });
   });
 
+  it("checks a shop's Instagram posts as drafts, from JSON, when told the file is them (ONB-04)", async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/products');
+
+    fireEvent.click(await screen.findByRole('link', { name: 'Import and export' }));
+    fireEvent.change(await screen.findByLabelText('The file is from'), {
+      target: { value: 'INSTAGRAM' },
+    });
+    expect(screen.getByText(/posts_1\.json in Instagram's download/)).toBeTruthy();
+    expect(screen.getByLabelText('Products file').getAttribute('accept')).toBe(
+      '.json,application/json',
+    );
+    await choose('Products file', 'posts_1.json', '[]');
+    await waitFor(() =>
+      expect(sentOf(fake, 'ProductsImport')).toEqual([
+        { csv: '[]', dryRun: true, overwrite: false, format: 'INSTAGRAM' },
+      ]),
+    );
+  });
+
   it("downloads products a search finds, and one location's stock, then counts a filled-in file", async () => {
     const fake = core('manager');
     vi.stubGlobal('fetch', fake.fetcher);

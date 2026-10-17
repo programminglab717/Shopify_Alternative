@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-500 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-501 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -508,6 +508,7 @@
 | 498 | Hatti's status page: Hatti's people post incidents and maintenance with a command, and the core serves them at /status, as JSON and to every shop's admin | Accepted |
 | 499 | The admin's banner: what goes on at Hatti above every page of a shop's admin, asked every minute, in the staff's language where Hatti wrote it in Urdu | Accepted |
 | 500 | The shop's tax profile: its province, filer status and Tier-1 kept with its tax settings, and the admin guiding it through what an online seller must register | Accepted |
+| 501 | Products from a shop's Instagram posts: productsImport reads its posts as Instagram gives them, each a draft product made of what its caption says | Accepted |
 
 ---
 
@@ -18916,3 +18917,42 @@
   * **Asking FBR for the filer status:** FBR has no public API for the list, only its SMS
     service and pages.
   * **Guidance as a page of its own:** the steps belong beside the numbers they are about.
+
+## ADR-501 · Products from a shop's Instagram posts: productsImport reads its posts as Instagram gives them, each a draft product made of what its caption says
+
+* **Context:** Most Pakistani shops sell on Instagram before they have a store. Their
+  catalogue is their posts: a photo, then a caption with the name, the price, the sizes or
+  colours, and hashtags. Typing it all again is what keeps them from opening a store (ONB-04).
+* **Decision:**
+  * **`productsImport` takes format INSTAGRAM, read as JSON.** It accepts Instagram's API media
+    list, with or without `data`, or `posts_1.json` from Instagram's own download of a shop's
+    information. The posts go through the same import as Shopify's and WooCommerce's files
+    (ADR-120, ADR-482). The admin's import page offers it, with a hint on what it reads, and
+    takes `.json`.
+  * **Each post with a caption becomes a draft product,** never on sale until staff check it.
+    It is read from the caption:
+    * **Title:** the caption's first line that says something, without emoji or hashtags.
+    * **Description:** the rest of the caption.
+    * **Price:** the amount after "Rs" or "PKR", before "/-", or after "Price". Where a caption
+      names two and says sale, now or was, the lower is the price and the higher is compared at.
+      Amounts under Rs 50, such as "3 piece", aren't taken. A caption without a price is priced
+      at Rs 0 and said so.
+    * **Sizes and colours:** from lines saying "Sizes:" or "Colours:". They become options with
+      a variant for each combination.
+    * **Tags:** its hashtags, up to 10.
+    * **Eastern wear (CAT-08):** stitched or not, its pieces, its fabrics and its season.
+  * **Photos come by address,** as the API gives them. A carousel's photos are taken, and its
+    videos are not. Instagram's download keeps its photos inside its ZIP, so those posts are
+    said to need their photos added by hand.
+  * Instagram's download writes text as UTF-8 read as Latin-1, and it is mended.
+  * The same title twice keeps a handle of its own.
+* **Consequences:**
+  * Hatti doesn't connect to a shop's Instagram account yet. The shop gives the file.
+  * Captions written otherwise, or in Urdu script, give only their title and hashtags.
+  * Reading them with the AI gateway comes later.
+* **Alternatives:**
+  * **Instagram's API through Meta's login:** it needs Meta's app review for each permission,
+    and the import should not wait on it.
+  * **Asking the AI gateway for every caption:** it costs a call for each post, and gives
+    different answers for the same caption. The rules give the same draft each time, and
+    staff check it either way.
