@@ -50,6 +50,7 @@ const DRAFT: DraftOrderDetail = {
   subtotalPrice: rupees('6400.00'),
   totalShippingPrice: rupees('250.00'),
   totalDiscounts: rupees('0.00'),
+  discountCode: null,
   totalPrice: rupees('6650.00'),
   codAmount: rupees('6650.00'),
   deliveryMethod: 'SHIPPING',

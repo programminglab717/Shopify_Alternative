@@ -37,7 +37,9 @@ export function valuesOf(draft: DraftOrderDetail): DraftValues {
     payment: draft.paymentMethod,
     delivery: amountText(draft.totalShippingPrice.amount),
     pickupAt: draft.deliveryMethod === 'PICKUP' ? (draft.location?.id ?? ANY_PICKUP) : '',
-    discount: amountText(draft.totalDiscounts.amount),
+    // A code's discount is the code's to set again (ADR-521).
+    discount: draft.discountCode ? '' : amountText(draft.totalDiscounts.amount),
+    code: draft.discountCode ?? '',
     note: draft.note,
     address: address && {
       name: address.name ?? '',

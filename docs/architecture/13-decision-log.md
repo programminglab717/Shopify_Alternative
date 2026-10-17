@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-521 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-522 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -529,6 +529,7 @@
 | 519 | Buy X get Y: a code or an automatic discount gives, in each full group of X + Y of its items, the Y cheapest at a percentage off, free unless it says less; spending tiers are automatic discounts with rising minimums | Accepted |
 | 520 | The admin's buy X get Y: both discount forms offer items for others bought, with items bought and given, two for one unless changed, and how much off those given, free unless changed; for the whole order or some products and collections | Accepted |
 | 521 | A draft order takes one of the shop's discount codes: checked against its items as checkout checks a cart's, setting what comes off or making delivery free, followed as the items change, and counted as a use when the draft becomes an order, in the same transaction | Accepted |
+| 522 | The admin's draft page takes a discount code beside the amount off: while a code is given the amount is the code's to set and is not asked, the draft shows its discount by the code, and emptying the code takes it off | Accepted |
 
 ---
 
@@ -19904,3 +19905,25 @@
     use the code up. Counting with the order is what checkout does.
   * **Codes on orderCreate as well:** staff placing an order directly agree its price there and
     then. A draft is where a chat's code belongs, and it is one step away.
+
+## ADR-522 · The admin's draft page takes a discount code beside the amount off: while a code is given the amount is the code's to set and is not asked, the draft shows its discount by the code, and emptying the code takes it off
+
+* **Context:** ADR-521 let a draft take one of the shop's discount codes through the Admin API.
+  The admin's draft form asked for an amount off alone (ADR-277, ADR-334).
+* **Decision:**
+  * **On the form:** for a new draft and an open one, a "Discount code" field under the delivery
+    charge and the amount off. Codes are typed in capitals. A line says the code works out what
+    comes off and counts as used when the order is placed.
+  * **With a code:** the amount off is not asked, since the code sets it. Saving sends the code
+    alone.
+  * **Taken off:** emptying the code brings back the amount, empty, and saving sends the amount
+    typed and takes the code off.
+  * **On the draft:** its discount reads "Discount (EID10)" when a code set it.
+  * **Refused:** the API's refusals are shown under the form, named "Discount code", with why:
+    the code has ended, isn't for these items, and so on.
+  * In English and Urdu.
+* **Consequences:** a staff member types the code the customer sent in the chat, and the draft
+  works out the rest.
+* **Alternatives:**
+  * **Choosing from the shop's codes:** a shop may have thousands of codes, and the customer
+    names theirs. Typing it is quicker and what checkout asks of shoppers.

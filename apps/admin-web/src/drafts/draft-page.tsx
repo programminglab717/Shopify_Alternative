@@ -219,14 +219,21 @@ export function DraftPage() {
     );
   }
   const pickup = draft.deliveryMethod === 'PICKUP';
-  const totals: [MessageKey, string][] = [
-    ['drafts.subtotal', draft.subtotalPrice.amount],
+  const totals: [string, string][] = [
+    [t('drafts.subtotal'), draft.subtotalPrice.amount],
     // Picked up: nothing to deliver (ADR-390).
     ...(pickup
       ? []
-      : [['drafts.delivery', draft.totalShippingPrice.amount] as [MessageKey, string]]),
+      : [[t('drafts.delivery'), draft.totalShippingPrice.amount] as [string, string]]),
     ...(Number(draft.totalDiscounts.amount) > 0
-      ? [['drafts.discount', `-${draft.totalDiscounts.amount}`] as [MessageKey, string]]
+      ? [
+          [
+            draft.discountCode
+              ? t('drafts.discountBy', { code: draft.discountCode })
+              : t('drafts.discount'),
+            `-${draft.totalDiscounts.amount}`,
+          ] as [string, string],
+        ]
       : []),
   ];
 
@@ -297,7 +304,7 @@ export function DraftPage() {
         <dl className="flex flex-col gap-1 border-t border-line px-4 py-3">
           {totals.map(([label, amount]) => (
             <div key={label} className="flex justify-between text-secondary">
-              <dt>{t(label)}</dt>
+              <dt dir="auto">{label}</dt>
               <dd className="num">{formatMoney(amount)}</dd>
             </div>
           ))}

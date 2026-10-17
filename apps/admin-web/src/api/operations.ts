@@ -3029,6 +3029,7 @@ export const DraftOrderQuery = /* GraphQL */ `
       totalDiscounts {
         ...Money
       }
+      discountCode
       totalPrice {
         ...Money
       }

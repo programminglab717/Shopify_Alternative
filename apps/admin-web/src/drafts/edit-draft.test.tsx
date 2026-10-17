@@ -43,6 +43,7 @@ const DRAFT: DraftOrderDetail = {
   subtotalPrice: rupees('6700.00'),
   totalShippingPrice: rupees('250.00'),
   totalDiscounts: rupees('0.00'),
+  discountCode: null,
   totalPrice: rupees('6950.00'),
   codAmount: rupees('6950.00'),
   deliveryMethod: 'SHIPPING',
@@ -191,5 +192,29 @@ describe('A draft changed while it is open', () => {
     expect(
       await screen.findByText('This draft is an order now: change the order instead.'),
     ).toBeTruthy();
+  });
+  it("shows a code's discount by it, and takes the code off for an amount typed (ADR-522)", async () => {
+    const fake = core({ ...DRAFT, discountCode: 'EID10', totalDiscounts: rupees('670.00') });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/drafts/dft_1');
+
+    expect(await screen.findByText('Discount (EID10)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('link', { name: 'Change the draft' }));
+    await screen.findByRole('heading', { name: 'Change #D7' });
+    // The code sets the discount, so there is no amount to type beside it.
+    expect((screen.getByLabelText('Discount code') as HTMLInputElement).value).toBe('EID10');
+    expect(screen.queryByLabelText('Discount')).toBeNull();
+    await press('Save the draft');
+    await screen.findByRole('heading', { name: '#D7' });
+    expect(sent(fake).at(-1)!.input).toMatchObject({ discountCode: 'EID10' });
+    expect(sent(fake).at(-1)!.input).not.toHaveProperty('discount');
+
+    fireEvent.click(screen.getByRole('link', { name: 'Change the draft' }));
+    await screen.findByRole('heading', { name: 'Change #D7' });
+    type('Discount code', '');
+    type('Discount', '300');
+    await press('Save the draft');
+    await screen.findByRole('heading', { name: '#D7' });
+    expect(sent(fake).at(-1)!.input).toMatchObject({ discount: '300', discountCode: null });
   });
 });

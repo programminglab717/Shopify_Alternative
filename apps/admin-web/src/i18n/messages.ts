@@ -893,6 +893,10 @@ const en = {
   'drafts.deliveryHint': 'In rupees; blank for free.',
   'drafts.discount': 'Discount',
   'drafts.discountHint': 'An amount off the items, in rupees.',
+  'drafts.code': 'Discount code',
+  'drafts.codeHint':
+    "One of the shop's codes: it works out what comes off, and counts as used when the order is placed.",
+  'drafts.discountBy': 'Discount ({code})',
   'drafts.note': 'Note (optional)',
   'drafts.address': "Customer's address",
   'drafts.addressHint': 'Leave it to the customer: the link asks them for it.',
@@ -5526,6 +5530,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'drafts.deliveryHint': 'روپوں میں؛ مفت کے لیے خالی۔',
   'drafts.discount': 'رعایت',
   'drafts.discountHint': 'چیزوں پر رقم کی رعایت، روپوں میں۔',
+  'drafts.code': 'ڈسکاؤنٹ کوڈ',
+  'drafts.codeHint':
+    'دکان کا کوئی کوڈ: رعایت یہ خود نکالتا ہے، اور آرڈر بننے پر استعمال شمار ہوتا ہے۔',
+  'drafts.discountBy': 'رعایت ({code})',
   'drafts.note': 'نوٹ (اختیاری)',
   'drafts.address': 'کسٹمر کا پتہ',
   'drafts.addressHint': 'کسٹمر پر چھوڑ دیں: لنک ان سے پوچھتا ہے۔',

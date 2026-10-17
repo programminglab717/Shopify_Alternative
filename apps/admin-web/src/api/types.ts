@@ -1298,6 +1298,8 @@ export interface DraftOrderDetail {
   subtotalPrice: MoneyValue;
   totalShippingPrice: MoneyValue;
   totalDiscounts: MoneyValue;
+  /** The shop's code that set totalDiscounts (ADR-521). */
+  discountCode: string | null;
   totalPrice: MoneyValue;
   codAmount: MoneyValue;
   deliveryMethod: OrderDeliveryMethod;

@@ -36,6 +36,7 @@ const LABELS: Partial<Record<string, MessageKey>> = {
   shippingPrice: 'drafts.delivery',
   locationId: 'drafts.deliveryMethod',
   discount: 'drafts.discount',
+  discountCode: 'drafts.code',
   shippingAddress: 'drafts.address',
   phone: 'drafts.phone',
   city: 'drafts.city',
@@ -152,6 +153,8 @@ export interface DraftValues {
    */
   pickupAt: string;
   discount: string;
+  /** One of the shop's discount codes, which sets the discount (ADR-521). */
+  code: string;
   note: string;
   address: DraftAddress | null;
 }
@@ -168,6 +171,7 @@ const FIRST: DraftValues = {
   delivery: '',
   pickupAt: '',
   discount: '',
+  code: '',
   note: '',
   address: null,
 };
@@ -219,6 +223,7 @@ export function DraftForm({
     ways.push({ value: pickupAt, label: t('drafts.pickupOnly') });
   }
   const [discount, setDiscount] = useState(initial.discount);
+  const [code, setCode] = useState(initial.code);
   const [note, setNote] = useState(initial.note);
   const [hasAddress, setHasAddress] = useState(initial.address !== null);
   const [address, setAddress] = useState<DraftAddress>(initial.address ?? NO_ADDRESS);
@@ -289,12 +294,20 @@ export function DraftForm({
         ...(editing
           ? {
               shippingPrice: (!pickupAt && delivery.trim()) || '0',
-              discount: discount.trim() || '0',
+              // A code sets the discount; without one, the amount typed does (ADR-521).
+              ...(code.trim()
+                ? { discountCode: code.trim() }
+                : {
+                    discount: discount.trim() || '0',
+                    ...(initial.code && { discountCode: null }),
+                  }),
               note: note.trim(),
             }
           : {
               ...(!pickupAt && delivery.trim() && { shippingPrice: delivery.trim() }),
-              ...(discount.trim() && { discount: discount.trim() }),
+              ...(code.trim()
+                ? { discountCode: code.trim() }
+                : discount.trim() && { discount: discount.trim() }),
               ...(note.trim() && { note: note.trim() }),
             }),
         ...addressInput(),
@@ -407,15 +420,27 @@ export function DraftForm({
               onChange={(event) => setDelivery(event.target.value)}
             />
           )}
-          <TextField
-            label={t('drafts.discount')}
-            hint={t('drafts.discountHint')}
-            inputMode="decimal"
-            ltr
-            value={discount}
-            onChange={(event) => setDiscount(event.target.value)}
-          />
+          {!code.trim() && (
+            <TextField
+              label={t('drafts.discount')}
+              hint={t('drafts.discountHint')}
+              inputMode="decimal"
+              ltr
+              value={discount}
+              onChange={(event) => setDiscount(event.target.value)}
+            />
+          )}
         </Pair>
+        <TextField
+          label={t('drafts.code')}
+          hint={t('drafts.codeHint')}
+          maxLength={64}
+          autoCapitalize="characters"
+          spellCheck={false}
+          ltr
+          value={code}
+          onChange={(event) => setCode(event.target.value.toUpperCase())}
+        />
         <TextArea label={t('drafts.note')} value={note} onChange={setNote} />
       </FormSection>
       <FormSection title={t('drafts.address')} hint={t('drafts.addressHint')}>
