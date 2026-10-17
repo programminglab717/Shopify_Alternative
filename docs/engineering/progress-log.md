@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Hatti's status page
+### eba3f74 · Hatti's status page
 
 * **Hatti's people post incidents and maintenance with a command, and the core serves them at
   `/status`, as JSON and to every shop's admin** ([ADR-498](../architecture/13-decision-log.md#adr-498--hattis-status-page-hattis-people-post-incidents-and-maintenance-with-a-command-and-the-core-serves-them-at-status-as-json-and-to-every-shops-admin), BIL-06).
