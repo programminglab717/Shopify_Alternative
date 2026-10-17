@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Products from Instagram's posts
+### e88b681 · Products from Instagram's posts
 
 * **`productsImport` reads a shop's Instagram posts, each a draft product made of what its
   caption says** ([ADR-501](../architecture/13-decision-log.md#adr-501--products-from-a-shops-instagram-posts-productsimport-reads-its-posts-as-instagram-gives-them-each-a-draft-product-made-of-what-its-caption-says), ONB-04 in part).
