@@ -49,6 +49,8 @@ import { AuditResolver } from './audit.resolver.js';
 import { HomeResolver } from './home.resolver.js';
 import { StarterKitService } from './starter-kits.js';
 import { StarterKitsResolver } from './starter-kits.resolver.js';
+import { StoreBuilderService } from './store-builder.js';
+import { StoreBuilderResolver } from './store-builder.resolver.js';
 import { PayoutsResolver } from './payouts.resolver.js';
 import { StoreSpeedResolver } from './store-speed.resolver.js';
 import { StorefrontSessionsResolver } from './storefront-sessions.resolver.js';
@@ -266,6 +268,8 @@ export class ApiModule {
         StoreSpeedResolver,
         StarterKitService,
         StarterKitsResolver,
+        StoreBuilderService,
+        StoreBuilderResolver,
         SetupChecklistService,
         SetupResolver,
         { provide: APP_GUARD, useClass: ScopesGuard },

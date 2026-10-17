@@ -3998,3 +3998,29 @@ export interface PlatformIncidentValue {
 export interface PlatformStatusData {
   platformStatus: { statusPageUrl: string; incidents: PlatformIncidentValue[] };
 }
+
+/** What the store builder makes of a shop's description (ONB-03, ADR-502). */
+export interface StoreBuildPlanValue {
+  kit: 'FASHION' | 'JEWELLERY' | 'BEAUTY' | 'ELECTRONICS' | 'GROCERY' | null;
+  accentColour: string;
+  aboutHtml: string;
+  seoTitle: string;
+  seoDescription: string;
+}
+
+export interface StoreBuildPlanData {
+  storeBuildPlan: StoreBuildPlanValue;
+}
+
+export interface StoreBuildData {
+  storeBuild: {
+    plan: StoreBuildPlanValue | null;
+    collectionsMade: number;
+    sizeChartsMade: number;
+    menuLinksAdded: number;
+    accentSet: boolean;
+    seoSet: boolean;
+    aboutPage: { id: string; handle: string } | null;
+    userErrors: UserError[];
+  };
+}

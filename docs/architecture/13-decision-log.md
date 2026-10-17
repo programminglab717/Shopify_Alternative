@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-501 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-502 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -509,6 +509,7 @@
 | 499 | The admin's banner: what goes on at Hatti above every page of a shop's admin, asked every minute, in the staff's language where Hatti wrote it in Urdu | Accepted |
 | 500 | The shop's tax profile: its province, filer status and Tier-1 kept with its tax settings, and the admin guiding it through what an online seller must register | Accepted |
 | 501 | Products from a shop's Instagram posts: productsImport reads its posts as Instagram gives them, each a draft product made of what its caption says | Accepted |
+| 502 | The store builder: a shop set up from a few lines saying what it sells, its kit, theme colour, About us page and home page SEO, leaving what it set | Accepted |
 
 ---
 
@@ -18956,3 +18957,37 @@
   * **Asking the AI gateway for every caption:** it costs a call for each post, and gives
     different answers for the same caption. The rules give the same draft each time, and
     staff check it either way.
+
+## ADR-502 · The store builder: a shop set up from a few lines saying what it sells, its kit, theme colour, About us page and home page SEO, leaving what it set
+
+* **Context:** A new owner faces an empty store: collections, colours, pages and SEO, each
+  behind its own screen. Most can say in two lines what they sell. That should be enough to
+  start (ONB-03).
+* **Decision:**
+  * **`storeBuildPlan(description)` says what the lines would make of the shop, changing
+    nothing.** `storeBuild` does it:
+    * **Kit:** the starter kit (ADR-486) whose words the lines name most, such as lawn, kurtas,
+      jhumkas, serum, chargers or achar; or the kit given. No kit when they name none.
+    * **Colour:** the kit's accent, one buttons read well on, or the colour given. It is set in
+      the main theme's `config/settings_data.json`, keeping its other settings, where the shop
+      has a main theme.
+    * **About us:** a page at `about-us` of the lines, a paragraph each, escaped.
+    * **Home page SEO:** the shop's name as the title, and as the description the first sentence
+      of 50 characters or more, else the lines, at most 160 characters.
+  * **What the shop set already stays.** A page at `about-us` and home page SEO it set are left
+    as they are. The kit, applied again, makes nothing twice. The payload says what was made and
+    what was left.
+  * `storeBuild` needs the scopes of everything it changes: products, navigation, pages, themes
+    and settings. The admin's online store has a "Build from a description" tab for owners and
+    managers. It previews the kind of shop, the colour, what search engines see and the page's
+    paragraphs, then builds in a tap.
+* **Consequences:**
+  * The lines are read by their words, not by the AI gateway. A description in Urdu script names
+    no kit, and the About page is still made of it.
+  * There's no reading of an Instagram handle's bio yet. Products come by the Instagram import
+    (ADR-501).
+* **Alternatives:**
+  * **A model writing the page and choosing the kit:** a call per shop for what its words
+    already say, and a page in words the owner didn't write.
+  * **Overwriting what the shop set:** a store built from two lines must not undo the work of a
+    shop that has more than two lines' worth.

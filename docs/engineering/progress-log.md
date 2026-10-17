@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### The store builder
+
+* **A shop is set up from a few lines saying what it sells: its kit, theme colour, About us page
+  and home page SEO, leaving what it set** ([ADR-502](../architecture/13-decision-log.md#adr-502--the-store-builder-a-shop-set-up-from-a-few-lines-saying-what-it-sells-its-kit-theme-colour-about-us-page-and-home-page-seo-leaving-what-it-set), ONB-03).
+* 3117 tests, 5 more: the plan from a description, the build through the
+  Admin API, and the admin's tab.
+
 ### e88b681 · Products from Instagram's posts
 
 * **`productsImport` reads a shop's Instagram posts, each a draft product made of what its

@@ -7989,6 +7989,11 @@ type Mutation {
   starterKitApply(kit: StarterKit!): StarterKitApplyPayload!
 
   """
+  Sets the shop up from a few lines saying what it sells (ONB-03, ADR-502): the starter kit its words call for, or the one given (ADR-486); the kit's accent, or the one given, in the main theme's settings; an About us page of the lines; and the home page's SEO. A page at about-us, and SEO the shop set, are left as they are.
+  """
+  storeBuild(input: StoreBuildInput!): StoreBuildPayload!
+
+  """
   Credits a store credit account, as Shopify's storeCreditAccountCredit: `id` is the account's, or a customer's, whose account in the shop's currency is opened if they have none. An account holds at most Rs 1,000,000. Audited. Needs an Idempotency-Key header.
   """
   storeCreditAccountCredit(creditInput: StoreCreditAccountCreditInput!, id: ID!): StoreCreditAccountCreditPayload!
@@ -12471,6 +12476,11 @@ type Query {
   """The starter kits a shop may apply (ONB-13), and what each sets up."""
   starterKits: [StarterKitPreview!]!
 
+  """
+  What storeBuild would make of the shop's description (ONB-03): its kit, accent, About us page and home page SEO. Changes nothing.
+  """
+  storeBuildPlan(description: String!): StoreBuildPlan!
+
   """A store credit account by ID, or null if not found."""
   storeCreditAccount(id: ID!): StoreCreditAccount
 
@@ -13985,6 +13995,62 @@ enum Stitching {
   SEMI_STITCHED
   STITCHED
   UNSTITCHED
+}
+
+input StoreBuildInput {
+  """A hex colour, such as #0F766E, for the theme's accent; else the kit's."""
+  accentColour: String
+
+  """
+  What the shop sells, and for whom, in a few lines: 20 to 2,000 characters. A blank line starts a paragraph of its About us page.
+  """
+  description: String!
+
+  """
+  The kit to apply, where its words call for another; else the one they call for.
+  """
+  kit: StarterKit
+}
+
+type StoreBuildPage {
+  handle: String!
+  id: ID!
+}
+
+type StoreBuildPayload {
+  """The About us page made; null where the shop had one, at about-us."""
+  aboutPage: StoreBuildPage
+
+  """Whether the main theme took the accent; false where there is none."""
+  accentSet: Boolean!
+  collectionsMade: Int!
+  menuLinksAdded: Int!
+
+  """Null when nothing was done."""
+  plan: StoreBuildPlan
+
+  """Whether the home page's SEO was set; false where the shop set its own."""
+  seoSet: Boolean!
+  sizeChartsMade: Int!
+  userErrors: [UserError!]!
+}
+
+"""What the store builder makes of a shop's description (ONB-03)."""
+type StoreBuildPlan {
+  """The About us page, as HTML: the description, a paragraph each."""
+  aboutHtml: String!
+
+  """The main theme's accent colour, such as #9F1239."""
+  accentColour: String!
+
+  """The starter kit its words call for most; null when they call for none."""
+  kit: StarterKit
+
+  """And its description: the first sentence, at most 160 characters."""
+  seoDescription: String!
+
+  """What search engines are told of the home page: the shop's name."""
+  seoTitle: String!
 }
 
 """

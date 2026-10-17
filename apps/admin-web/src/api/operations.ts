@@ -8606,3 +8606,48 @@ export const PlatformStatusQuery = /* GraphQL */ `
     }
   }
 `;
+
+const STORE_BUILD_PLAN = /* GraphQL */ `
+  fragment StoreBuildPlanParts on StoreBuildPlan {
+    kit
+    accentColour
+    aboutHtml
+    seoTitle
+    seoDescription
+  }
+`;
+
+/** What the store builder would make of a description (ONB-03), changing nothing. */
+export const StoreBuildPlanQuery = /* GraphQL */ `
+  query StoreBuildPlan($description: String!) {
+    storeBuildPlan(description: $description) {
+      ...StoreBuildPlanParts
+    }
+  }
+  ${STORE_BUILD_PLAN}
+`;
+
+/** The shop set up from its description (ONB-03, ADR-502). */
+export const StoreBuildMutation = /* GraphQL */ `
+  mutation StoreBuild($input: StoreBuildInput!) {
+    storeBuild(input: $input) {
+      plan {
+        ...StoreBuildPlanParts
+      }
+      collectionsMade
+      sizeChartsMade
+      menuLinksAdded
+      accentSet
+      seoSet
+      aboutPage {
+        id
+        handle
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${STORE_BUILD_PLAN}
+  ${USER_ERRORS}
+`;

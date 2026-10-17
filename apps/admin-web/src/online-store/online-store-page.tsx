@@ -15,6 +15,7 @@ import { PagesList, WRITES_PAGES } from './pages';
 import { PoliciesList, SETS_POLICIES } from './policies';
 import { RedirectsTab } from './redirects';
 import { SpeedTab } from './speed';
+import { StoreBuilderTab } from './store-builder';
 import { StorefrontPreferencesTab } from './storefront';
 import { EDITS_THEMES, ThemesTab } from './themes';
 
@@ -25,6 +26,7 @@ export const ONLINE_STORE_TABS = [
   'policies',
   'storefront',
   'themes',
+  'builder',
   'speed',
   'redirects',
   'links',
@@ -61,6 +63,11 @@ const TABS: Record<
     body: () => <StorefrontPreferencesTab />,
   },
   themes: { label: 'onlineStore.themes', roles: EDITS_THEMES, body: () => <ThemesTab /> },
+  builder: {
+    label: 'onlineStore.builder',
+    roles: EDITS_THEMES,
+    body: () => <StoreBuilderTab />,
+  },
   speed: { label: 'onlineStore.speed', roles: EDITS_THEMES, body: () => <SpeedTab /> },
   redirects: { label: 'onlineStore.redirects', roles: EDITS_MENUS, body: () => <RedirectsTab /> },
   links: { label: 'onlineStore.linkPage', roles: EDITS_MENUS, body: () => <LinkPageTab /> },
