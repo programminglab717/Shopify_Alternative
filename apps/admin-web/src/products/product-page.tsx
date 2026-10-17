@@ -51,6 +51,7 @@ import { ProductOptions } from './options';
 import { ProductPhotos } from './photos';
 import { CategoryCard } from './category';
 import { EasternWearCard } from './eastern-wear';
+import { ProductMetafieldsCard } from './metafields';
 import { GiftCardProduct } from './gift-card-product';
 import { ProductPreorder } from './preorder';
 import { ProductSizeChart } from './size-charts';
@@ -617,6 +618,7 @@ function ProductView() {
       {edits && <ProductPreorder product={product} />}
       {edits && <CategoryCard product={product} />}
       {edits && <EasternWearCard product={product} />}
+      {edits && <ProductMetafieldsCard product={product} />}
       {edits && <GiftCardProduct key={String(product.isGiftCard)} product={product} />}
       {edits && <ProductSizeChart product={product} />}
       {/* A product of options is no bundle: its parts have them (ADR-409). */}

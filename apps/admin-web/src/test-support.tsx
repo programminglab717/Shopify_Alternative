@@ -138,7 +138,12 @@ export function fakeCore(
                 })
               : operation === 'StaffAccessRequests'
                 ? orElse(() => answer(operation, variables), { staffAccessRequests: [] })
-                : answer(operation, variables);
+                : operation === 'ProductMetafields'
+                  ? orElse(() => answer(operation, variables), {
+                      metafieldDefinitions: [],
+                      product: { id: variables.id, metafields: [] },
+                    })
+                  : answer(operation, variables);
     if (data instanceof GraphQLErrors) return json({ data: null, errors: data.errors });
     return json({ data });
   });

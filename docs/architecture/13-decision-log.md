@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-489 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-490 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -497,6 +497,7 @@
 | 487 | Collaborators: staff invited for 1 to 90 days, whose access ends by itself | Accepted |
 | 488 | Requests for access: an agency asks a shop by its address, its owner approves or declines | Accepted |
 | 489 | Metafields: custom data on products, variants and collections, as Shopify keeps it, typed by the shop's definitions and read by themes in Liquid | Accepted |
+| 490 | Custom data in the admin: the shop's fields defined in Settings, keyed from their names, and filled on a product's page by the kind of field their type takes | Accepted |
 
 ---
 
@@ -18545,3 +18546,32 @@
     set or deleted on its own.
   * **Values parsed and kept by type in the database:** Shopify's API and its CSVs give strings,
     and Liquid parses them once on the page.
+
+## ADR-490 · Custom data in the admin: the shop's fields defined in Settings, keyed from their names, and filled on a product's page by the kind of field their type takes
+
+* **Context:** Metafields (ADR-489) were kept and read through the Admin API alone. Shop owners
+  need to make their fields and fill them in without an app, as Shopify's admin lets them.
+* **Decision:**
+  * **Settings → Custom data** lists the shop's definitions by what they are for: products,
+    variants and collections. Each shows its key, its type in words, and how many owners have a
+    value. A definition is added there with a name, a type and an optional description:
+    * its key is made from its name (`care_instructions`), in the `custom` namespace, and may
+      be changed before it is added;
+    * types are named in words ("Text, one line", "Yes or no", "List of lines").
+    A definition is deleted with its values, after the owner confirms.
+  * **A product's page has a "Custom fields" card**, with a field for each product definition
+    of the kind its type takes:
+    * a choice of yes, no or not said for true or false;
+    * a box of many lines for long text and JSON, and for a list, one item to a line;
+    * a date or web address field where the browser has one;
+    * one line of text otherwise.
+    Saving sets what was filled through `metafieldsSet` and deletes what was emptied through
+    `metafieldsDelete`. A refusal names its field. Without definitions, the card links to
+    Settings.
+* **Consequences:**
+  * Variants' and collections' values are set through the Admin API for now. Their pages'
+    fields come later.
+  * The admin checks no value itself: the core's checks (ADR-489) answer, in the field's words.
+* **Alternatives:**
+  * **A free form of namespace, key and value on each product:** shop owners would have to keep
+    keys and types consistent across products. Definitions keep them so.

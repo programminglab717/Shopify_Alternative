@@ -1991,6 +1991,108 @@ export const StaffQuery = /* GraphQL */ `
   }
 `;
 
+const METAFIELD_DEFINITION = /* GraphQL */ `
+  fragment MetafieldDefinitionParts on MetafieldDefinition {
+    id
+    ownerType
+    namespace
+    key
+    type
+    name
+    description
+    metafieldsCount
+  }
+`;
+
+/** The shop's own fields of products, variants and collections (CAT-06, ADR-489). */
+export const MetafieldDefinitionsQuery = /* GraphQL */ `
+  query MetafieldDefinitions {
+    metafieldDefinitions {
+      ...MetafieldDefinitionParts
+    }
+  }
+  ${METAFIELD_DEFINITION}
+`;
+
+/** A field of the shop's own defined: its name, and the type its values take. */
+export const MetafieldDefinitionCreateMutation = /* GraphQL */ `
+  mutation MetafieldDefinitionCreate($definition: MetafieldDefinitionInput!) {
+    metafieldDefinitionCreate(definition: $definition) {
+      createdDefinition {
+        ...MetafieldDefinitionParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${METAFIELD_DEFINITION}
+  ${USER_ERRORS}
+`;
+
+/** A field of the shop's own deleted, with its values. */
+export const MetafieldDefinitionDeleteMutation = /* GraphQL */ `
+  mutation MetafieldDefinitionDelete($id: ID!) {
+    metafieldDefinitionDelete(id: $id, deleteAllAssociatedMetafields: true) {
+      deletedDefinitionId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** A product's custom fields: the shop's definitions for products, and the product's values. */
+export const ProductMetafieldsQuery = /* GraphQL */ `
+  query ProductMetafields($id: ID!) {
+    metafieldDefinitions(ownerType: PRODUCT) {
+      ...MetafieldDefinitionParts
+    }
+    product(id: $id) {
+      id
+      metafields {
+        namespace
+        key
+        type
+        value
+      }
+    }
+  }
+  ${METAFIELD_DEFINITION}
+`;
+
+/** Metafields set on products, variants or collections, all or none. */
+export const MetafieldsSetMutation = /* GraphQL */ `
+  mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {
+    metafieldsSet(metafields: $metafields) {
+      metafields {
+        key
+        value
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** Metafields deleted by their owner, namespace and key. */
+export const MetafieldsDeleteMutation = /* GraphQL */ `
+  mutation MetafieldsDelete($metafields: [MetafieldIdentifierInput!]!) {
+    metafieldsDelete(metafields: $metafields) {
+      deletedMetafields {
+        key
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** Accounts asking to work in the shop for some days, waiting to be decided (ADR-488). */
 export const StaffAccessRequestsQuery = /* GraphQL */ `
   query StaffAccessRequests {

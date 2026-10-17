@@ -920,6 +920,45 @@ export interface StaffInvitation {
   accessDays: number | null;
 }
 
+export type MetafieldOwnerTypeValue = 'PRODUCT' | 'PRODUCTVARIANT' | 'COLLECTION';
+
+export type MetafieldTypeValue =
+  | 'single_line_text_field'
+  | 'multi_line_text_field'
+  | 'number_integer'
+  | 'number_decimal'
+  | 'boolean'
+  | 'date'
+  | 'date_time'
+  | 'url'
+  | 'color'
+  | 'json'
+  | 'list.single_line_text_field';
+
+/** A field of the shop's own (CAT-06, ADR-489). */
+export interface MetafieldDefinition {
+  id: string;
+  ownerType: MetafieldOwnerTypeValue;
+  namespace: string;
+  key: string;
+  type: MetafieldTypeValue;
+  name: string;
+  description: string | null;
+  metafieldsCount: number;
+}
+
+export interface MetafieldDefinitionsData {
+  metafieldDefinitions: MetafieldDefinition[];
+}
+
+export interface ProductMetafieldsData {
+  metafieldDefinitions: MetafieldDefinition[];
+  product: {
+    id: string;
+    metafields: { namespace: string; key: string; type: string; value: string }[];
+  } | null;
+}
+
 /** An account asking to work in the shop for some days (ADR-488). */
 export interface StaffAccessRequest {
   id: string;

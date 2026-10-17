@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   Banknote,
   Blocks,
+  Braces,
   ChevronRight,
   CreditCard,
   Globe,
@@ -58,6 +59,7 @@ interface Section {
     | '/$shopId/settings/verification'
     | '/$shopId/settings/apps'
     | '/$shopId/settings/tax'
+    | '/$shopId/settings/custom-data'
     | '/$shopId/settings/messages'
     | '/$shopId/settings/orders'
     | '/$shopId/settings/checkout'
@@ -124,6 +126,12 @@ const SECTIONS: readonly Section[] = [
     label: 'settings.tax',
     hint: 'settings.taxHint',
     icon: Percent,
+  },
+  {
+    to: '/$shopId/settings/custom-data',
+    label: 'settings.customData',
+    hint: 'settings.customDataHint',
+    icon: Braces,
   },
   {
     to: '/$shopId/settings/online-payments',

@@ -76,6 +76,7 @@ import { ActivityPage } from './settings/activity-page';
 import { SupportAccessPage } from './settings/support-page';
 import { StoreExportPage } from './settings/export-page';
 import { VerificationPage } from './settings/verification-page';
+import { CustomDataPage } from './settings/custom-data-page';
 import { AppsPage } from './settings/apps-page';
 import { WhatsAppPage } from './settings/whatsapp-page';
 import { AutomationsPage } from './marketing/automations-page';
@@ -681,6 +682,12 @@ const settingsExport = createRoute({
   component: StoreExportPage,
 });
 
+const settingsCustomData = createRoute({
+  getParentRoute: () => shop,
+  path: 'settings/custom-data',
+  component: CustomDataPage,
+});
+
 const settingsVerification = createRoute({
   getParentRoute: () => shop,
   path: 'settings/verification',
@@ -922,6 +929,7 @@ export const routeTree = root.addChildren([
     settingsSupport,
     settingsExport,
     settingsVerification,
+    settingsCustomData,
     settingsApps,
     settingsWhatsApp,
     marketing,
