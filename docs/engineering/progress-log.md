@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Trax
+### fd3b66a · Trax
 
 * **Shops book, track and cancel Trax parcels from Hatti with their own Trax account: the four
   couriers of SHP-01's MVP are in** ([ADR-510](../architecture/13-decision-log.md#adr-510--trax-the-fourth-courier-bookings-by-traxs-city-ids-from-the-shops-pickup-address-tracking-cancellations-and-cities-through-its-merchant-api)).
