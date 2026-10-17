@@ -405,4 +405,57 @@ describe.skipIf(!server)('Admin GraphQL API: sales tax', () => {
       userErrors: [],
     });
   });
+
+  it("keeps the shop's tax profile, with what it is withheld and what is left to register (ONB-12, ADR-500)", async () => {
+    const PROFILE = `{
+      province filerStatus tier1
+      withholding { digitalPercent cashOnDeliveryPercent }
+      guidance { code status }
+    }`;
+    const before = await gql(tokens.reader, `{ taxSettings ${PROFILE} }`);
+    expect(before.data?.taxSettings).toEqual({
+      province: null,
+      filerStatus: 'UNKNOWN',
+      tier1: false,
+      withholding: { digitalPercent: 2, cashOnDeliveryPercent: 4 },
+      guidance: [
+        { code: 'REGISTER_NTN', status: 'TO_DO' },
+        { code: 'REGISTER_SALES_TAX', status: 'TO_DO' },
+        { code: 'JOIN_ACTIVE_TAXPAYERS', status: 'TO_DO' },
+        { code: 'NAME_PROVINCE', status: 'TO_DO' },
+      ],
+    });
+    const updated = await mutate(
+      tokens.owner,
+      `mutation ($input: TaxSettingsUpdateInput!) {
+        taxSettingsUpdate(input: $input) { taxSettings ${PROFILE} userErrors { field code } }
+      }`,
+      {
+        input: {
+          ntn: '1234567-8',
+          strn: '3277876175852',
+          province: 'PUNJAB',
+          filerStatus: 'ACTIVE',
+          tier1: true,
+        },
+      },
+    );
+    expect(updated).toEqual({
+      taxSettings: {
+        province: 'PUNJAB',
+        filerStatus: 'ACTIVE',
+        tier1: true,
+        withholding: { digitalPercent: 1, cashOnDeliveryPercent: 2 },
+        guidance: [
+          { code: 'REGISTER_NTN', status: 'DONE' },
+          { code: 'REGISTER_SALES_TAX', status: 'DONE' },
+          { code: 'JOIN_ACTIVE_TAXPAYERS', status: 'DONE' },
+          { code: 'NAME_PROVINCE', status: 'DONE' },
+          { code: 'DIGITAL_INVOICING', status: 'NOTE' },
+          { code: 'TIER1_RETURNS', status: 'NOTE' },
+        ],
+      },
+      userErrors: [],
+    });
+  });
 });

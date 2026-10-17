@@ -17,7 +17,9 @@ import {
   checkStrn,
   checkTaxCategories,
   checkTaxRate,
+  type FilerStatus,
   type TaxCategoryInput,
+  type TaxProvince,
   type TaxSettingsRecord,
 } from './tax.js';
 
@@ -33,6 +35,12 @@ export interface TaxSettingsInput {
   ntn?: string | null;
   /** Its sales tax registration number; null or blank for none. */
   strn?: string | null;
+  /** The province its business is registered in (ADR-500); null for none. */
+  province?: TaxProvince | null;
+  /** Whether it is on FBR's Active Taxpayers List; null leaves it. */
+  filerStatus?: FilerStatus | null;
+  /** Whether it is a Tier-1 retailer; null leaves it. */
+  tier1?: boolean | null;
 }
 
 /**
@@ -88,6 +96,9 @@ export class TaxSettingsService {
         categories: categories ?? before.categories,
         ntn: ntn === undefined ? before.ntn : ntn,
         strn: strn === undefined ? before.strn : strn,
+        province: input.province === undefined ? before.province : input.province,
+        filerStatus: input.filerStatus ?? before.filerStatus,
+        tier1: input.tier1 ?? before.tier1,
       };
       const changed = [
         ...(next.rate !== before.rate ? ['rate'] : []),
@@ -97,6 +108,9 @@ export class TaxSettingsService {
           : []),
         ...(next.ntn !== before.ntn ? ['ntn'] : []),
         ...(next.strn !== before.strn ? ['strn'] : []),
+        ...(next.province !== before.province ? ['province'] : []),
+        ...(next.filerStatus !== before.filerStatus ? ['filerStatus'] : []),
+        ...(next.tier1 !== before.tier1 ? ['tier1'] : []),
       ];
       if (changed.length === 0) return { ok: true, value: before };
       await tx
@@ -127,6 +141,9 @@ export class TaxSettingsService {
           })),
           ntn: next.ntn,
           strn: next.strn,
+          province: next.province,
+          filerStatus: next.filerStatus,
+          tier1: next.tier1,
         },
       });
       return { ok: true, value: await taxSettingsIn(tx, tenant.shopId) };
@@ -152,6 +169,9 @@ export async function taxSettingsIn(
     categories: row.categories,
     ntn: row.ntn,
     strn: row.strn,
+    province: row.province,
+    filerStatus: row.filerStatus,
+    tier1: row.tier1,
     updatedAt: row.updatedAt,
   };
 }

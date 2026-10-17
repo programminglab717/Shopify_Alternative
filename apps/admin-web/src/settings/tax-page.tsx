@@ -1,9 +1,11 @@
-import { Plus, Save, Trash2 } from 'lucide-react';
+import { CircleCheck, CircleDashed, Info, Plus, Save, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { TaxSettingsQuery, TaxSettingsUpdateMutation } from '../api/operations';
 import type {
+  FilerStatus,
   TaxCategory,
+  TaxProvince,
   TaxSettings,
   TaxSettingsData,
   TaxSettingsUpdateData,
@@ -17,7 +19,7 @@ import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
-import { CheckField, Problems, settingProblem } from './settings-form';
+import { CheckField, Problems, SelectField, settingProblem } from './settings-form';
 import { BackToSettings } from './settings-page';
 
 const LABELS: Partial<Record<string, MessageKey>> = {
@@ -33,6 +35,25 @@ interface CategoryRow {
   code: string;
   name: string;
   rate: string;
+}
+
+export const TAX_PROVINCES: readonly TaxProvince[] = [
+  'PUNJAB',
+  'SINDH',
+  'KHYBER_PAKHTUNKHWA',
+  'BALOCHISTAN',
+  'ISLAMABAD',
+  'GILGIT_BALTISTAN',
+  'AZAD_KASHMIR',
+];
+
+const FILER_STATUSES: readonly FilerStatus[] = ['UNKNOWN', 'ACTIVE', 'INACTIVE'];
+
+/** The rest of the tax profile as the form holds it (ADR-500): no province as ''. */
+interface Profile {
+  province: TaxProvince | '';
+  filerStatus: FilerStatus;
+  tier1: boolean;
 }
 
 /** A percent as typed, "18" or "17.5%", or null where it is not one. */
@@ -55,12 +76,16 @@ function inputOf(
   ntn: string,
   strn: string,
   rows: Omit<CategoryRow, 'key'>[],
+  profile: Profile,
 ) {
   return {
     rate: charges ? percentOf(rate) : null,
     taxDelivery,
     ntn: ntn.trim() || null,
     strn: strn.trim() || null,
+    province: profile.province || null,
+    filerStatus: profile.filerStatus,
+    tier1: profile.tier1,
     categories: rows.map((row) => ({
       code: row.code.trim(),
       name: row.name.trim(),
@@ -87,11 +112,16 @@ function TaxForm({ settings }: { settings: TaxSettings }) {
   const [taxDelivery, setTaxDelivery] = useState(settings.taxDelivery);
   const [ntn, setNtn] = useState(settings.ntn ?? '');
   const [strn, setStrn] = useState(settings.strn ?? '');
+  const [profile, setProfile] = useState<Profile>({
+    province: settings.province ?? '',
+    filerStatus: settings.filerStatus,
+    tier1: settings.tier1,
+  });
   const [rows, setRows] = useState<CategoryRow[]>(() => keyed(settings.categories));
   const [problems, setProblems] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
 
-  const now = inputOf(charges, rate, taxDelivery, ntn, strn, rows);
+  const now = inputOf(charges, rate, taxDelivery, ntn, strn, rows, profile);
   const was = inputOf(
     settings.rate !== null,
     settings.rate === null ? '' : String(settings.rate),
@@ -99,6 +129,11 @@ function TaxForm({ settings }: { settings: TaxSettings }) {
     settings.ntn ?? '',
     settings.strn ?? '',
     settings.categories.map((each) => ({ ...each, rate: String(each.rate) })),
+    {
+      province: settings.province ?? '',
+      filerStatus: settings.filerStatus,
+      tier1: settings.tier1,
+    },
   );
   const changes = Object.fromEntries(
     Object.entries(now).filter(
@@ -202,6 +237,27 @@ function TaxForm({ settings }: { settings: TaxSettings }) {
           value={strn}
           onChange={(event) => setStrn(event.target.value)}
         />
+        <SelectField<TaxProvince | ''>
+          label={t('tax.province')}
+          value={profile.province}
+          options={[
+            { value: '', label: t('tax.provinceNone') },
+            ...TAX_PROVINCES.map((each) => ({ value: each, label: t(`tax.province.${each}`) })),
+          ]}
+          onChange={(province) => setProfile((was) => ({ ...was, province }))}
+        />
+        <SelectField<FilerStatus>
+          label={t('tax.filerStatus')}
+          value={profile.filerStatus}
+          options={FILER_STATUSES.map((each) => ({ value: each, label: t(`tax.filer.${each}`) }))}
+          onChange={(filerStatus) => setProfile((was) => ({ ...was, filerStatus }))}
+        />
+        <CheckField
+          label={t('tax.tier1')}
+          hint={t('tax.tier1Hint')}
+          checked={profile.tier1}
+          onChange={(tier1) => setProfile((was) => ({ ...was, tier1 }))}
+        />
       </FormSection>
 
       <FormSection title={t('tax.categories')} hint={t('tax.categoriesHint')}>
@@ -276,6 +332,66 @@ function TaxForm({ settings }: { settings: TaxSettings }) {
   );
 }
 
+/** Where FBR's people register sellers, file returns and keep the Active Taxpayers List. */
+export const FBR_IRIS_URL = 'https://iris.fbr.gov.pk';
+
+/**
+ * Registering with FBR as an online seller must (ONB-12, ADR-500), as the shop's profile saved
+ * says: each step done or to do, notes for a shop like it, and what its filer status means it
+ * is withheld.
+ */
+function TaxGuidance({ settings }: { settings: TaxSettings }) {
+  const { t } = useLocale();
+  const left = settings.guidance.filter((step) => step.status === 'TO_DO').length;
+  return (
+    <FormSection
+      title={t('tax.guidance')}
+      hint={left === 0 ? t('tax.guidanceDone') : t('tax.guidanceLeft', { count: left })}
+    >
+      <ol className="flex flex-col gap-3">
+        {settings.guidance.map((step) => {
+          const Icon =
+            step.status === 'DONE' ? CircleCheck : step.status === 'NOTE' ? Info : CircleDashed;
+          return (
+            <li key={step.code} className="flex items-start gap-2" data-status={step.status}>
+              <Icon
+                aria-hidden
+                className={`mt-0.5 size-5 shrink-0 ${step.status === 'DONE' ? 'text-success' : 'text-secondary'}`}
+              />
+              <div className="flex flex-col gap-0.5">
+                <p className="font-medium">
+                  {t(`tax.step.${step.code}`)}
+                  {step.status === 'DONE' && (
+                    <span className="sr-only"> ({t('tax.stepDone')})</span>
+                  )}
+                </p>
+                <p className="text-sm text-secondary">{t(`tax.step.${step.code}.hint`)}</p>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="text-sm">
+        {t('tax.withholding', {
+          digital: settings.withholding.digitalPercent,
+          cod: settings.withholding.cashOnDeliveryPercent,
+        })}
+      </p>
+      <p className="text-sm text-secondary">
+        {t('tax.guidanceWhere')}{' '}
+        <a
+          href={FBR_IRIS_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary underline-offset-4 hover:underline"
+        >
+          {t('tax.iris')}
+        </a>
+      </p>
+    </FormSection>
+  );
+}
+
 /**
  * The shop's sales tax (TAX-01, ADR-096, ADR-097): whether it charges it and at what rate,
  * included in its prices, on delivery too; the NTN and STRN its invoices name; and rates of its
@@ -298,7 +414,10 @@ export function TaxPage() {
           action={<Button onClick={() => void query.refetch()}>{t('action.retry')}</Button>}
         />
       ) : (
-        <TaxForm settings={query.data.taxSettings} />
+        <>
+          <TaxGuidance settings={query.data.taxSettings} />
+          <TaxForm settings={query.data.taxSettings} />
+        </>
       )}
     </div>
   );

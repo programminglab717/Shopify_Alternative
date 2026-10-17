@@ -16,11 +16,15 @@ import {
   orderTaxOf,
   ratePercent,
   taxIncludedWords,
+  taxGuidance,
   taxesByRate,
+  withholdingRates,
   type TaxCategoryInput,
 } from './tax.js';
 
 const server = testDatabaseServer();
+/** The rest of the tax profile, as a shop that set none has it (ADR-500). */
+const PROFILE = { province: null, filerStatus: 'unknown', tier1: false };
 
 describe('includedTax', () => {
   it('is the part of an amount that is tax at a rate, rounded half up to the paisa', () => {
@@ -304,15 +308,29 @@ describe.skipIf(!server)('TaxSettingsService', () => {
     expect(rows).toEqual([
       {
         action: 'tax_settings.updated',
-        details: { rate: 18, taxDelivery: false, categories: [], ntn: null, strn: null },
+        details: {
+          rate: 18,
+          taxDelivery: false,
+          categories: [],
+          ntn: null,
+          strn: null,
+          ...PROFILE,
+        },
       },
       {
         action: 'tax_settings.updated',
-        details: { rate: 18, taxDelivery: true, categories: [], ntn: null, strn: null },
+        details: { rate: 18, taxDelivery: true, categories: [], ntn: null, strn: null, ...PROFILE },
       },
       {
         action: 'tax_settings.updated',
-        details: { rate: null, taxDelivery: true, categories: [], ntn: null, strn: null },
+        details: {
+          rate: null,
+          taxDelivery: true,
+          categories: [],
+          ntn: null,
+          strn: null,
+          ...PROFILE,
+        },
       },
     ]);
     // Each shop its own.
@@ -342,6 +360,49 @@ describe.skipIf(!server)('TaxSettingsService', () => {
       { changed: ['ntn', 'strn'] },
       { changed: ['ntn'] },
       { changed: ['ntn', 'strn'] },
+    ]);
+    expect(await service.get(b)).toEqual(NO_TAX);
+  });
+
+  it("keeps the rest of the shop's tax profile, and guides it to register (ONB-12, ADR-500)", async () => {
+    // Nothing done yet: every step to do, and withheld at the non-filer's rates.
+    expect(taxGuidance(NO_TAX)).toEqual([
+      { code: 'register_ntn', status: 'to_do' },
+      { code: 'register_sales_tax', status: 'to_do' },
+      { code: 'join_active_taxpayers', status: 'to_do' },
+      { code: 'name_province', status: 'to_do' },
+    ]);
+    expect(withholdingRates('unknown')).toEqual({ digital: 2, cashOnDelivery: 4 });
+    expect(withholdingRates('active')).toEqual({ digital: 1, cashOnDelivery: 2 });
+
+    const profile = unwrap(
+      await service.update(a, {
+        ntn: '1234567-8',
+        strn: '3277876175852',
+        province: 'sindh',
+        filerStatus: 'active',
+        tier1: true,
+      }),
+    );
+    expect(profile).toMatchObject({ province: 'sindh', filerStatus: 'active', tier1: true });
+    expect(taxGuidance(profile)).toEqual([
+      { code: 'register_ntn', status: 'done' },
+      { code: 'register_sales_tax', status: 'done' },
+      { code: 'join_active_taxpayers', status: 'done' },
+      { code: 'name_province', status: 'done' },
+      { code: 'digital_invoicing', status: 'note' },
+      { code: 'tier1_returns', status: 'note' },
+    ]);
+    // Those not given stay; null takes the province off.
+    expect(unwrap(await service.update(a, { province: null, filerStatus: null }))).toMatchObject({
+      province: null,
+      filerStatus: 'active',
+      tier1: true,
+      ntn: '1234567-8',
+    });
+    expect((await outbox()).map(([, payload]) => payload)).toEqual([
+      { changed: ['ntn', 'strn', 'province', 'filerStatus', 'tier1'] },
+      { changed: ['province'] },
     ]);
     expect(await service.get(b)).toEqual(NO_TAX);
   });

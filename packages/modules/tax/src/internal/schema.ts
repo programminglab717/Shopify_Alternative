@@ -1,7 +1,7 @@
 // Drizzle mirror of the tax module's tables. The SQL migrations in db/migrations are the source of
 // truth; tax.test.ts checks this file against the migrated database.
 import { boolean, integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import type { TaxCategoryValue } from './tax.js';
+import type { FilerStatus, TaxCategoryValue, TaxProvince } from './tax.js';
 
 export const taxSchema = pgSchema('tax');
 
@@ -18,6 +18,12 @@ export const taxSettings = taxSchema.table('settings', {
   ntn: text('ntn'),
   /** Its sales tax registration number: 13 digits. */
   strn: text('strn'),
+  /** The province its business is registered in (ADR-500). */
+  province: text('province').$type<TaxProvince>(),
+  /** Whether it is on FBR's Active Taxpayers List: active, inactive or unknown. */
+  filerStatus: text('filer_status').$type<FilerStatus>().notNull().default('unknown'),
+  /** Whether it is a Tier-1 retailer. */
+  tier1: boolean('tier1').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

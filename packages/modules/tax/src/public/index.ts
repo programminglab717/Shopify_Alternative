@@ -8,8 +8,16 @@ export {
 } from '../internal/tax-settings.service.js';
 export { TaxModule } from '../internal/tax.module.js';
 export {
+  FILER_STATUSES,
   NO_TAX,
   SALES_TAX,
+  TAX_GUIDANCE,
+  TAX_PROVINCES,
+  taxGuidance,
+  withholdingRates,
+  type FilerStatus,
+  type TaxGuidanceCode,
+  type TaxProvince,
   TAX_CODE,
   TAX_LIMITS,
   includedTax,

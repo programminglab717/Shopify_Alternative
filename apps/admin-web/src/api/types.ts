@@ -2680,11 +2680,36 @@ export interface TaxCategory {
   rate: number;
 }
 
+export type TaxProvince =
+  | 'PUNJAB'
+  | 'SINDH'
+  | 'KHYBER_PAKHTUNKHWA'
+  | 'BALOCHISTAN'
+  | 'ISLAMABAD'
+  | 'GILGIT_BALTISTAN'
+  | 'AZAD_KASHMIR';
+
+export type FilerStatus = 'ACTIVE' | 'INACTIVE' | 'UNKNOWN';
+
+export type TaxGuidanceCode =
+  | 'REGISTER_NTN'
+  | 'REGISTER_SALES_TAX'
+  | 'JOIN_ACTIVE_TAXPAYERS'
+  | 'NAME_PROVINCE'
+  | 'DIGITAL_INVOICING'
+  | 'TIER1_RETURNS';
+
 export interface TaxSettings {
   rate: number | null;
   taxDelivery: boolean;
   ntn: string | null;
   strn: string | null;
+  /** The shop's tax profile (ONB-12, ADR-500). */
+  province: TaxProvince | null;
+  filerStatus: FilerStatus;
+  tier1: boolean;
+  withholding: { digitalPercent: number; cashOnDeliveryPercent: number };
+  guidance: { code: TaxGuidanceCode; status: 'DONE' | 'TO_DO' | 'NOTE' }[];
   updatedAt: string | null;
   categories: TaxCategory[];
 }

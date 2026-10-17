@@ -1,6 +1,14 @@
 import { Money, UserError } from '@hatti/api';
 import { money, type CurrencyCode } from '@hatti/money';
-import { Field, Float, GraphQLISODateTime, InputType, ObjectType } from '@nestjs/graphql';
+import {
+  Field,
+  Float,
+  GraphQLISODateTime,
+  InputType,
+  Int,
+  ObjectType,
+  registerEnumType,
+} from '@nestjs/graphql';
 import { SALES_TAX } from '../tax.js';
 
 @ObjectType({
@@ -17,6 +25,84 @@ export class TaxCategory {
 
   @Field(() => Float, { description: 'Percent: 10 is 10%.' })
   rate!: number;
+}
+
+export enum TaxProvince {
+  PUNJAB = 'PUNJAB',
+  SINDH = 'SINDH',
+  KHYBER_PAKHTUNKHWA = 'KHYBER_PAKHTUNKHWA',
+  BALOCHISTAN = 'BALOCHISTAN',
+  ISLAMABAD = 'ISLAMABAD',
+  GILGIT_BALTISTAN = 'GILGIT_BALTISTAN',
+  AZAD_KASHMIR = 'AZAD_KASHMIR',
+}
+
+registerEnumType(TaxProvince, {
+  name: 'TaxProvince',
+  description: "Where the shop's business is registered (ONB-12, ADR-500).",
+});
+
+export enum FilerStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  UNKNOWN = 'UNKNOWN',
+}
+
+registerEnumType(FilerStatus, {
+  name: 'FilerStatus',
+  description:
+    "Whether the shop is on FBR's Active Taxpayers List, as it says: ACTIVE, INACTIVE, or " +
+    'UNKNOWN, taken as not on it.',
+});
+
+export enum TaxGuidanceCode {
+  REGISTER_NTN = 'REGISTER_NTN',
+  REGISTER_SALES_TAX = 'REGISTER_SALES_TAX',
+  JOIN_ACTIVE_TAXPAYERS = 'JOIN_ACTIVE_TAXPAYERS',
+  NAME_PROVINCE = 'NAME_PROVINCE',
+  DIGITAL_INVOICING = 'DIGITAL_INVOICING',
+  TIER1_RETURNS = 'TIER1_RETURNS',
+}
+
+registerEnumType(TaxGuidanceCode, {
+  name: 'TaxGuidanceCode',
+  description:
+    'A step of registering with FBR as an online seller (ONB-12, ADR-500): an NTN; sales tax ' +
+    "registration; the Active Taxpayers List; the business's province; FBR's digital invoicing, " +
+    "for one registered for sales tax; and a Tier-1 retailer's monthly returns.",
+});
+
+export enum TaxGuidanceStatus {
+  DONE = 'DONE',
+  TO_DO = 'TO_DO',
+  NOTE = 'NOTE',
+}
+
+registerEnumType(TaxGuidanceStatus, {
+  name: 'TaxGuidanceStatus',
+  description: 'DONE, TO_DO, or a NOTE for a shop like this one, with nothing to tick off.',
+});
+
+@ObjectType({ description: "A step of the shop's registration with FBR, as its profile says." })
+export class TaxGuidanceStep {
+  @Field(() => TaxGuidanceCode)
+  code!: TaxGuidanceCode;
+
+  @Field(() => TaxGuidanceStatus)
+  status!: TaxGuidanceStatus;
+}
+
+@ObjectType({
+  description:
+    "Income tax couriers and payment gateways withhold from the shop's online sales (s.6A), as " +
+    'percentages: double for a shop not on the Active Taxpayers List.',
+})
+export class TaxWithholding {
+  @Field(() => Int, { description: 'From what customers pay online, by the gateway.' })
+  digitalPercent!: number;
+
+  @Field(() => Int, { description: 'From cash on delivery, by the courier.' })
+  cashOnDeliveryPercent!: number;
 }
 
 @ObjectType({
@@ -61,6 +147,30 @@ export class TaxSettings {
       'invoices. Null for none.',
   })
   strn!: string | null;
+
+  @Field(() => TaxProvince, {
+    nullable: true,
+    description: 'Where its business is registered; null while it says none.',
+  })
+  province!: TaxProvince | null;
+
+  @Field(() => FilerStatus)
+  filerStatus!: FilerStatus;
+
+  @Field({
+    description:
+      'Whether it is a Tier-1 retailer, for whom the sales tax gateways and couriers collect is ' +
+      'an advance against its own.',
+  })
+  tier1!: boolean;
+
+  @Field(() => TaxWithholding, { description: 'What its filer status means it is withheld.' })
+  withholding!: TaxWithholding;
+
+  @Field(() => [TaxGuidanceStep], {
+    description: 'What it has done to register as an online seller must, and what is left.',
+  })
+  guidance!: TaxGuidanceStep[];
 
   @Field(() => GraphQLISODateTime, {
     nullable: true,
@@ -115,6 +225,15 @@ export class TaxSettingsUpdateInput {
     description: '13 digits, dashes and spaces as typed; null or blank for none.',
   })
   strn?: string | null;
+
+  @Field(() => TaxProvince, { nullable: true, description: 'null for none.' })
+  province?: TaxProvince | null;
+
+  @Field(() => FilerStatus, { nullable: true })
+  filerStatus?: FilerStatus | null;
+
+  @Field(() => Boolean, { nullable: true })
+  tier1?: boolean | null;
 }
 
 @ObjectType()

@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-499 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-500 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -507,6 +507,7 @@
 | 497 | Invoices and credit notes in the admin: an order's invoice number and its refunds' credit notes on its page, and credit notes printed beside slips and invoices | Accepted |
 | 498 | Hatti's status page: Hatti's people post incidents and maintenance with a command, and the core serves them at /status, as JSON and to every shop's admin | Accepted |
 | 499 | The admin's banner: what goes on at Hatti above every page of a shop's admin, asked every minute, in the staff's language where Hatti wrote it in Urdu | Accepted |
+| 500 | The shop's tax profile: its province, filer status and Tier-1 kept with its tax settings, and the admin guiding it through what an online seller must register | Accepted |
 
 ---
 
@@ -18875,3 +18876,43 @@
   * **Asking only when the admin opens:** staff keep it open all day.
   * **Pushing incidents to open admins:** the admin has no channel from the core for them yet,
     and a minute is soon enough for news a person posts.
+
+## ADR-500 · The shop's tax profile: its province, filer status and Tier-1 kept with its tax settings, and the admin guiding it through what an online seller must register
+
+* **Context:** Since the Finance Act 2025, every online seller must register for sales tax.
+  Couriers and gateways may refuse to serve one that hasn't. From 1 July 2026, the income tax
+  they withhold from a seller not on FBR's Active Taxpayers List doubles: 2% online and 4% on
+  cash on delivery, instead of 1% and 2%. Most small shops don't know where they stand (ONB-12,
+  TAX-02).
+* **Decision:**
+  * **The tax module keeps three more things beside the NTN and STRN (ADR-190).** The shop says
+    each one itself:
+    * the province its business is registered in;
+    * whether it is on the Active Taxpayers List: active, inactive or unknown, unknown taken as
+      not on it;
+    * whether it is a Tier-1 retailer.
+    `taxSettingsUpdate` changes them with `write_settings`, recorded in the event and the audit
+    log as before.
+  * **`TaxSettings.withholding`** gives the percentages its filer status means couriers and
+    gateways withhold.
+  * **`TaxSettings.guidance`** gives the steps of registering, each DONE or TO_DO, in order:
+    * an NTN;
+    * sales tax registration;
+    * the Active Taxpayers List;
+    * the province.
+    Notes follow for a shop like this one:
+    * FBR's digital invoicing, for one with an STRN;
+    * monthly returns, for a Tier-1 retailer, for whom the 2% collected is an advance.
+  * **The admin's sales tax page shows the steps above its form, with what the shop is
+    withheld,** and takes the profile in its registration section. Each step says how to do it:
+    * IRIS for an NTN and returns;
+    * an SMS of ATL and the CNIC to 9966 to check the list.
+    It links to IRIS and says rules change each budget.
+* **Consequences:**
+  * Hatti doesn't check the filer status with FBR. It is what the shop says.
+  * There are no referrals to tax advisers yet.
+  * The rates are Hatti's constants, to change with each budget.
+* **Alternatives:**
+  * **Asking FBR for the filer status:** FBR has no public API for the list, only its SMS
+    service and pages.
+  * **Guidance as a page of its own:** the steps belong beside the numbers they are about.

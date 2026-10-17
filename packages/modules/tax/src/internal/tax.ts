@@ -36,6 +36,22 @@ export interface TaxCategoryInput {
   rate: number;
 }
 
+/** Where a shop's business may be registered (ADR-500). */
+export const TAX_PROVINCES = [
+  'punjab',
+  'sindh',
+  'khyber_pakhtunkhwa',
+  'balochistan',
+  'islamabad',
+  'gilgit_baltistan',
+  'azad_kashmir',
+] as const;
+export type TaxProvince = (typeof TAX_PROVINCES)[number];
+
+/** Whether a shop is on FBR's Active Taxpayers List: a filer who files its returns. */
+export const FILER_STATUSES = ['active', 'inactive', 'unknown'] as const;
+export type FilerStatus = (typeof FILER_STATUSES)[number];
+
 /** A shop's sales tax. */
 export interface TaxSettingsRecord {
   /** Hundredths of a percent included in its prices: 1800 is 18%. Null: it charges none. */
@@ -51,6 +67,12 @@ export interface TaxSettingsRecord {
   ntn: string | null;
   /** Its sales tax registration number, 13 digits, which makes its invoices tax invoices. */
   strn: string | null;
+  /** The province its business is registered in (ADR-500); null while it says none. */
+  province: TaxProvince | null;
+  /** Whether it is on FBR's Active Taxpayers List, as it says. */
+  filerStatus: FilerStatus;
+  /** Whether it is a Tier-1 retailer, as it says. */
+  tier1: boolean;
   /** Null while the shop has set none. */
   updatedAt: Date | null;
 }
@@ -62,6 +84,9 @@ export const NO_TAX: TaxSettingsRecord = {
   categories: [],
   ntn: null,
   strn: null,
+  province: null,
+  filerStatus: 'unknown',
+  tier1: false,
   updatedAt: null,
 };
 
@@ -281,4 +306,58 @@ export function checkStrn(check: InputChecker, field: string[], typed: string): 
   if (/^\d{13}$/.test(digits)) return digits;
   check.addMessage(field, 'INVALID', 'STRN must be 13 digits, like 3277876175852');
   return null;
+}
+
+/**
+ * Income tax couriers and payment gateways withhold from a shop's online sales under s.6A of the
+ * Income Tax Ordinance, as a percentage (ADR-500): from 1 July 2026, double for those not on the
+ * Active Taxpayers List, as one that doesn't say is taken to be.
+ */
+export function withholdingRates(filerStatus: FilerStatus): {
+  digital: number;
+  cashOnDelivery: number;
+} {
+  return filerStatus === 'active'
+    ? { digital: 1, cashOnDelivery: 2 }
+    : { digital: 2, cashOnDelivery: 4 };
+}
+
+/** A step of a shop's registration with FBR (ONB-12, ADR-500), in the order to take them. */
+export const TAX_GUIDANCE = [
+  'register_ntn',
+  'register_sales_tax',
+  'join_active_taxpayers',
+  'name_province',
+  'digital_invoicing',
+  'tier1_returns',
+] as const;
+export type TaxGuidanceCode = (typeof TAX_GUIDANCE)[number];
+
+/** Done, still to do, or a note for a shop like this one, with nothing to tick off. */
+export type TaxGuidanceStatus = 'done' | 'to_do' | 'note';
+
+/**
+ * What a shop has done to register as an online seller must, and what is left, from its profile
+ * (ADR-500): an NTN; sales tax registration, which every online seller needs and which couriers
+ * and gateways may refuse to serve a shop without; the Active Taxpayers List; its province; and
+ * for a shop registered for sales tax, FBR's digital invoicing, and a Tier-1 retailer's monthly
+ * returns. Those that don't apply to it are left out.
+ */
+export function taxGuidance(
+  profile: Pick<TaxSettingsRecord, 'ntn' | 'strn' | 'province' | 'filerStatus' | 'tier1'>,
+): { code: TaxGuidanceCode; status: TaxGuidanceStatus }[] {
+  const step = (code: TaxGuidanceCode, done: boolean) => ({
+    code,
+    status: (done ? 'done' : 'to_do') as TaxGuidanceStatus,
+  });
+  return [
+    step('register_ntn', profile.ntn !== null),
+    step('register_sales_tax', profile.strn !== null),
+    step('join_active_taxpayers', profile.filerStatus === 'active'),
+    step('name_province', profile.province !== null),
+    ...(profile.strn !== null
+      ? [{ code: 'digital_invoicing' as const, status: 'note' as const }]
+      : []),
+    ...(profile.tier1 ? [{ code: 'tier1_returns' as const, status: 'note' as const }] : []),
+  ];
 }

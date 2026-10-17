@@ -4153,6 +4153,15 @@ type FileEdge {
 }
 
 """
+Whether the shop is on FBR's Active Taxpayers List, as it says: ACTIVE, INACTIVE, or UNKNOWN, taken as not on it.
+"""
+enum FilerStatus {
+  ACTIVE
+  INACTIVE
+  UNKNOWN
+}
+
+"""
 What matters in an image (ADR-257), in percent of the image shown, across and down from its top left: themes keep it in sight as they fill a frame with the image.
 """
 type FocalPoint {
@@ -14352,6 +14361,33 @@ input TaxCategoryInput {
 }
 
 """
+A step of registering with FBR as an online seller (ONB-12, ADR-500): an NTN; sales tax registration; the Active Taxpayers List; the business's province; FBR's digital invoicing, for one registered for sales tax; and a Tier-1 retailer's monthly returns.
+"""
+enum TaxGuidanceCode {
+  DIGITAL_INVOICING
+  JOIN_ACTIVE_TAXPAYERS
+  NAME_PROVINCE
+  REGISTER_NTN
+  REGISTER_SALES_TAX
+  TIER1_RETURNS
+}
+
+"""
+DONE, TO_DO, or a NOTE for a shop like this one, with nothing to tick off.
+"""
+enum TaxGuidanceStatus {
+  DONE
+  NOTE
+  TO_DO
+}
+
+"""A step of the shop's registration with FBR, as its profile says."""
+type TaxGuidanceStep {
+  code: TaxGuidanceCode!
+  status: TaxGuidanceStatus!
+}
+
+"""
 A tax included in a price, as Shopify's TaxLine: what of an order's line, or of the order, was sales tax, at what rate.
 """
 type TaxLine {
@@ -14368,6 +14404,17 @@ type TaxLine {
   title: String!
 }
 
+"""Where the shop's business is registered (ONB-12, ADR-500)."""
+enum TaxProvince {
+  AZAD_KASHMIR
+  BALOCHISTAN
+  GILGIT_BALTISTAN
+  ISLAMABAD
+  KHYBER_PAKHTUNKHWA
+  PUNJAB
+  SINDH
+}
+
 """
 The sales tax the shop charges (TAX-01): a rate included in the prices of what it sells, as Pakistan's consumer laws ask prices to be shown, and in its delivery charges if it says so. Orders keep the tax in them as they were placed, for receipts and invoices.
 """
@@ -14376,11 +14423,20 @@ type TaxSettings {
   Rates of its own for some products, in the shop's order; they apply while the shop charges tax at all.
   """
   categories: [TaxCategory!]!
+  filerStatus: FilerStatus!
+
+  """
+  What it has done to register as an online seller must, and what is left.
+  """
+  guidance: [TaxGuidanceStep!]!
 
   """
   The NTN FBR registered the shop under, which its invoices name: "1234567-8", or a sole trader's CNIC, "35202-1234567-1". Null for none.
   """
   ntn: String
+
+  """Where its business is registered; null while it says none."""
+  province: TaxProvince
 
   """Percent included in its prices: 18 is 18%. Null: it charges none."""
   rate: Float
@@ -14395,19 +14451,31 @@ type TaxSettings {
   """
   taxDelivery: Boolean!
 
+  """
+  Whether it is a Tier-1 retailer, for whom the sales tax gateways and couriers collect is an advance against its own.
+  """
+  tier1: Boolean!
+
   """null while the shop has set none."""
   updatedAt: DateTime
+
+  """What its filer status means it is withheld."""
+  withholding: TaxWithholding!
 }
 
 """Those not given stay as they are."""
 input TaxSettingsUpdateInput {
   """Replaces every category; an empty list for none. Up to 20."""
   categories: [TaxCategoryInput!]
+  filerStatus: FilerStatus
 
   """
   Seven digits and a check digit, or a CNIC, dashes and spaces as typed; null or blank for none.
   """
   ntn: String
+
+  """null for none."""
+  province: TaxProvince
 
   """
   Percent, 18 for 18%: from 0.01 to 50, in hundredths. null charges none.
@@ -14417,11 +14485,23 @@ input TaxSettingsUpdateInput {
   """13 digits, dashes and spaces as typed; null or blank for none."""
   strn: String
   taxDelivery: Boolean
+  tier1: Boolean
 }
 
 type TaxSettingsUpdatePayload {
   taxSettings: TaxSettings
   userErrors: [UserError!]!
+}
+
+"""
+Income tax couriers and payment gateways withhold from the shop's online sales (s.6A), as percentages: double for a shop not on the Active Taxpayers List.
+"""
+type TaxWithholding {
+  """From cash on delivery, by the courier."""
+  cashOnDeliveryPercent: Int!
+
+  """From what customers pay online, by the gateway."""
+  digitalPercent: Int!
 }
 
 type ThemeCreatePayload {

@@ -5974,6 +5974,17 @@ const TAX_SETTINGS = /* GraphQL */ `
     taxDelivery
     ntn
     strn
+    province
+    filerStatus
+    tier1
+    withholding {
+      digitalPercent
+      cashOnDeliveryPercent
+    }
+    guidance {
+      code
+      status
+    }
     updatedAt
     categories {
       code

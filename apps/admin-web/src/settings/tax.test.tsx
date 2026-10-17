@@ -9,8 +9,18 @@ const pkr = (amount: string) => ({ amount, currencyCode: 'PKR' });
 const SETTINGS = {
   rate: 18,
   taxDelivery: false,
-  ntn: null,
-  strn: null,
+  ntn: null as string | null,
+  strn: null as string | null,
+  province: null as string | null,
+  filerStatus: 'UNKNOWN',
+  tier1: false,
+  withholding: { digitalPercent: 2, cashOnDeliveryPercent: 4 },
+  guidance: [
+    { code: 'REGISTER_NTN', status: 'TO_DO' },
+    { code: 'REGISTER_SALES_TAX', status: 'TO_DO' },
+    { code: 'JOIN_ACTIVE_TAXPAYERS', status: 'TO_DO' },
+    { code: 'NAME_PROVINCE', status: 'TO_DO' },
+  ],
   updatedAt: null,
   categories: [{ code: 'REDUCED', name: 'Reduced rate', rate: 10 }],
 };
@@ -146,6 +156,38 @@ describe("The shop's sales tax", () => {
         ],
       },
     });
+  });
+
+  it('guides the shop to register with FBR, and keeps its province, filer status and Tier-1 (ONB-12)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/tax');
+
+    expect(await screen.findByText('4 steps left for an online seller.')).toBeTruthy();
+    expect(screen.getByText('Get an NTN')).toBeTruthy();
+    expect(screen.getByText('Join the Active Taxpayers List')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Couriers and payment gateways withhold 2% of what customers pay online, and 4% of cash on delivery, as income tax.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: "FBR's IRIS" }).getAttribute('href')).toBe(
+      'https://iris.fbr.gov.pk',
+    );
+
+    fireEvent.change(screen.getByLabelText('Province your business is registered in'), {
+      target: { value: 'SINDH' },
+    });
+    fireEvent.change(screen.getByLabelText("On FBR's Active Taxpayers List?"), {
+      target: { value: 'ACTIVE' },
+    });
+    fireEvent.click(screen.getByLabelText(/A Tier-1 retailer/));
+    fireEvent.click(screen.getByRole('button', { name: 'Save sales tax' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'TaxSettingsUpdate')).toEqual([
+        { input: { province: 'SINDH', filerStatus: 'ACTIVE', tier1: true } },
+      ]),
+    );
   });
 
   it('stops charging it', async () => {
