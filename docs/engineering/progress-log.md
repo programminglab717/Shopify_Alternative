@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### The status probes
+### 2eb2ccb · The status probes
 
 * **The worker checks addresses given for Hatti's parts, posts an outage on the status page
   after three failed checks in a row, and resolves it when the part answers again** ([ADR-536](../architecture/13-decision-log.md#adr-536--the-worker-checks-addresses-given-for-hattis-parts-posts-an-outage-on-the-status-page-after-three-failed-checks-in-a-row-and-resolves-it-when-the-part-answers-again),
