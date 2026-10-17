@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### The shop's tax profile
+### 113e67b · The shop's tax profile
 
 * **The shop's province, filer status and Tier-1 are kept with its tax settings, and the admin
   guides it through what an online seller must register, with what it is withheld** ([ADR-500](../architecture/13-decision-log.md#adr-500--the-shops-tax-profile-its-province-filer-status-and-tier-1-kept-with-its-tax-settings-and-the-admin-guiding-it-through-what-an-online-seller-must-register),
