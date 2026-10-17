@@ -21,6 +21,22 @@ export const metaSettings = marketingSchema.table('meta_settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** The shop's TikTok pixel, and the access token Events Manager gave it (ADR-541). */
+export const tiktokSettings = marketingSchema.table('tiktok_settings', {
+  shopId: uuid('shop_id').primaryKey(),
+  pixelCode: text('pixel_code').notNull(),
+  /** Sealed for the shop alone, and never shown again. */
+  accessToken: text('access_token').notNull(),
+  /** Its last four characters. */
+  tokenHint: text('token_hint').notNull(),
+  testEventCode: text('test_event_code'),
+  /** Which of an order's moments is TikTok's purchase. */
+  purchaseAt: text('purchase_at', { enum: CONVERSION_MOMENTS }).notNull().default('placed'),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Each moment of an order to send to an ad platform, and how sending it went. */
 export const conversions = marketingSchema.table(
   'conversions',

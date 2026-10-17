@@ -234,6 +234,100 @@ describe.skipIf(!server)("Admin GraphQL API: Meta's conversions API", () => {
     expect(wrong.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT');
   });
 
+  it("connects the shop's TikTok pixel, never showing its token again, and disconnects it (ADR-541)", async () => {
+    const TIKTOK = '{ tiktokEvents { pixelCode accessTokenHint testEventCode purchaseAt } }';
+    const CONNECT = `mutation ($input: TikTokEventsInput!) {
+      tiktokEventsUpdate(input: $input) {
+        tiktokEvents { pixelCode accessTokenHint testEventCode purchaseAt }
+        userErrors { field code message }
+      }
+    }`;
+    const tiktokToken = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8Tk42';
+    expect(await data(tokens.owner, TIKTOK)).toBeNull();
+    expect(
+      await data(tokens.owner, CONNECT, { input: { pixelCode: 'CABC123DEF456GHI789J' } }),
+    ).toEqual({
+      tiktokEvents: null,
+      userErrors: [
+        {
+          field: ['input', 'accessToken'],
+          code: 'BLANK',
+          message: 'Connecting TikTok needs the access token Events Manager gave',
+        },
+      ],
+    });
+    expect(
+      await data(tokens.owner, CONNECT, {
+        input: {
+          pixelCode: 'CABC123DEF456GHI789J',
+          accessToken: tiktokToken,
+          testEventCode: 'TEST31337',
+          purchaseAt: 'CONFIRMED',
+        },
+      }),
+    ).toEqual({
+      tiktokEvents: {
+        pixelCode: 'CABC123DEF456GHI789J',
+        accessTokenHint: 'Tk42',
+        testEventCode: 'TEST31337',
+        purchaseAt: 'CONFIRMED',
+      },
+      userErrors: [],
+    });
+    expect(await data(tokens.reader, TIKTOK)).toMatchObject({ accessTokenHint: 'Tk42' });
+    expect(JSON.stringify(await gql(tokens.owner, TIKTOK))).not.toContain(tiktokToken.slice(0, 20));
+    for (const [token, query] of [
+      [tokens.orders, TIKTOK],
+      [tokens.reader, CONNECT],
+      [tokens.reader, 'mutation { tiktokEventsDelete { deletedPixelCode } }'],
+    ] as const) {
+      const denied = await gql(token, query, { input: { pixelCode: 'CABC123DEF456GHI789J' } });
+      expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+    }
+    expect(await data(tokens.other, TIKTOK)).toBeNull();
+
+    // A plan without the conversions API connects none.
+    await admin.query(`UPDATE billing.subscriptions SET plan = 'starter' WHERE shop_id = $1`, [
+      other,
+    ]);
+    const starter = await data(tokens.other, CONNECT, {
+      input: { pixelCode: 'CABC123DEF456GHI789J', accessToken: tiktokToken },
+    });
+    await admin.query(`UPDATE billing.subscriptions SET plan = 'growth' WHERE shop_id = $1`, [
+      other,
+    ]);
+    expect(starter.tiktokEvents).toBeNull();
+    expect(starter.userErrors[0]).toMatchObject({ field: ['input'], code: 'INVALID' });
+
+    const deleted = 'mutation { tiktokEventsDelete { deletedPixelCode userErrors { code } } }';
+    expect(await data(tokens.owner, deleted)).toEqual({
+      deletedPixelCode: 'CABC123DEF456GHI789J',
+      userErrors: [],
+    });
+    expect(await data(tokens.owner, deleted)).toEqual({ deletedPixelCode: null, userErrors: [] });
+    expect(await data(tokens.owner, TIKTOK)).toBeNull();
+
+    // Its moments listed apart from Meta's.
+    await admin.query(
+      `INSERT INTO marketing.conversions
+              (shop_id, platform, order_id, moment, occurred_at, status, event_name, trace_id,
+               sent_at)
+       VALUES ($1, 'tiktok', $2, 'placed', now(), 'sent', 'CompletePayment', 'req-1', now())`,
+      [shop, newId()],
+    );
+    const BY_PLATFORM = `query ($platform: ConversionPlatform) {
+      conversionEvents(platform: $platform) { nodes { platform eventName traceId } }
+    }`;
+    expect((await data(tokens.reader, BY_PLATFORM, { platform: 'TIKTOK' })).nodes).toEqual([
+      { platform: 'TIKTOK', eventName: 'CompletePayment', traceId: 'req-1' },
+    ]);
+    expect(
+      (await data(tokens.reader, BY_PLATFORM, { platform: 'META' })).nodes.every(
+        (node: Json) => node.platform === 'META',
+      ),
+    ).toBe(true);
+  });
+
   it("lists Pakistan's marketing calendar from the shop's today, each moment with its kit (ADR-484)", async () => {
     const CALENDAR = `query ($days: Int) {
       marketingCalendar(days: $days) {

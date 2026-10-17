@@ -15,8 +15,13 @@ import { Args, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { CALENDAR_DAYS_MAX, type MarketingDate as CalendarDate } from '../calendar.js';
 import { MarketingCalendarService } from '../calendar.service.js';
 import { ConversionsService, type ConversionRecord } from '../conversions.service.js';
-import type { ConversionMomentValue, ConversionStatusValue } from '../meta.js';
+import type {
+  ConversionMomentValue,
+  ConversionPlatformValue,
+  ConversionStatusValue,
+} from '../meta.js';
 import { MetaConversionsService, type MetaConversionsRecord } from '../meta-settings.service.js';
+import { TikTokEventsService, type TikTokEventsRecord } from '../tiktok-settings.service.js';
 import {
   ConversionEvent,
   ConversionEventConnection,
@@ -31,12 +36,17 @@ import {
   MetaConversionsUpdatePayload,
   MarketingDate,
   MarketingMoment,
+  TikTokEvents,
+  TikTokEventsDeletePayload,
+  TikTokEventsInput,
+  TikTokEventsUpdatePayload,
 } from './marketing.types.js';
 
 @Resolver()
 export class MarketingResolver {
   constructor(
     private readonly meta: MetaConversionsService,
+    private readonly tiktok: TikTokEventsService,
     private readonly conversions: ConversionsService,
     private readonly calendar: MarketingCalendarService,
   ) {}
@@ -116,6 +126,58 @@ export class MarketingResolver {
     });
   }
 
+  @Query(() => TikTokEvents, {
+    nullable: true,
+    description: "The shop's TikTok pixel its orders go to (MKT-10); null until it connects one.",
+  })
+  @RequireScopes('read_pixels')
+  async tiktokEvents(@CurrentTenant() tenant: TenantContext): Promise<TikTokEvents | null> {
+    const record = await this.tiktok.get(tenant);
+    return record && toTikTokEvents(record);
+  }
+
+  @Mutation(() => TikTokEventsUpdatePayload, {
+    description:
+      "Connects the shop's TikTok pixel, or changes how its orders go to it (ADR-541): from " +
+      "then on, each order placed through checkout goes to TikTok's Events API as it is " +
+      "placed, confirmed and delivered, its customer's details hashed. Audited, the token " +
+      'never. Staff confirm who they are first when they signed in over 15 minutes ago.',
+  })
+  @RequireScopes('write_pixels')
+  @RequireRecentAuthentication()
+  async tiktokEventsUpdate(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('input') input: TikTokEventsInput,
+  ): Promise<TikTokEventsUpdatePayload> {
+    const result = await this.tiktok.update(tenant, {
+      pixelCode: input.pixelCode,
+      accessToken: input.accessToken,
+      ...(input.testEventCode !== undefined && { testEventCode: input.testEventCode }),
+      purchaseAt: input.purchaseAt
+        ? (input.purchaseAt.toLowerCase() as ConversionMomentValue)
+        : null,
+    });
+    return Object.assign(new TikTokEventsUpdatePayload(), {
+      tiktokEvents: result.ok ? toTikTokEvents(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => TikTokEventsDeletePayload, {
+    description:
+      "Disconnects the shop's TikTok pixel: its token is forgotten, and moments still waiting " +
+      'are not sent.',
+  })
+  @RequireScopes('write_pixels')
+  async tiktokEventsDelete(
+    @CurrentTenant() tenant: TenantContext,
+  ): Promise<TikTokEventsDeletePayload> {
+    return Object.assign(new TikTokEventsDeletePayload(), {
+      deletedPixelCode: await this.tiktok.delete(tenant),
+      userErrors: [],
+    });
+  }
+
   @Query(() => ConversionEventConnection, {
     description:
       "The moments of the shop's orders sent, or to be sent, to the ad platforms it connected, " +
@@ -140,6 +202,7 @@ export class MarketingResolver {
       first: pageSize(args.first),
       after: after && { id: after.id, createdAt: after.at },
       status: args.status ? (args.status.toLowerCase() as ConversionStatusValue) : null,
+      platform: args.platform ? (args.platform.toLowerCase() as ConversionPlatformValue) : null,
       orderId,
     });
     const edges = items.map((record) =>
@@ -162,6 +225,16 @@ export class MarketingResolver {
 function toMetaConversions(record: MetaConversionsRecord): MetaConversions {
   return Object.assign(new MetaConversions(), {
     pixelId: record.pixelId,
+    accessTokenHint: record.tokenHint,
+    testEventCode: record.testEventCode,
+    purchaseAt: record.purchaseAt.toUpperCase() as ConversionMoment,
+    updatedAt: record.updatedAt,
+  });
+}
+
+function toTikTokEvents(record: TikTokEventsRecord): TikTokEvents {
+  return Object.assign(new TikTokEvents(), {
+    pixelCode: record.pixelCode,
     accessTokenHint: record.tokenHint,
     testEventCode: record.testEventCode,
     purchaseAt: record.purchaseAt.toUpperCase() as ConversionMoment,

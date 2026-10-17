@@ -15,7 +15,10 @@ import {
   ConversionsService,
   MetaConversionsClient,
   MetaConversionsService,
+  TikTokEventsClient,
+  TikTokEventsService,
   type MetaServerEvent,
+  type TikTokEvent,
 } from '@hatti/marketing/public';
 import {
   BankTransferService,
@@ -51,6 +54,18 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
   /** What the fake Graph API was sent, and what it answers next. */
   const requests: { url: string; events: MetaServerEvent[]; body: URLSearchParams }[] = [];
   let answer: { status: number; body: unknown } = { status: 200, body: {} };
+  /** What the fake TikTok API was sent, and what it answers next. */
+  const tiktokRequests: {
+    url: string;
+    token: string | undefined;
+    body: {
+      event_source: string;
+      event_source_id: string;
+      test_event_code?: string;
+      data: TikTokEvent[];
+    };
+  }[] = [];
+  let tiktokAnswer: { status: number; body: unknown } = { status: 200, body: {} };
   const shopId = newId();
   const tenant: TenantContext = {
     shopId,
@@ -63,6 +78,7 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
   let otherVariantId: string;
 
   const meta = () => new MetaConversionsService(database, box);
+  const tiktok = () => new TikTokEventsService(database, box);
   const moments = () => new ConversionsService(database);
   const orders = () => workerOrders(database);
   const sender = () =>
@@ -72,6 +88,8 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
       meta: meta(),
       orders: workerConversionOrders(database),
       client: new MetaConversionsClient({ baseUrl: graphUrl, version: 'v26.0' }),
+      tiktok: tiktok(),
+      tiktokClient: new TikTokEventsClient({ baseUrl: graphUrl }),
       storefronts: new StorefrontSite('http://localhost:4100'),
     });
   const handlers = () =>
@@ -240,6 +258,16 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
       let text = '';
       request.on('data', (chunk: Buffer) => (text += chunk.toString('utf8')));
       request.on('end', () => {
+        if (request.url?.startsWith('/open_api/')) {
+          tiktokRequests.push({
+            url: request.url,
+            token: request.headers['access-token'] as string | undefined,
+            body: JSON.parse(text) as (typeof tiktokRequests)[number]['body'],
+          });
+          response.writeHead(tiktokAnswer.status, { 'content-type': 'application/json' });
+          response.end(JSON.stringify(tiktokAnswer.body));
+          return;
+        }
         const body = new URLSearchParams(text);
         requests.push({
           url: request.url ?? '',
@@ -263,8 +291,13 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
 
   beforeEach(async () => {
     requests.splice(0);
+    tiktokRequests.splice(0);
     answer = { status: 200, body: { events_received: 1, fbtrace_id: 'AbC123' } };
-    await admin.query('DELETE FROM marketing.meta_settings; DELETE FROM marketing.conversions');
+    tiktokAnswer = { status: 200, body: { code: 0, message: 'OK', request_id: 'req-1' } };
+    await admin.query(
+      'DELETE FROM marketing.meta_settings; DELETE FROM marketing.tiktok_settings; ' +
+        'DELETE FROM marketing.conversions',
+    );
     await dispatch();
   });
 
@@ -499,6 +532,153 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
     await meta().delete(tenant);
     expect(await sender().sweep()).toBe(0);
     expect(await statusOf(last.id)).toEqual(['skipped', 'Not sent: the shop disconnected Meta']);
+  });
+
+  it("sends an order to TikTok's Events API beside Meta's, each settled by what its platform said", async () => {
+    unwrap(await meta().update(tenant, { pixelId: '1234567890', accessToken: TOKEN }));
+    const tiktokToken = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0';
+    unwrap(
+      await tiktok().update(tenant, {
+        pixelCode: 'CABC123DEF456GHI789J',
+        accessToken: tiktokToken,
+        testEventCode: 'TEST31337',
+        purchaseAt: 'confirmed',
+      }),
+    );
+    const order = await placeOnline({
+      attribution: {
+        first: visits.first,
+        last: {
+          at: '2026-10-01T08:00:00.000Z',
+          source: 'tiktok',
+          utm: null,
+          landingPage: '/products/kurta?ttclid=E.C.P.CjwBhz&utm_source=tiktok',
+        },
+      },
+    });
+    await dispatch();
+    const platforms = async () =>
+      (
+        await admin.query<{
+          platform: string;
+          moment: string;
+          status: string;
+          event_name: string | null;
+          error: string | null;
+          trace_id: string | null;
+        }>(
+          `SELECT platform, moment, status, event_name, error, trace_id FROM marketing.conversions
+            WHERE order_id = $1 ORDER BY occurred_at, platform`,
+          [order.id],
+        )
+      ).rows.map((row) => [
+        row.platform,
+        row.moment,
+        row.status,
+        row.event_name,
+        row.error,
+        row.trace_id,
+      ]);
+    expect(
+      (await platforms()).map(([platform, moment, status]) => [platform, moment, status]),
+    ).toEqual([
+      ['meta', 'placed', 'pending'],
+      ['tiktok', 'placed', 'pending'],
+    ]);
+
+    expect(await sender().sweep()).toBe(2);
+    expect(
+      requests.splice(0).map((request) => request.events.map((event) => event.event_name)),
+    ).toEqual([['Purchase']]);
+    const [request] = tiktokRequests.splice(0);
+    expect(request!.url).toBe('/open_api/v1.3/event/track/');
+    expect(request!.token).toBe(tiktokToken);
+    expect(request!.body).toEqual({
+      event_source: 'web',
+      event_source_id: 'CABC123DEF456GHI789J',
+      test_event_code: 'TEST31337',
+      data: [
+        {
+          // Not its purchase: the shop counts that when the order is confirmed.
+          event: 'PlaceAnOrder',
+          event_time: expect.any(Number) as number,
+          event_id: `order-${order.number}-placed`,
+          user: {
+            external_id: sha256(order.customerId),
+            phone: sha256('+923001112223'),
+            email: sha256('ayesha@example.com'),
+            ip: '39.40.1.2',
+            user_agent: 'Mozilla/5.0 (Linux; Android 14)',
+            ttclid: 'E.C.P.CjwBhz',
+          },
+          properties: {
+            currency: 'PKR',
+            value: 5_000,
+            order_id: String(order.number),
+            content_type: 'product',
+            contents: [
+              { content_id: variantId, quantity: 2, price: 2_000 },
+              { content_id: otherVariantId, quantity: 1, price: 750 },
+            ],
+          },
+          page: { url: 'http://zari.localhost:4100/checkout' },
+        },
+      ],
+    });
+    expect(await platforms()).toEqual([
+      ['meta', 'placed', 'sent', 'Purchase', null, 'AbC123'],
+      ['tiktok', 'placed', 'sent', 'PlaceAnOrder', null, 'req-1'],
+    ]);
+
+    // TikTok over its limits for now: its moment waits, Meta's goes.
+    unwrap(await orders().confirm(tenant, order.id));
+    await dispatch();
+    tiktokAnswer = {
+      status: 200,
+      body: { code: 40100, message: 'Too many requests', request_id: 'req-2' },
+    };
+    const now = new Date();
+    expect(await sender().send(shopId, now)).toBe(1);
+    expect((await platforms()).slice(2)).toEqual([
+      ['meta', 'confirmed', 'sent', 'OrderConfirmed', null, 'AbC123'],
+      ['tiktok', 'confirmed', 'pending', null, 'TikTok 40100: Too many requests', 'req-2'],
+    ]);
+    // A minute on, refused for good.
+    tiktokAnswer = {
+      status: 200,
+      body: { code: 40002, message: 'Invalid event_source_id', request_id: 'req-3' },
+    };
+    expect(await sender().send(shopId, new Date(now.getTime() + 61_000))).toBe(0);
+    expect(tiktokRequests.splice(0).map((each) => each.body.data[0]!.event)).toEqual([
+      'CompletePayment',
+      'CompletePayment',
+    ]);
+    expect((await platforms())[3]).toEqual([
+      'tiktok',
+      'confirmed',
+      'failed',
+      'CompletePayment',
+      'TikTok 40002: Invalid event_source_id',
+      'req-3',
+    ]);
+
+    // Disconnected with a moment waiting: it is not sent; Meta's still goes.
+    const fulfillments = new FulfillmentService(database, new StockService());
+    const { fulfillmentId } = unwrap(await fulfillments.fulfill(tenant, order.id, {}));
+    unwrap(await fulfillments.markDelivered(tenant, fulfillmentId));
+    await dispatch();
+    expect(await tiktok().delete(tenant)).toBe('CABC123DEF456GHI789J');
+    requests.splice(0);
+    expect(await sender().sweep()).toBe(1);
+    expect(tiktokRequests).toEqual([]);
+    expect(
+      (await platforms())
+        .slice(4)
+        .map(([platform, , status, , error]) => [platform, status, error]),
+    ).toEqual([
+      ['meta', 'sent', null],
+      ['tiktok', 'skipped', 'Not sent: the shop disconnected TikTok'],
+    ]);
   });
 
   it('reads the events that make moments', () => {

@@ -601,6 +601,8 @@ const workerSchema = z
      * (ADR-147). Required in production; http://localhost:4000 otherwise.
      */
     PUBLIC_URL: env.httpUrl().optional(),
+    /** TikTok's Business API, which shops' orders go to through its Events API (ADR-541). */
+    TIKTOK_API_URL: env.httpUrl().default('https://business-api.tiktok.com'),
     /** How often the moments of orders due go to the ad platforms. */
     CONVERSIONS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(15_000),
     /** How often messages due go out. */

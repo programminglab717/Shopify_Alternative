@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### TikTok's Events API
+
+* **Orders placed through checkout go to TikTok's Events API from the worker beside Meta's**
+  ([ADR-541](../architecture/13-decision-log.md#adr-541--orders-placed-through-checkout-go-to-tiktoks-events-api-from-the-worker-beside-metas-the-shop-connecting-its-tiktok-pixel-with-a-token-each-moment-waiting-in-postgres-as-metas-do), MKT-10), the shop connecting its TikTok pixel with a token; **the admin's online
+  store has a TikTok tab** ([ADR-542](../architecture/13-decision-log.md#adr-542--the-admins-online-store-has-a-tiktok-tab-the-pixel-connected-changed-and-disconnected-and-the-moments-sent-to-tiktok-listed-apart-from-metas)).
+* 3292 tests, 16 more: the events and their client, the pixel's settings,
+  the worker sending both platforms, the API, and the admin's tab.
+
 ### 833bc9e · AI credits bought
 
 * **A shop buys AI credits a hundred at a time from its message credit, and they last until

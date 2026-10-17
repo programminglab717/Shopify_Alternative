@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-540 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-542 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -548,6 +548,8 @@
 | 538 | A shop's own images are served at the widths and in the formats browsers take, each made once and kept beside its file, and removed with it | Accepted |
 | 539 | A shop buys AI credits a hundred at a time from its message credit, and they last until spent, after the month's own | Accepted |
 | 540 | The admin's billing page shows the shop's AI credits, the month's own and those bought, and its owner buys more | Accepted |
+| 541 | Orders placed through checkout go to TikTok's Events API from the worker beside Meta's, the shop connecting its TikTok pixel with a token, each moment waiting in Postgres as Meta's do | Accepted |
+| 542 | The admin's online store has a TikTok tab: the pixel connected, changed and disconnected, and the moments sent to TikTok listed apart from Meta's | Accepted |
 
 ---
 
@@ -20446,3 +20448,56 @@
 * **Alternatives:**
   * **Buying from the drafting screens themselves:** every screen that drafts would carry
     payment. Billing is where the shop's money is spent.
+
+## ADR-541 · Orders placed through checkout go to TikTok's Events API from the worker beside Meta's, the shop connecting its TikTok pixel with a token, each moment waiting in Postgres as Meta's do
+
+* **Context:** Orders reach Meta's ads from the server (ADR-143), but many Pakistani shops sell
+  through TikTok's ads, which learned nothing of the orders that turned out. TikTok's Events API
+  takes web events from a server much as Meta's conversions API does.
+* **Decision:**
+  * **The shop connects its TikTok pixel** with its code and an access token Events Manager made
+    for the Events API (`tiktokEventsUpdate`), both needed. The token is sealed for the shop alone
+    and never shown again; changes are audited, the token never; a code for test events may be
+    set while the shop tries it out. A plan without the conversions API connects none, as for
+    Meta (ADR-523).
+  * **The same moments** as Meta's: an order placed through checkout is recorded for each
+    platform connected when it is placed, and its confirming and delivery follow it to the same
+    platforms. A row of `marketing.conversions` is one moment for one platform, so the two are
+    sent and settled apart.
+  * **The worker sends them** a shop at a time, a hundred in a request to each platform. TikTok's
+    events are web events: the moment the shop chose as its purchase goes as `CompletePayment`,
+    the others as `PlaceAnOrder`, `OrderConfirmed` and `OrderDelivered`. Each carries the order's
+    total and its items by variant, the customer's number in E.164 and email hashed with SHA-256,
+    their ID with the shop hashed, the browser's address and user agent, and TikTok's click ID
+    (`ttclid`) from the latest visit whose address had one. The event's ID is the order's number
+    and the moment, so TikTok keeps one however often it goes.
+  * **What TikTok says** settles them as Meta's are: taken, sent; over its limits, in trouble, or
+    the token refused, tried again on the same backoff while seven days have not passed; anything
+    else, failed with TikTok's code and message. TikTok's request ID is kept as the trace.
+  * **Disconnecting** forgets the token and skips the moments waiting for TikTok; Meta's go on.
+  * **The Admin API** reads the pixel (`tiktokEvents`), connects and changes it, disconnects it,
+    and lists the moments by platform (`conversionEvents(platform:)`).
+* **Consequences:**
+  * A shop advertising on TikTok tells its ads which orders were real, confirmed or delivered,
+    as it does Meta's, without a script in checkout.
+  * TikTok's browser pixel is not loaded on the storefront yet: events from the server alone.
+* **Alternatives:**
+  * **TikTok's pixel in the browser only:** ad blockers and checkout's scriptless page lose the
+    orders that matter most.
+  * **A table of moments per platform:** the same waiting, claiming and settling twice.
+
+## ADR-542 · The admin's online store has a TikTok tab: the pixel connected, changed and disconnected, and the moments sent to TikTok listed apart from Meta's
+
+* **Context:** The Events API had no screen (ADR-541).
+* **Decision:**
+  * **Online store → TikTok**, for those who set Meta's (owners, managers and marketers): the
+    pixel's code, the access token (needed to connect, then left blank to keep the one ending as
+    shown), which moment is TikTok's purchase with what each choice means, and a test event code.
+    Saving confirms who they are first when the core asks; disconnecting asks whether they mean
+    it.
+  * **Sent to TikTok** lists the latest moments sent to TikTok alone, by status, each with
+    TikTok's request ID; Meta's tab lists Meta's alone.
+* **Consequences:**
+  * A shop connects TikTok the way it connects Meta, in English or Urdu.
+* **Alternatives:**
+  * **One tab for every ad platform:** two long forms on one screen, for most shops one unused.

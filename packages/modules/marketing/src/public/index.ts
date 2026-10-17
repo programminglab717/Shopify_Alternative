@@ -19,6 +19,8 @@ export {
   MarketingEvents,
   type MetaConversionsDeletedPayload,
   type MetaConversionsUpdatedPayload,
+  type TikTokEventsDeletedPayload,
+  type TikTokEventsUpdatedPayload,
 } from '../internal/events.js';
 export { MarketingModule } from '../internal/marketing.module.js';
 export {
@@ -37,6 +39,7 @@ export {
 } from '../internal/meta-settings.service.js';
 export {
   CONVERSION_MOMENTS,
+  CONVERSION_PLATFORMS,
   CONVERSION_STATUSES,
   META_EVENT_WINDOW_MS,
   clickOf,
@@ -46,6 +49,28 @@ export {
   retryDelayMs,
   type ConversionMomentValue,
   type ConversionOrder,
+  type ConversionPlatformValue,
   type ConversionStatusValue,
   type MetaServerEvent,
 } from '../internal/meta.js';
+export {
+  TikTokEventsClient,
+  type TikTokApiOptions,
+  type TikTokPixel,
+  type TikTokSendResult,
+} from '../internal/tiktok-client.js';
+export {
+  TIKTOK_LIMITS,
+  TikTokEventsService,
+  type TikTokEventsInput,
+  type TikTokEventsRecord,
+  type TikTokPixelSettings,
+} from '../internal/tiktok-settings.service.js';
+export {
+  tiktokClickOf,
+  tiktokEvent,
+  tiktokEventName,
+  tiktokUser,
+  type TikTokEvent,
+  type TikTokUser,
+} from '../internal/tiktok.js';

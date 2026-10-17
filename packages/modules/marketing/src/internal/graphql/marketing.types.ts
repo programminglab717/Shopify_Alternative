@@ -44,7 +44,8 @@ registerEnumType(ConversionStatus, {
     SENT: { description: 'The platform took it.' },
     FAILED: { description: 'The platform refused it, for good: `error` says why.' },
     EXPIRED: {
-      description: 'Too old for the platform by the time it could go: Meta takes seven days.',
+      description:
+        'Too old for the platform by the time it could go: Meta and TikTok take seven days.',
     },
     SKIPPED: {
       description:
@@ -55,6 +56,7 @@ registerEnumType(ConversionStatus, {
 
 export enum ConversionPlatform {
   META = 'META',
+  TIKTOK = 'TIKTOK',
 }
 
 registerEnumType(ConversionPlatform, {
@@ -62,6 +64,7 @@ registerEnumType(ConversionPlatform, {
   description: 'An ad platform orders go to.',
   valuesMap: {
     META: { description: "Meta's conversions API, for Facebook's and Instagram's ads." },
+    TIKTOK: { description: "TikTok's Events API, for TikTok's ads (ADR-541)." },
   },
 });
 
@@ -144,6 +147,84 @@ export class MetaConversionsDeletePayload {
     description: "The dataset's ID that was connected; null when none was.",
   })
   deletedPixelId!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType({
+  description:
+    "The shop's TikTok pixel, which its orders placed through checkout go to through TikTok's " +
+    'Events API as they are placed, confirmed and delivered (MKT-10, ADR-541).',
+})
+export class TikTokEvents {
+  @Field({ description: "The pixel's code, as TikTok's Events Manager shows it." })
+  pixelCode!: string;
+
+  @Field({ description: 'The last four characters of its access token, never shown again.' })
+  accessTokenHint!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "Events Manager's code for test events: while it is set, Events Manager shows the " +
+      "shop's events among them as they come.",
+  })
+  testEventCode!: string | null;
+
+  @Field(() => ConversionMoment, {
+    description:
+      "Which moment of an order is TikTok's CompletePayment; the others go as PlaceAnOrder, " +
+      'OrderConfirmed and OrderDelivered. DELIVERED counts only the sales that turned out.',
+  })
+  purchaseAt!: ConversionMoment;
+
+  @Field(() => GraphQLISODateTime)
+  updatedAt!: Date;
+}
+
+@InputType()
+export class TikTokEventsInput {
+  @Field(() => String, {
+    nullable: true,
+    description: "The pixel's code, from TikTok's Events Manager: needed to connect.",
+  })
+  pixelCode?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'An access token Events Manager made for the Events API: needed to connect, kept sealed, ' +
+      'and never shown again.',
+  })
+  accessToken?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description: "Events Manager's code for test events; blank or null takes it away.",
+  })
+  testEventCode?: string | null;
+
+  @Field(() => ConversionMoment, { nullable: true, description: 'PLACED unless set.' })
+  purchaseAt?: ConversionMoment | null;
+}
+
+@ObjectType()
+export class TikTokEventsUpdatePayload {
+  @Field(() => TikTokEvents, { nullable: true })
+  tiktokEvents!: TikTokEvents | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class TikTokEventsDeletePayload {
+  @Field(() => String, {
+    nullable: true,
+    description: "The pixel's code that was connected; null when none was.",
+  })
+  deletedPixelCode!: string | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];
@@ -235,6 +316,12 @@ export class ConversionEventsArgs {
 
   @Field(() => ConversionStatus, { nullable: true, description: 'Those of this status alone.' })
   status?: ConversionStatus | null;
+
+  @Field(() => ConversionPlatform, {
+    nullable: true,
+    description: 'Those of this platform alone (ADR-541).',
+  })
+  platform?: ConversionPlatform | null;
 
   @Field(() => ID, { nullable: true, description: "This order's alone." })
   orderId?: string | null;

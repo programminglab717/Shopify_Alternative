@@ -37,6 +37,7 @@ export interface ConversionsListOptions {
   /** The last one of the page before: the next page starts after it. */
   after: { id: string; createdAt: string } | null;
   status?: ConversionStatusValue | null;
+  platform?: ConversionPlatformValue | null;
   orderId?: string | null;
 }
 
@@ -91,17 +92,23 @@ export class ConversionsService {
   constructor(private readonly db: Database) {}
 
   /**
-   * Records an order's placing, once, for each platform its shop has connected: how many it was
-   * recorded for.
+   * Records an order's placing, once, for each platform its shop has connected, Meta's and
+   * TikTok's (ADR-541): how many it was recorded for.
    */
   async recordPlaced(shopId: string, orderId: string, occurredAt: Date): Promise<number> {
     return this.db.tenant(shopId, async (tx) => {
       const { rows } = await tx.execute<{ id: string }>(sql`
         INSERT INTO marketing.conversions (shop_id, platform, order_id, moment, occurred_at)
-        SELECT shop_id, 'meta', ${orderId}, 'placed', ${occurredAt.toISOString()}
+        SELECT shop_id, 'meta', ${orderId}::uuid, 'placed',
+               ${occurredAt.toISOString()}::timestamptz
           FROM marketing.meta_settings
          -- The pixel alone, without a token, sends to no conversions API (ADR-531).
          WHERE shop_id = ${shopId} AND access_token IS NOT NULL
+         UNION ALL
+        SELECT shop_id, 'tiktok', ${orderId}::uuid, 'placed',
+               ${occurredAt.toISOString()}::timestamptz
+          FROM marketing.tiktok_settings
+         WHERE shop_id = ${shopId}
             ON CONFLICT DO NOTHING
         RETURNING id`);
       return rows.length;
@@ -227,7 +234,7 @@ export class ConversionsService {
     tenant: TenantContext,
     options: ConversionsListOptions,
   ): Promise<Page<ConversionRecord>> {
-    const { after, status, orderId } = options;
+    const { after, status, platform, orderId } = options;
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<ConversionRow>(sql`
         SELECT id, platform, order_id, moment, occurred_at, status, event_name, attempts, sent_at,
@@ -235,6 +242,7 @@ export class ConversionsService {
           FROM marketing.conversions
          WHERE shop_id = ${tenant.shopId}
            ${status ? sql`AND status = ${status}` : sql``}
+           ${platform ? sql`AND platform = ${platform}` : sql``}
            ${orderId ? sql`AND order_id = ${orderId}` : sql``}
            ${
              after

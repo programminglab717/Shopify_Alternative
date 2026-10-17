@@ -33,6 +33,8 @@ import {
   ConversionsService,
   MetaConversionsClient,
   MetaConversionsService,
+  TikTokEventsClient,
+  TikTokEventsService,
 } from '@hatti/marketing/public';
 import {
   AutomationsService,
@@ -617,6 +619,8 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           baseUrl: config.META_GRAPH_URL,
           version: config.META_GRAPH_VERSION,
         }),
+        tiktok: new TikTokEventsService(database, config.ENCRYPTION_KEYS),
+        tiktokClient: new TikTokEventsClient({ baseUrl: config.TIKTOK_API_URL }),
         storefronts: new StorefrontSite(config.STOREFRONT_URL ?? 'http://localhost:4100'),
         logger,
       }).start(config.CONVERSIONS_INTERVAL_MS);

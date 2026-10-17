@@ -18,7 +18,7 @@ export const CONVERSION_STATUSES = ['pending', 'sent', 'failed', 'expired', 'ski
 export type ConversionStatusValue = (typeof CONVERSION_STATUSES)[number];
 
 /** The platforms a shop connects. */
-export const CONVERSION_PLATFORMS = ['meta'] as const;
+export const CONVERSION_PLATFORMS = ['meta', 'tiktok'] as const;
 export type ConversionPlatformValue = (typeof CONVERSION_PLATFORMS)[number];
 
 /** The names a moment goes by when it is not the shop's Purchase. */

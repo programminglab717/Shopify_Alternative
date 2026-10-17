@@ -2475,12 +2475,15 @@ enum ConversionMoment {
 enum ConversionPlatform {
   """Meta's conversions API, for Facebook's and Instagram's ads."""
   META
+
+  """TikTok's Events API, for TikTok's ads (ADR-541)."""
+  TIKTOK
 }
 
 """How sending a moment to an ad platform went."""
 enum ConversionStatus {
   """
-  Too old for the platform by the time it could go: Meta takes seven days.
+  Too old for the platform by the time it could go: Meta and TikTok take seven days.
   """
   EXPIRED
 
@@ -8395,6 +8398,16 @@ type Mutation {
   themePublish(id: ID!): ThemePublishPayload!
 
   """
+  Disconnects the shop's TikTok pixel: its token is forgotten, and moments still waiting are not sent.
+  """
+  tiktokEventsDelete: TikTokEventsDeletePayload!
+
+  """
+  Connects the shop's TikTok pixel, or changes how its orders go to it (ADR-541): from then on, each order placed through checkout goes to TikTok's Events API as it is placed, confirmed and delivered, its customer's details hashed. Audited, the token never. Staff confirm who they are first when they signed in over 15 minutes ago.
+  """
+  tiktokEventsUpdate(input: TikTokEventsInput!): TikTokEventsUpdatePayload!
+
+  """
   AI drafts of a resource's fields in a language (CAT-07, ADR-463): those named, or all with words. Nothing is kept: the shop checks each and keeps it through translationsRegister with its digest. A hundred a day per shop.
   """
   translationsDraft(keys: [String!], locale: String!, resourceId: ID!): TranslationsDraftPayload!
@@ -12183,6 +12196,9 @@ type Query {
     """This order's alone."""
     orderId: ID
 
+    """Those of this platform alone (ADR-541)."""
+    platform: ConversionPlatform
+
     """Those of this status alone."""
     status: ConversionStatus
   ): ConversionEventConnection!
@@ -13000,6 +13016,11 @@ type Query {
     """Only themes with these roles."""
     roles: [ThemeRole!]
   ): OnlineStoreThemeConnection!
+
+  """
+  The shop's TikTok pixel its orders go to (MKT-10); null until it connects one.
+  """
+  tiktokEvents: TikTokEvents
 
   """
   A product, collection, page, blog, article, menu, menu item, policy, product option or option value of the shop, or the shop itself, by its ID, with its fields that may be translated and their translations (ADR-238).
@@ -15152,6 +15173,55 @@ enum ThemeRole {
 
   """Being prepared, or shown before; publish it to show it."""
   UNPUBLISHED
+}
+
+"""
+The shop's TikTok pixel, which its orders placed through checkout go to through TikTok's Events API as they are placed, confirmed and delivered (MKT-10, ADR-541).
+"""
+type TikTokEvents {
+  """The last four characters of its access token, never shown again."""
+  accessTokenHint: String!
+
+  """The pixel's code, as TikTok's Events Manager shows it."""
+  pixelCode: String!
+
+  """
+  Which moment of an order is TikTok's CompletePayment; the others go as PlaceAnOrder, OrderConfirmed and OrderDelivered. DELIVERED counts only the sales that turned out.
+  """
+  purchaseAt: ConversionMoment!
+
+  """
+  Events Manager's code for test events: while it is set, Events Manager shows the shop's events among them as they come.
+  """
+  testEventCode: String
+  updatedAt: DateTime!
+}
+
+type TikTokEventsDeletePayload {
+  """The pixel's code that was connected; null when none was."""
+  deletedPixelCode: String
+  userErrors: [UserError!]!
+}
+
+input TikTokEventsInput {
+  """
+  An access token Events Manager made for the Events API: needed to connect, kept sealed, and never shown again.
+  """
+  accessToken: String
+
+  """The pixel's code, from TikTok's Events Manager: needed to connect."""
+  pixelCode: String
+
+  """PLACED unless set."""
+  purchaseAt: ConversionMoment
+
+  """Events Manager's code for test events; blank or null takes it away."""
+  testEventCode: String
+}
+
+type TikTokEventsUpdatePayload {
+  tiktokEvents: TikTokEvents
+  userErrors: [UserError!]!
 }
 
 """A parcel's courier and tracking number."""

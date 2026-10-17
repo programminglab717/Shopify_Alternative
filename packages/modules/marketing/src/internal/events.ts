@@ -4,6 +4,8 @@
 export const MarketingEvents = {
   MetaConversionsUpdated: 'meta_conversions.updated',
   MetaConversionsDeleted: 'meta_conversions.deleted',
+  TikTokEventsUpdated: 'tiktok_events.updated',
+  TikTokEventsDeleted: 'tiktok_events.deleted',
 } as const;
 
 /** The shop connected its Meta dataset, or changed how its orders go to it. */
@@ -17,6 +19,21 @@ export interface MetaConversionsUpdatedPayload {
 /** The shop disconnected its Meta dataset: its orders go to Meta no more. */
 export interface MetaConversionsDeletedPayload {
   pixelId: string;
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/** The shop connected its TikTok pixel, or changed how its orders go to it (ADR-541). */
+export interface TikTokEventsUpdatedPayload {
+  /** What changed: "pixelCode", "accessToken", "testEventCode" or "purchaseAt". */
+  changed: string[];
+  actorKind: 'app' | 'staff';
+  actorId: string;
+}
+
+/** The shop disconnected its TikTok pixel: its orders go to TikTok no more. */
+export interface TikTokEventsDeletedPayload {
+  pixelCode: string;
   actorKind: 'app' | 'staff';
   actorId: string;
 }

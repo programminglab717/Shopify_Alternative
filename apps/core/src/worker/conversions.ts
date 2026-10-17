@@ -7,11 +7,17 @@ import {
   META_EVENT_WINDOW_MS,
   MetaConversionsClient,
   MetaConversionsService,
+  TikTokEventsClient,
+  TikTokEventsService,
   metaEvent,
   retryDelayMs,
+  tiktokEvent,
+  type ClaimedConversion,
   type ConversionOrder,
   type ConversionOutcome,
+  type ConversionPlatformValue,
   type MetaServerEvent,
+  type TikTokEvent,
 } from '@hatti/marketing/public';
 import type { CurrencyCode } from '@hatti/money';
 import { shopDomainsOf } from '@hatti/online-store/public';
@@ -107,15 +113,37 @@ export interface ConversionsSenderOptions {
   meta: MetaConversionsService;
   orders: ConversionOrders;
   client: MetaConversionsClient;
+  /** The shop's TikTok pixel, and the client its events go to TikTok by (ADR-541). */
+  tiktok: TikTokEventsService;
+  tiktokClient: TikTokEventsClient;
   /** Where the shops' storefronts answer: the address events name. */
   storefronts: StorefrontSite;
   database: Database;
   logger?: Logger;
 }
 
+/** What a platform's request said, as the sender settles its moments by it. */
+type PlatformResult =
+  | { ok: true; traceId: string | null }
+  | { ok: false; retry: boolean; message: string; traceId: string | null };
+
+/** A platform the sender sends to, as the shop connected it. */
+interface PlatformSender {
+  /** Its name, as what is said of it reads. */
+  name: string;
+  /** The event of an order's moment, and the name it goes by. */
+  eventOf(
+    order: ConversionOrder,
+    conversion: ClaimedConversion,
+    sourceUrl: string,
+  ): { event: unknown; name: string };
+  send(events: unknown[]): Promise<PlatformResult>;
+}
+
 /**
- * Sends the moments due to Meta's conversions API (ADR-143), a shop at a time, a hundred in a
- * request: each as a server event, its order as it is when sent. Those Meta cannot take yet are
+ * Sends the moments due to the ad platforms shops connect, a shop at a time, a hundred in a
+ * request: to Meta's conversions API as server events (ADR-143), and to TikTok's Events API as
+ * web events (ADR-541), each its order as it is when sent. Those a platform cannot take yet are
  * tried again later, a minute after the first try and doubling to six hours, while they are new
  * enough to go; those it refuses for good are failed, with what it said.
  */
@@ -137,19 +165,23 @@ export class ConversionsSender {
     return sent;
   }
 
-  /** Sends the shop's moments due at `at`, up to a request's worth. How many went. */
+  /** Sends the shop's moments due at `at`, up to a request's worth for each platform. How many went. */
   async send(shopId: string, at: Date): Promise<number> {
-    const { conversions, meta, orders, client, logger } = this.options;
+    const { conversions, orders } = this.options;
     const claimed = await conversions.claim(shopId, at, BATCH, LEASE_MS);
     if (claimed.length === 0) return 0;
-    const dataset = await meta.datasetOf(shopId);
     const outcomes: ConversionOutcome[] = [];
+    const senders = new Map<ConversionPlatformValue, PlatformSender | null>();
+    for (const platform of new Set(claimed.map((conversion) => conversion.platform))) {
+      senders.set(platform, await this.#senderOf(shopId, platform));
+    }
     const live = claimed.filter((conversion) => {
-      if (!dataset) {
+      const sender = senders.get(conversion.platform);
+      if (!sender) {
         outcomes.push({
           id: conversion.id,
           status: 'skipped',
-          error: 'Not sent: the shop disconnected Meta',
+          error: `Not sent: the shop disconnected ${PLATFORM_NAMES[conversion.platform]}`,
         });
         return false;
       }
@@ -157,14 +189,14 @@ export class ConversionsSender {
         outcomes.push({
           id: conversion.id,
           status: 'expired',
-          error: 'Not sent: Meta takes events up to seven days after they happened',
+          error: `Not sent: ${sender.name} takes events up to seven days after they happened`,
         });
         return false;
       }
       return true;
     });
 
-    if (dataset && live.length > 0) {
+    if (live.length > 0) {
       const facts = new Map(
         (
           await orders.factsOf(
@@ -174,7 +206,10 @@ export class ConversionsSender {
         ).map((order) => [order.id, order]),
       );
       const sourceUrl = `${await this.#storefrontOf(shopId)}/checkout`;
-      const sending: { id: string; attempts: number; event: MetaServerEvent }[] = [];
+      const sending = new Map<
+        ConversionPlatformValue,
+        { id: string; attempts: number; event: unknown; name: string }[]
+      >();
       for (const conversion of live) {
         const order = facts.get(conversion.orderId);
         if (!order || order.erased) {
@@ -187,30 +222,25 @@ export class ConversionsSender {
           });
           continue;
         }
-        sending.push({
-          id: conversion.id,
-          attempts: conversion.attempts,
-          event: metaEvent(toConversionOrder(order), conversion, {
-            purchaseAt: dataset.purchaseAt,
-            sourceUrl,
-          }),
-        });
+        const sender = senders.get(conversion.platform)!;
+        const { event, name } = sender.eventOf(toConversionOrder(order), conversion, sourceUrl);
+        const each = sending.get(conversion.platform) ?? [];
+        each.push({ id: conversion.id, attempts: conversion.attempts, event, name });
+        sending.set(conversion.platform, each);
       }
-      if (sending.length > 0) {
-        const result = await client.send(
-          dataset,
-          sending.map((each) => each.event),
-        );
+      for (const [platform, each] of sending) {
+        const sender = senders.get(platform)!;
+        const result = await sender.send(each.map((one) => one.event));
         if (!result.ok) {
-          logger?.warn(
-            { shopId, events: sending.length, retry: result.retry, traceId: result.traceId },
-            `Meta refused conversions: ${result.message}`,
+          this.options.logger?.warn(
+            { shopId, platform, events: each.length, retry: result.retry, traceId: result.traceId },
+            `${sender.name} refused conversions: ${result.message}`,
           );
         }
-        for (const { id, attempts, event } of sending) {
+        for (const { id, attempts, name } of each) {
           outcomes.push(
             result.ok
-              ? { id, status: 'sent', eventName: event.event_name, traceId: result.traceId }
+              ? { id, status: 'sent', eventName: name, traceId: result.traceId }
               : result.retry
                 ? {
                     id,
@@ -222,7 +252,7 @@ export class ConversionsSender {
                 : {
                     id,
                     status: 'failed',
-                    eventName: event.event_name,
+                    eventName: name,
                     error: result.message,
                     traceId: result.traceId,
                   },
@@ -243,6 +273,52 @@ export class ConversionsSender {
     );
   }
 
+  /** The platform as the shop connected it, to send its moments to; null if it is not. */
+  async #senderOf(
+    shopId: string,
+    platform: ConversionPlatformValue,
+  ): Promise<PlatformSender | null> {
+    const { meta, client, tiktok, tiktokClient } = this.options;
+    if (platform === 'meta') {
+      const dataset = await meta.datasetOf(shopId);
+      if (!dataset) return null;
+      return {
+        name: 'Meta',
+        eventOf: (order, conversion, sourceUrl) => {
+          const event = metaEvent(order, conversion, {
+            purchaseAt: dataset.purchaseAt,
+            sourceUrl,
+          });
+          return { event, name: event.event_name };
+        },
+        send: (events) => client.send(dataset, events as MetaServerEvent[]),
+      };
+    }
+    const pixel = await tiktok.pixelOf(shopId);
+    if (!pixel) return null;
+    return {
+      name: 'TikTok',
+      eventOf: (order, conversion, sourceUrl) => {
+        const event = tiktokEvent(order, conversion, {
+          purchaseAt: pixel.purchaseAt,
+          sourceUrl,
+        });
+        return { event, name: event.event };
+      },
+      send: async (events) => {
+        const result = await tiktokClient.send(pixel, events as TikTokEvent[]);
+        return result.ok
+          ? { ok: true, traceId: result.requestId }
+          : {
+              ok: false,
+              retry: result.retry,
+              message: result.message,
+              traceId: result.requestId,
+            };
+      },
+    };
+  }
+
   /** The shop's storefront address: its primary domain, else its handle's subdomain. */
   async #storefrontOf(shopId: string): Promise<string> {
     const { database, storefronts } = this.options;
@@ -254,7 +330,13 @@ export class ConversionsSender {
   }
 }
 
-/** An order's facts as Meta hears of them: the visits that brought its customer, the last first. */
+/** The platforms' names, as what is said of their moments reads. */
+const PLATFORM_NAMES: Readonly<Record<ConversionPlatformValue, string>> = {
+  meta: 'Meta',
+  tiktok: 'TikTok',
+};
+
+/** An order's facts as the ad platforms hear of them: the visits that brought its customer, the last first. */
 function toConversionOrder(order: OrderConversionFacts): ConversionOrder {
   const visits = order.attribution ? [order.attribution.last, order.attribution.first] : [];
   return {
