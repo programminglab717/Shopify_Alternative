@@ -493,6 +493,24 @@ registerEnumType(AdSpendPlatform, {
   },
 });
 
+export enum AdSpendSource {
+  MANUAL = 'MANUAL',
+  META = 'META',
+}
+
+registerEnumType(AdSpendSource, {
+  name: 'AdSpendSource',
+  description: "Where a day's ad spend came from (ADR-564).",
+  valuesMap: {
+    MANUAL: { description: 'The shop typed it.' },
+    META: {
+      description:
+        "Pulled from Meta's Marketing API, from the ad account the shop connected: typing over " +
+        'it makes it MANUAL.',
+    },
+  },
+});
+
 @ObjectType({
   description:
     "What a shop spent on one platform's ads on a day, or on one campaign of them (ADR-553).",
@@ -513,6 +531,9 @@ export class AdSpendEntry {
 
   @Field(() => Money)
   amount!: Money;
+
+  @Field(() => AdSpendSource)
+  source!: AdSpendSource;
 }
 
 @InputType({ description: "One day's ad spend: an amount of 0 takes it away." })
@@ -539,6 +560,96 @@ export class AdSpendInput {
 export class AdSpendSetPayload {
   @Field(() => Int, { nullable: true, description: 'How many were recorded; null when refused.' })
   count!: number | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType({
+  description:
+    "The shop's Meta ad account, whose spend the worker pulls from Meta's Marketing API every few " +
+    'hours, by day and campaign, for the sales report (MKT-12, ADR-564).',
+})
+export class MetaAdAccount {
+  @Field({ description: 'Its ID, as Ads Manager shows it without "act_".' })
+  adAccountId!: string;
+
+  @Field({ description: 'Its name at Meta when it was connected.' })
+  name!: string;
+
+  @Field({ description: "What it bills in: the shop's currency." })
+  currency!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The time zone Meta reports its days in, as Asia/Karachi: each is kept as the shop's day " +
+      'of that date.',
+  })
+  timezone!: string | null;
+
+  @Field({ description: 'The last four characters of its access token, never shown again.' })
+  accessTokenHint!: string;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When its spend was last pulled; null before the first time.',
+  })
+  lastSyncedAt!: Date | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'Why the last pull failed, as Meta said: the worker tries again next time. Null when it ' +
+      'went through.',
+  })
+  lastError!: string | null;
+
+  @Field(() => GraphQLISODateTime)
+  updatedAt!: Date;
+}
+
+@InputType()
+export class MetaAdAccountConnectInput {
+  @Field({ description: 'Its ID, from Ads Manager: "act_123456789" or its digits.' })
+  adAccountId!: string;
+
+  @Field({
+    description:
+      "An access token with ads_read on the ad account, as a system user's in Business " +
+      'Settings: kept sealed, and never shown again.',
+  })
+  accessToken!: string;
+}
+
+@ObjectType()
+export class MetaAdAccountConnectPayload {
+  @Field(() => MetaAdAccount, { nullable: true })
+  metaAdAccount!: MetaAdAccount | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class MetaAdAccountDisconnectPayload {
+  @Field(() => String, {
+    nullable: true,
+    description: "The ad account's ID that was connected; null when none was.",
+  })
+  deletedAdAccountId!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class MetaAdSpendSyncPayload {
+  @Field(() => MetaAdAccount, {
+    nullable: true,
+    description: 'The ad account after the pull: lastError says if it failed.',
+  })
+  metaAdAccount!: MetaAdAccount | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

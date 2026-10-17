@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-563 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-564 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -571,6 +571,7 @@
 | 561 | The admin's Help page shows a request asked on WhatsApp with its thread, the answer once with how it went on WhatsApp, and says the shop can write there too | Accepted |
 | 562 | A sales-tax-registered shop reports its invoices through FBR's digital invoicing instead of the POS integration, by the same worker, its credit notes left to its return | Accepted |
 | 563 | The admin's FBR card connects a shop through FBR's digital invoicing or its POS integration, chosen from the shop's tax profile, and switches between them with a new token | Accepted |
+| 564 | A shop connects its Meta ad account and the worker pulls each day's spend by campaign, what the shop typed by hand kept over what Meta says | Accepted |
 
 ---
 
@@ -21087,3 +21088,29 @@
 * **Consequences:** A registered seller sets up digital invoicing without the API.
 * **Alternatives:** **A card for each way:** a shop reports one way at a time, and the token,
   environment and invoices are shared.
+
+## ADR-564 · A shop connects its Meta ad account and the worker pulls each day's spend by campaign, what the shop typed by hand kept over what Meta says
+
+* **Context:** A shop records its ad spend by hand, a day at a time (ADR-553, ADR-554), and most
+  Pakistani shops spend it on Meta, which reports it campaign by campaign.
+* **Decision:**
+  * **The ad account:** a shop on a plan with true profit gives its Meta ad account's ID and a
+    token that may read its ads, checked with Meta as it is saved, sealed, with its last four
+    shown; an account billing in another currency than rupees is refused, as the shop's spend is
+    recorded in rupees. Connecting and disconnecting are audited; disconnecting keeps what was
+    pulled.
+  * **Pulling:** the worker asks Meta, every three hours by default, for each connected shop's
+    spend by campaign and day, the last seven days, as Meta revises recent days, and thirty on the
+    first pull; it is pulled at once on connecting, and the shop may pull again once a minute.
+    Each day is Meta's, in the ad account's time zone, which Pakistani accounts share with their
+    shops. Spend is kept to the paisa, a campaign under its name as Meta has it.
+  * **Typed by hand wins:** each day's spend says where it came from. A pull replaces what was
+    pulled before for its days, and leaves alone a campaign's day, or Meta's whole day, that the
+    shop typed; typing over a pulled day makes it the shop's.
+  * **Failing:** a token refused, Meta's limits or Meta down are kept as the account's last error,
+    and the next round tries again; nothing pulled before is lost.
+* **Consequences:** True profit and the return on ad spend follow Meta's figures without typing.
+  TikTok and Google are still typed by hand.
+* **Alternatives:** **Pulling through the conversions API's settings:** their token sends events,
+  and reading ad spend needs another permission, often another token. **Meta's figures over the
+  shop's:** a shop types a day by hand to correct it, or to add what Meta does not see.

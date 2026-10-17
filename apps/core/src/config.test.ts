@@ -482,6 +482,8 @@ describe('Worker configuration', () => {
       META_GRAPH_URL: 'https://graph.facebook.com',
       META_GRAPH_VERSION: 'v26.0',
       CONVERSIONS_INTERVAL_MS: 15_000,
+      // Shops' spend pulled from their Meta ad accounts every three hours (ADR-564).
+      AD_SPEND_SYNC_INTERVAL_MS: 10_800_000,
       // Tier-1 shops' invoices go to FBR's IMS, or its sandbox (ADR-555).
       FBR_POS_URL: 'https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData',
       FBR_POS_SANDBOX_URL: 'https://esp.fbr.gov.pk:8244/FBR/v1/api/Live/PostData',
@@ -496,6 +498,13 @@ describe('Worker configuration', () => {
     expect(keyed.ENCRYPTION_KEYS).toBeInstanceOf(SecretBox);
     expect(() => loadWorkerConfig({ ...worker, META_GRAPH_VERSION: '26' })).toThrow(
       'META_GRAPH_VERSION: Expected a Graph API version, like v26.0',
+    );
+    expect(
+      loadWorkerConfig({ ...worker, AD_SPEND_SYNC_INTERVAL_MS: '3600000' })
+        .AD_SPEND_SYNC_INTERVAL_MS,
+    ).toBe(3_600_000);
+    expect(() => loadWorkerConfig({ ...worker, AD_SPEND_SYNC_INTERVAL_MS: '1000' })).toThrow(
+      'AD_SPEND_SYNC_INTERVAL_MS',
     );
     expect(() => loadWorkerConfig({ ...worker, ...R2, NODE_ENV: 'production' })).toThrow(
       "STOREFRONT_URL: Required in production: conversions name shops' storefronts there",

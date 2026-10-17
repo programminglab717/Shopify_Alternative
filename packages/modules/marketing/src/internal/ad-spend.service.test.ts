@@ -87,8 +87,14 @@ describe.skipIf(!server)("A shop's ad spend (MKT-12, ADR-553)", () => {
     );
     unwrap(await spend.set(b, [{ platform: 'meta', day: '2026-10-15', amount: '99' }], NOW));
     expect(unwrap(await spend.list(a, '2026-10-01', '2026-10-31'))).toEqual([
-      { platform: 'meta', day: '2026-10-15', campaign: null, amount: 1_500_00n },
-      { platform: 'meta', day: '2026-10-15', campaign: 'eid-sale', amount: 2_500_00n },
+      { platform: 'meta', day: '2026-10-15', campaign: null, amount: 1_500_00n, source: 'manual' },
+      {
+        platform: 'meta',
+        day: '2026-10-15',
+        campaign: 'eid-sale',
+        amount: 2_500_00n,
+        source: 'manual',
+      },
     ]);
     expect(unwrap(await spend.list(a, '2026-10-16', '2026-10-31'))).toEqual([]);
   });

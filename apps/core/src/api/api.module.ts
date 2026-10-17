@@ -26,7 +26,7 @@ import { TrustModule } from '@hatti/trust/public';
 import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
 import { InventoryCopiedVariantStock, InventoryModule } from '@hatti/inventory/public';
 import { type Couriers, LogisticsModule } from '@hatti/logistics/public';
-import { MarketingModule } from '@hatti/marketing/public';
+import { MarketingModule, type MetaGraphOptions } from '@hatti/marketing/public';
 import {
   MessagingModule,
   type SupportLineSettings,
@@ -111,6 +111,11 @@ export interface ApiModuleOptions {
    * them, replies are refused.
    */
   whatsAppReplies?: WhatsAppReplySettings | null;
+  /**
+   * Meta's Graph API, which shops' ad accounts are checked on and their spend pulled from
+   * (ADR-564); https://graph.facebook.com at v26.0 unless given.
+   */
+  metaGraph?: MetaGraphOptions;
   /** Hatti's VAPID keys (ADR-506); without them, nothing is pushed to staff's browsers. */
   push?: VapidKeys | null;
   /** Asks DNS whether shops' own domains point at the platform; the system's resolvers unless given. */
@@ -260,7 +265,12 @@ export class ApiModule {
         FilesModule,
         TaxModule,
         TrustModule,
-        MarketingModule,
+        MarketingModule.forRoot({
+          metaGraph: options.metaGraph ?? {
+            baseUrl: 'https://graph.facebook.com',
+            version: 'v26.0',
+          },
+        }),
         AppsModule,
         MessagingModule.forRoot({
           whatsapp: options.whatsapp ?? null,

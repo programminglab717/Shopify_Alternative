@@ -33,6 +33,8 @@ import {
   ConversionsService,
   GoogleAnalyticsClient,
   GoogleAnalyticsService,
+  MetaAdAccountService,
+  MetaAdsClient,
   MetaConversionsClient,
   MetaConversionsService,
   TikTokEventsClient,
@@ -102,6 +104,7 @@ import {
   FbrPosService,
   FiscalInvoicesService,
 } from '@hatti/tax/public';
+import { AdSpendSync } from './ad-spend-sync.js';
 import { ConversionMoments, ConversionsSender, workerConversionOrders } from './conversions.js';
 import { FiscalReporter } from './fiscal-reports.js';
 import { CourierBookings } from './courier-bookings.js';
@@ -646,6 +649,16 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         logger,
       }).start(config.CONVERSIONS_INTERVAL_MS);
       closers.push(() => conversions.stop());
+      // Shops' ad spend pulled from the Meta ad accounts they connected (ADR-564).
+      const adSpend = new AdSpendSync(
+        new MetaAdAccountService(
+          database,
+          config.ENCRYPTION_KEYS,
+          new MetaAdsClient({ baseUrl: config.META_GRAPH_URL, version: config.META_GRAPH_VERSION }),
+        ),
+        logger,
+      ).start(config.AD_SPEND_SYNC_INTERVAL_MS);
+      closers.push(() => adSpend.stop());
       // Shops' invoices reported to FBR from the POS each connected (ADR-555), or through
       // digital invoicing (ADR-562).
       const fiscal = new FiscalReporter({
@@ -706,9 +719,9 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       closers.push(() => winBacks.stop());
     } else {
       logger.warn(
-        'ENCRYPTION_KEYS is not set: no conversions go to the ad platforms, no invoices to FBR, ' +
-          'no orders are booked with couriers, no payments are asked after, and no broadcasts ' +
-          'are sent',
+        'ENCRYPTION_KEYS is not set: no conversions go to the ad platforms, no ad spend is ' +
+          'pulled from Meta, no invoices go to FBR, no orders are booked with couriers, no ' +
+          'payments are asked after, and no broadcasts are sent',
       );
     }
     // Each message is paid for from its shop's credit as it goes (ADR-155).

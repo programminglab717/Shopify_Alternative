@@ -105,6 +105,7 @@ type AdSpendEntry {
   """The day in the shop's time zone, as 2026-10-17."""
   day: String!
   platform: AdSpendPlatform!
+  source: AdSpendSource!
 }
 
 """One day's ad spend: an amount of 0 takes it away."""
@@ -141,6 +142,17 @@ type AdSpendSetPayload {
   """How many were recorded; null when refused."""
   count: Int
   userErrors: [UserError!]!
+}
+
+"""Where a day's ad spend came from (ADR-564)."""
+enum AdSpendSource {
+  """The shop typed it."""
+  MANUAL
+
+  """
+  Pulled from Meta's Marketing API, from the ad account the shop connected: typing over it makes it MANUAL.
+  """
+  META
 }
 
 """
@@ -7254,6 +7266,64 @@ type MessagingSettingsUpdatePayload {
 }
 
 """
+The shop's Meta ad account, whose spend the worker pulls from Meta's Marketing API every few hours, by day and campaign, for the sales report (MKT-12, ADR-564).
+"""
+type MetaAdAccount {
+  """The last four characters of its access token, never shown again."""
+  accessTokenHint: String!
+
+  """Its ID, as Ads Manager shows it without "act_"."""
+  adAccountId: String!
+
+  """What it bills in: the shop's currency."""
+  currency: String!
+
+  """
+  Why the last pull failed, as Meta said: the worker tries again next time. Null when it went through.
+  """
+  lastError: String
+
+  """When its spend was last pulled; null before the first time."""
+  lastSyncedAt: DateTime
+
+  """Its name at Meta when it was connected."""
+  name: String!
+
+  """
+  The time zone Meta reports its days in, as Asia/Karachi: each is kept as the shop's day of that date.
+  """
+  timezone: String
+  updatedAt: DateTime!
+}
+
+input MetaAdAccountConnectInput {
+  """
+  An access token with ads_read on the ad account, as a system user's in Business Settings: kept sealed, and never shown again.
+  """
+  accessToken: String!
+
+  """Its ID, from Ads Manager: "act_123456789" or its digits."""
+  adAccountId: String!
+}
+
+type MetaAdAccountConnectPayload {
+  metaAdAccount: MetaAdAccount
+  userErrors: [UserError!]!
+}
+
+type MetaAdAccountDisconnectPayload {
+  """The ad account's ID that was connected; null when none was."""
+  deletedAdAccountId: String
+  userErrors: [UserError!]!
+}
+
+type MetaAdSpendSyncPayload {
+  """The ad account after the pull: lastError says if it failed."""
+  metaAdAccount: MetaAdAccount
+  userErrors: [UserError!]!
+}
+
+"""
 The shop's Meta dataset, which its orders placed through checkout go to through Meta's conversions API as they are placed, confirmed and delivered (MKT-10, ADR-143).
 """
 type MetaConversions {
@@ -8088,6 +8158,21 @@ type Mutation {
   Changes how the shop's customers are told about their orders, from the next message: by WhatsApp or SMS, in English or Urdu, and which notifications they get.
   """
   messagingSettingsUpdate(input: MessagingSettingsInput!): MessagingSettingsUpdatePayload!
+
+  """
+  Connects the shop's Meta ad account, in place of any it had, or gives it another token (ADR-564), once Meta says the token reads it and that it bills in the shop's currency: from then on, the worker pulls its spend by day and campaign every few hours, the last week's again each time, and the last 30 days' at once. What the shop typed by hand stays its own. On plans with true profit. Audited, the token never. Staff confirm who they are first when they signed in over 15 minutes ago.
+  """
+  metaAdAccountConnect(input: MetaAdAccountConnectInput!): MetaAdAccountConnectPayload!
+
+  """
+  Disconnects the shop's Meta ad account: its token is forgotten, and no more spend is pulled. What was pulled stays.
+  """
+  metaAdAccountDisconnect: MetaAdAccountDisconnectPayload!
+
+  """
+  Pulls the shop's spend from its Meta ad account now, as the worker does every few hours (ADR-564): at most once a minute.
+  """
+  metaAdSpendSync: MetaAdSpendSyncPayload!
 
   """
   Disconnects the shop's Meta dataset: its token is forgotten, and moments still waiting are not sent.
@@ -13054,6 +13139,11 @@ type Query {
 
   """How the shop's customers are told about their orders."""
   messagingSettings: MessagingSettings!
+
+  """
+  The shop's Meta ad account its spend is pulled from (ADR-564); null until it connects one.
+  """
+  metaAdAccount: MetaAdAccount
 
   """
   The shop's Meta dataset its orders go to (MKT-10); null until it connects one.

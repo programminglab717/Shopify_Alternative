@@ -23,6 +23,7 @@ import type {
   ConversionPlatformValue,
   ConversionStatusValue,
 } from '../meta.js';
+import { MetaAdAccountService, type MetaAdAccountRecord } from '../meta-ad-account.service.js';
 import { MetaConversionsService, type MetaConversionsRecord } from '../meta-settings.service.js';
 import { TikTokEventsService, type TikTokEventsRecord } from '../tiktok-settings.service.js';
 import { GoogleAnalyticsService, type GoogleAnalyticsRecord } from '../google-settings.service.js';
@@ -31,6 +32,7 @@ import {
   AdSpendInput,
   AdSpendPlatform,
   AdSpendSetPayload,
+  AdSpendSource,
   ConversionEvent,
   ConversionEventConnection,
   ConversionEventEdge,
@@ -42,6 +44,11 @@ import {
   GoogleAnalyticsDeletePayload,
   GoogleAnalyticsInput,
   GoogleAnalyticsUpdatePayload,
+  MetaAdAccount,
+  MetaAdAccountConnectInput,
+  MetaAdAccountConnectPayload,
+  MetaAdAccountDisconnectPayload,
+  MetaAdSpendSyncPayload,
   MetaConversions,
   MetaConversionsDeletePayload,
   MetaConversionsInput,
@@ -63,6 +70,7 @@ export class MarketingResolver {
     private readonly conversions: ConversionsService,
     private readonly calendar: MarketingCalendarService,
     private readonly adSpend: AdSpendService,
+    private readonly adAccounts: MetaAdAccountService,
   ) {}
 
   @Query(() => [AdSpendEntry], {
@@ -84,6 +92,7 @@ export class MarketingResolver {
         day: entry.day,
         campaign: entry.campaign,
         amount: Money.from(money(entry.amount, tenant.currency)),
+        source: entry.source === 'meta_api' ? AdSpendSource.META : AdSpendSource.MANUAL,
       }),
     );
   }
@@ -111,6 +120,71 @@ export class MarketingResolver {
     );
     return Object.assign(new AdSpendSetPayload(), {
       count: result.ok ? result.value : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Query(() => MetaAdAccount, {
+    nullable: true,
+    description:
+      "The shop's Meta ad account its spend is pulled from (ADR-564); null until it connects one.",
+  })
+  @RequireScopes('read_pixels')
+  async metaAdAccount(@CurrentTenant() tenant: TenantContext): Promise<MetaAdAccount | null> {
+    const record = await this.adAccounts.get(tenant);
+    return record && toMetaAdAccount(record);
+  }
+
+  @Mutation(() => MetaAdAccountConnectPayload, {
+    description:
+      "Connects the shop's Meta ad account, in place of any it had, or gives it another token " +
+      "(ADR-564), once Meta says the token reads it and that it bills in the shop's currency: " +
+      'from then on, the worker pulls its spend by day and campaign every few hours, the last ' +
+      "week's again each time, and the last 30 days' at once. What the shop typed by hand stays " +
+      'its own. On plans with true profit. Audited, the token never. Staff confirm who they are ' +
+      'first when they signed in over 15 minutes ago.',
+  })
+  @RequireScopes('write_pixels')
+  @RequireRecentAuthentication()
+  async metaAdAccountConnect(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('input') input: MetaAdAccountConnectInput,
+  ): Promise<MetaAdAccountConnectPayload> {
+    const result = await this.adAccounts.connect(tenant, {
+      adAccountId: input.adAccountId,
+      accessToken: input.accessToken,
+    });
+    return Object.assign(new MetaAdAccountConnectPayload(), {
+      metaAdAccount: result.ok ? toMetaAdAccount(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => MetaAdAccountDisconnectPayload, {
+    description:
+      "Disconnects the shop's Meta ad account: its token is forgotten, and no more spend is " +
+      'pulled. What was pulled stays.',
+  })
+  @RequireScopes('write_pixels')
+  async metaAdAccountDisconnect(
+    @CurrentTenant() tenant: TenantContext,
+  ): Promise<MetaAdAccountDisconnectPayload> {
+    return Object.assign(new MetaAdAccountDisconnectPayload(), {
+      deletedAdAccountId: await this.adAccounts.disconnect(tenant),
+      userErrors: [],
+    });
+  }
+
+  @Mutation(() => MetaAdSpendSyncPayload, {
+    description:
+      "Pulls the shop's spend from its Meta ad account now, as the worker does every few hours " +
+      '(ADR-564): at most once a minute.',
+  })
+  @RequireScopes('write_pixels')
+  async metaAdSpendSync(@CurrentTenant() tenant: TenantContext): Promise<MetaAdSpendSyncPayload> {
+    const result = await this.adAccounts.pull(tenant);
+    return Object.assign(new MetaAdSpendSyncPayload(), {
+      metaAdAccount: result.ok ? toMetaAdAccount(result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }
@@ -345,6 +419,19 @@ function toMetaConversions(record: MetaConversionsRecord): MetaConversions {
     accessTokenHint: record.tokenHint,
     testEventCode: record.testEventCode,
     purchaseAt: record.purchaseAt.toUpperCase() as ConversionMoment,
+    updatedAt: record.updatedAt,
+  });
+}
+
+function toMetaAdAccount(record: MetaAdAccountRecord): MetaAdAccount {
+  return Object.assign(new MetaAdAccount(), {
+    adAccountId: record.adAccountId,
+    name: record.name,
+    currency: record.currency,
+    timezone: record.timezone,
+    accessTokenHint: record.tokenHint,
+    lastSyncedAt: record.lastSyncedAt,
+    lastError: record.lastError,
     updatedAt: record.updatedAt,
   });
 }

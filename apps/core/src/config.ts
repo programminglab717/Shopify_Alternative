@@ -96,7 +96,10 @@ const STORAGE_SHARED = {
  * (ADR-165).
  */
 const messageSending = {
-  /** Meta's Graph API, which conversions go to (ADR-143), and the version events go to. */
+  /**
+   * Meta's Graph API, which conversions go to (ADR-143) and shops' ad accounts' spend is read from
+   * (ADR-564), and the version asked.
+   */
   META_GRAPH_URL: env.httpUrl().default('https://graph.facebook.com'),
   META_GRAPH_VERSION: z
     .string()
@@ -642,6 +645,15 @@ const workerSchema = z
     GOOGLE_ANALYTICS_URL: env.httpUrl().default('https://www.google-analytics.com'),
     /** How often the moments of orders due go to the ad platforms. */
     CONVERSIONS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(15_000),
+    /**
+     * How often shops' spend is pulled from the Meta ad accounts they connected (ADR-564): every
+     * three hours, the last week's each time.
+     */
+    AD_SPEND_SYNC_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(60_000)
+      .default(3 * 60 * 60_000),
     /** FBR's IMS, which Tier-1 shops' POS report their invoices to (ADR-555). */
     FBR_POS_URL: env.httpUrl().default('https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData'),
     /** FBR's sandbox of it, for shops trying their POS. */

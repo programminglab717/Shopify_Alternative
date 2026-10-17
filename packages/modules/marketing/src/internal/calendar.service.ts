@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { marketingCalendar, type MarketingDate } from './calendar.js';
 
 /** The day it is at `at` in `timeZone`: YYYY-MM-DD. */
-function dayIn(timeZone: string, at: Date): string {
+export function dayIn(timeZone: string, at: Date): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',

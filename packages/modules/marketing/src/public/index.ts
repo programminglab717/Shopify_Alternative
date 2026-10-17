@@ -2,6 +2,7 @@
 export {
   AD_SPEND_LIMITS,
   AD_SPEND_PLATFORMS,
+  AD_SPEND_SOURCES,
   AdSpendService,
   adSpendByCampaignIn,
   adSpendByPeriodIn,
@@ -9,6 +10,7 @@ export {
   type AdSpendInput,
   type AdSpendPeriod,
   type AdSpendPlatformValue,
+  type AdSpendSourceValue,
 } from '../internal/ad-spend.service.js';
 export {
   ConversionsService,
@@ -28,6 +30,8 @@ export {
 export { MarketingCalendarService } from '../internal/calendar.service.js';
 export {
   MarketingEvents,
+  type MetaAdAccountConnectedPayload,
+  type MetaAdAccountDisconnectedPayload,
   type MetaConversionsDeletedPayload,
   type MetaConversionsUpdatedPayload,
   type GoogleAnalyticsDeletedPayload,
@@ -58,6 +62,23 @@ export {
   type GoogleEventsPayload,
 } from '../internal/google.js';
 export { MarketingModule } from '../internal/marketing.module.js';
+export {
+  META_AD_SPEND_DAYS,
+  META_AD_SPEND_PULL_GAP_MS,
+  MetaAdAccountService,
+  type MetaAdAccountInput,
+  type MetaAdAccountRecord,
+  type MetaAdSpendPull,
+} from '../internal/meta-ad-account.service.js';
+export {
+  META_INSIGHTS_PAGES,
+  MetaAdsClient,
+  adAccountIdOf,
+  spendMinor,
+  type MetaAdAccountFacts,
+  type MetaAdsResult,
+  type MetaCampaignDay,
+} from '../internal/meta-ad-spend.js';
 export {
   MetaConversionsClient,
   type MetaDataset,

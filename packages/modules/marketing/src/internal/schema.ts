@@ -52,6 +52,28 @@ export const googleSettings = marketingSchema.table('google_settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** The shop's Meta ad account, whose spend is pulled from Meta's Marketing API (ADR-564). */
+export const metaAdAccounts = marketingSchema.table('meta_ad_accounts', {
+  shopId: uuid('shop_id').primaryKey(),
+  /** Its digits, without "act_". */
+  adAccountId: text('ad_account_id').notNull(),
+  name: text('name').notNull(),
+  currency: text('currency').notNull(),
+  /** The time zone Meta reports its days in. */
+  timezone: text('timezone'),
+  /** Sealed for the shop alone, and never shown again. */
+  accessToken: text('access_token').notNull(),
+  /** Its last four characters. */
+  tokenHint: text('token_hint').notNull(),
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  /** Why the last pull failed. */
+  lastError: text('last_error'),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Each moment of an order to send to an ad platform, and how sending it went. */
 export const conversions = marketingSchema.table(
   'conversions',
