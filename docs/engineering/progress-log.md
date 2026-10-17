@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### FBR's digital invoicing in the admin
+
+* **The admin's FBR card connects a shop through FBR's digital invoicing or its POS integration,
+  chosen from the shop's tax profile, and switches between them with a new token** ([ADR-563](../architecture/13-decision-log.md#adr-563--the-admins-fbr-card-connects-a-shop-through-fbrs-digital-invoicing-or-its-pos-integration-chosen-from-the-shops-tax-profile-and-switches-between-them-with-a-new-token),
+  TAX-04).
+* 3431 tests, 4 more: connecting through digital invoicing, a shop not
+  registered, a connected shop's view and invoices, and switching both ways.
+
 ### f36d9d7 · FBR's digital invoicing
 
 * **A sales-tax-registered shop reports its invoices through FBR's digital invoicing instead of

@@ -2827,11 +2827,19 @@ export interface TaxSettingsUpdateData {
 export type FbrEnvironment = 'SANDBOX' | 'PRODUCTION';
 
 /**
- * The shop's POS as FBR registered it (POS-04, ADR-555): its token never shown, its last four
- * characters alone.
+ * How a shop reports its invoices to FBR: a Tier-1 retailer's POS reporting to FBR's IMS
+ * (ADR-555), or FBR's digital invoicing, for a seller registered for sales tax (ADR-562).
+ */
+export type FbrSystem = 'POS' | 'DIGITAL_INVOICING';
+
+/**
+ * The shop's connection to FBR (POS-04, ADR-555, ADR-562): its POS as FBR registered it, or FBR's
+ * digital invoicing; its token never shown, its last four characters alone.
  */
 export interface FbrPos {
-  posId: number;
+  system: FbrSystem;
+  /** Null for digital invoicing, which has none. */
+  posId: number | null;
   accessTokenHint: string;
   environment: FbrEnvironment;
   /** 8 digits, "62044200". */
@@ -2848,7 +2856,11 @@ export interface FbrPosUpdateData {
 }
 
 export interface FbrPosDeleteData {
-  fbrPosDelete: { deletedPosId: number | null; userErrors: UserError[] };
+  fbrPosDelete: {
+    deletedPosId: number | null;
+    deletedSystem: FbrSystem | null;
+    userErrors: UserError[];
+  };
 }
 
 export type FiscalInvoiceKind = 'INVOICE' | 'CREDIT_NOTE';
@@ -2859,9 +2871,11 @@ export type FiscalInvoiceKind = 'INVOICE' | 'CREDIT_NOTE';
  */
 export type FiscalInvoiceStatus = 'PENDING' | 'REPORTED' | 'FAILED' | 'SKIPPED';
 
-/** An invoice or credit note issued while the POS was connected, and how reporting it went. */
+/** An invoice or credit note issued while FBR was connected, and how reporting it went. */
 export interface FiscalInvoice {
   id: string;
+  /** What it was kept for, and is sent to. */
+  system: FbrSystem;
   kind: FiscalInvoiceKind;
   /** The shop's own number for it, FBR's USIN: "INV/2026-27/00001". */
   usin: string;

@@ -6170,6 +6170,7 @@ export const TaxSettingsUpdateMutation = /* GraphQL */ `
 
 const FBR_POS = /* GraphQL */ `
   fragment FbrPosParts on FbrPos {
+    system
     posId
     accessTokenHint
     environment
@@ -6178,7 +6179,10 @@ const FBR_POS = /* GraphQL */ `
   }
 `;
 
-/** The shop's POS as FBR registered it, if it connected one (POS-04, ADR-555). */
+/**
+ * The shop's connection to FBR, if it made one: its POS as FBR registered it, or FBR's digital
+ * invoicing (POS-04, ADR-555, ADR-562).
+ */
 export const FbrPosQuery = /* GraphQL */ `
   query FbrPos {
     fbrPos {
@@ -6188,7 +6192,7 @@ export const FbrPosQuery = /* GraphQL */ `
   ${FBR_POS}
 `;
 
-/** The shop's POS connected to FBR, or what it gave changed. */
+/** The shop connected to FBR, or what it gave changed, or how it reports switched. */
 export const FbrPosUpdateMutation = /* GraphQL */ `
   mutation FbrPosUpdate($input: FbrPosInput!) {
     fbrPosUpdate(input: $input) {
@@ -6204,10 +6208,11 @@ export const FbrPosUpdateMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
-/** The shop's POS disconnected from FBR: its token forgotten, invoices waiting not sent. */
+/** The shop disconnected from FBR: its token forgotten, invoices waiting not sent. */
 export const FbrPosDeleteMutation = /* GraphQL */ `
   mutation FbrPosDelete {
     fbrPosDelete {
+      deletedSystem
       deletedPosId
       userErrors {
         ...Problems
@@ -6217,11 +6222,12 @@ export const FbrPosDeleteMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
-/** The latest invoices and credit notes issued while the POS was connected, and how each went. */
+/** The latest invoices and credit notes issued while FBR was connected, and how each went. */
 export const FiscalInvoicesQuery = /* GraphQL */ `
   query FiscalInvoices($status: FiscalInvoiceStatus) {
     fiscalInvoices(first: 50, status: $status) {
       id
+      system
       kind
       usin
       orderId

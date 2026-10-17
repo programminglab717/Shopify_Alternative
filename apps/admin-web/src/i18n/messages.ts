@@ -4231,9 +4231,9 @@ const en = {
     'Couriers and payment gateways withhold {digital}% of what customers pay online, and {cod}% of cash on delivery, as income tax.',
   'tax.guidanceWhere': 'Rules change each budget: check with your tax adviser.',
   'tax.iris': "FBR's IRIS",
-  'fbr.title': 'FBR POS',
+  'fbr.title': 'Reporting to FBR',
   'fbr.hint':
-    "Tier-1 retailers must report each sale to FBR from a POS FBR registered. Once connected, each invoice and credit note the shop prints is reported to FBR, and FBR's number and QR code print on it.",
+    "Tier-1 retailers must report each sale to FBR from a POS FBR registered, and sellers registered for sales tax report theirs through FBR's digital invoicing. Once connected, each invoice the shop prints is reported to FBR, and FBR's number and QR code print on it.",
   'fbr.notConnected': 'Not connected.',
   'fbr.connected': 'Connected: invoices and credit notes are reported to FBR as they are printed.',
   'fbr.sandboxNote':
@@ -4245,9 +4245,9 @@ const en = {
   'fbr.newAccessToken': 'New access token',
   'fbr.accessTokenHint': 'The token FBR gave with your POS ID.',
   'fbr.accessTokenKept': 'Leave it blank to keep the one ending {hint}.',
-  'fbr.environment': "FBR's system",
+  'fbr.environment': 'Sandbox or production',
   'fbr.environment.SANDBOX': 'Sandbox',
-  'fbr.environment.SANDBOX.hint': "FBR's test system, to try your POS on: invoices don't count.",
+  'fbr.environment.SANDBOX.hint': "FBR's test system, to try reporting on: invoices don't count.",
   'fbr.environment.PRODUCTION': 'Production',
   'fbr.environment.PRODUCTION.hint': 'The real one: each invoice counts with FBR.',
   'fbr.pctCode': 'PCT code',
@@ -4261,7 +4261,7 @@ const en = {
     'Disconnect POS {posId}? Invoices printed from now on are not reported to FBR, and those still waiting are not sent.',
   'fbr.invoices': 'Invoices reported to FBR',
   'fbr.invoicesHint':
-    'The latest 50 invoices and credit notes printed while your POS was connected, and how reporting each went.',
+    'The latest 50 invoices and credit notes printed while FBR was connected, and how reporting each went.',
   'fbr.noInvoices': 'None yet.',
   'fbr.all': 'All',
   'fbr.status.PENDING': 'Pending',
@@ -4274,6 +4274,29 @@ const en = {
   'fbr.issued': 'Issued {date}',
   'fbr.retry': 'Send again',
   'fbr.retried': '{usin} goes to FBR again.',
+  'fbr.connected.DIGITAL_INVOICING':
+    "Connected through FBR's digital invoicing: invoices are reported to FBR as they are printed.",
+  'fbr.sandboxNote.DIGITAL_INVOICING':
+    "In FBR's sandbox: invoices reported there don't count. Switch to production once FBR approves your digital invoicing.",
+  'fbr.system': 'How the shop reports',
+  'fbr.system.POS': "FBR's POS integration (Tier-1 retailers)",
+  'fbr.system.POS.hint':
+    'A POS FBR registered reports each sale, with its POS ID and access token.',
+  'fbr.system.DIGITAL_INVOICING': "FBR's digital invoicing (sales-tax-registered sellers)",
+  'fbr.system.DIGITAL_INVOICING.hint':
+    'Each invoice goes to FBR with your NTN and STRN, using the security token from IRIS.',
+  'fbr.systemName.POS': 'POS integration',
+  'fbr.systemName.DIGITAL_INVOICING': 'Digital invoicing',
+  'fbr.switchNote':
+    "Switching how the shop reports needs the new way's token, and a POS ID for a POS. Invoices still waiting to go the old way are not sent.",
+  'fbr.securityToken': 'Security token',
+  'fbr.newSecurityToken': 'New security token',
+  'fbr.securityTokenHint': 'The security token FBR issued you through IRIS for digital invoicing.',
+  'fbr.tokenNeeded': 'Type the token FBR gave.',
+  'fbr.diDetails':
+    'Each invoice goes to FBR with the seller details in your tax settings above, the NTN, STRN and province, and the address its order ships from. Credit notes are not sent: they go in your sales tax return.',
+  'fbr.disconnectAsk.DIGITAL_INVOICING':
+    "Disconnect FBR's digital invoicing? Invoices printed from now on are not reported to FBR, and those still waiting are not sent.",
   'onlineStore.builder': 'Build from a description',
   'builder.title': 'Build your store from a few lines',
   'builder.hint':
@@ -9115,9 +9138,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'کورئیر اور پیمنٹ گیٹ وے آن لائن ادائیگی کا {digital}% اور کیش آن ڈیلیوری کا {cod}% انکم ٹیکس کے طور پر کاٹتے ہیں۔',
   'tax.guidanceWhere': 'قواعد ہر بجٹ میں بدلتے ہیں: اپنے ٹیکس مشیر سے تصدیق کریں۔',
   'tax.iris': 'ایف بی آر کا IRIS',
-  'fbr.title': 'ایف بی آر POS',
+  'fbr.title': 'ایف بی آر کو رپورٹنگ',
   'fbr.hint':
-    'ٹیئر ون ریٹیلرز کو ہر فروخت ایف بی آر کو ایسے POS سے رپورٹ کرنی ہوتی ہے جو ایف بی آر نے رجسٹر کیا ہو۔ منسلک ہونے کے بعد دکان کا پرنٹ کیا ہر انوائس اور کریڈٹ نوٹ ایف بی آر کو رپورٹ ہوتا ہے، اور اس پر ایف بی آر کا نمبر اور QR کوڈ پرنٹ ہوتا ہے۔',
+    'ٹیئر ون ریٹیلرز کو ہر فروخت ایف بی آر کو ایسے POS سے رپورٹ کرنی ہوتی ہے جو ایف بی آر نے رجسٹر کیا ہو، اور سیلز ٹیکس میں رجسٹرڈ فروخت کنندگان اپنی فروخت ایف بی آر کی ڈیجیٹل انوائسنگ سے رپورٹ کرتے ہیں۔ منسلک ہونے کے بعد دکان کا پرنٹ کیا ہر انوائس ایف بی آر کو رپورٹ ہوتا ہے، اور اس پر ایف بی آر کا نمبر اور QR کوڈ پرنٹ ہوتا ہے۔',
   'fbr.notConnected': 'منسلک نہیں۔',
   'fbr.connected': 'منسلک: انوائس اور کریڈٹ نوٹ پرنٹ ہوتے ہی ایف بی آر کو رپورٹ ہوتے ہیں۔',
   'fbr.sandboxNote':
@@ -9129,10 +9152,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'fbr.newAccessToken': 'نیا ایکسیس ٹوکن',
   'fbr.accessTokenHint': 'وہ ٹوکن جو ایف بی آر نے آپ کی POS آئی ڈی کے ساتھ دیا۔',
   'fbr.accessTokenKept': '{hint} پر ختم ہونے والا رکھنے کے لیے خالی چھوڑ دیں۔',
-  'fbr.environment': 'ایف بی آر کا سسٹم',
+  'fbr.environment': 'سینڈ باکس یا پروڈکشن',
   'fbr.environment.SANDBOX': 'سینڈ باکس',
   'fbr.environment.SANDBOX.hint':
-    'ایف بی آر کا آزمائشی سسٹم، POS آزمانے کے لیے: انوائس شمار نہیں ہوتے۔',
+    'ایف بی آر کا آزمائشی سسٹم، رپورٹنگ آزمانے کے لیے: انوائس شمار نہیں ہوتے۔',
   'fbr.environment.PRODUCTION': 'پروڈکشن',
   'fbr.environment.PRODUCTION.hint': 'اصل سسٹم: ہر انوائس ایف بی آر کے ہاں شمار ہوتا ہے۔',
   'fbr.pctCode': 'PCT کوڈ',
@@ -9146,7 +9169,7 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
     'POS {posId} الگ کریں؟ اب سے پرنٹ ہونے والے انوائس ایف بی آر کو رپورٹ نہیں ہوں گے، اور جو ابھی انتظار میں ہیں وہ نہیں بھیجے جائیں گے۔',
   'fbr.invoices': 'ایف بی آر کو رپورٹ کیے گئے انوائس',
   'fbr.invoicesHint':
-    'POS منسلک ہونے کے دوران پرنٹ ہونے والے تازہ ترین 50 انوائس اور کریڈٹ نوٹ، اور ہر ایک کی رپورٹنگ کیسی رہی۔',
+    'ایف بی آر منسلک ہونے کے دوران پرنٹ ہونے والے تازہ ترین 50 انوائس اور کریڈٹ نوٹ، اور ہر ایک کی رپورٹنگ کیسی رہی۔',
   'fbr.noInvoices': 'ابھی کوئی نہیں۔',
   'fbr.all': 'سب',
   'fbr.status.PENDING': 'زیر التوا',
@@ -9159,6 +9182,31 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'fbr.issued': 'جاری ہوا {date}',
   'fbr.retry': 'دوبارہ بھیجیں',
   'fbr.retried': '{usin} دوبارہ ایف بی آر کو جا رہا ہے۔',
+  'fbr.connected.DIGITAL_INVOICING':
+    'ایف بی آر کی ڈیجیٹل انوائسنگ سے منسلک: انوائس پرنٹ ہوتے ہی ایف بی آر کو رپورٹ ہوتے ہیں۔',
+  'fbr.sandboxNote.DIGITAL_INVOICING':
+    'ایف بی آر کے سینڈ باکس میں: وہاں رپورٹ ہونے والے انوائس شمار نہیں ہوتے۔ ایف بی آر آپ کی ڈیجیٹل انوائسنگ منظور کر لے تو پروڈکشن چنیں۔',
+  'fbr.system': 'دکان کیسے رپورٹ کرتی ہے',
+  'fbr.system.POS': 'ایف بی آر کا POS انٹیگریشن (ٹیئر ون ریٹیلرز)',
+  'fbr.system.POS.hint':
+    'ایف بی آر کا رجسٹر کیا ہوا POS ہر فروخت رپورٹ کرتا ہے، اپنی POS آئی ڈی اور ایکسیس ٹوکن کے ساتھ۔',
+  'fbr.system.DIGITAL_INVOICING':
+    'ایف بی آر کی ڈیجیٹل انوائسنگ (سیلز ٹیکس میں رجسٹرڈ فروخت کنندگان)',
+  'fbr.system.DIGITAL_INVOICING.hint':
+    'ہر انوائس آپ کے NTN اور STRN کے ساتھ ایف بی آر کو جاتا ہے، IRIS سے ملے سیکیورٹی ٹوکن کے ذریعے۔',
+  'fbr.systemName.POS': 'POS انٹیگریشن',
+  'fbr.systemName.DIGITAL_INVOICING': 'ڈیجیٹل انوائسنگ',
+  'fbr.switchNote':
+    'رپورٹ کرنے کا طریقہ بدلنے کے لیے نئے طریقے کا ٹوکن چاہیے، اور POS کے لیے POS آئی ڈی بھی۔ جو انوائس پرانے طریقے سے جانے کے انتظار میں ہیں وہ نہیں بھیجے جائیں گے۔',
+  'fbr.securityToken': 'سیکیورٹی ٹوکن',
+  'fbr.newSecurityToken': 'نیا سیکیورٹی ٹوکن',
+  'fbr.securityTokenHint':
+    'وہ سیکیورٹی ٹوکن جو ایف بی آر نے ڈیجیٹل انوائسنگ کے لیے آپ کو IRIS کے ذریعے جاری کیا۔',
+  'fbr.tokenNeeded': 'ایف بی آر کا دیا ہوا ٹوکن لکھیں۔',
+  'fbr.diDetails':
+    'ہر انوائس فروخت کنندہ کی ان تفصیلات کے ساتھ ایف بی آر کو جاتا ہے جو اوپر آپ کی ٹیکس سیٹنگز میں ہیں، یعنی NTN، STRN اور صوبہ، اور اس پتے کے ساتھ جہاں سے اس کا آرڈر بھیجا جاتا ہے۔ کریڈٹ نوٹ نہیں بھیجے جاتے: وہ آپ کے سیلز ٹیکس ریٹرن میں جاتے ہیں۔',
+  'fbr.disconnectAsk.DIGITAL_INVOICING':
+    'ایف بی آر کی ڈیجیٹل انوائسنگ الگ کریں؟ اب سے پرنٹ ہونے والے انوائس ایف بی آر کو رپورٹ نہیں ہوں گے، اور جو ابھی انتظار میں ہیں وہ نہیں بھیجے جائیں گے۔',
   'onlineStore.builder': 'تفصیل سے بنائیں',
   'builder.title': 'چند سطروں سے اپنی دکان بنائیں',
   'builder.hint':

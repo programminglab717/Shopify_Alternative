@@ -418,7 +418,7 @@ export function TaxPage() {
         <>
           <TaxGuidance settings={query.data.taxSettings} />
           <TaxForm settings={query.data.taxSettings} />
-          <FbrPosSection />
+          <FbrPosSection settings={query.data.taxSettings} />
         </>
       )}
     </div>

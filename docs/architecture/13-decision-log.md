@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-562 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-563 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -570,6 +570,7 @@
 | 560 | What a shop's staff write to Hatti's support WhatsApp number is kept as a request of their shop, threaded, and Hatti's answer goes back on WhatsApp within the day | Accepted |
 | 561 | The admin's Help page shows a request asked on WhatsApp with its thread, the answer once with how it went on WhatsApp, and says the shop can write there too | Accepted |
 | 562 | A sales-tax-registered shop reports its invoices through FBR's digital invoicing instead of the POS integration, by the same worker, its credit notes left to its return | Accepted |
+| 563 | The admin's FBR card connects a shop through FBR's digital invoicing or its POS integration, chosen from the shop's tax profile, and switches between them with a new token | Accepted |
 
 ---
 
@@ -21066,3 +21067,23 @@
 * **Alternatives:** **A connection and list of its own for DI:** the token, environment, retries
   and printing are the same, and a shop reports through one system at a time. **Sending a refund
   as a debit note:** a debit note raises a supply, the opposite of a refund.
+
+## ADR-563 · The admin's FBR card connects a shop through FBR's digital invoicing or its POS integration, chosen from the shop's tax profile, and switches between them with a new token
+
+* **Context:** A shop reports to FBR through its POS integration or its digital invoicing
+  (ADR-562), but the admin's card (ADR-558) knew only the POS.
+* **Decision:**
+  * **Reporting to FBR** on the sales tax page asks first which way: the POS integration, for
+    Tier-1 retailers, or digital invoicing, for sales-tax-registered sellers; the POS if the tax
+    profile says Tier-1, else digital invoicing if the shop has an STRN, else the POS.
+  * For digital invoicing, no POS ID: the security token FBR issued through IRIS, the
+    environment and the PCT code, with a line saying the seller's details come from the tax
+    settings above and the address orders ship from, and that credit notes go in the sales tax
+    return. A shop not registered is told what its tax settings lack, under the choice.
+  * Switching a connected shop asks for the new way's token, and a POS ID for the POS, and warns
+    that what waits for the old way is not sent. The connected view says which way it reports.
+  * The invoices list says each one's way when it shows both, and sends again only what the way
+    now connected takes. English and Urdu.
+* **Consequences:** A registered seller sets up digital invoicing without the API.
+* **Alternatives:** **A card for each way:** a shop reports one way at a time, and the token,
+  environment and invoices are shared.

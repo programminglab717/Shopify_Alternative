@@ -15,7 +15,7 @@ const SETTINGS = {
   rate: 18,
   taxDelivery: false,
   ntn: '1234567-8',
-  strn: null,
+  strn: null as string | null,
   province: 'PUNJAB',
   filerStatus: 'ACTIVE',
   tier1: true,
@@ -25,17 +25,30 @@ const SETTINGS = {
   categories: [],
 };
 
+/** A shop registered for sales tax that is not a Tier-1 retailer. */
+const REGISTERED = { ...SETTINGS, tier1: false, strn: '3277876175852', province: 'SINDH' };
+
 const CONNECTED = {
-  posId: 812345,
+  system: 'POS',
+  posId: 812345 as number | null,
   accessTokenHint: 'Ab12',
   environment: 'SANDBOX',
   pctCode: '62044200',
   updatedAt: '2026-10-01T10:00:00Z',
 };
 
+const CONNECTED_DI = {
+  ...CONNECTED,
+  system: 'DIGITAL_INVOICING',
+  posId: null,
+  accessTokenHint: 'f818',
+  environment: 'PRODUCTION',
+};
+
 const INVOICES = [
   {
     id: 'fi_3',
+    system: 'POS',
     kind: 'INVOICE',
     usin: 'INV/2026-27/00003',
     orderId: 'ord_3',
@@ -48,6 +61,7 @@ const INVOICES = [
   },
   {
     id: 'fi_2',
+    system: 'POS',
     kind: 'CREDIT_NOTE',
     usin: 'CN/2026-27/00001',
     orderId: 'ord_2',
@@ -60,6 +74,7 @@ const INVOICES = [
   },
   {
     id: 'fi_1',
+    system: 'POS',
     kind: 'INVOICE',
     usin: 'INV/2026-27/00001',
     orderId: 'ord_1',
@@ -74,8 +89,14 @@ const INVOICES = [
 
 function core(
   role: StaffRole,
-  options: { connected?: typeof CONNECTED; plan?: string; invoices?: typeof INVOICES } = {},
+  options: {
+    connected?: typeof CONNECTED;
+    plan?: string;
+    invoices?: (Record<string, unknown> & { id: string; usin: string; status: string })[];
+    settings?: typeof SETTINGS;
+  } = {},
 ) {
+  const settings = options.settings ?? SETTINGS;
   let pos: Record<string, unknown> | null = options.connected ?? null;
   let invoices = (options.invoices ?? []).map((each) => ({ ...each }));
   let confirmed = false;
@@ -84,7 +105,7 @@ function core(
     (operation, variables) => {
       switch (operation) {
         case 'TaxSettings':
-          return { taxSettings: SETTINGS };
+          return { taxSettings: settings };
         case 'FbrPos':
           return { fbrPos: pos };
         case 'FbrPosUpdate': {
@@ -99,6 +120,16 @@ function core(
             );
           }
           const input = variables.input as Record<string, unknown>;
+          const system = input.system ?? pos?.system ?? 'POS';
+          if (system === 'DIGITAL_INVOICING' && !(settings.ntn && settings.strn)) {
+            return fail(
+              ['input', 'system'],
+              "FBR's digital invoicing is for sellers registered for sales tax: set the shop's NTN, STRN and province in its tax settings first",
+            );
+          }
+          if (system === 'DIGITAL_INVOICING' && input.posId !== undefined) {
+            return fail(['input', 'posId'], "FBR's digital invoicing has no POS ID: leave it out");
+          }
           if (input.pctCode === '6204.42') {
             return fail(
               ['input', 'pctCode'],
@@ -109,15 +140,23 @@ function core(
           pos = {
             ...pos,
             ...kept,
+            system,
+            ...(system === 'DIGITAL_INVOICING' && { posId: null }),
             ...(pctCode !== undefined && { pctCode: String(pctCode).replace(/\D/g, '') }),
             accessTokenHint: accessToken ? String(accessToken).slice(-4) : pos?.accessTokenHint,
             updatedAt: new Date().toISOString(),
           };
           return { fbrPosUpdate: { fbrPos: pos, userErrors: [] } };
         }
-        case 'FbrPosDelete':
+        case 'FbrPosDelete': {
+          const deleted = {
+            deletedSystem: pos?.system ?? null,
+            deletedPosId: pos?.posId ?? null,
+            userErrors: [],
+          };
           pos = null;
-          return { fbrPosDelete: { deletedPosId: CONNECTED.posId, userErrors: [] } };
+          return { fbrPosDelete: deleted };
+        }
         case 'FiscalInvoices':
           return {
             fiscalInvoices: variables.status
@@ -158,7 +197,7 @@ const sentOf = (fake: ReturnType<typeof core>, operation: string) =>
 
 const rowOf = (usin: string) => screen.getByText(usin).closest('li')!;
 
-describe("FBR's POS integration (POS-04, ADR-555)", () => {
+describe('Reporting to FBR (POS-04, ADR-555, ADR-563)', () => {
   beforeEach(() => {
     window.localStorage.clear();
     signedIn();
@@ -174,9 +213,13 @@ describe("FBR's POS integration (POS-04, ADR-555)", () => {
     vi.stubGlobal('fetch', fake.fetcher);
     renderAdmin('/shop_1/settings/tax');
 
-    expect(await screen.findByRole('heading', { name: 'FBR POS' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Reporting to FBR' })).toBeTruthy();
     expect(await screen.findByText('Not connected.')).toBeTruthy();
     expect(screen.getByText(/^Tier-1 retailers must report each sale to FBR/)).toBeTruthy();
+    // A Tier-1 retailer most likely reports through its POS.
+    expect(
+      (screen.getByRole('radio', { name: /^FBR's POS integration/ }) as HTMLInputElement).checked,
+    ).toBe(true);
     expect((screen.getByRole('radio', { name: /^Sandbox/ }) as HTMLInputElement).checked).toBe(
       true,
     );
@@ -207,6 +250,7 @@ describe("FBR's POS integration (POS-04, ADR-555)", () => {
     ).toBeTruthy();
     expect(sentOf(fake, 'FbrPosUpdate').at(-1)).toEqual({
       input: {
+        system: 'POS',
         posId: 812345,
         accessToken: 'fbr-pos-token-Ab12',
         environment: 'PRODUCTION',
@@ -240,6 +284,7 @@ describe("FBR's POS integration (POS-04, ADR-555)", () => {
     );
     expect(sentOf(fake, 'FbrPosUpdate').at(-1)).toEqual({
       input: {
+        system: 'POS',
         posId: 812345,
         accessToken: 'fbr-pos-token-Ab12',
         environment: 'SANDBOX',
@@ -256,6 +301,7 @@ describe("FBR's POS integration (POS-04, ADR-555)", () => {
 
     expect(await screen.findByText('•••• Ab12')).toBeTruthy();
     const shown = screen.getByText('•••• Ab12').closest('dl')!;
+    expect(within(shown).getByText('POS integration')).toBeTruthy();
     expect(within(shown).getByText('812345')).toBeTruthy();
     expect(within(shown).getByText('Sandbox')).toBeTruthy();
     expect(within(shown).getByText('6204.4200')).toBeTruthy();
@@ -334,13 +380,213 @@ describe("FBR's POS integration (POS-04, ADR-555)", () => {
     expect(within(rowOf('CN/2026-27/00001')).queryByText('FBR 0401: Invalid PCT code')).toBeNull();
   });
 
+  it("connects FBR's digital invoicing for a shop registered for sales tax, without a POS ID", async () => {
+    const fake = core('owner', { settings: REGISTERED });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/tax');
+
+    // Registered for sales tax and not a Tier-1 retailer, it most likely reports this way.
+    const di = await screen.findByRole('radio', { name: /^FBR's digital invoicing/ });
+    expect((di as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByLabelText('POS ID')).toBeNull();
+    expect(screen.getByText(/^Each invoice goes to FBR with the seller details/)).toBeTruthy();
+    expect(
+      screen.getByText(/Credit notes are not sent: they go in your sales tax return\.$/),
+    ).toBeTruthy();
+    const token = screen.getByLabelText('Security token') as HTMLInputElement;
+    expect(token.type).toBe('password');
+    expect(token.required).toBe(true);
+    expect(
+      screen.getByText('The security token FBR issued you through IRIS for digital invoicing.'),
+    ).toBeTruthy();
+
+    type('PCT code', '6204.4200');
+    fireEvent.submit(screen.getByRole('button', { name: 'Connect FBR' }).closest('form')!);
+    expect(await screen.findByText('Type the token FBR gave.')).toBeTruthy();
+    expect(token.getAttribute('aria-invalid')).toBe('true');
+    expect(sentOf(fake, 'FbrPosUpdate')).toEqual([]);
+
+    type('Security token', 'fbr-di-token-f818');
+    fireEvent.click(screen.getByRole('button', { name: 'Connect FBR' }));
+    await confirmIdentity('Password', 'a long password');
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+    expect(
+      await screen.findByText(
+        "Connected through FBR's digital invoicing: invoices are reported to FBR as they are printed.",
+      ),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'FbrPosUpdate').at(-1)).toEqual({
+      input: {
+        system: 'DIGITAL_INVOICING',
+        accessToken: 'fbr-di-token-f818',
+        environment: 'SANDBOX',
+        pctCode: '6204.4200',
+      },
+    });
+    const shown = screen.getByText('•••• f818').closest('dl')!;
+    expect(within(shown).getByText('Digital invoicing')).toBeTruthy();
+    expect(within(shown).getByText('Security token')).toBeTruthy();
+    expect(within(shown).queryByText('POS ID')).toBeNull();
+    expect(
+      screen.getByText(/^In FBR's sandbox: .* once FBR approves your digital invoicing\.$/),
+    ).toBeTruthy();
+    expect((screen.getByLabelText('New security token') as HTMLInputElement).required).toBe(false);
+  });
+
+  it("shows a shop not registered for sales tax as the system choice's problem", async () => {
+    const fake = core('owner', { settings: { ...SETTINGS, tier1: false } });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/tax');
+
+    // Neither a Tier-1 retailer nor registered for sales tax: the POS, as before.
+    const pos = await screen.findByRole('radio', { name: /^FBR's POS integration/ });
+    expect((pos as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByRole('radio', { name: /^FBR's digital invoicing/ }));
+    type('Security token', 'fbr-di-token-f818');
+    type('PCT code', '62044200');
+    fireEvent.click(screen.getByRole('button', { name: 'Connect FBR' }));
+    await confirmIdentity('Password', 'a long password');
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+
+    const problem = await screen.findByText(
+      "FBR's digital invoicing is for sellers registered for sales tax: set the shop's NTN, STRN and province in its tax settings first",
+    );
+    const choice = screen.getByRole('group', { name: 'How the shop reports' });
+    expect(choice.contains(problem)).toBe(true);
+    expect(choice.getAttribute('aria-describedby')).toBe(problem.id);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(sentOf(fake, 'FbrPosUpdate').at(-1)).toEqual({
+      input: {
+        system: 'DIGITAL_INVOICING',
+        accessToken: 'fbr-di-token-f818',
+        environment: 'SANDBOX',
+        pctCode: '62044200',
+      },
+    });
+    expect(screen.getByText('Not connected.')).toBeTruthy();
+  });
+
+  it('shows a shop reporting through digital invoicing, without a POS ID, and disconnects it', async () => {
+    const fake = core('manager', {
+      connected: CONNECTED_DI,
+      settings: REGISTERED,
+      invoices: [
+        {
+          ...INVOICES[0]!,
+          id: 'fi_5',
+          system: 'DIGITAL_INVOICING',
+          usin: 'INV/2026-27/00005',
+          fbrInvoiceNumber: '3277876175852DI1760000000001',
+        },
+        {
+          ...INVOICES[1]!,
+          id: 'fi_4',
+          system: 'DIGITAL_INVOICING',
+          usin: 'CN/2026-27/00002',
+          status: 'SKIPPED',
+          attempts: 0,
+          error: "Not sent: FBR's digital invoicing takes no credit notes",
+        },
+        ...INVOICES,
+      ],
+    });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/tax');
+
+    const shown = (await screen.findByText('•••• f818')).closest('dl')!;
+    expect(within(shown).getByText('Digital invoicing')).toBeTruthy();
+    expect(within(shown).getByText('Production')).toBeTruthy();
+    expect(within(shown).queryByText('POS ID')).toBeNull();
+    expect(screen.queryByLabelText('POS ID')).toBeNull();
+    expect(screen.queryByText(/^In FBR's sandbox/)).toBeNull();
+    expect(
+      (screen.getByRole('radio', { name: /^FBR's digital invoicing/ }) as HTMLInputElement).checked,
+    ).toBe(true);
+    expect(screen.getByText('Leave it blank to keep the one ending f818.')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+
+    // The list has some of each, so each row says how it was reported.
+    const skipped = await waitFor(() => rowOf('CN/2026-27/00002'));
+    expect(within(skipped).getByText('Digital invoicing')).toBeTruthy();
+    expect(
+      within(skipped).getByText("Not sent: FBR's digital invoicing takes no credit notes"),
+    ).toBeTruthy();
+    // Digital invoicing takes no credit notes, and the POS is no longer connected.
+    expect(within(skipped).queryByRole('button', { name: 'Send again' })).toBeNull();
+    expect(within(rowOf('CN/2026-27/00001')).getByText('POS integration')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Send again' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect FBR' }));
+    expect(screen.getByText(/^Disconnect FBR's digital invoicing\?/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+    expect(await screen.findByText('Not connected.')).toBeTruthy();
+    expect(sentOf(fake, 'FbrPosDelete')).toEqual([{}]);
+  });
+
+  it('switches a connected POS to digital invoicing only with a new token', async () => {
+    const fake = core('owner', {
+      connected: CONNECTED,
+      settings: { ...REGISTERED, tier1: true },
+    });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/settings/tax');
+
+    expect(await screen.findByText('•••• Ab12')).toBeTruthy();
+    expect(screen.queryByText(/^Switching how the shop reports/)).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: /^FBR's digital invoicing/ }));
+    expect(
+      screen.getByText(
+        "Switching how the shop reports needs the new way's token, and a POS ID for a POS. Invoices still waiting to go the old way are not sent.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByLabelText('POS ID')).toBeNull();
+    const token = screen.getByLabelText('Security token') as HTMLInputElement;
+    expect(token.required).toBe(true);
+    expect(screen.queryByText('Leave it blank to keep the one ending Ab12.')).toBeNull();
+
+    fireEvent.submit(screen.getByRole('button', { name: 'Save' }).closest('form')!);
+    expect(await screen.findByText('Type the token FBR gave.')).toBeTruthy();
+    expect(sentOf(fake, 'FbrPosUpdate')).toEqual([]);
+
+    type('Security token', 'fbr-di-token-f818');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await confirmIdentity('Password', 'a long password');
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+    expect(
+      await screen.findByText('Saved. Invoices printed from now on are reported like this.'),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'FbrPosUpdate').at(-1)).toEqual({
+      input: { system: 'DIGITAL_INVOICING', accessToken: 'fbr-di-token-f818' },
+    });
+    const shown = screen.getByText('•••• f818').closest('dl')!;
+    expect(within(shown).getByText('Digital invoicing')).toBeTruthy();
+    expect(within(shown).queryByText('812345')).toBeNull();
+    expect(screen.queryByText(/^Switching how the shop reports/)).toBeNull();
+
+    // Back to the POS, which needs its POS ID again.
+    fireEvent.click(screen.getByRole('radio', { name: /^FBR's POS integration/ }));
+    expect((screen.getByLabelText('POS ID') as HTMLInputElement).value).toBe('');
+    type('Access token', 'fbr-pos-token-Zz99');
+    fireEvent.submit(screen.getByRole('button', { name: 'Save' }).closest('form')!);
+    expect(await screen.findByText('Type the number FBR gave, digits only.')).toBeTruthy();
+    type('POS ID', '812345');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(sentOf(fake, 'FbrPosUpdate').at(-1)).toEqual({
+        input: { system: 'POS', posId: 812345, accessToken: 'fbr-pos-token-Zz99' },
+      }),
+    );
+    expect(await within(shown).findByText('812345')).toBeTruthy();
+    expect(within(shown).getByText('POS integration')).toBeTruthy();
+  });
+
   it('is not shown to those who do not open settings', async () => {
     const fake = core('marketer', { connected: CONNECTED });
     vi.stubGlobal('fetch', fake.fetcher);
     renderAdmin('/shop_1/settings/tax');
 
     expect(await screen.findByRole('button', { name: 'Save sales tax' })).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: 'FBR POS' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Reporting to FBR' })).toBeNull();
     expect(sentOf(fake, 'FbrPos')).toEqual([]);
     expect(sentOf(fake, 'FiscalInvoices')).toEqual([]);
   });
