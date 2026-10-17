@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Plan cards with their features
+
+* **The admin's plan cards say which of the features a plan gates each includes: automations and
+  abandoned checkout reminders, cashback, Meta's conversions API and custom apps**
+  ([ADR-524](../architecture/13-decision-log.md#adr-524--the-admins-plan-cards-say-which-of-the-features-a-plan-gates-each-includes-automations-and-abandoned-checkout-reminders-cashback-metas-conversions-api-and-custom-apps-beside-its-limits-domain-and-payments), BIL-01).
+* 3239 tests, as before: the billing page's test reads the new lines.
+
 ### c36e3ee · Features gated by plan
 
 * **Plans gate custom apps, automations and the abandoned checkout reminder from Starter, and

@@ -29,6 +29,10 @@ const plan = (
   locationLimit: 1,
   customDomains: code !== 'FREE',
   onlineGateways: code !== 'FREE',
+  customApps: code !== 'FREE',
+  automations: code !== 'FREE',
+  loyalty: code === 'GROWTH' || code === 'PRO',
+  conversionsApi: code === 'GROWTH' || code === 'PRO',
 });
 
 const FREE = plan('FREE', 'Free', '0', 50);
@@ -176,6 +180,11 @@ describe('Plan and billing in the admin', () => {
 
     await screen.findByText('Your plan: Free');
     expect(screen.getByText('50 orders a month')).toBeTruthy();
+    // What each plan includes of the features it gates (ADR-523).
+    expect(screen.getByText('No automations')).toBeTruthy();
+    expect(screen.getByText('No custom apps')).toBeTruthy();
+    expect(screen.getByText('Cashback')).toBeTruthy();
+    expect(screen.getByText("Meta's conversions API")).toBeTruthy();
     expect(screen.getByText('Rs 120.50')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Pay'), { target: { value: 'YEARLY' } });
     expect(screen.getByText('Rs 50,000 a year')).toBeTruthy();

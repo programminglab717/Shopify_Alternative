@@ -1136,6 +1136,10 @@ export interface BillingPlanValue {
   locationLimit: number;
   customDomains: boolean;
   onlineGateways: boolean;
+  customApps: boolean;
+  automations: boolean;
+  loyalty: boolean;
+  conversionsApi: boolean;
 }
 
 export interface BillingInvoiceValue {

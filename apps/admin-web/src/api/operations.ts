@@ -2658,6 +2658,10 @@ const BILLING_PLAN = /* GraphQL */ `
     locationLimit
     customDomains
     onlineGateways
+    customApps
+    automations
+    loyalty
+    conversionsApi
   }
 `;
 

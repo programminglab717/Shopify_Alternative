@@ -45,6 +45,10 @@ function planLines(plan: BillingPlanValue, t: ReturnType<typeof useLocale>['t'])
     t('billing.locations', { count: plan.locationLimit }),
     t(plan.onlineGateways ? 'billing.gatewaysYes' : 'billing.gatewaysNo'),
     t(plan.customDomains ? 'billing.domainYes' : 'billing.domainNo'),
+    t(plan.automations ? 'billing.automationsYes' : 'billing.automationsNo'),
+    t(plan.loyalty ? 'billing.cashbackYes' : 'billing.cashbackNo'),
+    t(plan.conversionsApi ? 'billing.conversionsYes' : 'billing.conversionsNo'),
+    t(plan.customApps ? 'billing.appsYes' : 'billing.appsNo'),
   ];
 }
 

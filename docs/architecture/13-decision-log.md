@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-523 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-524 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -531,6 +531,7 @@
 | 521 | A draft order takes one of the shop's discount codes: checked against its items as checkout checks a cart's, setting what comes off or making delivery free, followed as the items change, and counted as a use when the draft becomes an order, in the same transaction | Accepted |
 | 522 | The admin's draft page takes a discount code beside the amount off: while a code is given the amount is the code's to set and is not asked, the draft shows its discount by the code, and emptying the code takes it off | Accepted |
 | 523 | Plans gate more of what the pricing leaves out: custom apps, automations and the abandoned checkout reminder from Starter, cashback and Meta's conversions API from Growth; refused when made, connected or turned on, those already are kept | Accepted |
+| 524 | The admin's plan cards say which of the features a plan gates each includes: automations and abandoned checkout reminders, cashback, Meta's conversions API and custom apps, beside its limits, domain and payments | Accepted |
 
 ---
 
@@ -19970,3 +19971,27 @@
       same rule.
   * **Gating in the GraphQL resolvers:** the modules' services are what the worker and other
     callers use. The check belongs where the feature is turned on, as ADR-264 put it.
+
+## ADR-524 · The admin's plan cards say which of the features a plan gates each includes: automations and abandoned checkout reminders, cashback, Meta's conversions API and custom apps, beside its limits, domain and payments
+
+* **Context:**
+  * Plans now gate custom apps, automations, cashback and Meta's conversions API (ADR-523).
+  * The admin's plan cards listed only a plan's orders, staff, locations, payments and domain. An
+    owner choosing a plan couldn't see what the rest came with.
+* **Decision:**
+  * Each card lists the four, after the domain line, as the payments and domain lines do: what the
+    plan includes ("Cashback"), or what it leaves out ("No cashback").
+  * They are listed in the order an owner looks for them: automations and abandoned checkout
+    reminders first, then cashback, Meta's conversions API, and custom apps.
+  * In English and Urdu, from the plans the API gives (`BillingPlan`), never written into the
+    admin.
+* **Consequences:**
+  * An owner sees what moving up gets them before choosing.
+  * A feature a plan refuses says which plan the shop is on, and the cards say which plans include
+    it.
+* **Alternatives:**
+  * **Listing only what each plan includes:** Free's card would be shorter, but cards would be
+    harder to compare line by line. The existing lines say "No" too.
+  * **Disabling the switches on the automations, apps and Meta pages for a plan without them:**
+    the API's refusal already says why and which plan the shop is on, and what was on before stays
+    usable. The switches can follow once they read the plan.
