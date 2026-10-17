@@ -35,6 +35,7 @@ const plan = (
   conversionsApi: code === 'GROWTH' || code === 'PRO',
   removeBranding: code !== 'FREE',
   trueProfit: code === 'GROWTH' || code === 'PRO',
+  pixels: code !== 'FREE',
 });
 
 const FREE = plan('FREE', 'Free', '0', 50);
@@ -190,6 +191,7 @@ describe('Plan and billing in the admin', () => {
     expect(screen.getByText('"Powered by Hatti" on your storefront')).toBeTruthy();
     expect(screen.getByText('Hide "Powered by Hatti"')).toBeTruthy();
     expect(screen.getByText('True profit, after couriers and returns')).toBeTruthy();
+    expect(screen.getByText('The Meta pixel on your storefront')).toBeTruthy();
     expect(screen.getByText('Rs 120.50')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Pay'), { target: { value: 'YEARLY' } });
     expect(screen.getByText('Rs 50,000 a year')).toBeTruthy();

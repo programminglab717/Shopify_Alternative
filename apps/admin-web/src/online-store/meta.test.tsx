@@ -83,7 +83,7 @@ function core(role: StaffRole, connected: typeof CONNECTED | null = null) {
             ...kept,
             accessTokenHint: accessToken
               ? String(accessToken).slice(-4)
-              : (meta?.accessTokenHint ?? ''),
+              : (meta?.accessTokenHint ?? null),
             updatedAt: new Date().toISOString(),
           };
           return { metaConversionsUpdate: { metaConversions: meta, userErrors: [] } };
@@ -165,6 +165,30 @@ describe('Meta and the catalog feed', () => {
     });
     expect(screen.getByText('Leave it blank to keep the one ending abcd.')).toBeTruthy();
     expect(await screen.findByRole('heading', { name: 'Sent to Meta' })).toBeTruthy();
+  });
+
+  it('connects the pixel alone without a token, saying orders go to no conversions API (ADR-532)', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=meta');
+
+    expect(await screen.findByText('Not connected.')).toBeTruthy();
+    expect(screen.getByText(/Without one, your storefront loads the pixel alone/)).toBeTruthy();
+    type('Dataset ID', '1234567890123456');
+    fireEvent.click(screen.getByRole('button', { name: 'Connect Meta' }));
+    await confirmIdentity('Password', 'a long password');
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+    expect(
+      await screen.findByText(
+        "Connected to dataset 1234567890123456. Your storefront loads the pixel; orders don't go to the conversions API without an access token.",
+      ),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'MetaConversionsUpdate').at(-1)).toEqual({
+      input: { pixelId: '1234567890123456' },
+    });
+    // No moments to list, and the token can still be given later.
+    expect(screen.queryByRole('heading', { name: 'Sent to Meta' })).toBeNull();
+    expect(screen.getByLabelText('Access token')).toBeTruthy();
   });
 
   it('changes only what changed, keeps the token, and lists the moments sent by status', async () => {

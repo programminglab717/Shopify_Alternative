@@ -79,7 +79,8 @@ function FeedCard({ url }: { url: string }) {
 /**
  * Connecting the shop's Meta dataset, or changing how its orders go to it: the pixel's ID, a
  * token for the conversions API, sealed and never shown again, which moment is Purchase, and a
- * code for test events. Only what changed is sent, once the member confirms who they are.
+ * code for test events. Without a token, the pixel alone is connected (ADR-532). Only what
+ * changed is sent, once the member confirms who they are.
  */
 function MetaForm({ current }: { current: MetaConversions | null }) {
   const { t } = useLocale();
@@ -144,16 +145,15 @@ function MetaForm({ current }: { current: MetaConversions | null }) {
         onChange={(event) => setPixelId(event.target.value)}
       />
       <TextField
-        label={current ? t('meta.newAccessToken') : t('meta.accessToken')}
+        label={current?.accessTokenHint ? t('meta.newAccessToken') : t('meta.accessToken')}
         hint={
-          current
+          current?.accessTokenHint
             ? t('meta.accessTokenKept', { hint: current.accessTokenHint })
-            : t('meta.accessTokenHint')
+            : `${t('meta.accessTokenHint')} ${t('meta.accessTokenOptional')}`
         }
         type="password"
         autoComplete="off"
         ltr
-        required={!current}
         value={accessToken}
         onChange={(event) => setAccessToken(event.target.value)}
       />
@@ -389,7 +389,9 @@ export function MetaTab() {
         {current ? (
           <Alert tone="success">
             {t('meta.connected', { pixelId: current.pixelId })}
-            {current.testEventCode && ` ${t('meta.testing', { code: current.testEventCode })}`}
+            {current.accessTokenHint
+              ? current.testEventCode && ` ${t('meta.testing', { code: current.testEventCode })}`
+              : ` ${t('meta.pixelAlone')}`}
           </Alert>
         ) : (
           <p className="font-medium">{t('meta.notConnected')}</p>
@@ -397,7 +399,7 @@ export function MetaTab() {
         <MetaForm current={current} />
         {current && <Disconnect pixelId={current.pixelId} />}
       </FormSection>
-      {current && <EventsList />}
+      {current?.accessTokenHint && <EventsList />}
     </div>
   );
 }

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### The Meta pixel alone in the admin
+
+* **The admin's Meta settings connect the pixel without a token, saying orders then go to no
+  conversions API, and the plan cards say which plans have the pixel** ([ADR-532](../architecture/13-decision-log.md#adr-532--the-admins-meta-settings-connect-the-pixel-without-a-token-saying-orders-then-go-to-no-conversions-api-and-the-plan-cards-say-which-plans-have-the-pixel), BIL-01,
+  MKT-10).
+* 3252 tests, 1 more: the pixel connected alone.
+
 ### 0270e94 · The Meta pixel alone
 
 * **A shop on Starter connects its Meta pixel alone, without the conversions API's token, and

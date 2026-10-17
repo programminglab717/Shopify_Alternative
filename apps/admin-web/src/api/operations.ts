@@ -2664,6 +2664,7 @@ const BILLING_PLAN = /* GraphQL */ `
     conversionsApi
     removeBranding
     trueProfit
+    pixels
   }
 `;
 

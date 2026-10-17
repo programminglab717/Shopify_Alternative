@@ -773,6 +773,8 @@ const en = {
   'billing.automationsNo': 'No automations',
   'billing.cashbackYes': 'Cashback',
   'billing.cashbackNo': 'No cashback',
+  'billing.pixelYes': 'The Meta pixel on your storefront',
+  'billing.pixelNo': 'No Meta pixel',
   'billing.conversionsYes': "Meta's conversions API",
   'billing.conversionsNo': 'No conversions API',
   'billing.appsYes': 'Custom apps',
@@ -2281,6 +2283,10 @@ const en = {
   'meta.accessTokenHint':
     "Made in Events Manager: your dataset's Settings, then Conversions API, then Generate access token.",
   'meta.accessTokenKept': 'Leave it blank to keep the one ending {hint}.',
+  'meta.accessTokenOptional':
+    "Without one, your storefront loads the pixel alone and orders don't go to the conversions API, which is on Growth and bigger plans.",
+  'meta.pixelAlone':
+    "Your storefront loads the pixel; orders don't go to the conversions API without an access token.",
   'meta.purchaseAt': 'Tell Meta of a purchase',
   'meta.purchaseAt.PLACED': 'When the order is placed',
   'meta.purchaseAt.CONFIRMED': 'When the order is confirmed',
@@ -5432,6 +5438,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'billing.automationsNo': 'آٹومیشنز نہیں',
   'billing.cashbackYes': 'کیش بیک',
   'billing.cashbackNo': 'کیش بیک نہیں',
+  'billing.pixelYes': 'اسٹور فرنٹ پر میٹا پکسل',
+  'billing.pixelNo': 'میٹا پکسل نہیں',
   'billing.conversionsYes': 'میٹا کی کنورژنز API',
   'billing.conversionsNo': 'کنورژنز API نہیں',
   'billing.appsYes': 'کسٹم ایپس',
@@ -6943,6 +6951,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'meta.accessTokenHint':
     'ایونٹس مینیجر میں بنتا ہے: ڈیٹا سیٹ کی سیٹنگز، پھر Conversions API، پھر Generate access token۔',
   'meta.accessTokenKept': '{hint} پر ختم ہونے والا رکھنے کے لیے خالی چھوڑ دیں۔',
+  'meta.accessTokenOptional':
+    'اس کے بغیر آپ کا اسٹور فرنٹ صرف پکسل لوڈ کرتا ہے اور آرڈرز کنورژنز API کو نہیں جاتے، جو گروتھ اور بڑے پلانز پر ہے۔',
+  'meta.pixelAlone':
+    'آپ کا اسٹور فرنٹ پکسل لوڈ کرتا ہے؛ ایکسیس ٹوکن کے بغیر آرڈرز کنورژنز API کو نہیں جاتے۔',
   'meta.purchaseAt': 'میٹا کو خریداری کب بتائیں',
   'meta.purchaseAt.PLACED': 'جب آرڈر آئے',
   'meta.purchaseAt.CONFIRMED': 'جب آرڈر کنفرم ہو',

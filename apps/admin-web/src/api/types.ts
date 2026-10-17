@@ -1143,6 +1143,8 @@ export interface BillingPlanValue {
   removeBranding: boolean;
   /** Whether its sales report gives true profit (ADR-529). */
   trueProfit: boolean;
+  /** Whether its storefront may load the Meta pixel (ADR-531). */
+  pixels: boolean;
 }
 
 export interface BillingInvoiceValue {
@@ -2783,7 +2785,8 @@ export type ConversionStatus = 'PENDING' | 'SENT' | 'FAILED' | 'EXPIRED' | 'SKIP
 /** The shop's Meta dataset (ADR-143): its token never shown, its last four characters alone. */
 export interface MetaConversions {
   pixelId: string;
-  accessTokenHint: string;
+  /** Null with the pixel alone, without the conversions API (ADR-531). */
+  accessTokenHint: string | null;
   purchaseAt: ConversionMoment;
   testEventCode: string | null;
   updatedAt: string;

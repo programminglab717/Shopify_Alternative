@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-531 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-532 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -539,6 +539,7 @@
 | 529 | The sales report's true profit lines are on Growth and bigger plans: smaller plans get them null, with the report saying so, and gross profit stays on every plan | Accepted |
 | 530 | The admin's analytics show gross profit where the plan leaves true profit out, saying which plans give it, and the plan cards say which plans do | Accepted |
 | 531 | A shop on Starter connects its Meta pixel alone, without the conversions API's token, and its storefront loads it while orders go to no conversions API; Free connects neither | Accepted |
+| 532 | The admin's Meta settings connect the pixel without a token, saying orders then go to no conversions API, and the plan cards say which plans have the pixel | Accepted |
 
 ---
 
@@ -20182,3 +20183,22 @@
     orders from the server.
 * **Alternatives:**
   * **A separate pixel setting:** a second place for the same dataset's ID, to keep in step.
+
+## ADR-532 · The admin's Meta settings connect the pixel without a token, saying orders then go to no conversions API, and the plan cards say which plans have the pixel
+
+* **Context:** A dataset may be connected without a token, for the pixel alone (ADR-531). The
+  admin's Meta form required one.
+* **Decision:**
+  * **Online store → Meta:** the access token is optional, its hint saying that without one the
+    storefront loads the pixel alone and orders don't go to the conversions API, which is on
+    Growth and bigger plans.
+    * Connected without a token, the page says so, and lists no moments sent to Meta.
+    * The core's refusal of a token on Starter, or of the pixel on Free, shows in its words.
+  * **The plan cards** add a line: "The Meta pixel on your storefront", or "No Meta pixel"
+    (ADR-524).
+  * English and Urdu.
+* **Consequences:**
+  * An owner on Starter connects the pixel where Growth's connect both, and learns which plan
+    adds the rest.
+* **Alternatives:**
+  * **A separate pixel form:** two places for one dataset.
