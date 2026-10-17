@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Features gated by plan
+
+* **Plans gate custom apps, automations and the abandoned checkout reminder from Starter, and
+  cashback and Meta's conversions API from Growth, as the pricing sets them; refused when made,
+  connected or turned on, those already are kept** ([ADR-523](../architecture/13-decision-log.md#adr-523--plans-gate-more-of-what-the-pricing-leaves-out-custom-apps-automations-and-the-abandoned-checkout-reminder-from-starter-cashback-and-metas-conversions-api-from-growth-refused-when-made-connected-or-turned-on-those-already-are-kept), BIL-01).
+* 3239 tests, 4 more: each feature refused on Free and kept once on.
+
 ### 530e724 · The admin's draft codes
 
 * **The admin's draft page takes a discount code beside the amount off, and shows a draft's

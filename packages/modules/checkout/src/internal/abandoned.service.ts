@@ -1,7 +1,9 @@
 import {
   InputChecker,
+  PlanAllowance,
   PublicSite,
   failOne,
+  planFeatureMessage,
   StorefrontSite,
   shopProfile,
   type MutationResult,
@@ -178,6 +180,7 @@ export class AbandonedCheckoutService {
     private readonly storefronts: StorefrontSite,
     /** Where reminders' links are: the core's own address. */
     @Optional() private readonly site?: PublicSite,
+    @Optional() private readonly allowance?: PlanAllowance,
   ) {}
 
   settings(tenant: TenantContext): Promise<RecoverySettingsRecord> {
@@ -188,6 +191,7 @@ export class AbandonedCheckoutService {
    * Sets how long after a shopper leaves the shop reminds them, of 30, 60, 180 or 600 minutes;
    * null for never. And which of its codes, a percentage or an amount off, it offers those still
    * not ordering 12, 24 or 48 hours after the reminder (ADR-426): none without the reminder.
+   * A plan without automations turns the reminder on for none, keeping one on before (ADR-523).
    * Records `recovery_settings.updated` when they changed.
    */
   async updateSettings(
@@ -223,6 +227,16 @@ export class AbandonedCheckoutService {
       );
     }
     if (!check.ok) return { ok: false, errors: check.errors };
+    if (minutes !== null && this.allowance) {
+      const plan = await this.allowance.excludes(tenant.shopId, 'automations');
+      if (plan && (await this.settings(tenant)).reminderAfterMinutes === null) {
+        return failOne(
+          ['input', 'reminderAfterMinutes'],
+          'INVALID',
+          planFeatureMessage(plan, 'the abandoned checkout reminder', 'turn it on'),
+        );
+      }
+    }
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { shopId } = tenant;

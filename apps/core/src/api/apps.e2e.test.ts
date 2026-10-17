@@ -95,6 +95,11 @@ describe.skipIf(!server)(
         `INSERT INTO control.shops (id, name, handle) VALUES ($1, 'Zari', 'zari')`,
         [shop],
       );
+      // On Growth, which includes custom apps (ADR-523).
+      await admin.query(
+        `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+         SELECT id, 'growth', 'monthly', now(), now() + interval '1 month' FROM control.shops`,
+      );
       api = await startTestApi(testDb);
     });
 

@@ -157,6 +157,21 @@ export class BillingPlan {
 
   @Field({ description: 'Whether the shop may connect accounts with payment gateways (ADR-264).' })
   onlineGateways!: boolean;
+
+  @Field({ description: 'Whether the shop may make custom apps (ADR-523).' })
+  customApps!: boolean;
+
+  @Field({
+    description:
+      'Whether the shop may turn automations and the abandoned checkout reminder on (ADR-523).',
+  })
+  automations!: boolean;
+
+  @Field({ description: 'Whether the shop may give cashback in store credit (ADR-523).' })
+  loyalty!: boolean;
+
+  @Field({ description: "Whether the shop may connect Meta's conversions API (ADR-523)." })
+  conversionsApi!: boolean;
 }
 
 @ObjectType({

@@ -94,6 +94,11 @@ describe.skipIf(!server)('Checkouts', () => {
       shopA,
       shopB,
     ]);
+    // On Growth, which includes the abandoned checkout reminder (ADR-523).
+    await admin.query(
+      `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+       SELECT id, 'growth', 'monthly', now(), now() + interval '1 month' FROM control.shops`,
+    );
     const { token, hash, hint } = generateAccessToken();
     adminToken = token;
     await admin.query(

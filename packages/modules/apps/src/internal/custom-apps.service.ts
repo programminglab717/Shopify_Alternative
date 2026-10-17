@@ -1,8 +1,10 @@
 import {
   InputChecker,
+  PlanAllowance,
   actorColumnsOf,
   failOne,
   generateAccessToken,
+  planFeatureMessage,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
@@ -10,7 +12,7 @@ import { SecretBox } from '@hatti/crypto';
 import { Database, toDate, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
 import { newId } from '@hatti/ids';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { APP_LIMITS, checkScopes, generateWebhookSecret, sealedFor } from './apps.js';
 import { AppEvents, type AppChangedPayload } from './events.js';
@@ -86,13 +88,15 @@ const NOT_FOUND = 'No app of the shop has this ID';
  * scopes it may use, and a secret its webhooks are signed with. Owners and managers make them, the
  * Admin API checking who may; the token and the secret are shown once, the secret kept sealed for
  * the app alone, and either can be replaced. Removing an app revokes its token at once. Every
- * change is on the activity log and the audit log, never a token or a secret.
+ * change is on the activity log and the audit log, never a token or a secret. A plan without
+ * custom apps makes none, keeping those made before (ADR-523).
  */
 @Injectable()
 export class CustomAppService {
   constructor(
     private readonly db: Database,
     private readonly box: SecretBox,
+    @Optional() private readonly allowance?: PlanAllowance,
   ) {}
 
   /** The shop's apps, the latest first; those removed or expired are not. */
@@ -119,6 +123,10 @@ export class CustomAppService {
     });
     const scopes = checkScopes(check, tenant, ['input', 'scopes'], input.scopes ?? []);
     if (!check.ok) return { ok: false, errors: check.errors };
+    const plan = await this.allowance?.excludes(tenant.shopId, 'customApps');
+    if (plan) {
+      return failOne(['input'], 'INVALID', planFeatureMessage(plan, 'custom apps', 'make one'));
+    }
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const { rows } = await tx.execute<{ count: number }>(sql`

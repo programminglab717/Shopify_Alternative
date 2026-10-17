@@ -65,6 +65,10 @@ describe.skipIf(!server)('Billing', () => {
     // Nor a domain of its own, nor payment gateways (ADR-264).
     expect(await f.billing.excludes(f.a.shopId, 'customDomains')).toBe('Free');
     expect(await f.billing.excludes(f.a.shopId, 'onlineGateways')).toBe('Free');
+    // Nor custom apps, automations, cashback or Meta's conversions API (ADR-523).
+    for (const feature of ['customApps', 'automations', 'loyalty', 'conversionsApi'] as const) {
+      expect(await f.billing.excludes(f.a.shopId, feature)).toBe('Free');
+    }
     expect(await f.billing.invoicesOf(f.a.shopId)).toEqual([]);
   });
 
@@ -146,6 +150,9 @@ describe.skipIf(!server)('Billing', () => {
     expect(await f.billing.limitOf(f.a.shopId, 'ordersPerMonth')).toBeNull();
     expect(await f.billing.excludes(f.a.shopId, 'customDomains')).toBeNull();
     expect(await f.billing.excludes(f.a.shopId, 'onlineGateways')).toBeNull();
+    for (const feature of ['customApps', 'automations', 'loyalty', 'conversionsApi'] as const) {
+      expect(await f.billing.excludes(f.a.shopId, feature)).toBeNull();
+    }
     // Reloaded, nothing changes; and a paid invoice is not paid again.
     await f.billing.returned(publicId(invoice.id), f.formOf(started.url));
     expect(errorsOf(await f.billing.pay(f.a, invoice.id))).toEqual([['id', 'INVALID']]);

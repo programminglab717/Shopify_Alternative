@@ -75,6 +75,11 @@ describe.skipIf(!server)("Admin GraphQL API: Meta's conversions API", () => {
       shop,
       other,
     ]);
+    // On Growth, which includes Meta's conversions API (ADR-523).
+    await admin.query(
+      `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+       SELECT id, 'growth', 'monthly', now(), now() + interval '1 month' FROM control.shops`,
+    );
     tokens.owner = await issueToken(shop, ['write_pixels']);
     tokens.reader = await issueToken(shop, ['read_pixels']);
     tokens.orders = await issueToken(shop, ['write_orders']);

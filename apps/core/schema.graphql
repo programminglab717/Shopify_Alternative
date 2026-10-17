@@ -689,13 +689,26 @@ type BillingMessagePrice {
 
 """A plan shops pay Hatti for, priced in rupees (ADR-154)."""
 type BillingPlan {
+  """
+  Whether the shop may turn automations and the abandoned checkout reminder on (ADR-523).
+  """
+  automations: Boolean!
   code: BillingPlanCode!
+
+  """Whether the shop may connect Meta's conversions API (ADR-523)."""
+  conversionsApi: Boolean!
+
+  """Whether the shop may make custom apps (ADR-523)."""
+  customApps: Boolean!
 
   """Whether the shop may connect a domain of its own (ADR-264)."""
   customDomains: Boolean!
 
   """Locations it has room for."""
   locationLimit: Int!
+
+  """Whether the shop may give cashback in store credit (ADR-523)."""
+  loyalty: Boolean!
 
   """For a month."""
   monthlyPrice: Money!

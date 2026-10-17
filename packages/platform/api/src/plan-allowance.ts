@@ -8,9 +8,11 @@ export type PlanLimitKind = 'staff' | 'locations' | 'ordersPerMonth';
 
 /**
  * What a shop's plan with Hatti includes or leaves out (BIL-01, ADR-264): a domain of the shop's
- * own, and its accounts with payment gateways.
+ * own, and its accounts with payment gateways; custom apps, automations and the abandoned
+ * checkout reminder, cashback, and Meta's conversions API (ADR-523).
  */
-export type PlanFeature = 'customDomains' | 'onlineGateways';
+export type PlanFeature =
+  'customDomains' | 'onlineGateways' | 'customApps' | 'automations' | 'loyalty' | 'conversionsApi';
 
 /** A limit of the shop's plan. */
 export interface PlanLimit {
@@ -33,17 +35,21 @@ export abstract class PlanAllowance {
 
   /**
    * The name of the shop's plan, such as "Free", when it leaves `feature` out; null when it
-   * includes it. Asked before connecting one: those connected already are kept.
+   * includes it. Asked before connecting, making or turning one on: those already are kept.
    */
   abstract excludes(shopId: string, feature: PlanFeature): Promise<string | null>;
 }
 
 /**
  * Why one is not connected: "The Free plan doesn't include payment gateways: choose a bigger plan
- * to connect one".
+ * to connect one", or made or turned on as `doing` says.
  */
-export function planFeatureMessage(plan: string, what: string): string {
-  return `The ${plan} plan doesn't include ${what}: choose a bigger plan to connect one`;
+export function planFeatureMessage(
+  plan: string,
+  what: string,
+  doing: string = 'connect one',
+): string {
+  return `The ${plan} plan doesn't include ${what}: choose a bigger plan to ${doing}`;
 }
 
 /** Why one more is refused: "The Free plan has room for 1 location: choose a bigger plan for more". */

@@ -1,7 +1,9 @@
 import {
   InputChecker,
+  PlanAllowance,
   actorColumnsOf,
   failOne,
+  planFeatureMessage,
   shopProfile,
   type MutationResult,
   type TenantContext,
@@ -9,7 +11,7 @@ import {
 import { SegmentService } from '@hatti/customers/public';
 import { Database, toDate, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { NO_NAME, audienceQuery, firstName, workerTenant } from './broadcasts.service.js';
 import { MessagingEvents, type MarketingAutomationUpdatedPayload } from './events.js';
@@ -137,6 +139,7 @@ export class AutomationsService {
     private readonly templates: WhatsAppTemplatesService,
     private readonly segments: SegmentService,
     private readonly messages: MessagesService,
+    @Optional() private readonly allowance?: PlanAllowance,
   ) {}
 
   /** Each of the shop's automations, as set, or off where it never was. */
@@ -255,6 +258,21 @@ export class AutomationsService {
         ? (current.template?.id ?? null)
         : input.templateId;
     const enabled = input.enabled ?? current.enabled;
+    if (enabled && !current.enabled) {
+      // A plan without them turns none on; those on before stay on (ADR-523).
+      const cashback = kind === 'cashback';
+      const plan = await this.allowance?.excludes(
+        tenant.shopId,
+        cashback ? 'loyalty' : 'automations',
+      );
+      if (plan) {
+        return failOne(
+          ['input', 'enabled'],
+          'INVALID',
+          planFeatureMessage(plan, cashback ? 'cashback' : 'automations', 'turn it on'),
+        );
+      }
+    }
     let template: WhatsAppTemplateRecord | null = null;
     if (templateId) {
       template = (await this.templates.list(tenant)).find((each) => each.id === templateId) ?? null;

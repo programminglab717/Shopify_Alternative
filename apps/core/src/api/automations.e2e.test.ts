@@ -83,6 +83,11 @@ describe.skipIf(!server)('Admin GraphQL API: marketing automations (MKT-04, ADR-
     await admin.query(`INSERT INTO control.shops (id, name, handle) VALUES ($1, 'Zari', 'zari')`, [
       shop,
     ]);
+    // On Growth, which includes automations (ADR-523).
+    await admin.query(
+      `INSERT INTO billing.subscriptions (shop_id, plan, billing_interval, period_start, period_end)
+       SELECT id, 'growth', 'monthly', now(), now() + interval '1 month' FROM control.shops`,
+    );
     // Three customers: two agreed to hear on WhatsApp, one of them a VIP.
     for (const [phone, consent, tags] of [
       ['+923001110001', 'subscribed', ['vip']],

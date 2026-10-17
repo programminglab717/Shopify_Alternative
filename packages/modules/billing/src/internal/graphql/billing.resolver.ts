@@ -270,6 +270,10 @@ function toPlan(plan: Plan): BillingPlan {
     orderLimit: plan.ordersPerMonth,
     customDomains: plan.customDomains,
     onlineGateways: plan.onlineGateways,
+    customApps: plan.customApps,
+    automations: plan.automations,
+    loyalty: plan.loyalty,
+    conversionsApi: plan.conversionsApi,
   });
 }
 

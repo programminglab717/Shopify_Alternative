@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-522 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-523 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -530,6 +530,7 @@
 | 520 | The admin's buy X get Y: both discount forms offer items for others bought, with items bought and given, two for one unless changed, and how much off those given, free unless changed; for the whole order or some products and collections | Accepted |
 | 521 | A draft order takes one of the shop's discount codes: checked against its items as checkout checks a cart's, setting what comes off or making delivery free, followed as the items change, and counted as a use when the draft becomes an order, in the same transaction | Accepted |
 | 522 | The admin's draft page takes a discount code beside the amount off: while a code is given the amount is the code's to set and is not asked, the draft shows its discount by the code, and emptying the code takes it off | Accepted |
+| 523 | Plans gate more of what the pricing leaves out: custom apps, automations and the abandoned checkout reminder from Starter, cashback and Meta's conversions API from Growth; refused when made, connected or turned on, those already are kept | Accepted |
 
 ---
 
@@ -19927,3 +19928,45 @@
 * **Alternatives:**
   * **Choosing from the shop's codes:** a shop may have thousands of codes, and the customer
     names theirs. Typing it is quicker and what checkout asks of shoppers.
+
+## ADR-523 · Plans gate more of what the pricing leaves out: custom apps, automations and the abandoned checkout reminder from Starter, cashback and Meta's conversions API from Growth; refused when made, connected or turned on, those already are kept
+
+* **Context:**
+  * The pricing (docs/product/03-pricing-and-business-model.md) gives each plan more than room
+    for staff, locations and orders. Free leaves out custom apps, automations, abandoned checkout
+    recovery and conversion APIs. Starter leaves out loyalty and the conversions API.
+  * Until now, plans gated only a domain of the shop's own and payment gateways (ADR-264). A shop
+    on Free could use everything else that Starter and Growth are priced for.
+* **Decision:**
+  * **Four more features of a plan**, kept beside its limits in the billing module:
+    * `customApps`: making custom apps (ADR-395). Starter and above.
+    * `automations`: turning a recipe on (ADR-425), and the abandoned checkout reminder (ADR-393),
+      with the offer that follows it (ADR-426). Starter and above.
+    * `loyalty`: turning cashback on (ADR-453). Growth and above.
+    * `conversionsApi`: connecting Meta's dataset (ADR-143). Growth and above.
+  * **Asked as ADR-264 asks:** each module asks `PlanAllowance.excludes` before it makes, connects
+    or turns one on. A plan that leaves the feature out is refused with its name, such as "The
+    Free plan doesn't include automations: choose a bigger plan to turn it on".
+  * **What is already on is kept.**
+    * An app made, a recipe or reminder on, or a dataset connected on a bigger plan goes on
+      working after a move to a smaller one.
+    * It can still be changed or turned off. Once off, it is turned on again only on a plan that
+      includes it.
+  * **`BillingPlan`** says which of the four each plan includes, for the admin's plan cards.
+  * **Back in stock and COD to prepaid** are automations, and are gated with them. Hatti sends
+    them from its own number, but they are recipes the pricing counts as automations.
+* **Consequences:**
+  * A shop sees in its plan what the pricing promises, and upgrading is how it gets more.
+  * Nothing stops working for a shop that moves down. A shop can't turn a feature off and on to
+    get it back on a plan that leaves it out.
+  * Free and Starter can't connect Meta's pixel, which shares the dataset's connection with the
+    conversions API. The pricing gives Starter the pixel alone; it waits until the pixel can be
+    connected on its own.
+  * The admin's plan cards don't yet list the four; ADR-524 will.
+* **Alternatives:**
+  * **Turning features off when a shop moves to a smaller plan:**
+    * Automations would stop sending mid-campaign, and apps an integrator relies on would break.
+    * Domains and gateways already stay connected on a move down (ADR-264). Features keep the
+      same rule.
+  * **Gating in the GraphQL resolvers:** the modules' services are what the worker and other
+    callers use. The check belongs where the feature is turned on, as ADR-264 put it.

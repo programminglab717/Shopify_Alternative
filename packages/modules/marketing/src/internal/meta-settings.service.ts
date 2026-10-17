@@ -1,14 +1,16 @@
 import {
   InputChecker,
+  PlanAllowance,
   actorColumnsOf,
   failOne,
+  planFeatureMessage,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
 import { SecretBox } from '@hatti/crypto';
 import { Database, toDate, type Tx } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import {
   MarketingEvents,
@@ -64,12 +66,14 @@ function sealedFor(shopId: string): string {
  * it for the conversions API, kept sealed and never shown again, a code for test events while
  * the shop tries it out, and which moment of an order is its Purchase. Changes are audited, the
  * token never: connecting sends customers' details to Meta, hashed, as a stolen login might.
+ * A plan without the conversions API connects none, keeping one connected before (ADR-523).
  */
 @Injectable()
 export class MetaConversionsService {
   constructor(
     private readonly db: Database,
     private readonly box: SecretBox,
+    @Optional() private readonly allowance?: PlanAllowance,
   ) {}
 
   async get(tenant: TenantContext): Promise<MetaConversionsRecord | null> {
@@ -96,6 +100,14 @@ export class MetaConversionsService {
         ? undefined
         : checkTestEventCode(check, input.testEventCode);
     if (!check.ok) return { ok: false, errors: check.errors };
+    const plan = await this.allowance?.excludes(tenant.shopId, 'conversionsApi');
+    if (plan && !(await this.get(tenant))) {
+      return failOne(
+        ['input'],
+        'INVALID',
+        planFeatureMessage(plan, "Meta's conversions API", 'connect it'),
+      );
+    }
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const current = await settingsIn(tx, tenant.shopId, { lock: true });

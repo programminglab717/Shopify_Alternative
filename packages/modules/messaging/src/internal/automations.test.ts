@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
-import type { MutationResult, TenantContext } from '@hatti/api';
+import { PlanAllowance, type MutationResult, type TenantContext } from '@hatti/api';
 import { SecretBox } from '@hatti/crypto';
 import { SegmentFieldRegistry, SegmentService } from '@hatti/customers/public';
 import { Database } from '@hatti/db';
@@ -19,6 +19,21 @@ import { MessagesService } from './messages.service.js';
 import { FakeGraph, NUMBER, WABA } from './test-support.js';
 import { WhatsAppAccountsService } from './whatsapp-accounts.service.js';
 import { WhatsAppTemplatesService } from './whatsapp-templates.service.js';
+
+/** A plan that leaves out every feature it is asked about (ADR-523). */
+class Free extends PlanAllowance {
+  async limitOf(): Promise<null> {
+    return null;
+  }
+
+  async limitIn(): Promise<null> {
+    return null;
+  }
+
+  async excludes(): Promise<string> {
+    return 'Free';
+  }
+}
 
 const server = testDatabaseServer();
 
@@ -415,5 +430,35 @@ describe.skipIf(!server)("A shop's marketing automations (MKT-04, ADR-425)", () 
     expect(await automations.update(a, 'win_back', { enabled: true, afterDays: 90 })).toMatchObject(
       { ok: false, errors: [{ code: 'INVALID' }] },
     );
+  });
+
+  it('turns no automation or cashback on for a plan without them, keeping those on before (ADR-523)', async () => {
+    const free = new AutomationsService(
+      db,
+      templates,
+      new SegmentService(db, new SegmentFieldRegistry()),
+      new MessagesService(db),
+      new Free(),
+    );
+    const refusal = async (result: Promise<MutationResult<unknown>>) => {
+      const done = await result;
+      return done.ok ? 'ok' : `${done.errors[0]!.field.join('.')}: ${done.errors[0]!.message}`;
+    };
+    unwrap(await automations.update(a, 'welcome', { enabled: false, templateId: approved }));
+    unwrap(await automations.update(a, 'cashback', { enabled: false }));
+    expect(await refusal(free.update(a, 'welcome', { enabled: true }))).toBe(
+      "input.enabled: The Free plan doesn't include automations: choose a bigger plan to turn it on",
+    );
+    expect(await refusal(free.update(a, 'cashback', { enabled: true }))).toBe(
+      "input.enabled: The Free plan doesn't include cashback: choose a bigger plan to turn it on",
+    );
+    // Off, it is still set; on before, it is changed and turned off.
+    expect(await refusal(free.update(a, 'cashback', { cashbackPercent: 4 }))).toBe('ok');
+    unwrap(await automations.update(a, 'cashback', { enabled: true }));
+    expect(unwrap(await free.update(a, 'cashback', { cashbackPercent: 6 }))).toMatchObject({
+      enabled: true,
+      cashbackPercent: 6,
+    });
+    expect(unwrap(await free.update(a, 'cashback', { enabled: false })).enabled).toBe(false);
   });
 });

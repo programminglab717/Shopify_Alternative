@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { randomBytes } from 'node:crypto';
-import type { MutationResult, TenantContext } from '@hatti/api';
+import { PlanAllowance, type MutationResult, type TenantContext } from '@hatti/api';
 import { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
@@ -10,6 +10,21 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ConversionsService } from './conversions.service.js';
 import { MetaConversionsService } from './meta-settings.service.js';
 import { conversions, metaSettings } from './schema.js';
+
+/** A plan that leaves out every feature it is asked about (ADR-523). */
+class Free extends PlanAllowance {
+  async limitOf(): Promise<null> {
+    return null;
+  }
+
+  async limitIn(): Promise<null> {
+    return null;
+  }
+
+  async excludes(): Promise<string> {
+    return 'Free';
+  }
+}
 
 const server = testDatabaseServer();
 
@@ -278,5 +293,23 @@ describe.skipIf(!server)("Meta's conversions API: the shop's dataset and its mom
     expect(skipped.items).toHaveLength(6);
     expect(skipped.items[0]!.error).toBe('Not sent: the shop disconnected Meta');
     expect((await outbox()).at(-1)).toEqual(['meta_conversions.deleted', '1234567890']);
+  });
+
+  it('connects nothing on a plan without the conversions API, which keeps one connected before (ADR-523)', async () => {
+    const free = new MetaConversionsService(db, box, new Free());
+    const refused = await free.update(a, { pixelId: '1234567890', accessToken: TOKEN });
+    expect(refused.ok || refused.errors).toEqual([
+      {
+        field: ['input'],
+        code: 'INVALID',
+        message:
+          "The Free plan doesn't include Meta's conversions API: choose a bigger plan to connect it",
+      },
+    ]);
+    expect(await meta.get(a)).toBeNull();
+    unwrap(await meta.update(a, { pixelId: '1234567890', accessToken: TOKEN }));
+    expect(unwrap(await free.update(a, { purchaseAt: 'delivered' }))).toMatchObject({
+      purchaseAt: 'delivered',
+    });
   });
 });

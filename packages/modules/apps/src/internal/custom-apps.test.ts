@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import {
   AccessTokenAuthenticator,
+  PlanAllowance,
   ROLE_SCOPES,
   type MutationResult,
   type StaffRole,
@@ -35,6 +36,21 @@ function staff(shopId: string, role: StaffRole): TenantContext {
 function unwrap<T>(result: MutationResult<T>): T {
   if (!result.ok) throw new Error(`Refused: ${JSON.stringify(result.errors)}`);
   return result.value;
+}
+
+/** A plan that leaves out every feature it is asked about (ADR-523). */
+class Free extends PlanAllowance {
+  async limitOf(): Promise<null> {
+    return null;
+  }
+
+  async limitIn(): Promise<null> {
+    return null;
+  }
+
+  async excludes(): Promise<string> {
+    return 'Free';
+  }
 }
 
 function refusals<T>(result: MutationResult<T>) {
@@ -208,5 +224,23 @@ describe.skipIf(!server)('Custom apps (DEV-04, ADR-395)', () => {
     expect(await service.webhookSecretOf(shopA, app!.id)).toBeNull();
     const secret = unwrap(await service.rotateSecret(owner, app!.id));
     expect(await service.webhookSecretOf(shopA, app!.id)).toBe(secret.webhookSecret);
+  });
+
+  it('is made on no plan without custom apps, which keeps those made before (ADR-523)', async () => {
+    const made = unwrap(await service.create(owner, { name: 'Sync', scopes: ['read_orders'] }));
+    const free = new CustomAppService(
+      db,
+      SecretBox.fromString(`k1:${SecretBox.generateKey()}`),
+      new Free(),
+    );
+    const refused = await free.create(owner, { name: 'Another', scopes: ['read_orders'] });
+    expect(refused.ok || refused.errors).toEqual([
+      {
+        field: ['input'],
+        code: 'INVALID',
+        message: "The Free plan doesn't include custom apps: choose a bigger plan to make one",
+      },
+    ]);
+    expect((await free.list(owner)).map((app) => app.id)).toEqual([made.app.id]);
   });
 });

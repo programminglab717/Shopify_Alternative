@@ -1,12 +1,29 @@
 import 'reflect-metadata';
-import type { TenantContext } from '@hatti/api';
+import { PlanAllowance, PublicSite, StorefrontSite, type TenantContext } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { MessagesService } from '@hatti/messaging/public';
 import type { CartActionName } from '@hatti/storefront-api';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { AbandonedCheckoutService } from './abandoned.service.js';
 import { parseAction } from './cart-lines.js';
 import type { CheckoutForm, CheckoutView } from './checkout.service.js';
 import { CHECKOUT_CUSTOMER_DATA } from './customer-data.js';
 import { checkoutFixture, unwrap, type CheckoutFixture } from './test-support.js';
+
+/** A plan that leaves out every feature it is asked about (ADR-523). */
+class Free extends PlanAllowance {
+  async limitOf(): Promise<null> {
+    return null;
+  }
+
+  async limitIn(): Promise<null> {
+    return null;
+  }
+
+  async excludes(): Promise<string> {
+    return 'Free';
+  }
+}
 
 const server = testDatabaseServer();
 
@@ -363,5 +380,32 @@ describe.skipIf(!server)('Abandoned checkouts, their reminder and offer (CHK-12,
     );
     expect(await f.abandoned.list(f.a)).toEqual([]);
     expect((await f.expiry.deleteExpired(new Date())).checkouts).toBe(1);
+  });
+
+  it('turns the reminder on for no plan without automations, which keeps one on before (ADR-523)', async () => {
+    const free = new AbandonedCheckoutService(
+      f.db,
+      new MessagesService(f.db),
+      f.orders,
+      new StorefrontSite('https://hatti.test'),
+      new PublicSite('https://hatti.test'),
+      new Free(),
+    );
+    const refused = await free.updateSettings(f.a, { reminderAfterMinutes: 60 });
+    expect(refused.ok || refused.errors).toEqual([
+      {
+        field: ['input', 'reminderAfterMinutes'],
+        code: 'INVALID',
+        message:
+          "The Free plan doesn't include the abandoned checkout reminder: choose a bigger plan " +
+          'to turn it on',
+      },
+    ]);
+    unwrap(await f.abandoned.updateSettings(f.a, { reminderAfterMinutes: 60 }));
+    // On before, it is changed, and turned off for good.
+    unwrap(await free.updateSettings(f.a, { reminderAfterMinutes: 180 }));
+    expect((await free.settings(f.a)).reminderAfterMinutes).toBe(180);
+    unwrap(await free.updateSettings(f.a, { reminderAfterMinutes: null }));
+    expect((await free.updateSettings(f.a, { reminderAfterMinutes: 60 })).ok).toBe(false);
   });
 });

@@ -3,7 +3,7 @@ import type { CurrencyCode } from '@hatti/money';
 // What shops pay Hatti (BIL-01, ADR-154), as docs/product/03-pricing-and-business-model.md
 // proposes it: plans priced in rupees, by the month or by the year, a year being ten months'
 // price, with the staff, locations and orders a month each allows, and whether it includes a
-// domain of the shop's own and payment gateways. Enterprise is agreed with each shop, not here.
+// domain of the shop's own, payment gateways and the features ADR-523 gates. Enterprise is agreed with each shop, not here.
 
 export const PLAN_CODES = ['free', 'starter', 'growth', 'pro'] as const;
 export type PlanCode = (typeof PLAN_CODES)[number];
@@ -31,6 +31,14 @@ export interface Plan {
   /** Whether the shop may connect a domain of its own, and accounts with payment gateways (ADR-264). */
   customDomains: boolean;
   onlineGateways: boolean;
+  /**
+   * Whether it may make custom apps, turn automations and the abandoned checkout reminder on,
+   * give cashback, and connect Meta's conversions API (ADR-523).
+   */
+  customApps: boolean;
+  automations: boolean;
+  loyalty: boolean;
+  conversionsApi: boolean;
 }
 
 export const PLANS: Readonly<Record<PlanCode, Plan>> = {
@@ -43,6 +51,10 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     ordersPerMonth: 50,
     customDomains: false,
     onlineGateways: false,
+    customApps: false,
+    automations: false,
+    loyalty: false,
+    conversionsApi: false,
   },
   starter: {
     code: 'starter',
@@ -53,6 +65,10 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     ordersPerMonth: null,
     customDomains: true,
     onlineGateways: true,
+    customApps: true,
+    automations: true,
+    loyalty: false,
+    conversionsApi: false,
   },
   growth: {
     code: 'growth',
@@ -63,6 +79,10 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     ordersPerMonth: null,
     customDomains: true,
     onlineGateways: true,
+    customApps: true,
+    automations: true,
+    loyalty: true,
+    conversionsApi: true,
   },
   pro: {
     code: 'pro',
@@ -73,6 +93,10 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     ordersPerMonth: null,
     customDomains: true,
     onlineGateways: true,
+    customApps: true,
+    automations: true,
+    loyalty: true,
+    conversionsApi: true,
   },
 };
 
