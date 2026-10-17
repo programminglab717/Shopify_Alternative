@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-557 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-558 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -565,6 +565,7 @@
 | 555 | A Tier-1 shop connects its POS to FBR, and each invoice and credit note it issues is reported to FBR's IMS as it is issued, tried again while FBR cannot be reached | Accepted |
 | 556 | A Tier-1 shop's invoices and credit notes print FBR's number and its QR code once FBR has numbered them, and say they await FBR until then | Accepted |
 | 557 | An inventory item keeps its HS code, Shopify's harmonizedSystemCode, and FBR is sent each item's own PCT code from it, the shop's for those without | Accepted |
+| 558 | The admin connects a Tier-1 shop's POS to FBR on the sales tax page, lists what was reported and sends again what was not, and an order's page says how its invoice stands with FBR | Accepted |
 
 ---
 
@@ -20944,3 +20945,24 @@
 * **Alternatives:** **Codes on products:** a product's variants can be different goods, and
   Shopify keeps them on the item. **Taking 6-digit codes as PCT codes:** FBR takes 8 digits, and
   padding a 6-digit heading guesses the subheading.
+
+## ADR-558 · The admin connects a Tier-1 shop's POS to FBR on the sales tax page, lists what was reported and sends again what was not, and an order's page says how its invoice stands with FBR
+
+* **Context:** A Tier-1 shop's POS is connected to FBR, and its invoices are reported and printed
+  with FBR's number (ADR-555, ADR-556), but only through the API.
+* **Decision:**
+  * **FBR POS** on the sales tax page, for owners and managers, as the shop's other settings are:
+    its POS ID, the access token FBR gave it (sealed, never shown again; left blank to keep it),
+    FBR's sandbox or production, and its PCT code. Connecting and changing it ask the member to
+    confirm who they are; only what changed is sent; a problem with a field shows under it, and a
+    plan without FBR reporting says so. Connected, it shows what is kept, the token's last four,
+    a warning while on the sandbox, and disconnecting, asked first.
+  * **Invoices reported to FBR** below it: the latest 50, all or of one status, each with its
+    kind, number, status, when issued in the shop's time zone, FBR's number, its tries and error,
+    and a link to its order; those refused or not sent are sent again in a tap while connected.
+  * **An order's page** says beside its invoice number FBR's number, that it awaits FBR, or that
+    FBR refused it. English and Urdu.
+* **Consequences:** A shop connects FBR and sees what FBR refused without the API.
+* **Alternatives:** **A page of its own under Settings:** FBR's POS is part of the shop's sales
+  tax, and its Tier-1 status is set on the same page. **Production by default:** a shop trying a
+  POS out would report real invoices.

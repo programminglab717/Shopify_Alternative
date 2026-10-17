@@ -365,6 +365,22 @@ export function OrderPage() {
             <span dir="ltr" className="num">
               {order.invoice.number}
             </span>
+            {order.invoice.fbrStatus === 'REPORTED' && order.invoice.fbrInvoiceNumber ? (
+              <>
+                {' · '}
+                {t('fbr.number')}{' '}
+                <span dir="ltr" className="num">
+                  {order.invoice.fbrInvoiceNumber}
+                </span>
+              </>
+            ) : order.invoice.fbrStatus === 'PENDING' || order.invoice.fbrStatus === 'FAILED' ? (
+              <>
+                {' · '}
+                <span className={order.invoice.fbrStatus === 'FAILED' ? 'text-danger' : undefined}>
+                  {t(`order.fbr.${order.invoice.fbrStatus}`)}
+                </span>
+              </>
+            ) : null}
           </p>
         )}
         {order.cancelReason && (

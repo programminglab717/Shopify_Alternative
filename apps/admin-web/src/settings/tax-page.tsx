@@ -19,6 +19,7 @@ import { useAdminMutation, useAdminQuery } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { FbrPosSection } from './fbr-pos';
 import { CheckField, Problems, SelectField, settingProblem } from './settings-form';
 import { BackToSettings } from './settings-page';
 
@@ -417,6 +418,7 @@ export function TaxPage() {
         <>
           <TaxGuidance settings={query.data.taxSettings} />
           <TaxForm settings={query.data.taxSettings} />
+          <FbrPosSection />
         </>
       )}
     </div>

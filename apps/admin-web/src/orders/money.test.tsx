@@ -262,6 +262,36 @@ describe("An order's money, on its page", () => {
     expect(await screen.findByRole('radio', { name: /^Credit notes/ })).toBeTruthy();
   });
 
+  it("shows how reporting the order's invoice to FBR went (ADR-555)", async () => {
+    const invoice = (fbrStatus: string | null, fbrInvoiceNumber: string | null = null) =>
+      order('7700', {
+        invoice: { number: 'INV/2026-27/00012', issuedAt: LATER, fbrStatus, fbrInvoiceNumber },
+      });
+    const line = async () => (await screen.findByText(/^Invoice issued/)).textContent;
+
+    vi.stubGlobal('fetch', core('owner', invoice('REPORTED', '812345FBR20261010120501')).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    expect(await line()).toMatch(/INV\/2026-27\/00012 · FBR no\. 812345FBR20261010120501$/);
+    cleanup();
+
+    vi.stubGlobal('fetch', core('owner', invoice('PENDING')).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    expect(await line()).toMatch(/INV\/2026-27\/00012 · Awaiting FBR$/);
+    cleanup();
+
+    vi.stubGlobal('fetch', core('owner', invoice('FAILED')).fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+    expect(await line()).toMatch(/INV\/2026-27\/00012 · FBR refused it$/);
+    cleanup();
+
+    for (const status of ['SKIPPED', null]) {
+      vi.stubGlobal('fetch', core('owner', invoice(status)).fetcher);
+      renderAdmin('/shop_1/orders/ord_7');
+      expect(await line()).toMatch(/INV\/2026-27\/00012$/);
+      cleanup();
+    }
+  });
+
   it("pays an order not yet shipped with its customer's store credit, as much as it covers", async () => {
     const customer = { id: 'cus_1', displayName: 'Ayesha Khan', numberOfOrders: 2 };
     const fake = core('manager', order('0', { stage: 'TO_PACK', customer }));

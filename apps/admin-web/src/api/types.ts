@@ -314,8 +314,16 @@ export interface OrderDetail {
   fulfillments: ParcelDetail[];
   amountRefunded: MoneyValue;
   refunds: RefundDetail[];
-  /** Its invoice in the shop's series, once printed (ADR-495). */
-  invoice: { number: string; issuedAt: string } | null;
+  /**
+   * Its invoice in the shop's series, once printed (ADR-495), and how reporting it to FBR went,
+   * where the shop's POS was connected when it was issued (ADR-555).
+   */
+  invoice: {
+    number: string;
+    issuedAt: string;
+    fbrStatus: FiscalInvoiceStatus | null;
+    fbrInvoiceNumber: string | null;
+  } | null;
   returns: ReturnDetail[];
   events: {
     nodes: {
@@ -2811,6 +2819,68 @@ export interface TaxSettingsData {
 
 export interface TaxSettingsUpdateData {
   taxSettingsUpdate: { taxSettings: TaxSettings | null; userErrors: UserError[] };
+}
+
+/** FBR's sandbox, to try a POS on, or the real one, where invoices count. */
+export type FbrEnvironment = 'SANDBOX' | 'PRODUCTION';
+
+/**
+ * The shop's POS as FBR registered it (POS-04, ADR-555): its token never shown, its last four
+ * characters alone.
+ */
+export interface FbrPos {
+  posId: number;
+  accessTokenHint: string;
+  environment: FbrEnvironment;
+  /** 8 digits, "62044200". */
+  pctCode: string;
+  updatedAt: string;
+}
+
+export interface FbrPosData {
+  fbrPos: FbrPos | null;
+}
+
+export interface FbrPosUpdateData {
+  fbrPosUpdate: { fbrPos: FbrPos | null; userErrors: UserError[] };
+}
+
+export interface FbrPosDeleteData {
+  fbrPosDelete: { deletedPosId: number | null; userErrors: UserError[] };
+}
+
+export type FiscalInvoiceKind = 'INVOICE' | 'CREDIT_NOTE';
+
+/**
+ * PENDING until FBR takes it; REPORTED with FBR's number; FAILED when FBR refused it; SKIPPED
+ * when the shop disconnected FBR before it went.
+ */
+export type FiscalInvoiceStatus = 'PENDING' | 'REPORTED' | 'FAILED' | 'SKIPPED';
+
+/** An invoice or credit note issued while the POS was connected, and how reporting it went. */
+export interface FiscalInvoice {
+  id: string;
+  kind: FiscalInvoiceKind;
+  /** The shop's own number for it, FBR's USIN: "INV/2026-27/00001". */
+  usin: string;
+  orderId: string;
+  status: FiscalInvoiceStatus;
+  fbrInvoiceNumber: string | null;
+  attempts: number;
+  error: string | null;
+  reportedAt: string | null;
+  createdAt: string;
+}
+
+export interface FiscalInvoicesData {
+  fiscalInvoices: FiscalInvoice[];
+}
+
+export interface FiscalInvoiceRetryData {
+  fiscalInvoiceRetry: {
+    fiscalInvoice: { usin: string; status: FiscalInvoiceStatus } | null;
+    userErrors: UserError[];
+  };
 }
 
 /** A moment of an order placed through checkout that the ad platforms hear of. */

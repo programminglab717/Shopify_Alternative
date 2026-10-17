@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### FBR in the admin
+
+* **The admin connects a Tier-1 shop's POS to FBR on the sales tax page, lists what was reported
+  and sends again what was not, and an order's page says how its invoice stands with FBR**
+  ([ADR-558](../architecture/13-decision-log.md#adr-558--the-admin-connects-a-tier-1-shops-pos-to-fbr-on-the-sales-tax-page-lists-what-was-reported-and-sends-again-what-was-not-and-an-orders-page-says-how-its-invoice-stands-with-fbr), POS-04, TAX-04).
+* 3399 tests, 11 more: connecting, changing and disconnecting, errors
+  and roles, the reported invoices and sending again, the order page's FBR status, and the GraphQL
+  checked against the schema.
+
 ### 3237864 · HS codes as FBR's PCT codes
 
 * **An inventory item keeps its HS code, Shopify's harmonizedSystemCode, and FBR is sent each

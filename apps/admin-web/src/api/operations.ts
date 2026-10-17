@@ -191,6 +191,8 @@ export const OrderQuery = /* GraphQL */ `
       invoice {
         number
         issuedAt
+        fbrStatus
+        fbrInvoiceNumber
       }
       note
       giftMessage
@@ -6158,6 +6160,89 @@ export const TaxSettingsUpdateMutation = /* GraphQL */ `
     }
   }
   ${TAX_SETTINGS}
+  ${USER_ERRORS}
+`;
+
+const FBR_POS = /* GraphQL */ `
+  fragment FbrPosParts on FbrPos {
+    posId
+    accessTokenHint
+    environment
+    pctCode
+    updatedAt
+  }
+`;
+
+/** The shop's POS as FBR registered it, if it connected one (POS-04, ADR-555). */
+export const FbrPosQuery = /* GraphQL */ `
+  query FbrPos {
+    fbrPos {
+      ...FbrPosParts
+    }
+  }
+  ${FBR_POS}
+`;
+
+/** The shop's POS connected to FBR, or what it gave changed. */
+export const FbrPosUpdateMutation = /* GraphQL */ `
+  mutation FbrPosUpdate($input: FbrPosInput!) {
+    fbrPosUpdate(input: $input) {
+      fbrPos {
+        ...FbrPosParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${FBR_POS}
+  ${USER_ERRORS}
+`;
+
+/** The shop's POS disconnected from FBR: its token forgotten, invoices waiting not sent. */
+export const FbrPosDeleteMutation = /* GraphQL */ `
+  mutation FbrPosDelete {
+    fbrPosDelete {
+      deletedPosId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The latest invoices and credit notes issued while the POS was connected, and how each went. */
+export const FiscalInvoicesQuery = /* GraphQL */ `
+  query FiscalInvoices($status: FiscalInvoiceStatus) {
+    fiscalInvoices(first: 50, status: $status) {
+      id
+      kind
+      usin
+      orderId
+      status
+      fbrInvoiceNumber
+      attempts
+      error
+      reportedAt
+      createdAt
+    }
+  }
+`;
+
+/** One FBR refused, or one disconnecting left unsent, sent to FBR again. */
+export const FiscalInvoiceRetryMutation = /* GraphQL */ `
+  mutation FiscalInvoiceRetry($id: ID!) {
+    fiscalInvoiceRetry(id: $id) {
+      fiscalInvoice {
+        usin
+        status
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
   ${USER_ERRORS}
 `;
 
