@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Plan cards with their features
+### ac8e205 · Plan cards with their features
 
 * **The admin's plan cards say which of the features a plan gates each includes: automations and
   abandoned checkout reminders, cashback, Meta's conversions API and custom apps**
