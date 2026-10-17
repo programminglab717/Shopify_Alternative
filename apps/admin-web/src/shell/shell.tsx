@@ -39,6 +39,7 @@ import type { MessageKey } from '../i18n/messages';
 import { Button } from '../ui/button';
 import { EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { LanguageToggle } from '../ui/language-toggle';
+import { PlatformStatusBanner } from './platform-status';
 import { ShopProvider } from './shop-context';
 
 interface NavItem {
@@ -266,6 +267,7 @@ export function Shell() {
               <span className="hidden md:inline">{t('action.signOut')}</span>
             </button>
           </header>
+          <PlatformStatusBanner />
           <main className="flex-1 p-4 pb-24 md:p-6 md:pb-6">
             <Outlet />
           </main>

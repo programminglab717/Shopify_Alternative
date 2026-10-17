@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### The admin's banner
+
+* **What goes on at Hatti shows above every page of a shop's admin, asked every minute, in the
+  staff's language where Hatti wrote it in Urdu** ([ADR-499](../architecture/13-decision-log.md#adr-499--the-admins-banner-what-goes-on-at-hatti-above-every-page-of-a-shops-admin-asked-every-minute-in-the-staffs-language-where-hatti-wrote-it-in-urdu), BIL-06).
+* 3104 tests, 3 more: the banner in English and Urdu, nothing while all
+  is well, and its query against the schema.
+
 ### eba3f74 · Hatti's status page
 
 * **Hatti's people post incidents and maintenance with a command, and the core serves them at

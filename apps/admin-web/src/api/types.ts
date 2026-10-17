@@ -3938,3 +3938,38 @@ export interface EasternWear {
   fabrics: FabricValue[];
   season: SeasonValue | null;
 }
+
+// Hatti's own status (BIL-06, ADR-498).
+export type PlatformIncidentStatusValue =
+  | 'INVESTIGATING'
+  | 'IDENTIFIED'
+  | 'MONITORING'
+  | 'RESOLVED'
+  | 'SCHEDULED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED';
+
+export type PlatformComponentValue =
+  'STOREFRONTS' | 'CHECKOUT' | 'ADMIN' | 'PAYMENTS' | 'COURIERS' | 'WHATSAPP' | 'SMS' | 'EMAIL';
+
+export interface PlatformIncidentValue {
+  id: string;
+  kind: 'INCIDENT' | 'MAINTENANCE';
+  impact: 'DEGRADED' | 'OUTAGE';
+  status: PlatformIncidentStatusValue;
+  components: PlatformComponentValue[];
+  title: string;
+  titleUr: string | null;
+  startsAt: string;
+  endsAt: string | null;
+  latestUpdate: {
+    status: PlatformIncidentStatusValue;
+    body: string;
+    bodyUr: string | null;
+    postedAt: string;
+  };
+}
+
+export interface PlatformStatusData {
+  platformStatus: { statusPageUrl: string; incidents: PlatformIncidentValue[] };
+}

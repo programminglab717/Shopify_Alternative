@@ -8569,3 +8569,29 @@ export const GiftCardDeactivateMutation = /* GraphQL */ `
   ${GIFT_CARD}
   ${USER_ERRORS}
 `;
+
+/** What is wrong at Hatti now, or planned within a day, for the banner above every page (ADR-499). */
+export const PlatformStatusQuery = /* GraphQL */ `
+  query PlatformStatus {
+    platformStatus {
+      statusPageUrl
+      incidents {
+        id
+        kind
+        impact
+        status
+        components
+        title
+        titleUr
+        startsAt
+        endsAt
+        latestUpdate {
+          status
+          body
+          bodyUr
+          postedAt
+        }
+      }
+    }
+  }
+`;

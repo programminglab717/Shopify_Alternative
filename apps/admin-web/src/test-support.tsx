@@ -99,6 +99,15 @@ export function fakeCore(
       variables: Record<string, unknown>;
     };
     const operation = /(?:query|mutation) (\w+)/.exec(query)![1]!;
+    // Hatti's own status, which the banner above every page asks after: all well unless
+    // answered, and left out of what was sent.
+    if (operation === 'PlatformStatus') {
+      return json({
+        data: orElse(() => answer(operation, variables), {
+          platformStatus: { statusPageUrl: 'https://hatti.pk/status', incidents: [] },
+        }),
+      });
+    }
     sent.push({ operation, variables });
     if (operation === 'Shop') {
       return json({

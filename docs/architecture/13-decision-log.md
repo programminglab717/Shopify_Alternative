@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-498 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-499 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -506,6 +506,7 @@
 | 496 | Credit notes: money refunded on an order whose invoice was issued goes on a credit note numbered in a series of its own, printed against the invoice it corrects | Accepted |
 | 497 | Invoices and credit notes in the admin: an order's invoice number and its refunds' credit notes on its page, and credit notes printed beside slips and invoices | Accepted |
 | 498 | Hatti's status page: Hatti's people post incidents and maintenance with a command, and the core serves them at /status, as JSON and to every shop's admin | Accepted |
+| 499 | The admin's banner: what goes on at Hatti above every page of a shop's admin, asked every minute, in the staff's language where Hatti wrote it in Urdu | Accepted |
 
 ---
 
@@ -18844,3 +18845,33 @@
   * **A static page written to storage on each change:** it would stay up without the edge,
     but it would need writes to the bucket from the command, and the admin would still need
     the API.
+
+## ADR-499 · The admin's banner: what goes on at Hatti above every page of a shop's admin, asked every minute, in the staff's language where Hatti wrote it in Urdu
+
+* **Context:** Staff working in the admin are the first to notice when bookings fail or
+  messages lag. A banner where they work tells them Hatti knows, before they ring support
+  (ADR-498, BIL-06).
+* **Decision:**
+  * **Every page of a shop's admin asks `platformStatus` when it opens, and every minute after,**
+    as often as the edge keeps the status page. The admin shows a banner under the header while
+    anything goes on, or maintenance begins within a day. Nothing shows while all is well, or
+    while Hatti can't be asked.
+  * **Each incident's line gives:**
+    * its title;
+    * its status, how badly, and the parts it touches;
+    * maintenance's times, in the shop's time zone;
+    * what Hatti said last;
+    * a link to the status page.
+    In Urdu the admin shows Hatti's Urdu title and words where Hatti gave them, else its
+    English.
+  * **An outage has a red edge, and anything else an amber one.** Maintenance not yet begun is
+    amber even when it will take things down.
+  * The test core answers `PlatformStatus` with all well unless a test answers it, and leaves it
+    out of what was sent. Pages' tests stay as they were.
+* **Consequences:**
+  * A staff member can't dismiss the banner. It goes when the incident ends.
+  * Nothing else of the admin changes while Hatti is down: its pages fail as they would.
+* **Alternatives:**
+  * **Asking only when the admin opens:** staff keep it open all day.
+  * **Pushing incidents to open admins:** the admin has no channel from the core for them yet,
+    and a minute is soon enough for news a person posts.
