@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Partners' revenue share
+### acf2388 · Partners' revenue share
 
 * **Partners earn 20% of each plan invoice a store they brought pays, recorded as it is paid,
   owed until Hatti's people pay it into their bank account** ([ADR-505](../architecture/13-decision-log.md#adr-505--partners-revenue-share-20-of-each-plan-invoice-a-store-they-brought-pays-recorded-as-it-is-paid-owed-until-hattis-people-pay-it-into-their-bank-account), PRT-02).
