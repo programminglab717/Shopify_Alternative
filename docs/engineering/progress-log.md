@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### The admin's inbox
+### f771c0d · The admin's inbox
 
 * **The admin's inbox lists a shop's WhatsApp conversations open, unread or closed, and a
   conversation's page reads, closes and reopens it, and answers within the day WhatsApp allows**
