@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Orders sent to Google
+### 369b1c8 · Orders sent to Google
 
 * **Orders placed through checkout go to Google Analytics' Measurement Protocol from the worker
   beside Meta's and TikTok's, for Google Ads to import its purchase as a conversion** ([ADR-547](../architecture/13-decision-log.md#adr-547--orders-placed-through-checkout-go-to-google-analytics-measurement-protocol-from-the-worker-beside-metas-and-tiktoks-the-shop-connecting-its-web-stream-with-an-api-secret-for-google-ads-to-import-its-purchase-as-a-conversion),
