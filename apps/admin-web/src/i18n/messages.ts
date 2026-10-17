@@ -2930,7 +2930,12 @@ const en = {
     'Goes in the parcel: the items left to ship, where it goes and the cash to collect, without prices.',
   'print.kind.INVOICE': 'Invoice',
   'print.kind.INVOICE.hint':
-    'What was bought at what price, what was paid and what is left to pay.',
+    "What was bought at what price, what was paid and what is left to pay. The first print issues it, numbered in the shop's series.",
+  'print.kind.CREDIT_NOTE': 'Credit notes',
+  'print.kind.CREDIT_NOTE.hint':
+    'What was refunded once the invoice was issued, a page for each credit note.',
+  'order.invoice': 'Invoice issued {date}:',
+  'money.creditNote': 'Credit note',
   'print.paper': 'Paper',
   'print.paper.A4': 'A4',
   'print.paper.THERMAL_4X6': '4×6 label printer',
@@ -7292,7 +7297,13 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'print.kind.PACKING_SLIP.hint':
     'پارسل میں جاتی ہے: بھیجنے کو باقی چیزیں، کہاں جانا ہے اور وصول کرنے کی رقم، قیمتوں کے بغیر۔',
   'print.kind.INVOICE': 'انوائس',
-  'print.kind.INVOICE.hint': 'کیا کس قیمت پر خریدا گیا، کتنا ادا ہوا اور کتنا ادا کرنا باقی ہے۔',
+  'print.kind.INVOICE.hint':
+    'کیا کس قیمت پر خریدا گیا، کتنا ادا ہوا اور کتنا ادا کرنا باقی ہے۔ پہلی بار پرنٹ ہونے پر یہ دکان کی سیریز کے نمبر کے ساتھ جاری ہوتی ہے۔',
+  'print.kind.CREDIT_NOTE': 'کریڈٹ نوٹس',
+  'print.kind.CREDIT_NOTE.hint':
+    'انوائس جاری ہونے کے بعد واپس کی گئی رقم، ہر کریڈٹ نوٹ کا ایک صفحہ۔',
+  'order.invoice': 'انوائس جاری ہوئی {date}:',
+  'money.creditNote': 'کریڈٹ نوٹ',
   'print.paper': 'کاغذ',
   'print.paper.A4': 'A4',
   'print.paper.THERMAL_4X6': '4×6 لیبل پرنٹر',

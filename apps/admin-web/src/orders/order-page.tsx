@@ -30,7 +30,7 @@ import type {
   OrderStage,
 } from '../api/types';
 import { errorText } from '../i18n/errors';
-import { formatCount, formatDateTime, formatPhone } from '../i18n/format';
+import { formatCount, formatDate, formatDateTime, formatPhone } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import type { MessageKey } from '../i18n/messages';
 import { READS_CUSTOMERS } from '../customers/customers-page';
@@ -357,6 +357,14 @@ export function OrderPage() {
           {t(`order.payment.${order.paymentMethod}` as MessageKey)}
           {order.assignee ? ` · ${t('order.assignee', { name: order.assignee.name })}` : ''}
         </p>
+        {order.invoice && (
+          <p className="text-secondary">
+            {t('order.invoice', { date: formatDate(order.invoice.issuedAt, timezone, locale) })}{' '}
+            <span dir="ltr" className="num">
+              {order.invoice.number}
+            </span>
+          </p>
+        )}
         {order.cancelReason && (
           <p className="text-secondary">
             {t('order.cancelledBecause', {

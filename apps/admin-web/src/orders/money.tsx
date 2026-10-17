@@ -521,6 +521,14 @@ export function OrderMoney({ order, timezone }: { order: OrderDetail; timezone: 
                   </>
                 )}
               </span>
+              {refund.creditNote && (
+                <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                  {t('money.creditNote')}{' '}
+                  <span dir="ltr" className="num">
+                    {refund.creditNote.number}
+                  </span>
+                </span>
+              )}
               {refund.receipt && (
                 <a
                   href={refund.receipt.url}

@@ -229,6 +229,39 @@ describe("An order's money, on its page", () => {
     );
     expect(refundable({ amountPaid: rupees('100'), amountRefunded: rupees('100') })).toBe('0');
   });
+  it("shows the order's invoice number and a refund's credit note (ADR-497)", async () => {
+    const fake = core(
+      'owner',
+      order('7700', {
+        invoice: { number: 'INV/2026-27/00012', issuedAt: LATER },
+        amountRefunded: rupees('500'),
+        refunds: [
+          {
+            id: 'rfd_4',
+            amount: rupees('500'),
+            method: 'CASH',
+            note: '',
+            reference: null,
+            createdAt: LATER,
+            receipt: null,
+            creditNote: { number: 'CN/2026-27/00003' },
+          },
+        ],
+      }),
+    );
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/orders/ord_7');
+
+    expect(await screen.findByText('INV/2026-27/00012')).toBeTruthy();
+    expect(screen.getByText(/^Invoice issued/)).toBeTruthy();
+    const money = screen.getByRole('region', { name: 'Payments and refunds' });
+    expect(within(money).getByText('CN/2026-27/00003')).toBeTruthy();
+    expect(within(money).getByText(/^Credit note/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Print' }));
+    expect(await screen.findByRole('radio', { name: /^Credit notes/ })).toBeTruthy();
+  });
+
   it("pays an order not yet shipped with its customer's store credit, as much as it covers", async () => {
     const customer = { id: 'cus_1', displayName: 'Ayesha Khan', numberOfOrders: 2 };
     const fake = core('manager', order('0', { stage: 'TO_PACK', customer }));

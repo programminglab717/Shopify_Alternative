@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Invoices and credit notes in the admin
+
+* **An order's page shows its invoice number and its refunds' credit notes, and credit notes
+  print beside slips and invoices** ([ADR-497](../architecture/13-decision-log.md#adr-497--invoices-and-credit-notes-in-the-admin-an-orders-invoice-number-and-its-refunds-credit-notes-on-its-page-and-credit-notes-printed-beside-slips-and-invoices), TAX-05 in part).
+* 3099 tests, 1 more: the order page's numbers and the print choice.
+
 ### 94938ea · Credit notes
 
 * **Money refunded once an order's invoice is issued goes on a credit note in a series of its

@@ -188,6 +188,10 @@ export const OrderQuery = /* GraphQL */ `
       confirmationStatus
       cancelReason
       overPlanLimit
+      invoice {
+        number
+        issuedAt
+      }
       note
       giftMessage
       tags
@@ -267,6 +271,9 @@ export const OrderQuery = /* GraphQL */ `
         receipt {
           url
           mimeType
+        }
+        creditNote {
+          number
         }
       }
       codAmount {

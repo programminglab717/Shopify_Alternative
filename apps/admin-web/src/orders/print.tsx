@@ -1,4 +1,5 @@
 /** Packing slips and invoices printed from the browser (ORD-06), as the core makes them. */
+import { useQueryClient } from '@tanstack/react-query';
 import { Printer } from 'lucide-react';
 import { useId, useState } from 'react';
 import { OrderDocumentQuery } from '../api/operations';
@@ -18,7 +19,7 @@ import { Button } from '../ui/button';
 import { Alert, Card } from '../ui/feedback';
 import { openPrintTab } from '../ui/print';
 
-const KINDS: readonly OrderDocumentKind[] = ['PACKING_SLIP', 'INVOICE'];
+const KINDS: readonly OrderDocumentKind[] = ['PACKING_SLIP', 'INVOICE', 'CREDIT_NOTE'];
 const PAPERS: readonly PaperSize[] = ['A4', 'THERMAL_4X6', 'THERMAL_80MM'];
 const LANGUAGES: readonly DocumentLanguage[] = ['BILINGUAL', 'ENGLISH', 'URDU'];
 
@@ -70,6 +71,7 @@ export function PrintPanel({
 }) {
   const { t } = useLocale();
   const store = useSessionStore();
+  const queryClient = useQueryClient();
   const shopId = useShop().id;
   const radios = useId();
   const [choice, setChoice] = useState<Choice>(keptChoice);
@@ -92,6 +94,8 @@ export function PrintPanel({
         ...choice,
       });
       tab.show(orderDocument.html);
+      // An invoice printed is issued, its number on the order from now on (ADR-495).
+      if (choice.kind === 'INVOICE') void queryClient.invalidateQueries({ queryKey: ['order'] });
       onDone();
     } catch (failure) {
       tab.close();

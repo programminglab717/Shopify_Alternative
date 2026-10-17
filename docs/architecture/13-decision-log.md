@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-496 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-497 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -504,6 +504,7 @@
 | 494 | Payouts and tax withheld in the admin: a month or Pakistan's tax year, who paid, and the statements that withheld tax to download for the shop's return | Accepted |
 | 495 | Invoice series: an order's invoice numbered in the shop's own series when first printed, counted afresh each tax year from 1 July, with no number skipped or given twice | Accepted |
 | 496 | Credit notes: money refunded on an order whose invoice was issued goes on a credit note numbered in a series of its own, printed against the invoice it corrects | Accepted |
+| 497 | Invoices and credit notes in the admin: an order's invoice number and its refunds' credit notes on its page, and credit notes printed beside slips and invoices | Accepted |
 
 ---
 
@@ -18776,3 +18777,20 @@
     issued.
   * **A credit note made when printed, as invoices are:** a refund on an invoiced order always
     needs one, and numbering it with the refund keeps the series in the order money went back.
+
+## ADR-497 · Invoices and credit notes in the admin: an order's invoice number and its refunds' credit notes on its page, and credit notes printed beside slips and invoices
+
+* **Context:** Invoices (ADR-495) and credit notes (ADR-496) were numbered and printed through
+  the Admin API alone. Staff answering a customer, or the shop's accountant, need the numbers
+  where the order is.
+* **Decision:**
+  * **An order's page says when its invoice was issued, and its number,** under when the order
+    was placed. Each refund in "Payments and refunds" names its credit note when it has one.
+  * **The print panel offers credit notes beside packing slips and invoices,** a page for each,
+    on the paper and in the language chosen. The invoice's hint says the first print issues it.
+    Once an invoice is printed, the order is read again so its number shows.
+* **Consequences:**
+  * Orders' lists don't show invoice numbers yet, and orders can't be searched by them.
+* **Alternatives:**
+  * **A tab of invoices and credit notes on the order:** a line under the order's date and one on
+    each refund say all there is, without another place to look.
