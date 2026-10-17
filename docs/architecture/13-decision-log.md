@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-503 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-504 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -511,6 +511,7 @@
 | 501 | Products from a shop's Instagram posts: productsImport reads its posts as Instagram gives them, each a draft product made of what its caption says | Accepted |
 | 502 | The store builder: a shop set up from a few lines saying what it sells, its kit, theme colour, About us page and home page SEO, leaving what it set | Accepted |
 | 503 | Auto-crop: a product's photos cropped to the product against a plain backdrop, in the shape asked, through the crops a shop makes, leaving busy photos | Accepted |
+| 504 | Partners: agencies open development stores, closed to shoppers until handed to their clients as any shop is handed over, and see every store they built, brought or work in | Accepted |
 
 ---
 
@@ -19031,3 +19032,56 @@
   * **A model finding the product:** a call per photo for what a plain backdrop already tells.
   * **Padding photos to the shape:** that needs a new image made, with a colour that matches. A
     crop keeps the photo the shop took.
+
+## ADR-504 · Partners: agencies open development stores, closed to shoppers until handed to their clients as any shop is handed over, and see every store they built, brought or work in
+
+* **Context:** In Pakistan, agencies and freelancers set up many stores for others. They need to
+  build a store before its owner has an account or has paid, and hand it over when it is ready.
+  They need to see the stores they work for in one place. Collaborator access (ADR-487, ADR-488)
+  lets them into a client's store, but not build one for a client to receive (PRT-01).
+* **Decision:**
+  * **Joining:** an account joins Hatti's partner programme from `/auth/partner` with a business
+    name and, optionally, an https website. It is given a referral code of eight letters and
+    digits that read apart, for the stores it brings (PRT-02). Changing its details keeps the code.
+  * **Development stores:**
+    * A partner opens one from `/auth/partner/stores`, as an owner opens a shop (ADR-145), and owns
+      it while building it. The shop is marked `development` in the shop directory.
+    * It counts against none of the five shops an account may own. A partner builds at most 20 at
+      once.
+    * Its storefront answers every page with Hatti's "This store opens soon" page, in English and
+      Urdu: 503, never kept, not indexed. Scripts get the same in a line. Its staff's previews show
+      the store as it is.
+  * **Handing it over is the handover every shop has (ADR-104).**
+    * The partner invites the client as a manager, the client adds a second factor, and the
+      partner hands the shop to them.
+    * The first handover of a development store opens it, in the same transaction. The shop is no
+      longer `development`, the store is kept as transferred to the client, and an event republishes
+      the shop's document.
+    * The partner stays on as a manager, as a previous owner does, for the client to keep or remove.
+  * **The dashboard** (`GET /auth/partner`) lists the partner's stores, newest first:
+    * development stores, still being built or handed over;
+    * stores referred by the partner;
+    * clients' stores where the partner works through staff or collaborator access, though not as
+      owner.
+    Each store has its handle, the partner's role there and, for a collaborator, when their access
+    ends. A shop the partner owns as a merchant is left out.
+  * In the database, the identity login may only update a shop's `development` flag, and only from
+    true to false. It may record in the outbox only the event saying a store was handed over.
+  * The admin has a page for partners, linked from the shop choice. It has a join form, a form to
+    open a development store, and the list of stores with their kind and role. A store's name opens
+    it.
+* **Consequences:**
+  * A development store's checkout is not closed. Shoppers can't reach it with the storefront
+    closed. Its staff may place test orders, and those count against the free plan's month as any
+    shop's do.
+  * Referred stores and revenue share come with PRT-02. The referral code is given now, so links
+    made with it last.
+  * Store transfer to someone with no account yet waits for them to sign up and accept the
+    invitation. The handover itself is unchanged.
+* **Alternatives:**
+  * **A separate transfer flow by email:** it would duplicate the handover's checks (a manager, a
+    second factor, one owner throughout) for no gain.
+  * **The storefront password for development stores:** a shop's password is its own to set and
+    share, while a development store must stay closed until handed over, whatever its builder sets.
+  * **A plan of its own for development stores:** billing stays as it is until shops are billed
+    differently by kind.

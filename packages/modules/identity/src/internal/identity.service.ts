@@ -14,7 +14,7 @@ import {
   sha256,
   verifyTotp,
 } from '@hatti/crypto';
-import { isUniqueViolation, type Db, type Tx } from '@hatti/db';
+import { isUniqueViolation, type Db } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { fromPublicId, newId, toPublicId, tryFromPublicId } from '@hatti/ids';
 import { parsePkMobile } from '@hatti/pk';
@@ -110,6 +110,7 @@ import {
   ShopEvents,
   handleFrom,
   handleProblem,
+  insertShop,
   type ShopOpenedPayload,
 } from './shops.js';
 import { SIGN_IN_ALERT, describeDevice, pakistanTime } from './sign-in-alerts.js';
@@ -2252,10 +2253,18 @@ export class IdentityService {
       throw new AuthError('INVALID_INPUT', 422, 'Some details need fixing', { fields });
     }
     return this.db.transaction(async (tx) => {
+      // A partner's development stores are counted apart (ADR-504).
       const [owned] = await tx
         .select({ count: sql<number>`count(*)::int` })
         .from(memberships)
-        .where(and(eq(memberships.userId, auth.userId), eq(memberships.role, 'owner')));
+        .where(
+          and(
+            eq(memberships.userId, auth.userId),
+            eq(memberships.role, 'owner'),
+            sql`NOT EXISTS (SELECT 1 FROM control.shops s
+                             WHERE s.id = ${memberships.shopId} AND s.development)`,
+          ),
+        );
       if ((owned?.count ?? 0) >= SHOP_LIMITS.ownedShops) {
         throw new AuthError(
           'TOO_MANY_SHOPS',
@@ -2264,7 +2273,7 @@ export class IdentityService {
         );
       }
       const shopId = newId();
-      const handle = await this.#insertShop(tx, shopId, name, asked ?? handleFrom(name), {
+      const handle = await insertShop(tx, shopId, name, asked ?? handleFrom(name), {
         numbered: asked === null,
       });
       await tx.insert(memberships).values({ userId: auth.userId, shopId, role: 'owner' });
@@ -2282,41 +2291,6 @@ export class IdentityService {
         role: 'owner',
         mfaRequired: MFA_REQUIRED_ROLES.has('owner'),
       };
-    });
-  }
-
-  /**
-   * Adds the shop under `handle`, or, `numbered`, the first of `handle-2`, `handle-3` … no other
-   * shop has; the handle it took.
-   */
-  async #insertShop(
-    tx: Tx,
-    shopId: string,
-    name: string,
-    handle: string,
-    options: { numbered: boolean },
-  ): Promise<string> {
-    // The identity login inserts these columns alone; the others take the table's defaults.
-    const insert = async (candidate: string) =>
-      (
-        await tx.execute(sql`
-          INSERT INTO control.shops (id, name, handle) VALUES (${shopId}, ${name}, ${candidate})
-              ON CONFLICT (handle) DO NOTHING
-          RETURNING handle`)
-      ).rows.length > 0;
-    for (let attempt = 1; attempt <= 20; attempt += 1) {
-      const suffix = attempt === 1 ? '' : `-${attempt}`;
-      const candidate = `${handle.slice(0, 40 - suffix.length).replace(/-+$/, '')}${suffix}`;
-      if (await insert(candidate)) return candidate;
-      if (!options.numbered) break;
-    }
-    if (options.numbered) {
-      // Twenty taken: a random suffix, as unlikely to be taken as a shop's ID.
-      const candidate = `${handle.slice(0, 31).replace(/-+$/, '')}-${randomBytes(4).toString('hex')}`;
-      if (await insert(candidate)) return candidate;
-    }
-    throw new AuthError('HANDLE_TAKEN', 409, 'Another shop has this handle', {
-      fields: { handle: 'Taken by another shop' },
     });
   }
 

@@ -20,6 +20,11 @@ const WORDS = {
   title: { en: 'This shop is taking a short break', ur: 'یہ دکان کچھ دیر کے لیے بند ہے' },
   askOnWhatsapp: { en: 'Message the shop on WhatsApp', ur: 'دکان کو واٹس ایپ پر پیغام بھیجیں' },
   track: { en: 'Track your order', ur: 'اپنا آرڈر ٹریک کریں' },
+  opensSoon: { en: 'This store opens soon', ur: 'یہ دکان جلد کھلے گی' },
+  beingBuilt: {
+    en: 'It is being built. Come back to shop here once it opens.',
+    ur: 'یہ ابھی بن رہی ہے۔ کھلنے پر یہاں خریداری کے لیے دوبارہ آئیں۔',
+  },
 } satisfies Record<string, Words>;
 
 /** The seconds a paused shop's answers ask to wait, for their Retry-After header. */
@@ -74,6 +79,27 @@ export function maintenancePage(
       <p class="center">
         <a href="${options.urdu ? '/ur/track' : '/track'}">${say('bilingual', WORDS.track)}</a>
       </p>
+    `,
+  });
+}
+
+/**
+ * The page a partner's development store shows shoppers while it is built (PRT-01, ADR-504): its
+ * logo or name, and that it opens soon. Nothing of its own runs; its staff's previews show it.
+ */
+export function developmentPage(shop: ShopDoc): RenderedPage {
+  const logo = shop.brand?.logo ?? null;
+  return renderPage({
+    title: `${WORDS.opensSoon.en} · ${shop.name}`,
+    images: logo ? [logo] : [],
+    body: html`
+      ${
+        logo
+          ? html`<p class="shop"><img class="logo" src="${logo}" alt="${shop.name}" /></p>`
+          : html`<p class="shop"><bdi>${shop.name}</bdi></p>`
+      }
+      <h1 class="title stack">${say('bilingual', WORDS.opensSoon)}</h1>
+      <div class="text center muted">${say('bilingual', WORDS.beingBuilt)}</div>
     `,
   });
 }

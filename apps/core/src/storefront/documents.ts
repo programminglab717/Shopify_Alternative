@@ -642,6 +642,8 @@ export function shopDoc(
     }),
     // Taken down by Hatti (ADR-461), left out while it is not, likewise.
     ...(profile.status === 'suspended' && { suspended: true as const }),
+    // Built by a partner, not yet handed over (ADR-504), left out once it is, likewise.
+    ...(profile.development && { development: true as const }),
     // Verified by Hatti (ADR-465), left out while it is not, likewise.
     ...(verified && { verified }),
     // Its return window (ADR-468), left out while it says nothing of it, likewise.

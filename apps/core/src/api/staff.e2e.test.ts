@@ -238,6 +238,47 @@ describe.skipIf(!server)('staff sign-in and Admin API access', () => {
       expect((await post('/auth/shops', { handle: 7 }, accessToken)).statusCode).toBe(400);
     });
 
+    it('lets a partner open development stores and see them on its dashboard (PRT-01, ADR-504)', async () => {
+      const { accessToken } = await signUp();
+      expect((await get('/auth/partner', accessToken)).json()).toEqual({
+        partner: null,
+        stores: [],
+      });
+      expect((await post('/auth/partner/stores', { name: 'Zari' }, accessToken)).json()).toEqual({
+        error: { code: 'NOT_PARTNER', message: "Join Hatti's partner programme first" },
+      });
+      const joined = await post(
+        '/auth/partner',
+        { businessName: 'Pixel Media', website: 'https://pixel.pk' },
+        accessToken,
+      );
+      expect([joined.statusCode, joined.headers['cache-control']]).toEqual([200, 'no-store']);
+      expect(joined.json()).toMatchObject({
+        partner: { businessName: 'Pixel Media', website: 'https://pixel.pk' },
+      });
+      const opened = await post('/auth/partner/stores', { name: 'Noor Jewels' }, accessToken);
+      expect(opened.statusCode).toBe(201);
+      const { shop } = opened.json() as { shop: { id: string } };
+      expect(shop).toMatchObject({ name: 'Noor Jewels', handle: 'noor-jewels', role: 'owner' });
+      const dashboard = (await get('/auth/partner', accessToken)).json() as {
+        stores: Record<string, unknown>[];
+      };
+      expect(dashboard.stores).toEqual([
+        {
+          id: shop.id,
+          name: 'Noor Jewels',
+          handle: 'noor-jewels',
+          status: 'active',
+          kind: 'development',
+          role: 'owner',
+          accessEndsAt: null,
+          since: expect.any(String),
+          transferredAt: null,
+        },
+      ]);
+      expect((await post('/auth/partner', { businessName: 7 }, accessToken)).statusCode).toBe(400);
+    });
+
     it('rotates tokens on refresh', async () => {
       const { refreshToken, accessToken } = await signUp();
       const response = await post('/auth/refresh', { refreshToken });

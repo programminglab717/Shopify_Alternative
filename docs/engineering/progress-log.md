@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Partners
+
+* **Agencies open development stores, closed to shoppers until handed to their clients as any
+  shop is handed over, and see every store they built, brought or work in** ([ADR-504](../architecture/13-decision-log.md#adr-504--partners-agencies-open-development-stores-closed-to-shoppers-until-handed-to-their-clients-as-any-shop-is-handed-over-and-see-every-store-they-built-brought-or-work-in), PRT-01).
+* 3130 tests, 7 more: partners and their stores in identity, through
+  /auth, the document and storefront of a development store, and the admin's partner page.
+
 ### 0421119 · Auto-crop
 
 * **A product's photos are cropped to the product against a plain backdrop, in the shape asked,

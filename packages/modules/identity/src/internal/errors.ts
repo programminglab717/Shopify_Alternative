@@ -52,7 +52,8 @@ export type AuthErrorCode =
   | 'INVALID_REQUEST'
   | 'SHOP_NOT_FOUND'
   | 'TOO_MANY_REQUESTS'
-  | 'REQUEST_WAITING';
+  | 'REQUEST_WAITING'
+  | 'NOT_PARTNER';
 
 /** An expected failure with an HTTP status and a stable code for clients. */
 export class AuthError extends Error {

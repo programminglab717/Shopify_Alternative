@@ -394,6 +394,9 @@ export function itemsFor(event: DomainEvent): string[] {
     case ShopEvents.ShopOpened:
       // Its storefront, at its handle's subdomain: a shop without documents gets all of them.
       return [Items.everything];
+    case ShopEvents.DevelopmentStoreTransferred:
+      // Its document says whether a partner still builds it (ADR-504).
+      return [Items.shop];
     case TrustEvents.StoreSuspended:
     case TrustEvents.StoreRestored:
       // Its document says whether Hatti took it down (ADR-461).
@@ -457,6 +460,7 @@ export const PUBLISHED_EVENTS = [
   FileEvents.ShopBrandUpdated,
   FileEvents.FileDeleted,
   ShopEvents.ShopOpened,
+  ShopEvents.DevelopmentStoreTransferred,
   TrustEvents.StoreSuspended,
   TrustEvents.StoreRestored,
   TrustEvents.VerificationChanged,

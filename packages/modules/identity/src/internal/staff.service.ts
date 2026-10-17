@@ -33,6 +33,7 @@ import {
 } from './account-emails.js';
 import { suppressed } from './email-feedback.js';
 import { AuthError } from './errors.js';
+import { developmentStoreTransferred } from './partners.service.js';
 import {
   ipOf,
   normalizeEmail,
@@ -660,6 +661,8 @@ export class StaffService {
         .set({ role: 'manager', updatedAt: now })
         .where(member(actor.userId));
       await tx.update(memberships).set({ role: 'owner', updatedAt: now }).where(member(userId));
+      // A partner's development store opens as it goes to its client (ADR-504).
+      await developmentStoreTransferred(tx, shopId, userId, now);
       await this.recordEvent(tx, actor.userId, 'shop_handed_over', client);
       await this.recordEvent(tx, userId, 'shop_received', client);
       const staff = await this.staffIn(tx, shopId);

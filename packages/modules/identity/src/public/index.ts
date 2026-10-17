@@ -70,6 +70,13 @@ export {
   handleProblem,
   type ShopOpenedPayload,
 } from '../internal/shops.js';
+export {
+  PARTNER_LIMITS,
+  PartnersService,
+  type PartnerProfile,
+  type PartnerStore,
+  type PartnerStoreKind,
+} from '../internal/partners.service.js';
 export { PASSKEY_LIMITS, type PasskeyInfo, type PasskeySettings } from '../internal/passkeys.js';
 export { DEVICE_HEADER, SIGN_IN_ALERT } from '../internal/sign-in-alerts.js';
 export {

@@ -70,7 +70,7 @@ import {
   sitemapPages,
 } from './sitemap.js';
 import { LINK_TAP_PATH, linkKey, linkTargets, tapTarget } from './link-page.js';
-import { maintenancePage, retryAfterOf } from './maintenance.js';
+import { developmentPage, maintenancePage, retryAfterOf } from './maintenance.js';
 import {
   EMPTY_REPORT,
   EMPTY_RIGHTS,
@@ -858,6 +858,26 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       // Not published: the handler says so.
       if (error instanceof StoreMissingError) return;
       throw error;
+    }
+    if (doc.development) {
+      // A partner builds it (ADR-504): shoppers wait for it to open; its staff's previews pass.
+      reply.header('cache-control', 'private, no-store').header('x-robots-tag', 'noindex');
+      const url = new URL(request.url, 'http://storefront');
+      const page =
+        (request.method === 'GET' || request.method === 'HEAD') &&
+        !fromScript(request) &&
+        !asksForSections(url) &&
+        !/\.(js|json|xml|atom)$/.test(url.pathname);
+      if (!page) {
+        return reply.code(503).type('text/plain; charset=utf-8').send('This store opens soon.\n');
+      }
+      const soon = developmentPage(doc);
+      return reply
+        .code(503)
+        .header('content-security-policy', soon.contentSecurityPolicy)
+        .header('x-content-type-options', 'nosniff')
+        .type('text/html; charset=utf-8')
+        .send(soon.html);
     }
     const { maintenance } = doc;
     const now = new Date();

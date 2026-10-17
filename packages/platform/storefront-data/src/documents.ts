@@ -485,6 +485,12 @@ export interface ShopDoc {
    */
   suspended?: true;
   /**
+   * True while a partner builds it as a development store (PRT-01, ADR-504): its storefront tells
+   * shoppers it opens soon, and shows its staff's previews alone. Absent once it is handed to its
+   * client, as in documents written before partners.
+   */
+  development?: true;
+  /**
    * What Hatti verified of it and stands by (ONB-11, ADR-465): `identity`, who runs it, by their
    * CNIC; or `business`, its NTN too. Its storefront shows a shop verified as such (OS-11). Absent
    * for none, as in documents written before shops could be verified.

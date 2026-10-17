@@ -780,6 +780,17 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect((await store().shop()).suspended).toBeUndefined();
   });
 
+  it('says in its document that a partner builds the shop, until it is handed over (ADR-504)', async () => {
+    const development = (value: boolean) =>
+      admin.query('UPDATE control.shops SET development = $2 WHERE id = $1', [shopId, value]);
+    await development(true);
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).development).toBe(true);
+    await development(false);
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).development).toBeUndefined();
+  });
+
   it('says in its document what Hatti verified of the shop, and stops when it is taken back (ADR-465)', async () => {
     const verify = (level: string) =>
       admin.query(

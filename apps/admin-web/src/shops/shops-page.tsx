@@ -73,6 +73,20 @@ function AskAccessLink() {
   );
 }
 
+/** For an agency that builds stores for others: Hatti's partner programme (ADR-504). */
+function PartnersLink() {
+  const { t } = useLocale();
+  return (
+    <Link
+      to="/partners"
+      className="inline-flex min-h-10 items-center gap-2 self-center text-secondary underline"
+    >
+      <Store aria-hidden className="size-5" />
+      {t('shops.partners')}
+    </Link>
+  );
+}
+
 /**
  * The shops the account works in, each with its role there: one alone opens at once; none asks
  * for the merchant's first.
@@ -117,6 +131,7 @@ export function ShopsPage() {
       <AuthLayout title={t('shops.openTitle')}>
         <OpenShopForm first />
         <AskAccessLink />
+        <PartnersLink />
       </AuthLayout>
     );
   }
@@ -150,6 +165,7 @@ export function ShopsPage() {
             {t('shops.open')}
           </Button>
           <AskAccessLink />
+          <PartnersLink />
         </div>
       )}
     </AuthLayout>

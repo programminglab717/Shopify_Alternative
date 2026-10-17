@@ -2622,6 +2622,27 @@ describe('Carts', () => {
     await over.close();
   });
 
+  it("shows a partner's development store as opening soon, to all but its staff's previews (ADR-504)", async () => {
+    const sample = sampleStore();
+    const app = server({
+      sample: new MemoryStore({ ...sample, shop: { ...sample.shop, development: true } }),
+    });
+    const get = (url: string, headers: Record<string, string> = {}) =>
+      app.inject({ method: 'GET', url, headers: { host: 'localhost', ...headers } });
+    for (const url of ['/', `/ur/products/${lawn.handle}`, '/collections/all']) {
+      const answer = await get(url);
+      expect(
+        [answer.statusCode, answer.headers['cache-control'], answer.headers['x-robots-tag']],
+        url,
+      ).toEqual([503, 'private, no-store', 'noindex']);
+      expect(answer.body, url).toContain('This store opens soon');
+    }
+    expect((await get('/cart.js')).body).toBe('This store opens soon.\n');
+    core.previews.set(PREVIEW_TOKEN, previewing('Winter', 'Winter Sale'));
+    expect((await get('/', { cookie: `hatti_preview=${PREVIEW_TOKEN}` })).statusCode).toBe(200);
+    await app.close();
+  });
+
   it("answers every address of a store Hatti took down with Hatti's page saying so (ADR-461)", async () => {
     const sample = sampleStore();
     const app = server({

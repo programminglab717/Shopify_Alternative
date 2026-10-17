@@ -1,6 +1,6 @@
 import type { Tx } from '@hatti/db';
 import { eq } from 'drizzle-orm';
-import { pgSchema, text, uuid } from 'drizzle-orm/pg-core';
+import { boolean, pgSchema, text, uuid } from 'drizzle-orm/pg-core';
 
 // The shop directory belongs to the control plane, which replicates it read-only into cells.
 // Request code reads its own shop's entry; row-level security shows it no other.
@@ -11,6 +11,7 @@ const shops = pgSchema('control').table('shops', {
   status: text('status').$type<ShopStatus>().notNull(),
   currency: text('currency').notNull(),
   timezone: text('timezone').notNull(),
+  development: boolean('development').notNull(),
 });
 
 export type ShopStatus = 'active' | 'suspended' | 'closed';
@@ -26,6 +27,8 @@ export interface ShopProfile {
   currency: string;
   /** IANA time zone, e.g. Asia/Karachi. */
   timezone: string;
+  /** A partner's development store, closed to shoppers until handed over (ADR-504). */
+  development: boolean;
 }
 
 /** The shop's entry in the shop directory, read in a tenant transaction of that shop. */

@@ -111,6 +111,7 @@ import { StaffPage } from './settings/staff-page';
 import { MorePage, Shell } from './shell/shell';
 import { ShippingPage, validateShippingSearch } from './shipping/shipping-page';
 import { AccessRequestPage } from './shops/access-request-page';
+import { PartnerPage } from './shops/partner-page';
 import { ShopsPage } from './shops/shops-page';
 import { NewTransferPage, validateNewTransferSearch } from './transfers/new-transfer-page';
 import { TransferPage } from './transfers/transfer-page';
@@ -220,6 +221,13 @@ const askAccess = createRoute({
   path: '/access',
   beforeLoad: requireSignedIn,
   component: AccessRequestPage,
+});
+
+const partners = createRoute({
+  getParentRoute: () => root,
+  path: '/partners',
+  beforeLoad: requireSignedIn,
+  component: PartnerPage,
 });
 
 const shop = createRoute({
@@ -863,6 +871,7 @@ export const routeTree = root.addChildren([
   twoStep,
   shops,
   askAccess,
+  partners,
   invitation,
   forgotPassword,
   resetPassword,

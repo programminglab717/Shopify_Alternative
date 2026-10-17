@@ -32,6 +32,7 @@ import {
 } from './passkeys.js';
 import { DEVICE_HEADER } from './sign-in-alerts.js';
 import { StaffService, type AccessRequestRecord } from './staff.service.js';
+import { PartnersService, type PartnerProfile, type PartnerStore } from './partners.service.js';
 import { SupportAccessService } from './support-access.service.js';
 
 /** Sends {@link AuthError}s as `{ error: { code, message, fields? } }` with their status. */
@@ -130,6 +131,10 @@ const reauthenticationCodeBody = phoneCodeBody.omit({ phone: true });
 const refreshBody = z.object({ refreshToken: z.string().max(100) });
 const shopBody = z.object({ name: z.string().max(1_024), handle: z.string().max(100).nullish() });
 const codeBody = z.object({ code: z.string().max(32) });
+const partnerBody = z.object({
+  businessName: z.string().max(1_024),
+  website: z.string().max(1_024).nullish(),
+});
 
 function parse<T extends z.ZodType>(schema: T, body: unknown): z.output<T> {
   const result = schema.safeParse(body ?? {});
@@ -197,6 +202,31 @@ function accessRequestJson(request: AccessRequestRecord) {
   };
 }
 
+/** A partner as they see themselves (ADR-504). */
+function partnerJson(partner: PartnerProfile) {
+  return {
+    businessName: partner.businessName,
+    website: partner.website,
+    referralCode: partner.referralCode,
+    joinedAt: partner.joinedAt.toISOString(),
+  };
+}
+
+/** A store on a partner's dashboard (ADR-504). */
+function partnerStoreJson(store: PartnerStore) {
+  return {
+    id: toPublicId('shop', store.shopId),
+    name: store.name,
+    handle: store.handle,
+    status: store.status,
+    kind: store.kind,
+    role: store.role,
+    accessEndsAt: store.accessEndsAt?.toISOString() ?? null,
+    since: store.since.toISOString(),
+    transferredAt: store.transferredAt?.toISOString() ?? null,
+  };
+}
+
 @Controller('auth')
 @UseFilters(AuthErrorFilter)
 export class AuthController {
@@ -204,6 +234,7 @@ export class AuthController {
     private readonly identity: IdentityService,
     private readonly staff: StaffService,
     private readonly support: SupportAccessService,
+    private readonly partners: PartnersService,
   ) {}
 
   @Post('sign-up')
@@ -788,6 +819,54 @@ export class AuthController {
     noStore(reply);
     const requests = await this.staff.accessRequestsBy(await this.session(request));
     return { requests: requests.map(accessRequestJson) };
+  }
+
+  /**
+   * The signed-in account's partner profile and stores (PRT-01, ADR-504): `{ partner, stores }`,
+   * the partner null and the stores none until they join.
+   */
+  @Get('partner')
+  async partner(@Req() request: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
+    noStore(reply);
+    const session = await this.session(request);
+    const partner = await this.partners.profile(session);
+    const stores = partner ? await this.partners.stores(session) : [];
+    return { partner: partner && partnerJson(partner), stores: stores.map(partnerStoreJson) };
+  }
+
+  /**
+   * Joins Hatti's partner programme, or changes the partner's details: `{ businessName, website? }`
+   * (ADR-504). The partner, with the referral code they were given.
+   */
+  @Post('partner')
+  @HttpCode(200)
+  async joinPartners(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const partner = await this.partners.join(await this.session(request), parse(partnerBody, body));
+    return { partner: partnerJson(partner) };
+  }
+
+  /**
+   * Opens a development store for a partner to build (ADR-504): `{ name, handle? }`. Closed to
+   * shoppers until the partner hands it to its client, as an owner hands over any shop.
+   */
+  @Post('partner/stores')
+  @HttpCode(201)
+  async openDevelopmentStore(
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    noStore(reply);
+    const shop = await this.partners.openDevelopmentStore(
+      await this.session(request),
+      parse(shopBody, body),
+    );
+    return { shop };
   }
 
   /**
