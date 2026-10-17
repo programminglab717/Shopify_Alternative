@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Meta's ad spend pulled
+### e76f660 · Meta's ad spend pulled
 
 * **A shop connects its Meta ad account and the worker pulls each day's spend by campaign, what
   the shop typed by hand kept over what Meta says** ([ADR-564](../architecture/13-decision-log.md#adr-564--a-shop-connects-its-meta-ad-account-and-the-worker-pulls-each-days-spend-by-campaign-what-the-shop-typed-by-hand-kept-over-what-meta-says), MKT-12, ANL-03).
