@@ -1733,6 +1733,12 @@ type Collection {
   """Unique, URL-safe name within the shop, e.g. "eid-collection"."""
   handle: String!
   id: ID!
+  metafield(key: String!, namespace: String!): Metafield
+
+  """
+  Its metafields, by namespace and key; in one namespace, if given (ADR-489).
+  """
+  metafields(namespace: String): [Metafield!]!
 
   """The products, in the collection's order."""
   products(
@@ -6619,6 +6625,120 @@ type MetaConversionsUpdatePayload {
   userErrors: [UserError!]!
 }
 
+"""
+Custom data on a product, variant or collection, as Shopify keeps it (ADR-489): a namespace, a key, a type and a value kept as a string.
+"""
+type Metafield {
+  createdAt: DateTime!
+  id: ID!
+  key: String!
+  namespace: String!
+
+  """The product, variant or collection it belongs to."""
+  ownerId: ID!
+  ownerType: MetafieldOwnerType!
+
+  """
+  Its type: single_line_text_field, multi_line_text_field, number_integer, number_decimal, boolean, date, date_time, url, color, json or list.single_line_text_field.
+  """
+  type: String!
+  updatedAt: DateTime!
+
+  """As a string; JSON for json and the list."""
+  value: String!
+}
+
+"""
+A field of the shop's own (ADR-489): its name for the admin, and the type its values take.
+"""
+type MetafieldDefinition {
+  createdAt: DateTime!
+  description: String
+  id: ID!
+  key: String!
+
+  """How many owners of its kind have a value for it."""
+  metafieldsCount: Int!
+  name: String!
+  namespace: String!
+  ownerType: MetafieldOwnerType!
+  type: String!
+  updatedAt: DateTime!
+}
+
+type MetafieldDefinitionCreatePayload {
+  createdDefinition: MetafieldDefinition
+  userErrors: [UserError!]!
+}
+
+type MetafieldDefinitionDeletePayload {
+  deletedDefinitionId: ID
+  userErrors: [UserError!]!
+}
+
+input MetafieldDefinitionInput {
+  description: String
+  key: String!
+  name: String!
+  namespace: String!
+  ownerType: MetafieldOwnerType!
+  type: String!
+}
+
+input MetafieldDefinitionUpdateInput {
+  description: String
+  name: String
+}
+
+type MetafieldDefinitionUpdatePayload {
+  updatedDefinition: MetafieldDefinition
+  userErrors: [UserError!]!
+}
+
+type MetafieldIdentifier {
+  key: String!
+  namespace: String!
+  ownerId: ID!
+}
+
+input MetafieldIdentifierInput {
+  key: String!
+  namespace: String!
+  ownerId: ID!
+}
+
+"""What a metafield belongs to (ADR-489)."""
+enum MetafieldOwnerType {
+  COLLECTION
+  PRODUCT
+  PRODUCTVARIANT
+}
+
+type MetafieldsDeletePayload {
+  """Those it found and deleted."""
+  deletedMetafields: [MetafieldIdentifier!]
+  userErrors: [UserError!]!
+}
+
+input MetafieldsSetInput {
+  key: String!
+  namespace: String!
+
+  """The product, variant or collection to set it on."""
+  ownerId: ID!
+
+  """
+  Its type; its definition's when one names it, which it must agree with.
+  """
+  type: String
+  value: String!
+}
+
+type MetafieldsSetPayload {
+  metafields: [Metafield!]
+  userErrors: [UserError!]!
+}
+
 """An amount of money in a currency."""
 type Money {
   """Decimal amount in major units, e.g. "12500.00"."""
@@ -7236,6 +7356,25 @@ type Mutation {
   Connects the shop's Meta dataset, or changes how its orders go to it (ADR-143): from then on, each order placed through checkout goes to Meta as it is placed, confirmed and delivered, its customer's details hashed. Audited, the token never. Staff confirm who they are first when they signed in over 15 minutes ago.
   """
   metaConversionsUpdate(input: MetaConversionsInput!): MetaConversionsUpdatePayload!
+  metafieldDefinitionCreate(definition: MetafieldDefinitionInput!): MetafieldDefinitionCreatePayload!
+
+  """
+  Deletes a definition; with `deleteAllAssociatedMetafields`, its values on every owner of its kind too.
+  """
+  metafieldDefinitionDelete(deleteAllAssociatedMetafields: Boolean = false, id: ID!): MetafieldDefinitionDeletePayload!
+
+  """
+  Renames a definition or changes its description; its type and key stay.
+  """
+  metafieldDefinitionUpdate(definition: MetafieldDefinitionUpdateInput!, id: ID!): MetafieldDefinitionUpdatePayload!
+
+  """Deletes metafields, up to 25, by their owner, namespace and key."""
+  metafieldsDelete(metafields: [MetafieldIdentifierInput!]!): MetafieldsDeletePayload!
+
+  """
+  Sets metafields on products, variants and collections, up to 25, all or none, as Shopify's metafieldsSet: each made or changed in place, of its type, or its definition's.
+  """
+  metafieldsSet(metafields: [MetafieldsSetInput!]!): MetafieldsSetPayload!
 
   """
   Changes what checkout takes off orders paid online, for orders placed from now on: orders placed before keep what was taken off them. Audited with the discount before and after.
@@ -10112,6 +10251,12 @@ type Product {
 
   """Images, in order."""
   media: [ProductMedia!]!
+  metafield(key: String!, namespace: String!): Metafield
+
+  """
+  Its metafields, by namespace and key; in one namespace, if given (ADR-489).
+  """
+  metafields(namespace: String): [Metafield!]!
   options: [ProductOption!]!
 
   """
@@ -10665,6 +10810,12 @@ type ProductVariant {
 
   """The image shown for this variant."""
   media: ProductMedia
+  metafield(key: String!, namespace: String!): Metafield
+
+  """
+  Its metafields, by namespace and key; in one namespace, if given (ADR-489).
+  """
+  metafields(namespace: String): [Metafield!]!
   position: Int!
   price: Money!
   selectedOptions: [SelectedOption!]!
@@ -11587,6 +11738,9 @@ type Query {
   The shop's Meta dataset its orders go to (MKT-10); null until it connects one.
   """
   metaConversions: MetaConversions
+
+  """The shop's metafield definitions, of a kind of owner or all, by name."""
+  metafieldDefinitions(ownerType: MetafieldOwnerType): [MetafieldDefinition!]!
 
   """The shop's settings for paying online, beside its gateway accounts."""
   onlinePaymentSettings: OnlinePaymentSettings!

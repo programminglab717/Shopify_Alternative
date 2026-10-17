@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-488 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-489 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -496,6 +496,7 @@
 | 486 | Vertical starter kits: what a kind of shop sells by, its smart collections, size charts and main menu links, set up in one go and safe to apply again | Accepted |
 | 487 | Collaborators: staff invited for 1 to 90 days, whose access ends by itself | Accepted |
 | 488 | Requests for access: an agency asks a shop by its address, its owner approves or declines | Accepted |
+| 489 | Metafields: custom data on products, variants and collections, as Shopify keeps it, typed by the shop's definitions and read by themes in Liquid | Accepted |
 
 ---
 
@@ -18496,3 +18497,51 @@
     handle is what agencies already know.
   * **Approval with no time box:** an agency's access would last until someone took it back.
     Approved requests always end, as ADM-07 asks.
+
+## ADR-489 · Metafields: custom data on products, variants and collections, as Shopify keeps it, typed by the shop's definitions and read by themes in Liquid
+
+* **Context:**
+  * CAT-06 asks for metafields: custom fields on what a shop sells, for care instructions, a
+    lining, a fabric's weight, a collection's banner colour.
+  * Themes and apps written for Shopify read them (`product.metafields.custom.care.value`,
+    `metafieldsSet`). Hatti wrote only its own namespaces so far: reviews' stars (ADR-401) and
+    eastern-wear attributes (ADR-477).
+* **Decision:**
+  * **Kept by the catalog** (`catalog.metafields`, migration 0229) on products, variants and
+    collections. Each owner is a foreign key, so values go when their owner is deleted.
+    * A value has a namespace, a key, a type and the value as Shopify keeps it: a string, JSON
+      for the list and json types.
+    * Types: single- and multi-line text, whole and decimal numbers, true or false, date, date
+      and time, URL, colour, JSON, and a list of lines.
+    * Each value is checked and kept in a standard form: numbers without leading zeros, dates
+      in ISO 8601, JSON compact, colours in lower case.
+  * **Definitions** (`catalog.metafield_definitions`) name a field of the shop's own for each
+    kind of owner and fix its type. Values set after take the definition's type and refuse
+    another. A definition is refused while values of the field have another type. Deleting a
+    definition can delete its values with it.
+  * **The Admin API, as Shopify's:**
+    * `metafieldsSet` sets up to 25 at once, all or none; an owner keeps 100.
+    * `metafieldsDelete` deletes by owner, namespace and key.
+    * `metafields(namespace)` and `metafield(namespace, key)` on `Product`, `ProductVariant`
+      and `Collection`, loaded for all owners at once.
+    * `metafieldDefinitions`, and `metafieldDefinitionCreate`, `metafieldDefinitionUpdate` and
+      `metafieldDefinitionDelete`.
+    * Under `read_products` and `write_products`.
+  * **Hatti's namespaces are its own:** `hatti` and `reviews` are refused, since the storefront
+    writes them from what the shop keeps elsewhere.
+  * **On the storefront:** `metafields.updated` names the products and collections whose pages
+    change, a variant's by its product. Their documents carry their metafields, and Liquid reads
+    them as Shopify's: `value` is of its type (a number, true or false, a list, an object for
+    JSON), and `{ product.metafields.custom.care }` prints the value.
+* **Consequences:**
+  * Themes and apps written for Shopify's metafields work on Hatti's products, variants and
+    collections.
+  * `metafields` is a list, not Shopify's connection: an owner keeps 100, which one list holds.
+  * Customers', orders' and the shop's metafields, metaobjects, and file and reference types
+    come later. The admin's definitions and the fields on a product's page are the next part of
+    CAT-06, and the metafield columns of Shopify's product CSV after that.
+* **Alternatives:**
+  * **One JSON column on each table:** no definition could fix a type, and a key could not be
+    set or deleted on its own.
+  * **Values parsed and kept by type in the database:** Shopify's API and its CSVs give strings,
+    and Liquid parses them once on the page.

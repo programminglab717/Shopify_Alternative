@@ -34,6 +34,7 @@ export {
   type StoreDocuments,
   type ThemeDoc,
   type TranslationsDoc,
+  type MetafieldsDoc,
   type VariantDoc,
   type VideoSourceDoc,
 } from './documents.js';

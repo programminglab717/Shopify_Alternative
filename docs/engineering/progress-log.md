@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Metafields
+
+* **Custom data on products, variants and collections, as Shopify keeps it: eleven types,
+  definitions that fix them, Shopify's metafieldsSet and definitions in the Admin API, and
+  themes reading them in Liquid** ([ADR-489](../architecture/13-decision-log.md#adr-489--metafields-custom-data-on-products-variants-and-collections-as-shopify-keeps-it-typed-by-the-shops-definitions-and-read-by-themes-in-liquid), CAT-06 in part).
+* 3071 tests, 7 more: the catalog's metafields, the Admin API's, the
+  publisher's and Liquid's.
+
 ### 65a6cf8 · Requests for access
 
 * **Agencies and freelancers ask a shop for access by its address, for a role and 1 to 90

@@ -10,6 +10,7 @@ import {
   PriceSaleService,
   ProductService,
   SizeChartService,
+  MetafieldService,
   bundleProductIdsIn,
   bundlesContainingIn,
   bundlesOfProductsIn,
@@ -19,6 +20,7 @@ import {
   VariantService,
   shownReviewsIn,
   shownSizeChartsIn,
+  shownMetafieldsIn,
   writeReviewsIn,
 } from '@hatti/catalog/public';
 import { DeliveryService } from '@hatti/checkout/public';
@@ -468,6 +470,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
             ),
         },
         sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
+        metafields: { shownMetafieldsOf: shownMetafieldsIn },
         bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
         comments: new CommentService(database),
         preferences,
@@ -1291,6 +1294,62 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await deliver()).toEqual(['size_chart.deleted']);
     expect((await store().productByHandle(kurta.handle))?.sizeChart).toBeUndefined();
     unwrap(await products.delete(tenant, kurta.id));
+    await deliver();
+  });
+
+  it("publishes products', variants' and collections' metafields as they change (ADR-489)", async () => {
+    const metafields = new MetafieldService(database);
+    const kurta = unwrap(await products.create(tenant, { title: 'Lawn Kurta', status: 'active' }));
+    const eid = unwrap(await collections.create(tenant, { title: 'Eid Edit' }));
+    await deliver();
+    expect((await store().productByHandle(kurta.handle))?.metafields).toBeUndefined();
+
+    unwrap(
+      await metafields.set(tenant, [
+        {
+          owner: { type: 'product', id: kurta.id },
+          namespace: 'custom',
+          key: 'care',
+          type: 'single_line_text_field',
+          value: 'Hand wash',
+        },
+        {
+          owner: { type: 'variant', id: kurta.variants[0]!.id },
+          namespace: 'custom',
+          key: 'length_in',
+          type: 'number_decimal',
+          value: '42',
+        },
+        {
+          owner: { type: 'collection', id: eid.id },
+          namespace: 'custom',
+          key: 'banner',
+          type: 'color',
+          value: '#0F766E',
+        },
+      ]),
+    );
+    expect(await deliver()).toEqual(['metafields.updated']);
+    const doc = await store().productByHandle(kurta.handle);
+    expect(doc?.metafields).toEqual({
+      custom: { care: { type: 'single_line_text_field', value: 'Hand wash' } },
+    });
+    expect(doc?.variants[0]?.metafields).toEqual({
+      custom: { length_in: { type: 'number_decimal', value: '42.0' } },
+    });
+    expect((await store().collectionByHandle(eid.handle))?.metafields).toEqual({
+      custom: { banner: { type: 'color', value: '#0f766e' } },
+    });
+
+    unwrap(
+      await metafields.delete(tenant, [
+        { owner: { type: 'product', id: kurta.id }, namespace: 'custom', key: 'care' },
+      ]),
+    );
+    await deliver();
+    expect((await store().productByHandle(kurta.handle))?.metafields).toBeUndefined();
+    unwrap(await products.delete(tenant, kurta.id));
+    unwrap(await collections.delete(tenant, eid.id));
     await deliver();
   });
 

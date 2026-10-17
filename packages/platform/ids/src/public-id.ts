@@ -112,6 +112,8 @@ export const ID_PREFIXES = {
   storeAppeal: 'apl',
   rightsComplaint: 'ipc',
   accessRequest: 'acr',
+  metafield: 'mtf',
+  metafieldDefinition: 'mfd',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

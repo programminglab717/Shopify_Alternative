@@ -25,6 +25,13 @@ import { SizeChartService } from './size-charts.js';
 import { VariantService } from './variant.service.js';
 import { CopyDraftService } from './copy-drafts.service.js';
 import { CopyDraftResolver } from './graphql/copy-draft.resolver.js';
+import {
+  CollectionMetafieldResolver,
+  MetafieldResolver,
+  ProductMetafieldResolver,
+  VariantMetafieldResolver,
+} from './graphql/metafield.resolver.js';
+import { MetafieldService } from './metafields.js';
 
 /**
  * Needs a {@link Database} provider from the host application, which also checks the storefront
@@ -57,6 +64,11 @@ import { CopyDraftResolver } from './graphql/copy-draft.resolver.js';
     PriceSaleResolver,
     CopyDraftService,
     CopyDraftResolver,
+    MetafieldService,
+    MetafieldResolver,
+    ProductMetafieldResolver,
+    VariantMetafieldResolver,
+    CollectionMetafieldResolver,
   ],
   controllers: [StorefrontSearchController],
   exports: [
@@ -73,6 +85,7 @@ import { CopyDraftResolver } from './graphql/copy-draft.resolver.js';
     BundleService,
     ComplementService,
     PriceSaleService,
+    MetafieldService,
   ],
 })
 export class CatalogModule {}

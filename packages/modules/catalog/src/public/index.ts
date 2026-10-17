@@ -159,6 +159,18 @@ export {
   type ShownReviews,
 } from '../internal/reviews.js';
 export {
+  METAFIELD_LIMITS,
+  METAFIELD_TYPES,
+  MetafieldEvents,
+  MetafieldService,
+  shownMetafieldsIn,
+  type MetafieldsChangedPayload,
+  type MetafieldOwnerType,
+  type MetafieldRecord,
+  type ShownMetafield,
+  type ShownMetafields,
+} from '../internal/metafields.js';
+export {
   SIZE_CHART_LIMITS,
   SizeChartEvents,
   SizeChartService,

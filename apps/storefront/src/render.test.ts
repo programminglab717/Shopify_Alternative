@@ -1424,6 +1424,66 @@ describe('Storefront rendering', () => {
     ).toContain('<p class="wear">unstitched|3|lawn,chiffon|Lawn/Chiffon|Summer</p>');
   });
 
+  it("gives themes products', variants' and collections' metafields of their types, as Shopify's (ADR-489)", async () => {
+    const sample = sampleStore();
+    const [first, ...rest] = sample.products;
+    const [collection, ...others] = sample.collections;
+    const kurta = {
+      ...first!,
+      metafields: {
+        custom: {
+          care: { type: 'single_line_text_field', value: 'Hand wash' },
+          pieces: { type: 'number_integer', value: '3' },
+          fabrics: { type: 'list.single_line_text_field', value: '["Lawn","Chiffon"]' },
+          specs: { type: 'json', value: '{"weight":"350g"}' },
+          lined: { type: 'boolean', value: 'false' },
+        },
+      },
+      variants: first!.variants.map((variant, index) =>
+        index === 0
+          ? {
+              ...variant,
+              metafields: { custom: { length_in: { type: 'number_decimal', value: '42.5' } } },
+            }
+          : variant,
+      ),
+    };
+    const eid = {
+      ...collection!,
+      metafields: { custom: { banner: { type: 'color', value: '#0f766e' } } },
+    };
+    const shop = new MemoryStore({
+      ...sample,
+      products: [kurta, ...rest],
+      collections: [eid, ...others],
+    });
+    const theme = loadTheme({
+      ...files,
+      'sections/main-product.liquid':
+        '<p class="fields">{{ product.metafields.custom.care }}|' +
+        '{{ product.metafields.custom.pieces.value | plus: 1 }}|' +
+        '{{ product.metafields.custom.fabrics.value | join: "/" }}|' +
+        '{{ product.metafields.custom.specs.value.weight }}|' +
+        '{% if product.metafields.custom.lined.value %}lined{% else %}unlined{% endif %}|' +
+        '{{ product.metafields.custom.care.type }}|' +
+        '{{ product.variants.first.metafields.custom.length_in.value | times: 2 }}|' +
+        '{{ product.metafields.custom.missing.value | default: "none" }}</p>' +
+        '{% schema %}{ "name": "Product" }{% endschema %}',
+      'sections/main-collection.liquid':
+        '<p class="banner">{{ collection.metafields.custom.banner.value }}</p>' +
+        '{% schema %}{ "name": "Collection" }{% endschema %}',
+    });
+    const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
+    expect(
+      (await renderer.render({ path: `/products/${kurta.handle}` }, shop.fresh())).html,
+    ).toContain(
+      '<p class="fields">Hand wash|4|Lawn/Chiffon|350g|unlined|single_line_text_field|85|none</p>',
+    );
+    expect(
+      (await renderer.render({ path: `/collections/${eid.handle}` }, shop.fresh())).html,
+    ).toContain('<p class="banner">#0f766e</p>');
+  });
+
   it("gives themes a product's videos among its media, with Shopify's video filters, and Hatti Base plays them (ADR-258)", async () => {
     const sample = sampleStore();
     const [first, ...rest] = sample.products;

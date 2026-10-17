@@ -8,6 +8,7 @@ import type {
   MediaDoc,
   MenuDoc,
   MenuLinkDoc,
+  MetafieldsDoc,
   PageDoc,
   ProductDoc,
   ShopDoc,
@@ -335,7 +336,12 @@ export function productObject(doc: ProductDoc, ctx: ObjectContext): Record<strin
     updated_at: doc.updatedAt ?? doc.createdAt ?? null,
     // Its published reviews (ADR-401): their stars as Shopify's standard review metafields hold
     // them, which themes and apps read, and the latest of them, Hatti's own.
-    metafields: { ...reviewMetafields(doc), ...easternWearMetafields(doc) },
+    // The shop's own (ADR-489), beside those Hatti writes in its own namespaces.
+    metafields: {
+      ...metafieldsObject(doc.metafields),
+      ...reviewMetafields(doc),
+      ...easternWearMetafields(doc),
+    },
     // The day it ships by while it is on pre-order (ADR-403), YYYY-MM-DD for the date filter;
     // nil when it is not. Hatti's own.
     preorder_ships_on: doc.preorderShipsOn ?? null,
@@ -489,7 +495,66 @@ function variantObject(variant: VariantDoc, product: ProductDoc, images: readonl
     url: `/products/${product.handle}?variant=${variant.id}`,
     image,
     featured_image: image,
+    metafields: metafieldsObject(variant.metafields),
   };
+}
+
+/**
+ * A metafield as Liquid reads it (CAT-06, ADR-489): its `type`, its `value` of that type (a
+ * number, true or false, a list or an object for JSON, text otherwise), and printed as its value.
+ */
+export class MetafieldDrop extends Drop {
+  readonly type: string;
+  readonly value: unknown;
+  readonly #kept: string;
+
+  constructor(type: string, kept: string) {
+    super();
+    this.type = type;
+    this.#kept = kept;
+    this.value = metafieldValue(type, kept);
+  }
+
+  /** What `{{ product.metafields.custom.care }}` prints: its value, or as kept for JSON. */
+  override valueOf(): unknown {
+    return typeof this.value === 'object' && this.value !== null ? this.#kept : this.value;
+  }
+}
+
+function metafieldValue(type: string, kept: string): unknown {
+  switch (type) {
+    case 'number_integer':
+    case 'number_decimal':
+      return Number(kept);
+    case 'boolean':
+      return kept === 'true';
+    case 'json':
+    case 'list.single_line_text_field':
+      try {
+        return JSON.parse(kept) as unknown;
+      } catch {
+        return null;
+      }
+    default:
+      return kept;
+  }
+}
+
+/** An owner's metafields for Liquid, by namespace and key (ADR-489); none where it has none. */
+export function metafieldsObject(
+  fields: MetafieldsDoc | undefined,
+): Record<string, Record<string, MetafieldDrop>> {
+  return Object.fromEntries(
+    Object.entries(fields ?? {}).map(([namespace, keys]) => [
+      namespace,
+      Object.fromEntries(
+        Object.entries(keys).map(([key, field]) => [
+          key,
+          new MetafieldDrop(field.type, field.value),
+        ]),
+      ),
+    ]),
+  );
 }
 
 /**
@@ -526,6 +591,7 @@ export function collectionObject(
     sort_by: listing?.sortBy ?? 'manual',
     default_sort_by: 'manual',
     sort_options: listing?.sortOptions ?? [],
+    metafields: metafieldsObject(doc.metafields),
     get products(): ItemRef[] {
       const ids = productIds.slice(window.offset, window.offset + window.limit);
       return (products ??= lazyProducts(ids, ctx));

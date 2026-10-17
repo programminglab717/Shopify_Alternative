@@ -7,6 +7,11 @@ import {
   ComplementEvents,
   ReviewEvents,
   SizeChartEvents,
+  MetafieldEvents,
+  shownMetafieldsIn,
+  type MetafieldOwnerType,
+  type MetafieldsChangedPayload,
+  type ShownMetafields,
   bundleProductIdsIn,
   bundleSellable,
   bundlesContainingIn,
@@ -120,6 +125,7 @@ import {
   productDoc,
   shopDoc,
   themeDoc,
+  withMetafields,
 } from './documents.js';
 import { NO_EDGE_CACHE, type EdgeCache } from './edge-cache.js';
 
@@ -258,6 +264,11 @@ export function itemsFor(event: DomainEvent): string[] {
     case SizeChartEvents.ProductsUpdated:
       // The products whose pages show another chart now, or none (ADR-407).
       return (event.payload as unknown as SizeChartChangedPayload).productIds.map(Items.product);
+    case MetafieldEvents.Updated: {
+      // The products and collections whose pages show other metafields now (ADR-489).
+      const { productIds, collectionIds } = event.payload as unknown as MetafieldsChangedPayload;
+      return [...productIds.map(Items.product), ...collectionIds.map(Items.collection)];
+    }
     case InventoryEvents.LocationUpdated: {
       // Whether a location sells online, or at all, changes what every product has to sell. A
       // location with stock history cannot be deleted, so deleting one changes nothing.
@@ -406,6 +417,7 @@ export const PUBLISHED_EVENTS = [
   SizeChartEvents.Updated,
   SizeChartEvents.Deleted,
   SizeChartEvents.ProductsUpdated,
+  MetafieldEvents.Updated,
   InventoryEvents.InventoryItemUpdated,
   InventoryEvents.InventoryLevelUpdated,
   InventoryEvents.ProductPreorderUpdated,
@@ -493,6 +505,15 @@ export interface PublisherServices {
     ): Promise<Map<string, BundleRecord>>;
     bundlesContainingIn(tx: Tx, shopId: string, productIds: readonly string[]): Promise<string[]>;
     bundleProductIdsIn(tx: Tx, shopId: string): Promise<string[]>;
+  };
+  /** The metafields of products, variants and collections, their pages' (ADR-489). */
+  metafields: {
+    shownMetafieldsOf(
+      tx: Tx,
+      shopId: string,
+      type: MetafieldOwnerType,
+      ids: readonly string[],
+    ): Promise<Map<string, ShownMetafields>>;
   };
   /** The size charts products' pages show (ADR-407). */
   sizeCharts: {
@@ -1022,6 +1043,18 @@ export class StorefrontPublisher {
       shopId,
       active.map((record) => record.id),
     );
+    const productFields = await this.services.metafields.shownMetafieldsOf(
+      tx,
+      shopId,
+      'product',
+      active.map((record) => record.id),
+    );
+    const variantFields = await this.services.metafields.shownMetafieldsOf(
+      tx,
+      shopId,
+      'variant',
+      active.flatMap((record) => record.variants.map((variant) => variant.id)),
+    );
     const related = await this.services.related.relatedProductsOf(
       tx,
       shopId,
@@ -1055,27 +1088,31 @@ export class StorefrontPublisher {
       if (count !== null && count > 0 && count <= LOW_STOCK_SHOWN) left.set(variantId, count);
     }
     const docs = active.map((record) =>
-      productDoc(
-        record,
-        available,
-        (media, handle) => {
-          const path = imagePathOf(shopId, media, handle);
-          return path && images.url(path);
-        },
-        translations,
-        // Videos the shop uploaded, at the same site as its images (ADR-258).
-        (media, handle) => {
-          const path = videoPathOf(shopId, media, handle);
-          return path && images.url(path);
-        },
-        reviews.get(record.id),
-        preorders.get(record.id),
-        sizeCharts.get(record.id),
-        bundleDoc(bundles.get(record.id), parts),
-        related.get(record.id),
-        complements.get(record.id) ?? boughtTogether.get(record.id),
-        sales.get(record.id),
-        left,
+      withMetafields(
+        productDoc(
+          record,
+          available,
+          (media, handle) => {
+            const path = imagePathOf(shopId, media, handle);
+            return path && images.url(path);
+          },
+          translations,
+          // Videos the shop uploaded, at the same site as its images (ADR-258).
+          (media, handle) => {
+            const path = videoPathOf(shopId, media, handle);
+            return path && images.url(path);
+          },
+          reviews.get(record.id),
+          preorders.get(record.id),
+          sizeCharts.get(record.id),
+          bundleDoc(bundles.get(record.id), parts),
+          related.get(record.id),
+          complements.get(record.id) ?? boughtTogether.get(record.id),
+          sales.get(record.id),
+          left,
+        ),
+        productFields,
+        variantFields,
       ),
     );
     await writer.putProducts(docs);
@@ -1104,10 +1141,18 @@ export class StorefrontPublisher {
       shopId,
       records.map((record) => record.id),
     );
+    const fields = await this.services.metafields.shownMetafieldsOf(
+      tx,
+      shopId,
+      'collection',
+      records.map((record) => record.id),
+    );
     const docs = [];
     for (const record of records) {
       const productIds = await this.services.collections.activeProductIdsOf(tx, shopId, record);
-      docs.push(collectionDoc(record, productIds, translations.get(record.id)));
+      const doc = collectionDoc(record, productIds, translations.get(record.id));
+      const own = fields.get(record.id);
+      docs.push(own ? { ...doc, metafields: own } : doc);
     }
     const stored = await this.#stored(shopId, 'collection', ids);
     await writer.putCollections(docs);
@@ -1316,6 +1361,7 @@ export function createStorefrontPublisher(
         boughtTogetherOf: boughtTogetherIn,
       },
       sizeCharts: { shownSizeChartsOf: shownSizeChartsIn },
+      metafields: { shownMetafieldsOf: shownMetafieldsIn },
       bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
       comments: new CommentService(database),
       preferences: { preferencesOf: shopPreferencesOf },

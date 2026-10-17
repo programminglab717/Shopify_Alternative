@@ -40,6 +40,7 @@ import {
   type MediaDoc,
   type MenuDoc,
   type MenuLinkDoc,
+  type MetafieldsDoc,
   type PageDoc,
   type ProductDoc,
   type SeoDoc,
@@ -199,6 +200,26 @@ export function productDoc(
     ...(bundle && { bundle }),
     ...(related && related.length > 0 && { related: [...related] }),
     ...(complements && complements.length > 0 && { complements: [...complements] }),
+  };
+}
+
+/**
+ * A product's document with its own metafields and its variants' (ADR-489), where they have any.
+ */
+export function withMetafields(
+  doc: ProductDoc,
+  products: ReadonlyMap<string, MetafieldsDoc>,
+  variants: ReadonlyMap<string, MetafieldsDoc>,
+): ProductDoc {
+  const own = products.get(doc.id);
+  if (!own && !doc.variants.some((variant) => variants.has(variant.id))) return doc;
+  return {
+    ...doc,
+    ...(own && { metafields: own }),
+    variants: doc.variants.map((variant) => {
+      const fields = variants.get(variant.id);
+      return fields ? { ...variant, metafields: fields } : variant;
+    }),
   };
 }
 

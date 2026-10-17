@@ -78,6 +78,12 @@ export type MediaDoc =
       externalId: string;
     };
 
+/**
+ * Metafields as the shop keeps them (CAT-06, ADR-489), by namespace and then key: each its type
+ * and its value as a string, which the storefront reads as Liquid's `metafield.value`.
+ */
+export type MetafieldsDoc = Record<string, Record<string, { type: string; value: string }>>;
+
 export interface VariantDoc {
   id: string;
   title: string;
@@ -99,6 +105,8 @@ export interface VariantDoc {
    * words. Absent where more are, where stock is not counted, or where it sells on at zero.
    */
   left?: number;
+  /** Its metafields (ADR-489); absent where it has none. */
+  metafields?: MetafieldsDoc;
 }
 
 /**
@@ -162,6 +170,8 @@ export interface ProductDoc {
   bundle?: BundleDoc;
   /** The size chart its page shows, if any (ADR-407). */
   sizeChart?: SizeChartDoc;
+  /** Its metafields (ADR-489); absent where it has none. */
+  metafields?: MetafieldsDoc;
   /**
    * The day it ships by, YYYY-MM-DD, while it is on pre-order (CAT-14, ADR-403): it sells
    * whatever its stock. Absent when it is not.
@@ -251,6 +261,8 @@ export interface CollectionDoc {
   image: ImageDoc | null;
   /** Its products, in the collection's order; their documents are fetched a page at a time. */
   productIds: string[];
+  /** Its metafields (ADR-489); absent where it has none. */
+  metafields?: MetafieldsDoc;
   /**
    * When it last changed, as ISO 8601: its sitemap's `lastmod` (ADR-236). Absent in documents
    * written before, and for all products.
