@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { chooseDiscounts, NO_DISCOUNTS } from './combining.js';
 import { automaticSummary } from './discounts.js';
+import type { OrderItems } from './items.js';
 import type { AutomaticDiscountRecord, DiscountCodeRecord } from './records.js';
 
 const AT = new Date('2026-10-17T12:00:00+05:00');
 const SINCE = new Date('2026-10-01T00:00:00+05:00');
+
+/** Items for the whole order alone, no line named. */
+const whole = (subtotal: bigint): OrderItems => ({ subtotal, lines: [] });
 
 function automatic(
   id: string,
@@ -19,6 +23,8 @@ function automatic(
     startsAt: SINCE,
     endsAt: null,
     combinesWithCodes: false,
+    productIds: [],
+    collectionIds: [],
     version: 1,
     createdAt: SINCE,
     updatedAt: SINCE,
@@ -39,6 +45,8 @@ function code(given: Partial<DiscountCodeRecord> & Pick<DiscountCodeRecord, 'kin
     usageLimit: null,
     oncePerCustomer: false,
     used: 0,
+    productIds: [],
+    collectionIds: [],
     version: 1,
     createdAt: SINCE,
     updatedAt: SINCE,
@@ -69,18 +77,18 @@ describe('Choosing the discounts an order takes (ADR-515)', () => {
     const all = [tenth, fiveHundred, delivery, big, ended, ahead];
 
     // Rs 3,000 of items: Rs 500 beats 10% (Rs 300); the 20% needs Rs 10,000.
-    const small = chooseDiscounts(300_000n, null, all, AT);
+    const small = chooseDiscounts(whole(300_000n), null, all, AT);
     expect(small.automatic.map((discount) => discount.id)).toEqual(['rs500', 'delivery']);
     expect(small).toMatchObject({ items: 50_000n, byAutomatic: 50_000n, freeDelivery: true });
 
     // Rs 10,000: 20% (Rs 2,000).
-    const large = chooseDiscounts(1_000_000n, null, all, AT);
+    const large = chooseDiscounts(whole(1_000_000n), null, all, AT);
     expect(large.automatic.map((discount) => discount.id)).toEqual(['big', 'delivery']);
     expect(large.items).toBe(200_000n);
 
-    expect(chooseDiscounts(300_000n, null, [ended, ahead], AT)).toEqual(NO_DISCOUNTS);
+    expect(chooseDiscounts(whole(300_000n), null, [ended, ahead], AT)).toEqual(NO_DISCOUNTS);
     // Never more than the items come to.
-    expect(chooseDiscounts(20_000n, null, [fiveHundred], AT).items).toBe(20_000n);
+    expect(chooseDiscounts(whole(20_000n), null, [fiveHundred], AT).items).toBe(20_000n);
   });
 
   it('adds a code where every automatic discount applied combines with codes', () => {
@@ -90,7 +98,7 @@ describe('Choosing the discounts an order takes (ADR-515)', () => {
       combinesWithCodes: true,
     });
     const chosen = chooseDiscounts(
-      300_000n,
+      whole(300_000n),
       code({ kind: 'fixed_amount', amount: 20_000n }),
       [tenth],
       AT,
@@ -107,7 +115,7 @@ describe('Choosing the discounts an order takes (ADR-515)', () => {
 
     // Together they take no more than the items.
     const capped = chooseDiscounts(
-      30_000n,
+      whole(30_000n),
       code({ kind: 'fixed_amount', amount: 28_000n }),
       [tenth],
       AT,
@@ -121,7 +129,7 @@ describe('Choosing the discounts an order takes (ADR-515)', () => {
 
     // 10% (Rs 300) beats a Rs 200 code: the code is set aside.
     const automaticWins = chooseDiscounts(
-      300_000n,
+      whole(300_000n),
       code({ kind: 'fixed_amount', amount: 20_000n }),
       [tenth, delivery],
       AT,
@@ -136,7 +144,7 @@ describe('Choosing the discounts an order takes (ADR-515)', () => {
 
     // A Rs 500 code beats it: the automatic discounts go, free delivery with them.
     const codeWins = chooseDiscounts(
-      300_000n,
+      whole(300_000n),
       code({ kind: 'fixed_amount', amount: 50_000n }),
       [tenth, delivery],
       AT,
@@ -151,7 +159,7 @@ describe('Choosing the discounts an order takes (ADR-515)', () => {
 
     // Free delivery alone, and a free-delivery code: equal off the items, so the code.
     const tie = chooseDiscounts(
-      300_000n,
+      whole(300_000n),
       code({ kind: 'free_shipping' }),
       [automatic('delivery', { kind: 'free_shipping' })],
       AT,

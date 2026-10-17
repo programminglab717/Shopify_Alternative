@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Discounts for some products or collections
+
+* **A code or an automatic discount can be for some products or collections, taking a
+  percentage or an amount off their items alone, in the cart, at checkout and through the Admin
+  API** ([ADR-517](../architecture/13-decision-log.md#adr-517--discounts-for-some-products-or-collections-a-code-or-an-automatic-discount-names-up-to-100-of-each-and-takes-a-percentage-or-an-amount-off-only-their-items-its-minimum-being-what-they-come-to-free-delivery-stays-for-the-whole-order), CHK-06). Migration 0244.
+* 3223 tests, 7 more: what each takes and its minimum, codes refused for
+  none of the cart, the IDs checked, and an order placed with both kinds.
+
 ### c6a7a24 · The admin's automatic discounts
 
 * **The admin's discounts page starts, ends and deletes the shop's automatic discounts below its

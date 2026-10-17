@@ -1,4 +1,5 @@
 import { discountOf, discountStatus } from './discounts.js';
+import { forSomeItems, itemsFor, type OrderItems } from './items.js';
 import type { AutomaticDiscountRecord, DiscountCodeRecord } from './records.js';
 
 /** The discounts an order takes, and what they take off it together (ADR-515). */
@@ -34,26 +35,30 @@ export const NO_DISCOUNTS: ChosenDiscounts = {
 };
 
 /**
- * The discounts an order whose items come to `subtotal` takes, at `at` (ADR-515): of the shop's
- * automatic discounts that run and whose minimum the items reach, the one that takes most off the
- * items (the oldest of equals) and the oldest giving free delivery; and `code`, a code the caller
- * found works for the order, beside them where every one applied combines with codes. Where one
- * doesn't, the code applies alone unless they take more off the items than it does. Each takes its
- * share of the items as they come before any discount; together, no more than the items.
+ * The discounts an order with `items` takes, at `at` (ADR-515): of the shop's automatic discounts
+ * that run and whose minimum the items reach, the one that takes most off the items (the oldest of
+ * equals) and the oldest giving free delivery; and `code`, a code the caller found works for the
+ * order, beside them where every one applied combines with codes. Where one doesn't, the code
+ * applies alone unless they take more off the items than it does. Each takes its share of the
+ * items it is for (ADR-517) as they come before any discount; together, no more than the items.
  */
 export function chooseDiscounts(
-  subtotal: bigint,
+  items: OrderItems,
   code: DiscountCodeRecord | null,
   automatics: readonly AutomaticDiscountRecord[],
   at: Date = new Date(),
 ): ChosenDiscounts {
-  const qualifying = automatics.filter(
-    (discount) =>
+  const { subtotal } = items;
+  const qualifying = automatics.filter((discount) => {
+    const its = itemsFor(discount, items);
+    return (
       discountStatus(discount, at) === 'active' &&
-      (discount.minimumSubtotal === null || subtotal >= discount.minimumSubtotal),
-  );
+      !(forSomeItems(discount) && its === 0n) &&
+      (discount.minimumSubtotal === null || its >= discount.minimumSubtotal)
+    );
+  });
   const off = (discount: AutomaticDiscountRecord | DiscountCodeRecord) =>
-    discountOf(discount, { subtotal, shipping: 0n }).items;
+    discountOf(discount, { subtotal: itemsFor(discount, items), shipping: 0n }).items;
   let best: AutomaticDiscountRecord | null = null;
   for (const discount of qualifying) {
     if (discount.kind === 'free_shipping') continue;

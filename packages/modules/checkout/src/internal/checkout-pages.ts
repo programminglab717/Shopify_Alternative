@@ -1833,6 +1833,11 @@ function refusalWords(code: string, refusal: DiscountRefusal | { reason: 'attemp
         ur: html`${ltr(code)} صرف ${ltr(minimum)} یا زیادہ کے آرڈر کے لیے ہے۔`,
       };
     }
+    case 'not_for_items':
+      return {
+        en: html`<span dir="ltr">${code}</span> isn't for the items in your cart.`,
+        ur: html`${ltr(code)} آپ کے کارٹ کی چیزوں کے لیے نہیں ہے۔`,
+      };
     case 'used_up':
       return {
         en: html`<span dir="ltr">${code}</span> has been used up.`,

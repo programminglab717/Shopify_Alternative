@@ -19,6 +19,7 @@ import {
   AutomaticDiscountInput,
   AutomaticDiscountPayload,
 } from './automatic-discount.types.js';
+import { itemIdsOf, withItemUuids } from './items.js';
 import { DiscountCodeKind, DiscountStatus } from './discount-code.types.js';
 
 /** Automatic discounts (CHK-06, ADR-515), with Shopify's discount scopes. */
@@ -55,7 +56,8 @@ export class AutomaticDiscountResolver {
     @CurrentTenant() tenant: TenantContext,
     @Args('automaticDiscount') input: AutomaticDiscountInput,
   ): Promise<AutomaticDiscountPayload> {
-    const result = await this.service.create(tenant, input);
+    const given = withItemUuids(input);
+    const result = given.ok ? await this.service.create(tenant, given.value) : given;
     return payload(result, tenant.currency);
   }
 
@@ -70,7 +72,8 @@ export class AutomaticDiscountResolver {
     @Args('id', { type: () => ID }) id: string,
     @Args('automaticDiscount') input: AutomaticDiscountInput,
   ): Promise<AutomaticDiscountPayload> {
-    const result = await this.service.update(tenant, uuidOf(id), input);
+    const given = withItemUuids(input);
+    const result = given.ok ? await this.service.update(tenant, uuidOf(id), given.value) : given;
     return payload(result, tenant.currency);
   }
 
@@ -143,6 +146,7 @@ export function toAutomaticDiscount(
     endsAt: record.endsAt,
     status: STATUSES[discountStatus(record)],
     combinesWithCodes: record.combinesWithCodes,
+    ...itemIdsOf(record),
     summary: automaticSummary(record, currency),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,

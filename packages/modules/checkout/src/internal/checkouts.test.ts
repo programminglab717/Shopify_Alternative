@@ -551,6 +551,79 @@ describe.skipIf(!server)('CheckoutService', () => {
     expect(rows).toEqual([{ amount: '50000' }]);
   });
 
+  it('takes a discount for some products or collections off their items alone, and refuses a code for none of the cart (ADR-517)', async () => {
+    const { token, small } = await lawnCart();
+    const [khussa] = await f.variantsOf(f.a, 'Khussa', { price: '3,000' });
+    const [shawl] = await f.variantsOf(f.a, 'Shawl', { price: '2,000' });
+    await f.stock(f.a, khussa!, 5);
+    await act(f.a, token, 'add', { items: [{ variantId: khussa, quantity: 1 }] });
+    const productOf = async (variantId: string) =>
+      (
+        await f.admin.query<{ product_id: string }>(
+          'SELECT product_id FROM catalog.variants WHERE id = $1',
+          [variantId],
+        )
+      ).rows[0]!.product_id;
+    // The khussas in a collection of footwear.
+    const footwear = (
+      await f.admin.query<{ id: string }>(
+        `INSERT INTO catalog.collections (shop_id, id, title, handle)
+         VALUES ($1, gen_random_uuid(), 'Footwear', 'footwear') RETURNING id`,
+        [f.a.shopId],
+      )
+    ).rows[0]!.id;
+    await f.admin.query(
+      `INSERT INTO catalog.collection_products (shop_id, collection_id, product_id)
+       VALUES ($1, $2, $3)`,
+      [f.a.shopId, footwear, await productOf(khussa!)],
+    );
+    unwrap(
+      await f.automatic.create(f.a, {
+        title: 'Footwear sale',
+        percentage: 20,
+        collectionIds: [footwear],
+        combinesWithCodes: true,
+      }),
+    );
+    unwrap(
+      await f.codes.create(f.a, {
+        code: 'SHAWL10',
+        percentage: 10,
+        productIds: [await productOf(shawl!)],
+      }),
+    );
+    unwrap(
+      await f.codes.create(f.a, {
+        code: 'LAWN500',
+        amount: '500',
+        productIds: [await productOf(small)],
+      }),
+    );
+    const { secret, view } = await started(token);
+    // 20% of the Rs 3,000 khussa alone, not of the Rs 16,500 the items come to.
+    expect(view.discounts).toMatchObject({ items: 600_00n, byAutomatic: 600_00n });
+
+    const refused = open(await f.checkouts.applyDiscount(secret, 'shawl10'));
+    expect(refused.problem).toEqual({
+      kind: 'discount',
+      code: 'shawl10',
+      refusal: { reason: 'not_for_items' },
+    });
+    const applied = open(await f.checkouts.applyDiscount(secret, 'lawn500'));
+    expect(applied.discounts).toMatchObject({
+      items: 1_100_00n,
+      byCode: 500_00n,
+      byAutomatic: 600_00n,
+    });
+    const order = placedOrder(await f.checkouts.place(secret, applied.shown, FORM));
+    expect(order).toMatchObject({
+      subtotal: 16_500_00n,
+      discount: 1_100_00n,
+      discountCodes: ['LAWN500'],
+      automaticDiscounts: ['Footwear sale'],
+    });
+  });
+
   it('makes delivery free with a free-delivery code, wherever it goes', async () => {
     unwrap(await f.delivery.update(f.a, { charge: '250' }));
     const free = unwrap(await f.codes.create(f.a, { code: 'FREEDEL', freeShipping: true }));

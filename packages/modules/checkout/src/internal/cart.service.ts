@@ -30,6 +30,7 @@ import {
   type VariantFacts,
 } from './cart-lines.js';
 import type { CodProduct } from './cod-rules.js';
+import { orderItemsIn } from './discount-items.js';
 import { carts } from './schema.js';
 
 /** A cart's secret: 128 random bits in base64url, as customers' links have. */
@@ -272,13 +273,14 @@ async function withDiscount(
   cart: CartJson,
   codes: readonly string[],
 ): Promise<CartJson> {
-  const subtotal = BigInt(cart.subtotal);
   const automatics = await runningAutomaticDiscountsIn(tx, shopId);
   const [typed] = codes;
   if (typed === undefined && automatics.length === 0) return cart;
   const record = typed === undefined ? null : await discountCodeIn(tx, shopId, typed);
-  const works = record && discountFor(record, { subtotal, shipping: 0n }).ok ? record : null;
-  const chosen = chooseDiscounts(subtotal, works, automatics);
+  // Each on the items it is for (ADR-517).
+  const items = await orderItemsIn(tx, shopId, cart, [record, ...automatics]);
+  const works = record && discountFor(record, { ...items, shipping: 0n }).ok ? record : null;
+  const chosen = chooseDiscounts(items, works, automatics);
   const automaticDiscounts: CartAutomaticDiscountJson[] = chosen.automatic.map((automatic) => ({
     title: automatic.title,
     kind: automatic.kind,

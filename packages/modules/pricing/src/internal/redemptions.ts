@@ -4,6 +4,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { discountCodeIn, toRecord } from './discount-code.service.js';
 import { discountOf, discountStatus, typedCode, type DiscountAmounts } from './discounts.js';
 import { PricingEvents, type DiscountCodeRedeemedPayload } from './events.js';
+import { forSomeItems, itemsFor, type OrderItems } from './items.js';
 import type { DiscountCodeRecord } from './records.js';
 import { discountCodes, discountRedemptions } from './schema.js';
 
@@ -15,6 +16,8 @@ export type DiscountRefusal =
   | { reason: 'expired' }
   /** The items come to less than the code needs. */
   | { reason: 'minimum'; minimum: bigint }
+  /** It is for some products or collections, and the order has none of their items. */
+  | { reason: 'not_for_items' }
   /** Its orders have all been placed. */
   | { reason: 'used_up' }
   /** The customer placed an order with it already, and it is once a customer. */
@@ -24,6 +27,14 @@ export type DiscountRefusal =
 export type AppliedDiscount =
   | { ok: true; code: DiscountCodeRecord; amounts: DiscountAmounts }
   | { ok: false; refusal: DiscountRefusal };
+
+/** An order as a code is put to it: its items, each line if a code may be for some, and delivery. */
+export interface DiscountedOrder {
+  subtotal: bigint;
+  shipping: bigint;
+  /** Its lines (ADR-517); left out, a code for some products or collections finds none. */
+  lines?: OrderItems['lines'];
+}
 
 /**
  * What the shop's code `typed` takes off an order whose items come to `subtotal` and whose
@@ -35,7 +46,7 @@ export async function applyDiscountIn(
   tx: Tx,
   shopId: string,
   typed: string,
-  order: { subtotal: bigint; shipping: bigint },
+  order: DiscountedOrder,
   at: Date = new Date(),
 ): Promise<AppliedDiscount> {
   const text = typedCode(typed);
@@ -44,10 +55,13 @@ export async function applyDiscountIn(
   return discountFor(code, order, at);
 }
 
-/** What `code` takes off the order, by its dates, minimum and uses. */
+/**
+ * What `code` takes off the order, by its dates, minimum and uses; one for some products or
+ * collections (ADR-517) off their items alone, its minimum being what they come to.
+ */
 export function discountFor(
   code: DiscountCodeRecord,
-  order: { subtotal: bigint; shipping: bigint },
+  order: DiscountedOrder,
   at: Date = new Date(),
 ): AppliedDiscount {
   const status = discountStatus(code, at);
@@ -55,13 +69,20 @@ export function discountFor(
     return { ok: false, refusal: { reason: 'scheduled', startsAt: code.startsAt } };
   }
   if (status === 'expired') return { ok: false, refusal: { reason: 'expired' } };
-  if (code.minimumSubtotal !== null && order.subtotal < code.minimumSubtotal) {
+  const items = itemsFor(code, { subtotal: order.subtotal, lines: order.lines ?? [] });
+  if (forSomeItems(code) && items === 0n)
+    return { ok: false, refusal: { reason: 'not_for_items' } };
+  if (code.minimumSubtotal !== null && items < code.minimumSubtotal) {
     return { ok: false, refusal: { reason: 'minimum', minimum: code.minimumSubtotal } };
   }
   if (code.usageLimit !== null && code.used >= code.usageLimit) {
     return { ok: false, refusal: { reason: 'used_up' } };
   }
-  return { ok: true, code, amounts: discountOf(code, order) };
+  return {
+    ok: true,
+    code,
+    amounts: discountOf(code, { subtotal: items, shipping: order.shipping }),
+  };
 }
 
 /**

@@ -312,6 +312,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
         DELETE FROM customers.consent_events;
         DELETE FROM customers.customers;
         DELETE FROM customers.blocklist_entries;
+        DELETE FROM catalog.collections;
         DELETE FROM catalog.products;
         DELETE FROM inventory.movements;
         DELETE FROM inventory.adjustments;

@@ -22,6 +22,12 @@ export interface DiscountCodeRecord {
   oncePerCustomer: boolean;
   /** Orders placed with it so far. */
   used: number;
+  /**
+   * The catalog's products and collections whose items it is for (ADR-517); neither, the whole
+   * order. Free delivery is always for the whole order.
+   */
+  productIds: string[];
+  collectionIds: string[];
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -43,6 +49,12 @@ export interface AutomaticDiscountRecord {
   endsAt: Date | null;
   /** Whether a discount code may be used with it. */
   combinesWithCodes: boolean;
+  /**
+   * The catalog's products and collections whose items it is for (ADR-517); neither, the whole
+   * order. Free delivery is always for the whole order.
+   */
+  productIds: string[];
+  collectionIds: string[];
   version: number;
   createdAt: Date;
   updatedAt: Date;

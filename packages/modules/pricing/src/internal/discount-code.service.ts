@@ -1,4 +1,12 @@
-import { InputChecker, fail, failOne, type MutationResult, type TenantContext } from '@hatti/api';
+import {
+  InputChecker,
+  fail,
+  failOne,
+  type FieldError,
+  type MutationResult,
+  type TenantContext,
+} from '@hatti/api';
+import { productsAndCollectionsIn } from '@hatti/catalog/public';
 import { Database, isUniqueViolation, type Tx } from '@hatti/db';
 import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
@@ -32,6 +40,9 @@ export interface DiscountCodeInput {
   /** Orders that may be placed with it, in all. */
   usageLimit?: number | null;
   oncePerCustomer?: boolean | null;
+  /** The catalog's products and collections it is for (ADR-517); empty or null, the whole order. */
+  productIds?: readonly string[] | null;
+  collectionIds?: readonly string[] | null;
 }
 
 /** The most uses a code may be given. */
@@ -51,6 +62,8 @@ type CheckedCode = Partial<
     | 'endsAt'
     | 'usageLimit'
     | 'oncePerCustomer'
+    | 'productIds'
+    | 'collectionIds'
   >
 >;
 
@@ -127,6 +140,8 @@ export class DiscountCodeService {
             `A shop can keep at most ${DISCOUNT_CODE_LIMIT.toLocaleString('en')} discount codes`,
           );
         }
+        const missing = await missingItemsIn(tx, tenant.shopId, values);
+        if (missing.length > 0) return fail(missing);
         const [row] = await tx
           .insert(discountCodes)
           .values({
@@ -142,6 +157,8 @@ export class DiscountCodeService {
             endsAt: values.endsAt ?? null,
             usageLimit: values.usageLimit ?? null,
             oncePerCustomer: values.oncePerCustomer ?? false,
+            productIds: values.productIds ?? [],
+            collectionIds: values.collectionIds ?? [],
           })
           .returning();
         await recordEvent(tx, PricingEvents.DiscountCodeCreated, row!);
@@ -169,6 +186,8 @@ export class DiscountCodeService {
         if (!row) return failOne(['id'], 'NOT_FOUND', 'Discount code not found');
         const checked = checkCode(tenant, input, row);
         if (!checked.ok) return checked;
+        const missing = await missingItemsIn(tx, tenant.shopId, checked.value);
+        if (missing.length > 0) return fail(missing);
         const changes = changedColumns(row, checked.value);
         if (Object.keys(changes).length === 0) return { ok: true, value: toRecord(row) };
         const [updated] = await tx
@@ -291,7 +310,13 @@ export interface OfferInput {
   minimumSubtotal?: string | null;
   startsAt?: Date | null;
   endsAt?: Date | null;
+  /** The catalog's products and collections it is for (ADR-517); empty or null, the whole order. */
+  productIds?: readonly string[] | null;
+  collectionIds?: readonly string[] | null;
 }
+
+/** A discount names at most this many products, and this many collections (ADR-517). */
+export const DISCOUNT_ITEMS_LIMIT = 100;
 
 /** The columns of what a discount gives that an input sets. */
 export interface CheckedOffer {
@@ -301,6 +326,17 @@ export interface CheckedOffer {
   minimumSubtotal?: bigint | null;
   startsAt?: Date;
   endsAt?: Date | null;
+  productIds?: string[];
+  collectionIds?: string[];
+}
+
+/** What a discount is now, which a change is checked over. */
+interface CurrentOffer {
+  startsAt: Date;
+  endsAt: Date | null;
+  kind: DiscountKindValue;
+  productIds: string[];
+  collectionIds: string[];
 }
 
 /**
@@ -312,7 +348,7 @@ export function checkOffer(
   check: InputChecker,
   tenant: TenantContext,
   input: OfferInput,
-  current: { startsAt: Date; endsAt: Date | null } | null,
+  current: CurrentOffer | null,
   value: CheckedOffer,
   noun: 'code' | 'discount',
 ): void {
@@ -363,6 +399,81 @@ export function checkOffer(
   if (endsAt !== null && endsAt <= startsAt) {
     check.addMessage(['endsAt'], 'INVALID', 'Ends at must be later than starts at');
   }
+
+  // The products and collections it is for (ADR-517): free delivery is for the whole order.
+  for (const field of ['productIds', 'collectionIds'] as const) {
+    const ids = input[field];
+    if (ids === undefined) continue;
+    const unique = [...new Set(ids ?? [])];
+    if (unique.length > DISCOUNT_ITEMS_LIMIT) {
+      check.addMessage(
+        [field],
+        'TOO_MANY',
+        `A ${noun} is for at most ${DISCOUNT_ITEMS_LIMIT} ${field === 'productIds' ? 'products' : 'collections'}`,
+      );
+    } else value[field] = unique;
+  }
+  if ((value.kind ?? current?.kind) === 'free_shipping') {
+    if ((value.productIds?.length ?? 0) > 0 || (value.collectionIds?.length ?? 0) > 0) {
+      check.addMessage(
+        [(value.productIds?.length ?? 0) > 0 ? 'productIds' : 'collectionIds'],
+        'INVALID',
+        'Free delivery is for the whole order, not some products or collections',
+      );
+    } else {
+      // Made free delivery: for the whole order, whatever it was for before.
+      value.productIds = [];
+      value.collectionIds = [];
+    }
+  }
+}
+
+/**
+ * Of the products and collections `value` names, those the shop doesn't have, as errors on their
+ * place in the input, in the caller's transaction `tx`.
+ */
+export async function missingItemsIn(
+  tx: Tx,
+  shopId: string,
+  value: Pick<CheckedOffer, 'productIds' | 'collectionIds'>,
+): Promise<FieldError[]> {
+  const productIds = value.productIds ?? [];
+  const collectionIds = value.collectionIds ?? [];
+  if (productIds.length === 0 && collectionIds.length === 0) return [];
+  const found = await productsAndCollectionsIn(tx, shopId, { productIds, collectionIds });
+  return [
+    ...productIds.flatMap((id, index) =>
+      found.productIds.has(id)
+        ? []
+        : [
+            {
+              field: ['productIds', String(index)],
+              code: 'NOT_FOUND' as const,
+              message: 'Product not found',
+            },
+          ],
+    ),
+    ...collectionIds.flatMap((id, index) =>
+      found.collectionIds.has(id)
+        ? []
+        : [
+            {
+              field: ['collectionIds', String(index)],
+              code: 'NOT_FOUND' as const,
+              message: 'Collection not found',
+            },
+          ],
+    ),
+  ];
+}
+
+/** Whether a column's value stays as it is: dates by their time, lists by what they hold. */
+export function sameValue(now: unknown, next: unknown): boolean {
+  if (now instanceof Date && next instanceof Date) return now.getTime() === next.getTime();
+  if (Array.isArray(now) && Array.isArray(next)) {
+    return now.length === next.length && now.every((item, index) => item === next[index]);
+  }
+  return now === next;
 }
 
 /** Given, and not null. */
@@ -382,10 +493,7 @@ function kindOf(
 function changedColumns(row: DiscountCodeRow, checked: CheckedCode): CheckedCode {
   const changes: Record<string, unknown> = {};
   for (const [column, next] of Object.entries(checked) as [keyof CheckedCode, unknown][]) {
-    const now = row[column];
-    const same =
-      now instanceof Date && next instanceof Date ? now.getTime() === next.getTime() : now === next;
-    if (!same) changes[column] = next;
+    if (!sameValue(row[column], next)) changes[column] = next;
   }
   return changes as CheckedCode;
 }
@@ -413,6 +521,8 @@ export function toRecord(row: DiscountCodeRow): DiscountCodeRecord {
     usageLimit: row.usageLimit,
     oncePerCustomer: row.oncePerCustomer,
     used: row.used,
+    productIds: row.productIds,
+    collectionIds: row.collectionIds,
     version: row.version,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

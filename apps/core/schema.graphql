@@ -343,6 +343,9 @@ type AutomaticDiscount {
   """
   amount: Money
 
+  """The collections whose products' items it is for."""
+  collectionIds: [ID!]!
+
   """Whether a discount code may be used with it."""
   combinesWithCodes: Boolean!
   createdAt: DateTime!
@@ -357,6 +360,11 @@ type AutomaticDiscount {
   Percent off the order's items, for PERCENTAGE discounts: 12.5 is 12.5%.
   """
   percentage: Float
+
+  """
+  The products whose items it is for, with those of its collections; neither, the whole order.
+  """
+  productIds: [ID!]!
   startsAt: DateTime!
   status: DiscountStatus!
 
@@ -380,6 +388,9 @@ input AutomaticDiscountInput {
   """An amount off the order's items, in the shop currency: "500"."""
   amount: String
 
+  """The collections whose products' items it is for, up to 100."""
+  collectionIds: [ID!]
+
   """Whether a discount code may be used with it; not unless given."""
   combinesWithCodes: Boolean
 
@@ -394,6 +405,11 @@ input AutomaticDiscountInput {
 
   """Percent off the order's items, 0.01 to 100."""
   percentage: Float
+
+  """
+  The products whose items it is for, up to 100, with those of collectionIds; empty or null with collectionIds, the whole order. Not for free delivery.
+  """
+  productIds: [ID!]
 
   """Now unless given."""
   startsAt: DateTime
@@ -3720,6 +3736,9 @@ type DiscountCode {
 
   """As the shop wrote it; shoppers may type it in any letter case."""
   code: String!
+
+  """The collections whose products' items it is for."""
+  collectionIds: [ID!]!
   createdAt: DateTime!
   endsAt: DateTime
   id: ID!
@@ -3733,6 +3752,11 @@ type DiscountCode {
 
   """Percent off the order's items, for PERCENTAGE codes: 12.5 is 12.5%."""
   percentage: Float
+
+  """
+  The products whose items it is for, with those of its collections; neither, the whole order.
+  """
+  productIds: [ID!]!
   startsAt: DateTime!
   status: DiscountStatus!
 
@@ -3785,6 +3809,9 @@ input DiscountCodeInput {
   """
   code: String
 
+  """The collections whose products' items it is for, up to 100."""
+  collectionIds: [ID!]
+
   """Null for no end."""
   endsAt: DateTime
 
@@ -3801,6 +3828,11 @@ input DiscountCodeInput {
 
   """Percent off the order's items, 0.01 to 100."""
   percentage: Float
+
+  """
+  The products whose items it is for, up to 100, with those of collectionIds; empty or null with collectionIds, the whole order. Not for free delivery.
+  """
+  productIds: [ID!]
 
   """Now unless given."""
   startsAt: DateTime

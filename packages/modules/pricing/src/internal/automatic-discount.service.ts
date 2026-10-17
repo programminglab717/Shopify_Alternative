@@ -4,7 +4,13 @@ import { appendEvent } from '@hatti/events';
 import { newId } from '@hatti/ids';
 import { Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
-import { checkOffer, type CheckedOffer, type OfferInput } from './discount-code.service.js';
+import {
+  checkOffer,
+  missingItemsIn,
+  sameValue,
+  type CheckedOffer,
+  type OfferInput,
+} from './discount-code.service.js';
 import { PricingEvents, type AutomaticDiscountChangedPayload } from './events.js';
 import type { AutomaticDiscountRecord } from './records.js';
 import { automaticDiscounts, type AutomaticDiscountRow } from './schema.js';
@@ -75,6 +81,8 @@ export class AutomaticDiscountService {
           `A shop can keep at most ${AUTOMATIC_DISCOUNT_LIMIT} automatic discounts; delete one that ended first`,
         );
       }
+      const missing = await missingItemsIn(tx, tenant.shopId, values);
+      if (missing.length > 0) return fail(missing);
       const [row] = await tx
         .insert(automaticDiscounts)
         .values({
@@ -88,6 +96,8 @@ export class AutomaticDiscountService {
           ...(values.startsAt ? { startsAt: values.startsAt } : {}),
           endsAt: values.endsAt ?? null,
           combinesWithCodes: values.combinesWithCodes ?? false,
+          productIds: values.productIds ?? [],
+          collectionIds: values.collectionIds ?? [],
         })
         .returning();
       await recordEvent(tx, PricingEvents.AutomaticDiscountCreated, row!);
@@ -110,6 +120,8 @@ export class AutomaticDiscountService {
       if (!row) return failOne(['id'], 'NOT_FOUND', 'Automatic discount not found');
       const checked = checkAutomatic(tenant, input, row);
       if (!checked.ok) return checked;
+      const missing = await missingItemsIn(tx, tenant.shopId, checked.value);
+      if (missing.length > 0) return fail(missing);
       const changes = changedColumns(row, checked.value);
       if (Object.keys(changes).length === 0) return { ok: true, value: toAutomaticRecord(row) };
       const [updated] = await tx
@@ -184,10 +196,7 @@ function checkAutomatic(
 function changedColumns(row: AutomaticDiscountRow, checked: CheckedAutomatic): CheckedAutomatic {
   const changes: Record<string, unknown> = {};
   for (const [column, next] of Object.entries(checked) as [keyof CheckedAutomatic, unknown][]) {
-    const now = row[column];
-    const same =
-      now instanceof Date && next instanceof Date ? now.getTime() === next.getTime() : now === next;
-    if (!same) changes[column] = next;
+    if (!sameValue(row[column], next)) changes[column] = next;
   }
   return changes as CheckedAutomatic;
 }
@@ -212,6 +221,8 @@ export function toAutomaticRecord(row: AutomaticDiscountRow): AutomaticDiscountR
     startsAt: row.startsAt,
     endsAt: row.endsAt,
     combinesWithCodes: row.combinesWithCodes,
+    productIds: row.productIds,
+    collectionIds: row.collectionIds,
     version: row.version,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

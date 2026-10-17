@@ -22,6 +22,8 @@ const CODE: DiscountCodeRecord = {
   usageLimit: null,
   oncePerCustomer: false,
   used: 0,
+  productIds: [],
+  collectionIds: [],
   version: 1,
   createdAt: new Date('2026-10-01T00:00:00+05:00'),
   updatedAt: new Date('2026-10-01T00:00:00+05:00'),

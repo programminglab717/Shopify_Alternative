@@ -198,6 +198,7 @@ export {
 } from '../internal/bundles.js';
 export { RELATED_PRODUCTS, relatedProductsIn } from '../internal/related-products.js';
 export { giftCardProductIdsIn } from '../internal/gift-card-products.js';
+export { collectionsOfProductsIn, productsAndCollectionsIn } from '../internal/discount-scopes.js';
 export {
   COMPLEMENTARY_PRODUCTS,
   ComplementEvents,

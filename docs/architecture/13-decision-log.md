@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-516 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-517 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -524,6 +524,7 @@
 | 514 | The admin keeps the shop's last data for use offline: Home, the orders and customers lists' first pages, the orders and customers opened and the account, in the browser's storage for the session that read them, shown offline with how old they are and forgotten on signing out | Accepted |
 | 515 | Automatic discounts: a percentage or an amount off the items, or free delivery, given without a code to every cart and checkout that qualifies; the one taking most off the items applies with free delivery beside it, and with a code only where each combines with codes, else whichever takes more | Accepted |
 | 516 | The admin's automatic discounts, on the discounts page below the codes: each with what it gives in a line and whether it runs; started with a title shoppers see, what it gives, a minimum, dates and whether codes go with it; ended at once or deleted | Accepted |
+| 517 | Discounts for some products or collections: a code or an automatic discount names up to 100 of each, and takes a percentage or an amount off only their items, its minimum being what they come to; free delivery stays for the whole order | Accepted |
 
 ---
 
@@ -19706,3 +19707,53 @@
   * **Editing in place:** a discount that runs while its value changes would give carts opened
     a minute apart different totals. Ending one and starting the next keeps each order's discount
     plain, as Shopify suggests for running sales.
+
+## ADR-517 · Discounts for some products or collections: a code or an automatic discount names up to 100 of each, and takes a percentage or an amount off only their items, its minimum being what they come to; free delivery stays for the whole order
+
+* **Context:**
+  * Codes (ADR-062) and automatic discounts (ADR-515) took something off a whole order's items.
+  * Shops in Pakistan run sales on part of what they sell: 20% off the lawn collection, Rs 500
+    off khussas, a code for one new product. Shopify's basic discounts are "for specific products
+    or collections" as often as for the whole order.
+* **Decision:**
+  * **What it names:** `productIds` and `collectionIds` on both, in the pricing module's tables,
+    up to 100 of each, as the catalog's IDs. Naming neither is for the whole order, as before.
+    The Admin API takes and gives them as public IDs on `DiscountCode`, `AutomaticDiscount` and
+    their inputs.
+  * **Checked:**
+    * Each must be one of the shop's own, asked through the catalog's facade
+      (`productsAndCollectionsIn`), never its tables.
+    * An ID that is not found, or is no product's or collection's, is a `NOT_FOUND` error at its
+      place in the list.
+    * A product or collection deleted later stays on the list and matches nothing.
+  * **Which items:** a line is the discount's when its product is named or is in a named
+    collection, smart collections included. Checkout asks the catalog which of the named
+    collections the cart's products are in (`collectionsOfProductsIn`), one query, and only when a
+    discount names a collection.
+  * **What it takes:**
+    * A percentage of those items.
+    * An amount off once an order, no more than those items come to.
+    * Its minimum is what those items come to, as Shopify's is.
+    * Automatic discounts still compete by what each takes off (ADR-515), now each on its own
+      items. Together they take no more than the order's items.
+  * **Free delivery:** stays for the whole order. Naming items for it is refused, and making a
+    discount free delivery forgets what it named.
+  * **A code for none of the cart:** refused with "isn't for the items in your cart", in English
+    and Urdu, and counted as a try (ADR-063). A cart says it does not apply.
+  * **Orders:** keep the discount as one amount, as before. Returns and tax share it over the lines
+    by their totals (ADR-096), not by which lines it was for.
+  * **The abandoned-checkout offer** (ADR-426): it knows only what the items came to, so a code
+    for some items is not offered.
+* **Consequences:**
+  * "20% off the Eid collection" and "Rs 500 off this product" work in the cart, at checkout and
+    on the order, beside codes and other automatic discounts by the rules of ADR-515.
+  * A cart's discounts need one more query when a discount names collections.
+  * The admin's discounts page does not yet choose products and collections; ADR-518 will.
+* **Alternatives:**
+  * **Discounts kept on each line:** the order would know which line had what off, as Shopify's
+    allocations do. That changes how orders, refunds, invoices and returns read their money.
+    One amount an order is what they all read today, and a later ADR can split it.
+  * **An amount off each item:** Shopify offers it, but shops here think of "Rs 500 off" as off
+    the order. Once an order keeps the sum plain at checkout.
+  * **Collections copied onto the discount as product lists:** that is wrong as soon as a smart
+    collection's products change. Asking at checkout follows the collection as it is.

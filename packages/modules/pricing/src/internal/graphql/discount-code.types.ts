@@ -97,6 +97,15 @@ export class DiscountCode {
   @Field(() => Int, { description: 'Orders placed with it so far.' })
   usageCount!: number;
 
+  @Field(() => [ID], {
+    description:
+      'The products whose items it is for, with those of its collections; neither, the whole order.',
+  })
+  productIds!: string[];
+
+  @Field(() => [ID], { description: "The collections whose products' items it is for." })
+  collectionIds!: string[];
+
   @Field({
     description:
       'What it gives, in a line: "10% off orders of Rs 3,000 or more; one use a customer".',
@@ -202,6 +211,20 @@ export class DiscountCodeInput {
     description: 'Whether a customer, by their mobile number, may place only one order with it.',
   })
   oncePerCustomer?: boolean | null;
+
+  @Field(() => [ID], {
+    nullable: true,
+    description:
+      'The products whose items it is for, up to 100, with those of collectionIds; empty or ' +
+      'null with collectionIds, the whole order. Not for free delivery.',
+  })
+  productIds?: string[] | null;
+
+  @Field(() => [ID], {
+    nullable: true,
+    description: "The collections whose products' items it is for, up to 100.",
+  })
+  collectionIds?: string[] | null;
 }
 
 @ObjectType()

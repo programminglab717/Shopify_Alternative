@@ -16,6 +16,7 @@ import { money, type CurrencyCode } from '@hatti/money';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { DiscountCodeService } from '../discount-code.service.js';
 import { discountStatus, discountSummary } from '../discounts.js';
+import { itemIdsOf, withItemUuids } from './items.js';
 import type { DiscountCodeRecord } from '../records.js';
 import {
   DiscountCode,
@@ -93,7 +94,8 @@ export class DiscountCodeResolver {
     @CurrentTenant() tenant: TenantContext,
     @Args('discountCode') discountCode: DiscountCodeInput,
   ): Promise<DiscountCodeCreatePayload> {
-    const result = await this.service.create(tenant, discountCode);
+    const input = withItemUuids(discountCode);
+    const result = input.ok ? await this.service.create(tenant, input.value) : input;
     return Object.assign(new DiscountCodeCreatePayload(), {
       discountCode: result.ok ? toDiscountCode(result.value, tenant.currency) : null,
       userErrors: result.ok ? [] : UserError.list(inDiscountCode(result.errors)),
@@ -111,7 +113,8 @@ export class DiscountCodeResolver {
     @Args('id', { type: () => ID }) id: string,
     @Args('discountCode') discountCode: DiscountCodeInput,
   ): Promise<DiscountCodeUpdatePayload> {
-    const result = await this.service.update(tenant, uuidOf(id), discountCode);
+    const input = withItemUuids(discountCode);
+    const result = input.ok ? await this.service.update(tenant, uuidOf(id), input.value) : input;
     return Object.assign(new DiscountCodeUpdatePayload(), {
       discountCode: result.ok ? toDiscountCode(result.value, tenant.currency) : null,
       userErrors: result.ok ? [] : UserError.list(inDiscountCode(result.errors)),
@@ -177,6 +180,7 @@ export function toDiscountCode(record: DiscountCodeRecord, currency: CurrencyCod
     usageLimit: record.usageLimit,
     oncePerCustomer: record.oncePerCustomer,
     usageCount: record.used,
+    ...itemIdsOf(record),
     summary: discountSummary(record, currency),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,

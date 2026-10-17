@@ -34,6 +34,13 @@ export { AutomaticDiscount } from '../internal/graphql/automatic-discount.types.
 export { toAutomaticDiscount } from '../internal/graphql/automatic-discount.resolver.js';
 export { DiscountCode } from '../internal/graphql/discount-code.types.js';
 export { toDiscountCode } from '../internal/graphql/discount-code.resolver.js';
+export {
+  collectionsNamed,
+  forSomeItems,
+  itemsFor,
+  type ItemLine,
+  type OrderItems,
+} from '../internal/items.js';
 export { PricingModule } from '../internal/pricing.module.js';
 export type {
   AutomaticDiscountRecord,
@@ -46,5 +53,6 @@ export {
   redeemDiscountIn,
   type AppliedDiscount,
   type DiscountRefusal,
+  type DiscountedOrder,
 } from '../internal/redemptions.js';
 export { DISCOUNT_KINDS, type DiscountKindValue } from '../internal/schema.js';

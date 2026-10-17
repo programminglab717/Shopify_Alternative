@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { generateAccessToken } from '@hatti/api';
 import { createTestDatabase, testDatabaseServer, type TestDatabase } from '@hatti/db/testing';
-import { newId } from '@hatti/ids';
+import { newId, toPublicId } from '@hatti/ids';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -254,5 +254,68 @@ describe.skipIf(!server)('Admin GraphQL API: discount codes', () => {
         })
       ).data?.automaticDiscount,
     ).toBeNull();
+  });
+  it('gives codes and automatic discounts to some products or collections, by their IDs (ADR-517)', async () => {
+    const lawn = newId();
+    const sale = newId();
+    await admin.query(
+      `INSERT INTO catalog.products (shop_id, id, title, handle) VALUES ($1, $2, 'Lawn', 'lawn')`,
+      [shop, lawn],
+    );
+    await admin.query(
+      `INSERT INTO catalog.collections (shop_id, id, title, handle) VALUES ($1, $2, 'Sale', 'sale')`,
+      [shop, sale],
+    );
+    const lawnId = toPublicId('product', lawn);
+    const saleId = toPublicId('collection', sale);
+    const made = await gql(
+      tokens.write,
+      `mutation ($discountCode: DiscountCodeInput!) {
+        discountCodeCreate(discountCode: $discountCode) {
+          discountCode { productIds collectionIds summary } userErrors { field code }
+        }
+      }`,
+      {
+        discountCode: {
+          code: 'LAWN10',
+          percentage: 10,
+          productIds: [lawnId],
+          collectionIds: [saleId],
+        },
+      },
+    );
+    expect(made.data?.discountCodeCreate).toEqual({
+      discountCode: {
+        productIds: [lawnId],
+        collectionIds: [saleId],
+        summary: '10% off 1 product and 1 collection',
+      },
+      userErrors: [],
+    });
+    // An ID that is no product's, or one the shop lacks, is not found.
+    const wrong = await gql(
+      tokens.write,
+      `mutation ($ids: [ID!]) {
+        automaticDiscountCreate(
+          automaticDiscount: { title: "Sale", percentage: 5, productIds: $ids }
+        ) { automaticDiscount { id } userErrors { field code } }
+      }`,
+      { ids: [saleId, toPublicId('product', newId())] },
+    );
+    expect(wrong.data?.automaticDiscountCreate.userErrors).toEqual([
+      { field: ['automaticDiscount', 'productIds', '0'], code: 'NOT_FOUND' },
+    ]);
+    const missing = await gql(
+      tokens.write,
+      `mutation ($ids: [ID!]) {
+        automaticDiscountCreate(
+          automaticDiscount: { title: "Sale", percentage: 5, collectionIds: $ids }
+        ) { automaticDiscount { collectionIds } userErrors { field code } }
+      }`,
+      { ids: [saleId, toPublicId('collection', newId())] },
+    );
+    expect(missing.data?.automaticDiscountCreate.userErrors).toEqual([
+      { field: ['automaticDiscount', 'collectionIds', '1'], code: 'NOT_FOUND' },
+    ]);
   });
 });

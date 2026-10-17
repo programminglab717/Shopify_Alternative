@@ -51,15 +51,17 @@ import {
   type PrepaidDiscountValue,
 } from '@hatti/orders/public';
 import {
-  applyDiscountIn,
   chooseDiscounts,
   discountCodeIn,
   discountFor,
   redeemDiscountIn,
   runningAutomaticDiscountsIn,
+  typedCode,
+  type AppliedDiscount,
   type ChosenDiscounts,
   type DiscountCodeRecord,
   type DiscountRefusal,
+  type OrderItems,
 } from '@hatti/pricing/public';
 import { maskPkMobile } from '@hatti/pk';
 import { ObjectStorage } from '@hatti/storage';
@@ -96,6 +98,7 @@ import {
 } from './number-codes.js';
 import { countLinkOrderIn, linkIsOpen, paymentLinkIn } from './payment-links.js';
 import { checkouts } from './schema.js';
+import { orderItemsIn } from './discount-items.js';
 import { checkoutTotals } from './totals.js';
 import { trustBadgesIn } from './trust-badge.service.js';
 import type { TrustBadgeValue } from './trust-badges.js';
@@ -1229,15 +1232,13 @@ export class CheckoutService {
     if (priced.items.length === 0) return { kind: 'empty', shop };
     const delivery = await this.delivery.settingsOf(tx, shopId);
     const [typed] = cart.discountCodes;
-    const discount =
-      typed === undefined ? null : await discountOn(tx, shopId, typed, BigInt(priced.subtotal));
-    // With the shop's automatic discounts that run, as they combine with the code (ADR-515).
+    const record = typed === undefined ? null : await discountCodeIn(tx, shopId, typed);
+    // With the shop's automatic discounts that run, as they combine with the code (ADR-515), each
+    // on the items it is for (ADR-517).
     const automatics = await runningAutomaticDiscountsIn(tx, shopId);
-    const discounts = chooseDiscounts(
-      BigInt(priced.subtotal),
-      discount?.record ?? null,
-      automatics,
-    );
+    const lines = await orderItemsIn(tx, shopId, priced, [record, ...automatics]);
+    const discount = typed === undefined ? null : discountOn(typed, record, lines);
+    const discounts = chooseDiscounts(lines, discount?.record ?? null, automatics);
     const totals = checkoutTotals(BigInt(priced.subtotal), delivery, null, discounts);
     // Items that alone come to more than cash on delivery may collect, by law or by the shop's
     // rules, or hold a product the shop takes it for none of, are paid by transfer, or cannot be
@@ -1448,10 +1449,14 @@ export class CheckoutService {
           problem: { kind: 'discount', code: shown, refusal: { reason: 'attempts' } },
         };
       }
-      const applied = await applyDiscountIn(tx, found.shopId, typed, {
-        subtotal: BigInt(view.cart.subtotal),
-        shipping: 0n,
-      });
+      const record =
+        typedCode(typed) === null ? null : await discountCodeIn(tx, found.shopId, typed);
+      const applied: AppliedDiscount = record
+        ? discountFor(record, {
+            ...(await orderItemsIn(tx, found.shopId, view.cart, [record])),
+            shipping: 0n,
+          })
+        : { ok: false, refusal: { reason: 'unknown' } };
       if (!applied.ok) {
         await tx
           .update(checkouts)
@@ -1794,16 +1799,14 @@ class DiscountRefused extends Error {
   }
 }
 
-/** The code `typed` a cart keeps, as it is now for items coming to `subtotal`. */
-async function discountOn(
-  tx: Tx,
-  shopId: string,
+/** The code `typed` a cart keeps, `record` the shop's by that name, as it is now for `items`. */
+function discountOn(
   typed: string,
-  subtotal: bigint,
-): Promise<CheckoutDiscount> {
-  const record = await discountCodeIn(tx, shopId, typed);
+  record: DiscountCodeRecord | null,
+  items: OrderItems,
+): CheckoutDiscount {
   if (!record) return { code: typed, record: null, refusal: { reason: 'unknown' } };
-  const applied = discountFor(record, { subtotal, shipping: 0n });
+  const applied = discountFor(record, { ...items, shipping: 0n });
   return applied.ok
     ? { code: record.code, record, refusal: null }
     : { code: record.code, record: null, refusal: applied.refusal };

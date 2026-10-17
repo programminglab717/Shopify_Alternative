@@ -410,4 +410,39 @@ describe.skipIf(!server)('CartService', () => {
       1_300_00,
     ]);
   });
+  it("takes a discount for some products off their lines alone, and says a code for none doesn't apply (ADR-517)", async () => {
+    const [lawn] = await f.variantsOf(f.a, 'Lawn 3-piece', { price: '4,000' });
+    const [khussa] = await f.variantsOf(f.a, 'Khussa', { price: '3,000' });
+    await f.stock(f.a, lawn!, 5);
+    await f.stock(f.a, khussa!, 5);
+    const { token, cart } = done(
+      await act(f.a, null, 'add', { items: [{ variantId: lawn }, { variantId: khussa }] }),
+    );
+    const productOf = (variantId: string) =>
+      cart.items.find((item) => item.variantId === variantId)!.productId;
+    unwrap(
+      await f.automatic.create(f.a, {
+        title: 'Khussa sale',
+        percentage: 10,
+        productIds: [productOf(khussa!)],
+      }),
+    );
+    // 10% of the Rs 3,000 khussa alone.
+    const sale = (await f.carts.cart(f.a.shopId, token!))!;
+    expect([sale.automaticDiscounts, sale.totalDiscount]).toEqual([
+      [{ title: 'Khussa sale', kind: 'percentage', value: 10, amount: 300_00 }],
+      300_00,
+    ]);
+    // A code for a product the cart lacks applies to nothing in it.
+    const [shawl] = await f.variantsOf(f.a, 'Shawl', { price: '2,000' });
+    const shawls = (
+      await f.admin.query<{ product_id: string }>(
+        'SELECT product_id FROM catalog.variants WHERE id = $1',
+        [shawl],
+      )
+    ).rows[0]!.product_id;
+    unwrap(await f.codes.create(f.a, { code: 'SHAWL', percentage: 50, productIds: [shawls] }));
+    const refused = done(await act(f.a, token, 'update', { discount: 'SHAWL' })).cart;
+    expect([refused.discount?.applicable, refused.totalDiscount]).toEqual([false, 300_00]);
+  });
 });

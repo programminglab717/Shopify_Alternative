@@ -78,9 +78,27 @@ export function discountValueText(
   return null;
 }
 
-/** What a discount gives, with its minimum: "10% off orders of Rs 3,000 or more". */
+/** What a discount is for, beside the whole order (ADR-517). */
+type ItemsNamed = Partial<Pick<DiscountCodeRecord, 'productIds' | 'collectionIds'>>;
+
+/** "3 products and 1 collection"; null for the whole order. */
+function itemsText(discount: ItemsNamed): string | null {
+  const counted = (count: number, noun: string) =>
+    count === 0 ? null : `${count.toLocaleString('en')} ${noun}${count === 1 ? '' : 's'}`;
+  const named = [
+    counted(discount.productIds?.length ?? 0, 'product'),
+    counted(discount.collectionIds?.length ?? 0, 'collection'),
+  ].filter((text) => text !== null);
+  return named.length === 0 ? null : named.join(' and ');
+}
+
+/**
+ * What a discount gives, with its minimum: "10% off orders of Rs 3,000 or more", or for some items
+ * "10% off 3 products, when they come to Rs 3,000 or more".
+ */
 function offerText(
-  discount: Pick<DiscountCodeRecord, 'kind' | 'percentageBps' | 'amount' | 'minimumSubtotal'>,
+  discount: Pick<DiscountCodeRecord, 'kind' | 'percentageBps' | 'amount' | 'minimumSubtotal'> &
+    ItemsNamed,
   currency: CurrencyCode,
 ): string {
   const rs = (amount: bigint) => formatMoney(money(amount, currency));
@@ -91,14 +109,17 @@ function offerText(
       : discount.kind === 'fixed_amount'
         ? `${rs(discount.amount ?? 0n)} off`
         : 'Free delivery';
+  const items = discount.kind === 'free_shipping' ? null : itemsText(discount);
   const which =
-    discount.kind === 'free_shipping'
-      ? minimum
-        ? ` on orders of ${minimum} or more`
-        : ''
-      : minimum
-        ? ` orders of ${minimum} or more`
-        : ' the order';
+    items !== null
+      ? ` ${items}${minimum ? `, when they come to ${minimum} or more` : ''}`
+      : discount.kind === 'free_shipping'
+        ? minimum
+          ? ` on orders of ${minimum} or more`
+          : ''
+        : minimum
+          ? ` orders of ${minimum} or more`
+          : ' the order';
   return `${what}${which}`;
 }
 
@@ -124,7 +145,8 @@ export function automaticSummary(
   discount: Pick<
     AutomaticDiscountRecord,
     'kind' | 'percentageBps' | 'amount' | 'minimumSubtotal' | 'combinesWithCodes'
-  >,
+  > &
+    ItemsNamed,
   currency: CurrencyCode,
 ): string {
   return `${offerText(discount, currency)}${discount.combinesWithCodes ? '; with codes' : ''}`;

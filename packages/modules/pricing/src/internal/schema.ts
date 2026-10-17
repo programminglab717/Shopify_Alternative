@@ -36,6 +36,9 @@ export const discountCodes = pricingSchema.table(
     usageLimit: integer('usage_limit'),
     oncePerCustomer: boolean('once_per_customer').notNull().default(false),
     used: integer('used').notNull().default(0),
+    /** The catalog's products and collections it is for (ADR-517); neither, the whole order. */
+    productIds: uuid('product_ids').array().notNull().default([]),
+    collectionIds: uuid('collection_ids').array().notNull().default([]),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -74,6 +77,8 @@ export const automaticDiscounts = pricingSchema.table(
     startsAt: timestamp('starts_at', { withTimezone: true }).notNull().defaultNow(),
     endsAt: timestamp('ends_at', { withTimezone: true }),
     combinesWithCodes: boolean('combines_with_codes').notNull().default(false),
+    productIds: uuid('product_ids').array().notNull().default([]),
+    collectionIds: uuid('collection_ids').array().notNull().default([]),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

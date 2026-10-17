@@ -77,6 +77,8 @@ const EID25: DiscountCodeRecord = {
   usageLimit: null,
   oncePerCustomer: false,
   used: 0,
+  productIds: [],
+  collectionIds: [],
   version: 1,
   createdAt: new Date('2026-10-01T00:00:00+05:00'),
   updatedAt: new Date('2026-10-01T00:00:00+05:00'),
@@ -134,7 +136,11 @@ function openView(
   const cart = changes.cart ?? CART;
   return {
     // The code applied, and no automatic discounts unless given.
-    discounts: chooseDiscounts(BigInt(cart.subtotal), changes.discount?.record ?? null, []),
+    discounts: chooseDiscounts(
+      { subtotal: BigInt(cart.subtotal), lines: [] },
+      changes.discount?.record ?? null,
+      [],
+    ),
     kind: 'open',
     shop: SHOP,
     cartId: 'c1',
@@ -1450,6 +1456,7 @@ describe('checkoutPage', () => {
     for (const [refusal, en] of [
       [{ reason: 'expired' }, 'has ended.'],
       [{ reason: 'used_up' }, 'has been used up.'],
+      [{ reason: 'not_for_items' }, "isn't for the items in your cart."],
       [{ reason: 'used' }, 'Remove it to place your order.'],
       [{ reason: 'attempts' }, 'This checkout can&#39;t take more discount codes.'],
       [{ reason: 'scheduled', startsAt: new Date('2026-10-05T00:00:00+05:00') }, '5 October 2026'],
@@ -1472,13 +1479,15 @@ describe('checkoutPage', () => {
       startsAt: new Date('2026-10-01T00:00:00+05:00'),
       endsAt: null,
       combinesWithCodes: false,
+      productIds: [],
+      collectionIds: [],
       version: 1,
       createdAt: new Date('2026-10-01T00:00:00+05:00'),
       updatedAt: new Date('2026-10-01T00:00:00+05:00'),
     };
     const subtotal = BigInt(CART.subtotal);
     const html = checkoutPage(
-      openView({ discounts: chooseDiscounts(subtotal, null, [sale]) }),
+      openView({ discounts: chooseDiscounts({ subtotal, lines: [] }, null, [sale]) }),
     ).html;
     expect(html).toContain('Eid sale');
     // 20% off the items.
@@ -1489,7 +1498,9 @@ describe('checkoutPage', () => {
       // A third off beats the code's quarter.
       openView({
         discount: coded,
-        discounts: chooseDiscounts(subtotal, EID25, [{ ...sale, percentageBps: 3_300 }]),
+        discounts: chooseDiscounts({ subtotal, lines: [] }, EID25, [
+          { ...sale, percentageBps: 3_300 },
+        ]),
       }),
     ).html;
     expect(aside).toMatch(/can't be used with\s+<bdi>Eid sale<\/bdi>, which takes more off\./);

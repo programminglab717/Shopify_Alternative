@@ -1501,6 +1501,9 @@ importers:
       '@hatti/api':
         specifier: workspace:*
         version: link:../../platform/api
+      '@hatti/catalog':
+        specifier: workspace:*
+        version: link:../catalog
       '@hatti/customers':
         specifier: workspace:*
         version: link:../customers
