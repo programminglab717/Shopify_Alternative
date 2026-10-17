@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Sorting, and the search page's filters
+### 4fd2695 · Sorting, and the search page's filters
 
 * **A collection's page is put in the order a shopper asks for, by Shopify's `sort_by`, and
   the search page's products are filtered and ordered as a collection's are** ([ADR-479](../architecture/13-decision-log.md#adr-479--a-collections-page-is-put-in-the-order-a-shopper-asks-for-by-shopifys-sort_by-and-the-search-pages-products-are-filtered-and-ordered-as-a-collections-are),
