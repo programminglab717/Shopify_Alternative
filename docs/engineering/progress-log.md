@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Push notifications for staff
+
+* **Staff's phones are told of new orders, orders to review, cash remitted and low stock by Web
+  Push, to the browsers each member turns on, in their own language, once each** ([ADR-506](../architecture/13-decision-log.md#adr-506--push-notifications-for-staff-web-push-to-the-browsers-each-member-turns-on-for-the-news-their-role-does-encrypted-and-signed-with-nodes-crypto-once-each),
+  APP-03).
+* 3156 tests, 22 more: the protocol and subscriptions in messaging, the
+  worker's pushes, the API and the VAPID keys in the core, and the admin's card and service worker.
+
 ### acf2388 · Partners' revenue share
 
 * **Partners earn 20% of each plan invoice a store they brought pays, recorded as it is paid,

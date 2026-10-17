@@ -181,3 +181,24 @@ export {
   type SmsSenderReview,
   type SmsSenderStatus,
 } from '../internal/sms-senders.service.js';
+export {
+  PUSH_KINDS,
+  PUSH_LIMITS,
+  PUSH_ROLES,
+  PUSH_SENDER,
+  PushService,
+  type PushKind,
+  type PushMessage,
+  type PushRecipient,
+  type PushSubscriptionRecord,
+} from '../internal/push.service.js';
+export {
+  WEB_PUSH,
+  WebPushSender,
+  encryptPayload,
+  generateVapidKeys,
+  vapidAuthorization,
+  type PushOutcome,
+  type PushSubscriptionKeys,
+  type VapidKeys,
+} from '../internal/web-push.js';

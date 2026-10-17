@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-505 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-506 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -513,6 +513,7 @@
 | 503 | Auto-crop: a product's photos cropped to the product against a plain backdrop, in the shape asked, through the crops a shop makes, leaving busy photos | Accepted |
 | 504 | Partners: agencies open development stores, closed to shoppers until handed to their clients as any shop is handed over, and see every store they built, brought or work in | Accepted |
 | 505 | Partners' revenue share: 20% of each plan invoice a store they brought pays, recorded as it is paid, owed until Hatti's people pay it into their bank account | Accepted |
+| 506 | Push notifications for staff: Web Push to the browsers each member turns on, for the news their role does, encrypted and signed with node's crypto, once each | Accepted |
 
 ---
 
@@ -19138,3 +19139,69 @@
     partners looking after their stores.
   * **Paying into a wallet to spend on Hatti:** partners run businesses, and they need rupees in
     the bank.
+
+## ADR-506 · Push notifications for staff: Web Push to the browsers each member turns on, for the news their role does, encrypted and signed with node's crypto, once each
+
+* **Context:** Shops run from their owners' and agents' phones. A COD order that waits an hour to
+  be confirmed is more likely to be refused at the door, and a WhatsApp alert costs the shop
+  credit and lands among its customers' chats. The admin is already installed on phones as a PWA
+  (ADR-295), so the browser's own push service can reach it for free, with the admin closed
+  (APP-03).
+* **Decision:**
+  * **What is pushed, and to whom:**
+    * A new order, to owners, managers and confirmation agents.
+    * An order held for review for its risk (at stage needs_review), to the same roles, in place
+      of the new-order push.
+    * A courier's statement of cash remitted, to owners, managers and accountants.
+    * A variant fallen to the shop's low-stock threshold, and again when it runs out, to owners
+      and managers. It goes with the WhatsApp alert's spell (ADR-157): the low-stock handler
+      pushes it, since a spell is found once.
+    * A part split from an order is nothing new, and isn't pushed.
+  * **Subscribing:**
+    * Each member of staff turns notifications on in each browser, from Your account, for the
+      kinds their role does. The admin asks the browser's permission, subscribes it with Hatti's
+      VAPID public key, and sends the subscription (endpoint, P-256 key, auth secret) through
+      `pushSubscribe`.
+    * A subscription is kept by shop and endpoint in `messaging.push_subscriptions`, under the
+      shop's row-level security. A browser another member signed in on before is theirs now.
+    * Apps are refused. No scope is asked: a subscription is the member's own, and pushes go by
+      role.
+  * **Sending:**
+    * The worker hears the events and pushes in each member's own language (English or Urdu),
+      with a link into the admin to the order, the courier's statement or the product.
+    * Recipients come from identity's `staff_phones` function, for the shop of the transaction
+      alone (ADR-193).
+    * Each push is recorded by its key in `messaging.push_deliveries`, so an event heard twice
+      pushes once.
+    * Orders' pushes are urgent; low stock's are normal.
+  * **The protocol without a library:** messages are encrypted for each browser by RFC 8291
+    (aes128gcm: ECDH on P-256, HKDF, AES-128-GCM), and requests are signed by RFC 8292 (an ES256
+    JWT for the push service's origin, good for 12 hours). node's crypto has every part. The
+    tests decrypt a message as a browser would and verify the signature.
+  * **Forgetting subscriptions:** a subscription its push service answers 404 or 410 for is
+    deleted. So is one that has failed 20 times in a row; one push that goes resets the count.
+  * **Turning it on:** `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT`, all three or
+    none, for the API and the worker alike, made once by `pnpm --filter @hatti/core vapid-keys`.
+    Without them nothing is pushed, and the admin says so.
+  * **The admin's service worker** shows the push (title, body, the shop's icon, a tag so that a
+    newer one replaces it) and opens the admin's own page when it is tapped. It focuses an open
+    admin rather than opening another. A link that would leave the admin's origin opens the home
+    instead.
+* **Consequences:**
+  * iPhones get pushes only once the admin is added to the home screen (iOS 16.4 and later). The
+    card says so there instead of offering a button.
+  * Changing the VAPID keys orphans every subscription: browsers subscribed with the old key.
+    Each member turns notifications on again.
+  * A push is sent once and not tried again, as the alerts are. One lost to a push service's
+    outage is lost. The order is still on the home and the desk.
+  * Pushes carry the shop's name, the order's number and amount, and a product's name, through
+    Google's, Mozilla's and Apple's push services. The content is encrypted end to end, but each
+    service sees when the device is told. No customer's name or number is in a push.
+* **Alternatives:**
+  * **Firebase Cloud Messaging's SDK:** a dependency and a Google project, to reach the same
+    push services that Web Push reaches directly. The native apps (APP-01) will need it, and
+    can add it then.
+  * **The `web-push` npm package:** about 200 lines of protocol, with node's crypto doing all the
+    work. Owning them keeps the dependency list short, and the tests pin the protocol.
+  * **WhatsApp alerts for staff:** they cost the shop credit and are mixed in with customers'
+    messages. They stay for owners who prefer them (ADR-157, ADR-191).

@@ -6,7 +6,7 @@ import { HaveIBeenPwnedChecker, noBreachCheck } from '@hatti/identity/public';
 import { createLogger } from '@hatti/logger';
 import { RateLimiter } from '@hatti/ratelimit';
 import { createApi } from './api/create-api.js';
-import { loadApiConfig, passkeysOf } from './config.js';
+import { loadApiConfig, passkeysOf, vapidKeysOf } from './config.js';
 import { couriersOf } from './couriers.js';
 import { accountEmailsOf } from './emails.js';
 import { ProviderPhoneCodes, messageProvidersOf } from './messaging.js';
@@ -92,6 +92,7 @@ const app = await createApi({
           ...(config.AI_BASE_URL && { baseUrl: config.AI_BASE_URL }),
         })
       : null,
+  push: vapidKeysOf(config),
 });
 await app.listen({ host: config.HOST, port: config.PORT });
 

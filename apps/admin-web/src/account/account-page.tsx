@@ -22,6 +22,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Alert, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { PushNotifications } from './push-notifications';
 import { createPasskey, passkeysWork } from './webauthn';
 
 interface SessionInfo {
@@ -630,6 +631,7 @@ export function AccountPage() {
       <FormSection title={t('account.signingIn')}>
         <Google google={google ?? null} />
       </FormSection>
+      <PushNotifications />
       <Passkeys />
       <Sessions />
     </div>

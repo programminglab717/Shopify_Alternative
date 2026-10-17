@@ -7,7 +7,9 @@ import { MessagingCustomerData } from './customer-data.js';
 import { AutomationResolver } from './graphql/automation.resolver.js';
 import { BroadcastResolver } from './graphql/broadcast.resolver.js';
 import { MessagingResolver } from './graphql/messaging.resolver.js';
+import { PushResolver } from './graphql/push.resolver.js';
 import { MessagesService } from './messages.service.js';
+import { PUSH_SENDER, PushService } from './push.service.js';
 import { SmsSenderResolver } from './graphql/sms-sender.resolver.js';
 import { SmsSendersService } from './sms-senders.service.js';
 import { StopLinkController } from './stop.controller.js';
@@ -22,17 +24,20 @@ import {
   WhatsAppWebhookController,
   type WhatsAppWebhookSettings,
 } from './webhooks.controller.js';
+import { WebPushSender, type VapidKeys } from './web-push.js';
 
 /**
  * Needs {@link Database} and {@link SecretBox} providers from the host application, which keeps
  * each webhook request's raw body as `rawBody`. Without WhatsApp's settings, its webhook answers
- * 404; without Embedded Signup's, shops cannot connect numbers of their own (ADR-419).
+ * 404; without Embedded Signup's, shops cannot connect numbers of their own (ADR-419); without
+ * VAPID keys, nothing is pushed to staff's browsers (ADR-506).
  */
 @Module({})
 export class MessagingModule {
   static forRoot(options: {
     whatsapp: WhatsAppWebhookSettings | null;
     signup?: WhatsAppSignupSettings | null;
+    push?: VapidKeys | null;
   }): DynamicModule {
     return {
       module: MessagingModule,
@@ -41,6 +46,10 @@ export class MessagingModule {
       providers: [
         { provide: WHATSAPP_WEBHOOK, useValue: options.whatsapp },
         { provide: WHATSAPP_SIGNUP, useValue: options.signup ?? null },
+        {
+          provide: PUSH_SENDER,
+          useValue: options.push ? new WebPushSender(options.push) : null,
+        },
         MessagesService,
         MessagingSettingsService,
         MessagingResolver,
@@ -56,6 +65,8 @@ export class MessagingModule {
         AutomationResolver,
         SmsSendersService,
         SmsSenderResolver,
+        PushService,
+        PushResolver,
       ],
       exports: [
         MessagesService,
@@ -65,6 +76,7 @@ export class MessagingModule {
         BroadcastsService,
         AutomationsService,
         StockWatchService,
+        PushService,
       ],
     };
   }

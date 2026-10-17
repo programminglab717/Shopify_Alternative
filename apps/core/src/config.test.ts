@@ -6,6 +6,7 @@ import {
   loadBillingTransfersConfig,
   loadWorkerConfig,
   passkeysOf,
+  vapidKeysOf,
 } from './config.js';
 
 const KEY = 'k'.repeat(32);
@@ -397,6 +398,32 @@ describe('Worker configuration', () => {
     ).toMatchObject({ ...ses, EMAIL_FROM: 'Zari via Hatti <orders@hatti.pk>' });
     expect(() => loadWorkerConfig({ ...worker, ...ses, SES_ACCESS_KEY_ID: undefined })).toThrow(
       'SES_SECRET_ACCESS_KEY: Set SES_REGION, SES_ACCESS_KEY_ID and SES_SECRET_ACCESS_KEY together, or none',
+    );
+  });
+
+  it("reads Hatti's VAPID keys as the API does, whole or not at all, to push to staff (ADR-506)", () => {
+    expect(vapidKeysOf(loadWorkerConfig(worker))).toBeNull();
+    const vapid = {
+      VAPID_PUBLIC_KEY: `B${'x'.repeat(86)}`,
+      VAPID_PRIVATE_KEY: 'p'.repeat(43),
+      VAPID_SUBJECT: 'mailto:push@hatti.pk',
+    };
+    expect(vapidKeysOf(loadWorkerConfig({ ...worker, ...vapid }))).toEqual({
+      publicKey: vapid.VAPID_PUBLIC_KEY,
+      privateKey: vapid.VAPID_PRIVATE_KEY,
+      subject: 'mailto:push@hatti.pk',
+    });
+    expect(vapidKeysOf(loadApiConfig({ ...env, ...vapid }))?.subject).toBe('mailto:push@hatti.pk');
+    const partial = { ...vapid, VAPID_SUBJECT: undefined };
+    const message =
+      'VAPID_SUBJECT: Set VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT together, or none';
+    expect(() => loadWorkerConfig({ ...worker, ...partial })).toThrow(message);
+    expect(() => loadApiConfig({ ...env, ...partial })).toThrow(message);
+    expect(() => loadWorkerConfig({ ...worker, ...vapid, VAPID_SUBJECT: 'push@hatti.pk' })).toThrow(
+      'VAPID_SUBJECT',
+    );
+    expect(() => loadWorkerConfig({ ...worker, ...vapid, VAPID_PUBLIC_KEY: 'short' })).toThrow(
+      'VAPID_PUBLIC_KEY',
     );
   });
 });

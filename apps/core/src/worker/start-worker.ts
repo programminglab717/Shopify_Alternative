@@ -38,8 +38,10 @@ import {
   AutomationsService,
   BroadcastsService,
   MessagesService,
+  PushService,
   SmsSendersService,
   StockWatchService,
+  WebPushSender,
   WhatsAppAccountsService,
   WhatsAppTemplatesService,
 } from '@hatti/messaging/public';
@@ -65,7 +67,7 @@ import {
 } from '@hatti/orders/public';
 import { GatewayAccountService, OnlinePaymentService } from '@hatti/payments/public';
 import { StorefrontActivity } from '@hatti/storefront-data';
-import type { WorkerConfig } from '../config.js';
+import { vapidKeysOf, type WorkerConfig } from '../config.js';
 import { couriersOf } from '../couriers.js';
 import { exportEmailsOf } from '../emails.js';
 import { messageProvidersOf, shopNumbersOf } from '../messaging.js';
@@ -80,6 +82,7 @@ import { workerStorage } from '../storage.js';
 import { storeExportBuilder } from '../store-export.js';
 import { BillingNotices } from './billing-notices.js';
 import { PartnerEarnings } from './partner-earnings.js';
+import { PushNotices } from './push-notices.js';
 import { BillingRenewals } from './billing-renewals.js';
 import { AutomationTriggers, WinBacks } from './automations.js';
 import { BroadcastQueue } from './broadcasts.js';
@@ -140,6 +143,7 @@ export interface EventConsumers {
   parcelSteps?: ParcelSteps;
   billing?: BillingNotices;
   partnerEarnings?: PartnerEarnings;
+  push?: PushNotices;
   staff?: StaffAlerts;
   storeCredit?: StoreCreditNotices;
   giftCards?: GiftCardSales;
@@ -168,6 +172,7 @@ export function eventHandlers(
     parcelSteps,
     billing,
     partnerEarnings,
+    push,
     staff,
     storeCredit,
     giftCards,
@@ -247,6 +252,9 @@ export function eventHandlers(
     for (const type of PartnerEarnings.EVENTS) {
       registry.on(type, (event) => partnerEarnings.handle(event));
     }
+  }
+  if (push) {
+    for (const type of PushNotices.EVENTS) registry.on(type, (event) => push.handle(event));
   }
   if (staff) {
     for (const type of StaffAlerts.EVENTS) registry.on(type, (event) => staff.handle(event));
@@ -328,6 +336,8 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       { products: new ProductService(database), collections: new CollectionService(database) },
       logger,
     );
+    const vapid = vapidKeysOf(config);
+    const pushes = new PushService(database, vapid && new WebPushSender(vapid));
     const worker = createEventWorker({
       connection: workerRedis,
       registry: eventHandlers(logger, {
@@ -349,6 +359,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
           database,
           new LowStockService(database, new VariantService(database)),
           new MessagesService(database),
+          pushes,
         ),
         backInStock: new BackInStockAlerts(
           database,
@@ -367,6 +378,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         parcelSteps: new ParcelSteps(new FulfillmentService(database, new StockService()), logger),
         billing: new BillingNotices(database, new MessagesService(database)),
         partnerEarnings: new PartnerEarnings(database),
+        push: new PushNotices(database, pushes),
         staff: new StaffAlerts(database, new MessagesService(database)),
         storeCredit: new StoreCreditNotices(database, new MessagesService(database)),
         giftCards: new GiftCardSales(database, new MessagesService(database)),

@@ -173,6 +173,51 @@ const SES_COMPLETE = {
   message: 'Set SES_REGION, SES_ACCESS_KEY_ID and SES_SECRET_ACCESS_KEY together, or none',
 };
 
+/**
+ * Hatti's VAPID keys (ADR-506), which pushes to staff's browsers are signed with: the public key,
+ * uncompressed, and the private one, base64url, as `pnpm --filter @hatti/core vapid-keys` makes
+ * them, and who runs Hatti, for push services to reach. All three or none; without them, nothing
+ * is pushed. The API gives browsers the public key; the worker signs with the private one.
+ */
+const webPush = {
+  VAPID_PUBLIC_KEY: z
+    .string()
+    .regex(/^B[A-Za-z0-9_-]{86}$/, 'Expected an uncompressed P-256 public key, base64url')
+    .optional(),
+  VAPID_PRIVATE_KEY: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{43}$/, 'Expected a P-256 private key, base64url')
+    .optional(),
+  VAPID_SUBJECT: z
+    .string()
+    .regex(/^(mailto:[^\s@]+@[^\s@]+|https:\/\/\S+)$/, 'Expected a mailto: or https: address')
+    .optional(),
+};
+export type WebPushConfig = z.output<z.ZodObject<typeof webPush>>;
+const webPushComplete = (config: WebPushConfig) =>
+  new Set([
+    config.VAPID_PUBLIC_KEY === undefined,
+    config.VAPID_PRIVATE_KEY === undefined,
+    config.VAPID_SUBJECT === undefined,
+  ]).size === 1;
+const WEB_PUSH_COMPLETE = {
+  path: ['VAPID_SUBJECT'],
+  message: 'Set VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT together, or none',
+};
+
+/** Hatti's VAPID keys, where it has them. */
+export function vapidKeysOf(
+  config: WebPushConfig,
+): { publicKey: string; privateKey: string; subject: string } | null {
+  return config.VAPID_PUBLIC_KEY && config.VAPID_PRIVATE_KEY && config.VAPID_SUBJECT
+    ? {
+        publicKey: config.VAPID_PUBLIC_KEY,
+        privateKey: config.VAPID_PRIVATE_KEY,
+        subject: config.VAPID_SUBJECT,
+      }
+    : null;
+}
+
 /** A host name shops point their own domains at (ADR-048), as both the API and the worker read it. */
 const storefrontDnsTarget = z
   .string()
@@ -315,7 +360,9 @@ const apiSchema = z
     AI_BASE_URL: env.httpUrl().optional(),
     ...messageSending,
     ...storage,
+    ...webPush,
   })
+  .refine(webPushComplete, WEB_PUSH_COMPLETE)
   .refine((config) => (config.AI_API_KEY === undefined) === (config.AI_MODEL === undefined), {
     path: ['AI_MODEL'],
     message: 'Set both AI_API_KEY and AI_MODEL, or neither',
@@ -504,7 +551,9 @@ const workerSchema = z
     STOREFRONTS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(60_000),
     ...messageSending,
     ...storage,
+    ...webPush,
   })
+  .refine(webPushComplete, WEB_PUSH_COMPLETE)
   .refine(whatsAppPaired, WHATSAPP_PAIRED)
   .refine(smsPaired, SMS_PAIRED)
   .refine(sesComplete, SES_COMPLETE)

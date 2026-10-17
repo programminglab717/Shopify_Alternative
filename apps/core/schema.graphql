@@ -7875,6 +7875,14 @@ type Mutation {
   purchaseOrderUpdate(id: ID!, input: PurchaseOrderUpdateInput!): PurchaseOrderPayload!
 
   """
+  Turns the shop's news on in a browser of the signed-in member of staff, for the kinds given, or changes them: the PushSubscription its push service gave. A browser someone else signed in on before is theirs no more.
+  """
+  pushSubscribe(input: PushSubscribeInput!): PushSubscribePayload!
+
+  """Turns the shop's news off in the signed-in member of staff's browser."""
+  pushUnsubscribe(endpoint: String!): PushUnsubscribePayload!
+
+  """
   Cancels a return still on its way back, as when its customer keeps the items after all.
   """
   returnCancel(id: ID!): ReturnCancelPayload!
@@ -11556,6 +11564,63 @@ input PurchaseOrderUpdateInput {
   reference: String
 }
 
+"""
+News pushed to staff: a NEW_ORDER, an order that NEEDS_REVIEW for its risk, CASH_REMITTED by a courier, or LOW_STOCK. Each goes to the roles whose work it is: orders to owners, managers and confirmation agents; cash to owners, managers and accountants; stock to owners and managers.
+"""
+enum PushNotificationKind {
+  CASH_REMITTED
+  LOW_STOCK
+  NEEDS_REVIEW
+  NEW_ORDER
+}
+
+"""Push notifications for staff (APP-03, ADR-506)."""
+type PushNotifications {
+  """
+  Hatti's VAPID public key, base64url, which browsers subscribe with (applicationServerKey); null where Hatti pushes nothing yet.
+  """
+  publicKey: String
+
+  """
+  The subscription of the browser asked about, if it is this member of staff’s.
+  """
+  subscription: PushSubscription
+}
+
+input PushSubscribeInput {
+  """The subscription's auth secret, base64url."""
+  auth: String!
+
+  """PushSubscription.endpoint, as the browser gave it."""
+  endpoint: String!
+
+  """The news this browser is told of."""
+  kinds: [PushNotificationKind!]!
+
+  """The subscription's p256dh key, base64url."""
+  p256dh: String!
+}
+
+type PushSubscribePayload {
+  subscription: PushSubscription
+  userErrors: [UserError!]!
+}
+
+"""A browser of the signed-in member of staff's, told of the shop's news."""
+type PushSubscription {
+  createdAt: DateTime!
+
+  """The browser's push service address it subscribed with."""
+  endpoint: String!
+  kinds: [PushNotificationKind!]!
+}
+
+type PushUnsubscribePayload {
+  """Whether the browser was subscribed."""
+  unsubscribed: Boolean!
+  userErrors: [UserError!]!
+}
+
 type Query {
   """
   Checkouts shoppers left after typing their number, the latest first, `first` at a time after the one `after` names; kept 30 days (CHK-12, ADR-393).
@@ -12419,6 +12484,11 @@ type Query {
     status: PurchaseOrderStatus
     supplierId: ID
   ): PurchaseOrderConnection!
+
+  """
+  Whether Hatti pushes news to staff, its key, and the subscription of the browser at `endpoint`, if one is given.
+  """
+  pushNotifications(endpoint: String): PushNotifications!
 
   """
   Parcels on their way back, refused or undeliverable, the longest on its way first, with how many days each has been: those a courier is slow to bring back, to chase.

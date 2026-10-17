@@ -8668,3 +8668,39 @@ export const StoreBuildMutation = /* GraphQL */ `
   ${STORE_BUILD_PLAN}
   ${USER_ERRORS}
 `;
+
+/** Push notifications for staff (APP-03, ADR-506): Hatti's key and this browser's subscription. */
+export const PushNotificationsQuery = /* GraphQL */ `
+  query PushNotifications($endpoint: String) {
+    pushNotifications(endpoint: $endpoint) {
+      publicKey
+      subscription {
+        endpoint
+        kinds
+      }
+    }
+  }
+`;
+
+export const PushSubscribeMutation = /* GraphQL */ `
+  mutation PushSubscribe($input: PushSubscribeInput!) {
+    pushSubscribe(input: $input) {
+      subscription {
+        endpoint
+        kinds
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+export const PushUnsubscribeMutation = /* GraphQL */ `
+  mutation PushUnsubscribe($endpoint: String!) {
+    pushUnsubscribe(endpoint: $endpoint) {
+      unsubscribed
+    }
+  }
+`;

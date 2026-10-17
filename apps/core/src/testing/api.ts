@@ -9,7 +9,11 @@ import { SecretBox } from '@hatti/crypto';
 import { Database } from '@hatti/db';
 import type { TestDatabase } from '@hatti/db/testing';
 import { createLogger } from '@hatti/logger';
-import type { WhatsAppSignupSettings, WhatsAppWebhookSettings } from '@hatti/messaging/public';
+import type {
+  VapidKeys,
+  WhatsAppSignupSettings,
+  WhatsAppWebhookSettings,
+} from '@hatti/messaging/public';
 import type { PaymentGateways } from '@hatti/payments/public';
 import { LocalStorage } from '@hatti/storage';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -75,6 +79,8 @@ export async function startTestApi(
     redis?: Redis;
     /** The AI gateway (ADR-463); without it, nothing is drafted with AI. */
     ai?: AiGateway;
+    /** Hatti's VAPID keys (ADR-506); without them, nothing is pushed to staff's browsers. */
+    push?: VapidKeys;
   } = {},
 ): Promise<TestApi> {
   const database = new Database({ appUrl: testDb.appUrl, applicationName: 'api-test' });
@@ -107,6 +113,7 @@ export async function startTestApi(
     dnsLookup: options.dns ?? new TestDns(),
     whatsapp: options.whatsapp ?? null,
     whatsAppSignup: options.whatsAppSignup ?? null,
+    push: options.push ?? null,
     couriers: couriersOf({ production: false }),
     paymentGateways: options.paymentGateways ?? paymentGatewaysOf({ production: false }),
     billingGateway:
