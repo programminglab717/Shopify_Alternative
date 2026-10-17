@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Sales tax on Hatti's invoices
+### 9642b79 · Sales tax on Hatti's invoices
 
 * **Where Hatti is registered for sales tax on services, its invoices carry the tax at the
   authority's rate, with its registration and NTN on the invoice's page** ([ADR-512](../architecture/13-decision-log.md#adr-512--sales-tax-on-hattis-invoices-provincial-sales-tax-on-services-at-hattis-registration-kept-on-each-invoice-with-its-authority-rate-and-number-and-paid-on-top-of-the-price), BIL-02).
