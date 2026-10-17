@@ -1146,6 +1146,19 @@ export class OrderSplitFrom {
   name!: string;
 }
 
+@ObjectType({
+  description:
+    "An order's invoice in the shop's series (TAX-05, ADR-495): numbered from 1 each tax year, " +
+    'from 1 July, the first time it is printed.',
+})
+export class OrderInvoice {
+  @Field({ description: '"INV/2026-27/00001".' })
+  number!: string;
+
+  @Field(() => GraphQLISODateTime)
+  issuedAt!: Date;
+}
+
 @ObjectType({ description: 'An order.' })
 export class Order {
   @Field(() => ID)

@@ -1,8 +1,10 @@
 import 'reflect-metadata';
 import type { TenantContext } from '@hatti/api';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { formatDay } from '@hatti/documents';
 import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { invoiceName, taxYearOf } from './invoice-series.js';
 import { errorsOf, ordersFixture, unwrap, type OrdersFixture } from './test-support.js';
 
 const server = testDatabaseServer();
@@ -166,10 +168,14 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     const invoice = async (language: 'english' | 'urdu' | 'bilingual') =>
       unwrap(await f.documents.render(f.a, [order.id], { kind: 'invoice', paper: 'a4', language }));
 
+    // Printed, the invoice is issued, the first of this tax year's series (ADR-495).
+    const first = invoiceName(taxYearOf(new Date(), 'Asia/Karachi'), 1);
+    const today = formatDay(new Date(), 'Asia/Karachi');
     const english = await invoice('english');
     expect(english.title).toBe(`Invoice #${order.number}`);
     expect(pagesOf(english.html)).toEqual([
-      `A Invoice #${order.number} 29 Sep 2026 Bill to Ayesha Khan House 12, Street 4, Block 5 ` +
+      `A Invoice #${order.number} 29 Sep 2026 Invoice no. ${first} · ${today} ` +
+        'Bill to Ayesha Khan House 12, Street 4, Block 5 ' +
         'Gulshan-e-Iqbal Near Jamia Masjid Karachi 75300, Sindh 0300 1234567 ayesha@example.com ' +
         'Payment Cash on delivery Item Qty Price Amount ' +
         'Peshawari Chappal 8 · PES-8 1 Rs 3,499 Rs 3,499 ' +
@@ -224,9 +230,51 @@ describe.skipIf(!server)('Packing slips and invoices', () => {
     unwrap(await f.orders.cancel(f.a, order.id, { reason: 'customer' }));
     unwrap(await f.customerData.erase(f.a, order.customerId));
     const [page] = pagesOf((await invoice()).html);
-    expect(page).toMatch(/^Cancelled A Invoice #\d+ \d+ \w+ \d{4} Bill to Karachi, Sindh Payment /);
+    // Issued before it was cancelled, it keeps its number.
+    expect(page).toMatch(
+      /^Cancelled A Invoice #\d+ \d+ \w+ \d{4} Invoice no\. INV\/\d{4}-\d{2}\/00001 · \d+ \w+ \d{4} Bill to Karachi, Sindh Payment /,
+    );
     expect(page).not.toContain('Ayesha');
     expect(page).not.toContain('0300');
+  });
+
+  it('numbers invoices in a series of their own as they are first printed, none skipped or given twice (ADR-495)', async () => {
+    const one = await f.order(f.a, [kurta]);
+    const two = await f.order(f.a, [kurta]);
+    const cancelled = await f.order(f.a, [kurta]);
+    unwrap(await f.orders.cancel(f.a, cancelled.id, { reason: 'customer' }));
+    const year = taxYearOf(new Date(), 'Asia/Karachi');
+    const print = (ids: string[], kind: 'invoice' | 'packing_slip' = 'invoice') =>
+      f.documents.render(f.a, ids, { kind, paper: 'a4', language: 'english' });
+
+    // A packing slip issues nothing.
+    unwrap(await print([one.id], 'packing_slip'));
+    expect((await f.documents.invoicesOf(f.a, [one.id])).size).toBe(0);
+
+    // Printed together, in the order given; a cancelled order without an invoice gets none.
+    unwrap(await print([two.id, cancelled.id, one.id]));
+    const issued = await f.documents.invoicesOf(f.a, [one.id, two.id, cancelled.id]);
+    expect([issued.get(two.id)?.name, issued.get(one.id)?.name, issued.has(cancelled.id)]).toEqual([
+      invoiceName(year, 1),
+      invoiceName(year, 2),
+      false,
+    ]);
+
+    // Printed again, an invoice keeps its number; printed at once in two places, an order is
+    // numbered once and no number is skipped.
+    const three = await f.order(f.a, [kurta]);
+    const four = await f.order(f.a, [kurta]);
+    await Promise.all([print([one.id, three.id]), print([four.id, three.id])]);
+    const after = await f.documents.invoicesOf(f.a, [one.id, three.id, four.id]);
+    expect(after.get(one.id)!.number).toBe(2);
+    expect([after.get(three.id)!.number, after.get(four.id)!.number].sort((a, b) => a - b)).toEqual(
+      [3, 4],
+    );
+
+    // The tax year starts on 1 July in Karachi.
+    expect(taxYearOf(new Date('2026-06-30T18:59:00Z'), 'Asia/Karachi')).toBe(2025);
+    expect(taxYearOf(new Date('2026-06-30T19:00:00Z'), 'Asia/Karachi')).toBe(2026);
+    expect(invoiceName(2099, 12)).toBe('INV/2099-00/00012');
   });
 
   it('prints the gift message on the packing slip, escaped, and none once its customer is erased (ADR-413)', async () => {

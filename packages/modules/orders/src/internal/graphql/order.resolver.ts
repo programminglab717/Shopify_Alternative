@@ -24,6 +24,8 @@ import {
   type LocationRecord,
 } from '@hatti/inventory/public';
 import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import { OrderDocumentService } from '../document.service.js';
+import type { OrderInvoiceRecord } from '../invoice-series.js';
 import { OrderService, type BulkResult } from '../order.service.js';
 import type { OrderAttributionRecord, OrderRecord } from '../records.js';
 import { ORDER_STAGES } from '../schema.js';
@@ -55,6 +57,7 @@ import {
   OrderPayWithStoreCreditPayload,
   OrderCreatePayload,
   OrderEventConnection,
+  OrderInvoice,
   OrderEventsArgs,
   OrderMarkAsPaidPayload,
   OrderLocationChangePayload,
@@ -99,6 +102,7 @@ export class OrderResolver {
     private readonly service: OrderService,
     private readonly locations: LocationService,
     private readonly customers: CustomerService,
+    private readonly documents: OrderDocumentService,
   ) {}
 
   @Query(() => Order, { nullable: true, description: 'An order by ID, or null if not found.' })
@@ -166,6 +170,24 @@ export class OrderResolver {
     );
     const record = await loader.load(order.locationId);
     return record ? toLocation(record) : null;
+  }
+
+  @ResolveField(() => OrderInvoice, {
+    nullable: true,
+    description: 'Its invoice, once one has been printed (ADR-495).',
+  })
+  async invoice(
+    @CurrentTenant() tenant: TenantContext,
+    @Loaders() loaders: RequestLoaders,
+    @Parent() order: Order,
+  ): Promise<OrderInvoice | null> {
+    const loader = loaders.get<string, OrderInvoiceRecord>('orders.invoices', (ids) =>
+      this.documents.invoicesOf(tenant, ids),
+    );
+    const record = await loader.load(order.uuid);
+    return record
+      ? Object.assign(new OrderInvoice(), { number: record.name, issuedAt: record.issuedAt })
+      : null;
   }
 
   @ResolveField(() => Customer, {

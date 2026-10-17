@@ -14,6 +14,7 @@ import type { LocationRecord } from '@hatti/inventory/public';
 import { formatMoney, money, type CurrencyCode } from '@hatti/money';
 import { PK_PROVINCES, parsePkMobile, type PkProvinceCode } from '@hatti/pk';
 import { taxIncludedWords, type TaxSettingsRecord } from '@hatti/tax/public';
+import type { OrderInvoiceRecord } from './invoice-series.js';
 import { taxByRate } from './order-tax.js';
 import type { OrderLineRecord, OrderRecord } from './records.js';
 import { orderName } from './rules.js';
@@ -36,6 +37,8 @@ export interface DocumentContext {
    * tax registration number, its invoices are sales tax invoices.
    */
   registration: Pick<TaxSettingsRecord, 'ntn' | 'strn'>;
+  /** The order's invoice, on an invoice once issued (ADR-495). */
+  invoice?: Pick<OrderInvoiceRecord, 'name' | 'issuedAt'> | null;
 }
 
 // Wording for documents that go to customers, in English and Urdu.
@@ -43,6 +46,7 @@ const WORDS = {
   packingSlip: { en: 'Packing slip', ur: 'پیکنگ سلپ' },
   invoice: { en: 'Invoice', ur: 'انوائس' },
   taxInvoice: { en: 'Sales tax invoice', ur: 'سیلز ٹیکس انوائس' },
+  invoiceNumber: { en: 'Invoice no.', ur: 'انوائس نمبر' },
   shipTo: { en: 'Ship to', ur: 'ترسیل کا پتہ' },
   billTo: { en: 'Bill to', ur: 'خریدار' },
   payment: { en: 'Payment', ur: 'ادائیگی' },
@@ -314,6 +318,14 @@ function header(
       <h2 class="title">${say(context.language, title)}</h2>
       <p class="big">${ltr(orderName(order.number))}</p>
       <p>${ltr(formatDay(order.createdAt, context.shop.timezone))}</p>
+      ${
+        registered &&
+        context.invoice &&
+        html`<p>
+          ${say(context.language, WORDS.invoiceNumber)} ${ltr(context.invoice.name)} ·
+          ${ltr(formatDay(context.invoice.issuedAt, context.shop.timezone))}
+        </p>`
+      }
     </div>
   </header>`;
 }

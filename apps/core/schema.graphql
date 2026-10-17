@@ -8558,6 +8558,9 @@ type Order {
   """
   giftMessage: String
   id: ID!
+
+  """Its invoice, once one has been printed (ADR-495)."""
+  invoice: OrderInvoice
   lineItems: [OrderLineItem!]!
 
   """Where it ships from, and where its stock was committed."""
@@ -9134,6 +9137,16 @@ enum OrderFulfillmentStatus {
   PARTIALLY_RETURNED
   RETURNED
   UNFULFILLED
+}
+
+"""
+An order's invoice in the shop's series (TAX-05, ADR-495): numbered from 1 each tax year, from 1 July, the first time it is printed.
+"""
+type OrderInvoice {
+  issuedAt: DateTime!
+
+  """"INV/2026-27/00001"."""
+  number: String!
 }
 
 """A line of an order: what was sold, as it was then."""

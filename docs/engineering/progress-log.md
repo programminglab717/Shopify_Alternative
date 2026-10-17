@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Invoice series
+
+* **An order's invoice takes the next number in the shop's own series when it is first printed,
+  counted afresh each tax year, with none skipped or given twice** ([ADR-495](../architecture/13-decision-log.md#adr-495--invoice-series-an-orders-invoice-numbered-in-the-shops-own-series-when-first-printed-counted-afresh-each-tax-year-from-1-july-with-no-number-skipped-or-given-twice), TAX-05 in part).
+* 3096 tests, 1 more: the series, and its number on the invoice and
+  through the Admin API.
+
 ### 2806e48 · Payouts and tax withheld in the admin
 
 * **A page beside the cash page reads payouts by month or Pakistan's tax year, and downloads the

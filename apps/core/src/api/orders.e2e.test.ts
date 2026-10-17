@@ -1944,7 +1944,7 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     const DOCUMENT = `
       query ($ids: [ID!]!, $kind: OrderDocumentKind!, $paper: PaperSize, $language: DocumentLanguage) {
         orderDocument(ids: $ids, kind: $kind, paper: $paper, language: $language) {
-          html title fileName orders { id name }
+          html title fileName orders { id name invoice { number } }
         }
       }`;
     const slip = await gql(tokens.aReader, DOCUMENT, { ids: [id], kind: 'PACKING_SLIP' });
@@ -1952,7 +1952,7 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
     expect(document).toMatchObject({
       title: `Packing slip ${created.order.name}`,
       fileName: `packing-slip-${created.order.number}.html`,
-      orders: [{ id, name: created.order.name }],
+      orders: [{ id, name: created.order.name, invoice: null }],
     });
     // A4 and both languages unless asked otherwise.
     expect(document.html).toMatch(/<html\s+lang="en"\s+dir="ltr"\s+data-paper="a4"/);
@@ -1969,6 +1969,10 @@ describe.skipIf(!server)('Admin GraphQL API: orders', () => {
       /<html\s+lang="ur"\s+dir="rtl"\s+data-paper="thermal_80mm"/,
     );
     expect(invoice.data?.orderDocument.html).toContain('انوائس');
+    // Printed, the invoice is issued in the shop's series (ADR-495).
+    const issued = invoice.data?.orderDocument.orders[0].invoice.number as string;
+    expect(issued).toMatch(/^INV\/\d{4}-\d{2}\/\d{5}$/);
+    expect(invoice.data?.orderDocument.html).toContain(issued);
 
     // Another shop's orders are left out; bad input is refused.
     const elsewhere = await gql(tokens.b, DOCUMENT, { ids: [id], kind: 'INVOICE' });

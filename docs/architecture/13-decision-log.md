@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-494 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-495 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -502,6 +502,7 @@
 | 492 | Gateway settlements in the admin: imported beside couriers' statements, checked before they are, and each opened on the lines to look into | Accepted |
 | 493 | Payouts and tax withheld: gateways' and couriers' statements over a period, by who paid and by month, and each that withheld tax for the shop's tax credit | Accepted |
 | 494 | Payouts and tax withheld in the admin: a month or Pakistan's tax year, who paid, and the statements that withheld tax to download for the shop's return | Accepted |
+| 495 | Invoice series: an order's invoice numbered in the shop's own series when first printed, counted afresh each tax year from 1 July, with no number skipped or given twice | Accepted |
 
 ---
 
@@ -18708,3 +18709,36 @@
     periods would not match the return.
   * **A CSV made by the core:** the page has every line already. Making it in the browser saves
     a round trip and an endpoint.
+
+## ADR-495 · Invoice series: an order's invoice numbered in the shop's own series when first printed, counted afresh each tax year from 1 July, with no number skipped or given twice
+
+* **Context:** Invoices went by their order's number (ADR-190). Order numbers are not an invoice
+  series: drafts and cancelled orders take them too, and they never start again. FBR asks a
+  registered seller's tax invoices to be numbered serially, and accountants expect a series a
+  year with no gaps (TAX-05). Pakistan's tax year runs from 1 July to 30 June.
+* **Decision:**
+  * **An order's invoice takes the next number in the shop's series the first time it is
+    printed,** written `INV/2026-27/00001`, and keeps it however often it is printed again.
+    Printing an invoice is issuing it, through the same `orderDocument` query. A packing slip
+    issues nothing.
+  * **The series starts again at 1 each tax year,** the year of the day the invoice is issued in
+    the shop's time zone.
+  * **No number is skipped or given twice:**
+    * a shop's invoices are issued one transaction at a time, under a lock of the shop's own;
+    * the counter is taken in the same transaction as the invoice, so a print that fails gives
+      its number back;
+    * an order printed in two places at once is numbered once.
+  * **A cancelled order without an invoice gets none.** One issued before it was cancelled keeps
+    its number, and prints marked cancelled. Nothing prints, and nothing is issued, while an
+    order of the batch is past the plan's limit.
+  * The invoice prints its number and the day it was issued under the order's number and date,
+    in English and Urdu. `Order.invoice` gives the number and when it was issued.
+* **Consequences:**
+  * A refund on an invoiced order should be a credit note in a series of its own. The counters
+    are kept by kind for that, and credit notes come next.
+  * Debit notes, for an invoiced order whose total rises, come later.
+* **Alternatives:**
+  * **Issuing an invoice when the order is confirmed or shipped:** most cash-on-delivery orders
+    are never invoiced, and confirmed orders are often cancelled. Numbering on print keeps the
+    series to the invoices the shop actually gives.
+  * **A Postgres sequence:** sequences skip numbers when a transaction rolls back.

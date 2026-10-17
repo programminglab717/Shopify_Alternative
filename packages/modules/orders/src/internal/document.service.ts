@@ -13,6 +13,7 @@ import { taxSettingsIn } from '@hatti/tax/public';
 import { Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { documentName, invoice, packingSlip, type DocumentKindValue } from './documents.js';
+import { invoicesIn, issueInvoicesIn, type OrderInvoiceRecord } from './invoice-series.js';
 import { loadOrders } from './order-store.js';
 import type { OrderRecord } from './records.js';
 import { OVER_LIMIT_MESSAGE } from './plan-orders.js';
@@ -56,7 +57,7 @@ export class OrderDocumentService {
       return failOne(['ids'], 'TOO_MANY', `Ids can have at most ${LIMITS.batch}`);
     }
     const wanted = [...new Set(ids)];
-    const { shop, registration, orders, locations } = await this.db.tenant(
+    const { shop, registration, orders, locations, invoices } = await this.db.tenant(
       tenant.shopId,
       async (tx) => {
         const found = await loadOrders(tx, tenant.shopId, {
@@ -65,11 +66,20 @@ export class OrderDocumentService {
         const byId = new Map(found.map((order) => [order.id, order]));
         const orders = wanted.flatMap((id) => byId.get(id) ?? []);
         const locationIds = orders.map((order) => order.locationId);
+        const shop = await shopProfile(tx, tenant.shopId);
+        // An invoice printed is issued (ADR-495): those of orders without one take the next
+        // numbers, unless an order in the batch is past the plan's limit and nothing prints.
+        const printable = orders.every((order) => order.overLimitAt === null);
+        const invoices: Map<string, OrderInvoiceRecord> =
+          request.kind === 'invoice' && printable
+            ? await issueInvoicesIn(tx, tenant.shopId, orders, shop.timezone)
+            : new Map();
         return {
-          shop: await shopProfile(tx, tenant.shopId),
+          shop,
           registration: await taxSettingsIn(tx, tenant.shopId),
           orders,
           locations: await this.locations.locationsOf(tx, tenant.shopId, locationIds),
+          invoices,
         };
       },
     );
@@ -88,6 +98,7 @@ export class OrderDocumentService {
         from: locations.get(order.locationId) ?? null,
         phone: shownNumber(tenant, order.phone),
         registration,
+        invoice: invoices.get(order.id) ?? null,
       }),
     );
     const { title, fileName } = documentName(
@@ -96,6 +107,14 @@ export class OrderDocumentService {
     );
     const html = renderDocument({ title, paper: request.paper, language: request.language, pages });
     return { ok: true, value: { html, title, fileName, orders } };
+  }
+
+  /** The invoices issued for orders `ids`, by order (ADR-495). */
+  async invoicesOf(
+    tenant: TenantContext,
+    ids: readonly string[],
+  ): Promise<Map<string, OrderInvoiceRecord>> {
+    return this.db.tenant(tenant.shopId, (tx) => invoicesIn(tx, tenant.shopId, ids));
   }
 }
 
