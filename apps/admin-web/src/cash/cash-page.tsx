@@ -1,5 +1,5 @@
 import { Link, useNavigate } from '@tanstack/react-router';
-import { CreditCard, FileUp, Wallet } from 'lucide-react';
+import { CreditCard, FileUp, Landmark, Wallet } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { CashQuery, CashStatementImportMutation } from '../api/operations';
@@ -377,14 +377,24 @@ export function CashPage() {
       <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
         {t('cash.title')}
       </h1>
-      <Link
-        to="/$shopId/settlements"
-        params={{ shopId }}
-        className="inline-flex min-h-10 items-center gap-2 self-start text-primary underline"
-      >
-        <CreditCard aria-hidden className="size-5" />
-        {t('cash.settlementsLink')}
-      </Link>
+      <div className="flex flex-wrap gap-x-6">
+        <Link
+          to="/$shopId/settlements"
+          params={{ shopId }}
+          className="inline-flex min-h-10 items-center gap-2 text-primary underline"
+        >
+          <CreditCard aria-hidden className="size-5" />
+          {t('cash.settlementsLink')}
+        </Link>
+        <Link
+          to="/$shopId/payouts"
+          params={{ shopId }}
+          className="inline-flex min-h-10 items-center gap-2 text-primary underline"
+        >
+          <Landmark aria-hidden className="size-5" />
+          {t('cash.payoutsLink')}
+        </Link>
+      </div>
       {nothing ? (
         <Card>
           <EmptyState

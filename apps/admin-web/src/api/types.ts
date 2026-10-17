@@ -1597,6 +1597,38 @@ export interface PaymentSettlementImportData {
   };
 }
 
+export interface PayoutTotalsValue {
+  statements: number;
+  gross: MoneyValue;
+  fees: MoneyValue;
+  tax: MoneyValue;
+  net: MoneyValue;
+}
+
+export type PayoutSourceKind = 'GATEWAY' | 'COURIER';
+
+export interface PayoutWithholdingValue {
+  id: string;
+  kind: PayoutSourceKind;
+  name: string;
+  reference: string | null;
+  importedAt: string;
+  gross: MoneyValue;
+  fees: MoneyValue;
+  tax: MoneyValue;
+  net: MoneyValue;
+}
+
+export interface PayoutsReportData {
+  payoutsReport: {
+    totals: PayoutTotalsValue;
+    sources: (PayoutTotalsValue & { kind: PayoutSourceKind; name: string })[];
+    months: (PayoutTotalsValue & { month: string })[];
+    withholdings: PayoutWithholdingValue[];
+    truncated: boolean;
+  };
+}
+
 export type FulfillmentClaimStatus = 'OPEN' | 'PAID' | 'REFUSED' | 'WITHDRAWN';
 
 export interface ParcelClaimValue {

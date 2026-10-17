@@ -3674,6 +3674,64 @@ export const PaymentSettlementImportMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** What a period's statements, a source's or a month's came to: the same fields on each type. */
+const PAYOUT_TOTAL_FIELDS = `
+  statements
+  gross {
+    ...Money
+  }
+  fees {
+    ...Money
+  }
+  tax {
+    ...Money
+  }
+  net {
+    ...Money
+  }
+`;
+
+/** What gateways and couriers paid over a period, and the tax they withheld (ANL-09, TAX-03). */
+export const PayoutsReportQuery = /* GraphQL */ `
+  query PayoutsReport($from: DateTime!, $before: DateTime!) {
+    payoutsReport(from: $from, before: $before) {
+      totals {
+        ${PAYOUT_TOTAL_FIELDS}
+      }
+      sources {
+        kind
+        name
+        ${PAYOUT_TOTAL_FIELDS}
+      }
+      months {
+        month
+        ${PAYOUT_TOTAL_FIELDS}
+      }
+      withholdings {
+        id
+        kind
+        name
+        reference
+        importedAt
+        gross {
+          ...Money
+        }
+        fees {
+          ...Money
+        }
+        tax {
+          ...Money
+        }
+        net {
+          ...Money
+        }
+      }
+      truncated
+    }
+  }
+  ${MONEY}
+`;
+
 const PARCEL_CLAIM = /* GraphQL */ `
   fragment ParcelClaim on FulfillmentClaim {
     status

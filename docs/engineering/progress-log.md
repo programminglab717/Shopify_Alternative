@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Payouts and tax withheld in the admin
+
+* **A page beside the cash page reads payouts by month or Pakistan's tax year, and downloads the
+  statements that withheld tax as CSV** ([ADR-494](../architecture/13-decision-log.md#adr-494--payouts-and-tax-withheld-in-the-admin-a-month-or-pakistans-tax-year-who-paid-and-the-statements-that-withheld-tax-to-download-for-the-shops-return), ANL-09 and TAX-03 in part).
+* 3095 tests, 3 more: the periods and the CSV, the page, and its
+  operation.
+
 ### 8c38d3f · Payouts and tax withheld
 
 * **What gateways and couriers paid the shop over a period, less their fees and the tax they

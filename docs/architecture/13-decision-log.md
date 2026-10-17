@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-493 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-494 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -501,6 +501,7 @@
 | 491 | Gateway settlements: the statements gateways send imported as they come, each line matched to a payment by the gateway's reference, and the fees and tax withheld kept beside it | Accepted |
 | 492 | Gateway settlements in the admin: imported beside couriers' statements, checked before they are, and each opened on the lines to look into | Accepted |
 | 493 | Payouts and tax withheld: gateways' and couriers' statements over a period, by who paid and by month, and each that withheld tax for the shop's tax credit | Accepted |
+| 494 | Payouts and tax withheld in the admin: a month or Pakistan's tax year, who paid, and the statements that withheld tax to download for the shop's return | Accepted |
 
 ---
 
@@ -18681,3 +18682,29 @@
 * **Alternatives:**
   * **A table of payouts kept as statements are imported:** a second copy to keep in step. Both
     modules' statements are few, so adding them up when asked is cheap.
+
+## ADR-494 · Payouts and tax withheld in the admin: a month or Pakistan's tax year, who paid, and the statements that withheld tax to download for the shop's return
+
+* **Context:** The payouts report (ADR-493) was read through the Admin API alone. The shop's
+  accountant reads it by the month, and by the tax year when the return is due. Pakistan's tax
+  year runs from 1 July to 30 June.
+* **Decision:**
+  * **The cash page links to "Payouts and tax withheld"**, for owners, managers and
+    accountants. The page reads the report for this month, last month, this tax year or last tax
+    year, each from midnight on the first in the shop's time zone. It shows:
+    * what was paid over, the tax withheld, the fees, and what customers paid;
+    * each gateway or courier, with its statements, fees and tax;
+    * each month, when the period has more than one;
+    * each statement that withheld tax, with its reference and date.
+  * **The statements that withheld tax download as a CSV file**, made in the browser: date in
+    the shop's time zone, who paid, gateway or courier, reference, and the four amounts. Headings
+    are in the admin's language.
+  * A period with more statements than the report counts says so, and to choose a shorter one.
+* **Consequences:**
+  * The certificates gateways and couriers issue for the tax are not kept with the statements.
+    The page reminds the shop to keep them.
+* **Alternatives:**
+  * **Rolling periods, as analytics has:** tax is reckoned by month and by tax year, so rolling
+    periods would not match the return.
+  * **A CSV made by the core:** the page has every line already. Making it in the browser saves
+    a round trip and an endpoint.

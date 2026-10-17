@@ -50,6 +50,15 @@ export function formatDateTime(iso: string, timeZone: string, locale: Locale): s
   }).format(new Date(iso));
 }
 
+/** "October 2026", of a year and month written "2026-10". */
+export function formatMonth(month: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(dateLocale(locale), {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${month}-01T00:00:00Z`));
+}
+
 /** "27 Sep 2026" in the shop's time zone. */
 export function formatDate(iso: string, timeZone: string, locale: Locale): string {
   return new Intl.DateTimeFormat(dateLocale(locale), {

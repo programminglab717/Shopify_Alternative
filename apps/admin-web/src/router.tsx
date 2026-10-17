@@ -33,6 +33,7 @@ import {
 import { AnalyticsPage } from './analytics/analytics-page';
 import { CashPage } from './cash/cash-page';
 import { ReturnsPage, validateReturnsSearch } from './returns/returns-page';
+import { PayoutsPage } from './cash/payouts-page';
 import { SettlementPage } from './cash/settlement-page';
 import { SettlementsPage } from './cash/settlements-page';
 import { StatementPage } from './cash/statement-page';
@@ -618,6 +619,12 @@ const statement = createRoute({
   component: StatementPage,
 });
 
+const payouts = createRoute({
+  getParentRoute: () => shop,
+  path: 'payouts',
+  component: PayoutsPage,
+});
+
 const settlements = createRoute({
   getParentRoute: () => shop,
   path: 'settlements',
@@ -894,6 +901,7 @@ export const routeTree = root.addChildren([
     statement,
     settlements,
     settlement,
+    payouts,
     stock,
     purchaseOrders,
     suppliers,
