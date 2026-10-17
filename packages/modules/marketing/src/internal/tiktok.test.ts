@@ -27,7 +27,7 @@ const order: ConversionOrder = {
       landingPage: '/products/kurta?ttclid=E.C.P.CjwBhz-1&utm_source=tiktok#reviews',
     },
   ],
-  browserIds: null,
+  browserIds: { fbp: 'fb.1.1727856000000.1116446470', ttp: '2RjN8g3hW6yFZ8JQ0Gk6p1Lq5Xv' },
   lines: [
     { variantId: 'v-1', quantity: 2, unitPrice: 2_499_00n },
     { variantId: 'v-2', quantity: 1, unitPrice: 252_00n },
@@ -52,6 +52,8 @@ describe("TikTok's Events API: events", () => {
       ip: '39.40.1.2',
       user_agent: 'Mozilla/5.0 (Linux; Android 14)',
       ttclid: 'E.C.P.CjwBhz-1',
+      // The ID TikTok's pixel gave the browser (ADR-543); Meta's are Meta's.
+      ttp: '2RjN8g3hW6yFZ8JQ0Gk6p1Lq5Xv',
     });
     // Without them, nothing of them goes.
     expect(
@@ -62,6 +64,7 @@ describe("TikTok's Events API: events", () => {
         clientIp: null,
         clientUserAgent: null,
         visits: [],
+        browserIds: null,
       }),
     ).toEqual({ external_id: sha256(order.customerId) });
   });

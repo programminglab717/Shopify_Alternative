@@ -555,6 +555,7 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
           landingPage: '/products/kurta?ttclid=E.C.P.CjwBhz&utm_source=tiktok',
         },
       },
+      browserIds: { ttp: '2RjN8g3hW6yFZ8JQ0Gk6p1Lq5Xv' },
     });
     await dispatch();
     const platforms = async () =>
@@ -610,6 +611,7 @@ describe.skipIf(!server)("Orders sent to Meta's conversions API", () => {
             ip: '39.40.1.2',
             user_agent: 'Mozilla/5.0 (Linux; Android 14)',
             ttclid: 'E.C.P.CjwBhz',
+            ttp: '2RjN8g3hW6yFZ8JQ0Gk6p1Lq5Xv',
           },
           properties: {
             currency: 'PKR',

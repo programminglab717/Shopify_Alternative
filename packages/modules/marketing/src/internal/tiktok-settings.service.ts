@@ -232,6 +232,16 @@ export class TikTokEventsService {
   }
 }
 
+/**
+ * The shop's TikTok pixel's code while it has TikTok connected, for its storefront's pages to load
+ * the pixel (ADR-543), in the caller's transaction; null while it has none.
+ */
+export async function tiktokPixelCodeIn(tx: Tx, shopId: string): Promise<string | null> {
+  const { rows } = await tx.execute<{ pixel_code: string }>(sql`
+    SELECT pixel_code FROM marketing.tiktok_settings WHERE shop_id = ${shopId}`);
+  return rows[0]?.pixel_code ?? null;
+}
+
 async function settingsIn(
   tx: Tx,
   shopId: string,

@@ -6,9 +6,11 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { sampleStore } from './fixtures.js';
 import {
   META_PIXEL_SCRIPT,
+  TIKTOK_PIXEL_SCRIPT,
   browserIdsOf,
   metaPixelScript,
   pixelProduct,
+  tiktokPixelScript,
   type PixelProduct,
 } from './pixels.js';
 import { PageRenderer, type PageRequest } from './render.js';
@@ -40,7 +42,7 @@ const formTo = (action: string, fields: Record<string, string> = {}) => ({
  * A page of the shop's loaded in a browser, its head's pixel script run: the pixel's calls so
  * far, the scripts the page added, and what a shopper does on it.
  */
-function load(script: string, options: { fbq?: unknown } = {}) {
+function load(script: string, options: { fbq?: unknown; ttq?: unknown } = {}) {
   const listeners: Record<string, ((event: object) => void)[]> = {};
   const added: { src: string; async: boolean }[] = [];
   const window: Record<string, unknown> = {
@@ -64,12 +66,20 @@ function load(script: string, options: { fbq?: unknown } = {}) {
   };
   window.window = window;
   if (options.fbq) window.fbq = options.fbq;
+  if (options.ttq) window.ttq = options.ttq;
   runInNewContext(script, window);
-  const fbq = window.fbq as { queue: ArrayLike<unknown>[] };
+  const fbq = window.fbq as { queue: ArrayLike<unknown>[] } | undefined;
   return {
     added,
-    /** The pixel's calls, waiting for its script. */
-    calls: () => JSON.parse(JSON.stringify(fbq.queue.map((call) => Array.from(call)))) as unknown[],
+    /** The pixel's calls, waiting for its script: Meta's queue, else TikTok's. */
+    calls: () =>
+      JSON.parse(
+        JSON.stringify(
+          fbq
+            ? fbq.queue.map((call) => Array.from(call))
+            : Array.from(window.ttq as ArrayLike<unknown>),
+        ),
+      ) as unknown[],
     submit: (form: ReturnType<typeof formTo>, submitter?: { name: string }) =>
       listeners.submit!.forEach((listener) => listener({ target: form, submitter })),
     click: (href: string) => {
@@ -176,6 +186,11 @@ describe("The shop's Meta pixel", () => {
       fbp: 'fb.1.1727856000000.1116446470',
     });
     expect(browserIdsOf('_fbp=<script>; _fbc=fb.x.1.2')).toBeUndefined();
+    // TikTok's pixel's browser ID too (ADR-543).
+    expect(browserIdsOf('_ttp=2RjN8g3hW6yFZ8JQ0Gk6p1Lq5Xv; _fbp=x')).toEqual({
+      ttp: '2RjN8g3hW6yFZ8JQ0Gk6p1Lq5Xv',
+    });
+    expect(browserIdsOf('_ttp=<script>alert(1)</script>')).toBeUndefined();
     expect(browserIdsOf(undefined)).toBeUndefined();
   });
 
@@ -185,9 +200,12 @@ describe("The shop's Meta pixel", () => {
       theme = loadTheme(await readThemeDir(THEME_DIR));
     });
 
-    const render = async (request: PageRequest, metaPixelId?: string) => {
+    const render = async (request: PageRequest, metaPixelId?: string, tiktokPixelCode?: string) => {
       const sample = sampleStore();
-      const store = new MemoryStore({ ...sample, shop: { ...sample.shop, metaPixelId } });
+      const store = new MemoryStore({
+        ...sample,
+        shop: { ...sample.shop, metaPixelId, tiktokPixelCode },
+      });
       const renderer = new PageRenderer(theme, { limits: { timeMs: 10_000 } });
       return (await renderer.render(request, store.fresh(0))).html;
     };
@@ -212,5 +230,70 @@ describe("The shop's Meta pixel", () => {
       }
       expect(await render({ path: '/' })).not.toContain('data-hatti-pixel');
     });
+
+    it("loads TikTok's pixel beside Meta's, or alone, while the shop has it (ADR-543)", async () => {
+      const both = head(await render({ path: '/' }, '1234567890', 'CABC123DEF456GHI789J'));
+      expect(both.split('<script data-hatti-pixel>')).toHaveLength(3);
+      expect(both).toContain('"CABC123DEF456GHI789J"');
+      const alone = head(await render({ path: '/' }, undefined, 'CABC123DEF456GHI789J'));
+      expect(alone.split('<script data-hatti-pixel>')).toHaveLength(2);
+      expect(alone).not.toContain('fbevents');
+      expect(
+        await render({ path: '/', preview: { name: 'Winter' } }, undefined, 'CABC123DEF456GHI789J'),
+      ).not.toContain('data-hatti-pixel');
+    });
+  });
+});
+
+describe("The shop's TikTok pixel (ADR-543)", () => {
+  it("loads TikTok's script once, and tracks the page and its product", () => {
+    const page = load(tiktokPixelScript('CABC123DEF456GHI789J', KURTA));
+    expect(page.added).toEqual([
+      { src: `${TIKTOK_PIXEL_SCRIPT}?sdkid=CABC123DEF456GHI789J&lib=ttq`, async: true },
+    ]);
+    expect(page.calls()).toEqual([
+      ['page'],
+      [
+        'track',
+        'ViewContent',
+        {
+          contents: [{ content_id: 'p-kurta', content_name: 'Chikankari Kurta <Eid>' }],
+          content_type: 'product_group',
+          currency: 'PKR',
+          value: 4990,
+        },
+      ],
+    ]);
+    // TikTok's script there already, the page's calls go to it.
+    const calls: unknown[] = [];
+    const ttq = { page: () => calls.push('page'), track: () => calls.push('track') };
+    const again = load(tiktokPixelScript('CABC123DEF456GHI789J', null), { ttq });
+    expect([again.added, calls]).toEqual([[], ['page']]);
+  });
+
+  it("tracks adding to the cart and leaving for checkout, as Meta's does", () => {
+    const page = load(tiktokPixelScript('CABC123DEF456GHI789J', KURTA));
+    page.submit(formTo('/cart/add', { id: 'v-large', quantity: '2' }));
+    page.submit(formTo('/cart/add', { id: 'v-other' }));
+    page.click('/checkout');
+    page.click('/products/checkout-bag');
+    expect(page.calls().slice(2)).toEqual([
+      [
+        'track',
+        'AddToCart',
+        {
+          contents: [{ content_id: 'v-large', quantity: 2 }],
+          content_type: 'product',
+          currency: 'PKR',
+          value: 10381,
+        },
+      ],
+      [
+        'track',
+        'AddToCart',
+        { contents: [{ content_id: 'v-other', quantity: 1 }], content_type: 'product' },
+      ],
+      ['track', 'InitiateCheckout'],
+    ]);
   });
 });

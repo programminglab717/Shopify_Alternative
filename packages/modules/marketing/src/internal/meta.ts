@@ -64,9 +64,10 @@ export interface ConversionOrder {
   visits: readonly { at: Date; landingPage: string | null }[];
   /**
    * The IDs the shop's Meta pixel gave its customer's browser, from its cookies (ADR-144): its
-   * browser ID, `fbp`, and the click on an ad that brought it, `fbc`.
+   * browser ID, `fbp`, and the click on an ad that brought it, `fbc`; and TikTok's pixel's
+   * browser ID, `ttp` (ADR-541).
    */
-  browserIds: { fbp?: string; fbc?: string } | null;
+  browserIds: { fbp?: string; fbc?: string; ttp?: string } | null;
   lines: readonly { variantId: string; quantity: number; unitPrice: bigint }[];
 }
 

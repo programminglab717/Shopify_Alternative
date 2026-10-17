@@ -62,6 +62,7 @@ export {
 export {
   TIKTOK_LIMITS,
   TikTokEventsService,
+  tiktokPixelCodeIn,
   type TikTokEventsInput,
   type TikTokEventsRecord,
   type TikTokPixelSettings,

@@ -37,7 +37,12 @@ import {
   pakistanDay,
   preordersIn,
 } from '@hatti/inventory/public';
-import { MetaConversionsService, metaPixelIdIn } from '@hatti/marketing/public';
+import {
+  MetaConversionsService,
+  TikTokEventsService,
+  metaPixelIdIn,
+  tiktokPixelCodeIn,
+} from '@hatti/marketing/public';
 import {
   ArticleService,
   BlogService,
@@ -478,7 +483,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         domains: { domainsOf: shopDomainsOf },
         redirects: { redirectsOf: shopRedirectsOf },
         policies: { policiesOf: shopPoliciesOf },
-        pixels: { metaPixelIdOf: metaPixelIdIn },
+        pixels: { metaPixelIdOf: metaPixelIdIn, tiktokPixelCodeOf: tiktokPixelCodeIn },
         brand: { logoOf: shopLogoOf },
         files: { readyImagesIn },
         translations: { translationsOf: shopTranslationsOf },
@@ -2014,6 +2019,33 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     expect(await meta.delete(tenant)).toBe('9876543210');
     expect(await deliver()).toEqual(['meta_conversions.deleted']);
     expect(Object.keys(await store().shop())).not.toContain('metaPixelId');
+    expect(forgotten.flat()).toContain(shopTag(shopId));
+  });
+
+  it("publishes the shop's TikTok pixel while it has TikTok connected, for its pages to load (ADR-543)", async () => {
+    const tiktok = new TikTokEventsService(
+      database,
+      new SecretBox([{ id: 'test', key: Buffer.alloc(32, 4) }]),
+    );
+    expect(Object.keys(await store().shop())).not.toContain('tiktokPixelCode');
+    forgotten.length = 0;
+    unwrap(
+      await tiktok.update(tenant, {
+        pixelCode: 'CABC123DEF456GHI789J',
+        accessToken: 'a1b2c3d4e5f6a7b8c9d0e1f2',
+      }),
+    );
+    expect(await deliver()).toEqual(['tiktok_events.updated']);
+    expect((await store().shop()).tiktokPixelCode).toBe('CABC123DEF456GHI789J');
+    expect(forgotten.flat()).toContain(shopTag(shopId));
+    // What its pages do not show changes nothing of theirs.
+    forgotten.length = 0;
+    unwrap(await tiktok.update(tenant, { testEventCode: 'TEST31337' }));
+    await deliver();
+    expect(forgotten).toEqual([]);
+    expect(await tiktok.delete(tenant)).toBe('CABC123DEF456GHI789J');
+    expect(await deliver()).toEqual(['tiktok_events.deleted']);
+    expect(Object.keys(await store().shop())).not.toContain('tiktokPixelCode');
     expect(forgotten.flat()).toContain(shopTag(shopId));
   });
 

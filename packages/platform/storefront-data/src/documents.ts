@@ -525,6 +525,11 @@ export interface ShopDoc {
    */
   metaPixelId?: string | null;
   /**
+   * Its TikTok pixel's code, while it has TikTok connected (MKT-10, ADR-543): its pages load the
+   * pixel for its shoppers. Absent or null for none.
+   */
+  tiktokPixelCode?: string | null;
+  /**
    * Its link-in-bio page, at /links (CH-07, ADR-161): what it says of itself, its own links, and
    * the products it shows, by ID, in their order. Absent while it set none, as in documents
    * written before shops had them.

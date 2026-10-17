@@ -60,7 +60,9 @@ import { boughtTogetherIn } from '@hatti/orders/public';
 import {
   MarketingEvents,
   metaPixelIdIn,
+  tiktokPixelCodeIn,
   type MetaConversionsUpdatedPayload,
+  type TikTokEventsUpdatedPayload,
 } from '@hatti/marketing/public';
 import {
   ArticleService,
@@ -385,6 +387,13 @@ export function itemsFor(event: DomainEvent): string[] {
         : [];
     case MarketingEvents.MetaConversionsDeleted:
       return [Items.shop];
+    // Its pages load TikTok's pixel the shop's document names (ADR-543).
+    case MarketingEvents.TikTokEventsUpdated:
+      return (event.payload as unknown as TikTokEventsUpdatedPayload).changed.includes('pixelCode')
+        ? [Items.shop]
+        : [];
+    case MarketingEvents.TikTokEventsDeleted:
+      return [Items.shop];
     // Its document names its logos (ADR-205).
     case FileEvents.ShopBrandUpdated:
       return [Items.shop];
@@ -457,6 +466,8 @@ export const PUBLISHED_EVENTS = [
   MessagingEvents.MarketingAutomationUpdated,
   MarketingEvents.MetaConversionsUpdated,
   MarketingEvents.MetaConversionsDeleted,
+  MarketingEvents.TikTokEventsUpdated,
+  MarketingEvents.TikTokEventsDeleted,
   FileEvents.ShopBrandUpdated,
   FileEvents.FileDeleted,
   ShopEvents.ShopOpened,
@@ -582,8 +593,11 @@ export interface PublisherServices {
       shopId: string,
     ): Promise<{ type: string; body: string; translations?: Partial<Record<string, string>> }[]>;
   };
-  /** The shop's Meta pixel, while it has Meta connected (ADR-144). */
-  pixels: { metaPixelIdOf(tx: Tx, shopId: string): Promise<string | null> };
+  /** The shop's Meta pixel, and its TikTok pixel, while it has them connected (ADR-144, ADR-543). */
+  pixels: {
+    metaPixelIdOf(tx: Tx, shopId: string): Promise<string | null>;
+    tiktokPixelCodeOf(tx: Tx, shopId: string): Promise<string | null>;
+  };
   /** The shop's logo and square logo, while it has them (ADR-205). */
   brand: { logoOf(tx: Tx, shopId: string, which: BrandImageValue): Promise<ShopLogo | null> };
   /** Which of the shop's files are images a page can show, as articles' are (ADR-213). */
@@ -841,6 +855,7 @@ export class StorefrontPublisher {
       (policy) => policy.type,
     );
     const metaPixelId = await this.services.pixels.metaPixelIdOf(tx, shopId);
+    const tiktokPixelCode = await this.services.pixels.tiktokPixelCodeOf(tx, shopId);
     // Its logos where the API serves them, each address naming its image (ADR-205).
     const images = this.options.images ?? LOCAL_IMAGES;
     const logoUrl = async (which: BrandImageValue) => {
@@ -876,6 +891,7 @@ export class StorefrontPublisher {
       translations.get(shopId),
       await automationOnIn(tx, shopId, 'back_in_stock'),
       await verifiedLevelIn(tx, shopId),
+      tiktokPixelCode,
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];
@@ -1373,7 +1389,7 @@ export function createStorefrontPublisher(
       domains: { domainsOf: shopDomainsOf },
       redirects: { redirectsOf: shopRedirectsOf },
       policies: { policiesOf: shopPoliciesOf },
-      pixels: { metaPixelIdOf: metaPixelIdIn },
+      pixels: { metaPixelIdOf: metaPixelIdIn, tiktokPixelCodeOf: tiktokPixelCodeIn },
       brand: { logoOf: shopLogoOf },
       files: { readyImagesIn },
       translations: { translationsOf: shopTranslationsOf },

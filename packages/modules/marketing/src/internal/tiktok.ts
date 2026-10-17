@@ -49,6 +49,8 @@ export interface TikTokUser {
   ip?: string;
   user_agent?: string;
   ttclid?: string;
+  /** The ID TikTok's pixel gave the browser, from its `_ttp` cookie (ADR-543). */
+  ttp?: string;
 }
 
 /**
@@ -84,8 +86,8 @@ export function tiktokEvent(
 /**
  * The customer's details, normalised as TikTok's advanced matching asks and hashed with SHA-256:
  * the mobile number in E.164, its plus kept, the email in lower case, and their ID with the shop.
- * The browser's address and user agent go as they are, and the click on TikTok's ad that brought
- * them, from the latest visit whose address had one.
+ * The browser's address and user agent go as they are, the click on TikTok's ad that brought
+ * them, from the latest visit whose address had one, and the ID TikTok's pixel gave the browser.
  */
 export function tiktokUser(order: ConversionOrder): TikTokUser {
   const user: TikTokUser = { external_id: hashed(order.customerId) };
@@ -97,6 +99,7 @@ export function tiktokUser(order: ConversionOrder): TikTokUser {
   if (order.clientUserAgent) user.user_agent = order.clientUserAgent;
   const click = tiktokClickOf(order.visits);
   if (click) user.ttclid = click;
+  if (order.browserIds?.ttp) user.ttp = order.browserIds.ttp;
   return user;
 }
 

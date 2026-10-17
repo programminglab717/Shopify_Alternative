@@ -96,9 +96,10 @@ export interface CheckoutClient {
   /**
    * The IDs the shop's Meta pixel gave their browser, from its cookies on the shop's address
    * (MKT-10, ADR-144): `fbp` from `_fbp`, its browser ID; `fbc` from `_fbc`, the click on an ad
-   * that brought it. Each left out when the browser had none.
+   * that brought it; and `ttp` from TikTok's `_ttp`, its browser ID (ADR-541). Each left out when
+   * the browser had none.
    */
-  browserIds?: { fbp?: string; fbc?: string };
+  browserIds?: { fbp?: string; fbc?: string; ttp?: string };
   /** The token of a number the browser proved lately, from its cookie (ADR-199). */
   proof?: string;
 }

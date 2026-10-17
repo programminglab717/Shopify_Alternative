@@ -599,6 +599,8 @@ export function shopDoc(
   backInStock = false,
   /** What Hatti verified of it (ADR-465); null for none. */
   verified: 'identity' | 'business' | null = null,
+  /** Its TikTok pixel's code, while it has TikTok connected (ADR-543). */
+  tiktokPixelCode: string | null = null,
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -656,6 +658,7 @@ export function shopDoc(
     policies: [...policies],
     // Left out without one, so a shop without one keeps its document as it was.
     ...(metaPixelId && { metaPixelId }),
+    ...(tiktokPixelCode && { tiktokPixelCode }),
     // Left out while it set nothing of it, for the same reason.
     ...((preferences.linkPage.bio !== '' ||
       preferences.linkPage.links.length > 0 ||

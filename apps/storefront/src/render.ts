@@ -47,7 +47,7 @@ import {
   type ObjectContext,
   type SearchFound,
 } from './objects.js';
-import { metaPixelScript, pixelProduct } from './pixels.js';
+import { metaPixelScript, pixelProduct, tiktokPixelScript, type PixelProduct } from './pixels.js';
 import { suggestedProducts, type SuggestParams } from './suggest.js';
 import { SESSION_SCRIPT } from './sessions.js';
 import { VISITS_SCRIPT } from './visits.js';
@@ -730,15 +730,17 @@ export class PageRenderer {
         origin && status === 200 && theme.locales.size > 1 && !request.preview && !request.editor
           ? alternateLinks([...theme.locales.keys()], theme.defaultLocale, addressIn)
           : '',
+      // The shop's pixels, Meta's and TikTok's, while it has them (ADR-144, ADR-543): shoppers'
+      // pages alone.
       pixel:
-        shopDoc.metaPixelId && !request.preview && !request.editor
-          ? `<script data-hatti-pixel>${metaPixelScript(
-              shopDoc.metaPixelId,
+        request.preview || request.editor
+          ? ''
+          : pixelTags(
+              shopDoc,
               name === 'product'
                 ? pixelProduct(resource.product as Record<string, unknown> | undefined)
                 : null,
-            )}</script>`
-          : '',
+            ),
       globals,
       renders,
     };
@@ -960,6 +962,17 @@ function previewBar(name: string, locale: string): string {
  * The time zone the shop's document names, where Intl knows it; Pakistan's for one written before
  * shops had one, or naming none Intl knows.
  */
+/** The script tags of the shop's pixels for a page telling of `product`; empty for none. */
+function pixelTags(shop: ShopDoc, product: PixelProduct | null): string {
+  return [
+    shop.metaPixelId && metaPixelScript(shop.metaPixelId, product),
+    shop.tiktokPixelCode && tiktokPixelScript(shop.tiktokPixelCode, product),
+  ]
+    .filter((script): script is string => Boolean(script))
+    .map((script) => `<script data-hatti-pixel>${script}</script>`)
+    .join('');
+}
+
 function timeZoneOf(shop: ShopDoc): string {
   const zone = shop.timezone;
   if (!zone) return DEFAULT_TIMEZONE;

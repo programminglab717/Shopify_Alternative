@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-542 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-543 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -550,6 +550,7 @@
 | 540 | The admin's billing page shows the shop's AI credits, the month's own and those bought, and its owner buys more | Accepted |
 | 541 | Orders placed through checkout go to TikTok's Events API from the worker beside Meta's, the shop connecting its TikTok pixel with a token, each moment waiting in Postgres as Meta's do | Accepted |
 | 542 | The admin's online store has a TikTok tab: the pixel connected, changed and disconnected, and the moments sent to TikTok listed apart from Meta's | Accepted |
+| 543 | A shop's storefront loads its TikTok pixel while TikTok is connected, beside Meta's, for the steps shoppers take before checkout, and the order keeps the pixel's browser ID for the Events API | Accepted |
 
 ---
 
@@ -20501,3 +20502,29 @@
   * A shop connects TikTok the way it connects Meta, in English or Urdu.
 * **Alternatives:**
   * **One tab for every ad platform:** two long forms on one screen, for most shops one unused.
+
+## ADR-543 · A shop's storefront loads its TikTok pixel while TikTok is connected, beside Meta's, for the steps shoppers take before checkout, and the order keeps the pixel's browser ID for the Events API
+
+* **Context:** Orders go to TikTok's Events API from the server (ADR-541), but TikTok's ads learn
+  more from the steps before an order, which only the browser sees, and match the server's events
+  best to the browser its pixel named.
+* **Decision:**
+  * **While the shop has TikTok connected,** shoppers' pages load TikTok's pixel, its own base
+    code with the pixel's code, beside Meta's when the shop has both (ADR-144). Previews and the
+    theme editor load neither.
+  * **The same steps as Meta's:** the page; `ViewContent` on a product's page, by the catalog
+    feed's IDs; `AddToCart` from forms adding to the cart, valued when the page prices the
+    variant; and `InitiateCheckout` for the cart's checkout button and links to checkout. One
+    listener code serves both pixels. Checkout's pages still run no scripts.
+  * **The pixel's browser ID,** its `_ttp` cookie, goes with the order placed through checkout
+    beside Meta's, kept only in TikTok's form, and the order's events send it as `ttp`.
+  * **The shop's document names the pixel's code,** published again when the code changes or
+    TikTok is disconnected, and every page kept at the edge is purged then.
+* **Consequences:**
+  * TikTok's ads optimise for the steps shoppers take on the shop's pages and match orders to
+    them, as Meta's do.
+  * Shoppers' browsers load another script while the shop has TikTok connected; a consent banner
+    is still to come.
+* **Alternatives:**
+  * **The shop pasting TikTok's code into its theme:** no pixel code in the theme to keep in step
+    with the connected one, and its order events would name no browser.
