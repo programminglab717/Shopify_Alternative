@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### TCS
+### 5964fbb · TCS
 
 * **Shops book, track and cancel TCS parcels from Hatti with their own TCS account** ([ADR-509](../architecture/13-decision-log.md#adr-509--tcs-the-third-courier-bookings-tracking-cancellations-and-cities-through-its-cod-api-with-the-shops-own-account-and-the-city-it-ships-from),
   SHP-01).
