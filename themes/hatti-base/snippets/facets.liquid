@@ -1,0 +1,81 @@
+{%- comment -%}
+  A collection's or a search's filters and order (ADR-478, ADR-479), as a form that works without
+  scripts. `results` is the collection or the search, `url` the page's address, `terms` a
+  search's words, kept when the form is sent.
+{%- endcomment -%}
+{%- if results.filters.size > 0 or results.sort_options.size > 0 -%}
+  {%- liquid
+    assign active_count = 0
+    for filter in results.filters
+      if filter.type == 'price_range'
+        if filter.min_value.value != nil or filter.max_value.value != nil
+          assign active_count = active_count | plus: 1
+        endif
+      else
+        assign active_count = active_count | plus: filter.active_values.size
+      endif
+    endfor
+  -%}
+  <form class="facets__form" action="{{ url }}" method="get">
+    {%- if terms != blank -%}
+      <input type="hidden" name="q" value="{{ terms | escape }}">
+      <input type="hidden" name="options[prefix]" value="last">
+    {%- endif -%}
+    {%- if results.sort_options.size > 0 -%}
+      <label class="facets__sort">
+        {{ 'sections.collection.filters.sort' | t }}
+        <select name="sort_by">
+          {%- for option in results.sort_options -%}
+            <option value="{{ option.value }}"{% if option.value == results.sort_by %} selected{% endif %}>{{ option.name | escape }}</option>
+          {%- endfor -%}
+        </select>
+      </label>
+    {%- endif -%}
+    {%- if results.filters.size > 0 -%}
+      <details class="facets"{% if active_count > 0 %} open{% endif %}>
+        <summary>{{ 'sections.collection.filters.title' | t }}</summary>
+        <div class="facets__filters">
+          {%- for filter in results.filters -%}
+            <fieldset class="facets__filter">
+              <legend dir="auto">{{ filter.label | escape }}</legend>
+              {%- if filter.type == 'price_range' -%}
+                <label>
+                  {{ 'sections.collection.filters.from' | t }}
+                  <input type="number" name="{{ filter.min_value.param_name }}" min="0" max="{{ filter.range_max | divided_by: 100 }}" inputmode="numeric"{% if filter.min_value.value != nil %} value="{{ filter.min_value.value | divided_by: 100 }}"{% endif %}>
+                </label>
+                <label>
+                  {{ 'sections.collection.filters.to' | t }}
+                  <input type="number" name="{{ filter.max_value.param_name }}" min="0" max="{{ filter.range_max | divided_by: 100 }}" inputmode="numeric" placeholder="{{ filter.range_max | divided_by: 100 }}"{% if filter.max_value.value != nil %} value="{{ filter.max_value.value | divided_by: 100 }}"{% endif %}>
+                </label>
+              {%- else -%}
+                {%- for value in filter.values -%}
+                  <label class="facets__value{% if value.count == 0 and value.active == false %} facets__value--none{% endif %}">
+                    <input type="checkbox" name="{{ value.param_name }}" value="{{ value.value | escape }}"{% if value.active %} checked{% endif %}{% if value.count == 0 and value.active == false %} disabled{% endif %}>
+                    <span dir="auto">{{ value.label | escape }}</span> <span class="facets__count">({{ value.count }})</span>
+                  </label>
+                {%- endfor -%}
+              {%- endif -%}
+            </fieldset>
+          {%- endfor -%}
+        </div>
+      </details>
+    {%- endif -%}
+    <button type="submit" class="button">{{ 'sections.collection.filters.apply' | t }}</button>
+  </form>
+  {%- if active_count > 0 -%}
+    <ul class="facets__active" role="list">
+      {%- for filter in results.filters -%}
+        {%- if filter.type == 'price_range' -%}
+          {%- if filter.min_value.value != nil or filter.max_value.value != nil -%}
+            <li><a href="{{ filter.url_to_remove }}" aria-label="{{ 'sections.collection.filters.remove' | t: name: filter.label }}">{{ filter.label | escape }}: {{ filter.min_value.value | default: 0 | money }} – {% if filter.max_value.value != nil %}{{ filter.max_value.value | money }}{% else %}{{ filter.range_max | money }}{% endif %} ✕</a></li>
+          {%- endif -%}
+        {%- else -%}
+          {%- for value in filter.active_values -%}
+            <li><a href="{{ value.url_to_remove }}" aria-label="{{ 'sections.collection.filters.remove' | t: name: value.label }}" dir="auto">{{ value.label | escape }} ✕</a></li>
+          {%- endfor -%}
+        {%- endif -%}
+      {%- endfor -%}
+      <li><a href="{{ url }}{% if terms != blank %}?q={{ terms | url_encode }}{% endif %}">{{ 'sections.collection.filters.clear' | t }}</a></li>
+    </ul>
+  {%- endif -%}
+{%- endif -%}

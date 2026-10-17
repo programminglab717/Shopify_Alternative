@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-478 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-479 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -486,6 +486,7 @@
 | 476 | The store's owner answers a rights complaint once, sworn, through a link in the notice; Hatti's people refuse the answer with why, or let the listings go | Accepted |
 | 477 | A product says whether it comes stitched, its pieces, fabrics and season in Hatti's own words, in English and Urdu: kept by the catalog, set from its admin page, shown on its storefront page and given to themes | Accepted |
 | 478 | A collection's page filters its products by Shopify's filter parameters: availability, price, product type, brand, each option and the eastern-wear attributes, each value counted, as Shopify's collection.filters | Accepted |
+| 479 | A collection's page is put in the order a shopper asks for, by Shopify's sort_by, and the search page's products are filtered and ordered as a collection's are | Accepted |
 
 ---
 
@@ -18114,3 +18115,29 @@
     where the documents are already at hand.
   * **Filters each shop chooses, as Shopify's Search & Discovery app:** a later part; the
     filters a collection's products have are shown meanwhile.
+
+## ADR-479 · A collection's page is put in the order a shopper asks for, by Shopify's sort_by, and the search page's products are filtered and ordered as a collection's are
+
+* **Context:**
+  * Shoppers who filter a collection (ADR-478) also want it cheapest first or newest first, and
+    Shopify's themes ask with `sort_by` and show `collection.sort_options`.
+  * The search page lists what a search found; Shopify's themes filter and order it with
+    `search.filters` and `search.sort_options` too.
+* **Decision:**
+  * **Orders, as Shopify names them:** a collection's own (`manual`, "Featured"), title A–Z
+    and Z–A, price low to high and high to low by its cheapest variant, and date new to old
+    and old to new, those without a date last. A search's: best first (`relevance`) and price
+    either way. One not among a list's is its own order; ties keep it.
+  * **Liquid:** `sort_by`, `default_sort_by` and `sort_options` (each `name`, in the page's
+    language, and `value`) on `collection` and `search`; `search.filters` as a collection's.
+    What the filters leave is put in order; pages' links keep the order and the filters.
+  * **A filtered search** lists the products alone, as pages and articles have none of their
+    filters; unfiltered, its pages and articles follow as before.
+  * **Hatti Base:** one form for both, a snippet: the order to choose, the filters, the search's
+    words kept, and the filters chosen as links that take each away.
+  * Past 1,000 products, a list keeps its own order, as it does its filters.
+* **Consequences:**
+  * Best-selling, Shopify's other order, needs sales in the documents: not yet; asked for, a
+    collection keeps its own order.
+* **Alternatives:**
+  * **Ordering in the core:** each order a query, where the documents are already at hand.

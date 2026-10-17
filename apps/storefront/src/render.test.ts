@@ -1557,6 +1557,48 @@ describe('Storefront rendering', () => {
     expect(urdu.html).toContain('“lawn” کے لیے 1 نتیجہ');
   });
 
+  it('sorts a collection and filters a search, as Shopify does (ADR-479)', async () => {
+    const lawn = sampleStore().products.filter((each) => each.id.startsWith('p-eid-lawn-'));
+    const cheapest = [...lawn].sort(
+      (a, b) =>
+        Math.min(...a.variants.map((variant) => variant.price)) -
+        Math.min(...b.variants.map((variant) => variant.price)),
+    )[0]!;
+    const sorted = await render({
+      path: '/collections/eid-lawn',
+      query: { sort_by: 'price-ascending' },
+    });
+    expect(sorted.errors).toEqual([]);
+    expect(sorted.html).toMatch(/<option value="price-ascending" selected>Price, low to high</);
+    const firstCard = /href="\/products\/([^"?]+)/.exec(
+      sorted.html.slice(sorted.html.indexOf('class="grid"')),
+    )![1];
+    expect(firstCard).toBe(cheapest.handle);
+    // Its pages' links keep the order.
+    expect(sorted.html).toContain('href="?sort_by=price-ascending&amp;page=2"');
+
+    const ids = sampleStore().products.map((product) => product.id);
+    const search = { terms: 'lawn', productIds: ids.slice(0, 100), pageIds: [] as string[] };
+    const all = await render({ path: '/search', query: { q: 'lawn' }, search });
+    expect(all.html).toContain('<option value="relevance" selected>Relevance</option>');
+    expect(all.html).toContain('name="filter.p.product_type" value="Footwear"');
+    expect(all.html).toContain('<input type="hidden" name="q" value="lawn">');
+    const params: [string, string][] = [
+      ['q', 'lawn'],
+      ['filter.p.product_type', 'Footwear'],
+    ];
+    const footwear = await render({
+      path: '/search',
+      query: Object.fromEntries(params),
+      params,
+      search,
+    });
+    expect(footwear.errors).toEqual([]);
+    const khussas = ids.slice(0, 100).filter((id) => id.startsWith('p-khussa-')).length;
+    expect(footwear.html).toContain(`${khussas} results for “lawn”`);
+    expect(footwear.html).toContain('href="/search?q=lawn">Clear all</a>');
+  });
+
   it("renders the predictive search section alone, as Shopify's section rendering API does", async () => {
     const sample = sampleStore();
     const [first, second, third] = sample.products as [ProductDoc, ProductDoc, ProductDoc];

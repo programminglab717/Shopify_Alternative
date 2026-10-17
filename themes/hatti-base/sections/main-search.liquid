@@ -25,6 +25,7 @@
           {{ 'sections.search.results' | t: count: search.results_count, terms: search.terms }}
         {%- endif -%}
       </p>
+      {%- render 'facets', results: search, url: routes.search_url, terms: search.terms -%}
       <ul class="grid" role="list">
         {%- for item in search.results -%}
           {%- if item.object_type == 'product' -%}

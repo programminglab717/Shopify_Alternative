@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { CollectionDoc, ProductDoc } from '@hatti/storefront-data';
-import { FILTERED_PRODUCTS_MAX, filteredListing, type QueryParams } from './filters.js';
+import type { ProductDoc } from '@hatti/storefront-data';
+import {
+  FILTERED_PRODUCTS_MAX,
+  filteredListing,
+  type QueryParams,
+  type SortKind,
+} from './filters.js';
 
 /** A product with a variant for each size, `sold` those sold out, priced in rupees. */
 function product(
@@ -80,25 +85,22 @@ const PRODUCTS = [
   product('khussa', { type: 'Footwear', vendor: 'Khussa Co', sizes: ['38', '39'], rupees: 2500 }),
 ];
 
-const COLLECTION: CollectionDoc = {
-  id: 'c-1',
-  handle: 'eid',
-  title: 'Eid',
-  descriptionHtml: '',
-  image: null,
-  productIds: PRODUCTS.map((each) => each.id),
-};
-
-async function listing(params: QueryParams, locale = 'en', products = PRODUCTS) {
+async function listing(
+  params: QueryParams,
+  locale = 'en',
+  products = PRODUCTS,
+  kind: SortKind = 'collection',
+) {
   const byId = new Map(products.map((each) => [each.id, each]));
   let fetched = 0;
   const result = await filteredListing(
-    { ...COLLECTION, productIds: products.map((each) => each.id) },
+    products.map((each) => each.id),
     { params, path: '/collections/eid', locale },
     async (ids) => {
       fetched += ids.length;
       return ids.map((id) => byId.get(id) ?? null);
     },
+    kind,
   );
   return { ...result, fetched };
 }
@@ -263,5 +265,63 @@ describe('Collection filters', () => {
     expect(result.filters).toEqual([]);
     expect(result.productIds).toHaveLength(FILTERED_PRODUCTS_MAX + 1);
     expect(result.fetched).toBe(0);
+  });
+});
+
+describe('Sorting a list', () => {
+  const dated = PRODUCTS.map((each, index) =>
+    index === 3 ? each : { ...each, createdAt: `2026-0${index + 1}-01T00:00:00Z` },
+  );
+
+  it('puts a collection in the order asked for, its own unless one of Shopify’s', async () => {
+    const order = async (sortBy: string, products = PRODUCTS) =>
+      (await listing([['sort_by', sortBy]], 'en', products)).productIds;
+    expect(await order('price-ascending')).toEqual(['khussa', 'lawn-a', 'lawn-b', 'khaddar']);
+    expect(await order('price-descending')).toEqual(['khaddar', 'lawn-b', 'lawn-a', 'khussa']);
+    expect(await order('title-ascending')).toEqual(['khaddar', 'khussa', 'lawn-a', 'lawn-b']);
+    expect(await order('title-descending')).toEqual(['lawn-b', 'lawn-a', 'khussa', 'khaddar']);
+    // Newest first; one without a date last.
+    expect(await order('created-descending', dated)).toEqual([
+      'khaddar',
+      'lawn-b',
+      'lawn-a',
+      'khussa',
+    ]);
+    expect(await order('created-ascending', dated)).toEqual([
+      'lawn-a',
+      'lawn-b',
+      'khaddar',
+      'khussa',
+    ]);
+    expect(await order('best-selling')).toEqual(['lawn-a', 'lawn-b', 'khaddar', 'khussa']);
+    const sorted = await listing([['sort_by', 'price-ascending']]);
+    expect(sorted.sortBy).toBe('price-ascending');
+    expect(sorted.sortOptions[0]).toEqual({ name: 'Featured', value: 'manual' });
+    expect((await listing([['sort_by', 'nonsense']])).sortBy).toBe('manual');
+  });
+
+  it('sorts what the filters leave', async () => {
+    const { productIds, filtered } = await listing([
+      ['filter.p.product_type', 'Suit'],
+      ['sort_by', 'price-descending'],
+    ]);
+    expect(filtered).toBe(true);
+    expect(productIds).toEqual(['khaddar', 'lawn-b', 'lawn-a']);
+  });
+
+  it('gives a search its own orders, best first unless asked, in the page’s language', async () => {
+    const found = await listing([], 'ur', PRODUCTS, 'search');
+    expect(found.sortBy).toBe('relevance');
+    expect(found.filtered).toBe(false);
+    expect(found.sortOptions.map((each) => each.value)).toEqual([
+      'relevance',
+      'price-ascending',
+      'price-descending',
+    ]);
+    expect(found.sortOptions[0]!.name).toBe('سب سے موزوں');
+    // A collection's own orders are not a search's.
+    const titled = await listing([['sort_by', 'title-ascending']], 'en', PRODUCTS, 'search');
+    expect(titled.sortBy).toBe('relevance');
+    expect(titled.productIds).toEqual(['lawn-a', 'lawn-b', 'khaddar', 'khussa']);
   });
 });

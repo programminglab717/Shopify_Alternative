@@ -522,6 +522,10 @@ export function collectionObject(
     products_count: productIds.length,
     all_products_count: doc.productIds.length,
     filters: listing?.filters ?? [],
+    // Put in the order the page asked for (ADR-479).
+    sort_by: listing?.sortBy ?? 'manual',
+    default_sort_by: 'manual',
+    sort_options: listing?.sortOptions ?? [],
     get products(): ItemRef[] {
       const ids = productIds.slice(window.offset, window.offset + window.limit);
       return (products ??= lazyProducts(ids, ctx));
@@ -540,12 +544,15 @@ export function collectionObject(
 export function searchObject(
   found: SearchFound | null,
   ctx: ObjectContext,
+  listing?: FilteredListing,
 ): Record<string, unknown> & Paginable {
+  // Filtered, its products alone: pages and articles have none of their filters (ADR-479).
+  const filtered = listing?.filtered ?? false;
   // Products, then pages, then articles, each kind best first (ADR-212).
   const entries = [
-    ...(found?.productIds ?? []).map((id) => `product:${id}`),
-    ...(found?.pageIds ?? []).map((id) => `page:${id}`),
-    ...(found?.articleIds ?? []).map((id) => `article:${id}`),
+    ...(listing?.productIds ?? found?.productIds ?? []).map((id) => `product:${id}`),
+    ...(filtered ? [] : (found?.pageIds ?? [])).map((id) => `page:${id}`),
+    ...(filtered ? [] : (found?.articleIds ?? [])).map((id) => `article:${id}`),
   ];
   let window = { offset: 0, limit: 50 };
   let results: ItemRef[] | null = null;
@@ -554,6 +561,10 @@ export function searchObject(
     terms: found?.terms ?? '',
     results_count: entries.length,
     types: found?.types ?? ['product'],
+    filters: listing?.filters ?? [],
+    sort_by: listing?.sortBy ?? 'relevance',
+    default_sort_by: 'relevance',
+    sort_options: listing?.sortOptions ?? [],
     get results(): ItemRef[] {
       return (results ??= lazyResults(
         entries.slice(window.offset, window.offset + window.limit),

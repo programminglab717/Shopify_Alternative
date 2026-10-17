@@ -545,18 +545,26 @@ export class PageRenderer {
     const cart = request.cart ?? null;
     const suggest = request.suggest ?? null;
     const asked = request.recommendations ?? null;
-    const [{ shopDoc, theme }, shown, cartDocs, suggested, recommended] = await Promise.all([
-      data.shop().then(async (shopDoc) => ({
-        shopDoc,
-        theme: themeFor ? await themeFor(shopDoc) : this.theme,
-      })),
-      resourceOf(found, ctx),
-      cartProducts(cart, (ids) => data.products(ids)),
-      suggest
-        ? data.products(suggest.productIds).then((docs) => suggestedProducts(docs, suggest.params))
-        : [],
-      asked ? recommendedProducts(data, asked) : [],
-    ]);
+    const search = request.search ?? null;
+    const [{ shopDoc, theme }, shown, cartDocs, suggested, recommended, searched] =
+      await Promise.all([
+        data.shop().then(async (shopDoc) => ({
+          shopDoc,
+          theme: themeFor ? await themeFor(shopDoc) : this.theme,
+        })),
+        resourceOf(found, ctx),
+        cartProducts(cart, (ids) => data.products(ids)),
+        suggest
+          ? data
+              .products(suggest.productIds)
+              .then((docs) => suggestedProducts(docs, suggest.params))
+          : [],
+        asked ? recommendedProducts(data, asked) : [],
+        // The search page's products narrowed by its filters and put in order (ADR-479).
+        search && found.name === 'search'
+          ? filteredListing(search.productIds, ctx.filters!, (ids) => data.products(ids), 'search')
+          : undefined,
+      ]);
     const name = shown ? found.name : '404';
     const resource = shown ?? {};
     const seo = (resource as { [SEO]?: PageSeo })[SEO];
@@ -622,7 +630,7 @@ export class PageRenderer {
       routes,
       canonical_url: addressIn(locale),
       cart: cartObject(cart, cartDocs, ctx, routes.cart_change_url!),
-      search: searchObject(request.search ?? null, ctx),
+      search: searchObject(search, ctx, searched),
       predictive_search: predictiveSearchObject(
         suggest && {
           terms: suggest.params.terms,
@@ -1070,7 +1078,7 @@ async function resourceOf(
     if (!doc) return null;
     // Narrowed by the page's filters, and its filters counted (SRC-03, ADR-478).
     const listing = ctx.filters
-      ? await filteredListing(doc, ctx.filters, (ids) => ctx.data.products(ids))
+      ? await filteredListing(doc.productIds, ctx.filters, (ids) => ctx.data.products(ids))
       : undefined;
     return {
       collection: collectionObject(doc, ctx, listing),

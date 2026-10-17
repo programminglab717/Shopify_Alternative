@@ -1674,6 +1674,8 @@ export function createStorefrontServer(options: StorefrontServerOptions): Fastif
       const page = {
         path: '/search',
         query,
+        // Its filters, each as often as given (ADR-479).
+        params: [...url.searchParams],
         locale: urdu ? 'ur' : 'en',
         search: { terms, types, ...results },
       };

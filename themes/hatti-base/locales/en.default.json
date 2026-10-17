@@ -109,6 +109,7 @@
       "empty": "Nothing here yet. Check back soon.",
       "filters": {
         "title": "Filter",
+        "sort": "Sort by",
         "from": "From Rs",
         "to": "To Rs",
         "apply": "Show results",

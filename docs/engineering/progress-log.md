@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Sorting, and the search page's filters
+
+* **A collection's page is put in the order a shopper asks for, by Shopify's `sort_by`, and
+  the search page's products are filtered and ordered as a collection's are** ([ADR-479](../architecture/13-decision-log.md#adr-479--a-collections-page-is-put-in-the-order-a-shopper-asks-for-by-shopifys-sort_by-and-the-search-pages-products-are-filtered-and-ordered-as-a-collections-are),
+  SRC-03).
+* 3005 tests, 4 more: the orders, a search's own, and Hatti Base's
+  form on both pages.
+
 ### 62563b8 · Collection filters
 
 * **A collection's page filters its products by Shopify's filter parameters: availability,

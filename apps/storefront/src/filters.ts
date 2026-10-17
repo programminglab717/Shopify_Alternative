@@ -1,4 +1,4 @@
-import type { CollectionDoc, ProductDoc, VariantDoc } from '@hatti/storefront-data';
+import type { ProductDoc, VariantDoc } from '@hatti/storefront-data';
 
 // Storefront filters (SRC-03, CAT-08, ADR-478): Shopify's `collection.filters` and its `filter.*`
 // parameters on a collection's page. A shopper narrows the collection by availability, price,
@@ -235,6 +235,79 @@ function variantLeft(
 export interface FilteredListing {
   productIds: readonly string[];
   filters: Record<string, unknown>[];
+  /** Whether the page asked for any of the filters. */
+  filtered: boolean;
+  /** The order they are in, as Shopify's `sort_by`, and the orders a page may ask for. */
+  sortBy: string;
+  sortOptions: { name: string; value: string }[];
+}
+
+/** What a list's products may be put in order by: a collection's or a search's. */
+export type SortKind = 'collection' | 'search';
+
+/** Shopify's orders, as `sort_by` names them; a list's own first, its default. */
+const SORTS: Record<SortKind, readonly string[]> = {
+  collection: [
+    'manual',
+    'title-ascending',
+    'title-descending',
+    'price-ascending',
+    'price-descending',
+    'created-descending',
+    'created-ascending',
+  ],
+  search: ['relevance', 'price-ascending', 'price-descending'],
+};
+
+const SORT_NAMES: Record<'en' | 'ur', Record<string, string>> = {
+  en: {
+    manual: 'Featured',
+    relevance: 'Relevance',
+    'title-ascending': 'Alphabetically, A-Z',
+    'title-descending': 'Alphabetically, Z-A',
+    'price-ascending': 'Price, low to high',
+    'price-descending': 'Price, high to low',
+    'created-descending': 'Date, new to old',
+    'created-ascending': 'Date, old to new',
+  },
+  ur: {
+    manual: 'نمایاں',
+    relevance: 'سب سے موزوں',
+    'title-ascending': 'حروفِ تہجی سے، A-Z',
+    'title-descending': 'حروفِ تہجی سے، Z-A',
+    'price-ascending': 'قیمت، کم سے زیادہ',
+    'price-descending': 'قیمت، زیادہ سے کم',
+    'created-descending': 'تاریخ، نئے پہلے',
+    'created-ascending': 'تاریخ، پرانے پہلے',
+  },
+};
+
+/** The order a page asks for, of those its list may be put in; its own where none or another. */
+function sortOf(params: QueryParams, kind: SortKind): string {
+  const asked = params.findLast(([name]) => name === 'sort_by')?.[1];
+  return asked && SORTS[kind].includes(asked) ? asked : SORTS[kind][0]!;
+}
+
+function lowestPrice(product: ProductDoc): number {
+  return Math.min(...product.variants.map((variant) => variant.price));
+}
+
+/** Products put in an order, those that tie as they were. Without a date, last. */
+function sorted(products: readonly ProductDoc[], sortBy: string): ProductDoc[] {
+  const [field, way] = sortBy.split('-') as [string, string | undefined];
+  const sign = way === 'descending' ? -1 : 1;
+  const list = [...products];
+  if (field === 'title') {
+    list.sort((a, b) => sign * a.title.localeCompare(b.title));
+  } else if (field === 'price') {
+    list.sort((a, b) => sign * (lowestPrice(a) - lowestPrice(b)));
+  } else if (field === 'created') {
+    list.sort((a, b) => {
+      if (!a.createdAt || !b.createdAt) return (a.createdAt ? 0 : 1) - (b.createdAt ? 0 : 1);
+      return sign * a.createdAt.localeCompare(b.createdAt);
+    });
+  }
+  return list;
 }
 
 /** A link to the page with these filters, the query's other parameters but its page kept. */
@@ -253,14 +326,24 @@ function linkWith(request: FilterRequest, filters: QueryParams): string {
  * counted. Unfiltered where it has more than {@link FILTERED_PRODUCTS_MAX} products.
  */
 export async function filteredListing(
-  doc: CollectionDoc,
+  ids: readonly string[],
   request: FilterRequest,
   products: (ids: readonly string[]) => Promise<(ProductDoc | null)[]>,
+  kind: SortKind = 'collection',
 ): Promise<FilteredListing> {
-  if (doc.productIds.length === 0 || doc.productIds.length > FILTERED_PRODUCTS_MAX) {
-    return { productIds: doc.productIds, filters: [] };
+  const sortNames = request.locale === 'ur' ? SORT_NAMES.ur : SORT_NAMES.en;
+  if (ids.length === 0 || ids.length > FILTERED_PRODUCTS_MAX) {
+    return {
+      productIds: ids,
+      filters: [],
+      filtered: false,
+      sortBy: SORTS[kind][0]!,
+      sortOptions: [],
+    };
   }
-  const docs = (await products(doc.productIds)).filter((each): each is ProductDoc => !!each);
+  const sortBy = sortOf(request.params, kind);
+  const sortOptions = SORTS[kind].map((value) => ({ name: sortNames[value]!, value }));
+  const docs = (await products(ids)).filter((each): each is ProductDoc => !!each);
   const dimensions = dimensionsOf(docs, request.locale);
   const selection = selectionOf(request.params, dimensions);
   const active =
@@ -370,10 +453,12 @@ export async function filteredListing(
     });
   }
 
-  const productIds = active
-    ? docs
-        .filter((product) => leaves(product, dimensions, selection, null))
-        .map((product) => product.id)
-    : doc.productIds;
-  return { productIds, filters };
+  const left = active
+    ? docs.filter((product) => leaves(product, dimensions, selection, null))
+    : null;
+  const productIds =
+    sortBy === SORTS[kind][0]
+      ? (left?.map((product) => product.id) ?? ids)
+      : sorted(left ?? docs, sortBy).map((product) => product.id);
+  return { productIds, filters, filtered: active, sortBy, sortOptions };
 }
