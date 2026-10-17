@@ -92,6 +92,58 @@ type ActivityEntryEdge {
 }
 
 """
+What a shop spent on one platform's ads on a day, or on one campaign of them (ADR-553).
+"""
+type AdSpendEntry {
+  amount: Money!
+
+  """
+  The campaign, as its links' utm_campaign names it; null for the platform's day as a whole.
+  """
+  campaign: String
+
+  """The day in the shop's time zone, as 2026-10-17."""
+  day: String!
+  platform: AdSpendPlatform!
+}
+
+"""One day's ad spend: an amount of 0 takes it away."""
+input AdSpendInput {
+  """In the shop's currency, as 2499.50."""
+  amount: String!
+
+  """
+  The campaign, as its links' utm_campaign names it, up to 200 characters, for the sales report's rows by campaign; blank for the platform's day as a whole.
+  """
+  campaign: String
+
+  """The day in the shop's time zone, as 2026-10-17: up to today."""
+  day: String!
+  platform: AdSpendPlatform!
+}
+
+"""Where a shop's ads ran (ADR-553)."""
+enum AdSpendPlatform {
+  """Google: search, Shopping and YouTube."""
+  GOOGLE
+
+  """Meta's apps: Facebook, Instagram, Messenger and WhatsApp."""
+  META
+
+  """Anywhere else: influencers, Snapchat, a newspaper."""
+  OTHER
+
+  """TikTok."""
+  TIKTOK
+}
+
+type AdSpendSetPayload {
+  """How many were recorded; null when refused."""
+  count: Int
+  userErrors: [UserError!]!
+}
+
+"""
 An article of one of the shop's blogs, which its storefront shows at /blogs/{blog}/{handle} once published.
 """
 type Article {
@@ -7250,6 +7302,11 @@ input MoveInput {
 
 type Mutation {
   """
+  Records what the shop spent on its ads (ADR-553), day by day, by platform and, where it says, by campaign as its links' utm_campaign names it: each replaces what that day had, and an amount of 0 takes it away. The sales report takes it off the orders' profit. At most 400 at a time, all or none.
+  """
+  adSpendSet(entries: [AdSpendInput!]!): AdSpendSetPayload!
+
+  """
   A new article, which the storefront shows a moment later unless it is not published. Its body and summary are cleaned of anything that could run.
   """
   articleCreate(article: ArticleCreateInput!): ArticleCreatePayload!
@@ -12172,6 +12229,17 @@ type Query {
     """Only this type, as "product.updated"."""
     type: String
   ): ActivityEntryConnection!
+
+  """
+  What the shop spent on its ads (ADR-553) from one day to another in its time zone, both included, at most 366 days, the latest first.
+  """
+  adSpendEntries(
+    """The first day, as 2026-10-01."""
+    from: String!
+
+    """The last day, as 2026-10-31."""
+    to: String!
+  ): [AdSpendEntry!]!
   article(id: ID!): Article
 
   """The articles of the shop's blogs, or of one, oldest first."""
@@ -13636,6 +13704,11 @@ What orders came to, as Shopify reports sales: an order counts when it was place
 """
 type Sales {
   """
+  What the shop spent on its ads (ADR-553), as recorded with adSpendSet: on the days of the period, or of the report, in its time zone; for a row by campaign, on that campaign. Null for rows by channel or by where visits came from, which ad spend is not split by. Null when the shop's plan leaves true profit out (ADR-529).
+  """
+  adSpend: Money
+
+  """
   Fees charged for paying on delivery, as Shopify's reports count additional fees, without their tax.
   """
   additionalFees: Money!
@@ -13676,7 +13749,7 @@ type Sales {
   orders: Int!
 
   """
-  What the orders made (ANL-03): total sales less taxes, the cost of goods, couriers' charges and write-offs, plus claims recovered. Payment fees and ad spend are not in it yet. Null when the shop's plan leaves true profit out (ADR-529).
+  What the orders made (ANL-03): total sales less taxes, the cost of goods, couriers' charges and write-offs, plus claims recovered, less ad spend where it is known (ADR-553). Payment fees are not in it yet. Null when the shop's plan leaves true profit out (ADR-529).
   """
   profit: Money
 
@@ -13684,6 +13757,11 @@ type Sales {
   Money given back on the orders (ORD-09), with its tax, whenever it was given (ADR-250). It is beside the other amounts, not taken off them: the items that came back already are.
   """
   refunds: Money!
+
+  """
+  Net sales for each rupee spent on ads (ADR-553), to two places; null without ad spend, or when the shop's plan leaves true profit out (ADR-529).
+  """
+  returnOnAdSpend: Float
 
   """
   Items in parcels that came back, refused or undeliverable, at the prices sold, less the tax that came back with them. Refunds are the money side, and are not taken off.
@@ -13790,7 +13868,7 @@ type SalesReport {
   totals: Sales!
 
   """
-  Whether the shop's plan includes true profit (ANL-03, ADR-529): without it, every Sales' shippingCosts, shippingCostsEstimated, writeOffs, claimsRecovered and profit are null.
+  Whether the shop's plan includes true profit (ANL-03, ADR-529): without it, every Sales' shippingCosts, shippingCostsEstimated, writeOffs, claimsRecovered, profit, adSpend and returnOnAdSpend are null.
   """
   trueProfit: Boolean!
 }

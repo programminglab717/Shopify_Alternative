@@ -199,6 +199,75 @@ describe.skipIf(!server)('Admin GraphQL API: sales analytics', () => {
     expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
   });
 
+  it('takes the ad spend the shop records off what its orders made (ADR-553)', async () => {
+    const marketer = await issueToken(['write_pixels', 'read_orders']);
+    // Yesterday in Karachi, a day of its own with no orders: the shop is on Growth by now.
+    const day = new Date(now - 86_400_000).toLocaleDateString('en-CA', {
+      timeZone: 'Asia/Karachi',
+    });
+    const next = new Date(Date.parse(`${day}T00:00:00+05:00`) + 86_400_000).toISOString();
+    const set = await gql(
+      marketer,
+      `mutation ($entries: [AdSpendInput!]!) {
+        adSpendSet(entries: $entries) { count userErrors { field code } }
+      }`,
+      {
+        entries: [
+          { platform: 'META', day, campaign: 'Eid-Sale', amount: '1,200' },
+          { platform: 'GOOGLE', day, amount: '300.50' },
+        ],
+      },
+    );
+    expect(set.data?.adSpendSet).toEqual({ count: 2, userErrors: [] });
+    const refused = await gql(
+      marketer,
+      `mutation { adSpendSet(entries: [{ platform: TIKTOK, day: "2026-02-30", amount: "5" }]) {
+        count userErrors { field code }
+      } }`,
+    );
+    expect(refused.data?.adSpendSet).toEqual({
+      count: null,
+      userErrors: [{ field: ['entries', '0', 'day'], code: 'INVALID' }],
+    });
+    const listed = await gql(
+      marketer,
+      `query ($from: String!, $to: String!) {
+        adSpendEntries(from: $from, to: $to) { platform day campaign amount { amount } }
+      }`,
+      { from: day, to: day },
+    );
+    expect(listed.data?.adSpendEntries).toEqual([
+      { platform: 'GOOGLE', day, campaign: null, amount: { amount: '300.50' } },
+      { platform: 'META', day, campaign: 'Eid-Sale', amount: { amount: '1200.00' } },
+    ]);
+
+    const report = await gql(
+      marketer,
+      `query ($from: DateTime!, $before: DateTime!) {
+        salesReport(placedFrom: $from, placedBefore: $before, by: CAMPAIGN) {
+          totals { orders adSpend { amount } returnOnAdSpend profit { amount } }
+          rows { key sales { orders adSpend { amount } } }
+        }
+      }`,
+      { from: `${day}T00:00:00+05:00`, before: next },
+    );
+    expect(report.data?.salesReport).toEqual({
+      totals: {
+        orders: 0,
+        adSpend: { amount: '1500.50' },
+        returnOnAdSpend: 0,
+        profit: { amount: '-1500.50' },
+      },
+      rows: [{ key: 'Eid-Sale', sales: { orders: 0, adSpend: { amount: '1200.00' } } }],
+    });
+    // Recording it takes the scope of the ad platforms.
+    const denied = await gql(
+      tokens.owner,
+      `mutation { adSpendSet(entries: [{ platform: META, day: "${day}", amount: "1" }]) { count } }`,
+    );
+    expect(denied.errors?.[0]?.extensions?.code).toBe('ACCESS_DENIED');
+  });
+
   it('says where the orders came from, in sales and in COD health (ADR-140)', async () => {
     // The kurta alone came through the online store, from an Instagram ad's campaign.
     const visit = {

@@ -17,6 +17,7 @@ import {
   grossProfit,
   netSales,
   profit,
+  returnOnAdSpend,
   totalSales,
   type SalesDimension as SalesDimensionValue,
   type SalesIntervalValue,
@@ -90,6 +91,8 @@ export class SalesReportResolver {
         writeOffs: profitLine(tally.writeOffs),
         claimsRecovered: profitLine(tally.claimsRecovered),
         profit: profitLine(profit(tally)),
+        adSpend: tally.adSpend === null ? null : profitLine(tally.adSpend),
+        returnOnAdSpend: trueProfit ? returnOnAdSpend(tally) : null,
         refunds: amount(tally.refunds),
       });
     };

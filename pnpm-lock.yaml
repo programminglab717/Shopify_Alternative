@@ -1358,6 +1358,9 @@ importers:
       '@hatti/inventory':
         specifier: workspace:*
         version: link:../inventory
+      '@hatti/marketing':
+        specifier: workspace:*
+        version: link:../marketing
       '@hatti/money':
         specifier: workspace:*
         version: link:../../platform/money

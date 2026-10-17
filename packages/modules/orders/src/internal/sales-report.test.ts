@@ -8,6 +8,7 @@ import {
   grossProfit,
   netSales,
   profit,
+  returnOnAdSpend,
   totalSales,
   type SalesReportInput,
 } from './sales-report.service.js';
@@ -86,6 +87,7 @@ describe.skipIf(!server)('SalesReportService', () => {
     writeOffs: 0n,
     claimsRecovered: 0n,
     refunds: 0n,
+    adSpend: 0n,
   };
 
   const zero = {
@@ -493,6 +495,67 @@ describe.skipIf(!server)('SalesReportService', () => {
     const report = unwrap(await sales.report(f.a, days({ by: 'visit_source' })));
     expect(totalSales(report.totals)).toBe(16_000_00n);
     expect(unwrap(await sales.report(f.a, days())).rows).toEqual([]);
+  });
+
+  it('takes what the shop spent on its ads off what the orders made, day by day and by campaign (ADR-553)', async () => {
+    // Two kurtas from the Eid-Sale campaign's ad, on the 29th.
+    const two = await placedAt('2026-09-29T05:00:00Z', [kurta, kurta]);
+    const visit = {
+      at: '2026-09-29T04:00:00.000Z',
+      source: 'instagram',
+      utm: { source: 'instagram', medium: null, campaign: 'Eid-Sale', term: null, content: null },
+    };
+    await f.admin.query('UPDATE orders.orders SET attribution = $2 WHERE id = $1', [
+      two.id,
+      JSON.stringify({ first: visit, last: visit }),
+    ]);
+    const spent = (
+      shopId: string,
+      platform: string,
+      day: string,
+      campaign: string,
+      amount: number,
+    ) =>
+      f.admin.query(
+        `INSERT INTO marketing.ad_spend (shop_id, platform, day, campaign, amount)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [shopId, platform, day, campaign, amount],
+      );
+    // On the 29th, Rs 1,000 on the campaign, spelt another way, and Rs 500 on Meta besides; on the
+    // 30th, Rs 300 on a campaign no order came from; the day after the period, and before it.
+    await spent(f.a.shopId, 'meta', '2026-09-29', 'eid-sale', 1_000_00);
+    await spent(f.a.shopId, 'meta', '2026-09-29', '', 500_00);
+    await spent(f.a.shopId, 'google', '2026-09-30', 'Brand', 300_00);
+    await spent(f.a.shopId, 'tiktok', '2026-10-01', '', 9_999_00);
+    await spent(f.a.shopId, 'meta', '2026-09-27', '', 7_00);
+    // Another shop's is its own.
+    await spent(f.b.shopId, 'meta', '2026-09-29', '', 50_000_00);
+
+    const report = unwrap(await sales.report(f.a, days()));
+    expect(report.periods.map((period) => period.adSpend)).toEqual([0n, 1_500_00n, 300_00n]);
+    expect(report.totals.adSpend).toBe(1_800_00n);
+    // Rs 4,000 of kurtas that cost Rs 2,400, and Rs 1,800 of ads.
+    expect(profit(report.totals)).toBe(-200_00n);
+    expect(returnOnAdSpend(report.totals)).toBe(2.22);
+    expect(report.previous.totals.adSpend).toBe(7_00n);
+    // Weeks and months add the days up.
+    const weeks = unwrap(await sales.report(f.a, days({ interval: 'week' })));
+    expect(weeks.periods.map((period) => period.adSpend)).toEqual([1_800_00n]);
+
+    const rows = async (by: SalesReportInput['by']) =>
+      unwrap(await sales.report(f.a, days({ by }))).rows.map((row) => [
+        row.key,
+        row.orders,
+        row.adSpend,
+      ]);
+    // By campaign, each one's; a campaign spent on without orders is a row of none.
+    expect(await rows('campaign')).toEqual([
+      ['Eid-Sale', 1, 1_000_00n],
+      ['Brand', 0, 300_00n],
+    ]);
+    // By channel or by where visits came from, ad spend is not split.
+    expect(await rows('visit_source')).toEqual([['instagram', 1, null]]);
+    expect(returnOnAdSpend({ ...report.totals, adSpend: 0n })).toBeNull();
   });
 
   it('says what the period as long before came to, and what was refunded beside the rest (ADR-250)', async () => {

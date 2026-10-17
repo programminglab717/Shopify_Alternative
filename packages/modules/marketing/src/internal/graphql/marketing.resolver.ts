@@ -3,6 +3,7 @@ import {
   PageInfo,
   RequireRecentAuthentication,
   RequireScopes,
+  Money,
   UserError,
   badUserInput,
   decodeTimeCursor,
@@ -11,7 +12,9 @@ import {
   type TenantContext,
 } from '@hatti/api';
 import { isUuid, toPublicId, tryFromPublicId } from '@hatti/ids';
+import { money } from '@hatti/money';
 import { Args, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { AdSpendService, type AdSpendPlatformValue } from '../ad-spend.service.js';
 import { CALENDAR_DAYS_MAX, type MarketingDate as CalendarDate } from '../calendar.js';
 import { MarketingCalendarService } from '../calendar.service.js';
 import { ConversionsService, type ConversionRecord } from '../conversions.service.js';
@@ -24,6 +27,10 @@ import { MetaConversionsService, type MetaConversionsRecord } from '../meta-sett
 import { TikTokEventsService, type TikTokEventsRecord } from '../tiktok-settings.service.js';
 import { GoogleAnalyticsService, type GoogleAnalyticsRecord } from '../google-settings.service.js';
 import {
+  AdSpendEntry,
+  AdSpendInput,
+  AdSpendPlatform,
+  AdSpendSetPayload,
   ConversionEvent,
   ConversionEventConnection,
   ConversionEventEdge,
@@ -55,7 +62,58 @@ export class MarketingResolver {
     private readonly google: GoogleAnalyticsService,
     private readonly conversions: ConversionsService,
     private readonly calendar: MarketingCalendarService,
+    private readonly adSpend: AdSpendService,
   ) {}
+
+  @Query(() => [AdSpendEntry], {
+    description:
+      'What the shop spent on its ads (ADR-553) from one day to another in its time zone, both ' +
+      'included, at most 366 days, the latest first.',
+  })
+  @RequireScopes('read_pixels')
+  async adSpendEntries(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('from', { description: 'The first day, as 2026-10-01.' }) from: string,
+    @Args('to', { description: 'The last day, as 2026-10-31.' }) to: string,
+  ): Promise<AdSpendEntry[]> {
+    const result = await this.adSpend.list(tenant, from, to);
+    if (!result.ok) throw badUserInput(result.errors[0]!.message);
+    return result.value.map((entry) =>
+      Object.assign(new AdSpendEntry(), {
+        platform: entry.platform.toUpperCase() as AdSpendPlatform,
+        day: entry.day,
+        campaign: entry.campaign,
+        amount: Money.from(money(entry.amount, tenant.currency)),
+      }),
+    );
+  }
+
+  @Mutation(() => AdSpendSetPayload, {
+    description:
+      'Records what the shop spent on its ads (ADR-553), day by day, by platform and, where it ' +
+      "says, by campaign as its links' utm_campaign names it: each replaces what that day had, " +
+      "and an amount of 0 takes it away. The sales report takes it off the orders' profit. At " +
+      'most 400 at a time, all or none.',
+  })
+  @RequireScopes('write_pixels')
+  async adSpendSet(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('entries', { type: () => [AdSpendInput] }) entries: AdSpendInput[],
+  ): Promise<AdSpendSetPayload> {
+    const result = await this.adSpend.set(
+      tenant,
+      entries.map((entry) => ({
+        platform: entry.platform.toLowerCase() as AdSpendPlatformValue,
+        day: entry.day,
+        campaign: entry.campaign ?? null,
+        amount: entry.amount,
+      })),
+    );
+    return Object.assign(new AdSpendSetPayload(), {
+      count: result.ok ? result.value : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
 
   @Query(() => [MarketingDate], {
     description:

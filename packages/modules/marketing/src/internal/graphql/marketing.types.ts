@@ -1,4 +1,4 @@
-import { PageInfo, UserError } from '@hatti/api';
+import { Money, PageInfo, UserError } from '@hatti/api';
 import {
   ArgsType,
   Field,
@@ -470,6 +470,75 @@ export class GoogleAnalyticsDeletePayload {
     description: 'The measurement ID that was connected; null when none was.',
   })
   deletedMeasurementId!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+export enum AdSpendPlatform {
+  META = 'META',
+  TIKTOK = 'TIKTOK',
+  GOOGLE = 'GOOGLE',
+  OTHER = 'OTHER',
+}
+
+registerEnumType(AdSpendPlatform, {
+  name: 'AdSpendPlatform',
+  description: "Where a shop's ads ran (ADR-553).",
+  valuesMap: {
+    META: { description: "Meta's apps: Facebook, Instagram, Messenger and WhatsApp." },
+    TIKTOK: { description: 'TikTok.' },
+    GOOGLE: { description: 'Google: search, Shopping and YouTube.' },
+    OTHER: { description: 'Anywhere else: influencers, Snapchat, a newspaper.' },
+  },
+});
+
+@ObjectType({
+  description:
+    "What a shop spent on one platform's ads on a day, or on one campaign of them (ADR-553).",
+})
+export class AdSpendEntry {
+  @Field(() => AdSpendPlatform)
+  platform!: AdSpendPlatform;
+
+  @Field({ description: "The day in the shop's time zone, as 2026-10-17." })
+  day!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The campaign, as its links' utm_campaign names it; null for the platform's day as a whole.",
+  })
+  campaign!: string | null;
+
+  @Field(() => Money)
+  amount!: Money;
+}
+
+@InputType({ description: "One day's ad spend: an amount of 0 takes it away." })
+export class AdSpendInput {
+  @Field(() => AdSpendPlatform)
+  platform!: AdSpendPlatform;
+
+  @Field({ description: "The day in the shop's time zone, as 2026-10-17: up to today." })
+  day!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The campaign, as its links' utm_campaign names it, up to 200 characters, for the sales " +
+      "report's rows by campaign; blank for the platform's day as a whole.",
+  })
+  campaign?: string | null;
+
+  @Field({ description: "In the shop's currency, as 2499.50." })
+  amount!: string;
+}
+
+@ObjectType()
+export class AdSpendSetPayload {
+  @Field(() => Int, { nullable: true, description: 'How many were recorded; null when refused.' })
+  count!: number | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

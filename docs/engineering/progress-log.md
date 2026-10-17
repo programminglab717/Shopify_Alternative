@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Ad spend in true profit
+
+* **A shop records what it spends on its ads, day by day, by platform and campaign, and the sales
+  report takes it off the orders' profit and sets their sales against it** ([ADR-553](../architecture/13-decision-log.md#adr-553--a-shop-records-what-it-spends-on-its-ads-day-by-day-by-platform-and-campaign-and-the-sales-report-takes-it-off-the-orders-profit-and-sets-their-sales-against-it), MKT-12,
+  ANL-03). Rows by campaign have each campaign's, those spent on without an order among them.
+* 3366 tests, 5 more: recording and listing it, the report's periods
+  and campaigns, and the API.
+
 ### 698ae2d · The consent banner in the admin
 
 * **The admin's storefront preferences turn the consent banner on and off, saying what each choice

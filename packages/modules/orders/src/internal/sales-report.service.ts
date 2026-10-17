@@ -1,5 +1,6 @@
 import { failOne, shopProfile, type MutationResult, type TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
+import { adSpendByCampaignIn, adSpendByPeriodIn } from '@hatti/marketing/public';
 import { Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 import {
@@ -96,6 +97,12 @@ export interface SalesTally {
    * other amounts, not taken off them, since the items that came back already are.
    */
   refunds: bigint;
+  /**
+   * What the shop spent on its ads (ADR-553): on the period's days in its time zone; for a row by
+   * campaign, on that campaign. Null for rows by channel or by where visits came from, which ad
+   * spend is not split by.
+   */
+  adSpend: bigint | null;
 }
 
 export interface SalesPeriod extends SalesTally {
@@ -255,7 +262,9 @@ export class SalesReportService {
           grossSales: BigInt(row.gross),
           costOfGoods: BigInt(row.cost),
         })),
-        rows: input.by ? await salesRowsIn(tx, shopId, input, input.by, input.first ?? 50) : [],
+        rows: input.by
+          ? await salesRowsIn(tx, shopId, timezone, input, input.by, input.first ?? 50)
+          : [],
       };
       return { ok: true, value: report };
     });
@@ -417,6 +426,7 @@ function tallyOfRow(row: TallyRow): SalesTally {
     writeOffs: BigInt(row.write_offs),
     claimsRecovered: BigInt(row.claims),
     refunds: BigInt(row.refunds),
+    adSpend: 0n,
   };
 }
 
@@ -445,7 +455,17 @@ export async function salesPeriodsIn(
     SELECT b.bucket AT TIME ZONE ${timezone} AS start, ${TALLY_COLUMNS}
       FROM buckets b LEFT JOIN sales s ON s.key = b.bucket
      ORDER BY b.bucket`);
-  return rows.map((row) => ({ start: new Date(row.start), ...tallyOfRow(row) }));
+  // And what the shop spent on its ads on each one's days (ADR-553).
+  const spent = new Map(
+    (await adSpendByPeriodIn(tx, shopId, timezone, period)).map((each) => [
+      each.start.getTime(),
+      each.amount,
+    ]),
+  );
+  return rows.map((row) => {
+    const start = new Date(row.start);
+    return { start, ...tallyOfRow(row), adSpend: spent.get(start.getTime()) ?? 0n };
+  });
 }
 
 /**
@@ -455,6 +475,7 @@ export async function salesPeriodsIn(
 async function salesRowsIn(
   tx: Tx,
   shopId: string,
+  timezone: string,
   period: Pick<SalesReportInput, 'placedFrom' | 'placedBefore'>,
   by: SalesDimension,
   first: number,
@@ -463,8 +484,24 @@ async function salesRowsIn(
   const { rows } = await tx.execute<GroupRow>(sql`
     ${salesWith(shopId, period, group.key, group.title)}
     SELECT s.key, s.title, ${TALLY_COLUMNS} FROM sales s`);
-  return rows
-    .map((row): SalesRow => ({ ...rowName(by, row), ...tallyOfRow(row) }))
+  let tallied = rows.map((row): SalesRow => ({
+    ...rowName(by, row),
+    ...tallyOfRow(row),
+    adSpend: null,
+  }));
+  if (by === 'campaign') {
+    // Each campaign's ad spend (ADR-553), and those spent on without an order, as rows of none.
+    const spent = await adSpendByCampaignIn(tx, shopId, timezone, period);
+    tallied = tallied.map((row) => {
+      const campaign = row.key === null ? undefined : spent.get(row.key.toLowerCase());
+      if (row.key !== null) spent.delete(row.key.toLowerCase());
+      return { ...row, adSpend: row.key === null ? null : (campaign?.amount ?? 0n) };
+    });
+    for (const { title, amount } of spent.values()) {
+      tallied.push({ key: title, title, ...tallyOf([]), adSpend: amount });
+    }
+  }
+  return tallied
     .sort(
       (a, b) =>
         Number(totalSales(b) - totalSales(a)) ||
@@ -505,6 +542,7 @@ export function tallyOf(periods: readonly SalesTally[]): SalesTally {
     writeOffs: 0n,
     claimsRecovered: 0n,
     refunds: 0n,
+    adSpend: 0n,
   };
   for (const period of periods) {
     tally.orders += period.orders;
@@ -521,6 +559,7 @@ export function tallyOf(periods: readonly SalesTally[]): SalesTally {
     tally.writeOffs += period.writeOffs;
     tally.claimsRecovered += period.claimsRecovered;
     tally.refunds += period.refunds;
+    tally.adSpend = (tally.adSpend ?? 0n) + (period.adSpend ?? 0n);
   }
   return tally;
 }
@@ -545,8 +584,8 @@ export function grossProfit(tally: SalesTally): bigint {
 
 /**
  * What the orders made (ANL-03, ADR-141): what they came to less what came back and the tax they
- * include, less what their goods cost, what couriers charged and what was written off, and plus
- * what couriers paid of claims.
+ * include, less what their goods cost, what couriers charged and what was written off, plus what
+ * couriers paid of claims, and less what the shop spent on its ads (ADR-553), where known.
  */
 export function profit(tally: SalesTally): bigint {
   return (
@@ -555,8 +594,18 @@ export function profit(tally: SalesTally): bigint {
     tally.costOfGoods -
     tally.shippingCosts -
     tally.writeOffs +
-    tally.claimsRecovered
+    tally.claimsRecovered -
+    (tally.adSpend ?? 0n)
   );
+}
+
+/**
+ * Net sales for each rupee spent on ads (ADR-553), to two places; null without ad spend, or where
+ * it is not known.
+ */
+export function returnOnAdSpend(tally: SalesTally): number | null {
+  if (!tally.adSpend) return null;
+  return Math.round((Number(netSales(tally)) / Number(tally.adSpend)) * 100) / 100;
 }
 
 /**

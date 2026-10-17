@@ -1,5 +1,16 @@
 // The marketing module's public surface. Everything under src/internal is private to this module.
 export {
+  AD_SPEND_LIMITS,
+  AD_SPEND_PLATFORMS,
+  AdSpendService,
+  adSpendByCampaignIn,
+  adSpendByPeriodIn,
+  type AdSpendEntry,
+  type AdSpendInput,
+  type AdSpendPeriod,
+  type AdSpendPlatformValue,
+} from '../internal/ad-spend.service.js';
+export {
   ConversionsService,
   type ClaimedConversion,
   type ConversionOutcome,

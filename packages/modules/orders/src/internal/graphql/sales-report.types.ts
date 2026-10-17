@@ -205,11 +205,29 @@ export class Sales {
     nullable: true,
     description:
       "What the orders made (ANL-03): total sales less taxes, the cost of goods, couriers' " +
-      'charges and write-offs, plus claims recovered. Payment fees and ad spend are not in it ' +
-      'yet.' +
+      'charges and write-offs, plus claims recovered, less ad spend where it is known ' +
+      '(ADR-553). Payment fees are not in it yet.' +
       PLAN_LEAVES_OUT,
   })
   profit!: Money | null;
+
+  @Field(() => Money, {
+    nullable: true,
+    description:
+      'What the shop spent on its ads (ADR-553), as recorded with adSpendSet: on the days of ' +
+      'the period, or of the report, in its time zone; for a row by campaign, on that campaign. ' +
+      'Null for rows by channel or by where visits came from, which ad spend is not split by.' +
+      PLAN_LEAVES_OUT,
+  })
+  adSpend!: Money | null;
+
+  @Field(() => Float, {
+    nullable: true,
+    description:
+      'Net sales for each rupee spent on ads (ADR-553), to two places; null without ad spend, ' +
+      "or when the shop's plan leaves true profit out (ADR-529).",
+  })
+  returnOnAdSpend!: number | null;
 
   @Field(() => Money, {
     description:
@@ -314,8 +332,8 @@ export class SalesReport {
   @Field({
     description:
       "Whether the shop's plan includes true profit (ANL-03, ADR-529): without it, every " +
-      "Sales' shippingCosts, shippingCostsEstimated, writeOffs, claimsRecovered and profit are " +
-      'null.',
+      "Sales' shippingCosts, shippingCostsEstimated, writeOffs, claimsRecovered, profit, adSpend " +
+      'and returnOnAdSpend are null.',
   })
   trueProfit!: boolean;
 }

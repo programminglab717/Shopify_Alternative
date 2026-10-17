@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AdSpendService } from './ad-spend.service.js';
 import { MarketingCalendarService } from './calendar.service.js';
 import { ConversionsService } from './conversions.service.js';
 import { GoogleAnalyticsService } from './google-settings.service.js';
@@ -14,6 +15,7 @@ import { TikTokEventsService } from './tiktok-settings.service.js';
     GoogleAnalyticsService,
     ConversionsService,
     MarketingCalendarService,
+    AdSpendService,
     MarketingResolver,
   ],
   exports: [
@@ -21,6 +23,7 @@ import { TikTokEventsService } from './tiktok-settings.service.js';
     TikTokEventsService,
     GoogleAnalyticsService,
     ConversionsService,
+    AdSpendService,
   ],
 })
 export class MarketingModule {}

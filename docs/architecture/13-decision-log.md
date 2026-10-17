@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-552 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-553 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -560,6 +560,7 @@
 | 550 | The admin's online store has a Google tab: the web stream connected with its measurement ID and API secret, its purchase moment chosen, disconnected once asked, and the moments sent to Google listed apart | Accepted |
 | 551 | A shop may ask its shoppers before its ad platforms' pixels load: a banner until they accept or decline, kept in a cookie of the shop's, the pixels waiting for the answer, and an order placed by one who did not accept sent to no ad platform | Accepted |
 | 552 | The admin's storefront preferences turn the consent banner on and off, saying what each choice means for the shop's pixels and its orders | Accepted |
+| 553 | A shop records what it spends on its ads, day by day, by platform and campaign, and the sales report takes it off the orders' profit and sets their sales against it | Accepted |
 
 ---
 
@@ -20798,3 +20799,36 @@
   without the API.
 * **Alternatives:** **Beside each platform's tab:** the banner holds back every platform alike, so
   it is the storefront's.
+
+## ADR-553 · A shop records what it spends on its ads, day by day, by platform and campaign, and the sales report takes it off the orders' profit and sets their sales against it
+
+* **Context:** True profit takes off what goods, couriers and write-offs cost (ADR-141), but not
+  what the ads that brought the orders cost (ANL-03, MKT-12), so a shop selling at a loss on its
+  ads saw a profit. The platforms' reporting APIs each need an ad account's access, and many
+  Pakistani shops pay for ads in dollars by card, or boost posts from a phone, so what they paid
+  in rupees is theirs to say.
+* **Decision:**
+  * **Ad spend is recorded by day** in the shop's time zone, by platform (Meta, TikTok, Google or
+    other) and, where the shop says, by campaign as its links' `utm_campaign` names it, in rupees
+    as it paid (`adSpendSet`, up to 400 at a time, all or none): each replaces what that day had,
+    campaigns in any letter case being one, and 0 takes it away. Days from 2020 to today, a day
+    ahead allowed for a shop already in tomorrow.
+    Listed a span of up to 366 days at a time (`adSpendEntries`). Kept by marketing, recorded by
+    those who connect the ad platforms (`write_pixels`): owners, managers and marketers.
+  * **The sales report** counts each period's days: its `adSpend`, taken off `profit`, and its
+    `returnOnAdSpend`, net sales for each rupee spent. By campaign, each row has its campaign's
+    spend, and a campaign spent on without an order is a row of none; by channel or by where
+    visits came from, the spend is not split, so those rows' is null. On plans without true
+    profit, null, as its other lines are (ADR-529).
+  * **Orders read it through marketing's public functions** (`adSpendByPeriodIn`,
+    `adSpendByCampaignIn`), in the report's own transaction.
+* **Consequences:**
+  * A shop sees whether its ads paid, for the shop and campaign by campaign.
+  * Rows by channel or visit source add up to the totals but for the ad spend.
+  * The admin does not record it yet, nor are the platforms asked for it.
+* **Alternatives:**
+  * **Pulling spend from Meta's and Google's reporting APIs:** exact for the platforms that give
+    it, but needs each shop's ad account access and turns dollars into rupees at a rate the shop
+    did not pay; it can fill the same days later.
+  * **Splitting a platform's spend over visit sources:** Meta's spend covers Facebook, Instagram
+    and Messenger alike, with no honest way to share it.
