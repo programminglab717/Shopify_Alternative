@@ -28,6 +28,11 @@ export function formatMoney(amount: string, currency = 'PKR'): string {
   return currency === 'PKR' ? `${sign}Rs ${digits}` : `${sign}${currency} ${digits}`;
 }
 
+/** A multiple to two places, as return on ad spend is given: "3.20×". */
+export function formatTimes(value: number): string {
+  return `${groupedPaisa.format(value)}×`;
+}
+
 /** A Pakistani mobile kept as "+923001234567", shown as "0300 1234567"; others as they are. */
 export function formatPhone(phone: string): string {
   return parsePkMobile(phone)?.display ?? phone;

@@ -3665,6 +3665,9 @@ const en = {
   'parcels.chargeEstimate': 'Likely courier charges: about {amount}, by the rate card',
   'shipping.about': 'about {amount}',
   'analytics.profitEstimated': 'Includes {amount} of courier charges estimated by rate cards',
+  'analytics.adSpend': 'Ad spend',
+  'analytics.returnOnAdSpend': 'Return on ad spend',
+  'analytics.returnOnAdSpendNote': 'Net sales for each rupee spent on ads',
   'activity.subject.courier_rate_card': 'Rate card',
   'couriers.performance.title': 'Couriers',
   'couriers.performance.hint':
@@ -3957,6 +3960,32 @@ const en = {
     'Khaddar, karandi, velvet and shawls, and warm clothes for children.',
   'calendar.idea.WEDDING_SEASON':
     'Formal and bridal wear, jewellery, gifts and decor, from mehndi to walima.',
+  'adSpend.title': 'Ad spend',
+  'adSpend.linkHint': 'What your Meta, TikTok and Google ads cost, day by day',
+  'adSpend.intro':
+    'What you spent on your ads, day by day. The sales report takes it off your profit, and campaigns named here match the campaigns in sales by campaign.',
+  'adSpend.cannot': "Only the shop's owners, managers and marketers record its ad spend.",
+  'adSpend.record': "Record a day's spend",
+  'adSpend.recordHint':
+    'It takes the place of what that day had for the platform and campaign. An amount of 0 takes it away.',
+  'adSpend.platform': 'Platform',
+  'adSpend.platform.META': 'Meta',
+  'adSpend.platform.TIKTOK': 'TikTok',
+  'adSpend.platform.GOOGLE': 'Google',
+  'adSpend.platform.OTHER': 'Other',
+  'adSpend.day': 'Day',
+  'adSpend.campaign': 'Campaign',
+  'adSpend.campaignHint':
+    "Optional: as the ad's links' utm_campaign names it. Leave it blank for the platform's day as a whole.",
+  'adSpend.amount': 'Amount in rupees',
+  'adSpend.amountHint': 'As 2499.50.',
+  'adSpend.save': 'Record spend',
+  'adSpend.saved': '{amount} on {platform} for {day} is recorded.',
+  'adSpend.recent': 'The last 30 days',
+  'adSpend.none': 'No ad spend recorded in the last 30 days.',
+  'adSpend.allCampaigns': 'All campaigns',
+  'adSpend.total': 'Total for the 30 days',
+  'adSpend.remove': 'Remove {platform} on {day}, {campaign}',
   'onlineStore.speed': 'Speed',
   'speed.intro':
     "How fast your store was for your shoppers over the last 28 days, as their own browsers measured it: Google's Core Web Vitals, which search ranks stores by. Each is the time three in four page views were faster than.",
@@ -8463,6 +8492,9 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'shipping.about': 'تقریباً {amount}',
   'analytics.profitEstimated':
     'اس میں ریٹ کارڈ سے اندازہ لگائے گئے {amount} کے کوریئر چارجز شامل ہیں',
+  'analytics.adSpend': 'اشتہارات کا خرچ',
+  'analytics.returnOnAdSpend': 'اشتہارات پر واپسی',
+  'analytics.returnOnAdSpendNote': 'اشتہارات پر خرچ کیے گئے ہر روپے پر خالص فروخت',
   'activity.subject.courier_rate_card': 'ریٹ کارڈ',
   'couriers.performance.title': 'کوریئرز',
   'couriers.performance.hint':
@@ -8752,6 +8784,32 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'calendar.idea.WINTER_COLLECTION': 'کھدر، کرنڈی، ویلویٹ اور شالیں، اور بچوں کے گرم کپڑے۔',
   'calendar.idea.WEDDING_SEASON':
     'فارمل اور دلہن کے کپڑے، زیورات، تحفے اور سجاوٹ، مہندی سے ولیمے تک۔',
+  'adSpend.title': 'اشتہارات کا خرچ',
+  'adSpend.linkHint': 'میٹا، ٹک ٹاک اور گوگل کے اشتہارات پر کیا لگا، دن بہ دن',
+  'adSpend.intro':
+    'آپ نے اپنے اشتہارات پر کیا خرچ کیا، دن بہ دن۔ سیلز رپورٹ اسے آپ کے منافع سے نکالتی ہے، اور یہاں لکھی گئی مہمات مہم کے حساب سے فروخت میں انہی مہمات سے ملتی ہیں۔',
+  'adSpend.cannot': 'دکان کے اشتہارات کا خرچ صرف اس کے مالک، مینیجر اور مارکیٹر لکھتے ہیں۔',
+  'adSpend.record': 'ایک دن کا خرچ لکھیں',
+  'adSpend.recordHint':
+    'یہ اس پلیٹ فارم اور مہم کے لیے اس دن پہلے لکھے خرچ کی جگہ لے لیتا ہے۔ 0 کی رقم اسے ہٹا دیتی ہے۔',
+  'adSpend.platform': 'پلیٹ فارم',
+  'adSpend.platform.META': 'میٹا',
+  'adSpend.platform.TIKTOK': 'ٹک ٹاک',
+  'adSpend.platform.GOOGLE': 'گوگل',
+  'adSpend.platform.OTHER': 'کوئی اور',
+  'adSpend.day': 'دن',
+  'adSpend.campaign': 'مہم',
+  'adSpend.campaignHint':
+    'اختیاری: جیسے اشتہار کے لنکس کا utm_campaign اسے نام دیتا ہے۔ پلیٹ فارم کے پورے دن کے لیے خالی چھوڑ دیں۔',
+  'adSpend.amount': 'رقم روپوں میں',
+  'adSpend.amountHint': 'جیسے 2499.50۔',
+  'adSpend.save': 'خرچ لکھیں',
+  'adSpend.saved': '{day} کے لیے {platform} پر {amount} لکھ دیا گیا۔',
+  'adSpend.recent': 'پچھلے 30 دن',
+  'adSpend.none': 'پچھلے 30 دنوں میں اشتہارات کا کوئی خرچ نہیں لکھا گیا۔',
+  'adSpend.allCampaigns': 'تمام مہمات',
+  'adSpend.total': '30 دنوں کا کل',
+  'adSpend.remove': '{day} کا {platform} کا خرچ ہٹائیں، {campaign}',
   'onlineStore.speed': 'رفتار',
   'speed.intro':
     'پچھلے 28 دنوں میں آپ کا اسٹور آپ کے خریداروں کے لیے کتنا تیز تھا، جیسا ان کے اپنے براؤزرز نے ناپا: گوگل کے کور ویب وائٹلز، جن سے سرچ اسٹورز کی درجہ بندی کرتا ہے۔ ہر ایک وہ وقت ہے جس سے چار میں سے تین صفحات تیز تھے۔',

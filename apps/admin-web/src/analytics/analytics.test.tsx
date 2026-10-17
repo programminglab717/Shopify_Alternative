@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SalesTotalsValue } from '../api/types';
 import { sectionsOf } from '../shell/shell';
@@ -117,6 +117,55 @@ describe('Analytics in the admin', () => {
       screen.getByText('Profit after couriers and returns is on Growth and bigger plans'),
     ).toBeTruthy();
     expect(screen.queryByText('Profit')).toBeNull();
+    expect(screen.queryByText('Ad spend')).toBeNull();
+    expect(screen.queryByText('Return on ad spend')).toBeNull();
+  });
+
+  it('shows what the ads cost and the net sales they brought in, beside profit (ADR-553)', async () => {
+    const report = (adSpend: string | null, returnOnAdSpend: number | null) => ({
+      salesReport: {
+        totals: {
+          ...totals('60000', 20),
+          adSpend: adSpend === null ? null : rupees(adSpend),
+          returnOnAdSpend,
+        },
+        previous: {
+          totals: { ...totals('48000', 25), adSpend: rupees('15000'), returnOnAdSpend: 3.2 },
+        },
+        periods: [],
+        topProducts: [],
+        rows: [],
+        trueProfit: true,
+      },
+    });
+    let answer = report('18750', 3.2);
+    const core = fakeCore('owner', (operation) => {
+      if (operation in NO_VISITS) return NO_VISITS[operation];
+      if (operation === 'CodHealth') return { codHealth: COD_HEALTH };
+      if (operation !== 'Sales') return {};
+      return answer;
+    });
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/analytics');
+
+    const spend = (await screen.findByText('Ad spend')).parentElement!;
+    expect(within(spend).getByText('Rs 18,750')).toBeTruthy();
+    // A quarter more spent than the period before.
+    expect(within(spend).getByText('25% more')).toBeTruthy();
+    const roas = screen.getByText('Return on ad spend').parentElement!;
+    expect(within(roas).getByText('3.20×')).toBeTruthy();
+    expect(within(roas).getByText('Net sales for each rupee spent on ads')).toBeTruthy();
+    expect(screen.getByText('Profit')).toBeTruthy();
+
+    // No spend recorded for the period: neither is shown.
+    answer = report('0', null);
+    fireEvent.click(screen.getByRole('tab', { name: 'Last 7 days' }));
+    await waitFor(() =>
+      expect(core.sent.filter((each) => each.operation === 'Sales')).toHaveLength(2),
+    );
+    expect(await screen.findByText('Profit')).toBeTruthy();
+    expect(screen.queryByText('Ad spend')).toBeNull();
+    expect(screen.queryByText('Return on ad spend')).toBeNull();
   });
 
   it('shows sales against the period before, by day, with what sold most and from where', async () => {
@@ -168,6 +217,8 @@ describe('Analytics in the admin', () => {
     );
 
     expect(screen.queryByRole('link', { name: "Agents' performance" })).toBeNull();
+    // Without true profit said, no ad spend.
+    expect(screen.queryByText('Ad spend')).toBeNull();
 
     fireEvent.click(screen.getByRole('tab', { name: 'Last 90 days' }));
     await waitFor(() =>

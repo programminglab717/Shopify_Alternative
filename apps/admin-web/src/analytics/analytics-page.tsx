@@ -6,7 +6,7 @@ import type { MoneyValue, SalesData, SalesTotalsValue } from '../api/types';
 import type { StaffRole } from '../auth/session';
 import { SEES_AGENTS } from '../desk/agents-page';
 import { errorText } from '../i18n/errors';
-import { formatCount, formatDate, formatMoney } from '../i18n/format';
+import { formatCount, formatDate, formatMoney, formatTimes } from '../i18n/format';
 import { useLocale } from '../i18n/locale';
 import { FormSection } from '../products/product-form';
 import { useAdminQuery, useShop, useShopTimezone } from '../shell/shop-context';
@@ -24,10 +24,20 @@ export const READS_ANALYTICS: readonly StaffRole[] = ['owner', 'manager', 'marke
 
 const amount = (money: MoneyValue | null) => Number(money?.amount ?? 0);
 
-function Totals({ now, before }: { now: SalesTotalsValue; before: SalesTotalsValue }) {
+function Totals({
+  now,
+  before,
+  trueProfit,
+}: {
+  now: SalesTotalsValue;
+  before: SalesTotalsValue;
+  trueProfit: boolean;
+}) {
   const { t } = useLocale();
   // Couriers' charges no statement has said yet, estimated by rate cards (ADR-383).
   const estimated = amount(now.shippingCostsEstimated ?? null);
+  // What the ads cost, recorded on Marketing's ad spend (ADR-553), and what they brought in.
+  const adSpend = trueProfit && now.adSpend && amount(now.adSpend) > 0 ? now.adSpend : null;
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       <Figure
@@ -72,16 +82,33 @@ function Totals({ now, before }: { now: SalesTotalsValue; before: SalesTotalsVal
           note={t('analytics.trueProfitPlan')}
         />
       )}
+      {adSpend && (
+        <>
+          <Figure
+            label="analytics.adSpend"
+            now={amount(adSpend)}
+            before={amount(before.adSpend ?? null)}
+            shown={formatMoney(adSpend.amount, adSpend.currencyCode)}
+          />
+          <Figure
+            label="analytics.returnOnAdSpend"
+            now={now.returnOnAdSpend ?? 0}
+            before={before.returnOnAdSpend ?? 0}
+            shown={typeof now.returnOnAdSpend === 'number' ? formatTimes(now.returnOnAdSpend) : '–'}
+            note={t('analytics.returnOnAdSpendNote')}
+          />
+        </>
+      )}
     </div>
   );
 }
 
 /**
  * Sales over time (ANL-02, ADR-250): who is on the online store now; the last 7, 30 or 90 days
- * against the period as long before, net sales by day (by week over 90), what sold most, where
- * the orders came from, the online store's visits and how far they went, how its
- * cash-on-delivery orders turned out, and how its stock sold (ANL-05); for owners and managers,
- * the way to how each agent of the Confirmation Desk did.
+ * against the period as long before, with what the ads cost and brought in (ADR-553), net sales
+ * by day (by week over 90), what sold most, where the orders came from, the online store's visits
+ * and how far they went, how its cash-on-delivery orders turned out, and how its stock sold
+ * (ANL-05); for owners and managers, the way to how each agent of the Confirmation Desk did.
  */
 export function AnalyticsPage() {
   const { t, locale } = useLocale();
@@ -117,6 +144,7 @@ export function AnalyticsPage() {
           <Totals
             now={query.data.salesReport.totals}
             before={query.data.salesReport.previous.totals}
+            trueProfit={query.data.salesReport.trueProfit === true}
           />
           <Bars
             title={t('analytics.overTime')}

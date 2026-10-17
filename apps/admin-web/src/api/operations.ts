@@ -3264,6 +3264,10 @@ const SALES_TOTALS = /* GraphQL */ `
     shippingCostsEstimated {
       ...Money
     }
+    adSpend {
+      ...Money
+    }
+    returnOnAdSpend
   }
 `;
 
@@ -9121,5 +9125,33 @@ export const ConversationReplyMutation = /* GraphQL */ `
     }
   }
   ${CONVERSATION}
+  ${USER_ERRORS}
+`;
+
+/** What the shop spent on its ads from one day to another, both included, the latest first (ADR-553). */
+export const AdSpendEntriesQuery = /* GraphQL */ `
+  query AdSpendEntries($from: String!, $to: String!) {
+    adSpendEntries(from: $from, to: $to) {
+      platform
+      day
+      campaign
+      amount {
+        ...Money
+      }
+    }
+  }
+  ${MONEY}
+`;
+
+/** Days of ad spend recorded, each in place of what its day had; an amount of 0 takes it away. */
+export const AdSpendSetMutation = /* GraphQL */ `
+  mutation AdSpendSet($entries: [AdSpendInput!]!) {
+    adSpendSet(entries: $entries) {
+      count
+      userErrors {
+        ...Problems
+      }
+    }
+  }
   ${USER_ERRORS}
 `;

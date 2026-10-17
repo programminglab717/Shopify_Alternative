@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-553 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-554 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -561,6 +561,7 @@
 | 551 | A shop may ask its shoppers before its ad platforms' pixels load: a banner until they accept or decline, kept in a cookie of the shop's, the pixels waiting for the answer, and an order placed by one who did not accept sent to no ad platform | Accepted |
 | 552 | The admin's storefront preferences turn the consent banner on and off, saying what each choice means for the shop's pixels and its orders | Accepted |
 | 553 | A shop records what it spends on its ads, day by day, by platform and campaign, and the sales report takes it off the orders' profit and sets their sales against it | Accepted |
+| 554 | The admin records ad spend a day at a time under Marketing, and analytics shows the spend and the sales each rupee of it brought, beside true profit | Accepted |
 
 ---
 
@@ -20832,3 +20833,23 @@
     did not pay; it can fill the same days later.
   * **Splitting a platform's spend over visit sources:** Meta's spend covers Facebook, Instagram
     and Messenger alike, with no honest way to share it.
+
+## ADR-554 · The admin records ad spend a day at a time under Marketing, and analytics shows the spend and the sales each rupee of it brought, beside true profit
+
+* **Context:** A shop records its ad spend, and the sales report takes it off profit (ADR-553), but
+  only through the API.
+* **Decision:**
+  * **Ad spend** under Marketing, for owners, managers and marketers, as the other ads settings
+    are. A form takes the platform, the day (today in the shop's time zone at first, and none
+    after it), the campaign as its links' `utm_campaign` names it, or none for the platform's day
+    as a whole, and the amount. Each entry is saved alone; one given again replaces the last.
+  * Below it, the last 30 days, the latest first, with their total, and each entry removed in a tap,
+    as an amount of nothing does.
+  * **Analytics** shows the period's ad spend and its return on ad spend, the net sales for each
+    rupee spent, after profit. Both are shown only where true profit is (ADR-529) and something
+    was spent, and each is compared with the period before.
+* **Consequences:** A shop sees what its ads cost against what they sold, without the API.
+  Entries are typed by hand: what the platforms say they spent is not pulled from them.
+* **Alternatives:** **A grid of days by platform:** most shops pay one or two platforms, and an
+  entry at a time also fits a phone. **Spend shown without true profit:** it is part of what
+  profit takes off, so it shows where that does.

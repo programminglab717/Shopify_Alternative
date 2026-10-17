@@ -1399,6 +1399,10 @@ export interface SalesTotalsValue {
   profit: MoneyValue | null;
   /** Of couriers' charges in profit, what rate cards estimate, no statement saying (ADR-383). */
   shippingCostsEstimated?: MoneyValue | null;
+  /** What the shop spent on its ads in the period (ADR-553); null on a plan without true profit. */
+  adSpend?: MoneyValue | null;
+  /** Net sales for each rupee of ad spend; null without spend or without true profit. */
+  returnOnAdSpend?: number | null;
 }
 
 export interface SalesData {
@@ -4258,4 +4262,34 @@ export interface ConversationUpdatePayload {
 
 export interface ConversationReplyData {
   conversationReply: ConversationUpdatePayload & { message: ConversationMessageValue | null };
+}
+
+/** Where a shop's ads ran (ADR-553). */
+export type AdSpendPlatform = 'META' | 'TIKTOK' | 'GOOGLE' | 'OTHER';
+
+/** What a shop spent on one platform's ads on a day, or on one campaign of them. */
+export interface AdSpendEntryValue {
+  platform: AdSpendPlatform;
+  /** YYYY-MM-DD in the shop's time zone. */
+  day: string;
+  /** As its links' utm_campaign names it; null for the platform's day as a whole. */
+  campaign: string | null;
+  amount: MoneyValue;
+}
+
+export interface AdSpendEntriesData {
+  adSpendEntries: AdSpendEntryValue[];
+}
+
+/** One day's ad spend to record: an amount of "0" takes it away. */
+export interface AdSpendInput {
+  platform: AdSpendPlatform;
+  day: string;
+  campaign: string | null;
+  /** In rupees, as "2499.50". */
+  amount: string;
+}
+
+export interface AdSpendSetData {
+  adSpendSet: { count: number | null; userErrors: UserError[] };
 }
