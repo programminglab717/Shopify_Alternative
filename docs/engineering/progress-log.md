@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### A consent banner
+### b4e39e7 · A consent banner
 
 * **A shop may ask its shoppers before its ad platforms' pixels load: a banner until they accept or
   decline, the pixels waiting for the answer, and an order placed by one who did not accept sent to
