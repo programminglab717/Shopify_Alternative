@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### The admin's edge headers
+
+* **The merchant admin's builds write the edge's headers to `_headers`: a content security
+  policy that runs only its own scripts and Google's and Facebook's sign-in, with HSTS, framing
+  refused and the camera alone allowed** ([ADR-513](../architecture/13-decision-log.md#adr-513--the-merchant-admins-edge-headers-a-content-security-policy-that-runs-only-the-admins-own-scripts-and-googles-and-facebooks-sign-in-written-to-_headers-by-each-build-with-hsts-framing-refused-and-the-camera-alone-allowed)). `vite preview` sends them too; Chromium
+  rendered the sign-in page under them with no violation and refused an injected script.
+* 3191 tests, 3 more: the policy, the scripts the admin loads against
+  it, and the `_headers` file.
+
 ### 9642b79 · Sales tax on Hatti's invoices
 
 * **Where Hatti is registered for sales tax on services, its invoices carry the tax at the

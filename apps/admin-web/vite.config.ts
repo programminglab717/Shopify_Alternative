@@ -5,6 +5,7 @@ import { themeStylesheet } from '@hatti/tokens';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vitest/config';
+import { headersFile, securityHeaders } from './src/edge/headers.ts';
 import { precacheOf } from './src/offline/rules.ts';
 
 const TOKENS = 'virtual:hatti-tokens.css';
@@ -47,12 +48,33 @@ function serviceWorker(): Plugin {
   };
 }
 
+/**
+ * The edge's headers (ADR-513): written beside the build as `_headers`, and sent by `vite preview`
+ * so the built admin is tried under its content security policy. `vite dev` sends none, React's
+ * refresh running inline there.
+ */
+function edgeHeaders(): Plugin {
+  return {
+    name: 'hatti-edge-headers',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: '_headers', source: headersFile() });
+    },
+    configurePreviewServer(server) {
+      const headers = Object.entries(securityHeaders());
+      server.middlewares.use((_request, response, next) => {
+        for (const [name, value] of headers) response.setHeader(name, value);
+        next();
+      });
+    },
+  };
+}
+
 // In development the admin is served on its own port and sends the API's paths on to the core
 // (`pnpm dev:api`), so the browser sees one origin, as it does behind the edge in production.
 const api = process.env.HATTI_API_URL ?? 'http://localhost:4000';
 
 export default defineConfig({
-  plugins: [hattiTokens(), react(), tailwindcss(), serviceWorker()],
+  plugins: [hattiTokens(), react(), tailwindcss(), serviceWorker(), edgeHeaders()],
   server: {
     port: 5173,
     proxy: {

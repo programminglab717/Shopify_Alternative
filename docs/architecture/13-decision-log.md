@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-512 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-513 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -520,6 +520,7 @@
 | 510 | Trax, the fourth courier: bookings by Trax's city IDs from the shop's pickup address, tracking, cancellations and cities through its merchant API | Accepted |
 | 511 | Humane dunning: an overdue period's owner reminded the day it ends, with three days left and with one, each once, and the admin saying by when, the store open throughout | Accepted |
 | 512 | Sales tax on Hatti's invoices: provincial sales tax on services at Hatti's registration, kept on each invoice with its authority, rate and number, and paid on top of the price | Accepted |
+| 513 | The merchant admin's edge headers: a content security policy that runs only the admin's own scripts and Google's and Facebook's sign-in, written to `_headers` by each build with HSTS, framing refused and the camera alone allowed | Accepted |
 
 ---
 
@@ -19489,3 +19490,72 @@
     prices would cut Hatti's revenue by the rate wherever it registers.
   * **A tax line on the payment rather than the invoice:** the invoice is the tax document. Its
     tax, authority and number must not change once issued.
+
+## ADR-513 · The merchant admin's edge headers: a content security policy that runs only the admin's own scripts and Google's and Facebook's sign-in, written to `_headers` by each build with HSTS, framing refused and the camera alone allowed
+
+* **Context:**
+  * The admin keeps its session's tokens in the browser's storage, where any script on its
+    origin could read them. ADR-265 left the admin's origin a strict content security policy
+    "with the infrastructure".
+  * ADR-164 added Google's sign-in script, and ADR-419 added Facebook's SDK for Embedded Signup.
+    Neither was allowed for anywhere, and no header was sent at all: Vite served the admin in
+    development alone.
+  * The edge is Cloudflare (docs/architecture/10). Its static hosting reads headers from a
+    `_headers` file beside the files it serves.
+* **Decision:**
+  * **One module says the headers:** `apps/admin-web/src/edge/headers.ts`. Each build writes them
+    to `dist/_headers`, and `vite preview` sends them, so the built admin is tried under the same
+    policy. `vite dev` sends none, because React's refresh runs inline there.
+  * **Scripts:**
+    * Allowed: the admin's own origin, `https://accounts.google.com/gsi/client` and
+      `https://connect.facebook.net`.
+    * Nothing inline and nothing evaluated: no `'unsafe-inline'` and no `'unsafe-eval'`. The
+      built page loads one module script by its address, and the bundle uses neither `eval` nor
+      `new Function`.
+    * A test finds every `script.src` the admin's source sets and checks the policy allows each
+      one, so a new third-party script fails the build's tests until the policy names it.
+  * **The rest of the policy:**
+    * Styles may be inline, because React's style props and Google's button set them. The tab a
+      document is printed in is the admin's own, and inherits the policy, so styles and fonts
+      from Google Fonts are allowed for the documents' fonts.
+    * Images, media and connections may go to any `https:` address. Photos and files go
+      straight to storage by presigned addresses wherever storage is, and come back from the
+      image route.
+    * Frames may show any `https:` page: the theme editor frames the shop's storefront at its own
+      domain (ADR-325), and Google and Facebook frame their sign-in.
+    * `object-src` and `base-uri` are `'none'`. Forms post only to the admin's origin.
+    * No one may frame the admin (`frame-ancestors 'none'`, and `X-Frame-Options: DENY` for older
+      browsers). Insecure requests are upgraded.
+  * **Other headers on every path:**
+    * HSTS for two years, with subdomains, ready for the preload list.
+    * `nosniff`.
+    * `strict-origin-when-cross-origin`, so the shop's addresses inside the admin never leave as
+      referrers.
+    * `Cross-Origin-Opener-Policy: same-origin-allow-popups`, because Google's and Facebook's
+      sign-in answer from pop-ups the admin opens.
+    * A permissions policy that allows the camera (barcodes and photos) on the admin's origin and
+      nothing else: microphone, location, payment and USB are refused.
+  * **Caching:**
+    * The page and `sw.js` are asked for again every time, so a new build reaches staff at once.
+    * `/assets/*`, named by content, is kept for a year and marked immutable.
+    * The service worker never precaches `_headers`, because ADR-295's rules keep only the
+      admin's own files.
+* **Consequences:**
+  * Script injected into the admin is refused. Checked in Chromium against `vite preview`: the
+    sign-in page renders with no violation, and an inline script added to the page does not run.
+  * A third-party script the admin starts loading needs its address in the policy and in this
+    ADR's test.
+  * `connect-src https:` would let script already running send data anywhere. The policy's
+    guard is that no foreign script runs, not where data goes. Narrowing connections to
+    storage's own origin waits for that origin to be known when the admin is built.
+  * Responses from `/auth` and the Admin API are the core's, and are not documents. The edge's
+    worker that routes them to the core passes them through without these headers.
+* **Alternatives:**
+  * **Nonces on a server-rendered page:** the admin is a static page that the edge and the
+    service worker serve from cache, so there is nothing to put a fresh nonce in. With no inline
+    script, nonces protect nothing more.
+  * **The refresh token in an HTTP-only cookie:** this is ADR-265's other answer. It needs
+    `/auth` to share a site with the admin and CSRF defences on every refresh. The policy keeps
+    foreign script out first. Moving the refresh token into a cookie can still come later.
+  * **A `<meta>` policy in index.html:** a meta tag cannot carry `frame-ancestors`, cannot report
+    violations, and would not cover the service worker's script.
