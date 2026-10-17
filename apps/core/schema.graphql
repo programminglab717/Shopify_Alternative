@@ -4747,6 +4747,21 @@ type Image {
   width: Int!
 }
 
+"""The shape auto-crop frames a product's photos in (CAT-21, ADR-503)."""
+enum ImageAspectRatio {
+  """4:3, wider than tall."""
+  LANDSCAPE_4_3
+
+  """3:4, as clothes are often shown."""
+  PORTRAIT_3_4
+
+  """4:5, taller than wide."""
+  PORTRAIT_4_5
+
+  """1:1, as Instagram and most themes show products."""
+  SQUARE
+}
+
 """
 The part of an image shown (ADR-257), in pixels of the whole image (`ProductMedia.width` and `height`) from its top left.
 """
@@ -5964,6 +5979,23 @@ enum MarketingState {
 
   """Said no, or asked to stop."""
   UNSUBSCRIBED
+}
+
+type MediaAutoCropSkip {
+  mediaId: ID!
+  reason: MediaAutoCropSkipReason!
+}
+
+"""Why auto-crop left a media as it was."""
+enum MediaAutoCropSkipReason {
+  """Its backdrop is not plain, so what is the product in it is a guess."""
+  BUSY_BACKGROUND
+
+  """It is a video, or an image not yet ready."""
+  NOT_A_READY_IMAGE
+
+  """Nothing stands out from its backdrop."""
+  NO_SUBJECT
 }
 
 enum MediaContentType {
@@ -7703,6 +7735,11 @@ type Mutation {
   Sets a sale ahead. One starting now, or a minute from now at most, starts at once; others within a minute of their time.
   """
   priceSaleCreate(input: PriceSaleCreateInput!): PriceSalePayload!
+
+  """
+  Crops a product's photos to the product in each (CAT-21, ADR-503): found against its plain backdrop and framed in the shape asked, with a margin round it, as productUpdateMedia crops. The images given, or all its ready images; one whose backdrop is not plain is left as it is, and said to be. The whole of each image is kept, to be cropped again.
+  """
+  productAutoCropMedia(aspectRatio: ImageAspectRatio! = SQUARE, mediaIds: [ID!], productId: ID!): ProductAutoCropMediaPayload!
 
   """
   Adds tags to up to 250 products (CAT-04). Tags a product has already, in any case, stay as they are; one with too many is refused.
@@ -10663,6 +10700,18 @@ type Product {
 
   """Starts at 1 and increases with every change."""
   version: Int!
+}
+
+type ProductAutoCropMediaPayload {
+  """
+  The images cropped to their product, or shown whole where all of it is its frame.
+  """
+  croppedMediaIds: [ID!]
+  product: Product
+
+  """Those left as they were."""
+  skipped: [MediaAutoCropSkip!]
+  userErrors: [UserError!]!
 }
 
 """Products deleted many at once (CAT-04)."""

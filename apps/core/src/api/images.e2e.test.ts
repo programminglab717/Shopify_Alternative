@@ -343,6 +343,53 @@ describe.skipIf(!server)("Products' images: uploaded or fetched, checked, served
     expect((await get(image.url)).statusCode).toBe(404);
   });
 
+  it("crops a product's photos to the product in a square through the Admin API (CAT-21, ADR-503)", async () => {
+    const product = (
+      await gql(
+        'mutation { productCreate(input: { title: "Chiffon Dupatta" }) { product { id } } }',
+      )
+    ).product;
+    const garment = await sharp({
+      create: { width: 300, height: 400, channels: 3, background: '#7a1f3d' },
+    })
+      .png()
+      .toBuffer();
+    const onSheet = await sharp({
+      create: { width: 1000, height: 800, channels: 3, background: '#f4f4f0' },
+    })
+      .composite([{ input: garment, left: 600, top: 300 }])
+      .jpeg()
+      .toBuffer();
+    const created = await gql(
+      `mutation ($id: ID!, $media: [CreateMediaInput!]!) {
+        productCreateMedia(productId: $id, media: $media) { media { id } userErrors { field } } }`,
+      { id: product.id, media: [{ originalSource: 'https://cdn.example.pk/dupatta.jpg' }] },
+    );
+    const mediaId = created.media[0].id as string;
+    await images({ 'https://cdn.example.pk/dupatta.jpg': onSheet }).process(
+      shop,
+      new Date(Date.now() + 60_000),
+    );
+
+    const cropped = await gql(
+      `mutation ($id: ID!) {
+        productAutoCropMedia(productId: $id) {
+          croppedMediaIds skipped { mediaId reason }
+          product { media { crop { left top width height } image { width height } } }
+          userErrors { field code message } } }`,
+      { id: product.id },
+    );
+    expect(cropped).toMatchObject({ croppedMediaIds: [mediaId], skipped: [], userErrors: [] });
+    const { crop, image } = cropped.product.media[0];
+    // The dupatta 300 × 400 at (600, 300), a margin of 32 round it, made square: 464 a side,
+    // as far down as the photo goes.
+    expect(crop.width).toBe(crop.height);
+    expect(Math.abs(crop.width - 464)).toBeLessThanOrEqual(8);
+    expect(Math.abs(crop.left - 518)).toBeLessThanOrEqual(8);
+    expect(crop.top + crop.height).toBeLessThanOrEqual(800);
+    expect(image).toEqual({ width: crop.width, height: crop.height });
+  });
+
   it("takes a product's videos, uploaded or YouTube's, and plays an uploaded one a range at a time (ADR-258)", async () => {
     const product = (
       await gql(

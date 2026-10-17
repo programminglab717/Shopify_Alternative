@@ -24,6 +24,7 @@ import { useAdminMutation } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { TextField } from '../ui/field';
 import { Alert } from '../ui/feedback';
+import { AutoCrop } from './auto-crop';
 import { FormSection, problemText } from './product-form';
 
 /** The types the core takes for an image (ADR-079). */
@@ -395,6 +396,9 @@ export function ProductPhotos({ product, edits }: { product: ProductDetail; edit
             ))}
           </ul>
         </Alert>
+      )}
+      {edits && images.some((media) => media.status === 'READY') && (
+        <AutoCrop productId={product.id} />
       )}
       {edits && (
         <>

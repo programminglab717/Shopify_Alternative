@@ -88,6 +88,14 @@ function photosCore() {
         };
       case 'ProductReorderMedia':
         return { productReorderMedia: { userErrors: [] } };
+      case 'ProductAutoCropMedia':
+        return {
+          productAutoCropMedia: {
+            croppedMediaIds: ['media_1'],
+            skipped: [{ mediaId: 'media_2', reason: 'BUSY_BACKGROUND' }],
+            userErrors: [],
+          },
+        };
       default:
         throw new Error(`unexpected ${operation}`);
     }
@@ -184,6 +192,23 @@ describe("A product's photos", () => {
     ).toEqual({
       productId: 'prod_1',
       media: [{ id: 'media_2', alt: 'Blue and red ajrak, folded' }],
+    });
+  });
+
+  it('crops the photos to the product in the shape chosen, saying which it left (CAT-21)', async () => {
+    const core = photosCore();
+    vi.stubGlobal('fetch', core.fetcher);
+    renderAdmin('/shop_1/products/prod_1');
+
+    fireEvent.change(await screen.findByLabelText('Shape'), {
+      target: { value: 'PORTRAIT_3_4' },
+    });
+    await press('Crop to the product');
+    expect(await screen.findByText('Cropped 1 photos.')).toBeTruthy();
+    expect(screen.getByText('1 left as they were: their background is not plain.')).toBeTruthy();
+    expect(core.sent.find((each) => each.operation === 'ProductAutoCropMedia')?.variables).toEqual({
+      productId: 'prod_1',
+      aspectRatio: 'PORTRAIT_3_4',
     });
   });
 });

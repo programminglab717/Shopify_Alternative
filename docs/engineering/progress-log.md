@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Auto-crop
+
+* **A product's photos are cropped to the product against a plain backdrop, in the shape asked,
+  through the crops a shop makes, leaving busy photos** ([ADR-503](../architecture/13-decision-log.md#adr-503--auto-crop-a-products-photos-cropped-to-the-product-against-a-plain-backdrop-in-the-shape-asked-through-the-crops-a-shop-makes-leaving-busy-photos), CAT-21 in part).
+* 3123 tests, 6 more: the subject found and framed, the catalog's
+  crops, the Admin API, and the admin's photos card.
+
 ### ccf4e32 · The store builder
 
 * **A shop is set up from a few lines saying what it sells: its kit, theme colour, About us page

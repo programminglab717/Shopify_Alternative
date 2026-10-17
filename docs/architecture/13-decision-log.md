@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-502 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-503 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -510,6 +510,7 @@
 | 500 | The shop's tax profile: its province, filer status and Tier-1 kept with its tax settings, and the admin guiding it through what an online seller must register | Accepted |
 | 501 | Products from a shop's Instagram posts: productsImport reads its posts as Instagram gives them, each a draft product made of what its caption says | Accepted |
 | 502 | The store builder: a shop set up from a few lines saying what it sells, its kit, theme colour, About us page and home page SEO, leaving what it set | Accepted |
+| 503 | Auto-crop: a product's photos cropped to the product against a plain backdrop, in the shape asked, through the crops a shop makes, leaving busy photos | Accepted |
 
 ---
 
@@ -18991,3 +18992,42 @@
     already say, and a page in words the owner didn't write.
   * **Overwriting what the shop set:** a store built from two lines must not undo the work of a
     shop that has more than two lines' worth.
+
+## ADR-503 · Auto-crop: a product's photos cropped to the product against a plain backdrop, in the shape asked, through the crops a shop makes, leaving busy photos
+
+* **Context:** Most of a small shop's photos show a product on a sheet or a wall. They are taken
+  from too far, off centre, in whatever shape the phone made. A grid of them looks untidy beside
+  a brand's. Cropping each by hand (ADR-257) takes a minute a photo (CAT-21).
+* **Decision:**
+  * **`productAutoCropMedia(productId, aspectRatio, mediaIds)`** crops the product's photos to
+    the product in each. It takes the photos given, or all its ready images, in one of four
+    shapes: square (the default), 4:5, 3:4 or 4:3.
+  * **The product is found on a copy at most 256 pixels a side.**
+    * The backdrop is the colour of most of the photo's border: each channel's median, which a
+      corner's shadow doesn't move.
+    * If less than 85% of the border is within 40 of that colour, the photo is not on a plain
+      backdrop. It is left as it is, as `BUSY_BACKGROUND`.
+    * The product is the bounds of the rows and columns at least 1% of which differ from the
+      backdrop, so dust is not the product. A photo with none is `NO_SUBJECT`.
+  * **The frame:**
+    * The product plus a margin of 8% of its longer side, widened or heightened to the shape and
+      centred on the product.
+    * Where that is larger than the photo, the frame is as large as the photo allows. It is
+      moved to stay within the photo.
+    * A frame that is the whole photo leaves it whole.
+  * **The crops go through `productUpdateMedia`'s path:** checked, their clean copy made and
+    kept beside the whole image's, the product's version bumped. The whole photo is kept, to be
+    cropped again, by hand or in another shape. A crop the shop made is replaced.
+  * The admin's product photos card has a shape and "Crop to the product". It then says how many
+    photos were cropped and how many were left, and why.
+* **Consequences:**
+  * Background removal and lifestyle backgrounds wait for an image model behind the AI gateway.
+    The other half of CAT-21's V1 is not done.
+  * A product the colour of its backdrop, white kurta on a white sheet, is found in part or not
+    at all. The shop crops that one by hand.
+* **Alternatives:**
+  * **libvips's own trim:** it takes the top-left pixel as the backdrop. A shadow there trims
+    nothing, and a busy photo is trimmed to nonsense rather than refused.
+  * **A model finding the product:** a call per photo for what a plain backdrop already tells.
+  * **Padding photos to the shape:** that needs a new image made, with a colour that matches. A
+    crop keeps the photo the shop took.

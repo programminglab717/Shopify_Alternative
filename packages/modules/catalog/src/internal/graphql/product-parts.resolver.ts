@@ -9,6 +9,8 @@ import { VariantService } from '../variant.service.js';
 import { optionalUuidOf, toProduct, toUserErrors, uuidOf } from './mappers.js';
 import {
   CreateMediaInput,
+  ImageAspectRatio,
+  ProductAutoCropMediaPayload,
   MoveInput,
   ProductCreateMediaPayload,
   ProductDeleteMediaPayload,
@@ -22,6 +24,7 @@ import {
   ProductVariantsBulkUpdateInput,
   ProductVariantsStrategy,
   UpdateMediaInput,
+  type MediaAutoCropSkipReason,
   type Product,
 } from './product.types.js';
 
@@ -230,6 +233,40 @@ export class ProductPartsResolver {
       media.map((item) => ({ ...item, id: uuidOf('media', item.id) })),
     );
     return productPayload(result, tenant);
+  }
+
+  @Mutation(() => ProductAutoCropMediaPayload, {
+    description:
+      "Crops a product's photos to the product in each (CAT-21, ADR-503): found against its " +
+      'plain backdrop and framed in the shape asked, with a margin round it, as productUpdateMedia ' +
+      'crops. The images given, or all its ready images; one whose backdrop is not plain is left ' +
+      'as it is, and said to be. The whole of each image is kept, to be cropped again.',
+  })
+  @RequireScopes('write_products')
+  async productAutoCropMedia(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('productId', { type: () => ID }) productId: string,
+    @Args('aspectRatio', { type: () => ImageAspectRatio, defaultValue: ImageAspectRatio.SQUARE })
+    aspectRatio: ImageAspectRatio,
+    @Args('mediaIds', { type: () => [ID], nullable: true }) mediaIds?: string[] | null,
+  ): Promise<ProductAutoCropMediaPayload> {
+    const result = await this.media.autoCrop(tenant, uuidOf('product', productId), {
+      aspect: aspectRatio,
+      mediaIds: mediaIds?.map((id) => uuidOf('media', id)) ?? null,
+    });
+    return Object.assign(new ProductAutoCropMediaPayload(), {
+      croppedMediaIds: result.ok
+        ? result.value.croppedIds.map((id) => toPublicId('media', id))
+        : null,
+      skipped: result.ok
+        ? result.value.skipped.map((skip) => ({
+            mediaId: toPublicId('media', skip.id),
+            reason: skip.reason as MediaAutoCropSkipReason,
+          }))
+        : null,
+      product: result.ok ? toProduct(result.value.product, tenant.currency) : null,
+      userErrors: result.ok ? [] : toUserErrors(result.errors),
+    });
   }
 
   @Mutation(() => ProductDeleteMediaPayload, {

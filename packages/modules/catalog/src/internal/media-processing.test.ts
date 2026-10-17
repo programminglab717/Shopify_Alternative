@@ -7,7 +7,7 @@ import { newId } from '@hatti/ids';
 import { LocalStorage } from '@hatti/storage';
 import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { cleanImageKey, imagePathOf, parseImagePath, shownSizeOf } from './images.js';
+import { cleanImageKey, cropNameOf, imagePathOf, parseImagePath, shownSizeOf } from './images.js';
 import { MediaProcessing } from './media-processing.js';
 import { MediaService } from './media.service.js';
 import { catalogFixture, errorsOf, unwrap, type CatalogFixture } from './test-support.js';
@@ -303,6 +303,80 @@ describe.skipIf(!server)('product images (ADR-158)', () => {
       expect(errorsOf(await media.update(f.b, kurta.id, [{ id: front!, crop: null }]))).toEqual([
         ['productId', 'NOT_FOUND'],
       ]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('crops photos to their product against a plain backdrop, leaving busy ones (CAT-21, ADR-503)', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'hatti-autocrop-'));
+    try {
+      const storage = new LocalStorage({
+        directory,
+        baseUrl: 'http://localhost:4000/storage',
+        secret: 'a'.repeat(32),
+      });
+      const media = new MediaService(f.db, storage);
+      const kurta = await product(f.a, 'Lawn Kurta', 3);
+      const [onSheet, busy, waiting] = kurta.mediaIds;
+      // A kurta 300 × 400 on a sheet, off centre; and a photo with no plain backdrop.
+      const garment = await sharp({
+        create: { width: 300, height: 400, channels: 3, background: '#3B2F5C' },
+      })
+        .png()
+        .toBuffer();
+      const sheet = await sharp({
+        create: { width: 1000, height: 800, channels: 3, background: '#F2F0EC' },
+      })
+        .composite([{ input: garment, left: 150, top: 200 }])
+        .jpeg({ quality: 90 })
+        .toBuffer();
+      const raw = Buffer.alloc(400 * 300 * 3);
+      for (let at = 0; at < 400 * 300; at++) raw[at * 3] = Math.round((255 * (at % 400)) / 400);
+      const street = await sharp(raw, { raw: { width: 400, height: 300, channels: 3 } })
+        .jpeg()
+        .toBuffer();
+      await processing.claim(f.a.shopId, now, 2, LEASE);
+      for (const [id, body, width, height] of [
+        [onSheet!, sheet, 1000, 800],
+        [busy!, street, 400, 300],
+      ] as const) {
+        await storage.put(cleanImageKey(f.a.shopId, id, 'jpeg'), body, 'image/jpeg');
+        await processing.ready(f.a.shopId, id, {
+          format: 'jpeg',
+          width,
+          height,
+          size: body.length,
+        });
+      }
+
+      const result = unwrap(await media.autoCrop(f.a, kurta.id, { aspect: 'square' }));
+      expect(result.croppedIds).toEqual([onSheet]);
+      expect(result.skipped).toEqual([{ id: busy, reason: 'BUSY_BACKGROUND' }]);
+      const crop = result.product.media.find((each) => each.id === onSheet)!.crop!;
+      expect(crop.width).toBe(crop.height);
+      expect(Math.abs(crop.left - 68)).toBeLessThanOrEqual(8);
+      expect(Math.abs(crop.top - 168)).toBeLessThanOrEqual(8);
+      expect(
+        await storage.head(cleanImageKey(f.a.shopId, onSheet!, 'jpeg', cropNameOf(crop))),
+      ).not.toBeNull();
+
+      // Asked by name: one not ready is said to be; another shape replaces the crop.
+      const again = unwrap(
+        await media.autoCrop(f.a, kurta.id, {
+          aspect: 'portrait_3_4',
+          mediaIds: [onSheet!, waiting!],
+        }),
+      );
+      expect(again.skipped).toEqual([{ id: waiting, reason: 'NOT_A_READY_IMAGE' }]);
+      const tall = again.product.media.find((each) => each.id === onSheet)!.crop!;
+      expect(Math.abs(tall.width / tall.height - 0.75)).toBeLessThan(0.01);
+      expect(
+        errorsOf(await media.autoCrop(f.a, kurta.id, { aspect: 'square', mediaIds: [newId()] })),
+      ).toEqual([['mediaIds.0', 'NOT_FOUND']]);
+      expect(
+        errorsOf(await media.autoCrop(f.a, kurta.id, { aspect: 'square', mediaIds: [waiting!] })),
+      ).toEqual([['mediaIds', 'INVALID']]);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

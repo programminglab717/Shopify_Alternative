@@ -43,3 +43,13 @@ export {
   type VideoProblem,
   type VideoProblemCode,
 } from './videos.js';
+export {
+  ASPECT_RATIOS,
+  SUBJECT_LIMITS,
+  frame,
+  subjectBox,
+  subjectCrop,
+  type AspectRatio,
+  type SubjectCrop,
+  type SubjectProblem,
+} from './subject.js';

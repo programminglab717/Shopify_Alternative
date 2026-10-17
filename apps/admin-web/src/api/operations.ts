@@ -1363,6 +1363,23 @@ export const ProductUpdateMediaMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+/** A product's photos cropped to the product in each, in the shape asked (CAT-21, ADR-503). */
+export const ProductAutoCropMediaMutation = /* GraphQL */ `
+  mutation ProductAutoCropMedia($productId: ID!, $aspectRatio: ImageAspectRatio!) {
+    productAutoCropMedia(productId: $productId, aspectRatio: $aspectRatio) {
+      croppedMediaIds
+      skipped {
+        mediaId
+        reason
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
 /** A photo moved, to be the product's first: the one its listings show. */
 export const ProductReorderMediaMutation = /* GraphQL */ `
   mutation ProductReorderMedia($productId: ID!, $moves: [MoveInput!]!) {

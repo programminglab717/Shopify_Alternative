@@ -583,6 +583,18 @@ export interface ProductReorderMediaData {
   productReorderMedia: { userErrors: UserError[] };
 }
 
+/** The shape auto-crop frames a product's photos in (CAT-21, ADR-503). */
+export type ImageAspectRatio = 'SQUARE' | 'PORTRAIT_4_5' | 'PORTRAIT_3_4' | 'LANDSCAPE_4_3';
+
+export interface ProductAutoCropMediaData {
+  productAutoCropMedia: {
+    croppedMediaIds: string[] | null;
+    skipped:
+      { mediaId: string; reason: 'BUSY_BACKGROUND' | 'NO_SUBJECT' | 'NOT_A_READY_IMAGE' }[] | null;
+    userErrors: UserError[];
+  };
+}
+
 export type BlocklistReason = 'FRAUD' | 'FAKE_ORDERS' | 'REFUSED_DELIVERIES' | 'ABUSE' | 'OTHER';
 
 export interface CustomerListItem {

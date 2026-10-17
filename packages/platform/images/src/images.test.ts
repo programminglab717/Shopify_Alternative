@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { MAX_IMAGE_SIDE, cleanImage, cropImage } from './clean.js';
 import { ImageFetcher } from './fetch.js';
 import { sniffImage } from './formats.js';
+import { frame, subjectCrop } from './subject.js';
 import { IMAGE_WIDTHS, formatFor, imageVariant, widthFor } from './variants.js';
 import { MAX_VIDEO_BYTES, cleanVideo } from './videos.js';
 
@@ -188,6 +189,75 @@ describe('crops', () => {
       40,
       true,
     ]);
+  });
+});
+
+describe('auto-crop (CAT-21, ADR-503)', () => {
+  /** A product photographed on a sheet: a dark kurta 300 × 400 off centre, a speck of dust. */
+  async function onASheet(): Promise<Buffer> {
+    const kurta = await sharp({
+      create: { width: 300, height: 400, channels: 3, background: '#3B2F5C' },
+    })
+      .png()
+      .toBuffer();
+    const dust = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: '#000000' },
+    })
+      .png()
+      .toBuffer();
+    return sharp({ create: { width: 1000, height: 800, channels: 3, background: '#F2F0EC' } })
+      .composite([
+        { input: kurta, left: 150, top: 200 },
+        { input: dust, left: 900, top: 60 },
+      ])
+      .jpeg({ quality: 90 })
+      .toBuffer();
+  }
+
+  const near = (crop: object | null, expected: Record<string, number>) => {
+    expect(crop).not.toBeNull();
+    for (const [side, value] of Object.entries(expected)) {
+      expect(Math.abs((crop as Record<string, number>)[side]! - value)).toBeLessThanOrEqual(8);
+    }
+  };
+
+  it('frames the product found against a plain backdrop in the shape asked, with a margin', async () => {
+    const photo = await onASheet();
+    // Its longer side 400, a margin of 32 round it: 364 × 464, made square, on its centre.
+    const square = await subjectCrop(photo, 'square');
+    if (!square.ok) throw new Error(square.problem);
+    near(square.crop, { left: 68, top: 168, width: 464, height: 464 });
+    const portrait = await subjectCrop(photo, 'portrait_4_5');
+    if (!portrait.ok) throw new Error(portrait.problem);
+    near(portrait.crop, { left: 114, top: 168, width: 371, height: 464 });
+  });
+
+  it('frames as much as the image has where the product is too large, and leaves busy photos', async () => {
+    // Too tall for a square of its own: the image's height, across its centre.
+    expect(
+      frame(
+        { left: 300, top: 20, width: 200, height: 560 },
+        { width: 800, height: 600 },
+        { width: 1, height: 1 },
+      ),
+    ).toEqual({ left: 100, top: 0, width: 600, height: 600 });
+    // Where that is the whole image, nothing to crop.
+    expect(
+      frame(
+        { left: 40, top: 40, width: 520, height: 520 },
+        { width: 600, height: 600 },
+        { width: 1, height: 1 },
+      ),
+    ).toBeNull();
+    // A photo with no plain backdrop, and one with nothing on it.
+    const busy = await (await photo(400, 300)).toBuffer();
+    expect(await subjectCrop(busy, 'square')).toEqual({ ok: false, problem: 'BUSY_BACKGROUND' });
+    const blank = await sharp({
+      create: { width: 400, height: 300, channels: 3, background: '#ffffff' },
+    })
+      .jpeg()
+      .toBuffer();
+    expect(await subjectCrop(blank, 'square')).toEqual({ ok: false, problem: 'NO_SUBJECT' });
   });
 });
 

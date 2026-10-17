@@ -1,7 +1,14 @@
 import type { TenantContext } from '@hatti/api';
 import { Database, type Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
-import { CONTENT_TYPES, MAX_ASPECT_RATIO, cropImage } from '@hatti/images';
+import {
+  CONTENT_TYPES,
+  MAX_ASPECT_RATIO,
+  cropImage,
+  subjectCrop,
+  type AspectRatio,
+  type SubjectProblem,
+} from '@hatti/images';
 import { ObjectStorage } from '@hatti/storage';
 import { Injectable, Optional } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
@@ -50,6 +57,16 @@ export interface MediaUpdateInput {
 
 /** The fewest pixels a side of a crop may have. */
 export const CROP_MIN_SIDE = 16;
+
+/** Why auto-crop left a media as it was (ADR-503). */
+export type AutoCropSkipValue = SubjectProblem | 'NOT_A_READY_IMAGE';
+
+export interface AutoCropResult {
+  product: ProductRecord;
+  /** The images cropped to their product, or shown whole where all of each is its frame. */
+  croppedIds: string[];
+  skipped: { id: string; reason: AutoCropSkipValue }[];
+}
 
 export interface MediaMove {
   id: string;
@@ -205,6 +222,64 @@ export class MediaService {
       await productChanged(tx, tenant, productId, ['media']);
       return { ok: true, value: (await loadProduct(tx, tenant.shopId, productId))! };
     });
+  }
+
+  /**
+   * Crops a product's images to the product in each (CAT-21, ADR-503): found against its plain
+   * backdrop and framed in `aspect`, with a margin round it, through {@link update}, as a crop the
+   * shop made would be. The images given, or all of its ready images; one whose backdrop is not
+   * plain, or which shows nothing, is left as it is and said to be.
+   */
+  async autoCrop(
+    tenant: TenantContext,
+    productId: string,
+    input: { aspect: AspectRatio; mediaIds?: readonly string[] | null },
+  ): Promise<MutationResult<AutoCropResult>> {
+    const product = await this.db.tenant(tenant.shopId, (tx) =>
+      loadProduct(tx, tenant.shopId, productId),
+    );
+    if (!product) return failOne(['productId'], 'NOT_FOUND', 'Product not found');
+    const known = new Map(product.media.map((media) => [media.id, media]));
+    const check = new InputChecker();
+    input.mediaIds?.forEach((id, index) => {
+      if (!known.has(id)) {
+        check.addMessage(['mediaIds', String(index)], 'NOT_FOUND', 'The product has no such media');
+      }
+    });
+    if (!check.ok) return fail(check.errors);
+    const ready = (media: MediaRecord) =>
+      media.mediaType === 'image' && media.status === 'ready' && media.imageFormat !== null;
+    const chosen = input.mediaIds
+      ? [...new Set(input.mediaIds)].map((id) => known.get(id)!)
+      : product.media.filter(ready);
+    if (!chosen.some(ready)) {
+      return failOne(['mediaIds'], 'INVALID', 'The product has no ready image to crop');
+    }
+    if (!this.storage) {
+      return failOne(['mediaIds'], 'INVALID', 'The images could not be read just now: try again');
+    }
+
+    const crops: MediaUpdateInput[] = [];
+    const skipped: AutoCropResult['skipped'] = [];
+    for (const media of chosen) {
+      const whole =
+        ready(media) &&
+        (await this.storage.read(cleanImageKey(tenant.shopId, media.id, media.imageFormat!)));
+      if (!whole) {
+        skipped.push({ id: media.id, reason: 'NOT_A_READY_IMAGE' });
+        continue;
+      }
+      const found = await subjectCrop(whole.body, input.aspect);
+      if (found.ok) crops.push({ id: media.id, crop: found.crop });
+      else skipped.push({ id: media.id, reason: found.problem });
+    }
+    if (crops.length === 0) return { ok: true, value: { product, croppedIds: [], skipped } };
+    const updated = await this.update(tenant, productId, crops);
+    if (!updated.ok) return updated;
+    return {
+      ok: true,
+      value: { product: updated.value, croppedIds: crops.map((crop) => crop.id), skipped },
+    };
   }
 
   /** Deletes media; variants showing them show none. */

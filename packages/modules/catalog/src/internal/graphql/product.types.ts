@@ -995,6 +995,70 @@ export class ProductCreateMediaPayload {
   userErrors!: UserError[];
 }
 
+export enum ImageAspectRatio {
+  SQUARE = 'square',
+  PORTRAIT_4_5 = 'portrait_4_5',
+  PORTRAIT_3_4 = 'portrait_3_4',
+  LANDSCAPE_4_3 = 'landscape_4_3',
+}
+
+registerEnumType(ImageAspectRatio, {
+  name: 'ImageAspectRatio',
+  description: "The shape auto-crop frames a product's photos in (CAT-21, ADR-503).",
+  valuesMap: {
+    SQUARE: { description: '1:1, as Instagram and most themes show products.' },
+    PORTRAIT_4_5: { description: '4:5, taller than wide.' },
+    PORTRAIT_3_4: { description: '3:4, as clothes are often shown.' },
+    LANDSCAPE_4_3: { description: '4:3, wider than tall.' },
+  },
+});
+
+export enum MediaAutoCropSkipReason {
+  BUSY_BACKGROUND = 'BUSY_BACKGROUND',
+  NO_SUBJECT = 'NO_SUBJECT',
+  NOT_A_READY_IMAGE = 'NOT_A_READY_IMAGE',
+}
+
+registerEnumType(MediaAutoCropSkipReason, {
+  name: 'MediaAutoCropSkipReason',
+  description: 'Why auto-crop left a media as it was.',
+  valuesMap: {
+    BUSY_BACKGROUND: {
+      description: 'Its backdrop is not plain, so what is the product in it is a guess.',
+    },
+    NO_SUBJECT: { description: 'Nothing stands out from its backdrop.' },
+    NOT_A_READY_IMAGE: { description: 'It is a video, or an image not yet ready.' },
+  },
+});
+
+@ObjectType()
+export class MediaAutoCropSkip {
+  @Field(() => ID)
+  mediaId!: string;
+
+  @Field(() => MediaAutoCropSkipReason)
+  reason!: MediaAutoCropSkipReason;
+}
+
+@ObjectType()
+export class ProductAutoCropMediaPayload {
+  @Field(() => [ID], {
+    nullable: true,
+    description:
+      'The images cropped to their product, or shown whole where all of it is its frame.',
+  })
+  croppedMediaIds!: string[] | null;
+
+  @Field(() => [MediaAutoCropSkip], { nullable: true, description: 'Those left as they were.' })
+  skipped!: MediaAutoCropSkip[] | null;
+
+  @Field(() => Product, { nullable: true })
+  product!: Product | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
 @ObjectType()
 export class ProductDeleteMediaPayload {
   @Field(() => [ID], { nullable: true })
