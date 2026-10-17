@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### TikTok's Events API
+### ba46ee5 · TikTok's Events API
 
 * **Orders placed through checkout go to TikTok's Events API from the worker beside Meta's**
   ([ADR-541](../architecture/13-decision-log.md#adr-541--orders-placed-through-checkout-go-to-tiktoks-events-api-from-the-worker-beside-metas-the-shop-connecting-its-tiktok-pixel-with-a-token-each-moment-waiting-in-postgres-as-metas-do), MKT-10), the shop connecting its TikTok pixel with a token; **the admin's online
