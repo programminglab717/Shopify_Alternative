@@ -147,6 +147,19 @@ describe.skipIf(!server)('Admin GraphQL API: couriers and bookings', () => {
         test: false,
       },
       {
+        courier: 'tcs',
+        name: 'TCS',
+        credentials: [
+          { key: 'clientId', label: 'API client ID' },
+          { key: 'userName', label: 'User name' },
+          { key: 'password', label: 'Password' },
+          { key: 'costCenterCode', label: 'Cost centre code' },
+          { key: 'originCity', label: 'City you ship from' },
+        ],
+        pickupCode: 'Cost centre code',
+        test: false,
+      },
+      {
         courier: 'test',
         name: 'Test courier',
         credentials: [{ key: 'key', label: 'Any key' }],

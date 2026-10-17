@@ -592,6 +592,7 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         production: config.NODE_ENV === 'production',
         postexUrl: config.POSTEX_URL,
         leopardsUrl: config.LEOPARDS_URL,
+        tcsUrl: config.TCS_URL,
       });
       const courierAccounts = new CourierAccountService(database, config.ENCRYPTION_KEYS, couriers);
       const bookings = new CourierBookings({

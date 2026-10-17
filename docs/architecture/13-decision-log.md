@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-508 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-509 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -516,6 +516,7 @@
 | 506 | Push notifications for staff: Web Push to the browsers each member turns on, for the news their role does, encrypted and signed with node's crypto, once each | Accepted |
 | 507 | Camera-first products: a product added from a photo, its copy drafted by the AI from the photos themselves, made small for the model, and squared to the product | Accepted |
 | 508 | Local support: each plan's way to reach Hatti's people, requests from the admin kept for them and answered with a command, and a help centre in English and Urdu | Accepted |
+| 509 | TCS, the third courier: bookings, tracking, cancellations and cities through its COD API, with the shop's own account and the city it ships from | Accepted |
 
 ---
 
@@ -19320,3 +19321,47 @@
     carries the shop and its plan without asking.
   * **Answering from an internal web tool:** Hatti's people answer transfers and reports with
     commands already, and a web tool for Hatti's own people is its own project.
+
+## ADR-509 · TCS, the third courier: bookings, tracking, cancellations and cities through its COD API, with the shop's own account and the city it ships from
+
+* **Context:** TCS is Pakistan's largest courier by network, and many shops already hold an
+  account with it. SHP-01 names PostEx, Leopards, TCS and Trax for the MVP. PostEx (ADR-149) and
+  Leopards (ADR-162) were behind the courier adapter interface, and TCS was not.
+* **Decision:**
+  * **`TcsCourier` implements the adapter interface** against TCS's COD API
+    (`api.tcscourier.com/production/v1/cod`, `TCS_URL` to point elsewhere):
+    * Shops connect their own account with five credentials: the API client ID, user name,
+      password, cost centre code and the city they ship from.
+    * The client ID goes in the `X-IBM-Client-Id` header. The user name and password go in each
+      request's body, never in an address.
+    * A booking sends the parcel from the account's city to the city as TCS's list names it,
+      overnight. It carries the weight in kilograms (half a kilo where none is known), the cash
+      to collect in whole rupees with paisa rounded up, the order's name as the reference, and
+      what is in the parcel.
+    * A pickup code, where the shop gives one, is another cost centre of the same account.
+    * TCS's consignment number, which it reports only in a sentence ("Your generated CN is:
+      …"), is read from the end of that sentence. A booking without one is refused rather than
+      kept without a tracking number.
+    * Tracking asks about each parcel in turn and takes its delivery status, else the latest of
+      its checkpoints. A parcel TCS does not know is left out. TCS refusing the account, or not
+      answering, stops the round.
+    * Cancelling uses `cancel-order`. The cities TCS delivers to are listed once a day for
+      matching parcels' cities (ADR-233), and the last list is kept while TCS cannot give one.
+  * **TCS's statuses map to Hatti's** through `logistics.courier_statuses` (migration 0239), as
+    for the other couriers. A status no row names waits as one on its way.
+  * **No pickups or load sheets through the API:** TCS takes them through its own portal and
+    riders. `pickups` is null, so the admin offers none for TCS.
+* **Consequences:**
+  * Shops with a TCS account book, track and cancel from Hatti as with PostEx and Leopards.
+    Courier rules (ADR-382) and rate cards (ADR-383) take TCS accounts like any other.
+  * The adapter follows TCS's published API documentation and is tested against a stand-in.
+    It must be tried against TCS's sandbox with a real account before shops rely on it, and
+    statuses TCS says that no row maps need rows added as they are seen.
+  * The city a shop ships from is a credential, typed by staff. A city TCS does not know refuses
+    the booking with TCS's own message.
+* **Alternatives:**
+  * **TCS's newer token API:** it needs an OAuth client registered per merchant and is not yet
+    offered to most accounts. The COD API is what TCS gives merchants today, and the adapter can
+    change behind the same interface.
+  * **Trax in the same change:** Trax's API is a different shape, and one courier per change
+    keeps each reviewable. Trax follows.

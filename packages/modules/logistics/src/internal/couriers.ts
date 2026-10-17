@@ -717,6 +717,234 @@ function errorText(error: unknown): string {
   return '';
 }
 
+/** TCS's COD API; its sandbox is at api.tcscourier.com/sandbox/v1/cod. */
+export const TCS_API_URL = 'https://api.tcscourier.com/production/v1/cod';
+
+export interface TcsOptions {
+  /** {@link TCS_API_URL}, unless a test or TCS's sandbox says otherwise. */
+  baseUrl?: string;
+  /** How long a request may take; fifteen seconds unless given. */
+  timeoutMs?: number;
+}
+
+/** What TCS answers every request with: `returnStatus.status` SUCCESS when it did what was asked. */
+interface TcsAnswer {
+  returnStatus?: { status?: string; message?: string; code?: string | number };
+  bookingReply?: { result?: string };
+  TrackDetailReply?: {
+    DeliveryInfo?: { status?: string; dateTime?: string }[] | null;
+    Checkpoints?: { status?: string; dateTime?: string }[] | null;
+  } | null;
+  allCities?: { cityName?: string; cityID?: number | string }[] | null;
+}
+
+/** What a parcel without a weight is booked as: TCS's first half kilo. */
+const TCS_DEFAULT_GRAMS = 500;
+
+/**
+ * TCS (https://api.tcscourier.com): the account's client ID goes in a header, its user name,
+ * password and cost centre in each request's body, never in an address. A booking names the city
+ * it ships from, the account's, and the city it goes to, as TCS's list of cities names them;
+ * TCS's own number for the parcel, its consignment number, is read from what it says it made.
+ * Tracking asks for each parcel in turn, and TCS's API takes no load sheets.
+ */
+export class TcsCourier implements CourierAdapter {
+  readonly info: CourierInfo = {
+    courier: 'tcs',
+    name: 'TCS',
+    credentials: [
+      { key: 'clientId', label: 'API client ID' },
+      { key: 'userName', label: 'User name' },
+      { key: 'password', label: 'Password' },
+      { key: 'costCenterCode', label: 'Cost centre code' },
+      { key: 'originCity', label: 'City you ship from' },
+    ],
+    pickupCode: 'Cost centre code',
+    pickups: null,
+    test: false,
+  };
+
+  /** TCS's cities, with when they were asked for; and when they last could not be had. */
+  #cities: { at: number; names: string[] } | null = null;
+  #citiesFailed: { at: number; answer: CourierResult<never> } | null = null;
+
+  constructor(private readonly options: TcsOptions = {}) {}
+
+  /**
+   * The cities TCS delivers to, from its list (ADR-233), asked for once a day; those it gave last
+   * are kept while it cannot give them, and it is asked again no sooner than five minutes after
+   * it could not.
+   */
+  async cities(credentials: CourierCredentials): Promise<CourierResult<string[]>> {
+    const now = Date.now();
+    const kept = this.#cities;
+    if (kept && now - kept.at <= COURIER_CITIES_TTL_MS) return { ok: true, value: kept.names };
+    let failed = this.#citiesFailed;
+    if (!failed || now - failed.at > COURIER_CITIES_RETRY_MS) {
+      const listed = await this.#cityList(credentials);
+      if (listed.ok) {
+        this.#cities = { at: now, names: listed.value };
+        this.#citiesFailed = null;
+        return listed;
+      }
+      failed = this.#citiesFailed = { at: now, answer: listed };
+    }
+    return kept ? { ok: true, value: kept.names } : failed.answer;
+  }
+
+  async book(
+    credentials: CourierCredentials,
+    shipment: CourierShipment,
+  ): Promise<CourierResult<{ trackingNumber: string }>> {
+    const grams =
+      shipment.weightGrams !== null && shipment.weightGrams > 0
+        ? shipment.weightGrams
+        : TCS_DEFAULT_GRAMS;
+    const { answer } = await this.#call(credentials, 'POST', 'create-order', {
+      ...this.#signed(credentials),
+      costCenterCode: shipment.pickupCode?.trim() || (credentials.costCenterCode ?? ''),
+      consigneeName: shipment.customerName,
+      consigneeAddress: shipment.address,
+      consigneeMobNo: shipment.customerPhone,
+      consigneeEmail: '',
+      originCityName: credentials.originCity ?? '',
+      destinationCityName: shipment.city,
+      // Kilograms, to the gram.
+      weight: Math.ceil(grams) / 1_000,
+      pieces: shipment.pieces,
+      // Whole rupees, as riders collect them: paisa round up.
+      codAmount: String((shipment.codAmount + 99n) / 100n),
+      customerReferenceNo: shipment.reference,
+      // Overnight, TCS's service for parcels.
+      services: 'O',
+      productDetails: shipment.contents,
+      fragile: 'No',
+      remarks: '',
+      insuranceValue: 0,
+    });
+    if (!answer.ok) return answer;
+    // TCS says what it made in words: "Your generated CN is: 779404061230".
+    const trackingNumber = /(\d{6,})\s*$/.exec(answer.value.bookingReply?.result ?? '')?.[1];
+    if (!trackingNumber) {
+      return { ok: false, retry: false, message: 'TCS booked the parcel without a CN' };
+    }
+    return { ok: true, value: { trackingNumber } };
+  }
+
+  async track(
+    credentials: CourierCredentials,
+    trackingNumbers: readonly string[],
+  ): Promise<CourierResult<CourierTracking[]>> {
+    const tracked: CourierTracking[] = [];
+    for (const trackingNumber of trackingNumbers) {
+      const { answer, status } = await this.#call(
+        credentials,
+        'GET',
+        `track-order?consignmentNo=${encodeURIComponent(trackingNumber)}`,
+      );
+      if (!answer.ok) {
+        // TCS not answering, or refusing the account, stops the round; a parcel it does not know
+        // is left out.
+        if (answer.retry || status === 401 || status === 403) return answer;
+        continue;
+      }
+      const reply = answer.value.TrackDetailReply;
+      const said = latest(reply?.DeliveryInfo) ?? latest(reply?.Checkpoints);
+      if (said) tracked.push({ trackingNumber, status: said.slice(0, 200) });
+    }
+    return { ok: true, value: tracked };
+  }
+
+  async cancel(
+    credentials: CourierCredentials,
+    trackingNumber: string,
+  ): Promise<CourierResult<null>> {
+    const { answer } = await this.#call(credentials, 'PUT', 'cancel-order', {
+      ...this.#signed(credentials),
+      consignmentNumber: trackingNumber,
+    });
+    return answer.ok ? { ok: true, value: null } : answer;
+  }
+
+  #signed(credentials: CourierCredentials): Record<string, string> {
+    return { userName: credentials.userName ?? '', password: credentials.password ?? '' };
+  }
+
+  async #cityList(credentials: CourierCredentials): Promise<CourierResult<string[]>> {
+    const { answer } = await this.#call(credentials, 'GET', 'cities');
+    if (!answer.ok) return answer;
+    const names = new Map<string, string>();
+    for (const each of answer.value.allCities ?? []) {
+      const name = typeof each.cityName === 'string' ? each.cityName.trim() : '';
+      if (cityKey(name) !== '' && !names.has(cityKey(name))) names.set(cityKey(name), name);
+    }
+    return names.size === 0
+      ? { ok: false, retry: true, message: 'TCS gave no cities to deliver to' }
+      : { ok: true, value: [...names.values()] };
+  }
+
+  async #call(
+    credentials: CourierCredentials,
+    method: 'GET' | 'POST' | 'PUT',
+    path: string,
+    body?: unknown,
+  ): Promise<{ answer: CourierResult<TcsAnswer>; status: number }> {
+    const base = (this.options.baseUrl ?? TCS_API_URL).replace(/\/+$/, '');
+    let response: Response;
+    try {
+      response = await fetch(`${base}/${path}`, {
+        method,
+        headers: {
+          'x-ibm-client-id': credentials.clientId ?? '',
+          accept: 'application/json',
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+      });
+    } catch (error) {
+      return {
+        answer: {
+          ok: false,
+          retry: true,
+          message: `TCS could not be reached: ${(error as Error).message}`.slice(0, 1_000),
+        },
+        status: 0,
+      };
+    }
+    const json = (await response.json().catch(() => null)) as TcsAnswer | null;
+    // TCS says how a request went in its answer too, and may say otherwise than HTTP does.
+    const said = json?.returnStatus;
+    if (response.ok && String(said?.status ?? '').toUpperCase() === 'SUCCESS') {
+      return { answer: { ok: true, value: json ?? {} }, status: response.status };
+    }
+    const message = typeof said?.message === 'string' ? said.message.trim() : '';
+    return {
+      answer: {
+        ok: false,
+        retry: response.status >= 500 || response.status === 429 || (response.ok && json === null),
+        message: `TCS: ${message || `it answered ${response.status}`}`.slice(0, 1_000),
+      },
+      status: response.status,
+    };
+  }
+}
+
+/** The latest status of a parcel's history: by its time where each says one, else the first. */
+function latest(
+  events: { status?: string; dateTime?: string }[] | null | undefined,
+): string | null {
+  const said = (events ?? []).filter(
+    (each) => typeof each.status === 'string' && each.status.trim() !== '',
+  );
+  if (said.length === 0) return null;
+  const timed = said.map((each) => ({ each, at: Date.parse(each.dateTime ?? '') }));
+  const newest = timed.every((one) => !Number.isNaN(one.at))
+    ? timed.reduce((a, b) => (b.at > a.at ? b : a)).each
+    : said[0]!;
+  return newest.status!.trim();
+}
+
 /**
  * A courier that books nothing (ADR-149): for trying bookings out in development and tests. Its
  * tracking numbers start "HT", and its parcels stay booked until {@link TestCourier.set} moves
