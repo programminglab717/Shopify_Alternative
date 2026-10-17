@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### Order updates from shops' own numbers
+### 6295e6f · Order updates from shops' own numbers
 
 * **Hatti's order templates go to each shop's own WhatsApp account for approval, and a shop's
   customers' order news goes from its own number for each one Meta approves there** ([ADR-537](../architecture/13-decision-log.md#adr-537--hattis-order-templates-go-to-each-shops-own-whatsapp-account-for-approval-and-a-shops-customers-order-news-goes-from-its-own-number-for-each-one-meta-approves-there),
