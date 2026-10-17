@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
-### The admin's buy X get Y
+### 4ed6262 · The admin's buy X get Y
 
 * **The admin's forms for codes and automatic discounts make buy X get Y, two for one and free
   unless changed, in English and Urdu** ([ADR-520](../architecture/13-decision-log.md#adr-520--the-admins-buy-x-get-y-both-discount-forms-offer-items-for-others-bought-with-items-bought-and-given-two-for-one-unless-changed-and-how-much-off-those-given-free-unless-changed-for-the-whole-order-or-some-products-and-collections), CHK-06).
