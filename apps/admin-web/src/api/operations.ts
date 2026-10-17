@@ -9030,6 +9030,7 @@ export const PushUnsubscribeMutation = /* GraphQL */ `
 const SUPPORT_REQUEST = /* GraphQL */ `
   fragment SupportRequestFields on SupportRequest {
     id
+    channel
     topic
     message
     callBack
@@ -9038,6 +9039,15 @@ const SUPPORT_REQUEST = /* GraphQL */ `
     answeredBy
     answeredAt
     createdAt
+    messages {
+      id
+      direction
+      body
+      mediaKind
+      at
+      status
+      error
+    }
   }
 `;
 

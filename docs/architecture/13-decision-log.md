@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-560 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-561 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -568,6 +568,7 @@
 | 558 | The admin connects a Tier-1 shop's POS to FBR on the sales tax page, lists what was reported and sends again what was not, and an order's page says how its invoice stands with FBR | Accepted |
 | 559 | The admin's product page takes each variant's HS code with its stock rules, saved as the field is left | Accepted |
 | 560 | What a shop's staff write to Hatti's support WhatsApp number is kept as a request of their shop, threaded, and Hatti's answer goes back on WhatsApp within the day | Accepted |
+| 561 | The admin's Help page shows a request asked on WhatsApp with its thread, the answer once with how it went on WhatsApp, and says the shop can write there too | Accepted |
 
 ---
 
@@ -21012,3 +21013,23 @@
 * **Alternatives:** **Finding the shop by asking the sender:** a menu on WhatsApp is a step
   between staff and help, and most staff have one shop. **The shared number:** customers write to
   it about orders, and a shop's staff are customers too.
+
+## ADR-561 · The admin's Help page shows a request asked on WhatsApp with its thread, the answer once with how it went on WhatsApp, and says the shop can write there too
+
+* **Context:** What staff write to Hatti's support WhatsApp number is kept as requests, threaded,
+  and answered back on WhatsApp (ADR-560), but the Help page showed only a request's first words
+  and its answer.
+* **Decision:**
+  * A request asked on WhatsApp says so, quietly, beside its topic and status.
+  * Its thread follows, oldest first: who wrote, when in the shop's time zone, what (a photo or
+    voice note named, as Hatti keeps no files), and for Hatti's messages how WhatsApp delivered
+    them, with why when it could not.
+  * Nothing shows twice: a thread that opens with the request's own words stands for them, and the
+    message Hatti sent with the answer's words is the answer, shown once where it was sent, with
+    its WhatsApp status; an answer not sent on WhatsApp follows the thread as before.
+  * On plans with WhatsApp, the form says they can also write to Hatti's number from their own
+    proved mobile, and it shows here. English and Urdu.
+* **Consequences:** A shop sees in one place what it asked, however it asked, and whether Hatti's
+  answer reached its phone.
+* **Alternatives:** **A link between the answer and its message in the API:** the answer's words
+  match the message sent with them, and an unmatched one still shows, in full, after the thread.

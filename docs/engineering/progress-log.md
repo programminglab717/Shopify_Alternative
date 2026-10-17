@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Support threads in the admin
+
+* **The admin's Help page shows a request asked on WhatsApp with its thread, the answer once with
+  how it went on WhatsApp, and says the shop can write there too** ([ADR-561](../architecture/13-decision-log.md#adr-561--the-admins-help-page-shows-a-request-asked-on-whatsapp-with-its-thread-the-answer-once-with-how-it-went-on-whatsapp-and-says-the-shop-can-write-there-too), BIL-05).
+* 3418 tests, 2 more: a WhatsApp request's thread, and one whose thread
+  does not open with its words and whose answer was not sent on WhatsApp.
+
 ### 4c35ed2 · Support on WhatsApp
 
 * **What a shop's staff write to Hatti's support WhatsApp number is kept as a request of their

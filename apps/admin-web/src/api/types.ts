@@ -4249,9 +4249,26 @@ export type SupportChannel = 'HELP_CENTRE' | 'WHATSAPP' | 'PRIORITY_WHATSAPP' | 
 export type SupportTopic =
   'ORDERS' | 'PAYMENTS' | 'COURIERS' | 'STORE' | 'BILLING' | 'ACCOUNT' | 'OTHER';
 export type SupportRequestStatus = 'OPEN' | 'ANSWERED' | 'CLOSED';
+/** Where a request was asked (ADR-560): in the admin, or on Hatti's support WhatsApp. */
+export type SupportRequestChannel = 'ADMIN' | 'WHATSAPP';
+/** How an answer went on WhatsApp, as WhatsApp says. */
+export type SupportMessageStatus = 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
+
+/** A message of a request on WhatsApp: the shop's staff's (INBOUND) or Hatti's answer (OUTBOUND). */
+export interface SupportRequestMessageValue {
+  id: string;
+  direction: 'INBOUND' | 'OUTBOUND';
+  body: string | null;
+  /** What else it held, as WhatsApp names it: "image", "audio". */
+  mediaKind: string | null;
+  at: string;
+  status: SupportMessageStatus | null;
+  error: string | null;
+}
 
 export interface SupportRequestValue {
   id: string;
+  channel: SupportRequestChannel;
   topic: SupportTopic;
   message: string;
   callBack: string | null;
@@ -4260,6 +4277,8 @@ export interface SupportRequestValue {
   answeredBy: string | null;
   answeredAt: string | null;
   createdAt: string;
+  /** Its latest 50 messages on WhatsApp, the oldest first; none for a request asked here alone. */
+  messages: SupportRequestMessageValue[];
 }
 
 export interface HattiSupportData {
