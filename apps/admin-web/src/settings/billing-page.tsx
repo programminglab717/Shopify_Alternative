@@ -49,6 +49,7 @@ function planLines(plan: BillingPlanValue, t: ReturnType<typeof useLocale>['t'])
     t(plan.loyalty ? 'billing.cashbackYes' : 'billing.cashbackNo'),
     t(plan.conversionsApi ? 'billing.conversionsYes' : 'billing.conversionsNo'),
     t(plan.customApps ? 'billing.appsYes' : 'billing.appsNo'),
+    t(plan.removeBranding ? 'billing.brandingYes' : 'billing.brandingNo'),
   ];
 }
 

@@ -13,6 +13,7 @@ const PREFERENCES = {
   seo: { title: null, description: null },
   returnDays: null,
   returnExchangesOnly: false,
+  hidePoweredBy: false,
 };
 
 const CHECKED = {
@@ -31,6 +32,22 @@ function core(role: StaffRole) {
       case 'StorefrontPreferences':
         return { onlineStorePreferences: PREFERENCES };
       case 'StorefrontPreferencesUpdate':
+        // The shop's plan leaves hiding "Powered by Hatti" out (ADR-526).
+        if ((variables.input as { hidePoweredBy?: boolean }).hidePoweredBy) {
+          return {
+            onlineStorePreferencesUpdate: {
+              preferences: null,
+              userErrors: [
+                {
+                  field: ['hidePoweredBy'],
+                  code: 'INVALID',
+                  message:
+                    'The Free plan doesn\'t include hiding "Powered by Hatti": choose a bigger plan to hide it',
+                },
+              ],
+            },
+          };
+        }
         return {
           onlineStorePreferencesUpdate: { preferences: PREFERENCES, userErrors: [] },
         };
@@ -180,6 +197,31 @@ describe("The storefront's preferences and redirects", () => {
         input: { returnDays: 7, returnExchangesOnly: true },
       }),
     );
+  });
+
+  it('hides "Powered by Hatti", and says when the plan leaves it out (ADR-527)', async () => {
+    const fake = core('manager');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/online-store?tab=storefront');
+
+    const branding = await screen.findByRole('region', { name: 'Powered by Hatti' });
+    const save = within(branding).getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+    const shown = within(branding).getByLabelText(/Show "Powered by Hatti"/) as HTMLInputElement;
+    expect(shown.checked).toBe(true);
+    expect(save.disabled).toBe(true);
+    fireEvent.click(shown);
+    expect(within(branding).getByText('Your storefront says nothing of Hatti.')).toBeTruthy();
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(sentOf(fake, 'StorefrontPreferencesUpdate').at(-1)).toEqual({
+        input: { hidePoweredBy: true },
+      }),
+    );
+    expect(
+      await within(branding).findByText(
+        'The Free plan doesn\'t include hiding "Powered by Hatti": choose a bigger plan to hide it',
+      ),
+    ).toBeTruthy();
   });
 
   it('changes a redirect in place, and says what the core refuses', async () => {

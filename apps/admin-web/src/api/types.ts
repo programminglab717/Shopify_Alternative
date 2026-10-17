@@ -1140,6 +1140,7 @@ export interface BillingPlanValue {
   automations: boolean;
   loyalty: boolean;
   conversionsApi: boolean;
+  removeBranding: boolean;
 }
 
 export interface BillingInvoiceValue {
@@ -2360,6 +2361,7 @@ export interface StorefrontPreferences {
   /** Days a buyer has to return an order, null while the shop says nothing (ADR-468). */
   returnDays: number | null;
   returnExchangesOnly: boolean;
+  hidePoweredBy: boolean;
 }
 
 export interface StorefrontPreferencesData {

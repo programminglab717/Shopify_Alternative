@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-526 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-527 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -534,6 +534,7 @@
 | 524 | The admin's plan cards say which of the features a plan gates each includes: automations and abandoned checkout reminders, cashback, Meta's conversions API and custom apps, beside its limits, domain and payments | Accepted |
 | 525 | A shop's support request still open past its plan's time is flagged to Hatti's people once: the worker's sweep marks it, logs it and emails Hatti's support address the list, and the command says when each request is due | Accepted |
 | 526 | Every storefront says it is "Powered by Hatti", as Shopify's powered_by_link does; a shop on Starter or above may hide it, and one hidden before stays hidden on a smaller plan | Accepted |
+| 527 | The admin's storefront settings show or hide "Powered by Hatti" with a switch, saying the core's refusal on a plan without it, and the plan cards say which plans hide it | Accepted |
 
 ---
 
@@ -20066,3 +20067,22 @@
     itself when its plan changes. Keeping what was set matches ADR-523 and ADR-264.
   * **Translated words from the theme's own locale files:** every theme would need the same
     words. The storefront gives them, as Shopify does.
+
+## ADR-527 · The admin's storefront settings show or hide "Powered by Hatti" with a switch, saying the core's refusal on a plan without it, and the plan cards say which plans hide it
+
+* **Context:** Storefronts say "Powered by Hatti", which shops on Starter and above may hide
+  (ADR-526). Owners need a place to hide it, and to see which plans let them.
+* **Decision:**
+  * **Online store → Storefront** has a "Powered by Hatti" section after the return window, for
+    owners and managers as the rest of the tab is.
+    * A switch shows it, with what shoppers see either way, and Save sends the change alone.
+    * On a plan without it, the core's refusal is shown in its words, which name the plan.
+  * **The plan cards** add a line: "Hide "Powered by Hatti"", or ""Powered by Hatti" on your
+    storefront" for Free (ADR-524).
+  * English and Urdu.
+* **Consequences:**
+  * An owner hides it where the storefront's other settings are, and learns from the refusal and
+    the cards which plan to choose.
+* **Alternatives:**
+  * **Hiding the switch on Free:** the owner wouldn't know it can be hidden at all. Showing it,
+    with the core's refusal naming the plan, says what to do.

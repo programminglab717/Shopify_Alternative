@@ -238,9 +238,33 @@ function ReturnsForm({ preferences }: { preferences: StorefrontPreferences }) {
 }
 
 /**
+ * "Powered by Hatti" at the foot of the storefront (ADR-526, ADR-527): shown unless the shop hides
+ * it, which plans from Starter allow; the core says so when the plan doesn't.
+ */
+function BrandingForm({ preferences }: { preferences: StorefrontPreferences }) {
+  const { t } = useLocale();
+  const [shown, setShown] = useState(!preferences.hidePoweredBy);
+  const input = shown === !preferences.hidePoweredBy ? {} : { hidePoweredBy: !shown };
+  return (
+    <PreferencesForm
+      title={t('storefront.branding')}
+      hint={t('storefront.brandingHint')}
+      input={input}
+    >
+      <CheckField
+        label={t('storefront.poweredBy')}
+        hint={t(shown ? 'storefront.poweredByOn' : 'storefront.poweredByOff')}
+        checked={shown}
+        onChange={setShown}
+      />
+    </PreferencesForm>
+  );
+}
+
+/**
  * The storefront's preferences (OS-09, OS-11, OS-15), for owners and managers: its password while
- * the shop gets ready, a pause while it is open, its home page for search engines, and its return
- * window.
+ * the shop gets ready, a pause while it is open, its home page for search engines, its return
+ * window, and whether it says "Powered by Hatti".
  */
 export function StorefrontPreferencesTab() {
   const { t } = useLocale();
@@ -264,6 +288,7 @@ export function StorefrontPreferencesTab() {
       <PauseForm preferences={preferences} />
       <SearchForm preferences={preferences} />
       <ReturnsForm preferences={preferences} />
+      <BrandingForm preferences={preferences} />
       <HomeUrduCard />
     </div>
   );

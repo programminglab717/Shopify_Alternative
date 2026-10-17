@@ -777,6 +777,8 @@ const en = {
   'billing.conversionsNo': 'No conversions API',
   'billing.appsYes': 'Custom apps',
   'billing.appsNo': 'No custom apps',
+  'billing.brandingYes': 'Hide "Powered by Hatti"',
+  'billing.brandingNo': '"Powered by Hatti" on your storefront',
   'billing.yourPlan': 'Your plan',
   'billing.choose': 'Choose {plan}',
   'billing.keep': 'Keep {plan}',
@@ -1816,6 +1818,12 @@ const en = {
   'storefront.returnExchangesOnly': 'Exchanges only',
   'storefront.returnExchangesOn': 'Buyers swap what they return for another size or piece.',
   'storefront.returnExchangesOff': 'Buyers get their money back for what they return.',
+  'storefront.branding': 'Powered by Hatti',
+  'storefront.brandingHint':
+    'Your storefront says "Powered by Hatti" at the foot of its pages. Plans from Starter can hide it.',
+  'storefront.poweredBy': 'Show "Powered by Hatti"',
+  'storefront.poweredByOn': 'Shoppers see a link to Hatti at the foot of every page.',
+  'storefront.poweredByOff': 'Your storefront says nothing of Hatti.',
   'redirects.intro':
     "Send old addresses, such as your Shopify store's, on to where their pages are now, so links shared before still work.",
   'redirects.search': 'Find a redirect',
@@ -5424,6 +5432,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'billing.conversionsNo': 'کنورژنز API نہیں',
   'billing.appsYes': 'کسٹم ایپس',
   'billing.appsNo': 'کسٹم ایپس نہیں',
+  'billing.brandingYes': '"ہٹی کے ذریعے" چھپائیں',
+  'billing.brandingNo': 'اسٹور فرنٹ پر "ہٹی کے ذریعے"',
   'billing.yourPlan': 'آپ کا پلان',
   'billing.choose': '{plan} چنیں',
   'billing.keep': '{plan} رکھیں',
@@ -6466,6 +6476,12 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'storefront.returnExchangesOnly': 'صرف تبدیلی',
   'storefront.returnExchangesOn': 'خریدار واپس کی گئی چیز کسی اور سائز یا پیس سے بدلتے ہیں۔',
   'storefront.returnExchangesOff': 'خریداروں کو واپس کی گئی چیز کے پیسے واپس ملتے ہیں۔',
+  'storefront.branding': 'ہٹی کے ذریعے',
+  'storefront.brandingHint':
+    'آپ کے اسٹور فرنٹ کے صفحات کے آخر میں "ہٹی کے ذریعے" لکھا ہوتا ہے۔ اسٹارٹر اور اس سے بڑے پلان اسے چھپا سکتے ہیں۔',
+  'storefront.poweredBy': '"ہٹی کے ذریعے" دکھائیں',
+  'storefront.poweredByOn': 'خریداروں کو ہر صفحے کے آخر میں ہٹی کا لنک نظر آتا ہے۔',
+  'storefront.poweredByOff': 'آپ کا اسٹور فرنٹ ہٹی کا ذکر نہیں کرتا۔',
   'redirects.intro':
     'پرانے ایڈریس، جیسے آپ کے شاپیفائی اسٹور کے، وہاں بھیجیں جہاں ان کے صفحے اب ہیں، تاکہ پہلے شیئر کیے گئے لنک چلتے رہیں۔',
   'redirects.search': 'ری ڈائریکٹ تلاش کریں',

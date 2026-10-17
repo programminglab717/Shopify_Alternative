@@ -2662,6 +2662,7 @@ const BILLING_PLAN = /* GraphQL */ `
     automations
     loyalty
     conversionsApi
+    removeBranding
   }
 `;
 
@@ -5396,6 +5397,7 @@ const STOREFRONT_PREFERENCES = /* GraphQL */ `
     }
     returnDays
     returnExchangesOnly
+    hidePoweredBy
   }
 `;
 
