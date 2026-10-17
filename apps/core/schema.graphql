@@ -343,6 +343,9 @@ type AutomaticDiscount {
   """
   amount: Money
 
+  """For BUY_X_GET_Y: items bought for each group."""
+  buyQuantity: Int
+
   """The collections whose products' items it is for."""
   collectionIds: [ID!]!
 
@@ -350,6 +353,9 @@ type AutomaticDiscount {
   combinesWithCodes: Boolean!
   createdAt: DateTime!
   endsAt: DateTime
+
+  """For BUY_X_GET_Y: items given in each group, at percentage off."""
+  getQuantity: Int
   id: ID!
   kind: DiscountCodeKind!
 
@@ -357,7 +363,7 @@ type AutomaticDiscount {
   minimumSubtotal: Money
 
   """
-  Percent off the order's items, for PERCENTAGE discounts: 12.5 is 12.5%.
+  Percent off the order's items, for PERCENTAGE discounts: 12.5 is 12.5%; for BUY_X_GET_Y, off the items given.
   """
   percentage: Float
 
@@ -388,6 +394,11 @@ input AutomaticDiscountInput {
   """An amount off the order's items, in the shop currency: "500"."""
   amount: String
 
+  """
+  Items bought for each group, 1 to 100: with getQuantity, it gives items for others bought (BUY_X_GET_Y), percentage off them, 100 unless given.
+  """
+  buyQuantity: Int
+
   """The collections whose products' items it is for, up to 100."""
   collectionIds: [ID!]
 
@@ -399,6 +410,9 @@ input AutomaticDiscountInput {
 
   """Free delivery."""
   freeShipping: Boolean
+
+  """Items given in each group, 1 to 100, the cheapest of them."""
+  getQuantity: Int
 
   """What the order's items must come to for it to apply: "3,000"."""
   minimumSubtotal: String
@@ -3734,6 +3748,9 @@ type DiscountCode {
   """
   amount: Money
 
+  """For BUY_X_GET_Y: items bought for each group."""
+  buyQuantity: Int
+
   """As the shop wrote it; shoppers may type it in any letter case."""
   code: String!
 
@@ -3741,6 +3758,9 @@ type DiscountCode {
   collectionIds: [ID!]!
   createdAt: DateTime!
   endsAt: DateTime
+
+  """For BUY_X_GET_Y: items given in each group, at percentage off."""
+  getQuantity: Int
   id: ID!
   kind: DiscountCodeKind!
 
@@ -3750,7 +3770,9 @@ type DiscountCode {
   """Whether a customer may place only one order with it."""
   oncePerCustomer: Boolean!
 
-  """Percent off the order's items, for PERCENTAGE codes: 12.5 is 12.5%."""
+  """
+  Percent off the order's items, for PERCENTAGE codes: 12.5 is 12.5%; for BUY_X_GET_Y, off the items given.
+  """
   percentage: Float
 
   """
@@ -3805,6 +3827,11 @@ input DiscountCodeInput {
   amount: String
 
   """
+  Items bought for each group, 1 to 100: with getQuantity, it gives items for others bought (BUY_X_GET_Y), percentage off them, 100 unless given.
+  """
+  buyQuantity: Int
+
+  """
   Letters, digits, hyphens and underscores, up to 64, like EID25; unique in the shop in any letter case. Needed to make one.
   """
   code: String
@@ -3817,6 +3844,9 @@ input DiscountCodeInput {
 
   """Free delivery."""
   freeShipping: Boolean
+
+  """Items given in each group, 1 to 100, the cheapest of them."""
+  getQuantity: Int
 
   """What the order's items must come to for the code to work: "3,000"."""
   minimumSubtotal: String
@@ -3848,6 +3878,11 @@ input DiscountCodeInput {
 
 """What a discount code gives."""
 enum DiscountCodeKind {
+  """
+  Items for others bought: in each group of buyQuantity + getQuantity of its items, the getQuantity cheapest at percentage off, free at 100 (ADR-519).
+  """
+  BUY_X_GET_Y
+
   """An amount off the order's items."""
   FIXED_AMOUNT
 

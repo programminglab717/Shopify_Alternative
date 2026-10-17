@@ -28,6 +28,7 @@ export async function orderItemsIn(
     lines: cart.items.map((item) => ({
       productId: item.productId,
       collectionIds: collections.get(item.productId) ?? [],
+      quantity: item.quantity,
       total: BigInt(item.linePrice),
     })),
   };

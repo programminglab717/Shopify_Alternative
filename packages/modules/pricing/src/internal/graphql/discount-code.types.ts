@@ -15,6 +15,7 @@ export enum DiscountCodeKind {
   PERCENTAGE = 'PERCENTAGE',
   FIXED_AMOUNT = 'FIXED_AMOUNT',
   FREE_SHIPPING = 'FREE_SHIPPING',
+  BUY_X_GET_Y = 'BUY_X_GET_Y',
 }
 
 registerEnumType(DiscountCodeKind, {
@@ -24,6 +25,11 @@ registerEnumType(DiscountCodeKind, {
     PERCENTAGE: { description: "A percentage off the order's items." },
     FIXED_AMOUNT: { description: "An amount off the order's items." },
     FREE_SHIPPING: { description: 'Free delivery.' },
+    BUY_X_GET_Y: {
+      description:
+        'Items for others bought: in each group of buyQuantity + getQuantity of its items, the ' +
+        'getQuantity cheapest at percentage off, free at 100 (ADR-519).',
+    },
   },
 });
 
@@ -63,7 +69,9 @@ export class DiscountCode {
 
   @Field(() => Float, {
     nullable: true,
-    description: "Percent off the order's items, for PERCENTAGE codes: 12.5 is 12.5%.",
+    description:
+      "Percent off the order's items, for PERCENTAGE codes: 12.5 is 12.5%; for BUY_X_GET_Y, off " +
+      'the items given.',
   })
   percentage!: number | null;
 
@@ -96,6 +104,18 @@ export class DiscountCode {
 
   @Field(() => Int, { description: 'Orders placed with it so far.' })
   usageCount!: number;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'For BUY_X_GET_Y: items bought for each group.',
+  })
+  buyQuantity!: number | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'For BUY_X_GET_Y: items given in each group, at percentage off.',
+  })
+  getQuantity!: number | null;
 
   @Field(() => [ID], {
     description:
@@ -225,6 +245,20 @@ export class DiscountCodeInput {
     description: "The collections whose products' items it is for, up to 100.",
   })
   collectionIds?: string[] | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Items bought for each group, 1 to 100: with getQuantity, it gives items for others ' +
+      'bought (BUY_X_GET_Y), percentage off them, 100 unless given.',
+  })
+  buyQuantity?: number | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'Items given in each group, 1 to 100, the cheapest of them.',
+  })
+  getQuantity?: number | null;
 }
 
 @ObjectType()

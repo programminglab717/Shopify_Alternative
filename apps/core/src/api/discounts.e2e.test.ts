@@ -318,4 +318,42 @@ describe.skipIf(!server)('Admin GraphQL API: discount codes', () => {
       { field: ['automaticDiscount', 'collectionIds', '1'], code: 'NOT_FOUND' },
     ]);
   });
+  it('gives items for others bought, free unless a percentage is given (ADR-519)', async () => {
+    const made = await gql(
+      tokens.write,
+      `mutation {
+        automaticDiscountCreate(
+          automaticDiscount: { title: "Buy 2 get 1", buyQuantity: 2, getQuantity: 1 }
+        ) {
+          automaticDiscount { kind percentage buyQuantity getQuantity summary }
+          userErrors { field code }
+        }
+      }`,
+    );
+    expect(made.data?.automaticDiscountCreate).toEqual({
+      automaticDiscount: {
+        kind: 'BUY_X_GET_Y',
+        percentage: 100,
+        buyQuantity: 2,
+        getQuantity: 1,
+        summary: 'Buy 2, get 1 free',
+      },
+      userErrors: [],
+    });
+    const half = await create(tokens.write, {
+      code: 'HALFOFF',
+      buyQuantity: 1,
+      getQuantity: 1,
+      percentage: 50,
+    });
+    expect(half.data?.discountCodeCreate.discountCode).toMatchObject({
+      kind: 'BUY_X_GET_Y',
+      percentage: 50,
+      summary: 'Buy 1, get 1 at 50% off',
+    });
+    const blank = await create(tokens.write, { code: 'NOGET', buyQuantity: 2 });
+    expect(blank.data?.discountCodeCreate.userErrors).toEqual([
+      expect.objectContaining({ field: ['discountCode', 'getQuantity'], code: 'BLANK' }),
+    ]);
+  });
 });

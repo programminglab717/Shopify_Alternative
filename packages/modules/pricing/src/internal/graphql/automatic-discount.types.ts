@@ -1,5 +1,5 @@
 import { Money, UserError } from '@hatti/api';
-import { Field, Float, GraphQLISODateTime, ID, InputType, ObjectType } from '@nestjs/graphql';
+import { Field, Float, GraphQLISODateTime, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
 import { DiscountCodeKind, DiscountStatus } from './discount-code.types.js';
 
 @ObjectType({
@@ -21,7 +21,9 @@ export class AutomaticDiscount {
 
   @Field(() => Float, {
     nullable: true,
-    description: "Percent off the order's items, for PERCENTAGE discounts: 12.5 is 12.5%.",
+    description:
+      "Percent off the order's items, for PERCENTAGE discounts: 12.5 is 12.5%; for BUY_X_GET_Y, off " +
+      'the items given.',
   })
   percentage!: number | null;
 
@@ -48,6 +50,18 @@ export class AutomaticDiscount {
 
   @Field({ description: 'Whether a discount code may be used with it.' })
   combinesWithCodes!: boolean;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'For BUY_X_GET_Y: items bought for each group.',
+  })
+  buyQuantity!: number | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'For BUY_X_GET_Y: items given in each group, at percentage off.',
+  })
+  getQuantity!: number | null;
 
   @Field(() => [ID], {
     description:
@@ -127,6 +141,20 @@ export class AutomaticDiscountInput {
     description: "The collections whose products' items it is for, up to 100.",
   })
   collectionIds?: string[] | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Items bought for each group, 1 to 100: with getQuantity, it gives items for others ' +
+      'bought (BUY_X_GET_Y), percentage off them, 100 unless given.',
+  })
+  buyQuantity?: number | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'Items given in each group, 1 to 100, the cheapest of them.',
+  })
+  getQuantity?: number | null;
 }
 
 @ObjectType()

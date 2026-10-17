@@ -624,6 +624,41 @@ describe.skipIf(!server)('CheckoutService', () => {
     });
   });
 
+  it('gives the cheapest of every three for buying two, and refuses a code for too few (ADR-519)', async () => {
+    unwrap(
+      await f.automatic.create(f.a, { title: 'Buy 2 get 1 free', buyQuantity: 2, getQuantity: 1 }),
+    );
+    unwrap(
+      await f.codes.create(f.a, {
+        code: 'FOURTH',
+        buyQuantity: 3,
+        getQuantity: 1,
+        percentage: 50,
+      }),
+    );
+    // Three lawn suits at Rs 4,500: one free.
+    const { token } = await lawnCart();
+    const { secret, view } = await started(token);
+    expect(view.discounts).toMatchObject({
+      items: 4_500_00n,
+      byAutomatic: 4_500_00n,
+      automatic: [{ title: 'Buy 2 get 1 free' }],
+    });
+    // Three items are too few for buying three to get one.
+    const refused = open(await f.checkouts.applyDiscount(secret, 'fourth'));
+    expect(refused.problem).toEqual({
+      kind: 'discount',
+      code: 'fourth',
+      refusal: { reason: 'too_few', count: 4 },
+    });
+    const order = placedOrder(await f.checkouts.place(secret, refused.shown, FORM));
+    expect(order).toMatchObject({
+      subtotal: 13_500_00n,
+      discount: 4_500_00n,
+      automaticDiscounts: ['Buy 2 get 1 free'],
+    });
+  });
+
   it('makes delivery free with a free-delivery code, wherever it goes', async () => {
     unwrap(await f.delivery.update(f.a, { charge: '250' }));
     const free = unwrap(await f.codes.create(f.a, { code: 'FREEDEL', freeShipping: true }));

@@ -17,6 +17,8 @@ const CODE: DiscountCodeRecord = {
   percentageBps: 2_500,
   amount: null,
   minimumSubtotal: null,
+  buyQuantity: null,
+  getQuantity: null,
   startsAt: new Date('2026-10-01T00:00:00+05:00'),
   endsAt: null,
   usageLimit: null,

@@ -28,6 +28,8 @@ function automatic(given: Partial<AutomaticDiscountRecord>): AutomaticDiscountRe
     percentageBps: 2_000,
     amount: null,
     minimumSubtotal: null,
+    buyQuantity: null,
+    getQuantity: null,
     startsAt: SINCE,
     endsAt: null,
     combinesWithCodes: false,
@@ -49,6 +51,8 @@ function code(given: Partial<DiscountCodeRecord>): DiscountCodeRecord {
     percentageBps: null,
     amount: 50_000n,
     minimumSubtotal: null,
+    buyQuantity: null,
+    getQuantity: null,
     startsAt: SINCE,
     endsAt: null,
     usageLimit: null,
@@ -67,8 +71,8 @@ function code(given: Partial<DiscountCodeRecord>): DiscountCodeRecord {
 const ITEMS: OrderItems = {
   subtotal: 900_000n,
   lines: [
-    { productId: LAWN, collectionIds: [SALE], total: 600_000n },
-    { productId: KHUSSA, collectionIds: [], total: 300_000n },
+    { productId: LAWN, collectionIds: [SALE], quantity: 2, total: 600_000n },
+    { productId: KHUSSA, collectionIds: [], quantity: 1, total: 300_000n },
   ],
 };
 

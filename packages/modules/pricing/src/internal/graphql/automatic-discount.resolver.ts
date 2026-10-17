@@ -121,6 +121,7 @@ const KINDS = {
   percentage: DiscountCodeKind.PERCENTAGE,
   fixed_amount: DiscountCodeKind.FIXED_AMOUNT,
   free_shipping: DiscountCodeKind.FREE_SHIPPING,
+  buy_x_get_y: DiscountCodeKind.BUY_X_GET_Y,
 } as const;
 
 const STATUSES = {
@@ -146,6 +147,8 @@ export function toAutomaticDiscount(
     endsAt: record.endsAt,
     status: STATUSES[discountStatus(record)],
     combinesWithCodes: record.combinesWithCodes,
+    buyQuantity: record.buyQuantity,
+    getQuantity: record.getQuantity,
     ...itemIdsOf(record),
     summary: automaticSummary(record, currency),
     createdAt: record.createdAt,

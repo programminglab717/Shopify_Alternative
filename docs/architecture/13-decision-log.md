@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-518 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-519 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -526,6 +526,7 @@
 | 516 | The admin's automatic discounts, on the discounts page below the codes: each with what it gives in a line and whether it runs; started with a title shoppers see, what it gives, a minimum, dates and whether codes go with it; ended at once or deleted | Accepted |
 | 517 | Discounts for some products or collections: a code or an automatic discount names up to 100 of each, and takes a percentage or an amount off only their items, its minimum being what they come to; free delivery stays for the whole order | Accepted |
 | 518 | The admin's discounts for some products or collections: a new code or automatic discount applies to the whole order or to products found by name and collections chosen from the shop's, shown as chips taken off with a tap; free delivery has no such choice | Accepted |
+| 519 | Buy X get Y: a code or an automatic discount gives, in each full group of X + Y of its items, the Y cheapest at a percentage off, free unless it says less; spending tiers are automatic discounts with rising minimums | Accepted |
 
 ---
 
@@ -19792,3 +19793,50 @@
     phone. Finding by name is what the drafts and menus already do.
   * **Choosing variants:** Shopify allows it, but shops here run sales on products and
     collections. Variants would add a step for little gain.
+
+## ADR-519 · Buy X get Y: a code or an automatic discount gives, in each full group of X + Y of its items, the Y cheapest at a percentage off, free unless it says less; spending tiers are automatic discounts with rising minimums
+
+* **Context:**
+  * "Buy 2 get 1 free" and "buy one, get the second half off" are how Pakistan's fashion and
+    beauty shops run their biggest sales. Shopify calls these "Buy X get Y".
+  * Codes and automatic discounts (ADR-062, ADR-515) took a share or an amount off items, now for
+    some products or collections (ADR-517), or gave free delivery.
+* **Decision:**
+  * **A fourth kind:** `buy_x_get_y`, for codes and automatic discounts alike. It has:
+    * `buyQuantity` and `getQuantity`, 1 to 100 each;
+    * `percentage`, how much off the items given: 100, free, unless it says less.
+  * **Which items:** those it is for, its products and collections or any (ADR-517), count and
+    are given alike.
+  * **What it gives:**
+    * Every full group of X + Y of its items gives Y.
+    * The cheapest items are given, each at its own price, rounded half up, as Shopify gives the
+      lowest-priced items.
+    * Six items for buy 2 get 1 make two groups, so two items are free.
+  * **With others:**
+    * Among automatic discounts it competes by what it takes off now, as any does (ADR-515).
+    * One that gives nothing yet, too few of its items, is not applied.
+    * As a code, too few of its items is refused: "needs 3 of its items in your cart", in English
+      and Urdu.
+    * A minimum, if it has one, is what its items come to.
+  * **Changing one:** a percentage alone changes how much the given items take off and keeps it
+    buy X get Y. Giving another kind makes it that kind and forgets its quantities.
+  * **The cart's JSON:** says the kind, and the amount it takes off now as its value. Themes
+    showing a discount's value read it as an amount off.
+  * **Orders:** keep the discount as one amount, as before (ADR-517).
+  * **The abandoned-checkout offer** (ADR-426) does not offer a buy X get Y code: its message
+    names a percentage or an amount.
+  * **Tiers** ("5% off Rs 3,000, 10% off Rs 5,000") need no kind of their own. The shop makes
+    one automatic discount for each step, each with its minimum, and the one taking most off the
+    order applies (ADR-515).
+* **Consequences:**
+  * "Buy 2 get 1 free on lawn" works in the cart, at checkout and on the order, and through the
+    Admin API.
+  * The admin's forms don't yet make buy X get Y; ADR-520 will.
+* **Alternatives:**
+  * **Different items bought and given** ("buy a kurta, get a dupatta free"): Shopify allows it,
+    but sharing one set keeps the groups plain and covers the sales shops run here. A later ADR
+    can add a second set.
+  * **Giving the dearest items:** that is kinder to shoppers but costs the shop more than it
+    meant. The cheapest is what Shopify and the shops' own posters mean.
+  * **A cap on uses an order:** every full group gives, as shops expect from "buy 2 get 1". A cap
+    can come later if shops ask.

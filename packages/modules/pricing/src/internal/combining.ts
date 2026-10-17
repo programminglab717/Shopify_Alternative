@@ -1,5 +1,5 @@
-import { discountOf, discountStatus } from './discounts.js';
-import { forSomeItems, itemsFor, type OrderItems } from './items.js';
+import { discountStatus } from './discounts.js';
+import { forSomeItems, itemsFor, itemsOff, type OrderItems } from './items.js';
 import type { AutomaticDiscountRecord, DiscountCodeRecord } from './records.js';
 
 /** The discounts an order takes, and what they take off it together (ADR-515). */
@@ -57,11 +57,11 @@ export function chooseDiscounts(
       (discount.minimumSubtotal === null || its >= discount.minimumSubtotal)
     );
   });
-  const off = (discount: AutomaticDiscountRecord | DiscountCodeRecord) =>
-    discountOf(discount, { subtotal: itemsFor(discount, items), shipping: 0n }).items;
+  const off = (discount: AutomaticDiscountRecord | DiscountCodeRecord) => itemsOff(discount, items);
   let best: AutomaticDiscountRecord | null = null;
   for (const discount of qualifying) {
-    if (discount.kind === 'free_shipping') continue;
+    // Buying too few for one that gives items takes nothing (ADR-519).
+    if (discount.kind === 'free_shipping' || off(discount) === 0n) continue;
     if (best === null || off(discount) > off(best)) best = discount;
   }
   const delivery = qualifying.find((discount) => discount.kind === 'free_shipping') ?? null;

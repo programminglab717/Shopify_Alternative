@@ -14,6 +14,12 @@ export interface DiscountCodeRecord {
   amount: bigint | null;
   /** What the order's items must come to for the code to work. */
   minimumSubtotal: bigint | null;
+  /**
+   * Buy X get Y (ADR-519): in each group of this many items bought and `getQuantity` more, the
+   * cheapest `getQuantity` are `percentageBps` off. Buy X get Y codes only.
+   */
+  buyQuantity: number | null;
+  getQuantity: number | null;
   startsAt: Date;
   endsAt: Date | null;
   /** Orders that may be placed with it, in all. */
@@ -45,6 +51,9 @@ export interface AutomaticDiscountRecord {
   amount: bigint | null;
   /** What the order's items must come to for it to apply. */
   minimumSubtotal: bigint | null;
+  /** Buy X get Y (ADR-519), as a code's. */
+  buyQuantity: number | null;
+  getQuantity: number | null;
   startsAt: Date;
   endsAt: Date | null;
   /** Whether a discount code may be used with it. */

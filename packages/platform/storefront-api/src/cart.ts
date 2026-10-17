@@ -262,8 +262,11 @@ export interface CartJson {
 export interface CartAutomaticDiscountJson {
   /** What the shop calls it for shoppers: "Eid sale". */
   title: string;
-  kind: 'percentage' | 'fixed_amount' | 'free_shipping';
-  /** The percentage off, such as 12.5, or the amount off in paisa; 0 for free delivery. */
+  kind: 'percentage' | 'fixed_amount' | 'free_shipping' | 'buy_x_get_y';
+  /**
+   * The percentage off, such as 12.5, or the amount off in paisa; 0 for free delivery; for buy X
+   * get Y (ADR-519), the amount it takes off now.
+   */
   value: number;
   /** Off the items now, in paisa; 0 for free delivery, which checkout takes off. */
   amount: number;
@@ -283,8 +286,11 @@ export interface CartDiscountJson {
    */
   applicable: boolean;
   /** What the code gives, when it applies. */
-  kind: 'percentage' | 'fixed_amount' | 'free_shipping' | null;
-  /** The percentage off, such as 12.5, or the amount off in paisa; 0 for free delivery. */
+  kind: 'percentage' | 'fixed_amount' | 'free_shipping' | 'buy_x_get_y' | null;
+  /**
+   * The percentage off, such as 12.5, or the amount off in paisa; 0 for free delivery; for buy X
+   * get Y (ADR-519), the amount it takes off now.
+   */
   value: number;
   /** Off the items now, in paisa; 0 for free delivery, which checkout takes off. */
   amount: number;

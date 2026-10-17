@@ -155,6 +155,7 @@ const KINDS = {
   percentage: DiscountCodeKind.PERCENTAGE,
   fixed_amount: DiscountCodeKind.FIXED_AMOUNT,
   free_shipping: DiscountCodeKind.FREE_SHIPPING,
+  buy_x_get_y: DiscountCodeKind.BUY_X_GET_Y,
 } as const;
 
 const STATUSES = {
@@ -180,6 +181,8 @@ export function toDiscountCode(record: DiscountCodeRecord, currency: CurrencyCod
     usageLimit: record.usageLimit,
     oncePerCustomer: record.oncePerCustomer,
     usageCount: record.used,
+    buyQuantity: record.buyQuantity,
+    getQuantity: record.getQuantity,
     ...itemIdsOf(record),
     summary: discountSummary(record, currency),
     createdAt: record.createdAt,

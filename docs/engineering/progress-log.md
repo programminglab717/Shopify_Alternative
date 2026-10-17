@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Buy X get Y
+
+* **Codes and automatic discounts can give the cheapest Y of each full group of X + Y of their
+  items at a percentage off, free unless they say less, in the cart, at checkout and through the
+  Admin API** ([ADR-519](../architecture/13-decision-log.md#adr-519--buy-x-get-y-a-code-or-an-automatic-discount-gives-in-each-full-group-of-x--y-of-its-items-the-y-cheapest-at-a-percentage-off-free-unless-it-says-less-spending-tiers-are-automatic-discounts-with-rising-minimums), CHK-06). Spending tiers are automatic discounts with rising minimums.
+  Migration 0245.
+* 3231 tests, 6 more: what it gives and when, how it competes, a code for
+  too few refused, its checks, and an order placed with one.
+
 ### 3034dcf · The admin's discounts for some products or collections
 
 * **The admin's forms for codes and automatic discounts choose whether they are for the whole

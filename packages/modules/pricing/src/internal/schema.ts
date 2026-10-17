@@ -13,8 +13,16 @@ import {
 
 export const pricingSchema = pgSchema('pricing');
 
-/** What a code takes off: a share of the items, an amount off them, or the delivery charge. */
-export const DISCOUNT_KINDS = ['percentage', 'fixed_amount', 'free_shipping'] as const;
+/**
+ * What a code takes off: a share of the items, an amount off them, the delivery charge, or some
+ * items for every so many bought (ADR-519).
+ */
+export const DISCOUNT_KINDS = [
+  'percentage',
+  'fixed_amount',
+  'free_shipping',
+  'buy_x_get_y',
+] as const;
 export type DiscountKindValue = (typeof DISCOUNT_KINDS)[number];
 
 const money = (name: string) => bigint(name, { mode: 'bigint' });
@@ -31,6 +39,9 @@ export const discountCodes = pricingSchema.table(
     percentageBps: integer('percentage_bps'),
     amount: money('amount'),
     minimumSubtotal: money('minimum_subtotal'),
+    /** Buy X get Y (ADR-519): items bought for each group, and items given in it. */
+    buyQuantity: integer('buy_quantity'),
+    getQuantity: integer('get_quantity'),
     startsAt: timestamp('starts_at', { withTimezone: true }).notNull().defaultNow(),
     endsAt: timestamp('ends_at', { withTimezone: true }),
     usageLimit: integer('usage_limit'),
@@ -74,6 +85,9 @@ export const automaticDiscounts = pricingSchema.table(
     percentageBps: integer('percentage_bps'),
     amount: money('amount'),
     minimumSubtotal: money('minimum_subtotal'),
+    /** Buy X get Y (ADR-519): items bought for each group, and items given in it. */
+    buyQuantity: integer('buy_quantity'),
+    getQuantity: integer('get_quantity'),
     startsAt: timestamp('starts_at', { withTimezone: true }).notNull().defaultNow(),
     endsAt: timestamp('ends_at', { withTimezone: true }),
     combinesWithCodes: boolean('combines_with_codes').notNull().default(false),

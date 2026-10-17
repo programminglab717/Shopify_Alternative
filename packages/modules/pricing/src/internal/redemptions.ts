@@ -4,7 +4,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { discountCodeIn, toRecord } from './discount-code.service.js';
 import { discountOf, discountStatus, typedCode, type DiscountAmounts } from './discounts.js';
 import { PricingEvents, type DiscountCodeRedeemedPayload } from './events.js';
-import { forSomeItems, itemsFor, type OrderItems } from './items.js';
+import { forSomeItems, itemsFor, itemsOff, type OrderItems } from './items.js';
 import type { DiscountCodeRecord } from './records.js';
 import { discountCodes, discountRedemptions } from './schema.js';
 
@@ -18,6 +18,8 @@ export type DiscountRefusal =
   | { reason: 'minimum'; minimum: bigint }
   /** It is for some products or collections, and the order has none of their items. */
   | { reason: 'not_for_items' }
+  /** It gives items for others bought (ADR-519), and the order has fewer of its items than that. */
+  | { reason: 'too_few'; count: number }
   /** Its orders have all been placed. */
   | { reason: 'used_up' }
   /** The customer placed an order with it already, and it is once a customer. */
@@ -77,6 +79,14 @@ export function discountFor(
   }
   if (code.usageLimit !== null && code.used >= code.usageLimit) {
     return { ok: false, refusal: { reason: 'used_up' } };
+  }
+  if (code.kind === 'buy_x_get_y') {
+    const off = itemsOff(code, { subtotal: order.subtotal, lines: order.lines ?? [] });
+    if (off === 0n) {
+      const count = (code.buyQuantity ?? 0) + (code.getQuantity ?? 0);
+      return { ok: false, refusal: { reason: 'too_few', count } };
+    }
+    return { ok: true, code, amounts: { items: off, shipping: 0n } };
   }
   return {
     ok: true,

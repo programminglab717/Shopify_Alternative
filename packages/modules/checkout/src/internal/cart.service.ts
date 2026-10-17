@@ -284,7 +284,7 @@ async function withDiscount(
   const automaticDiscounts: CartAutomaticDiscountJson[] = chosen.automatic.map((automatic) => ({
     title: automatic.title,
     kind: automatic.kind,
-    value: valueOf(automatic),
+    value: automatic.kind === 'buy_x_get_y' ? Number(chosen.byAutomatic) : valueOf(automatic),
     amount: automatic.kind === 'free_shipping' ? 0 : Number(chosen.byAutomatic),
   }));
   const code = chosen.code;
@@ -296,7 +296,7 @@ async function withDiscount(
             code: code.code,
             applicable: true,
             kind: code.kind,
-            value: valueOf(code),
+            value: code.kind === 'buy_x_get_y' ? Number(chosen.byCode) : valueOf(code),
             amount: Number(chosen.byCode),
           }
         : { code: typed, applicable: false, kind: null, value: 0, amount: 0 };

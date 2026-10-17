@@ -54,6 +54,9 @@ export function discountOf(
     }
     case 'free_shipping':
       return { items: 0n, shipping: order.shipping };
+    case 'buy_x_get_y':
+      // Its items, not their sum, say what it takes off: itemsOff counts them (ADR-519).
+      return { items: 0n, shipping: 0n };
   }
 }
 
@@ -98,11 +101,27 @@ function itemsText(discount: ItemsNamed): string | null {
  */
 function offerText(
   discount: Pick<DiscountCodeRecord, 'kind' | 'percentageBps' | 'amount' | 'minimumSubtotal'> &
+    Partial<Pick<DiscountCodeRecord, 'buyQuantity' | 'getQuantity'>> &
     ItemsNamed,
   currency: CurrencyCode,
 ): string {
   const rs = (amount: bigint) => formatMoney(money(amount, currency));
   const minimum = discount.minimumSubtotal === null ? null : rs(discount.minimumSubtotal);
+  if (discount.kind === 'buy_x_get_y') {
+    // "Buy 2, get 1 free of 1 collection, when they come to Rs 5,000 or more" (ADR-519).
+    const bps = discount.percentageBps ?? 10_000;
+    const items = itemsText(discount);
+    const at = bps === 10_000 ? 'free' : `at ${percentText(bps)} off`;
+    return [
+      `Buy ${discount.buyQuantity ?? 0}, get ${discount.getQuantity ?? 0} ${at}`,
+      items ? ` of ${items}` : '',
+      minimum
+        ? items
+          ? `, when they come to ${minimum} or more`
+          : ` on orders of ${minimum} or more`
+        : '',
+    ].join('');
+  }
   const what =
     discount.kind === 'percentage'
       ? `${percentText(discount.percentageBps ?? 0)} off`

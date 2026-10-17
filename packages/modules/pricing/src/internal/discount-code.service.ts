@@ -43,6 +43,10 @@ export interface DiscountCodeInput {
   /** The catalog's products and collections it is for (ADR-517); empty or null, the whole order. */
   productIds?: readonly string[] | null;
   collectionIds?: readonly string[] | null;
+  /** Buy X get Y (ADR-519): items bought for each group, 1 to 100. */
+  buyQuantity?: number | null;
+  /** Buy X get Y: items given in each group, 1 to 100, `percentage` off them (100 unless given). */
+  getQuantity?: number | null;
 }
 
 /** The most uses a code may be given. */
@@ -64,6 +68,8 @@ type CheckedCode = Partial<
     | 'oncePerCustomer'
     | 'productIds'
     | 'collectionIds'
+    | 'buyQuantity'
+    | 'getQuantity'
   >
 >;
 
@@ -152,6 +158,8 @@ export class DiscountCodeService {
             kind: values.kind!,
             percentageBps: values.percentageBps ?? null,
             amount: values.amount ?? null,
+            buyQuantity: values.buyQuantity ?? null,
+            getQuantity: values.getQuantity ?? null,
             minimumSubtotal: values.minimumSubtotal ?? null,
             ...(values.startsAt ? { startsAt: values.startsAt } : {}),
             endsAt: values.endsAt ?? null,
@@ -313,7 +321,13 @@ export interface OfferInput {
   /** The catalog's products and collections it is for (ADR-517); empty or null, the whole order. */
   productIds?: readonly string[] | null;
   collectionIds?: readonly string[] | null;
+  /** Buy X get Y (ADR-519): items bought, and items given at `percentage` off, 100 unless given. */
+  buyQuantity?: number | null;
+  getQuantity?: number | null;
 }
+
+/** Buy X get Y counts at most this many items bought, and this many given (ADR-519). */
+export const BUY_X_GET_Y_LIMIT = 100;
 
 /** A discount names at most this many products, and this many collections (ADR-517). */
 export const DISCOUNT_ITEMS_LIMIT = 100;
@@ -328,6 +342,8 @@ export interface CheckedOffer {
   endsAt?: Date | null;
   productIds?: string[];
   collectionIds?: string[];
+  buyQuantity?: number | null;
+  getQuantity?: number | null;
 }
 
 /** What a discount is now, which a change is checked over. */
@@ -335,6 +351,9 @@ interface CurrentOffer {
   startsAt: Date;
   endsAt: Date | null;
   kind: DiscountKindValue;
+  percentageBps: number | null;
+  buyQuantity: number | null;
+  getQuantity: number | null;
   productIds: string[];
   collectionIds: string[];
 }
@@ -353,6 +372,19 @@ export function checkOffer(
   noun: 'code' | 'discount',
 ): void {
   const creating = current === null;
+  // Buy X get Y (ADR-519): its quantities say so; a percentage alone changes one's off.
+  const buying =
+    present(input.buyQuantity) ||
+    present(input.getQuantity) ||
+    (current?.kind === 'buy_x_get_y' &&
+      present(input.percentage) &&
+      !present(input.amount) &&
+      input.freeShipping !== true);
+  if (buying) {
+    checkBuyXGetY(check, input, current, value, noun);
+    checkRest(check, tenant, input, current, value, noun);
+    return;
+  }
   const given = [
     present(input.percentage) && 'percentage',
     present(input.amount) && 'amount',
@@ -371,14 +403,8 @@ export function checkOffer(
       `Say what the ${noun} gives: a percentage off, an amount off, or free delivery`,
     );
   } else if (given[0] === 'percentage') {
-    const bps = Math.round(input.percentage! * 100);
-    if (!(bps >= 1 && bps <= 10_000) || Math.abs(input.percentage! * 100 - bps) > 1e-6) {
-      check.addMessage(
-        ['percentage'],
-        'INVALID',
-        'Percentage must be from 0.01 to 100, with two decimals at most, like 10 or 12.5',
-      );
-    } else Object.assign(value, kindOf('percentage', bps, null));
+    const bps = percentageOf(check, input.percentage!);
+    if (bps !== null) Object.assign(value, kindOf('percentage', bps, null));
   } else if (given[0] === 'amount') {
     const amount = check.price(['amount'], input.amount, tenant.currency);
     if (amount === 0n) check.add(['amount'], 'INVALID', 'must be more than zero');
@@ -386,7 +412,76 @@ export function checkOffer(
   } else if (given[0] === 'freeShipping') {
     Object.assign(value, kindOf('free_shipping', null, null));
   }
+  checkRest(check, tenant, input, current, value, noun);
+}
 
+/** Hundredths of a percent from a percentage given, or null and why not. */
+function percentageOf(check: InputChecker, percentage: number): number | null {
+  const bps = Math.round(percentage * 100);
+  if (!(bps >= 1 && bps <= 10_000) || Math.abs(percentage * 100 - bps) > 1e-6) {
+    check.addMessage(
+      ['percentage'],
+      'INVALID',
+      'Percentage must be from 0.01 to 100, with two decimals at most, like 10 or 12.5',
+    );
+    return null;
+  }
+  return bps;
+}
+
+/**
+ * Buy X get Y's quantities and how much off the items given (ADR-519): both quantities, kept from
+ * one that buys already; the percentage off, free unless given or kept.
+ */
+function checkBuyXGetY(
+  check: InputChecker,
+  input: OfferInput,
+  current: CurrentOffer | null,
+  value: CheckedOffer,
+  noun: 'code' | 'discount',
+): void {
+  if (present(input.amount) || input.freeShipping === true) {
+    check.addMessage(
+      [present(input.amount) ? 'amount' : 'freeShipping'],
+      'INVALID',
+      `A ${noun} gives one thing: a percentage off, an amount off, free delivery, or items for others bought`,
+    );
+    return;
+  }
+  const kept = current?.kind === 'buy_x_get_y' ? current : null;
+  const quantity = (field: 'buyQuantity' | 'getQuantity') => {
+    const given = input[field];
+    if (present(given)) {
+      return check.integer([field], given, { min: 1, max: BUY_X_GET_Y_LIMIT });
+    }
+    if (kept?.[field]) return kept[field];
+    check.add([field], 'BLANK', "can't be blank");
+    return null;
+  };
+  const buy = quantity('buyQuantity');
+  const get = quantity('getQuantity');
+  const bps = present(input.percentage)
+    ? percentageOf(check, input.percentage)
+    : (kept?.percentageBps ?? 10_000);
+  if (buy === null || get === null || bps === null) return;
+  Object.assign(value, {
+    kind: 'buy_x_get_y',
+    percentageBps: bps,
+    amount: null,
+    buyQuantity: buy,
+    getQuantity: get,
+  } satisfies CheckedOffer);
+}
+
+/** Its minimum, dates, and the products and collections it is for. */
+function checkRest(
+  check: InputChecker,
+  tenant: TenantContext,
+  input: OfferInput,
+  current: CurrentOffer | null,
+  value: CheckedOffer,
+  noun: 'code' | 'discount',
+): void {
   if (input.minimumSubtotal !== undefined) {
     const minimum = check.price(['minimumSubtotal'], input.minimumSubtotal, tenant.currency);
     if (minimum === 0n) check.add(['minimumSubtotal'], 'INVALID', 'must be more than zero');
@@ -486,7 +581,7 @@ function kindOf(
   percentageBps: number | null,
   amount: bigint | null,
 ): CheckedCode {
-  return { kind, percentageBps, amount };
+  return { kind, percentageBps, amount, buyQuantity: null, getQuantity: null };
 }
 
 /** Of `checked`, what differs from `row`. */
@@ -516,6 +611,8 @@ export function toRecord(row: DiscountCodeRow): DiscountCodeRecord {
     percentageBps: row.percentageBps,
     amount: row.amount,
     minimumSubtotal: row.minimumSubtotal,
+    buyQuantity: row.buyQuantity,
+    getQuantity: row.getQuantity,
     startsAt: row.startsAt,
     endsAt: row.endsAt,
     usageLimit: row.usageLimit,
