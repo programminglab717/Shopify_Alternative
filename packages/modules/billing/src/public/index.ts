@@ -41,7 +41,7 @@ export {
 } from '../internal/billing.service.js';
 export { invoicePage } from '../internal/billing-pages.js';
 export { BillingModule } from '../internal/billing.module.js';
-export { AiCreditsService, creditMonth } from '../internal/ai-credits.js';
+export { AI_CREDIT_PACK, AiCreditsService, creditMonth } from '../internal/ai-credits.js';
 export {
   BILLING_CURRENCY,
   BILLING_INTERVALS,

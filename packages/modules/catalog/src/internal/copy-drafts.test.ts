@@ -26,6 +26,7 @@ class Credits extends AiCredits {
     return {
       perMonth: 10,
       used: 10 - this.left,
+      bought: 0,
       left: this.left,
       plan: 'Free',
       renewsAt: new Date('2026-11-01T00:00:00+05:00'),
@@ -188,7 +189,7 @@ describe.skipIf(!server)("AI drafts of products' copy (CAT-20, ADR-471)", () => 
         field: ['base'],
         code: 'TOO_MANY',
         message:
-          "The Free plan includes 10 AI credits a month, and this month's are used: they come back on the 1st, or choose a bigger plan for more",
+          "The Free plan includes 10 AI credits a month, and this month's are used: they come back on the 1st, or buy more, or choose a bigger plan for more",
       },
     ]);
     // Refused before asking the AI.

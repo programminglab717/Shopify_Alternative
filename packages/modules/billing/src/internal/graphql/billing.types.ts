@@ -93,6 +93,7 @@ export enum BillingWalletEntryKind {
   GRANT = 'GRANT',
   MESSAGE = 'MESSAGE',
   MESSAGE_REFUND = 'MESSAGE_REFUND',
+  AI_CREDITS = 'AI_CREDITS',
 }
 
 registerEnumType(BillingWalletEntryKind, {
@@ -104,6 +105,7 @@ registerEnumType(BillingWalletEntryKind, {
     MESSAGE_REFUND: {
       description: 'What a WhatsApp message was charged, given back: it could not be delivered.',
     },
+    AI_CREDITS: { description: 'AI credits bought with it (ADR-539).' },
   },
 });
 
@@ -446,14 +448,36 @@ export class BillingAiCredits {
   @Field(() => Int)
   perMonth!: number;
 
-  @Field(() => Int)
+  @Field(() => Int, { description: "How many of the month's own are spent." })
   used!: number;
 
-  @Field(() => Int)
+  @Field(() => Int, {
+    description:
+      'Credits the shop bought and has not spent (ADR-539): they last until spent, after the ' +
+      "month's own.",
+  })
+  bought!: number;
+
+  @Field(() => Int, { description: "What it has left: the month's own, then those it bought." })
   left!: number;
 
-  @Field(() => GraphQLISODateTime, { description: 'When they come back.' })
+  @Field(() => GraphQLISODateTime, { description: "When the month's own come back." })
   renewsAt!: Date;
+
+  @Field(() => Int, { description: 'How many credits a pack bought with billingAiCreditsBuy has.' })
+  packCredits!: number;
+
+  @Field(() => Money, { description: "What a pack costs, from the shop's message credit." })
+  packPrice!: Money;
+}
+
+@ObjectType()
+export class BillingAiCreditsBuyPayload {
+  @Field(() => BillingAiCredits, { nullable: true })
+  aiCredits!: BillingAiCredits | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
 }
 
 @ObjectType({ description: "The credit the shop's messages are paid from (ADR-155)." })

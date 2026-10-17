@@ -5,7 +5,11 @@ export type AiCreditUse = 'product_copy' | 'translation';
 export interface AiCreditBalance {
   /** How many its plan includes a month. */
   perMonth: number;
+  /** How many of the month's own are spent. */
   used: number;
+  /** Credits the shop bought (ADR-539) and has not spent: they last until spent. */
+  bought: number;
+  /** What it has left to spend: the month's own, then those it bought. */
   left: number;
   /** The plan's name, such as "Free", to say which. */
   plan: string;
@@ -30,6 +34,6 @@ export abstract class AiCredits {
 export function aiCreditsMessage(balance: AiCreditBalance): string {
   return (
     `The ${balance.plan} plan includes ${balance.perMonth} AI credits a month, and this month's ` +
-    'are used: they come back on the 1st, or choose a bigger plan for more'
+    'are used: they come back on the 1st, or buy more, or choose a bigger plan for more'
   );
 }

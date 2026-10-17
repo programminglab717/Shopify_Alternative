@@ -419,6 +419,41 @@ describe.skipIf(!server)('Admin GraphQL API: what shops pay Hatti', () => {
     expect((await data(app, WALLET)).balance).toEqual({ amount: '1000.00' });
   });
 
+  it("sells AI credits from the shop's message credit, the owner alone (ADR-539)", async () => {
+    const CREDITS = `{ billingAiCredits { perMonth used bought left packCredits
+      packPrice { amount } } }`;
+    const BUY = `mutation ($packs: Int!) { billingAiCreditsBuy(packs: $packs) {
+      aiCredits { bought left } userErrors { field code message } } }`;
+    const manager = await member('manager');
+    const before = await data(manager, CREDITS);
+    expect(before).toMatchObject({ bought: 0, packCredits: 100, packPrice: { amount: '500.00' } });
+    expect((await gql(manager, BUY, { packs: 1 })).errors?.[0].extensions.code).toBe(
+      'ACCESS_DENIED',
+    );
+    expect(await data(owner, BUY, { packs: 1 })).toEqual({
+      aiCredits: { bought: 100, left: before.left + 100 },
+      userErrors: [],
+    });
+    // Paid from the message credit bought before, as an entry of its own.
+    expect((await data(manager, '{ billingWallet { balance { amount } } }')).balance).toEqual({
+      amount: '500.00',
+    });
+    expect(
+      (
+        await data(manager, '{ billingWalletEntries(first: 1) { kind amount { amount } note } }')
+      )[0],
+    ).toEqual({ kind: 'AI_CREDITS', amount: { amount: '-500.00' }, note: '100 AI credits' });
+    expect((await data(owner, BUY, { packs: 2 })).userErrors).toEqual([
+      {
+        field: ['packs'],
+        code: 'INSUFFICIENT_FUNDS',
+        message:
+          "200 AI credits cost Rs 1,000 of the shop's message credit, which has Rs 500: buy " +
+          'credit first',
+      },
+    ]);
+  });
+
   it("takes an invoice paid by transfer into Hatti's account, as its owner says, once Hatti finds it (ADR-254)", async () => {
     const manager = await member('manager');
     // Owners and managers see Hatti's account, to pay into; its invoices' pages show it too.

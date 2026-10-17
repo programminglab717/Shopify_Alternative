@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-538 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-540 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -546,6 +546,8 @@
 | 536 | The worker checks addresses given for Hatti's parts, posts an outage on the status page after three failed checks in a row, and resolves it when the part answers again | Accepted |
 | 537 | Hatti's order templates go to each shop's own WhatsApp account for approval, and a shop's customers' order news goes from its own number for each one Meta approves there | Accepted |
 | 538 | A shop's own images are served at the widths and in the formats browsers take, each made once and kept beside its file, and removed with it | Accepted |
+| 539 | A shop buys AI credits a hundred at a time from its message credit, and they last until spent, after the month's own | Accepted |
+| 540 | The admin's billing page shows the shop's AI credits, the month's own and those bought, and its owner buys more | Accepted |
 
 ---
 
@@ -20399,3 +20401,48 @@
     worker's image pipeline, and PDFs and videos share it. Making sizes when asked costs nothing
     for files never shown.
   * **Making each answer anew, kept by the edge alone:** every edge miss would encode again.
+
+## ADR-539 · A shop buys AI credits a hundred at a time from its message credit, and they last until spent, after the month's own
+
+* **Context:** Each plan includes AI credits a month (ADR-533), and a shop that spent them had to
+  wait for the 1st or choose a bigger plan. A shop that drafts a whole new collection in one week
+  needs more without changing plans.
+* **Decision:**
+  * **A pack** is 100 credits for Rs 500, and the owner buys one to ten at a time
+    (`billingAiCreditsBuy`), having signed in lately, as for anything that spends the shop's money.
+  * **Paid from the message credit** (ADR-155), at once. The credit must hold the price; otherwise
+    nothing is bought and the shop is told what the credit holds. The payment is an entry of its
+    own in the credit's history, `AI_CREDITS`, saying how many were bought, and the purchase is
+    on the activity log.
+  * **Bought credits last until spent.** A draft spends the month's own first, then one bought;
+    each use says which it spent, so the month's own come back on the 1st and those bought stay.
+    Uses are counted one draft at a time, under a lock per shop.
+  * **A shop's balance** now says what is left of the month's own and of those bought, with the
+    pack's size and price. The message a shop gets with none left says it may buy more.
+* **Consequences:**
+  * A shop never waits for the 1st to keep drafting, and pays only for what it uses beyond its
+    plan.
+  * There is no new way to pay: the message credit already takes Hatti's gateway and transfers.
+* **Alternatives:**
+  * **An invoice for each pack:** a payment, and a wait, for Rs 500.
+  * **Bought credits ending with the month:** a shop would lose what it paid for.
+
+## ADR-540 · The admin's billing page shows the shop's AI credits, the month's own and those bought, and its owner buys more
+
+* **Context:** The admin showed the plan's AI credits only on the plan card (ADR-534), and buying
+  more had no screen (ADR-539).
+* **Decision:**
+  * **Settings → Billing** has an AI credits section under the message credit. It shows what is
+    left of the month's own and when they come back, and how many bought credits are left, which
+    last until used.
+  * **The owner buys** one pack at a time with a button that names its size and price, confirming
+    who they are first if the core asks.
+  * **The credit's history** names AI credits bought.
+  * **The AI's drafting screens** count what is left of both, beside the plan's monthly number.
+    With none left, they say the plan's come back on the 1st, or that more can be bought in
+    Settings → Billing.
+* **Consequences:**
+  * A shop that runs out finds where to buy more from the message that says so.
+* **Alternatives:**
+  * **Buying from the drafting screens themselves:** every screen that drafts would carry
+    payment. Billing is where the shop's money is spent.

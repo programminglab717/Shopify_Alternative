@@ -53,15 +53,24 @@ export function messagePriceOf(channel: PhoneChannel, category: MessageCategory)
   return (MESSAGE_RATES[channel][category] * (100n + MESSAGE_FEES[channel]) + 99n) / 100n;
 }
 
-export const WALLET_ENTRY_KINDS = ['top_up', 'grant', 'message', 'message_refund'] as const;
+export const WALLET_ENTRY_KINDS = [
+  'top_up',
+  'grant',
+  'message',
+  'message_refund',
+  'ai_credits',
+] as const;
 export type WalletEntryKind = (typeof WALLET_ENTRY_KINDS)[number];
 
 /** A change to the shop's credit, as the Admin API shows it. */
 export interface WalletEntryRecord {
   id: string;
-  /** Credit bought, credit Hatti gave, a message paid for, or what one was charged given back. */
+  /**
+   * Credit bought, credit Hatti gave, a message paid for, what one was charged given back, or AI
+   * credits bought with it (ADR-539).
+   */
   kind: WalletEntryKind;
-  /** Paisa: added, or taken for a message, below nothing. */
+  /** Paisa: added, or taken for a message or AI credits, below nothing. */
   amount: bigint;
   /** Paisa: what the wallet held after it. */
   balance: bigint;

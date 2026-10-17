@@ -8,6 +8,7 @@ import {
   UserError,
   badUserInput,
   deniedToRole,
+  type AiCreditBalance,
   type TenantContext,
 } from '@hatti/api';
 import { toPublicId, tryFromPublicId } from '@hatti/ids';
@@ -23,11 +24,12 @@ import {
   type SubscriptionRecord,
   type WalletRecord,
 } from '../billing.service.js';
-import { AiCreditsService } from '../ai-credits.js';
+import { AI_CREDIT_PACK, AiCreditsService } from '../ai-credits.js';
 import type { WalletEntryRecord } from '../credits.js';
 import { BILLING_CURRENCY, type Plan } from '../plans.js';
 import {
   BillingAiCredits,
+  BillingAiCreditsBuyPayload,
   BillingBankAccount,
   BillingCreditsBuyInput,
   BillingCreditsBuyPayload,
@@ -108,17 +110,12 @@ export class BillingResolver {
 
   @Query(() => BillingAiCredits, {
     description:
-      "The AI credits the shop's plan includes this month, and how many are left (ADR-533).",
+      "The AI credits the shop's plan includes this month, those it bought, and how many are " +
+      'left (ADR-533, ADR-539).',
   })
   @RequireScopes('read_settings')
   async billingAiCredits(@CurrentTenant() tenant: TenantContext): Promise<BillingAiCredits> {
-    const balance = await this.credits.balanceOf(tenant.shopId);
-    return Object.assign(new BillingAiCredits(), {
-      perMonth: balance.perMonth,
-      used: balance.used,
-      left: balance.left,
-      renewsAt: balance.renewsAt,
-    });
+    return toAiCredits(await this.credits.balanceOf(tenant.shopId));
   }
 
   @Query(() => BillingWallet, {
@@ -167,6 +164,26 @@ export class BillingResolver {
     const result = await this.billing.buyCredits(tenant, { amount: input.amount });
     return Object.assign(new BillingCreditsBuyPayload(), {
       invoice: result.ok ? toInvoice(result.value.invoice) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => BillingAiCreditsBuyPayload, {
+    description:
+      `Buys AI credits, ${AI_CREDIT_PACK.credits} a pack, paid at once from the shop's message ` +
+      "credit (ADR-539): they last until spent, after the month's own. The owner alone, having " +
+      'signed in lately.',
+  })
+  @RequireScopes('write_settings')
+  @RequireRecentAuthentication()
+  async billingAiCreditsBuy(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('packs', { type: () => Int, defaultValue: 1 }) packs: number,
+  ): Promise<BillingAiCreditsBuyPayload> {
+    owner(tenant);
+    const result = await this.credits.buy(tenant, packs);
+    return Object.assign(new BillingAiCreditsBuyPayload(), {
+      aiCredits: result.ok ? toAiCredits(result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }
@@ -387,5 +404,17 @@ function toMessagePrice(record: MessagePriceRecord): BillingMessagePrice {
     channel: record.channel.toUpperCase() as MessageChannelEnum,
     category: record.category.toUpperCase() as MessageCategory,
     price: rupees(record.price),
+  });
+}
+
+function toAiCredits(balance: AiCreditBalance): BillingAiCredits {
+  return Object.assign(new BillingAiCredits(), {
+    perMonth: balance.perMonth,
+    used: balance.used,
+    bought: balance.bought,
+    left: balance.left,
+    renewsAt: balance.renewsAt,
+    packCredits: AI_CREDIT_PACK.credits,
+    packPrice: Money.from(money(AI_CREDIT_PACK.price, BILLING_CURRENCY)),
   });
 }

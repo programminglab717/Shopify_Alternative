@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### AI credits bought
+
+* **A shop buys AI credits a hundred at a time from its message credit, and they last until
+  spent, after the month's own** ([ADR-539](../architecture/13-decision-log.md#adr-539--a-shop-buys-ai-credits-a-hundred-at-a-time-from-its-message-credit-and-they-last-until-spent-after-the-months-own), BIL-01); **the admin's billing page shows them and its
+  owner buys more** ([ADR-540](../architecture/13-decision-log.md#adr-540--the-admins-billing-page-shows-the-shops-ai-credits-the-months-own-and-those-bought-and-its-owner-buys-more)).
+* 3276 tests, 3 more: buying and spending them, the API, and the admin's
+  section.
+
 ### 486b63b · The shop's own images sized
 
 * **A shop's own images are served at the widths and in the formats browsers take, each made once

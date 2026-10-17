@@ -527,12 +527,31 @@ type BankTransferSettingsUpdatePayload {
 The AI credits the shop's plan includes this month (ADR-533): each draft the AI gives, of a product's copy or of translations, spends one, and they come back on the 1st, Pakistan's time.
 """
 type BillingAiCredits {
+  """
+  Credits the shop bought and has not spent (ADR-539): they last until spent, after the month's own.
+  """
+  bought: Int!
+
+  """What it has left: the month's own, then those it bought."""
   left: Int!
+
+  """How many credits a pack bought with billingAiCreditsBuy has."""
+  packCredits: Int!
+
+  """What a pack costs, from the shop's message credit."""
+  packPrice: Money!
   perMonth: Int!
 
-  """When they come back."""
+  """When the month's own come back."""
   renewsAt: DateTime!
+
+  """How many of the month's own are spent."""
   used: Int!
+}
+
+type BillingAiCreditsBuyPayload {
+  aiCredits: BillingAiCredits
+  userErrors: [UserError!]!
 }
 
 """
@@ -861,6 +880,9 @@ type BillingWalletEntry {
 }
 
 enum BillingWalletEntryKind {
+  """AI credits bought with it (ADR-539)."""
+  AI_CREDITS
+
   """Credit Hatti gave."""
   GRANT
 
@@ -7092,6 +7114,11 @@ type Mutation {
   bankTransferSettingsUpdate(input: BankTransferSettingsInput!): BankTransferSettingsUpdatePayload!
 
   """
+  Buys AI credits, 100 a pack, paid at once from the shop's message credit (ADR-539): they last until spent, after the month's own. The owner alone, having signed in lately.
+  """
+  billingAiCreditsBuy(packs: Int! = 1): BillingAiCreditsBuyPayload!
+
+  """
   Chooses credit to buy for the shop's messages: an invoice, paid with billingInvoicePay, whose credit is the shop's once paid. Credit chosen before and not paid for gives way to it. The owner alone, having signed in lately.
   """
   billingCreditsBuy(input: BillingCreditsBuyInput!): BillingCreditsBuyPayload!
@@ -11973,7 +12000,7 @@ type Query {
   bankTransferSettings: BankTransferSettings!
 
   """
-  The AI credits the shop's plan includes this month, and how many are left (ADR-533).
+  The AI credits the shop's plan includes this month, those it bought, and how many are left (ADR-533, ADR-539).
   """
   billingAiCredits: BillingAiCredits!
 
