@@ -100,7 +100,8 @@ export class ConversionsService {
         INSERT INTO marketing.conversions (shop_id, platform, order_id, moment, occurred_at)
         SELECT shop_id, 'meta', ${orderId}, 'placed', ${occurredAt.toISOString()}
           FROM marketing.meta_settings
-         WHERE shop_id = ${shopId}
+         -- The pixel alone, without a token, sends to no conversions API (ADR-531).
+         WHERE shop_id = ${shopId} AND access_token IS NOT NULL
             ON CONFLICT DO NOTHING
         RETURNING id`);
       return rows.length;

@@ -97,14 +97,13 @@ describe.skipIf(!server)("Admin GraphQL API: Meta's conversions API", () => {
 
   it("connects the shop's dataset, never showing its token again, and disconnects it", async () => {
     expect(await data(tokens.owner, SETTINGS)).toBeNull();
-    expect(await data(tokens.owner, UPDATE, { input: { pixelId: '1234567890' } })).toEqual({
+    expect(await data(tokens.owner, UPDATE, { input: { accessToken: TOKEN } })).toEqual({
       metaConversions: null,
       userErrors: [
         {
-          field: ['input', 'accessToken'],
+          field: ['input', 'pixelId'],
           code: 'BLANK',
-          message:
-            "Connecting Meta needs the pixel's ID and an access token for its conversions API",
+          message: "Connecting Meta needs the pixel's ID",
         },
       ],
     });

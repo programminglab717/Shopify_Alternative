@@ -725,6 +725,11 @@ type BillingPlan {
   orderLimit: Int
 
   """
+  Whether the shop may load the Meta pixel on its storefront, without Meta's conversions API where the plan leaves that out (ADR-531).
+  """
+  pixels: Boolean!
+
+  """
   Whether the shop may hide "Powered by Hatti" from its storefront (ADR-526).
   """
   removeBranding: Boolean!
@@ -6853,8 +6858,10 @@ type MessagingSettingsUpdatePayload {
 The shop's Meta dataset, which its orders placed through checkout go to through Meta's conversions API as they are placed, confirmed and delivered (MKT-10, ADR-143).
 """
 type MetaConversions {
-  """The last four characters of its access token, never shown again."""
-  accessTokenHint: String!
+  """
+  The last four characters of its access token, never shown again; null with the pixel alone, which the storefront loads while orders go to no conversions API (ADR-531).
+  """
+  accessTokenHint: String
 
   """The dataset's ID: its Meta pixel's, as Events Manager shows it."""
   pixelId: String!
@@ -6879,7 +6886,7 @@ type MetaConversionsDeletePayload {
 
 input MetaConversionsInput {
   """
-  An access token Events Manager made for the conversions API, needed to connect: kept sealed, and never shown again.
+  An access token Events Manager made for the conversions API, on plans with it: kept sealed, and never shown again. Without one, the storefront loads the pixel alone (ADR-531).
   """
   accessToken: String
 

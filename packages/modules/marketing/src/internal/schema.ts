@@ -10,9 +10,9 @@ export const metaSettings = marketingSchema.table('meta_settings', {
   shopId: uuid('shop_id').primaryKey(),
   pixelId: text('pixel_id').notNull(),
   /** Sealed for the shop alone, and never shown again. */
-  accessToken: text('access_token').notNull(),
-  /** Its last four characters. */
-  tokenHint: text('token_hint').notNull(),
+  accessToken: text('access_token'),
+  /** Its last four characters; null with the pixel alone (ADR-531). */
+  tokenHint: text('token_hint'),
   testEventCode: text('test_event_code'),
   /** Which of an order's moments is Meta's Purchase. */
   purchaseAt: text('purchase_at', { enum: CONVERSION_MOMENTS }).notNull().default('placed'),

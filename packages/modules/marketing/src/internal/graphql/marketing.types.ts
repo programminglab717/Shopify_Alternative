@@ -74,8 +74,13 @@ export class MetaConversions {
   @Field({ description: "The dataset's ID: its Meta pixel's, as Events Manager shows it." })
   pixelId!: string;
 
-  @Field({ description: 'The last four characters of its access token, never shown again.' })
-  accessTokenHint!: string;
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The last four characters of its access token, never shown again; null with the pixel ' +
+      'alone, which the storefront loads while orders go to no conversions API (ADR-531).',
+  })
+  accessTokenHint!: string | null;
 
   @Field(() => String, {
     nullable: true,
@@ -107,8 +112,9 @@ export class MetaConversionsInput {
   @Field(() => String, {
     nullable: true,
     description:
-      'An access token Events Manager made for the conversions API, needed to connect: kept ' +
-      'sealed, and never shown again.',
+      'An access token Events Manager made for the conversions API, on plans with it: kept ' +
+      'sealed, and never shown again. Without one, the storefront loads the pixel alone ' +
+      '(ADR-531).',
   })
   accessToken?: string | null;
 

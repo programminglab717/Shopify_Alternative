@@ -183,6 +183,13 @@ export class BillingPlan {
       'Whether its sales report gives true profit: couriers, write-offs and claims (ADR-529).',
   })
   trueProfit!: boolean;
+
+  @Field({
+    description:
+      "Whether the shop may load the Meta pixel on its storefront, without Meta's conversions " +
+      'API where the plan leaves that out (ADR-531).',
+  })
+  pixels!: boolean;
 }
 
 @ObjectType({

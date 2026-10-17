@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### The Meta pixel alone
+
+* **A shop on Starter connects its Meta pixel alone, without the conversions API's token, and
+  its storefront loads it while orders go to no conversions API; Free connects neither**
+  ([ADR-531](../architecture/13-decision-log.md#adr-531--a-shop-on-starter-connects-its-meta-pixel-alone-without-the-conversions-apis-token-and-its-storefront-loads-it-while-orders-go-to-no-conversions-api-free-connects-neither), BIL-01, MKT-10). Migration 0249.
+* 3251 tests, 1 more: the pixel alone on Starter.
+
 ### 2f1d7e8 · True profit in the admin
 
 * **The admin's analytics show gross profit where the plan leaves true profit out, saying which

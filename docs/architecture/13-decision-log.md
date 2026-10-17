@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-530 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-531 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -538,6 +538,7 @@
 | 528 | The status page shows each part's last 90 days: a bar a day by the worst it was, and its uptime, counting incidents that took it down and not maintenance posted ahead | Accepted |
 | 529 | The sales report's true profit lines are on Growth and bigger plans: smaller plans get them null, with the report saying so, and gross profit stays on every plan | Accepted |
 | 530 | The admin's analytics show gross profit where the plan leaves true profit out, saying which plans give it, and the plan cards say which plans do | Accepted |
+| 531 | A shop on Starter connects its Meta pixel alone, without the conversions API's token, and its storefront loads it while orders go to no conversions API; Free connects neither | Accepted |
 
 ---
 
@@ -20158,3 +20159,26 @@
     learns which plan gives the rest.
 * **Alternatives:**
   * **Hiding the figure:** the owner wouldn't know true profit exists.
+
+## ADR-531 · A shop on Starter connects its Meta pixel alone, without the conversions API's token, and its storefront loads it while orders go to no conversions API; Free connects neither
+
+* **Context:** The pricing gives the Meta pixel to Starter and the conversions API to Growth and
+  bigger plans. Connecting Meta needed a token for the conversions API (ADR-143), and Starter
+  could connect no token (ADR-523), so Starter had no pixel at all; Free could connect one.
+* **Decision:**
+  * **A dataset may have no token.** Migration 0249 makes the token and its hint nullable,
+    together or neither. Connecting needs the pixel's ID; the token is for the conversions API.
+  * **Plans say whether they include the pixel.** `pixels` is on Starter and bigger, as
+    `BillingPlan` says. A plan without it connects nothing; one connected before stays, as other
+    features do (ADR-523).
+  * **A plan without the conversions API gives no token.** It is refused on the token's field,
+    naming the plan; one given before stays, and may be changed.
+  * **The pixel alone sends no orders.** The storefront loads it as before (ADR-144). No
+    moments are recorded for a dataset without a token, and the worker finds no dataset to send
+    to. A token given later sends the orders placed from then on.
+  * `MetaConversions.accessTokenHint` is null with the pixel alone.
+* **Consequences:**
+  * Starter's owners see their storefront's visits and add-to-carts in Meta's ads; Growth's add
+    orders from the server.
+* **Alternatives:**
+  * **A separate pixel setting:** a second place for the same dataset's ID, to keep in step.

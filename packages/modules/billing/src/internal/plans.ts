@@ -43,6 +43,8 @@ export interface Plan {
   removeBranding: boolean;
   /** Whether its sales report says what the orders made, couriers and write-offs taken off (ADR-529). */
   trueProfit: boolean;
+  /** Whether it may load the Meta pixel on its storefront, without the conversions API (ADR-531). */
+  pixels: boolean;
 }
 
 export const PLANS: Readonly<Record<PlanCode, Plan>> = {
@@ -61,6 +63,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     conversionsApi: false,
     removeBranding: false,
     trueProfit: false,
+    pixels: false,
   },
   starter: {
     code: 'starter',
@@ -77,6 +80,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     conversionsApi: false,
     removeBranding: true,
     trueProfit: false,
+    pixels: true,
   },
   growth: {
     code: 'growth',
@@ -93,6 +97,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     conversionsApi: true,
     removeBranding: true,
     trueProfit: true,
+    pixels: true,
   },
   pro: {
     code: 'pro',
@@ -109,6 +114,7 @@ export const PLANS: Readonly<Record<PlanCode, Plan>> = {
     conversionsApi: true,
     removeBranding: true,
     trueProfit: true,
+    pixels: true,
   },
 };
 

@@ -66,7 +66,7 @@ describe.skipIf(!server)('Billing', () => {
     expect(await f.billing.excludes(f.a.shopId, 'customDomains')).toBe('Free');
     expect(await f.billing.excludes(f.a.shopId, 'onlineGateways')).toBe('Free');
     // Nor custom apps, automations, cashback or Meta's conversions API (ADR-523), nor hiding
-    // "Powered by Hatti" (ADR-526), nor true profit (ADR-529).
+    // "Powered by Hatti" (ADR-526), nor true profit (ADR-529), nor the Meta pixel (ADR-531).
     for (const feature of [
       'customApps',
       'automations',
@@ -74,6 +74,7 @@ describe.skipIf(!server)('Billing', () => {
       'conversionsApi',
       'removeBranding',
       'trueProfit',
+      'pixels',
     ] as const) {
       expect(await f.billing.excludes(f.a.shopId, feature)).toBe('Free');
     }
@@ -165,6 +166,7 @@ describe.skipIf(!server)('Billing', () => {
       'conversionsApi',
       'removeBranding',
       'trueProfit',
+      'pixels',
     ] as const) {
       expect(await f.billing.excludes(f.a.shopId, feature)).toBeNull();
     }

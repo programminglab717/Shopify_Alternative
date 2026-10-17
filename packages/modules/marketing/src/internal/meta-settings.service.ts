@@ -26,14 +26,20 @@ export const META_LIMITS = { accessToken: 1_000, testEventCode: 64 } as const;
 /** The shop's Meta dataset, as the Admin API shows it: never its token. */
 export interface MetaConversionsRecord {
   pixelId: string;
-  /** The token's last four characters. */
-  tokenHint: string;
+  /**
+   * The token's last four characters; null with the pixel alone, without the conversions API
+   * (ADR-531).
+   */
+  tokenHint: string | null;
   testEventCode: string | null;
   purchaseAt: ConversionMomentValue;
   updatedAt: Date;
 }
 
-/** Fields left out stay as they are; connecting needs the pixel's ID and a token. */
+/**
+ * Fields left out stay as they are. Connecting needs the pixel's ID; a token for the conversions
+ * API too, unless the pixel alone is wanted (ADR-531).
+ */
 export interface MetaConversionsInput {
   pixelId?: string | null;
   accessToken?: string | null;
@@ -49,8 +55,8 @@ export interface MetaDatasetSettings extends MetaDataset {
 
 type SettingsRow = {
   pixel_id: string;
-  access_token: string;
-  token_hint: string;
+  access_token: string | null;
+  token_hint: string | null;
   test_event_code: string | null;
   purchase_at: ConversionMomentValue;
   updated_at: string | Date;
@@ -66,7 +72,9 @@ function sealedFor(shopId: string): string {
  * it for the conversions API, kept sealed and never shown again, a code for test events while
  * the shop tries it out, and which moment of an order is its Purchase. Changes are audited, the
  * token never: connecting sends customers' details to Meta, hashed, as a stolen login might.
- * A plan without the conversions API connects none, keeping one connected before (ADR-523).
+ * A plan without the conversions API gives no token, keeping one given before (ADR-523), and may
+ * connect the pixel alone for its storefront; a plan without the pixel connects nothing
+ * (ADR-531).
  */
 @Injectable()
 export class MetaConversionsService {
@@ -100,25 +108,33 @@ export class MetaConversionsService {
         ? undefined
         : checkTestEventCode(check, input.testEventCode);
     if (!check.ok) return { ok: false, errors: check.errors };
-    const plan = await this.allowance?.excludes(tenant.shopId, 'conversionsApi');
-    if (plan && !(await this.get(tenant))) {
+    const existing = await this.get(tenant);
+    const noPixel = existing ? null : await this.allowance?.excludes(tenant.shopId, 'pixels');
+    if (noPixel) {
       return failOne(
         ['input'],
         'INVALID',
-        planFeatureMessage(plan, "Meta's conversions API", 'connect it'),
+        planFeatureMessage(noPixel, 'the Meta pixel', 'connect it'),
       );
+    }
+    if (accessToken !== undefined && !existing?.tokenHint) {
+      const plan = await this.allowance?.excludes(tenant.shopId, 'conversionsApi');
+      if (plan) {
+        return failOne(
+          ['input', 'accessToken'],
+          'INVALID',
+          planFeatureMessage(plan, "Meta's conversions API", 'connect it'),
+        );
+      }
     }
 
     return this.db.tenant(tenant.shopId, async (tx) => {
       const current = await settingsIn(tx, tenant.shopId, { lock: true });
-      if (!current && (pixelId === undefined || accessToken === undefined)) {
-        return failOne(
-          ['input', pixelId === undefined ? 'pixelId' : 'accessToken'],
-          'BLANK',
-          "Connecting Meta needs the pixel's ID and an access token for its conversions API",
-        );
+      if (!current && pixelId === undefined) {
+        return failOne(['input', 'pixelId'], 'BLANK', "Connecting Meta needs the pixel's ID");
       }
-      const opened = current && this.box.decrypt(current.access_token, sealedFor(tenant.shopId));
+      const opened =
+        current?.access_token && this.box.decrypt(current.access_token, sealedFor(tenant.shopId));
       const next = {
         pixelId: pixelId ?? current!.pixel_id,
         testEventCode:
@@ -136,9 +152,10 @@ export class MetaConversionsService {
       if (current && changed.length === 0) return { ok: true, value: toRecord(current) };
       const sealed =
         accessToken === undefined
-          ? current!.access_token
+          ? (current?.access_token ?? null)
           : this.box.encrypt(accessToken, sealedFor(tenant.shopId));
-      const hint = accessToken === undefined ? current!.token_hint : accessToken.slice(-4);
+      const hint =
+        accessToken === undefined ? (current?.token_hint ?? null) : accessToken.slice(-4);
       await tx.execute(sql`
         INSERT INTO marketing.meta_settings
                (shop_id, pixel_id, access_token, token_hint, test_event_code, purchase_at)
@@ -213,10 +230,13 @@ export class MetaConversionsService {
     });
   }
 
-  /** The dataset the worker sends the shop's events to, its token opened; null if none. */
+  /**
+   * The dataset the worker sends the shop's events to, its token opened; null if none, or the
+   * pixel alone without a token (ADR-531).
+   */
   async datasetOf(shopId: string): Promise<MetaDatasetSettings | null> {
     const row = await this.db.tenant(shopId, (tx) => settingsIn(tx, shopId));
-    if (!row) return null;
+    if (!row?.access_token) return null;
     return {
       pixelId: row.pixel_id,
       accessToken: this.box.decrypt(row.access_token, sealedFor(shopId)).toString('utf8'),

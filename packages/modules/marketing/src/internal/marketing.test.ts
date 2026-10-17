@@ -8,7 +8,7 @@ import { newId } from '@hatti/ids';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ConversionsService } from './conversions.service.js';
-import { MetaConversionsService } from './meta-settings.service.js';
+import { MetaConversionsService, metaPixelIdIn } from './meta-settings.service.js';
 import { conversions, metaSettings } from './schema.js';
 
 /** A plan that leaves out every feature it is asked about (ADR-523). */
@@ -21,8 +21,15 @@ class Free extends PlanAllowance {
     return null;
   }
 
-  async excludes(): Promise<string> {
+  async excludes(_shopId: string, _feature: string): Promise<string | null> {
     return 'Free';
+  }
+}
+
+/** Starter: the Meta pixel, and not the conversions API (ADR-531). */
+class Starter extends Free {
+  override async excludes(_shopId: string, feature: string): Promise<string | null> {
+    return feature === 'conversionsApi' ? 'Starter' : null;
   }
 }
 
@@ -107,9 +114,9 @@ describe.skipIf(!server)("Meta's conversions API: the shop's dataset and its mom
 
   it('connects with the pixel and a token, keeping the token sealed and showing its end', async () => {
     expect(await meta.get(a)).toBeNull();
-    const refused = await meta.update(a, { pixelId: '1234567890' });
+    const refused = await meta.update(a, { accessToken: TOKEN });
     expect(refused.ok || refused.errors.map((e) => [e.field.join('.'), e.code])).toEqual([
-      ['input.accessToken', 'BLANK'],
+      ['input.pixelId', 'BLANK'],
     ]);
     const wrong = await meta.update(a, {
       pixelId: 'pixel-1',
@@ -295,15 +302,14 @@ describe.skipIf(!server)("Meta's conversions API: the shop's dataset and its mom
     expect((await outbox()).at(-1)).toEqual(['meta_conversions.deleted', '1234567890']);
   });
 
-  it('connects nothing on a plan without the conversions API, which keeps one connected before (ADR-523)', async () => {
+  it('connects nothing on a plan without the pixel, which keeps one connected before (ADR-523, ADR-531)', async () => {
     const free = new MetaConversionsService(db, box, new Free());
     const refused = await free.update(a, { pixelId: '1234567890', accessToken: TOKEN });
     expect(refused.ok || refused.errors).toEqual([
       {
         field: ['input'],
         code: 'INVALID',
-        message:
-          "The Free plan doesn't include Meta's conversions API: choose a bigger plan to connect it",
+        message: "The Free plan doesn't include the Meta pixel: choose a bigger plan to connect it",
       },
     ]);
     expect(await meta.get(a)).toBeNull();
@@ -311,5 +317,34 @@ describe.skipIf(!server)("Meta's conversions API: the shop's dataset and its mom
     expect(unwrap(await free.update(a, { purchaseAt: 'delivered' }))).toMatchObject({
       purchaseAt: 'delivered',
     });
+  });
+
+  it('connects the pixel alone on a plan without the conversions API, sending it no orders (ADR-531)', async () => {
+    const starter = new MetaConversionsService(db, box, new Starter());
+    const refused = await starter.update(a, { pixelId: '1234567890', accessToken: TOKEN });
+    expect(refused.ok || refused.errors).toEqual([
+      {
+        field: ['input', 'accessToken'],
+        code: 'INVALID',
+        message:
+          "The Starter plan doesn't include Meta's conversions API: choose a bigger plan to connect it",
+      },
+    ]);
+    expect(unwrap(await starter.update(a, { pixelId: '1234567890' }))).toMatchObject({
+      pixelId: '1234567890',
+      tokenHint: null,
+    });
+    // The storefront loads the pixel; the worker has no dataset to send to, and nothing to send.
+    expect(await db.tenant(a.shopId, (tx) => metaPixelIdIn(tx, a.shopId))).toBe('1234567890');
+    expect(await meta.datasetOf(a.shopId)).toBeNull();
+    expect(await moments.recordPlaced(a.shopId, newId(), new Date())).toBe(0);
+    expect(unwrap(await starter.update(a, { pixelId: '9876543210' })).pixelId).toBe('9876543210');
+    expect((await starter.update(a, { accessToken: TOKEN })).ok).toBe(false);
+
+    // On a plan with it, a token added later starts sending.
+    expect(unwrap(await meta.update(a, { accessToken: TOKEN })).tokenHint).toBe('Wx9z');
+    expect(await moments.recordPlaced(a.shopId, newId(), new Date())).toBe(1);
+    // One given before stays on the smaller plan, and may be changed there.
+    expect(unwrap(await starter.update(a, { accessToken: TOKEN })).tokenHint).toBe('Wx9z');
   });
 });

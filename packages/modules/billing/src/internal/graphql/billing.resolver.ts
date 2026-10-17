@@ -276,6 +276,7 @@ function toPlan(plan: Plan): BillingPlan {
     conversionsApi: plan.conversionsApi,
     removeBranding: plan.removeBranding,
     trueProfit: plan.trueProfit,
+    pixels: plan.pixels,
   });
 }
 
