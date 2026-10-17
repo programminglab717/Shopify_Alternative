@@ -323,6 +323,27 @@ export class LogExportEmails extends ScheduledExportSender {
 }
 
 /**
+ * Where Hatti's emails to its own people go out (ADR-525): through Amazon SES where it is set up,
+ * to the log in development, and nowhere in production without it.
+ */
+export function hattiEmailsOf(
+  config: MessageSendingConfig,
+  logger: Logger,
+): AccountEmailSender | null {
+  if (config.SES_REGION && config.SES_ACCESS_KEY_ID && config.SES_SECRET_ACCESS_KEY) {
+    return new SesEmails({
+      region: config.SES_REGION,
+      accessKeyId: config.SES_ACCESS_KEY_ID,
+      secretAccessKey: config.SES_SECRET_ACCESS_KEY,
+      from: config.EMAIL_FROM,
+      baseUrl: config.SES_URL,
+      logger,
+    });
+  }
+  return config.NODE_ENV === 'production' ? null : new LogEmails(logger);
+}
+
+/**
  * Where scheduled exports' emails go out (ADR-183): through Amazon SES where it is set up, to the
  * log in development, and nowhere in production without it, where they wait.
  */

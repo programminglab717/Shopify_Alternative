@@ -1,6 +1,6 @@
 import { PublicSite, StorefrontSite, SystemDnsLookup } from '@hatti/api';
 import { HttpWebhookSender, WebhookService } from '@hatti/apps/public';
-import { BillingService, MessageWallet } from '@hatti/billing/public';
+import { BillingService, MessageWallet, SupportService } from '@hatti/billing/public';
 import {
   CollectionService,
   MediaProcessing,
@@ -69,7 +69,7 @@ import { GatewayAccountService, OnlinePaymentService } from '@hatti/payments/pub
 import { StorefrontActivity } from '@hatti/storefront-data';
 import { vapidKeysOf, type WorkerConfig } from '../config.js';
 import { couriersOf } from '../couriers.js';
-import { exportEmailsOf } from '../emails.js';
+import { exportEmailsOf, hattiEmailsOf } from '../emails.js';
 import { messageProvidersOf, shopNumbersOf } from '../messaging.js';
 import { paymentGatewaysOf } from '../payments.js';
 import { CloudflareCache, NO_EDGE_CACHE, type EdgeCache } from '../storefront/edge-cache.js';
@@ -119,6 +119,7 @@ import { ScheduledContent, scheduledKinds } from './scheduled-content.js';
 import { ScheduledExports } from './scheduled-exports.js';
 import { StoreExports } from './store-exports.js';
 import { StaffAlerts } from './staff-alerts.js';
+import { SupportAlerts } from './support-alerts.js';
 import { StorefrontSessions } from './storefront-sessions.js';
 import { StorefrontSweep } from './storefront-sweep.js';
 import { UnpaidOrders } from './unpaid-orders.js';
@@ -574,6 +575,14 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
       logger,
     ).start(config.SWEEP_INTERVAL_MS);
     closers.push(() => renewals.stop());
+    // Shops' support requests still open past their plan's time, told to Hatti's people (ADR-525).
+    const supportAlerts = new SupportAlerts(
+      new SupportService(database),
+      hattiEmailsOf(config, logger),
+      config.SUPPORT_EMAIL ?? null,
+      logger,
+    ).start(config.SWEEP_INTERVAL_MS);
+    closers.push(() => supportAlerts.stop());
     if (config.ENCRYPTION_KEYS) {
       const conversions = new ConversionsSender({
         database,

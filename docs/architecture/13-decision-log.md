@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-524 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-525 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -532,6 +532,7 @@
 | 522 | The admin's draft page takes a discount code beside the amount off: while a code is given the amount is the code's to set and is not asked, the draft shows its discount by the code, and emptying the code takes it off | Accepted |
 | 523 | Plans gate more of what the pricing leaves out: custom apps, automations and the abandoned checkout reminder from Starter, cashback and Meta's conversions API from Growth; refused when made, connected or turned on, those already are kept | Accepted |
 | 524 | The admin's plan cards say which of the features a plan gates each includes: automations and abandoned checkout reminders, cashback, Meta's conversions API and custom apps, beside its limits, domain and payments | Accepted |
+| 525 | A shop's support request still open past its plan's time is flagged to Hatti's people once: the worker's sweep marks it, logs it and emails Hatti's support address the list, and the command says when each request is due | Accepted |
 
 ---
 
@@ -19995,3 +19996,40 @@
   * **Disabling the switches on the automations, apps and Meta pages for a plan without them:**
     the API's refusal already says why and which plan the shop is on, and what was on before stays
     usable. The switches can follow once they read the plan.
+
+## ADR-525 · A shop's support request still open past its plan's time is flagged to Hatti's people once: the worker's sweep marks it, logs it and emails Hatti's support address the list, and the command says when each request is due
+
+* **Context:**
+  * Each plan promises an answer within its hours (ADR-508): 48 on Free, 24 on Starter, 8 on
+    Growth and 4 on Pro.
+  * Hatti's people list what waits with a command. Nothing told them when a promise was about to
+    be broken, or had been.
+* **Decision:**
+  * **Due:** a request is due its plan's hours after it was asked, counted on the clock. The plan
+    is the one the shop was on when it asked.
+  * **Flagged once:**
+    * The support module's `overdue` marks each request still open past its time, in the same
+      statement that finds it (migration 0247), with the system role.
+    * The next sweep finds only those late since. An answered or closed request is never flagged.
+  * **Told:**
+    * The worker sweeps as its other sweeps do. Each request flagged is logged as a warning, with
+      its public ID, shop, plan and when it was due.
+    * One email per sweep goes to Hatti's support address (`SUPPORT_EMAIL`) through SES. It lists
+      the late requests, the most urgent first. Each item gives the shop, plan, priority, topic,
+      hours late and the shop's words, with the command that answers it.
+    * Without the address or SES, the log alone says so. An email SES refuses is logged.
+  * **The command's list** shows when each request is due, or LATE once it is past.
+* **Consequences:**
+  * A broken promise reaches Hatti's people's inbox within one sweep, at most ten minutes by
+    default, and the log feeds whatever alerting watches it.
+  * A request is flagged once. Only the email tells of it, and the list's LATE marks it after.
+  * Hours on the clock are stricter than working hours. A Friday-evening request on Pro is late
+    by Saturday morning. Hatti's hours are words shown to shops, not a schedule the core keeps.
+* **Alternatives:**
+  * **A message to Hatti's people on WhatsApp:** it needs a template Meta approves and a number
+    for Hatti's people. Email reaches the inbox support already works from.
+  * **Flagging after the email went:** a sweep that failed between the two would flag twice or
+    not at all. Marking in the statement that finds a request keeps two workers from both
+    telling of it; the warning in the log is there however the email went.
+  * **Working hours:** they need Hatti's own calendar of hours and holidays, which the core
+    doesn't keep.

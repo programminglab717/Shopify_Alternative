@@ -5,7 +5,8 @@ import { parseArgs } from 'node:util';
 import { loadSupportRequestsConfig } from './config.js';
 
 // The requests shops sent Hatti's people from their admin (ADR-508): those waiting, the most
-// urgent then the oldest first, as the shops' plans set; and each answered, in the language the
+// urgent then the oldest first, as the shops' plans set, each with when it is due (ADR-525); and
+// each answered, in the language the
 // shop asked in, which its admin shows. For Hatti's own people, by whoever runs Hatti, never
 // through the Admin API.
 //
@@ -85,12 +86,16 @@ function parseCommand(
   return { command, id, request, by, text };
 }
 
-/** A request waiting, on one line: who, how urgent, about what, and what they said. */
+/**
+ * A request waiting, on one line: who, how urgent, when it is due, or LATE past its plan's time
+ * (ADR-525), about what, and what they said.
+ */
 function line(request: OpenSupportRequest): string {
   return [
     toPublicId('supportRequest', request.id),
     request.createdAt.toISOString(),
     `P${request.priority}`,
+    request.dueAt.getTime() <= Date.now() ? 'LATE' : `due ${request.dueAt.toISOString()}`,
     request.shopName,
     request.plan,
     request.topic,

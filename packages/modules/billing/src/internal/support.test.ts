@@ -131,4 +131,26 @@ describe.skipIf(!server)("Hatti's support for shops (BIL-05, ADR-508)", () => {
     ]);
     expect((await support.waiting()).map((each) => each.id)).toEqual([free.id]);
   });
+
+  it("flags each request still open past its plan's time once, the most urgent first (ADR-525)", async () => {
+    const free = unwrap(await ask(f.b));
+    await f.subscribe(f.a, 'growth', 'monthly', year);
+    const growth = unwrap(await ask(f.a));
+    const answered = unwrap(await ask(f.a, { topic: 'orders' }));
+    unwrap(await support.answer(answered.id, 'Done.', 'Ayesha'));
+    const later = (hours: number) => new Date(growth.createdAt.getTime() + hours * 3_600_000);
+    // Growth answers in 8 hours, Free in 48.
+    expect((await support.waiting()).map((each) => [each.id, each.dueAt])).toEqual([
+      [growth.id, later(8)],
+      [free.id, new Date(free.createdAt.getTime() + 48 * 3_600_000)],
+    ]);
+    expect(await support.overdue(later(7))).toEqual([]);
+    expect((await support.overdue(later(9))).map((each) => [each.id, each.shopName])).toEqual([
+      [growth.id, 'Zari'],
+    ]);
+    // Once: the next sweep finds only those late since; an answered one never.
+    expect(await support.overdue(later(10))).toEqual([]);
+    expect((await support.overdue(later(49))).map((each) => each.id)).toEqual([free.id]);
+    expect(await support.overdue(later(100))).toEqual([]);
+  });
 });

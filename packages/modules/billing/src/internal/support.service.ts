@@ -3,7 +3,7 @@ import { Database, toDate, type Tx } from '@hatti/db';
 import { parsePkMobile } from '@hatti/pk';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
-import { PLANS, type PlanCode } from './plans.js';
+import { PLAN_CODES, PLANS, type PlanCode } from './plans.js';
 
 // Hatti's support for shops (BIL-05, ADR-508): where a shop reaches Hatti's people, as its plan
 // allows, from the docs/product/03 pricing: Free has the help centre and requests answered in two
@@ -95,6 +95,29 @@ export interface OpenSupportRequest extends SupportRequestRecord {
   shopId: string;
   shopName: string;
   plan: PlanCode;
+  /** When its plan says it is answered by (ADR-525). */
+  dueAt: Date;
+}
+
+/**
+ * When a request asked at `createdAt` on `plan` is due an answer (ADR-525): its plan's hours
+ * after, counted on the clock.
+ */
+export function supportDueAt(plan: PlanCode, createdAt: Date): Date {
+  return new Date(createdAt.getTime() + SUPPORT_TIERS[plan].answerWithinHours * 3_600_000);
+}
+
+type OpenRow = SupportRow & { shop_id: string; shop_name: string; plan: PlanCode };
+
+function toOpen(row: OpenRow): OpenSupportRequest {
+  const record = toRecord(row);
+  return {
+    ...record,
+    shopId: row.shop_id,
+    shopName: row.shop_name,
+    plan: row.plan,
+    dueAt: supportDueAt(row.plan, record.createdAt),
+  };
 }
 
 type SupportRow = {
@@ -248,9 +271,7 @@ export class SupportService {
    */
   async waiting(): Promise<OpenSupportRequest[]> {
     return this.db.system(async (tx) => {
-      const { rows } = await tx.execute<
-        SupportRow & { shop_id: string; shop_name: string; plan: PlanCode }
-      >(sql`
+      const { rows } = await tx.execute<OpenRow>(sql`
         SELECT r.id, r.topic, r.message, r.language, r.call_back, r.priority, r.status, r.answer,
                r.answered_by, r.answered_at, r.created_at, r.shop_id, r.plan,
                s.name AS shop_name
@@ -258,13 +279,35 @@ export class SupportService {
           JOIN control.shops s ON s.id = r.shop_id
          WHERE r.status = 'open'
          ORDER BY r.priority, r.created_at`);
-      return rows.map((row) => ({
-        ...toRecord(row),
-        shopId: row.shop_id,
-        shopName: row.shop_name,
-        plan: row.plan,
-      }));
+      return rows.map(toOpen);
     });
+  }
+
+  /**
+   * The requests still open at `now` past the time their plan answers in (ADR-525), each once:
+   * marked as flagged as they are found, so the next sweep finds only those late since. The most
+   * urgent then the oldest first, with the system role, for Hatti's own people alone.
+   */
+  async overdue(now: Date = new Date()): Promise<OpenSupportRequest[]> {
+    const hours = sql.join(
+      PLAN_CODES.map((code) => sql`(${code}::text, ${SUPPORT_TIERS[code].answerWithinHours}::int)`),
+      sql`, `,
+    );
+    const { rows } = await this.db.system((tx) =>
+      tx.execute<OpenRow>(sql`
+        UPDATE billing.support_requests r
+           SET overdue_at = ${now}
+          FROM control.shops s, (VALUES ${hours}) AS t (plan, hours)
+         WHERE s.id = r.shop_id AND t.plan = r.plan
+           AND r.status = 'open' AND r.overdue_at IS NULL
+           AND r.created_at + make_interval(hours => t.hours) <= ${now}
+        RETURNING r.id, r.topic, r.message, r.language, r.call_back, r.priority, r.status,
+                  r.answer, r.answered_by, r.answered_at, r.created_at, r.shop_id, r.plan,
+                  s.name AS shop_name`),
+    );
+    return rows
+      .map(toOpen)
+      .sort((a, b) => a.priority - b.priority || a.createdAt.getTime() - b.createdAt.getTime());
   }
 
   /**

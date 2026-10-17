@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### Support requests past their time
+
+* **A shop's support request still open past its plan's time is flagged to Hatti's people once:
+  logged, and emailed to Hatti's support address with the others late, the command saying when
+  each is due** ([ADR-525](../architecture/13-decision-log.md#adr-525--a-shops-support-request-still-open-past-its-plans-time-is-flagged-to-hattis-people-once-the-workers-sweep-marks-it-logs-it-and-emails-hattis-support-address-the-list-and-the-command-says-when-each-request-is-due), BIL-05). Migration 0247.
+* 3243 tests, 4 more: the requests flagged by their plans' hours, and
+  the sweep's log and email.
+
 ### ac8e205 · Plan cards with their features
 
 * **The admin's plan cards say which of the features a plan gates each includes: automations and

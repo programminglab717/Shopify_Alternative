@@ -596,6 +596,11 @@ const workerSchema = z
     SESSIONS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(60_000),
     /** How often storefronts whose publisher gave up are built, once they go quiet (ADR-225). */
     STOREFRONTS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(60_000),
+    /**
+     * Hatti's support address (ADR-508), which is told of shops' requests still open past their
+     * plan's time (ADR-525). Without it, they are logged alone.
+     */
+    SUPPORT_EMAIL: z.string().trim().email().max(200).optional(),
     ...messageSending,
     ...storage,
     ...webPush,

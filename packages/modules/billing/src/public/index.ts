@@ -61,6 +61,7 @@ export {
   SUPPORT_TIERS,
   SUPPORT_TOPICS,
   SupportService,
+  supportDueAt,
   type OpenSupportRequest,
   type SupportChannel,
   type SupportContact,
