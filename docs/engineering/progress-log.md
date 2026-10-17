@@ -16,6 +16,15 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-17
 
+### The shop's last data kept for offline use
+
+* **Offline, the merchant admin shows what the session last saw of Home, the orders and
+  customers lists and the orders and customers opened, saying how old it is** ([ADR-514](../architecture/13-decision-log.md#adr-514--the-admin-keeps-the-shops-last-data-for-use-offline-home-the-orders-and-customers-lists-first-pages-the-orders-and-customers-opened-and-the-account-in-the-browsers-storage-for-the-session-that-read-them-shown-offline-with-how-old-they-are-and-forgotten-on-signing-out)). It is
+  kept in the browser's storage for that session alone, at most three days, and forgotten on
+  signing out. Queries start offline when the phone is, so they wait instead of failing.
+* 3195 tests, 4 more: what is kept and restored, other sessions and old
+  data refused, Home offline and back online, and signing out.
+
 ### 3e00218 · The admin's edge headers
 
 * **The merchant admin's builds write the edge's headers to `_headers`: a content security

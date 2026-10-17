@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-513 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-514 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -521,6 +521,7 @@
 | 511 | Humane dunning: an overdue period's owner reminded the day it ends, with three days left and with one, each once, and the admin saying by when, the store open throughout | Accepted |
 | 512 | Sales tax on Hatti's invoices: provincial sales tax on services at Hatti's registration, kept on each invoice with its authority, rate and number, and paid on top of the price | Accepted |
 | 513 | The merchant admin's edge headers: a content security policy that runs only the admin's own scripts and Google's and Facebook's sign-in, written to `_headers` by each build with HSTS, framing refused and the camera alone allowed | Accepted |
+| 514 | The admin keeps the shop's last data for use offline: Home, the orders and customers lists' first pages, the orders and customers opened and the account, in the browser's storage for the session that read them, shown offline with how old they are and forgotten on signing out | Accepted |
 
 ---
 
@@ -19559,3 +19560,52 @@
     foreign script out first. Moving the refresh token into a cookie can still come later.
   * **A `<meta>` policy in index.html:** a meta tag cannot carry `frame-ancestors`, cannot report
     violations, and would not cover the service worker's script.
+
+## ADR-514 · The admin keeps the shop's last data for use offline: Home, the orders and customers lists' first pages, the orders and customers opened and the account, in the browser's storage for the session that read them, shown offline with how old they are and forgotten on signing out
+
+* **Context:**
+  * ADR-295 made the admin open offline, but showed none of the shop's data there. Keeping
+    orders and customers in the browser's storage was left for later: shops share phones, and
+    the session's own keeping of data had to be thought through first.
+  * Staff lose their connection in markets, warehouses and on the road. A packer who opens the
+    admin there finds a page saying only that they are offline.
+* **Decision:**
+  * **What is kept** (`src/offline/kept-data.ts`):
+    * Home's counts and stock.
+    * The first page of the orders and customers lists, as last searched.
+    * The orders and customers opened.
+    * The account and its shops (`/auth/me`), without which no shop opens.
+    * At most 40 queries and about 1.5 MB, the newest first. Nothing else the admin reads is
+      kept: settings, reports and other pages are left out.
+  * **Kept for the session that read it:**
+    * Saved in the browser's storage under the session's id, a second after the last query that
+      succeeded.
+    * Put back into the query cache when the admin opens, only for that same session. Each query
+      is restored as old as its data.
+    * A different session on the same phone, or none, finds nothing, and what was kept is
+      forgotten at once.
+    * Signing out forgets it, here or in another tab.
+    * Data older than three days is not shown.
+  * **Offline:**
+    * The admin tells its queries at once that the browser is offline. They wait for a
+      connection instead of failing over the data they show.
+    * Home, the lists and the order and customer pages show what was kept, with "As Hatti last
+      saw it, 2 hours ago." The notice above every page says Hatti shows what it last saw.
+  * **Online:** each kept query is stale, so its page fetches it again as it opens. Nothing old
+    is shown once a connection is back.
+  * Saving changes offline stays as ADR-295 left it: the work waits for a connection.
+* **Consequences:**
+  * Staff can read the orders they were working on, and Home's counts, with no connection.
+  * The data is what the API gave that member. A confirmation agent's kept customers have their
+    numbers masked as the API masks them (ADR-027). It sits in the phone's browser storage, where
+    anyone with the unlocked phone could read it. The limits, the three days and signing out keep
+    that small. Staff who share a phone should sign out when they hand it on.
+  * Only what staff opened is kept. An order never opened online cannot be read offline.
+* **Alternatives:**
+  * **TanStack Query's persister packages:** they keep the whole cache unless told otherwise, and
+    know nothing of sessions. The few dozen lines here keep what is chosen, for one session.
+  * **IndexedDB:** it holds more, but the kept data is small, and synchronous storage lets the
+    cache be filled before the first render, with no flash of a loading page.
+  * **The service worker caching the API's answers:** the Admin API is GraphQL over POST, which
+    the Cache API does not keep. The worker would also have to know which session a response
+    belongs to. ADR-295 keeps the worker out of the shop's data.

@@ -26,6 +26,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { CustomerTagsPanel } from './bulk';
 import { MOVES_CUSTOMERS } from './transfer-page';
+import { SeenAt } from '../offline/seen-at';
 
 const PAGE = 50;
 
@@ -172,6 +173,7 @@ export function CustomersPage() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
+      <SeenAt at={customers.dataUpdatedAt} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
           {t('customers.title')}

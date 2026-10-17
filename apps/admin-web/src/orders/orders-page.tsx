@@ -46,6 +46,7 @@ import { SEES_PACKERS, SEES_PACKING } from './packers-page';
 import { WORKS_PARCELS } from './parcels';
 import { PrintPanel } from './print';
 import { StageBadge, STAGES } from './stage';
+import { SeenAt } from '../offline/seen-at';
 
 /** The stage tabs, in the pipeline's order (docs/design/02 §1). */
 const TABS: readonly (OrderStage | null)[] = [
@@ -301,6 +302,7 @@ export function OrdersPage() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
+      <SeenAt at={orders.dataUpdatedAt} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
           {t('orders.title')}

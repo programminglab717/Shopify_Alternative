@@ -111,6 +111,11 @@ export class SessionStore {
 
   getSnapshot = (): SessionSnapshot => this.#snapshot;
 
+  /** The session's id while it is signed in: what the admin keeps for offline is its (ADR-514). */
+  sessionId(): string | null {
+    return this.#snapshot.signedIn ? (this.#tokens?.session.id ?? null) : null;
+  }
+
   /** Another tab signed in, refreshed or signed out: take what it kept. */
   sync(): void {
     this.#set(this.#read(), false);

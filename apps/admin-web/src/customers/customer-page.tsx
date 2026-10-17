@@ -34,6 +34,7 @@ import { useWide } from '../ui/wide';
 import { shownPhone } from './customers-page';
 import { CustomerCare, MarketingConsent } from './care';
 import { READS_CREDIT, StoreCredit } from './store-credit';
+import { SeenAt } from '../offline/seen-at';
 
 /** The roles that change customers and the blocklist (docs/design/02 §6). */
 const EDITS_CUSTOMERS: readonly StaffRole[] = ['owner', 'manager'];
@@ -423,6 +424,7 @@ export function CustomerPage() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 pb-8">
       {back}
+      <SeenAt at={query.dataUpdatedAt} />
       <header className="flex flex-col gap-1">
         <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold" dir="auto">
           {customer.displayName}

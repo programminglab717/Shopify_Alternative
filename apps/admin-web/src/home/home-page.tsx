@@ -24,6 +24,7 @@ import { LocationFilter, useOrdersLocation } from '../orders/location-filter';
 import { useAdminQuery, useShop } from '../shell/shop-context';
 import { Button } from '../ui/button';
 import { Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
+import { SeenAt } from '../offline/seen-at';
 
 type HomeKey = Exclude<keyof HomeData['home'], 'today' | 'parcelsUnseen' | 'deliveriesToRescue'>;
 
@@ -350,6 +351,7 @@ export function HomePage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
+      <SeenAt at={home.dataUpdatedAt} />
       <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
         {t('home.title')}
       </h1>

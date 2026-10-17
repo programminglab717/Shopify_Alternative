@@ -1664,7 +1664,8 @@ const en = {
     'This Google account signs in to another Hatti account. Disconnect it there first.',
   'error.INVALID_PASSKEY': 'That passkey did not work here. Try again, or use another way.',
   'offline.notice':
-    "You're offline. Hatti shows and saves your shop's work again once you're back online.",
+    "You're offline. Hatti shows what it last saw of your shop, and saves your work again once you're back online.",
+  'offline.seenAt': 'As Hatti last saw it, {when}.',
   'update.ready': 'A new version of Hatti is ready.',
   'update.reload': 'Reload',
   'onlineStore.blogs': 'Blogs',
@@ -6269,7 +6270,8 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'error.INVALID_PASSKEY':
     'یہ پاس کی یہاں کام نہیں کر سکی۔ دوبارہ کوشش کریں، یا کوئی اور طریقہ استعمال کریں۔',
   'offline.notice':
-    'آپ آف لائن ہیں۔ انٹرنیٹ واپس آنے پر ہٹی آپ کی دکان کا کام پھر سے دکھائے گا اور محفوظ کرے گا۔',
+    'آپ آف لائن ہیں۔ ہٹی آپ کی دکان کا وہی حال دکھا رہا ہے جو اس نے آخری بار دیکھا، اور انٹرنیٹ واپس آنے پر آپ کا کام پھر سے محفوظ کرے گا۔',
+  'offline.seenAt': 'جیسا ہٹی نے آخری بار دیکھا، {when}۔',
   'update.ready': 'ہٹی کا نیا ورژن تیار ہے۔',
   'update.reload': 'نیا ورژن کھولیں',
   'onlineStore.blogs': 'بلاگ',

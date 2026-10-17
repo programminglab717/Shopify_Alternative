@@ -50,6 +50,7 @@ import { RepeatBanner } from './repeat';
 import { OrderReturns } from './returns';
 import { ShipsFrom } from './ships-from';
 import { StageBadge } from './stage';
+import { SeenAt } from '../offline/seen-at';
 
 const CONFIRMABLE: readonly OrderStage[] = ['NEEDS_CONFIRMATION', 'NEEDS_REVIEW'];
 /** The stages an order is cancelled from: any before it ships. */
@@ -335,6 +336,7 @@ export function OrderPage() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
       {back}
+      <SeenAt at={query.dataUpdatedAt} />
       <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="num text-[length:var(--hatti-type-display-size)] font-semibold">
