@@ -5480,6 +5480,54 @@ export const StorefrontPreferencesUpdateMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
+const ONLINE_STORE_FILTERS = /* GraphQL */ `
+  fragment OnlineStoreFilterFields on StorefrontFilter {
+    kind
+    key
+    label
+    labelUr
+    defaultLabel
+    metafieldType
+  }
+  fragment OnlineStoreFiltersFields on OnlineStoreFilters {
+    filters {
+      ...OnlineStoreFilterFields
+    }
+    availableFilters {
+      ...OnlineStoreFilterFields
+    }
+  }
+`;
+
+/**
+ * The filters the storefront's collection and search pages show, null for every one in the
+ * platform's order, and those the shop could choose (ADR-568).
+ */
+export const OnlineStoreFiltersQuery = /* GraphQL */ `
+  query OnlineStoreFilters {
+    onlineStoreFilters {
+      ...OnlineStoreFiltersFields
+    }
+  }
+  ${ONLINE_STORE_FILTERS}
+`;
+
+/** The storefront's filters chosen, in their order and words, or null for the platform's. */
+export const OnlineStoreFiltersUpdateMutation = /* GraphQL */ `
+  mutation OnlineStoreFiltersUpdate($input: OnlineStoreFiltersInput!) {
+    onlineStoreFiltersUpdate(input: $input) {
+      onlineStoreFilters {
+        ...OnlineStoreFiltersFields
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${ONLINE_STORE_FILTERS}
+  ${USER_ERRORS}
+`;
+
 /** The shop's redirects from old addresses, found by any part of either address (OS-09). */
 export const UrlRedirectsQuery = /* GraphQL */ `
   query UrlRedirects($query: String) {

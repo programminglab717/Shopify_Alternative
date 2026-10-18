@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-568 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-569 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -576,6 +576,7 @@
 | 566 | A shop connects its TikTok advertiser account and the same worker pulls its spend by campaign under Meta's rules, shared between the two | Accepted |
 | 567 | The admin's ad spend page connects the shop's TikTok advertiser account as it does Meta's, one card for both, TikTok's folded until it is wanted | Accepted |
 | 568 | A shop chooses its storefront's filters, their order and their words, filters on its products' and variants' custom fields among them, and none chosen keeps every filter as before | Accepted |
+| 569 | The admin's online store has a Filters tab: every filter as before, or the shop's own list, ordered, named in English and Urdu, its custom fields' filters added | Accepted |
 
 ---
 
@@ -21201,3 +21202,20 @@
   vary by; a theme's `collection.filters` follows without a change of theme.
 * **Alternatives:** **Filters in the theme's settings:** each theme would ask again, and a
   shop's filters are of its catalog, not its look.
+
+## ADR-569 · The admin's online store has a Filters tab: every filter as before, or the shop's own list, ordered, named in English and Urdu, its custom fields' filters added
+
+* **Context:** A shop may choose its storefront's filters (ADR-568), but only through the API.
+* **Decision:**
+  * **A Filters tab** in the online store, for those who edit its menus and preferences: every
+    filter (the default), shown as the storefront now shows them, or the shop's own list.
+  * **Choosing** starts from what the storefront shows, so the shop edits what it sees; each
+    filter moves up or down, takes words of its own in English and Urdu, or is removed; a
+    filter is added from the built-in ones, the products' options, and the product's and
+    variant's custom fields. Up to 25; an empty list is said to show none. A chosen list is
+    fixed: options added later join it only when the shop adds them, as the page says.
+  * Saving sends the whole list, or the default; a problem shows under its filter. English and
+    Urdu.
+* **Consequences:** A shop arranges its filters without the API.
+* **Alternatives:** **Dragging to reorder:** buttons to move a filter work by keyboard and on a
+  phone, and say what they do to a screen reader.

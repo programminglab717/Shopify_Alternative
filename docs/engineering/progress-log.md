@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-18
 
+### The Filters tab
+
+* **The admin's online store has a Filters tab: every filter as before, or the shop's own list,
+  ordered, named in English and Urdu, its custom fields' filters added** ([ADR-569](../architecture/13-decision-log.md#adr-569--the-admins-online-store-has-a-filters-tab-every-filter-as-before-or-the-shops-own-list-ordered-named-in-english-and-urdu-its-custom-fields-filters-added), SRC-03).
+* 3498 tests, 9 more: the tab's default, choosing and editing, what is
+  saved, problems, the limit and roles, and the GraphQL against the schema.
+
 ### 0239c1e · The filters a shop chooses
 
 * **A shop chooses its storefront's filters, their order and their words, filters on its

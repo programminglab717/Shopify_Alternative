@@ -8,6 +8,7 @@ import { EmptyState } from '../ui/feedback';
 import { WRITES_URDU } from '../urdu/in-urdu';
 import { UrduOverview } from '../urdu/urdu-overview';
 import { BlogsList } from './blogs';
+import { FiltersTab } from './filters';
 import { GoogleTab } from './google';
 import { LinkPageTab } from './link-page';
 import { EDITS_MENUS, MenusList } from './menus';
@@ -27,6 +28,7 @@ export const ONLINE_STORE_TABS = [
   'menus',
   'policies',
   'storefront',
+  'filters',
   'themes',
   'builder',
   'speed',
@@ -66,6 +68,7 @@ const TABS: Record<
     roles: EDITS_MENUS,
     body: () => <StorefrontPreferencesTab />,
   },
+  filters: { label: 'onlineStore.filters', roles: EDITS_MENUS, body: () => <FiltersTab /> },
   themes: { label: 'onlineStore.themes', roles: EDITS_THEMES, body: () => <ThemesTab /> },
   builder: {
     label: 'onlineStore.builder',
@@ -88,7 +91,7 @@ export const OPENS_ONLINE_STORE: readonly StaffRole[] = [
 
 /**
  * The online store (OS-02, OS-06, OS-07, OS-09, OS-15): the shop's pages, blogs, menus and policies,
- * its storefront's password, pause and home page for search engines, its themes, its speed (OS-13), its
+ * its storefront's password, pause and home page for search engines, its filters (ADR-568), its themes, its speed (OS-13), its
  * redirects, its
  * link page, Meta and the catalog feed (MKT-10, MKT-11), TikTok (ADR-542), Google (ADR-550), and what is left to put in Urdu; a tab for
  * each part its role works in.

@@ -2429,6 +2429,56 @@ export interface StorefrontPreferencesUpdateData {
   };
 }
 
+/** What one of the storefront's filters narrows products by (ADR-568). */
+export type StorefrontFilterKind =
+  | 'AVAILABILITY'
+  | 'PRICE'
+  | 'PRODUCT_TYPE'
+  | 'VENDOR'
+  | 'OPTION'
+  | 'STITCHING'
+  | 'PIECES'
+  | 'FABRIC'
+  | 'SEASON'
+  | 'PRODUCT_METAFIELD'
+  | 'VARIANT_METAFIELD';
+
+/** One of the storefront's filters: one the shop chose, or one it could choose. */
+export interface StorefrontFilter {
+  kind: StorefrontFilterKind;
+  /** An option's name, or a metafield definition's namespace.key; null for the others. */
+  key: string | null;
+  label: string | null;
+  labelUr: string | null;
+  defaultLabel: string;
+  /** A metafield's type; null for the others, or a definition deleted since. */
+  metafieldType: string | null;
+}
+
+export interface StorefrontFilterInput {
+  kind: StorefrontFilterKind;
+  key?: string;
+  label?: string;
+  labelUr?: string;
+}
+
+export interface OnlineStoreFilters {
+  /** Those the pages show, in their order; null for every one, in the platform's order. */
+  filters: StorefrontFilter[] | null;
+  availableFilters: StorefrontFilter[];
+}
+
+export interface OnlineStoreFiltersData {
+  onlineStoreFilters: OnlineStoreFilters;
+}
+
+export interface OnlineStoreFiltersUpdateData {
+  onlineStoreFiltersUpdate: {
+    onlineStoreFilters: OnlineStoreFilters | null;
+    userErrors: UserError[];
+  };
+}
+
 export interface UrlRedirectValue {
   id: string;
   path: string;
