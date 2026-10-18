@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-18
 
-### Meta's ad account in the admin
+### f965d59 · Meta's ad account in the admin
 
 * **The admin's ad spend page connects the shop's Meta ad account, pulls it now, and says which
   days came from Meta** ([ADR-565](../architecture/13-decision-log.md#adr-565--the-admins-ad-spend-page-connects-the-shops-meta-ad-account-pulls-it-now-and-says-which-days-came-from-meta), MKT-12).
