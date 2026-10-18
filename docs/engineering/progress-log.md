@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-18
 
-### TikTok's ad spend pulled
+### f5f0c0e · TikTok's ad spend pulled
 
 * **A shop connects its TikTok advertiser account and the same worker pulls its spend by
   campaign under Meta's rules, shared between the two** ([ADR-566](../architecture/13-decision-log.md#adr-566--a-shop-connects-its-tiktok-advertiser-account-and-the-same-worker-pulls-its-spend-by-campaign-under-metas-rules-shared-between-the-two), MKT-12, ANL-03).
