@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-18
 
-### The filters a shop chooses
+### 0239c1e · The filters a shop chooses
 
 * **A shop chooses its storefront's filters, their order and their words, filters on its
   products' and variants' custom fields among them, and none chosen keeps every filter as
