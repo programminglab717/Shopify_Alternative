@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-18
 
-### TikTok's advertiser account in the admin
+### 3785b0e · TikTok's advertiser account in the admin
 
 * **The admin's ad spend page connects the shop's TikTok advertiser account as it does Meta's,
   one card for both, TikTok's folded until it is wanted** ([ADR-567](../architecture/13-decision-log.md#adr-567--the-admins-ad-spend-page-connects-the-shops-tiktok-advertiser-account-as-it-does-metas-one-card-for-both-tiktoks-folded-until-it-is-wanted), MKT-12).
