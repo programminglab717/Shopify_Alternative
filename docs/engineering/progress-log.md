@@ -16,6 +16,12 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-18
 
+### The day's test clear of midnight
+
+* **Fix:** the test of the home's "today" read the shop's day twice, and CI ran it across midnight
+  in Karachi, 19:00 UTC, so the two reads were of different days. It now waits out the day's last
+  half minute before it starts; the service is unchanged. No tests more.
+
 ### 3785b0e · TikTok's advertiser account in the admin
 
 * **The admin's ad spend page connects the shop's TikTok advertiser account as it does Meta's,

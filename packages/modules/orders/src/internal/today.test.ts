@@ -27,6 +27,16 @@ describe.skipIf(!server)('TodayService', () => {
     await f.stock(f.a, kurta, 50);
   });
 
+  /**
+   * Waits out the shop's day if it ends within `marginMs`, so that a test reading its day twice
+   * reads the same day both times, however near midnight in Karachi it runs.
+   */
+  async function clearOfMidnight(marginMs = 30_000): Promise<void> {
+    const { since } = await days.today(f.a);
+    const left = since.getTime() + 86_400_000 - Date.now();
+    if (left < marginMs) await new Promise((resolve) => setTimeout(resolve, left + 1_000));
+  }
+
   /** Confirms an order and ships it in one parcel; the parcel's id. */
   async function shipped(orderId: string): Promise<string> {
     unwrap(await f.orders.confirm(f.a, orderId));
@@ -34,6 +44,7 @@ describe.skipIf(!server)('TodayService', () => {
   }
 
   it("says how the shop's day has gone, from midnight in its time zone (ADR-121)", async () => {
+    await clearOfMidnight();
     const none = { count: 0, total: 0n };
     const empty = await days.today(f.a);
     // Midnight in Karachi is 19:00 the day before in UTC.
@@ -101,7 +112,7 @@ describe.skipIf(!server)('TodayService', () => {
       delivered: none,
       returnedToOrigin: none,
     });
-  });
+  }, 90_000);
 
   it("tells the day before, by the shop's clock, for its owner each morning (ADR-386)", async () => {
     const { since: midnight } = await days.today(f.a);
