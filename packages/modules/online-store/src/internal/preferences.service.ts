@@ -20,7 +20,12 @@ import { parsePkMobile } from '@hatti/pk';
 import { Injectable, Optional } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { OnlineStoreEvents, type PreferencesUpdatedPayload } from './events.js';
-import type { LinkPageRecord, MaintenanceRecord, PreferencesRecord } from './records.js';
+import type {
+  LinkPageRecord,
+  MaintenanceRecord,
+  PreferencesRecord,
+  StorefrontFilterKind,
+} from './records.js';
 import { ROBOTS_RULES_LIMITS, robotsRules } from './robots-rules.js';
 import { preferences } from './schema.js';
 
@@ -520,6 +525,14 @@ function toRecord(row: PreferencesRow | undefined, now = new Date()): Preference
     },
     hidePoweredBy: row?.hidePoweredBy ?? false,
     consentBanner: row?.consentBanner ?? false,
+    // As the online store checked them when they were chosen (ADR-568).
+    storefrontFilters:
+      row?.storefrontFilters?.map((filter) => ({
+        kind: filter.kind as StorefrontFilterKind,
+        key: filter.key ?? null,
+        label: filter.label ?? null,
+        labelUr: filter.labelUr ?? null,
+      })) ?? null,
   };
 }
 

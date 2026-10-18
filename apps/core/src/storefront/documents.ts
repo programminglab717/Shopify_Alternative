@@ -23,6 +23,7 @@ import {
   type PageRecord,
   type DomainRecord,
   type PreferencesRecord,
+  type StorefrontFilterRecord,
   type ShownComments,
   type ThemeFileRecord,
   type ThemeRecord,
@@ -603,6 +604,8 @@ export function shopDoc(
   tiktokPixelCode: string | null = null,
   /** Its Google Analytics measurement ID, while it has Google connected (ADR-548). */
   googleMeasurementId: string | null = null,
+  /** The filters it chose for its pages (ADR-568); null while it chose none. */
+  filters: readonly StorefrontFilterRecord[] | null = null,
 ): ShopDoc {
   return {
     version: DOCUMENTS_VERSION,
@@ -687,6 +690,15 @@ export function shopDoc(
       seo: { title: preferences.seo.title, description: preferences.seo.description },
     }),
     ...(sharingImage && { sharingImage }),
+    // The filters it chose (ADR-568), left out while it chose none, likewise: every one shows.
+    ...(filters && {
+      filters: filters.map((filter) => ({
+        kind: filter.kind,
+        ...(filter.key !== null && { key: filter.key }),
+        ...(filter.label !== null && { label: filter.label }),
+        ...(filter.labelUr !== null && { labelUr: filter.labelUr }),
+      })),
+    }),
     // Left out while it translated none of them, likewise (ADR-245).
     ...translationsDoc(translations, (fields) => ({ seo: seoTranslation(fields) })),
   };

@@ -575,7 +575,17 @@ export class PageRenderer {
         asked ? recommendedProducts(data, asked) : [],
         // The search page's products narrowed by its filters and put in order (ADR-479).
         search && found.name === 'search'
-          ? filteredListing(search.productIds, ctx.filters!, (ids) => data.products(ids), 'search')
+          ? data
+              .shop()
+              .then((shopDoc) =>
+                filteredListing(
+                  search.productIds,
+                  ctx.filters!,
+                  (ids) => data.products(ids),
+                  'search',
+                  shopDoc.filters,
+                ),
+              )
           : undefined,
       ]);
     const name = shown ? found.name : '404';
@@ -1125,9 +1135,16 @@ async function resourceOf(
   if (found.name === 'collection' && found.handle) {
     const doc = await ctx.data.collection(found.handle);
     if (!doc) return null;
-    // Narrowed by the page's filters, and its filters counted (SRC-03, ADR-478).
+    // Narrowed by the page's filters, and its filters counted (SRC-03, ADR-478): those the shop
+    // chose (ADR-568).
     const listing = ctx.filters
-      ? await filteredListing(doc.productIds, ctx.filters, (ids) => ctx.data.products(ids))
+      ? await filteredListing(
+          doc.productIds,
+          ctx.filters,
+          (ids) => ctx.data.products(ids),
+          'collection',
+          (await ctx.data.shop()).filters,
+        )
       : undefined;
     return {
       collection: collectionObject(doc, ctx, listing),

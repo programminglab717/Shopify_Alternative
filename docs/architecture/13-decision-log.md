@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-567 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-568 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -575,6 +575,7 @@
 | 565 | The admin's ad spend page connects the shop's Meta ad account, pulls it now, and says which days came from Meta | Accepted |
 | 566 | A shop connects its TikTok advertiser account and the same worker pulls its spend by campaign under Meta's rules, shared between the two | Accepted |
 | 567 | The admin's ad spend page connects the shop's TikTok advertiser account as it does Meta's, one card for both, TikTok's folded until it is wanted | Accepted |
+| 568 | A shop chooses its storefront's filters, their order and their words, filters on its products' and variants' custom fields among them, and none chosen keeps every filter as before | Accepted |
 
 ---
 
@@ -21174,3 +21175,29 @@
 * **Consequences:** A shop connects both platforms from the page its spend is on.
 * **Alternatives:** **Both forms open:** most shops run one platform, and two forms asking for
   tokens read as two steps to take.
+
+## ADR-568 · A shop chooses its storefront's filters, their order and their words, filters on its products' and variants' custom fields among them, and none chosen keeps every filter as before
+
+* **Context:** Collection and search pages filter by every filter there is, in one order
+  (ADR-478, ADR-479); Shopify's Search & Discovery lets a shop choose its filters, name them, and
+  filter on its products' metafields.
+* **Decision:**
+  * **The shop's filters,** kept with its online store's preferences: up to 25, in its order, of
+    availability, price, product type, brand, an option by its name, the eastern-wear attributes,
+    and a product's or variant's custom field of a definition the shop has, of text, a list of
+    text, or yes and no; each with words of its own in English and Urdu, or the built-in ones (an
+    option's as the page's products name it, a custom field's its definition's name). None chosen
+    is every filter as before; an empty list is no filters.
+  * **Checked as saved:** a filter twice, a custom field the shop has no definition of, or one of
+    a type filters cannot read is refused under it; an option no product has yet is kept. A
+    change is audited and republishes the shop's storefront.
+  * **On the storefront,** the shop's document carries its filters; pages show them in its order,
+    in the page's language, and read only their parameters, a hidden filter's ignored. Custom
+    fields filter as Shopify's do, `filter.p.m.<namespace>.<key>` and `filter.v.m.<namespace>.<key>`,
+    a list's items each a value, yes and no as `true` and `false`. A translated option is still
+    found by its own name.
+  * The API gives the shop's filters and those it could choose.
+* **Consequences:** A shop selling lawn shows fabric first and hides what its products do not
+  vary by; a theme's `collection.filters` follows without a change of theme.
+* **Alternatives:** **Filters in the theme's settings:** each theme would ask again, and a
+  shop's filters are of its catalog, not its look.

@@ -36,6 +36,8 @@ export type {
   PolicyVersionRecord,
   PreferencesRecord,
   ReturnsRecord,
+  StorefrontFilterKind,
+  StorefrontFilterRecord,
   ThemeFileRecord,
   ThemeRecord,
   UrlRedirectRecord,
@@ -104,6 +106,16 @@ export {
   type PreferencesInput,
   type PreferencesView,
 } from '../internal/preferences.service.js';
+export {
+  FILTERABLE_METAFIELD_TYPES,
+  STOREFRONT_FILTER_KINDS,
+  STOREFRONT_FILTER_LIMITS,
+  StorefrontFiltersService,
+  shownStorefrontFiltersIn,
+  type StorefrontFilterInput,
+  type StorefrontFilterView,
+  type StorefrontFiltersView,
+} from '../internal/storefront-filters.service.js';
 export type { CommentPolicyValue, CommentStatusValue, ThemeRoleValue } from '../internal/schema.js';
 export {
   SESSION_INTERVALS,

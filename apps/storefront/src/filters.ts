@@ -1,4 +1,4 @@
-import type { ProductDoc, VariantDoc } from '@hatti/storefront-data';
+import type { FilterDoc, ProductDoc, VariantDoc } from '@hatti/storefront-data';
 
 // Storefront filters (SRC-03, CAT-08, ADR-478): Shopify's `collection.filters` and its `filter.*`
 // parameters on a collection's page. A shopper narrows the collection by availability, price,
@@ -31,6 +31,8 @@ export function isFilterParam(name: string): boolean {
 interface Word {
   value: string;
   label: string;
+  /** Before those of a greater rank, whatever their label: true before false. */
+  rank?: number;
 }
 
 /** A list filter: what a product or each of its variants has of it. */
@@ -56,6 +58,8 @@ const LABELS = {
     pieces: 'Pieces',
     fabric: 'Fabric',
     season: 'Season',
+    yes: 'Yes',
+    no: 'No',
   },
   ur: {
     availability: 'دستیابی',
@@ -68,16 +72,30 @@ const LABELS = {
     pieces: 'پیس',
     fabric: 'کپڑا',
     season: 'موسم',
+    yes: 'ہاں',
+    no: 'نہیں',
   },
 } as const;
 
-/** The dimensions a collection's products have, in the order their filters are shown. */
-function dimensionsOf(products: readonly ProductDoc[], locale: string): Dimension[] {
-  const words = locale === 'ur' ? LABELS.ur : LABELS.en;
-  const one = (value: string | null | undefined): Word[] =>
-    value && value.trim() !== '' ? [{ value, label: value }] : [];
-  const dimensions: Dimension[] = [
-    {
+/** What a page's filters are, in the order they are shown: its list filters, and its price's. */
+interface Shown {
+  dimensions: Dimension[];
+  /** Where the price's filter is among the list filters, before the one at `at`; null for none. */
+  price: { at: number; label: string } | null;
+}
+
+type Words = (typeof LABELS)[keyof typeof LABELS];
+
+const one = (value: string | null | undefined): Word[] =>
+  value && value.trim() !== '' ? [{ value, label: value }] : [];
+
+const wear = (word: { value: string; label: string } | undefined): Word[] =>
+  word ? [{ value: word.value, label: word.label }] : [];
+
+/** The platform's list filters, by the kind a shop chooses them by (ADR-568). */
+function builtIns(words: Words) {
+  return {
+    availability: {
       param: 'filter.v.availability',
       label: words.availability,
       level: 'variant',
@@ -88,74 +106,183 @@ function dimensionsOf(products: readonly ProductDoc[], locale: string): Dimensio
       ],
       order: (a, b) => b.value.localeCompare(a.value),
     },
-    {
+    product_type: {
       param: 'filter.p.product_type',
       label: words.product_type,
       level: 'product',
       of: (product) => one(product.productType),
       order: 'label',
     },
-    {
+    vendor: {
       param: 'filter.p.vendor',
       label: words.vendor,
       level: 'product',
       of: (product) => one(product.vendor),
       order: 'label',
     },
-  ];
-  // Each option by its name, as products name it: their sizes in the order they are sold in.
-  const options = new Map<string, string>();
-  for (const product of products) {
-    for (const option of product.options) {
-      const key = option.name.trim().toLowerCase();
-      if (key !== '' && !options.has(key)) options.set(key, option.name.trim());
-    }
-  }
-  for (const [key, name] of options) {
-    dimensions.push({
-      param: `filter.v.option.${key}`,
-      label: name,
-      level: 'variant',
-      of: (product, variant) => {
-        const at = product.options.findIndex((option) => option.name.trim().toLowerCase() === key);
-        return at < 0 ? [] : one(variant.options[at]);
-      },
-      order: 'found',
-    });
-  }
-  const wear = (word: { value: string; label: string } | undefined): Word[] =>
-    word ? [{ value: word.value, label: word.label }] : [];
-  dimensions.push(
-    {
+    stitching: {
       param: 'filter.p.m.hatti.stitching',
       label: words.stitching,
       level: 'product',
       of: (product) => wear(product.easternWear?.stitching),
       order: 'label',
     },
-    {
+    pieces: {
       param: 'filter.p.m.hatti.pieces',
       label: words.pieces,
       level: 'product',
       of: (product) => wear(product.easternWear?.pieces),
       order: (a, b) => Number(a.value) - Number(b.value),
     },
-    {
+    fabric: {
       param: 'filter.p.m.hatti.fabric',
       label: words.fabric,
       level: 'product',
       of: (product) => (product.easternWear?.fabrics ?? []).map((word) => wear(word)[0]!),
       order: 'label',
     },
-    {
+    season: {
       param: 'filter.p.m.hatti.season',
       label: words.season,
       level: 'product',
       of: (product) => wear(product.easternWear?.season),
       order: 'label',
     },
-  );
-  return dimensions;
+  } satisfies Record<string, Dimension>;
+}
+
+const folded = (name: string) => name.trim().toLowerCase();
+
+/**
+ * An option's filter, by its name folded: its values as the products sell them. `named` gives
+ * the name an option is found by: as the page shows it, or as the shop named it.
+ */
+function optionDimension(
+  key: string,
+  label: string,
+  named: (option: ProductDoc['options'][number]) => string,
+): Dimension {
+  return {
+    param: `filter.v.option.${key}`,
+    label,
+    level: 'variant',
+    of: (product, variant) => {
+      const at = product.options.findIndex((option) => folded(named(option)) === key);
+      return at < 0 ? [] : one(variant.options[at]);
+    },
+    order: 'found',
+  };
+}
+
+/**
+ * A metafield's filter (ADR-568), as Shopify names it: filter.p.m.custom.material of a
+ * product's, filter.v.m.custom.material of a variant's. Its values are its words, each of a
+ * list's, or true and false, which read as yes and no.
+ */
+function metafieldDimension(
+  level: 'product' | 'variant',
+  namespace: string,
+  key: string,
+  label: string,
+  words: Words,
+): Dimension {
+  return {
+    param: `filter.${level === 'product' ? 'p' : 'v'}.m.${namespace}.${key}`,
+    label,
+    level,
+    of: (product, variant) => {
+      const field = (level === 'product' ? product : variant).metafields?.[namespace]?.[key];
+      if (!field) return [];
+      if (field.type === 'single_line_text_field') return one(field.value);
+      if (field.type === 'boolean') {
+        if (field.value === 'true') return [{ value: 'true', label: words.yes, rank: 0 }];
+        return field.value === 'false' ? [{ value: 'false', label: words.no, rank: 1 }] : [];
+      }
+      if (field.type !== 'list.single_line_text_field') return [];
+      try {
+        const list: unknown = JSON.parse(field.value);
+        return Array.isArray(list)
+          ? [...new Set(list.filter((each): each is string => typeof each === 'string'))].flatMap(
+              one,
+            )
+          : [];
+      } catch {
+        return [];
+      }
+    },
+    order: (a, b) => (a.rank ?? 2) - (b.rank ?? 2) || a.label.localeCompare(b.label),
+  };
+}
+
+/**
+ * The filters a page's products have, in the order they are shown: those the shop chose, in its
+ * order and under its words (ADR-568), the page's Urdu ones on Urdu pages; or, while it chose
+ * none, every one, as Shopify's are by default.
+ */
+function dimensionsOf(
+  products: readonly ProductDoc[],
+  locale: string,
+  chosen: readonly FilterDoc[] | undefined,
+): Shown {
+  const words = locale === 'ur' ? LABELS.ur : LABELS.en;
+  const builtIn = builtIns(words);
+  if (!chosen) {
+    // Each option by its name, as products name it: their sizes in the order they are sold in.
+    const options = new Map<string, string>();
+    for (const product of products) {
+      for (const option of product.options) {
+        const key = folded(option.name);
+        if (key !== '' && !options.has(key)) options.set(key, option.name.trim());
+      }
+    }
+    return {
+      dimensions: [
+        builtIn.availability,
+        builtIn.product_type,
+        builtIn.vendor,
+        ...[...options].map(([key, name]) => optionDimension(key, name, (option) => option.name)),
+        builtIn.stitching,
+        builtIn.pieces,
+        builtIn.fabric,
+        builtIn.season,
+      ],
+      price: { at: 1, label: words.price },
+    };
+  }
+  const dimensions: Dimension[] = [];
+  let price: Shown['price'] = null;
+  // Each once, as the online store chose them.
+  const push = (dimension: Dimension) => {
+    if (!dimensions.some((each) => each.param === dimension.param)) dimensions.push(dimension);
+  };
+  for (const filter of chosen) {
+    // The shop's Urdu words on Urdu pages, else its own, else the platform's.
+    const label = (fallback: string) =>
+      (locale === 'ur' ? filter.labelUr : undefined) || filter.label || fallback;
+    if (filter.kind === 'price') {
+      price ??= { at: dimensions.length, label: label(words.price) };
+    } else if (filter.kind === 'option') {
+      const key = folded(filter.key ?? '');
+      if (key === '') continue;
+      // Found by its own name on a page that shows it translated, and called as the page does.
+      const own = (option: ProductDoc['options'][number]) => option.ownName ?? option.name;
+      const shown = products
+        .flatMap((product) => product.options)
+        .find((option) => folded(own(option)) === key);
+      push(optionDimension(key, label(shown?.name.trim() ?? filter.key!.trim()), own));
+    } else if (filter.kind === 'product_metafield' || filter.kind === 'variant_metafield') {
+      const at = filter.key?.indexOf('.') ?? -1;
+      if (at <= 0) continue;
+      const [namespace, key] = [filter.key!.slice(0, at), filter.key!.slice(at + 1)];
+      const level = filter.kind === 'product_metafield' ? 'product' : 'variant';
+      push(metafieldDimension(level, namespace, key, label(filter.key!), words));
+    } else {
+      // A kind this storefront does not know yet shows nothing.
+      const dimension = builtIn[filter.kind] as Dimension | undefined;
+      if (dimension) push({ ...dimension, label: label(dimension.label) });
+    }
+  }
+  return { dimensions, price };
 }
 
 /** A price in the query, in rupees, as paisa; null where it is not one. */
@@ -171,14 +298,15 @@ interface Selection {
   price: { gte: number | null; lte: number | null };
 }
 
-function selectionOf(params: QueryParams, dimensions: readonly Dimension[]): Selection {
-  const known = new Set(dimensions.map((dimension) => dimension.param));
+/** What the query asks of the filters shown: those of filters the shop hid are not asked. */
+function selectionOf(params: QueryParams, shown: Shown): Selection {
+  const known = new Set(shown.dimensions.map((dimension) => dimension.param));
   const lists = new Map<string, Set<string>>();
   let gte: number | null = null;
   let lte: number | null = null;
   for (const [name, value] of params) {
-    if (name === PRICE_GTE) gte = paisaOf(value);
-    else if (name === PRICE_LTE) lte = paisaOf(value);
+    if (name === PRICE_GTE && shown.price) gte = paisaOf(value);
+    else if (name === PRICE_LTE && shown.price) lte = paisaOf(value);
     else if (known.has(name) && value !== '') {
       const values = lists.get(name) ?? new Set<string>();
       values.add(value);
@@ -330,6 +458,8 @@ export async function filteredListing(
   request: FilterRequest,
   products: (ids: readonly string[]) => Promise<(ProductDoc | null)[]>,
   kind: SortKind = 'collection',
+  /** The filters the shop chose, as its document has them (ADR-568); absent for every one. */
+  chosen?: readonly FilterDoc[],
 ): Promise<FilteredListing> {
   const sortNames = request.locale === 'ur' ? SORT_NAMES.ur : SORT_NAMES.en;
   if (ids.length === 0 || ids.length > FILTERED_PRODUCTS_MAX) {
@@ -344,8 +474,9 @@ export async function filteredListing(
   const sortBy = sortOf(request.params, kind);
   const sortOptions = SORTS[kind].map((value) => ({ name: sortNames[value]!, value }));
   const docs = (await products(ids)).filter((each): each is ProductDoc => !!each);
-  const dimensions = dimensionsOf(docs, request.locale);
-  const selection = selectionOf(request.params, dimensions);
+  const shown = dimensionsOf(docs, request.locale, chosen);
+  const { dimensions } = shown;
+  const selection = selectionOf(request.params, shown);
   const active =
     selection.lists.size > 0 || selection.price.gte !== null || selection.price.lte !== null;
 
@@ -363,7 +494,9 @@ export async function filteredListing(
     all.filter(([name, each]) => !(name === param && (value === undefined || each === value)));
 
   const filters: Record<string, unknown>[] = [];
-  for (const dimension of dimensions) {
+  // Where each filter's dimension is among those shown, for the price's to go among them.
+  const places: number[] = [];
+  for (const [place, dimension] of dimensions.entries()) {
     const wanted = selection.lists.get(dimension.param) ?? new Set<string>();
     const found = new Map<string, Word>();
     const counts = new Map<string, number>();
@@ -420,23 +553,24 @@ export async function filteredListing(
       inactive_values: values.filter((value) => !value.active),
       url_to_remove: linkWith(request, without(dimension.param)),
     });
+    places.push(place);
   }
 
   // The price's range, from the products the other filters leave: in paisa, as money prints it.
   const prices = docs.flatMap((product) => product.variants.map((variant) => variant.price));
   const rangeMax = prices.length > 0 ? Math.max(...prices) : 0;
   const rangeMin = prices.length > 0 ? Math.min(...prices) : 0;
-  if (rangeMax > rangeMin || priceAsked.length > 0) {
+  if (shown.price && (rangeMax > rangeMin || priceAsked.length > 0)) {
     const bound = (param: string, value: number | null) => ({
       param_name: param,
       value,
       url_to_remove: linkWith(request, without(param)),
     });
-    const words = request.locale === 'ur' ? LABELS.ur : LABELS.en;
-    // After availability, before the rest, as Shopify's are by default.
-    const at = filters.findIndex((filter) => filter.param_name !== 'filter.v.availability');
+    // Where the shop put it; after availability, before the rest, as Shopify's are by default.
+    const before = shown.price.at;
+    const at = places.findIndex((place) => place >= before);
     filters.splice(at < 0 ? filters.length : at, 0, {
-      label: words.price,
+      label: shown.price.label,
       param_name: 'filter.v.price',
       type: 'price_range',
       presentation: null,

@@ -656,6 +656,52 @@ describe('Storefront rendering', () => {
     );
   });
 
+  it('shows the filters the shop chose on its collection and search pages, its params alone (ADR-568)', async () => {
+    const sample = sampleStore();
+    const store = new MemoryStore({
+      ...sample,
+      shop: {
+        ...sample.shop,
+        filters: [
+          { kind: 'product_type', label: 'Kind', labelUr: 'قسمیں' },
+          { kind: 'availability' },
+        ],
+      },
+    });
+    const errors: unknown[] = [];
+    const renderer = new PageRenderer(loadTheme(files), {
+      limits: { timeMs: 10_000 },
+      onError: (_, error) => errors.push(error),
+    });
+    const params: [string, string][] = [['filter.v.price.gte', '999999']];
+    const page = (path: string, locale?: string, search?: PageRequest['search']) =>
+      renderer.render(
+        {
+          path,
+          query: Object.fromEntries(params),
+          params,
+          ...(locale && { locale }),
+          ...(search && { search }),
+        },
+        store.fresh(),
+      );
+    const collection = await page('/collections/eid-lawn');
+    expect(collection.html).toContain('name="filter.v.availability"');
+    // The price is hidden: its filter is not shown, and the price asked for narrows nothing.
+    expect(collection.html).not.toContain('name="filter.v.price.gte"');
+    expect(collection.html).toContain('80 products');
+    const ids = sample.products.map((product) => product.id);
+    const search = { terms: 'lawn', productIds: ids.slice(0, 100), pageIds: [] as string[] };
+    const found = await page('/search', undefined, search);
+    expect(found.html).toContain('Kind');
+    expect(found.html.indexOf('name="filter.p.product_type"')).toBeLessThan(
+      found.html.indexOf('name="filter.v.availability"'),
+    );
+    expect(found.html).not.toContain('name="filter.v.price.gte"');
+    expect((await page('/search', 'ur', search)).html).toContain('قسمیں');
+    expect(errors).toEqual([]);
+  });
+
   it("renders Urdu pages right to left, in the theme's Urdu", async () => {
     const page = await render({ path: '/products/bridal-lehenga-heavy', locale: 'ur' });
     expect(page.html).toMatch(/<html lang="ur" dir="rtl">/);

@@ -1270,6 +1270,22 @@ export async function activeProductsIn(tx: Tx, shopId: string): Promise<number> 
   return rows[0]?.count ?? 0;
 }
 
+/**
+ * The names the shop's products give their options, each once whatever its case, as most of its
+ * products spell it, those the most products have first, in the caller's transaction: what the
+ * storefront's filters may be of (SRC-03, ADR-568).
+ */
+export async function optionNamesIn(tx: Tx, shopId: string, limit = 100): Promise<string[]> {
+  const { rows } = await tx.execute<{ name: string }>(sql`
+    SELECT mode() WITHIN GROUP (ORDER BY btrim(name)) AS name
+      FROM catalog.product_options
+     WHERE shop_id = ${shopId} AND btrim(name) <> ''
+     GROUP BY lower(btrim(name))
+     ORDER BY count(DISTINCT product_id) DESC, lower(btrim(name))
+     LIMIT ${limit}`);
+  return rows.map((row) => row.name);
+}
+
 /** What screening looks at, of a product's columns: a change to one screens it again. */
 /** Why a product Hatti holds off sale may not go on sale (ADR-475). */
 function heldError(reference: string): FieldError {

@@ -8214,6 +8214,11 @@ type Mutation {
   onlinePaymentSettingsUpdate(input: OnlinePaymentSettingsInput!): OnlinePaymentSettingsUpdatePayload!
 
   """
+  Chooses the filters the storefront's collection and search pages show, in their order and under the shop's words, or null for the platform's; the storefront shows them a moment later. A page's filter.* parameters of filters not chosen are ignored.
+  """
+  onlineStoreFiltersUpdate(input: OnlineStoreFiltersInput!): OnlineStoreFiltersUpdatePayload!
+
+  """
   Changes what the shop sets for its storefront as a whole; the storefront shows it a moment later. Those not given stay as they are.
   """
   onlineStorePreferencesUpdate(input: OnlineStorePreferencesInput!): OnlineStorePreferencesUpdatePayload!
@@ -9052,6 +9057,33 @@ input OnlinePaymentSettingsInput {
 
 type OnlinePaymentSettingsUpdatePayload {
   onlinePaymentSettings: OnlinePaymentSettings
+  userErrors: [UserError!]!
+}
+
+"""
+The filters the storefront's collection and search pages show (SRC-03, ADR-568), as Shopify's Search & Discovery app chooses them, and those the shop could choose.
+"""
+type OnlineStoreFilters {
+  """
+  Those the shop could choose: the platform's, one for each of its products' options, the most used first, and one for each of its product and variant metafield definitions of single line text, lists of it, or true or false.
+  """
+  availableFilters: [StorefrontFilter!]!
+
+  """
+  Those its pages show, in their order; null while the shop chose none, when its pages show availability, price, product type, brand, each option, stitching, pieces, fabric and season, in that order.
+  """
+  filters: [StorefrontFilter!]
+}
+
+input OnlineStoreFiltersInput {
+  """
+  The filters, in the order the pages show them, up to 25, each once; an empty list for none. Null for the platform's, in its order, as for a shop that never chose.
+  """
+  filters: [StorefrontFilterInput!]
+}
+
+type OnlineStoreFiltersUpdatePayload {
+  onlineStoreFilters: OnlineStoreFilters
   userErrors: [UserError!]!
 }
 
@@ -13177,6 +13209,11 @@ type Query {
   onlinePaymentSettings: OnlinePaymentSettings!
 
   """
+  The filters the storefront's collection and search pages show, and those the shop could choose (ADR-568).
+  """
+  onlineStoreFilters: OnlineStoreFilters!
+
+  """
   What the shop sets for its storefront as a whole, such as its WhatsApp number, its password, and whether it is paused for a while.
   """
   onlineStorePreferences: OnlineStorePreferences!
@@ -15338,6 +15375,92 @@ type StoreSpeed {
 
   """Page views measured in the 28 days."""
   pageViews: Int!
+}
+
+"""
+One of the storefront's filters (ADR-568): one the shop chose, or one it could choose.
+"""
+type StorefrontFilter {
+  """
+  What its pages call it without a label: the platform's words, the option's name as the shop's products spell it, or the metafield definition's name.
+  """
+  defaultLabel: String!
+
+  """
+  The option's name, as Size, for an option's filter; the metafield definition's namespace.key, as custom.material, for a metafield's; null for the others.
+  """
+  key: String
+  kind: StorefrontFilterKind!
+
+  """
+  What English pages call it, as the shop wrote it; null for defaultLabel.
+  """
+  label: String
+
+  """What Urdu pages call it; null for label, or the platform's Urdu words."""
+  labelUr: String
+
+  """
+  A metafield's type, as its definition fixes it: single_line_text_field, list.single_line_text_field or boolean; null for the others, or a definition deleted since.
+  """
+  metafieldType: String
+}
+
+"""One of the filters the storefront shows."""
+input StorefrontFilterInput {
+  """
+  For an option's filter, the option's name, matched whatever its case: one none of the products has yet shows nothing until one does. For a metafield's, one of the shop's definitions' namespace.key. None for the others.
+  """
+  key: String
+  kind: StorefrontFilterKind!
+
+  """
+  What English pages call it, up to 60 characters; blank for defaultLabel.
+  """
+  label: String
+
+  """What Urdu pages call it, up to 60 characters; blank for label."""
+  labelUr: String
+}
+
+"""
+What one of the storefront's filters narrows a collection's or a search's products by.
+"""
+enum StorefrontFilterKind {
+  """Whether a variant is in stock: filter.v.availability."""
+  AVAILABILITY
+
+  """filter.p.m.hatti.fabric."""
+  FABRIC
+
+  """One of the options, named by key, as Size: filter.v.option.size."""
+  OPTION
+
+  """How many pieces a suit has: filter.p.m.hatti.pieces."""
+  PIECES
+
+  """A variant's price, from and to: filter.v.price.gte and .lte."""
+  PRICE
+
+  """
+  A product metafield, named by key as its definition's namespace.key, as custom.material: filter.p.m.custom.material.
+  """
+  PRODUCT_METAFIELD
+
+  """filter.p.product_type."""
+  PRODUCT_TYPE
+
+  """filter.p.m.hatti.season."""
+  SEASON
+
+  """Stitched or unstitched: filter.p.m.hatti.stitching."""
+  STITCHING
+
+  """A variant metafield, likewise: filter.v.m.custom.material."""
+  VARIANT_METAFIELD
+
+  """The brand: filter.p.vendor."""
+  VENDOR
 }
 
 """

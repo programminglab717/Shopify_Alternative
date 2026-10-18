@@ -255,6 +255,39 @@ export interface PreferencesRecord {
   hidePoweredBy: boolean;
   /** Whether its storefront asks shoppers before its ad platforms' pixels load (ADR-551). */
   consentBanner: boolean;
+  /**
+   * The filters its collection and search pages show, in their order (SRC-03, ADR-568); null
+   * while it chose none: every filter the platform has, in the platform's order.
+   */
+  storefrontFilters: StorefrontFilterRecord[] | null;
+}
+
+/** The kinds of filter a storefront's pages may show (ADR-568). */
+export type StorefrontFilterKind =
+  | 'availability'
+  | 'price'
+  | 'product_type'
+  | 'vendor'
+  | 'option'
+  | 'stitching'
+  | 'pieces'
+  | 'fabric'
+  | 'season'
+  | 'product_metafield'
+  | 'variant_metafield';
+
+/** One of the filters a shop chose for its storefront's pages (ADR-568). */
+export interface StorefrontFilterRecord {
+  kind: StorefrontFilterKind;
+  /**
+   * The option's name for an option's filter, as "Size", matched whatever its case; the
+   * metafield's `namespace.key` for a metafield's, as "custom.material"; null for the others.
+   */
+  key: string | null;
+  /** What it is called on English pages, as the shop wrote it; null for the platform's words. */
+  label: string | null;
+  /** What it is called on Urdu pages; null for its English label, or the platform's words. */
+  labelUr: string | null;
 }
 
 /** A shop's return window (OS-11, ADR-468), which its product pages say. */

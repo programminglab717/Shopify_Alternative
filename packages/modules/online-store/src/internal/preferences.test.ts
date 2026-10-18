@@ -44,6 +44,7 @@ describe.skipIf(!server)('PreferencesService', () => {
     returns: { days: null, exchangesOnly: false },
     hidePoweredBy: false,
     consentBanner: false,
+    storefrontFilters: null,
   };
 
   it("keeps a shop's WhatsApp number in E.164, recording each change", async () => {
@@ -89,6 +90,7 @@ describe.skipIf(!server)('PreferencesService', () => {
       returns: { days: null, exchangesOnly: false },
       hidePoweredBy: false,
       consentBanner: false,
+      storefrontFilters: null,
     });
   });
 

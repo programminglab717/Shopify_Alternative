@@ -54,6 +54,7 @@ import {
   PageService,
   PolicyService,
   PreferencesService,
+  StorefrontFiltersService,
   ThemeService,
   TranslationService,
   UrlRedirectService,
@@ -62,6 +63,7 @@ import {
   shopRedirectsOf,
   digestOf,
   shopTranslationsOf,
+  shownStorefrontFiltersIn,
   type TranslatableKind,
 } from '@hatti/online-store/public';
 import type { ObjectStorage } from '@hatti/storage';
@@ -481,6 +483,7 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
         bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
         comments: new CommentService(database),
         preferences,
+        filters: { shownStorefrontFiltersOf: shownStorefrontFiltersIn },
         delivery,
         domains: { domainsOf: shopDomainsOf },
         redirects: { redirectsOf: shopRedirectsOf },
@@ -1800,7 +1803,11 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     });
     // As an Urdu page shows it: each variant's values and title in them, its ID its own.
     const shown = await new TranslatedStore(store(), 'ur').productByHandle(doc!.handle);
-    expect(shown!.options).toEqual(doc!.translations!.ur!.options);
+    // A translated option keeps its own name too, which the filters the shop chose find it by.
+    expect(shown!.options).toEqual([
+      { name: 'سائز', values: ['چھوٹا', 'بڑا'], ownName: 'Size' },
+      { name: 'Colour', values: ['Red', 'Blue'] },
+    ]);
     expect(shown!.variants.map((variant) => [variant.id, variant.title, variant.options])).toEqual([
       [doc!.variants[0]!.id, 'چھوٹا / Red', ['چھوٹا', 'Red']],
       [doc!.variants[1]!.id, 'بڑا / Red', ['بڑا', 'Red']],
@@ -1859,6 +1866,42 @@ describe.skipIf(!server || !redisUrl)('Storefront publisher', () => {
     unwrap(await preferences.update(tenant, { consentBanner: false }));
     await deliver();
     expect((await store().shop()).consentBanner).toBeUndefined();
+  });
+
+  it('publishes the filters the shop chose, a metafield’s by its definition’s name, and leaves them out while it chose none (ADR-568)', async () => {
+    const filters = new StorefrontFiltersService(database);
+    const metafields = new MetafieldService(database);
+    const definition = unwrap(
+      await metafields.createDefinition(tenant, {
+        ownerType: 'product',
+        namespace: 'custom',
+        key: 'filter_material',
+        type: 'single_line_text_field',
+        name: 'Material',
+      }),
+    );
+    await publisher.publishAll(shopId);
+    expect((await store().shop()).filters).toBeUndefined();
+    unwrap(
+      await filters.update(tenant, [
+        { kind: 'option', key: 'Size', labelUr: 'سائز' },
+        { kind: 'product_metafield', key: 'custom.filter_material' },
+        { kind: 'price', label: 'Budget' },
+      ]),
+    );
+    expect(await deliver()).toEqual(['online_store_preferences.updated']);
+    expect((await store().shop()).filters).toEqual([
+      { kind: 'option', key: 'Size', labelUr: 'سائز' },
+      { kind: 'product_metafield', key: 'custom.filter_material', label: 'Material' },
+      { kind: 'price', label: 'Budget' },
+    ]);
+    unwrap(await filters.update(tenant, []));
+    await deliver();
+    expect((await store().shop()).filters).toEqual([]);
+    unwrap(await filters.update(tenant, null));
+    await deliver();
+    expect((await store().shop()).filters).toBeUndefined();
+    unwrap(await metafields.deleteDefinition(tenant, definition.id, false));
   });
 
   it("closes the shop's storefront behind its password, with what shoppers are told, and opens it", async () => {

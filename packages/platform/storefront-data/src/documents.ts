@@ -189,7 +189,12 @@ export interface ProductDoc {
   vendor: string;
   productType: string;
   tags: string[];
-  options: { name: string; values: string[] }[];
+  /**
+   * Its options, in order. `ownName` is never written: an option's own name, where a page in
+   * another language shows it translated (`translatedProduct`), what a filter the shop chose finds
+   * it by (ADR-568).
+   */
+  options: { name: string; values: string[]; ownName?: string }[];
   variants: VariantDoc[];
   /** Its images, in order: videos are not among them, as on Shopify. */
   images: ImageDoc[];
@@ -563,10 +568,44 @@ export interface ShopDoc {
    */
   sharingImage?: ImageDoc;
   /**
+   * The filters its collection and search pages show, in their order (SRC-03, ADR-568). Absent
+   * while it chose none, as in documents written before shops could: every filter the platform
+   * has, in the platform's order.
+   */
+  filters?: FilterDoc[];
+  /**
    * Its home page's title and description in Urdu (ADR-245), those the shop translated; absent
    * where it translated neither.
    */
   translations?: TranslationsDoc<ShopDoc, never>;
+}
+
+/** One of the filters a shop chose for its storefront's pages (ADR-568). */
+export interface FilterDoc {
+  kind:
+    | 'availability'
+    | 'price'
+    | 'product_type'
+    | 'vendor'
+    | 'option'
+    | 'stitching'
+    | 'pieces'
+    | 'fabric'
+    | 'season'
+    | 'product_metafield'
+    | 'variant_metafield';
+  /**
+   * An option's name, as "Size", matched whatever its case; a metafield's `namespace.key`, as
+   * "custom.material". Absent for the others.
+   */
+  key?: string;
+  /**
+   * What English pages call it: the shop's own words, or a metafield definition's name. Absent
+   * for the platform's words, or the option's name as the products spell it.
+   */
+  label?: string;
+  /** What Urdu pages call it, where the shop wrote it; absent for `label`, or the platform's. */
+  labelUr?: string;
 }
 
 export interface MaintenanceDoc {

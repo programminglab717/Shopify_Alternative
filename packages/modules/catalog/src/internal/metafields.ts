@@ -408,6 +408,23 @@ export async function shownMetafieldsIn(
 }
 
 /**
+ * The shop's definitions for owners of a kind, or all, by name, in the caller's transaction `tx`:
+ * for the storefront's filters of them (SRC-03, ADR-568).
+ */
+export async function metafieldDefinitionsIn(
+  tx: Tx,
+  shopId: string,
+  ownerType: MetafieldOwnerType | null = null,
+): Promise<MetafieldDefinitionRecord[]> {
+  const { rows } = await tx.execute<DefinitionRow>(sql`
+    SELECT ${DEFINITION_COLUMNS} FROM catalog.metafield_definitions d
+     WHERE d.shop_id = ${shopId}
+       ${ownerType === null ? sql`` : sql`AND d.owner_type = ${ownerType}`}
+     ORDER BY d.owner_type, lower(d.name), d.id`);
+  return rows.map(toDefinition);
+}
+
+/**
  * The shop's metafields and their definitions (CAT-06, ADR-489): set many at once, all or none,
  * each checked against its type and its definition's; deleted; read for the owners of a kind.
  */
@@ -607,14 +624,9 @@ export class MetafieldService {
     tenant: TenantContext,
     ownerType: MetafieldOwnerType | null = null,
   ): Promise<MetafieldDefinitionRecord[]> {
-    const { rows } = await this.db.tenant(tenant.shopId, (tx) =>
-      tx.execute<DefinitionRow>(sql`
-        SELECT ${DEFINITION_COLUMNS} FROM catalog.metafield_definitions d
-         WHERE d.shop_id = ${tenant.shopId}
-           ${ownerType === null ? sql`` : sql`AND d.owner_type = ${ownerType}`}
-         ORDER BY d.owner_type, lower(d.name), d.id`),
+    return this.db.tenant(tenant.shopId, (tx) =>
+      metafieldDefinitionsIn(tx, tenant.shopId, ownerType),
     );
-    return rows.map(toDefinition);
   }
 
   /**

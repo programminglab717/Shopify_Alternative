@@ -101,6 +101,7 @@ export {
 export {
   ProductService,
   activeProductsIn,
+  optionNamesIn,
   type CreateProductInput,
   type DuplicateProductInput,
   type ListProductsOptions,
@@ -163,7 +164,9 @@ export {
   METAFIELD_TYPES,
   MetafieldEvents,
   MetafieldService,
+  metafieldDefinitionsIn,
   shownMetafieldsIn,
+  type MetafieldDefinitionRecord,
   type MetafieldsChangedPayload,
   type MetafieldOwnerType,
   type MetafieldRecord,

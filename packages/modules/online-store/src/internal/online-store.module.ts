@@ -13,6 +13,7 @@ import { MenuResolver } from './graphql/menu.resolver.js';
 import { PageResolver } from './graphql/page.resolver.js';
 import { PolicyResolver } from './graphql/policy.resolver.js';
 import { PreferencesResolver } from './graphql/preferences.resolver.js';
+import { StorefrontFiltersResolver } from './graphql/storefront-filters.resolver.js';
 import { ThemeResolver } from './graphql/theme.resolver.js';
 import { TranslationResolver } from './graphql/translation.resolver.js';
 import { UrlRedirectResolver } from './graphql/url-redirect.resolver.js';
@@ -22,6 +23,7 @@ import { PageService } from './page.service.js';
 import { PolicyService } from './policy.service.js';
 import { PreferencesService } from './preferences.service.js';
 import { SessionDaysService } from './session-days.service.js';
+import { StorefrontFiltersService } from './storefront-filters.service.js';
 import { StorefrontThemePreviewController } from './theme-preview.controller.js';
 import { StorefrontContentSearchController } from './content-search.js';
 import { ThemePreviewService } from './theme-preview.js';
@@ -52,6 +54,8 @@ import { UrlRedirectService } from './url-redirect.service.js';
     ArticleCommentsResolver,
     PreferencesService,
     PreferencesResolver,
+    StorefrontFiltersService,
+    StorefrontFiltersResolver,
     DomainService,
     DomainResolver,
     UrlRedirectService,
@@ -77,6 +81,7 @@ import { UrlRedirectService } from './url-redirect.service.js';
     ArticleService,
     CommentService,
     PreferencesService,
+    StorefrontFiltersService,
     DomainService,
     UrlRedirectService,
     PolicyService,

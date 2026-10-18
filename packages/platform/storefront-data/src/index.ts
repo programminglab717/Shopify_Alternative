@@ -14,6 +14,7 @@ export {
   type CollectionDoc,
   type DeliveryDaysDoc,
   type DeliveryDoc,
+  type FilterDoc,
   type ImageDoc,
   type LinkPageDoc,
   type MaintenanceDoc,

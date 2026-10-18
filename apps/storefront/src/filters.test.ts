@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ProductDoc } from '@hatti/storefront-data';
+import type { FilterDoc, ProductDoc } from '@hatti/storefront-data';
 import {
   FILTERED_PRODUCTS_MAX,
   filteredListing,
@@ -90,6 +90,7 @@ async function listing(
   locale = 'en',
   products = PRODUCTS,
   kind: SortKind = 'collection',
+  chosen?: FilterDoc[],
 ) {
   const byId = new Map(products.map((each) => [each.id, each]));
   let fetched = 0;
@@ -101,6 +102,7 @@ async function listing(
       return ids.map((id) => byId.get(id) ?? null);
     },
     kind,
+    chosen,
   );
   return { ...result, fetched };
 }
@@ -265,6 +267,262 @@ describe('Collection filters', () => {
     expect(result.filters).toEqual([]);
     expect(result.productIds).toHaveLength(FILTERED_PRODUCTS_MAX + 1);
     expect(result.fetched).toBe(0);
+  });
+});
+
+/** The products, with metafields: of each product, and of each of its variants by size. */
+function withMetafields(
+  products: readonly ProductDoc[],
+  fields: Record<
+    string,
+    { product?: Record<string, [string, string]>; variants?: Record<string, boolean> }
+  >,
+): ProductDoc[] {
+  return products.map((product) => {
+    const own = fields[product.id];
+    if (!own) return product;
+    return {
+      ...product,
+      ...(own.product && {
+        metafields: {
+          custom: Object.fromEntries(
+            Object.entries(own.product).map(([key, [type, value]]) => [key, { type, value }]),
+          ),
+        },
+      }),
+      variants: product.variants.map((variant) => {
+        const handmade = own.variants?.[variant.options[0]!];
+        return handmade === undefined
+          ? variant
+          : {
+              ...variant,
+              metafields: { custom: { handmade: { type: 'boolean', value: String(handmade) } } },
+            };
+      }),
+    };
+  });
+}
+
+describe('The filters a shop chose (ADR-568)', () => {
+  it('shows those chosen alone, in their order, under the shop’s words', async () => {
+    const { filters } = await listing([], 'en', PRODUCTS, 'collection', [
+      { kind: 'option', key: 'SIZE', label: 'Sizes' },
+      { kind: 'fabric' },
+      { kind: 'price', label: 'Budget' },
+      { kind: 'product_type' },
+      { kind: 'availability' },
+      // None of the products has a fit, nor a season: nothing to show.
+      { kind: 'option', key: 'Fit' },
+      { kind: 'season' },
+    ]);
+    expect(filters.map((each) => [each.param_name, each.label])).toEqual([
+      ['filter.v.option.size', 'Sizes'],
+      ['filter.p.m.hatti.fabric', 'Fabric'],
+      ['filter.v.price', 'Budget'],
+      ['filter.p.product_type', 'Product type'],
+      ['filter.v.availability', 'Availability'],
+    ]);
+    // An option's filter is called as the products call it, without words of the shop's own.
+    const named = await listing([], 'en', PRODUCTS, 'collection', [
+      { kind: 'option', key: 'size' },
+    ]);
+    expect(named.filters.map((each) => each.label)).toEqual(['Size']);
+  });
+
+  it('ignores the parameters of filters the shop hid', async () => {
+    const hidden = await listing(
+      [
+        ['filter.p.product_type', 'Footwear'],
+        ['filter.v.price.gte', '5000'],
+        ['filter.v.availability', '1'],
+      ],
+      'en',
+      PRODUCTS,
+      'collection',
+      [{ kind: 'availability' }, { kind: 'vendor' }],
+    );
+    // In stock alone: the type and the price are not asked for.
+    expect(hidden.productIds).toEqual(['lawn-a', 'khaddar', 'khussa']);
+    expect(hidden.filters.map((each) => each.param_name)).toEqual([
+      'filter.v.availability',
+      'filter.p.vendor',
+    ]);
+    // Its links leave them off.
+    const vendor = filter(hidden.filters, 'filter.p.vendor');
+    expect(vendor.values[0]!.url_to_add).toBe(
+      '/collections/eid?filter.v.availability=1&filter.p.vendor=Khussa+Co',
+    );
+    // None chosen: nothing filters.
+    const none = await listing([['filter.v.availability', '1']], 'en', PRODUCTS, 'collection', []);
+    expect(none.filters).toEqual([]);
+    expect(none.filtered).toBe(false);
+    expect(none.productIds).toEqual(['lawn-a', 'lawn-b', 'khaddar', 'khussa']);
+  });
+
+  const METAFIELDS = withMetafields(PRODUCTS, {
+    'lawn-a': {
+      product: {
+        material: ['single_line_text_field', 'Cotton'],
+        occasions: ['list.single_line_text_field', '["Eid","Wedding"]'],
+      },
+      variants: { S: true, M: false },
+    },
+    'lawn-b': {
+      product: {
+        material: ['single_line_text_field', 'Silk'],
+        occasions: ['list.single_line_text_field', '["Eid"]'],
+      },
+      variants: { S: true, M: true },
+    },
+    khaddar: {
+      product: { material: ['single_line_text_field', 'Cotton'] },
+      variants: { M: false, L: false },
+    },
+  });
+  const METAFIELD_FILTERS: FilterDoc[] = [
+    { kind: 'product_metafield', key: 'custom.material', label: 'Material' },
+    { kind: 'product_metafield', key: 'custom.occasions', label: 'Occasion', labelUr: 'موقع' },
+    { kind: 'variant_metafield', key: 'custom.handmade', label: 'Handmade' },
+    { kind: 'availability' },
+  ];
+
+  it('filters by product metafields, each of a list’s words a value', async () => {
+    const all = await listing([], 'en', METAFIELDS, 'collection', METAFIELD_FILTERS);
+    expect(
+      filter(all.filters, 'filter.p.m.custom.material').values.map((each) => [
+        each.value,
+        each.count,
+      ]),
+    ).toEqual([
+      ['Cotton', 2],
+      ['Silk', 1],
+    ]);
+    expect(
+      filter(all.filters, 'filter.p.m.custom.occasions').values.map((each) => [
+        each.value,
+        each.count,
+      ]),
+    ).toEqual([
+      ['Eid', 2],
+      ['Wedding', 1],
+    ]);
+    const cotton = await listing(
+      [['filter.p.m.custom.material', 'Cotton']],
+      'en',
+      METAFIELDS,
+      'collection',
+      METAFIELD_FILTERS,
+    );
+    expect(cotton.productIds).toEqual(['lawn-a', 'khaddar']);
+    const eid = await listing(
+      [
+        ['filter.p.m.custom.material', 'Cotton'],
+        ['filter.p.m.custom.occasions', 'Eid'],
+      ],
+      'en',
+      METAFIELDS,
+      'collection',
+      METAFIELD_FILTERS,
+    );
+    expect(eid.productIds).toEqual(['lawn-a']);
+    // Each occasion counts what the material leaves.
+    expect(
+      filter(eid.filters, 'filter.p.m.custom.occasions').values.map((each) => [
+        each.value,
+        each.count,
+        each.active,
+      ]),
+    ).toEqual([
+      ['Eid', 1, true],
+      ['Wedding', 1, false],
+    ]);
+  });
+
+  it('filters by variant metafields, true or false, of one variant with its other filters', async () => {
+    const all = await listing([], 'en', METAFIELDS, 'collection', METAFIELD_FILTERS);
+    const handmade = filter(all.filters, 'filter.v.m.custom.handmade');
+    expect(handmade.values.map((each) => [each.value, each.label, each.count])).toEqual([
+      ['true', 'Yes', 2],
+      ['false', 'No', 2],
+    ]);
+    const made = await listing(
+      [['filter.v.m.custom.handmade', 'true']],
+      'en',
+      METAFIELDS,
+      'collection',
+      METAFIELD_FILTERS,
+    );
+    expect(made.productIds).toEqual(['lawn-a', 'lawn-b']);
+    // lawn-a's handmade S is in stock; lawn-b's handmade variants are all sold out.
+    const inStock = await listing(
+      [
+        ['filter.v.m.custom.handmade', 'true'],
+        ['filter.v.availability', '1'],
+      ],
+      'en',
+      METAFIELDS,
+      'collection',
+      METAFIELD_FILTERS,
+    );
+    expect(inStock.productIds).toEqual(['lawn-a']);
+  });
+
+  it('names them in Urdu on Urdu pages: the shop’s Urdu words, else its own, else the platform’s', async () => {
+    const { filters } = await listing([], 'ur', METAFIELDS, 'collection', [
+      ...METAFIELD_FILTERS,
+      { kind: 'product_type', label: 'Kind' },
+      { kind: 'vendor', label: 'Maker', labelUr: 'بنانے والا' },
+    ]);
+    expect(filters.map((each) => each.label)).toEqual([
+      'Material',
+      'موقع',
+      'Handmade',
+      'دستیابی',
+      'Kind',
+      'بنانے والا',
+    ]);
+    expect(filter(filters, 'filter.v.m.custom.handmade').values.map((each) => each.label)).toEqual([
+      'ہاں',
+      'نہیں',
+    ]);
+  });
+
+  it('finds an option by the shop’s own name on a page that shows it translated', async () => {
+    const translated = PRODUCTS.map((product) => ({
+      ...product,
+      options: [{ name: 'سائز', values: product.options[0]!.values, ownName: 'Size' }],
+    }));
+    const { filters, productIds } = await listing(
+      [['filter.v.option.size', 'L']],
+      'ur',
+      translated,
+      'collection',
+      [{ kind: 'option', key: 'Size' }],
+    );
+    expect(productIds).toEqual(['lawn-a', 'khaddar']);
+    // Called as the page calls it.
+    expect(filters.map((each) => [each.param_name, each.label])).toEqual([
+      ['filter.v.option.size', 'سائز'],
+    ]);
+  });
+
+  it('shows every filter in the platform’s order while the shop chose none', async () => {
+    const none = await listing([['filter.p.vendor', 'Zari']]);
+    const unset = await listing([['filter.p.vendor', 'Zari']], 'en', PRODUCTS, 'collection');
+    expect(unset).toEqual(none);
+    expect(none.filters.map((each) => each.param_name)).toEqual([
+      'filter.v.availability',
+      'filter.v.price',
+      'filter.p.product_type',
+      'filter.p.vendor',
+      'filter.v.option.size',
+      'filter.p.m.hatti.pieces',
+      'filter.p.m.hatti.fabric',
+    ]);
+    // Metafields filter nothing until the shop chooses them.
+    const params = (await listing([['filter.p.m.custom.material', 'Silk']], 'en', METAFIELDS))
+      .productIds;
+    expect(params).toHaveLength(4);
   });
 });
 

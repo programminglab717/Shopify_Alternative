@@ -46,7 +46,7 @@ export function translated<T extends Translatable>(doc: T, locale: string): T {
  * A product as a page in `locale` shows it (ADR-241): as {@link translated} gives it, and each of
  * its variants' values in its options' words in the language, its title made of them as the
  * catalog makes it. A variant keeps its ID, so the one a shopper chooses is the same in either
- * language.
+ * language, and a translated option its own name as `ownName` (ADR-568).
  */
 export function translatedProduct(doc: ProductDoc, locale: string): ProductDoc {
   const shown = urduWords(translated(doc, locale), locale);
@@ -54,6 +54,12 @@ export function translatedProduct(doc: ProductDoc, locale: string): ProductDoc {
   if (!options) return shown;
   return {
     ...shown,
+    // Each named as the shop names it too, where it is translated: the filters it chose find
+    // options by their own names (ADR-568).
+    options: shown.options.map((option, index) => {
+      const own = doc.options[index]?.name;
+      return own === undefined || own === option.name ? option : { ...option, ownName: own };
+    }),
     variants: doc.variants.map((variant) => {
       const values = variant.options.map((value, index) => {
         const at = doc.options[index]?.values.indexOf(value) ?? -1;

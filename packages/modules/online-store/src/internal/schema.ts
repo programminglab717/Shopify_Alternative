@@ -233,8 +233,24 @@ export const preferences = onlineStoreSchema.table('preferences', {
   hidePoweredBy: boolean('hide_powered_by').notNull().default(false),
   /** Whether its storefront asks shoppers before its ad platforms' pixels load (ADR-551). */
   consentBanner: boolean('consent_banner').notNull().default(false),
+  /**
+   * The filters its collection and search pages show, in their order (ADR-568); null for every
+   * filter the platform has, in its order.
+   */
+  storefrontFilters: jsonb('storefront_filters').$type<StorefrontFilterValue[]>(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * One of the filters a shop chose (ADR-568): its kind, the option's name or the metafield's
+ * `namespace.key` it is of, and its own words, null for the platform's.
+ */
+export interface StorefrontFilterValue {
+  kind: string;
+  key: string | null;
+  label: string | null;
+  labelUr: string | null;
+}
 
 /** One of a link page's own links: what it says, and where it goes. */
 export interface LinkPageLinkValue {

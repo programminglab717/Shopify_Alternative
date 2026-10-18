@@ -79,6 +79,7 @@ import {
   shopPreferencesOf,
   shopRedirectsOf,
   shopTranslationsOf,
+  shownStorefrontFiltersIn,
   type ArticleChangedPayload,
   type ArticleRecord,
   type ArticleUpdatedPayload,
@@ -90,6 +91,7 @@ import {
   type PageUpdatedPayload,
   type PreferencesRecord,
   type ShownComments,
+  type StorefrontFilterRecord,
   type ThemeUpdatedPayload,
   type TranslatedFields,
   type TranslationsUpdatedPayload,
@@ -596,6 +598,10 @@ export interface PublisherServices {
     ): Promise<Map<string, ShownComments>>;
   };
   preferences: { preferencesOf(tx: Tx, shopId: string): Promise<PreferencesRecord> };
+  /** The filters the shop chose for its pages, as its document holds them (ADR-568). */
+  filters: {
+    shownStorefrontFiltersOf(tx: Tx, shopId: string): Promise<StorefrontFilterRecord[] | null>;
+  };
   delivery: DeliveryService;
   domains: { domainsOf(tx: Tx, shopId: string): Promise<DomainRecord[]> };
   redirects: { redirectsOf(tx: Tx, shopId: string): Promise<{ path: string; target: string }[]> };
@@ -911,6 +917,7 @@ export class StorefrontPublisher {
       await verifiedLevelIn(tx, shopId),
       tiktokPixelCode,
       googleMeasurementId,
+      await this.services.filters.shownStorefrontFiltersOf(tx, shopId),
     );
     await writer.putShop(doc);
     const hosts = doc.domains ?? [];
@@ -1404,6 +1411,7 @@ export function createStorefrontPublisher(
       bundles: { bundlesOfProductsIn, bundlesContainingIn, bundleProductIdsIn },
       comments: new CommentService(database),
       preferences: { preferencesOf: shopPreferencesOf },
+      filters: { shownStorefrontFiltersOf: shownStorefrontFiltersIn },
       delivery: new DeliveryService(database),
       domains: { domainsOf: shopDomainsOf },
       redirects: { redirectsOf: shopRedirectsOf },

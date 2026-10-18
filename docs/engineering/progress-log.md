@@ -16,6 +16,14 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-18
 
+### The filters a shop chooses
+
+* **A shop chooses its storefront's filters, their order and their words, filters on its
+  products' and variants' custom fields among them, and none chosen keeps every filter as
+  before** ([ADR-568](../architecture/13-decision-log.md#adr-568--a-shop-chooses-its-storefronts-filters-their-order-and-their-words-filters-on-its-products-and-variants-custom-fields-among-them-and-none-chosen-keeps-every-filter-as-before), SRC-03).
+* 3489 tests, 18 more: the setting checked and published, the shop's
+  document, the pages' filters in both languages, custom fields' filters, and the API.
+
 ### 5f9c750 · The day's test clear of midnight
 
 * **Fix:** the test of the home's "today" read the shop's day twice, and CI ran it across midnight
