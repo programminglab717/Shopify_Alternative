@@ -37,6 +37,7 @@ export const MESSAGE_KINDS = [
   'cod_prepaid',
   'store_open',
   'one_time_code',
+  'account_code',
   'stock_low',
   'stock_out',
   'daily_summary',
@@ -101,6 +102,8 @@ export type AnyMessageKind = MessageKind | PlatformMessageKind;
  */
 export const ALWAYS_SENT: readonly MessageKind[] = [
   'one_time_code',
+  // A code to sign in to their account on the shop's storefront, which they asked for (ADR-570).
+  'account_code',
   // Turned on and off with checkout's own setting, which says when (ADR-393, ADR-426).
   'checkout_reminder',
   'checkout_offer',
@@ -599,6 +602,18 @@ export const TEMPLATES: Readonly<Record<AnyMessageKind, Template>> = {
     text: {
       en: '{code} is your code to place your order with {shop}. It works for 10 minutes. Never share it.',
       ur: '{shop} پر آرڈر دینے کے لیے آپ کا کوڈ {code} ہے۔ یہ 10 منٹ کام کرے گا۔ کسی کو نہ بتائیں۔',
+    },
+  },
+  // A shopper's code to sign in to their account on the shop's storefront (CUS-02, ADR-570).
+  account_code: {
+    whatsapp: 'hatti_account_code',
+    category: 'authentication',
+    parameters: ['code'],
+    buttons: [{ type: 'copy_code' }],
+    secret: true,
+    text: {
+      en: '{code} is your code to sign in to your account with {shop}. It works for 10 minutes. Never share it.',
+      ur: '{shop} پر اپنے اکاؤنٹ میں سائن ان کرنے کے لیے آپ کا کوڈ {code} ہے۔ یہ 10 منٹ کام کرے گا۔ کسی کو نہ بتائیں۔',
     },
   },
   sign_in_code: {

@@ -23,6 +23,8 @@ export {
 } from '../internal/customer-data.service.js';
 export {
   CustomerService,
+  customerExistsIn,
+  customerOfPhoneIn,
   type CustomerCreateInput,
   type CustomerUpdateInput,
   type ListCustomersOptions,
@@ -81,11 +83,13 @@ export {
   revertOrderStoreCreditIn,
   shopGivesStoreCreditIn,
   storeCreditAccountsIn,
+  storeCreditOfCustomerIn,
   storeCreditOfPhoneIn,
   storeCreditNoticeFactsIn,
   storeCreditPaidIn,
   withdrawOrderCreditIn,
   type StoreCreditAccountRecord,
+  type StoreCreditBalance,
   type StoreCreditNoticeFacts,
   type StoreCreditChange,
   type StoreCreditEventValue,

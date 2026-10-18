@@ -3,12 +3,15 @@ import { isIP } from 'node:net';
 import { secretToken, sha256 } from '@hatti/crypto';
 import type { Tx } from '@hatti/db';
 import { newId } from '@hatti/ids';
-import type { MessagesService, PhoneChannel } from '@hatti/messaging/public';
+import type { MessageLanguage, MessagesService, PhoneChannel } from '@hatti/messaging/public';
 import { sql } from 'drizzle-orm';
 
 // Codes that prove a shopper's number at checkout (CHK-09, ADR-148): six digits sent to the number
 // they typed, on WhatsApp or by SMS, working for ten minutes and five tries. Only a digest of each
-// is kept, and it goes with its checkout.
+// is kept, and it goes with its checkout. The same codes sign shoppers in to their accounts on the
+// shop's storefront (CUS-02, ADR-570), with no checkout: each kept apart by its purpose, so that a
+// code sent for one proves nothing for the other, and counted with checkout's against the number
+// and the internet address they are sent for. A sign-in code goes a day after it was sent.
 
 export const NUMBER_CODE = {
   digits: 6,
@@ -46,8 +49,18 @@ export type CodeCheck =
   | 'expired'
   /** Its tries are used up, or no more are sent for now. */
   | 'too_many'
-  /** None was sent to the number in this checkout. */
+  /** None was sent to the number in this checkout; to sign in, none that is still unused. */
   | 'none';
+
+/**
+ * Whose codes: a checkout's, by its ID, or, with null, those that sign shoppers in to the shop's
+ * accounts (ADR-570).
+ */
+function codesOf(checkoutId: string | null) {
+  return checkoutId === null
+    ? sql`purpose = 'sign_in'`
+    : sql`purpose = 'checkout' AND checkout_id = ${checkoutId}`;
+}
 
 function digest(id: string, code: string): Buffer {
   return createHash('sha256').update(`${id}:${code}`).digest();
@@ -72,12 +85,14 @@ export async function numberVerifiedIn(
 
 /**
  * Checks `typed` against the last code the checkout sent to `phone`, counting a try: proving the
- * number if it is the code, while its time and tries last.
+ * number if it is the code, while its time and tries last. With a null `checkoutId`, against the
+ * last code sent to `phone` to sign in (ADR-570), which proves it once: a code that signed in once
+ * signs in no one again.
  */
 export async function checkCodeIn(
   tx: Tx,
   shopId: string,
-  checkoutId: string,
+  checkoutId: string | null,
   phone: string,
   typed: string,
 ): Promise<CodeCheck> {
@@ -90,13 +105,13 @@ export async function checkCodeIn(
   }>(sql`
     SELECT id, code_hash, attempts, expires_at <= now() AS expired, verified_at
       FROM checkout.number_codes
-     WHERE shop_id = ${shopId} AND checkout_id = ${checkoutId} AND phone = ${phone}
+     WHERE shop_id = ${shopId} AND ${codesOf(checkoutId)} AND phone = ${phone}
      ORDER BY created_at DESC
      LIMIT 1
        FOR UPDATE`);
   const sent = rows[0];
   if (!sent) return 'none';
-  if (sent.verified_at) return 'verified';
+  if (sent.verified_at) return checkoutId === null ? 'none' : 'verified';
   if (sent.attempts >= NUMBER_CODE.attempts) return 'too_many';
   if (sent.expired) return 'expired';
   const code = typed.replace(/\D/g, '');
@@ -114,18 +129,22 @@ export async function checkCodeIn(
  * Sends a new code to `phone` on `channel`, for the checkout, through the shop's messages: the
  * last one sent stops working. None while the checkout sent as many as it may, the number was
  * sent as many as it may be in a day, or the address `ip` the shopper asked from asked for as many
- * as it may in an hour (ADR-249); an address that isn't one counts for nothing.
+ * as it may in an hour (ADR-249); an address that isn't one counts for nothing. With a null
+ * `checkoutId`, a code to sign in with (ADR-570), in its own words, in `language` where given: the
+ * last sign-in code sent stops working, and the number's and the address's codes are counted
+ * with checkout's.
  */
 export async function sendCodeIn(
   tx: Tx,
   messages: MessagesService,
   code: {
     shopId: string;
-    checkoutId: string;
+    checkoutId: string | null;
     phone: string;
     channel: PhoneChannel;
     shop: string;
     ip?: string | null;
+    language?: MessageLanguage;
   },
 ): Promise<'sent' | 'too_many'> {
   const { shopId, checkoutId, phone, channel } = code;
@@ -149,17 +168,21 @@ export async function sendCodeIn(
   }
   const id = newId();
   const digits = String(randomInt(0, 10 ** NUMBER_CODE.digits)).padStart(NUMBER_CODE.digits, '0');
+  const purpose = checkoutId === null ? 'sign_in' : 'checkout';
   // The last one sent stops working: only the newest is checked.
   await tx.execute(sql`
-    INSERT INTO checkout.number_codes (shop_id, id, checkout_id, phone, channel, code_hash,
-                                       expires_at, ip)
-    VALUES (${shopId}, ${id}, ${checkoutId}, ${phone}, ${channel}, ${digest(id, digits)},
-            now() + ${`${NUMBER_CODE.minutes} minutes`}::interval, ${ip}::inet)`);
+    INSERT INTO checkout.number_codes (shop_id, id, checkout_id, purpose, phone, channel,
+                                       code_hash, expires_at, ip)
+    VALUES (${shopId}, ${id}, ${checkoutId}, ${purpose}, ${phone}, ${channel},
+            ${digest(id, digits)}, now() + ${`${NUMBER_CODE.minutes} minutes`}::interval,
+            ${ip}::inet)`);
+  const kind = checkoutId === null ? 'account_code' : 'one_time_code';
   await messages.queueIn(tx, shopId, {
-    kind: 'one_time_code',
+    kind,
     recipient: phone,
     channel,
-    dedupeKey: `one_time_code:${id}`,
+    ...(code.language && { language: code.language }),
+    dedupeKey: `${kind}:${id}`,
     variables: { shop: code.shop, code: digits },
   });
   return 'sent';

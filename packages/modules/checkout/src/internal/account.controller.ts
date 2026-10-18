@@ -1,0 +1,141 @@
+import {
+  ACCOUNT_TOKEN_HEADER,
+  CLIENT_IP_HEADER,
+  accountPath,
+  type AccountErrorResponse,
+  type AccountLoginStartResponse,
+  type AccountLoginVerifyErrorResponse,
+  type AccountLoginVerifyResponse,
+  type AccountOrderLinkResponse,
+  type AccountResponse,
+  type AccountSessionResponse,
+} from '@hatti/storefront-api';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Headers,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Post,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import { AccountService, toSessionJson } from './account.service.js';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * Shoppers' accounts, as storefronts reach them (CUS-02, ADR-570): `POST …/account/login` with
+ * the `phone` typed, the `channel` and the storefront's `locale` sends a code to sign in with,
+ * from the address in `x-hatti-client-ip`; `POST …/account/login/verify` with the `phone` and the
+ * `code` signs in, answering the session's secret once; and, with that secret in
+ * `x-hatti-account`, `GET …/account/session` reads the session, `GET …/account` the account,
+ * `POST …/account/orders/{id}/link` the page of one of its orders, and `POST …/account/logout`
+ * signs out. 422 says what was wrong with what was typed. The host application checks the
+ * storefront key before any of this runs.
+ */
+@Controller(accountPath(':shopId').slice(1))
+export class StorefrontAccountController {
+  constructor(private readonly accounts: AccountService) {}
+
+  @Post('login')
+  @HttpCode(200)
+  @Header('cache-control', 'no-store')
+  async start(
+    @Param('shopId') shopId: string,
+    @Body() body: unknown,
+    @Headers(CLIENT_IP_HEADER) ip: string | undefined,
+  ): Promise<AccountLoginStartResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const started = await this.accounts.startSignIn(
+      shopId,
+      {
+        phone: field(body, 'phone').slice(0, 40),
+        channel: field(body, 'channel') === 'sms' ? 'sms' : 'whatsapp',
+        locale: field(body, 'locale').slice(0, 16),
+      },
+      { ip: ip ?? null },
+    );
+    if (started.kind === 'invalid') {
+      throw new UnprocessableEntityException({
+        errors: started.errors.map(({ field, message }) => ({ field: field.join('.'), message })),
+      } satisfies AccountErrorResponse);
+    }
+    return { state: started.kind, phone: started.phone, channel: started.channel };
+  }
+
+  @Post('login/verify')
+  @HttpCode(200)
+  @Header('cache-control', 'no-store')
+  async verify(
+    @Param('shopId') shopId: string,
+    @Body() body: unknown,
+  ): Promise<AccountLoginVerifyResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const verified = await this.accounts.verifySignIn(shopId, {
+      phone: field(body, 'phone').slice(0, 40),
+      code: field(body, 'code').slice(0, 20),
+    });
+    if (verified.kind !== 'signed_in') {
+      throw new UnprocessableEntityException({
+        error: verified.kind,
+      } satisfies AccountLoginVerifyErrorResponse);
+    }
+    return { token: verified.token, session: toSessionJson(verified.session) };
+  }
+
+  @Get('session')
+  @Header('cache-control', 'no-store')
+  async session(
+    @Param('shopId') shopId: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountSessionResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const session = token ? await this.accounts.session(shopId, token) : null;
+    return { session: session && toSessionJson(session) };
+  }
+
+  @Post('logout')
+  @HttpCode(204)
+  @Header('cache-control', 'no-store')
+  async logout(
+    @Param('shopId') shopId: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<void> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    if (token) await this.accounts.signOut(shopId, token);
+  }
+
+  @Get()
+  @Header('cache-control', 'no-store')
+  async account(
+    @Param('shopId') shopId: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    return { account: token ? await this.accounts.account(shopId, token) : null };
+  }
+
+  @Post('orders/:orderId/link')
+  @HttpCode(200)
+  @Header('cache-control', 'no-store')
+  async orderLink(
+    @Param('shopId') shopId: string,
+    @Param('orderId') orderId: string,
+    @Headers(ACCOUNT_TOKEN_HEADER) token: string | undefined,
+  ): Promise<AccountOrderLinkResponse> {
+    if (!UUID.test(shopId)) throw new NotFoundException();
+    const link = token ? await this.accounts.orderLink(shopId, token, orderId) : null;
+    if (!link) throw new NotFoundException();
+    return link;
+  }
+}
+
+/** A text field of a JSON body; blank for one it lacks. */
+function field(body: unknown, name: string): string {
+  const value =
+    typeof body === 'object' && body !== null ? (body as Record<string, unknown>)[name] : null;
+  return typeof value === 'string' ? value : '';
+}

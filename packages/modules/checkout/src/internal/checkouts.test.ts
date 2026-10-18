@@ -1197,7 +1197,13 @@ describe.skipIf(!server)('CheckoutService', () => {
     // Later checkouts leave it; the worker's sweep deletes it (ADR-230).
     const next = await lawnCart();
     await started(next.token);
-    expect(await f.expiry.deleteExpired()).toEqual({ checkouts: 1, carts: 0, proofs: 0 });
+    expect(await f.expiry.deleteExpired()).toEqual({
+      checkouts: 1,
+      carts: 0,
+      proofs: 0,
+      codes: 0,
+      sessions: 0,
+    });
     const { rows } = await f.admin.query<{ count: string }>(
       'SELECT count(*) FROM checkout.checkouts',
     );

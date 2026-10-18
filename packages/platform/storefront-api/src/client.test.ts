@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { StorefrontApiError, StorefrontApiClient, type CartJson } from './index.js';
+import {
+  StorefrontApiError,
+  StorefrontApiClient,
+  accountCookie,
+  accountCookieCleared,
+  type AccountJson,
+  type CartJson,
+} from './index.js';
 
 const EMPTY: CartJson = {
   note: '',
@@ -252,6 +259,107 @@ describe('StorefrontApiClient', () => {
       ['GET', 'http://core.test/storefront/shops/shop-1/theme-images/file_other?preview=1'],
     ]);
     expect(requests[0]!.headers.get('authorization')).toBe('Bearer storefront-key');
+  });
+
+  it('signs a shopper in with a code, from where they asked, and says what was wrong (ADR-570)', async () => {
+    const session = {
+      phone: '+923001234567',
+      name: 'Ayesha Khan',
+      signedInAt: '2026-10-18T09:00:00.000Z',
+      expiresAt: '2026-11-17T09:00:00.000Z',
+    };
+    const { client, requests } = clientAnswering((request) => {
+      if (request.url.endsWith('/login')) {
+        return Response.json({ state: 'sent', phone: '0300 ••••567', channel: 'whatsapp' });
+      }
+      return Response.json({ token: 'session-secret', session });
+    });
+    expect(
+      await client.accountLoginStart(
+        'shop-1',
+        { phone: '0300 1234567', locale: 'ur' },
+        { ip: '203.0.113.7' },
+      ),
+    ).toEqual({ ok: true, state: 'sent', phone: '0300 ••••567', channel: 'whatsapp' });
+    expect(
+      await client.accountLoginVerify('shop-1', { phone: '0300 1234567', code: '048213' }),
+    ).toEqual({ ok: true, token: 'session-secret', session });
+    expect(requests.map((request) => [request.method, request.url])).toEqual([
+      ['POST', 'http://core.test/storefront/shops/shop-1/account/login'],
+      ['POST', 'http://core.test/storefront/shops/shop-1/account/login/verify'],
+    ]);
+    expect(await requests[0]!.json()).toEqual({ phone: '0300 1234567', locale: 'ur' });
+    expect(requests[0]!.headers.get('x-hatti-client-ip')).toBe('203.0.113.7');
+    expect(await requests[1]!.json()).toEqual({ phone: '0300 1234567', code: '048213' });
+
+    const errors = [{ field: 'phone', message: 'Enter a Pakistani mobile number' }];
+    const { client: refusing } = clientAnswering((request) =>
+      request.url.endsWith('/login')
+        ? Response.json({ errors }, { status: 422 })
+        : Response.json({ error: 'wrong' }, { status: 422 }),
+    );
+    expect(await refusing.accountLoginStart('shop-1', { phone: '042' })).toEqual({
+      ok: false,
+      errors,
+    });
+    expect(
+      await refusing.accountLoginVerify('shop-1', { phone: '0300 1234567', code: '1' }),
+    ).toEqual({ ok: false, error: 'wrong' });
+    // The cookie the storefront keeps it in, and takes away.
+    expect(accountCookie('session-secret', { secure: true })).toBe(
+      'hatti_account=session-secret; Path=/; Max-Age=7776000; HttpOnly; SameSite=Lax; Secure',
+    );
+    expect(accountCookieCleared({ secure: false })).toBe(
+      'hatti_account=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+    );
+  });
+
+  it("reads a signed-in shopper's session and account, opens their order's page, and signs out", async () => {
+    const account: AccountJson = {
+      phone: '+923001234567',
+      name: 'Ayesha Khan',
+      orders: [],
+      storeCredit: { balance: 50_000, currency: 'PKR', expiring: null },
+    };
+    const link = { path: '/o/abc', url: 'http://core.test/o/abc' };
+    const { client, requests } = clientAnswering((request) => {
+      const signedIn = request.headers.get('x-hatti-account') === 'session-secret';
+      if (request.url.endsWith('/logout')) return new Response(null, { status: 204 });
+      if (request.url.endsWith('/session')) return Response.json({ session: null });
+      if (request.url.endsWith('/link')) {
+        return signedIn ? Response.json(link) : new Response('Not found', { status: 404 });
+      }
+      return Response.json({ account: signedIn ? account : null });
+    });
+    // Without a cookie, nothing is asked.
+    expect(await client.account('shop-1', null)).toBeNull();
+    expect(await client.accountSession('shop-1', null)).toBeNull();
+    expect(await client.accountOrderLink('shop-1', null, 'ord_1')).toBeNull();
+    await client.accountLogout('shop-1', null);
+    expect(requests).toEqual([]);
+
+    expect(await client.account('shop-1', 'session-secret')).toEqual(account);
+    expect(await client.account('shop-1', 'gone')).toBeNull();
+    expect(await client.accountSession('shop-1', 'gone')).toBeNull();
+    expect(await client.accountOrderLink('shop-1', 'session-secret', 'ord_1')).toEqual(link);
+    expect(await client.accountOrderLink('shop-1', 'gone', 'ord_1')).toBeNull();
+    await client.accountLogout('shop-1', 'session-secret');
+    expect(requests.map((request) => [request.method, request.url])).toEqual([
+      ['GET', 'http://core.test/storefront/shops/shop-1/account'],
+      ['GET', 'http://core.test/storefront/shops/shop-1/account'],
+      ['GET', 'http://core.test/storefront/shops/shop-1/account/session'],
+      ['POST', 'http://core.test/storefront/shops/shop-1/account/orders/ord_1/link'],
+      ['POST', 'http://core.test/storefront/shops/shop-1/account/orders/ord_1/link'],
+      ['POST', 'http://core.test/storefront/shops/shop-1/account/logout'],
+    ]);
+    // The session's secret goes in its header, never in the address.
+    expect(requests[0]!.headers.get('x-hatti-account')).toBe('session-secret');
+    expect(requests.every((request) => !request.url.includes('secret'))).toBe(true);
+    const { client: down } = clientAnswering(() => new Response('down', { status: 503 }));
+    await expect(down.account('shop-1', 'session-secret')).rejects.toThrow(StorefrontApiError);
+    await expect(down.accountLogout('shop-1', 'session-secret')).rejects.toThrow(
+      StorefrontApiError,
+    );
   });
 
   it('throws when the core answers otherwise', async () => {

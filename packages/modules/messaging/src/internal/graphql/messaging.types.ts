@@ -35,6 +35,7 @@ export enum MessageKind {
   COD_PREPAID = 'COD_PREPAID',
   STORE_OPEN = 'STORE_OPEN',
   ONE_TIME_CODE = 'ONE_TIME_CODE',
+  ACCOUNT_CODE = 'ACCOUNT_CODE',
   STOCK_LOW = 'STOCK_LOW',
   STOCK_OUT = 'STOCK_OUT',
   DAILY_SUMMARY = 'DAILY_SUMMARY',
@@ -180,6 +181,11 @@ registerEnumType(MessageKind, {
       description:
         'A code to prove their number at checkout (CHK-09), which the shop cannot turn off; the ' +
         'code is not kept once sent.',
+    },
+    ACCOUNT_CODE: {
+      description:
+        "A code to sign in to their account on the shop's storefront (CUS-02, ADR-570), which " +
+        'the shop cannot turn off; the code is not kept once sent.',
     },
     STOCK_LOW: {
       description:

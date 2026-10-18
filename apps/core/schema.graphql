@@ -6932,6 +6932,11 @@ A notification the shop's customers get about their orders, an alert the shop ge
 """
 enum MessageKind {
   """
+  A code to sign in to their account on the shop's storefront (CUS-02, ADR-570), which the shop cannot turn off; the code is not kept once sent.
+  """
+  ACCOUNT_CODE
+
+  """
   Sent by one of the shop's automations, a welcome or a win-back, from its own WhatsApp number to a customer who agreed to hear from it there (ADR-425): never by SMS.
   """
   AUTOMATION

@@ -74,6 +74,11 @@ export {
 } from '../internal/confirmation-desk.service.js';
 export { orderConversionFactsIn, type OrderConversionFacts } from '../internal/conversion-facts.js';
 export {
+  accountOrderLinkIn,
+  accountOrdersIn,
+  type AccountOrderFacts,
+} from '../internal/account-orders.js';
+export {
   CustomerAnswers,
   messageLinkIn,
   type AnswerOutcome,

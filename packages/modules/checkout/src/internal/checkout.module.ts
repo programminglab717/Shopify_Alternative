@@ -5,6 +5,8 @@ import { MessagesService } from '@hatti/messaging/public';
 import { OrdersModule } from '@hatti/orders/public';
 import { Module } from '@nestjs/common';
 import { AbandonedCheckoutService } from './abandoned.service.js';
+import { StorefrontAccountController } from './account.controller.js';
+import { AccountService } from './account.service.js';
 import { CartController } from './cart.controller.js';
 import { CartService } from './cart.service.js';
 import {
@@ -56,7 +58,9 @@ import { TrustBadgeService } from './trust-badge.service.js';
     // Checkouts shoppers left, and their reminders (ADR-393).
     AbandonedCheckoutService,
     AbandonedCheckoutResolver,
-    // Sends the codes that prove shoppers' numbers (CHK-09).
+    // Shoppers' accounts on the storefront, signed in to by a code (CUS-02, ADR-570).
+    AccountService,
+    // Sends the codes that prove shoppers' numbers (CHK-09) and sign them in.
     MessagesService,
     // Browsers' proofs of numbers in customers' erasure and exports (ADR-199).
     CheckoutCustomerData,
@@ -67,6 +71,7 @@ import { TrustBadgeService } from './trust-badge.service.js';
     StorefrontPaymentLinkController,
     CheckoutController,
     ReminderLinkController,
+    StorefrontAccountController,
   ],
   exports: [
     CartService,
@@ -78,6 +83,7 @@ import { TrustBadgeService } from './trust-badge.service.js';
     CheckoutService,
     PaymentLinkService,
     AbandonedCheckoutService,
+    AccountService,
   ],
 })
 export class CheckoutModule {}

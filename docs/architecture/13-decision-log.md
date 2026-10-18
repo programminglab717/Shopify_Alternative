@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-569 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-570 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -577,6 +577,7 @@
 | 567 | The admin's ad spend page connects the shop's TikTok advertiser account as it does Meta's, one card for both, TikTok's folded until it is wanted | Accepted |
 | 568 | A shop chooses its storefront's filters, their order and their words, filters on its products' and variants' custom fields among them, and none chosen keeps every filter as before | Accepted |
 | 569 | The admin's online store has a Filters tab: every filter as before, or the shop's own list, ordered, named in English and Urdu, its custom fields' filters added | Accepted |
+| 570 | A shopper signs in to a shop's storefront with a code to their mobile, and the session reads their orders and store credit, the storefront's pages to follow | Accepted |
 
 ---
 
@@ -21219,3 +21220,31 @@
 * **Consequences:** A shop arranges its filters without the API.
 * **Alternatives:** **Dragging to reorder:** buttons to move a filter work by keyboard and on a
   phone, and say what they do to a screen reader.
+
+## ADR-570 · A shopper signs in to a shop's storefront with a code to their mobile, and the session reads their orders and store credit, the storefront's pages to follow
+
+* **Context:** Hatti's shoppers have no accounts (CUS-02): a customer is the shop's record of a
+  number, and checkout proves a number with a one-time code (CHK-09, ADR-148, ADR-186). Shopify's
+  customer accounts sign in by a code too, and show the shopper their orders.
+* **Decision:**
+  * **Signing in:** the storefront asks for a code to a mobile number, sent by WhatsApp or SMS as
+    checkout's are, worded as a sign-in code in English and Urdu; it answers the same whether or
+    not the number is anyone's. A code signs in once, within ten minutes and five tries, and is
+    kept apart from checkout's: neither proves the other. The two share checkout's limits, a
+    number's day and an address's hour.
+  * **The session:** 32 random bytes, given to the storefront once and kept as their digest; it
+    lasts 30 days from its last use and never 90 past signing in, signing out ending it at once.
+    It follows the number: a number with no orders takes on its customer with its first, a
+    merged customer's sessions move to the one kept, a number moved away ends its sessions when
+    next read, and erasing a customer deletes them and its codes.
+  * **The account:** the number, the customer's name, their latest 20 orders with this shop, of
+    every number merged into them, with their state, total and whether they have a page, and
+    their store credit with what expires first. An order's page opens with the link its messages
+    carry, or one the session opened before, else a new one, as messages make them.
+  * **In the checkout module,** which already owns the codes and reads customers, orders and
+    messaging through their facades, which cannot read one another the other way.
+* **Consequences:** The storefront's sign-in and account pages need only render what the API
+  gives. The WhatsApp template for the code is to be registered with Meta before it is used.
+* **Alternatives:** **A password:** shoppers pay by cash on delivery from phones and remember a
+  code better than a password. **Accounts in the customers module:** it is read by messaging and
+  orders, so it cannot read them.

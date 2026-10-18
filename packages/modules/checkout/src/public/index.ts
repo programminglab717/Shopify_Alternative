@@ -21,6 +21,14 @@ export {
   type AbandonedCheckoutRecord,
   type RecoverySettingsRecord,
 } from '../internal/abandoned.service.js';
+export {
+  ACCOUNT_SESSION,
+  AccountService,
+  type AccountClient,
+  type AccountSessionRecord,
+  type SignInStart,
+  type SignInVerify,
+} from '../internal/account.service.js';
 export { CartService, type CartResult } from '../internal/cart.service.js';
 export { CheckoutModule } from '../internal/checkout.module.js';
 export { CHECKOUT_CUSTOMER_DATA, CheckoutCustomerData } from '../internal/customer-data.js';

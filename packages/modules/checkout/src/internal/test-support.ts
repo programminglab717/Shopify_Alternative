@@ -12,6 +12,7 @@ import { newId } from '@hatti/ids';
 import { InventoryService, LocationService, StockService } from '@hatti/inventory/public';
 import { MessagesService } from '@hatti/messaging/public';
 import { AbandonedCheckoutService } from './abandoned.service.js';
+import { AccountService } from './account.service.js';
 import {
   BankTransferService,
   FulfillmentService,
@@ -127,6 +128,8 @@ export interface CheckoutFixture {
   abandoned: AbandonedCheckoutService;
   /** What the worker's sweep deletes once past its time (ADR-230). */
   expiry: CheckoutExpiry;
+  /** Shoppers' accounts on the storefront, signed in to by a code (ADR-570). */
+  accounts: AccountService;
   orders: OrderService;
   /** The shop's gateway, as the payments module would give it: none unless a test sets one. */
   payments: StubPayments;
@@ -245,6 +248,7 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
       new PublicSite('https://hatti.test'),
     ),
     expiry: new CheckoutExpiry(db),
+    accounts: new AccountService(db, new MessagesService(db), new PublicSite('https://hatti.test')),
     orders,
     payments,
     fulfillments: new FulfillmentService(db, stock),
@@ -295,6 +299,8 @@ export async function checkoutFixture(server: string): Promise<CheckoutFixture> 
       await admin.query(`
         DELETE FROM checkout.checkouts;
         DELETE FROM checkout.number_proofs;
+        DELETE FROM checkout.number_codes;
+        DELETE FROM checkout.account_sessions;
         DELETE FROM checkout.carts;
         DELETE FROM checkout.delivery_settings;
         DELETE FROM checkout.cod_settings;

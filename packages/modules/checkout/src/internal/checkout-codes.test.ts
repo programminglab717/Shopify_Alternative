@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { sha256 } from '@hatti/crypto';
 import { testDatabaseServer } from '@hatti/db/testing';
+import { newId } from '@hatti/ids';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseAction } from './cart-lines.js';
 import { checkoutPage } from './checkout-pages.js';
@@ -154,7 +155,7 @@ describe.skipIf(!server)('Codes that prove the number at checkout', () => {
       problemOf(await f.checkouts.place(fourth.secret, fourth.shown, FORM, from('x'.repeat(22)))),
     ).toMatchObject({ kind: 'code' });
     // A customer's own file says when their number was proved; erased, its proof goes.
-    const identity = { id: 'not-needed', phones: ['+923001234567'], email: null };
+    const identity = { id: newId(), phones: ['+923001234567'], email: null };
     const filed = await f.db.tenant(f.a.shopId, (tx) =>
       CHECKOUT_CUSTOMER_DATA.export(tx, f.a.shopId, identity),
     );
@@ -170,6 +171,8 @@ describe.skipIf(!server)('Codes that prove the number at checkout', () => {
       checkoutsLeft: expect.arrayContaining([
         expect.objectContaining({ number: '+923001234567', remindedAt: null }),
       ]) as unknown,
+      // Never signed in to their account on the storefront (ADR-570).
+      accountSessions: [],
     });
     await f.admin.query(
       `UPDATE checkout.number_proofs

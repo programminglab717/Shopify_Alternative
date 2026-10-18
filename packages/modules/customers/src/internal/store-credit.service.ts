@@ -672,6 +672,56 @@ export async function storeCreditOfPhoneIn(
   return BigInt(rows[0]!.balance);
 }
 
+/** What a customer has of store credit in a currency, and what of it expires soonest. */
+export interface StoreCreditBalance {
+  /** Minor units: what their credits have left that has not expired. */
+  balance: bigint;
+  /**
+   * What of it expires soonest, and when: the credits that expire first, together where several
+   * expire at once; null while none of it expires.
+   */
+  expiring: { amount: bigint; expiresAt: Date } | null;
+}
+
+/**
+ * What the customer `customerId` has of store credit in `currency` at `at`, and what of it
+ * expires soonest, in the caller's transaction: for their account on the shop's storefront
+ * (ADR-570). Nothing for a customer with no account in it.
+ */
+export async function storeCreditOfCustomerIn(
+  tx: Tx,
+  shopId: string,
+  customerId: string,
+  currency: string,
+  at: Date = new Date(),
+): Promise<StoreCreditBalance> {
+  const { rows } = await tx.execute<{
+    balance: string;
+    expiring: string | null;
+    expires_at: string | Date | null;
+  }>(sql`
+    WITH live AS (
+      SELECT t.remaining, t.expires_at
+        FROM customers.store_credit_accounts a
+        JOIN customers.store_credit_transactions t
+          ON t.shop_id = a.shop_id AND t.account_id = a.id AND t.kind = 'credit'
+         AND t.remaining > 0 AND (t.expires_at IS NULL OR t.expires_at > ${at.toISOString()})
+       WHERE a.shop_id = ${shopId} AND a.customer_id = ${customerId} AND a.currency = ${currency}),
+    soonest AS (SELECT min(expires_at) AS expires_at FROM live)
+    SELECT coalesce((SELECT sum(remaining) FROM live), 0)::text AS balance,
+           (SELECT sum(l.remaining) FROM live l, soonest s
+             WHERE l.expires_at = s.expires_at)::text AS expiring,
+           (SELECT expires_at FROM soonest) AS expires_at`);
+  const row = rows[0]!;
+  return {
+    balance: BigInt(row.balance),
+    expiring:
+      row.expiring === null || row.expires_at === null
+        ? null
+        : { amount: BigInt(row.expiring), expiresAt: toDate(row.expires_at) },
+  };
+}
+
 /** What of order `orderId` store credit paid and was not given back, in the caller's transaction. */
 export async function storeCreditPaidIn(tx: Tx, shopId: string, orderId: string): Promise<bigint> {
   const { rows } = await tx.execute<{ paid: string }>(sql`

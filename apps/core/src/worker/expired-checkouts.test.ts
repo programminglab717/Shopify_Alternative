@@ -12,27 +12,42 @@ describe('Expired carts and checkouts in the worker (ADR-230)', () => {
       .mockImplementationOnce(async (_at, _limit, failed) => {
         // One shop's failure is logged, and the rest go on.
         failed!('0190a1b2-0000-7000-8000-000000000001', trouble);
-        return { checkouts: 12, carts: 1_000, proofs: 3 };
+        return { checkouts: 12, carts: 1_000, proofs: 3, codes: 4, sessions: 1 };
       })
-      .mockResolvedValueOnce({ checkouts: 0, carts: 1_000, proofs: 0 })
-      .mockResolvedValueOnce({ checkouts: 0, carts: 41, proofs: 0 })
-      .mockResolvedValueOnce({ checkouts: 0, carts: 0, proofs: 0 });
+      .mockResolvedValueOnce({ checkouts: 0, carts: 1_000, proofs: 0, codes: 0, sessions: 2 })
+      .mockResolvedValueOnce({ checkouts: 0, carts: 41, proofs: 0, codes: 0, sessions: 0 })
+      .mockResolvedValueOnce({ checkouts: 0, carts: 0, proofs: 0, codes: 0, sessions: 0 });
     const logger = { info: vi.fn(), warn: vi.fn() };
     const sweeps = new ExpiredCheckouts(
       { deleteExpired } as unknown as CheckoutExpiry,
       logger as never,
     );
     const at = new Date('2027-03-01T09:00:00Z');
-    expect(await sweeps.sweep(at)).toEqual({ checkouts: 12, carts: 2_041, proofs: 3 });
+    expect(await sweeps.sweep(at)).toEqual({
+      checkouts: 12,
+      carts: 2_041,
+      proofs: 3,
+      codes: 4,
+      sessions: 3,
+    });
     expect(deleteExpired.mock.calls.map(([when, limit]) => [when, limit])).toEqual([
       [at, 1_000],
       [at, 1_000],
       [at, 1_000],
     ]);
-    expect(await sweeps.sweep(at)).toEqual({ checkouts: 0, carts: 0, proofs: 0 });
+    expect(await sweeps.sweep(at)).toEqual({
+      checkouts: 0,
+      carts: 0,
+      proofs: 0,
+      codes: 0,
+      sessions: 0,
+    });
     expect(deleteExpired).toHaveBeenCalledTimes(4);
     expect(logger.info.mock.calls).toEqual([
-      [{ checkouts: 12, carts: 2_041, proofs: 3 }, 'expired carts and checkouts deleted'],
+      [
+        { checkouts: 12, carts: 2_041, proofs: 3, codes: 4, sessions: 3 },
+        'expired carts and checkouts deleted',
+      ],
     ]);
     expect(logger.warn.mock.calls).toEqual([
       [

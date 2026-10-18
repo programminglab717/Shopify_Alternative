@@ -6,14 +6,21 @@ const EXPIRING = {
   checkouts: sql`checkout.checkouts`,
   carts: sql`checkout.carts`,
   proofs: sql`checkout.number_proofs`,
+  // Codes to sign in with, which no checkout takes with it, and sessions signed in (ADR-570).
+  codes: sql`checkout.number_codes`,
+  sessions: sql`checkout.account_sessions`,
 } as const satisfies Record<string, SQL>;
 
 /**
  * What else must have passed: a checkout with a number is kept for its shop past its page's day,
- * as an abandoned checkout (ADR-393).
+ * as an abandoned checkout (ADR-393); a code is the sweep's only to sign in with, a checkout's
+ * going with it, and only once its day is up, as until then it counts towards the codes its number
+ * is sent in a day.
  */
 const KEPT: Partial<Record<keyof typeof EXPIRING, (at: string) => SQL>> = {
   checkouts: (at) => sql`AND (kept_until IS NULL OR kept_until <= ${at})`,
+  codes: (at) =>
+    sql`AND purpose = 'sign_in' AND created_at <= ${at}::timestamptz - interval '1 day'`,
 };
 
 /** How many of each kind a sweep deleted. */
@@ -24,9 +31,10 @@ export const EXPIRY_BATCH = 1_000;
 
 /**
  * The checkout module's rows past their time (ADR-042, ADR-230): checkouts, their codes with
- * them; carts; and browsers' proofs of a number (ADR-199). Nothing reads one once it has expired:
- * a secret naming a cart that is gone is never taken up, a checkout's page says it expired, and a
- * proof spares no code. The worker's sweep deletes them, so that shoppers' requests delete none,
+ * them; carts; browsers' proofs of a number (ADR-199); and codes to sign in to shoppers' accounts
+ * and the sessions signed in, lapsed or signed out (ADR-570). Nothing reads one once it has
+ * expired: a secret naming a cart that is gone is never taken up, a checkout's page says it
+ * expired, a proof spares no code and a session reads no account. The worker's sweep deletes them, so that shoppers' requests delete none,
  * and a shop that gets no new carts keeps no old ones.
  */
 export class CheckoutExpiry {
@@ -44,7 +52,7 @@ export class CheckoutExpiry {
     limit = EXPIRY_BATCH,
     failed?: (shopId: string, error: unknown) => void,
   ): Promise<ExpiredCounts> {
-    const deleted: ExpiredCounts = { checkouts: 0, carts: 0, proofs: 0 };
+    const deleted: ExpiredCounts = { checkouts: 0, carts: 0, proofs: 0, codes: 0, sessions: 0 };
     for (const kind of Object.keys(EXPIRING) as (keyof typeof EXPIRING)[]) {
       const table = EXPIRING[kind];
       const kept = KEPT[kind]?.(at.toISOString()) ?? sql``;

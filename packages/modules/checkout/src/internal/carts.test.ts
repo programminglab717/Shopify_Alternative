@@ -207,7 +207,13 @@ describe.skipIf(!server)('CartService', () => {
     expect(fresh.token).not.toBe(noted.token);
     expect(fresh.cart.note).toBe('');
     // The expired one is left to the worker's sweep (ADR-230).
-    expect(await f.expiry.deleteExpired()).toEqual({ checkouts: 0, carts: 1, proofs: 0 });
+    expect(await f.expiry.deleteExpired()).toEqual({
+      checkouts: 0,
+      carts: 1,
+      proofs: 0,
+      codes: 0,
+      sessions: 0,
+    });
     const { rows } = await f.admin.query<{ count: string }>(`SELECT count(*) FROM checkout.carts`);
     expect(rows[0]!.count).toBe('1');
   });
@@ -280,6 +286,8 @@ describe.skipIf(!server)('CartService', () => {
       checkouts: 1,
       carts: 1,
       proofs: 1,
+      codes: 0,
+      sessions: 0,
     });
     expect(await left()).toEqual({
       carts: [ids.oldA, ids.staleA, ids.liveA],
@@ -293,6 +301,8 @@ describe.skipIf(!server)('CartService', () => {
       checkouts: 0,
       carts: 2,
       proofs: 1,
+      codes: 0,
+      sessions: 0,
     });
     expect(await left()).toEqual({
       carts: [ids.liveA],
@@ -311,6 +321,8 @@ describe.skipIf(!server)('CartService', () => {
       checkouts: 0,
       carts: 0,
       proofs: 0,
+      codes: 0,
+      sessions: 0,
     });
   });
 

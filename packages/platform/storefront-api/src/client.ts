@@ -1,4 +1,20 @@
 import {
+  ACCOUNT_TOKEN_HEADER,
+  accountOrderLinkPath,
+  accountPath,
+  type AccountErrorResponse,
+  type AccountJson,
+  type AccountLoginStartRequest,
+  type AccountLoginStartResponse,
+  type AccountLoginVerifyErrorResponse,
+  type AccountLoginVerifyRequest,
+  type AccountLoginVerifyResponse,
+  type AccountOrderLinkResponse,
+  type AccountResponse,
+  type AccountSessionJson,
+  type AccountSessionResponse,
+} from './accounts.js';
+import {
   CART_TOKEN_HEADER,
   CLIENT_BROWSER_IDS_HEADER,
   CLIENT_IP_HEADER,
@@ -89,6 +105,17 @@ export type StockWatchResult =
 
 export type CommentResult =
   ({ ok: true } & CommentResponse) | ({ ok: false } & CommentErrorResponse);
+
+export type AccountLoginStartResult =
+  ({ ok: true } & AccountLoginStartResponse) | ({ ok: false } & AccountErrorResponse);
+
+export type AccountLoginVerifyResult =
+  ({ ok: true } & AccountLoginVerifyResponse) | ({ ok: false } & AccountLoginVerifyErrorResponse);
+
+/** Where a shopper signs in from, as their browser told the storefront: its internet address. */
+export interface AccountClient {
+  ip: string;
+}
 
 /** The core answered as it should not: down, misconfigured, or failing. */
 export class StorefrontApiError extends Error {
@@ -367,6 +394,121 @@ export class StorefrontApiClient {
       body: new Uint8Array(await response.arrayBuffer()),
       contentType: response.headers.get('content-type') ?? 'application/octet-stream',
     };
+  }
+
+  /**
+   * Sends a code to sign in with to the number a shopper typed (CUS-02, ADR-570), from the
+   * address `client` gives: whether it went, the same for any number; or what was wrong with it.
+   */
+  async accountLoginStart(
+    shopId: string,
+    request: AccountLoginStartRequest,
+    client?: AccountClient,
+  ): Promise<AccountLoginStartResult> {
+    const response = await this.#request(
+      'POST',
+      accountPath(shopId, 'login'),
+      null,
+      request,
+      client ? { [CLIENT_IP_HEADER]: client.ip } : {},
+    );
+    if (response.status === 422) {
+      return { ok: false, ...((await response.json()) as AccountErrorResponse) };
+    }
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return { ok: true, ...((await response.json()) as AccountLoginStartResponse) };
+  }
+
+  /**
+   * Checks the code the shopper typed (ADR-570): signed in, with the session's secret for the
+   * browser's cookie, which the core gives only now; or why not.
+   */
+  async accountLoginVerify(
+    shopId: string,
+    request: AccountLoginVerifyRequest,
+  ): Promise<AccountLoginVerifyResult> {
+    const response = await this.#request(
+      'POST',
+      accountPath(shopId, 'login/verify'),
+      null,
+      request,
+    );
+    if (response.status === 422) {
+      return { ok: false, ...((await response.json()) as AccountLoginVerifyErrorResponse) };
+    }
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return { ok: true, ...((await response.json()) as AccountLoginVerifyResponse) };
+  }
+
+  /**
+   * The session the cookie's `token` names, which reading keeps going (ADR-570); null without
+   * one, and once it is none: signed out, expired or unknown.
+   */
+  async accountSession(shopId: string, token: string | null): Promise<AccountSessionJson | null> {
+    if (!token) return null;
+    const response = await this.#request('GET', accountPath(shopId, 'session'), null, undefined, {
+      [ACCOUNT_TOKEN_HEADER]: token,
+    });
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return ((await response.json()) as AccountSessionResponse).session;
+  }
+
+  /** Signs the session the cookie's `token` names out (ADR-570); nothing to do without one. */
+  async accountLogout(shopId: string, token: string | null): Promise<void> {
+    if (!token) return;
+    const response = await this.#request(
+      'POST',
+      accountPath(shopId, 'logout'),
+      null,
+      {},
+      {
+        [ACCOUNT_TOKEN_HEADER]: token,
+      },
+    );
+    if (response.status !== 204) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+  }
+
+  /**
+   * The account of the session the cookie's `token` names (ADR-570): the shopper's orders with the
+   * shop and their store credit; null without a session.
+   */
+  async account(shopId: string, token: string | null): Promise<AccountJson | null> {
+    if (!token) return null;
+    const response = await this.#request('GET', accountPath(shopId), null, undefined, {
+      [ACCOUNT_TOKEN_HEADER]: token,
+    });
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return ((await response.json()) as AccountResponse).account;
+  }
+
+  /**
+   * The page of the order `orderId` of the account the cookie's `token` names, its public ID from
+   * {@link account} (ADR-570): where to send the shopper; null without a session, for an order not
+   * theirs, or one with no page.
+   */
+  async accountOrderLink(
+    shopId: string,
+    token: string | null,
+    orderId: string,
+  ): Promise<AccountOrderLinkResponse | null> {
+    if (!token) return null;
+    const path = accountOrderLinkPath(shopId, encodeURIComponent(orderId));
+    const response = await this.#request('POST', path, null, {}, { [ACCOUNT_TOKEN_HEADER]: token });
+    if (response.status === 404) return null;
+    if (response.status !== 200) {
+      throw new StorefrontApiError(response.status, await response.text());
+    }
+    return (await response.json()) as AccountOrderLinkResponse;
   }
 
   #request(

@@ -687,6 +687,36 @@ export class CustomerService {
 }
 
 /**
+ * The customer whose number `phone` is (E.164), main or other, by ID with their name, in the
+ * caller's transaction; null for a number no customer has. For the account a shopper signs in to
+ * on the shop's storefront with the number (ADR-570).
+ */
+export async function customerOfPhoneIn(
+  tx: Tx,
+  shopId: string,
+  phone: string,
+): Promise<{ id: string; name: string | null } | null> {
+  const [found] = await tx
+    .select({ id: customers.id, name: customers.name })
+    .from(customerPhones)
+    .innerJoin(
+      customers,
+      and(eq(customers.shopId, customerPhones.shopId), eq(customers.id, customerPhones.customerId)),
+    )
+    .where(and(eq(customerPhones.shopId, shopId), eq(customerPhones.phone, phone)));
+  return found ?? null;
+}
+
+/** Whether the shop has the customer `id` still: not merged into another, nor erased. */
+export async function customerExistsIn(tx: Tx, shopId: string, id: string): Promise<boolean> {
+  const [found] = await tx
+    .select({ id: customers.id })
+    .from(customers)
+    .where(and(eq(customers.shopId, shopId), eq(customers.id, id)));
+  return found !== undefined;
+}
+
+/**
  * In the caller's transaction, the customer with `details.phone`, main or other, created from its
  * name and email if the number is new, recorded as made from `source`. An existing customer's
  * profile is left as it is. The number stays locked until the transaction ends, so a merge or

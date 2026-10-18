@@ -568,6 +568,8 @@ describe("Messages' words", () => {
     ]);
     expect(ALWAYS_SENT).toEqual([
       'one_time_code',
+      // And the code to sign in to their account on the storefront (ADR-570).
+      'account_code',
       // Checkout's own setting turns it on and off (ADR-393).
       'checkout_reminder',
       'checkout_offer',
@@ -679,7 +681,7 @@ describe("Messages' words", () => {
       'ABCD EFGH JKLM NPQR',
     ]);
     expect(templateButtons('gift_card', card)).toEqual([]);
-    expect(SECRET_KINDS).toEqual(['gift_card', 'one_time_code']);
+    expect(SECRET_KINDS).toEqual(['gift_card', 'one_time_code', 'account_code']);
     expect(messageEmail('gift_card', 'en', card)).toBeNull();
   });
 
@@ -698,6 +700,15 @@ describe("Messages' words", () => {
         parameters: [{ type: 'text', text: '048213' }],
       },
     ]);
+    // The shop's, signing a shopper in to their account on its storefront (ADR-570): in words
+    // of its own, so that it is never taken for one to place an order.
+    expect(messageText('account_code', 'en', code)).toBe(
+      '048213 is your code to sign in to your account with Zari Fashions. It works for 10 ' +
+        'minutes. Never share it.',
+    );
+    expect(messageText('account_code', 'ur', code)).toContain('سائن ان');
+    expect(templateParameters('account_code', code)).toEqual(['048213']);
+    expect(templateButtons('account_code', code)).toEqual(templateButtons('one_time_code', code));
     // Hatti's own, signing a merchant in (ADR-159): the same button, from Hatti.
     const signIn = { shop: 'Hatti', code: '731904' };
     expect(messageText('sign_in_code', 'en', signIn)).toBe(
