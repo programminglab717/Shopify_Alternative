@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-18
 
-### Shoppers signed in
+### 5831b08 · Shoppers signed in
 
 * **A shopper signs in to a shop's storefront with a code to their mobile, and the session reads
   their orders and store credit, the storefront's pages to follow** ([ADR-570](../architecture/13-decision-log.md#adr-570--a-shopper-signs-in-to-a-shops-storefront-with-a-code-to-their-mobile-and-the-session-reads-their-orders-and-store-credit-the-storefronts-pages-to-follow), CUS-02).
