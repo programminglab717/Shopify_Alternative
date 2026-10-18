@@ -26,7 +26,11 @@ import { TrustModule } from '@hatti/trust/public';
 import { IdentityModule, type IdentityServiceOptions } from '@hatti/identity/public';
 import { InventoryCopiedVariantStock, InventoryModule } from '@hatti/inventory/public';
 import { type Couriers, LogisticsModule } from '@hatti/logistics/public';
-import { MarketingModule, type MetaGraphOptions } from '@hatti/marketing/public';
+import {
+  MarketingModule,
+  type MetaGraphOptions,
+  type TikTokApiOptions,
+} from '@hatti/marketing/public';
 import {
   MessagingModule,
   type SupportLineSettings,
@@ -116,6 +120,11 @@ export interface ApiModuleOptions {
    * (ADR-564); https://graph.facebook.com at v26.0 unless given.
    */
   metaGraph?: MetaGraphOptions;
+  /**
+   * TikTok's Business API, which shops' advertiser accounts are checked on and their spend pulled
+   * from (ADR-566); https://business-api.tiktok.com unless given.
+   */
+  tiktokApi?: TikTokApiOptions;
   /** Hatti's VAPID keys (ADR-506); without them, nothing is pushed to staff's browsers. */
   push?: VapidKeys | null;
   /** Asks DNS whether shops' own domains point at the platform; the system's resolvers unless given. */
@@ -270,6 +279,7 @@ export class ApiModule {
             baseUrl: 'https://graph.facebook.com',
             version: 'v26.0',
           },
+          tiktokApi: options.tiktokApi ?? { baseUrl: 'https://business-api.tiktok.com' },
         }),
         AppsModule,
         MessagingModule.forRoot({

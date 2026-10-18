@@ -144,7 +144,7 @@ type AdSpendSetPayload {
   userErrors: [UserError!]!
 }
 
-"""Where a day's ad spend came from (ADR-564)."""
+"""Where a day's ad spend came from (ADR-564, ADR-566)."""
 enum AdSpendSource {
   """The shop typed it."""
   MANUAL
@@ -153,6 +153,11 @@ enum AdSpendSource {
   Pulled from Meta's Marketing API, from the ad account the shop connected: typing over it makes it MANUAL.
   """
   META
+
+  """
+  Pulled from TikTok's Business API, from the advertiser account the shop connected: typing over it makes it MANUAL.
+  """
+  TIKTOK
 }
 
 """
@@ -8887,6 +8892,21 @@ type Mutation {
   themePublish(id: ID!): ThemePublishPayload!
 
   """
+  Connects the shop's TikTok advertiser account, in place of any it had, or gives it another token (ADR-566), once TikTok says the token reads it and that it bills in the shop's currency: from then on, the worker pulls its spend by day and campaign every few hours, the last week's again each time, and the last 30 days' at once, as a Meta ad account's. What the shop typed by hand stays its own. On plans with true profit. Audited, the token never. Staff confirm who they are first when they signed in over 15 minutes ago.
+  """
+  tiktokAdAccountConnect(input: TikTokAdAccountConnectInput!): TikTokAdAccountConnectPayload!
+
+  """
+  Disconnects the shop's TikTok advertiser account: its token is forgotten, and no more spend is pulled. What was pulled stays.
+  """
+  tiktokAdAccountDisconnect: TikTokAdAccountDisconnectPayload!
+
+  """
+  Pulls the shop's spend from its TikTok advertiser account now, as the worker does every few hours (ADR-566): at most once a minute.
+  """
+  tiktokAdSpendSync: TikTokAdSpendSyncPayload!
+
+  """
   Disconnects the shop's TikTok pixel: its token is forgotten, and moments still waiting are not sent.
   """
   tiktokEventsDelete: TikTokEventsDeletePayload!
@@ -13593,6 +13613,11 @@ type Query {
   ): OnlineStoreThemeConnection!
 
   """
+  The shop's TikTok advertiser account its spend is pulled from (ADR-566); null until it connects one.
+  """
+  tiktokAdAccount: TikTokAdAccount
+
+  """
   The shop's TikTok pixel its orders go to (MKT-10); null until it connects one.
   """
   tiktokEvents: TikTokEvents
@@ -15814,6 +15839,64 @@ enum ThemeRole {
 
   """Being prepared, or shown before; publish it to show it."""
   UNPUBLISHED
+}
+
+"""
+The shop's TikTok advertiser account, whose spend the worker pulls from TikTok's Business API every few hours, by day and campaign, for the sales report (MKT-12, ADR-566).
+"""
+type TikTokAdAccount {
+  """The last four characters of its access token, never shown again."""
+  accessTokenHint: String!
+
+  """Its ID, as TikTok Ads Manager shows it."""
+  advertiserId: String!
+
+  """What it bills in: the shop's currency."""
+  currency: String!
+
+  """
+  Why the last pull failed, as TikTok said: the worker tries again next time. Null when it went through.
+  """
+  lastError: String
+
+  """When its spend was last pulled; null before the first time."""
+  lastSyncedAt: DateTime
+
+  """Its name at TikTok when it was connected."""
+  name: String!
+
+  """
+  The time zone TikTok reports its days in, as Asia/Karachi: each is kept as the shop's day of that date.
+  """
+  timezone: String
+  updatedAt: DateTime!
+}
+
+input TikTokAdAccountConnectInput {
+  """
+  A long-term access token of the advertiser, from TikTok's Marketing API: kept sealed, and never shown again.
+  """
+  accessToken: String!
+
+  """Its ID, from TikTok Ads Manager: its digits."""
+  advertiserId: String!
+}
+
+type TikTokAdAccountConnectPayload {
+  tiktokAdAccount: TikTokAdAccount
+  userErrors: [UserError!]!
+}
+
+type TikTokAdAccountDisconnectPayload {
+  """The advertiser account's ID that was connected; null when none was."""
+  deletedAdvertiserId: String
+  userErrors: [UserError!]!
+}
+
+type TikTokAdSpendSyncPayload {
+  """The advertiser account after the pull: lastError says if it failed."""
+  tiktokAdAccount: TikTokAdAccount
+  userErrors: [UserError!]!
 }
 
 """

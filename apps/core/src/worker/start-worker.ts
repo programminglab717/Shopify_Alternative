@@ -37,6 +37,8 @@ import {
   MetaAdsClient,
   MetaConversionsClient,
   MetaConversionsService,
+  TikTokAdAccountService,
+  TikTokAdsClient,
   TikTokEventsClient,
   TikTokEventsService,
 } from '@hatti/marketing/public';
@@ -649,13 +651,24 @@ export async function startWorker(config: WorkerConfig, logger: Logger): Promise
         logger,
       }).start(config.CONVERSIONS_INTERVAL_MS);
       closers.push(() => conversions.stop());
-      // Shops' ad spend pulled from the Meta ad accounts they connected (ADR-564).
+      // Shops' ad spend pulled from the Meta ad accounts (ADR-564) and TikTok advertiser
+      // accounts (ADR-566) they connected.
       const adSpend = new AdSpendSync(
-        new MetaAdAccountService(
-          database,
-          config.ENCRYPTION_KEYS,
-          new MetaAdsClient({ baseUrl: config.META_GRAPH_URL, version: config.META_GRAPH_VERSION }),
-        ),
+        {
+          meta: new MetaAdAccountService(
+            database,
+            config.ENCRYPTION_KEYS,
+            new MetaAdsClient({
+              baseUrl: config.META_GRAPH_URL,
+              version: config.META_GRAPH_VERSION,
+            }),
+          ),
+          tiktok: new TikTokAdAccountService(
+            database,
+            config.ENCRYPTION_KEYS,
+            new TikTokAdsClient({ baseUrl: config.TIKTOK_API_URL }),
+          ),
+        },
         logger,
       ).start(config.AD_SPEND_SYNC_INTERVAL_MS);
       closers.push(() => adSpend.stop());

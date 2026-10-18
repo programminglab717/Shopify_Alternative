@@ -7,8 +7,11 @@ import { sql } from 'drizzle-orm';
 export const AD_SPEND_PLATFORMS = ['meta', 'tiktok', 'google', 'other'] as const;
 export type AdSpendPlatformValue = (typeof AD_SPEND_PLATFORMS)[number];
 
-/** Where a day's spend came from: typed by the shop, or pulled from Meta's Marketing API (ADR-564). */
-export const AD_SPEND_SOURCES = ['manual', 'meta_api'] as const;
+/**
+ * Where a day's spend came from: typed by the shop, or pulled from Meta's Marketing API (ADR-564)
+ * or TikTok's Business API (ADR-566), each for its own platform's spend alone.
+ */
+export const AD_SPEND_SOURCES = ['manual', 'meta_api', 'tiktok_api'] as const;
 export type AdSpendSourceValue = (typeof AD_SPEND_SOURCES)[number];
 
 export const AD_SPEND_LIMITS = {
@@ -63,8 +66,8 @@ function dayOf(day: string): string | null {
  * What a shop spends on its ads (MKT-12, ANL-03, ADR-553), day by day, by platform and, where it
  * says, by campaign as its links' `utm_campaign` names it, in its own currency as it paid: the
  * sales report takes it off the orders' profit and sets it against their sales. Recorded by those
- * who connect the shop's ad platforms, or pulled from Meta's Marketing API where the shop connected
- * its ad account (ADR-564); a day of none is no entry.
+ * who connect the shop's ad platforms, or pulled from Meta's Marketing API (ADR-564) or TikTok's
+ * Business API (ADR-566) where the shop connected its account there; a day of none is no entry.
  */
 @Injectable()
 export class AdSpendService {
@@ -74,8 +77,8 @@ export class AdSpendService {
    * Records each day's spend given, replacing what that platform's day, or campaign of it, had;
    * an amount of zero takes it away. All of them, or none. How many were given. What the shop
    * types is its own, pulled before or not (ADR-564): a campaign's day typed over one pulled from
-   * Meta stays as typed, and a platform's whole day typed takes the place of the campaigns pulled
-   * for it, which would count twice beside it.
+   * Meta or TikTok stays as typed, and a platform's whole day typed takes the place of the
+   * campaigns pulled for it, which would count twice beside it.
    */
   async set(
     tenant: TenantContext,
@@ -189,7 +192,7 @@ export class AdSpendService {
   }
 }
 
-/** What one of the shop's Meta campaigns spent on a day, as Meta reports it (ADR-564). */
+/** What one of the shop's campaigns spent on a day, as its ad platform reports it (ADR-564). */
 export interface PulledAdSpend {
   /** `YYYY-MM-DD`. */
   day: string;
@@ -200,17 +203,20 @@ export interface PulledAdSpend {
 }
 
 /**
- * Puts `pulled`, what Meta's Marketing API now reports of the days `since` to `until`, both
+ * Puts `pulled`, what `platform`'s API `source` now reports of the days `since` to `until`, both
  * included, in the place of what was pulled from it for those days before, in the caller's
- * transaction (ADR-564): a day or campaign it no longer reports goes, as one of nothing does. The
- * shop's own stay as it typed them: a campaign's day it typed keeps what Meta says of that
- * campaign out, and Meta's whole day it typed keeps out every campaign of that day, which would
- * count twice beside it. The same campaign named twice is added up, as the sales report would.
- * How many days and campaigns were kept.
+ * transaction: Meta's Marketing API's (ADR-564), or TikTok's Business API's (ADR-566). A day or
+ * campaign it no longer reports goes, as one of nothing does. The shop's own stay as it typed
+ * them: a campaign's day it typed keeps what the platform says of that campaign out, and the
+ * platform's whole day it typed keeps out every campaign of that day, which would count twice
+ * beside it. The same campaign named twice is added up, as the sales report would. How many days
+ * and campaigns were kept.
  */
-export async function replaceMetaAdSpendIn(
+export async function replacePulledAdSpendIn(
   tx: Tx,
   shopId: string,
+  platform: AdSpendPlatformValue,
+  source: Exclude<AdSpendSourceValue, 'manual'>,
   since: string,
   until: string,
   pulled: readonly PulledAdSpend[],
@@ -218,7 +224,7 @@ export async function replaceMetaAdSpendIn(
   const { rows: typed } = await tx.execute<{ day: string; campaign: string }>(sql`
     SELECT to_char(day, 'YYYY-MM-DD') AS day, lower(campaign) AS campaign
       FROM marketing.ad_spend
-     WHERE shop_id = ${shopId} AND platform = 'meta' AND source = 'manual'
+     WHERE shop_id = ${shopId} AND platform = ${platform} AND source = 'manual'
        AND day BETWEEN ${since}::date AND ${until}::date`);
   const own = new Set(typed.map((row) => `${row.day}|${row.campaign}`));
   const wholeDays = new Set(typed.filter((row) => row.campaign === '').map((row) => row.day));
@@ -236,14 +242,14 @@ export async function replaceMetaAdSpendIn(
   );
   await tx.execute(sql`
     DELETE FROM marketing.ad_spend
-     WHERE shop_id = ${shopId} AND platform = 'meta' AND source = 'meta_api'
+     WHERE shop_id = ${shopId} AND platform = ${platform} AND source = ${source}
        AND day BETWEEN ${since}::date AND ${until}::date`);
   for (let start = 0; start < values.length; start += 500) {
     const rows = values
       .slice(start, start + 500)
       .map(
         (entry) =>
-          sql`(${shopId}, 'meta', ${entry.day}::date, ${entry.campaign}, ${entry.amount}, 'meta_api')`,
+          sql`(${shopId}, ${platform}, ${entry.day}::date, ${entry.campaign}, ${entry.amount}, ${source})`,
       );
     await tx.execute(sql`
       INSERT INTO marketing.ad_spend (shop_id, platform, day, campaign, amount, source)

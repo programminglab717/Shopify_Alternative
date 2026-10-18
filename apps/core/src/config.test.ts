@@ -338,6 +338,16 @@ describe('API configuration', () => {
     );
   });
 
+  it("reads TikTok's Business API, which shops' advertiser accounts are checked on (ADR-566)", () => {
+    expect(loadApiConfig(env).TIKTOK_API_URL).toBe('https://business-api.tiktok.com');
+    expect(loadApiConfig({ ...env, TIKTOK_API_URL: 'http://localhost:4900' }).TIKTOK_API_URL).toBe(
+      'http://localhost:4900',
+    );
+    expect(() => loadApiConfig({ ...env, TIKTOK_API_URL: 'business-api' })).toThrow(
+      /TIKTOK_API_URL/,
+    );
+  });
+
   it("takes Hatti's support WhatsApp number with its token, or neither (ADR-560)", () => {
     // Without it, nothing written to WhatsApp is kept as a support request.
     expect(supportLineOf(loadApiConfig(env))).toBeNull();
@@ -482,8 +492,10 @@ describe('Worker configuration', () => {
       META_GRAPH_URL: 'https://graph.facebook.com',
       META_GRAPH_VERSION: 'v26.0',
       CONVERSIONS_INTERVAL_MS: 15_000,
-      // Shops' spend pulled from their Meta ad accounts every three hours (ADR-564).
+      // Shops' spend pulled from their Meta ad accounts (ADR-564) and TikTok advertiser
+      // accounts, on TikTok's Business API (ADR-566), every three hours.
       AD_SPEND_SYNC_INTERVAL_MS: 10_800_000,
+      TIKTOK_API_URL: 'https://business-api.tiktok.com',
       // Tier-1 shops' invoices go to FBR's IMS, or its sandbox (ADR-555).
       FBR_POS_URL: 'https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData',
       FBR_POS_SANDBOX_URL: 'https://esp.fbr.gov.pk:8244/FBR/v1/api/Live/PostData',

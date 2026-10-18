@@ -148,6 +148,15 @@ const messageSending = {
   EMAIL_FROM: z.string().min(3).default('Hatti <no-reply@hatti.pk>'),
 };
 
+/**
+ * TikTok's Business API, as the worker and the API read it: shops' orders go to it through its
+ * Events API (ADR-541), and their advertiser accounts are checked on it and their spend pulled
+ * from it (ADR-566).
+ */
+const tiktokApi = {
+  TIKTOK_API_URL: env.httpUrl().default('https://business-api.tiktok.com'),
+};
+
 /** The message-sending settings, as both processes read them, with the environment's name. */
 export type MessageSendingConfig = z.output<z.ZodObject<typeof messageSending>> & {
   NODE_ENV: string;
@@ -412,6 +421,7 @@ const apiSchema = z
     AI_MODEL: z.string().trim().min(1).max(200).optional(),
     AI_BASE_URL: env.httpUrl().optional(),
     ...messageSending,
+    ...tiktokApi,
     ...storage,
     ...webPush,
   })
@@ -639,15 +649,14 @@ const workerSchema = z
      * (ADR-147). Required in production; http://localhost:4000 otherwise.
      */
     PUBLIC_URL: env.httpUrl().optional(),
-    /** TikTok's Business API, which shops' orders go to through its Events API (ADR-541). */
-    TIKTOK_API_URL: env.httpUrl().default('https://business-api.tiktok.com'),
+    ...tiktokApi,
     /** Google Analytics, which shops' orders go to through its Measurement Protocol (ADR-547). */
     GOOGLE_ANALYTICS_URL: env.httpUrl().default('https://www.google-analytics.com'),
     /** How often the moments of orders due go to the ad platforms. */
     CONVERSIONS_INTERVAL_MS: z.coerce.number().int().min(1_000).default(15_000),
     /**
-     * How often shops' spend is pulled from the Meta ad accounts they connected (ADR-564): every
-     * three hours, the last week's each time.
+     * How often shops' spend is pulled from the Meta ad accounts (ADR-564) and TikTok advertiser
+     * accounts (ADR-566) they connected: every three hours, the last week's each time.
      */
     AD_SPEND_SYNC_INTERVAL_MS: z.coerce
       .number()

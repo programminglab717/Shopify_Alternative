@@ -4,34 +4,52 @@ import {
   actorColumnsOf,
   failOne,
   planFeatureMessage,
-  shopProfile,
   type MutationResult,
   type TenantContext,
 } from '@hatti/api';
 import { SecretBox } from '@hatti/crypto';
-import { Database, toDate, type Tx } from '@hatti/db';
+import { Database } from '@hatti/db';
 import { appendEvent, recordAudit } from '@hatti/events';
-import { exponentOf, isCurrencyCode } from '@hatti/money';
 import { Injectable, Optional } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
-import { AD_SPEND_LIMITS, replaceMetaAdSpendIn, type PulledAdSpend } from './ad-spend.service.js';
-import { dayIn } from './calendar.service.js';
+import {
+  AD_SPEND_PULL_DAYS,
+  AD_SPEND_PULL_GAP_MS,
+  adAccountIn,
+  adAccountKeptOf,
+  adAccountsDue,
+  deleteAdAccountIn,
+  pullAdSpend,
+  saveAdAccountIn,
+  type AdAccountRow,
+  type AdAccountTable,
+  type AdSpendPull,
+} from './ad-account-pull.js';
 import {
   MarketingEvents,
   type MetaAdAccountConnectedPayload,
   type MetaAdAccountDisconnectedPayload,
 } from './events.js';
-import { MetaAdsClient, adAccountIdOf, spendMinor } from './meta-ad-spend.js';
+import { MetaAdsClient, adAccountIdOf } from './meta-ad-spend.js';
 import { META_LIMITS } from './meta-settings.service.js';
 
 /**
  * The days each pull covers, today in the shop's time zone among them: the last week, which Meta
  * still revises; the last 30 the first time.
  */
-export const META_AD_SPEND_DAYS = { sync: 7, backfill: 30 } as const;
+export const META_AD_SPEND_DAYS = AD_SPEND_PULL_DAYS;
 
 /** How soon after the last the shop may have its spend pulled again. */
-export const META_AD_SPEND_PULL_GAP_MS = 60_000;
+export const META_AD_SPEND_PULL_GAP_MS = AD_SPEND_PULL_GAP_MS;
+
+/** Where shops' Meta ad accounts are kept, and their spend pulled to. */
+const META_AD_ACCOUNTS: AdAccountTable = {
+  platform: 'meta',
+  source: 'meta_api',
+  table: 'meta_ad_accounts',
+  idColumn: 'ad_account_id',
+  idField: 'adAccountId',
+  sealing: 'meta-ads',
+};
 
 /** The shop's Meta ad account, as the Admin API shows it: never its token. */
 export interface MetaAdAccountRecord {
@@ -58,31 +76,7 @@ export interface MetaAdAccountInput {
 }
 
 /** How pulling the shop's spend went: how many days it covered and entries it kept, or why not. */
-export type MetaAdSpendPull =
-  { ok: true; days: number; entries: number } | { ok: false; message: string };
-
-type AccountRow = {
-  ad_account_id: string;
-  name: string;
-  currency: string;
-  timezone: string | null;
-  access_token: string;
-  token_hint: string;
-  last_synced_at: string | Date | null;
-  last_error: string | null;
-  version: number;
-  updated_at: string | Date;
-};
-
-/** What the shop's sealed token is bound to: it opens for that shop alone. */
-function sealedFor(shopId: string): string {
-  return `meta-ads:${shopId}`;
-}
-
-/** The day `days` after `day`, YYYY-MM-DD. */
-function addDays(day: string, days: number): string {
-  return new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
-}
+export type MetaAdSpendPull = AdSpendPull;
 
 /**
  * The shop's Meta ad account (MKT-12, ADR-564), whose spend is pulled from Meta's Marketing API
@@ -107,7 +101,9 @@ export class MetaAdAccountService {
   ) {}
 
   async get(tenant: TenantContext): Promise<MetaAdAccountRecord | null> {
-    const row = await this.db.tenant(tenant.shopId, (tx) => accountIn(tx, tenant.shopId));
+    const row = await this.db.tenant(tenant.shopId, (tx) =>
+      adAccountIn(tx, META_AD_ACCOUNTS, tenant.shopId),
+    );
     return row && toRecord(row);
   }
 
@@ -171,32 +167,18 @@ export class MetaAdAccountService {
     }
 
     const connected = await this.db.tenant(tenant.shopId, async (tx) => {
-      const current = await accountIn(tx, tenant.shopId, { lock: true });
-      const opened =
-        current && this.box.decrypt(current.access_token, sealedFor(tenant.shopId)).toString();
-      const changed = [
-        ...(adAccountId !== current?.ad_account_id ? ['adAccountId'] : []),
-        ...(accessToken !== opened ? ['accessToken'] : []),
-      ];
-      if (current && changed.length === 0) return false;
-      const sealed = this.box.encrypt(accessToken, sealedFor(tenant.shopId));
-      const hint = accessToken.slice(-4);
+      const saved = await saveAdAccountIn(
+        tx,
+        this.box,
+        META_AD_ACCOUNTS,
+        tenant.shopId,
+        adAccountId,
+        account.value,
+        accessToken,
+      );
+      if (!saved) return false;
+      const { changed, tokenHint: hint, before: current } = saved;
       const { name, currency, timezone } = account.value;
-      // Another account's spend is pulled from its first 30 days; another token tries at once.
-      await tx.execute(sql`
-        INSERT INTO marketing.meta_ad_accounts
-               (shop_id, ad_account_id, name, currency, timezone, access_token, token_hint)
-        VALUES (${tenant.shopId}, ${adAccountId}, ${name}, ${currency}, ${timezone}, ${sealed},
-                ${hint})
-            ON CONFLICT (shop_id) DO UPDATE
-                   SET ad_account_id = excluded.ad_account_id, name = excluded.name,
-                       currency = excluded.currency, timezone = excluded.timezone,
-                       access_token = excluded.access_token, token_hint = excluded.token_hint,
-                       last_attempt_at = NULL, last_error = NULL,
-                       last_synced_at = CASE
-                         WHEN marketing.meta_ad_accounts.ad_account_id = excluded.ad_account_id
-                         THEN marketing.meta_ad_accounts.last_synced_at END,
-                       version = marketing.meta_ad_accounts.version + 1, updated_at = now()`);
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<MetaAdAccountConnectedPayload>(tx, tenant.shopId, {
         type: MarketingEvents.MetaAdAccountConnected,
@@ -216,7 +198,7 @@ export class MetaAdAccountService {
           currency,
           timezone,
           tokenHint: hint,
-          before: current && { adAccountId: current.ad_account_id, tokenHint: current.token_hint },
+          before: current && { adAccountId: current.account_id, tokenHint: current.token_hint },
         },
       });
       return true;
@@ -231,10 +213,7 @@ export class MetaAdAccountService {
    */
   async disconnect(tenant: TenantContext): Promise<string | null> {
     return this.db.tenant(tenant.shopId, async (tx) => {
-      const { rows } = await tx.execute<{ ad_account_id: string }>(sql`
-        DELETE FROM marketing.meta_ad_accounts WHERE shop_id = ${tenant.shopId}
-        RETURNING ad_account_id`);
-      const adAccountId = rows[0]?.ad_account_id;
+      const adAccountId = await deleteAdAccountIn(tx, META_AD_ACCOUNTS, tenant.shopId);
       if (!adAccountId) return null;
       const actor = actorColumnsOf(tenant.actor);
       await appendEvent<MetaAdAccountDisconnectedPayload>(tx, tenant.shopId, {
@@ -282,102 +261,29 @@ export class MetaAdAccountService {
    * never, those asked longest ago first: for the worker.
    */
   async dueShops(before: Date, limit = 500): Promise<string[]> {
-    const { rows } = await this.db.system((tx) =>
-      tx.execute<{ shop_id: string }>(sql`
-        SELECT shop_id FROM marketing.meta_ad_accounts
-         WHERE last_attempt_at IS NULL OR last_attempt_at < ${before.toISOString()}
-         ORDER BY last_attempt_at NULLS FIRST, shop_id
-         LIMIT ${limit}`),
-    );
-    return rows.map((row) => row.shop_id);
+    return adAccountsDue(this.db, META_AD_ACCOUNTS, before, limit);
   }
 
   /**
    * Pulls the shop's spend from Meta at `at`, in place of what was pulled of those days before,
-   * as {@link replaceMetaAdSpendIn} keeps it; what Meta says when it refuses is kept for the
-   * shop to see, and the next round tries again. Null when the shop has no account connected,
-   * or its spend was asked for under `gapMs` ago. A token or account changed meanwhile is the
-   * next pull's.
+   * as {@link pullAdSpend} keeps it; what Meta says when it refuses is kept for the shop to see,
+   * and the next round tries again. Null when the shop has no account connected, or its spend was
+   * asked for under `gapMs` ago. A token or account changed meanwhile is the next pull's.
    */
   async sync(shopId: string, at: Date = new Date(), gapMs = 0): Promise<MetaAdSpendPull | null> {
-    const started = await this.db.tenant(shopId, async (tx) => {
-      const { rows } = await tx.execute<AccountRow>(sql`
-        UPDATE marketing.meta_ad_accounts SET last_attempt_at = ${at.toISOString()}
-         WHERE shop_id = ${shopId}
-           AND (last_attempt_at IS NULL
-                OR last_attempt_at <= ${new Date(at.getTime() - gapMs).toISOString()})
-        RETURNING ${COLUMNS}`);
-      const row = rows[0];
-      return row && { row, timezone: (await shopProfile(tx, shopId)).timezone };
-    });
-    if (!started) return null;
-    const { row, timezone } = started;
-    const days = row.last_synced_at ? META_AD_SPEND_DAYS.sync : META_AD_SPEND_DAYS.backfill;
-    const until = dayIn(timezone, at);
-    const since = addDays(until, 1 - days);
-    const token = this.box.decrypt(row.access_token, sealedFor(shopId)).toString('utf8');
-    // Asked outside the shop's transaction: Meta may take a while.
-    const spend = await this.client.spend(row.ad_account_id, token, since, until);
-
-    const exponent = isCurrencyCode(row.currency) ? exponentOf(row.currency) : 2;
-    return this.db.tenant(shopId, async (tx) => {
-      const { rows } = await tx.execute<{ version: number }>(sql`
-        SELECT version FROM marketing.meta_ad_accounts WHERE shop_id = ${shopId} FOR UPDATE`);
-      if (rows[0]?.version !== row.version) {
-        return { ok: false, message: 'The ad account changed while its spend was pulled' };
-      }
-      if (!spend.ok) {
-        await tx.execute(sql`
-          UPDATE marketing.meta_ad_accounts SET last_error = ${spend.message.slice(0, 1_000)}
-           WHERE shop_id = ${shopId}`);
-        return { ok: false, message: spend.message };
-      }
-      const pulled: PulledAdSpend[] = [];
-      for (const each of spend.value) {
-        const amount = spendMinor(each.spend, exponent);
-        if (amount === null) continue;
-        pulled.push({
-          day: each.day,
-          campaign: Array.from(each.campaign.trim()).slice(0, AD_SPEND_LIMITS.campaign).join(''),
-          amount,
-        });
-      }
-      const entries = await replaceMetaAdSpendIn(tx, shopId, since, until, pulled);
-      await tx.execute(sql`
-        UPDATE marketing.meta_ad_accounts
-           SET last_synced_at = ${at.toISOString()}, last_error = NULL
-         WHERE shop_id = ${shopId}`);
-      return { ok: true, days, entries };
-    });
+    return pullAdSpend(
+      this.db,
+      this.box,
+      META_AD_ACCOUNTS,
+      (adAccountId, token, since, until) => this.client.spend(adAccountId, token, since, until),
+      shopId,
+      at,
+      gapMs,
+    );
   }
 }
 
-const COLUMNS = sql.raw(
-  'ad_account_id, name, currency, timezone, access_token, token_hint, last_synced_at, ' +
-    'last_error, version, updated_at',
-);
-
-async function accountIn(
-  tx: Tx,
-  shopId: string,
-  options: { lock?: boolean } = {},
-): Promise<AccountRow | null> {
-  const { rows } = await tx.execute<AccountRow>(sql`
-    SELECT ${COLUMNS} FROM marketing.meta_ad_accounts
-     WHERE shop_id = ${shopId}
-     ${options.lock ? sql`FOR UPDATE` : sql``}`);
-  return rows[0] ?? null;
-}
-
-function toRecord(row: AccountRow): MetaAdAccountRecord {
-  return {
-    adAccountId: row.ad_account_id,
-    name: row.name,
-    currency: row.currency,
-    timezone: row.timezone,
-    tokenHint: row.token_hint,
-    lastSyncedAt: row.last_synced_at === null ? null : toDate(row.last_synced_at),
-    lastError: row.last_error,
-    updatedAt: toDate(row.updated_at),
-  };
+function toRecord(row: AdAccountRow): MetaAdAccountRecord {
+  const { accountId, ...kept } = adAccountKeptOf(row);
+  return { adAccountId: accountId, ...kept };
 }

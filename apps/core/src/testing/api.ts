@@ -21,7 +21,7 @@ import type {
   WhatsAppSignupSettings,
   WhatsAppWebhookSettings,
 } from '@hatti/messaging/public';
-import type { MetaGraphOptions } from '@hatti/marketing/public';
+import type { MetaGraphOptions, TikTokApiOptions } from '@hatti/marketing/public';
 import type { PaymentGateways } from '@hatti/payments/public';
 import { LocalStorage } from '@hatti/storage';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -73,6 +73,8 @@ export async function startTestApi(
     whatsAppReplies?: WhatsAppReplySettings;
     /** Meta's Graph API as shops' ad accounts are read (ADR-564); Meta's own unless given. */
     metaGraph?: MetaGraphOptions;
+    /** TikTok's Business API as shops' advertisers are read (ADR-566); TikTok's unless given. */
+    tiktokApi?: TikTokApiOptions;
     paymentGateways?: PaymentGateways;
     /** Hatti's own gateway account (ADR-154); the test gateway unless given, or null for none. */
     billingGateway?: HattiGateway | null;
@@ -133,6 +135,7 @@ export async function startTestApi(
     whatsAppSignup: options.whatsAppSignup ?? null,
     whatsAppReplies: options.whatsAppReplies ?? null,
     ...(options.metaGraph && { metaGraph: options.metaGraph }),
+    ...(options.tiktokApi && { tiktokApi: options.tiktokApi }),
     push: options.push ?? null,
     couriers: couriersOf({ production: false }),
     paymentGateways: options.paymentGateways ?? paymentGatewaysOf({ production: false }),

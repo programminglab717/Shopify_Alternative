@@ -8,17 +8,27 @@ import { MetaAdAccountService } from './meta-ad-account.service.js';
 import { MetaAdsClient } from './meta-ad-spend.js';
 import type { MetaGraphOptions } from './meta-client.js';
 import { MetaConversionsService } from './meta-settings.service.js';
+import { TikTokAdAccountService } from './tiktok-ad-account.service.js';
+import { TikTokAdsClient } from './tiktok-ad-spend.js';
+import type { TikTokApiOptions } from './tiktok-client.js';
 import { TikTokEventsService } from './tiktok-settings.service.js';
 
 /** Needs {@link Database} and {@link SecretBox} providers from the host application. */
 @Module({})
 export class MarketingModule {
-  /** `metaGraph`: Meta's Graph API, which shops' ad accounts' spend is read from (ADR-564). */
-  static forRoot(options: { metaGraph: MetaGraphOptions }): DynamicModule {
+  /**
+   * `metaGraph`: Meta's Graph API, which shops' ad accounts' spend is read from (ADR-564);
+   * `tiktokApi`: TikTok's Business API, which their advertiser accounts' is (ADR-566).
+   */
+  static forRoot(options: {
+    metaGraph: MetaGraphOptions;
+    tiktokApi: TikTokApiOptions;
+  }): DynamicModule {
     return {
       module: MarketingModule,
       providers: [
         { provide: MetaAdsClient, useValue: new MetaAdsClient(options.metaGraph) },
+        { provide: TikTokAdsClient, useValue: new TikTokAdsClient(options.tiktokApi) },
         MetaConversionsService,
         TikTokEventsService,
         GoogleAnalyticsService,
@@ -26,6 +36,7 @@ export class MarketingModule {
         MarketingCalendarService,
         AdSpendService,
         MetaAdAccountService,
+        TikTokAdAccountService,
         MarketingResolver,
       ],
       exports: [
@@ -35,6 +46,7 @@ export class MarketingModule {
         ConversionsService,
         AdSpendService,
         MetaAdAccountService,
+        TikTokAdAccountService,
       ],
     };
   }

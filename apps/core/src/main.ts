@@ -97,6 +97,7 @@ const app = await createApi({
         : null,
   },
   metaGraph: { baseUrl: config.META_GRAPH_URL, version: config.META_GRAPH_VERSION },
+  tiktokApi: { baseUrl: config.TIKTOK_API_URL },
   storefrontKey: config.STOREFRONT_SERVICE_KEY,
   couriers: couriersOf({ production: config.NODE_ENV === 'production' }),
   paymentGateways: paymentGatewaysOf({ production: config.NODE_ENV === 'production' }),

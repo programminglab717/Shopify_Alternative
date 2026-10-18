@@ -14,7 +14,11 @@ import {
 import { isUuid, toPublicId, tryFromPublicId } from '@hatti/ids';
 import { money } from '@hatti/money';
 import { Args, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { AdSpendService, type AdSpendPlatformValue } from '../ad-spend.service.js';
+import {
+  AdSpendService,
+  type AdSpendPlatformValue,
+  type AdSpendSourceValue,
+} from '../ad-spend.service.js';
 import { CALENDAR_DAYS_MAX, type MarketingDate as CalendarDate } from '../calendar.js';
 import { MarketingCalendarService } from '../calendar.service.js';
 import { ConversionsService, type ConversionRecord } from '../conversions.service.js';
@@ -25,6 +29,10 @@ import type {
 } from '../meta.js';
 import { MetaAdAccountService, type MetaAdAccountRecord } from '../meta-ad-account.service.js';
 import { MetaConversionsService, type MetaConversionsRecord } from '../meta-settings.service.js';
+import {
+  TikTokAdAccountService,
+  type TikTokAdAccountRecord,
+} from '../tiktok-ad-account.service.js';
 import { TikTokEventsService, type TikTokEventsRecord } from '../tiktok-settings.service.js';
 import { GoogleAnalyticsService, type GoogleAnalyticsRecord } from '../google-settings.service.js';
 import {
@@ -55,11 +63,23 @@ import {
   MetaConversionsUpdatePayload,
   MarketingDate,
   MarketingMoment,
+  TikTokAdAccount,
+  TikTokAdAccountConnectInput,
+  TikTokAdAccountConnectPayload,
+  TikTokAdAccountDisconnectPayload,
+  TikTokAdSpendSyncPayload,
   TikTokEvents,
   TikTokEventsDeletePayload,
   TikTokEventsInput,
   TikTokEventsUpdatePayload,
 } from './marketing.types.js';
+
+/** Where a day's spend came from, as the Admin API names it. */
+const SOURCES: Record<AdSpendSourceValue, AdSpendSource> = {
+  manual: AdSpendSource.MANUAL,
+  meta_api: AdSpendSource.META,
+  tiktok_api: AdSpendSource.TIKTOK,
+};
 
 @Resolver()
 export class MarketingResolver {
@@ -71,6 +91,7 @@ export class MarketingResolver {
     private readonly calendar: MarketingCalendarService,
     private readonly adSpend: AdSpendService,
     private readonly adAccounts: MetaAdAccountService,
+    private readonly advertisers: TikTokAdAccountService,
   ) {}
 
   @Query(() => [AdSpendEntry], {
@@ -92,7 +113,7 @@ export class MarketingResolver {
         day: entry.day,
         campaign: entry.campaign,
         amount: Money.from(money(entry.amount, tenant.currency)),
-        source: entry.source === 'meta_api' ? AdSpendSource.META : AdSpendSource.MANUAL,
+        source: SOURCES[entry.source],
       }),
     );
   }
@@ -185,6 +206,74 @@ export class MarketingResolver {
     const result = await this.adAccounts.pull(tenant);
     return Object.assign(new MetaAdSpendSyncPayload(), {
       metaAdAccount: result.ok ? toMetaAdAccount(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Query(() => TikTokAdAccount, {
+    nullable: true,
+    description:
+      "The shop's TikTok advertiser account its spend is pulled from (ADR-566); null until it " +
+      'connects one.',
+  })
+  @RequireScopes('read_pixels')
+  async tiktokAdAccount(@CurrentTenant() tenant: TenantContext): Promise<TikTokAdAccount | null> {
+    const record = await this.advertisers.get(tenant);
+    return record && toTikTokAdAccount(record);
+  }
+
+  @Mutation(() => TikTokAdAccountConnectPayload, {
+    description:
+      "Connects the shop's TikTok advertiser account, in place of any it had, or gives it another " +
+      "token (ADR-566), once TikTok says the token reads it and that it bills in the shop's " +
+      'currency: from then on, the worker pulls its spend by day and campaign every few hours, ' +
+      "the last week's again each time, and the last 30 days' at once, as a Meta ad account's. " +
+      'What the shop typed by hand stays its own. On plans with true profit. Audited, the token ' +
+      'never. Staff confirm who they are first when they signed in over 15 minutes ago.',
+  })
+  @RequireScopes('write_pixels')
+  @RequireRecentAuthentication()
+  async tiktokAdAccountConnect(
+    @CurrentTenant() tenant: TenantContext,
+    @Args('input') input: TikTokAdAccountConnectInput,
+  ): Promise<TikTokAdAccountConnectPayload> {
+    const result = await this.advertisers.connect(tenant, {
+      advertiserId: input.advertiserId,
+      accessToken: input.accessToken,
+    });
+    return Object.assign(new TikTokAdAccountConnectPayload(), {
+      tiktokAdAccount: result.ok ? toTikTokAdAccount(result.value) : null,
+      userErrors: result.ok ? [] : UserError.list(result.errors),
+    });
+  }
+
+  @Mutation(() => TikTokAdAccountDisconnectPayload, {
+    description:
+      "Disconnects the shop's TikTok advertiser account: its token is forgotten, and no more " +
+      'spend is pulled. What was pulled stays.',
+  })
+  @RequireScopes('write_pixels')
+  async tiktokAdAccountDisconnect(
+    @CurrentTenant() tenant: TenantContext,
+  ): Promise<TikTokAdAccountDisconnectPayload> {
+    return Object.assign(new TikTokAdAccountDisconnectPayload(), {
+      deletedAdvertiserId: await this.advertisers.disconnect(tenant),
+      userErrors: [],
+    });
+  }
+
+  @Mutation(() => TikTokAdSpendSyncPayload, {
+    description:
+      "Pulls the shop's spend from its TikTok advertiser account now, as the worker does every " +
+      'few hours (ADR-566): at most once a minute.',
+  })
+  @RequireScopes('write_pixels')
+  async tiktokAdSpendSync(
+    @CurrentTenant() tenant: TenantContext,
+  ): Promise<TikTokAdSpendSyncPayload> {
+    const result = await this.advertisers.pull(tenant);
+    return Object.assign(new TikTokAdSpendSyncPayload(), {
+      tiktokAdAccount: result.ok ? toTikTokAdAccount(result.value) : null,
       userErrors: result.ok ? [] : UserError.list(result.errors),
     });
   }
@@ -426,6 +515,19 @@ function toMetaConversions(record: MetaConversionsRecord): MetaConversions {
 function toMetaAdAccount(record: MetaAdAccountRecord): MetaAdAccount {
   return Object.assign(new MetaAdAccount(), {
     adAccountId: record.adAccountId,
+    name: record.name,
+    currency: record.currency,
+    timezone: record.timezone,
+    accessTokenHint: record.tokenHint,
+    lastSyncedAt: record.lastSyncedAt,
+    lastError: record.lastError,
+    updatedAt: record.updatedAt,
+  });
+}
+
+function toTikTokAdAccount(record: TikTokAdAccountRecord): TikTokAdAccount {
+  return Object.assign(new TikTokAdAccount(), {
+    advertiserId: record.advertiserId,
     name: record.name,
     currency: record.currency,
     timezone: record.timezone,

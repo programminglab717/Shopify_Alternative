@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-565 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-566 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -573,6 +573,7 @@
 | 563 | The admin's FBR card connects a shop through FBR's digital invoicing or its POS integration, chosen from the shop's tax profile, and switches between them with a new token | Accepted |
 | 564 | A shop connects its Meta ad account and the worker pulls each day's spend by campaign, what the shop typed by hand kept over what Meta says | Accepted |
 | 565 | The admin's ad spend page connects the shop's Meta ad account, pulls it now, and says which days came from Meta | Accepted |
+| 566 | A shop connects its TikTok advertiser account and the same worker pulls its spend by campaign under Meta's rules, shared between the two | Accepted |
 
 ---
 
@@ -21132,3 +21133,26 @@
 * **Consequences:** A shop connects Meta once and its true profit follows Meta's spend.
 * **Alternatives:** **The card in the settings:** it belongs with the spend it fills, where the
   shop sees what came from Meta.
+
+## ADR-566 · A shop connects its TikTok advertiser account and the same worker pulls its spend by campaign under Meta's rules, shared between the two
+
+* **Context:** Meta's ad spend is pulled (ADR-564); TikTok is the other platform Pakistani shops
+  spend on, and its Business API reports spend by campaign and day.
+* **Decision:**
+  * **The advertiser account:** its ID and a long-term token of TikTok's Marketing API, checked
+    with TikTok as it is saved, sealed, its last four shown; an account billing in another
+    currency than rupees is refused. On a plan with true profit, audited, as Meta's.
+  * **One set of rules for both:** saving an account, disconnecting, which are due, and the pull
+    itself (seven days each round, thirty at first, the platform asked outside the transaction,
+    what the shop typed kept, what the platform no longer reports dropped, errors kept) are one
+    module, set up for each platform; each day's spend says which platform it was pulled from.
+  * **TikTok's report:** spend by campaign and day, page by page, the day TikTok's in the
+    advertiser's time zone; a campaign without a name kept under its ID, as no name is the
+    platform's whole day. A token refused, TikTok's limits or TikTok down are kept as the
+    account's last error and tried again next round. TikTok's codes are in one place, as best
+    known.
+  * The worker pulls Meta and then TikTok each round; the API connects, disconnects and pulls
+    now, as for Meta.
+* **Consequences:** True profit follows both platforms' spend; Google's is still typed.
+* **Alternatives:** **One table for every platform's accounts:** Meta's would be moved and its
+  queries rewritten for no change in what they do; the rules, not the rows, are what is shared.

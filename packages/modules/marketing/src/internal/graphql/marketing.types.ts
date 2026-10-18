@@ -496,17 +496,23 @@ registerEnumType(AdSpendPlatform, {
 export enum AdSpendSource {
   MANUAL = 'MANUAL',
   META = 'META',
+  TIKTOK = 'TIKTOK',
 }
 
 registerEnumType(AdSpendSource, {
   name: 'AdSpendSource',
-  description: "Where a day's ad spend came from (ADR-564).",
+  description: "Where a day's ad spend came from (ADR-564, ADR-566).",
   valuesMap: {
     MANUAL: { description: 'The shop typed it.' },
     META: {
       description:
         "Pulled from Meta's Marketing API, from the ad account the shop connected: typing over " +
         'it makes it MANUAL.',
+    },
+    TIKTOK: {
+      description:
+        "Pulled from TikTok's Business API, from the advertiser account the shop connected: " +
+        'typing over it makes it MANUAL.',
     },
   },
 });
@@ -650,6 +656,96 @@ export class MetaAdSpendSyncPayload {
     description: 'The ad account after the pull: lastError says if it failed.',
   })
   metaAdAccount!: MetaAdAccount | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType({
+  description:
+    "The shop's TikTok advertiser account, whose spend the worker pulls from TikTok's Business " +
+    'API every few hours, by day and campaign, for the sales report (MKT-12, ADR-566).',
+})
+export class TikTokAdAccount {
+  @Field({ description: 'Its ID, as TikTok Ads Manager shows it.' })
+  advertiserId!: string;
+
+  @Field({ description: 'Its name at TikTok when it was connected.' })
+  name!: string;
+
+  @Field({ description: "What it bills in: the shop's currency." })
+  currency!: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      "The time zone TikTok reports its days in, as Asia/Karachi: each is kept as the shop's day " +
+      'of that date.',
+  })
+  timezone!: string | null;
+
+  @Field({ description: 'The last four characters of its access token, never shown again.' })
+  accessTokenHint!: string;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'When its spend was last pulled; null before the first time.',
+  })
+  lastSyncedAt!: Date | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'Why the last pull failed, as TikTok said: the worker tries again next time. Null when it ' +
+      'went through.',
+  })
+  lastError!: string | null;
+
+  @Field(() => GraphQLISODateTime)
+  updatedAt!: Date;
+}
+
+@InputType()
+export class TikTokAdAccountConnectInput {
+  @Field({ description: 'Its ID, from TikTok Ads Manager: its digits.' })
+  advertiserId!: string;
+
+  @Field({
+    description:
+      "A long-term access token of the advertiser, from TikTok's Marketing API: kept sealed, " +
+      'and never shown again.',
+  })
+  accessToken!: string;
+}
+
+@ObjectType()
+export class TikTokAdAccountConnectPayload {
+  @Field(() => TikTokAdAccount, { nullable: true })
+  tiktokAdAccount!: TikTokAdAccount | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class TikTokAdAccountDisconnectPayload {
+  @Field(() => String, {
+    nullable: true,
+    description: "The advertiser account's ID that was connected; null when none was.",
+  })
+  deletedAdvertiserId!: string | null;
+
+  @Field(() => [UserError])
+  userErrors!: UserError[];
+}
+
+@ObjectType()
+export class TikTokAdSpendSyncPayload {
+  @Field(() => TikTokAdAccount, {
+    nullable: true,
+    description: 'The advertiser account after the pull: lastError says if it failed.',
+  })
+  tiktokAdAccount!: TikTokAdAccount | null;
 
   @Field(() => [UserError])
   userErrors!: UserError[];

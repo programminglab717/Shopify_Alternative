@@ -32,6 +32,8 @@ export {
   MarketingEvents,
   type MetaAdAccountConnectedPayload,
   type MetaAdAccountDisconnectedPayload,
+  type TikTokAdAccountConnectedPayload,
+  type TikTokAdAccountDisconnectedPayload,
   type MetaConversionsDeletedPayload,
   type MetaConversionsUpdatedPayload,
   type GoogleAnalyticsDeletedPayload,
@@ -109,6 +111,20 @@ export {
   type ConversionStatusValue,
   type MetaServerEvent,
 } from '../internal/meta.js';
+export {
+  TikTokAdAccountService,
+  type TikTokAdAccountInput,
+  type TikTokAdAccountRecord,
+  type TikTokAdSpendPull,
+} from '../internal/tiktok-ad-account.service.js';
+export {
+  TIKTOK_REPORT_PAGES,
+  TikTokAdsClient,
+  advertiserIdOf,
+  type TikTokAdsResult,
+  type TikTokAdvertiserFacts,
+  type TikTokCampaignDay,
+} from '../internal/tiktok-ad-spend.js';
 export {
   TikTokEventsClient,
   type TikTokApiOptions,

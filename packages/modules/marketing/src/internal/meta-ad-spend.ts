@@ -2,6 +2,9 @@
 // gave it: the account as Meta names it, and each day's spend on each of its campaigns.
 import type { MetaGraphOptions } from './meta-client.js';
 
+// Meta's decimals in minor units, as every platform's spend pulled is read (ADR-566).
+export { spendMinor } from './ad-account-pull.js';
+
 /** The most pages of a span's spend asked for, 500 campaign days each, before giving up on it. */
 export const META_INSIGHTS_PAGES = 20;
 
@@ -54,18 +57,6 @@ const BUSY = new Set([1, 2, 4, 17, 32, 341, 613]);
 export function adAccountIdOf(value: string): string | null {
   const id = value.replace(/\s/g, '').replace(/^act_/i, '');
   return /^[0-9]{5,20}$/.test(id) ? id : null;
-}
-
-/**
- * `spend`, a decimal Meta wrote in major units, in minor units of a currency with `exponent`
- * decimal places, rounded half up; null for anything else.
- */
-export function spendMinor(spend: string, exponent: number): bigint | null {
-  const match = /^(\d+)(?:\.(\d*))?$/.exec(spend.trim());
-  if (!match) return null;
-  const [, whole = '0', fraction = ''] = match;
-  const minor = BigInt(whole + fraction.slice(0, exponent).padEnd(exponent, '0'));
-  return (fraction[exponent] ?? '0') >= '5' ? minor + 1n : minor;
 }
 
 /** Reads shops' ad accounts from Meta's Marketing API, on the Graph API (ADR-564). */
