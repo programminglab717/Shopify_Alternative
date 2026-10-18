@@ -4372,8 +4372,8 @@ export interface ConversationReplyData {
 /** Where a shop's ads ran (ADR-553). */
 export type AdSpendPlatform = 'META' | 'TIKTOK' | 'GOOGLE' | 'OTHER';
 
-/** Where a day's ad spend came from: typed, or pulled from Meta (ADR-564). */
-export type AdSpendSource = 'MANUAL' | 'META';
+/** Where a day's ad spend came from: typed, or pulled from Meta or TikTok (ADR-564, ADR-566). */
+export type AdSpendSource = 'MANUAL' | 'META' | 'TIKTOK';
 
 /** What a shop spent on one platform's ads on a day, or on one campaign of them. */
 export interface AdSpendEntryValue {
@@ -4383,7 +4383,7 @@ export interface AdSpendEntryValue {
   /** As its links' utm_campaign names it; null for the platform's day as a whole. */
   campaign: string | null;
   amount: MoneyValue;
-  /** Typed by the shop, or pulled from its Meta ad account (ADR-564). */
+  /** Typed by the shop, or pulled from its Meta ad account or TikTok advertiser account. */
   source: AdSpendSource;
 }
 
@@ -4433,4 +4433,35 @@ export interface MetaAdAccountDisconnectData {
 
 export interface MetaAdSpendSyncData {
   metaAdSpendSync: { metaAdAccount: MetaAdAccount | null; userErrors: UserError[] };
+}
+
+/** The shop's TikTok advertiser account (ADR-566): its token never shown, but its last four. */
+export interface TikTokAdAccount {
+  /** As TikTok Ads Manager shows it: its digits. */
+  advertiserId: string;
+  name: string;
+  currency: string;
+  timezone: string | null;
+  accessTokenHint: string;
+  /** Null before its spend was first pulled. */
+  lastSyncedAt: string | null;
+  /** Why the last pull failed, as TikTok said; null when it went through. */
+  lastError: string | null;
+  updatedAt: string;
+}
+
+export interface TikTokAdAccountData {
+  tiktokAdAccount: TikTokAdAccount | null;
+}
+
+export interface TikTokAdAccountConnectData {
+  tiktokAdAccountConnect: { tiktokAdAccount: TikTokAdAccount | null; userErrors: UserError[] };
+}
+
+export interface TikTokAdAccountDisconnectData {
+  tiktokAdAccountDisconnect: { deletedAdvertiserId: string | null; userErrors: UserError[] };
+}
+
+export interface TikTokAdSpendSyncData {
+  tiktokAdSpendSync: { tiktokAdAccount: TikTokAdAccount | null; userErrors: UserError[] };
 }

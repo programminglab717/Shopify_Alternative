@@ -8,6 +8,7 @@ import type {
   AdSpendInput,
   AdSpendPlatform,
   AdSpendSetData,
+  AdSpendSource,
   UserError,
 } from '../api/types';
 import { errorText, userErrorText } from '../i18n/errors';
@@ -23,8 +24,21 @@ import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { MetaAdAccountSection } from './meta-ad-account';
 import { BackToMarketing } from './templates-page';
+import { TikTokAdAccountSection } from './tiktok-ad-account';
 
 const PLATFORMS: readonly AdSpendPlatform[] = ['META', 'TIKTOK', 'GOOGLE', 'OTHER'];
+
+/** What typing over a platform's pulled spend does, for the platforms whose spend is pulled. */
+const TYPED: Partial<Record<AdSpendPlatform, MessageKey>> = {
+  META: 'adSpend.metaTyped',
+  TIKTOK: 'adSpend.tiktokTyped',
+};
+
+/** Where a day's spend was pulled from, for the spend not typed. */
+const PULLED_FROM: Partial<Record<AdSpendSource, MessageKey>> = {
+  META: 'adSpend.fromMeta',
+  TIKTOK: 'adSpend.fromTiktok',
+};
 
 /** The days the page lists, today's included. */
 const DAYS = 30;
@@ -74,6 +88,7 @@ function RecordSpend() {
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [problems, setProblems] = useState<string[]>([]);
   const [saved, setSaved] = useState<string | null>(null);
+  const typed = TYPED[platform];
 
   const onProblems = (userErrors: UserError[]) => {
     const fields: Partial<Record<Field, string>> = {};
@@ -127,9 +142,9 @@ function RecordSpend() {
             }))}
             onChange={setPlatform}
           />
-          {platform === 'META' && (
+          {typed && (
             <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-              {t('adSpend.metaTyped')}
+              {t(typed)}
             </p>
           )}
         </div>
@@ -188,6 +203,7 @@ function SpendRow({ entry }: { entry: AdSpendEntryValue }) {
   const [problem, setProblem] = useState<string | null>(null);
   const platform = t(`adSpend.platform.${entry.platform}` as MessageKey);
   const campaign = entry.campaign ?? t('adSpend.allCampaigns');
+  const pulledFrom = PULLED_FROM[entry.source];
 
   const onRemove = async () => {
     setProblem(null);
@@ -219,10 +235,10 @@ function SpendRow({ entry }: { entry: AdSpendEntryValue }) {
             >
               {campaign}
             </span>
-            {entry.source === 'META' && (
+            {pulledFrom && (
               <span className="inline-flex items-center gap-1 text-secondary">
                 <CloudDownload aria-hidden className="size-4" />
-                {t('adSpend.fromMeta')}
+                {t(pulledFrom)}
               </span>
             )}
           </span>
@@ -298,10 +314,11 @@ function RecentSpend() {
 }
 
 /**
- * Ad spend (ADR-553, ADR-554, ADR-565): what the shop spent on its ads, day by day, by platform
- * and, where it says, by campaign as its links' utm_campaign names it, pulled from its Meta ad
- * account, recorded by hand and taken away; and the last 30 days of it, with what they came to and
- * which Meta's came from. The sales report takes it off profit.
+ * Ad spend (ADR-553, ADR-554, ADR-565, ADR-567): what the shop spent on its ads, day by day, by
+ * platform and, where it says, by campaign as its links' utm_campaign names it, pulled from its
+ * Meta ad account and its TikTok advertiser account, recorded by hand and taken away; and the last
+ * 30 days of it, with what they came to and which were pulled from where. The sales report takes
+ * it off profit.
  */
 export function AdSpendPage() {
   const { t } = useLocale();
@@ -319,6 +336,7 @@ export function AdSpendPage() {
         <>
           <p className="text-secondary">{t('adSpend.intro')}</p>
           <MetaAdAccountSection />
+          <TikTokAdAccountSection />
           <RecordSpend />
           <RecentSpend />
         </>

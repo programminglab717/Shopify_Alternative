@@ -4002,21 +4002,39 @@ const en = {
   'adSpend.metaAccount.idHint': 'From Ads Manager, as act_123456789 or its digits.',
   'adSpend.metaAccount.tokenHint':
     "A token with the ads_read permission on the ad account, as a system user's from Business Settings.",
-  'adSpend.metaAccount.connect': 'Connect',
-  'adSpend.metaAccount.connected': 'Connected to {name}.',
+  'adSpend.account.connect': 'Connect',
+  'adSpend.account.connected': 'Connected to {name}.',
   'adSpend.metaAccount.name': 'Ad account',
-  'adSpend.metaAccount.currency': 'Currency',
-  'adSpend.metaAccount.lastPulled': 'Last pulled',
-  'adSpend.metaAccount.notPulled': 'Not pulled yet',
+  'adSpend.account.currency': 'Currency',
+  'adSpend.account.lastPulled': 'Last pulled',
+  'adSpend.account.notPulled': 'Not pulled yet',
   'adSpend.metaAccount.lastError':
     'The last pull failed, and Hatti tries again in a few hours. Meta said:',
-  'adSpend.metaAccount.pull': 'Pull now',
+  'adSpend.account.pull': 'Pull now',
   'adSpend.metaAccount.pulled': 'Spend pulled from Meta.',
-  'adSpend.metaAccount.change': 'Change',
-  'adSpend.metaAccount.cancel': 'Cancel',
+  'adSpend.account.change': 'Change',
+  'adSpend.account.cancel': 'Cancel',
   'adSpend.metaAccount.disconnect': 'Disconnect ad account',
   'adSpend.metaAccount.disconnectAsk':
     'Disconnect ad account {id}? Hatti forgets its access token and pulls no more spend. The spend already pulled stays.',
+  'adSpend.tiktokTyped':
+    "Typing a figure for a campaign and day pulled from TikTok replaces it, and TikTok won't overwrite it. A whole day typed for TikTok keeps out TikTok's campaigns of that day.",
+  'adSpend.fromTiktok': 'From TikTok',
+  'adSpend.tiktokAccount.title': 'TikTok advertiser account',
+  'adSpend.tiktokAccount.hint':
+    "Connect your TikTok advertiser account and Hatti pulls each day's spend by campaign from TikTok every few hours, the last 30 days at once. What you type by hand is kept over TikTok's figures.",
+  'adSpend.tiktokAccount.open': 'Connect an advertiser account',
+  'adSpend.tiktokAccount.id': 'Advertiser ID',
+  'adSpend.tiktokAccount.idHint': 'Its digits, from TikTok Ads Manager.',
+  'adSpend.tiktokAccount.tokenHint':
+    "A long-term access token of TikTok's Marketing API, with access to the advertiser's reports.",
+  'adSpend.tiktokAccount.name': 'Advertiser account',
+  'adSpend.tiktokAccount.lastError':
+    'The last pull failed, and Hatti tries again in a few hours. TikTok said:',
+  'adSpend.tiktokAccount.pulled': 'Spend pulled from TikTok.',
+  'adSpend.tiktokAccount.disconnect': 'Disconnect advertiser account',
+  'adSpend.tiktokAccount.disconnectAsk':
+    'Disconnect advertiser account {id}? Hatti forgets its access token and pulls no more spend. The spend already pulled stays.',
   'onlineStore.speed': 'Speed',
   'speed.intro':
     "How fast your store was for your shoppers over the last 28 days, as their own browsers measured it: Google's Core Web Vitals, which search ranks stores by. Each is the time three in four page views were faster than.",
@@ -8935,21 +8953,39 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'adSpend.metaAccount.idHint': 'ایڈز مینیجر سے، جیسے act_123456789 یا صرف اس کے ہندسے۔',
   'adSpend.metaAccount.tokenHint':
     'اشتہاری اکاؤنٹ پر ads_read اجازت والا ٹوکن، جیسے بزنس سیٹنگز سے سسٹم یوزر کا۔',
-  'adSpend.metaAccount.connect': 'منسلک کریں',
-  'adSpend.metaAccount.connected': '{name} سے منسلک۔',
+  'adSpend.account.connect': 'منسلک کریں',
+  'adSpend.account.connected': '{name} سے منسلک۔',
   'adSpend.metaAccount.name': 'اشتہاری اکاؤنٹ',
-  'adSpend.metaAccount.currency': 'کرنسی',
-  'adSpend.metaAccount.lastPulled': 'آخری بار لایا گیا',
-  'adSpend.metaAccount.notPulled': 'ابھی نہیں لایا گیا',
+  'adSpend.account.currency': 'کرنسی',
+  'adSpend.account.lastPulled': 'آخری بار لایا گیا',
+  'adSpend.account.notPulled': 'ابھی نہیں لایا گیا',
   'adSpend.metaAccount.lastError':
     'پچھلی بار خرچ نہیں لایا جا سکا، ہٹی چند گھنٹوں میں دوبارہ کوشش کرے گا۔ میٹا نے کہا:',
-  'adSpend.metaAccount.pull': 'ابھی لائیں',
+  'adSpend.account.pull': 'ابھی لائیں',
   'adSpend.metaAccount.pulled': 'میٹا سے خرچ لے آیا گیا۔',
-  'adSpend.metaAccount.change': 'بدلیں',
-  'adSpend.metaAccount.cancel': 'منسوخ',
+  'adSpend.account.change': 'بدلیں',
+  'adSpend.account.cancel': 'منسوخ',
   'adSpend.metaAccount.disconnect': 'اشتہاری اکاؤنٹ الگ کریں',
   'adSpend.metaAccount.disconnectAsk':
     'اشتہاری اکاؤنٹ {id} الگ کریں؟ ہٹی اس کا ایکسیس ٹوکن بھول جائے گا اور مزید خرچ نہیں لائے گا۔ پہلے سے لایا گیا خرچ رہے گا۔',
+  'adSpend.tiktokTyped':
+    'ٹک ٹاک سے لائے گئے کسی مہم اور دن کا خرچ لکھنے سے وہ اس کی جگہ لے لیتا ہے، اور ٹک ٹاک اسے دوبارہ نہیں بدلے گا۔ ٹک ٹاک کے لیے لکھا پورا دن اس دن کی ٹک ٹاک کی مہمات کو باہر رکھتا ہے۔',
+  'adSpend.fromTiktok': 'ٹک ٹاک سے',
+  'adSpend.tiktokAccount.title': 'ٹک ٹاک ایڈورٹائزر اکاؤنٹ',
+  'adSpend.tiktokAccount.hint':
+    'اپنا ٹک ٹاک ایڈورٹائزر اکاؤنٹ منسلک کریں اور ہٹی ہر چند گھنٹے بعد ٹک ٹاک سے ہر دن کا خرچ مہم کے حساب سے لے آتا ہے، پچھلے 30 دن ایک ساتھ۔ جو آپ خود لکھیں وہ ٹک ٹاک کے اعداد کی جگہ رہتا ہے۔',
+  'adSpend.tiktokAccount.open': 'ایڈورٹائزر اکاؤنٹ منسلک کریں',
+  'adSpend.tiktokAccount.id': 'ایڈورٹائزر ID',
+  'adSpend.tiktokAccount.idHint': 'اس کے ہندسے، ٹک ٹاک ایڈز مینیجر سے۔',
+  'adSpend.tiktokAccount.tokenHint':
+    'ٹک ٹاک کے مارکیٹنگ API کا طویل مدتی ایکسیس ٹوکن، جسے ایڈورٹائزر کی رپورٹس تک رسائی ہو۔',
+  'adSpend.tiktokAccount.name': 'ایڈورٹائزر اکاؤنٹ',
+  'adSpend.tiktokAccount.lastError':
+    'پچھلی بار خرچ نہیں لایا جا سکا، ہٹی چند گھنٹوں میں دوبارہ کوشش کرے گا۔ ٹک ٹاک نے کہا:',
+  'adSpend.tiktokAccount.pulled': 'ٹک ٹاک سے خرچ لے آیا گیا۔',
+  'adSpend.tiktokAccount.disconnect': 'ایڈورٹائزر اکاؤنٹ الگ کریں',
+  'adSpend.tiktokAccount.disconnectAsk':
+    'ایڈورٹائزر اکاؤنٹ {id} الگ کریں؟ ہٹی اس کا ایکسیس ٹوکن بھول جائے گا اور مزید خرچ نہیں لائے گا۔ پہلے سے لایا گیا خرچ رہے گا۔',
   'onlineStore.speed': 'رفتار',
   'speed.intro':
     'پچھلے 28 دنوں میں آپ کا اسٹور آپ کے خریداروں کے لیے کتنا تیز تھا، جیسا ان کے اپنے براؤزرز نے ناپا: گوگل کے کور ویب وائٹلز، جن سے سرچ اسٹورز کی درجہ بندی کرتا ہے۔ ہر ایک وہ وقت ہے جس سے چار میں سے تین صفحات تیز تھے۔',

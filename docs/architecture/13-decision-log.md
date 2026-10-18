@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-566 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-567 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -574,6 +574,7 @@
 | 564 | A shop connects its Meta ad account and the worker pulls each day's spend by campaign, what the shop typed by hand kept over what Meta says | Accepted |
 | 565 | The admin's ad spend page connects the shop's Meta ad account, pulls it now, and says which days came from Meta | Accepted |
 | 566 | A shop connects its TikTok advertiser account and the same worker pulls its spend by campaign under Meta's rules, shared between the two | Accepted |
+| 567 | The admin's ad spend page connects the shop's TikTok advertiser account as it does Meta's, one card for both, TikTok's folded until it is wanted | Accepted |
 
 ---
 
@@ -21156,3 +21157,20 @@
 * **Consequences:** True profit follows both platforms' spend; Google's is still typed.
 * **Alternatives:** **One table for every platform's accounts:** Meta's would be moved and its
   queries rewritten for no change in what they do; the rules, not the rows, are what is shared.
+
+## ADR-567 · The admin's ad spend page connects the shop's TikTok advertiser account as it does Meta's, one card for both, TikTok's folded until it is wanted
+
+* **Context:** TikTok's ad spend is pulled once its advertiser account is connected (ADR-566),
+  but only through the API; the page had Meta's card alone (ADR-565).
+* **Decision:**
+  * **One card, set up for each platform:** the connect form, the connected view, pulling now,
+    changing the token and disconnecting are one component, given each platform's operations,
+    field and words; Meta's behaves as before.
+  * **TikTok's** below Meta's: its advertiser ID and a long-term token of TikTok's Marketing API
+    with access to its reports. Not connected, its form is folded behind a button, so a shop that
+    runs no TikTok ads has a short page on a phone.
+  * The list says which days came from TikTok, and the form's word on typing over pulled days
+    shows for TikTok too. English and Urdu.
+* **Consequences:** A shop connects both platforms from the page its spend is on.
+* **Alternatives:** **Both forms open:** most shops run one platform, and two forms asking for
+  tokens read as two steps to take.

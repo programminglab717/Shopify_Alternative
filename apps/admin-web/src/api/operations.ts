@@ -9330,3 +9330,71 @@ export const MetaAdSpendSyncMutation = /* GraphQL */ `
   ${META_AD_ACCOUNT}
   ${USER_ERRORS}
 `;
+
+const TIKTOK_AD_ACCOUNT = /* GraphQL */ `
+  fragment TikTokAdAccountParts on TikTokAdAccount {
+    advertiserId
+    name
+    currency
+    timezone
+    accessTokenHint
+    lastSyncedAt
+    lastError
+    updatedAt
+  }
+`;
+
+/** The shop's TikTok advertiser account, its spend pulled every few hours, if it connected one. */
+export const TikTokAdAccountQuery = /* GraphQL */ `
+  query TikTokAdAccount {
+    tiktokAdAccount {
+      ...TikTokAdAccountParts
+    }
+  }
+  ${TIKTOK_AD_ACCOUNT}
+`;
+
+/** The shop's TikTok advertiser account connected, in place of any it had, or given a new token. */
+export const TikTokAdAccountConnectMutation = /* GraphQL */ `
+  mutation TikTokAdAccountConnect($input: TikTokAdAccountConnectInput!) {
+    tiktokAdAccountConnect(input: $input) {
+      tiktokAdAccount {
+        ...TikTokAdAccountParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${TIKTOK_AD_ACCOUNT}
+  ${USER_ERRORS}
+`;
+
+/** The shop's TikTok advertiser account disconnected: its token forgotten, its spend pulled kept. */
+export const TikTokAdAccountDisconnectMutation = /* GraphQL */ `
+  mutation TikTokAdAccountDisconnect {
+    tiktokAdAccountDisconnect {
+      deletedAdvertiserId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The shop's spend pulled from its TikTok advertiser account now: at most once a minute. */
+export const TikTokAdSpendSyncMutation = /* GraphQL */ `
+  mutation TikTokAdSpendSync {
+    tiktokAdSpendSync {
+      tiktokAdAccount {
+        ...TikTokAdAccountParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${TIKTOK_AD_ACCOUNT}
+  ${USER_ERRORS}
+`;

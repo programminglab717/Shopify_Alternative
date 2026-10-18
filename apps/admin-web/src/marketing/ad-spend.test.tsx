@@ -42,13 +42,39 @@ const PULLED = {
   source: 'META',
 };
 
+/** The shop's TikTok advertiser account, connected (ADR-566). */
+const ADVERTISER = {
+  advertiserId: '7012345678901234567',
+  name: 'Zari on TikTok',
+  currency: 'PKR',
+  timezone: 'Asia/Karachi',
+  accessTokenHint: 'Tk34',
+  lastSyncedAt: '2026-10-18T06:00:00Z' as string | null,
+  lastError: null as string | null,
+  updatedAt: '2026-10-18T06:00:00Z',
+};
+
+/** What TikTok reports of a campaign yesterday, as a pull keeps it. */
+const PULLED_TIKTOK = {
+  platform: 'TIKTOK',
+  day: YESTERDAY,
+  campaign: 'Azadi Drop',
+  amount: rupees('650.00'),
+  source: 'TIKTOK',
+};
+
 /**
  * A fake core keeping the shop's ad spend, as adSpendSet replaces and takes it away, and its Meta
- * ad account, connected once the member confirms who they are, pulled and disconnected.
+ * ad account and TikTok advertiser account, connected once the member confirms who they are,
+ * pulled and disconnected.
  */
 function core(
   role: StaffRole = 'marketer',
-  { account = null as typeof ACCOUNT | null, pulled = [] as (typeof PULLED)[] } = {},
+  {
+    account = null as typeof ACCOUNT | null,
+    advertiser = null as typeof ADVERTISER | null,
+    pulled = [] as (typeof PULLED)[],
+  } = {},
 ) {
   let entries = [
     { platform: 'META', day: TODAY, campaign: null, amount: rupees('2500.00'), source: 'MANUAL' },
@@ -62,8 +88,10 @@ function core(
     ...pulled,
   ];
   let meta = account;
+  let tiktok = advertiser;
   let confirmed = false;
   let pulls = 0;
+  let tiktokPulls = 0;
   const answer = (operation: string, variables: Record<string, unknown>) => {
     switch (operation) {
       case 'AdSpendEntries':
@@ -122,6 +150,57 @@ function core(
         const deletedAdAccountId = meta?.adAccountId ?? null;
         meta = null;
         return { metaAdAccountDisconnect: { deletedAdAccountId, userErrors: [] } };
+      }
+      case 'TikTokAdAccount':
+        return { tiktokAdAccount: tiktok };
+      case 'TikTokAdAccountConnect': {
+        if (!confirmed) return REAUTHENTICATE;
+        const input = variables.input as { advertiserId: string; accessToken: string };
+        if (!/^\d+$/.test(input.advertiserId)) {
+          return {
+            tiktokAdAccountConnect: {
+              tiktokAdAccount: null,
+              userErrors: [
+                {
+                  field: ['input', 'advertiserId'],
+                  code: 'INVALID',
+                  message: 'must be its digits',
+                },
+              ],
+            },
+          };
+        }
+        tiktok = {
+          ...ADVERTISER,
+          advertiserId: input.advertiserId,
+          accessTokenHint: input.accessToken.slice(-4),
+        };
+        return { tiktokAdAccountConnect: { tiktokAdAccount: tiktok, userErrors: [] } };
+      }
+      case 'TikTokAdSpendSync': {
+        tiktokPulls += 1;
+        if (tiktokPulls > 1) {
+          return {
+            tiktokAdSpendSync: {
+              tiktokAdAccount: null,
+              userErrors: [
+                {
+                  field: ['base'],
+                  code: 'INVALID',
+                  message: 'Its spend was pulled under a minute ago: try again in a minute',
+                },
+              ],
+            },
+          };
+        }
+        tiktok = { ...tiktok!, lastSyncedAt: '2026-10-18T09:20:00Z', lastError: null };
+        entries = [...entries, PULLED_TIKTOK];
+        return { tiktokAdSpendSync: { tiktokAdAccount: tiktok, userErrors: [] } };
+      }
+      case 'TikTokAdAccountDisconnect': {
+        const deletedAdvertiserId = tiktok?.advertiserId ?? null;
+        tiktok = null;
+        return { tiktokAdAccountDisconnect: { deletedAdvertiserId, userErrors: [] } };
       }
       case 'AdSpendSet': {
         const [entry] = variables.entries as AdSpendInput[];
@@ -472,5 +551,206 @@ describe("Meta's ad spend on the ad spend page (ADR-565)", () => {
     expect(
       screen.queryByText(/^Typing a figure for a campaign and day pulled from Meta/),
     ).toBeNull();
+  });
+});
+
+describe("TikTok's ad spend on the ad spend page (ADR-567)", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    signedIn();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  /** The TikTok advertiser account's card, once the page shows it. */
+  const card = async () =>
+    (await screen.findByRole('region', { name: 'TikTok advertiser account' })) as HTMLElement;
+  const typeIn = (section: HTMLElement, label: string, value: string) =>
+    fireEvent.change(within(section).getByLabelText(label), { target: { value } });
+
+  it('connects the advertiser account once asked for, a field problem under its field', async () => {
+    const fake = core('owner');
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/marketing/ad-spend');
+
+    const section = await card();
+    expect(
+      within(section).getByText(/pulls each day's spend by campaign from TikTok/),
+    ).toBeTruthy();
+    // Its form waits until asked for, so that the page stays short.
+    const open = await within(section).findByRole('button', {
+      name: 'Connect an advertiser account',
+    });
+    expect(open.getAttribute('aria-expanded')).toBe('false');
+    expect(within(section).queryByLabelText('Advertiser ID')).toBeNull();
+    fireEvent.click(open);
+    expect(open.getAttribute('aria-expanded')).toBe('true');
+    expect(within(section).getByText('Its digits, from TikTok Ads Manager.')).toBeTruthy();
+    expect(
+      within(section).getByText(/^A long-term access token of TikTok's Marketing API/),
+    ).toBeTruthy();
+    expect((within(section).getByLabelText('Access token') as HTMLInputElement).type).toBe(
+      'password',
+    );
+
+    typeIn(section, 'Advertiser ID', 'adv-701');
+    typeIn(section, 'Access token', 'tt-token-Tk34');
+    fireEvent.click(within(section).getByRole('button', { name: 'Connect' }));
+    await confirmIdentity('Password', 'a long password');
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+    expect(await within(section).findByText('must be its digits')).toBeTruthy();
+    expect(within(section).getByLabelText('Advertiser ID').getAttribute('aria-invalid')).toBe(
+      'true',
+    );
+
+    typeIn(section, 'Advertiser ID', ' 7012345678901234567 ');
+    typeIn(section, 'Access token', ' tt-token-Tk34 ');
+    fireEvent.click(within(section).getByRole('button', { name: 'Connect' }));
+    expect(await within(section).findByText('Connected to Zari on TikTok.')).toBeTruthy();
+    expect(sentOf(fake, 'TikTokAdAccountConnect')).toEqual([
+      { input: { advertiserId: 'adv-701', accessToken: 'tt-token-Tk34' } },
+      { input: { advertiserId: 'adv-701', accessToken: 'tt-token-Tk34' } },
+      { input: { advertiserId: '7012345678901234567', accessToken: 'tt-token-Tk34' } },
+    ]);
+    expect(sentOf(fake, 'MetaAdAccountConnect')).toEqual([]);
+    expect(within(section).getByText('•••• Tk34')).toBeTruthy();
+    expect(within(section).queryByLabelText('Access token')).toBeNull();
+  });
+
+  it('shows the connected advertiser account, and why its last pull failed', async () => {
+    const lastError = 'Access token is expired';
+    vi.stubGlobal('fetch', core('marketer', { advertiser: { ...ADVERTISER, lastError } }).fetcher);
+    renderAdmin('/shop_1/marketing/ad-spend');
+
+    const section = await card();
+    expect(await within(section).findByText('Connected to Zari on TikTok.')).toBeTruthy();
+    const details = (term: string) =>
+      within(section).getByText(term).nextElementSibling?.textContent;
+    expect(details('Advertiser account')).toBe('Zari on TikTok');
+    expect(details('Advertiser ID')).toBe('7012345678901234567');
+    expect(details('Currency')).toBe('PKR');
+    expect(details('Access token')).toBe('•••• Tk34');
+    expect(details('Last pulled')).toBe(
+      formatDateTime(ADVERTISER.lastSyncedAt!, 'Asia/Karachi', 'en'),
+    );
+    expect(
+      within(section).getByText(
+        'The last pull failed, and Hatti tries again in a few hours. TikTok said:',
+      ),
+    ).toBeTruthy();
+    expect(within(section).getByText(lastError)).toBeTruthy();
+    // Meta's card is its own.
+    const meta = screen.getByRole('region', { name: 'Meta ad account' });
+    expect(await within(meta).findByText('Not connected.')).toBeTruthy();
+    cleanup();
+
+    vi.stubGlobal(
+      'fetch',
+      core('marketer', { advertiser: { ...ADVERTISER, lastSyncedAt: null } }).fetcher,
+    );
+    renderAdmin('/shop_1/marketing/ad-spend');
+    expect(await within(await card()).findByText('Not pulled yet')).toBeTruthy();
+    expect(screen.queryByText(/^The last pull failed/)).toBeNull();
+  });
+
+  it('pulls the spend now, and says when it was pulled under a minute ago', async () => {
+    const fake = core('manager', { advertiser: ADVERTISER });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/marketing/ad-spend');
+
+    const section = await card();
+    fireEvent.click(await within(section).findByRole('button', { name: 'Pull now' }));
+    expect(await within(section).findByText('Spend pulled from TikTok.')).toBeTruthy();
+    expect(sentOf(fake, 'TikTokAdSpendSync')).toEqual([{}]);
+    expect(sentOf(fake, 'MetaAdSpendSync')).toEqual([]);
+    await waitFor(() =>
+      expect(within(section).getByText('Last pulled').nextElementSibling?.textContent).toBe(
+        formatDateTime('2026-10-18T09:20:00Z', 'Asia/Karachi', 'en'),
+      ),
+    );
+    expect(await screen.findByText('Azadi Drop')).toBeTruthy();
+
+    fireEvent.click(within(section).getByRole('button', { name: 'Pull now' }));
+    expect(
+      await within(section).findByText(
+        'Its spend was pulled under a minute ago: try again in a minute',
+      ),
+    ).toBeTruthy();
+    expect(within(section).queryByText('Spend pulled from TikTok.')).toBeNull();
+  });
+
+  it('disconnects the advertiser account once asked whether they mean it, the spend pulled kept', async () => {
+    const fake = core('marketer', { advertiser: ADVERTISER, pulled: [PULLED_TIKTOK] });
+    vi.stubGlobal('fetch', fake.fetcher);
+    renderAdmin('/shop_1/marketing/ad-spend');
+
+    const section = await card();
+    fireEvent.click(
+      await within(section).findByRole('button', { name: 'Disconnect advertiser account' }),
+    );
+    fireEvent.click(within(section).getByRole('button', { name: 'Keep it connected' }));
+    expect(sentOf(fake, 'TikTokAdAccountDisconnect')).toEqual([]);
+    fireEvent.click(within(section).getByRole('button', { name: 'Disconnect advertiser account' }));
+    expect(
+      within(section).getByText(
+        'Disconnect advertiser account 7012345678901234567? Hatti forgets its access token and pulls no more spend. The spend already pulled stays.',
+      ),
+    ).toBeTruthy();
+    fireEvent.click(within(section).getByRole('button', { name: 'Disconnect' }));
+    expect(
+      await within(section).findByRole('button', { name: 'Connect an advertiser account' }),
+    ).toBeTruthy();
+    expect(sentOf(fake, 'TikTokAdAccountDisconnect')).toEqual([{}]);
+    expect(sentOf(fake, 'MetaAdAccountDisconnect')).toEqual([]);
+    expect(screen.getByText('Azadi Drop')).toBeTruthy();
+  });
+
+  it("labels the spend pulled from TikTok, and says typing over it keeps TikTok's out", async () => {
+    vi.stubGlobal(
+      'fetch',
+      core('marketer', { advertiser: ADVERTISER, pulled: [PULLED, PULLED_TIKTOK] }).fetcher,
+    );
+    renderAdmin('/shop_1/marketing/ad-spend');
+
+    const list = await screen.findByRole('list', { name: 'The last 30 days' });
+    const rows = within(list).getAllByRole('listitem');
+    expect(rows).toHaveLength(4);
+    const pulled = rows.find((row) => within(row).queryByText('Azadi Drop'))!;
+    expect(within(pulled).getByText('TikTok')).toBeTruthy();
+    expect(within(pulled).getByText('From TikTok')).toBeTruthy();
+    expect(within(list).getAllByText('From TikTok')).toHaveLength(1);
+    expect(within(list).getAllByText('From Meta')).toHaveLength(1);
+
+    expect(
+      screen.queryByText(/^Typing a figure for a campaign and day pulled from TikTok/),
+    ).toBeNull();
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'TIKTOK' } });
+    expect(
+      screen.getByText(
+        "Typing a figure for a campaign and day pulled from TikTok replaces it, and TikTok won't overwrite it. A whole day typed for TikTok keeps out TikTok's campaigns of that day.",
+      ),
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'GOOGLE' } });
+    expect(screen.queryByText(/^Typing a figure for a campaign and day pulled from/)).toBeNull();
+  });
+
+  it('is not there for roles that do not market', async () => {
+    for (const role of ['packer', 'accountant'] as const) {
+      const fake = core(role, { advertiser: ADVERTISER });
+      vi.stubGlobal('fetch', fake.fetcher);
+      renderAdmin('/shop_1/marketing/ad-spend');
+
+      expect(
+        await screen.findByText(
+          "Only the shop's owners, managers and marketers record its ad spend.",
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByRole('heading', { name: 'TikTok advertiser account' })).toBeNull();
+      expect(sentOf(fake, 'TikTokAdAccount')).toEqual([]);
+      cleanup();
+    }
   });
 });

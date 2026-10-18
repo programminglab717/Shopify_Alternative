@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-18
 
+### TikTok's advertiser account in the admin
+
+* **The admin's ad spend page connects the shop's TikTok advertiser account as it does Meta's,
+  one card for both, TikTok's folded until it is wanted** ([ADR-567](../architecture/13-decision-log.md#adr-567--the-admins-ad-spend-page-connects-the-shops-tiktok-advertiser-account-as-it-does-metas-one-card-for-both-tiktoks-folded-until-it-is-wanted), MKT-12).
+* 3471 tests, 10 more: connecting, the connected view, pulling,
+  disconnecting, TikTok's days and roles, and the GraphQL against the schema.
+
 ### f5f0c0e · TikTok's ad spend pulled
 
 * **A shop connects its TikTok advertiser account and the same worker pulls its spend by
