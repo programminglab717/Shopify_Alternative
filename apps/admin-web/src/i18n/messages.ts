@@ -3992,6 +3992,31 @@ const en = {
   'adSpend.allCampaigns': 'All campaigns',
   'adSpend.total': 'Total for the 30 days',
   'adSpend.remove': 'Remove {platform} on {day}, {campaign}',
+  'adSpend.metaTyped':
+    "Typing a figure for a campaign and day pulled from Meta replaces it, and Meta won't overwrite it. A whole day typed for Meta keeps out Meta's campaigns of that day.",
+  'adSpend.fromMeta': 'From Meta',
+  'adSpend.metaAccount.title': 'Meta ad account',
+  'adSpend.metaAccount.hint':
+    "Connect your Meta ad account and Hatti pulls each day's spend by campaign from Meta every few hours, the last 30 days at once. What you type by hand is kept over Meta's figures.",
+  'adSpend.metaAccount.id': 'Ad account ID',
+  'adSpend.metaAccount.idHint': 'From Ads Manager, as act_123456789 or its digits.',
+  'adSpend.metaAccount.tokenHint':
+    "A token with the ads_read permission on the ad account, as a system user's from Business Settings.",
+  'adSpend.metaAccount.connect': 'Connect',
+  'adSpend.metaAccount.connected': 'Connected to {name}.',
+  'adSpend.metaAccount.name': 'Ad account',
+  'adSpend.metaAccount.currency': 'Currency',
+  'adSpend.metaAccount.lastPulled': 'Last pulled',
+  'adSpend.metaAccount.notPulled': 'Not pulled yet',
+  'adSpend.metaAccount.lastError':
+    'The last pull failed, and Hatti tries again in a few hours. Meta said:',
+  'adSpend.metaAccount.pull': 'Pull now',
+  'adSpend.metaAccount.pulled': 'Spend pulled from Meta.',
+  'adSpend.metaAccount.change': 'Change',
+  'adSpend.metaAccount.cancel': 'Cancel',
+  'adSpend.metaAccount.disconnect': 'Disconnect ad account',
+  'adSpend.metaAccount.disconnectAsk':
+    'Disconnect ad account {id}? Hatti forgets its access token and pulls no more spend. The spend already pulled stays.',
   'onlineStore.speed': 'Speed',
   'speed.intro':
     "How fast your store was for your shoppers over the last 28 days, as their own browsers measured it: Google's Core Web Vitals, which search ranks stores by. Each is the time three in four page views were faster than.",
@@ -8900,6 +8925,31 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'adSpend.allCampaigns': 'تمام مہمات',
   'adSpend.total': '30 دنوں کا کل',
   'adSpend.remove': '{day} کا {platform} کا خرچ ہٹائیں، {campaign}',
+  'adSpend.metaTyped':
+    'میٹا سے لائے گئے کسی مہم اور دن کا خرچ لکھنے سے وہ اس کی جگہ لے لیتا ہے، اور میٹا اسے دوبارہ نہیں بدلے گا۔ میٹا کے لیے لکھا پورا دن اس دن کی میٹا کی مہمات کو باہر رکھتا ہے۔',
+  'adSpend.fromMeta': 'میٹا سے',
+  'adSpend.metaAccount.title': 'میٹا اشتہاری اکاؤنٹ',
+  'adSpend.metaAccount.hint':
+    'اپنا میٹا اشتہاری اکاؤنٹ منسلک کریں اور ہٹی ہر چند گھنٹے بعد میٹا سے ہر دن کا خرچ مہم کے حساب سے لے آتا ہے، پچھلے 30 دن ایک ساتھ۔ جو آپ خود لکھیں وہ میٹا کے اعداد کی جگہ رہتا ہے۔',
+  'adSpend.metaAccount.id': 'اشتہاری اکاؤنٹ ID',
+  'adSpend.metaAccount.idHint': 'ایڈز مینیجر سے، جیسے act_123456789 یا صرف اس کے ہندسے۔',
+  'adSpend.metaAccount.tokenHint':
+    'اشتہاری اکاؤنٹ پر ads_read اجازت والا ٹوکن، جیسے بزنس سیٹنگز سے سسٹم یوزر کا۔',
+  'adSpend.metaAccount.connect': 'منسلک کریں',
+  'adSpend.metaAccount.connected': '{name} سے منسلک۔',
+  'adSpend.metaAccount.name': 'اشتہاری اکاؤنٹ',
+  'adSpend.metaAccount.currency': 'کرنسی',
+  'adSpend.metaAccount.lastPulled': 'آخری بار لایا گیا',
+  'adSpend.metaAccount.notPulled': 'ابھی نہیں لایا گیا',
+  'adSpend.metaAccount.lastError':
+    'پچھلی بار خرچ نہیں لایا جا سکا، ہٹی چند گھنٹوں میں دوبارہ کوشش کرے گا۔ میٹا نے کہا:',
+  'adSpend.metaAccount.pull': 'ابھی لائیں',
+  'adSpend.metaAccount.pulled': 'میٹا سے خرچ لے آیا گیا۔',
+  'adSpend.metaAccount.change': 'بدلیں',
+  'adSpend.metaAccount.cancel': 'منسوخ',
+  'adSpend.metaAccount.disconnect': 'اشتہاری اکاؤنٹ الگ کریں',
+  'adSpend.metaAccount.disconnectAsk':
+    'اشتہاری اکاؤنٹ {id} الگ کریں؟ ہٹی اس کا ایکسیس ٹوکن بھول جائے گا اور مزید خرچ نہیں لائے گا۔ پہلے سے لایا گیا خرچ رہے گا۔',
   'onlineStore.speed': 'رفتار',
   'speed.intro':
     'پچھلے 28 دنوں میں آپ کا اسٹور آپ کے خریداروں کے لیے کتنا تیز تھا، جیسا ان کے اپنے براؤزرز نے ناپا: گوگل کے کور ویب وائٹلز، جن سے سرچ اسٹورز کی درجہ بندی کرتا ہے۔ ہر ایک وہ وقت ہے جس سے چار میں سے تین صفحات تیز تھے۔',

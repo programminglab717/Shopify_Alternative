@@ -4372,6 +4372,9 @@ export interface ConversationReplyData {
 /** Where a shop's ads ran (ADR-553). */
 export type AdSpendPlatform = 'META' | 'TIKTOK' | 'GOOGLE' | 'OTHER';
 
+/** Where a day's ad spend came from: typed, or pulled from Meta (ADR-564). */
+export type AdSpendSource = 'MANUAL' | 'META';
+
 /** What a shop spent on one platform's ads on a day, or on one campaign of them. */
 export interface AdSpendEntryValue {
   platform: AdSpendPlatform;
@@ -4380,6 +4383,8 @@ export interface AdSpendEntryValue {
   /** As its links' utm_campaign names it; null for the platform's day as a whole. */
   campaign: string | null;
   amount: MoneyValue;
+  /** Typed by the shop, or pulled from its Meta ad account (ADR-564). */
+  source: AdSpendSource;
 }
 
 export interface AdSpendEntriesData {
@@ -4397,4 +4402,35 @@ export interface AdSpendInput {
 
 export interface AdSpendSetData {
   adSpendSet: { count: number | null; userErrors: UserError[] };
+}
+
+/** The shop's Meta ad account (ADR-564): its token never shown, its last four characters alone. */
+export interface MetaAdAccount {
+  /** As Ads Manager shows it, without "act_". */
+  adAccountId: string;
+  name: string;
+  currency: string;
+  timezone: string | null;
+  accessTokenHint: string;
+  /** Null before its spend was first pulled. */
+  lastSyncedAt: string | null;
+  /** Why the last pull failed, as Meta said; null when it went through. */
+  lastError: string | null;
+  updatedAt: string;
+}
+
+export interface MetaAdAccountData {
+  metaAdAccount: MetaAdAccount | null;
+}
+
+export interface MetaAdAccountConnectData {
+  metaAdAccountConnect: { metaAdAccount: MetaAdAccount | null; userErrors: UserError[] };
+}
+
+export interface MetaAdAccountDisconnectData {
+  metaAdAccountDisconnect: { deletedAdAccountId: string | null; userErrors: UserError[] };
+}
+
+export interface MetaAdSpendSyncData {
+  metaAdSpendSync: { metaAdAccount: MetaAdAccount | null; userErrors: UserError[] };
 }

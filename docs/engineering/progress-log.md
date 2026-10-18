@@ -14,6 +14,15 @@ TAX-05), and FBR's digital invoicing Growth's (TAX-04).
 Checkout's own fields are V1's (CHK-14); TCS and Trax wait for their API documents, which come
 with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1's.
 
+## 2026-10-18
+
+### Meta's ad account in the admin
+
+* **The admin's ad spend page connects the shop's Meta ad account, pulls it now, and says which
+  days came from Meta** ([ADR-565](../architecture/13-decision-log.md#adr-565--the-admins-ad-spend-page-connects-the-shops-meta-ad-account-pulls-it-now-and-says-which-days-came-from-meta), MKT-12).
+* 3451 tests, 10 more: connecting, problems, the connected view,
+  pulling, changing, disconnecting, Meta's days and roles, and the GraphQL against the schema.
+
 ## 2026-10-17
 
 ### e76f660 · Meta's ad spend pulled

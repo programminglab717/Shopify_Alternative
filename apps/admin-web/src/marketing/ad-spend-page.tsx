@@ -1,4 +1,4 @@
-import { Banknote, Save, Trash2 } from 'lucide-react';
+import { Banknote, CloudDownload, Save, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { AdSpendEntriesQuery, AdSpendSetMutation } from '../api/operations';
@@ -21,6 +21,7 @@ import { useAdminMutation, useAdminQuery, useShop, useShopTimezone } from '../sh
 import { Button } from '../ui/button';
 import { Alert, Card, EmptyState, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
+import { MetaAdAccountSection } from './meta-ad-account';
 import { BackToMarketing } from './templates-page';
 
 const PLATFORMS: readonly AdSpendPlatform[] = ['META', 'TIKTOK', 'GOOGLE', 'OTHER'];
@@ -116,15 +117,22 @@ function RecordSpend() {
   return (
     <FormSection title={t('adSpend.record')} hint={t('adSpend.recordHint')}>
       <form onSubmit={(event) => void onSubmit(event)} className="flex flex-col gap-4">
-        <SelectField<AdSpendPlatform>
-          label={t('adSpend.platform')}
-          value={platform}
-          options={PLATFORMS.map((each) => ({
-            value: each,
-            label: t(`adSpend.platform.${each}` as MessageKey),
-          }))}
-          onChange={setPlatform}
-        />
+        <div className="flex flex-col gap-1">
+          <SelectField<AdSpendPlatform>
+            label={t('adSpend.platform')}
+            value={platform}
+            options={PLATFORMS.map((each) => ({
+              value: each,
+              label: t(`adSpend.platform.${each}` as MessageKey),
+            }))}
+            onChange={setPlatform}
+          />
+          {platform === 'META' && (
+            <p className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+              {t('adSpend.metaTyped')}
+            </p>
+          )}
+        </div>
         <TextField
           label={t('adSpend.day')}
           type="date"
@@ -204,13 +212,19 @@ function SpendRow({ entry }: { entry: AdSpendEntryValue }) {
             {platform}
             <span className="text-secondary font-normal"> · {day(entry.day)}</span>
           </span>
-          <span
-            className={`break-all text-[length:var(--hatti-type-body-sm-size)] ${
-              entry.campaign ? '' : 'text-secondary'
-            }`}
-            dir={entry.campaign ? 'ltr' : undefined}
-          >
-            {campaign}
+          <span className="flex flex-wrap items-baseline gap-x-2 text-[length:var(--hatti-type-body-sm-size)]">
+            <span
+              className={`break-all ${entry.campaign ? '' : 'text-secondary'}`}
+              dir={entry.campaign ? 'ltr' : undefined}
+            >
+              {campaign}
+            </span>
+            {entry.source === 'META' && (
+              <span className="inline-flex items-center gap-1 text-secondary">
+                <CloudDownload aria-hidden className="size-4" />
+                {t('adSpend.fromMeta')}
+              </span>
+            )}
           </span>
         </span>
         <span className="num font-medium">
@@ -284,9 +298,10 @@ function RecentSpend() {
 }
 
 /**
- * Ad spend (ADR-553, ADR-554): what the shop spent on its ads, day by day, by platform and, where
- * it says, by campaign as its links' utm_campaign names it, recorded and taken away; and the last
- * 30 days of it, with what they came to. The sales report takes it off profit.
+ * Ad spend (ADR-553, ADR-554, ADR-565): what the shop spent on its ads, day by day, by platform
+ * and, where it says, by campaign as its links' utm_campaign names it, pulled from its Meta ad
+ * account, recorded by hand and taken away; and the last 30 days of it, with what they came to and
+ * which Meta's came from. The sales report takes it off profit.
  */
 export function AdSpendPage() {
   const { t } = useLocale();
@@ -303,6 +318,7 @@ export function AdSpendPage() {
       {allowed ? (
         <>
           <p className="text-secondary">{t('adSpend.intro')}</p>
+          <MetaAdAccountSection />
           <RecordSpend />
           <RecentSpend />
         </>

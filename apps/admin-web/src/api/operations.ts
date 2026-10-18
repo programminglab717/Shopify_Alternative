@@ -9244,6 +9244,7 @@ export const AdSpendEntriesQuery = /* GraphQL */ `
       amount {
         ...Money
       }
+      source
     }
   }
   ${MONEY}
@@ -9259,5 +9260,73 @@ export const AdSpendSetMutation = /* GraphQL */ `
       }
     }
   }
+  ${USER_ERRORS}
+`;
+
+const META_AD_ACCOUNT = /* GraphQL */ `
+  fragment MetaAdAccountParts on MetaAdAccount {
+    adAccountId
+    name
+    currency
+    timezone
+    accessTokenHint
+    lastSyncedAt
+    lastError
+    updatedAt
+  }
+`;
+
+/** The shop's Meta ad account, whose spend is pulled every few hours, if it connected one (ADR-564). */
+export const MetaAdAccountQuery = /* GraphQL */ `
+  query MetaAdAccount {
+    metaAdAccount {
+      ...MetaAdAccountParts
+    }
+  }
+  ${META_AD_ACCOUNT}
+`;
+
+/** The shop's Meta ad account connected, in place of any it had, or given another token. */
+export const MetaAdAccountConnectMutation = /* GraphQL */ `
+  mutation MetaAdAccountConnect($input: MetaAdAccountConnectInput!) {
+    metaAdAccountConnect(input: $input) {
+      metaAdAccount {
+        ...MetaAdAccountParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${META_AD_ACCOUNT}
+  ${USER_ERRORS}
+`;
+
+/** The shop's Meta ad account disconnected: its token forgotten, the spend pulled kept. */
+export const MetaAdAccountDisconnectMutation = /* GraphQL */ `
+  mutation MetaAdAccountDisconnect {
+    metaAdAccountDisconnect {
+      deletedAdAccountId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
+`;
+
+/** The shop's spend pulled from its Meta ad account now: at most once a minute. */
+export const MetaAdSpendSyncMutation = /* GraphQL */ `
+  mutation MetaAdSpendSync {
+    metaAdSpendSync {
+      metaAdAccount {
+        ...MetaAdAccountParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${META_AD_ACCOUNT}
   ${USER_ERRORS}
 `;

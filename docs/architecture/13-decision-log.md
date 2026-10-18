@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-564 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-565 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -572,6 +572,7 @@
 | 562 | A sales-tax-registered shop reports its invoices through FBR's digital invoicing instead of the POS integration, by the same worker, its credit notes left to its return | Accepted |
 | 563 | The admin's FBR card connects a shop through FBR's digital invoicing or its POS integration, chosen from the shop's tax profile, and switches between them with a new token | Accepted |
 | 564 | A shop connects its Meta ad account and the worker pulls each day's spend by campaign, what the shop typed by hand kept over what Meta says | Accepted |
+| 565 | The admin's ad spend page connects the shop's Meta ad account, pulls it now, and says which days came from Meta | Accepted |
 
 ---
 
@@ -21114,3 +21115,20 @@
 * **Alternatives:** **Pulling through the conversions API's settings:** their token sends events,
   and reading ad spend needs another permission, often another token. **Meta's figures over the
   shop's:** a shop types a day by hand to correct it, or to add what Meta does not see.
+
+## ADR-565 · The admin's ad spend page connects the shop's Meta ad account, pulls it now, and says which days came from Meta
+
+* **Context:** The worker pulls a shop's Meta ad spend once its ad account is connected
+  (ADR-564), but only through the API.
+* **Decision:**
+  * **A Meta ad account card** on the ad spend page, for those who see the page: its ID and a
+    token that may read its ads, sealed, after the member confirms who they are; a field's
+    problem under the field. Connected, it shows the account, its currency, the token's last
+    four, when it was last pulled, and Meta's last error as a warning, as the worker tries again;
+    it pulls now, changes the token, or disconnects, asked first, keeping what was pulled.
+  * **The list** says which days came from Meta, and the form says that a figure typed over them
+    is the shop's from then on, Meta's whole day typed keeping Meta's campaigns out. English and
+    Urdu.
+* **Consequences:** A shop connects Meta once and its true profit follows Meta's spend.
+* **Alternatives:** **The card in the settings:** it belongs with the spend it fills, where the
+  shop sees what came from Meta.
