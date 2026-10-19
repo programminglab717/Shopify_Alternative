@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-import { ApiError, browserFetch } from './api/client';
+import { ApiError, browserFetch, isCostRefusal } from './api/client';
 import { SessionProvider } from './auth/context';
 import { SessionStore } from './auth/session';
 import { LocaleProvider } from './i18n/locale';
@@ -9,8 +9,12 @@ import { keepShopData, restoreKept, startAsTheBrowserIs } from './offline/kept-d
 import { AppNotices } from './offline/notices';
 import { createAdminRouter } from './router';
 
-/** Whether a failed query is worth trying again: not when the API refused it for a reason. */
+/**
+ * Whether a failed query is worth trying again: not when the API refused it for a reason, nor for
+ * its cost, which the client already waited out and tried again (ADR-577).
+ */
 function retry(failures: number, error: unknown): boolean {
+  if (isCostRefusal(error)) return false;
   if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false;
   if (error instanceof ApiError && error.code === 'BAD_USER_INPUT') return false;
   return failures < 2;

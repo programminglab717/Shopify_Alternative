@@ -1731,6 +1731,11 @@ const en = {
   'offline.notice':
     "You're offline. Hatti shows what it last saw of your shop, and saves your work again once you're back online.",
   'offline.seenAt': 'As Hatti last saw it, {when}.',
+  'busy.retrying': 'Hatti is busy for this shop. Trying again in {count} seconds…',
+  'busy.retrying.one': 'Hatti is busy for this shop. Trying again in 1 second…',
+  'error.THROTTLED': 'Hatti is busy for this shop right now. Try again in a moment.',
+  'error.MAX_COST_EXCEEDED':
+    'This page asks Hatti for too much at once. Try showing fewer items or narrowing the search.',
   'update.ready': 'A new version of Hatti is ready.',
   'update.reload': 'Reload',
   'onlineStore.blogs': 'Blogs',
@@ -6739,6 +6744,10 @@ const ur: Record<MessageKey, string> & Partial<Record<SingularKey, string>> = {
   'offline.notice':
     'آپ آف لائن ہیں۔ ہٹی آپ کی دکان کا وہی حال دکھا رہا ہے جو اس نے آخری بار دیکھا، اور انٹرنیٹ واپس آنے پر آپ کا کام پھر سے محفوظ کرے گا۔',
   'offline.seenAt': 'جیسا ہٹی نے آخری بار دیکھا، {when}۔',
+  'busy.retrying': 'ہٹی اس دکان کے لیے مصروف ہے۔ {count} سیکنڈ میں دوبارہ کوشش ہو گی…',
+  'error.THROTTLED': 'ہٹی اس وقت اس دکان کے لیے مصروف ہے۔ تھوڑی دیر میں دوبارہ کوشش کریں۔',
+  'error.MAX_COST_EXCEEDED':
+    'یہ صفحہ ہٹی سے ایک ساتھ بہت زیادہ مانگ رہا ہے۔ کم چیزیں دکھائیں یا تلاش محدود کریں۔',
   'update.ready': 'ہٹی کا نیا ورژن تیار ہے۔',
   'update.reload': 'نیا ورژن کھولیں',
   'onlineStore.blogs': 'بلاگ',

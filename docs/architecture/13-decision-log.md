@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-576 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-577 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -584,6 +584,7 @@
 | 574 | A shopper buys an order again from their account: what can still be sold goes into their cart at the order's quantities, and the cart says what could not | Accepted |
 | 575 | A signed-in shopper's wishlist is kept with their account and follows them across devices, the browser's list still what pages show, so every page stays cacheable | Accepted |
 | 576 | The Admin API costs each query before it runs and meters it per app or member of staff in each shop, Shopify's leaky bucket, refusing what would overdraw it and saying the cost | Accepted |
+| 577 | The admin waits out a throttled request and sends it again, saying it is busy meanwhile, and gives up after three tries with plain words | Accepted |
 
 ---
 
@@ -21387,3 +21388,20 @@
   counted as one item; buckets by plan are to come.
 * **Alternatives:** **Requests a second:** a page of 250 orders and one product would weigh the
   same. **Closed when Redis fails:** an outage of the cache would stop every shop's admin.
+
+## ADR-577 · The admin waits out a throttled request and sends it again, saying it is busy meanwhile, and gives up after three tries with plain words
+
+* **Context:** The Admin API refuses a query that would overdraw its caller's bucket, saying how
+  much is left and how fast it fills (ADR-576); the admin showed any refusal as an error.
+* **Decision:**
+  * **Throttled:** the admin's client waits the time the bucket needs for the query's cost, at
+    least a second and at most 30, and sends the request again as it was, a mutation with its
+    idempotency key, up to three times; then it says Hatti is busy for the shop, to try again in a
+    moment. The query cache does not retry on top.
+  * **Too costly a query** is never sent again, and says so in plain words.
+  * **While waiting,** the notices every page shows say Hatti is busy and count down the seconds.
+    English and Urdu.
+* **Consequences:** A burst of pages, or a member of staff clicking fast, waits a second instead
+  of failing.
+* **Alternatives:** **Retrying at once:** a throttled request would be refused again until the
+  bucket fills, each refusal one more round trip.

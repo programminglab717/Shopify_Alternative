@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
+### Throttles waited out in the admin
+
+* **The admin waits out a throttled request and sends it again, saying it is busy meanwhile, and
+  gives up after three tries with plain words** ([ADR-577](../architecture/13-decision-log.md#adr-577--the-admin-waits-out-a-throttled-request-and-sends-it-again-saying-it-is-busy-meanwhile-and-gives-up-after-three-tries-with-plain-words), DEV-01).
+* 3589 tests, 8 more: the wait, the retries, giving up, too costly a
+  query, and the notice.
+
 ### 43f1c76 · The Admin API's query cost
 
 * **The Admin API costs each query before it runs and meters it per app or member of staff in
