@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
-### The admin by a member's own permissions
+### ba30f87 · The admin by a member's own permissions
 
 * **The admin shows each member what their own scopes and capabilities let them use, a custom
   role's member no more than it holds** ([ADR-580](../architecture/13-decision-log.md#adr-580--the-admin-shows-each-member-what-their-own-scopes-and-capabilities-let-them-use-a-custom-roles-member-no-more-than-it-holds), ADM-01).
