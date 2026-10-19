@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
-### Roles of a shop's own
+### aa9e299 · Roles of a shop's own
 
 * **A shop makes roles of its own, each narrowed from a preset, and what was checked by a role's
   name is checked by capabilities each preset holds as before** ([ADR-578](../architecture/13-decision-log.md#adr-578--a-shop-makes-roles-of-its-own-each-narrowed-from-a-preset-and-what-was-checked-by-a-roles-name-is-checked-by-capabilities-each-preset-holds-as-before), ADM-01).
