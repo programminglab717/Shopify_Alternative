@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
-### Throttles waited out in the admin
+### fc78e43 · Throttles waited out in the admin
 
 * **The admin waits out a throttled request and sends it again, saying it is busy meanwhile, and
   gives up after three tries with plain words** ([ADR-577](../architecture/13-decision-log.md#adr-577--the-admin-waits-out-a-throttled-request-and-sends-it-again-saying-it-is-busy-meanwhile-and-gives-up-after-three-tries-with-plain-words), DEV-01).
