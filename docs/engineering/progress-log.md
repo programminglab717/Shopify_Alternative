@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
-### Data requests from the account
+### 2bf19ec · Data requests from the account
 
 * **A signed-in shopper downloads their data and asks for its erasure from their account,
   through the requests staff make, the file kept a day and linked for minutes** ([ADR-572](../architecture/13-decision-log.md#adr-572--a-signed-in-shopper-downloads-their-data-and-asks-for-its-erasure-from-their-account-through-the-requests-staff-make-the-file-kept-a-day-and-linked-for-minutes),
