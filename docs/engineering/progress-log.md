@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
-### Who asked, in the admin
+### d038429 · Who asked, in the admin
 
 * **The admin says who asked each waiting erasure, and shows a customer who acted in the activity
   log, linked to their page** ([ADR-573](../architecture/13-decision-log.md#adr-573--the-admin-says-who-asked-each-waiting-erasure-and-shows-a-customer-who-acted-in-the-activity-log-linked-to-their-page), CUS-05).
