@@ -30,6 +30,7 @@ import { Button } from '../ui/button';
 import { Alert, Card, ErrorState, Loading } from '../ui/feedback';
 import { TextField } from '../ui/field';
 import { AccessRequests } from './access-requests';
+import { RoleName, RoleOptions, RolesTab, useCustomRoles } from './custom-roles';
 import { SelectField } from './settings-form';
 import { apiRole, BackToSettings, roleLabel } from './settings-page';
 
@@ -42,6 +43,14 @@ const ROLES: readonly StaffMemberRole[] = [
   'MARKETER',
   'ACCOUNTANT',
 ];
+
+/** Whether a role select's value is a preset; a custom role's is its ID otherwise. */
+const isPreset = (value: string): value is StaffMemberRole =>
+  (ROLES as readonly string[]).includes(value);
+
+/** The role a select's value gives, as the API takes it: a preset, or a custom role by its ID. */
+const roleVariables = (value: string) =>
+  isPreset(value) ? { role: value } : { customRoleId: value };
 
 /** The roles a member gives and takes: the owner any but its own, managers those below them. */
 export function rolesManagedBy(role: StaffMemberRole): StaffMemberRole[] {
@@ -194,7 +203,9 @@ function HandOver({
 /**
  * Staff (ADR-101): who works in the shop and in what role, changed or let go by those who manage
  * it; and invitations, sent as a link to share on WhatsApp or emailed, taken back while open.
- * The core asks the member to confirm who they are first when they signed in a while ago.
+ * The core asks the member to confirm who they are first when they signed in a while ago. Those
+ * who manage staff have the shop's own roles too (ADR-578), on a tab of their own, and give them
+ * as they give presets.
  */
 export function StaffPage() {
   const { t, locale } = useLocale();
@@ -206,7 +217,8 @@ export function StaffPage() {
   const invite = useAdminMutation<
     StaffInvitationCreateData,
     {
-      role: StaffMemberRole;
+      role?: StaffMemberRole;
+      customRoleId?: string;
       note: string | null;
       email: string | null;
       language: 'EN' | 'UR';
@@ -219,7 +231,7 @@ export function StaffPage() {
   >(StaffInvitationRevokeMutation);
   const changeRole = useAdminMutation<
     { staffMemberRoleUpdate: { userErrors: UserError[] } },
-    { id: string; role: StaffMemberRole }
+    { id: string; role?: StaffMemberRole; customRoleId?: string }
   >(StaffMemberRoleUpdateMutation);
   const remove = useAdminMutation<
     { staffMemberRemove: { userErrors: UserError[] } },
@@ -230,7 +242,15 @@ export function StaffPage() {
     { id: string; language: 'EN' | 'UR' }
   >(StaffInvitationResendMutation);
   const managed = rolesManagedBy(apiRole(shop.role));
-  const [role, setRole] = useState<StaffMemberRole>(managed.at(-1) ?? 'PACKER');
+  const customRoles = useCustomRoles(managed.length > 0);
+  // The shop's roles the member may give: those made from a preset they manage.
+  const assignable = (customRoles.data?.customRoles ?? []).filter((each) =>
+    managed.includes(each.basedOn),
+  );
+  const [tab, setTab] = useState<'people' | 'roles'>('people');
+  /** A preset, or a custom role's ID. */
+  const [role, setRole] = useState<string>(managed.at(-1) ?? 'PACKER');
+  const chosenCustom = assignable.find((each) => each.id === role);
   const roleField = useId();
   const [note, setNote] = useState('');
   const [email, setEmail] = useState('');
@@ -247,7 +267,7 @@ export function StaffPage() {
     setInvited(null);
     void run(async () => {
       const { staffInvitationCreate } = await invite.mutateAsync({
-        role,
+        ...roleVariables(role),
         note: note.trim() || null,
         email: email.trim() || null,
         language: locale === 'ur' ? 'UR' : 'EN',
@@ -267,10 +287,13 @@ export function StaffPage() {
     }, onError);
   };
 
-  const onRole = (member: StaffMember, next: StaffMemberRole) => {
+  const onRole = (member: StaffMember, next: string) => {
     setProblem(null);
     void run(async () => {
-      const { staffMemberRoleUpdate } = await changeRole.mutateAsync({ id: member.id, role: next });
+      const { staffMemberRoleUpdate } = await changeRole.mutateAsync({
+        id: member.id,
+        ...roleVariables(next),
+      });
       setProblem(failedWith(staffMemberRoleUpdate.userErrors, t));
     }, onError);
   };
@@ -329,202 +352,234 @@ export function StaffPage() {
       <h1 className="text-[length:var(--hatti-type-display-size)] font-semibold">
         {t('settings.staff')}
       </h1>
-      {panel}
-      {problem && <Alert tone="danger">{problem}</Alert>}
+      {managed.length > 0 && (
+        <div role="tablist" className="flex gap-2">
+          {(['people', 'roles'] as const).map((each) => (
+            <button
+              key={each}
+              type="button"
+              role="tab"
+              aria-selected={tab === each}
+              onClick={() => setTab(each)}
+              className={`min-h-10 rounded-full border px-4 ${
+                tab === each ? 'border-primary bg-primary text-on-primary' : 'border-line'
+              }`}
+            >
+              {t(`staff.tab.${each}`)}
+            </button>
+          ))}
+        </div>
+      )}
+      {tab === 'roles' && managed.length > 0 ? (
+        <RolesTab managed={managed} />
+      ) : (
+        <>
+          {panel}
+          {problem && <Alert tone="danger">{problem}</Alert>}
 
-      <Card>
-        <ul className="divide-y divide-line">
-          {members.map((member) => {
-            const mine = member.id === myId;
-            const changeable = !mine && managed.includes(member.role);
-            return (
-              <li key={member.id} className="flex flex-col gap-2 px-4 py-3">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className="font-medium" dir="auto">
-                    {member.name}
-                    {mine && <span className="text-secondary"> · {t('staff.you')}</span>}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-secondary">{member.email}</span>
-                  {changeable ? (
-                    <select
-                      value={member.role}
-                      aria-label={t('staff.roleOf', { name: member.name })}
-                      disabled={changeRole.isPending}
-                      onChange={(event) => onRole(member, event.target.value as StaffMemberRole)}
-                      className="min-h-12 rounded-control border border-line bg-surface px-3 md:min-h-10"
-                    >
-                      {managed.map((each) => (
-                        <option key={each} value={each}>
-                          {t(roleLabel(each))}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="text-secondary">{t(roleLabel(member.role))}</span>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-                  {t('staff.joined', { date: formatDate(member.joinedAt, timezone, locale) })}
-                  {member.expiresAt && (
-                    <span className="font-medium">
-                      ·{' '}
-                      {t('staff.accessEnds', {
-                        date: formatDate(member.expiresAt, timezone, locale),
-                      })}
-                    </span>
-                  )}
-                  {changeable &&
-                    (removing === member.id ? (
-                      <>
-                        <span>{t('staff.removeSure', { name: member.name })}</span>
-                        <Button
-                          variant="destructive"
-                          busy={remove.isPending}
-                          onClick={() => onRemove(member)}
-                        >
-                          {t('staff.removeYes')}
-                        </Button>
-                        <Button variant="tertiary" onClick={() => setRemoving(null)}>
-                          {t('action.back')}
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        variant="danger"
-                        icon={<Trash2 aria-hidden className="size-5" />}
-                        aria-label={t('staff.remove', { name: member.name })}
-                        onClick={() => setRemoving(member.id)}
-                      />
-                    ))}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </Card>
-
-      {managed.length > 0 && <AccessRequests run={run} />}
-
-      {invitations.length > 0 && (
-        <section aria-labelledby="staff-invitations" className="flex flex-col gap-2">
-          <h2 id="staff-invitations" className="font-semibold">
-            {t('staff.invitations')}
-          </h2>
           <Card>
             <ul className="divide-y divide-line">
-              {invitations.map((invitation) => (
-                <li key={invitation.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="font-medium" dir="auto">
-                      {invitation.note || invitation.email || t(roleLabel(invitation.role))}
-                    </span>
-                    <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-                      {t(roleLabel(invitation.role))} ·{' '}
-                      {invitation.accessDays !== null && (
-                        <>{t('staff.accessFor', { days: invitation.accessDays })} · </>
+              {members.map((member) => {
+                const mine = member.id === myId;
+                const changeable = !mine && managed.includes(member.role);
+                return (
+                  <li key={member.id} className="flex flex-col gap-2 px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="font-medium" dir="auto">
+                        {member.name}
+                        {mine && <span className="text-secondary"> · {t('staff.you')}</span>}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-secondary">{member.email}</span>
+                      {changeable ? (
+                        <select
+                          value={member.customRole?.id ?? member.role}
+                          aria-label={t('staff.roleOf', { name: member.name })}
+                          disabled={changeRole.isPending}
+                          onChange={(event) => onRole(member, event.target.value)}
+                          className="min-h-12 rounded-control border border-line bg-surface px-3 md:min-h-10"
+                        >
+                          <RoleOptions
+                            presets={managed}
+                            custom={
+                              member.customRole &&
+                              !assignable.some((each) => each.id === member.customRole?.id)
+                                ? [...assignable, member.customRole]
+                                : assignable
+                            }
+                          />
+                        </select>
+                      ) : (
+                        <span className="text-secondary">
+                          <RoleName role={member.role} customRole={member.customRole} />
+                        </span>
                       )}
-                      {t('staff.expires', {
-                        when: formatRelative(invitation.expiresAt, timezone, locale),
-                      })}
-                    </span>
-                  </span>
-                  {invitation.email && (
-                    <Button
-                      variant="secondary"
-                      icon={<Send aria-hidden className="size-5" />}
-                      disabled={resend.isPending}
-                      aria-label={t('staff.resendTo', { email: invitation.email })}
-                      onClick={() => onResend(invitation)}
-                    >
-                      {t('staff.resend')}
-                    </Button>
-                  )}
-                  <Button
-                    variant="tertiary"
-                    disabled={revoke.isPending}
-                    onClick={() => onRevoke(invitation)}
-                  >
-                    {t('staff.revoke')}
-                  </Button>
-                </li>
-              ))}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                      {t('staff.joined', { date: formatDate(member.joinedAt, timezone, locale) })}
+                      {member.expiresAt && (
+                        <span className="font-medium">
+                          ·{' '}
+                          {t('staff.accessEnds', {
+                            date: formatDate(member.expiresAt, timezone, locale),
+                          })}
+                        </span>
+                      )}
+                      {changeable &&
+                        (removing === member.id ? (
+                          <>
+                            <span>{t('staff.removeSure', { name: member.name })}</span>
+                            <Button
+                              variant="destructive"
+                              busy={remove.isPending}
+                              onClick={() => onRemove(member)}
+                            >
+                              {t('staff.removeYes')}
+                            </Button>
+                            <Button variant="tertiary" onClick={() => setRemoving(null)}>
+                              {t('action.back')}
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            variant="danger"
+                            icon={<Trash2 aria-hidden className="size-5" />}
+                            aria-label={t('staff.remove', { name: member.name })}
+                            onClick={() => setRemoving(member.id)}
+                          />
+                        ))}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </Card>
-        </section>
-      )}
 
-      {managed.length > 0 && (
-        <Card className="p-4">
-          <form onSubmit={onInvite} className="flex flex-col gap-4">
-            <h2 className="inline-flex items-center gap-2 font-semibold">
-              <UserPlus aria-hidden className="size-5" />
-              {t('staff.invite')}
-            </h2>
-            <div className="flex flex-col gap-1">
-              <label htmlFor={roleField} className="font-medium">
-                {t('staff.role')}
-              </label>
-              <select
-                id={roleField}
-                value={role}
-                onChange={(event) => setRole(event.target.value as StaffMemberRole)}
-                className="min-h-12 rounded-control border border-line bg-surface px-3 md:min-h-10"
-              >
-                {managed.map((each) => (
-                  <option key={each} value={each}>
-                    {t(roleLabel(each))}
-                  </option>
-                ))}
-              </select>
-              <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-                {t(`role.${role}.hint` as Parameters<typeof t>[0])}
-              </span>
-            </div>
-            <TextField
-              label={t('staff.note')}
-              hint={t('staff.noteHint')}
-              maxLength={100}
-              dir="auto"
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
+          {managed.length > 0 && <AccessRequests run={run} />}
+
+          {invitations.length > 0 && (
+            <section aria-labelledby="staff-invitations" className="flex flex-col gap-2">
+              <h2 id="staff-invitations" className="font-semibold">
+                {t('staff.invitations')}
+              </h2>
+              <Card>
+                <ul className="divide-y divide-line">
+                  {invitations.map((invitation) => (
+                    <li key={invitation.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="font-medium" dir="auto">
+                          {invitation.note ||
+                            invitation.email ||
+                            invitation.customRole?.name ||
+                            t(roleLabel(invitation.role))}
+                        </span>
+                        <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                          <RoleName role={invitation.role} customRole={invitation.customRole} /> ·{' '}
+                          {invitation.accessDays !== null && (
+                            <>{t('staff.accessFor', { days: invitation.accessDays })} · </>
+                          )}
+                          {t('staff.expires', {
+                            when: formatRelative(invitation.expiresAt, timezone, locale),
+                          })}
+                        </span>
+                      </span>
+                      {invitation.email && (
+                        <Button
+                          variant="secondary"
+                          icon={<Send aria-hidden className="size-5" />}
+                          disabled={resend.isPending}
+                          aria-label={t('staff.resendTo', { email: invitation.email })}
+                          onClick={() => onResend(invitation)}
+                        >
+                          {t('staff.resend')}
+                        </Button>
+                      )}
+                      <Button
+                        variant="tertiary"
+                        disabled={revoke.isPending}
+                        onClick={() => onRevoke(invitation)}
+                      >
+                        {t('staff.revoke')}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </section>
+          )}
+
+          {managed.length > 0 && (
+            <Card className="p-4">
+              <form onSubmit={onInvite} className="flex flex-col gap-4">
+                <h2 className="inline-flex items-center gap-2 font-semibold">
+                  <UserPlus aria-hidden className="size-5" />
+                  {t('staff.invite')}
+                </h2>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor={roleField} className="font-medium">
+                    {t('staff.role')}
+                  </label>
+                  <select
+                    id={roleField}
+                    value={role}
+                    onChange={(event) => setRole(event.target.value)}
+                    className="min-h-12 rounded-control border border-line bg-surface px-3 md:min-h-10"
+                  >
+                    <RoleOptions presets={managed} custom={assignable} />
+                  </select>
+                  <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                    {isPreset(role)
+                      ? t(`role.${role}.hint` as Parameters<typeof t>[0])
+                      : chosenCustom &&
+                        t('roles.customHint', { role: t(roleLabel(chosenCustom.basedOn)) })}
+                  </span>
+                </div>
+                <TextField
+                  label={t('staff.note')}
+                  hint={t('staff.noteHint')}
+                  maxLength={100}
+                  dir="auto"
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                />
+                <TextField
+                  label={t('staff.email')}
+                  hint={t('staff.emailHint')}
+                  type="email"
+                  ltr
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+                <div className="flex flex-col gap-1">
+                  <SelectField<Access>
+                    label={t('staff.access')}
+                    value={access}
+                    options={ACCESS.map((value) => ({
+                      value,
+                      label:
+                        value === 'forGood'
+                          ? t('staff.accessForGood')
+                          : t('staff.accessFor', { days: Number(value) }),
+                    }))}
+                    onChange={setAccess}
+                  />
+                  <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
+                    {t('staff.accessHint')}
+                  </span>
+                </div>
+                <Button type="submit" busy={invite.isPending} className="self-start">
+                  {t('staff.inviteSubmit')}
+                </Button>
+              </form>
+            </Card>
+          )}
+          {invited && <Invited token={invited.token} emailed={invited.emailed} />}
+          {shop.role === 'owner' && (
+            <HandOver
+              managers={members.filter((member) => member.role === 'MANAGER' && member.id !== myId)}
+              run={run}
             />
-            <TextField
-              label={t('staff.email')}
-              hint={t('staff.emailHint')}
-              type="email"
-              ltr
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-            <div className="flex flex-col gap-1">
-              <SelectField<Access>
-                label={t('staff.access')}
-                value={access}
-                options={ACCESS.map((value) => ({
-                  value,
-                  label:
-                    value === 'forGood'
-                      ? t('staff.accessForGood')
-                      : t('staff.accessFor', { days: Number(value) }),
-                }))}
-                onChange={setAccess}
-              />
-              <span className="text-secondary text-[length:var(--hatti-type-body-sm-size)]">
-                {t('staff.accessHint')}
-              </span>
-            </div>
-            <Button type="submit" busy={invite.isPending} className="self-start">
-              {t('staff.inviteSubmit')}
-            </Button>
-          </form>
-        </Card>
-      )}
-      {invited && <Invited token={invited.token} emailed={invited.emailed} />}
-      {shop.role === 'owner' && (
-        <HandOver
-          managers={members.filter((member) => member.role === 'MANAGER' && member.id !== myId)}
-          run={run}
-        />
+          )}
+        </>
       )}
     </div>
   );

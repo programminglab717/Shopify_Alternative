@@ -926,11 +926,83 @@ export interface CourierAccountPayloadData {
 export type StaffMemberRole =
   'OWNER' | 'MANAGER' | 'CONFIRMATION_AGENT' | 'PACKER' | 'MARKETER' | 'ACCOUNTANT';
 
+/**
+ * What staff may do beyond their scopes (ADR-578): each preset holds some, a custom role some of
+ * its preset's.
+ */
+export type StaffCapability =
+  | 'SEE_CUSTOMER_NUMBERS'
+  | 'REVEAL_CUSTOMER_NUMBERS'
+  | 'EXPORT_ORDERS'
+  | 'MANAGE_EXPORT_SCHEDULES'
+  | 'REFUND_ORDERS'
+  | 'ASSIGN_ORDERS'
+  | 'MODERATE_COMMENTS'
+  | 'SEE_STAFF_PERFORMANCE'
+  | 'RECONCILE_PAYMENTS'
+  | 'CLAIM_FROM_COURIERS'
+  | 'MANAGE_STAFF'
+  | 'MANAGE_APPS'
+  | 'SEE_BILLING'
+  | 'SEE_VERIFICATION'
+  | 'MANAGE_SUPPORT_ACCESS';
+
+/** A shop's own staff role (ADR-578): some of a preset's scopes and capabilities, never more. */
+export interface CustomRole {
+  id: string;
+  name: string;
+  basedOn: StaffMemberRole;
+  /** Such as "write_orders": its preset's, or the read of what the preset writes. */
+  scopes: string[];
+  capabilities: StaffCapability[];
+  staffMemberCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A member's or an invitation's custom role, as the staff list names it. */
+export type CustomRoleRef = Pick<CustomRole, 'id' | 'name' | 'basedOn'>;
+
+/** A role preset, with what it holds: what a custom role made from it holds some of. */
+export interface RolePreset {
+  role: StaffMemberRole;
+  scopes: string[];
+  capabilities: StaffCapability[];
+  customizable: boolean;
+}
+
+export interface CustomRolesData {
+  customRoles: CustomRole[];
+  rolePresets: RolePreset[];
+}
+
+export interface CustomRoleInput {
+  name: string;
+  basedOn: StaffMemberRole;
+  scopes: string[];
+  capabilities: StaffCapability[];
+}
+
+export interface CustomRoleCreateData {
+  customRoleCreate: { customRole: CustomRole | null; userErrors: UserError[] };
+}
+
+export interface CustomRoleUpdateData {
+  customRoleUpdate: { customRole: CustomRole | null; userErrors: UserError[] };
+}
+
+export interface CustomRoleDeleteData {
+  customRoleDelete: { deletedCustomRoleId: string | null; userErrors: UserError[] };
+}
+
 export interface StaffMember {
   id: string;
   name: string;
   email: string | null;
+  /** Their role's preset; for a custom role, the one it was made from. */
   role: StaffMemberRole;
+  /** Their custom role (ADR-578); null for a preset. */
+  customRole: CustomRoleRef | null;
   joinedAt: string;
   /** When a collaborator's access ends; none for staff kept for good (ADR-487). */
   expiresAt: string | null;
@@ -939,6 +1011,8 @@ export interface StaffMember {
 export interface StaffInvitation {
   id: string;
   role: StaffMemberRole;
+  /** The custom role it gives (ADR-578); null for a preset. */
+  customRole: CustomRoleRef | null;
   note: string | null;
   email: string | null;
   invitedBy: string;

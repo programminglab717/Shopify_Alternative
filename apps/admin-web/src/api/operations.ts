@@ -2007,12 +2007,22 @@ export const StaffQuery = /* GraphQL */ `
       name
       email
       role
+      customRole {
+        id
+        name
+        basedOn
+      }
       joinedAt
       expiresAt
     }
     staffInvitations {
       id
       role
+      customRole {
+        id
+        name
+        basedOn
+      }
       note
       email
       invitedBy
@@ -2020,6 +2030,83 @@ export const StaffQuery = /* GraphQL */ `
       accessDays
     }
   }
+`;
+
+const CUSTOM_ROLE = /* GraphQL */ `
+  fragment CustomRoleParts on CustomRole {
+    id
+    name
+    basedOn
+    scopes
+    capabilities
+    staffMemberCount
+    createdAt
+    updatedAt
+  }
+`;
+
+/**
+ * The shop's custom roles (ADR-578), and the presets they are made from with what each holds:
+ * for those who manage staff.
+ */
+export const CustomRolesQuery = /* GraphQL */ `
+  query CustomRoles {
+    customRoles {
+      ...CustomRoleParts
+    }
+    rolePresets {
+      role
+      scopes
+      capabilities
+      customizable
+    }
+  }
+  ${CUSTOM_ROLE}
+`;
+
+/** A custom role made from a preset, with some of its scopes and capabilities. */
+export const CustomRoleCreateMutation = /* GraphQL */ `
+  mutation CustomRoleCreate($input: CustomRoleCreateInput!) {
+    customRoleCreate(input: $input) {
+      customRole {
+        ...CustomRoleParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CUSTOM_ROLE}
+  ${USER_ERRORS}
+`;
+
+/** A custom role's name, scopes or capabilities changed; its preset stays. */
+export const CustomRoleUpdateMutation = /* GraphQL */ `
+  mutation CustomRoleUpdate($id: ID!, $input: CustomRoleUpdateInput!) {
+    customRoleUpdate(id: $id, input: $input) {
+      customRole {
+        ...CustomRoleParts
+      }
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${CUSTOM_ROLE}
+  ${USER_ERRORS}
+`;
+
+/** A custom role nobody holds, nor any invitation waiting, deleted. */
+export const CustomRoleDeleteMutation = /* GraphQL */ `
+  mutation CustomRoleDelete($id: ID!) {
+    customRoleDelete(id: $id) {
+      deletedCustomRoleId
+      userErrors {
+        ...Problems
+      }
+    }
+  }
+  ${USER_ERRORS}
 `;
 
 const METAFIELD_DEFINITION = /* GraphQL */ `
@@ -2171,7 +2258,8 @@ export const StaffAccessRequestDeclineMutation = /* GraphQL */ `
 /** Someone invited to work in the shop by a link, emailed too where an address is given. */
 export const StaffInvitationCreateMutation = /* GraphQL */ `
   mutation StaffInvitationCreate(
-    $role: StaffMemberRole!
+    $role: StaffMemberRole
+    $customRoleId: ID
     $note: String
     $email: String
     $language: EmailLanguage
@@ -2179,6 +2267,7 @@ export const StaffInvitationCreateMutation = /* GraphQL */ `
   ) {
     staffInvitationCreate(
       role: $role
+      customRoleId: $customRoleId
       note: $note
       email: $email
       language: $language
@@ -2245,13 +2334,16 @@ export const StaffInvitationRevokeMutation = /* GraphQL */ `
   ${USER_ERRORS}
 `;
 
-/** A staff member given another role, from their next request. */
+/** A staff member given another role, a preset or a custom role, from their next request. */
 export const StaffMemberRoleUpdateMutation = /* GraphQL */ `
-  mutation StaffMemberRoleUpdate($id: ID!, $role: StaffMemberRole!) {
-    staffMemberRoleUpdate(id: $id, role: $role) {
+  mutation StaffMemberRoleUpdate($id: ID!, $role: StaffMemberRole, $customRoleId: ID) {
+    staffMemberRoleUpdate(id: $id, role: $role, customRoleId: $customRoleId) {
       staffMember {
         id
         role
+        customRole {
+          id
+        }
       }
       userErrors {
         ...Problems

@@ -16,6 +16,13 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
+### The Roles tab
+
+* **The admin's staff page has a Roles tab to make a shop's roles from a preset, and invitations
+  and role changes offer them beside the presets** ([ADR-579](../architecture/13-decision-log.md#adr-579--the-admins-staff-page-has-a-roles-tab-to-make-a-shops-roles-from-a-preset-and-invitations-and-role-changes-offer-them-beside-the-presets), ADM-01).
+* 3609 tests, 12 more: roles listed, made, changed and deleted, given,
+  shown and hidden, and the GraphQL against the schema.
+
 ### aa9e299 · Roles of a shop's own
 
 * **A shop makes roles of its own, each narrowed from a preset, and what was checked by a role's

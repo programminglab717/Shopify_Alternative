@@ -1,6 +1,6 @@
 # 13 · Architecture Decision Log
 
-> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-578 added)
+> **Status:** Living document · **Last updated:** 2026-10-07 (ADR-033 to ADR-579 added)
 > Each decision records its context, the choice, the consequences and the alternatives considered.
 > Status values: **Accepted** (build on it), **Proposed** (needs a spike or business input),
 > **Superseded** (kept for history). Add new decisions at the end. Never rewrite history; supersede
@@ -586,6 +586,7 @@
 | 576 | The Admin API costs each query before it runs and meters it per app or member of staff in each shop, Shopify's leaky bucket, refusing what would overdraw it and saying the cost | Accepted |
 | 577 | The admin waits out a throttled request and sends it again, saying it is busy meanwhile, and gives up after three tries with plain words | Accepted |
 | 578 | A shop makes roles of its own, each narrowed from a preset, and what was checked by a role's name is checked by capabilities each preset holds as before | Accepted |
+| 579 | The admin's staff page has a Roles tab to make a shop's roles from a preset, and invitations and role changes offer them beside the presets | Accepted |
 
 ---
 
@@ -21432,3 +21433,22 @@
   exactly that.
 * **Alternatives:** **Roles of any scopes:** a role could grant what no preset does, beyond the
   owner's say. **Roles by name in every check:** each new role would mean changing each module.
+
+## ADR-579 · The admin's staff page has a Roles tab to make a shop's roles from a preset, and invitations and role changes offer them beside the presets
+
+* **Context:** A shop may make roles of its own, narrowed from a preset (ADR-578), but only
+  through the API.
+* **Decision:**
+  * **A Roles tab** beside People, for those who manage staff: the shop's roles with their preset
+    and how many members hold each, changed or deleted, the deletion asked first and refused with
+    the core's count when the role is in use.
+  * **The editor:** a name, the preset it is based on (fixed once made), and what the preset holds,
+    all ticked at first: its permissions in plain words, grouped as customers' numbers, orders,
+    money, and team and shop, and its areas, each to view or edit, the view of what it edits
+    allowed alone. It says a role can only narrow its preset; saving asks who they are.
+  * **Assigning:** inviting and changing a member's role offer the presets and the shop's roles,
+    and members and invitations show their role's name, and quietly its preset. English and Urdu.
+* **Consequences:** A shop makes and gives its own roles without the API. The admin's own pages are
+  still shown by a member's preset, the core refusing what their role does not allow.
+* **Alternatives:** **One list of every scope:** grouped by area, view and edit read as a shop
+  thinks of its work.

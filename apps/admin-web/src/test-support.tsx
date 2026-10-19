@@ -125,7 +125,7 @@ export function fakeCore(
     // A list's saved searches, asked by every orders and products page, and the product types
     // and vendors a product's form suggests: none unless answered. AI drafts of Urdu, which the
     // Urdu pages ask after, and of products' copy, which their forms ask after: not set up unless
-    // answered.
+    // answered. The shop's custom roles, which the staff page asks after: none unless answered.
     const data = /SavedSearches$/.test(operation)
       ? orElse(() => answer(operation, variables), { savedSearches: { nodes: [] } })
       : operation === 'ProductSuggestions'
@@ -147,12 +147,14 @@ export function fakeCore(
                 })
               : operation === 'StaffAccessRequests'
                 ? orElse(() => answer(operation, variables), { staffAccessRequests: [] })
-                : operation === 'ProductMetafields'
-                  ? orElse(() => answer(operation, variables), {
-                      metafieldDefinitions: [],
-                      product: { id: variables.id, metafields: [] },
-                    })
-                  : answer(operation, variables);
+                : operation === 'CustomRoles'
+                  ? orElse(() => answer(operation, variables), { customRoles: [], rolePresets: [] })
+                  : operation === 'ProductMetafields'
+                    ? orElse(() => answer(operation, variables), {
+                        metafieldDefinitions: [],
+                        product: { id: variables.id, metafields: [] },
+                      })
+                    : answer(operation, variables);
     if (data instanceof GraphQLErrors) return json({ data: null, errors: data.errors });
     return json({ data });
   });

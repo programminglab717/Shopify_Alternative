@@ -104,11 +104,13 @@ export function SelectField<T extends string>({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: T;
   options: readonly { value: T; label: string }[];
   onChange: (value: T) => void;
+  disabled?: boolean;
 }) {
   const id = useId();
   return (
@@ -119,8 +121,9 @@ export function SelectField<T extends string>({
       <select
         id={id}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value as T)}
-        className="min-h-12 rounded-control border border-line bg-surface px-3 md:min-h-10"
+        className="min-h-12 rounded-control border border-line bg-surface px-3 disabled:opacity-60 md:min-h-10"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
