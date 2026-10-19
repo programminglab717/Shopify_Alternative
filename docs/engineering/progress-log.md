@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
-### The storefront's account
+### 6d092df · The storefront's account
 
 * **The storefront signs shoppers in with a code and shows their account, the pages never cached
   and every other page as it was, Hatti Base's customer templates in both languages** ([ADR-571](../architecture/13-decision-log.md#adr-571--the-storefront-signs-shoppers-in-with-a-code-and-shows-their-account-the-pages-never-cached-and-every-other-page-as-it-was-hatti-bases-customer-templates-in-both-languages),
