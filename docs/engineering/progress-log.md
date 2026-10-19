@@ -16,7 +16,7 @@ with merchants' accounts; and TikTok's and Google's conversions (MKT-10) are V1'
 
 ## 2026-10-19
 
-### The sign-in code named in the admin
+### ec56bd4 · The sign-in code named in the admin
 
 * **Fix:** the admin's list of messages sent showed the code to sign in on the storefront
   (ADR-570) by its own name, `account code`; it is now "Sign-in code", in Urdu too, among the
